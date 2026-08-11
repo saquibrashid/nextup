@@ -24,6 +24,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- **`docs/backlog.md` TASK-017 and TASK-047 led with superseded PostgreSQL
+  instructions.** Both are on the critical path and both named the retained,
+  superseded chapters (`data-model.md` §15.3 / §15.6), `postgres:16-alpine`,
+  `pg_trgm` GIN and `EXPLAIN` in their *primary* text, correcting to Azure SQL
+  only in an appended `↳ R4` clause. A literal top-to-bottom implementer would
+  have built the wrong DDL, the wrong indexes and the wrong test container.
+  The current (R4/R7) design is now the primary instruction and the PostgreSQL
+  text is demoted to a struck-through history line — the same in-place
+  treatment already applied to TASK-006 and TASK-141 (review finding `F-006`).
 - **CI could never pass its SQL Server wait step.** `.github/workflows/ci.yml`
   and `specs/testing.md` §3.3a both invoked `/opt/mssql-tools18/bin/sqlcmd`
   as a runner command, but that binary exists only *inside* the mssql service
