@@ -1,0 +1,29 @@
+{
+  "name": "nextup",
+  "private": true,
+  "version": "0.0.0",
+  "description": "One deduplicated, owner-reviewed watchlist across streaming services, fed by screenshot upload.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20 <21"
+  },
+  "workspaces": [
+    "packages/domain",
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace apps/web",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --build",
+    "test:unit": "vitest run --project unit",
+    "test:int": "vitest run --project integration",
+    "test:web": "vitest run --project web",
+    "test:e2e": "playwright test",
+    "test": "npm run test:unit && npm run test:int && npm run test:web"
+  }
+}

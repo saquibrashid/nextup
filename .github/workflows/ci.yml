@@ -1,0 +1,82 @@
+# CI — install → lint → typecheck → test → build.
+#
+# BASELINE scaffold. TASK-003 expands this into the 12 blocking jobs specified
+# in specs/testing.md §8. The mssql service container below follows
+# specs/testing.md §3.3a EXACTLY — do not change the sqlcmd path, the -C flag,
+# or the health-wait without reading that section. This workflow does NOT
+# publish or deploy anything (deployment is TASK-007's deploy.yml).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_SA_PASSWORD: "Str0ng!Passw0rd_ci"   # CI-only, non-secret, ephemeral
+          MSSQL_PID: "Developer"                      # free edition for CI
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$MSSQL_SA_PASSWORD\" -Q \"SELECT 1\" -b -o /dev/null"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+          --health-start-period 30s
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # NOTE: this scaffold does NOT run the install for you. On a real runner
+      # `npm ci` runs here once package-lock.json exists.
+      - name: Install
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # An explicit wait backstops the service health check before migrations —
+      # the mssql container is not ready the instant the port opens (§3.3a).
+      - name: Wait for SQL Server
+        env:
+          MSSQL_SA_PASSWORD: "Str0ng!Passw0rd_ci"
+        run: |
+          for i in $(seq 1 30); do
+            /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b && exit 0
+            sleep 2
+          done
+          echo "SQL Server did not become ready" && exit 1
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Integration tests
+        run: npm run test:int
+
+      - name: Web component tests
+        run: npm run test:web
+
+      - name: Build
+        run: npm run build

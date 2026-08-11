@@ -1,0 +1,20 @@
+# Normalise line endings to LF on checkin.
+* text=auto eol=lf
+
+# Explicitly text
+*.ts    text
+*.tsx   text
+*.js    text
+*.json  text
+*.md    text
+*.yml   text
+*.yaml  text
+*.bicep text
+
+# Binary — never touch
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.webp  binary
+*.ico   binary
+*.pdf   binary

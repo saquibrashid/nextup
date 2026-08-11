@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Backlog (what to build, in order)
+    url: https://github.com/nextup/nextup/blob/main/docs/backlog.md
+    about: Work is driven by the backlog. Check it before opening an issue.
+  - name: Specs
+    url: https://github.com/nextup/nextup/blob/main/specs/specs.md
+    about: Implementation detail and the AC → named-test mapping.

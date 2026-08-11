@@ -1,0 +1,8 @@
+dist/
+build/
+coverage/
+node_modules/
+*.min.*
+docs/
+specs/
+CHANGELOG.md
