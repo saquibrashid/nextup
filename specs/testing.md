@@ -354,19 +354,56 @@ services:
   `/opt/mssql-tools/bin/sqlcmd` path and the un-`-C` invocation are the two
   most common reasons a copied-from-the-web health check silently never
   passes.
+- ⚠ **That path exists ONLY INSIDE the mssql container, never on the runner.**
+  The `--health-cmd` above is fine because Docker executes it *in* the
+  container. A **job step**, however, runs on the **runner**, where Microsoft
+  client tools are **not installed** — they were **removed from the
+  `ubuntu-24.04` image** (i.e. from current `ubuntu-latest`). A wait step that
+  calls `/opt/mssql-tools18/bin/sqlcmd` directly therefore fails immediately
+  with *"No such file or directory"*, on every run. **This is the same
+  class of defect as the `-C`/`mssql-tools` traps above — it just bites one
+  layer out.**
 - **An explicit wait step** backstops the service health check before
   migrations, because `services.*.options.--health-*` gates job start but a
-  belt-and-braces wait catches the resume race:
+  belt-and-braces wait catches the resume race. It reaches `sqlcmd` through
+  **`docker exec` into the service container**, which needs nothing installed
+  on the runner:
 
   ```yaml
   - name: Wait for SQL Server
+    env:
+      MSSQL_SA_PASSWORD: "Str0ng!Passw0rd_ci"
     run: |
+      cid=$(docker ps --filter "ancestor=mcr.microsoft.com/mssql/server:2022-latest" --format '{{.ID}}' | head -n1)
+      if [ -z "$cid" ]; then
+        echo "mssql service container not found" && exit 1
+      fi
       for i in $(seq 1 30); do
-        /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b && exit 0
+        if docker exec "$cid" /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b -o /dev/null; then
+          echo "SQL Server is ready" && exit 0
+        fi
         sleep 2
       done
       echo "SQL Server did not become ready" && exit 1
   ```
+
+  *(The alternative — `apt-get install mssql-tools18` on the runner — also
+  works but adds an install to every CI run and a network dependency that
+  `NFR-003` would rather not have. `docker exec` is preferred.)*
+
+  > ~~**Superseded (R4 original) — DO NOT COPY, it cannot work:**~~
+  > ```yaml
+  > - name: Wait for SQL Server
+  >   run: |
+  >     for i in $(seq 1 30); do
+  >       /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b && exit 0
+  >       sleep 2
+  >     done
+  >     echo "SQL Server did not become ready" && exit 1
+  > ```
+  > ~~This ran `sqlcmd` on the **runner**, where the binary does not exist on
+  > `ubuntu-24.04`. It also omitted `MSSQL_SA_PASSWORD` from the step `env:`,
+  > so the variable expanded empty.~~
 - **Test databases are created per run** (`CREATE DATABASE nextup_test`)
   against the `sa` login; `prisma migrate deploy` then runs the
   `sqlserver` migrations. Connection string mirrors `data-model.md` §16.1.1
@@ -374,6 +411,11 @@ services:
 - **`T-INFRA-006` (new, R4):** the CI workflow contains the mssql service
   with `ACCEPT_EULA`, the `-C` health command, and the wait step — so an
   edit that drops the wait (reintroducing flakiness) is a reviewable diff.
+  **It additionally asserts the wait step does NOT invoke
+  `/opt/mssql-tools18/bin/sqlcmd` as a bare runner command** (it must go
+  through `docker exec`, or install the tools first). Presence alone is not
+  enough: the original R4 wait step was *present* and *unrunnable*, so a
+  presence-only assertion went green while CI went red.
 - **Alternative considered and rejected:** Azure SQL Edge
   (`mcr.microsoft.com/azure-sql-edge`) is lighter but is **deprecated/
   retiring** and lacks some T-SQL surface (e.g. certain `ISJSON`/collation
@@ -1247,7 +1289,7 @@ and that ids are unique.
 
 | Test | Asserts |
 |---|---|
-| **`T-INFRA-006` (new, R4)** | The CI workflow provisions the **`mcr.microsoft.com/mssql/server:2022-latest`** service container with `ACCEPT_EULA=Y`, the `sqlcmd -C` health command, and the explicit wait step (§3.3a). Dropping the wait — reintroducing the flaky-gate failure `NFR-003` forbids — is then a reviewable diff. |
+| **`T-INFRA-006` (new, R4)** | The CI workflow provisions the **`mcr.microsoft.com/mssql/server:2022-latest`** service container with `ACCEPT_EULA=Y`, the `sqlcmd -C` health command, and the explicit wait step (§3.3a). Dropping the wait — reintroducing the flaky-gate failure `NFR-003` forbids — is then a reviewable diff. **Also asserts the wait step reaches `sqlcmd` via `docker exec` (or an explicit tools install) rather than calling `/opt/mssql-tools18/bin/sqlcmd` directly on the runner, where it does not exist on `ubuntu-24.04`.** |
 | **`T-MIG-002` (new, R4)** | The `M0` smoke migration is proven: a fresh Azure SQL Basic (or the mssql container) accepts `prisma migrate deploy` end-to-end and a `SELECT 1` round-trips. This is the concrete `RSK-031` mitigation — it fails **before** any feature work if `Prisma sqlserver` cannot migrate the schema or authenticate (`TASK-141`). |
 
 ### 11-R4.3 Deleted / superseded

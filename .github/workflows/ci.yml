@@ -59,12 +59,24 @@ jobs:
 
       # An explicit wait backstops the service health check before migrations —
       # the mssql container is not ready the instant the port opens (§3.3a).
+      #
+      # sqlcmd is run INSIDE the service container via `docker exec`, because
+      # /opt/mssql-tools18/bin/sqlcmd exists only in the mssql image. Microsoft
+      # client tools are NOT installed on ubuntu-24.04 runners (removed in the
+      # 24.04 image), so invoking that path directly on the runner fails with
+      # "No such file or directory". See specs/testing.md §3.3a.
       - name: Wait for SQL Server
         env:
           MSSQL_SA_PASSWORD: "Str0ng!Passw0rd_ci"
         run: |
+          cid=$(docker ps --filter "ancestor=mcr.microsoft.com/mssql/server:2022-latest" --format '{{.ID}}' | head -n1)
+          if [ -z "$cid" ]; then
+            echo "mssql service container not found" && exit 1
+          fi
           for i in $(seq 1 30); do
-            /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b && exit 0
+            if docker exec "$cid" /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b -o /dev/null; then
+              echo "SQL Server is ready" && exit 0
+            fi
             sleep 2
           done
           echo "SQL Server did not become ready" && exit 1

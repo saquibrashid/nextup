@@ -14,3 +14,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   documentation and specs under `docs/` and `specs/`. No application logic yet —
   implementation is driven by [docs/backlog.md](docs/backlog.md), starting at
   `TASK-001`.
+- Root `devDependencies` (`typescript`, `eslint`, `@typescript-eslint/*`,
+  `eslint-config-prettier`, `prettier`, `vitest`, `@types/node`) and web
+  `@types/react` / `@types/react-dom`, plus `package-lock.json`. The scripts and
+  config files already referenced these tools but never declared them, so
+  `npm run lint`, `typecheck`, `test:*` and `build` all failed on a clean clone.
+  `TASK-001`'s exit criterion — `npm ci && npm run lint && npm run build` on a
+  clean clone — now passes.
+
+### Fixed
+
+- **CI could never pass its SQL Server wait step.** `.github/workflows/ci.yml`
+  and `specs/testing.md` §3.3a both invoked `/opt/mssql-tools18/bin/sqlcmd`
+  as a runner command, but that binary exists only *inside* the mssql service
+  container — Microsoft client tools were removed from the `ubuntu-24.04`
+  runner image. The step now reaches `sqlcmd` via `docker exec` into the
+  service container, and the spec is corrected in place with the unrunnable
+  original retained struck-through. `T-INFRA-006` is widened to assert the
+  step is *runnable*, not merely *present* — the original was present and
+  unrunnable, so a presence-only assertion would go green while CI went red.
+
+### Notes
+
+- `test:unit` / `test:int` / `test:web` currently carry `--passWithNoTests` as
+  a deliberate stopgap: no test files or per-workspace `vitest.config.ts` exist
+  yet. `TASK-002` owns the test harness and should remove these flags as soon
+  as the first real tests land, so the suite cannot pass vacuously.
