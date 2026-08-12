@@ -42,7 +42,7 @@
     "@types/node": "^20.14.10",
     "@typescript-eslint/eslint-plugin": "^8.66.0",
     "@typescript-eslint/parser": "^8.66.0",
-    "@vitest/coverage-v8": "^3.2.7",
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-nextup": "*",
@@ -50,6 +50,6 @@
     "prettier": "^3.3.3",
     "typescript": "^5.5.4",
     "vite": "^7.3.5",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.10"
   }
 }
