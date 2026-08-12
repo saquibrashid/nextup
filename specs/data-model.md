@@ -1781,6 +1781,21 @@ which is what the identity invariants rely on. SQL Server databases are
 
 ### 16.3 Tables (T-SQL DDL — normative; supersedes §15.3)
 
+> ⚠ **Enum-value correction (applied in place).** Three `CHECK` lists below
+> were stale and have been corrected against the authoritative unions in §3 of
+> this document and `packages/domain/src/enums.ts`. Each would have compiled
+> and deployed cleanly, then rejected legitimate writes at **runtime**:
+>
+> | Column | Was | Now | Why the old value was wrong |
+> |---|---|---|---|
+> | `service` (×3) | `'netflix','prime'` | `'netflix','max'` | The spine services are Netflix and **Max** (`REQ-002`, `REQ-053`). `BRD.md` names Prime Video as one of the seven **non-spine** services that are out of scope. The old list rejected every Max listing. |
+> | `mode` | `'append_only','full_update'` | `'append-only','full-update'` | Hyphenated everywhere else in the corpus (127 uses vs 7) and in `BATCH_MODES`. §16.2 requires values "byte-identical to the §15.3 unions". |
+> | `status` | 6 values, incl. `'review'`, `'failed'` | 8 values | §3 (ll. 313–319) and the state machine (l. 943) both define **eight**. `'submitted'`, `'extraction-failed'`, `'in-review'` and `'discarded'` are all reachable and were unrepresentable. |
+> | `status` width | `NVARCHAR(16)` | `NVARCHAR(24)` | A consequence of the row above: `'extraction-failed'` is **17 characters** and would not fit. Every other enum column was re-audited against its longest permitted value and is correctly sized. |
+>
+> §15.3 retains the original `'prime'`/`'append_only'` text: it is superseded
+> and kept only as historical record. Do not build from it.
+
 The Prisma schema (`provider = "sqlserver"`) is generated to match. Enums
 are modelled as checked `NVARCHAR`; the CHECK/filtered-index DDL that
 Prisma cannot express lives in **raw migration SQL** (§16.8).
@@ -1822,7 +1837,7 @@ CREATE TABLE service_listing (
   owner_id            NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
   title_id            NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL
                         REFERENCES title(id) ON DELETE CASCADE,
-  service             NVARCHAR(16)  NOT NULL CONSTRAINT ck_listing_service CHECK (service IN ('netflix','prime')),
+  service             NVARCHAR(16)  NOT NULL CONSTRAINT ck_listing_service CHECK (service IN ('netflix','max')),
   state               NVARCHAR(16)  NOT NULL CONSTRAINT ck_listing_state   CHECK (state IN ('active','removed')),
   date_added          DATE          NOT NULL,   -- WRITE-ONCE, REQ-030
   date_added_edited   BIT           NOT NULL CONSTRAINT df_listing_edited DEFAULT 0,
@@ -1848,10 +1863,10 @@ CREATE TABLE suppression (
 CREATE TABLE upload_batch (
   id                  NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
   owner_id            NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
-  mode                NVARCHAR(16)  NOT NULL CONSTRAINT ck_batch_mode   CHECK (mode IN ('append_only','full_update')),
-  service             NVARCHAR(16)  NOT NULL CONSTRAINT ck_batch_service CHECK (service IN ('netflix','prime')),
-  status              NVARCHAR(16)  NOT NULL CONSTRAINT ck_batch_status
-                        CHECK (status IN ('draft','extracting','review','applied','undone','failed')),
+  mode                NVARCHAR(16)  NOT NULL CONSTRAINT ck_batch_mode   CHECK (mode IN ('append-only','full-update')),
+  service             NVARCHAR(16)  NOT NULL CONSTRAINT ck_batch_service CHECK (service IN ('netflix','max')),
+  status              NVARCHAR(24)  NOT NULL CONSTRAINT ck_batch_status
+                        CHECK (status IN ('draft','submitted','extracting','extraction-failed','in-review','applied','undone','discarded')),
   submitted_at        DATETIME2(3),
   completed_at        DATETIME2(3),
   extraction_stats    NVARCHAR(MAX) CONSTRAINT ck_batch_stats_json CHECK (extraction_stats IS NULL OR ISJSON(extraction_stats) = 1),
@@ -1913,7 +1928,7 @@ CREATE TABLE extraction_candidate (
 
 CREATE TABLE service_state (
   owner_id                 NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
-  service                  NVARCHAR(16) NOT NULL CONSTRAINT ck_state_service CHECK (service IN ('netflix','prime')),
+  service                  NVARCHAR(16) NOT NULL CONSTRAINT ck_state_service CHECK (service IN ('netflix','max')),
   last_completed_batch_at  DATETIME2(3),
   CONSTRAINT pk_service_state PRIMARY KEY (owner_id, service)
 );
