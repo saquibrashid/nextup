@@ -1,0 +1,855 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "nextup infrastructure composition root (Variant A)."
+  },
+  "parameters": {
+    "environmentName": {
+      "type": "string",
+      "allowedValues": [
+        "prod",
+        "staging"
+      ],
+      "metadata": {
+        "description": "Deployment environment: prod or staging."
+      }
+    },
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for all resources."
+      }
+    },
+    "containerImage": {
+      "type": "string",
+      "metadata": {
+        "description": "Fully-qualified container image in ghcr.io."
+      }
+    },
+    "ghcrUsername": {
+      "type": "string",
+      "metadata": {
+        "description": "GitHub username that owns the ghcr.io fine-grained PAT."
+      }
+    },
+    "ghcrToken": {
+      "type": "securestring",
+      "metadata": {
+        "description": "ghcr.io fine-grained PAT with read:packages."
+      }
+    },
+    "sqlAdminLogin": {
+      "type": "string",
+      "metadata": {
+        "description": "SQL administrator login for the documented fallback auth path."
+      }
+    },
+    "sqlAdminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "SQL administrator password. Supplied at deploy time."
+      }
+    },
+    "entraAdminObjectId": {
+      "type": "string",
+      "metadata": {
+        "description": "Entra ID object id of the SQL Entra administrator."
+      }
+    },
+    "entraAdminLogin": {
+      "type": "string",
+      "metadata": {
+        "description": "Entra ID UPN of the SQL Entra administrator."
+      }
+    }
+  },
+  "variables": {
+    "suffix": "[uniqueString(resourceGroup().id)]",
+    "storageAccountName": "[format('stnextup{0}', variables('suffix'))]",
+    "sqlServerName": "[format('sql-nextup-{0}', variables('suffix'))]",
+    "managedEnvironmentName": "cae-nextup",
+    "logAnalyticsName": "log-nextup",
+    "containerAppName": "[format('ca-nextup-{0}', parameters('environmentName'))]",
+    "blobContainerName": "[if(equals(parameters('environmentName'), 'prod'), 'screenshots', 'screenshots-staging')]",
+    "storageBlobDataContributorRoleId": "ba92f5b4-2d11-453d-a403-e96b0029c9fe"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2023-09-01",
+      "name": "[variables('logAnalyticsName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "sku": {
+          "name": "PerGB2018"
+        },
+        "retentionInDays": 30
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "storage",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "environmentName": {
+            "value": "[parameters('environmentName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "storageAccountName": {
+            "value": "[variables('storageAccountName')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "description": "Private screenshot blob storage with a 30-day lifecycle purge."
+          },
+          "parameters": {
+            "environmentName": {
+              "type": "string",
+              "allowedValues": [
+                "prod",
+                "staging"
+              ],
+              "metadata": {
+                "description": "Deployment environment: prod or staging."
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for all resources."
+              }
+            },
+            "storageAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Globally-unique storage account name (computed by main.bicep)."
+              }
+            },
+            "imageRetentionDays": {
+              "type": "int",
+              "defaultValue": 30,
+              "metadata": {
+                "description": "Screenshot retention in days (NFR-019). Do NOT reuse for TMDB metadata age."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Storage/storageAccounts",
+              "apiVersion": "2023-05-01",
+              "name": "[parameters('storageAccountName')]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "Standard_LRS"
+              },
+              "kind": "StorageV2",
+              "properties": {
+                "accessTier": "Hot",
+                "allowBlobPublicAccess": false,
+                "allowSharedKeyAccess": false,
+                "minimumTlsVersion": "TLS1_2",
+                "supportsHttpsTrafficOnly": true,
+                "publicNetworkAccess": "Enabled",
+                "networkAcls": {
+                  "bypass": "AzureServices",
+                  "defaultAction": "Allow"
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/blobServices",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}/{1}', parameters('storageAccountName'), 'default')]",
+              "properties": {
+                "deleteRetentionPolicy": {
+                  "enabled": false
+                },
+                "containerDeleteRetentionPolicy": {
+                  "enabled": false
+                },
+                "isVersioningEnabled": false,
+                "changeFeed": {
+                  "enabled": false
+                },
+                "restorePolicy": {
+                  "enabled": false
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}/{1}/{2}', parameters('storageAccountName'), 'default', 'screenshots')]",
+              "properties": {
+                "publicAccess": "None"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccountName'), 'default')]"
+              ]
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}/{1}/{2}', parameters('storageAccountName'), 'default', 'screenshots-staging')]",
+              "properties": {
+                "publicAccess": "None"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccountName'), 'default')]"
+              ]
+            },
+            {
+              "type": "Microsoft.Storage/storageAccounts/managementPolicies",
+              "apiVersion": "2023-05-01",
+              "name": "[format('{0}/{1}', parameters('storageAccountName'), 'default')]",
+              "properties": {
+                "policy": {
+                  "rules": [
+                    {
+                      "name": "purge-screenshots-30d",
+                      "enabled": true,
+                      "type": "Lifecycle",
+                      "definition": {
+                        "filters": {
+                          "blobTypes": [
+                            "blockBlob"
+                          ],
+                          "prefixMatch": [
+                            "screenshots/",
+                            "screenshots-staging/"
+                          ]
+                        },
+                        "actions": {
+                          "baseBlob": {
+                            "delete": {
+                              "daysAfterModificationGreaterThan": "[parameters('imageRetentionDays')]"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "accountName": {
+              "type": "string",
+              "metadata": {
+                "description": "The storage account name."
+              },
+              "value": "[parameters('storageAccountName')]"
+            },
+            "containerName": {
+              "type": "string",
+              "metadata": {
+                "description": "The blob container this environment writes to."
+              },
+              "value": "[if(equals(parameters('environmentName'), 'prod'), 'screenshots', 'screenshots-staging')]"
+            },
+            "blobEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "The blob service endpoint."
+              },
+              "value": "[reference(resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName')), '2023-05-01').primaryEndpoints.blob]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "sqldb",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "environmentName": {
+            "value": "[parameters('environmentName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "sqlServerName": {
+            "value": "[variables('sqlServerName')]"
+          },
+          "sqlAdminLogin": {
+            "value": "[parameters('sqlAdminLogin')]"
+          },
+          "sqlAdminPassword": {
+            "value": "[parameters('sqlAdminPassword')]"
+          },
+          "entraAdminObjectId": {
+            "value": "[parameters('entraAdminObjectId')]"
+          },
+          "entraAdminLogin": {
+            "value": "[parameters('entraAdminLogin')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "description": "Azure SQL logical server with a Basic prod database and a serverless staging database."
+          },
+          "parameters": {
+            "environmentName": {
+              "type": "string",
+              "allowedValues": [
+                "prod",
+                "staging"
+              ],
+              "metadata": {
+                "description": "Deployment environment: prod or staging."
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for all resources."
+              }
+            },
+            "sqlServerName": {
+              "type": "string",
+              "metadata": {
+                "description": "Globally-unique Azure SQL logical server name (computed by main.bicep)."
+              }
+            },
+            "sqlAdminLogin": {
+              "type": "string",
+              "metadata": {
+                "description": "SQL administrator login for the documented fallback auth path (TASK-141)."
+              }
+            },
+            "sqlAdminPassword": {
+              "type": "securestring",
+              "metadata": {
+                "description": "SQL administrator password. Supplied at deploy time; never stored in the repo."
+              }
+            },
+            "entraAdminObjectId": {
+              "type": "string",
+              "metadata": {
+                "description": "Entra ID object id of the SQL Entra administrator."
+              }
+            },
+            "entraAdminLogin": {
+              "type": "string",
+              "metadata": {
+                "description": "Entra ID display name / UPN of the SQL Entra administrator."
+              }
+            },
+            "tenantId": {
+              "type": "string",
+              "defaultValue": "[subscription().tenantId]",
+              "metadata": {
+                "description": "Entra tenant id."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Sql/servers",
+              "apiVersion": "2023-08-01-preview",
+              "name": "[parameters('sqlServerName')]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "administratorLogin": "[parameters('sqlAdminLogin')]",
+                "administratorLoginPassword": "[parameters('sqlAdminPassword')]",
+                "version": "12.0",
+                "minimalTlsVersion": "1.2",
+                "publicNetworkAccess": "Enabled",
+                "administrators": {
+                  "administratorType": "ActiveDirectory",
+                  "principalType": "User",
+                  "login": "[parameters('entraAdminLogin')]",
+                  "sid": "[parameters('entraAdminObjectId')]",
+                  "tenantId": "[parameters('tenantId')]",
+                  "azureADOnlyAuthentication": false
+                }
+              }
+            },
+            {
+              "type": "Microsoft.Sql/servers/firewallRules",
+              "apiVersion": "2023-08-01-preview",
+              "name": "[format('{0}/{1}', parameters('sqlServerName'), 'AllowAllWindowsAzureIps')]",
+              "properties": {
+                "startIpAddress": "0.0.0.0",
+                "endIpAddress": "0.0.0.0"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', parameters('sqlServerName'))]"
+              ]
+            },
+            {
+              "condition": "[equals(parameters('environmentName'), 'prod')]",
+              "type": "Microsoft.Sql/servers/databases",
+              "apiVersion": "2023-08-01-preview",
+              "name": "[format('{0}/{1}', parameters('sqlServerName'), 'nextup')]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "Basic",
+                "tier": "Basic",
+                "capacity": 5
+              },
+              "properties": {
+                "maxSizeBytes": 2147483648,
+                "zoneRedundant": false,
+                "requestedBackupStorageRedundancy": "Local"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', parameters('sqlServerName'))]"
+              ]
+            },
+            {
+              "condition": "[equals(parameters('environmentName'), 'prod')]",
+              "type": "Microsoft.Sql/servers/databases/backupShortTermRetentionPolicies",
+              "apiVersion": "2023-08-01-preview",
+              "name": "[format('{0}/{1}/{2}', parameters('sqlServerName'), 'nextup', 'default')]",
+              "properties": {
+                "retentionDays": 7
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers/databases', parameters('sqlServerName'), 'nextup')]"
+              ]
+            },
+            {
+              "condition": "[equals(parameters('environmentName'), 'staging')]",
+              "type": "Microsoft.Sql/servers/databases",
+              "apiVersion": "2023-08-01-preview",
+              "name": "[format('{0}/{1}', parameters('sqlServerName'), 'nextup_staging')]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "GP_S_Gen5_1",
+                "tier": "GeneralPurpose",
+                "family": "Gen5",
+                "capacity": 1
+              },
+              "properties": {
+                "autoPauseDelay": 60,
+                "minCapacity": "[json('0.5')]",
+                "maxSizeBytes": 2147483648,
+                "zoneRedundant": false,
+                "requestedBackupStorageRedundancy": "Local"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.Sql/servers', parameters('sqlServerName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "serverName": {
+              "type": "string",
+              "metadata": {
+                "description": "The Azure SQL logical server name."
+              },
+              "value": "[parameters('sqlServerName')]"
+            },
+            "serverFqdn": {
+              "type": "string",
+              "metadata": {
+                "description": "The fully-qualified SQL server hostname."
+              },
+              "value": "[reference(resourceId('Microsoft.Sql/servers', parameters('sqlServerName')), '2023-08-01-preview').fullyQualifiedDomainName]"
+            },
+            "databaseName": {
+              "type": "string",
+              "metadata": {
+                "description": "The database this environment uses."
+              },
+              "value": "[if(equals(parameters('environmentName'), 'prod'), 'nextup', 'nextup_staging')]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "aca",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "environmentName": {
+            "value": "[parameters('environmentName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "managedEnvironmentName": {
+            "value": "[variables('managedEnvironmentName')]"
+          },
+          "containerAppName": {
+            "value": "[variables('containerAppName')]"
+          },
+          "logAnalyticsCustomerId": {
+            "value": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName')), '2023-09-01').customerId]"
+          },
+          "logAnalyticsSharedKey": {
+            "value": "[listKeys(resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName')), '2023-09-01').primarySharedKey]"
+          },
+          "containerImage": {
+            "value": "[parameters('containerImage')]"
+          },
+          "ghcrUsername": {
+            "value": "[parameters('ghcrUsername')]"
+          },
+          "ghcrToken": {
+            "value": "[parameters('ghcrToken')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "description": "Container Apps environment and the per-environment app, pulling from ghcr.io."
+          },
+          "parameters": {
+            "environmentName": {
+              "type": "string",
+              "allowedValues": [
+                "prod",
+                "staging"
+              ],
+              "metadata": {
+                "description": "Deployment environment: prod or staging."
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for all resources."
+              }
+            },
+            "managedEnvironmentName": {
+              "type": "string",
+              "metadata": {
+                "description": "Container Apps managed environment name."
+              }
+            },
+            "containerAppName": {
+              "type": "string",
+              "metadata": {
+                "description": "Container App name for this environment."
+              }
+            },
+            "logAnalyticsCustomerId": {
+              "type": "string",
+              "metadata": {
+                "description": "Log Analytics workspace customer id."
+              }
+            },
+            "logAnalyticsSharedKey": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Log Analytics workspace shared key."
+              }
+            },
+            "containerImage": {
+              "type": "string",
+              "metadata": {
+                "description": "Fully-qualified container image, e.g. ghcr.io/saquibrashid/nextup:sha-abc123."
+              }
+            },
+            "ghcrUsername": {
+              "type": "string",
+              "metadata": {
+                "description": "GitHub username that owns the ghcr.io fine-grained PAT."
+              }
+            },
+            "ghcrToken": {
+              "type": "securestring",
+              "metadata": {
+                "description": "ghcr.io fine-grained PAT with read:packages. Supplied at deploy time."
+              }
+            },
+            "containerCpu": {
+              "type": "string",
+              "defaultValue": "0.25",
+              "metadata": {
+                "description": "Container CPU. Paired with containerMemory and maxDecodePixels."
+              }
+            },
+            "containerMemory": {
+              "type": "string",
+              "defaultValue": "0.5Gi",
+              "metadata": {
+                "description": "Container memory. Paired with containerCpu and maxDecodePixels."
+              }
+            },
+            "maxDecodePixels": {
+              "type": "string",
+              "defaultValue": "25000000",
+              "metadata": {
+                "description": "Pre-decode pixel guard. Paired with containerCpu and containerMemory."
+              }
+            }
+          },
+          "variables": {
+            "isProd": "[equals(parameters('environmentName'), 'prod')]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.App/managedEnvironments",
+              "apiVersion": "2024-03-01",
+              "name": "[parameters('managedEnvironmentName')]",
+              "location": "[parameters('location')]",
+              "properties": {
+                "appLogsConfiguration": {
+                  "destination": "log-analytics",
+                  "logAnalyticsConfiguration": {
+                    "customerId": "[parameters('logAnalyticsCustomerId')]",
+                    "sharedKey": "[parameters('logAnalyticsSharedKey')]"
+                  }
+                }
+              }
+            },
+            {
+              "type": "Microsoft.App/containerApps",
+              "apiVersion": "2024-03-01",
+              "name": "[parameters('containerAppName')]",
+              "location": "[parameters('location')]",
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "managedEnvironmentId": "[resourceId('Microsoft.App/managedEnvironments', parameters('managedEnvironmentName'))]",
+                "configuration": {
+                  "ingress": {
+                    "external": true,
+                    "targetPort": 8080,
+                    "transport": "auto",
+                    "allowInsecure": false,
+                    "traffic": [
+                      {
+                        "latestRevision": true,
+                        "weight": 100
+                      }
+                    ]
+                  },
+                  "registries": [
+                    {
+                      "server": "ghcr.io",
+                      "username": "[parameters('ghcrUsername')]",
+                      "passwordSecretRef": "ghcr-token"
+                    }
+                  ],
+                  "secrets": [
+                    {
+                      "name": "ghcr-token",
+                      "value": "[parameters('ghcrToken')]"
+                    }
+                  ]
+                },
+                "template": {
+                  "containers": [
+                    {
+                      "name": "nextup",
+                      "image": "[parameters('containerImage')]",
+                      "resources": {
+                        "cpu": "[json(parameters('containerCpu'))]",
+                        "memory": "[parameters('containerMemory')]"
+                      },
+                      "env": [
+                        {
+                          "name": "NEXTUP_MAX_DECODE_PIXELS",
+                          "value": "[parameters('maxDecodePixels')]"
+                        },
+                        {
+                          "name": "NODE_ENV",
+                          "value": "production"
+                        },
+                        {
+                          "name": "NEXTUP_ENVIRONMENT",
+                          "value": "[parameters('environmentName')]"
+                        }
+                      ]
+                    }
+                  ],
+                  "scale": {
+                    "minReplicas": "[if(variables('isProd'), 1, 0)]",
+                    "maxReplicas": "[if(variables('isProd'), 2, 1)]"
+                  }
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.App/managedEnvironments', parameters('managedEnvironmentName'))]"
+              ]
+            }
+          ],
+          "outputs": {
+            "appName": {
+              "type": "string",
+              "metadata": {
+                "description": "The Container App name."
+              },
+              "value": "[parameters('containerAppName')]"
+            },
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "System-assigned managed identity principal id, for RBAC in main.bicep."
+              },
+              "value": "[reference(resourceId('Microsoft.App/containerApps', parameters('containerAppName')), '2024-03-01', 'full').identity.principalId]"
+            },
+            "appFqdn": {
+              "type": "string",
+              "metadata": {
+                "description": "The public FQDN of the app."
+              },
+              "value": "[reference(resourceId('Microsoft.App/containerApps', parameters('containerAppName')), '2024-03-01').configuration.ingress.fqdn]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('blob-rbac-{0}', parameters('environmentName'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "storageAccountName": {
+            "value": "[variables('storageAccountName')]"
+          },
+          "blobContainerName": {
+            "value": "[variables('blobContainerName')]"
+          },
+          "principalId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'aca'), '2025-04-01').outputs.principalId.value]"
+          },
+          "roleDefinitionId": {
+            "value": "[variables('storageBlobDataContributorRoleId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "description": "Grants a principal a role scoped to a single blob container."
+          },
+          "parameters": {
+            "storageAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Storage account holding the container."
+              }
+            },
+            "blobContainerName": {
+              "type": "string",
+              "metadata": {
+                "description": "The blob container to scope the grant to — NOT the whole account."
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "Principal id of the system-assigned managed identity."
+              }
+            },
+            "roleDefinitionId": {
+              "type": "string",
+              "metadata": {
+                "description": "Role definition guid to grant."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', parameters('storageAccountName'), 'default', parameters('blobContainerName'))]",
+              "name": "[guid(resourceId('Microsoft.Storage/storageAccounts/blobServices/containers', parameters('storageAccountName'), 'default', parameters('blobContainerName')), parameters('principalId'), parameters('roleDefinitionId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('roleDefinitionId'))]",
+                "principalId": "[parameters('principalId')]",
+                "principalType": "ServicePrincipal"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'aca')]",
+        "[resourceId('Microsoft.Resources/deployments', 'storage')]"
+      ]
+    }
+  ],
+  "outputs": {
+    "appFqdn": {
+      "type": "string",
+      "metadata": {
+        "description": "The public FQDN of the deployed app."
+      },
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'aca'), '2025-04-01').outputs.appFqdn.value]"
+    },
+    "containerAppName": {
+      "type": "string",
+      "metadata": {
+        "description": "The Container App name."
+      },
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'aca'), '2025-04-01').outputs.appName.value]"
+    },
+    "sqlServerFqdn": {
+      "type": "string",
+      "metadata": {
+        "description": "The SQL server FQDN."
+      },
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'sqldb'), '2025-04-01').outputs.serverFqdn.value]"
+    },
+    "databaseName": {
+      "type": "string",
+      "metadata": {
+        "description": "The database this environment uses."
+      },
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'sqldb'), '2025-04-01').outputs.databaseName.value]"
+    },
+    "storageAccountName": {
+      "type": "string",
+      "metadata": {
+        "description": "The storage account name."
+      },
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'storage'), '2025-04-01').outputs.accountName.value]"
+    },
+    "blobContainerName": {
+      "type": "string",
+      "metadata": {
+        "description": "The blob container this environment writes to."
+      },
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'storage'), '2025-04-01').outputs.containerName.value]"
+    }
+  }
+}

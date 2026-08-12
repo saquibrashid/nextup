@@ -307,8 +307,18 @@ jobs:
           az bicep install
           for f in "${files[@]}"; do
             echo "bicep build $f"
-            az bicep build --file "$f"
+            # --stdout, NOT the default outfile. `az bicep build --file
+            # infra/main.bicep` would WRITE infra/main.json, overwriting the
+            # committed artifact with a fresh compile — after which the drift
+            # check below would compare a fresh compile against itself and
+            # pass vacuously, no matter what the Bicep said.
+            az bicep build --file "$f" --stdout > /dev/null
           done
+      # The committed infra/main.json is what the T-INFRA-* tests assert
+      # against. This proves it still matches infra/main.bicep, so the tests
+      # can never pass against a stale template.
+      - name: Compiled ARM is not stale
+        run: npm run check:infra
       # T-INFRA-*, T-INV-013 and T-MIG-001 (the destructive-migration gate).
       - name: Infra and invariant tests
         run: npm run test:infra

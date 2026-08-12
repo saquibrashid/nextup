@@ -8,6 +8,51 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **TASK-006 — the Azure infrastructure, as Bicep.** `infra/main.bicep` plus
+  `storage.bicep`, `sqldb.bicep`, `aca.bicep` and `rbac.bicep`, built to
+  Variant A (A40): Container Apps at 0.25 vCPU / 0.5 GiB with `minReplicas=1`,
+  Azure SQL Basic for prod and a serverless auto-paused `nextup_staging`,
+  private blob containers with a 30-day purge, `ghcr.io` as the registry (no
+  ACR, no `AcrPull`), and Log Analytics. Region `eastus2`, resource group
+  `nextup-rg`.
+  - **Both environments deploy into one resource group** (ADR-0003 R2.4).
+    Shared resources are declared unconditionally so either deployment is
+    idempotent; only the database, the container app and the blob grant are
+    conditional.
+  - **The blob service properties and the lifecycle policy are deliberately
+    unconditional.** Both are account-level singletons: had each environment
+    declared only its own rule, whichever deployed second would have silently
+    deleted the first's, and screenshots would have been retained forever.
+  - **Blob RBAC is scoped to a single container, not the storage account**, so
+    "staging has no grant on the production container" holds by construction
+    rather than by convention. This needed a separate `rbac.bicep` module — a
+    role-assignment `name` must be calculable at the start of a deployment, so
+    it cannot be built from another module's output (Bicep BCP120).
+  - **The database keeps its case-insensitive default collation.** Identity
+    columns take `COLLATE Latin1_General_100_BIN2` per column in the migration
+    DDL, while search columns depend on the DB default staying case-insensitive
+    (`specs/data-model.md` §16.2). A binary database collation would have
+    looked more correct and broken the removed-view search.
+- **`T-INFRA-001`, `T-INFRA-002`, `T-INFRA-003` (`tests/infra/infra.spec.ts`,
+  20 tests)** — asserted against the **compiled ARM**, not the Bicep source,
+  because the compiled template is what actually deploys and a regex over
+  `.bicep` could pass while the emitted template said otherwise. Every rule is
+  also fed a deliberately mutated template and proven to catch it, including
+  the case where a retention property is *deleted* rather than set to `false` —
+  omission inherits the service default, which is exactly the retention the
+  rule exists to prevent.
+- **`npm run infra:build` / `npm run check:infra`** — `infra/main.json` is a
+  committed generated artifact with a drift gate, so the tests can never pass
+  against a stale template. The comparison strips Bicep's
+  `metadata._generator` stamp and compares structurally: a byte comparison
+  would fail whenever CI's Bicep version differed from the author's, and the
+  only obvious fix for that false failure would have been to weaken the gate.
+  - **The existing `Bicep build` CI step had to change to `--stdout`.** As
+    written it ran `az bicep build --file infra/main.bicep`, which *writes*
+    `infra/main.json` — overwriting the committed artifact moments before the
+    drift check read it, so the check would have compared a fresh compile
+    against itself and passed vacuously forever.
+
 - **TASK-167 — a task status ledger, a gate that can falsify it, and a
   generated report.** `docs/backlog.md` is the work order but recorded no
   status, so "what is done?" was answerable only from memory. `npm run status`

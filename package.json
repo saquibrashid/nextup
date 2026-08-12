@@ -33,6 +33,8 @@
     "check:licences": "node tools/check-licences.mjs --check",
     "status": "node tools/check-status.mjs",
     "check:status": "node tools/check-status.mjs --check",
+    "infra:build": "node tools/check-infra.mjs",
+    "check:infra": "node tools/check-infra.mjs --check",
     "test:meta": "vitest run --project meta --passWithNoTests",
     "coverage": "vitest run --project unit --project web --coverage",
     "test": "npm run test:unit && npm run test:int && npm run test:web"

@@ -1370,6 +1370,7 @@ tests/meta/                    acMapping.spec.ts
 tests/infra/                   …, supplyChain.spec.ts   # T-SEC-009, T-CI-006
                                …, licences.spec.ts      # TASK-153 — T-LICENSE-001a…l (§9A)
                                 …, status.spec.ts        # TASK-167 — T-STATUS-001a…q (§9A)
+                                …, infra.spec.ts         # TASK-006 — T-INFRA-001a…d, T-INFRA-002a…m, T-INFRA-003a…c
 ```
 
 
