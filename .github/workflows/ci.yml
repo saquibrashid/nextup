@@ -59,10 +59,24 @@ jobs:
           # gitleaks scans history as well as the working tree; a shallow
           # clone would silently scan almost nothing.
           fetch-depth: 0
+      # Run the pinned gitleaks image directly rather than gitleaks-action.
+      # The action calls the GitHub API (`pulls/:n/commits`) on pull_request
+      # events, which needs `pull-requests: read`; this workflow grants only
+      # `contents: read`, so the action crashed on EVERY pull request while
+      # passing on every push to main — the job was red for a reason that had
+      # nothing to do with secrets, and the real findings underneath it were
+      # never reported. Scanning the checkout directly needs no token, so push
+      # and pull_request now scan identically, and a Dependabot PR (whose token
+      # is read-only regardless of what the workflow declares) behaves the same
+      # as any other. `--exit-code 1` is explicit: the whole point is to fail.
       - name: gitleaks
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # renovate/dependabot do not track digests in `run:` steps, so this
+          # pin is updated by hand alongside any gitleaks version bump.
+          GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks@sha256:cdbb7c955abce02001a9f6c9f602fb195b7fadc1e812065883f695d1eeaba854
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/repo" --entrypoint sh "$GITLEAKS_IMAGE" \
+            -c 'git config --global --add safe.directory /repo && exec gitleaks detect --source=/repo --config=/repo/.gitleaks.toml --redact --verbose --exit-code 1'
 
   # ── 3 ─────────────────────────────────────────────────────────────────────
   audit:

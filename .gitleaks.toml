@@ -1,0 +1,35 @@
+# gitleaks configuration — CI job "2 · secrets".
+#
+# Policy: no secrets in the repo, ever, in the working tree OR in history
+# (see .github/copilot-instructions.md §6 and specs/security.md). Real values
+# live in Container Apps secrets / Key Vault references; `.env.example` carries
+# placeholders only.
+#
+# Keep this file's allowlist NARROW. A broad rule — muting a whole directory,
+# or every `*.md` — would still let the job report green while a genuine
+# credential sat in the repo. That failure is silent and permanent, because a
+# leaked secret survives in git history even after the file is corrected.
+
+[extend]
+useDefault = true
+
+# ── Allowlists ─────────────────────────────────────────────────────────────
+# `minReplicas=0` is an Azure Container Apps scaling setting. It appears in
+# `docs/architecture.md` and `docs/review-report.md` inside prose that lists
+# the *banned* grep tokens the F-001 supersession sweep hunts for — i.e. the
+# text is deliberately quoting superseded config so TASK-143 can detect it.
+# (ADR-0003 Rev 3 sets `minReplicas = 1`; the `=0` form is the retired value.)
+#
+# The default `generic-api-key` rule reads `key=value` shapes as credentials
+# and cannot tell configuration prose from a real assignment.
+#
+# The allowlist is a single exact-value regex, NOT a path or file-type
+# exclusion: the only string it can ever suppress is `minReplicas=0` or
+# `minReplicas=1`, so it is incapable of hiding a credential anywhere in the
+# repo. (`targetRules` would narrow it further to `generic-api-key` alone, but
+# gitleaks v8.28 silently ignores the whole allowlist when that key is present
+# at global scope — verified by running both forms against this repo — so
+# using it would have re-broken the job while looking stricter.)
+[[allowlists]]
+description = "Azure Container Apps minReplicas config token quoted in docs prose, not a credential"
+regexes = ['''minReplicas\s*=\s*[01]''']

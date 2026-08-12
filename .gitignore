@@ -35,3 +35,10 @@ prisma/*.db-journal
 Thumbs.db
 *.swp
 *.log
+
+# Scratch files used while driving git/CI from PowerShell. commitmsg.tmp is how
+# a multi-line commit message reaches `git commit -F` on a shell with no heredoc;
+# it and any extracted-CI-step probes must never be committed.
+commitmsg.tmp
+_step.sh
+_env.txt
