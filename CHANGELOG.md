@@ -8,6 +8,43 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`TASK-022` — the error envelope and the closed error-code enumeration**
+  (`T-API-002`, `T-SEC-007`, 15 tests). `packages/domain/src/errorCodes.ts`
+  holds all 39 codes from `specs/api.md` §8;
+  `apps/api/src/errors/AppError.ts` is what handlers throw;
+  `apps/api/src/middleware/errorEnvelope.ts` is the **only** place an error
+  becomes a response body. A handler writing its own `res.status().json()`
+  bypasses the envelope, the redaction and the correlation id at once.
+  - **Azure SQL uniqueness errors are mapped, never forwarded.** A `2627`/`2601`
+    carries the constraint name **and the duplicated key value** — owner data,
+    including a `workIdentity` — inside the driver's own message string. The
+    mapper matches the constraint name and substitutes **our** sentence; no part
+    of the driver string reaches `message`. An *unrecognised* constraint maps to
+    nothing and falls through to 500, because guessing a domain code would tell
+    the owner a confident, wrong remedy.
+  - `redactMessage` is a **backstop, not the control** — the control is that a
+    driver string is never assigned to `message`. It is worth having anyway
+    because this leak is silent and permanent: it reaches the browser, logs and
+    screenshots. `T-SEC-007f` pairs it with a test that ordinary owner-facing
+    copy survives untouched, since an over-eager redactor would replace every
+    helpful remedy with the generic sentence — a quieter failure than the leak.
+  - A `correlationId` appears on 5xx only, and the **full** error is logged
+    under that same id. Nothing is lost; it just does not travel to the browser.
+
+### Fixed
+
+- **`@nextup/domain` now resolves to SOURCE in tests, via a Vitest alias.**
+  The `test:unit` CI job runs `npm ci` then `npm run coverage` **with no build
+  step**, so `packages/domain/dist` does not exist on the runner and every API
+  test importing the package would have failed to resolve — a job that has been
+  green only because nothing imported it across the workspace boundary yet.
+  Confirmed by deleting `dist` locally and watching the suite go red, then green
+  again with the alias. It also makes coverage honest (API tests were about to
+  start crediting a *built* copy of the domain, i.e. nothing) and removes the
+  stale-`dist` hazard of tests passing against code no longer in the repo.
+  **Vitest does not inherit a root `resolve` into `projects`**, so the alias is
+  applied to each project explicitly.
+
 - **`TASK-016` — `packages/domain/src/derive.ts`** (`T-INV-009`, `T-INV-010`,
   12 tests). `deriveTitleState` and `deriveSortDateAdded`: the only place
   `title.state` and `title.sortDateAdded` are computed.

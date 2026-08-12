@@ -19,9 +19,31 @@
  * the false comfort this project cannot afford.
  */
 
+import { fileURLToPath } from 'node:url';
+
 import { defineConfig } from 'vitest/config';
 
+/**
+ * `@nextup/domain` resolves to SOURCE under test, not to `dist`.
+ *
+ * Two reasons, both load-bearing. (1) The `test:unit` CI job runs `npm ci` then
+ * `npm run coverage` with NO build step, so `packages/domain/dist` does not
+ * exist there and every API test importing the package fails to resolve —
+ * verified by deleting `dist` locally and watching the suite go red. (2)
+ * Without it, API tests would exercise a BUILT copy of the domain: coverage
+ * would credit none of it, and a stale `dist` would let tests pass against code
+ * no longer in the repository.
+ *
+ * Vitest does not inherit a root `resolve` into `projects`, so it is applied
+ * per project.
+ */
+const domainAlias = {
+  '@nextup/domain': fileURLToPath(new URL('./packages/domain/src/index.ts', import.meta.url)),
+};
+
 export default defineConfig({
+  resolve: { alias: domainAlias },
+
   test: {
     coverage: {
       provider: 'v8',
@@ -47,6 +69,7 @@ export default defineConfig({
 
     projects: [
       {
+        resolve: { alias: domainAlias },
         // ~55% of the pyramid, < 10s. Pure domain logic, no I/O, no container.
         test: {
           name: 'unit',
@@ -59,6 +82,7 @@ export default defineConfig({
         },
       },
       {
+        resolve: { alias: domainAlias },
         // ~30%, < 3min. Real mssql/server:2022 + Azurite; migrations applied
         // first (specs/testing.md §3.3a). Never mocked — the properties under
         // test are owner scoping, constraints and transactions, which a mock
@@ -76,6 +100,7 @@ export default defineConfig({
       },
       './apps/web/vitest.config.ts',
       {
+        resolve: { alias: domainAlias },
         // The extractor golden suite — OFFLINE, replayed recordings only.
         // `goldenLive.spec.ts` is excluded here and never runs in CI: it calls
         // the live providers and COSTS MONEY (specs/testing.md §4A).
@@ -87,6 +112,7 @@ export default defineConfig({
         },
       },
       {
+        resolve: { alias: domainAlias },
         // Static assertions over Bicep and migrations: T-INFRA-*, T-INV-013,
         // T-MIG-001. No Azure subscription required.
         test: {
@@ -96,6 +122,7 @@ export default defineConfig({
         },
       },
       {
+        resolve: { alias: domainAlias },
         // T-META-001: every acceptance criterion maps to a named test that
         // exists. This is the job that catches a spec growing past its suite.
         test: {
