@@ -12,7 +12,7 @@
 ## What it does
 
 Your saved watchlists are trapped inside separate streaming apps, so answering
-*"what have I saved that I could watch right now?"* means opening several apps
+_"what have I saved that I could watch right now?"_ means opening several apps
 in sequence at the exact moment you have sat down to watch — and titles saved
 months ago are effectively lost. Syncing those lists programmatically turns out
 not to be viable for anyone: there is no public API, no partner route, and the
@@ -36,7 +36,7 @@ worth the price of feeding it by hand.
 
 🚧 **Pre-alpha** — scaffolded from specs, not yet implemented.
 
-**Next up:** `TASK-001` — *npm-workspaces monorepo scaffold* (`package.json`
+**Next up:** `TASK-001` — _npm-workspaces monorepo scaffold_ (`package.json`
 workspaces, root `tsconfig.base.json`, per-workspace configs, lint/format).
 See [docs/backlog.md](docs/backlog.md).
 
@@ -96,16 +96,16 @@ nextup/
 
 ## Documentation
 
-| Document | What's in it |
-|---|---|
-| [PRD](docs/PRD.md) | User stories and the 230 acceptance criteria |
-| [Architecture](docs/architecture.md) | System design, the locked stack, and the cost model |
-| [Specs](specs/specs.md) | Implementation detail; [testing.md](specs/testing.md) carries the AC → named-test mapping |
-| [Backlog](docs/backlog.md) | What to build, in order (the work order) |
-| [Roadmap](docs/roadmap.md) | Sequencing and milestones |
-| [ADRs](docs/adr/) | Why the load-bearing decisions are what they are |
-| [BRD](docs/BRD.md) | The (personal, non-commercial) business case |
-| [Review report](docs/review-report.md) | Known open items from the pre-build review |
+| Document                               | What's in it                                                                              |
+| -------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [PRD](docs/PRD.md)                     | User stories and the 230 acceptance criteria                                              |
+| [Architecture](docs/architecture.md)   | System design, the locked stack, and the cost model                                       |
+| [Specs](specs/specs.md)                | Implementation detail; [testing.md](specs/testing.md) carries the AC → named-test mapping |
+| [Backlog](docs/backlog.md)             | What to build, in order (the work order)                                                  |
+| [Roadmap](docs/roadmap.md)             | Sequencing and milestones                                                                 |
+| [ADRs](docs/adr/)                      | Why the load-bearing decisions are what they are                                          |
+| [BRD](docs/BRD.md)                     | The (personal, non-commercial) business case                                              |
+| [Review report](docs/review-report.md) | Known open items from the pre-build review                                                |
 
 If you are a coding agent, start with
 [`.github/copilot-instructions.md`](.github/copilot-instructions.md).

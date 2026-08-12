@@ -24,9 +24,9 @@ jobs:
       mssql:
         image: mcr.microsoft.com/mssql/server:2022-latest
         env:
-          ACCEPT_EULA: "Y"
-          MSSQL_SA_PASSWORD: "Str0ng!Passw0rd_ci"   # CI-only, non-secret, ephemeral
-          MSSQL_PID: "Developer"                      # free edition for CI
+          ACCEPT_EULA: 'Y'
+          MSSQL_SA_PASSWORD: 'Str0ng!Passw0rd_ci' # CI-only, non-secret, ephemeral
+          MSSQL_PID: 'Developer' # free edition for CI
         ports:
           - 1433:1433
         options: >-
@@ -54,6 +54,12 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Formatting is part of the lint gate (specs/testing.md §8 job 1). It is a
+      # separate step so a failure names the cause instead of hiding inside
+      # eslint's output.
+      - name: Format check
+        run: npm run format:check
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -67,7 +73,7 @@ jobs:
       # "No such file or directory". See specs/testing.md §3.3a.
       - name: Wait for SQL Server
         env:
-          MSSQL_SA_PASSWORD: "Str0ng!Passw0rd_ci"
+          MSSQL_SA_PASSWORD: 'Str0ng!Passw0rd_ci'
         run: |
           cid=$(docker ps --filter "ancestor=mcr.microsoft.com/mssql/server:2022-latest" --format '{{.ID}}' | head -n1)
           if [ -z "$cid" ]; then

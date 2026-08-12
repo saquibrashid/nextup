@@ -1,0 +1,4 @@
+{
+  "//": "The repo root is \"type\": \"module\", but ESLint 8 loads rules and plugins with require(). This directory-scoped marker keeps tools/eslint-rules/*.js CommonJS so the rule loads on Node 20, where require(ESM) is not available. Do not delete it: without it ESLint fails with 'module is not defined'.",
+  "type": "commonjs"
+}

@@ -45,9 +45,9 @@ guarantees):
 nextup is pre-alpha and unversioned. Only the current `main` branch is
 supported; there are no back-ported fixes.
 
-| Version | Supported |
-|---|---|
-| `main` (pre-alpha) | ✅ |
+| Version            | Supported     |
+| ------------------ | ------------- |
+| `main` (pre-alpha) | ✅            |
 | Any tagged release | ❌ (none yet) |
 
 ## Handling secrets

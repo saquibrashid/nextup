@@ -23,22 +23,22 @@ owner's review.
 
 ## 2. The stack — concrete, fixed where the architecture fixes it
 
-| Layer | Choice | Notes |
-|---|---|---|
-| Language | **TypeScript**, end to end, `strict` + `noUncheckedIndexedAccess` | ADR-0004 |
-| Repo | **npm-workspaces monorepo**: `packages/domain`, `apps/api`, `apps/web` | TASK-001 |
-| Front end | **React + Vite** SPA (`apps/web/src/**`) | ADR-0004 |
-| API | **Node + Express** (`apps/api/src/**`), single process also serving the built SPA | ADR-0004, TASK-005 |
-| Shared domain | Pure TypeScript in `packages/domain/src/**` (types in `types.ts`) | data-model.md |
-| ORM | **Prisma, provider `sqlserver`** | ADR-0005 Rev 3 |
-| Database | **Azure SQL Database, Basic** (5 DTU, 2 GB, 7-day PITR) | ADR-0005 Rev 3 |
-| Staging DB | a **separate serverless auto-paused Azure SQL database** — there is **no shared server**, Azure SQL bills per database | ADR-0003 Rev 3 |
-| Compute | **Azure Container Apps**, 0.25 vCPU / 0.5 GiB, **`minReplicas = 1`** (always warm) | ADR-0003 Rev 3 |
-| Registry | **`ghcr.io`** (a fine-grained PAT, `read:packages`) — **NOT** Azure Container Registry | ADR-0003 Rev 3, TASK-146 |
-| Extraction | Azure OpenAI **`gpt-4.1`** vision (primary) **+** Azure AI Vision **Read F0** OCR (deterministic cross-check) | ADR-0001 Rev 2 |
-| Screenshots | **Azure Blob Storage**, private container, **30-day lifecycle purge** | ADR-0006 |
-| Auth | **Container Apps built-in auth (Easy Auth)** with a federated Entra IdP; allow-list in middleware. Zero application auth code. | ADR-0002 |
-| Tests | **Vitest** (unit + integration) and **Playwright** (e2e) | testing.md |
+| Layer         | Choice                                                                                                                         | Notes                    |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------ |
+| Language      | **TypeScript**, end to end, `strict` + `noUncheckedIndexedAccess`                                                              | ADR-0004                 |
+| Repo          | **npm-workspaces monorepo**: `packages/domain`, `apps/api`, `apps/web`                                                         | TASK-001                 |
+| Front end     | **React + Vite** SPA (`apps/web/src/**`)                                                                                       | ADR-0004                 |
+| API           | **Node + Express** (`apps/api/src/**`), single process also serving the built SPA                                              | ADR-0004, TASK-005       |
+| Shared domain | Pure TypeScript in `packages/domain/src/**` (types in `types.ts`)                                                              | data-model.md            |
+| ORM           | **Prisma, provider `sqlserver`**                                                                                               | ADR-0005 Rev 3           |
+| Database      | **Azure SQL Database, Basic** (5 DTU, 2 GB, 7-day PITR)                                                                        | ADR-0005 Rev 3           |
+| Staging DB    | a **separate serverless auto-paused Azure SQL database** — there is **no shared server**, Azure SQL bills per database         | ADR-0003 Rev 3           |
+| Compute       | **Azure Container Apps**, 0.25 vCPU / 0.5 GiB, **`minReplicas = 1`** (always warm)                                             | ADR-0003 Rev 3           |
+| Registry      | **`ghcr.io`** (a fine-grained PAT, `read:packages`) — **NOT** Azure Container Registry                                         | ADR-0003 Rev 3, TASK-146 |
+| Extraction    | Azure OpenAI **`gpt-4.1`** vision (primary) **+** Azure AI Vision **Read F0** OCR (deterministic cross-check)                  | ADR-0001 Rev 2           |
+| Screenshots   | **Azure Blob Storage**, private container, **30-day lifecycle purge**                                                          | ADR-0006                 |
+| Auth          | **Container Apps built-in auth (Easy Auth)** with a federated Entra IdP; allow-list in middleware. Zero application auth code. | ADR-0002                 |
+| Tests         | **Vitest** (unit + integration) and **Playwright** (e2e)                                                                       | testing.md               |
 
 **SQL-Server-specific DDL** (filtered unique indexes, `CHECK`, `ISJSON`,
 `Latin1_General_100_BIN2` collation) lives in **raw migration SQL**, not in
@@ -54,14 +54,14 @@ passes.
 
 ## 3. Where the specs live, and which is authoritative for what
 
-| Source | Authoritative for |
-|---|---|
-| `docs/backlog.md` | **The work order.** What to build, in order. Tasks sized in agent-runs + owner-review-minutes, not developer-days. Start at the top. |
-| `docs/PRD.md` | The **acceptance criteria** (230 of them). What "done" looks like from the user's side. |
-| `specs/testing.md` | **The most important spec (NFR-003).** Carries the full **AC → named-test mapping**. Every AC maps to a named test; **that mapping is the definition of done.** |
-| `specs/*.md` | Implementation detail — data model, API surface, AI pipeline, UI, UX states, security. |
-| `docs/architecture.md` | System design and the cost model. |
-| `docs/adr/` | *Why* each load-bearing decision is what it is. |
+| Source                 | Authoritative for                                                                                                                                               |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/backlog.md`      | **The work order.** What to build, in order. Tasks sized in agent-runs + owner-review-minutes, not developer-days. Start at the top.                            |
+| `docs/PRD.md`          | The **acceptance criteria** (230 of them). What "done" looks like from the user's side.                                                                         |
+| `specs/testing.md`     | **The most important spec (NFR-003).** Carries the full **AC → named-test mapping**. Every AC maps to a named test; **that mapping is the definition of done.** |
+| `specs/*.md`           | Implementation detail — data model, API surface, AI pipeline, UI, UX states, security.                                                                          |
+| `docs/architecture.md` | System design and the cost model.                                                                                                                               |
+| `docs/adr/`            | _Why_ each load-bearing decision is what it is.                                                                                                                 |
 
 **Work is driven by `docs/backlog.md`, in order.** The first task is
 **TASK-001** (npm-workspaces monorepo scaffold). A task with no test ID cannot
@@ -82,7 +82,7 @@ project's design already; treat them as hard rules.
 3. **Full-update is transactional and scoped to exactly ONE service.** One
    batch close = one transaction, one service.
 4. **Soft delete forever. No TTL, no scheduled deletion, anywhere.** The
-   *absence* of such a mechanism **is** REQ-028. **Azure SQL Agent jobs and
+   _absence_ of such a mechanism **is** REQ-028. **Azure SQL Agent jobs and
    Elastic Jobs are prohibited.** `T-INV-013` / `T-MIG-001` guard this.
 5. **No scheduler may change user-visible LIST state** (membership, ordering,
    service badges). The only permitted background work is **metadata-only lazy
@@ -108,18 +108,18 @@ project's design already; treat them as hard rules.
    if you find a reference to it, it is stale documentation, not a TODO.
    ~~Superseded: "NFR-019 image retention (user-decided, real) vs ASM-038
    staleness threshold (an unconfirmed placeholder)."~~
-8a. **There is NO staleness nudge, and you must not add one (`A46`).** The owner
+   8a. **There is NO staleness nudge, and you must not add one (`A46`).** The owner
    dropped the concept outright: no staleness threshold, no nag, no derived
    `stale` state, no "you haven't updated in N days" prompt, no re-capture
    reminder. ⚠ **But the factual per-service last-updated date STAYS** —
    **REQ-039 (`must`)** is the mandatory mitigation for **RSK-007** (the list
    silently going out of date without the owner noticing). `FreshnessStrip`
-   renders *"Netflix updated today"*, *"Max updated 47 days ago"*, *"Max has
-   never been updated"*, and tapping it still opens `/upload` with that service
+   renders _"Netflix updated today"_, _"Max updated 47 days ago"_, _"Max has
+   never been updated"_, and tapping it still opens `/upload` with that service
    pre-selected. **Show the fact; never nag about it.**
    ⚠ **"Stale" is overloaded — do not pattern-match on the word.** The TMDB
-   `metadataStale` flag and its 183-day lazy refresh (NFR-014) are a *different,
-   still-required* feature. Deleting them because they say "stale" breaks the
+   `metadataStale` flag and its 183-day lazy refresh (NFR-014) are a _different,
+   still-required_ feature. Deleting them because they say "stale" breaks the
    metadata pipeline.
 9. **NFR-012a: extraction is quality-first.** A cost-motivated downgrade of
    extraction quality is **non-compliance, not an optimisation.**
@@ -127,9 +127,9 @@ project's design already; treat them as hard rules.
     requests to streaming services.** The dependency allow-list
     (`tools/check-deps.mjs`, TASK-004) forbids telemetry/analytics packages;
     adding one fails CI.
-11. **Uploads accept PNG *and* JPEG *and* HEIC/HEIF — all three (REQ-007,
+11. **Uploads accept PNG _and_ JPEG _and_ HEIC/HEIF — all three (REQ-007,
     ASM-058).** ⚠ **This is not a swap and the list must not be "tidied".** iOS
-    *screenshots* are normally PNG, iOS *camera photos* default to HEIC, an iOS
+    _screenshots_ are normally PNG, iOS _camera photos_ default to HEIC, an iOS
     Safari file input can deliver any of the three, and the laptop-web capture
     path produces PNG. Dropping any one of them breaks a real capture path —
     an earlier PNG/JPEG-only spec would have rejected the owner's own phone
@@ -143,7 +143,7 @@ project's design already; treat them as hard rules.
     rule in invariant 5. Lossless PNG, **not** a lossy JPEG re-encode:
     degrading the image degrades extraction, which invariant 9 forbids. Keep
     images processed **serially** and reject implausible pixel dimensions
-    *before* allocating a decode buffer — memory is 0.5 GiB and OOM here is
+    _before_ allocating a decode buffer — memory is 0.5 GiB and OOM here is
     live risk RSK-016.
 13. **Strip EXIF/XMP metadata — including GPS and device model — from every
     uploaded image on ingest (REQ-078), and assert it with a test.** HEIC
@@ -176,13 +176,13 @@ project's design already; treat them as hard rules.
     Two different primitives are required and both must be built: the **`paste`
     event** (Ctrl/Cmd+V) on desktop, and a **visible "Paste screenshot"
     button** calling `navigator.clipboard.read()` **synchronously inside the
-    click handler** on iOS. A document-level listener alone is *not* a working
+    click handler** on iOS. A document-level listener alone is _not_ a working
     iOS design. Scope the desktop listener so it does **not** hijack text paste
     when an editable element is focused. All three affordances **append to the
     same open `UploadBatch`** — no new entity, no auto-submit.
 17. **The HEIC transcode is CONDITIONAL, and the condition is the SNIFFED
     format — never the ingest source.** `if (ingestSource === 'paste')
-    skipTranscode()` is **forbidden**: it is currently equivalent, but it makes
+skipTranscode()` is **forbidden**: it is currently equivalent, but it makes
     a security-relevant decision from untrusted client input. The transcode is
     **not deleted** — the iOS Photos path still delivers raw HEIC. The metadata
     strip and the pre-decode pixel guard sit **outside** the condition and run
@@ -203,10 +203,10 @@ Several documents carry revision banners: the datastore changed twice
 - **The latest revision section is authoritative.** Struck-through and
   "retained verbatim / historical" text is **dead** — do not build it. If a
   document names PostgreSQL, `pg_trgm`, ACR/`AcrPull`, Postgres error `23505`,
-  or `postgres:16-alpine` as *current*, you are reading a superseded section.
+  or `postgres:16-alpine` as _current_, you are reading a superseded section.
   Current is **Azure SQL, `ghcr.io`, error `2627`/`2601`, `mssql/server:2022`**.
 - **When YOU edit a document where text is an INSTRUCTION a machine executes
-  top-to-bottom, correct it *in place* and put any superseded version *below*
+  top-to-bottom, correct it _in place_ and put any superseded version _below_
   it, struck through.** Supersede-by-banner (a note at the top pointing
   elsewhere) is for **rationale and design narrative only**, never for an
   executable instruction — that is exactly the F-001 defect this project hit.

@@ -60,8 +60,8 @@ It does not deploy — deployment is a separate workflow (TASK-007).
 
 Where a document's text is an **instruction a machine executes top-to-bottom**,
 correct it **in place** and put any superseded version **below** it, struck
-through. A banner at the top pointing elsewhere is for *rationale and design
-narrative only* — never for an executable instruction. Several docs carry
+through. A banner at the top pointing elsewhere is for _rationale and design
+narrative only_ — never for an executable instruction. Several docs carry
 revision banners (the datastore changed Cosmos → PostgreSQL → Azure SQL); always
 treat the latest revision section as authoritative and struck-through text as
 dead.

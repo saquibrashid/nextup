@@ -11,7 +11,8 @@
   "workspaces": [
     "packages/domain",
     "apps/api",
-    "apps/web"
+    "apps/web",
+    "tools/eslint-plugin-nextup"
   ],
   "scripts": {
     "dev": "npm run dev --workspace apps/web",
@@ -20,18 +21,29 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --build",
-    "test:unit": "vitest run --project unit --passWithNoTests",
+    "test:unit": "vitest run --project unit",
     "test:int": "vitest run --project integration --passWithNoTests",
     "test:web": "vitest run --project web --passWithNoTests",
     "test:e2e": "playwright test",
+    "test:a11y": "playwright test tests/e2e/a11y.spec.ts",
+    "golden": "vitest run --project golden --passWithNoTests",
+    "test:infra": "vitest run --project infra --passWithNoTests",
     "test": "npm run test:unit && npm run test:int && npm run test:web"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "@playwright/test": "^1.47.2",
+    "@testing-library/jest-dom": "^6.5.0",
+    "@testing-library/react": "^16.0.1",
+    "@testing-library/user-event": "^14.5.2",
     "@types/node": "^20.14.10",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
+    "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-nextup": "*",
+    "jsdom": "^25.0.1",
     "prettier": "^3.3.3",
     "typescript": "^5.5.4",
     "vitest": "^2.1.9"

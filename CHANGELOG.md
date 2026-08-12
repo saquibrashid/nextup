@@ -8,6 +8,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`TASK-002` — test harness.** `vitest.workspace.ts` defines the five Vitest
+  projects (`unit`, `integration`, `web`, `golden`, `infra`) using the test
+  layout in `specs/testing.md` §11 verbatim; `vitest.config.ts` carries the §1
+  per-path coverage thresholds; `apps/web/vitest.config.ts` adds the jsdom +
+  Testing Library component environment; `playwright.config.ts` adds the
+  Chromium and Mobile Safari e2e projects. New scripts: `test:a11y`, `golden`,
+  `test:infra`, and `format:check` is now enforced in CI.
+- **The `T-META-004` test-ID naming rule** (`tools/eslint-rules/test-id-naming.js`),
+  surfaced to ESLint through an in-repo workspace plugin
+  (`tools/eslint-plugin-nextup`) so no third-party rule loader is needed
+  (NFR-004). It requires every `it`/`test` title to start with a `T-` id,
+  rejects dynamically-computed titles (an id CI cannot read statically is not
+  an id), and flags duplicate ids within a file. `describe` is exempt. Verified
+  both by `RuleTester` (21 cases) and by running real ESLint against an
+  intentionally mis-named test — `TASK-002`'s exit criterion.
 - Repository scaffolded from the nextup specification set: community health
   files, baseline TypeScript monorepo (`apps/web`, `apps/api`,
   `packages/domain`), Bicep infrastructure skeletons, CI workflow, and the full
@@ -23,6 +38,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   clean clone — now passes.
 
 ### Fixed
+
+- **`prettier --check` had never passed on this repository** (40 files,
+  including the original scaffold's own `README.md` and `package.json`). It was
+  declared as a script but wired into no gate, so the failure was invisible;
+  `TASK-003` would have inherited a lint job that could not go green. The tree
+  is now formatted, `package-lock.json` / `playwright-report/` / `test-results/`
+  are prettier-ignored, and CI runs `format:check` as an explicit step so a
+  failure names its cause instead of hiding inside eslint output.
+- **`tests/unit/` and `tests/integration/` contradicted the authoritative test
+  layout.** `specs/testing.md` §11 places unit tests inside the workspace they
+  cover (`packages/domain/test/`, `apps/api/test/unit/`) and integration tests
+  in `apps/api/test/integration/`. The two stray scaffold directories are
+  removed; had they survived, Vitest's include globs and the spec would have
+  disagreed silently and new tests would have landed in a directory nothing
+  runs.
 
 - **`docs/backlog.md` TASK-017 and TASK-047 led with superseded PostgreSQL
   instructions.** Both are on the critical path and both named the retained,
@@ -45,7 +75,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Notes
 
-- `test:unit` / `test:int` / `test:web` currently carry `--passWithNoTests` as
-  a deliberate stopgap: no test files or per-workspace `vitest.config.ts` exist
-  yet. `TASK-002` owns the test harness and should remove these flags as soon
-  as the first real tests land, so the suite cannot pass vacuously.
+- `--passWithNoTests` has been **removed from `test:unit`** now that the
+  `T-META-004` rule tests exist — the unit suite can no longer pass vacuously.
+  It remains on `test:int`, `test:web`, `golden` and `test:infra` because those
+  suites genuinely have no tests yet (they arrive with `TASK-017` and later).
+  **Each flag must be dropped by the task that lands that suite's first test**,
+  not inherited forward: a suite that passes with zero tests is the single
+  easiest way for CI to be green while asserting nothing.
+- The Vitest `golden` project excludes `**/goldenLive.spec.ts`. That exclusion
+  is load-bearing, not tidiness — the live variant calls the real extraction
+  providers and costs money (`specs/testing.md` §4A).
+- `npm audit --omit=dev` reports **0 vulnerabilities**; the 6 findings in a full
+  `npm audit` are all dev-only (esbuild/vite transitive). `TASK-004` owns the
+  audit gate and should scope it accordingly rather than forcing a breaking
+  `vite@8` upgrade for a dev-server advisory that never ships.

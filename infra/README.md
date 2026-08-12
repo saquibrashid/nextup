@@ -6,14 +6,14 @@ visible; the real definitions are built by **TASK-006** against **Variant A**
 
 ## The target (Variant A, ~$11–14/month)
 
-| Concern | Choice | File |
-|---|---|---|
-| Compute | Azure Container Apps, **0.25 vCPU / 0.5 GiB**, `minReplicas = 1` (always warm), `maxReplicas = 2` for revision transitions, **no scale rule** | `aca.bicep` |
-| Database (prod) | **Azure SQL Database, Basic** (5 DTU, 2 GB, 7-day PITR) on an Azure SQL logical server | `sqldb.bicep` |
-| Database (staging) | a **separate serverless auto-paused** Azure SQL database (`nextup_staging`) — billed per-database, there is **no shared server** | `sqldb.bicep` |
-| Screenshots | Azure Blob, private containers `screenshots` / `screenshots-staging`, **30-day lifecycle purge**, soft-delete/versioning/PITR **DISABLED** | `storage.bicep` |
-| Registry | **`ghcr.io`** — there is **NO** Azure Container Registry resource, no `AcrPull` | (external) |
-| Composition | environment, identities, RBAC, Log Analytics, budget alerts | `main.bicep` |
+| Concern            | Choice                                                                                                                                        | File            |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| Compute            | Azure Container Apps, **0.25 vCPU / 0.5 GiB**, `minReplicas = 1` (always warm), `maxReplicas = 2` for revision transitions, **no scale rule** | `aca.bicep`     |
+| Database (prod)    | **Azure SQL Database, Basic** (5 DTU, 2 GB, 7-day PITR) on an Azure SQL logical server                                                        | `sqldb.bicep`   |
+| Database (staging) | a **separate serverless auto-paused** Azure SQL database (`nextup_staging`) — billed per-database, there is **no shared server**              | `sqldb.bicep`   |
+| Screenshots        | Azure Blob, private containers `screenshots` / `screenshots-staging`, **30-day lifecycle purge**, soft-delete/versioning/PITR **DISABLED**    | `storage.bicep` |
+| Registry           | **`ghcr.io`** — there is **NO** Azure Container Registry resource, no `AcrPull`                                                               | (external)      |
+| Composition        | environment, identities, RBAC, Log Analytics, budget alerts                                                                                   | `main.bicep`    |
 
 ## Hard rules encoded here (do not "improve" them away)
 

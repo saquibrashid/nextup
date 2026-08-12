@@ -1,7 +1,7 @@
 ---
 name: Spec gap
 about: A spec is ambiguous, contradictory, or silent on a decision you need
-title: "[spec-gap] "
+title: '[spec-gap] '
 labels: spec-gap
 ---
 

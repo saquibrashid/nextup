@@ -1,0 +1,125 @@
+/**
+ * T-META-004 — every `it(...)` title in the suite starts with a `T-` test id,
+ * and ids are unique.
+ *
+ * `specs/testing.md` §11: "Every test declares its id in its title so a CI
+ * failure names the AC directly", e.g.
+ *
+ *   it('T-SUP-003 · US-028 AC-3 · a suppressed work that reappears creates nothing', ...)
+ *
+ * Why this is a lint rule and not a convention: a CI failure that says
+ * "reconciliation test failed" costs a spelunking session; one that says
+ * "T-REV-006 failed" names the acceptance criterion directly. The rule is the
+ * only thing that keeps that property true as the suite grows.
+ *
+ * SCOPE — this rule sees one file at a time, so it enforces:
+ *   1. the id prefix on every test title, and
+ *   2. uniqueness WITHIN a file.
+ * Cross-file uniqueness and the AC->test mapping are enforced by `T-META-001`
+ * (TASK-126), which parses the whole suite. Both halves are needed; neither
+ * subsumes the other.
+ */
+
+'use strict';
+
+/** `T-` + an UPPERCASE area + `-` + digits. e.g. T-SUP-003, T-E2E-001, T-INV-013 */
+const TEST_ID = /^(T-[A-Z][A-Z0-9]*-\d+)/;
+
+/** Call names that declare a test case. `describe` blocks are deliberately exempt. */
+const TEST_CALLERS = new Set(['it', 'test']);
+
+/** Modifiers that still declare a test: it.only, it.skip, it.each`...`, test.concurrent ... */
+function isTestCall(node) {
+  const callee = node.callee;
+
+  if (callee.type === 'Identifier') {
+    return TEST_CALLERS.has(callee.name);
+  }
+
+  // it.only(...) / it.skip(...) / it.concurrent(...) / it.each([...])(...)
+  if (callee.type === 'MemberExpression') {
+    let object = callee.object;
+    // Unwrap it.each([...])(...) - the callee object is itself a CallExpression.
+    while (object && object.type === 'CallExpression') {
+      object = object.callee;
+    }
+    while (object && object.type === 'MemberExpression') {
+      object = object.object;
+    }
+    return Boolean(object) && object.type === 'Identifier' && TEST_CALLERS.has(object.name);
+  }
+
+  return false;
+}
+
+/** Returns the literal title string, or null when it is not statically knowable. */
+function staticTitle(node) {
+  if (!node) return null;
+  if (node.type === 'Literal' && typeof node.value === 'string') return node.value;
+  if (node.type === 'TemplateLiteral' && node.expressions.length === 0) {
+    return node.quasis.map((q) => q.value.cooked).join('');
+  }
+  return null;
+}
+
+module.exports = {
+  meta: {
+    type: 'problem',
+    docs: {
+      description:
+        'Require every test title to start with a unique T- test id (T-META-004, specs/testing.md section 11).',
+      recommended: true,
+    },
+    schema: [],
+    messages: {
+      missingId:
+        "Test title must start with a T- test id, e.g. it('T-SUP-003 - US-028 AC-3 - ...'). Got: {{title}} (T-META-004, specs/testing.md section 11).",
+      dynamicTitle:
+        'Test title must be a static string so its T- id can be verified. Computed titles hide the id from CI (T-META-004).',
+      duplicateId:
+        'Duplicate test id {{id}} - already used on line {{line}} of this file. Test ids must be unique so a failure names exactly one acceptance criterion (T-META-004).',
+    },
+  },
+
+  create(context) {
+    /** @type {Map<string, number>} id -> line of first use, per file */
+    const seen = new Map();
+
+    return {
+      CallExpression(node) {
+        if (!isTestCall(node)) return;
+
+        const first = node.arguments[0];
+        if (!first) return;
+
+        const title = staticTitle(first);
+        if (title === null) {
+          context.report({ node: first, messageId: 'dynamicTitle' });
+          return;
+        }
+
+        const match = TEST_ID.exec(title);
+        if (!match) {
+          context.report({
+            node: first,
+            messageId: 'missingId',
+            data: { title: JSON.stringify(title) },
+          });
+          return;
+        }
+
+        const id = match[1];
+        const previous = seen.get(id);
+        if (previous !== undefined) {
+          context.report({
+            node: first,
+            messageId: 'duplicateId',
+            data: { id, line: String(previous) },
+          });
+          return;
+        }
+        seen.set(id, node.loc.start.line);
+      },
+    };
+  },
+};

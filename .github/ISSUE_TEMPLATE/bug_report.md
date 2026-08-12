@@ -1,7 +1,7 @@
 ---
 name: Bug report
 about: Something behaves differently from the spec or the acceptance criteria
-title: "[bug] "
+title: '[bug] '
 labels: bug
 ---
 
