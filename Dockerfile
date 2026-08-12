@@ -36,6 +36,14 @@ ARG NPM_REGISTRY
 RUN npm config set registry "${NPM_REGISTRY}" && npm ci
 
 COPY . .
+
+# The Prisma client is GENERATED code, not shipped code. `npm ci` above cannot
+# produce it: @prisma/client's postinstall reads `prisma/schema.prisma`, and at
+# that point only the manifests have been copied, so it silently generates a
+# stub. `tsc` then fails on every Prisma type — which is exactly how this was
+# found. Generate explicitly here rather than reordering the COPYs, so the
+# dependency layer stays cached independently of schema edits.
+RUN npx prisma generate
 RUN npm run build
 
 # ── Stage 2: runtime ───────────────────────────────────────────────────────
@@ -68,6 +76,14 @@ RUN npm config set registry "${NPM_REGISTRY}" \
 COPY --from=build /app/packages/domain/dist packages/domain/dist
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/apps/web/dist apps/web/dist
+
+# The generated Prisma client and its query engine. The `npm ci` above runs
+# with `--ignore-scripts` (deliberately — see the note there), so @prisma/client
+# arrives as an ungenerated stub that throws at the first query. Taking the
+# generated output from the build stage is what makes it real, and it keeps the
+# runtime image free of the Prisma CLI and its schema. `.prisma/client` carries
+# the platform query engine binary, so both directories are required.
+COPY --from=build /app/node_modules/.prisma node_modules/.prisma
 
 # `node` is an unprivileged user that already exists in the base image.
 USER node

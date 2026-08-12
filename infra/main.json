@@ -351,6 +351,9 @@
               }
             }
           },
+          "variables": {
+            "databaseCollation": "Latin1_General_100_BIN2"
+          },
           "resources": [
             {
               "type": "Microsoft.Sql/servers",
@@ -397,6 +400,7 @@
                 "capacity": 5
               },
               "properties": {
+                "collation": "[variables('databaseCollation')]",
                 "maxSizeBytes": 2147483648,
                 "zoneRedundant": false,
                 "requestedBackupStorageRedundancy": "Local"
@@ -430,6 +434,7 @@
                 "capacity": 1
               },
               "properties": {
+                "collation": "[variables('databaseCollation')]",
                 "autoPauseDelay": 60,
                 "minCapacity": "[json('0.5')]",
                 "maxSizeBytes": 2147483648,
