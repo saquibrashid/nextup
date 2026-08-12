@@ -11,10 +11,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 139 |
+| ⬜ todo | 138 |
 | 🚧 doing | 0 |
-| ✅ done | 16 |
-| 🙋 owner | 6 |
+| ✅ done | 18 |
+| 🙋 owner | 5 |
 | 💤 deferred | 0 |
 | **total** | **161** |
 
@@ -32,6 +32,8 @@ Not done, and every task they depend on is done.
 | `TASK-126` | M | Epic K — Platform, safety, and the shell |
 | `TASK-128` | XS | Epic K — Platform, safety, and the shell |
 | `TASK-132` | XS | Epic K — Platform, safety, and the shell |
+| `TASK-134` | XS | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
+| `TASK-142` | XS | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-143` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-145` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-147` | S | Epic B — Capture & import |
@@ -44,7 +46,6 @@ Not done, and every task they depend on is done.
 
 | Task | Section | Note |
 |---|---|---|
-| `TASK-006` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Azure boundary — owner gated the deployment step |
 | `TASK-007` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Azure boundary — owner gated the deployment step |
 | `TASK-010` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs a real subscription: verify cost model, `gpt-4.1` region and quota |
 | `TASK-011` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs the owner to capture golden-fixture screenshots |
@@ -53,18 +54,17 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-124 tasks cannot start yet.
+121 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
-| `TASK-008` | `TASK-006` |
 | `TASK-018` | `TASK-017` |
 | `TASK-019` | `TASK-018` |
 | `TASK-020` | `TASK-018` |
 | `TASK-021` | `TASK-018` |
 | `TASK-023` | `TASK-019`, `TASK-020` |
 | `TASK-024` | `TASK-023` |
-| `TASK-027` | `TASK-006`, `TASK-019` |
+| `TASK-027` | `TASK-019` |
 | `TASK-028` | `TASK-019` |
 | `TASK-029` | `TASK-023` |
 | `TASK-030` | `TASK-023` |
@@ -84,7 +84,7 @@ Not done, and every task they depend on is done.
 | `TASK-044` | `TASK-043` |
 | `TASK-045` | `TASK-023` |
 | `TASK-046` | `TASK-026`, `TASK-038` |
-| `TASK-047` | `TASK-006`, `TASK-033` |
+| `TASK-047` | `TASK-033` |
 | `TASK-049` | `TASK-048` |
 | `TASK-050` | `TASK-048`, `TASK-148`, `TASK-158` |
 | `TASK-051` | `TASK-050` |
@@ -154,7 +154,7 @@ Not done, and every task they depend on is done.
 | `TASK-116` | `TASK-114` |
 | `TASK-117` | `TASK-112`, `TASK-103`, `TASK-118` |
 | `TASK-118` | `TASK-052` |
-| `TASK-119` | `TASK-118`, `TASK-006` |
+| `TASK-119` | `TASK-118` |
 | `TASK-120` | `TASK-026`, `TASK-118` |
 | `TASK-121` | `TASK-023` |
 | `TASK-123` | `TASK-038`, `TASK-069`, `TASK-096`, `TASK-162` |
@@ -165,16 +165,14 @@ Not done, and every task they depend on is done.
 | `TASK-130` | `TASK-124`, `TASK-108` |
 | `TASK-131` | `TASK-017`, `TASK-044` |
 | `TASK-133` | `TASK-007`, `TASK-156` |
-| `TASK-134` | `TASK-006` |
-| `TASK-141` | `TASK-006`, `TASK-017` |
-| `TASK-142` | `TASK-006` |
+| `TASK-141` | `TASK-017` |
 | `TASK-148` | `TASK-147` |
 | `TASK-150` | `TASK-149` |
 | `TASK-151` | `TASK-149`, `TASK-150` |
 | `TASK-152` | `TASK-053` |
 | `TASK-154` | `TASK-050`, `TASK-149`, `TASK-054` |
 | `TASK-155` | `TASK-149`, `TASK-152` |
-| `TASK-156` | `TASK-006`, `TASK-007`, `TASK-008` |
+| `TASK-156` | `TASK-007` |
 | `TASK-159` | `TASK-053`, `TASK-050` |
 | `TASK-160` | `TASK-053`, `TASK-158` |
 | `TASK-161` | `TASK-160` |
@@ -191,6 +189,8 @@ Not done, and every task they depend on is done.
 | `TASK-003` | `3539384` | _no test id declared_ |
 | `TASK-004` | `eab919a` | `T-SEC-009` |
 | `TASK-005` | `ecec349` | _no test id declared_ |
+| `TASK-006` | `f496055` — Bicep authored, what-if clean for both environments; live deployment stays owner-gated | `T-INFRA-002`, `T-INFRA-005` |
+| `TASK-008` | `T-INFRA-005` + `T-INV-013`, both mutation-proven against half-applied up-sizes | `T-INFRA-005`, `T-INV-013` |
 | `TASK-009` | `6d47f55` | _no test id declared_ |
 | `TASK-012` | `9ae0a0f` | _no test id declared_ |
 | `TASK-013` | `692305b` | `T-DM-004` |
@@ -199,6 +199,6 @@ Not done, and every task they depend on is done.
 | `TASK-016` | `536aeb3` | `T-INV-009`, `T-INV-010` |
 | `TASK-022` | `d95a1ea` | `T-API-002`, `T-SEC-007` |
 | `TASK-025` | `a9e3483` | `T-UI-023` |
-| `TASK-144` | `eb07409` — a CI grep gate over `prisma/migrations/**`, which needs no infrastructure ahead-of:TASK-006 | `T-MIG-001` |
+| `TASK-144` | `eb07409` — a CI grep gate over `prisma/migrations/**` | `T-MIG-001` |
 | `TASK-153` | `d6796b3` — owner approved the LGPL-3.0 obligation; gate proven on synthetic fixtures ahead-of:TASK-147 | `T-LICENSE-001` |
 | `TASK-167` | this commit — the ledger, the gate and `docs/status.md` | `T-STATUS-001` |

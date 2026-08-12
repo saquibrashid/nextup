@@ -457,9 +457,9 @@ finished, so the exception cannot outlive its reason.
 | `TASK-003` | `done` | `3539384` |
 | `TASK-004` | `done` | `eab919a` |
 | `TASK-005` | `done` | `ecec349` |
-| `TASK-006` | `owner` | Azure boundary — owner gated the deployment step |
+| `TASK-006` | `done` | `f496055` — Bicep authored, what-if clean for both environments; live deployment stays owner-gated |
 | `TASK-007` | `owner` | Azure boundary — owner gated the deployment step |
-| `TASK-008` | `todo` | — |
+| `TASK-008` | `done` | `T-INFRA-005` + `T-INV-013`, both mutation-proven against half-applied up-sizes |
 | `TASK-009` | `done` | `6d47f55` |
 | `TASK-010` | `owner` | Needs a real subscription: verify cost model, `gpt-4.1` region and quota |
 | `TASK-011` | `owner` | Needs the owner to capture golden-fixture screenshots |
@@ -589,7 +589,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-141` | `todo` | — |
 | `TASK-142` | `todo` | — |
 | `TASK-143` | `todo` | — |
-| `TASK-144` | `done` | `eb07409` — a CI grep gate over `prisma/migrations/**`, which needs no infrastructure ahead-of:TASK-006 |
+| `TASK-144` | `done` | `eb07409` — a CI grep gate over `prisma/migrations/**` |
 | `TASK-145` | `todo` | — |
 | `TASK-146` | `owner` | Needs the owner to mint the `ghcr.io` fine-grained PAT |
 | `TASK-147` | `todo` | — |

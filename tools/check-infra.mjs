@@ -215,6 +215,161 @@ export function rbacPolicyViolations(template) {
   return violations;
 }
 
+/**
+ * The ONLY permitted (cpu, memory, NEXTUP_MAX_DECODE_PIXELS) combinations.
+ *
+ * REQ-079 / A43 / invariant 14: these are one setting in three places. Raising
+ * the guard without the memory removes the only thing stopping a large image
+ * killing the container; raising the memory without the guard buys ~$4/month
+ * of nothing. A half-applied up-size is strictly worse than none.
+ */
+export const ALLOWED_COMPUTE_PAIRS = [
+  { cpu: '0.25', memory: '0.5Gi', pixels: '25000000' },
+  { cpu: '0.5', memory: '1.0Gi', pixels: '50000000' },
+];
+
+export const COUPLING_MESSAGE =
+  'compute size and NEXTUP_MAX_DECODE_PIXELS must move together — see docs/runbooks/scale-up-memory.md';
+
+/** `[json('0.25')]` in compiled ARM, or a bare number/string elsewhere. */
+export function normaliseCpu(value) {
+  if (typeof value === 'number') return String(value);
+  const match = /json\('([^']+)'\)/.exec(String(value));
+  return match ? match[1] : String(value);
+}
+
+/**
+ * T-INFRA-005 — SKU pinning AND the compute/decode-guard coupling.
+ *
+ * A failing assertion here is a FEATURE: it is what forces the reactive
+ * up-size (A43) to be taken completely rather than half-applied.
+ */
+export function skuViolations(template) {
+  const violations = [];
+
+  for (const app of resourcesOfType(template, 'Microsoft.App/containerApps')) {
+    const container = app.properties?.template?.containers?.[0];
+    if (!container) {
+      violations.push(`aca: ${app.name} declares no container`);
+      continue;
+    }
+    const cpu = normaliseCpu(container.resources?.cpu);
+    const memory = String(container.resources?.memory);
+    const pixels = String(
+      (container.env ?? []).find((e) => e.name === 'NEXTUP_MAX_DECODE_PIXELS')?.value,
+    );
+
+    const matched = ALLOWED_COMPUTE_PAIRS.some(
+      (pair) => pair.cpu === cpu && pair.memory === memory && pair.pixels === pixels,
+    );
+    if (!matched) {
+      violations.push(`${COUPLING_MESSAGE} (found cpu=${cpu}, memory=${memory}, pixels=${pixels})`);
+    }
+  }
+
+  // Azure SQL: Basic for prod, serverless GP_S for staging. Never Standard,
+  // never zone-redundant, never a failover group.
+  for (const db of resourcesOfType(template, 'Microsoft.Sql/servers/databases')) {
+    const sku = db.sku ?? {};
+    const isBasic = sku.name === 'Basic' && sku.tier === 'Basic';
+    const isServerless = String(sku.name).startsWith('GP_S_');
+    if (!isBasic && !isServerless) {
+      violations.push(
+        `sql: unpinned SKU ${sku.name}/${sku.tier} — expected Basic or GP_S_ serverless`,
+      );
+    }
+    if (db.properties?.zoneRedundant !== false) {
+      violations.push(`sql: ${db.name} must not be zone-redundant`);
+    }
+  }
+
+  // The registry is ghcr.io. An Azure Container Registry of ANY tier is a
+  // design change, not an optimisation (ADR-0003 Rev 3).
+  const registries = resourcesOfType(template, 'Microsoft.ContainerRegistry/registries');
+  if (registries.length > 0) {
+    violations.push('registry: no Azure Container Registry may exist — the registry is ghcr.io');
+  }
+  for (const app of resourcesOfType(template, 'Microsoft.App/containerApps')) {
+    for (const registry of app.properties?.configuration?.registries ?? []) {
+      if (registry.server !== 'ghcr.io') {
+        violations.push(`registry: expected ghcr.io, found ${registry.server}`);
+      }
+    }
+  }
+
+  // Always warm in prod, scale-to-zero in staging, and NO scale rule.
+  for (const app of resourcesOfType(template, 'Microsoft.App/containerApps')) {
+    const scale = app.properties?.template?.scale ?? {};
+    if (scale.rules && scale.rules.length > 0) {
+      violations.push(`aca: ${app.name} must declare no scale rule`);
+    }
+  }
+
+  return violations;
+}
+
+/**
+ * T-INV-013 — soft delete is FOREVER.
+ *
+ * The ABSENCE of any expiry mechanism IS the requirement (REQ-028), so this
+ * asserts a negative. Azure SQL Agent jobs and Elastic Jobs are prohibited
+ * outright, as is any TTL-shaped property.
+ */
+export const PROHIBITED_TYPES = [
+  'Microsoft.Sql/servers/jobAgents',
+  'Microsoft.Sql/servers/jobAgents/jobs',
+  'Microsoft.Scheduler/jobCollections',
+  'Microsoft.Logic/workflows',
+  'Microsoft.Automation/automationAccounts',
+];
+
+export const PROHIBITED_PROPERTY_KEYS = [
+  'defaultTtl',
+  'ttl',
+  'timeToLive',
+  'timeToLiveInSeconds',
+  'expirationPolicy',
+  'retentionPolicy',
+];
+
+export function ttlViolations(template) {
+  const violations = [];
+
+  for (const resource of allResources(template)) {
+    if (PROHIBITED_TYPES.includes(resource.type)) {
+      violations.push(
+        `prohibited resource type: ${resource.type} (REQ-028 — no scheduled deletion)`,
+      );
+    }
+  }
+
+  // A TTL could hide at any depth, so walk the whole tree rather than only the
+  // properties we happen to know about. The blob lifecycle purge is the ONE
+  // sanctioned expiry and is matched by type, not by key name.
+  const walk = (node, path) => {
+    if (Array.isArray(node)) {
+      node.forEach((item, index) => walk(item, `${path}[${index}]`));
+      return;
+    }
+    if (node === null || typeof node !== 'object') return;
+    for (const [key, value] of Object.entries(node)) {
+      if (PROHIBITED_PROPERTY_KEYS.includes(key)) {
+        violations.push(
+          `TTL-shaped property "${key}" at ${path} (REQ-028 — soft delete is forever)`,
+        );
+      }
+      walk(value, `${path}.${key}`);
+    }
+  };
+
+  for (const resource of allResources(template)) {
+    if (resource.type === 'Microsoft.Storage/storageAccounts/managementPolicies') continue;
+    walk(resource.properties, resource.type);
+  }
+
+  return violations;
+}
+
 function main() {
   const check = process.argv.includes('--check');
   const compiled = compileArm();

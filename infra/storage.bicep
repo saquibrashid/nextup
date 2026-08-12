@@ -14,13 +14,16 @@ param location string
 @description('Globally-unique storage account name (computed by main.bicep).')
 param storageAccountName string
 
-// IMAGE_RETENTION_DAYS (NFR-019). This is the SCREENSHOT retention constant.
-// It is NOT the TMDB metadata refresh age (TMDB_METADATA_MAX_AGE_DAYS = 183,
-// NFR-014) and the two must never be merged into one value — see
-// .github/copilot-instructions.md invariant 8 and T-INV-008. There is no
-// list-staleness constant; do not add one (invariant 8a).
-@description('Screenshot retention in days (NFR-019). Do NOT reuse for TMDB metadata age.')
-param imageRetentionDays int = 30
+// IMAGE_RETENTION_DAYS (NFR-019) is inlined at its single use site below as a
+// literal 30. It is NOT the TMDB metadata refresh age
+// (TMDB_METADATA_MAX_AGE_DAYS = 183, NFR-014) and the two must never be merged
+// into one value — see .github/copilot-instructions.md invariant 8 and
+// T-INV-008. There is no list-staleness constant; do not add one (invariant 8a).
+//
+// It is a literal rather than a param or a var because retention is a privacy
+// commitment to the owner: a defaulted parameter can be silently overridden at
+// a call site while this file still reads as "30", and a `var` compiles to a
+// variable reference that the T-INV-013 gate cannot assert a value on.
 
 resource storage 'Microsoft.Storage/storageAccounts@2023-05-01' = {
   name: storageAccountName
@@ -130,7 +133,7 @@ resource lifecycle 'Microsoft.Storage/storageAccounts/managementPolicies@2023-05
             actions: {
               baseBlob: {
                 delete: {
-                  daysAfterModificationGreaterThan: imageRetentionDays
+                  daysAfterModificationGreaterThan: 30 // IMAGE_RETENTION_DAYS (NFR-019)
                 }
               }
             }

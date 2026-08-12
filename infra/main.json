@@ -136,13 +136,6 @@
               "metadata": {
                 "description": "Globally-unique storage account name (computed by main.bicep)."
               }
-            },
-            "imageRetentionDays": {
-              "type": "int",
-              "defaultValue": 30,
-              "metadata": {
-                "description": "Screenshot retention in days (NFR-019). Do NOT reuse for TMDB metadata age."
-              }
             }
           },
           "resources": [
@@ -237,7 +230,7 @@
                         "actions": {
                           "baseBlob": {
                             "delete": {
-                              "daysAfterModificationGreaterThan": "[parameters('imageRetentionDays')]"
+                              "daysAfterModificationGreaterThan": 30
                             }
                           }
                         }
@@ -588,27 +581,6 @@
               "metadata": {
                 "description": "ghcr.io fine-grained PAT with read:packages. Supplied at deploy time."
               }
-            },
-            "containerCpu": {
-              "type": "string",
-              "defaultValue": "0.25",
-              "metadata": {
-                "description": "Container CPU. Paired with containerMemory and maxDecodePixels."
-              }
-            },
-            "containerMemory": {
-              "type": "string",
-              "defaultValue": "0.5Gi",
-              "metadata": {
-                "description": "Container memory. Paired with containerCpu and maxDecodePixels."
-              }
-            },
-            "maxDecodePixels": {
-              "type": "string",
-              "defaultValue": "25000000",
-              "metadata": {
-                "description": "Pre-decode pixel guard. Paired with containerCpu and containerMemory."
-              }
             }
           },
           "variables": {
@@ -673,13 +645,13 @@
                       "name": "nextup",
                       "image": "[parameters('containerImage')]",
                       "resources": {
-                        "cpu": "[json(parameters('containerCpu'))]",
-                        "memory": "[parameters('containerMemory')]"
+                        "cpu": "[json('0.25')]",
+                        "memory": "0.5Gi"
                       },
                       "env": [
                         {
                           "name": "NEXTUP_MAX_DECODE_PIXELS",
-                          "value": "[parameters('maxDecodePixels')]"
+                          "value": "25000000"
                         },
                         {
                           "name": "NODE_ENV",

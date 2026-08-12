@@ -60,14 +60,11 @@ param ghcrToken string
 // is NOT a substitute: HEIC compression varies wildly and a 6 MiB file can
 // decode to 48 MP.
 // ---------------------------------------------------------------------------
-@description('Container CPU. Paired with containerMemory and maxDecodePixels.')
-param containerCpu string = '0.25'
-
-@description('Container memory. Paired with containerCpu and maxDecodePixels.')
-param containerMemory string = '0.5Gi'
-
-@description('Pre-decode pixel guard. Paired with containerCpu and containerMemory.')
-param maxDecodePixels string = '25000000'
+// The three values below are LITERALS on purpose, not parameters: the
+// up-size runbook (docs/runbooks/scale-up-memory.md, TASK-156) tells the
+// reader to edit this exact block, and T-INFRA-005 asserts on it. A
+// parameterised default would let an override at the call site silently
+// break the pair while this file still looked correct.
 
 var isProd = environmentName == 'prod'
 
@@ -137,13 +134,13 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'nextup'
           image: containerImage
           resources: {
-            cpu: json(containerCpu)
-            memory: containerMemory
+            cpu: json('0.25')
+            memory: '0.5Gi'
           }
           env: [
             {
               name: 'NEXTUP_MAX_DECODE_PIXELS'
-              value: maxDecodePixels
+              value: '25000000'
             }
             {
               name: 'NODE_ENV'

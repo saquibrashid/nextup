@@ -8,6 +8,42 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **TASK-008 — the SKU-pinning and no-TTL infrastructure gates.**
+  `tests/infra/sku.spec.ts` (`T-INFRA-005`, 17 tests) and
+  `tests/infra/no-ttl.spec.ts` (`T-INV-013`, 8 tests), backed by
+  `skuViolations()` and `ttlViolations()` in `tools/check-infra.mjs`.
+  - **The compute/decode-guard coupling is the point.** `cpu`, `memory` and
+    `NEXTUP_MAX_DECODE_PIXELS` are one setting in three places (REQ-079,
+    invariant 14), so the permitted combinations are a closed set of exactly
+    two: `(0.25, 0.5Gi, 25000000)` and `(0.5, 1.0Gi, 50000000)`. Raising the
+    guard without the memory removes the only thing stopping a large image
+    killing the container; raising the memory without the guard spends ~$4 a
+    month on nothing. Any half-applied change fails with the verbatim message
+    naming `docs/runbooks/scale-up-memory.md`. The gate was mutation-proven in
+    both directions: a lone `memory` bump fails, and the sanctioned matched
+    up-size passes — a gate that blocked its own documented remedy would be
+    deleted during the incident it exists for.
+  - `infra/aca.bicep` now declares the trio as **literals rather than
+    parameters**, so a call site cannot override half the pair while the file
+    still reads as correct. `T-INFRA-005c` asserts the source text as well as
+    the compiled ARM, because the up-size runbook tells the reader to edit that
+    exact block.
+  - Screenshot retention moved from a defaulted `param` to an **inlined literal
+    `30`** in `infra/storage.bicep` for the same reason — retention is a privacy
+    commitment, and a `var` compiles to a variable reference the gate cannot
+    assert a value on.
+  - `T-INV-013` asserts a negative (REQ-028: soft delete is forever, no TTL, no
+    Azure SQL Agent or Elastic Job), which makes it unusually easy to ship as
+    decoration. Every rule is therefore fed a template that *does* contain the
+    prohibited thing and proven to catch it, including TTL-shaped keys buried at
+    arbitrary depth. The sanctioned 30-day blob purge is explicitly asserted
+    *not* to trip it.
+  - The migrations half of `T-INV-013` is `T-MIG-001`; the "none on the live
+    container" half needs a deployed subscription and is verified at TASK-010.
+  - `docs/runbooks/scale-up-memory.md` gained the missing `npm run infra:build`
+    step (the drift gate blocks without it) and a note that
+    `ALLOWED_COMPUTE_PAIRS` must not be widened.
+
 - **TASK-006 — the Azure infrastructure, as Bicep.** `infra/main.bicep` plus
   `storage.bicep`, `sqldb.bicep`, `aca.bicep` and `rbac.bicep`, built to
   Variant A (A40): Container Apps at 0.25 vCPU / 0.5 GiB with `minReplicas=1`,

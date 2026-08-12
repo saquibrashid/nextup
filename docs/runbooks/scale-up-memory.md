@@ -204,8 +204,20 @@ And the matching environment variable in the same file:
 `cpu` **must** be written as `json('0.5')`, not a bare `0.5` — Bicep has
 no decimal literal type and a bare `0.5` will not compile.
 
+Then regenerate the compiled ARM artifact — **`npm run infra:build`** — or
+`check:infra` will fail CI on drift between `infra/main.bicep` and the
+committed `infra/main.json`.
+
 Then update `T-INFRA-005`'s expected SKU (`tests/infra/sku.spec.ts`) to
-`0.5` / `1.0Gi`, commit both together with the message
+`0.5` / `1.0Gi` / `50000000`. Both the pinned values (`T-INFRA-005b`,
+`T-INFRA-005c`) and the single-value mutation cases (`T-INFRA-005d`–`f`,
+which mutate *away* from the deployed pair) move together. Do **not** relax
+`ALLOWED_COMPUTE_PAIRS` in `tools/check-infra.mjs` — `0.5` / `1.0Gi` /
+`50000000` is already in the permitted set, so no change is needed there. If
+you find yourself widening that set, you are taking an up-size that has not
+been sanctioned.
+
+Commit all of it together with the message
 `infra: up-size ACA to 0.5 vCPU / 1.0 GiB per A43 reactive remedy`, and
 deploy. The CLI change and the Bicep change now agree, and nothing will
 silently revert.
