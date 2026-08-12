@@ -1,10 +1,18 @@
-# CI — install → lint → typecheck → test → build.
+# CI — the only gate (RSK-025).
 #
-# BASELINE scaffold. TASK-003 expands this into the 12 blocking jobs specified
-# in specs/testing.md §8. The mssql service container below follows
-# specs/testing.md §3.3a EXACTLY — do not change the sqlcmd path, the -C flag,
-# or the health-wait without reading that section. This workflow does NOT
-# publish or deploy anything (deployment is TASK-007's deploy.yml).
+# The TWELVE blocking jobs specified in specs/testing.md §8. **Every job
+# blocks. There are no advisory jobs and nothing may carry
+# `continue-on-error`** — an advisory job in a one-reviewer project is a job
+# nobody reads. Branch protection requires all twelve green plus a linear
+# history.
+#
+# This workflow does NOT publish or deploy anything; deployment is TASK-007's
+# deploy.yml.
+#
+# ⚠ Several suites are still empty and run with a "pass with no tests" flag.
+# Each flag must be removed by the task that lands that suite's FIRST test —
+# see CHANGELOG. A suite that passes green while asserting nothing is the
+# single easiest way for this gate to become decorative.
 
 name: CI
 
@@ -16,8 +24,83 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-and-test:
+  # ── 1 ─────────────────────────────────────────────────────────────────────
+  lint:
+    name: '1 · lint'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: ESLint
+        run: npm run lint
+      # A separate step so a formatting failure names its cause instead of
+      # hiding inside eslint output.
+      - name: Prettier
+        run: npm run format:check
+      - name: Typecheck
+        run: npm run typecheck
+
+  # ── 2 ─────────────────────────────────────────────────────────────────────
+  secrets:
+    name: '2 · secrets'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # gitleaks scans history as well as the working tree; a shallow
+          # clone would silently scan almost nothing.
+          fetch-depth: 0
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── 3 ─────────────────────────────────────────────────────────────────────
+  audit:
+    name: '3 · audit'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # High and critical only (§8 job 3). Moderate and low findings in
+      # dev-only tooling do not ship in the image and must not block a
+      # one-person project on a breaking major upgrade.
+      - name: npm audit
+        run: npm audit --audit-level=high
+      # TASK-004 adds the dependency allow-list here (tools/check-deps.mjs).
+
+  # ── 4 ─────────────────────────────────────────────────────────────────────
+  test-unit:
+    name: '4 · test:unit + coverage'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # Coverage thresholds from specs/testing.md §1 are enforced by
+      # vitest.config.ts and fail this job on their own.
+      - name: Unit tests with coverage
+        run: npm run coverage
+
+  # ── 5 ─────────────────────────────────────────────────────────────────────
+  test-int:
+    name: '5 · test:int'
     runs-on: ubuntu-latest
 
     services:
@@ -36,32 +119,18 @@ jobs:
           --health-retries 12
           --health-start-period 30s
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite:latest
+        ports:
+          - 10000:10000
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
-
-      # NOTE: this scaffold does NOT run the install for you. On a real runner
-      # `npm ci` runs here once package-lock.json exists.
-      - name: Install
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      # Formatting is part of the lint gate (specs/testing.md §8 job 1). It is a
-      # separate step so a failure names the cause instead of hiding inside
-      # eslint's output.
-      - name: Format check
-        run: npm run format:check
-
-      - name: Typecheck
-        run: npm run typecheck
+      - run: npm ci
 
       # An explicit wait backstops the service health check before migrations —
       # the mssql container is not ready the instant the port opens (§3.3a).
@@ -87,14 +156,167 @@ jobs:
           done
           echo "SQL Server did not become ready" && exit 1
 
-      - name: Unit tests
-        run: npm run test:unit
+      # TASK-016/017 add `prisma migrate deploy` here. Migrations are applied
+      # BEFORE the suite runs, never by the suite (§3.3a).
 
       - name: Integration tests
+        env:
+          DATABASE_URL: 'sqlserver://localhost:1433;database=nextup_test;user=sa;password=Str0ng!Passw0rd_ci;encrypt=true;trustServerCertificate=true'
+          AZURE_STORAGE_CONNECTION_STRING: 'UseDevelopmentStorage=true'
         run: npm run test:int
 
-      - name: Web component tests
+  # ── 6 ─────────────────────────────────────────────────────────────────────
+  test-web:
+    name: '6 · test:web'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Component tests
         run: npm run test:web
 
+  # ── 7 ─────────────────────────────────────────────────────────────────────
+  golden:
+    name: '7 · golden'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # OFFLINE, replayed recordings only. `goldenLive.spec.ts` is excluded by
+      # vitest.config.ts and must never run here: it calls the live extraction
+      # providers and costs money (§4A). No provider keys are exposed to this
+      # job, so a mistake fails loudly rather than billing quietly.
+      - name: Extractor golden suite
+        run: npm run golden
+
+  # ── 8 ─────────────────────────────────────────────────────────────────────
+  test-e2e:
+    name: '8 · test:e2e'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
       - name: Build
         run: npm run build
+      - name: E2E (Chromium + Mobile Safari)
+        run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-e2e
+          path: playwright-report/
+          retention-days: 7
+
+  # ── 9 ─────────────────────────────────────────────────────────────────────
+  test-a11y:
+    name: '9 · test:a11y'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+      - name: Build
+        run: npm run build
+      # axe on all nine routes; ZERO serious/critical (§8 job 9). The
+      # zero-tolerance threshold lives in the spec file itself, not here.
+      - name: Accessibility scan
+        run: npm run test:a11y
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-a11y
+          path: playwright-report/
+          retention-days: 7
+
+  # ── 10 ────────────────────────────────────────────────────────────────────
+  infra:
+    name: '10 · infra'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # `bicep build` is a compile, not a deployment — it needs no Azure
+      # credentials and no subscription. `what-if` DOES need both, so it
+      # belongs to the deploy workflow, not to a gate that must run on every
+      # pull request.
+      - name: Bicep build
+        run: |
+          shopt -s nullglob
+          files=(infra/*.bicep)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "no .bicep files yet (TASK-006)"
+            exit 0
+          fi
+          az bicep install
+          for f in "${files[@]}"; do
+            echo "bicep build $f"
+            az bicep build --file "$f"
+          done
+      # T-INFRA-*, T-INV-013 and T-MIG-001 (the destructive-migration gate).
+      - name: Infra and invariant tests
+        run: npm run test:infra
+
+  # ── 11 ────────────────────────────────────────────────────────────────────
+  meta:
+    name: '11 · meta'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # T-META-001: every acceptance criterion maps to a named test that
+      # actually exists. This is the job that catches the spec growing past
+      # its suite.
+      - name: AC to test mapping completeness
+        run: npm run test:meta
+
+  # ── 12 ────────────────────────────────────────────────────────────────────
+  build:
+    name: '12 · build'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - name: Build workspaces
+        run: npm run build
+      # The production container image. Built but NOT pushed: publishing is
+      # the deploy workflow's job and must not happen from a pull request.
+      - name: Build container image
+        run: |
+          if [ -f Dockerfile ]; then
+            docker build -t nextup:ci .
+          else
+            echo "no Dockerfile yet (TASK-005)"
+          fi
+      # T-SEC-019 (no dev shim in dist) is asserted by TASK-004's static
+      # checks once the image exists.

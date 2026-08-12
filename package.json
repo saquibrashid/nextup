@@ -24,10 +24,12 @@
     "test:unit": "vitest run --project unit",
     "test:int": "vitest run --project integration --passWithNoTests",
     "test:web": "vitest run --project web --passWithNoTests",
-    "test:e2e": "playwright test",
-    "test:a11y": "playwright test tests/e2e/a11y.spec.ts",
+    "test:e2e": "playwright test --pass-with-no-tests",
+    "test:a11y": "playwright test tests/e2e/a11y.spec.ts --pass-with-no-tests",
     "golden": "vitest run --project golden --passWithNoTests",
     "test:infra": "vitest run --project infra --passWithNoTests",
+    "test:meta": "vitest run --project meta --passWithNoTests",
+    "coverage": "vitest run --project unit --coverage",
     "test": "npm run test:unit && npm run test:int && npm run test:web"
   },
   "devDependencies": {
@@ -39,13 +41,14 @@
     "@types/node": "^20.14.10",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
-    "@vitest/coverage-v8": "^2.1.9",
+    "@vitest/coverage-v8": "^3.2.7",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-nextup": "*",
     "jsdom": "^25.0.1",
     "prettier": "^3.3.3",
     "typescript": "^5.5.4",
-    "vitest": "^2.1.9"
+    "vite": "^7.3.5",
+    "vitest": "^3.2.7"
   }
 }
