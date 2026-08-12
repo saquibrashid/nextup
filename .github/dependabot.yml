@@ -36,6 +36,33 @@ updates:
           - 'react-dom'
           - '@types/react'
           - '@types/react-dom'
+    # Majors that CANNOT be taken yet. Each names the condition that unblocks
+    # it, because an `ignore` with no exit criterion silently becomes permanent.
+    ignore:
+      # Node is pinned to 20 in .nvmrc, `engines`, and the digest-pinned
+      # Dockerfile base image. These two require Node >= 22 (`jsdom` >= 22.22,
+      # `jest-dom` >= 22), so they cannot install here at all.
+      # UNBLOCKED BY: moving the runtime to Node 22 — which is a spec-touching
+      # change (ADR + Dockerfile digest + .nvmrc + engines), not a dep bump.
+      - dependency-name: 'jsdom'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@testing-library/jest-dom'
+        update-types: ['version-update:semver-major']
+      # `@types/node` must track the Node major actually being run. Floating it
+      # to 26 against a Node 20 runtime is worse than being out of date: code
+      # would typecheck against APIs that do not exist at runtime, and the
+      # failure appears in production rather than in CI.
+      # UNBLOCKED BY: the same move to Node 22 — then pin to ^22.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+      # typescript-eslint refuses to load against the TS 7.0 compiler API
+      # ("typescript-eslint does not support TS 7.0"), so taking TS 7 would
+      # disable linting across the repo rather than fail loudly. The project
+      # sits on TS 6, which typescript-eslint v8 does support.
+      # UNBLOCKED BY: typescript-eslint TS >= 7.1 support, tracked upstream at
+      # typescript-eslint/typescript-eslint#10940.
+      - dependency-name: 'typescript'
+        versions: ['>=7.0.0 <7.1.0']
 
   # GitHub Actions used by the workflows.
   - package-ecosystem: github-actions

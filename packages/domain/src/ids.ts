@@ -9,6 +9,8 @@
 
 import { sha256 } from '@noble/hashes/sha2.js';
 
+import { fillRandomBytes, utf8 } from './runtime.js';
+
 /**
  * Crockford's base32 alphabet: the digits and the uppercase letters, minus
  * `I`, `L`, `O` and `U` — excluded because they misread as `1`, `1`, `0`, and
@@ -69,7 +71,7 @@ function randomBytes(length: number): Uint8Array {
   // Web Crypto, present in Node >= 19 and every supported browser. Deliberately
   // NOT `node:crypto`: this module is imported by the SPA as well as the API,
   // and a Node built-in here breaks the browser bundle.
-  globalThis.crypto.getRandomValues(bytes);
+  fillRandomBytes(bytes);
   return bytes;
 }
 
@@ -104,7 +106,7 @@ export function deterministicId(seed: string): string {
   if (seed.length === 0) {
     throw new RangeError('deterministicId requires a non-empty seed');
   }
-  const digest = sha256(new TextEncoder().encode(seed));
+  const digest = sha256(utf8(seed));
   return encodeBase32(digest, ULID_LEN);
 }
 
@@ -128,10 +130,7 @@ export function monotonicUlidFactory(seed = 0): (now?: number) => string {
       counter += 1;
       // A fixed, seed-derived random segment keeps the whole sequence
       // reproducible — a test that fails must fail the same way twice.
-      lastRandom = encodeBase32(
-        sha256(new TextEncoder().encode(`ulid-seed:${counter}`)),
-        RANDOM_LEN,
-      );
+      lastRandom = encodeBase32(sha256(utf8(`ulid-seed:${counter}`)), RANDOM_LEN);
     }
     return encodeTime(now) + lastRandom;
   };

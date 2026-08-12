@@ -49,7 +49,17 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov'],
       // Only first-party source counts; fixtures and configs would inflate it.
-      include: ['packages/domain/src/**', 'apps/api/src/**', 'apps/web/src/**'],
+      // Extensions are explicit: vitest 4 widened what an unqualified `src/**`
+      // matches, and started reporting the `.gitkeep` placeholders that hold
+      // the empty web directories as 0%-covered source files. Harmless while
+      // web has no code, but it would have quietly dragged the web threshold
+      // below its floor the moment real components landed — a failure that
+      // would have looked like a coverage regression in new code.
+      include: [
+        'packages/domain/src/**/*.{ts,tsx}',
+        'apps/api/src/**/*.{ts,tsx}',
+        'apps/web/src/**/*.{ts,tsx}',
+      ],
       exclude: [
         '**/*.d.ts',
         '**/dist/**',

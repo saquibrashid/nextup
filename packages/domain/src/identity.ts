@@ -2,6 +2,8 @@
 
 import { sha256 } from '@noble/hashes/sha2.js';
 
+import { utf8 } from './runtime.js';
+
 /**
  * A `workIdentity` is a single opaque string on `title` and the entire key of
  * `suppression`. Exactly two forms:
@@ -75,7 +77,7 @@ export function workIdentityForTmdb(mediaType: WorkMediaType, tmdbId: number): s
  * match hint.
  */
 export function workIdentityForUnmatched(rawText: string): string {
-  const digest = sha256(new TextEncoder().encode(normaliseTitleText(rawText)));
+  const digest = sha256(utf8(normaliseTitleText(rawText)));
   let hex = '';
   for (let i = 0; i < 8; i += 1) {
     hex += digest[i]!.toString(16).padStart(2, '0');
