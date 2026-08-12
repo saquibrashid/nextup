@@ -109,6 +109,13 @@ jobs:
       - name: Third-party licence notices (T-LICENSE-001)
         run: npm run check:licences
 
+      # T-STATUS-001. Runs here rather than as a 13th job so the branch
+      # ruleset's twelve required status contexts stay valid. The CLI prints
+      # which claim failed and why ("TASK-nnn is marked done but its Done when
+      # test is not in the suite"), which is the actionable form.
+      - name: Task status ledger (T-STATUS-001)
+        run: npm run check:status
+
   # ── 4 ─────────────────────────────────────────────────────────────────────
   test-unit:
     name: '4 · test:unit + coverage'

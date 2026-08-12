@@ -8,6 +8,56 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **TASK-167 — a task status ledger, a gate that can falsify it, and a
+  generated report.** `docs/backlog.md` is the work order but recorded no
+  status, so "what is done?" was answerable only from memory. `npm run status`
+  now generates `docs/status.md`; `npm run check:status` (`T-STATUS-001`, 17
+  tests) runs in CI.
+  - **Status is recorded by hand, not derived from `git log`.** Deriving it was
+    built and measured first, and it was wrong three separate ways: tasks named
+    in a commit *body* counted as delivered (5 of 21 — a 24% false-done rate);
+    `c3febc3` names `TASK-017` and `TASK-047` in its *subject* while only
+    editing their spec text, which subject-only parsing does not fix; and
+    `TASK-013/014/015: …` yields only `TASK-013` to a scan while `TASK-001`
+    landed inside the initial commit with no id at all. Git history is
+    evidence, not truth.
+  - **The gate refuses a `done` claim** when a test the task's own row names is
+    absent from the suite, when evidence is missing, or when a dependency is
+    unfinished. Work deliberately delivered ahead of a dependency records
+    `ahead-of:TASK-nnn` naming the exact task jumped; the token is rejected if
+    that task is not really a dependency, and again once it lands, so an
+    exception cannot outlive its reason. Two real ones exist: `TASK-144` (a CI
+    grep gate, ahead of the Azure work it is listed under) and `TASK-153`.
+  - **The ledger is one table with one row per task, not a column on the task
+    rows.** Fifty tasks appear in two or three of the backlog's 41 tables — 59
+    duplicate rows — so a per-row column would give one task several status
+    cells free to disagree.
+  - **`T-STATUS-001p` is what gives the gate teeth, and it was found by
+    mutation, not by reading.** The first version scanned whole spec files for
+    the test-id pattern, so marking `TASK-017` done passed cleanly: `T-SEC-021`
+    appears only in a *comment* and `T-INV-001` only in a *string literal* in
+    the ESLint rule's fixtures. 43 of 186 apparently-defined ids were mentions
+    of that kind. Ids are now read only from declarations that begin their own
+    line — precisely what separates a real test from a quoted fixture.
+  - Tightening that alone then reported nine of fifteen delivered tasks as
+    unfinished, because the backlog names `T-UI-023` while the suite implements
+    `T-UI-023a`…`g`, which `T-META-004` expressly permits. A base id is now
+    satisfied by its lettered variants, one-way, and the suffix must be a
+    *letter* — a length-only check made `T-UI-023` look like a variant of
+    `T-UI-02`.
+  - Every rule was mutation-tested against the real repository: each was shown
+    to fail on the input it must reject, and the tree restored clean.
+
+### Fixed
+
+- `tools/check-status.mjs` carries no `#!` shebang. Node tolerates one when
+  executing a file directly, but it is a syntax error to the transformer that
+  loads the module inside Vitest — which is why the sibling
+  `tools/check-licences.mjs` (no shebang) always worked.
+- The `TASK-153` sign-off banner added in `d6796b3` was written with two cells
+  inside a five-column table, which renders as a broken row. Restated with the
+  full column count.
+
 - **TASK-153 — the licence gate, `NOTICE`, and third-party notices**
   (`specs/security.md` §9, ADR-0008). **The owner approved carrying
   `libheif-js` (LGPL-3.0) and shipping the notice** — a licence decision is not

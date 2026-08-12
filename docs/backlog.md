@@ -414,6 +414,208 @@ review checkpoint where the owner can stop.
 
 ---
 
+### 1.2 Task status ledger — the single place status is recorded
+
+**This table is the source of truth for what is done.** `docs/status.md` is
+generated from it by `npm run status`, and `npm run check:status`
+(`T-STATUS-001`) fails the build if it is not true.
+
+**Why status lives here and not as a column on the task rows.** Fifty tasks
+appear in two or three different tables in this document — 59 duplicate rows in
+total, because the epic tables, the milestone tables and the cross-cutting
+summary all list the same work. A per-row status column would give a single
+task several status cells, free to disagree with one another. One row per task
+makes that impossible.
+
+**Why it is recorded by hand rather than derived from `git log`.** Deriving it
+was tried and measured on this repository, and it was wrong three different
+ways: tasks named in a commit *body* were counted as delivered (5 of 21, a 24%
+false-done rate); `c3febc3` names `TASK-017` and `TASK-047` in its *subject*
+while only editing their spec text; and `TASK-013/014/015: …` yields only
+`TASK-013` to a scan, while `TASK-001` landed inside the initial commit with no
+id at all. Git history is evidence, not truth. So the claim is written down and
+the gate tries to falsify it:
+
+| Status | Meaning |
+|---|---|
+| `todo` | Not started. |
+| `doing` | In progress. |
+| `done` | Delivered. Requires evidence, requires every test id named in the task's row to exist in the suite, and requires its dependencies to be done. |
+| `owner` | Blocked on a decision or an action only the owner can take. |
+| `deferred` | Consciously out of scope for v1. |
+
+A task delivered deliberately ahead of a dependency records `ahead-of:TASK-nnn`
+in its evidence cell, naming the exact task jumped. The gate rejects the token
+if that task is not really a dependency, and rejects it again once that task is
+finished, so the exception cannot outlive its reason.
+
+<!-- STATUS-LEDGER:START -->
+| Task | Status | Evidence |
+|---|---|---|
+| `TASK-001` | `done` | `dd61243` (in the initial scaffold commit) |
+| `TASK-002` | `done` | `85daf49` |
+| `TASK-003` | `done` | `3539384` |
+| `TASK-004` | `done` | `eab919a` |
+| `TASK-005` | `done` | `ecec349` |
+| `TASK-006` | `owner` | Azure boundary — owner gated the deployment step |
+| `TASK-007` | `owner` | Azure boundary — owner gated the deployment step |
+| `TASK-008` | `todo` | — |
+| `TASK-009` | `done` | `6d47f55` |
+| `TASK-010` | `owner` | Needs a real subscription: verify cost model, `gpt-4.1` region and quota |
+| `TASK-011` | `owner` | Needs the owner to capture golden-fixture screenshots |
+| `TASK-012` | `done` | `9ae0a0f` |
+| `TASK-013` | `done` | `692305b` |
+| `TASK-014` | `done` | `692305b` |
+| `TASK-015` | `done` | `692305b` |
+| `TASK-016` | `done` | `536aeb3` |
+| `TASK-017` | `todo` | — |
+| `TASK-018` | `todo` | — |
+| `TASK-019` | `todo` | — |
+| `TASK-020` | `todo` | — |
+| `TASK-021` | `todo` | — |
+| `TASK-022` | `done` | `d95a1ea` |
+| `TASK-023` | `todo` | — |
+| `TASK-024` | `todo` | — |
+| `TASK-025` | `done` | `a9e3483` |
+| `TASK-026` | `todo` | — |
+| `TASK-027` | `todo` | — |
+| `TASK-028` | `todo` | — |
+| `TASK-029` | `todo` | — |
+| `TASK-030` | `todo` | — |
+| `TASK-031` | `todo` | — |
+| `TASK-032` | `todo` | — |
+| `TASK-033` | `todo` | — |
+| `TASK-034` | `todo` | — |
+| `TASK-035` | `todo` | — |
+| `TASK-036` | `todo` | — |
+| `TASK-037` | `todo` | — |
+| `TASK-038` | `todo` | — |
+| `TASK-039` | `todo` | — |
+| `TASK-040` | `todo` | — |
+| `TASK-041` | `todo` | — |
+| `TASK-042` | `todo` | — |
+| `TASK-043` | `todo` | — |
+| `TASK-044` | `todo` | — |
+| `TASK-045` | `todo` | — |
+| `TASK-046` | `todo` | — |
+| `TASK-047` | `todo` | — |
+| `TASK-048` | `todo` | — |
+| `TASK-049` | `todo` | — |
+| `TASK-050` | `todo` | — |
+| `TASK-051` | `todo` | — |
+| `TASK-052` | `todo` | — |
+| `TASK-053` | `todo` | — |
+| `TASK-054` | `todo` | — |
+| `TASK-055` | `todo` | — |
+| `TASK-056` | `todo` | — |
+| `TASK-057` | `todo` | — |
+| `TASK-058` | `todo` | — |
+| `TASK-059` | `todo` | — |
+| `TASK-060` | `todo` | — |
+| `TASK-061` | `todo` | — |
+| `TASK-062` | `todo` | — |
+| `TASK-063` | `todo` | — |
+| `TASK-064` | `todo` | — |
+| `TASK-065` | `todo` | — |
+| `TASK-066` | `todo` | — |
+| `TASK-067` | `todo` | — |
+| `TASK-068` | `todo` | — |
+| `TASK-069` | `todo` | — |
+| `TASK-070` | `todo` | — |
+| `TASK-071` | `todo` | — |
+| `TASK-072` | `todo` | — |
+| `TASK-073` | `todo` | — |
+| `TASK-074` | `todo` | — |
+| `TASK-075` | `todo` | — |
+| `TASK-076` | `todo` | — |
+| `TASK-077` | `todo` | — |
+| `TASK-078` | `todo` | — |
+| `TASK-079` | `todo` | — |
+| `TASK-080` | `todo` | — |
+| `TASK-081` | `todo` | — |
+| `TASK-082` | `todo` | — |
+| `TASK-083` | `todo` | — |
+| `TASK-084` | `todo` | — |
+| `TASK-085` | `todo` | — |
+| `TASK-086` | `todo` | — |
+| `TASK-087` | `todo` | — |
+| `TASK-088` | `todo` | — |
+| `TASK-089` | `todo` | — |
+| `TASK-090` | `todo` | — |
+| `TASK-091` | `todo` | — |
+| `TASK-092` | `todo` | — |
+| `TASK-093` | `todo` | — |
+| `TASK-094` | `todo` | — |
+| `TASK-095` | `todo` | — |
+| `TASK-096` | `todo` | — |
+| `TASK-097` | `todo` | — |
+| `TASK-098` | `todo` | — |
+| `TASK-099` | `todo` | — |
+| `TASK-100` | `todo` | — |
+| `TASK-101` | `todo` | — |
+| `TASK-102` | `todo` | — |
+| `TASK-103` | `todo` | — |
+| `TASK-104` | `todo` | — |
+| `TASK-105` | `todo` | — |
+| `TASK-106` | `todo` | — |
+| `TASK-107` | `todo` | — |
+| `TASK-108` | `todo` | — |
+| `TASK-109` | `todo` | — |
+| `TASK-110` | `todo` | — |
+| `TASK-111` | `todo` | — |
+| `TASK-112` | `todo` | — |
+| `TASK-113` | `todo` | — |
+| `TASK-114` | `todo` | — |
+| `TASK-115` | `todo` | — |
+| `TASK-116` | `todo` | — |
+| `TASK-117` | `todo` | — |
+| `TASK-118` | `todo` | — |
+| `TASK-119` | `todo` | — |
+| `TASK-120` | `todo` | — |
+| `TASK-121` | `todo` | — |
+| `TASK-122` | `todo` | — |
+| `TASK-123` | `todo` | — |
+| `TASK-124` | `todo` | — |
+| `TASK-125` | `todo` | — |
+| `TASK-126` | `todo` | — |
+| `TASK-127` | `todo` | — |
+| `TASK-128` | `todo` | — |
+| `TASK-129` | `todo` | — |
+| `TASK-130` | `todo` | — |
+| `TASK-131` | `todo` | — |
+| `TASK-132` | `todo` | — |
+| `TASK-133` | `todo` | — |
+| `TASK-134` | `todo` | — |
+| `TASK-141` | `todo` | — |
+| `TASK-142` | `todo` | — |
+| `TASK-143` | `todo` | — |
+| `TASK-144` | `done` | `eb07409` — a CI grep gate over `prisma/migrations/**`, which needs no infrastructure ahead-of:TASK-006 |
+| `TASK-145` | `todo` | — |
+| `TASK-146` | `owner` | Needs the owner to mint the `ghcr.io` fine-grained PAT |
+| `TASK-147` | `todo` | — |
+| `TASK-148` | `todo` | — |
+| `TASK-149` | `todo` | — |
+| `TASK-150` | `todo` | — |
+| `TASK-151` | `todo` | — |
+| `TASK-152` | `todo` | — |
+| `TASK-153` | `done` | `d6796b3` — owner approved the LGPL-3.0 obligation; gate proven on synthetic fixtures ahead-of:TASK-147 |
+| `TASK-154` | `todo` | — |
+| `TASK-155` | `todo` | — |
+| `TASK-156` | `todo` | — |
+| `TASK-157` | `todo` | — |
+| `TASK-158` | `todo` | — |
+| `TASK-159` | `todo` | — |
+| `TASK-160` | `todo` | — |
+| `TASK-161` | `todo` | — |
+| `TASK-162` | `todo` | — |
+| `TASK-163` | `todo` | — |
+| `TASK-164` | `todo` | — |
+| `TASK-165` | `owner` | Needs a real iOS device to verify the clipboard paste path |
+| `TASK-166` | `todo` | — |
+| `TASK-167` | `done` | this commit — the ledger, the gate and `docs/status.md` |
+<!-- STATUS-LEDGER:END -->
+
+
 ## 2. Critical path
 
 The items that determine when the MVP is demonstrable. Everything not on this
@@ -923,10 +1125,11 @@ Traces to: US-036 (REQ-041, NFR-005) · Milestone M0/M2/M7
 
 | Task | Description | Size | Depends on | Done when |
 |---|---|---|---|---|
+| TASK-167 **(new)** | **Task status ledger + gate + generated report.** `docs/backlog.md` §1.2 records one status row per task; `tools/check-status.mjs` validates it and regenerates `docs/status.md`; `npm run check:status` runs in CI. The gate refuses `done` when a test the task names is absent from the suite, when evidence is missing, or when a dependency is unfinished without an explicit `ahead-of:TASK-nnn` token. **Status is recorded, not derived from `git log`:** deriving it was measured on this repository and was wrong three ways — commit-body mentions counted as delivered (24% false-done), `c3febc3` names TASK-017 and TASK-047 in its subject while only editing spec text, and `TASK-013/014/015:` scans as one task while TASK-001 has no id at all. | S | 002 | `T-STATUS-001` |
 | TASK-004 | *(see M0)* gitleaks + `npm audit` + dependency allow-list. | XS | 003 | `T-SEC-009` |
 | TASK-044 | `tests/ci/no-scheduler.spec.ts` — static gate against timers, cron, and queue triggers. | XS | 043 | `T-CI-005` |
 | TASK-121 | Mutating-route registry checked against the REQ-041 closed enumeration. | S | 023 | `T-MUT-001`, `T-MUT-002` |
-| TASK-153 **(new, R5 — OWNER-DEPENDENT; ✅ OWNER APPROVED)** | **✅ SIGNED OFF.** The owner approved carrying the LGPL-3.0 HEIC codec and shipping the notice. `NOTICE` + `THIRD-PARTY-NOTICES.md` exist; `T-LICENSE-001` (`specs/testing.md` §9A, `tests/infra/licences.spec.ts`) is green and wired into CI job 3 and job 10. **The remaining half of this task is TASK-147’s to complete:** the notice file lists what actually ships, so `libheif-js` appears in it only once the dependency is installed — the gate then requires it, and fails the build if it is missing. Original text retained below. |
+| TASK-153 **(✅ OWNER APPROVED)** | **✅ SIGNED OFF — see the status ledger §1.2 and `CHANGELOG.md`.** The owner approved carrying the LGPL-3.0 HEIC codec and shipping the notice. `NOTICE` and `THIRD-PARTY-NOTICES.md` exist, and `T-LICENSE-001` (`specs/testing.md` §9A, `tests/infra/licences.spec.ts`) is green and wired into CI. **The remaining half is TASK-147’s to complete:** the notice file lists what actually ships, so `libheif-js` appears in it only once the dependency is installed — at which point the gate requires it and fails the build if it is absent. Original task text retained in the row below. | XS | 147 | Delivered at `d6796b3`; `T-LICENSE-001` |
 | TASK-153 **(new, R5 — OWNER-DEPENDENT)** | **Owner licence sign-off for the LGPL-3.0 HEIC codec + add a `NOTICE` file.** The HEIC decode dependency introduces `libheif-js` (**LGPL-3.0**, weak copyleft, used unmodified, decode-only). Compatibility with this **MIT** repo is conditional on **retaining the LGPL notice**. A licence decision is **not an agent's to make**, so this task requires the owner to (a) approve carrying an LGPL-3.0 dependency in the shipped MIT app, and (b) confirm the `NOTICE` / THIRD-PARTY text. The agent prepares `NOTICE` + `THIRD-PARTY-NOTICES.md` (per `specs/security.md` §4.2) listing `libheif-js` LGPL-3.0 (unmodified, replaceable) for the owner to sign off. ⚠ **ID-collision: the architect's ADR-0008 report calls this "TASK-144", but TASK-144 is the destructive-migration gate — this is TASK-153; do NOT merge them.** Note: **OQ-027** (retain vs discard the original HEIC after verified transcode) is a separate open question, not resolved by this task. | XS | 147 | Owner has recorded approval (or rejection) of the LGPL-3.0 obligation; `NOTICE` + `THIRD-PARTY-NOTICES.md` exist and list `libheif-js` LGPL-3.0; if rejected, an alternative decode path is raised to the owner rather than shipped silently |
 
 #### US-037 — It works on my phone and is accessible
@@ -1003,6 +1206,7 @@ Each is a real task above, listed here so it cannot be quietly skipped.
 | TASK-141 | **DB auth + M0 smoke migration** (managed-identity preferred, KV password fallback) | S | M0 | **R4:** Prisma `sqlserver` MI path is less-established (`RSK-031`) — prove the migration against real Azure SQL Basic before feature work |
 | TASK-142 | **Budget alert at 1.5× the published total** | XS | M0 | Converts unverified spend (`RSK-029`) into monitored spend |
 | TASK-144 | **`T-MIG-001` destructive-migration gate** | XS | M0 | `REQ-028` is most easily violated by a Prisma-generated `DROP COLUMN` / `DROP CONSTRAINT` |
+| TASK-167 | **Task status ledger + `T-STATUS-001` gate** | S | M0 | `docs/backlog.md` is the work order but recorded no status; git history proved unusable as a substitute, so the claim is written down and gated |
 | TASK-143 | **Post-revision consistency sweep** (`RSK-030`) | S | M0 | **R4** widened it: the PG→Azure SQL change superseded parts of six specs and every store-naming diagram |
 | TASK-145 **(R6)** | **Serial image processing + the pre-decode PIXEL guard at 0.5 GiB** (`RSK-016`, owner-accepted residual) — ~~byte guard~~ **corrected to a pixel guard: bytes do not predict raster size** | S | **M2** ~~M1~~ | `A43-M1`. The R4 compute cut is now the *confirmed* as-designed size (`A43`), so the guard is what makes it survivable. **Milestone corrected at R6: TASK-145 depends on TASK-033, which is M2, so it cannot be M1. It must still land before TASK-149 (M3), which it does.** |
 | TASK-154 **(new, R6)** | **Per-image failure isolation + retryability** — one bad image fails one image, never the batch | M | M3 | `A43-M2`. Must land **before or with** the extraction runner (`TASK-058` depends on it) |

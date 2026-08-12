@@ -1185,6 +1185,7 @@ they fail — and because `T-META-003` requires every id referenced by
 |---|---|---|
 | **`T-UI-023`** *(a–g)* | `TASK-025` | **The app shell and the nine-route table** (`specs/ui.md` §1). `ROUTES` holds exactly the nine specified paths (`a`); each renders its own distinct screen rather than falling through to the catch-all (`b`); `<header>`, `<nav>`, `<main>` and `<footer>` each appear **exactly once** on every route, per `ui.md` §10.2 (`c`); an unknown path renders `NotFoundPage` **with a working link back to `/`**, which the screen index names as that route's whole purpose (`d`); the three overlapping `/batches…` patterns do not shadow one another (`e`); the nav exposes the six top-level destinations (`f`); and the global footer landmark exists on every route, ready for the TMDB attribution `TASK-026` mounts into it (`g`). |
 | **`T-LICENSE-001`** *(a–l)* | `TASK-153` | **The MIT licence and its retained-notice obligations** (`specs/security.md` §9, ADR-0008 §"Licence obligation"). `LICENSE` is MIT with a copyright line and both operative clauses (`a`); `README`, `NOTICE` and `LICENSE` agree (`b`); **`THIRD-PARTY-NOTICES.md` matches the installed production tree byte for byte** (`c` — the drift gate); every production dependency has a resolvable licence (`d`); **`LGPL-3.0` classifies as WEAK copyleft, never strong** (`e`); the full HEIC chain clears once `libheif-js` is listed (`f`); an LGPL dependency **missing** from the notices is caught (`g`); a **strong-copyleft** dependency is refused outright and listing it does not clear it (`h`); an unlicensed dependency cannot be cleared (`i`); the render is deterministic (`j`); and `NOTICE` records the approved obligation **and its decode-only scope** (`k`). `l` guards the one interaction that can deadlock CI — see below. |
+| **`T-STATUS-001`** *(a–q)* | `TASK-167` | **The task status ledger and its gate** (`docs/backlog.md` §1.2). The backlog parses into tasks with a dependency graph, merging the 59 rows that list one task in several tables (`a`); the committed ledger and backlog agree and every `done` claim holds (`b`); a backlog task missing from the ledger (`c`) and a ledger row for a task that does not exist (`d`) are both caught; a status outside the closed set is caught (`e`); **`done` is refused when a test the task names is absent from the suite** (`f`) and accepted when it is present (`g`); `done` without evidence is caught (`h`); a task `done` before its dependency is caught (`i`) unless an explicit `ahead-of:TASK-nnn` token names it (`j`), and that token is itself rejected when it names a non-dependency (`k`) or when the named task has since landed (`l`); the ready-set excludes blocked tasks (`m`); the report is deterministic and matches the committed `docs/status.md` (`n`); the ledger covers every task (`o`); **a test id mentioned only in a comment or a fixture does not count as delivered** (`p`); and a base id is satisfied by its lettered variants but not the reverse (`q`). |
 
 **Why the route set gets a test of its own.** Four later suites — `T-ATTR-002`,
 `T-ATTR-003`, `T-A11Y-001` and `T-A11Y-012` — are each specified as running
@@ -1224,6 +1225,39 @@ formatting. This was **observed, not predicted** — both failed in turn during
 loosen the byte comparison into a fuzzy one, and the byte comparison is the only
 thing that gives the drift gate any teeth. The ignore line is the fix, so the
 ignore line is what is asserted.
+
+**Why status is asserted at all, and why not from `git log`.** `docs/backlog.md`
+is the work order but records no status, so "what is done?" was answerable only
+from memory. Deriving it from git history was tried and measured on this
+repository, and it was wrong three separate ways: tasks named in a commit *body*
+were counted as delivered (5 of 21, a 24% false-done rate); `c3febc3` names
+`TASK-017` and `TASK-047` in its *subject* while only editing their spec text,
+which subject-only parsing does not fix; and `TASK-013/014/015: …` yields only
+`TASK-013` to a scan while `TASK-001` landed inside the initial commit with no
+id at all, so work that IS done goes unseen. Git history is evidence, not truth.
+The claim is therefore written down, and `T-STATUS-001` is the attempt to
+falsify it.
+
+**`T-STATUS-001p` is the one that gives the gate teeth, and it was found by
+mutation rather than by reading.** The first implementation scanned whole spec
+files for the test-id pattern, so marking `TASK-017` done passed cleanly: of the
+two ids it names, `T-SEC-021` appears only inside a *comment* and `T-INV-001`
+only inside a *string literal* in `tools/eslint-rules/test-id-naming.spec.ts`,
+where sample test declarations serve as fixtures for the naming rule. 43 of 186
+apparently-defined ids were mentions of this kind. Ids are now read only from
+declarations that begin their own line — which is what separates a real test
+from a fixture, since a fixture is always preceded on its line by the opening
+quote of the string containing it.
+
+**`T-STATUS-001q` is the counterweight.** Tightening `p` alone reported nine of
+the fifteen delivered tasks as unfinished, because the backlog names an
+acceptance criterion (`T-UI-023`) while the suite splits it into lettered cases
+(`T-UI-023a`…`g`) exactly as `T-META-004` permits. A base id is therefore
+satisfied by any of its variants — but not the reverse, so an id the spec pins to
+a specific case must be present as that case. The suffix must be a *letter*: an
+earlier length-only check made `T-UI-023` look like a variant of `T-UI-02`, which
+would have let a mistyped trailing digit resolve to a different criterion.
+
 
 ---
 
@@ -1335,6 +1369,7 @@ Test files live where §11's tree puts them, plus:
 tests/meta/                    acMapping.spec.ts
 tests/infra/                   …, supplyChain.spec.ts   # T-SEC-009, T-CI-006
                                …, licences.spec.ts      # TASK-153 — T-LICENSE-001a…l (§9A)
+                                …, status.spec.ts        # TASK-167 — T-STATUS-001a…q (§9A)
 ```
 
 
