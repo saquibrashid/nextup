@@ -29,6 +29,7 @@ import {
   parseLedger,
   readyTasks,
   renderStatus,
+  unparsedDependencyTasks,
 } from '../../tools/check-status.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -202,6 +203,62 @@ describe('T-STATUS-001 · the task status ledger and its gate', () => {
       ledgerOf(['| `TASK-900` | `done` | `abc1234` |', '| `TASK-901` | `todo` | — |'])!,
     );
     expect(unblocked.map((t) => t.id)).toEqual(['TASK-901']);
+  });
+
+  it('T-STATUS-001r · an escaped pipe in a description does not destroy the dependency graph', () => {
+    // The real defect this caught. `\|` is an escaped pipe, not a column
+    // separator; splitting on it widened the row, which discarded the Size and
+    // Depends-on cells, which left the task with NO recorded dependencies —
+    // and a task with no dependencies is reported ready to start. TASK-166
+    // (blocked on two unfinished tasks) and TASK-149 (blocked on TASK-148)
+    // were both advertised as ready in the committed `docs/status.md`.
+    const escaped = [
+      '## Epic Z — synthetic',
+      '',
+      '| Task | Description | Size | Depends on | Done when |',
+      '|---|---|---|---|---|',
+      '| TASK-900 | first | S | — | `T-FAKE-001` |',
+      '| TASK-902 | wires `desc`/newest-first \\| `asc`/oldest-first | S | 900 | `T-FAKE-003` |',
+      '',
+    ].join('\n');
+
+    const tasks = parseBacklog(escaped);
+    expect(tasks.get('TASK-902')?.deps).toEqual(['TASK-900']);
+    expect(tasks.get('TASK-902')?.size).toBe('S');
+
+    const ready = readyTasks(
+      tasks,
+      ledgerOf(['| `TASK-900` | `todo` | — |', '| `TASK-902` | `todo` | — |'])!,
+    );
+    expect(ready.map((t) => t.id)).toEqual(['TASK-900']);
+  });
+
+  it('T-STATUS-001s · an unreadable row is reported, never treated as dependency-free', () => {
+    // Fail closed. An unparsed row has UNKNOWN dependencies, not zero of them,
+    // and `.every()` over an empty list is vacuously true — so without this the
+    // two are indistinguishable and the task is advertised as ready.
+    const broken = [
+      '## Epic Z — synthetic',
+      '',
+      '| Task | Description | Size | Depends on | Done when |',
+      '|---|---|---|---|---|',
+      '| TASK-900 | first | S | — | `T-FAKE-001` |',
+      '| TASK-903 | uses `a || b` unescaped | S | 900 | `T-FAKE-004` |',
+      '',
+    ].join('\n');
+
+    const tasks = parseBacklog(broken);
+    expect(unparsedDependencyTasks(tasks)).toEqual(['TASK-903']);
+
+    const ledger = ledgerOf(['| `TASK-900` | `todo` | — |', '| `TASK-903` | `todo` | — |'])!;
+    expect(readyTasks(tasks, ledger).map((t) => t.id)).toEqual(['TASK-900']);
+
+    const findings = checkStatus(tasks, ledger, new Set(['T-FAKE-001', 'T-FAKE-004']));
+    expect(findings.join('\n')).toContain('TASK-903');
+  });
+
+  it('T-STATUS-001t · the committed backlog has no unreadable rows', () => {
+    expect(unparsedDependencyTasks(parseBacklog(read('docs/backlog.md')))).toEqual([]);
   });
 
   it('T-STATUS-001n · the report is deterministic and matches the committed file', () => {

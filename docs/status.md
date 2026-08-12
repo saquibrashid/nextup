@@ -11,10 +11,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 132 |
+| ⬜ todo | 129 |
 | 🚧 doing | 0 |
 | ✅ done | 25 |
-| 🙋 owner | 4 |
+| 🙋 owner | 7 |
 | 💤 deferred | 0 |
 | **total** | **161** |
 
@@ -34,7 +34,7 @@ Not done, and every task they depend on is done.
 | `TASK-033` | M | Epic F — The list itself (the value loop) |
 | `TASK-041` | S | Epic F — The list itself (the value loop) |
 | `TASK-045` | S | Epic D — Matching & identity |
-| `TASK-048` | — | Epic B — Capture & import |
+| `TASK-048` | S | Epic B — Capture & import |
 | `TASK-055` | S | Epic C — Extraction |
 | `TASK-101` | S | Epic H — History, removal ledger, suppression |
 | `TASK-121` | S | Epic K — Platform, safety, and the shell |
@@ -42,16 +42,8 @@ Not done, and every task they depend on is done.
 | `TASK-126` | M | Epic K — Platform, safety, and the shell |
 | `TASK-128` | XS | Epic K — Platform, safety, and the shell |
 | `TASK-132` | XS | Epic K — Platform, safety, and the shell |
-| `TASK-134` | XS | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
-| `TASK-141` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
-| `TASK-142` | XS | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-143` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
-| `TASK-145` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-147` | S | Epic B — Capture & import |
-| `TASK-149` | — | Epic B — Capture & import |
-| `TASK-157` | M | Epic K — Platform, safety, and the shell |
-| `TASK-158` | S | Epic B — Capture & import |
-| `TASK-166` | — | Epic F — The list itself (the value loop) |
 
 ## Waiting on the owner
 
@@ -60,11 +52,14 @@ Not done, and every task they depend on is done.
 | `TASK-007` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Azure boundary — owner gated the deployment step |
 | `TASK-010` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs a real subscription: verify cost model, `gpt-4.1` region and quota |
 | `TASK-011` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs the owner to capture golden-fixture screenshots |
+| `TASK-134` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs the owner to APPLY to Microsoft for Azure OpenAI modified abuse monitoring — an approval, not code. `docs/parallel-execution-plan.md` §3 already lists it as owner-dependent; the ledger said `todo`, which advertised it to lane agents as startable work. |
+| `TASK-141` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs a REAL Azure SQL database: the gating deliverable is an M0 smoke migration applied against one. Blocked behind the same owner-gated Azure boundary as TASK-007. |
+| `TASK-142` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs a real subscription — a budget alert is configured at subscription scope and cannot be verified without one. |
 | `TASK-165` | Epic B — Capture & import | Needs a real iOS device to verify the clipboard paste path |
 
 ## Blocked by a dependency
 
-104 tasks cannot start yet.
+109 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -159,19 +154,24 @@ Not done, and every task they depend on is done.
 | `TASK-130` | `TASK-124`, `TASK-108` |
 | `TASK-131` | `TASK-044` |
 | `TASK-133` | `TASK-007`, `TASK-156` |
+| `TASK-145` | `TASK-033` |
 | `TASK-148` | `TASK-147` |
+| `TASK-149` | `TASK-148`, `TASK-145` |
 | `TASK-150` | `TASK-149` |
 | `TASK-151` | `TASK-149`, `TASK-150` |
 | `TASK-152` | `TASK-053` |
 | `TASK-154` | `TASK-050`, `TASK-149`, `TASK-054` |
 | `TASK-155` | `TASK-149`, `TASK-152` |
 | `TASK-156` | `TASK-007` |
+| `TASK-157` | `TASK-010`, `TASK-142`, `TASK-149` |
+| `TASK-158` | `TASK-148` |
 | `TASK-159` | `TASK-053`, `TASK-050` |
 | `TASK-160` | `TASK-053`, `TASK-158` |
 | `TASK-161` | `TASK-160` |
 | `TASK-162` | `TASK-053`, `TASK-159`, `TASK-160` |
 | `TASK-163` | `TASK-050`, `TASK-149`, `TASK-150`, `TASK-158`, `TASK-160`, `TASK-162` |
 | `TASK-164` | `TASK-080`, `TASK-160`, `TASK-162` |
+| `TASK-166` | `TASK-036`, `TASK-039` |
 
 ## Done
 
@@ -191,7 +191,7 @@ Not done, and every task they depend on is done.
 | `TASK-015` | `692305b` | `T-DM-001` |
 | `TASK-016` | `536aeb3` | `T-INV-009`, `T-INV-010` |
 | `TASK-017` | Prisma `sqlserver` + `prisma/migrations/0001_init` applied against real `mssql/server:2022`; `apps/api/src/repository/ownerData.ts` with `ownerId` as the first positional parameter of every method; `T-SEC-021` (AST walk, 17 cases, 12 of them mutations), `T-INV-001/002/015` (DB raises `2601`/`2627`), `T-INV-018` (BIN2 collation + filtered indexes exist), `T-INV-019/020/021/022`. 28 integration tests green. Schema/migration drift is zero and CI now asserts it. | `T-INV-001`, `T-MIG-001`, `T-SEC-021` |
-| `TASK-018` | `apps/api/src/auth/principal.ts` — Easy Auth `x-ms-client-principal` adapter, plus `auth/ownerId.ts`. Fails **closed** on every malformed input including a repeated header. `T-SEC-013` (15 cases), `T-SEC-020` (8, incl. a 10,000-subject collision fixture and the `\ | `T-SEC-013` |
+| `TASK-018` | `apps/api/src/auth/principal.ts` — Easy Auth `x-ms-client-principal` adapter, plus `auth/ownerId.ts`. Fails **closed** on every malformed input including a repeated header. `T-SEC-013` (15 cases), `T-SEC-020` (8, incl. a 10,000-subject collision fixture and the `\|`-separator collision), `T-SEC-019` (the shim boundary, mutation-proven). | `T-SEC-013` |
 | `TASK-019` | `apps/api/src/middleware/allowList.ts` — fail-closed against `NEXTUP_ALLOWED_SUBJECTS`; `NEXTUP_BOOTSTRAP_ALLOW_FIRST` grants nothing on its own. `T-SEC-010`, `T-SEC-014`, `T-SEC-015` (address-claim word ban, mutation-proven), `T-SEC-016`. | `T-SEC-010`, `T-SEC-014`, `T-SEC-015`, `T-SEC-016` |
 | `TASK-020` | `apps/api/src/middleware/ownerScope.ts` + `auth/ownerId.ts` — `ownerId` derives from the principal only. `T-SEC-020`, `T-SEC-029` (routes **enumerated** from the app and the router, not listed; `T-SEC-029c` mutation-proven against a route mounted outside the chain). | `T-SEC-020`, `T-SEC-029` |
 | `TASK-021` | `apps/api/dev/devPrincipal.ts` — the shim is excluded **structurally** (outside the production `include: ["src/**/*.ts"]`), not by a flag or an exclude list; `createApp` injects the reader. `T-SEC-019a-f`. ⚠ The task row said `apps/api/src/auth/devPrincipal.ts`; corrected in place below and in `specs/security.md` §2.3. | `T-SEC-019` |

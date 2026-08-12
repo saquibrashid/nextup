@@ -56,9 +56,25 @@ const TASK_RE = /TASK-\d{3}/;
 const TEST_ID_RE = /T-[A-Z0-9]+-\d+[a-z]?/g;
 
 const norm = (s) => s.replace(/\r\n/g, '\n');
+
+/**
+ * Split a markdown table row into cells.
+ *
+ * ⚠ `\|` is an ESCAPED pipe, not a column separator. Splitting on it silently
+ * widens the row, which made `shaped` false, which discarded the row's Size
+ * and Depends-on cells — and a task with no recorded dependencies is reported
+ * READY. That is fail-open in the one direction that matters: `docs/status.md`
+ * is what tells an agent which work is unblocked, and TASK-166 (which depends
+ * on two unfinished tasks and wires a route that does not exist yet) was being
+ * advertised as ready to start because its description contains
+ * `` `desc`/newest-first default \| `asc` ``.
+ */
 const cells = (line) =>
   line
-    .split('|')
+    // A negative lookbehind, so an escaped `\|` is not a separator. (The
+    // earlier version substituted a sentinel character, which tripped
+    // `no-control-regex`; this needs no sentinel and no round trip.)
+    .split(/(?<!\\)\|/)
     .slice(1, -1)
     .map((c) => c.trim());
 
@@ -116,14 +132,16 @@ export function parseBacklog(markdown) {
       section,
       size: '',
       deps: [],
+      depsKnown: false,
       testIds: [],
       rows: 0,
     };
     existing.rows += 1;
     if (!existing.size && at('size'))
       existing.size = at('size').replace(/\*/g, '').split('(')[0].trim();
-    if (existing.deps.length === 0 && at('depends')) {
+    if (!existing.depsKnown && at('depends')) {
       existing.deps = [...at('depends').matchAll(/(\d{3})/g)].map((m) => `TASK-${m[1]}`);
+      existing.depsKnown = true;
     }
     // Test ids are collected from the WHOLE row, not just the "Done when"
     // column. The backlog names them in whichever column reads best —
@@ -322,6 +340,17 @@ export function checkStatus(tasks, ledger, definedTestIds) {
       findings.push(`${id} is in the status ledger but no such task exists in the backlog.`);
   }
 
+  // An unreadable row is a defect in the backlog, not something to route
+  // around. It silently strips the task's dependencies, and a task with no
+  // recorded dependencies is reported ready to start — so this must be loud.
+  // The usual cause is an unescaped `|` inside a code span; write `\|`.
+  for (const id of unparsedDependencyTasks(tasks)) {
+    findings.push(
+      `${id}: its table row could not be parsed, so its dependencies are unknown. ` +
+        'This is almost always an unescaped `|` inside a code span — write `\\|`.',
+    );
+  }
+
   for (const entry of ledger.values()) {
     const task = tasks.get(entry.id);
     if (!task) continue;
@@ -390,13 +419,33 @@ export function checkStatus(tasks, ledger, definedTestIds) {
 
 /** Tasks that are not done and whose dependencies are all done. */
 export function readyTasks(tasks, ledger) {
+  return (
+    [...tasks.values()]
+      .filter((task) => {
+        const status = ledger.get(task.id)?.status;
+        return status === 'todo' || status === 'doing';
+      })
+      // ⚠ Fail CLOSED on an unparsed dependency cell. A task whose row shape the
+      // parser could not read has UNKNOWN dependencies, not zero of them, and
+      // `.every()` over an empty list is vacuously true — so the two are
+      // indistinguishable here and the task is advertised as ready to start.
+      // That is the wrong direction for this report: `docs/status.md` is what
+      // tells an agent what is unblocked. Measured, before the `\|` escape fix:
+      // TASK-149 (blocked on the unfinished TASK-148) and TASK-166 (blocked on
+      // two unfinished tasks, wiring a route that does not exist) were both
+      // listed as ready.
+      .filter((task) => task.depsKnown)
+      .filter((task) => task.deps.every((dep) => ledger.get(dep)?.status === 'done'))
+      .sort((a, b) => a.id.localeCompare(b.id))
+  );
+}
+
+/** Tasks whose dependency cell could not be read. Never silently empty. */
+export function unparsedDependencyTasks(tasks) {
   return [...tasks.values()]
-    .filter((task) => {
-      const status = ledger.get(task.id)?.status;
-      return status === 'todo' || status === 'doing';
-    })
-    .filter((task) => task.deps.every((dep) => ledger.get(dep)?.status === 'done'))
-    .sort((a, b) => a.id.localeCompare(b.id));
+    .filter((task) => !task.depsKnown)
+    .map((task) => task.id)
+    .sort();
 }
 
 const BADGE = {
