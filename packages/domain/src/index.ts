@@ -1,9 +1,9 @@
 // @nextup/domain — shared, pure TypeScript domain.
 //
-// PLACEHOLDER entry point (baseline scaffold). The real domain types live in
-// `packages/domain/src/types.ts` and are imported verbatim by the API and web
-// apps — see specs/data-model.md §"types.ts" (SERVICES, workIdentity, the
-// normalisation and identity functions). Do not add logic here without a
-// backlog task and its named test.
+// Imported verbatim by `apps/api` and `apps/web` (ADR-0004). Everything here is
+// pure: no I/O, no Prisma, no Express, no React.
 
-export const PLACEHOLDER = true;
+export * from './enums.js';
+export * from './identity.js';
+export * from './schemas.js';
+export * from './types.js';

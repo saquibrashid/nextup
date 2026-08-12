@@ -8,6 +8,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`TASK-012` — shared domain types (`packages/domain/src/**`).** The six
+  document types from `specs/data-model.md` §3 as pure TypeScript interfaces
+  (`types.ts`), the enums as `as const` tuples (`enums.ts`), and Zod mirrors
+  (`schemas.ts`) tied to the interfaces with `satisfies z.ZodType<T>` so a
+  drifting schema is a **compile** error, not a runtime surprise. `zod@^4` is
+  the one new runtime dependency (`NFR-004`: mainstream, no transitive deps).
+  - **`TitleState` is `'active' | 'removed'` — there is deliberately no
+    `'suppressed'`.** Suppression is a separate `Suppression` document keyed on
+    `workIdentity` (`REQ-071`). A title-scoped flag would appear to work and
+    then silently stop the first time a title reappears, because a reappearance
+    is a **brand-new row** (`L1`/`A33`). `T-DM-021a/b` assert both halves.
+  - **`ingestSource` is `'paste' | 'upload' | 'drop'` — all three** (ADR-0009).
+    Paste was *added* to file selection, not swapped in; `T-DM-025a/b` round-trip
+    each and reject a fourth so the set cannot be quietly trimmed.
+  - `uploadedFormat` admits `heic`/`heif` but the stored `format` does **not**:
+    HEIC is transcoded to lossless PNG on ingest (`REQ-077`, ADR-0008), so a
+    persisted `format: 'heic'` means the transcode was skipped. `T-DM-025d`
+    fails if the schema stops distinguishing them.
+  - Every schema is `.strict()`: an unknown key is an **error**, not stripped.
+    Stripping hides a producer/consumer mismatch until it matters (`T-DM-020c`).
+  - `packages/domain/test/placeholder.spec.ts` and its `PLACEHOLDER` export were
+    deleted, exactly as the note below required, now that real types have landed.
+    Domain coverage is **100/100**, above the 95/90 floor.
+
 - **`TASK-009` — offline getting-started.** `docker-compose.test.yml` (SQL
   Server 2022 + Azurite, mirroring the CI service containers exactly, so a
   failure reproduces locally instead of only on a runner) and
@@ -200,11 +224,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   itself and `tests/infra/supplyChain.spec.ts` — because a checker cannot name
   what it forbids without matching itself. **Do not widen this to "test files"
   as a class**; that would hand a future beacon somewhere to hide.
-- `packages/domain/test/placeholder.spec.ts` (`T-SCAFFOLD-001`) exists only to
+- ~~`packages/domain/test/placeholder.spec.ts` (`T-SCAFFOLD-001`) exists only to
   hold the §1 95% domain coverage floor armed while `src/index.ts` is still a
-  placeholder. **Delete it when `types.ts` lands** — it is not an acceptance
-  criterion and must never be mistaken for one. A threshold switched off
-  "until there is code" is a threshold that never comes back on.
+  placeholder. **Delete it when `types.ts` lands**~~ — **done in TASK-012**;
+  the file and `PLACEHOLDER` are gone, and `packages/domain/test/schemas.spec.ts`
+  now holds the floor with real assertions (domain coverage is 100/100).
 - Coverage excludes exactly two files — `apps/api/src/index.ts` and
   `apps/web/src/main.tsx`. Both are process entrypoints that only bootstrap and
   are covered by the e2e and smoke suites. **Never widen this to `src/**`.**
