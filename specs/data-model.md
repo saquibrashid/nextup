@@ -1781,10 +1781,22 @@ which is what the identity invariants rely on. SQL Server databases are
 
 ### 16.3 Tables (T-SQL DDL — normative; supersedes §15.3)
 
-> ⚠ **Enum-value correction (applied in place).** Three `CHECK` lists below
-> were stale and have been corrected against the authoritative unions in §3 of
-> this document and `packages/domain/src/enums.ts`. Each would have compiled
-> and deployed cleanly, then rejected legitimate writes at **runtime**:
+> ⚠ **Revision 5 (2026-08-12). This DDL was previously NOT EXECUTABLE.** It was
+> extracted verbatim and run against `mcr.microsoft.com/mssql/server:2022-latest`
+> (16.0.4265.3); the published form created **0 of 9 tables**. Every correction
+> below was verified by execution, not by reading. The full record, including
+> the reproduction, is `docs/task-017-schema-findings.md`.
+>
+> **A. Defects that stopped it working**
+>
+> | # | Defect | Correction |
+> |---|---|---|
+> | **E-1** | `title` referenced `upload_batch`, and `service_listing` referenced `removal_group`, **before either existed** — `Msg 1767`, nothing created. | Tables are now in dependency order. **Do not re-alphabetise them.** |
+> | **E-2** | 7 FK columns omitted the `Latin1_General_100_BIN2` collation §16.2.1 mandates, so every FK failed with `Msg 1757` (collation mismatch). | Collation added to all 7. **Every `*_id` column carries it, without exception.** |
+> | **E-3** | `ISJSON(x) = 1` returns **0 for a JSON scalar** (verified: `ISJSON('"tmdb:tv:1"')` → 0). `batch_change.prev_value`/`next_value` hold scalars, so the commonest provenance write was rejected — and because batch close is one transaction, **the whole close rolled back**. | `ISJSON(x, VALUE) = 1` on those two columns only. Verified supported on SQL Server 2022. |
+>
+> **B. Enum-value corrections (Revision 4, retained)** — each compiled and
+> deployed cleanly, then rejected legitimate writes at **runtime**:
 >
 > | Column | Was | Now | Why the old value was wrong |
 > |---|---|---|---|
@@ -1793,25 +1805,94 @@ which is what the identity invariants rely on. SQL Server databases are
 > | `status` | 6 values, incl. `'review'`, `'failed'` | 8 values | §3 (ll. 313–319) and the state machine (l. 943) both define **eight**. `'submitted'`, `'extraction-failed'`, `'in-review'` and `'discarded'` are all reachable and were unrepresentable. |
 > | `status` width | `NVARCHAR(16)` | `NVARCHAR(24)` | A consequence of the row above: `'extraction-failed'` is **17 characters** and would not fit. Every other enum column was re-audited against its longest permitted value and is correctly sized. |
 >
-> §15.3 retains the original `'prime'`/`'append_only'` text: it is superseded
-> and kept only as historical record. Do not build from it.
+> **C. Owner decisions applied** (`docs/task-017-schema-findings.md` §2):
+>
+> | # | Change |
+> |---|---|
+> | **D-1** | `listing_one_per_service` is now **filtered** on `state = 'active'` and leads with `owner_id` (§16.4). Unfiltered it made a service reappearance permanently impossible, because the soft-deleted row occupies the pair forever. |
+> | **D-2** | `title.duplicate_ack_seq` added. It replaces the `dup:<ulid>:` identity prefix, which `WORK_IDENTITY_RE` and `title_match_coherent` both reject, and which would have **silently broken suppression** (keyed on canonical work identity, REQ-071). ⚠ Its sentinel is `''`, **never `NULL`** — SQL Server treats two `NULL`s as *equal* in a unique index. |
+> | **D-3** | `candidate_source_image` added, replacing the singular `extraction_candidate.source_image_id`. Intra-batch collapse makes this many-to-many (§4, SD-02, `T-AI-007`). Ten physical tables, still nine logical entities. |
+> | **D-4** | `upload_batch` gains `degraded_extraction`, `low_yield`, `cross_check`. Both of the first two force `computeRemovals: false` — the invariant that a failed extraction must never be misread as a removal. Extraction and review are **separate requests**, so an unpersisted flag loses the reason removals were withheld. |
+>
+> **D. Columns added from §3** — these fields are queried, sorted or mutated by
+> the API and had no column at all. Types are taken from the CI-tested
+> `packages/domain/src/types.ts`, which is authoritative for field shape.
+> `bounding_boxes` **moved** from `uploaded_image` to `extraction_candidate`
+> (a box belongs to a candidate; `BoundingBox` carries its own `imageId`).
+> `upload_batch.failure_reason` is **replaced** by the structured
+> `extraction_error_*` triple matching `ExtractionError`.
+>
+> **E. Two timestamps renamed** to match their `types.ts` names exactly, because
+> a silent semantic mapping is the kind of thing that gets implemented backwards:
+> `uploaded_image.created_at` → **`uploaded_at`** (`retainUntil` is derived from
+> it), and `suppression.created_at`/`lifted_at` → **`suppressed_at`**/
+> **`unsuppressed_at`**.
+>
+> ~~§15.3 and Revisions 1–4 of this section are superseded and retained only as
+> historical record. Do not build from them: they name `'prime'`,
+> `'append_only'`, a singular `source_image_id`, an unfiltered
+> `listing_one_per_service`, and a table order that does not execute.~~
 
 The Prisma schema (`provider = "sqlserver"`) is generated to match. Enums
 are modelled as checked `NVARCHAR`; the CHECK/filtered-index DDL that
 Prisma cannot express lives in **raw migration SQL** (§16.8).
 
 ```sql
--- No CREATE TYPE: enums are NVARCHAR + CHECK (values identical to §15.3).
+-- No CREATE TYPE: enums are NVARCHAR + CHECK (values identical to §3 / enums.ts).
+-- ⚠ TABLE ORDER IS LOAD-BEARING (E-1). Each table references only tables above it.
+
+CREATE TABLE upload_batch (
+  id                     NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
+  owner_id               NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  mode                   NVARCHAR(16)  NOT NULL CONSTRAINT ck_batch_mode    CHECK (mode IN ('append-only','full-update')),
+  service                NVARCHAR(16)  NOT NULL CONSTRAINT ck_batch_service CHECK (service IN ('netflix','max')),
+  status                 NVARCHAR(24)  NOT NULL CONSTRAINT ck_batch_status
+                           CHECK (status IN ('draft','submitted','extracting','extraction-failed','in-review','applied','undone','discarded')),
+  -- US-034 AC-3: set for re-extraction batches. Self-reference, so it is
+  -- declared here and the FK is added by ALTER after the table exists.
+  derived_from_batch_id  NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL,
+  submitted_at           DATETIME2(3),
+  extraction_started_at  DATETIME2(3),
+  completed_at           DATETIME2(3),
+  undone_at              DATETIME2(3),
+  extraction_stats       NVARCHAR(MAX) CONSTRAINT ck_batch_stats_json CHECK (extraction_stats IS NULL OR ISJSON(extraction_stats) = 1),
+  -- Structured ExtractionError (replaces the free-text failure_reason).
+  extraction_error_code  NVARCHAR(32)  NULL CONSTRAINT ck_batch_err_code
+                           CHECK (extraction_error_code IS NULL OR
+                                  extraction_error_code IN ('EXTRACTOR_UNAVAILABLE','EXTRACTOR_ERROR','IMAGES_PURGED')),
+  extraction_error_message NVARCHAR(MAX) NULL,
+  extraction_error_at    DATETIME2(3)  NULL,
+  -- D-4. degraded_extraction and low_yield each force computeRemovals = false
+  -- (specs/ai.md 2.2/8.2). They are SAFETY STATE, not statistics: do not
+  -- recompute them on read.
+  degraded_extraction    BIT           NOT NULL CONSTRAINT df_batch_degraded  DEFAULT 0,
+  low_yield              BIT           NOT NULL CONSTRAINT df_batch_low_yield DEFAULT 0,
+  cross_check            NVARCHAR(20)  NULL CONSTRAINT ck_batch_cross_check
+                           CHECK (cross_check IS NULL OR cross_check IN ('ok','ocr-unavailable','llm-unavailable')),
+  created_at             DATETIME2(3)  NOT NULL CONSTRAINT df_batch_created DEFAULT SYSUTCDATETIME(),
+  CONSTRAINT ck_batch_error_coherent CHECK (
+    (extraction_error_code IS     NULL AND extraction_error_at IS     NULL)
+ OR (extraction_error_code IS NOT NULL AND extraction_error_at IS NOT NULL)
+  )
+);
+
+ALTER TABLE upload_batch ADD CONSTRAINT fk_batch_derived_from
+  FOREIGN KEY (derived_from_batch_id) REFERENCES upload_batch(id);
 
 CREATE TABLE title (
   id                   NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
   owner_id             NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
   work_identity        NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  -- D-2. '' means "not an acknowledged duplicate". NEVER NULL: two NULLs
+  -- compare EQUAL in a SQL Server unique index, so a nullable column would
+  -- silently reject the second row it exists to permit.
+  duplicate_ack_seq    NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL
+                                     CONSTRAINT df_title_dup_seq DEFAULT '',
   state                NVARCHAR(16)  NOT NULL CONSTRAINT ck_title_state       CHECK (state IN ('active','removed')),
   match_state          NVARCHAR(16)  NOT NULL CONSTRAINT ck_title_match_state CHECK (match_state IN ('matched','unmatched')),
   raw_extracted_text   NVARCHAR(MAX),
   normalised_text      NVARCHAR(MAX),
-  created_by_batch_id  NVARCHAR(200) NULL REFERENCES upload_batch(id),
+  created_by_batch_id  NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL REFERENCES upload_batch(id),
   sort_date_added      DATE,
   tmdb_id              INT,
   tmdb_media_type      NVARCHAR(16)  CONSTRAINT ck_title_media_type CHECK (tmdb_media_type IN ('movie','tv')),
@@ -1832,6 +1913,14 @@ CREATE TABLE title (
   )
 );
 
+CREATE TABLE removal_group (
+  id           NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
+  owner_id     NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  batch_id     NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL REFERENCES upload_batch(id),
+  undone_at    DATETIME2(3),
+  created_at   DATETIME2(3)  NOT NULL CONSTRAINT df_group_created DEFAULT SYSUTCDATETIME()
+);
+
 CREATE TABLE service_listing (
   listing_id          NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
   owner_id            NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
@@ -1842,36 +1931,13 @@ CREATE TABLE service_listing (
   date_added          DATE          NOT NULL,   -- WRITE-ONCE, REQ-030
   date_added_edited   BIT           NOT NULL CONSTRAINT df_listing_edited DEFAULT 0,
   removed_at          DATETIME2(3),
-  removed_by_batch_id NVARCHAR(200) NULL REFERENCES upload_batch(id),
-  removed_by_group_id NVARCHAR(200) NULL REFERENCES removal_group(id),
-  created_by_batch_id NVARCHAR(200) NOT NULL REFERENCES upload_batch(id),
+  removed_by_batch_id NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL REFERENCES upload_batch(id),
+  removed_by_group_id NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL REFERENCES removal_group(id),
+  created_by_batch_id NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL REFERENCES upload_batch(id),
   CONSTRAINT listing_removal_coherent CHECK (
     (state = 'removed' AND removed_at IS NOT NULL)
  OR (state = 'active'  AND removed_at IS NULL)
   )
-);
-
-CREATE TABLE suppression (
-  id            NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
-  owner_id      NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
-  work_identity NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
-  active        BIT           NOT NULL CONSTRAINT df_suppression_active DEFAULT 1,
-  created_at    DATETIME2(3)  NOT NULL CONSTRAINT df_suppression_created DEFAULT SYSUTCDATETIME(),
-  lifted_at     DATETIME2(3)
-);
-
-CREATE TABLE upload_batch (
-  id                  NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
-  owner_id            NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
-  mode                NVARCHAR(16)  NOT NULL CONSTRAINT ck_batch_mode   CHECK (mode IN ('append-only','full-update')),
-  service             NVARCHAR(16)  NOT NULL CONSTRAINT ck_batch_service CHECK (service IN ('netflix','max')),
-  status              NVARCHAR(24)  NOT NULL CONSTRAINT ck_batch_status
-                        CHECK (status IN ('draft','submitted','extracting','extraction-failed','in-review','applied','undone','discarded')),
-  submitted_at        DATETIME2(3),
-  completed_at        DATETIME2(3),
-  extraction_stats    NVARCHAR(MAX) CONSTRAINT ck_batch_stats_json CHECK (extraction_stats IS NULL OR ISJSON(extraction_stats) = 1),
-  failure_reason      NVARCHAR(MAX),
-  created_at          DATETIME2(3)  NOT NULL CONSTRAINT df_batch_created DEFAULT SYSUTCDATETIME()
 );
 
 CREATE TABLE batch_change (
@@ -1880,20 +1946,14 @@ CREATE TABLE batch_change (
   batch_id     NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL REFERENCES upload_batch(id),
   kind         NVARCHAR(24)  NOT NULL CONSTRAINT ck_change_kind
                  CHECK (kind IN ('title_created','listing_added','listing_removed','attr_modified')),
-  title_id     NVARCHAR(200) NULL REFERENCES title(id),
-  listing_id   NVARCHAR(200) NULL REFERENCES service_listing(listing_id),
+  title_id     NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL REFERENCES title(id),
+  listing_id   NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL REFERENCES service_listing(listing_id),
   attr         NVARCHAR(100),
-  prev_value   NVARCHAR(MAX) CONSTRAINT ck_change_prev_json CHECK (prev_value IS NULL OR ISJSON(prev_value) = 1),
-  next_value   NVARCHAR(MAX) CONSTRAINT ck_change_next_json CHECK (next_value IS NULL OR ISJSON(next_value) = 1),
+  -- ⚠ E-3: these hold JSON *scalars* (e.g. a previous workIdentity string).
+  -- ISJSON(x) = 1 REJECTS a scalar; the VALUE argument is required. Verified.
+  prev_value   NVARCHAR(MAX) CONSTRAINT ck_change_prev_json CHECK (prev_value IS NULL OR ISJSON(prev_value, VALUE) = 1),
+  next_value   NVARCHAR(MAX) CONSTRAINT ck_change_next_json CHECK (next_value IS NULL OR ISJSON(next_value, VALUE) = 1),
   created_at   DATETIME2(3)  NOT NULL CONSTRAINT df_change_created DEFAULT SYSUTCDATETIME()
-);
-
-CREATE TABLE removal_group (
-  id           NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
-  owner_id     NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
-  batch_id     NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL REFERENCES upload_batch(id),
-  undone_at    DATETIME2(3),
-  created_at   DATETIME2(3)  NOT NULL CONSTRAINT df_group_created DEFAULT SYSUTCDATETIME()
 );
 
 CREATE TABLE uploaded_image (
@@ -1909,28 +1969,100 @@ CREATE TABLE uploaded_image (
   -- 'upload' is the DEFAULT for backfill because every pre-A45 row arrived that way.
   ingest_source  NVARCHAR(16)  NOT NULL CONSTRAINT df_image_ingest_source DEFAULT 'upload'
                    CONSTRAINT ck_image_ingest_source CHECK (ingest_source IN ('paste','upload','drop')),
+  -- What the DEVICE delivered, by MAGIC BYTES (never Content-Type). May be heic/heif.
+  uploaded_format NVARCHAR(8)  NOT NULL CONSTRAINT ck_image_uploaded_format CHECK (uploaded_format IN ('png','jpeg','heic','heif')),
+  -- What is actually STORED. HEIC/HEIF is transcoded to lossless PNG on ingest,
+  -- so this is only ever png|jpeg (REQ-077).
+  format         NVARCHAR(8)   NOT NULL CONSTRAINT ck_image_format CHECK (format IN ('png','jpeg')),
+  -- Bytes as STORED (post-transcode). The 10 MiB ingest ceiling is enforced at
+  -- the API boundary against the UPLOADED bytes, not here: a lossless PNG
+  -- transcode of a compliant HEIC can legitimately exceed it.
+  byte_size      BIGINT        NOT NULL CONSTRAINT ck_image_byte_size CHECK (byte_size > 0),
+  width          INT           NULL,
+  height         INT           NULL,
+  uploaded_at    DATETIME2(3)  NOT NULL CONSTRAINT df_image_uploaded DEFAULT SYSUTCDATETIME(),
   retain_until   DATETIME2(3)  NOT NULL,   -- set ONCE at upload, NFR-019 — IDENTICAL for pasted images
-  bounding_boxes NVARCHAR(MAX) CONSTRAINT ck_image_boxes_json CHECK (bounding_boxes IS NULL OR ISJSON(bounding_boxes) = 1),
-  created_at     DATETIME2(3)  NOT NULL CONSTRAINT df_image_created DEFAULT SYSUTCDATETIME()
+  -- NULL until extraction runs; 0 is MEANINGFUL and is not NULL (US-006 AC-3).
+  candidate_count INT          NULL CONSTRAINT ck_image_candidate_count CHECK (candidate_count IS NULL OR candidate_count >= 0)
 );
 
 CREATE TABLE extraction_candidate (
-  id                NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
-  owner_id          NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
-  batch_id          NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL REFERENCES upload_batch(id),
-  source_image_id   NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL REFERENCES uploaded_image(id),
-  raw_text          NVARCHAR(MAX) NOT NULL,
-  normalised_text   NVARCHAR(MAX) NOT NULL,
-  match_candidates  NVARCHAR(MAX) CONSTRAINT ck_candidate_json CHECK (match_candidates IS NULL OR ISJSON(match_candidates) = 1),
-  resolved_title_id NVARCHAR(200) NULL REFERENCES title(id),
-  created_at        DATETIME2(3)  NOT NULL CONSTRAINT df_candidate_created DEFAULT SYSUTCDATETIME()
+  id                  NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
+  owner_id            NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  batch_id            NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL REFERENCES upload_batch(id),
+  raw_text            NVARCHAR(MAX) NOT NULL,
+  inferred_title      NVARCHAR(500) NULL,
+  basis               NVARCHAR(16)  NOT NULL CONSTRAINT ck_cand_basis    CHECK (basis IN ('text','artwork','both','unknown')),
+  ocr_support         NVARCHAR(16)  NOT NULL CONSTRAINT ck_cand_ocr_sup  CHECK (ocr_support IN ('exact','partial','none','not-checked')),
+  provider            NVARCHAR(16)  NOT NULL CONSTRAINT ck_cand_provider CHECK (provider IN ('llm','ocr-only')),
+  -- BIN2: this is a GROUPING KEY (collapse/dedup), never a search target.
+  -- Under a case-insensitive collation, two texts that must stay distinct
+  -- would silently group together.
+  normalised_text     NVARCHAR(MAX) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  extracted_year      INT           NULL,   -- MATCH HINT ONLY, never enters identity (SD-05)
+  bounding_boxes      NVARCHAR(MAX) CONSTRAINT ck_cand_boxes_json CHECK (bounding_boxes IS NULL OR ISJSON(bounding_boxes) = 1),
+  box_source          NVARCHAR(8)   NOT NULL CONSTRAINT ck_cand_box_source CHECK (box_source IN ('ocr','llm')),
+  ocr_confidence      FLOAT         NULL CONSTRAINT ck_cand_confidence CHECK (ocr_confidence IS NULL OR (ocr_confidence >= 0 AND ocr_confidence <= 1)),
+  -- Classify-and-surface, NEVER drop (REQ-012, specs/ai.md 3.3).
+  cleanup_verdict     NVARCHAR(24)  NOT NULL CONSTRAINT ck_cand_verdict
+                        CHECK (cleanup_verdict IN ('title-candidate','low-confidence','inferred-unverified','unreadable-tile','chrome-suspected')),
+  match_candidates    NVARCHAR(MAX) CONSTRAINT ck_candidate_json CHECK (match_candidates IS NULL OR ISJSON(match_candidates) = 1),
+  resolved_work_identity NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL,
+  resolved_title_id   NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL REFERENCES title(id),
+  classification      NVARCHAR(40)  NULL CONSTRAINT ck_cand_classification
+                        CHECK (classification IS NULL OR classification IN ('new','already-present-for-this-service')),
+  -- Default 'pending': there is NO accept-by-inaction (REQ-014, US-012 AC-3).
+  review_disposition  NVARCHAR(16)  NOT NULL CONSTRAINT df_cand_disposition DEFAULT 'pending'
+                        CONSTRAINT ck_cand_disposition CHECK (review_disposition IN ('pending','confirmed','corrected','discarded','unresolved')),
+  corrected_to_tmdb_id INT          NULL,
+  created_at          DATETIME2(3)  NOT NULL CONSTRAINT df_candidate_created DEFAULT SYSUTCDATETIME()
+);
+
+-- D-3. Candidate -> image is MANY-TO-MANY after intra-batch overlap collapse:
+-- the surviving candidate ABSORBS the losers' provenance (SD-02, T-AI-007).
+CREATE TABLE candidate_source_image (
+  -- ⚠ Surrogate key, not a composite PK. Three NVARCHAR(200) columns are 1200
+  -- bytes, over SQL Server's 900-byte CLUSTERED key cap: it creates with only a
+  -- warning and then fails at INSERT time. The natural key is kept as a
+  -- NONCLUSTERED unique constraint, whose cap is 1700 bytes. Same pattern as
+  -- batch_change.
+  id           BIGINT IDENTITY(1,1) NOT NULL CONSTRAINT pk_candidate_source_image PRIMARY KEY,
+  owner_id     NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  candidate_id NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL
+                 REFERENCES extraction_candidate(id) ON DELETE CASCADE,
+  image_id     NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL
+                 REFERENCES uploaded_image(id),
+  -- Preserves the §7.4 (imageIndex, yTop, xLeft) reading order.
+  ordinal      INT NOT NULL,
+  CONSTRAINT uq_candidate_source_image UNIQUE NONCLUSTERED (owner_id, candidate_id, image_id)
 );
 
 CREATE TABLE service_state (
   owner_id                 NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
   service                  NVARCHAR(16) NOT NULL CONSTRAINT ck_state_service CHECK (service IN ('netflix','max')),
+  -- NULL === "never updated" (US-022 AC-3). REQ-039 / FreshnessStrip reads both.
   last_completed_batch_at  DATETIME2(3),
+  last_completed_batch_id  NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL REFERENCES upload_batch(id),
   CONSTRAINT pk_service_state PRIMARY KEY (owner_id, service)
+);
+
+CREATE TABLE suppression (
+  id              NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL PRIMARY KEY,
+  owner_id        NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  -- REQ-071: keyed on canonical WORK IDENTITY, never on a row id.
+  work_identity   NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NOT NULL,
+  active          BIT           NOT NULL CONSTRAINT df_suppression_active DEFAULT 1,
+  suppressed_at   DATETIME2(3)  NOT NULL CONSTRAINT df_suppression_created DEFAULT SYSUTCDATETIME(),
+  unsuppressed_at DATETIME2(3),
+  -- SD-06: the previous workIdentity if migrated by fix-match.
+  migrated_from   NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL,
+  -- SuppressionDisplaySnapshot, flattened. Lets the suppressed view render
+  -- WITHOUT a Title row (US-029 AC-1) — which is the whole point of it.
+  display_name         NVARCHAR(500) NOT NULL,
+  display_release_year INT           NULL,
+  display_media_type   NVARCHAR(16)  NULL CONSTRAINT ck_suppression_media_type
+                         CHECK (display_media_type IS NULL OR display_media_type IN ('movie','tv')),
+  display_poster_path  NVARCHAR(400) NULL
 );
 ```
 
@@ -1939,30 +2071,69 @@ CREATE TABLE service_state (
 > stay ≤ 450 chars. All indexed identity columns are `NVARCHAR(200)` = 400
 > bytes, safely inside the limit. This is *why* the ids are `NVARCHAR(200)`
 > and not `NVARCHAR(MAX)` (which cannot be an index key at all).
+>
+> ⚠ `extraction_candidate.normalised_text` is `NVARCHAR(MAX)` and therefore
+> **cannot be an index key**. Group on it in application code, or add a
+> computed `NVARCHAR(450)` prefix column if a covering index is ever needed.
 
 ### 16.4 Invariants as filtered unique indexes (supersedes §15.4)
 
 All three of the invariants that were partial unique indexes in PostgreSQL
 express cleanly in Azure SQL as **filtered unique indexes**
-(`CREATE UNIQUE INDEX ... WHERE`). Each was verified individually:
+(`CREATE UNIQUE INDEX ... WHERE`). Each was verified individually against
+`mssql/server:2022-latest`, in both directions — the violating write is
+rejected, and the legitimate write that superficially resembles it is
+accepted.
+
+> ⚠ **`SET QUOTED_IDENTIFIER ON` is REQUIRED to create a filtered index, and
+> `sqlcmd` defaults it OFF.** Without it every statement below fails with
+> `Msg 1934` — and the failure is easy to miss, because subsequent inserts
+> then succeed *precisely because the index enforcing them does not exist*.
+> A run in that state looks green while asserting nothing. Pass **`-I`** to
+> `sqlcmd` (alongside the `-C` required by §3.3a of `specs/testing.md`), and
+> assert the indexes exist in the harness rather than assuming they do.
 
 | ID | Invariant | Azure SQL enforcement | Test |
 |---|---|---|---|
-| **I-1** | At most one `title` per `(owner_id, work_identity)` with `state <> 'removed'` | `CREATE UNIQUE INDEX title_one_active_per_work ON title (owner_id, work_identity) WHERE state = 'active';` — **the predicate uses `= 'active'`, not `<> 'removed'`.** The enum is only `active`/`removed`, so the two are equivalent, and SQL Server's filtered-index predicates unambiguously allow `=` while `<>` is disallowed. Equivalence holds by the CHECK constraint. | `T-INV-001` — asserts the DB raises **2601/2627** |
-| **I-2** | At most one `service_listing` per `(title_id, service)` | `CREATE UNIQUE INDEX listing_one_per_service ON service_listing (title_id, service);` — plain unique index, no filter needed | `T-INV-002` |
+| **I-1** | At most one `title` per `(owner_id, work_identity, duplicate_ack_seq)` with `state <> 'removed'` | `CREATE UNIQUE INDEX title_one_active_per_work ON title (owner_id, work_identity, duplicate_ack_seq) WHERE state = 'active';` — **the predicate uses `= 'active'`, not `<> 'removed'`.** The enum is only `active`/`removed`, so the two are equivalent, and SQL Server's filtered-index predicates unambiguously allow `=` while `<>` is disallowed. Equivalence holds by the CHECK constraint. | `T-INV-001` — asserts the DB raises **2601/2627** |
+| **I-2** | At most one **active** `service_listing` per `(owner_id, title_id, service)` | `CREATE UNIQUE INDEX listing_one_per_service ON service_listing (owner_id, title_id, service) WHERE state = 'active';` | `T-INV-002` |
 | **I-9** | At most one **active** `suppression` per `(owner_id, work_identity)` | `CREATE UNIQUE INDEX suppression_one_active ON suppression (owner_id, work_identity) WHERE active = 1;` — filter on the `BIT` column | `T-INV-015` |
+
+**I-2 must be filtered (D-1).** ~~Unfiltered — `ON service_listing (title_id,
+service)` with no `WHERE` — it was previously specified as "a plain unique
+index, no filter needed".~~ That form is **wrong** and was verified to break a
+real user journey: because soft delete is forever (REQ-028), a `removed` row
+occupies the `(title, service)` pair permanently, so a work removed from
+Netflix could **never reappear on Netflix**. Both available paths were blocked —
+re-adding the listing by `listing_one_per_service`, and creating a fresh title
+by `title_one_active_per_work`. Filtering resolves it, and a genuine second
+*active* Netflix listing is still rejected. It also leads with `owner_id`,
+which the unfiltered form failed to do (NFR-008).
 
 The two **CHECK** constraints (`title_match_coherent`,
 `listing_removal_coherent`) port **verbatim** — SQL Server's CHECK syntax
 is identical for these predicates. I-3/I-4/I-6/I-7 stay application-enforced
 exactly as in §15.4. I-8 is §16.7.
 
-**Duplicate acknowledgement (US-025 AC-5 / US-030 AC-4) is unchanged:** the
-`dup:<ulid>:` prefix makes an acknowledged duplicate a distinct
-`work_identity`, so the filtered unique index holds by construction.
-`createTitle()` surfaces the DB's **2627** (unique constraint) /
-**2601** (unique index) as `DuplicateWorkIdentityError`; only
-`createTitleAllowingDuplicate()` may apply the prefix (`T-INV-016`).
+**Duplicate acknowledgement (US-025 AC-5 / US-030 AC-4) uses the
+`title.duplicate_ack_seq` column (D-2).** An acknowledged duplicate keeps the
+**same** `work_identity` and is distinguished by a ULID in
+`duplicate_ack_seq`, so the filtered unique index holds by construction.
+`createTitle()` surfaces the DB's **2627** (unique constraint) / **2601**
+(unique index) as `DuplicateWorkIdentityError`; only
+`createTitleAllowingDuplicate()` may write a non-empty `duplicate_ack_seq`,
+which is what `T-INV-016` must assert.
+
+~~**Superseded:** "the `dup:<ulid>:` prefix makes an acknowledged duplicate a
+distinct `work_identity`… only `createTitleAllowingDuplicate()` may apply the
+prefix." This never worked and could not be made to work: `WORK_IDENTITY_RE`
+(`identity.ts:24`) rejects the prefix, `title_match_coherent` rejects it at the
+database (verified: *"BLOCKED by CHECK constraint title_match_coherent"*), and
+— decisively — a prefixed identity would **silently break suppression**, which
+is keyed on canonical work identity (REQ-071). Marking the work "not
+interested" would suppress one row and quietly miss the other. `T-INV-016` as
+written greps for a string that appears nowhere in the codebase, so it passes
+vacuously.~~
 
 ### 16.5 Batch close is one transaction (unchanged from §15.5)
 

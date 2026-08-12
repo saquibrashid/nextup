@@ -40,7 +40,7 @@ extracting the §16.3 DDL verbatim from the spec and running it.
 create cleanly with zero errors.** Those two fixes are settled — no decision
 needed, they are unambiguous defects with one correct answer.
 
-### 1a. Two traps found while executing, worth keeping
+### 1a. Three traps found while executing, worth keeping
 
 - **Filtered indexes require `SET QUOTED_IDENTIFIER ON`, and `sqlcmd` defaults
   it OFF.** The three invariant indexes failed with `Msg 1934` and the run
@@ -51,8 +51,41 @@ needed, they are unambiguous defects with one correct answer.
 - **SQL Server treats two `NULL`s as equal in a unique index** (verified:
   second `(w, NULL)` row rejected with `2601`). Any dedup column must use a
   non-null sentinel, not `NULL`, to mean "not a duplicate".
+- **A composite key of three `NVARCHAR(200)` columns is 1200 bytes and exceeds
+  the 900-byte CLUSTERED index cap — but it CREATES SUCCESSFULLY with only a
+  warning and fails later, at INSERT time.** Caught in the first
+  `candidate_source_image` draft (D-3), which used the natural triple as its
+  primary key. The nonclustered cap is 1700 bytes, so the fix is a `BIGINT
+  IDENTITY` surrogate PK plus a `UNIQUE NONCLUSTERED` natural key — the pattern
+  `batch_change` already uses. ⚠ **Do not dismiss `CREATE` warnings as noise on
+  this schema**; with 200-char id columns, any composite key of three or more
+  of them is over the cap.
 - Incidentally confirms the unique-violation error number is **`2601`**, so
   `specs/testing.md:1439`'s surviving PostgreSQL `23505` reference is stale.
+
+### 1b. Revision 5 was verified end to end, not just read
+
+After applying every correction and decision, the §16.3 DDL was extracted
+verbatim from the spec by script and executed against
+`mssql/server:2022-latest` on a clean database:
+
+- **10 of 10 tables create, with zero warnings.**
+- **All 3 invariant indexes create with `has_filter = 1`** — confirmed by
+  querying `sys.indexes`, not assumed.
+- **22 behavioural assertions all landed in the required direction**, each
+  written as a matched pair so that a constraint which rejects everything
+  cannot pass: the reappearance journey is *accepted* while a genuine second
+  active listing is *rejected* (`2601`); a JSON scalar in `prev_value` is
+  *accepted* while non-JSON is *rejected*; an acknowledged duplicate is
+  *accepted* while an unacknowledged one is *rejected* (`2601`); one candidate
+  with two source images is *accepted* while a repeated pair is *rejected*;
+  `'extraction-failed'` fits while `'prime'` and `'full_update'` are rejected.
+- **The REQ-071 property was asserted directly:** with two acknowledged
+  duplicate rows present, a single canonical `work_identity` still matches
+  **both** — which is exactly what the `dup:` prefix would have broken.
+
+These scenarios should be ported into the TASK-017 integration suite rather
+than rewritten from scratch.
 
 ## 2. Owner decisions — MADE (2026-08-12)
 
@@ -166,11 +199,11 @@ silently rewrite the meaning of historical batches.
 ⚠ The matching TypeScript fields belong in `packages/domain/src/types.ts`, a
 **contended file** — coordinator only, never a lane.
 
-## 3. Gaps needing columns — no decision, just work
+## 3. Gaps needing columns — APPLIED in Revision 5
 
-~33 fields the application must persist have no column. Full per-field evidence
-(file:line, REQ id, consequence, proposed DDL) is in the audit; the headline
-groups:
+~33 fields the application must persist had no column. **All of the groups
+below are now in `specs/data-model.md` §16.3** and were verified to create and
+accept realistic writes (§1b). This table is kept as the rationale record.
 
 | Group | Missing | Why it matters |
 |---|---|---|
@@ -179,7 +212,22 @@ groups:
 | `suppression` | `displaySnapshot` (4 flat columns), `migratedFrom` | Suppression is keyed on **work identity**, not a row (REQ-071), so there may be no `Title` to join to. Without the snapshot the suppressed view renders unidentifiable rows |
 | `upload_batch` | `derivedFromBatchId`, `extractionStartedAt`, `undoneAt`, structured `extractionError` | `T-REX-012` asserts `derivedFromBatchId`; squashing the error into free-text `failure_reason` makes `IMAGES_PURGED` a prose string-match |
 | `service_state` | `lastCompletedBatchId` | `GET /api/service-state` returns it; **REQ-039/FreshnessStrip** depends on it |
-| `service_listing` | `heldBackByGroupId` | `T-GRP-012`; recomputable at undo time but lost forever afterwards |
+
+Also applied: `bounding_boxes` **moved** from `uploaded_image` to
+`extraction_candidate` (a box belongs to a candidate, and `BoundingBox` carries
+its own `imageId`), and `extraction_candidate.normalised_text` gained the BIN2
+collation — it is a **grouping key** for collapse, so under a case-insensitive
+collation two texts that must stay distinct would silently merge.
+
+### 3a. One audited "gap" that was rejected
+
+`service_listing.heldBackByGroupId` was **not** added. The audit cited
+`T-GRP-012`, but that test asserts a work is *"named in `heldBack[]`"* — a
+response array computed at undo time (`specs/testing.md:940`). The field name
+appears **nowhere** in `specs/**`, `packages/domain/**` or `docs/**` outside
+the audit's own claim. Adding a column for it would have invented schema.
+⚠ If a future task shows the held-back set must survive past the undo, this
+becomes a real additive migration — but it is not one today.
 
 `bounding_boxes` is also on the **wrong table** — it belongs on
 `extraction_candidate` (each `BoundingBox` carries its own `imageId` precisely

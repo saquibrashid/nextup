@@ -1436,22 +1436,22 @@ project that collects it.
 
 | Test | Change |
 |---|---|
-| `T-INV-001`, `T-INV-002` | Now assert the **database** raises a unique violation (`23505`), not that application code noticed. The invariants became constraints (`specs/data-model.md` §15.4). |
-| `T-INV-013` | Repointed from "no Cosmos TTL" to the five-part assertion in §15.7: no `pg_cron`, no delete trigger, no scheduled job, no `TRUNCATE` in any migration, `DELETE` in exactly one module. |
+| `T-INV-001`, `T-INV-002` | Now assert the **database** raises a unique violation — **`2601` (unique index) or `2627` (unique constraint)**, the Azure SQL codes, verified by execution against `mssql/server:2022-latest`. ~~PostgreSQL's `23505`.~~ The invariants became constraints (`specs/data-model.md` §16.4). |
+| `T-INV-013` | Repointed from "no Cosmos TTL" to the five-part assertion in §16.7: **no SQL Agent job and no Elastic Job**, no delete trigger, no scheduled job, no `TRUNCATE` in any migration, `DELETE` in exactly one module. ~~"no `pg_cron`" — PostgreSQL, superseded; Azure SQL has no `pg_cron` to look for, so a grep for it would pass vacuously.~~ |
 | `T-BATCH-005` | Rewritten. Kill the process mid-close and assert the list is **byte-identical to its pre-close state** — an uncommitted transaction leaves nothing — then assert a retry produces exactly one copy. Previously it asserted an invisible-but-resumable partial batch. |
-| `T-PERF-001` | Query-plan assertion via `EXPLAIN (ANALYZE, BUFFERS)` instead of an RU-charge ratio. Stronger and stable across machines. |
+| `T-PERF-001` | Query-plan assertion via **`SET STATISTICS IO, TIME ON` / `SET SHOWPLAN_XML ON`**, asserting an index seek rather than a scan. ~~`EXPLAIN (ANALYZE, BUFFERS)` — PostgreSQL-only syntax, superseded: SQL Server has no `EXPLAIN` statement and the test would not run at all.~~ Stronger than an RU-charge ratio and stable across machines. |
 | `T-INFRA-005` | Rewritten from "every SKU is free" to **SKU pinning** (§9, US-039 AC-4). See the note there — enforcing a repealed constraint would have blocked the very upgrades A41 authorised. |
 | `T-SEC-006` and the repository-signature test | **Promoted to load-bearing.** Owner scoping is a column filter, not a partition key, so nothing but these tests stands between a forgotten `WHERE` and a cross-owner read (`specs/api.md` §1.1). |
-| `T-SEC-007` | Extended with a constraint-violation case: a Postgres `23505` carries the index name and conflicting values in `detail`, and none of it may reach a response body. |
+| `T-SEC-007` | Extended with a constraint-violation case: an Azure SQL **`2601`/`2627`** message carries the **index name, the table name and the duplicate key value**, and none of it may reach a response body. ~~"a Postgres `23505` carries the index name and conflicting values in `detail`".~~ |
 
 ### 11.2 Added
 
 | Test | Asserts |
 |---|---|
 | **`T-MIG-001`** | **No migration in `prisma/migrations/**` contains `DROP TABLE`, `DROP COLUMN`, `TRUNCATE` or `DROP TYPE`.** `REQ-028` forbids losing data and a migration is the one place it can be lost quietly and irreversibly — Prisma will happily generate a `DROP COLUMN` from a renamed field. **The highest-value single test added this revision.** |
-| `T-INV-014` | Every table has an `owner_id` column and every index leads with it (`specs/data-model.md` §15.2). |
-| `T-INV-015` | At most one **active** `suppression` per `(owner_id, work_identity)` — enforced by a partial unique index (I-9). |
-| `T-INV-016` | The acknowledged-duplicate `dup:` work-identity prefix is applied in `createTitleAllowingDuplicate()` and nowhere else (§15.4). |
+| `T-INV-014` | Every table has an `owner_id` column and every index leads with it (`specs/data-model.md` §16.2). |
+| `T-INV-015` | At most one **active** `suppression` per `(owner_id, work_identity)` — enforced by a **filtered** unique index (I-9). ~~"partial unique index" — PostgreSQL's name for it; SQL Server calls it *filtered* and the `CREATE` syntax differs.~~ ⚠ The harness must run with `QUOTED_IDENTIFIER ON` (`sqlcmd -I`), or the filtered index is **never created** and this test passes while asserting nothing. |
+| `T-INV-016` | A non-empty `title.duplicate_ack_seq` is written in `createTitleAllowingDuplicate()` and nowhere else (§16.4). ~~"The acknowledged-duplicate `dup:` work-identity prefix is applied in `createTitleAllowingDuplicate()` and nowhere else."~~ ⚠ **That form passed vacuously**: it grepped for a `dup:` prefix that appears nowhere in the codebase, that `WORK_IDENTITY_RE` rejects, and that `title_match_coherent` rejects at the database (all verified). See `docs/task-017-schema-findings.md` §2 D-2. |
 | `T-API-01x` | A tampered or unparseable pagination cursor returns **400 `INVALID_CURSOR`**, never a silent reset to page 1. |
 | **`T-INFRA-002` (extended)** | The storage account has **blob soft delete, container soft delete, versioning and point-in-time restore all DISABLED.** Enabling any of them looks like good practice, costs pennies, and would **silently retain the owner's screenshots past 30 days while every other test still passes** — breaking `NFR-019` invisibly (ADR-0006 A41 note). This is a trap, and the test is the tripwire. |
 | **`T-SMOKE-*` (staging tier, new)** | A post-deploy smoke suite run against **staging** before production (architecture §Environments): authenticated request succeeds, allow-list refuses a non-listed subject, the app reaches the database, the app pulls its image, and a synthetic batch closes. It exists because staging exists (ADR-0003 R2.4) and because these are precisely the failures no emulator can rehearse. |
