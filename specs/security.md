@@ -378,15 +378,33 @@ tested rather than documented.
 
 ## 7. Secrets and platform identity
 
-**2–3 secrets exist (R4 — the ghcr.io PAT returns; was ONE in R3).**
+**1–2 secrets exist (R8 — the ghcr.io PAT is GONE again; was 2–3 in R4).**
 
 | Secret | Storage | Consumer | Rotation |
 |---|---|---|---|
 | `TMDB_API_KEY` | Container Apps secret, referenced as a secret env var | `apps/api/src/matching/tmdbClient.ts` only | Manual; regenerate at TMDB, update the Container App, restart |
-| **`GHCR_PULL_TOKEN` (R4 — RETURNS)** | **Container Apps registry secret.** The image moved from Azure Container Registry back to **ghcr.io** (ADR-0003 R3.1), which has no managed-identity pull, so a **GitHub PAT with `read:packages`** is required to pull the private image. | Container Apps registry config (image pull) | **Manual, and the PAT EXPIRES.** This is the accepted regression of Variant A — see the warning below |
+| ~~**`GHCR_PULL_TOKEN` (R4 — RETURNS)**~~ **DELETED at R8.** No registry credential exists. The ghcr.io **package is public**, so Container Apps pulls it anonymously and CI pushes with the built-in `GITHUB_TOKEN`. | — | — | **None — there is nothing to rotate.** |
 | **DB credential (R4 — conditional)** | **Secretless if managed-identity auth works** (preferred). **Else** a least-privilege SQL login password stored in **Key Vault**, surfaced as a Key-Vault-referenced Container Apps secret. | `apps/api` Prisma `sqlserver` connection | MI: none. SQL-auth fallback: manual; **does not auto-expire** |
 
-> ⚠ **The ghcr.io PAT is a quiet-expiry time bomb (R4, RSK-031-adjacent).**
+> ✅ **R8 — the quiet-expiry time bomb is defused, not mitigated.** The R4
+> plan below specified a **fine-grained PAT**. That token **cannot
+> authenticate to `ghcr.io` at all** — GitHub Packages supports **classic**
+> PATs only and returns a 403 for fine-grained ones — so the "least-privilege
+> form" it relied on does not exist. The only working token is a classic PAT
+> whose `read:packages` scope is **account-wide**, readable across every
+> private package on the account, with no way to narrow it.
+>
+> Storing an account-wide credential in Azure to keep private an image built
+> entirely from an **already-public repository** is a worse trade than
+> publishing the package. The package is therefore **public**, the credential
+> is **deleted**, and the registry half of `RSK-031` is **removed rather than
+> mitigated**. The compensating control is that `deploy.yml` **secret-scans
+> the built image before pushing** (TASK-007), which catches the one case a
+> private package would have contained: a secret hardcoded into source, where
+> `.dockerignore`'s filename-based exclusions do not help. Full reasoning and
+> the retained private-package fallback: `docs/ghcr-pat.md`.
+
+> ⚠ ~~**The ghcr.io PAT is a quiet-expiry time bomb (R4, RSK-031-adjacent).**
 > A GitHub PAT has an expiry date. When it lapses, a **future deployment
 > fails to pull the image** for a reason unrelated to the change being
 > deployed, months later, in a project with no operational budget and an
@@ -396,7 +414,9 @@ tested rather than documented.
 > permitted expiry**, record its expiry date in the deployment runbook, and
 > add a calendar reminder; `T-INFRA-001` still asserts it is a Container
 > Apps secret and never appears in the repo. A fine-grained PAT scoped to
-> `read:packages` on this one package is the least-privilege form.
+> `read:packages` on this one package is the least-privilege form.~~
+> **(Superseded by R8 above — the fine-grained PAT this relied on does not
+> work with ghcr.io, and no credential is used at all.)**
 
 **The database credential can still be secretless (R4).** Azure SQL
 Database **supports Entra / managed-identity authentication**, so the

@@ -18,9 +18,6 @@ param containerImage = readEnvironmentVariable(
   'mcr.microsoft.com/k8se/quickstart:latest'
 )
 
-param ghcrUsername = readEnvironmentVariable('NEXTUP_GHCR_USERNAME', 'saquibrashid')
-param ghcrToken = readEnvironmentVariable('NEXTUP_GHCR_TOKEN')
-
 param sqlAdminLogin = readEnvironmentVariable('NEXTUP_SQL_ADMIN_LOGIN', 'nextupadmin')
 param sqlAdminPassword = readEnvironmentVariable('NEXTUP_SQL_ADMIN_PASSWORD')
 

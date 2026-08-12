@@ -28,18 +28,6 @@
         "description": "Fully-qualified container image in ghcr.io."
       }
     },
-    "ghcrUsername": {
-      "type": "string",
-      "metadata": {
-        "description": "GitHub username that owns the ghcr.io fine-grained PAT."
-      }
-    },
-    "ghcrToken": {
-      "type": "securestring",
-      "metadata": {
-        "description": "ghcr.io fine-grained PAT with read:packages."
-      }
-    },
     "sqlAdminLogin": {
       "type": "string",
       "metadata": {
@@ -509,12 +497,6 @@
           },
           "containerImage": {
             "value": "[parameters('containerImage')]"
-          },
-          "ghcrUsername": {
-            "value": "[parameters('ghcrUsername')]"
-          },
-          "ghcrToken": {
-            "value": "[parameters('ghcrToken')]"
           }
         },
         "template": {
@@ -569,18 +551,6 @@
               "metadata": {
                 "description": "Fully-qualified container image, e.g. ghcr.io/saquibrashid/nextup:sha-abc123."
               }
-            },
-            "ghcrUsername": {
-              "type": "string",
-              "metadata": {
-                "description": "GitHub username that owns the ghcr.io fine-grained PAT."
-              }
-            },
-            "ghcrToken": {
-              "type": "securestring",
-              "metadata": {
-                "description": "ghcr.io fine-grained PAT with read:packages. Supplied at deploy time."
-              }
             }
           },
           "variables": {
@@ -625,19 +595,7 @@
                       }
                     ]
                   },
-                  "registries": [
-                    {
-                      "server": "ghcr.io",
-                      "username": "[parameters('ghcrUsername')]",
-                      "passwordSecretRef": "ghcr-token"
-                    }
-                  ],
-                  "secrets": [
-                    {
-                      "name": "ghcr-token",
-                      "value": "[parameters('ghcrToken')]"
-                    }
-                  ]
+                  "secrets": []
                 },
                 "template": {
                   "containers": [

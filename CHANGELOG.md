@@ -8,6 +8,38 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **TASK-146 — the registry credential runbook (`docs/ghcr-pat.md`), and the
+  removal of the credential it was written to manage.**
+  - **The specified credential does not exist.** TASK-006/007/146 all called for
+    a *fine-grained* PAT scoped `read:packages`. GitHub's Container registry
+    documentation states twice, verbatim, that *"GitHub Packages only supports
+    authentication using a personal access token (classic)"* — a fine-grained
+    token authenticates against `ghcr.io` with a 403. Building to the spec
+    literally would have produced an auth failure with no code cause: exactly
+    the symptom TASK-146 existed to make diagnosable.
+  - **Neither half of the registry path needs a PAT.** CI pushes with the
+    built-in `GITHUB_TOKEN`, so `write:packages` was dead scope. And pulls need
+    a credential only for a *private* package — GitHub serves public container
+    images anonymously.
+  - **The package is therefore public and there is no registry credential at
+    all.** The only working token is a classic PAT whose `read:packages` scope
+    is account-wide, readable across every private package on the account with
+    no way to narrow it. Storing that in Azure to keep private an image built
+    entirely from an already-public repository is the worse trade. This
+    **removes** the registry half of `RSK-031` rather than mitigating it, and
+    drops an owner touchpoint from `RSK-027`.
+  - **The compensating control**: `deploy.yml` must secret-scan the built image
+    before pushing (TASK-007). `.dockerignore` guards by filename, which does
+    not catch a secret hardcoded into a source file — the one case where a
+    private package would genuinely have helped.
+  - `infra/aca.bicep` accordingly drops its `registries` block, the `ghcr-token`
+    secret and the `ghcrUsername`/`ghcrToken` parameters, with a comment
+    explaining why restoring one is wrong: **a registries entry fails CLOSED**,
+    because once present the anonymous pull is no longer attempted.
+    `T-INFRA-005r` is the regression guard.
+  - Both environments re-validated: `az deployment group what-if` returns
+    `Succeeded` with no error.
+
 - **TASK-008 — the SKU-pinning and no-TTL infrastructure gates.**
   `tests/infra/sku.spec.ts` (`T-INFRA-005`, 17 tests) and
   `tests/infra/no-ttl.spec.ts` (`T-INV-013`, 8 tests), backed by

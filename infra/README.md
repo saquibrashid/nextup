@@ -80,11 +80,14 @@ variable fails loudly instead of silently deploying a weak credential:
 
 | Variable                       | Purpose                                  |
 | ------------------------------ | ---------------------------------------- |
-| `NEXTUP_GHCR_TOKEN`            | ghcr.io fine-grained PAT (TASK-146)      |
 | `NEXTUP_SQL_ADMIN_PASSWORD`    | SQL login — the documented fallback path |
 | `NEXTUP_ENTRA_ADMIN_LOGIN`     | Entra SQL administrator UPN              |
 | `NEXTUP_ENTRA_ADMIN_OBJECT_ID` | Entra SQL administrator object id        |
 | `NEXTUP_IMAGE`                 | image tag; defaults to a bootstrap image |
+
+There is deliberately **no `NEXTUP_GHCR_TOKEN`**: the ghcr.io package is public
+and Container Apps pulls it anonymously, so no registry credential exists. See
+`docs/ghcr-pat.md` before adding one.
 
 ## Not built here, deliberately
 

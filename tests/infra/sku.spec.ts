@@ -137,10 +137,15 @@ describe('T-INFRA-005 SKU pinning and the compute/guard pair', () => {
     expect(skuViolations(bad).join('\n')).toMatch(/must not be zone-redundant/);
   });
 
-  it('T-INFRA-005m: the registry is ghcr.io and no ACR resource exists', () => {
+  it('T-INFRA-005m: no ACR exists and NO registry credential is configured', () => {
     expect(resourcesOfType(template, 'Microsoft.ContainerRegistry/registries')).toHaveLength(0);
     const app = resourceOfType(template, 'Microsoft.App/containerApps');
-    expect(app.properties.configuration.registries[0].server).toBe('ghcr.io');
+    // The ghcr.io package is public and ACA pulls it anonymously, so there is
+    // no credential to expire (TASK-146 / R8). A `registries` entry here would
+    // fail CLOSED: once one is present the anonymous pull is not attempted, so
+    // a wrong or expired secret breaks every revision.
+    expect(app.properties.configuration.registries ?? []).toEqual([]);
+    expect(app.properties.configuration.secrets ?? []).toEqual([]);
   });
 
   it('T-INFRA-005n: catches an Azure Container Registry being reintroduced', () => {
@@ -152,6 +157,19 @@ describe('T-INFRA-005 SKU pinning and the compute/guard pair', () => {
       });
     });
     expect(skuViolations(bad).join('\n')).toMatch(/no Azure Container Registry may exist/);
+  });
+
+  // A restored PAT-based credential is the specific regression this guards.
+  // It would look like a fix ("the pull needs auth") and would instead break
+  // every revision, because a registries entry stops the anonymous pull.
+  it('T-INFRA-005r: catches a registry credential being reintroduced', () => {
+    const bad = mutate((t) => {
+      const app = resourceOfType(t, 'Microsoft.App/containerApps');
+      app.properties.configuration.registries = [
+        { server: 'ghcr.io', username: 'saquibrashid', passwordSecretRef: 'ghcr-token' },
+      ];
+    });
+    expect(skuViolations(bad).join('\n')).toMatch(/no registry credential may be configured/);
   });
 
   it('T-INFRA-005o: prod is always warm and declares no scale rule', () => {

@@ -23,22 +23,22 @@ owner's review.
 
 ## 2. The stack — concrete, fixed where the architecture fixes it
 
-| Layer         | Choice                                                                                                                         | Notes                    |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------------ |
-| Language      | **TypeScript**, end to end, `strict` + `noUncheckedIndexedAccess`                                                              | ADR-0004                 |
-| Repo          | **npm-workspaces monorepo**: `packages/domain`, `apps/api`, `apps/web`                                                         | TASK-001                 |
-| Front end     | **React + Vite** SPA (`apps/web/src/**`)                                                                                       | ADR-0004                 |
-| API           | **Node + Express** (`apps/api/src/**`), single process also serving the built SPA                                              | ADR-0004, TASK-005       |
-| Shared domain | Pure TypeScript in `packages/domain/src/**` (types in `types.ts`)                                                              | data-model.md            |
-| ORM           | **Prisma, provider `sqlserver`**                                                                                               | ADR-0005 Rev 3           |
-| Database      | **Azure SQL Database, Basic** (5 DTU, 2 GB, 7-day PITR)                                                                        | ADR-0005 Rev 3           |
-| Staging DB    | a **separate serverless auto-paused Azure SQL database** — there is **no shared server**, Azure SQL bills per database         | ADR-0003 Rev 3           |
-| Compute       | **Azure Container Apps**, 0.25 vCPU / 0.5 GiB, **`minReplicas = 1`** (always warm)                                             | ADR-0003 Rev 3           |
-| Registry      | **`ghcr.io`** (a fine-grained PAT, `read:packages`) — **NOT** Azure Container Registry                                         | ADR-0003 Rev 3, TASK-146 |
-| Extraction    | Azure OpenAI **`gpt-4.1`** vision (primary) **+** Azure AI Vision **Read F0** OCR (deterministic cross-check)                  | ADR-0001 Rev 2           |
-| Screenshots   | **Azure Blob Storage**, private container, **30-day lifecycle purge**                                                          | ADR-0006                 |
-| Auth          | **Container Apps built-in auth (Easy Auth)** with a federated Entra IdP; allow-list in middleware. Zero application auth code. | ADR-0002                 |
-| Tests         | **Vitest** (unit + integration) and **Playwright** (e2e)                                                                       | testing.md               |
+| Layer         | Choice                                                                                                                                                                                              | Notes                                        |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| Language      | **TypeScript**, end to end, `strict` + `noUncheckedIndexedAccess`                                                                                                                                   | ADR-0004                                     |
+| Repo          | **npm-workspaces monorepo**: `packages/domain`, `apps/api`, `apps/web`                                                                                                                              | TASK-001                                     |
+| Front end     | **React + Vite** SPA (`apps/web/src/**`)                                                                                                                                                            | ADR-0004                                     |
+| API           | **Node + Express** (`apps/api/src/**`), single process also serving the built SPA                                                                                                                   | ADR-0004, TASK-005                           |
+| Shared domain | Pure TypeScript in `packages/domain/src/**` (types in `types.ts`)                                                                                                                                   | data-model.md                                |
+| ORM           | **Prisma, provider `sqlserver`**                                                                                                                                                                    | ADR-0005 Rev 3                               |
+| Database      | **Azure SQL Database, Basic** (5 DTU, 2 GB, 7-day PITR)                                                                                                                                             | ADR-0005 Rev 3                               |
+| Staging DB    | a **separate serverless auto-paused Azure SQL database** — there is **no shared server**, Azure SQL bills per database                                                                              | ADR-0003 Rev 3                               |
+| Compute       | **Azure Container Apps**, 0.25 vCPU / 0.5 GiB, **`minReplicas = 1`** (always warm)                                                                                                                  | ADR-0003 Rev 3                               |
+| Registry      | **`ghcr.io`**, **public package, NO credential** — CI pushes with `GITHUB_TOKEN`, ACA pulls anonymously. **NOT** ACR, and **not** a fine-grained PAT (which cannot authenticate to ghcr.io at all). | ADR-0003 Rev 3, TASK-146, `docs/ghcr-pat.md` |
+| Extraction    | Azure OpenAI **`gpt-4.1`** vision (primary) **+** Azure AI Vision **Read F0** OCR (deterministic cross-check)                                                                                       | ADR-0001 Rev 2                               |
+| Screenshots   | **Azure Blob Storage**, private container, **30-day lifecycle purge**                                                                                                                               | ADR-0006                                     |
+| Auth          | **Container Apps built-in auth (Easy Auth)** with a federated Entra IdP; allow-list in middleware. Zero application auth code.                                                                      | ADR-0002                                     |
+| Tests         | **Vitest** (unit + integration) and **Playwright** (e2e)                                                                                                                                            | testing.md                                   |
 
 **SQL-Server-specific DDL** (filtered unique indexes, `CHECK`, `ISJSON`,
 `Latin1_General_100_BIN2` collation) lives in **raw migration SQL**, not in

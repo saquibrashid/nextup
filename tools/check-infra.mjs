@@ -283,17 +283,22 @@ export function skuViolations(template) {
     }
   }
 
-  // The registry is ghcr.io. An Azure Container Registry of ANY tier is a
-  // design change, not an optimisation (ADR-0003 Rev 3).
+  // The registry is ghcr.io and the package is PUBLIC, so no credential exists
+  // (TASK-146 / R8). A `registries` entry fails CLOSED — once one is present
+  // ACA stops attempting the anonymous pull, so a wrong or expired secret
+  // breaks every revision. An Azure Container Registry of ANY tier is a design
+  // change, not an optimisation (ADR-0003 Rev 3).
   const registries = resourcesOfType(template, 'Microsoft.ContainerRegistry/registries');
   if (registries.length > 0) {
     violations.push('registry: no Azure Container Registry may exist — the registry is ghcr.io');
   }
   for (const app of resourcesOfType(template, 'Microsoft.App/containerApps')) {
-    for (const registry of app.properties?.configuration?.registries ?? []) {
-      if (registry.server !== 'ghcr.io') {
-        violations.push(`registry: expected ghcr.io, found ${registry.server}`);
-      }
+    const configured = app.properties?.configuration?.registries ?? [];
+    if (configured.length > 0) {
+      violations.push(
+        'registry: no registry credential may be configured — the ghcr.io package is public ' +
+          'and a registries entry fails closed (see docs/ghcr-pat.md)',
+      );
     }
   }
 

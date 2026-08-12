@@ -12,9 +12,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 | Status | Count |
 |---|---|
 | ⬜ todo | 138 |
-| 🚧 doing | 0 |
+| 🚧 doing | 1 |
 | ✅ done | 18 |
-| 🙋 owner | 5 |
+| 🙋 owner | 4 |
 | 💤 deferred | 0 |
 | **total** | **161** |
 
@@ -49,12 +49,11 @@ Not done, and every task they depend on is done.
 | `TASK-007` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Azure boundary — owner gated the deployment step |
 | `TASK-010` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs a real subscription: verify cost model, `gpt-4.1` region and quota |
 | `TASK-011` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs the owner to capture golden-fixture screenshots |
-| `TASK-146` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs the owner to mint the `ghcr.io` fine-grained PAT |
 | `TASK-165` | Epic B — Capture & import | Needs a real iOS device to verify the clipboard paste path |
 
 ## Blocked by a dependency
 
-121 tasks cannot start yet.
+122 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -166,6 +165,7 @@ Not done, and every task they depend on is done.
 | `TASK-131` | `TASK-017`, `TASK-044` |
 | `TASK-133` | `TASK-007`, `TASK-156` |
 | `TASK-141` | `TASK-017` |
+| `TASK-146` | `TASK-007` |
 | `TASK-148` | `TASK-147` |
 | `TASK-150` | `TASK-149` |
 | `TASK-151` | `TASK-149`, `TASK-150` |

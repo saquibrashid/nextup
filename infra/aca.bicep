@@ -26,17 +26,11 @@ param logAnalyticsCustomerId string
 param logAnalyticsSharedKey string
 
 // The image lives in ghcr.io. There is NO Azure Container Registry and NO
-// AcrPull grant anywhere (ADR-0003 Rev 3, TASK-146). The registry credential
-// is a fine-grained PAT with read:packages, held as a Container Apps secret.
+// AcrPull grant anywhere (ADR-0003 Rev 3), and — since TASK-146 / R8 — no
+// registry credential of any kind: the package is public and Container Apps
+// pulls it anonymously. See docs/ghcr-pat.md before adding one back.
 @description('Fully-qualified container image, e.g. ghcr.io/saquibrashid/nextup:sha-abc123.')
 param containerImage string
-
-@description('GitHub username that owns the ghcr.io fine-grained PAT.')
-param ghcrUsername string
-
-@description('ghcr.io fine-grained PAT with read:packages. Supplied at deploy time.')
-@secure()
-param ghcrToken string
 
 // ---------------------------------------------------------------------------
 // THE COMPUTE / DECODE-GUARD PAIR (REQ-079, A43, invariant 14).
@@ -111,19 +105,17 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           }
         ]
       }
-      registries: [
-        {
-          server: 'ghcr.io'
-          username: ghcrUsername
-          passwordSecretRef: 'ghcr-token'
-        }
-      ]
-      secrets: [
-        {
-          name: 'ghcr-token'
-          value: ghcrToken
-        }
-      ]
+      // NO `registries` block, deliberately. The ghcr.io package is PUBLIC and
+      // Container Apps pulls it anonymously, so there is no registry credential
+      // anywhere in this system (TASK-146, docs/ghcr-pat.md).
+      //
+      // Do not "restore" one. A fine-grained PAT CANNOT authenticate to ghcr.io
+      // (GitHub Packages supports classic PATs only, and returns 403), and a
+      // classic PAT's `read:packages` scope is account-wide with no way to
+      // narrow it to one repository. Adding a half-configured `registries`
+      // entry is also strictly worse than none: it fails CLOSED, because the
+      // anonymous pull path is no longer attempted.
+      secrets: []
       // Easy Auth (authConfigs) is NOT configured here — it is TASK-027,
       // which depends on TASK-006 and TASK-019. Zero auth code in the app
       // (ADR-0002).

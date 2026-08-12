@@ -26,12 +26,8 @@ param location string = resourceGroup().location
 @description('Fully-qualified container image in ghcr.io.')
 param containerImage string
 
-@description('GitHub username that owns the ghcr.io fine-grained PAT.')
-param ghcrUsername string
-
-@description('ghcr.io fine-grained PAT with read:packages.')
-@secure()
-param ghcrToken string
+// No ghcr credential parameters: the package is public and ACA pulls it
+// anonymously (TASK-146 / R8, docs/ghcr-pat.md).
 
 @description('SQL administrator login for the documented fallback auth path.')
 param sqlAdminLogin string
@@ -104,8 +100,6 @@ module aca 'aca.bicep' = {
     logAnalyticsCustomerId: logAnalytics.properties.customerId
     logAnalyticsSharedKey: logAnalytics.listKeys().primarySharedKey
     containerImage: containerImage
-    ghcrUsername: ghcrUsername
-    ghcrToken: ghcrToken
   }
 }
 
@@ -135,7 +129,7 @@ module blobRbac 'rbac.bicep' = {
 //   - Managed-identity DB user + smoke migration -> TASK-141
 //   - Budget alerts (1.0x informational + 1.5x, NO auto-remediation)
 //                                      -> TASK-142
-//   - ghcr.io fine-grained PAT rotation -> TASK-146
+//   - ghcr.io package visibility (public, no credential) -> TASK-146
 //
 // And permanently absent (REQ-028, T-INV-013): any TTL, Azure SQL Agent job,
 // Elastic Job agent or scheduled deletion. Their ABSENCE is the requirement.
