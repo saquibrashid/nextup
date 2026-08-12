@@ -617,7 +617,11 @@ later."* (US-007 AC-6). Extraction does **not** fail. `T-AI-017`.
 
 - `apps/api/src/matching/` has **no import path** to `apps/api/src/extraction/`
   other than the `ExtractionCandidate` type. Enforced by an ESLint
-  `no-restricted-imports` rule declared in `.eslintrc.cjs` and by `T-AI-012`.
+  `no-restricted-imports` rule declared in `eslint.config.cjs` and by
+  `T-AI-012`. ~~declared in `.eslintrc.cjs`~~ — ESLint 10 removed `.eslintrc.*`
+  support entirely and the repo now uses flat config; a rule added to the old
+  file would be silently ignored, and `T-AI-012` would fail with no obvious
+  cause.
 - `T-AI-013` is a **network-shaped** test: it runs a full extraction with a
   recording HTTP fake, then asserts that **no request whose host is the vision
   endpoint carries a body or header containing any string from the TMDB

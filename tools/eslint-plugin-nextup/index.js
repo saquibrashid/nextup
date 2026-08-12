@@ -1,7 +1,7 @@
 /**
  * eslint-plugin-nextup — in-repo ESLint plugin.
  *
- * Exists so the T-META-004 rule can be referenced from `.eslintrc.cjs` as
+ * Exists so the T-META-004 rule can be referenced from `eslint.config.cjs` as
  * `nextup/test-id-naming` without adding a third-party plugin-loader
  * dependency (NFR-004: keep the dependency set small and mainstream).
  * npm workspaces symlink this package into node_modules, so ESLint resolves

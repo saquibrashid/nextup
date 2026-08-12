@@ -21,8 +21,11 @@ import rule from '../eslint-rules/test-id-naming.js';
 RuleTester.describe = describe;
 RuleTester.it = it;
 
+// ESLint 10 accepts only flat-config keys here; the eslintrc-era
+// `parserOptions` is now a hard error ("eslintrc-incompat"), not a silently
+// ignored option.
 const ruleTester = new RuleTester({
-  parserOptions: { ecmaVersion: 2022, sourceType: 'module' },
+  languageOptions: { ecmaVersion: 2022, sourceType: 'module' },
 });
 
 describe('T-META-004 · test titles carry a unique T- id', () => {
