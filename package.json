@@ -30,7 +30,7 @@
     "test:infra": "vitest run --project infra",
     "check:deps": "node tools/check-deps.mjs",
     "test:meta": "vitest run --project meta --passWithNoTests",
-    "coverage": "vitest run --project unit --coverage",
+    "coverage": "vitest run --project unit --project web --coverage",
     "test": "npm run test:unit && npm run test:int && npm run test:web"
   },
   "devDependencies": {
@@ -50,6 +50,8 @@
     "globals": "^17.9.0",
     "jsdom": "^25.0.1",
     "prettier": "^3.3.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "typescript": "^6.0.3",
     "vite": "^8.2.0",
     "vitest": "^4.1.10"

@@ -195,6 +195,34 @@ skipTranscode()` is **forbidden**: it is currently equivalent, but it makes
     `navigator.clipboard` is absent on `http://` — over a plain LAN IP the paste
     button will simply not be there. Do not debug that from scratch.
 
+20. **If you were given a LANE, you own only that lane's paths.** Multiple
+    agents may be building this repo in parallel — see
+    `docs/parallel-execution-plan.md`. When your opening prompt names a lane:
+    - **Write only inside the paths listed for your lane** in §4.2 of that
+      document. Do not create, edit or delete anything outside them, however
+      obviously broken it looks.
+    - **A shared file is a HARD STOP, not an obstacle to route around.** The
+      contended set is listed in §6 of that document and includes
+      `packages/domain/src/enums.ts` (the closed error-code enum),
+      `apps/api/src/middleware/errorEnvelope.ts`, `apps/api/src/app.ts`
+      (middleware order), `apps/api/src/routes/batches.ts`, `infra/aca.bicep`,
+      `.github/workflows/ci.yml`, every workspace manifest, and
+      `prisma/schema.prisma` + `prisma/migrations/**`. If your task needs one
+      changed: **stop and report the change you need.** Do NOT make it, and do
+      NOT duplicate the file, shadow it, or add a parallel implementation to
+      avoid touching it — a divergent second copy is worse than a blocked task.
+    - **Migrations are never yours** unless you are lane A. Concurrent
+      migration files apply in filename/timestamp order, which is _not_
+      dependency order.
+    - **Do not edit `specs/**` or `docs/**` to agree with your code.** The
+      specs are the input to your work, not an output of it. A spec that looks
+      wrong is a finding to report.
+    - **Rebase onto `main`; never merge `main` in, and never touch another
+      lane's branch.**
+    - **If you finish early, stop.** Do not pick up the critical path or
+      another lane's tasks to be helpful. Unrequested cross-lane work is the
+      single most expensive thing you can do here.
+
 ## 5. How to read revision banners (the F-001 lesson — applies to you too)
 
 Several documents carry revision banners: the datastore changed twice

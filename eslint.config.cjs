@@ -73,6 +73,25 @@ module.exports = [
   },
 
   {
+    // typescript-eslint's own guidance: ESLint's core `no-undef` and
+    // `no-redeclare` must be OFF in TypeScript, because they only model the
+    // VALUE namespace. A type-only import (`import type { JSX } from 'react'`)
+    // is invisible to them, so `no-undef` reports every type the compiler
+    // resolves perfectly well, and `no-redeclare` treats a type that shares a
+    // name with a global as a duplicate declaration. Both are false positives
+    // by construction, and both are already covered properly — and with the
+    // real type graph — by `tsc --build`, which CI runs as its own job.
+    //
+    // Scoped to TypeScript so the rules keep working in the plain .js/.cjs
+    // tooling files, where they are genuine findings.
+    files: ['**/*.{ts,tsx}'],
+    rules: {
+      'no-undef': 'off',
+      'no-redeclare': 'off',
+    },
+  },
+
+  {
     files: TEST_FILES,
     plugins: { nextup },
     rules: {

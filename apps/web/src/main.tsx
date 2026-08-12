@@ -1,21 +1,23 @@
-// @nextup/web — React + Vite SPA entry point.
+// @nextup/web - React + Vite SPA entry point.
 //
-// PLACEHOLDER (baseline scaffold). The nine screens, copy constants
-// (apps/web/src/copy.ts), routing, breakpoints and accessibility behaviour are
-// specified in specs/ui.md and specs/ux-states.md and built by the backlog
-// tasks. This file only proves the app mounts.
+// Mounts the router (TASK-025). The nine screens themselves are stubs until
+// their own backlog tasks land; copy constants (apps/web/src/copy.ts),
+// breakpoints and accessibility behaviour are specified in specs/ui.md and
+// specs/ux-states.md.
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+
+import { App } from './App';
 
 const root = document.getElementById('root');
 if (root) {
   createRoot(root).render(
     <StrictMode>
-      <main>
-        <h1>nextup</h1>
-        <p>Scaffolded from specs — not yet implemented. See docs/backlog.md.</p>
-      </main>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
     </StrictMode>,
   );
 }

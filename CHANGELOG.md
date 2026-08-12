@@ -6,6 +6,66 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **TASK-025 — the app shell and all nine routes** (`specs/ui.md` §1).
+  `AppShell` renders the header, nav and global footer; `App` mounts the nine
+  screens; the eight page components and `NotFoundPage` ship as stubs for their
+  own backlog tasks to fill.
+  - **The route table is exported as data (`src/routes.tsx`), not written as
+    JSX.** Four later suites — `T-ATTR-002`, `T-ATTR-003`, `T-A11Y-001` and
+    `T-A11Y-012` — are specified as running across **"all nine routes"** and
+    each asserts something *across* the route set rather than *about* it. Had
+    each kept its own hand-written list, a route added later would not fail
+    them; they would keep passing while silently not covering the new screen.
+    `T-UI-023a` is now the single place the count and the paths themselves are
+    the subject.
+  - Each stub carries a **distinct `<h1>`**, so `T-UI-023b` detects a route
+    falling through to the catch-all. A plain "does it render?" check cannot:
+    the catch-all renders perfectly well.
+  - `NotFoundPage` ships with a working link back to `/`, because the screen
+    index names *"getting back to `/`"* as that route's entire purpose.
+  - Verified by mutation, not just by a green run: removing the footer failed
+    two tests and renaming one route path failed four.
+
+- **`specs/testing.md` §9A — structural tests not owned by a single acceptance
+  criterion.** `docs/backlog.md` names `T-UI-023` as TASK-025's done-when, but
+  the id **had no definition anywhere in `specs/testing.md`**. Since that file
+  is the definition of done (NFR-003) and `T-META-003` requires every claimed
+  test id to resolve to a definition in it, the task could not have been
+  verified as specified. §9A defines it, and gives the small class of
+  structural tests a home rather than forcing them under an arbitrary user
+  story, which would misrepresent what fails when they fail.
+
+### Fixed
+
+- **Two copies of React were installed, and the tree was one web test away from
+  breaking.** The root had `react@18.3.1` hoisted to satisfy
+  `@testing-library/react`'s peer dependency while `apps/web` carried
+  `react@19.2.8`. The first component test rendered against one copy and
+  asserted against the other, producing the famously unhelpful *"Objects are
+  not valid as a React child"*. Nothing had caught it because `apps/web` had no
+  tests until now, and neither `build` nor `typecheck` looks at duplicate
+  runtime instances. React 19 is now an explicit root devDependency, so a
+  single copy dedupes for every workspace.
+
+- **`npm run coverage` enforced a threshold on code it never ran.** The script
+  was `vitest run --project unit --coverage`, but `vitest.config.ts` sets a
+  70%/60% floor for `apps/web/src/**` — a path the `unit` project does not
+  include. The gate was satisfiable only by tests the command does not
+  execute, and passed **vacuously** for as long as `apps/web/src` held no real
+  source. The moment TASK-025 added components it failed at 0%, having never
+  once measured them. The script now runs `--project unit --project web`.
+
+- **ESLint's core `no-undef` and `no-redeclare` are now off for `.ts`/`.tsx`.**
+  Both rules model only the *value* namespace, so a type-only import
+  (`import type { JSX } from 'react'`) is invisible to them: `no-undef` reports
+  types the compiler resolves perfectly, and `no-redeclare` treats a type
+  sharing a name with a global as a duplicate. This is typescript-eslint's own
+  documented guidance, and `tsc --build` — a separate CI job — already checks
+  both properly, against the real type graph. They stay enabled for the plain
+  `.js`/`.cjs` tooling files, where they are genuine findings.
+
 ### Security
 
 - **The `2 · secrets` CI job was failing open on every pull request.**

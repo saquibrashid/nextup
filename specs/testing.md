@@ -1173,6 +1173,32 @@ AC-3/AC-4/AC-5 keep their original labels, this is not an error to "fix".)*
 
 ---
 
+## 9A. Structural tests not owned by a single acceptance criterion
+
+A small number of tests guard structure that **several** acceptance criteria
+silently depend on. They are listed here rather than under a user story
+because attaching them to one arbitrary AC would misrepresent what fails when
+they fail — and because `T-META-003` requires every id referenced by
+`docs/backlog.md` to resolve to a definition in this file.
+
+| Test | Task | Assertion |
+|---|---|---|
+| **`T-UI-023`** *(a–g)* | `TASK-025` | **The app shell and the nine-route table** (`specs/ui.md` §1). `ROUTES` holds exactly the nine specified paths (`a`); each renders its own distinct screen rather than falling through to the catch-all (`b`); `<header>`, `<nav>`, `<main>` and `<footer>` each appear **exactly once** on every route, per `ui.md` §10.2 (`c`); an unknown path renders `NotFoundPage` **with a working link back to `/`**, which the screen index names as that route's whole purpose (`d`); the three overlapping `/batches…` patterns do not shadow one another (`e`); the nav exposes the six top-level destinations (`f`); and the global footer landmark exists on every route, ready for the TMDB attribution `TASK-026` mounts into it (`g`). |
+
+**Why the route set gets a test of its own.** Four later suites — `T-ATTR-002`,
+`T-ATTR-003`, `T-A11Y-001` and `T-A11Y-012` — are each specified as running
+across **"all nine routes"**, and each asserts something *across* the route set
+rather than *about* it. They enumerate `ROUTES`, so a route missing from that
+table does not fail them: they keep passing while no longer covering the
+missing screen. `T-UI-023a` is the only place the count and the paths
+themselves are the subject, which is what makes the other four honest.
+`T-UI-023g` exists for the same reason at one remove — `ui.md` §8 warns that
+attribution failure is **invisible from inside the product**, so the footer it
+must live in is asserted from the moment the shell ships, not from the moment
+the copy arrives.
+
+---
+
 ## 10. Acceptance criteria that are NOT fully machine-verifiable
 
 Named explicitly, as required, rather than quietly skipped. **Twelve of 241**,
@@ -1244,6 +1270,7 @@ apps/api/test/integration/     batches.spec.ts, titles.spec.ts, removed.spec.ts,
                                ingestSources.spec.ts     # A45 — T-PASTE-005/006/007, T-IMG-023, T-RET-014
 apps/web/test/                 listPage.spec.tsx, reviewPage.spec.tsx, removedPage.spec.tsx,
                                attribution.spec.tsx, states.spec.tsx,
+                               appShell.spec.tsx,        # TASK-025 — T-UI-023a…g (§9A)
                                pasteCapture.spec.tsx     # A45 — T-PASTE-001/002/003/004/008/009, T-UI-014
 tests/e2e/                     journey.spec.ts, auth.spec.ts, a11y.spec.ts, viewport.spec.ts,
                                uploadPathRegression.spec.ts  # A45 — T-PASTE-010 (add-not-swap guard)
