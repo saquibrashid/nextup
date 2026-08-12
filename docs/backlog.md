@@ -469,12 +469,12 @@ finished, so the exception cannot outlive its reason.
 | `TASK-015` | `done` | `692305b` |
 | `TASK-016` | `done` | `536aeb3` |
 | `TASK-017` | `done` | Prisma `sqlserver` + `prisma/migrations/0001_init` applied against real `mssql/server:2022`; `apps/api/src/repository/ownerData.ts` with `ownerId` as the first positional parameter of every method; `T-SEC-021` (AST walk, 17 cases, 12 of them mutations), `T-INV-001/002/015` (DB raises `2601`/`2627`), `T-INV-018` (BIN2 collation + filtered indexes exist), `T-INV-019/020/021/022`. 28 integration tests green. Schema/migration drift is zero and CI now asserts it. |
-| `TASK-018` | `todo` | — |
-| `TASK-019` | `todo` | — |
-| `TASK-020` | `todo` | — |
-| `TASK-021` | `todo` | — |
+| `TASK-018` | `done` | `apps/api/src/auth/principal.ts` — Easy Auth `x-ms-client-principal` adapter, plus `auth/ownerId.ts`. Fails **closed** on every malformed input including a repeated header. `T-SEC-013` (15 cases), `T-SEC-020` (8, incl. a 10,000-subject collision fixture and the `\|`-separator collision), `T-SEC-019` (the shim boundary, mutation-proven). |
+| `TASK-019` | `done` | `apps/api/src/middleware/allowList.ts` — fail-closed against `NEXTUP_ALLOWED_SUBJECTS`; `NEXTUP_BOOTSTRAP_ALLOW_FIRST` grants nothing on its own. `T-SEC-010`, `T-SEC-014`, `T-SEC-015` (address-claim word ban, mutation-proven), `T-SEC-016`. |
+| `TASK-020` | `done` | `apps/api/src/middleware/ownerScope.ts` + `auth/ownerId.ts` — `ownerId` derives from the principal only. `T-SEC-020`, `T-SEC-029` (routes **enumerated** from the app and the router, not listed; `T-SEC-029c` mutation-proven against a route mounted outside the chain). |
+| `TASK-021` | `done` | `apps/api/dev/devPrincipal.ts` — the shim is excluded **structurally** (outside the production `include: ["src/**/*.ts"]`), not by a flag or an exclude list; `createApp` injects the reader. `T-SEC-019a-f`. ⚠ The task row said `apps/api/src/auth/devPrincipal.ts`; corrected in place below and in `specs/security.md` §2.3. |
 | `TASK-022` | `done` | `d95a1ea` |
-| `TASK-023` | `todo` | — |
+| `TASK-023` | `done` | `apps/api/src/app.ts` + `routes/index.ts` in the mandated order, no CORS middleware, `/api` 404 fallback **inside** the chain. `T-SEC-005`, `T-SEC-012`, `T-SEC-030`, `T-API-001`. Driven over real HTTP on an ephemeral port — no new dependency. |
 | `TASK-024` | `todo` | — |
 | `TASK-025` | `done` | `a9e3483` |
 | `TASK-026` | `todo` | — |
@@ -744,7 +744,8 @@ Traces to: US-001 (NFR-015, NFR-016, NFR-017) · Milestone M1 · Depends on: TAS
 |---|---|---|---|---|
 | TASK-018 | `apps/api/src/auth/principal.ts` — adapt the Easy Auth `x-ms-client-principal` header into a `Principal`. No auth library, no password handling. | S | 017 | `T-SEC-013` |
 | TASK-019 | `apps/api/src/middleware/allowList.ts` — **fail-closed** against `NEXTUP_ALLOWED_SUBJECTS`; explicit bootstrap mode when unset-and-empty. | S | 018 | `T-SEC-010`, `T-SEC-014`, `T-SEC-015`, `T-SEC-016` |
-| TASK-021 | `apps/api/src/auth/devPrincipal.ts` — dev shim **excluded at compile time** from production builds (not a runtime flag). | S | 018 | `T-SEC-019` |
+| TASK-021 | `apps/api/dev/devPrincipal.ts` — dev shim excluded from production builds by the **directory boundary**: it sits outside `apps/api/tsconfig.json`'s `include: ["src/**/*.ts"]`, so the production compiler cannot emit it, and `createApp` takes the reader as an injected parameter so nothing under `src/` names it. Not a runtime flag, and not an exclude list (a denylist protects the files you thought of, never the next one). | S | 018 | `T-SEC-019` |
+| ~~TASK-021~~ | ~~`apps/api/src/auth/devPrincipal.ts` — dev shim **excluded at compile time** from production builds (not a runtime flag).~~ ⚠ Superseded: a file inside `src/` can only be excluded by a list, and the cited `tsconfig.build.json` / esbuild `external` mechanism does not exist in this repo (`apps/api` builds with plain `tsc --build`). See `specs/security.md` §2.3. | S | 018 | `T-SEC-019` |
 | TASK-027 | Easy Auth configuration in `infra/aca.bicep`: Entra ID provider, redirect to the requested path, deep-link preservation across sign-in, sign-out route. **Zero auth code in the app.** | S | 006, 019 | `T-AUTH-001`, `T-AUTH-002`, `T-AUTH-003` |
 | TASK-028 | `apps/web/src/pages/RefusalPage.tsx` + 401 and IdP-failure states; copy from `ui.md` §9. | S | 025, 019 | `T-SEC-018`, `T-UX-019` |
 | TASK-031 | `tests/smoke/deployed.spec.ts` — post-deploy smoke run against the 0%-traffic revision. | S | 007, 027 | `T-SMOKE-001`, `T-SMOKE-003` |

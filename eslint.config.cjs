@@ -44,6 +44,11 @@ module.exports = [
       'coverage/',
       'node_modules/',
       '**/dist/**',
+      // The local-development build output (`apps/api/tsconfig.dev.json`).
+      // It is compiled JavaScript, so linting it reports on generated code —
+      // and it must NOT share `dist`, because that directory boundary is what
+      // keeps the dev principal shim out of the production build (`T-SEC-019`).
+      '**/dist-dev/**',
       '**/build/**',
       '**/coverage/**',
       '**/*.d.ts',

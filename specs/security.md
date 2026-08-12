@@ -150,16 +150,33 @@ const allowed = new Set(
 > (Playwright: the browser renders the refusal page and the network log
 > contains no successful `/api/titles` response).
 
-### 2.3 The development shim — excluded at compile time
+### 2.3 The development shim — excluded by the directory boundary
 
-`apps/api/src/auth/devPrincipal.ts` synthesises a principal from
-`NEXTUP_DEV_SUBJECT` for local development and tests.
+`apps/api/dev/devPrincipal.ts` synthesises a principal from
+`NEXTUP_DEV_SUBJECT` for local development. ⚠ **It lives in `apps/api/dev/`,
+NOT under `src/`** — that location *is* the control, and moving it is the one
+change that breaks this section.
 
 | Control | Mechanism |
 |---|---|
-| Compile-time exclusion | The import is guarded by `if (import.meta.env?.MODE !== 'production')` **and** the file is excluded from the production build by `tsconfig.build.json`'s `exclude` and by an esbuild `external` rule. **Not a runtime flag.** |
-| Test | `T-SEC-019` builds the production bundle in CI and asserts the strings `devPrincipal`, `NEXTUP_DEV_SUBJECT` and `readDevPrincipal` appear **nowhere** in `apps/api/dist/**`. This test blocks the merge. |
-| Belt and braces | Even if present, `devPrincipal` returns `null` when `NODE_ENV === 'production'`. |
+| Compile-time exclusion | `apps/api/tsconfig.json` has `include: ["src/**/*.ts"]`. The shim is outside that root, so the production compiler **cannot** emit it — there is nothing to remember to exclude. `apps/api/tsconfig.dev.json` typechecks and runs `dev/`, emitting to a separate `dist-dev`. **Not a runtime flag, and not an exclude list.** |
+| No reference from production code | `createApp({ readPrincipal })` takes the reader as an injected parameter and defaults to the real Easy Auth reader, so no file under `src/` ever names the shim. `T-SEC-019c` asserts this. |
+| Test | `T-SEC-019d` **deletes `apps/api/dist`, runs `tsc --build --force`**, and asserts the strings `devPrincipal`, `NEXTUP_DEV_SUBJECT` and `readDevPrincipal` appear **nowhere** in the output. ⚠ Both the delete and `--force` are load-bearing: `tsc --build` is incremental and this test was observed to PASS against a stale `dist` while a shim sat in `src`. This test blocks the merge. |
+| Belt and braces | Even if present, `readDevPrincipal` returns `null` when `NODE_ENV === 'production'` (`T-SEC-019e`) and when `NEXTUP_DEV_SUBJECT` is unset (`T-SEC-019f`). |
+| Not a bypass | The shim produces a *principal*; it does **not** skip the allow-list. A dev server that skipped it would leave the refusal path as the one configuration nobody ever exercises. |
+
+> **Superseded (R4).** The original mechanism below was written against a build
+> this repo does not have: `apps/api` compiles with plain `tsc --build`, there
+> is no `tsconfig.build.json` and no esbuild step, and `import.meta.env` is a
+> Vite construct that is `undefined` in Node — so the guard would have been
+> dead code that always took the dev branch. It is retained struck through for
+> history only. **Do not implement it.**
+>
+> | ~~Control~~ | ~~Mechanism~~ |
+> |---|---|
+> | ~~Compile-time exclusion~~ | ~~The import is guarded by `if (import.meta.env?.MODE !== 'production')` **and** the file is excluded from the production build by `tsconfig.build.json`'s `exclude` and by an esbuild `external` rule. **Not a runtime flag.**~~ |
+> | ~~Test~~ | ~~`T-SEC-019` builds the production bundle in CI and asserts the strings `devPrincipal`, `NEXTUP_DEV_SUBJECT` and `readDevPrincipal` appear **nowhere** in `apps/api/dist/**`. This test blocks the merge.~~ |
+> | ~~Belt and braces~~ | ~~Even if present, `devPrincipal` returns `null` when `NODE_ENV === 'production'`.~~ |
 
 ### 2.4 Owner mapping
 

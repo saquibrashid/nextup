@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 137 |
+| ⬜ todo | 132 |
 | 🚧 doing | 0 |
-| ✅ done | 20 |
+| ✅ done | 25 |
 | 🙋 owner | 4 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -24,13 +24,20 @@ Not done, and every task they depend on is done.
 
 | Task | Size | Section |
 |---|---|---|
-| `TASK-018` | S | Epic A — Access & identity |
+| `TASK-024` | XS | Epic G — Attribution & compliance |
 | `TASK-026` | S | Epic G — Attribution & compliance |
+| `TASK-027` | S | Epic A — Access & identity |
+| `TASK-028` | S | Epic A — Access & identity |
+| `TASK-029` | S | Epic A — Access & identity |
+| `TASK-030` | XS | Epic K — Platform, safety, and the shell |
 | `TASK-032` | S | Epic K — Platform, safety, and the shell |
+| `TASK-033` | M | Epic F — The list itself (the value loop) |
 | `TASK-041` | S | Epic F — The list itself (the value loop) |
+| `TASK-045` | S | Epic D — Matching & identity |
 | `TASK-048` | — | Epic B — Capture & import |
 | `TASK-055` | S | Epic C — Extraction |
 | `TASK-101` | S | Epic H — History, removal ledger, suppression |
+| `TASK-121` | S | Epic K — Platform, safety, and the shell |
 | `TASK-122` | S | Epic K — Platform, safety, and the shell |
 | `TASK-126` | M | Epic K — Platform, safety, and the shell |
 | `TASK-128` | XS | Epic K — Platform, safety, and the shell |
@@ -57,21 +64,11 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-116 tasks cannot start yet.
+104 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
-| `TASK-019` | `TASK-018` |
-| `TASK-020` | `TASK-018` |
-| `TASK-021` | `TASK-018` |
-| `TASK-023` | `TASK-019`, `TASK-020` |
-| `TASK-024` | `TASK-023` |
-| `TASK-027` | `TASK-019` |
-| `TASK-028` | `TASK-019` |
-| `TASK-029` | `TASK-023` |
-| `TASK-030` | `TASK-023` |
 | `TASK-031` | `TASK-007`, `TASK-027` |
-| `TASK-033` | `TASK-023` |
 | `TASK-034` | `TASK-033` |
 | `TASK-035` | `TASK-033` |
 | `TASK-036` | `TASK-033` |
@@ -82,7 +79,6 @@ Not done, and every task they depend on is done.
 | `TASK-042` | `TASK-041` |
 | `TASK-043` | `TASK-045`, `TASK-033` |
 | `TASK-044` | `TASK-043` |
-| `TASK-045` | `TASK-023` |
 | `TASK-046` | `TASK-026`, `TASK-038` |
 | `TASK-047` | `TASK-033` |
 | `TASK-049` | `TASK-048` |
@@ -155,7 +151,6 @@ Not done, and every task they depend on is done.
 | `TASK-118` | `TASK-052` |
 | `TASK-119` | `TASK-118` |
 | `TASK-120` | `TASK-026`, `TASK-118` |
-| `TASK-121` | `TASK-023` |
 | `TASK-123` | `TASK-038`, `TASK-069`, `TASK-096`, `TASK-162` |
 | `TASK-124` | `TASK-123` |
 | `TASK-125` | `TASK-123` |
@@ -196,7 +191,12 @@ Not done, and every task they depend on is done.
 | `TASK-015` | `692305b` | `T-DM-001` |
 | `TASK-016` | `536aeb3` | `T-INV-009`, `T-INV-010` |
 | `TASK-017` | Prisma `sqlserver` + `prisma/migrations/0001_init` applied against real `mssql/server:2022`; `apps/api/src/repository/ownerData.ts` with `ownerId` as the first positional parameter of every method; `T-SEC-021` (AST walk, 17 cases, 12 of them mutations), `T-INV-001/002/015` (DB raises `2601`/`2627`), `T-INV-018` (BIN2 collation + filtered indexes exist), `T-INV-019/020/021/022`. 28 integration tests green. Schema/migration drift is zero and CI now asserts it. | `T-INV-001`, `T-MIG-001`, `T-SEC-021` |
+| `TASK-018` | `apps/api/src/auth/principal.ts` — Easy Auth `x-ms-client-principal` adapter, plus `auth/ownerId.ts`. Fails **closed** on every malformed input including a repeated header. `T-SEC-013` (15 cases), `T-SEC-020` (8, incl. a 10,000-subject collision fixture and the `\ | `T-SEC-013` |
+| `TASK-019` | `apps/api/src/middleware/allowList.ts` — fail-closed against `NEXTUP_ALLOWED_SUBJECTS`; `NEXTUP_BOOTSTRAP_ALLOW_FIRST` grants nothing on its own. `T-SEC-010`, `T-SEC-014`, `T-SEC-015` (address-claim word ban, mutation-proven), `T-SEC-016`. | `T-SEC-010`, `T-SEC-014`, `T-SEC-015`, `T-SEC-016` |
+| `TASK-020` | `apps/api/src/middleware/ownerScope.ts` + `auth/ownerId.ts` — `ownerId` derives from the principal only. `T-SEC-020`, `T-SEC-029` (routes **enumerated** from the app and the router, not listed; `T-SEC-029c` mutation-proven against a route mounted outside the chain). | `T-SEC-020`, `T-SEC-029` |
+| `TASK-021` | `apps/api/dev/devPrincipal.ts` — the shim is excluded **structurally** (outside the production `include: ["src/**/*.ts"]`), not by a flag or an exclude list; `createApp` injects the reader. `T-SEC-019a-f`. ⚠ The task row said `apps/api/src/auth/devPrincipal.ts`; corrected in place below and in `specs/security.md` §2.3. | `T-SEC-019` |
 | `TASK-022` | `d95a1ea` | `T-API-002`, `T-SEC-007` |
+| `TASK-023` | `apps/api/src/app.ts` + `routes/index.ts` in the mandated order, no CORS middleware, `/api` 404 fallback **inside** the chain. `T-SEC-005`, `T-SEC-012`, `T-SEC-030`, `T-API-001`. Driven over real HTTP on an ephemeral port — no new dependency. | `T-API-001`, `T-SEC-005` |
 | `TASK-025` | `a9e3483` | `T-UI-023` |
 | `TASK-144` | `eb07409` — a CI grep gate over `prisma/migrations/**` | `T-MIG-001` |
 | `TASK-146` | **ahead-of:TASK-007.** `docs/ghcr-pat.md` written. **No PAT is needed at all** — a fine-grained PAT cannot authenticate to `ghcr.io` and a classic one is account-wide, so the package is public and CI pushes with `GITHUB_TOKEN` (R8). Remaining: the `deploy.yml` link + image secret-scan land with TASK-007, and the one-time visibility flip runs after the first successful push. | _no test id declared_ |

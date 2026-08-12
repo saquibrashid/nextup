@@ -1,0 +1,19 @@
+{
+  // Local development only. The production build is `tsconfig.json`, which
+  // compiles `src/**` and nothing else — that directory boundary is what keeps
+  // the dev principal shim out of `dist` (see `dev/devPrincipal.ts` and
+  // `T-SEC-019`).
+  //
+  // This config exists so `dev/` can still be typechecked and run. It emits to
+  // a SEPARATE outDir: sharing `dist` would put the shim exactly where the
+  // production build looks, defeating the whole arrangement.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "./dist-dev",
+    "lib": ["ES2022"],
+    "composite": false
+  },
+  "include": ["dev/**/*.ts", "src/**/*.ts"],
+  "references": [{ "path": "../../packages/domain" }]
+}

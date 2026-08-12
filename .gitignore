@@ -42,3 +42,5 @@ Thumbs.db
 commitmsg.tmp
 _step.sh
 _env.txt
+
+dist-dev/
