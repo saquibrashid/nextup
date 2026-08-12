@@ -50,9 +50,25 @@ describe('T-META-004 · test titles carry a unique T- id', () => {
       "it('T-INV-001 · one visible title per work', () => {});\nit('T-INV-002 · one listing per service', () => {});",
       // Not a test call at all.
       "somethingElse('no id here', () => {});",
+      // A table test: `it.each(table)` is the TABLE call — its first argument
+      // is the data, not a title — and the title lives on the call it returns.
+      // `specs/data-model.md` §2.2 makes a table test MANDATORY for T-DM-001,
+      // so a rule that rejected the form would push authors off the spec.
+      "it.each(CASES)('T-DM-001 · %j → %j', (input, expected) => {});",
+      "it.each([[1, 2]])('T-DM-001 · %i', (a, b) => {});",
     ],
 
     invalid: [
+      // A table test is still held to the id rule on the title it DOES have —
+      // exempting the table call must not exempt the test.
+      {
+        code: "it.each(CASES)('normalises text', (a) => {});",
+        errors: [{ messageId: 'missingId' }],
+      },
+      {
+        code: 'it.each(CASES)(titleVar, (a) => {});',
+        errors: [{ messageId: 'dynamicTitle' }],
+      },
       // The intentionally mis-named test TASK-002 names as the exit criterion.
       {
         code: "it('reconciles removals correctly', () => {});",

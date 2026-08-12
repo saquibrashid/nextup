@@ -40,6 +40,19 @@ const TEST_ID = /^(T-[A-Z][A-Z0-9]*-\d+[a-z]?)/;
 /** Call names that declare a test case. `describe` blocks are deliberately exempt. */
 const TEST_CALLERS = new Set(['it', 'test']);
 
+/** True for `it.each(table)` / `test.each(table)` — the TABLE call. */
+function isEachTableCall(node) {
+  return (
+    node.type === 'CallExpression' &&
+    node.callee.type === 'MemberExpression' &&
+    !node.callee.computed &&
+    node.callee.property.type === 'Identifier' &&
+    node.callee.property.name === 'each' &&
+    node.callee.object.type === 'Identifier' &&
+    TEST_CALLERS.has(node.callee.object.name)
+  );
+}
+
 /** Modifiers that still declare a test: it.only, it.skip, it.each`...`, test.concurrent ... */
 function isTestCall(node) {
   const callee = node.callee;
@@ -48,8 +61,23 @@ function isTestCall(node) {
     return TEST_CALLERS.has(callee.name);
   }
 
-  // it.only(...) / it.skip(...) / it.concurrent(...) / it.each([...])(...)
+  // `it.each(table)(title, fn)` — the OUTER call is the test declaration and
+  // carries the title; the inner `it.each(table)` carries the data. Before
+  // this, the outer call (a CallExpression callee) matched nothing and the
+  // inner one was reported as a dynamic title — so every table test failed
+  // lint, which would push authors off the table tests
+  // `specs/data-model.md` §2.2 makes MANDATORY.
+  if (isEachTableCall(callee)) {
+    return true;
+  }
+
+  // it.only(...) / it.skip(...) / it.concurrent(...)
   if (callee.type === 'MemberExpression') {
+    // The table call itself declares no test; its title is on the outer call.
+    if (isEachTableCall(node)) {
+      return false;
+    }
+
     let object = callee.object;
     // Unwrap it.each([...])(...) - the callee object is itself a CallExpression.
     while (object && object.type === 'CallExpression') {

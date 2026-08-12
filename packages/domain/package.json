@@ -16,6 +16,7 @@
     "clean": "tsc --build --clean"
   },
   "dependencies": {
+    "@noble/hashes": "^2.2.0",
     "zod": "^4.4.3"
   }
 }

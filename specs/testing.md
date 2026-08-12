@@ -1130,7 +1130,7 @@ AC-3/AC-4/AC-5 keep their original labels, this is not an error to "fix".)*
 | AC-4 | I | **`T-IMG-002`** | Bytes are only ever served authenticated, with the mandated headers |
 | AC-5 | I | `T-RET-013` | An open batch whose images reach 30 days: purge proceeds; the batch reports `IMAGES_PURGED` rather than erroring |
 | AC-6 | I | **`T-IMG-005`** | A missing blob is 410, never 500 |
-| AC-7 | S | **`T-INV-008`** | The three 30-ish-day constants are declared separately and never share a call site |
+| AC-7 | S | **`T-INV-008`** | The **two** 30-ish-day constants (`IMAGE_RETENTION_DAYS = 30`, `TMDB_METADATA_MAX_AGE_DAYS = 183`) are declared separately, as two exported declarations, and never share a call site. **↳ R9 (`A46`): was *three* — `LIST_STALENESS_DAYS` is retired with the staleness nudge, so a third constant must NOT be reintroduced to satisfy this row.** ~~The three 30-ish-day constants are declared separately and never share a call site~~ |
 
 ### US-036 — Nothing but the owner changes user-visible list state
 | AC | L | Test | Assertion |

@@ -8,6 +8,71 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`TASK-013` — `packages/domain/src/ids.ts`.** ULID generation, the
+  deterministic variant, and a monotonic factory for tests (`T-DM-004`, 11
+  tests). Hand-rolled rather than taking the `ulid` package: the variant this
+  project actually depends on (`deterministicId`) is not something that package
+  offers, so we would own half the scheme anyway — and owning half an id scheme
+  is worse than owning all of it. Crockford base32 is a lookup table; the part
+  that *is* a cryptographic primitive is delegated to `@noble/hashes`.
+  - **`deterministicId` derives its timestamp segment from the hash, not the
+    clock.** A clock-derived prefix would make the id depend on *when* a retry
+    ran, which is exactly the variable that must not matter — `REQ-005`/`REQ-006`
+    resumability turns on a retry after a crash mid-apply **overwriting** the
+    rows the first attempt wrote rather than inserting a second set. Random ids
+    would duplicate silently, and only under conditions that are hardest to
+    reproduce. `T-DM-004g` pins this.
+  - An empty seed **throws**. Hashing `''` would hand every caller with a
+    missing id the *same* id — a duplicate-overwrite that presents as data loss.
+
+- **`TASK-015` — `normaliseTitleText` and the two `workIdentity` builders**
+  (`T-DM-001`, the table test `specs/data-model.md` §2.2 makes mandatory, plus
+  `T-DM-002`). They live in the same file as `WORK_IDENTITY_RE` deliberately:
+  §2.2 requires exactly **one** normalisation implementation, and splitting it
+  across files is how a second one appears.
+  - **No year enters the hash (SD-05).** A year is present on some captures of a
+    tile and absent on others, so folding it in splits one work into two
+    identities on the exact axis the scheme exists to hold together — and does
+    it **invisibly**, as a silently bypassed suppression. `extractedYear` stays
+    on the candidate as a TMDB match hint only.
+  - `T-DM-002g` **pins the digest of `'Dune'`**, independently verified against
+    Node's own `crypto.createHash('sha256')`. If the hash, the slice or the
+    normaliser ever changes, every stored `unmatched:*` identity and every
+    suppression keyed on one is orphaned. That must be a deliberate, migrated
+    decision — so it has to break a test first.
+
+- **`TASK-014` — `apps/api/src/config.ts`: two constants, permanently two**
+  (`T-INV-008`). `IMAGE_RETENTION_DAYS = 30` (NFR-019) and
+  `TMDB_METADATA_MAX_AGE_DAYS = 183` (NFR-014) are numerically similar and
+  semantically unrelated: one is a privacy commitment stated to the owner in
+  `/about`, the other an invisible cache-freshness threshold. Unified, a future
+  change to a caching policy silently rewrites a stated retention promise — a
+  diff that reads as housekeeping. The test asserts two separate literal
+  declarations, neither derived from the other, and **no shared call site**.
+  - It also asserts there is **no third** day-constant and no
+    `LIST_STALENESS_DAYS`. The list-staleness nudge was retired outright at
+    `A46`; re-introducing the constant would smuggle back a feature the owner
+    explicitly dropped. What survives is the factual per-service last-updated
+    date (`REQ-039`) — show the fact, never nag about it.
+
+- **`@noble/hashes`** is the second (and, for the domain, last expected) runtime
+  dependency: audited, zero transitive dependencies, and **isomorphic**. That
+  last property is the requirement, not a bonus — `packages/domain` is imported
+  by the SPA as well as the API, so `node:crypto` would break the browser
+  bundle, and `crypto.subtle` is async where these functions must be sync.
+
+### Fixed
+
+- **`T-META-004` rejected every table test.** `it.each(table)(title, fn)` is two
+  calls: the rule matched the inner `it.each(table)` — reporting its data array
+  as a "dynamic title" — and did not match the outer call, which is the one that
+  actually declares the test and carries the title. So a correctly-named table
+  test failed lint while its title went unchecked. `specs/data-model.md` §2.2
+  makes a table test **mandatory** for `T-DM-001`, so the rule was pushing
+  authors off the spec. Both halves are now handled, with four cases added to
+  the rule's own suite — including two `invalid` ones, so exempting the *table*
+  call cannot quietly exempt the *test*.
+
 - **`TASK-012` — shared domain types (`packages/domain/src/**`).** The six
   document types from `specs/data-model.md` §3 as pure TypeScript interfaces
   (`types.ts`), the enums as `as const` tuples (`enums.ts`), and Zod mirrors
