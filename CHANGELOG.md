@@ -8,6 +8,41 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **TASK-153 — the licence gate, `NOTICE`, and third-party notices**
+  (`specs/security.md` §9, ADR-0008). **The owner approved carrying
+  `libheif-js` (LGPL-3.0) and shipping the notice** — a licence decision is not
+  an agent's to make, and `RSK-032` had this waiting on a human since R5.
+  - `tools/check-licences.mjs` classifies every **production** dependency and
+    regenerates `THIRD-PARTY-NOTICES.md` (83 packages). `--check` fails CI on
+    drift, on a weak-copyleft package missing from the notices, and on a
+    strong-copyleft runtime dependency outright. Wired into CI.
+  - **`"LGPL-3.0"` contains the substring `"GPL-"`.** A naive strong-copyleft
+    match therefore rejects `libheif-js` and removes HEIC ingest entirely
+    (`ASM-058`) on what reads like sound compliance reasoning. The classifier
+    tests weak copyleft **first**; `T-LICENSE-001e` asserts the distinction
+    directly, because the opposite error — waving all copyleft through — lets a
+    GPL-3.0 package relicense this MIT repository.
+  - **The dependency tree is read from `package-lock.json`, not from
+    `npm sbom`.** Node 22 refuses to spawn `npm.cmd` without a shell (the
+    CVE-2024-27980 fix), so an `npm` subprocess throws `EINVAL` on Windows and
+    succeeds on Linux CI — the gate would be unrunnable for its only maintainer
+    while showing green in CI. The lockfile is the same source `npm sbom` reads.
+  - **`THIRD-PARTY-NOTICES.md` is in `.prettierignore`, and `T-LICENSE-001l`
+    asserts that it stays there.** The drift gate compares the file byte for
+    byte; Prettier reflows generated Markdown; with both active neither gate can
+    be satisfied. Observed, not predicted — both failed in turn. The tempting
+    escape is to loosen the byte comparison, which is the only thing that makes
+    the drift gate meaningful.
+  - The LGPL path is proven **now**, against synthetic package lists carrying
+    the real ADR-0008 chain, rather than first being exercised in M3 when
+    `TASK-147` installs the codec and nobody is thinking about licensing.
+  - **Correction:** an earlier status report in this session claimed the
+    repository had no `LICENSE` file. It was wrong. `LICENSE` — verbatim MIT —
+    has been present since the initial commit `dd61243`. The claim came from
+    `gh repo view --json licenseInfo` returning `NONE`, which was GitHub not
+    having re-indexed the repository after the private→public change. **Trust
+    the filesystem over the API.**
+
 - **TASK-025 — the app shell and all nine routes** (`specs/ui.md` §1).
   `AppShell` renders the header, nav and global footer; `App` mounts the nine
   screens; the eight page components and `NotFoundPage` ship as stubs for their

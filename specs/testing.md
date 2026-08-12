@@ -1184,6 +1184,7 @@ they fail — and because `T-META-003` requires every id referenced by
 | Test | Task | Assertion |
 |---|---|---|
 | **`T-UI-023`** *(a–g)* | `TASK-025` | **The app shell and the nine-route table** (`specs/ui.md` §1). `ROUTES` holds exactly the nine specified paths (`a`); each renders its own distinct screen rather than falling through to the catch-all (`b`); `<header>`, `<nav>`, `<main>` and `<footer>` each appear **exactly once** on every route, per `ui.md` §10.2 (`c`); an unknown path renders `NotFoundPage` **with a working link back to `/`**, which the screen index names as that route's whole purpose (`d`); the three overlapping `/batches…` patterns do not shadow one another (`e`); the nav exposes the six top-level destinations (`f`); and the global footer landmark exists on every route, ready for the TMDB attribution `TASK-026` mounts into it (`g`). |
+| **`T-LICENSE-001`** *(a–l)* | `TASK-153` | **The MIT licence and its retained-notice obligations** (`specs/security.md` §9, ADR-0008 §"Licence obligation"). `LICENSE` is MIT with a copyright line and both operative clauses (`a`); `README`, `NOTICE` and `LICENSE` agree (`b`); **`THIRD-PARTY-NOTICES.md` matches the installed production tree byte for byte** (`c` — the drift gate); every production dependency has a resolvable licence (`d`); **`LGPL-3.0` classifies as WEAK copyleft, never strong** (`e`); the full HEIC chain clears once `libheif-js` is listed (`f`); an LGPL dependency **missing** from the notices is caught (`g`); a **strong-copyleft** dependency is refused outright and listing it does not clear it (`h`); an unlicensed dependency cannot be cleared (`i`); the render is deterministic (`j`); and `NOTICE` records the approved obligation **and its decode-only scope** (`k`). `l` guards the one interaction that can deadlock CI — see below. |
 
 **Why the route set gets a test of its own.** Four later suites — `T-ATTR-002`,
 `T-ATTR-003`, `T-A11Y-001` and `T-A11Y-012` — are each specified as running
@@ -1196,6 +1197,33 @@ themselves are the subject, which is what makes the other four honest.
 attribution failure is **invisible from inside the product**, so the footer it
 must live in is asserted from the moment the shell ships, not from the moment
 the copy arrives.
+
+**Why the licence gate is tested against synthetic packages.** The one
+obligation this project knowingly carries — `libheif-js`, LGPL-3.0 — is
+installed by **`TASK-147`**, which lands in M3. A gate written only against the
+tree as it stands today would pass because there is no copyleft dependency in
+it, and would first be exercised months later, at the exact point nobody is
+thinking about licensing. `T-LICENSE-001e`–`i` therefore drive the classifier
+and the checker with constructed package lists, including the real ADR-0008
+chain, so the LGPL path is proven **before** the dependency arrives.
+
+`T-LICENSE-001e` is the load-bearing one: **`"LGPL-3.0"` contains the substring
+`"GPL-"`**, so a naive strong-copyleft match rejects `libheif-js` — removing
+HEIC ingest entirely (`ASM-058`) on what reads like sound licence-compliance
+reasoning. The reverse error is worse: treating all copyleft as acceptable lets
+a GPL-3.0 package relicense this MIT repository. The two must be distinguished,
+so the distinction is asserted directly.
+
+**Why `T-LICENSE-001l` asserts a `.prettierignore` line.** `THIRD-PARTY-NOTICES.md`
+is generated, and the drift gate compares it against a fresh render **byte for
+byte**. Prettier reflows generated Markdown, so while the file sits inside
+Prettier's scope the two gates cannot both be satisfied: `format:check` rewrites
+it, `check:licences --check` then reports drift, and regenerating undoes the
+formatting. This was **observed, not predicted** — both failed in turn during
+`TASK-153`. It is worth a test because the obvious way out of the deadlock is to
+loosen the byte comparison into a fuzzy one, and the byte comparison is the only
+thing that gives the drift gate any teeth. The ignore line is the fix, so the
+ignore line is what is asserted.
 
 ---
 
@@ -1306,6 +1334,7 @@ Test files live where §11's tree puts them, plus:
 ```
 tests/meta/                    acMapping.spec.ts
 tests/infra/                   …, supplyChain.spec.ts   # T-SEC-009, T-CI-006
+                               …, licences.spec.ts      # TASK-153 — T-LICENSE-001a…l (§9A)
 ```
 
 

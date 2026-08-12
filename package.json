@@ -29,6 +29,8 @@
     "golden": "vitest run --project golden --passWithNoTests",
     "test:infra": "vitest run --project infra",
     "check:deps": "node tools/check-deps.mjs",
+    "notices": "node tools/check-licences.mjs",
+    "check:licences": "node tools/check-licences.mjs --check",
     "test:meta": "vitest run --project meta --passWithNoTests",
     "coverage": "vitest run --project unit --project web --coverage",
     "test": "npm run test:unit && npm run test:int && npm run test:web"

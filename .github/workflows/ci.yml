@@ -101,6 +101,14 @@ jobs:
       - name: Dependency allow-list (T-SEC-009, T-CI-006)
         run: npm run check:deps
 
+      # T-LICENSE-001. The behavioural assertions live in tests/infra, but the
+      # CLI runs here too: when THIRD-PARTY-NOTICES.md drifts, this prints the
+      # one-line remedy ("run npm run notices") instead of a byte-comparison
+      # diff. A notice obligation that is only satisfiable by reading a failed
+      # assertion is one that gets switched off.
+      - name: Third-party licence notices (T-LICENSE-001)
+        run: npm run check:licences
+
   # ── 4 ─────────────────────────────────────────────────────────────────────
   test-unit:
     name: '4 · test:unit + coverage'
