@@ -6,6 +6,80 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+
+- **The `2 · secrets` CI job was failing open on every pull request.**
+  `gitleaks-action` calls the GitHub API (`GET pulls/:n/commits`) on
+  `pull_request` events; the workflow grants only `contents: read`, so the
+  action crashed with `403 Resource not accessible by integration` on **every**
+  PR while passing on every push to `main`. All ten open Dependabot PRs were red
+  for a reason that had nothing to do with secrets — and, worse, the crash
+  happened *before* the scan, so the job had never actually reported findings.
+  Scanning directly surfaced two immediately (both false positives on the
+  literal `minReplicas=0` quoted in docs prose as a superseded config value).
+  - Now runs the **digest-pinned gitleaks image directly**. It needs no token,
+    so `push` and `pull_request` scan identically and a Dependabot PR — whose
+    token is read-only no matter what the workflow declares — behaves like any
+    other.
+  - `.gitleaks.toml` allowlists a **single exact value**, not a path or a file
+    type, so the only string it can ever suppress is `minReplicas=0|1`. A
+    directory- or `*.md`-level mute would have let the job report green with a
+    real credential in the repo, which is unrecoverable: a leaked secret
+    survives in git history after the file is corrected.
+  - Verified in both directions — clean on this repo, and still exits 1 on a
+    planted `github-pat` and a generic key in a throwaway clone.
+
+### Changed
+
+- **Dependency wave: vite 8, vitest 4, react 19, typescript-eslint 8,
+  TypeScript 6, ESLint 10 flat config.** Done as one coordinated change rather
+  than ten interdependent PRs.
+  - **TypeScript stops at 6.0.3, not the offered 7.0.2.** typescript-eslint
+    refuses to load against the TS 7.0 compiler API outright, so taking TS 7
+    would not have failed loudly — ESLint would have stopped running and
+    `1 · lint` would report green while linting nothing.
+  - **`packages/domain` was typechecking browser-bound code against Node's
+    global typings.** The package compiles with `lib: ES2022` and no `DOM`, so
+    `TextEncoder` and `globalThis.crypto` resolved only because `@types/node`
+    was ambiently included. TS 7 surfaced it; the fix is kept. `runtime.ts` is
+    now the single place the package reaches for a host API, types both
+    narrowly and locally (**not** via `declare global`, which would travel in
+    the emitted `.d.ts` and collide in consumers), and **throws** when one is
+    missing rather than falling back — those bytes become ULIDs, and a silent
+    downgrade to `Math.random()` would surface only as a duplicate key in
+    production.
+  - **Dependabot now groups peer-locked packages.** It had raised
+    `@typescript-eslint/eslint-plugin` 7 → 8 alone and left `parser` at 7; they
+    are peers, so `npm ci` died with `ERESOLVE` and all twelve jobs failed on a
+    PR that could not have passed in any merge order.
+  - **Three majors are blocked, each with the condition that unblocks it**,
+    because an `ignore` with no exit criterion silently becomes permanent:
+    `jsdom` 30 and `@testing-library/jest-dom` 7 need Node ≥ 22 while Node is
+    pinned to 20 across `.nvmrc`, `engines` and the Dockerfile digest;
+    `@types/node` must track the Node major actually run, since typing Node 26
+    APIs against a Node 20 runtime moves the failure from CI to production.
+
+### Fixed
+
+- **`no-console` was never actually enabled.** `apps/api/src/index.ts` carried
+  an `eslint-disable-next-line no-console` for a rule absent from
+  `eslint:recommended` — inert since the day it was written, and invisible
+  until ESLint 10 began flagging unused directives. The rule is now on for
+  shipped source so the directive means what its author intended.
+- **Coverage counted `.gitkeep` as source.** vitest 4 widened what an
+  unqualified `src/**` matches, so the placeholders holding the empty web
+  directories were reported as 0%-covered files. Harmless while web has no
+  code, but it would have dragged the web threshold under its floor the moment
+  real components landed — and looked like a coverage regression in the new
+  code rather than a config artefact.
+- **Branch protection cannot be enabled on this repo.** Both the classic
+  protection API and the newer rulesets API return `403 — Upgrade to GitHub Pro
+  or make this repository public`, so the twelve jobs **report but do not
+  block**: a red run does not stop a merge, and `main` can be force-pushed or
+  deleted. `docs/runbooks/enable-branch-protection.md` records the decision and
+  ships a ready-to-apply ruleset. **This is an open owner decision, not a
+  resolved item.**
+
 ### Added
 
 - **`TASK-022` — the error envelope and the closed error-code enumeration**
