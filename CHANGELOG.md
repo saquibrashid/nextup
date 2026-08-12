@@ -72,13 +72,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   code, but it would have dragged the web threshold under its floor the moment
   real components landed — and looked like a coverage regression in the new
   code rather than a config artefact.
-- **Branch protection cannot be enabled on this repo.** Both the classic
-  protection API and the newer rulesets API return `403 — Upgrade to GitHub Pro
-  or make this repository public`, so the twelve jobs **report but do not
-  block**: a red run does not stop a merge, and `main` can be force-pushed or
-  deleted. `docs/runbooks/enable-branch-protection.md` records the decision and
-  ships a ready-to-apply ruleset. **This is an open owner decision, not a
-  resolved item.**
+- **Branch protection is now active on `main`.** The repository was made public
+  (both the classic protection API and rulesets returned
+  `403 — Upgrade to GitHub Pro or make this repository public` while it was a
+  private repo on a free plan), and two rulesets were applied.
+  - Split into **two** rulesets on purpose, because they need different bypass
+    rules. `main: history integrity` (`non_fast_forward` + `deletion`) has **no
+    bypass actors at all** — neither operation is ever legitimate on `main`,
+    including for the owner. `main: required status checks` (all twelve jobs)
+    keeps an admin bypass so a single-owner repo is not forced to route every
+    one-line change through a branch, a PR and a full twelve-job run.
+  - **The split came from a failed test, not a hypothesis.** The first attempt
+    put all three rules in one ruleset with an admin bypass; attempting a
+    force-push printed `Bypassed rule violations` and **rolled `main` back a
+    commit**. The protection was decorative for the only account that normally
+    pushes. Re-verified after the split: force-push is now rejected with
+    `GH013` and `main` is unchanged.
+  - Going public also enabled **secret scanning with push protection** and
+    **Dependabot alerts** (free on public repos). Push protection rejects a
+    recognised credential *at push time* — the only moment a leak is still
+    cheap to fix — and complements rather than replaces the `2 · secrets` job,
+    which scans full history on every run.
 
 ### Added
 

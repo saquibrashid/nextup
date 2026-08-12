@@ -1,59 +1,14 @@
 {
+  "target": "branch",
   "rules": [
     {
       "type": "deletion"
     },
     {
       "type": "non_fast_forward"
-    },
-    {
-      "parameters": {
-        "strict_required_status_checks_policy": false,
-        "required_status_checks": [
-          {
-            "context": "1 · lint"
-          },
-          {
-            "context": "2 · secrets"
-          },
-          {
-            "context": "3 · audit"
-          },
-          {
-            "context": "4 · test:unit + coverage"
-          },
-          {
-            "context": "5 · test:int"
-          },
-          {
-            "context": "6 · test:web"
-          },
-          {
-            "context": "7 · golden"
-          },
-          {
-            "context": "8 · test:e2e"
-          },
-          {
-            "context": "9 · test:a11y"
-          },
-          {
-            "context": "10 · infra"
-          },
-          {
-            "context": "11 · meta"
-          },
-          {
-            "context": "12 · build"
-          }
-        ]
-      },
-      "type": "required_status_checks"
     }
   ],
-  "target": "branch",
-  "enforcement": "active",
-  "name": "main",
+  "bypass_actors": [],
   "conditions": {
     "ref_name": {
       "exclude": [],
@@ -62,11 +17,6 @@
       ]
     }
   },
-  "bypass_actors": [
-    {
-      "actor_id": 5,
-      "bypass_mode": "always",
-      "actor_type": "RepositoryRole"
-    }
-  ]
+  "enforcement": "active",
+  "name": "main: history integrity"
 }
