@@ -8,6 +8,37 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`TASK-005` — the production container.** `Dockerfile` (multi-stage) and
+  `.dockerignore`: **one image, one process, one port** serving the built SPA
+  and the Express API (ADR-0003, `specs/api.md` §1) — the packaging reason the
+  API carries no CORS configuration at all. The base image is pinned **by
+  digest**, not by tag, in both stages (`specs/security.md` §8): a tag is
+  mutable, so a tag-pinned build that passed CI is not the build that ships.
+  CI job 12 no longer skips when the `Dockerfile` is absent — it builds the
+  image, runs it, and asserts the exit criterion (`/` returns the SPA shell,
+  `/api/me` returns a 401 envelope rather than the shell) plus a check that no
+  build tooling survived into the runtime image.
+  - `apps/api/src/index.ts` is now a real Express server. `/api/me` **fails
+    closed** with `401 UNAUTHENTICATED` (`specs/api.md` §6) until the principal
+    adapter (`TASK-018`) and the allow-list (`TASK-019`) land. A permissive
+    placeholder here is the kind of thing that is never noticed again; the
+    route must never return 200 without a principal. Unknown `/api/*` paths
+    return a 404 envelope rather than the SPA shell, so a mistyped `fetch`
+    surfaces as an error instead of HTML parsed as JSON.
+  - Removed `peerDependencies.eslint` from `tools/eslint-plugin-nextup`. A peer
+    dependency is **not** marked `dev` in the lockfile, so `npm ci --omit=dev`
+    kept installing all of ESLint (3.9 MB) into the production image. The root
+    already devDepends on ESLint and the plugin is private and never published,
+    so the peer declaration bought nothing and cost a runtime dependency.
+  - `.dockerignore` excludes `*.tsbuildinfo`. `tsc --build` is incremental: a
+    stale host build-info copied into the context makes it declare the project
+    up to date and **emit nothing**, so `dist` never appears — the exact
+    failure hit while building this task.
+  - `NPM_REGISTRY` is a build arg defaulting to the public registry, for
+    networks where npmjs.org is unreachable. The default must stay public:
+    GitHub-hosted runners cannot resolve an internal proxy, and an internal URL
+    committed as the default would break CI and publish internal infrastructure.
+
 - **`TASK-004` — supply-chain gates.** `tools/check-deps.mjs` enforces NFR-005
   as a CI allow-list rather than a review convention: no telemetry/analytics/APM
   package in **any** `package.json` (the seven vendors `specs/security.md` §8

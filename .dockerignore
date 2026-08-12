@@ -1,0 +1,38 @@
+# Keep the build context small and, more importantly, keep secrets and build
+# artefacts OUT of the image. `.env` is listed explicitly: a stray local env
+# file copied into a layer is recoverable from the published image forever.
+node_modules
+**/node_modules
+dist
+**/dist
+coverage
+**/coverage
+# `tsc --build` is incremental: a stale host .tsbuildinfo copied into the image
+# makes tsc declare the project up to date and emit NOTHING, so `dist` never
+# appears and the runtime COPY fails. Worse, if the stale info ever matched, a
+# previous build's output would ship. Never let these into the context.
+*.tsbuildinfo
+**/*.tsbuildinfo
+.git
+.github
+.gitignore
+.gitattributes
+.env
+.env.*
+!.env.example
+*.log
+playwright-report
+test-results
+tests
+**/test
+**/*.spec.ts
+**/*.spec.tsx
+docs
+specs
+Context
+infra
+*.md
+!README.md
+Dockerfile
+.dockerignore
+docker-compose*.yml

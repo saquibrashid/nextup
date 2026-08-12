@@ -316,12 +316,34 @@ jobs:
         run: npm run build
       # The production container image. Built but NOT pushed: publishing is
       # the deploy workflow's job and must not happen from a pull request.
+      # No `if [ -f Dockerfile ]` guard — a missing Dockerfile must fail this
+      # job, not skip it silently.
       - name: Build container image
+        run: docker build -t nextup:ci .
+      # The exit criterion for TASK-005, asserted rather than assumed: ONE
+      # container on ONE port serves both the SPA shell and the API. If the
+      # static handler ever shadows the API mount (or vice versa) this fails.
+      - name: Container serves the SPA and the API on one port
         run: |
-          if [ -f Dockerfile ]; then
-            docker build -t nextup:ci .
-          else
-            echo "no Dockerfile yet (TASK-005)"
-          fi
+          set -euo pipefail
+          docker run -d --name nextup-ci -p 3000:3000 nextup:ci
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://localhost:3000/; then break; fi
+            if [ "$i" = "30" ]; then docker logs nextup-ci; exit 1; fi
+            sleep 1
+          done
+          curl -fsS http://localhost:3000/ | grep -q '<div id="root"'
+          # /api/me fails closed until the principal adapter lands (TASK-018).
+          # 401 with the error envelope proves the route is mounted and that
+          # it is NOT being served the SPA shell.
+          code=$(curl -s -o /tmp/me.json -w '%{http_code}' http://localhost:3000/api/me)
+          test "$code" = "401"
+          grep -q 'UNAUTHENTICATED' /tmp/me.json
+          # The image must not ship the build toolchain.
+          docker run --rm --entrypoint sh nextup:ci -c '
+            for p in vite typescript vitest eslint prettier; do
+              if [ -e "node_modules/$p" ]; then echo "dev dependency in runtime image: $p"; exit 1; fi
+            done'
+          docker rm -f nextup-ci
       # T-SEC-019 (no dev shim in dist) is asserted by TASK-004's static
       # checks once the image exists.

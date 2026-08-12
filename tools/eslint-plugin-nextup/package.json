@@ -4,8 +4,5 @@
   "private": true,
   "description": "In-repo ESLint rules for nextup (T-META-004 test-id naming).",
   "main": "index.js",
-  "type": "commonjs",
-  "peerDependencies": {
-    "eslint": ">=8"
-  }
+  "type": "commonjs"
 }
