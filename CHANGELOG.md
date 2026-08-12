@@ -8,6 +8,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`TASK-009` — offline getting-started.** `docker-compose.test.yml` (SQL
+  Server 2022 + Azurite, mirroring the CI service containers exactly, so a
+  failure reproduces locally instead of only on a runner) and
+  `docs/getting-started.md`. After a one-time `npm ci` and image pull,
+  `npm run test:unit && npm run test:int` runs with **no network** — `NFR-003`
+  makes CI the implementer's only feedback loop, so the loop must not depend on
+  a network that might be down.
+  - The compose health check carries the same two traps CI does, documented in
+    place: `sqlcmd` is at `/opt/mssql-tools18/bin/` (not `/opt/mssql-tools/`)
+    and needs `-C`. Without the wait, `prisma migrate deploy` fails
+    intermittently — the flaky gate `NFR-003` cannot tolerate.
+  - **§6 states that HTTPS is a _functional_ dependency, not merely a transport
+    control** (`A45`, ADR-0009 §Compliance). `navigator.clipboard` is absent on
+    `http://`, so opening the dev server from a phone at
+    `http://<LAN-IP>:5173` shows **no "Paste screenshot" button at all** — a
+    failure that looks like a missing feature rather than a missing
+    certificate. Names the two supported ways to exercise paste (staging over
+    HTTPS, or a trusted HTTPS tunnel) and the desktop-listener exception.
+  - README: corrected the CI badge URL, refreshed the stale "Next up:
+    TASK-001" status, and added the offline test loop and the HTTPS warning.
+
 - **`TASK-144` — `T-MIG-001`, the destructive-migration gate.**
   `tools/check-migrations.ts` scans `prisma/migrations/**` for `DROP TABLE`,
   `ALTER TABLE ... DROP COLUMN`, `TRUNCATE TABLE`, `DROP INDEX`,

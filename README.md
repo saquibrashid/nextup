@@ -6,7 +6,7 @@
 > that you can filter and sort and that never loses anything without asking you
 > first.
 
-[![CI](https://github.com/nextup/nextup/actions/workflows/ci.yml/badge.svg)](https://github.com/nextup/nextup/actions/workflows/ci.yml)
+[![CI](https://github.com/saquibrashid/nextup/actions/workflows/ci.yml/badge.svg)](https://github.com/saquibrashid/nextup/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## What it does
@@ -34,13 +34,21 @@ worth the price of feeding it by hand.
 
 ## Status
 
-🚧 **Pre-alpha** — scaffolded from specs, not yet implemented.
+🚧 **Pre-alpha** — scaffolding and CI complete; feature work not yet started.
 
-**Next up:** `TASK-001` — _npm-workspaces monorepo scaffold_ (`package.json`
-workspaces, root `tsconfig.base.json`, per-workspace configs, lint/format).
-See [docs/backlog.md](docs/backlog.md).
+Done: `TASK-001` monorepo scaffold, `TASK-002` test harness, `TASK-003` the
+twelve blocking CI jobs, `TASK-004` supply-chain gates, `TASK-005` the
+production container image, `TASK-009` offline getting-started, `TASK-144`
+the `T-MIG-001` destructive-migration gate.
+
+**Next up:** `TASK-006` — _Bicep infrastructure_ (Azure SQL Basic + serverless
+staging database, Container Apps at `0.25 vCPU / 0.5 GiB`, ghcr.io). See
+[docs/backlog.md](docs/backlog.md).
 
 ## Quick start
+
+> Full instructions, including the offline test loop, are in
+> **[docs/getting-started.md](docs/getting-started.md)**.
 
 > The install command is **not run for you**. Run it yourself.
 
@@ -69,15 +77,25 @@ npm run dev            # Vite dev server (apps/web), proxying /api to the API
 ### Test
 
 ```bash
+docker compose -f docker-compose.test.yml up -d   # mssql 2022 + Azurite
 npm run test:unit      # Vitest — pure domain logic
 npm run test:int       # Vitest — API surface against the mssql + Azurite containers
 npm run test:web       # Vitest + Testing Library — component/screen states
 npm run test:e2e       # Playwright — the value loop and the irreversible paths
 ```
 
-The integration suite expects a SQL Server 2022 container and Azurite; CI wires
-them as service containers (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
-and [specs/testing.md](specs/testing.md) §3.3a).
+After a one-time `npm ci` and image pull, the whole suite runs **offline** —
+`NFR-003` makes CI the only feedback loop, so the loop must not depend on a
+network. CI wires the same two containers as services (see
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) and
+[specs/testing.md](specs/testing.md) §3.3a).
+
+> ⚠ **HTTPS is a functional dependency, not just a security control.**
+> `navigator.clipboard` does not exist on `http://`, so opening the dev server
+> from a phone at `http://<LAN-IP>:5173` shows **no "Paste screenshot" button at
+> all** — and it looks like a missing feature, not a missing certificate. The
+> desktop `Ctrl`/`Cmd`+`V` listener is unaffected. See
+> [docs/getting-started.md §6](docs/getting-started.md).
 
 ## Project structure
 
@@ -96,16 +114,17 @@ nextup/
 
 ## Documentation
 
-| Document                               | What's in it                                                                              |
-| -------------------------------------- | ----------------------------------------------------------------------------------------- |
-| [PRD](docs/PRD.md)                     | User stories and the 230 acceptance criteria                                              |
-| [Architecture](docs/architecture.md)   | System design, the locked stack, and the cost model                                       |
-| [Specs](specs/specs.md)                | Implementation detail; [testing.md](specs/testing.md) carries the AC → named-test mapping |
-| [Backlog](docs/backlog.md)             | What to build, in order (the work order)                                                  |
-| [Roadmap](docs/roadmap.md)             | Sequencing and milestones                                                                 |
-| [ADRs](docs/adr/)                      | Why the load-bearing decisions are what they are                                          |
-| [BRD](docs/BRD.md)                     | The (personal, non-commercial) business case                                              |
-| [Review report](docs/review-report.md) | Known open items from the pre-build review                                                |
+| Document                                   | What's in it                                                                              |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| [Getting started](docs/getting-started.md) | Clone → install → run the whole suite offline; the HTTPS/clipboard trap                   |
+| [PRD](docs/PRD.md)                         | User stories and the 230 acceptance criteria                                              |
+| [Architecture](docs/architecture.md)       | System design, the locked stack, and the cost model                                       |
+| [Specs](specs/specs.md)                    | Implementation detail; [testing.md](specs/testing.md) carries the AC → named-test mapping |
+| [Backlog](docs/backlog.md)                 | What to build, in order (the work order)                                                  |
+| [Roadmap](docs/roadmap.md)                 | Sequencing and milestones                                                                 |
+| [ADRs](docs/adr/)                          | Why the load-bearing decisions are what they are                                          |
+| [BRD](docs/BRD.md)                         | The (personal, non-commercial) business case                                              |
+| [Review report](docs/review-report.md)     | Known open items from the pre-build review                                                |
 
 If you are a coding agent, start with
 [`.github/copilot-instructions.md`](.github/copilot-instructions.md).

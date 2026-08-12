@@ -1,0 +1,51 @@
+# The local integration-test stack (TASK-009). Mirrors the CI service
+# containers in `.github/workflows/ci.yml` job 5 so a failure reproduces
+# locally instead of only on a runner.
+#
+#   docker compose -f docker-compose.test.yml up -d
+#   npm run test:int
+#   docker compose -f docker-compose.test.yml down -v
+#
+# Both images must be pulled ONCE. After that the whole suite runs offline —
+# that is the point of this file (NFR-003, TASK-009 exit criterion).
+
+services:
+  # The same engine Azure SQL Database runs (specs/testing.md §3.3). Three of
+  # the data-model invariants are database constraints, so the integration
+  # tests assert that the STORE refuses the bad write — an assertion no mock
+  # could make.
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: 'Y'
+      # Local-only, ephemeral, and deliberately identical to the CI password so
+      # DATABASE_URL is the same in both places. This is NOT a secret: it
+      # guards a throwaway container with no data in it.
+      MSSQL_SA_PASSWORD: 'Str0ng!Passw0rd_ci'
+      MSSQL_PID: 'Developer'
+    ports:
+      - '1433:1433'
+    # SQL Server is not ready the instant the port opens — typically 10-30 s.
+    # Without this wait, `prisma migrate deploy` fails intermittently, which is
+    # precisely the flaky gate NFR-003 cannot tolerate.
+    #
+    # `sqlcmd` lives at /opt/mssql-tools18/bin/sqlcmd in the 2022 image (NOT
+    # /opt/mssql-tools/) and requires `-C` to trust the dev certificate. Those
+    # two details are the usual reason a copied health check never passes.
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          '/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -Q "SELECT 1" -b -o /dev/null',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  # Blob emulator for the screenshot store (ADR-0006).
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:latest
+    command: ['azurite-blob', '--blobHost', '0.0.0.0', '--skipApiVersionCheck']
+    ports:
+      - '10000:10000'
