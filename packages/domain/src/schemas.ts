@@ -30,6 +30,7 @@ import {
   TITLE_STATES,
   UPLOAD_FORMATS,
 } from './enums.js';
+import { deriveSortDateAdded, deriveTitleState } from './derive.js';
 import { WORK_IDENTITY_RE } from './identity.js';
 import type {
   BatchProvenance,
@@ -164,6 +165,25 @@ export const titleSchema = z
   .refine((t) => new Set(t.listings.map((l) => l.service)).size === t.listings.length, {
     message: 'at most one listing per service',
     path: ['listings'],
+  })
+  // Invariant I-4 (`T-INV-010`): the stored derived fields equal what
+  // `derive.ts` computes. Enforced HERE rather than only at the repository so
+  // that no path — fixture, migration backfill, hand-built response — can put
+  // a title into circulation whose state or sort position disagrees with its
+  // own listings. That disagreement produces no error, just a row in the
+  // wrong place or a title that looks active with everything removed.
+  //
+  // The `length === 0` guard is not defensive padding: Zod runs every
+  // refinement even after `listings.min(1)` has already failed, and
+  // `deriveTitleState` throws on an empty array by design (I-3). Without it, a
+  // listing-less title turns `safeParse` into a thrown exception.
+  .refine((t) => t.listings.length === 0 || t.state === deriveTitleState(t.listings), {
+    message: 'state must equal deriveTitleState(listings) (invariant I-4)',
+    path: ['state'],
+  })
+  .refine((t) => t.sortDateAdded === deriveSortDateAdded(t.listings), {
+    message: 'sortDateAdded must equal deriveSortDateAdded(listings) (invariant I-4)',
+    path: ['sortDateAdded'],
   }) satisfies z.ZodType<Title>;
 
 // ── Suppression ────────────────────────────────────────────────────────────

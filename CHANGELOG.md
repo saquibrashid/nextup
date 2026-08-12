@@ -8,6 +8,33 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`TASK-016` — `packages/domain/src/derive.ts`** (`T-INV-009`, `T-INV-010`,
+  12 tests). `deriveTitleState` and `deriveSortDateAdded`: the only place
+  `title.state` and `title.sortDateAdded` are computed.
+  - **`deriveSortDateAdded` takes the EARLIEST date, not the latest**, and that
+    is what makes adding an already-saved work on a *second* service leave the
+    row where it is (US-020 AC-4) instead of jumping it to the top as though it
+    were new — while removing the earliest listing legitimately recomputes it
+    (AC-5). Dates are compared **as text**: `YYYY-MM-DD` sorts chronologically,
+    and parsing to `Date` would let a local timezone move a listing across a day
+    boundary and quietly reorder the list.
+  - **`deriveTitleState([])` throws.** `[].every(...)` is `true`, so the natural
+    implementation reports an impossible title (invariant I-3) as `removed`
+    rather than failing — the safer of two wrong answers, but still wrong.
+  - **Invariant I-4 is enforced in `titleSchema`, not only in the repository.**
+    No fixture, backfill or hand-built response can put a title into circulation
+    whose state or sort position disagrees with its own listings; that
+    disagreement raises nothing, it just puts a row in the wrong place or shows
+    a title as active when every listing is gone. *(The refinements guard
+    `listings.length === 0` because Zod runs every refinement even after
+    `min(1)` has failed, and the derivation throws on an empty array by design.)*
+  - `T-INV-009` greps `packages/domain/src`, `apps/api/src` and `apps/web/src`
+    for a second implementation. It carries **two self-checks**: one asserting
+    the scan actually reaches source files (a broken path would make the greps
+    pass over an empty set — green while asserting nothing) and one asserting
+    the patterns *do* fire on a verbatim copy of the spec's reference
+    implementation.
+
 - **`TASK-013` — `packages/domain/src/ids.ts`.** ULID generation, the
   deterministic variant, and a monotonic factory for tests (`T-DM-004`, 11
   tests). Hand-rolled rather than taking the `ulid` package: the variant this
