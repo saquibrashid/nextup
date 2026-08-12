@@ -8,6 +8,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`TASK-004` — supply-chain gates.** `tools/check-deps.mjs` enforces NFR-005
+  as a CI allow-list rather than a review convention: no telemetry/analytics/APM
+  package in **any** `package.json` (the seven vendors `specs/security.md` §8
+  names, plus their scoped and suffixed variants), no third-party `<script src>`
+  in any `index.html`, and no hard-coded analytics host in source — because a
+  `fetch()` beacon is the same defect with none of the dependency-diff
+  visibility. Wired into CI job 3 and asserted by `T-SEC-009a`–`j`, including
+  `TASK-004`'s exit criterion (adding `posthog-js` fails) and a check that the
+  script actually **exits non-zero**, since a checker that finds violations and
+  exits 0 blocks nothing.
+- **`T-CI-006` — every GitHub Action is now pinned to a full commit SHA**, not
+  a tag. A tag is mutable: `@v2` can be re-pointed at new code by anyone who
+  can push to that repository, in a workflow that holds `GITHUB_TOKEN`. The
+  same script enforces it, so a new unpinned action fails CI. This test had no
+  owning backlog task; it is squarely a supply-chain gate, so it lands here.
 - **`TASK-003` — CI, the only gate.** `.github/workflows/ci.yml` now runs the
   **twelve blocking jobs** of `specs/testing.md` §8 — `lint`, `secrets`
   (gitleaks), `audit`, `test:unit`+coverage, `test:int` (mssql/server:2022 +
@@ -15,8 +30,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `test:a11y`, `infra` (Bicep build + `T-INFRA-*`/`T-INV-013`/`T-MIG-001`),
   `meta` (`T-META-001`) and `build`. **No job carries `continue-on-error`**;
   an advisory job in a one-reviewer project is a job nobody reads. Verified by
-  parsing the workflow (exactly 12 jobs, zero `continue-on-error`) and by
-  confirming a deliberately failing test turns the gate red.
+  parsing the workflow (exactly 12 jobs, zero `continue-on-error`), by a real
+  run in which all twelve passed, and by confirming a deliberately failing test
+  turns the gate red.
 - **`TASK-002` — test harness.** `vitest.config.ts` defines the six Vitest
   projects (`unit`, `integration`, `web`, `golden`, `infra`, `meta`) using the
   test layout in `specs/testing.md` §11 verbatim and carries the §1 per-path
@@ -54,6 +70,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   which would have switched the gate off rather than fixed the finding. Under
   Vitest 3 the project split moved from the deprecated `vitest.workspace.ts`
   into `test.projects` in `vitest.config.ts`.
+- **`T-META-004` now accepts an optional lowercase suffix on a test id**
+  (`T-SEC-009a`, `T-SEC-009b`) and treats suffixed variants as distinct. The
+  specs already use the form (`T-AI-010b`), and without it a single acceptance
+  criterion needing several cases would collide with itself — pushing authors
+  toward one giant test per criterion, the opposite of "a failure names exactly
+  one thing". `specs/testing.md` §11 documents the form.
 
 ### Fixed
 
@@ -93,14 +115,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Notes
 
-- `--passWithNoTests` has been **removed from `test:unit`** now that the
-  `T-META-004` rule tests exist — the unit suite can no longer pass vacuously.
-  It remains on `test:int`, `test:web`, `golden`, `test:infra` and `test:meta`,
-  and `--pass-with-no-tests` on `test:e2e` / `test:a11y`, because those suites
-  genuinely have no tests yet (they arrive with `TASK-017` and later).
+- `--passWithNoTests` has been **removed from `test:unit` and `test:infra`** now
+  that both have real tests — neither can pass vacuously. It remains on
+  `test:int`, `test:web`, `golden` and `test:meta`, and `--pass-with-no-tests`
+  on `test:e2e` / `test:a11y`, because those suites genuinely have no tests yet
+  (they arrive with `TASK-017` and later).
   **Each flag must be dropped by the task that lands that suite's first test**,
   not inherited forward: a suite that passes with zero tests is the single
   easiest way for CI to be green while asserting nothing.
+- `tools/check-deps.mjs` exempts exactly two paths from its own host scan —
+  itself and `tests/infra/supplyChain.spec.ts` — because a checker cannot name
+  what it forbids without matching itself. **Do not widen this to "test files"
+  as a class**; that would hand a future beacon somewhere to hide.
 - `packages/domain/test/placeholder.spec.ts` (`T-SCAFFOLD-001`) exists only to
   hold the §1 95% domain coverage floor armed while `src/index.ts` is still a
   placeholder. **Delete it when `types.ts` lands** — it is not an acceptance
@@ -119,4 +145,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `--audit-level=high` threshold and ships in nothing.
 - **Branch protection is a repository setting, not a file.** The §8 requirement
   that all twelve jobs block merge, plus linear history, must be configured on
-  `main` in GitHub; CI cannot assert it about itself.
+  `main` in GitHub; CI cannot assert it about itself. **⚠ It is currently NOT
+  configured**: GitHub rejects branch protection and rulesets on a *private*
+  repository outside a paid plan (`403 — Upgrade to GitHub Pro or make this
+  repository public`). Until the owner either upgrades or makes the repository
+  public, the twelve jobs run and report but **do not mechanically block a
+  merge**. This is the one part of `TASK-003` that code cannot deliver.

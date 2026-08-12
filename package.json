@@ -27,7 +27,8 @@
     "test:e2e": "playwright test --pass-with-no-tests",
     "test:a11y": "playwright test tests/e2e/a11y.spec.ts --pass-with-no-tests",
     "golden": "vitest run --project golden --passWithNoTests",
-    "test:infra": "vitest run --project infra --passWithNoTests",
+    "test:infra": "vitest run --project infra",
+    "check:deps": "node tools/check-deps.mjs",
     "test:meta": "vitest run --project meta --passWithNoTests",
     "coverage": "vitest run --project unit --coverage",
     "test": "npm run test:unit && npm run test:int && npm run test:web"

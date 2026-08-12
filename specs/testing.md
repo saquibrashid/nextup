@@ -1263,6 +1263,24 @@ it('T-SUP-003 · US-028 AC-3 · a suppressed work that reappears creates nothing
 `T-META-004` asserts every `it(...)` title in the suite starts with a `T-` id
 and that ids are unique.
 
+The id form is `T-<AREA>-<digits>` with an **optional lowercase suffix**:
+`T-SUP-003`, `T-INV-013`, `T-AI-010b`. The suffix is how ONE acceptance
+criterion carries several cases — `T-SEC-009a` the clean tree, `T-SEC-009b`
+the caught violation — and suffixed variants count as **distinct** ids.
+Without it, uniqueness would push every criterion into one giant test, which
+is the opposite of "a CI failure names exactly one thing".
+
+`T-META-004` also **rejects a dynamically-computed title**
+(`it(\`${id} · …\`)` with a variable): an id CI cannot read statically is not
+an id.
+
+Test files live where §11's tree puts them, plus:
+
+```
+tests/meta/                    acMapping.spec.ts
+tests/infra/                   …, supplyChain.spec.ts   # T-SEC-009, T-CI-006
+```
+
 
 ---
 

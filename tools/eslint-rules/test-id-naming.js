@@ -22,8 +22,20 @@
 
 'use strict';
 
-/** `T-` + an UPPERCASE area + `-` + digits. e.g. T-SUP-003, T-E2E-001, T-INV-013 */
-const TEST_ID = /^(T-[A-Z][A-Z0-9]*-\d+)/;
+/**
+ * `T-` + an UPPERCASE area + `-` + digits, with an OPTIONAL lowercase suffix.
+ *
+ * The suffix is not decoration: one acceptance criterion often needs several
+ * cases (`T-SEC-009a` the clean tree, `T-SEC-009b` the caught violation), and
+ * the specs already use the form — see `T-AI-010b` / `T-AI-011b` in
+ * `specs/testing.md`. It is part of the captured id so that suffixed variants
+ * count as DISTINCT ids; without it every case for one AC collides and the
+ * uniqueness check would push authors into one giant test per criterion,
+ * which is the opposite of "a failure names exactly one thing".
+ *
+ * e.g. T-SUP-003, T-E2E-001, T-INV-013, T-AI-010b
+ */
+const TEST_ID = /^(T-[A-Z][A-Z0-9]*-\d+[a-z]?)/;
 
 /** Call names that declare a test case. `describe` blocks are deliberately exempt. */
 const TEST_CALLERS = new Set(['it', 'test']);
