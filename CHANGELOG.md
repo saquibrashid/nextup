@@ -8,6 +8,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **`TASK-144` — `T-MIG-001`, the destructive-migration gate.**
+  `tools/check-migrations.ts` scans `prisma/migrations/**` for `DROP TABLE`,
+  `ALTER TABLE ... DROP COLUMN`, `TRUNCATE TABLE`, `DROP INDEX`,
+  `DROP CONSTRAINT` and an `sp_rename` column rename (`specs/testing.md`
+  §11-R4.2 — there is no `DROP TYPE` in SQL Server). `REQ-028` says data is
+  never lost, and a migration is the one place it is lost quietly: Prisma
+  generates `DROP COLUMN` from a field rename, a diff that reads like a rename
+  and behaves like a deletion.
+  - **There is no escape hatch, deliberately.** A genuinely necessary
+    destructive migration is an owner decision made in the open, so removing
+    the gate has to be a visible diff.
+  - The twelve `T-MIG-001a`–`l` cases **feed the checker deliberate
+    violations** rather than only observing a clean tree. Before `TASK-017`
+    there are no migrations at all, so a gate that did nothing would pass just
+    as loudly. Verified additionally by dropping a real
+    `ALTER TABLE ... DROP COLUMN` migration on disk and watching CI's infra
+    job go red.
+  - SQL comments are blanked rather than removed, so a destructive statement
+    quoted in a comment does not fail the build while reported line numbers
+    still point at the real statement.
+
 - **`TASK-005` — the production container.** `Dockerfile` (multi-stage) and
   `.dockerignore`: **one image, one process, one port** serving the built SPA
   and the Express API (ADR-0003, `specs/api.md` §1) — the packaging reason the
