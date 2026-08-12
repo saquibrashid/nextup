@@ -8,6 +8,35 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+### Added
+
+- **`T-CI-008` — a gate against tests that never run.**
+  - **The defect:** a `.spec.*` file placed where no runner collects it does not
+    execute, and the suite still reports success. Its assertions "pass" by never
+    running. This is the worst failure class in this repository, because the
+    work looks finished and CI agrees.
+  - **It was already live in the specs.** `docs/backlog.md` and
+    `docs/parallel-execution-plan.md` between them pointed **six** test files at
+    `tests/web/`, `tests/images/`, `tests/ci/`, `tests/domain/`,
+    `tests/integration/`, `tests/invariants/` and `tests/security/` — none of
+    which any Vitest project collects. Four paste tasks (TASK-159/160/161/162),
+    TASK-044, TASK-029, TASK-089, TASK-154 and an entire parallel lane were
+    aimed at paths that produce no signal.
+  - **Proven, not assumed:** a canary asserting `1 === 2` in `tests/web/` was
+    reported inside a run of `8 passed (8) / 122 passed (122)`.
+  - `tools/check-test-locations.mjs` asks **Vitest itself** (`vitest list
+    --filesOnly`) which files it collects, rather than hardcoding a directory
+    list that would drift from `vitest.config.ts` in the same silent direction.
+    `tests/e2e/**` and `tests/smoke/**` are exempt with a stated owning runner.
+  - Every referenced spec path was rehomed to `specs/testing.md` §11 — notably
+    `tests/web/pasteCapture.spec.tsx` → `apps/web/test/pasteCapture.spec.tsx`.
+  - Wired as a **step** in CI job 3 (`npm run check:test-locations`), keeping the
+    twelve required status contexts intact. Recorded as invariant 21 and as lane
+    rule 7, since parallel agents are the most likely source of a recurrence.
+  - The gate's own entrypoint check was caught being vacuous on Windows
+    (`file://${argv[1]}` never matches the three-slash `import.meta.url`, so it
+    exited 0 having checked nothing) — fixed with `pathToFileURL` before use.
+
 - **TASK-146 — the registry credential runbook (`docs/ghcr-pat.md`), and the
   removal of the credential it was written to manage.**
   - **The specified credential does not exist.** TASK-006/007/146 all called for

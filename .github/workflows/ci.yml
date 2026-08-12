@@ -116,6 +116,16 @@ jobs:
       - name: Task status ledger (T-STATUS-001)
         run: npm run check:status
 
+      # T-CI-008. Guards the worst failure class in this repo: a spec file in a
+      # path no runner collects never executes, so its assertions "pass" and CI
+      # goes green while nothing was checked. This is not theoretical — the
+      # backlog and the parallel-execution plan both pointed paste tests at
+      # tests/web/, and a canary asserting 1 === 2 there was reported as part
+      # of a fully passing suite. Runs after check:status because it shells out
+      # to `vitest list` and is the slower of the two.
+      - name: Test locations are collected (T-CI-008)
+        run: npm run check:test-locations
+
   # ── 4 ─────────────────────────────────────────────────────────────────────
   test-unit:
     name: '4 · test:unit + coverage'

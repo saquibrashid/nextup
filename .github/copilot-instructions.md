@@ -223,6 +223,20 @@ skipTranscode()` is **forbidden**: it is currently equivalent, but it makes
       another lane's tasks to be helpful. Unrequested cross-lane work is the
       single most expensive thing you can do here.
 
+21. **A test only counts if a runner collects it (`T-CI-008`).** A `.spec.*`
+    file outside a collected path **never executes** — its assertions "pass"
+    by never running, and the whole suite still reports green. This has
+    already happened here: the backlog and the parallel plan pointed six test
+    files at `tests/web/`, `tests/images/`, `tests/ci/`, `tests/domain/`,
+    `tests/integration/`, `tests/invariants/` and `tests/security/`, none of
+    which any Vitest project collects; a canary asserting `1 === 2` in
+    `tests/web/` was reported inside a fully passing run. **The authoritative
+    layout is `specs/testing.md` §11** — web tests live in `apps/web/test/`,
+    never `tests/web/`. Only `tests/e2e/**` and `tests/smoke/**` are
+    legitimately outside Vitest, because Playwright owns them. Run
+    `npm run check:test-locations` before pushing. If a backlog row names a
+    path the gate rejects, **report it — do not create the directory.**
+
 ## 5. How to read revision banners (the F-001 lesson — applies to you too)
 
 Several documents carry revision banners: the datastore changed twice

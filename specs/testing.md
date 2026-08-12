@@ -1373,7 +1373,17 @@ tests/infra/                   …, supplyChain.spec.ts   # T-SEC-009, T-CI-006
                                 …, infra.spec.ts         # TASK-006 — T-INFRA-001a…d, T-INFRA-002a…m, T-INFRA-003a…c
                                 …, sku.spec.ts           # TASK-008 — T-INFRA-005a…r (§9A)
                                 …, no-ttl.spec.ts        # TASK-008 — T-INV-013a…h (§9A)
+                                …, test-locations.spec.ts # T-CI-008a…g (§9A) — no spec may live where no runner collects it
+                                …, no-scheduler.spec.ts  # TASK-044 — T-CI-005 (static gate; was mis-specced as tests/ci/)
 ```
+
+⚠ **This tree is enforced, not advisory (`T-CI-008`).** A `.spec.*` file placed
+outside a path some runner collects **never executes**, and the suite stays
+green — its assertions "pass" by never running. `npm run check:test-locations`
+asks Vitest itself (`vitest list`) which files it collects and fails on any
+spec that nobody owns; `tests/e2e/**` and `tests/smoke/**` are exempt because
+Playwright owns them. Add a directory here **only** together with a Vitest
+project that collects it.
 
 
 ---

@@ -60,14 +60,20 @@ vocabulary with one agent first, then fan out against it.
 
 **Run M0 and M1 with a single agent, serially. Do not parallelise this.**
 
-| Tasks | What they fix in place |
-|---|---|
-| TASK-001, 002, 003, 005 | Monorepo layout, workspace manifests, the 12-job CI gate |
-| TASK-006, 007, 008 | Bicep infra, deploy workflow, container sizing |
-| TASK-012, 013, 016, 017 | Domain types, IDs, derivations, owner-scoped repository |
-| TASK-022 | **Error envelope + the closed error-code enum** |
-| TASK-018 → 023 | Principal, allow-list, owner scope, middleware order |
-| TASK-025 | App shell |
+| Tasks | What they fix in place | Status |
+|---|---|---|
+| TASK-001, 002, 003, 005 | Monorepo layout, workspace manifests, the 12-job CI gate | ✅ done |
+| TASK-006, 008 | Bicep infra, container sizing + SKU pinning | ✅ done |
+| TASK-007 | Deploy workflow — **owner-gated: first Azure spend** | ⏳ owner |
+| TASK-012, 013, 016 | Domain types, IDs, derivations | ✅ done |
+| TASK-022 | **Error envelope + the closed error-code enum** | ✅ done |
+| TASK-017 | Prisma schema, initial migration, owner-scoped repository | ⏳ next |
+| TASK-018 → 023 | Principal, allow-list, owner scope, middleware order | ⏳ todo |
+| TASK-025 | App shell | ✅ done |
+
+Live status is `docs/backlog.md` §1.2 (the ledger), not this table — run
+`npm run check:status` for the generated report. This column is a
+navigational aid and **will** go stale; the ledger is CI-enforced.
 
 Every one of these defines a convention that later lanes must *conform
 to* rather than *invent*. `TASK-022` in particular: the closed error-code
@@ -79,9 +85,12 @@ different naming styles inside it.
 **Gate:** Stage 1 is complete when CI is green and `TASK-031`
 (deployed smoke) passes. Only then fan out.
 
-Owner-dependent M0 items — **TASK-010, 011, 134, 141, 142, 146** — are
+Owner-dependent M0 items — **TASK-010, 011, 134, 141, 142** — are
 yours, not an agent's, and run in parallel with Stage 1 by definition.
 `TASK-134` must land before the first real screenshot upload.
+**TASK-146 is no longer on this list:** the design is credential-free
+(a public ghcr package pulled anonymously; CI publishes with the built-in
+`GITHUB_TOKEN`), so there is no PAT for you to mint — see `docs/ghcr-pat.md`.
 
 ---
 
@@ -100,7 +109,7 @@ work.** Checking the actual file paths in `backlog.md`:
 | `packages/domain/src/enums.ts` | TASK-158 (paste) — and the domain lane |
 | `apps/api/src/middleware/errorEnvelope.ts` | TASK-155 (OOM) — and Stage 1 |
 | `apps/web/src/pages/UploadPage.tsx` | TASK-049, TASK-159 |
-| `tests/web/pasteCapture.spec.tsx` | TASK-159, 161, 162 |
+| `apps/web/test/pasteCapture.spec.tsx` | TASK-159, 161, 162 |
 
 Feature lanes collide because these features **share a request path**.
 Lanes must therefore be drawn by **layer ownership**, not by feature.
@@ -113,10 +122,10 @@ inside them.
 | Lane | Owns (exclusive write) | M3 tasks | M7 tasks |
 |---|---|---|---|
 | **A — critical path** | `packages/domain/**`, `apps/api/src/routes/**`, `apps/api/src/services/**`, `apps/api/src/middleware/**` | 054, 057, 060, 065, 071, 074, 148, 158 | — |
-| **B — web / UI** | `apps/web/**`, `tests/web/**` | 049, 059, 069, 070, 159, 160, 161, 162, 166 | 123, 124, 125 |
-| **C — image pipeline** | `apps/api/src/images/**`, `apps/api/src/jobs/**`, `tests/images/**` | 147, 149, 150, 152, 154, 157 | — |
+| **B — web / UI** | `apps/web/**` (including `apps/web/test/**`) | 049, 059, 069, 070, 159, 160, 161, 162, 166 | 123, 124, 125 |
+| **C — image pipeline** | `apps/api/src/images/**`, `apps/api/src/jobs/**`, and the image spec FILES named in `specs/testing.md` §11 | 147, 149, 150, 152, 154, 157 | — |
 | **D — infra / ops / docs** | `infra/**`, `docs/runbooks/**`, `docs/evaluation/**` | — | 131, 133, 143, 156 |
-| **E — fixtures / test scaffolding** | `tests/fixtures/**`, `golden/**` | 032, 078, 079, 151 | 097, 115 |
+| **E — fixtures / test scaffolding** | `tests/fixtures/**`, `tests/extraction/**` | 032, 078, 079, 151 | 097, 115 |
 
 **Lane A keeps your strongest agent and stays serial.** It is the
 critical path; the other lanes exist to keep work *off* it.
@@ -168,6 +177,13 @@ invariant 20 in `.github/copilot-instructions.md`.
    when the code looks finished.
 6. **If you finish early, stop.** Do not pick up work from another lane
    or from the critical path.
+7. **Put every test where `specs/testing.md` §11 says, and nowhere else.**
+   A `.spec.*` file in an uncollected path **never runs**, so your lane
+   reports green having asserted nothing. Web tests go in
+   `apps/web/test/`, **never `tests/web/`**. If your task's row in
+   `backlog.md` names a path that `npm run check:test-locations`
+   rejects, that is a finding to report — not a directory to create.
+   Run `npm run check:test-locations` before every push.
 
 ---
 
@@ -258,15 +274,33 @@ rubber-stamp.
 
 ---
 
-## 9. Prerequisite — commit first
+## 9. Prerequisite — commit first *(satisfied)*
 
-The repository has **never been committed**. Worktrees require a git
+✅ **Done.** The repository is published at `saquibrashid/nextup` (public),
+`main` is protected by two rulesets requiring twelve status contexts, and
+Stage 1 work is committed. Worktrees can branch from `main` immediately.
+
+Two things this changes for every lane:
+
+- **Lanes push branches; they never push `main`.** `main` is protected and
+  merges are the coordinator's job (merge order in §7).
+- **Pushing uses a different GitHub account.** The push identity is
+  `saquibrashid`, the working identity is `saquib-rashid-msft`:
+
+  ```powershell
+  gh auth switch --user saquibrashid
+  git push -u origin lane/<name>
+  gh auth switch --user saquib-rashid-msft
+  ```
+
+~~The repository has **never been committed**. Worktrees require a git
 history to branch from, and parallel work without version control has no
-undo. Before anything in this document:
+undo. Before anything in this document:~~
 
 ```powershell
-cd C:\Users\srashid\Repos\GitHub_Personal\nextup
-git init
-git add -A
-git commit -m "Initial scaffold from nextup specs (TASK-001 next)"
+# SUPERSEDED — the repository is already initialised and published.
+# cd C:\Users\srashid\Repos\GitHub_Personal\nextup
+# git init
+# git add -A
+# git commit -m "Initial scaffold from nextup specs (TASK-001 next)"
 ```
