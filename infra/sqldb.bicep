@@ -75,16 +75,31 @@ resource allowAzureServices 'Microsoft.Sql/servers/firewallRules@2023-08-01-prev
 }
 
 // ---------------------------------------------------------------------------
-// DATABASE COLLATION — do not "fix" this to a BIN2 collation.
+// DATABASE COLLATION — Latin1_General_100_BIN2, and it is REQUIRED.
 //
-// The database keeps the default case-INSENSITIVE collation on purpose.
-// specs/data-model.md §16.2: identity/key columns declare
-// COLLATE Latin1_General_100_BIN2 per-COLUMN in the migration DDL, while
-// search columns (tmdb_name, normalised_text) are stored in the DB's DEFAULT
-// collation and searched with an explicit per-query
-// COLLATE Latin1_General_100_CI_AI. Making the DATABASE binary-collated would
-// break the forgiving removed-view search.
+// ⚠ Corrected 2026-08-12 by execution. See specs/data-model.md §16.2.1.
+//
+// This is not a preference; Prisma does not work without it. Prisma's create()
+// emits `DECLARE @generated_keys table([id] NVARCHAR(200))` and then joins that
+// table variable back to the inserted row on [t].[id] = [g].[id]. A table
+// variable takes the DATABASE DEFAULT collation, so on a CI_AS database that
+// join compares CI_AS against the BIN2 [id] column and fails with Msg 468,
+// "Cannot resolve the collation conflict ... in the equal to operation".
+// Every single row insert fails. Measured: 24 of 25 integration tests failed
+// on the default collation and all passed on BIN2.
+//
+// The forgiving removed-view search is NOT lost. specs/data-model.md §16.2.1
+// already specifies that search columns are searched with an explicit
+// per-query COLLATE Latin1_General_100_CI_AI — that per-query collation is now
+// load-bearing rather than cosmetic, and it is what keeps search case- and
+// accent-insensitive on a binary-collated database.
+//
+// ~~Superseded: "The database keeps the default case-INSENSITIVE collation on
+// purpose ... Making the DATABASE binary-collated would break the forgiving
+// removed-view search." That was written from the spec before the spec had
+// been executed. It is wrong: with a CI database, nothing writes at all.~~
 // ---------------------------------------------------------------------------
+var databaseCollation = 'Latin1_General_100_BIN2'
 
 // prod: Basic — 5 DTU, 2 GB, 7-day PITR. NOT Standard/GeneralPurpose, not
 // zone-redundant, no failover group (T-INFRA-005 pins this).
@@ -98,6 +113,7 @@ resource prodDb 'Microsoft.Sql/servers/databases@2023-08-01-preview' = if (envir
     capacity: 5
   }
   properties: {
+    collation: databaseCollation
     maxSizeBytes: 2147483648
     zoneRedundant: false
     requestedBackupStorageRedundancy: 'Local'
@@ -128,6 +144,7 @@ resource stagingDb 'Microsoft.Sql/servers/databases@2023-08-01-preview' = if (en
     capacity: 1
   }
   properties: {
+    collation: databaseCollation
     autoPauseDelay: 60
     minCapacity: json('0.5')
     maxSizeBytes: 2147483648

@@ -200,8 +200,40 @@ jobs:
           done
           echo "SQL Server did not become ready" && exit 1
 
-      # TASK-016/017 add `prisma migrate deploy` here. Migrations are applied
-      # BEFORE the suite runs, never by the suite (§3.3a).
+      # Migrations are applied BEFORE the suite runs, never by the suite (§3.3a).
+      #
+      # ⚠ The COLLATE clause below is NOT optional. Prisma's create() joins a
+      # `DECLARE @generated_keys table([id] NVARCHAR(200))` variable back to the
+      # inserted row. A table variable takes the DATABASE DEFAULT collation, so
+      # on a CI_AS database that join compares CI_AS against the BIN2 [id]
+      # column and EVERY insert fails with Msg 468. Measured: 24 of 25
+      # integration tests failed on the default collation, all passed on BIN2.
+      # See specs/data-model.md §16.2.1 and infra/sqldb.bicep. T-INV-018
+      # asserts the live collation so a dropped clause fails loudly.
+      #
+      # -I sets QUOTED_IDENTIFIER ON, which the three FILTERED unique indexes
+      # require; without it they are never created and T-INV-001/002/015 pass
+      # while asserting nothing (specs/testing.md §3.3a).
+      - name: Create the test database
+        env:
+          MSSQL_SA_PASSWORD: 'Str0ng!Passw0rd_ci'
+        run: |
+          cid=$(docker ps --filter "ancestor=mcr.microsoft.com/mssql/server:2022-latest" --format '{{.ID}}' | head -n1)
+          docker exec "$cid" /opt/mssql-tools18/bin/sqlcmd -C -I -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -b \
+            -Q "IF DB_ID('nextup_test') IS NULL CREATE DATABASE [nextup_test] COLLATE Latin1_General_100_BIN2;"
+
+      - name: Apply migrations
+        env:
+          DATABASE_URL: 'sqlserver://localhost:1433;database=nextup_test;user=sa;password=Str0ng!Passw0rd_ci;encrypt=true;trustServerCertificate=true'
+        run: npx prisma migrate deploy --schema prisma/schema.prisma
+
+      # A migration that has drifted from schema.prisma is a landmine: the next
+      # `prisma migrate dev` would emit DROP INDEX / DROP CONSTRAINT to
+      # reconcile them, which T-MIG-001 forbids outright. Assert they agree.
+      - name: Check schema and migration agree
+        env:
+          DATABASE_URL: 'sqlserver://localhost:1433;database=nextup_test;user=sa;password=Str0ng!Passw0rd_ci;encrypt=true;trustServerCertificate=true'
+        run: npx prisma migrate diff --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma --exit-code
 
       - name: Integration tests
         env:

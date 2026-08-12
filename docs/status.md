@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 138 |
-| 🚧 doing | 1 |
-| ✅ done | 18 |
+| ⬜ todo | 137 |
+| 🚧 doing | 0 |
+| ✅ done | 20 |
 | 🙋 owner | 4 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -24,15 +24,19 @@ Not done, and every task they depend on is done.
 
 | Task | Size | Section |
 |---|---|---|
-| `TASK-017` | L | Epic A — Access & identity |
+| `TASK-018` | S | Epic A — Access & identity |
 | `TASK-026` | S | Epic G — Attribution & compliance |
+| `TASK-032` | S | Epic K — Platform, safety, and the shell |
+| `TASK-041` | S | Epic F — The list itself (the value loop) |
 | `TASK-048` | — | Epic B — Capture & import |
 | `TASK-055` | S | Epic C — Extraction |
+| `TASK-101` | S | Epic H — History, removal ledger, suppression |
 | `TASK-122` | S | Epic K — Platform, safety, and the shell |
 | `TASK-126` | M | Epic K — Platform, safety, and the shell |
 | `TASK-128` | XS | Epic K — Platform, safety, and the shell |
 | `TASK-132` | XS | Epic K — Platform, safety, and the shell |
 | `TASK-134` | XS | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
+| `TASK-141` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-142` | XS | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-143` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-145` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
@@ -53,11 +57,10 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-122 tasks cannot start yet.
+116 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
-| `TASK-018` | `TASK-017` |
 | `TASK-019` | `TASK-018` |
 | `TASK-020` | `TASK-018` |
 | `TASK-021` | `TASK-018` |
@@ -68,8 +71,7 @@ Not done, and every task they depend on is done.
 | `TASK-029` | `TASK-023` |
 | `TASK-030` | `TASK-023` |
 | `TASK-031` | `TASK-007`, `TASK-027` |
-| `TASK-032` | `TASK-017` |
-| `TASK-033` | `TASK-017`, `TASK-023` |
+| `TASK-033` | `TASK-023` |
 | `TASK-034` | `TASK-033` |
 | `TASK-035` | `TASK-033` |
 | `TASK-036` | `TASK-033` |
@@ -77,7 +79,6 @@ Not done, and every task they depend on is done.
 | `TASK-038` | `TASK-033` |
 | `TASK-039` | `TASK-037`, `TASK-038` |
 | `TASK-040` | `TASK-038` |
-| `TASK-041` | `TASK-017` |
 | `TASK-042` | `TASK-041` |
 | `TASK-043` | `TASK-045`, `TASK-033` |
 | `TASK-044` | `TASK-043` |
@@ -135,7 +136,6 @@ Not done, and every task they depend on is done.
 | `TASK-098` | `TASK-095`, `TASK-101` |
 | `TASK-099` | `TASK-098` |
 | `TASK-100` | `TASK-095`, `TASK-071` |
-| `TASK-101` | `TASK-017` |
 | `TASK-102` | `TASK-101` |
 | `TASK-103` | `TASK-101`, `TASK-071` |
 | `TASK-104` | `TASK-103` |
@@ -162,10 +162,8 @@ Not done, and every task they depend on is done.
 | `TASK-127` | `TASK-126` |
 | `TASK-129` | `TASK-070`, `TASK-081` |
 | `TASK-130` | `TASK-124`, `TASK-108` |
-| `TASK-131` | `TASK-017`, `TASK-044` |
+| `TASK-131` | `TASK-044` |
 | `TASK-133` | `TASK-007`, `TASK-156` |
-| `TASK-141` | `TASK-017` |
-| `TASK-146` | `TASK-007` |
 | `TASK-148` | `TASK-147` |
 | `TASK-150` | `TASK-149` |
 | `TASK-151` | `TASK-149`, `TASK-150` |
@@ -197,8 +195,10 @@ Not done, and every task they depend on is done.
 | `TASK-014` | `692305b` | `T-INV-008` |
 | `TASK-015` | `692305b` | `T-DM-001` |
 | `TASK-016` | `536aeb3` | `T-INV-009`, `T-INV-010` |
+| `TASK-017` | Prisma `sqlserver` + `prisma/migrations/0001_init` applied against real `mssql/server:2022`; `apps/api/src/repository/ownerData.ts` with `ownerId` as the first positional parameter of every method; `T-SEC-021` (AST walk, 17 cases, 12 of them mutations), `T-INV-001/002/015` (DB raises `2601`/`2627`), `T-INV-018` (BIN2 collation + filtered indexes exist), `T-INV-019/020/021/022`. 28 integration tests green. Schema/migration drift is zero and CI now asserts it. | `T-INV-001`, `T-MIG-001`, `T-SEC-021` |
 | `TASK-022` | `d95a1ea` | `T-API-002`, `T-SEC-007` |
 | `TASK-025` | `a9e3483` | `T-UI-023` |
 | `TASK-144` | `eb07409` — a CI grep gate over `prisma/migrations/**` | `T-MIG-001` |
+| `TASK-146` | **ahead-of:TASK-007.** `docs/ghcr-pat.md` written. **No PAT is needed at all** — a fine-grained PAT cannot authenticate to `ghcr.io` and a classic one is account-wide, so the package is public and CI pushes with `GITHUB_TOKEN` (R8). Remaining: the `deploy.yml` link + image secret-scan land with TASK-007, and the one-time visibility flip runs after the first successful push. | _no test id declared_ |
 | `TASK-153` | `d6796b3` — owner approved the LGPL-3.0 obligation; gate proven on synthetic fixtures ahead-of:TASK-147 | `T-LICENSE-001` |
 | `TASK-167` | this commit — the ledger, the gate and `docs/status.md` | `T-STATUS-001` |

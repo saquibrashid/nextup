@@ -194,6 +194,45 @@ export function parseLedger(markdown) {
  * live on the enclosing `describe`. Excluding `describe` reported the naming
  * rule — a delivered, passing test — as missing.
  */
+/**
+ * Every test id MENTIONED anywhere in a spec file, including in comments and
+ * inside string literals.
+ *
+ * This is the deliberate opposite of `collectDefinedTestIds`, and it exists so
+ * that T-STATUS-001p can prove its probe ids are genuinely *mentioned but not
+ * declared*. Without it, that case could silently degenerate into asserting
+ * that two ids nobody has ever written down are absent — which is true of any
+ * random string and therefore proves nothing.
+ */
+export function mentionedTestIds(root = ROOT) {
+  const ids = new Set();
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir)) {
+      if (
+        [
+          'node_modules',
+          '.git',
+          'dist',
+          'build',
+          'coverage',
+          'playwright-report',
+          'test-results',
+        ].includes(entry)
+      ) {
+        continue;
+      }
+      const full = path.join(dir, entry);
+      if (statSync(full).isDirectory()) walk(full);
+      else if (/\.(spec|test)\.[cm]?[tj]sx?$/.test(entry)) {
+        for (const m of readFileSync(full, 'utf8').matchAll(/T-[A-Z0-9]+-\d+[a-z]?/g))
+          ids.add(m[0]);
+      }
+    }
+  };
+  walk(root);
+  return ids;
+}
+
 export function collectDefinedTestIds(root = ROOT) {
   const files = [];
   const walk = (dir) => {

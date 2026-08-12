@@ -1,0 +1,415 @@
+// nextup — Prisma schema (TASK-017).
+//
+// ⚠ SOURCE OF TRUTH: `specs/data-model.md` §16.3 (Revision 5), NOT §15.3 —
+// §15.3 is the retained, superseded PostgreSQL chapter. Revision 5 was
+// verified by execution against `mcr.microsoft.com/mssql/server:2022-latest`;
+// see `docs/task-017-schema-findings.md`.
+//
+// ⚠ WHAT IS DELIBERATELY NOT HERE. Prisma's `sqlserver` modelling cannot
+// express the parts of this schema that carry the actual safety properties:
+//
+//   - `COLLATE Latin1_General_100_BIN2` on identity/key columns (§16.2.1)
+//   - the FILTERED unique indexes that ARE invariants I-1, I-2 and I-9 (§16.4)
+//   - every `CHECK` constraint, including `ISJSON(...)`
+//
+// All of it lives in raw migration SQL (`prisma/migrations/**`). Prisma's
+// `@@unique` is NOT a substitute for a filtered index: an unfiltered unique
+// index on the same columns would make a service reappearance permanently
+// impossible (verified — see finding D-1). Do not "tidy" these into model
+// attributes.
+//
+// ⚠ Every id column is `@db.NVarChar(200)`. Without it Prisma emits
+// `NVARCHAR(1000)` = 2000 bytes, over SQL Server's 900-byte index-key cap.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+/// One upload session for exactly ONE service (product invariant 3).
+model UploadBatch {
+  id      String @id @db.NVarChar(200)
+  ownerId String @map("owner_id") @db.NVarChar(200)
+
+  mode    String @db.NVarChar(16)
+  service String @db.NVarChar(16)
+  status  String @db.NVarChar(24)
+
+  /// US-034 AC-3 — set for re-extraction batches. Self-referential.
+  derivedFromBatchId String?       @map("derived_from_batch_id") @db.NVarChar(200)
+  derivedFrom        UploadBatch?  @relation("BatchDerivation", fields: [derivedFromBatchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_batch_derived_from")
+  derivedBatches     UploadBatch[] @relation("BatchDerivation")
+
+  submittedAt         DateTime? @map("submitted_at") @db.DateTime2
+  extractionStartedAt DateTime? @map("extraction_started_at") @db.DateTime2
+  completedAt         DateTime? @map("completed_at") @db.DateTime2
+  undoneAt            DateTime? @map("undone_at") @db.DateTime2
+
+  /// The ONLY evidence for RSK-021 / OQ-024. JSON, CHECK-guarded by ISJSON.
+  extractionStats String? @map("extraction_stats") @db.NVarChar(Max)
+
+  extractionErrorCode    String?   @map("extraction_error_code") @db.NVarChar(32)
+  extractionErrorMessage String?   @map("extraction_error_message") @db.NVarChar(Max)
+  extractionErrorAt      DateTime? @map("extraction_error_at") @db.DateTime2
+
+  /// ⚠ SAFETY STATE, not statistics. `degradedExtraction` and `lowYield` each
+  /// force `computeRemovals: false` (`specs/ai.md` §2.2/§8.2) — the invariant
+  /// that a failed extraction must never be misread as a removal. Extraction
+  /// and review are separate requests, so these MUST survive the round trip.
+  /// Never recompute them on read.
+  degradedExtraction Boolean @default(false, map: "df_batch_degraded") @map("degraded_extraction")
+  lowYield           Boolean @default(false, map: "df_batch_low_yield") @map("low_yield")
+  crossCheck         String? @map("cross_check") @db.NVarChar(20)
+
+  createdAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_batch_created") @map("created_at") @db.DateTime2
+
+  titlesCreated   Title[]
+  removalGroups   RemovalGroup[]
+  listingsCreated ServiceListing[]      @relation("ListingCreatedBy")
+  listingsRemoved ServiceListing[]      @relation("ListingRemovedBy")
+  changes         BatchChange[]
+  images          UploadedImage[]
+  candidates      ExtractionCandidate[]
+  serviceStates   ServiceState[]
+
+  @@index([ownerId, service, status], map: "upload_batch_owner_service_status")
+  @@index([derivedFromBatchId], map: "upload_batch_derived_from")
+  @@map("upload_batch")
+}
+
+/// One row per WORK. Deduplicated across services — REQ-005.
+model Title {
+  id      String @id @db.NVarChar(200)
+  ownerId String @map("owner_id") @db.NVarChar(200)
+
+  /// Canonical work identity. Suppression is keyed on THIS, never on a row id
+  /// (REQ-071, product invariant 1).
+  workIdentity String @map("work_identity") @db.NVarChar(200)
+
+  /// `''` means "not an acknowledged duplicate" (finding D-2).
+  /// ⚠ NEVER nullable: SQL Server treats two NULLs as EQUAL in a unique index,
+  /// so a nullable column would silently reject the second row it exists to
+  /// permit. Verified.
+  duplicateAckSeq String @default("", map: "df_title_dup_seq") @map("duplicate_ack_seq") @db.NVarChar(200)
+
+  state      String @db.NVarChar(16)
+  matchState String @map("match_state") @db.NVarChar(16)
+
+  rawExtractedText String? @map("raw_extracted_text") @db.NVarChar(Max)
+  normalisedText   String? @map("normalised_text") @db.NVarChar(Max)
+
+  createdByBatchId String?      @map("created_by_batch_id") @db.NVarChar(200)
+  createdByBatch   UploadBatch? @relation(fields: [createdByBatchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_title_created_by_batch")
+
+  /// EARLIEST dateAdded across the title's listings (REQ-038). Derived AND
+  /// stored — the default sort indexes it.
+  sortDateAdded DateTime? @map("sort_date_added") @db.Date
+
+  tmdbId             Int?    @map("tmdb_id")
+  tmdbMediaType      String? @map("tmdb_media_type") @db.NVarChar(16)
+  tmdbName           String? @map("tmdb_name") @db.NVarChar(500)
+  tmdbReleaseYear    Int?    @map("tmdb_release_year")
+  tmdbRuntimeMinutes Int?    @map("tmdb_runtime_minutes")
+  tmdbGenres         String  @default("[]", map: "df_title_genres") @map("tmdb_genres") @db.NVarChar(Max)
+  tmdbPosterPath     String? @map("tmdb_poster_path") @db.NVarChar(400)
+
+  /// NFR-014 lazy refresh reads this. ⚠ Its max age is
+  /// TMDB_METADATA_MAX_AGE_DAYS (183) — never the screenshot-retention
+  /// constant, which is a different number for a different purpose (T-INV-008).
+  tmdbFetchedAt DateTime? @map("tmdb_fetched_at") @db.DateTime2
+
+  createdAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_title_created") @map("created_at") @db.DateTime2
+  updatedAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_title_updated") @map("updated_at") @db.DateTime2
+
+  listings   ServiceListing[]
+  changes    BatchChange[]
+  candidates ExtractionCandidate[]
+
+  @@index([ownerId, state, sortDateAdded], map: "title_owner_state_sortdate")
+  @@index([createdByBatchId], map: "title_created_by_batch")
+  @@map("title")
+}
+
+/// A work's presence on ONE service. Soft-deleted forever — REQ-028.
+model ServiceListing {
+  listingId String @id @map("listing_id") @db.NVarChar(200)
+  ownerId   String @map("owner_id") @db.NVarChar(200)
+
+  titleId String @map("title_id") @db.NVarChar(200)
+  title   Title  @relation(fields: [titleId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_listing_title")
+
+  service String @db.NVarChar(16)
+  state   String @db.NVarChar(16)
+
+  /// REQ-030, WRITE-ONCE. Set only by `createListing()`; there is no
+  /// `updateDateAdded` and `T-INV-006` greps for any other assignment.
+  dateAdded DateTime @map("date_added") @db.Date
+
+  /// v1.1 (REQ-059) — modelled now, ALWAYS false in v1 (`T-INV-007`).
+  dateAddedEdited Boolean @default(false, map: "df_listing_edited") @map("date_added_edited")
+
+  removedAt DateTime? @map("removed_at") @db.DateTime2
+
+  removedByBatchId String?      @map("removed_by_batch_id") @db.NVarChar(200)
+  removedByBatch   UploadBatch? @relation("ListingRemovedBy", fields: [removedByBatchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_listing_removed_by_batch")
+
+  removedByGroupId String?       @map("removed_by_group_id") @db.NVarChar(200)
+  removedByGroup   RemovalGroup? @relation(fields: [removedByGroupId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_listing_removed_by_group")
+
+  createdByBatchId String      @map("created_by_batch_id") @db.NVarChar(200)
+  createdByBatch   UploadBatch @relation("ListingCreatedBy", fields: [createdByBatchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_listing_created_by_batch")
+
+  changes BatchChange[]
+
+  @@index([ownerId, service, state], map: "service_listing_owner_service_state")
+  @@index([titleId], map: "service_listing_title")
+  @@index([removedByBatchId], map: "service_listing_removed_by_batch")
+  @@index([removedByGroupId], map: "service_listing_removed_by_group")
+  @@index([createdByBatchId], map: "service_listing_created_by_batch")
+  @@map("service_listing")
+}
+
+/// Append-only provenance. REQ-068 — replaces an embedded provenance blob.
+model BatchChange {
+  id      BigInt @id(map: "batch_change_pkey") @default(autoincrement())
+  ownerId String @map("owner_id") @db.NVarChar(200)
+
+  batchId String      @map("batch_id") @db.NVarChar(200)
+  batch   UploadBatch @relation(fields: [batchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_change_batch")
+
+  kind String @db.NVarChar(24)
+
+  titleId String? @map("title_id") @db.NVarChar(200)
+  title   Title?  @relation(fields: [titleId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_change_title")
+
+  listingId String?         @map("listing_id") @db.NVarChar(200)
+  listing   ServiceListing? @relation(fields: [listingId], references: [listingId], onUpdate: NoAction, onDelete: NoAction, map: "fk_change_listing")
+
+  attr String? @db.NVarChar(100)
+
+  /// ⚠ These hold JSON *scalars* (e.g. a previous workIdentity string). Their
+  /// CHECK uses `ISJSON(x, VALUE)`; plain `ISJSON(x)` returns 0 for a scalar
+  /// and rejected the commonest write here — and because batch close is one
+  /// transaction, that rolled the whole close back. Verified (finding E-3).
+  prevValue String? @map("prev_value") @db.NVarChar(Max)
+  nextValue String? @map("next_value") @db.NVarChar(Max)
+
+  createdAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_change_created") @map("created_at") @db.DateTime2
+
+  @@index([ownerId, batchId], map: "batch_change_owner_batch")
+  @@index([titleId], map: "batch_change_title")
+  @@index([listingId], map: "batch_change_listing")
+  @@map("batch_change")
+}
+
+/// One full-update close's removals, undoable as a unit (§8.2).
+model RemovalGroup {
+  id      String @id @db.NVarChar(200)
+  ownerId String @map("owner_id") @db.NVarChar(200)
+
+  batchId String      @map("batch_id") @db.NVarChar(200)
+  batch   UploadBatch @relation(fields: [batchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_group_batch")
+
+  undoneAt  DateTime? @map("undone_at") @db.DateTime2
+  createdAt DateTime  @default(dbgenerated("SYSUTCDATETIME()"), map: "df_group_created") @map("created_at") @db.DateTime2
+
+  listings ServiceListing[]
+
+  @@index([ownerId, batchId], map: "removal_group_owner_batch")
+  @@map("removal_group")
+}
+
+/// An uploaded screenshot. Purged at 30 days (NFR-019, ADR-0006).
+model UploadedImage {
+  id      String @id @db.NVarChar(200)
+  ownerId String @map("owner_id") @db.NVarChar(200)
+
+  batchId String      @map("batch_id") @db.NVarChar(200)
+  batch   UploadBatch @relation(fields: [batchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_image_batch")
+
+  /// Composed ONLY from server-generated ULIDs. NEVER emitted to a client
+  /// (`T-SEC-003`).
+  blobPath String @map("blob_path") @db.NVarChar(400)
+
+  /// DISPLAY ONLY. ⚠ NEVER used to compose `blobPath` (`specs/security.md` T4).
+  fileName String @map("file_name") @db.NVarChar(255)
+
+  /// (A45) HOW the bytes arrived. WRITE-ONCE. Do NOT infer it from the
+  /// filename prefix — the prefix is display copy; this field is the datum.
+  ingestSource String @default("upload", map: "df_image_ingest_source") @map("ingest_source") @db.NVarChar(16)
+
+  /// What the DEVICE delivered, by MAGIC BYTES, never Content-Type (iOS
+  /// commonly sends application/octet-stream). May be heic/heif.
+  uploadedFormat String @map("uploaded_format") @db.NVarChar(8)
+
+  /// What is actually STORED. HEIC/HEIF is transcoded to LOSSLESS PNG on
+  /// ingest (REQ-077), so this is only ever png|jpeg.
+  format String @db.NVarChar(8)
+
+  /// Bytes as STORED. The 10 MiB ceiling is enforced at the API boundary
+  /// against the UPLOADED bytes — a lossless PNG transcode of a compliant
+  /// HEIC can legitimately exceed it.
+  byteSize BigInt @map("byte_size")
+
+  width  Int?
+  height Int?
+
+  uploadedAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_image_uploaded") @map("uploaded_at") @db.DateTime2
+
+  /// `uploadedAt` + IMAGE_RETENTION_DAYS (30). WRITTEN ONCE, NEVER UPDATED.
+  /// Identical for pasted images. Availability is DERIVED, never stored.
+  retainUntil DateTime @map("retain_until") @db.DateTime2
+
+  /// ⚠ `null` (not extracted yet) and `0` (extracted, found nothing) are
+  /// DIFFERENT and both meaningful — US-006 AC-3.
+  candidateCount Int? @map("candidate_count")
+
+  sourceOf CandidateSourceImage[]
+
+  @@index([ownerId, batchId], map: "uploaded_image_owner_batch")
+  @@index([retainUntil], map: "uploaded_image_retain_until")
+  @@map("uploaded_image")
+}
+
+/// A single read title, staged for owner review. Never auto-applied.
+model ExtractionCandidate {
+  id      String @id @db.NVarChar(200)
+  ownerId String @map("owner_id") @db.NVarChar(200)
+
+  batchId String      @map("batch_id") @db.NVarChar(200)
+  batch   UploadBatch @relation(fields: [batchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_cand_batch")
+
+  rawText       String  @map("raw_text") @db.NVarChar(Max)
+  inferredTitle String? @map("inferred_title") @db.NVarChar(500)
+
+  basis      String @db.NVarChar(16)
+  ocrSupport String @map("ocr_support") @db.NVarChar(16)
+  provider   String @db.NVarChar(16)
+
+  /// ⚠ BIN2-collated in the migration: this is a GROUPING KEY for collapse,
+  /// never a search target. Under a case-insensitive collation two texts that
+  /// must stay distinct would silently merge.
+  normalisedText String @map("normalised_text") @db.NVarChar(Max)
+
+  /// MATCH HINT ONLY — never enters identity (SD-05).
+  extractedYear Int? @map("extracted_year")
+
+  boundingBoxes String? @map("bounding_boxes") @db.NVarChar(Max)
+  boxSource     String  @map("box_source") @db.NVarChar(8)
+  ocrConfidence Float?  @map("ocr_confidence")
+
+  /// Classify-and-surface, NEVER drop (REQ-012).
+  cleanupVerdict String @map("cleanup_verdict") @db.NVarChar(24)
+
+  /// US-007 AC-4: alternatives are shown, never hidden.
+  matchCandidates String? @map("match_candidates") @db.NVarChar(Max)
+
+  resolvedWorkIdentity String? @map("resolved_work_identity") @db.NVarChar(200)
+
+  resolvedTitleId String? @map("resolved_title_id") @db.NVarChar(200)
+  resolvedTitle   Title?  @relation(fields: [resolvedTitleId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_cand_resolved_title")
+
+  classification String? @db.NVarChar(40)
+
+  /// Defaults to 'pending'. There is NO accept-by-inaction (REQ-014).
+  reviewDisposition String @default("pending", map: "df_cand_disposition") @map("review_disposition") @db.NVarChar(16)
+
+  correctedToTmdbId Int? @map("corrected_to_tmdb_id")
+
+  /// Intra-batch overlap collapse (SD-02, `specs/data-model.md` §7.4).
+  ///
+  /// ⚠ The losing candidate is NOT deleted. It is written with
+  /// `reviewDisposition: 'discarded'` and this pointer to the survivor that
+  /// absorbed it, so REQ-012's "nothing is silently discarded" holds at the
+  /// storage layer while review still shows one item per work (US-004 AC-5).
+  /// Deleting the loser instead would make the suite pass and quietly destroy
+  /// the audit trail. `T-AI-007`.
+  ///
+  /// Self-referential and deliberately NOT a declared Prisma relation: a
+  /// self-FK on the same table gives SQL Server a cascade path it refuses, and
+  /// the pointer is only ever read within an already-loaded batch.
+  collapsedIntoCandidateId String? @map("collapsed_into_candidate_id") @db.NVarChar(200)
+
+  createdAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_candidate_created") @map("created_at") @db.DateTime2
+
+  sourceImages CandidateSourceImage[]
+
+  @@index([ownerId, batchId, reviewDisposition], map: "extraction_candidate_owner_batch_disposition")
+  @@index([resolvedTitleId], map: "extraction_candidate_resolved_title")
+  @@map("extraction_candidate")
+}
+
+/// Candidate -> image is MANY-TO-MANY after intra-batch overlap collapse: the
+/// survivor ABSORBS the losers' provenance (SD-02, `T-AI-007`, finding D-3).
+///
+/// ⚠ Surrogate key, not a composite PK. Three NVARCHAR(200) columns are 1200
+/// bytes, over SQL Server's 900-byte CLUSTERED key cap — it creates with only
+/// a warning, then fails at INSERT time.
+model CandidateSourceImage {
+  id      BigInt @id(map: "pk_candidate_source_image") @default(autoincrement())
+  ownerId String @map("owner_id") @db.NVarChar(200)
+
+  candidateId String              @map("candidate_id") @db.NVarChar(200)
+  candidate   ExtractionCandidate @relation(fields: [candidateId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_csi_candidate")
+
+  imageId String        @map("image_id") @db.NVarChar(200)
+  image   UploadedImage @relation(fields: [imageId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_csi_image")
+
+  /// Preserves the §7.4 (imageIndex, yTop, xLeft) reading order.
+  ordinal Int
+
+  @@unique([ownerId, candidateId, imageId], map: "uq_candidate_source_image")
+  @@index([ownerId, imageId], map: "candidate_source_image_owner_image")
+  @@index([candidateId], map: "candidate_source_image_candidate")
+  @@map("candidate_source_image")
+}
+
+/// Per-service last-updated fact. REQ-039 / FreshnessStrip.
+/// ⚠ Show the fact; NEVER nag about it. There is no staleness threshold and no
+/// staleness nudge (`A46`) — do not add one.
+model ServiceState {
+  ownerId String @map("owner_id") @db.NVarChar(200)
+  service String @db.NVarChar(16)
+
+  /// `null` === "never updated" (US-022 AC-3).
+  lastCompletedBatchAt DateTime? @map("last_completed_batch_at") @db.DateTime2
+
+  lastCompletedBatchId String?      @map("last_completed_batch_id") @db.NVarChar(200)
+  lastCompletedBatch   UploadBatch? @relation(fields: [lastCompletedBatchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_state_batch")
+
+  @@id([ownerId, service], map: "pk_service_state")
+  @@index([lastCompletedBatchId], map: "service_state_last_batch")
+  @@map("service_state")
+}
+
+/// "Not interested". Keyed on canonical WORK IDENTITY, never a row id
+/// (REQ-071). NEVER DELETED (REQ-028, US-029 AC-2).
+model Suppression {
+  id      String @id @db.NVarChar(200)
+  ownerId String @map("owner_id") @db.NVarChar(200)
+
+  workIdentity String @map("work_identity") @db.NVarChar(200)
+
+  /// `false` === un-suppressed. The row survives.
+  active Boolean @default(true, map: "df_suppression_active")
+
+  suppressedAt   DateTime  @default(dbgenerated("SYSUTCDATETIME()"), map: "df_suppression_created") @map("suppressed_at") @db.DateTime2
+  unsuppressedAt DateTime? @map("unsuppressed_at") @db.DateTime2
+
+  /// SD-06 — the previous workIdentity if migrated by fix-match.
+  migratedFrom String? @map("migrated_from") @db.NVarChar(200)
+
+  /// SuppressionDisplaySnapshot, flattened. Lets the suppressed view render
+  /// WITHOUT a Title row (US-029 AC-1) — which is the whole point of it.
+  displayName        String  @map("display_name") @db.NVarChar(500)
+  displayReleaseYear Int?    @map("display_release_year")
+  displayMediaType   String? @map("display_media_type") @db.NVarChar(16)
+  displayPosterPath  String? @map("display_poster_path") @db.NVarChar(400)
+
+  @@index([ownerId, workIdentity], map: "suppression_owner_work")
+  @@map("suppression")
+}

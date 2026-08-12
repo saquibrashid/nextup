@@ -23,6 +23,7 @@ import {
   STATUSES,
   checkStatus,
   collectDefinedTestIds,
+  mentionedTestIds,
   isTestIdPresent,
   parseBacklog,
   parseLedger,
@@ -217,13 +218,27 @@ describe('T-STATUS-001 · the task status ledger and its gate', () => {
   it('T-STATUS-001p · a test id mentioned in a comment or a fixture does NOT count as delivered', () => {
     // Found by mutation, not by reading. The first version of this gate scanned
     // whole files for the id pattern, so marking TASK-017 done sailed straight
-    // through: `T-SEC-021` appears only inside a comment, and `T-INV-001` only
-    // inside a STRING LITERAL in tools/eslint-rules/test-id-naming.spec.ts,
-    // where sample test declarations are fixtures for the naming rule. Counting
-    // either as a delivered test turns this gate into decoration.
+    // through on ids that appeared only inside a comment or inside a STRING
+    // LITERAL in tools/eslint-rules/test-id-naming.spec.ts, where sample test
+    // declarations are fixtures for the naming rule. Counting either as a
+    // delivered test turns this gate into decoration.
+    //
+    // ⚠ The probe ids below MUST be ones that are mentioned but NOT yet
+    // implemented. They were originally `T-SEC-021` and `T-INV-001`; TASK-017
+    // then genuinely delivered both, and this case failed — correctly, because
+    // the ids stopped being examples of the thing under test. If it fails that
+    // way again, the fix is to move the probe to another undelivered id, NEVER
+    // to relax the assertion.
     const defined = collectDefinedTestIds();
-    expect(defined.has('T-SEC-021')).toBe(false);
-    expect(defined.has('T-INV-001')).toBe(false);
+
+    // Both appear as fixtures in tools/eslint-rules/test-id-naming.spec.ts.
+    for (const probe of ['T-SUP-003', 'T-REV-006']) {
+      expect(
+        mentionedTestIds().has(probe),
+        `${probe} is no longer mentioned anywhere, so it cannot probe anything`,
+      ).toBe(true);
+      expect(defined.has(probe), `${probe} is now implemented; pick another probe id`).toBe(false);
+    }
 
     // …while genuinely declared tests, including this one, are found.
     expect(defined.has('T-STATUS-001p')).toBe(true);

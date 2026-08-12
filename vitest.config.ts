@@ -69,6 +69,19 @@ export default defineConfig({
         // two entry files ON PURPOSE — never widen this to `src/**`.
         'apps/api/src/index.ts',
         'apps/web/src/main.tsx',
+        // The owner-scoped repository layer (TASK-017). Excluded because it is
+        // measured by the WRONG suite, not because it is untested: coverage is
+        // bound to CI job 4 (`test:unit`), which has no database, while every
+        // line here is exercised by the `integration` project against a real
+        // mssql/server:2022 (specs/testing.md §3.3a). Counting it in the unit
+        // run would report 0% for thoroughly-tested code and force the floor
+        // down for everything else — the exact false signal §1 warns about.
+        //
+        // This exclusion is NOT a licence to leave repository code untested.
+        // `T-INV-023` fails if any file here is not imported by an integration
+        // spec, so deleting the tests re-breaks the build rather than quietly
+        // granting an exemption. Keep it scoped to this directory.
+        'apps/api/src/repository/**',
       ],
       thresholds: {
         'packages/domain/src/**': { statements: 95, branches: 90 },

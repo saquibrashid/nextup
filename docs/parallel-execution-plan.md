@@ -130,6 +130,43 @@ inside them.
 **Lane A keeps your strongest agent and stays serial.** It is the
 critical path; the other lanes exist to keep work *off* it.
 
+### 4.2a Before spawning: compute the ready pool, don't estimate it
+
+⚠ **A lane is only worth an agent if there is a queue of genuinely
+unblocked work in its paths.** Check mechanically — parse the `Depends on`
+column against the §1.2 ledger in `backlog.md` — because the intuition is
+reliably wrong.
+
+Measured on 2026-08-12, immediately after the TASK-017 spec reconciliation:
+
+| Point | Tasks with all dependencies satisfied |
+|---|---|
+| That day | **11** (of which one was web, several were owner-only, and `TASK-126` only *looked* ready because its dependency reads "all feature tests") |
+| After TASK-017 | 15 |
+| After TASK-017 + the auth chain 018–023 | **23** |
+
+So fanning out *before* the Stage-1 gate has 2–3 agents contending for
+roughly five real tasks. **The gate in §3 is not bureaucratic — it is where
+the work pool actually doubles.**
+
+Two concrete errors that this check caught, both of which had already been
+written into a draft spawn plan:
+
+- **TASK-166 was proposed for the web lane and is not runnable.** It depends
+  on TASK-036 and TASK-039 (neither done) and wires `GET /api/titles`, a
+  route that does not yet exist. The lane would have stalled on its second
+  task.
+- **TASK-143 is not a safe early lane, and is more dangerous than it looks.**
+  It is the post-revision consistency sweep over the six specs the
+  PostgreSQL→Azure SQL change superseded — the same files Stage 1 is
+  actively correcting. Worse: those corrections **deliberately retain**
+  struck-through PostgreSQL text (`23505`, `pg_cron`, `EXPLAIN`) below the
+  correction, because the F-001 rule requires a superseded *instruction* to
+  stay visible. An agent sweeping for "PostgreSQL" will read that retained
+  history as leftover staleness and delete it — destroying the exact artefact
+  the rule exists to produce. **Whoever runs TASK-143 must be told that
+  struck-through text is the deliverable, not the defect.**
+
 ### 4.3 Tasks that are not assignable to a lane
 
 These span lanes by construction. They run **after** the lanes they

@@ -468,7 +468,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-014` | `done` | `692305b` |
 | `TASK-015` | `done` | `692305b` |
 | `TASK-016` | `done` | `536aeb3` |
-| `TASK-017` | `todo` | — |
+| `TASK-017` | `done` | Prisma `sqlserver` + `prisma/migrations/0001_init` applied against real `mssql/server:2022`; `apps/api/src/repository/ownerData.ts` with `ownerId` as the first positional parameter of every method; `T-SEC-021` (AST walk, 17 cases, 12 of them mutations), `T-INV-001/002/015` (DB raises `2601`/`2627`), `T-INV-018` (BIN2 collation + filtered indexes exist), `T-INV-019/020/021/022`. 28 integration tests green. Schema/migration drift is zero and CI now asserts it. |
 | `TASK-018` | `todo` | — |
 | `TASK-019` | `todo` | — |
 | `TASK-020` | `todo` | — |
@@ -591,7 +591,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-143` | `todo` | — |
 | `TASK-144` | `done` | `eb07409` — a CI grep gate over `prisma/migrations/**` |
 | `TASK-145` | `todo` | — |
-| `TASK-146` | `doing` | `docs/ghcr-pat.md` written. **No PAT is needed at all** — a fine-grained PAT cannot authenticate to `ghcr.io` and a classic one is account-wide, so the package is public and CI pushes with `GITHUB_TOKEN` (R8). Remaining: the `deploy.yml` link + image secret-scan land with TASK-007, and the one-time visibility flip runs after the first successful push. |
+| `TASK-146` | `done` | **ahead-of:TASK-007.** `docs/ghcr-pat.md` written. **No PAT is needed at all** — a fine-grained PAT cannot authenticate to `ghcr.io` and a classic one is account-wide, so the package is public and CI pushes with `GITHUB_TOKEN` (R8). Remaining: the `deploy.yml` link + image secret-scan land with TASK-007, and the one-time visibility flip runs after the first successful push. |
 | `TASK-147` | `todo` | — |
 | `TASK-148` | `todo` | — |
 | `TASK-149` | `todo` | — |

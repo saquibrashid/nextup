@@ -1770,14 +1770,42 @@ which is what the identity invariants rely on. SQL Server databases are
 **case-insensitive by default** — which would silently merge
 `work_identity` values that must stay distinct. Therefore:
 
+- **The DATABASE ITSELF is created `COLLATE Latin1_General_100_BIN2`.**
+  ⚠ This is a property of `CREATE DATABASE`, not of the migration, so it
+  must be set by whatever provisions the database — the Bicep
+  (`collation` on `Microsoft.Sql/servers/databases`) and the CI/test
+  harness alike. It cannot be retrofitted from inside the migration:
+  `ALTER DATABASE ... COLLATE` needs exclusive access to the database the
+  migration is already connected to.
+
+  **This is required for Prisma to function at all, not merely for
+  correctness.** Prisma's `create()` emits
+  `DECLARE @generated_keys table([id] NVARCHAR(200))` and then joins that
+  table variable back to the real row: `... INNER JOIN [t] ON [t].[id] =
+  [g].[id]`. A table variable takes the **database default** collation,
+  so if the database is `SQL_Latin1_General_CP1_CI_AS` while `[t].[id]`
+  is `BIN2`, that join is a column-to-column collation conflict and every
+  single `create()` fails with **`Msg 468`**. Verified by execution: with
+  the default collation, 24 of 25 integration tests failed; with
+  `Latin1_General_100_BIN2`, all passed. `T-INV-018` asserts it.
+
 - **Identity/key columns** (`work_identity`, `owner_id`, all `*_id`) are
-  declared **`COLLATE Latin1_General_100_BIN2`** — binary, case- and
-  accent-sensitive. This reproduces PostgreSQL's exact-match semantics so
-  the three invariants mean exactly what they meant in §15.
+  *additionally* declared **`COLLATE Latin1_General_100_BIN2`**
+  explicitly — binary, case- and accent-sensitive. This is redundant
+  once the database default is BIN2 and is kept deliberately: it keeps
+  the guarantee visible at the column that depends on it, and it survives
+  a database being restored or recreated with the wrong default.
 - **Search columns** (`tmdb_name`, `normalised_text`) are stored in the
   DB's default collation but **searched with an explicit per-query
   `COLLATE Latin1_General_100_CI_AI`** so the removed-view search stays
-  forgiving of case and accents.
+  forgiving of case and accents. ⚠ With the database default now BIN2,
+  that per-query `COLLATE` is **load-bearing rather than cosmetic**:
+  without it, search is byte-exact and a lowercase query silently matches
+  nothing.
+
+~~Superseded (Revision 5): the database default collation was left
+unspecified, and only individual columns carried `BIN2`. That combination
+does not work — see `Msg 468` above.~~
 
 ### 16.3 Tables (T-SQL DDL — normative; supersedes §15.3)
 
