@@ -8,6 +8,34 @@ updates:
     open-pull-requests-limit: 10
     labels:
       - dependencies
+    # Packages that must move TOGETHER or CI cannot even install.
+    #
+    # Ungrouped, Dependabot raised `@typescript-eslint/eslint-plugin` 7 -> 8 on
+    # its own and left `@typescript-eslint/parser` at 7. They are peers, so
+    # `npm ci` died with ERESOLVE and all twelve jobs failed on a PR that could
+    # never have passed in any order. The same trap applies to vite/plugin-react
+    # and to the vitest packages, which share a version line.
+    groups:
+      typescript-eslint:
+        patterns:
+          - '@typescript-eslint/*'
+      vitest:
+        patterns:
+          - 'vitest'
+          - '@vitest/*'
+      vite:
+        patterns:
+          - 'vite'
+          - '@vitejs/*'
+      testing-library:
+        patterns:
+          - '@testing-library/*'
+      react:
+        patterns:
+          - 'react'
+          - 'react-dom'
+          - '@types/react'
+          - '@types/react-dom'
 
   # GitHub Actions used by the workflows.
   - package-ecosystem: github-actions

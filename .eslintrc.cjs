@@ -37,5 +37,17 @@ module.exports = {
         'nextup/test-id-naming': 'error',
       },
     },
+    {
+      // ESLint loads plugins and shareable config through CommonJS, so these
+      // files have to use `require()` — there is no ESM entry point to import.
+      // typescript-eslint v8 turned `no-require-imports` on for plain .js/.cjs
+      // as well (v7 only flagged it in TypeScript), which made the repo's own
+      // lint plugin unlintable. Scoped to the CJS tooling files so the ban
+      // still holds everywhere it is a real finding.
+      files: ['tools/eslint-plugin-nextup/**/*.js', 'tools/eslint-rules/**/*.js', '*.cjs'],
+      rules: {
+        '@typescript-eslint/no-require-imports': 'off',
+      },
+    },
   ],
 };
