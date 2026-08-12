@@ -121,6 +121,21 @@ export type CandidateProvider = (typeof CANDIDATE_PROVIDERS)[number];
 export const BOX_SOURCES = ['ocr', 'llm'] as const;
 export type BoxSource = (typeof BOX_SOURCES)[number];
 
+/**
+ * Whether the deterministic OCR pass and the vision model could be cross-checked
+ * against each other for a batch (`specs/ai.md` §2.2, D-4).
+ *
+ * ⚠ This is SAFETY STATE, not a statistic. Anything other than `'ok'` means one
+ * of the two readers was unavailable, so the extraction was never corroborated —
+ * which forces `computeRemovals: false` on the batch. A batch that could not be
+ * cross-checked must never be allowed to conclude that a title was removed:
+ * that is product invariant 2 (a failed extraction is not a removal).
+ *
+ * Mirrors `ck_batch_cross_check` in `prisma/migrations/0001_init/migration.sql`.
+ */
+export const CROSS_CHECK_OUTCOMES = ['ok', 'ocr-unavailable', 'llm-unavailable'] as const;
+export type CrossCheckOutcome = (typeof CROSS_CHECK_OUTCOMES)[number];
+
 /** Batch extraction failure codes (`specs/data-model.md` §3.6). */
 export const EXTRACTION_ERROR_CODES = [
   'EXTRACTOR_UNAVAILABLE',

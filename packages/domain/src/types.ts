@@ -20,6 +20,7 @@ import type {
   CandidateClassification,
   CandidateProvider,
   CleanupVerdict,
+  CrossCheckOutcome,
   ExtractionErrorCode,
   ImageFormat,
   IngestSource,
@@ -168,6 +169,20 @@ export interface UploadBatch {
   undoneAt: IsoDateTime | null;
   /** The ONLY evidence for RSK-021 / OQ-024. */
   extractionStats: ExtractionStats | null;
+  /**
+   * ⚠ SAFETY STATE, not statistics — `specs/ai.md` §2.2/§8.2, decision D-4.
+   *
+   * `degradedExtraction` and `lowYield` each force `computeRemovals: false`.
+   * They exist to uphold product invariant 2: a failed or partial extraction
+   * must never be reinterpreted as the owner having removed a title. Extraction
+   * and review are separate requests, so these MUST survive that round trip and
+   * MUST NOT be recomputed on read — recomputing them from data that has since
+   * changed is exactly how a removal gets inferred from an outage.
+   */
+  degradedExtraction: boolean;
+  lowYield: boolean;
+  /** `null` until extraction has run. See `CrossCheckOutcome`. */
+  crossCheck: CrossCheckOutcome | null;
   /** 0..1 in v1 (§8.2). */
   removalGroups: RemovalGroup[];
   /** REQ-068 (§8.1). */
@@ -321,6 +336,16 @@ export interface ExtractionCandidate {
   classification: CandidateClassification | null;
   reviewDisposition: ReviewDisposition;
   correctedToTmdbId: number | null;
+  /**
+   * Set on the LOSER of an intra-batch overlap collapse (SD-02, REQ-012,
+   * `specs/data-model.md` §7.4), pointing at the candidate that survived.
+   *
+   * The loser is retained, never deleted: review must be able to show that two
+   * tiles were read as the same work and which one won, so the owner can
+   * disagree. A collapse that silently dropped a row would be indistinguishable
+   * from a failed extraction. `T-AI-007` covers this.
+   */
+  collapsedIntoCandidateId: string | null;
   createdAt: IsoDateTime;
 }
 

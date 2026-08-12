@@ -107,6 +107,9 @@ function aBatch(overrides: Partial<UploadBatch> = {}): UploadBatch {
     completedAt: null,
     undoneAt: null,
     extractionStats: null,
+    degradedExtraction: false,
+    lowYield: false,
+    crossCheck: null,
     removalGroups: [],
     provenance: { created: [], modified: [], removed: [] },
     ...overrides,
@@ -156,6 +159,7 @@ function aCandidate(overrides: Partial<ExtractionCandidate> = {}): ExtractionCan
     classification: 'new',
     reviewDisposition: 'pending',
     correctedToTmdbId: null,
+    collapsedIntoCandidateId: null,
     createdAt: NOW,
     ...overrides,
   };

@@ -18,6 +18,7 @@ import {
   CANDIDATE_CLASSIFICATIONS,
   CANDIDATE_PROVIDERS,
   CLEANUP_VERDICTS,
+  CROSS_CHECK_OUTCOMES,
   EXTRACTION_ERROR_CODES,
   IMAGE_FORMATS,
   INGEST_SOURCES,
@@ -300,6 +301,12 @@ export const uploadBatchSchema = z
     completedAt: isoDateTimeSchema.nullable(),
     undoneAt: isoDateTimeSchema.nullable(),
     extractionStats: extractionStatsSchema.nullable(),
+    // Safety state (D-4). Defaults live in the database, not here: a parser
+    // that defaulted these to `false` would turn a payload that FORGOT them
+    // into one that positively asserts the extraction was healthy.
+    degradedExtraction: z.boolean(),
+    lowYield: z.boolean(),
+    crossCheck: z.enum(CROSS_CHECK_OUTCOMES).nullable(),
     removalGroups: z.array(removalGroupSchema),
     provenance: batchProvenanceSchema,
   })
@@ -391,6 +398,7 @@ export const extractionCandidateSchema = z
     classification: candidateClassificationSchema.nullable(),
     reviewDisposition: reviewDispositionSchema,
     correctedToTmdbId: z.number().int().positive().nullable(),
+    collapsedIntoCandidateId: z.string().min(1).max(200).nullable(),
     createdAt: isoDateTimeSchema,
   })
   .strict()
