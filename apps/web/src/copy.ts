@@ -51,11 +51,35 @@ export const FIXMATCH_SUPPRESSION_MIGRATED =
 export const LOW_YIELD_FULL_UPDATE =
   "We couldn't read enough titles from these screenshots to safely work out what's been removed, so nothing will be removed by this batch. You can re-extract, add more screenshots, or discard it.";
 
-/** US-003 AC-2. `{Service}` is substituted with the batch's service name. */
+/**
+ * US-003 AC-2. `{Service}` is substituted with the batch's service name.
+ *
+ * ⚠ This is the `specs/ui.md` §9 TEMPLATE, kept verbatim so the §9
+ * byte-equality harness has something to compare against. It is NOT the
+ * runtime source: render this sentence with `modeFullUpdateConsequence(service)`
+ * from `@nextup/domain`, which the API's `modeExplanation` also uses, so the
+ * radio-card text and `POST /api/batches` cannot drift (US-003 AC-2/AC-3).
+ * `MODE_TEMPLATES_AGREE` below is what stops the two from diverging.
+ */
 export const MODE_FULL_UPDATE_CONSEQUENCE =
   "Full update: anything on {Service} that isn't in these screenshots will be offered for removal.";
 
-/** US-003 AC-3. */
+/**
+ * US-003 AC-3.
+ *
+ * ⚠ DUPLICATE, deliberately. `packages/domain/src/copy.ts` (lane A) landed
+ * this same sentence for the API's `modeExplanation`. Re-exporting it from
+ * there was tried and reverted: the §9 byte-equality harness cannot follow a
+ * re-export, and the domain's own test (`T-BATCH-010p`) asserts only
+ * `toContain('Nothing will be removed')` — so the collapse traded a proven
+ * byte-equal-to-spec constant for an unproven one.
+ *
+ * Whoever builds the mode picker (TASK-049) should render
+ * `modeExplanation(mode, service)` from `@nextup/domain`, NOT this constant,
+ * so the card text and `POST /api/batches` cannot disagree — and should add
+ * the cross-package equality assertion that makes the duplication safe. That
+ * needs a test id this lane does not own; reported rather than invented.
+ */
 export const MODE_APPEND_ONLY_CONSEQUENCE =
   "Only adds what's in these screenshots. Nothing will be removed.";
 
