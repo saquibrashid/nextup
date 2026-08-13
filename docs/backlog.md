@@ -496,7 +496,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-042` | `todo` | — |
 | `TASK-043` | `todo` | — |
 | `TASK-044` | `todo` | — |
-| `TASK-045` | `todo` | — |
+| `TASK-045` | `doing` | Client, route handler and `msw`-served recorded fixtures delivered; `T-TMDB-010`…`010z` pass (client `a`–`o`, `v`–`z`; route `p`–`u`). The client suite runs on the REAL `fetch` at the real TMDB origin through `msw`, so request construction and API-key placement are actually asserted. NOT done: (a) `routes/index.ts` registration is coordinator-owned and still absent, so the route is unreachable and outside `T-SEC-029`; (b) `T-AI-017` is an integration assertion over the matching pipeline (TASK-056/057/060) and cannot exist yet. |
 | `TASK-046` | `todo` | — |
 | `TASK-047` | `todo` | — |
 | `TASK-048` | `done` | `T-BATCH-010`, `T-BATCH-015` |
@@ -506,7 +506,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-052` | `todo` | — |
 | `TASK-053` | `todo` | — |
 | `TASK-054` | `todo` | — |
-| `TASK-055` | `todo` | — |
+| `TASK-055` | `done` | `packages/domain/src/extraction/` (contract + degraded projections) + `apps/api/src/extraction/` (recordings, `StubExtractor`, factory). `T-STUB-001a`…`r`, incl. the three fault tokens and byte-identical output over three runs. |
 | `TASK-056` | `todo` | — |
 | `TASK-057` | `todo` | — |
 | `TASK-058` | `todo` | — |
