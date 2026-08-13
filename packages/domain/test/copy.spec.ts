@@ -8,7 +8,13 @@
  * decoration.
  */
 
-import { BATCH_MODES, SERVICES, modeExplanation } from '@nextup/domain';
+import {
+  BATCH_MODES,
+  DATE_ADDED_LABEL_MARKER,
+  SERVICES,
+  dateAddedLabel,
+  modeExplanation,
+} from '@nextup/domain';
 import { describe, expect, it } from 'vitest';
 
 describe('T-BATCH-010 the mode consequence is stated in plain language', () => {
@@ -47,5 +53,57 @@ describe('T-BATCH-010 the mode consequence is stated in plain language', () => {
   it('T-BATCH-010r: the service is named in its display form, not its slug', () => {
     expect(modeExplanation('full-update', 'max')).toContain('Max');
     expect(modeExplanation('full-update', 'max')).not.toContain('max ');
+  });
+});
+
+describe('T-LIST-034 the date-added label is honest about whose date it is', () => {
+  it('T-LIST-034a: the label always contains "to nextup"', () => {
+    // REQ-061. This product does NOT know when the owner saved a title on
+    // Netflix or Max, and cannot: there is no API and no scraping. The only
+    // date it has is when the title entered THIS list from a screenshot.
+    expect(dateAddedLabel('2026-04-02')).toContain(DATE_ADDED_LABEL_MARKER);
+    expect(DATE_ADDED_LABEL_MARKER).toBe('to nextup');
+  });
+
+  it('T-LIST-034b: no bare "Added <date>" label is produced', () => {
+    // The failure this guards: "Added 2 Apr 2026" reads as the streaming
+    // service's date and quietly asserts something false about the owner's
+    // own history.
+    const label = dateAddedLabel('2026-04-02');
+    expect(label).toBe('Added to nextup 2 Apr 2026');
+    expect(/^Added \d/.test(label)).toBe(false);
+  });
+
+  it('T-LIST-034c: the day is un-padded and the month is a name', () => {
+    expect(dateAddedLabel('2026-04-02')).toBe('Added to nextup 2 Apr 2026');
+    expect(dateAddedLabel('2026-12-25')).toBe('Added to nextup 25 Dec 2026');
+    expect(dateAddedLabel('2026-01-01')).toBe('Added to nextup 1 Jan 2026');
+  });
+
+  it('T-LIST-034d: every month renders as a real name, never as a number', () => {
+    for (let month = 1; month <= 12; month += 1) {
+      const iso = `2026-${String(month).padStart(2, '0')}-15`;
+      expect(dateAddedLabel(iso), iso).toMatch(/^Added to nextup 15 [A-Z][a-z]{2} 2026$/);
+    }
+  });
+
+  it('T-LIST-034e: the label does not shift with the host timezone', () => {
+    // A `new Date(iso)` implementation renders 1 Apr in any timezone west of
+    // UTC, because the string parses as UTC midnight and then gets localised.
+    // This one is pure string work, so there is nothing to shift.
+    expect(dateAddedLabel('2026-04-01')).toBe('Added to nextup 1 Apr 2026');
+  });
+
+  it('T-LIST-034f: a malformed date is refused rather than half-rendered', () => {
+    // "Added to nextup Invalid Date" is worse than a loud failure: it looks
+    // like a rendering quirk instead of a write path storing a bad value.
+    for (const bad of ['', '2026-4-2', '02/04/2026', '2026-04-02T00:00:00Z', 'yesterday']) {
+      expect(() => dateAddedLabel(bad), bad).toThrow(RangeError);
+    }
+  });
+
+  it('T-LIST-034g: an impossible month is refused', () => {
+    expect(() => dateAddedLabel('2026-00-10')).toThrow(RangeError);
+    expect(() => dateAddedLabel('2026-13-10')).toThrow(RangeError);
   });
 });

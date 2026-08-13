@@ -1599,3 +1599,41 @@ rather than renumbering the work order for no benefit.
 | **`T-BATCH-007`** | I | The inline extraction runner honours its operational ceilings: image concurrency **2**, a **15-minute** batch ceiling, and `estimatedCostUsd` recorded in `extractionStats`. `T-EXT-010` covers progress and `T-AI-036` the degraded path; nothing asserted the limits that stop a runaway batch from exhausting the 0.5 GiB container (`RSK-016`). |
 | **`T-PERF-003`** | I | The `batch_change_by_batch` and `candidate_by_batch` queries resolve by **index seek, not scan**, under the §16.6 indexes, and pagination is **keyset** — no `OFFSET`. `T-PERF-001` covers only the list and removed views. On Azure SQL Basic (5 DTU) a scan that is invisible at 50 rows is a timeout at 5,000. |
 | **`T-EXPORT-001`** | I | `scripts/export-owner-data.ts` writes every owner row to a restorable artefact, is **never scheduled** and **never deletes** — and `docs/restore.md` documents the 7-day PITR and BACPAC paths. ⚠ Must not become a background job: product invariant 5 permits exactly two non-owner processes, and `T-CI-005` fails if a third appears. `REQ-028` forbids deletion but gives the owner no backup of their own, which is what this closes (`OQ-025`). |
+
+---
+
+## 13. Tests added by TASK-033 (`GET /api/titles`)
+
+⚠ **These ids were chosen because they were FREE, not because they were
+convenient.** The first draft of this suite reached for `T-LIST-016`,
+`T-LIST-018`, `T-LIST-024`, `T-LIST-025`, `T-LIST-026` and `T-LIST-027`, all of
+which are already assigned in §9 to **TASK-035, TASK-036 and TASK-037** — three
+tasks that have not been started. Shipping under those ids would have made
+`check:status` report the ordering, labelling and filtering work as complete,
+which is the same defect the §12 sweep existed to remove, arriving from the
+opposite direction. **Check a family for free numbers before naming a test.**
+
+The ids below therefore assert what TASK-033 actually built, and the §9 rows
+for `T-LIST-016`/`018`/`024`/`025`/`026`/`027` remain **unimplemented and still
+owned by their own tasks**.
+
+| Test | L | Assertion |
+|---|---|---|
+| **`T-LIST-029`** | U | The `GET /api/titles` query contract: newest-first by default (REQ-038/A44), `dir=asc` accepted, unknown `sort`/`dir` refused, repeatable filters de-duplicated and bounded, Express's nested-object query form refused rather than coerced, and **no owner id is ever read from the query string** (`T-SEC-006`). |
+| **`T-LIST-030`** | I | Ordering and keyset pagination end to end: default newest-first, `dir=asc` reverses, **paging visits every row exactly once with no gaps**, rows sharing a date are neither skipped nor repeated across pages, the last page reports `nextCursor: null`, and an empty list is a 200 with `[]` rather than a 404. |
+| **`T-LIST-031`** | U | The list-item shape: every documented field present, badges carrying service + listing id + date, an **unmatched** title falling back to its raw extracted text, `name` never `undefined`, and a missing date yielding a `null` label rather than an invented one. |
+| **`T-LIST-032`** | U | `tmdb_genres` parsing never defaults a genre: `[]` stays `[]` (US-019 AC-6), a **corrupt** blob yields `[]` rather than a 500 that would take the owner's whole list down, and non-string entries are dropped. |
+| **`T-LIST-033`** | U | A stored date renders as its own calendar day. Guards the off-by-one that a local-time getter produces on any host west of UTC — a date that is simply wrong and that nobody would connect to a timezone. |
+| **`T-LIST-034`** | U | `dateAddedLabel()` always contains **"to nextup"** (REQ-061), never renders a bare `Added <date>`, renders every month as a name, does not shift with the host timezone, and **refuses** a malformed date rather than rendering "Invalid Date". ⚠ This is the DOMAIN half. `T-LIST-018` (layer C, TASK-035) still owns the assertion that every **rendered** label carries the marker, and remains unimplemented. |
+| **`T-API-018`** | U | `limit` is bounded 1..200, defaults to 50, and out-of-range is **refused rather than clamped** — clamping returns a page the caller did not ask for and gives no hint why the remaining rows are missing. |
+
+`T-API-017` (§11.2) gained its implementation here, at both layers: the decoder
+is unit-tested (`T-API-017a`–`k`) and the refusal is asserted through the real
+app (`T-API-017l`–`o`).
+
+⚠ **The re-encode comparison in `decodeCursor` is load-bearing.** Node's base64
+decoder is lenient, so a tampered cursor frequently decodes to the same bytes
+as the original and sails through a shape-only check. Mutation-tested:
+removing it fails `T-API-017i` and nothing else, which is exactly the point —
+without that one assertion, "tampered" becomes undetectable for every input
+that happens to parse.

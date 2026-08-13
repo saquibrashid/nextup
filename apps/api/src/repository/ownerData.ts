@@ -216,6 +216,103 @@ export async function listActiveTitles(
   });
 }
 
+/**
+ * ONE PAGE of the combined list (`specs/api.md` §6.2, TASK-033).
+ *
+ * Four things here are requirements rather than query-shaping choices:
+ *
+ * 1. **Suppressed works are excluded here, in the repository, never by the
+ *    caller** (REQ-024). A route that filtered afterwards would return short
+ *    pages and a wrong `nextCursor`, and any second caller that forgot the
+ *    filter would silently re-show something the owner said they were not
+ *    interested in.
+ * 2. **Suppression is matched on `workIdentity`, never on a title id**
+ *    (REQ-071, product invariant 1). A suppressed title that reappears in a
+ *    later capture becomes a BRAND-NEW row (product invariant 7), so an
+ *    id-keyed exclusion would work once and then quietly stop.
+ * 3. **`badges` are the `active` listings only** (REQ-026). A removed
+ *    listing's badge must be absent while the row itself survives.
+ * 4. **Keyset pagination, never `OFFSET`** (`specs/data-model.md` §15.6).
+ *
+ * WHY THE ANTI-JOIN IS TWO QUERIES AND NOT RAW SQL
+ * ------------------------------------------------
+ * `suppression.work_identity` cannot carry a Prisma relation — it is not
+ * unique, deliberately, because deactivated suppressions are retained forever
+ * — so a single-statement `NOT EXISTS` would have to be `$queryRaw`. That is
+ * the wrong trade here: `T-SEC-021` walks the AST of this directory and proves
+ * every Prisma call binds `ownerId`, and it CANNOT see inside a raw SQL
+ * string. Buying one round trip's worth of latency to keep the whole file
+ * under that guarantee is worth it, and the suppression set is bounded by the
+ * single owner's own "not interested" decisions.
+ *
+ * `take` is deliberately fetched as `limit + 1`: the extra row is how the
+ * caller learns whether a next page exists without a `COUNT(*)`, which §3
+ * forbids over an ever-growing history.
+ */
+export interface TitlePageOptions {
+  limit: number;
+  dir: 'asc' | 'desc';
+  cursor?: { sortDateAdded: string; id: string } | undefined;
+  services?: readonly string[];
+  mediaType?: string | undefined;
+}
+
+export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions, tx?: Db) {
+  const conn = db(tx);
+  const { limit, dir, cursor, services = [], mediaType } = options;
+
+  const suppressed = await conn.suppression.findMany({
+    where: { ownerId, active: true },
+    select: { workIdentity: true },
+  });
+
+  // The keyset predicate, spelled out because SQL Server has no row-value
+  // comparison Prisma can express. `(sortDateAdded, id) < (@d, @id)` becomes
+  // "an earlier date, OR the same date and a smaller id" — and the second
+  // branch is what stops rows sharing a date from being skipped between pages.
+  const before = dir === 'desc' ? 'lt' : 'gt';
+  const keyset =
+    cursor === undefined
+      ? {}
+      : {
+          OR: [
+            { sortDateAdded: { [before]: new Date(`${cursor.sortDateAdded}T00:00:00.000Z`) } },
+            {
+              sortDateAdded: new Date(`${cursor.sortDateAdded}T00:00:00.000Z`),
+              id: { [before]: cursor.id },
+            },
+          ],
+        };
+
+  const rows = await conn.title.findMany({
+    where: {
+      ownerId,
+      state: 'active',
+      ...(suppressed.length > 0
+        ? { workIdentity: { notIn: suppressed.map((s) => s.workIdentity) } }
+        : {}),
+      ...(mediaType === undefined ? {} : { tmdbMediaType: mediaType }),
+      // A service filter selects titles HOLDING an active listing on one of
+      // the named services. It deliberately does not narrow `badges` below:
+      // filtering by Netflix must not hide the row's Max badge (REQ-032).
+      ...(services.length > 0
+        ? { listings: { some: { ownerId, state: 'active', service: { in: [...services] } } } }
+        : {}),
+      ...keyset,
+    },
+    orderBy: [{ sortDateAdded: dir }, { id: dir }],
+    take: limit + 1,
+    include: {
+      listings: {
+        where: { ownerId, state: 'active' },
+        orderBy: [{ dateAdded: 'asc' }, { listingId: 'asc' }],
+      },
+    },
+  });
+
+  return { rows: rows.slice(0, limit), hasMore: rows.length > limit };
+}
+
 export async function updateTitle(
   ownerId: OwnerId,
   id: string,
@@ -224,7 +321,6 @@ export async function updateTitle(
 ) {
   return db(tx).title.updateMany({ where: { ownerId, id }, data });
 }
-
 /**
  * Titles whose TMDB metadata is older than the lazy-refresh horizon.
  *

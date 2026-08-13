@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 127 |
+| ⬜ todo | 126 |
 | 🚧 doing | 0 |
-| ✅ done | 27 |
+| ✅ done | 28 |
 | 🙋 owner | 7 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -31,9 +31,14 @@ Not done, and every task they depend on is done.
 | `TASK-029` | S | Epic A — Access & identity |
 | `TASK-030` | XS | Epic K — Platform, safety, and the shell |
 | `TASK-032` | S | Epic K — Platform, safety, and the shell |
-| `TASK-033` | M | Epic F — The list itself (the value loop) |
+| `TASK-034` | XS | Epic F — The list itself (the value loop) |
+| `TASK-035` | S | Epic F — The list itself (the value loop) |
+| `TASK-036` | S | Epic F — The list itself (the value loop) |
+| `TASK-037` | S | Epic F — The list itself (the value loop) |
+| `TASK-038` | M | Epic F — The list itself (the value loop) |
 | `TASK-041` | S | Epic F — The list itself (the value loop) |
 | `TASK-045` | S | Epic D — Matching & identity |
+| `TASK-047` | S | Epic H — History, removal ledger, suppression |
 | `TASK-049` | S | Epic B — Capture & import |
 | `TASK-054` | M | Epic B — Capture & import |
 | `TASK-055` | S | Epic C — Extraction |
@@ -44,6 +49,7 @@ Not done, and every task they depend on is done.
 | `TASK-128` | XS | Epic K — Platform, safety, and the shell |
 | `TASK-132` | XS | Epic K — Platform, safety, and the shell |
 | `TASK-143` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
+| `TASK-145` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-148` | M | Epic B — Capture & import |
 
 ## Waiting on the owner
@@ -60,23 +66,17 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-106 tasks cannot start yet.
+99 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
 | `TASK-031` | `TASK-007`, `TASK-027` |
-| `TASK-034` | `TASK-033` |
-| `TASK-035` | `TASK-033` |
-| `TASK-036` | `TASK-033` |
-| `TASK-037` | `TASK-033` |
-| `TASK-038` | `TASK-033` |
 | `TASK-039` | `TASK-037`, `TASK-038` |
 | `TASK-040` | `TASK-038` |
 | `TASK-042` | `TASK-041` |
-| `TASK-043` | `TASK-045`, `TASK-033` |
+| `TASK-043` | `TASK-045` |
 | `TASK-044` | `TASK-043` |
 | `TASK-046` | `TASK-026`, `TASK-038` |
-| `TASK-047` | `TASK-033` |
 | `TASK-050` | `TASK-148`, `TASK-158` |
 | `TASK-051` | `TASK-050` |
 | `TASK-052` | `TASK-050` |
@@ -153,7 +153,6 @@ Not done, and every task they depend on is done.
 | `TASK-130` | `TASK-124`, `TASK-108` |
 | `TASK-131` | `TASK-044` |
 | `TASK-133` | `TASK-007`, `TASK-156` |
-| `TASK-145` | `TASK-033` |
 | `TASK-149` | `TASK-148`, `TASK-145` |
 | `TASK-150` | `TASK-149` |
 | `TASK-151` | `TASK-149`, `TASK-150` |
@@ -196,6 +195,7 @@ Not done, and every task they depend on is done.
 | `TASK-022` | `d95a1ea` | `T-API-002`, `T-SEC-007` |
 | `TASK-023` | `apps/api/src/app.ts` + `routes/index.ts` in the mandated order, no CORS middleware, `/api` 404 fallback **inside** the chain. `T-SEC-005`, `T-SEC-012`, `T-SEC-030`, `T-API-001`. Driven over real HTTP on an ephemeral port — no new dependency. | `T-API-001`, `T-SEC-005` |
 | `TASK-025` | `a9e3483` | `T-UI-023` |
+| `TASK-033` | `T-LIST-010`, `T-LIST-011`, `T-API-017` | `T-API-017`, `T-LIST-010`, `T-LIST-011` |
 | `TASK-048` | `T-BATCH-010`, `T-BATCH-015` | `T-API-003`, `T-BATCH-010`, `T-BATCH-015` |
 | `TASK-144` | `eb07409` — a CI grep gate over `prisma/migrations/**` | `T-MIG-001` |
 | `TASK-146` | **ahead-of:TASK-007.** `docs/ghcr-pat.md` written. **No PAT is needed at all** — a fine-grained PAT cannot authenticate to `ghcr.io` and a classic one is account-wide, so the package is public and CI pushes with `GITHUB_TOKEN` (R8). Remaining: the `deploy.yml` link + image secret-scan land with TASK-007, and the one-time visibility flip runs after the first successful push. | _no test id declared_ |

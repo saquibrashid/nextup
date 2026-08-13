@@ -27,6 +27,7 @@ import type { PrincipalReader } from '../auth/principal.js';
 import { AppError } from '../errors/AppError.js';
 import { registerBatchRoutes } from './batches.js';
 import { registerMeRoutes } from './me.js';
+import { registerTitleRoutes } from './titles.js';
 
 /**
  * Ceiling for a JSON request body.
@@ -81,6 +82,7 @@ export function createApiRouter(): Router {
   const apiRouter = Router();
   registerMeRoutes(apiRouter);
   registerBatchRoutes(apiRouter);
+  registerTitleRoutes(apiRouter);
   return apiRouter;
 }
 

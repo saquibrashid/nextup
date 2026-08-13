@@ -484,7 +484,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-030` | `todo` | — |
 | `TASK-031` | `todo` | — |
 | `TASK-032` | `todo` | — |
-| `TASK-033` | `todo` | — |
+| `TASK-033` | `done` | `T-LIST-010`, `T-LIST-011`, `T-API-017` |
 | `TASK-034` | `todo` | — |
 | `TASK-035` | `todo` | — |
 | `TASK-036` | `todo` | — |
