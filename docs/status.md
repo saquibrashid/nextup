@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 120 |
-| 🚧 doing | 0 |
-| ✅ done | 34 |
+| ⬜ todo | 110 |
+| 🚧 doing | 3 |
+| ✅ done | 41 |
 | 🙋 owner | 7 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -24,22 +24,19 @@ Not done, and every task they depend on is done.
 
 | Task | Size | Section |
 |---|---|---|
-| `TASK-024` | XS | Epic G — Attribution & compliance |
 | `TASK-026` | S | Epic G — Attribution & compliance |
-| `TASK-027` | S | Epic A — Access & identity |
 | `TASK-028` | S | Epic A — Access & identity |
-| `TASK-034` | XS | Epic F — The list itself (the value loop) |
 | `TASK-035` | S | Epic F — The list itself (the value loop) |
 | `TASK-036` | S | Epic F — The list itself (the value loop) |
 | `TASK-037` | S | Epic F — The list itself (the value loop) |
 | `TASK-038` | M | Epic F — The list itself (the value loop) |
-| `TASK-041` | S | Epic F — The list itself (the value loop) |
+| `TASK-042` | XS | Epic F — The list itself (the value loop) |
 | `TASK-045` | S | Epic D — Matching & identity |
 | `TASK-047` | S | Epic H — History, removal ledger, suppression |
-| `TASK-049` | S | Epic B — Capture & import |
 | `TASK-054` | M | Epic B — Capture & import |
-| `TASK-055` | S | Epic C — Extraction |
-| `TASK-101` | S | Epic H — History, removal ledger, suppression |
+| `TASK-056` | S | Epic C — Extraction |
+| `TASK-102` | S | Epic H — History, removal ledger, suppression |
+| `TASK-106` | S | Epic H — History, removal ledger, suppression |
 | `TASK-126` | M | Epic K — Platform, safety, and the shell |
 | `TASK-132` | XS | Epic K — Platform, safety, and the shell |
 | `TASK-143` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
@@ -60,14 +57,13 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-99 tasks cannot start yet.
+95 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
-| `TASK-031` | `TASK-007`, `TASK-027` |
+| `TASK-031` | `TASK-007` |
 | `TASK-039` | `TASK-037`, `TASK-038` |
 | `TASK-040` | `TASK-038` |
-| `TASK-042` | `TASK-041` |
 | `TASK-043` | `TASK-045` |
 | `TASK-044` | `TASK-043` |
 | `TASK-046` | `TASK-026`, `TASK-038` |
@@ -75,7 +71,6 @@ Not done, and every task they depend on is done.
 | `TASK-051` | `TASK-050` |
 | `TASK-052` | `TASK-050` |
 | `TASK-053` | `TASK-050` |
-| `TASK-056` | `TASK-055` |
 | `TASK-057` | `TASK-056` |
 | `TASK-058` | `TASK-056`, `TASK-057`, `TASK-054`, `TASK-149`, `TASK-154` |
 | `TASK-059` | `TASK-058` |
@@ -117,18 +112,16 @@ Not done, and every task they depend on is done.
 | `TASK-095` | `TASK-088`, `TASK-047` |
 | `TASK-096` | `TASK-095` |
 | `TASK-097` | `TASK-095` |
-| `TASK-098` | `TASK-095`, `TASK-101` |
+| `TASK-098` | `TASK-095` |
 | `TASK-099` | `TASK-098` |
 | `TASK-100` | `TASK-095`, `TASK-071` |
-| `TASK-102` | `TASK-101` |
-| `TASK-103` | `TASK-101`, `TASK-071` |
+| `TASK-103` | `TASK-071` |
 | `TASK-104` | `TASK-103` |
 | `TASK-105` | `TASK-103`, `TASK-083` |
-| `TASK-106` | `TASK-101` |
 | `TASK-107` | `TASK-106` |
 | `TASK-108` | `TASK-103`, `TASK-096` |
 | `TASK-109` | `TASK-074`, `TASK-060` |
-| `TASK-110` | `TASK-109`, `TASK-101` |
+| `TASK-110` | `TASK-109` |
 | `TASK-111` | `TASK-109` |
 | `TASK-112` | `TASK-074` |
 | `TASK-113` | `TASK-112`, `TASK-075` |
@@ -188,12 +181,19 @@ Not done, and every task they depend on is done.
 | `TASK-021` | `apps/api/dev/devPrincipal.ts` — the shim is excluded **structurally** (outside the production `include: ["src/**/*.ts"]`), not by a flag or an exclude list; `createApp` injects the reader. `T-SEC-019a-f`. ⚠ The task row said `apps/api/src/auth/devPrincipal.ts`; corrected in place below and in `specs/security.md` §2.3. | `T-SEC-019` |
 | `TASK-022` | `d95a1ea` | `T-API-002`, `T-SEC-007` |
 | `TASK-023` | `apps/api/src/app.ts` + `routes/index.ts` in the mandated order, no CORS middleware, `/api` 404 fallback **inside** the chain. `T-SEC-005`, `T-SEC-012`, `T-SEC-030`, `T-API-001`. Driven over real HTTP on an ephemeral port — no new dependency. | `T-API-001`, `T-SEC-005` |
+| `TASK-024` | `T-ATTR-001` | `T-ATTR-001` |
 | `TASK-025` | `a9e3483` | `T-UI-023` |
-| `TASK-029` | `9a0b232` — `apps/api/test/integration/security.spec.ts`; the route walk is enumerated from the live Express router, so `GET /api/titles` and the `/api/batches` routes are covered without editing it. `T-SEC-002` (a–h), `T-SEC-017` (a–d), `T-SEC-028` (a–c), `T-SEC-030` (d–g). `T-SEC-002f` is the mutation: a deliberate `/api/leak/:id` answering 403 for a foreign id, which the walk catches. | `T-SEC-002`, `T-SEC-017`, `T-SEC-028`, `T-SEC-030` |
-| `TASK-030` | `b419b21` — `tools/check-no-credentials.mjs`, `T-SEC-011` (a–d), `T-SEC-001` (a–m). Mutation-proven against `passport`, `bcrypt`, a `puppeteer` runtime dependency (while `@playwright/test` in devDependencies stays legal), a streaming host literal and a schema credential field. | `T-SEC-001`, `T-SEC-011` |
-| `TASK-032` | `9a0b232` (fixtures) + `tests/meta/decisionVerifiability.spec.ts` — `tests/fixtures/seed.ts` with an injected clock, a pure `planSeed()`, `asOwner()` and owner-scoped writes under the DERIVED `ownerId`. Its "Done when" test `T-META-003` existed nowhere, so it is delivered here as `tools/check-decision-verifiability.mjs` + `T-META-003` (a–m): every criterion the testing spec claims verifiable resolves to a defined id, and every criterion with no test is declared in §10. 243 mapped criteria pass. ⚠ See the finding below — `T-META-003` is a spec-hygiene gate and is not a plausible definition of done for a seed fixture. | `T-META-003` |
+| `TASK-027` | `T-INFRA-008` | `T-INFRA-008` |
+| `TASK-029` | `apps/api/test/integration/security.spec.ts` — delivered with the auth chain and never recorded. The route walk is enumerated from the live Express router, so `GET /api/titles`, `/api/titles/:titleId` and the `/api/batches` routes are covered without editing it. `T-SEC-002` (a–h), `T-SEC-017` (a–d), `T-SEC-028` (a–c), `T-SEC-030` (d–g). `T-SEC-002f` is the mutation: a deliberate `/api/leak/:id` answering 403 for a foreign id, which the walk catches. | `T-SEC-002`, `T-SEC-017`, `T-SEC-028`, `T-SEC-030` |
+| `TASK-030` | `tools/check-no-credentials.mjs` + `tests/infra/noCredentials.spec.ts` — `T-SEC-011` (a–k) and `T-SEC-001` (a–m). Mutation-proven against `passport`, `bcrypt`, a `puppeteer` runtime dependency, a streaming host literal and a schema credential field; with false-positive cases (`passwordless`, the SQL connection string, the `netflix`/`max` enum values, and `@playwright/test` in devDependencies staying legal). Wired as `npm run check:credentials`. | `T-SEC-001`, `T-SEC-011` |
+| `TASK-032` | `tests/fixtures/seed.ts` (fixture) + `tests/infra/seedFixture.spec.ts` — a seed fixture with an injected clock, a pure `planSeed()`, `asOwner()` and owner-scoped writes under the DERIVED `ownerId`. `T-SEED-001` (a–e) determinism, `T-SEED-002` (a–d) derived identity, `T-SEED-003` (a–e) the clock as the only time source, per `specs/testing.md` §14.1. The original done-when `~~T-META-003~~` was a mis-citation (`A48`); it is delivered separately as `tools/check-decision-verifiability.mjs` + `tests/meta/decisionVerifiability.spec.ts`. | `T-SEED-001`, `T-SEED-002`, `T-SEED-003` |
 | `TASK-033` | `T-LIST-010`, `T-LIST-011`, `T-API-017` | `T-API-017`, `T-LIST-010`, `T-LIST-011` |
+| `TASK-034` | `T-LIST-028` — `apps/api/test/integration/titleDetail.spec.ts` (8 cases): owner scoping, and the foreign-id refusal asserted byte-identical to the unknown-id refusal with `T-LIST-028g` as its non-vacuity guard. `T-LIST-035` — `apps/api/test/unit/titlesShape.spec.ts` (8 cases) for the §6.3 shaping, where coverage is measured. The active/removed badge split is mutation-proven at both layers. | `T-LIST-028`, `T-LIST-035` |
+| `TASK-041` | `apps/api/src/routes/serviceState.ts` + `packages/domain/src/freshness.ts` — `GET /api/service-state`, one entry per service in `SERVICES` so a never-captured service reads "has never been updated" rather than vanishing. `ageInDays` counts UTC calendar days, not 24-hour blocks, and clamps clock skew. `T-FRESH-010` (a–h), `T-FRESH-012` (a–f), `T-FRESH-015` (a–c, the A46 no-nudge regression guard). All four mutations caught; see `specs/testing.md` §16. | `T-FRESH-010`, `T-FRESH-012`, `T-FRESH-015` |
 | `TASK-048` | `T-BATCH-010`, `T-BATCH-015` | `T-API-003`, `T-BATCH-010`, `T-BATCH-015` |
+| `TASK-049` | `T-UI-003a`…`j` green in `apps/web/test/uploadStep1.spec.tsx`; mutation-proven against a defaulted mode and against revealing the consequence on selection | `T-UI-003` |
+| `TASK-055` | `packages/domain/src/extraction/` (contract + degraded projections) + `apps/api/src/extraction/` (recordings, `StubExtractor`, factory). `T-STUB-001a`…`r`, incl. the three fault tokens and byte-identical output over three runs. | `T-STUB-001` |
+| `TASK-101` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` |
 | `TASK-121` | `fdd5519` — `tools/check-mutating-routes.mjs`, `T-MUT-001` (a–j), `T-MUT-002` (a–f). The 18 mutating routes each map to one of the eight REQ-041 owner-initiated operations or carry an explicit non-list-state reason; mutation-proven with an unregistered `POST /titles/:id/auto-confirm` and a `jobs/reconcile.ts` calling a guarded operation. | `T-MUT-001`, `T-MUT-002` |
 | `TASK-122` | `dde3dc5` — `tools/check-outbound-hosts.mjs`, `T-SEC-031` (a–i) and the outbound half of `T-SEC-009` (`k`). Exactly three destinations: TMDB, Azure OpenAI, Azure AI Vision. Mutation-proven by widening the list to four, shrinking it below three, and planting an unlisted host in source. The telemetry and streaming hostnames the spec needs are assembled from fragments rather than added to another gate's exemption list. | `T-SEC-009`, `T-SEC-031` |
 | `TASK-128` | `c64b7b5` — `tools/egress-guard.mjs`, `T-CI-007` (a–n). Patches `fetch`, `http.request` and `https.request`; loopback and the compose service names stay reachable; mutation-proven with a `fetch` and a raw `https.request` to an external host. ⚠ Installed per-suite, not globally: global wiring needs `setupFiles` in `vitest.config.ts`, which no lane may edit — see the finding below. | `T-CI-007` |
