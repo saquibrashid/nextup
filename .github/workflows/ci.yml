@@ -116,6 +116,16 @@ jobs:
       - name: Task status ledger (T-STATUS-001)
         run: npm run check:status
 
+      # T-META-005. Upstream of check:status: that gate asks whether a done
+      # task's tests are implemented, this one asks whether the ids the backlog
+      # cites are REAL. When it was added, 89 of 276 cited ids (32%) were
+      # defined nowhere in specs/testing.md, and three tasks had already been
+      # implemented against ids invented at the keyboard. A row whose "Done
+      # when" names a test that does not exist has no definition of done, and
+      # nothing else in CI can tell.
+      - name: Backlog test ids are defined (T-META-005)
+        run: npm run check:test-ids
+
       # T-CI-008. Guards the worst failure class in this repo: a spec file in a
       # path no runner collects never executes, so its assertions "pass" and CI
       # goes green while nothing was checked. This is not theoretical — the

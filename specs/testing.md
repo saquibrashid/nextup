@@ -1452,7 +1452,7 @@ project that collects it.
 | `T-INV-014` | Every table has an `owner_id` column and every index leads with it (`specs/data-model.md` §16.2). |
 | `T-INV-015` | At most one **active** `suppression` per `(owner_id, work_identity)` — enforced by a **filtered** unique index (I-9). ~~"partial unique index" — PostgreSQL's name for it; SQL Server calls it *filtered* and the `CREATE` syntax differs.~~ ⚠ The harness must run with `QUOTED_IDENTIFIER ON` (`sqlcmd -I`), or the filtered index is **never created** and this test passes while asserting nothing. |
 | `T-INV-016` | A non-empty `title.duplicate_ack_seq` is written in `createTitleAllowingDuplicate()` and nowhere else (§16.4). ~~"The acknowledged-duplicate `dup:` work-identity prefix is applied in `createTitleAllowingDuplicate()` and nowhere else."~~ ⚠ **That form passed vacuously**: it grepped for a `dup:` prefix that appears nowhere in the codebase, that `WORK_IDENTITY_RE` rejects, and that `title_match_coherent` rejects at the database (all verified). See `docs/task-017-schema-findings.md` §2 D-2. |
-| `T-API-01x` | A tampered or unparseable pagination cursor returns **400 `INVALID_CURSOR`**, never a silent reset to page 1. |
+| **`T-API-017`** | A tampered or unparseable pagination cursor returns **400 `INVALID_CURSOR`**, never a silent reset to page 1. ⚠ **This row's id was the literal placeholder `~~T-API-01x~~`** — an `x` where the digit should be, sitting unremarked in a table of real ids. It was never resolved, so the one test defining what a bad cursor does could not be cited by the backlog (`TASK-033` cited the invented `T-API-004` instead) and could not be found by anyone searching for it. Numbered `T-API-017` at the TASK-048 reconciliation sweep. |
 | **`T-INV-018`** (new, TASK-017) | **The live database's default collation is `Latin1_General_100_BIN2`, and all three filtered unique indexes report `has_filter = 1`.** ⚠ Both halves are load-bearing. Prisma's `create()` joins a `DECLARE @generated_keys table([id] NVARCHAR(200))` variable back to the inserted row; a table variable takes the **database default** collation, so on a `CI_AS` database that join meets the `BIN2` `[id]` column and **every insert fails with `Msg 468`** — measured, 24 of 25 integration tests. The index half catches the `QUOTED_IDENTIFIER` trap in `T-INV-015` at its source, so a missing filtered index fails HERE loudly instead of making `T-INV-001/002/015` pass vacuously. |
 | **`T-INV-019`** (new, TASK-017) | `upload_batch.degraded_extraction`, `low_yield` and `cross_check` **survive the storage round trip** and default to `false`/`NULL`, never to `NULL`/`true`. Extraction and review are separate requests and each flag forces `computeRemovals: false` (`specs/ai.md` §2.2/§8.2), so a flag lost in storage lets a failed extraction be misread as a removal — product invariant 2. |
 | **`T-INV-020`** (new, TASK-017) | The **database** rejects an unsupported `service`, an unknown batch `mode`, and non-JSON in the JSON columns. ⚠ Includes the E-3 pair: `extraction_stats` holds an object and correctly rejects a bare scalar under `ISJSON(x) = 1`, while `batch_change.prev_value`/`next_value` hold scalars and require `ISJSON(x, VALUE) = 1`. Conflating the two rolled back every full-update batch close. |
@@ -1476,6 +1476,8 @@ project that collects it.
 
 | **`T-API-003`** (implemented, TASK-048) | **The error-code enumeration is CLOSED (`specs/api.md` §8).** A source scan over `apps/api/src/**` asserts every `new AppError('CODE'` literal is a member of `ERROR_CODES`. ⚠ **This id was a phantom until TASK-048**: `packages/domain/src/errorCodes.ts` claimed in its own header that `T-API-003` asserted this, and `docs/backlog.md` named it as a done-when test, but it was defined in no spec and implemented in no file — so the invariant its comment advertised was in fact unguarded, and a route could have invented a code that reached the owner as an untranslated failure. The scan is static rather than runtime because a runtime assertion only sees codes on paths a test happens to exercise, which excludes the rarely-hit branch that most needs checking. `T-API-003b` is the negative control: it pins a **multi-line** `new AppError(` call so a regex that silently stopped matching cannot pass vacuously. The second half of the original claim — *every member has at least one test* — is deliberately NOT asserted yet: most codes belong to endpoints that do not exist, so it would fail for the whole of M3. It is added when the last code-throwing endpoint lands. |
 
+| **`T-META-005`** (implemented, TASK-048 follow-up) | **Every test id `docs/backlog.md` cites is DEFINED in this file.** `tools/check-test-ids.mjs`, run in CI job 3. Upstream of `T-STATUS-001`: that gate asks whether a *done* task's tests are implemented, this one asks whether the cited ids are real at all — which matters for every task, including those not started. ⚠ **When added, 89 of the 276 ids the backlog cited (32%) were defined nowhere here.** The cause was systematic, not random: this file's §9 tables were renumbered (`T-LIST-001`/`002` → `T-LIST-010`…`027`; `T-REM-001`…`005` → `T-REM-006`/`010`…`022`; `T-AI-001`…`003` → `T-AI-004`/`007`/`010`…`044`) and `docs/backlog.md` was never reconciled, so a third of the work order pointed at nothing. Three ids had already reached code: `T-BATCH-001`, `T-BATCH-002` and `T-API-003` were cited as done-when tests, `T-API-003` was additionally advertised in `packages/domain/src/errorCodes.ts` as a guard that existed, and none of the three was implemented anywhere. **This is the failure NFR-003 exists to prevent**: a row whose "Done when" names a nonexistent test has no definition of done, so the implementer invents one and every other gate passes against an assertion nobody specified. `~~struck-through~~` ids are ignored, so an in-place correction can keep the superseded id visible without failing CI. |
+
 ### 11.3 Deleted
 
 | Test / fixture | Why |
@@ -1493,3 +1495,107 @@ datastore forces edits to behavioural tests, that is a signal the storage
 decision has leaked into the domain and should be reviewed rather than
 accommodated.
 
+
+## 12. Tests defined by the backlog reconciliation sweep (TASK-048 follow-up)
+
+`T-META-005` found that **98 of the 276 test ids `docs/backlog.md` cited were
+defined nowhere in this file** (32%, then 36% once the gate stopped counting
+prose mentions as definitions — see below). Most were casualties of the §9
+renumbering and were corrected in the backlog in place, pointing at the test
+that really asserts the behaviour.
+
+The ids below could **not** be corrected that way, for one of two reasons, and
+are defined here instead. The distinction matters: it is the difference between
+"the work order pointed at the wrong test" and "the behaviour has no test at
+all", and only the second is a gap in the definition of done.
+
+⚠ **A definition is a table cell that NAMES a test — not any mention of the id.**
+`tools/check-test-ids.mjs` originally counted every occurrence, which made it
+self-defeating: §11.2's entry recording that `T-BATCH-001`, `T-BATCH-002` and
+`T-API-004` were invented ids contains those ids, so **writing down that a
+phantom was a phantom silently promoted it to "defined"** and removed it from
+the report. Three ids vanished from the offender list the moment the finding was
+recorded, and nine more were hidden the same way. The gate now recognises a
+definition only in a cell that holds ids and their markup, nothing else.
+
+### 12.1 Already implemented, never listed here
+
+These are real, passing tests. The backlog cited them correctly all along; this
+file simply never recorded them, so `T-META-005` reported them as phantoms.
+**The fix is here, not in the backlog** — a test that exists and passes is not a
+phantom, and re-pointing the backlog at some other id would have discarded
+working coverage and left `packages/domain` asserting behaviour no spec claimed.
+
+| Test | Asserts |
+|---|---|
+| **`T-DM-001`** | `normaliseTitleText` is idempotent, empties whitespace-only input without collapsing to a space, does not strip an article-only title, and **appends no year (SD-05)**. Implemented in `packages/domain/test/identity.spec.ts` (TASK-015). The year exclusion is load-bearing: a year in the identity input would make the same work under two release-year sources into two different works, silently defeating suppression (product invariant 1). |
+| **`T-DM-004`** | ULID generation and `deterministicId`: 26 Crockford base32 characters, the alphabet excludes `I`/`L`/`O`/`U`, ids sort lexicographically by time, distinct ids within one millisecond, an out-of-range timestamp **throws rather than truncating**, `deterministicId` is stable for a seed and independent of the clock, and the monotonic test helper stays ordered across a millisecond boundary. Implemented in `packages/domain/test/ids.spec.ts` (TASK-013). Also asserts the Web Crypto and `TextEncoder` absence paths **throw rather than falling back** — a silent fallback to `Math.random()` would make ids predictable and non-unique at once. |
+| **`T-INV-009`** | `deriveTitleState` and `deriveSortDateAdded` each exist in **exactly one place**. A static scan over the source (`packages/domain/test/derive.spec.ts`, TASK-016) that fails on a second implementation, with `T-INV-009c`/`d` proving the scan reaches real files and fires on a real re-implementation. A duplicated derivation is the classic way two surfaces disagree about whether a title is removed while every unit test passes. |
+| **`T-INV-010`** | Derived title fields: a title is `removed` only when **every** listing is removed; a title with no listings **throws** rather than reporting removed; `sortDateAdded` is the **earliest** date across non-removed listings; adding a work on a second service does not move the row (US-020 AC-4); removing the earliest listing recomputes the value (AC-5); a fully removed title has `sortDateAdded: null` (AC-7); dates compare lexicographically **so no timezone can shift a day**; and the schema refuses a title whose derived fields disagree. Implemented in `packages/domain/test/derive.spec.ts` (TASK-016). ⚠ This is the unit-level counterpart of `T-LIST-014`/`015`/`017` and `T-REM-018`, which assert the same behaviour through the API. The sweep briefly re-pointed TASK-016 at those ids — which would have discarded eight passing assertions and marked a finished task incomplete. **A test that exists and passes is not a phantom; the spec was the thing missing.** |
+
+### 12.2 Genuine coverage gaps found by the sweep
+
+No existing test asserts these behaviours. They are defined here **before** the
+citing task is built, because the spec is the definition of done and the backlog
+is not: a task allowed to invent its own test id is a task that grades its own
+homework (NFR-003).
+
+| Test | L | Asserts |
+|---|---|---|
+| **`T-LIST-028`** | I | `GET /api/titles/:titleId` returns the single canonical work with its active listings and badges, poster, type, year and date-added, scoped to the owner; an unknown or other-owner id returns **404, never 403** — distinguishing "absent" from "forbidden" tells an unauthorised caller which ids exist. US-018's other integration tests assert list-level shape only, and the one per-row-content test (`T-UI-010`) is a component test, the wrong layer for an endpoint. |
+| **`T-RES-016`** | C | The removed view renders a Restore control per removed row and, when the work is **suppressed**, drives the un-suppress-first flow rather than failing with a bare 409. US-025 holds integration tests only (`T-RES-010`…`015`); the restore UI and its un-suppress-first interaction had no component test. ⚠ Restore stays an **explicit user action** (product invariant 7) — this test must never assert an automatic restore. |
+| **`T-BATCH-016`** | I | `GET /api/batches` returns the owner's batch history — id, service, mode, status, dates — newest first and owner-scoped. The `T-BATCH-*` family holds `003`–`006` and `010`–`015`; the batch-list endpoint had no test at all. |
+| **`T-UI-016`** | C | `FilterBar` renders the service, type and genre controls and syncs the selected filters to the URL query string **in both directions**, so a filtered list is deep-linkable and survives reload. `T-UX-013` covers only the zero-match state. |
+| **`T-UI-020`** | C | `FixMatchDialog` renders the TMDB search input and results and lets the owner select a new match, wired to the fix-match action. The only US-030 component test (`T-UX-033`) covers the TMDB-unavailable branch; the normal search-and-select path was asserted at integration level only. |
+| **`T-UI-022`** | C | `/about` renders `IMAGE_RETENTION_STATEMENT` and the never-delete and no-analytics copy **byte-equal to the named constants**. US-035's tests are all integration retention and purge tests; nothing asserted the page that tells the owner what the product does with their images. Byte-equality, not "contains", because a reworded retention promise is a different promise. |
+| **`T-UX-007`** | C | `BatchStatusPage` polls the batch and renders per-image progress and per-image failure states **without navigating away**. LLM latency makes this screen visible for minutes (`ADR-0001`), so it is a primary surface, not a spinner. `T-EXT-010` asserts progress at integration level — the wrong layer for the page. |
+| **`T-UX-008`** | C | `BatchStatusPage` renders the degraded / cross-check-unavailable banner when either extraction leg is missing. `T-AI-036` asserts the degraded batch outcome at integration level and states a banner is shown, but no component test proves the page actually renders one. ⚠ Whenever this banner shows, full-update removals are withheld (`specs/ai.md` §2.2) — product invariant 2 — so a banner that silently fails to render hides the reason the owner's removals disappeared. |
+| **`T-UX-011`** | C | `ReviewPage` renders a sticky action bar that stays visible while the candidate list scrolls. With a long review list the confirm and close actions would otherwise scroll out of reach on a phone (US-037). |
+| **`T-UX-020`** | E | Each primary surface — list, upload, review, removed, suppressions, batches, about — renders a **distinct offline state**, not a blank page and not the generic load-failure error. `ux-states.md` §11 requires it per surface; US-037 held only responsive and a11y tests. |
+| **`T-UX-021`** | E | On reconnect each surface recovers — retry or refetch — **without losing in-progress owner input**. The pair with `T-UX-020`: an offline state that clears by discarding a half-finished review is a data-loss bug wearing an error message. |
+| **`T-AI-023`** | I | `POST /api/batches/:batchId/candidates` creates an owner-supplied candidate on an **open** batch — the manual-entry fallback for the artwork-only tile that carries no readable text — returns it in the review response, and rejects entry on a closed batch. `T-UNM-010` covers actions on an *unmatched* candidate, not creation of a new one, and `T-AI-041` covers only rendering the untitled tile. |
+
+### 12.3 Defined in a SISTER spec, never imported here
+
+The sixth and least obvious class the sweep found. These ids are not invented
+and not renumbered: they are anchored under their own id in `specs/ai.md`,
+`specs/ui.md`, `specs/ux-states.md` or in this file's own **prose**, and the
+backlog cites them correctly. What was missing is a cell in a mapping table
+here.
+
+That matters because of NFR-003: **this file carries the AC → named-test
+mapping and is the definition of done.** A test specified only in a sister
+document is a test no one is accountable for delivering — it appears in a
+design discussion, never in a work order's exit criteria, and every gate stays
+green while it is never written. So the fix is to import the id here, not to
+teach `T-META-005` to read every spec: widening the gate would make four
+documents jointly authoritative and remove the single place a reviewer can
+check what "done" means.
+
+| Test | L | Asserts | Anchored in |
+|---|---|---|---|
+| **`T-API-002`** | U | The error envelope's shape — `{ error: { code, message, correlationId? } }` — is what every failure returns, and a thrown non-`AppError` is reported as `INTERNAL_ERROR` without leaking a stack. **Already implemented and passing** in `apps/api/test/unit/errorEnvelope.spec.ts` (TASK-022), cases `a`–`h`. | implemented, unspecced |
+| **`T-META-004`** | S | Every `it(...)` title starts with a `T-` id, as a static string. **Already implemented and passing** in `tools/eslint-rules/test-id-naming.spec.ts` (TASK-002). Described in §11 prose but never given a table cell — so the rule that makes every other id traceable was itself untraceable. | §11 prose |
+| **`T-AI-009`** | U | The Read extractor requests `features=['Read']` only, and the extractor result type carries **no service field** — `'netflix'`/`'max'` appear nowhere under `extraction/` (`specs/ai.md`). Service attribution is the owner's, declared on the batch; an extractor that guessed it could relabel a title onto a service the owner never uploaded. | `specs/ai.md` |
+| **`T-AI-010`** | S | `azureVisionExtractor.ts` is the **only** file permitted to import the Vision SDK (`specs/ai.md` §305). Confining the SDK to one adapter is what keeps `packages/domain` pure and the matcher deterministic (`NFR-012a`, ADR-0001). | `specs/ai.md` |
+| **`T-AI-033`** | I | The stage-1 provider-contract suite: the **real** `LlmVisionExtractor` and `AzureVisionExtractor` driven offline against committed HTTP recordings (§3.1a) — schema parsing, strict-schema rejection, 429/5xx retry timing, timeouts, content-filter refusals and both degraded paths. Offline, so it runs in CI without a key and without cost. | §3.1a prose |
+| **`T-CI-004`** | S | Neither `golden:live` nor `golden:record` is referenced by **any** workflow file (§4A). Both spend real money against real providers; a well-meaning "run the golden set in CI" would bill the owner per push and, worse, re-record the baseline the gates are measured against. | §4A prose |
+| **`T-CI-007`** | I | An outbound-blocking proxy observes **zero** requests during the CI test run. Egress in CI means a test is really an integration test against someone else's service: it fails on their outage, passes on their cached response, and quietly breaks the offline guarantee `T-AI-033` depends on. | §2 prose |
+| **`T-E2E-001`** | E | The full owner journey — sign in → upload → extract → match → review → confirm → see the combined list — specified end to end in §5 and called there **"the single most valuable test in the suite"**. It was cited by five backlog tasks (`TASK-080`, `094`, `108`, `130`, `164`) as their exit criterion while having no table cell anywhere. | §5 |
+| **`T-INFRA-004`** | S | The Bicep 30-day blob-lifecycle purge rule **exists and is correctly shaped** (§3.4, `NFR-019`). Pairs with `T-INFRA-002`, which asserts soft delete and versioning are OFF: a correct lifecycle rule plus soft delete still retains the owner's screenshots past 30 days, so neither test is sufficient alone. | §3.4 prose |
+| **`T-SMOKE-001`** | E | An authenticated request against the freshly deployed **staging** revision succeeds. The `T-SMOKE-*` family was defined only as a **glob** in §11.2, which no id-level gate can resolve — `T-SMOKE-003` was already enumerated as a real cell, so the family was half-addressable and the missing half looked like a phantom. | §11.2 glob |
+| **`T-UI-004`** | C | `ImageDropzone` names **PNG, JPEG and HEIC** in its accept list and its copy (`specs/ui.md`). ⚠ Load-bearing per product invariant 11: without HEIC in `accept`, an iOS file picker greys out the owner's own camera photos and the failure looks like a broken phone, not a missing format. Deliberately distinct from `T-UI-014`, which TASK-162 owns. | `specs/ui.md` |
+| **`T-UX-041`** | C | The empty dropzone shows **all three** ingest affordances — paste, file selection and drag-and-drop (`specs/ux-states.md` §4.3). Product invariant 16: paste was added, not swapped in, and a tidied-up single-affordance dropzone silently removes a working capture path. | `specs/ux-states.md` §4.3 |
+| **`T-UX-042`** | C | Partial acceptance on `/upload`: accepted files show running totals while rejected files are listed **individually with a per-file reason** (`specs/ux-states.md` §4.4). Product invariant 15 at the UI layer — one bad image must fail alone and stay retryable, which the owner can only act on if told which file and why. | `specs/ux-states.md` §4.4 |
+| **`T-A11Y-012`** | E | The axe-core suite runs across **all nine routes** with zero serious or critical violations (§9A). §9A prose already treats this id as the cross-route a11y suite; the backlog cited it as the loose range `T-A11Y-003 … T-A11Y-012`, of which only the upper bound was ever a real id. | §9A prose |
+
+### 12.4 Genuine gaps, defined under the id the backlog already cites
+
+Free slots in their families, so the cited id is kept and given a meaning here
+rather than renumbering the work order for no benefit.
+
+| Test | L | Asserts |
+|---|---|---|
+| **`T-BATCH-007`** | I | The inline extraction runner honours its operational ceilings: image concurrency **2**, a **15-minute** batch ceiling, and `estimatedCostUsd` recorded in `extractionStats`. `T-EXT-010` covers progress and `T-AI-036` the degraded path; nothing asserted the limits that stop a runaway batch from exhausting the 0.5 GiB container (`RSK-016`). |
+| **`T-PERF-003`** | I | The `batch_change_by_batch` and `candidate_by_batch` queries resolve by **index seek, not scan**, under the §16.6 indexes, and pagination is **keyset** — no `OFFSET`. `T-PERF-001` covers only the list and removed views. On Azure SQL Basic (5 DTU) a scan that is invisible at 50 rows is a timeout at 5,000. |
+| **`T-EXPORT-001`** | I | `scripts/export-owner-data.ts` writes every owner row to a restorable artefact, is **never scheduled** and **never deletes** — and `docs/restore.md` documents the 7-day PITR and BACPAC paths. ⚠ Must not become a background job: product invariant 5 permits exactly two non-owner processes, and `T-CI-005` fails if a third appears. `REQ-028` forbids deletion but gives the owner no backup of their own, which is what this closes (`OQ-025`). |

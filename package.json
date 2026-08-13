@@ -33,6 +33,7 @@
     "check:licences": "node tools/check-licences.mjs --check",
     "status": "node tools/check-status.mjs",
     "check:status": "node tools/check-status.mjs --check",
+    "check:test-ids": "node tools/check-test-ids.mjs",
     "infra:build": "node tools/check-infra.mjs",
     "check:infra": "node tools/check-infra.mjs --check",
     "check:test-locations": "node tools/check-test-locations.mjs",
