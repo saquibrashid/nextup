@@ -97,6 +97,7 @@ export default defineConfig({
         test: {
           name: 'unit',
           environment: 'node',
+          setupFiles: ['./vitest.setup.ts'],
           include: [
             'packages/domain/test/**/*.spec.ts',
             'apps/api/test/unit/**/*.spec.ts',
@@ -113,6 +114,7 @@ export default defineConfig({
         test: {
           name: 'integration',
           environment: 'node',
+          setupFiles: ['./vitest.setup.ts'],
           include: ['apps/api/test/integration/**/*.spec.ts'],
           // A real engine plus migrations is slower than the unit default.
           testTimeout: 30_000,
@@ -130,6 +132,7 @@ export default defineConfig({
         test: {
           name: 'golden',
           environment: 'node',
+          setupFiles: ['./vitest.setup.ts'],
           include: ['tests/extraction/**/*.spec.ts'],
           exclude: ['**/goldenLive.spec.ts'],
         },
@@ -141,6 +144,7 @@ export default defineConfig({
         test: {
           name: 'infra',
           environment: 'node',
+          setupFiles: ['./vitest.setup.ts'],
           include: ['tests/infra/**/*.spec.ts'],
         },
       },
@@ -151,6 +155,7 @@ export default defineConfig({
         test: {
           name: 'meta',
           environment: 'node',
+          setupFiles: ['./vitest.setup.ts'],
           include: ['tests/meta/**/*.spec.ts'],
         },
       },

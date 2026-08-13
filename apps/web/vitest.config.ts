@@ -35,6 +35,12 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     include: ['test/**/*.spec.{ts,tsx}'],
-    setupFiles: ['./test/setup.ts'],
+    // ⚠ ORDER IS LOAD-BEARING. The root setup installs the network egress
+    // guard (`T-CI-007`) by wrapping `fetch`/`http.request`; anything that
+    // legitimately intercepts requests — `msw` for TMDB — must be installed
+    // AFTER it, so the interceptor sits above the guard and a faked request
+    // never reaches it. Reverse the order and the guard wraps the interceptor
+    // instead, blocking the very requests the fakes exist to serve.
+    setupFiles: ['../../vitest.setup.ts', './test/setup.ts'],
   },
 });

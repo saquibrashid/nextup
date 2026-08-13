@@ -37,6 +37,9 @@
     "infra:build": "node tools/check-infra.mjs",
     "check:infra": "node tools/check-infra.mjs --check",
     "check:test-locations": "node tools/check-test-locations.mjs",
+    "check:credentials": "node tools/check-no-credentials.mjs",
+    "check:outbound": "node tools/check-outbound-hosts.mjs",
+    "check:mutating-routes": "node tools/check-mutating-routes.mjs",
     "test:meta": "vitest run --project meta --passWithNoTests",
     "coverage": "vitest run --project unit --project web --coverage",
     "test": "npm run test:unit && npm run test:int && npm run test:web"
@@ -57,6 +60,7 @@
     "eslint-plugin-nextup": "*",
     "globals": "^17.9.0",
     "jsdom": "^25.0.1",
+    "msw": "2.15.0",
     "prettier": "^3.3.3",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

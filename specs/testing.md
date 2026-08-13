@@ -1656,3 +1656,58 @@ as the original and sails through a shape-only check. Mutation-tested:
 removing it fails `T-API-017i` and nothing else, which is exactly the point —
 without that one assertion, "tampered" becomes undetectable for every input
 that happens to parse.
+
+---
+
+## 14. Tests defined by the CI-sealing sweep and the TASK-032 correction (`A48`)
+
+### 14.1 `T-SEED-001` – `T-SEED-003` — TASK-032's real done-when
+
+**TASK-032's "Done when" cited `T-META-003`, and that was a mis-citation.**
+TASK-032 builds `tests/fixtures/seed.ts` (a deterministic seed, an `asOwner`
+helper and an injected clock); `T-META-003` asserts that every decision claimed
+as verifiable resolves to a test id that exists in *this* file. The two are
+unrelated, and that is precisely **why `T-META-003` went unwritten for so
+long** — the task that was supposed to deliver it could not, so the status gate
+correctly refused the task and nobody could tell which of the two was wrong.
+`T-META-003` has since been delivered independently (`tools/check-decision-verifiability.mjs`).
+
+A "Done when" that cannot be satisfied by doing the task is worse than a
+missing one: it looks like coverage, so nobody goes looking.
+
+| id | L | Assertion |
+|---|---|---|
+| **`T-SEED-001`** | U | Seeding twice from the same seed value produces byte-identical rows — ids, `dateAdded` values and ordering included. A fixture that is *nearly* deterministic produces tests that fail once a week and get retried rather than read. |
+| **`T-SEED-002`** | U | `asOwner` stamps the **owner principal** derived by `ownerId.ts`, not a literal — so a change to owner derivation breaks the fixture loudly instead of leaving the suite asserting against an owner that no longer exists. |
+| **`T-SEED-003`** | U | The injected clock is the **only** source of time in seeded rows: with the clock frozen, no seeded timestamp equals the real wall clock. `Date.now()` reached for directly inside the seed is the defect this catches, and it is invisible until a date-boundary test fails at midnight. |
+
+### 14.2 The egress guard is now installed globally, not per-suite
+
+`tools/egress-guard.mjs` existed and was proven correct by
+`tests/infra/noEgress.spec.ts`, but **nothing switched it on**: the root
+`vitest.config.ts` had no `setupFiles`, so `T-CI-007` proved the guard *works*
+while proving nothing about whether the run was actually sealed. It was not.
+A throwaway spec fetching `api.themoviedb.org` reached the live network in
+196 ms.
+
+`vitest.setup.ts` now installs it in **every** root project and in the web
+project. Two properties are load-bearing:
+
+* **`tests/infra/noEgress.spec.ts` is excluded by name.** It installs and
+  uninstalls the guard deliberately and asserts `isEgressGuardInstalled()` in
+  both states; pre-installing underneath it would break the very test that
+  proves the guard works.
+* **Ordering in `apps/web/vitest.config.ts` is deliberate.** The root setup
+  runs **before** `./test/setup.ts`, so an interceptor such as `msw` installs
+  *above* the guard and a faked request never reaches it. Reversed, the guard
+  would wrap the interceptor and block the requests the fakes exist to serve.
+
+⚠ **Known limitation, deliberately not chased.** The guard patches
+`globalThis.fetch` and the `node:http` / `node:https` **module objects**. A
+named ESM import — `import { request } from 'node:http'` — binds to a snapshot
+taken at instantiation and **bypasses the guard**; verified, not assumed. This
+is not fixable from the guard: builtin ESM namespace bindings are read-only.
+The static gate `npm run check:outbound` (`T-SEC-031`) is what covers that
+route, by refusing any source file that contacts a host outside the
+three-destination allow-list. **Do not treat the runtime guard as sufficient on
+its own** — the two gates are complementary and both must stay.

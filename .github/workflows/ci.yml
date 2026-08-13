@@ -77,6 +77,25 @@ jobs:
         run: |
           docker run --rm -v "$GITHUB_WORKSPACE:/repo" --entrypoint sh "$GITLEAKS_IMAGE" \
             -c 'git config --global --add safe.directory /repo && exec gitleaks detect --source=/repo --config=/repo/.gitleaks.toml --redact --verbose --exit-code 1'
+      # ⚠ STEPS, never new jobs. Branch protection requires exactly the twelve
+      # job contexts named in `specs/testing.md` §8; adding a thirteenth job
+      # makes the ruleset unsatisfiable and blocks every merge.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      # TASK-030 / `T-SEC-001`, `T-SEC-011` — no streaming credentials, no
+      # password handling, no auth or browser-automation dependency. gitleaks
+      # finds secrets that look like secrets; this finds the DESIGN that would
+      # need one (NFR-008: nextup never holds a streaming credential).
+      - name: No credentials or automation dependencies
+        run: npm run check:credentials
+      # TASK-122 / `T-SEC-031` — the outbound host allow-list. The product
+      # makes no automated request to any streaming service, ever; this is the
+      # gate that keeps that true as code is added.
+      - name: Outbound host allow-list
+        run: npm run check:outbound
 
   # ── 3 ─────────────────────────────────────────────────────────────────────
   audit:
@@ -394,6 +413,13 @@ jobs:
       # T-INFRA-*, T-INV-013 and T-MIG-001 (the destructive-migration gate).
       - name: Infra and invariant tests
         run: npm run test:infra
+      # TASK-121 / `T-MUT-001`, `T-MUT-002` — every mutating route resolves to
+      # one of the owner-initiated actions REQ-041 enumerates. Product
+      # invariant 5: no scheduler may change user-visible list state, so a
+      # mutating route with no owner action behind it is the shape that
+      # invariant fails in.
+      - name: Mutating-route registry
+        run: npm run check:mutating-routes
 
   # ── 11 ────────────────────────────────────────────────────────────────────
   meta:
