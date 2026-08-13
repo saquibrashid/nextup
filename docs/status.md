@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 124 |
+| ⬜ todo | 123 |
 | 🚧 doing | 0 |
-| ✅ done | 30 |
+| ✅ done | 31 |
 | 🙋 owner | 7 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -35,7 +35,7 @@ Not done, and every task they depend on is done.
 | `TASK-036` | S | Epic F — The list itself (the value loop) |
 | `TASK-037` | S | Epic F — The list itself (the value loop) |
 | `TASK-038` | M | Epic F — The list itself (the value loop) |
-| `TASK-041` | S | Epic F — The list itself (the value loop) |
+| `TASK-042` | XS | Epic F — The list itself (the value loop) |
 | `TASK-045` | S | Epic D — Matching & identity |
 | `TASK-047` | S | Epic H — History, removal ledger, suppression |
 | `TASK-049` | S | Epic B — Capture & import |
@@ -66,14 +66,13 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-97 tasks cannot start yet.
+96 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
 | `TASK-031` | `TASK-007`, `TASK-027` |
 | `TASK-039` | `TASK-037`, `TASK-038` |
 | `TASK-040` | `TASK-038` |
-| `TASK-042` | `TASK-041` |
 | `TASK-043` | `TASK-045` |
 | `TASK-044` | `TASK-043` |
 | `TASK-046` | `TASK-026`, `TASK-038` |
@@ -195,6 +194,7 @@ Not done, and every task they depend on is done.
 | `TASK-024` | `T-ATTR-001` | `T-ATTR-001` |
 | `TASK-025` | `a9e3483` | `T-UI-023` |
 | `TASK-033` | `T-LIST-010`, `T-LIST-011`, `T-API-017` | `T-API-017`, `T-LIST-010`, `T-LIST-011` |
+| `TASK-041` | `apps/api/src/routes/serviceState.ts` + `packages/domain/src/freshness.ts` — `GET /api/service-state`, one entry per service in `SERVICES` so a never-captured service reads "has never been updated" rather than vanishing. `ageInDays` counts UTC calendar days, not 24-hour blocks, and clamps clock skew. `T-FRESH-010` (a–h), `T-FRESH-012` (a–f), `T-FRESH-015` (a–c, the A46 no-nudge regression guard). All four mutations caught; see `specs/testing.md` §16. | `T-FRESH-010`, `T-FRESH-012`, `T-FRESH-015` |
 | `TASK-048` | `T-BATCH-010`, `T-BATCH-015` | `T-API-003`, `T-BATCH-010`, `T-BATCH-015` |
 | `TASK-101` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` |
 | `TASK-144` | `eb07409` — a CI grep gate over `prisma/migrations/**` | `T-MIG-001` |

@@ -13,9 +13,26 @@ import { PrismaClient } from '@prisma/client';
 import { setPrisma } from '../../src/repository/client.js';
 import { asOwnerId, type OwnerId } from '../../src/repository/ownerData.js';
 
+/**
+ * ⚠ The database name here MUST match the one CI creates (`nextup_test`,
+ * `.github/workflows/ci.yml`), because CI creates it with
+ * `COLLATE Latin1_General_100_BIN2` and a database created any other way
+ * gets the server default, `SQL_Latin1_General_CP1_CI_AS`.
+ *
+ * On a default-collation database Prisma's `create()` joins its
+ * `DECLARE @generated_keys table([id] NVARCHAR(200))` variable — which takes
+ * the DATABASE DEFAULT collation — back against the BIN2 `[id]` column, and
+ * every insert fails with **Msg 468, "Cannot resolve the collation conflict"**.
+ * That surfaces as dozens of unrelated-looking integration failures pointing at
+ * `ownerData.ts`, so it reads as an application bug rather than a
+ * provisioning one. `T-INV-018a` is the test that names the real cause — if
+ * it fails, fix the DATABASE, not the code.
+ *
+ * See `specs/data-model.md` §16.2.1 and `specs/testing.md` §17.
+ */
 export const TEST_DATABASE_URL =
   process.env.DATABASE_URL ??
-  'sqlserver://localhost:1433;database=nextup;user=sa;password=Str0ng!Passw0rd_ci;trustServerCertificate=true';
+  'sqlserver://localhost:1433;database=nextup_test;user=sa;password=Str0ng!Passw0rd_ci;trustServerCertificate=true';
 
 let prisma: PrismaClient | undefined;
 

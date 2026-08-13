@@ -992,11 +992,22 @@ ends up unmapped.
 | AC-3 | I/C | `T-FRESH-012` | Never-updated renders "never updated", not an error |
 | AC-4 | I | `T-FRESH-013` | Abandoned/failed batches never update `serviceState` |
 | AC-5 | C | `T-FRESH-014` | If the dates cannot be computed, the list still renders and the strip degrades visibly |
+| — | U | **`T-FRESH-015`** | **A46 regression guard:** the freshness labels state a FACT and never nag |
 
 *(A46: US-022 AC-2 — the `LIST_STALENESS_DAYS` nudge, `T-FRESH-011` — is
 deleted entirely; the list-staleness nudge concept is dropped from v1 and
 REQ-040/ASM-038 are retired. The AC numbering intentionally skips AC-2 here —
 AC-3/AC-4/AC-5 keep their original labels, this is not an error to "fix".)*
+
+*(`T-FRESH-015` is deliberately **not** attached to an AC. It asserts an
+ABSENCE, so no acceptance criterion can carry it: A46 deleted AC-2 rather than
+reworded it, which leaves the retired concept guarded by nothing. Every other
+test here would still pass if `serviceFreshnessLabel` were reworded from
+"Max updated 47 days ago" into "Max updated 47 days ago — time to update?",
+because they all assert the parts that stay. `T-FRESH-015` is the only thing
+standing between the retired nudge and a quiet return, so it asserts the
+forbidden wording directly and asserts that the phrasing does not change with
+age — a threshold cannot be reintroduced without a visible failure.)*
 
 ### US-023 — Soft delete forever: nothing is ever hard-deleted or purged
 | AC | L | Test | Assertion |
@@ -1799,3 +1810,186 @@ one-way function of the principal (`ownerId.ts`), so a literal such as
 ever scoped to. Every assertion then fails as a **404 that looks exactly like a
 routing bug** — the handler is fine, the fixture is invisible. `titles.spec.ts`
 already carried the warning; this suite hit it anyway.
+
+---
+
+## 16. TASK-041 (freshness) — and the mis-citation pattern, third occurrence
+
+### 16.1 The third mis-cited done-when
+
+TASK-041 cited **`T-LIST-014`, `T-LIST-015`** — US-020 **sort-date** tests
+(`sortDateAdded` = earliest `dateAdded` across non-removed listings). They have
+nothing to do with `serviceState` or REQ-039. Corrected to **`T-FRESH-010`,
+`T-FRESH-012`, `T-FRESH-013`, `T-FRESH-015`**, which is what §9's US-022 table
+had all along.
+
+That makes **three in one sweep**, and the shape is identical every time:
+
+| Task | Cited | What the cited test actually is |
+|---|---|---|
+| TASK-032 (seed fixture) | `T-META-003` | A spec-hygiene meta test. Unrelated. |
+| TASK-101 (suppress route) | `T-SUP-002` | The *extraction* gate — needs a batch and reconciliation. |
+| TASK-041 (serviceState) | `T-LIST-014/015` | US-020 sort-date, a different user story. |
+
+**The pattern is: a task whose done-when names a test its own dependencies
+cannot satisfy.** The failure mode is not a wrong id — it is a test nobody
+writes, inside a task nobody can close, because the only honest way to satisfy
+the cited id is to build a different task first.
+
+⚠ **Neither `check:test-ids` nor `check:status` can see this.** Both confirm the
+id is *real*; neither confirms it is *reachable from this task*. The id exists,
+the row parses, the gates stay green, and the work silently cannot be finished.
+Three occurrences is a pattern, not bad luck — **a gate for this class is worth
+building**: for each task, assert that every cited test id appears in a §9 row
+whose user story is reachable from that task's own dependency closure.
+
+### 16.2 The orphans this exposed, and why TASK-016 is NOT their home
+
+Striking `T-LIST-014/015` from TASK-041 left them cited by no task at all, so
+US-020 AC-1/AC-4/AC-5 had no owner. They are re-homed to **TASK-036**
+(`todo` — ordering, `dir`, tie-breaker), which is the task that makes
+`sortDateAdded` observable *through the API*.
+
+⚠ **Not TASK-016.** §1545 records that an earlier sweep tried exactly that and
+it would have discarded eight passing assertions and reopened a finished task.
+TASK-016 owns the **unit-level** derivation and is closed by `T-INV-009`/
+`T-INV-010`; `T-LIST-014/015` assert the same behaviour **through the list
+endpoint**. Same behaviour, two levels, two owners — that is deliberate, and
+collapsing them loses the level that catches a correct derivation wired into
+the wrong query.
+
+### 16.2a The fourth instance — caught in the act, on this very task
+
+TASK-041's corrected done-when initially read `T-FRESH-010`, `T-FRESH-012`,
+**`T-FRESH-013`**, `T-FRESH-015`. That was about to repeat the pattern §16.1
+had just finished documenting.
+
+§9 defines `T-FRESH-013` at level **I** as *"abandoned/failed batches never
+update `serviceState`"* — an assertion about the **write** path. TASK-041 builds
+the **read** endpoint. `upsertServiceState` exists in the repository but is
+**called from nowhere**: nothing writes `serviceState` at all until the
+transactional close (**TASK-072**) lands. So the property is not merely
+unproven, it is currently **unfalsifiable** — every batch, applied or
+abandoned, leaves the date untouched, so a test would pass for the wrong
+reason and go on passing until TASK-072 quietly broke it.
+
+`T-FRESH-013` is therefore re-homed to **TASK-072**, the only writer, and the
+read-path assertion originally labelled `T-FRESH-013a` is renamed
+**`T-FRESH-012f`**.
+
+⚠ **The tell is worth internalising, because the id was not obviously wrong** —
+unlike the other three it was in the right user story, the right feature, and
+the right numeric family. What gave it away was checking whether anything could
+*make it fail*. **An id whose behaviour has no writer yet is a passing test that
+asserts nothing**, and it is far more dangerous than an obviously mismatched
+citation, because it goes green immediately and nobody looks again.
+
+**Before citing a test id, find the code path that would make it fail. If there
+is none, the id belongs to the task that will build that path.**
+
+### 16.3 `T-FRESH-015` — guarding an absence
+
+A46 **deleted** US-022 AC-2 rather than rewording it, which is what left the
+retired staleness nudge guarded by nothing. Every other US-022 test asserts the
+parts of the label that stay, so all of them still pass if
+`serviceFreshnessLabel` is reworded from `"Max updated 47 days ago"` into
+`"Max updated 47 days ago — time to update?"`.
+
+`T-FRESH-015` therefore asserts the **forbidden wording directly**, and asserts
+that the phrasing does not change with age so no threshold can be reintroduced
+without a visible failure. Mutation-proven: that exact reword fails
+`T-FRESH-010e`, `T-FRESH-015a` and `T-FRESH-015b`.
+
+It is attached to no AC on purpose — an absence has no acceptance criterion.
+That is also why it is listed explicitly in §9's US-022 table with `—` in the
+AC column, so `check:decisions` cannot report it as an unmapped stray.
+
+### 16.4 The enumeration drives the response, not the store
+
+`GET /api/service-state` returns **one entry per service in `SERVICES`**, never
+one per stored row. A never-captured service must arrive as
+`lastCompletedBatchAt: null` → `"Max has never been updated"`.
+
+⚠ The SPA renders one chip per array entry, so a service omitted because it has
+no row makes its chip **vanish** — and a missing chip reads as "nothing to
+report" rather than "never updated", which is the precise misreading US-022
+AC-3 exists to prevent. Mutation-proven: filtering to stored services only
+fails **four** tests (`T-FRESH-012c/012d/012e`, `T-FRESH-013a`).
+
+⚠ The mixed case is the one that hides the bug. A handler mapping over the store
+returns a single entry and still passes every single-service assertion, so
+`T-FRESH-012d` captures one service and asserts the *other* is present.
+
+### 16.5 `ageInDays` counts calendar days, not 24-hour blocks
+
+Computed on **UTC day boundaries**. A batch completed at 23:00 and read at 01:00
+is **1 day**, which is what the owner sees on a calendar; the naive
+`(now - from) / 86400000` reports **0** and labels it "today". Mutation-proven
+(`T-FRESH-010b`, `T-FRESH-010c`).
+
+Clamped at zero: clock skew between the database and the container can put
+`lastCompletedBatchAt` marginally in the future, and *"updated -1 days ago"* is a
+bug report. Mutation-proven (`T-FRESH-010d`).
+
+### 16.6 Suffix table
+
+| Id | Where | Asserts |
+|---|---|---|
+| `T-FRESH-010a-d` | `packages/domain/test/freshness.spec.ts` | `ageInDays`: same-day, calendar boundary, month boundary, skew clamp |
+| `T-FRESH-010e-f` | same | label wording; `1 day` is singular |
+| `T-FRESH-010g-h` | `apps/api/test/unit/serviceState.spec.ts` | date + batch id surfaced; `now` injected so `ageDays` is deterministic |
+| `T-FRESH-012a-b` | `packages/domain/test/freshness.spec.ts` | `null` → "never updated"; display name capitalised |
+| `T-FRESH-012c-e` | `apps/api/test/unit/serviceState.spec.ts` | every service present; one captured does not mask the other; unknown stored service ignored |
+| `T-FRESH-012f` | same | an empty store yields nulls — no date is invented |
+| `T-FRESH-015a-b` | `packages/domain/test/freshness.spec.ts` | A46: no nag wording; phrasing constant with age |
+| `T-FRESH-015c` | `apps/api/test/unit/serviceState.spec.ts` | A46: the payload's key set is exact — no `stale` flag can be added silently |
+
+---
+
+## 17. The integration harness must name CI's database, not "nextup"
+
+`apps/api/test/integration/harness.ts` fell back to
+`database=nextup` when `DATABASE_URL` was unset, while CI creates and uses
+**`nextup_test`**. Corrected to `nextup_test`.
+
+This is worth a section because of how it fails. CI creates its database with
+an explicit `COLLATE Latin1_General_100_BIN2`; a database created any other way
+— `prisma migrate` against a fresh name, a stray `CREATE DATABASE`, a developer
+following a README — silently gets the **server default**,
+`SQL_Latin1_General_CP1_CI_AS`.
+
+On such a database Prisma's `create()` joins its
+`DECLARE @generated_keys table([id] NVARCHAR(200))` variable, which takes the
+**database default** collation, back against the **BIN2** `[id]` column. Every
+insert then fails with **Msg 468, "Cannot resolve the collation conflict"**.
+
+⚠ **The symptom points at the wrong layer.** Observed locally: **74 integration
+failures**, every stack ending at `ownerData.ts:118` via `batches.ts:89`. It
+reads unmistakably as an application bug in the batch-create path, and two
+separate lanes independently reported it as one. Nothing in that output names
+provisioning. The only test that tells the truth is **`T-INV-018a`** — *"the
+database default collation is `Latin1_General_100_BIN2`"* — and it is a single
+line buried among seventy-odd others.
+
+**If `T-INV-018a` fails, stop and fix the DATABASE. Every other failure in that
+run is downstream of it and none of them should be investigated.**
+
+Two databases on one server is what made this survive: `nextup_test` existed
+with the correct collation *and* `nextup` existed with the default, so the
+server looked healthy, `docker ps` looked healthy, and the collation query
+returned the right answer — as long as you asked about the right database. The
+harness default was the only thing choosing the wrong one.
+
+Diagnosis order for a wall of 468s:
+
+```sql
+SELECT name, collation_name FROM sys.databases;
+```
+
+Every database the tests touch must read `Latin1_General_100_BIN2`. Recreate
+any that does not — the collation cannot be changed in place once BIN2 columns
+exist:
+
+```sql
+CREATE DATABASE [nextup_test] COLLATE Latin1_General_100_BIN2;
+```

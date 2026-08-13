@@ -8,6 +8,7 @@ export * from './copy.js';
 export * from './derive.js';
 export * from './enums.js';
 export * from './errorCodes.js';
+export * from './freshness.js';
 export * from './identity.js';
 export * from './ids.js';
 export * from './schemas.js';

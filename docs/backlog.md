@@ -492,7 +492,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-038` | `todo` | — |
 | `TASK-039` | `todo` | — |
 | `TASK-040` | `todo` | — |
-| `TASK-041` | `todo` | — |
+| `TASK-041` | `done` | `apps/api/src/routes/serviceState.ts` + `packages/domain/src/freshness.ts` — `GET /api/service-state`, one entry per service in `SERVICES` so a never-captured service reads "has never been updated" rather than vanishing. `ageInDays` counts UTC calendar days, not 24-hour blocks, and clamps clock skew. `T-FRESH-010` (a–h), `T-FRESH-012` (a–f), `T-FRESH-015` (a–c, the A46 no-nudge regression guard). All four mutations caught; see `specs/testing.md` §16. |
 | `TASK-042` | `todo` | — |
 | `TASK-043` | `todo` | — |
 | `TASK-044` | `todo` | — |
@@ -823,7 +823,7 @@ Traces to: US-005 (REQ-005, REQ-006) · Milestone M3 · Depends on: TASK-048
 |---|---|---|---|---|
 | TASK-013 | `packages/domain/src/ids.ts` — ULID generation, `deterministicId`, monotonic test-ULID helper. | XS | 001 | `T-DM-004` |
 | TASK-054 | `apps/api/src/services/batchLifecycle.ts` — the state machine `draft → submitted → extracting → in-review → applied → undone`, plus `extraction-failed` and `discarded`; submit; discard; one-open-batch enforcement. | M | 048, 013 | `T-BATCH-011`, `T-BATCH-012`, `T-BATCH-013`, `T-BATCH-014`, `T-BATCH-006` ⚠ **corrected in place at TASK-048: the struck-through ids below are defined nowhere in `specs/testing.md` — both appeared only in this file. The defined lifecycle tests are `T-BATCH-011`…`T-BATCH-014` and `T-BATCH-006`.** ~~`T-BATCH-001`, `T-BATCH-002`~~ |
-| TASK-072 | **Atomic close by visibility flip** (not one transaction) + crash resumability. | M | 071, 074 | `T-BATCH-003`, `T-BATCH-005` |
+| TASK-072 **(done-when EXTENDED, A48)** | **Atomic close by visibility flip** (not one transaction) + crash resumability. **↳ This is the ONLY writer of `serviceState.lastCompletedBatchAt` — `upsertServiceState` exists in the repository but is called from nowhere until this task lands, which is why `T-FRESH-013` cannot be satisfied before it.** | M | 071, 074 | `T-BATCH-003`, `T-BATCH-005`, `T-FRESH-013` |
 | TASK-073 | `packages/domain/src/reconcile.ts` — a pure function called **once** over the union of affected works. | S | 072 | `T-BATCH-004` |
 
 ### Epic C — Extraction
@@ -980,7 +980,7 @@ Traces to: US-020 (REQ-036, REQ-038) · Milestone M1/M2
 | Task | Description | Size | Depends on | Done when |
 |---|---|---|---|---|
 | TASK-016 | `packages/domain/src/derive.ts` — `deriveTitleState`, `deriveSortDateAdded` (earliest `dateAdded` across **non-removed** listings). | S | 012 | `T-INV-009`, `T-INV-010` |
-| TASK-036 | Ordering with a `title.id` ascending tie-breaker, nulls last, `dir` parameter. | S | 016, 033 | `T-LIST-016 ~~T-LIST-009~~`, `T-LIST-010` |
+| TASK-036 **(done-when EXTENDED, A48)** | Ordering with a `title.id` ascending tie-breaker, nulls last, `dir` parameter. | S | 016, 033 | `T-LIST-016 ~~T-LIST-009~~`, `T-LIST-010`, `T-LIST-014`, `T-LIST-015` |
 | TASK-166 **(new, R8 — `A44`; `must` as of `A47` — NOT optional scope)** | `components/SortControl.tsx` (spec: `specs/ui.md`) — the client-side control AC-6 needs. Wires the existing `GET /api/titles` `dir` parameter (`desc`/newest-first default \| `asc`/oldest-first); reflects the selection in the URL query string so it is deep-linkable and back/forward-safe; persists the selection for the session (US-020 AC-6). Date-added label stays honest per **REQ-061** — it is the date the title entered *nextup*, never the streaming service's own saved date. | S | 036, 039 | `T-UI-024` |
 
 #### US-021 — Know when something was added
@@ -995,7 +995,7 @@ Traces to: US-022 (REQ-039) · Milestone M2
 
 | Task | Description | Size | Depends on | Done when |
 |---|---|---|---|---|
-| TASK-041 **(REVISED, R9 — `A46`)** | `serviceState` document + `GET /api/service-state` — per-service `lastCompletedBatchAt` (REQ-039) and the never-updated case. **↳ R9 (A46): the staleness computation and `LIST_STALENESS_DAYS` are DROPPED — the document/endpoint now serve the last-completed-batch date only, no derived "stale" state.** | S | 017, 014 | `T-LIST-014`, `T-LIST-015` |
+| TASK-041 **(REVISED, R9 — `A46`; done-when CORRECTED, A48)** | `serviceState` document + `GET /api/service-state` — per-service `lastCompletedBatchAt` (REQ-039) and the never-updated case. **↳ R9 (A46): the staleness computation and `LIST_STALENESS_DAYS` are DROPPED — the document/endpoint now serve the last-completed-batch date only, no derived "stale" state.** | S | 017, 014 | `T-FRESH-010`, `T-FRESH-012`, `T-FRESH-015` ~~`T-LIST-014`, `T-LIST-015`~~ |
 | TASK-042 | `components/FreshnessStrip.tsx` + a degraded state when service state is unavailable. | XS | 041 | `T-FRESH-014 ~~T-UI-017~~` |
 
 #### US-010 — Metadata stays current without a scheduler
