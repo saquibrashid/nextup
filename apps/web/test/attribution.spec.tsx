@@ -146,40 +146,52 @@ describe('TMDB attribution', () => {
  * retention, that removed titles are kept forever, and that no analytics are
  * collected.
  *
- * ⚠ FINDING (reported, not worked around): `specs/testing.md` §9 maps no test
- * id to the `/about` content at all, and it does not appear in §10's list of
- * criteria that are deliberately not machine-verifiable - so the copy §8
- * mandates would ship with nothing asserting it. `docs/backlog.md` TASK-120
- * ("`IMAGE_RETENTION_STATEMENT` + `/about` copy: retention, never-delete,
- * no-analytics") names **`T-UI-022`**, which is the closest thing the record
- * has to an owner for these assertions, so they are filed under it rather than
- * under an invented id. TASK-120 remains outstanding: it is an M7 task, and
- * when it lands it should adopt these rather than duplicate them.
+ * `T-UI-022` is now DEFINED in `specs/testing.md` §12.2 (added by the
+ * phantom-id reconciliation) as exactly this: "`/about` renders
+ * `IMAGE_RETENTION_STATEMENT` and the never-delete and no-analytics copy
+ * **byte-equal to the named constants**".
+ *
+ * ⚠ Byte-equality, not `toHaveTextContent` and not "contains", because - in
+ * the spec's own words - "a reworded retention promise is a different
+ * promise". `getByText` normalises whitespace before matching, so it can find
+ * an element whose text is NOT byte-equal to the constant; every case below
+ * therefore re-asserts `textContent` against the constant afterwards.
+ *
+ * `docs/backlog.md` TASK-120 (M7) also cites `T-UI-022`. When it lands it
+ * should adopt these cases rather than duplicate them.
  */
 describe('/about', () => {
+  /** `getByText` normalises; `textContent` does not. Assert both. */
+  function expectByteEqualCopy(constant: string): void {
+    const el = screen.getByText(constant);
+    expect(el).toBeVisible();
+    expect(el.textContent).toBe(constant);
+  }
+
   it('T-UI-022a · specs/ui.md §8 · /about states what TMDB is used for', () => {
     renderAt('/about');
-    expect(screen.getByText(ABOUT_TMDB_USE)).toBeVisible();
+    expectByteEqualCopy(ABOUT_TMDB_USE);
   });
 
-  it('T-UI-022b · US-035 AC-6 · /about states the 30-day screenshot retention', () => {
+  it('T-UI-022b · US-035 AC-6 · /about renders IMAGE_RETENTION_STATEMENT byte-equal', () => {
     renderAt('/about');
     // NFR-019's IMAGE_RETENTION_DAYS = 30, and NOT the 183-day TMDB metadata
     // refresh age (NFR-014) - invariant 8 keeps the two apart.
-    expect(screen.getByText(IMAGE_RETENTION_STATEMENT)).toBeVisible();
-    expect(screen.getByText(IMAGE_RETENTION_STATEMENT).textContent).toContain('30 days');
+    expectByteEqualCopy(IMAGE_RETENTION_STATEMENT);
+    expect(IMAGE_RETENTION_STATEMENT).toContain('30 days');
+    expect(IMAGE_RETENTION_STATEMENT).not.toContain('183');
   });
 
   it('T-UI-022c · US-023 AC-2 · /about states that removed titles are kept forever', () => {
     // REQ-028: soft delete forever, no TTL, nothing scheduled. This sentence is
     // the owner-facing half of that promise.
     renderAt('/about');
-    expect(screen.getByText(ABOUT_REMOVED_KEPT_FOREVER)).toBeVisible();
+    expectByteEqualCopy(ABOUT_REMOVED_KEPT_FOREVER);
   });
 
   it('T-UI-022d · NFR-005 · /about states that no analytics are collected', () => {
     renderAt('/about');
-    expect(screen.getByText(ABOUT_NO_ANALYTICS)).toBeVisible();
+    expectByteEqualCopy(ABOUT_NO_ANALYTICS);
   });
 
   it('T-UI-022e · US-011 AC-3 · /about does NOT become the home of the disclaimer', () => {

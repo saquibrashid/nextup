@@ -15,11 +15,24 @@
  * silent: a refusal screen that still rendered the nav, or a stale list behind
  * a banner, would look fine to everyone except the person whose data leaked.
  *
- * ⚠ FINDING (reported, not worked around): `specs/ux-states.md` §2.11 assigns
- * `T-UX-020` to the 403 refusal state, while `docs/backlog.md` TASK-125 assigns
- * `T-UX-020` and `T-UX-021` to the offline states - and `T-UX-021` is already
- * §2.13's "submitting (row action)". This suite uses `T-UX-020a…c` for the 403
- * refusal, following `ux-states.md`, which is the spec that owns the state.
+ * ⚠ FINDING — A LIVE CONTRADICTION BETWEEN TWO SPECS, reported not resolved:
+ * `specs/ux-states.md` §2.11 assigns **`T-UX-020`** to the 403 refusal state,
+ * but `specs/testing.md` §12.2 (added by the phantom-id reconciliation) now
+ * DEFINES `T-UX-020` as an **e2e** test that "each primary surface renders a
+ * distinct offline state". Those are two different tests under one id, and
+ * `testing.md` is the file NFR-003 makes authoritative.
+ *
+ * So the 403-refusal cases below are filed under **`T-UX-019f…i`**, not under
+ * `T-UX-020`. Squatting on `T-UX-020` would have been the more damaging
+ * choice: the id would resolve, CI would stay green, and the suite would
+ * appear to carry offline-state coverage that does not exist anywhere -
+ * precisely the phantom-id failure that reconciliation was run to remove.
+ * `T-UX-019` is TASK-028's own named test and its definition
+ * ("...; no partial app UI") is the property these cases assert.
+ *
+ * The real gap: **the 403 refusal has no COMPONENT-level id at all.** US-001
+ * AC-4 maps only to `T-SEC-010` (unit, middleware), `T-SEC-017` (integration)
+ * and `T-SEC-018` (e2e). `specs/testing.md` needs a `T-UX-0xx` row for it.
  */
 
 import { render, screen, within } from '@testing-library/react';
@@ -105,7 +118,7 @@ describe('Refusal and sign-in states', () => {
     }
   });
 
-  it('T-UX-020a · US-001 AC-4 · a non-allow-listed account gets the refusal, its email and Sign out', () => {
+  it('T-UX-019f · US-001 AC-4 · a non-allow-listed account gets the refusal, its email and Sign out', () => {
     render(<RefusalPage reason="not-allowed" signedInEmail="someone@example.com" />);
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(REFUSAL_NOT_ALLOWED_TITLE);
@@ -121,12 +134,12 @@ describe('Refusal and sign-in states', () => {
     );
   });
 
-  it('T-UX-020b · US-001 AC-4 · the refusal renders no list data, no nav and no partial UI', () => {
+  it('T-UX-019g · US-001 AC-4 · the refusal renders no list data, no nav and no partial UI', () => {
     render(<RefusalPage reason="not-allowed" signedInEmail="someone@example.com" />);
     expectNoAppUi();
   });
 
-  it('T-UX-020c · NFR-015 · the refusal offers sign-out only - no sign-in loop, no way to request access', () => {
+  it('T-UX-019h · NFR-015 · the refusal offers sign-out only - no sign-in loop, no way to request access', () => {
     // Offering "Sign in again" to a refused account produces a loop that reads
     // as a bug; offering a request-access path would be a self-service
     // registration path, which NFR-015 says does not exist.
@@ -138,7 +151,7 @@ describe('Refusal and sign-in states', () => {
     expect(screen.queryByRole('link', { name: SIGN_IN_AGAIN_LABEL })).toBeNull();
   });
 
-  it('T-UX-020d · specs/security.md §2.2 · the refusal renders without an email at all', () => {
+  it('T-UX-019i · specs/security.md §2.2 · the refusal renders without an email at all', () => {
     // The email is display-only and may be absent - a malformed or missing
     // principal still has to produce a refusal, not a crashed render. Falling
     // back to a blank "Signed in as" line would be worse than omitting it.
