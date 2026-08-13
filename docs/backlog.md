@@ -477,9 +477,9 @@ finished, so the exception cannot outlive its reason.
 | `TASK-023` | `done` | `apps/api/src/app.ts` + `routes/index.ts` in the mandated order, no CORS middleware, `/api` 404 fallback **inside** the chain. `T-SEC-005`, `T-SEC-012`, `T-SEC-030`, `T-API-001`. Driven over real HTTP on an ephemeral port — no new dependency. |
 | `TASK-024` | `done` | `T-ATTR-001` |
 | `TASK-025` | `done` | `a9e3483` |
-| `TASK-026` | `todo` | — |
+| `TASK-026` | `doing` | `T-ATTR-001a`…`g` + `T-UI-022a`…`e` green in `apps/web/test/attribution.spec.tsx`; copy verified byte-equal to `ui.md` §9. Blocked on `T-ATTR-004` (Playwright, `tests/e2e/**` — outside the web lane, and `playwright.config.ts` has no `webServer`). Logo asset is a labelled placeholder pending the real mark |
 | `TASK-027` | `done` | `T-INFRA-008` |
-| `TASK-028` | `todo` | — |
+| `TASK-028` | `doing` | `T-UX-019a`…`i` green in `apps/web/test/states.spec.tsx` (403, 401 and IdP-failure). Blocked on `T-SEC-018` (Playwright, `tests/e2e/**` — outside the web lane). `IDP_FAILURE_TITLE`/`_BODY` are invented copy pending owner review — no spec defines them |
 | `TASK-029` | `done` | `apps/api/test/integration/security.spec.ts` — delivered with the auth chain and never recorded. `T-SEC-002` (a–h, route-enumerated over the REAL router; `T-SEC-002f` is the mutation proving the walk catches a 403), `T-SEC-017` (a–d), `T-SEC-028` (a–c), `T-SEC-030` (d–g). |
 | `TASK-030` | `done` | `tools/check-no-credentials.mjs` + `tests/infra/noCredentials.spec.ts` — `T-SEC-011` (a–k) and `T-SEC-001` (a–m), both with false-positive cases (`passwordless`, the SQL connection string, the `netflix`/`max` enum values, playwright in devDependencies). Wired as `npm run check:credentials`. |
 | `TASK-031` | `todo` | — |
@@ -500,7 +500,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-046` | `todo` | — |
 | `TASK-047` | `todo` | — |
 | `TASK-048` | `done` | `T-BATCH-010`, `T-BATCH-015` |
-| `TASK-049` | `todo` | — |
+| `TASK-049` | `done` | `T-UI-003a`…`j` green in `apps/web/test/uploadStep1.spec.tsx`; mutation-proven against a defaulted mode and against revealing the consequence on selection |
 | `TASK-050` | `todo` | — |
 | `TASK-051` | `todo` | — |
 | `TASK-052` | `todo` | — |

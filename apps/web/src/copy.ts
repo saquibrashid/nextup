@@ -204,3 +204,30 @@ export const ABOUT_REMOVED_KEPT_FOREVER =
 /** §8 / NFR-005 - nothing is collected, so there is nothing to opt out of. */
 export const ABOUT_NO_ANALYTICS =
   'nextup collects no analytics. There is no tracking, no telemetry and no third-party measurement of any kind.';
+
+/* -------------------------------------------------------------------------- */
+/* /upload step 1 - service and mode (specs/ui.md §3.1, TASK-049)             */
+/* -------------------------------------------------------------------------- */
+
+/** §3.1 card headings. The heading names the mode; the body states what it DOES. */
+export const MODE_APPEND_ONLY_LABEL = 'Add only';
+export const MODE_FULL_UPDATE_LABEL = 'Full update';
+
+/** §3.1 - the two required choices, neither defaulted (US-003 AC-1/AC-2). */
+export const SERVICE_STEP_LEGEND = 'Which service did these screenshots come from?';
+export const MODE_STEP_LEGEND = 'Is this a complete capture of that list?';
+
+/**
+ * ⚠ FINDING - INVENTED COPY, needs owner review. `specs/ui.md` §9 defines
+ * `MODE_FULL_UPDATE_CONSEQUENCE` with a `{Service}` placeholder "substituted
+ * with the batch's service name", but US-003 AC-1 forbids a default service,
+ * and `T-UI-003` requires BOTH consequence sentences in the DOM *without
+ * interaction* - i.e. while no service is yet chosen. No spec supplies wording
+ * for that window.
+ *
+ * Substituting a real service name would be worse than inventing: it would
+ * state a consequence for Netflix while the owner is about to choose Max, and
+ * the sentence's whole job is to be true at the point of choice. Leaving the
+ * literal `{Service}` on screen would ship a visible template.
+ */
+export const MODE_FULL_UPDATE_SERVICE_PLACEHOLDER = 'the service you choose';
