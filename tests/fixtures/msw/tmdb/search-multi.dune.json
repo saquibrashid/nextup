@@ -1,0 +1,52 @@
+{
+  "page": 1,
+  "results": [
+    {
+      "id": 438631,
+      "media_type": "movie",
+      "title": "Dune",
+      "original_title": "Dune",
+      "release_date": "2021-09-15",
+      "poster_path": "/d5NXSklXo0qyIYkgV94XAgMIckC.jpg",
+      "overview": "Paul Atreides, a brilliant and gifted young man...",
+      "popularity": 142.331,
+      "vote_average": 7.8,
+      "adult": false
+    },
+    {
+      "id": 41733,
+      "media_type": "movie",
+      "title": "Dune",
+      "original_title": "Dune",
+      "release_date": "1984-12-14",
+      "poster_path": "/aRSuC2fS5Q3q2ZK7Bg5aQZKvVSk.jpg",
+      "overview": "In the year 10,191, the most precious substance...",
+      "popularity": 21.404,
+      "vote_average": 6.3,
+      "adult": false
+    },
+    {
+      "id": 66732,
+      "media_type": "tv",
+      "name": "Dune: Prophecy",
+      "original_name": "Dune: Prophecy",
+      "first_air_date": "2024-11-17",
+      "poster_path": "/gZ4dNYIBIbBRuBGRUcXvHMYaFmm.jpg",
+      "overview": "10,000 years before the ascension of Paul Atreides...",
+      "popularity": 88.02,
+      "vote_average": 7.1,
+      "adult": false
+    },
+    {
+      "id": 1120683,
+      "media_type": "person",
+      "name": "Denis Villeneuve",
+      "known_for_department": "Directing",
+      "profile_path": "/zdDx9Xs93UIrJFWYAvJhc5xJhtM.jpg",
+      "popularity": 12.9,
+      "adult": false
+    }
+  ],
+  "total_pages": 1,
+  "total_results": 4
+}

@@ -1,0 +1,15 @@
+{
+  "id": 438631,
+  "title": "Dune",
+  "release_date": "2021-09-15",
+  "poster_path": "/d5NXSklXo0qyIYkgV94XAgMIckC.jpg",
+  "runtime": 155,
+  "genres": [
+    { "id": 878, "name": "Science Fiction" },
+    { "id": 12, "name": "Adventure" }
+  ],
+  "overview": "Paul Atreides, a brilliant and gifted young man...",
+  "popularity": 142.331,
+  "vote_average": 7.8,
+  "budget": 165000000
+}

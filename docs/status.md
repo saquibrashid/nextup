@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 119 |
-| 🚧 doing | 0 |
-| ✅ done | 35 |
+| ⬜ todo | 117 |
+| 🚧 doing | 1 |
+| ✅ done | 36 |
 | 🙋 owner | 7 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -36,7 +36,7 @@ Not done, and every task they depend on is done.
 | `TASK-047` | S | Epic H — History, removal ledger, suppression |
 | `TASK-049` | S | Epic B — Capture & import |
 | `TASK-054` | M | Epic B — Capture & import |
-| `TASK-055` | S | Epic C — Extraction |
+| `TASK-056` | S | Epic C — Extraction |
 | `TASK-102` | S | Epic H — History, removal ledger, suppression |
 | `TASK-106` | S | Epic H — History, removal ledger, suppression |
 | `TASK-121` | S | Epic K — Platform, safety, and the shell |
@@ -62,7 +62,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-96 tasks cannot start yet.
+95 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -76,7 +76,6 @@ Not done, and every task they depend on is done.
 | `TASK-051` | `TASK-050` |
 | `TASK-052` | `TASK-050` |
 | `TASK-053` | `TASK-050` |
-| `TASK-056` | `TASK-055` |
 | `TASK-057` | `TASK-056` |
 | `TASK-058` | `TASK-056`, `TASK-057`, `TASK-054`, `TASK-149`, `TASK-154` |
 | `TASK-059` | `TASK-058` |
@@ -196,6 +195,7 @@ Not done, and every task they depend on is done.
 | `TASK-034` | `T-LIST-028` — `apps/api/test/integration/titleDetail.spec.ts` (8 cases): owner scoping, and the foreign-id refusal asserted byte-identical to the unknown-id refusal with `T-LIST-028g` as its non-vacuity guard. `T-LIST-035` — `apps/api/test/unit/titlesShape.spec.ts` (8 cases) for the §6.3 shaping, where coverage is measured. The active/removed badge split is mutation-proven at both layers. | `T-LIST-028`, `T-LIST-035` |
 | `TASK-041` | `apps/api/src/routes/serviceState.ts` + `packages/domain/src/freshness.ts` — `GET /api/service-state`, one entry per service in `SERVICES` so a never-captured service reads "has never been updated" rather than vanishing. `ageInDays` counts UTC calendar days, not 24-hour blocks, and clamps clock skew. `T-FRESH-010` (a–h), `T-FRESH-012` (a–f), `T-FRESH-015` (a–c, the A46 no-nudge regression guard). All four mutations caught; see `specs/testing.md` §16. | `T-FRESH-010`, `T-FRESH-012`, `T-FRESH-015` |
 | `TASK-048` | `T-BATCH-010`, `T-BATCH-015` | `T-API-003`, `T-BATCH-010`, `T-BATCH-015` |
+| `TASK-055` | `packages/domain/src/extraction/` (contract + degraded projections) + `apps/api/src/extraction/` (recordings, `StubExtractor`, factory). `T-STUB-001a`…`r`, incl. the three fault tokens and byte-identical output over three runs. | `T-STUB-001` |
 | `TASK-101` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` |
 | `TASK-144` | `eb07409` — a CI grep gate over `prisma/migrations/**` | `T-MIG-001` |
 | `TASK-146` | **ahead-of:TASK-007.** `docs/ghcr-pat.md` written. **No PAT is needed at all** — a fine-grained PAT cannot authenticate to `ghcr.io` and a classic one is account-wide, so the package is public and CI pushes with `GITHUB_TOKEN` (R8). Remaining: the `deploy.yml` link + image secret-scan land with TASK-007, and the one-time visibility flip runs after the first successful push. | _no test id declared_ |

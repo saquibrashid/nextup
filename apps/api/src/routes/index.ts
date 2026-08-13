@@ -30,6 +30,8 @@ import { registerMeRoutes } from './me.js';
 import { registerServiceStateRoutes } from './serviceState.js';
 import { registerSuppressionRoutes } from './suppressions.js';
 import { registerTitleRoutes } from './titles.js';
+import { registerTmdbRoutes } from './tmdb.js';
+import { TmdbClient } from '../clients/tmdbClient.js';
 
 /**
  * Ceiling for a JSON request body.
@@ -87,6 +89,23 @@ export function createApiRouter(): Router {
   registerTitleRoutes(apiRouter);
   registerSuppressionRoutes(apiRouter);
   registerServiceStateRoutes(apiRouter);
+  // TASK-045 (`specs/api.md` §6.29). The client is built PER REQUEST on
+  // purpose: its in-process search cache then dies with the request and can
+  // never accumulate into a mirror of the TMDB catalogue, which US-007 AC-6
+  // forbids. See `registerTmdbRoutes`.
+  //
+  // The §4.1 rate limit is NOT affected by that lifetime: the gate is module
+  // scoped in `tmdbClient.ts`, so the 4-concurrent / 30 ms cap holds across
+  // every request in this process regardless of how many clients exist.
+  //
+  // ~~Superseded: "⚠ Known consequence… the rate-limit gate is per-instance,
+  // so a fresh client per request starts each one believing it is the only
+  // caller and the cap is not enforced ACROSS requests. The fix belongs in
+  // `tmdbClient.ts`." Fixed there; `T-TMDB-010` covers it.~~
+  registerTmdbRoutes(
+    apiRouter,
+    () => new TmdbClient({ apiKey: process.env['TMDB_API_KEY'] ?? '' }),
+  );
   return apiRouter;
 }
 
