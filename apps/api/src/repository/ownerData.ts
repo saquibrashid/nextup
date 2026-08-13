@@ -46,6 +46,7 @@
  */
 
 import { Prisma, type PrismaClient } from '@prisma/client';
+import { TERMINAL_BATCH_STATUSES } from '@nextup/domain';
 
 import { getPrisma } from './client.js';
 
@@ -134,6 +135,34 @@ export async function listUploadBatches(ownerId: OwnerId, service: string, take 
     where: { ownerId, service },
     orderBy: { createdAt: 'desc' },
     take,
+  });
+}
+
+/**
+ * The owner's currently OPEN batch, if any (`specs/api.md` §5 "Open batches
+ * per owner: 1", US-005 AC-5).
+ *
+ * "Open" is defined by exclusion, and that direction is deliberate. The three
+ * TERMINAL statuses are `applied`, `undone` and `discarded`; every other
+ * status is a batch the owner still has to resolve. Listing the open statuses
+ * positively would mean a status added to `BATCH_STATUSES` later defaults to
+ * CLOSED, letting a second batch open alongside it — the exact thing this
+ * query exists to prevent. Defined negatively, a new status defaults to open,
+ * which fails safe.
+ *
+ * ⚠ `extraction-failed` is OPEN. The batch retains its images and offers a
+ * retry (US-006 AC-4), so the owner must discard or retry it before starting
+ * another. Treating it as closed would strand the images behind a batch
+ * nothing can reach.
+ *
+ * Not scoped to a service: the ceiling is one open batch per OWNER, not per
+ * service, because a full-update batch reconciles a service against the whole
+ * list and two concurrent batches could interleave (product invariant 3).
+ */
+export async function findOpenUploadBatch(ownerId: OwnerId, tx?: Db) {
+  return db(tx).uploadBatch.findFirst({
+    where: { ownerId, status: { notIn: [...TERMINAL_BATCH_STATUSES] } },
+    orderBy: { createdAt: 'desc' },
   });
 }
 

@@ -499,7 +499,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-045` | `todo` | — |
 | `TASK-046` | `todo` | — |
 | `TASK-047` | `todo` | — |
-| `TASK-048` | `todo` | — |
+| `TASK-048` | `done` | `T-BATCH-010`, `T-BATCH-015` |
 | `TASK-049` | `todo` | — |
 | `TASK-050` | `todo` | — |
 | `TASK-051` | `todo` | — |
@@ -768,7 +768,7 @@ Traces to: US-003 (REQ-002, REQ-003, REQ-058) · Milestone M3 · Depends on: TAS
 
 | Task | Description | Size | Depends on | Done when |
 |---|---|---|---|---|
-| TASK-048 | `POST /api/batches` in `apps/api/src/routes/batches.ts` — creates a `draft` batch with `service` and `mode` (`full-update` \| `append-only`); one open batch per owner. | S | 023, 017 | `T-BATCH-001`, `T-API-003` |
+| TASK-048 | `POST /api/batches` in `apps/api/src/routes/batches.ts` — creates a `draft` batch with `service` and `mode` (`full-update` \| `append-only`); one open batch per owner. | S | 023, 017 | `T-BATCH-010`, `T-BATCH-015`, `T-API-003` ⚠ **corrected in place at implementation. The struck-through id below is defined NOWHERE in `specs/testing.md` — it appeared only in this file. The defined tests for this endpoint's behaviour are `T-BATCH-010` (US-003 AC-1, no default mode) and `T-BATCH-015` (US-005 AC-5, second open batch → 409 naming the open batch). `T-API-003` was ALSO a phantom — cited by this row AND by `packages/domain/src/errorCodes.ts`, implemented nowhere — and was implemented as part of this task; see `specs/testing.md` §11.2.** ~~`T-BATCH-001`~~ |
 | TASK-049 | `apps/web/src/pages/UploadPage.tsx` step 1 — service + mode selection as two explanatory cards, not a bare radio. | S | 025, 048 | `T-UI-003` |
 
 #### US-004 — Add multiple screenshots to one batch — by paste, by file upload, or by drag-and-drop
@@ -822,7 +822,7 @@ Traces to: US-005 (REQ-005, REQ-006) · Milestone M3 · Depends on: TASK-048
 | Task | Description | Size | Depends on | Done when |
 |---|---|---|---|---|
 | TASK-013 | `packages/domain/src/ids.ts` — ULID generation, `deterministicId`, monotonic test-ULID helper. | XS | 001 | `T-DM-004` |
-| TASK-054 | `apps/api/src/services/batchLifecycle.ts` — the state machine `draft → submitted → extracting → in-review → applied → undone`, plus `extraction-failed` and `discarded`; submit; discard; one-open-batch enforcement. | M | 048, 013 | `T-BATCH-001`, `T-BATCH-002`, `T-BATCH-006` |
+| TASK-054 | `apps/api/src/services/batchLifecycle.ts` — the state machine `draft → submitted → extracting → in-review → applied → undone`, plus `extraction-failed` and `discarded`; submit; discard; one-open-batch enforcement. | M | 048, 013 | `T-BATCH-011`, `T-BATCH-012`, `T-BATCH-013`, `T-BATCH-014`, `T-BATCH-006` ⚠ **corrected in place at TASK-048: the struck-through ids below are defined nowhere in `specs/testing.md` — both appeared only in this file. The defined lifecycle tests are `T-BATCH-011`…`T-BATCH-014` and `T-BATCH-006`.** ~~`T-BATCH-001`, `T-BATCH-002`~~ |
 | TASK-072 | **Atomic close by visibility flip** (not one transaction) + crash resumability. | M | 071, 074 | `T-BATCH-003`, `T-BATCH-005` |
 | TASK-073 | `packages/domain/src/reconcile.ts` — a pure function called **once** over the union of affected works. | S | 072 | `T-BATCH-004` |
 

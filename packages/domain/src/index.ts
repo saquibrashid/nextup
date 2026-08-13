@@ -3,6 +3,7 @@
 // Imported verbatim by `apps/api` and `apps/web` (ADR-0004). Everything here is
 // pure: no I/O, no Prisma, no Express, no React.
 
+export * from './copy.js';
 export * from './derive.js';
 export * from './enums.js';
 export * from './errorCodes.js';

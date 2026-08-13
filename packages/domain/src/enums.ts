@@ -23,6 +23,28 @@ export const BATCH_STATUSES = [
 ] as const;
 export type BatchStatus = (typeof BATCH_STATUSES)[number];
 
+/**
+ * The statuses from which a batch can never become active again — the batch is
+ * finished with, and the owner is free to start another.
+ *
+ * ⚠ Everything NOT in this tuple counts as an OPEN batch, and that direction
+ * is deliberate (`specs/api.md` §5, "Open batches per owner: 1"). Enumerating
+ * the OPEN statuses positively would mean a status added to `BATCH_STATUSES`
+ * later silently counts as closed, letting a second batch open alongside it.
+ * Defined this way round, a new status defaults to open, which fails safe.
+ *
+ * `'extraction-failed'` is deliberately ABSENT: that batch keeps its images
+ * and offers a retry (US-006 AC-4), so the owner must retry or discard it
+ * before starting another.
+ */
+export const TERMINAL_BATCH_STATUSES = ['applied', 'undone', 'discarded'] as const;
+export type TerminalBatchStatus = (typeof TERMINAL_BATCH_STATUSES)[number];
+
+/** A batch the owner still has to resolve. The complement of the above. */
+export function isBatchOpen(status: BatchStatus): boolean {
+  return !(TERMINAL_BATCH_STATUSES as readonly string[]).includes(status);
+}
+
 export const LISTING_STATES = ['active', 'removed'] as const; // REQ-027/028
 export type ListingState = (typeof LISTING_STATES)[number];
 

@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 128 |
+| ⬜ todo | 127 |
 | 🚧 doing | 0 |
-| ✅ done | 26 |
+| ✅ done | 27 |
 | 🙋 owner | 7 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -34,7 +34,8 @@ Not done, and every task they depend on is done.
 | `TASK-033` | M | Epic F — The list itself (the value loop) |
 | `TASK-041` | S | Epic F — The list itself (the value loop) |
 | `TASK-045` | S | Epic D — Matching & identity |
-| `TASK-048` | S | Epic B — Capture & import |
+| `TASK-049` | S | Epic B — Capture & import |
+| `TASK-054` | M | Epic B — Capture & import |
 | `TASK-055` | S | Epic C — Extraction |
 | `TASK-101` | S | Epic H — History, removal ledger, suppression |
 | `TASK-121` | S | Epic K — Platform, safety, and the shell |
@@ -59,7 +60,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-108 tasks cannot start yet.
+106 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -76,12 +77,10 @@ Not done, and every task they depend on is done.
 | `TASK-044` | `TASK-043` |
 | `TASK-046` | `TASK-026`, `TASK-038` |
 | `TASK-047` | `TASK-033` |
-| `TASK-049` | `TASK-048` |
-| `TASK-050` | `TASK-048`, `TASK-148`, `TASK-158` |
+| `TASK-050` | `TASK-148`, `TASK-158` |
 | `TASK-051` | `TASK-050` |
 | `TASK-052` | `TASK-050` |
 | `TASK-053` | `TASK-050` |
-| `TASK-054` | `TASK-048` |
 | `TASK-056` | `TASK-055` |
 | `TASK-057` | `TASK-056` |
 | `TASK-058` | `TASK-056`, `TASK-057`, `TASK-054`, `TASK-149`, `TASK-154` |
@@ -197,6 +196,7 @@ Not done, and every task they depend on is done.
 | `TASK-022` | `d95a1ea` | `T-API-002`, `T-SEC-007` |
 | `TASK-023` | `apps/api/src/app.ts` + `routes/index.ts` in the mandated order, no CORS middleware, `/api` 404 fallback **inside** the chain. `T-SEC-005`, `T-SEC-012`, `T-SEC-030`, `T-API-001`. Driven over real HTTP on an ephemeral port — no new dependency. | `T-API-001`, `T-SEC-005` |
 | `TASK-025` | `a9e3483` | `T-UI-023` |
+| `TASK-048` | `T-BATCH-010`, `T-BATCH-015` | `T-API-003`, `T-BATCH-010`, `T-BATCH-015` |
 | `TASK-144` | `eb07409` — a CI grep gate over `prisma/migrations/**` | `T-MIG-001` |
 | `TASK-146` | **ahead-of:TASK-007.** `docs/ghcr-pat.md` written. **No PAT is needed at all** — a fine-grained PAT cannot authenticate to `ghcr.io` and a classic one is account-wide, so the package is public and CI pushes with `GITHUB_TOKEN` (R8). Remaining: the `deploy.yml` link + image secret-scan land with TASK-007, and the one-time visibility flip runs after the first successful push. | _no test id declared_ |
 | `TASK-147` | HEIC decode chain (`heic-convert` → `heic-decode` → `libheif-js`, LGPL-3.0, decode-only) + `sharp` installed; `T-DEP-001` runtime allow-list, `T-DEP-002` encoder ban and `T-DEP-003` prebuilt-only added to `tools/check-deps.mjs`; `T-LICENSE-001` now green against the REAL tree, completing TASK-153's other half. Three corrections found at implementation: (a) `sharp@0.34` carried high-severity libvips CVEs and would have been blocked by `npm audit` in CI — pinned `^0.35.3`, 0 vulnerabilities; (b) `sharp` is Apache-2.0 with LGPL-3.0-or-later libvips binaries, **not MIT** as the spec claimed — corrected in `specs/security.md` §8 and the TASK-147 row; (c) **the runtime container stage installed with `--omit=optional`, which excludes all 25 sharp platform binaries** — proven by building the image both ways (`require('sharp')` threw "Could not load the sharp module using the linuxmusl-x64 runtime"), fixed with a `COPY --from=build` and guarded by `T-INFRA-007`. | _no test id declared_ |

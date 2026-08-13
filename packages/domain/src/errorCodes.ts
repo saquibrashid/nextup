@@ -2,9 +2,17 @@
 //
 // CLOSED means closed: every error the API can return is a member of this
 // union, and `T-API-003` asserts that every code thrown anywhere in
-// `apps/api/src` is one of these AND that every member has at least one test.
-// An open set of strings would let a route invent a code the UI has never
-// seen, which surfaces to the owner as an untranslated failure with no remedy.
+// `apps/api/src` is one of these. An open set of strings would let a route
+// invent a code the UI has never seen, which surfaces to the owner as an
+// untranslated failure with no remedy.
+//
+// ⚠ `T-API-003` did NOT exist until TASK-048 — this comment asserted a guard
+// that was implemented nowhere, which is worse than no comment because it
+// stops the next reader from adding one. It now lives in
+// `apps/api/test/unit/errorCodes.spec.ts`. The rest of the original claim —
+// "AND that every member has at least one test" — is retained here as intent
+// but is not yet asserted: most codes belong to endpoints that do not exist.
+// See `specs/testing.md` §11.2.
 
 export const ERROR_CODES = [
   // ── Generic ──────────────────────────────────────────────────────────────

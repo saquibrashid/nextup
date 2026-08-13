@@ -29,6 +29,7 @@ import {
   parseLedger,
   readyTasks,
   renderStatus,
+  stripStruckThrough,
   unparsedDependencyTasks,
 } from '../../tools/check-status.mjs';
 
@@ -326,5 +327,30 @@ describe('T-STATUS-001 · the task status ledger and its gate', () => {
     expect(ledger).not.toBeNull();
     expect([...ledger!.keys()].sort()).toEqual([...tasks.keys()].sort());
     expect(BACKLOG_FILE.endsWith(path.join('docs', 'backlog.md'))).toBe(true);
+  });
+
+  it('T-STATUS-001u · a struck-through test id is dead and is not required', () => {
+    // The project's editing convention corrects an instruction IN PLACE and
+    // retains the superseded version below it, struck through, where it is
+    // DEAD (`.github/copilot-instructions.md` §5). Before this, the gate read
+    // ids out of struck-through text and demanded a test that the correction
+    // had just finished explaining does not exist — so recording a correction
+    // honestly failed CI, and the only green path was deleting the history.
+    const row =
+      '| TASK-999 | does a thing | S | 001 | `T-REAL-010` ' +
+      'corrected in place ~~`T-PHANTOM-001`~~ |';
+    const tasks = parseBacklog(`## Tasks\n\n${row}\n`);
+
+    expect(tasks.get('TASK-999')?.testIds).toEqual(['T-REAL-010']);
+  });
+
+  it('T-STATUS-001v · stripping strikethrough does not swallow live text', () => {
+    // The negative control for the non-greedy match. A greedy `~~.*~~` would
+    // delete everything between the FIRST and LAST marker on the row, taking
+    // the live id in the middle with it — a gate that quietly stops checking.
+    expect(stripStruckThrough('~~`T-OLD-001`~~ `T-LIVE-010` ~~`T-OLD-002`~~').trim()).toBe(
+      '`T-LIVE-010`',
+    );
+    expect(stripStruckThrough('`T-LIVE-011`')).toBe('`T-LIVE-011`');
   });
 });

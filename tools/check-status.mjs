@@ -58,6 +58,15 @@ const TEST_ID_RE = /T-[A-Z0-9]+-\d+[a-z]?/g;
 const norm = (s) => s.replace(/\r\n/g, '\n');
 
 /**
+ * Remove `~~struck-through~~` spans.
+ *
+ * Non-greedy and single-line by construction: a table row is one line, and a
+ * greedy match would swallow everything between the FIRST and LAST `~~` on the
+ * row, deleting the live correction that sits between two superseded ones.
+ */
+export const stripStruckThrough = (s) => s.replace(/~~.*?~~/g, '');
+
+/**
  * Split a markdown table row into cells.
  *
  * ⚠ `\|` is an ESCAPED pipe, not a column separator. Splitting on it silently
@@ -152,7 +161,16 @@ export function parseBacklog(markdown) {
     // and a reference to a test id that exists nowhere in the suite is itself
     // the defect (it is how `T-UI-023` and `T-LICENSE-001` were both found
     // undefined).
-    for (const m of line.matchAll(TEST_ID_RE)) {
+    //
+    // ⚠ EXCEPT inside `~~strikethrough~~`. This project's editing convention
+    // is that an instruction is corrected IN PLACE with the superseded version
+    // retained below it, struck through, and that struck-through text is DEAD
+    // (see `.github/copilot-instructions.md` §5). Reading ids out of it makes
+    // the gate demand a test that the correction just finished explaining does
+    // not and should not exist — so recording the correction honestly would be
+    // punished, and the only way to a green gate would be to delete the
+    // history. Stripping it here is what makes the two rules agree.
+    for (const m of stripStruckThrough(line).matchAll(TEST_ID_RE)) {
       if (!existing.testIds.includes(m[0])) existing.testIds.push(m[0]);
     }
     tasks.set(id, existing);
