@@ -11,16 +11,17 @@
  *
  * The footer is where TMDB attribution goes (`specs/ui.md` §8) - it is a
  * compliance obligation that must be present, as visible text, on every one of
- * the nine routes. TASK-026 fills it from `GET /api/me`, backed by
- * `TMDB_DISCLAIMER` in `packages/domain/src/attribution.ts`. It is deliberately
- * NOT hard-coded here: US-011 AC-2 requires the sentence verbatim, and
- * `T-ATTR-001` asserts one string flows constant -> API -> DOM. A literal in
- * this file would be a second source of truth that can silently diverge.
+ * the nine routes. TASK-026 mounts `<TmdbAttribution />` here; the sentence
+ * itself is deliberately NOT hard-coded in this file, because US-011 AC-2
+ * requires it verbatim and `T-ATTR-001` asserts one string flows constant ->
+ * API -> DOM. A literal here would be a second source of truth that can
+ * silently diverge.
  */
 
 import type { JSX } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 
+import { TmdbAttribution } from './TmdbAttribution';
 import { ROUTES } from '../routes';
 
 const NAV_ITEMS = ROUTES.filter(
@@ -51,12 +52,9 @@ export function AppShell(): JSX.Element {
         <Outlet />
       </main>
 
-      {/*
-        TASK-026 mounts <TmdbAttribution /> here. The landmark itself ships now
-        so that the shell's structure is asserted from the start rather than
-        being introduced alongside the copy it must carry.
-      */}
-      <footer data-testid="app-footer" />
+      <footer data-testid="app-footer">
+        <TmdbAttribution />
+      </footer>
     </div>
   );
 }
