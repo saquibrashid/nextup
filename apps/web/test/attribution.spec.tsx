@@ -21,6 +21,11 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
+import {
+  attributionPayload,
+  TMDB_DISCLAIMER as DOMAIN_TMDB_DISCLAIMER,
+  TMDB_LOGO_PATH as DOMAIN_TMDB_LOGO_PATH,
+} from '@nextup/domain';
 import { App } from '../src/App';
 import {
   ABOUT_NO_ANALYTICS,
@@ -69,7 +74,32 @@ describe('TMDB attribution', () => {
     expect(rendered.textContent).toBe(TMDB_DISCLAIMER);
   });
 
-  it('T-ATTR-001c · specs/api.md §6.1 · an API-supplied disclaimer renders verbatim, unmodified', () => {
+  it('T-ATTR-001c · specs/api.md §6.1 · the API payload, the constant and the DOM are one source', () => {
+    // The third leg of the chain §8 requires. `attributionPayload()` is what
+    // `GET /api/me` serves, so this proves the sentence the API advertises and
+    // the sentence the SPA paints are the same bytes - not merely two literals
+    // that happen to agree today.
+    const payload = attributionPayload();
+    expect(payload.tmdbDisclaimer).toBe(REQUIRED_WORDING);
+    expect(payload.tmdbDisclaimer).toBe(TMDB_DISCLAIMER);
+    expect(payload.tmdbLogoPath).toBe(TMDB_LOGO_PATH);
+
+    // The re-exports must still RESOLVE to the domain. Someone reintroducing a
+    // local literal here would keep every other assertion green - the strings
+    // would agree on the day it was written - and reopen the divergence this
+    // whole chain exists to close.
+    expect(TMDB_DISCLAIMER).toBe(DOMAIN_TMDB_DISCLAIMER);
+    expect(TMDB_LOGO_PATH).toBe(DOMAIN_TMDB_LOGO_PATH);
+
+    render(<TmdbAttribution />);
+    expect(screen.getByText(REQUIRED_WORDING).textContent).toBe(payload.tmdbDisclaimer);
+    expect(screen.getByRole('img', { name: TMDB_LOGO_ALT })).toHaveAttribute(
+      'src',
+      payload.tmdbLogoPath,
+    );
+  });
+
+  it('T-ATTR-001d · specs/api.md §6.1 · an API-supplied disclaimer renders verbatim, unmodified', () => {
     // The seam for TASK-024. If the component ever templated, trimmed, title-cased
     // or otherwise "tidied" the string, the constant/API/DOM chain would break at
     // the point the real API value differs from the local constant - which is the
@@ -84,7 +114,7 @@ describe('TMDB attribution', () => {
     );
   });
 
-  it('T-ATTR-001d · US-011 AC-2 · the disclaimer is VISIBLE TEXT, not a title or an aria-label', () => {
+  it('T-ATTR-001e · US-011 AC-2 · the disclaimer is VISIBLE TEXT, not a title or an aria-label', () => {
     render(<TmdbAttribution />);
 
     const rendered = screen.getByText(REQUIRED_WORDING);
@@ -101,7 +131,7 @@ describe('TMDB attribution', () => {
     expect(carriers).toHaveLength(0);
   });
 
-  it('T-ATTR-001e · specs/ui.md §8 · the logo renders with alt="TMDB" at the specified path', () => {
+  it('T-ATTR-001f · specs/ui.md §8 · the logo renders with alt="TMDB" at the specified path', () => {
     render(<TmdbAttribution />);
 
     const logo = screen.getByRole('img', { name: TMDB_LOGO_ALT });
@@ -110,7 +140,7 @@ describe('TMDB attribution', () => {
     expect(logo).toHaveAttribute('alt', 'TMDB');
   });
 
-  it('T-ATTR-001f · US-011 AC-3/AC-5 · the disclaimer is in the footer of every one of the nine routes', () => {
+  it('T-ATTR-001g · US-011 AC-3/AC-5 · the disclaimer is in the footer of every one of the nine routes', () => {
     // The nine routes are enumerated from ROUTES rather than listed here, so a
     // tenth screen is covered the day it is added. T-ATTR-002/003 assert the
     // same property in a real browser; this is the fast-suite tripwire that
@@ -129,7 +159,7 @@ describe('TMDB attribution', () => {
     }
   });
 
-  it('T-ATTR-001g · US-011 AC-3 · the disclaimer needs no interaction and is not behind /about', () => {
+  it('T-ATTR-001h · US-011 AC-3 · the disclaimer needs no interaction and is not behind /about', () => {
     // §8: never behind an expander, a tooltip, a modal or an "about" link. The
     // failure this catches is a well-meaning refactor that moves the sentence
     // onto /about "where it belongs" and leaves the other eight screens bare.
