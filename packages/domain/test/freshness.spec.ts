@@ -56,10 +56,7 @@ describe('serviceFreshnessLabel', () => {
   });
 
   it('T-FRESH-012b · the display name is capitalised, never the stored value', () => {
-    for (const label of [
-      serviceFreshnessLabel('netflix', 0),
-      serviceFreshnessLabel('max', null),
-    ]) {
+    for (const label of [serviceFreshnessLabel('netflix', 0), serviceFreshnessLabel('max', null)]) {
       expect(label).not.toContain('netflix');
       expect(label.startsWith('Netflix') || label.startsWith('Max')).toBe(true);
     }

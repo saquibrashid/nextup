@@ -19,9 +19,7 @@ describe('suppressionIdFor', () => {
     // Spelled out, not built from the constant under test.
     expect(suppressionIdFor('tmdb:movie:438631')).toBe('supp:tmdb:movie:438631');
     expect(suppressionIdFor('tmdb:tv:1396')).toBe('supp:tmdb:tv:1396');
-    expect(suppressionIdFor('unmatched:0123456789abcdef')).toBe(
-      'supp:unmatched:0123456789abcdef',
-    );
+    expect(suppressionIdFor('unmatched:0123456789abcdef')).toBe('supp:unmatched:0123456789abcdef');
   });
 
   it('T-SUP-001f · US-028 AC-1 · it is a pure function — same identity, same id', () => {
