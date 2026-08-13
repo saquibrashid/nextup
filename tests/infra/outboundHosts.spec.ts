@@ -266,6 +266,41 @@ describe('T-SEC-031 · US-038 AC-2/AC-5 · exactly three outbound destinations (
     const out = execFileSync(process.execPath, [SCRIPT], { cwd: ROOT, stdio: 'pipe' });
     expect(out.toString()).toContain('Outbound host check passed');
   });
+
+  it('T-SEC-031s · a named ESM import bypassing the runtime guard is still caught', async () => {
+    // ⚠ `specs/testing.md` §14.2 names THIS gate as the compensating control
+    // for a verified hole in the runtime egress guard: `import { request } from
+    // 'node:http'` binds a read-only snapshot at instantiation, so patching the
+    // module object cannot reach it. That is a claim about this checker, and a
+    // claim about a gate is worth exactly as much as the test behind it — so it
+    // is asserted here rather than trusted.
+    //
+    // It holds because this gate reasons about the HOST LITERAL, not the call
+    // mechanism: the request cannot be made without naming where it goes.
+    const host = ['api', '.', 'themoviedb', '.org'].join('');
+    const bypass = [
+      "import { request } from 'node:http';",
+      `const r = request('https://${host.replace('themoviedb', 'evil-mirror')}/3/find');`,
+      'r.end();',
+    ].join('\n');
+
+    const root = scratchRepo('esm-bypass', path.join('apps', 'api', 'src', 'sneak.ts'), bypass);
+    const findings = await checkOutboundHosts(root);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]).toContain('evil-mirror');
+  });
+
+  it('T-SEC-031t · the allow-listed host is still permitted through the same route', async () => {
+    // The other half: the gate must not "work" by refusing every ESM import.
+    const host = ['api', '.', 'themoviedb', '.org'].join('');
+    const legitimate = [
+      "import { request } from 'node:https';",
+      `const r = request('https://${host}/3/find');`,
+    ].join('\n');
+
+    const root = scratchRepo('esm-allowed', path.join('apps', 'api', 'src', 'tmdb.ts'), legitimate);
+    expect(await checkOutboundHosts(root)).toEqual([]);
+  });
 });
 
 describe('T-SEC-009 · US-034 AC-6 · no telemetry (NFR-005) — the outbound half', () => {

@@ -165,6 +165,19 @@ jobs:
       - name: Backlog test ids are defined (T-META-005)
         run: npm run check:test-ids
 
+      # T-META-003. The mirror of check:test-ids, looking the other way. That
+      # gate asks whether the ids the BACKLOG cites are real; this one asks
+      # whether specs/testing.md's own mapping holds up: every criterion it
+      # claims is verifiable must resolve to an id the file defines, and every
+      # criterion with no test must be declared in §10 with a compensating
+      # check beside it. Deleting an id from a Test cell is a one-character
+      # diff that drops a criterion from the definition of done, and before
+      # this gate nothing in CI could see it — T-META-001 counts the row as
+      # mapped, T-META-005 sees no id to resolve, and T-STATUS-001 only
+      # inspects tasks already claimed done.
+      - name: Verifiable decisions resolve to defined tests (T-META-003)
+        run: npm run check:decisions
+
       # T-CI-008. Guards the worst failure class in this repo: a spec file in a
       # path no runner collects never executes, so its assertions "pass" and CI
       # goes green while nothing was checked. This is not theoretical — the
