@@ -85,7 +85,13 @@ describe('T-SEC-009 · no telemetry, analytics or APM anywhere (NFR-005)', () =>
       rmSync(dir, { recursive: true, force: true });
       created.pop();
     }
-  });
+    // ⚠ Explicit timeout, NOT a slow-test workaround. This test re-walks the
+    // ENTIRE repository once per vendor — eight full scans — so its cost grows
+    // with the repository and Vitest's 5 s default is a time bomb every lane
+    // walks into as it lands files. Do not "fix" it by dropping vendors from
+    // the list: each one is named in specs/security.md §8 and must be proven
+    // caught individually.
+  }, 60_000);
 
   it('T-SEC-009d · US-034 AC-6 · a devDependency is caught, not just a runtime one', async () => {
     const dir = scratchDir('devdep');

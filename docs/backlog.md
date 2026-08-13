@@ -480,10 +480,10 @@ finished, so the exception cannot outlive its reason.
 | `TASK-026` | `doing` | `T-ATTR-001a`…`g` + `T-UI-022a`…`e` green in `apps/web/test/attribution.spec.tsx`; copy verified byte-equal to `ui.md` §9. Blocked on `T-ATTR-004` (Playwright, `tests/e2e/**` — outside the web lane, and `playwright.config.ts` has no `webServer`). Logo asset is a labelled placeholder pending the real mark |
 | `TASK-027` | `done` | `T-INFRA-008` |
 | `TASK-028` | `doing` | `T-UX-019a`…`i` green in `apps/web/test/states.spec.tsx` (403, 401 and IdP-failure). Blocked on `T-SEC-018` (Playwright, `tests/e2e/**` — outside the web lane). `IDP_FAILURE_TITLE`/`_BODY` are invented copy pending owner review — no spec defines them |
-| `TASK-029` | `done` | `apps/api/test/integration/security.spec.ts` — delivered with the auth chain and never recorded. `T-SEC-002` (a–h, route-enumerated over the REAL router; `T-SEC-002f` is the mutation proving the walk catches a 403), `T-SEC-017` (a–d), `T-SEC-028` (a–c), `T-SEC-030` (d–g). |
-| `TASK-030` | `done` | `tools/check-no-credentials.mjs` + `tests/infra/noCredentials.spec.ts` — `T-SEC-011` (a–k) and `T-SEC-001` (a–m), both with false-positive cases (`passwordless`, the SQL connection string, the `netflix`/`max` enum values, playwright in devDependencies). Wired as `npm run check:credentials`. |
+| `TASK-029` | `done` | `apps/api/test/integration/security.spec.ts` — delivered with the auth chain and never recorded. The route walk is enumerated from the live Express router, so `GET /api/titles`, `/api/titles/:titleId` and the `/api/batches` routes are covered without editing it. `T-SEC-002` (a–h), `T-SEC-017` (a–d), `T-SEC-028` (a–c), `T-SEC-030` (d–g). `T-SEC-002f` is the mutation: a deliberate `/api/leak/:id` answering 403 for a foreign id, which the walk catches. |
+| `TASK-030` | `done` | `tools/check-no-credentials.mjs` + `tests/infra/noCredentials.spec.ts` — `T-SEC-011` (a–k) and `T-SEC-001` (a–m). Mutation-proven against `passport`, `bcrypt`, a `puppeteer` runtime dependency, a streaming host literal and a schema credential field; with false-positive cases (`passwordless`, the SQL connection string, the `netflix`/`max` enum values, and `@playwright/test` in devDependencies staying legal). Wired as `npm run check:credentials`. |
 | `TASK-031` | `todo` | — |
-| `TASK-032` | `todo` | — |
+| `TASK-032` | `done` | `tests/fixtures/seed.ts` + `tests/infra/seedFixture.spec.ts` + `tests/meta/decisionVerifiability.spec.ts` — a seed fixture with an injected clock, a pure `planSeed()`, `asOwner()` and owner-scoped writes under the DERIVED `ownerId`; `T-SEED-001/002/003` (14 cases) assert determinism, the derived owner id and clock-relative timestamps. Its "Done when" test `~~T-META-003~~` existed nowhere, so it is delivered here as `tools/check-decision-verifiability.mjs` + `T-META-003` (a–m): every criterion the testing spec claims verifiable resolves to a defined id, and every criterion with no test is declared in §10. 243 mapped criteria pass. ⚠ See the finding below — `T-META-003` is a spec-hygiene gate and is not a plausible definition of done for a seed fixture. |
 | `TASK-033` | `done` | `T-LIST-010`, `T-LIST-011`, `T-API-017` |
 | `TASK-034` | `done` | `T-LIST-028` — `apps/api/test/integration/titleDetail.spec.ts` (8 cases): owner scoping, and the foreign-id refusal asserted byte-identical to the unknown-id refusal with `T-LIST-028g` as its non-vacuity guard. `T-LIST-035` — `apps/api/test/unit/titlesShape.spec.ts` (8 cases) for the §6.3 shaping, where coverage is measured. The active/removed badge split is mutation-proven at both layers. |
 | `TASK-035` | `todo` | — |
@@ -572,14 +572,14 @@ finished, so the exception cannot outlive its reason.
 | `TASK-118` | `todo` | — |
 | `TASK-119` | `todo` | — |
 | `TASK-120` | `todo` | — |
-| `TASK-121` | `todo` | — |
-| `TASK-122` | `todo` | — |
+| `TASK-121` | `done` | `fdd5519` — `tools/check-mutating-routes.mjs`, `T-MUT-001` (a–j), `T-MUT-002` (a–f). The 18 mutating routes each map to one of the eight REQ-041 owner-initiated operations or carry an explicit non-list-state reason; mutation-proven with an unregistered `POST /titles/:id/auto-confirm` and a `jobs/reconcile.ts` calling a guarded operation. |
+| `TASK-122` | `done` | `dde3dc5` — `tools/check-outbound-hosts.mjs`, `T-SEC-031` (a–i) and the outbound half of `T-SEC-009` (`k`). Exactly three destinations: TMDB, Azure OpenAI, Azure AI Vision. Mutation-proven by widening the list to four, shrinking it below three, and planting an unlisted host in source. The telemetry and streaming hostnames the spec needs are assembled from fragments rather than added to another gate's exemption list. |
 | `TASK-123` | `todo` | — |
 | `TASK-124` | `todo` | — |
 | `TASK-125` | `todo` | — |
 | `TASK-126` | `todo` | — |
 | `TASK-127` | `todo` | — |
-| `TASK-128` | `todo` | — |
+| `TASK-128` | `done` | `c64b7b5` — `tools/egress-guard.mjs`, `T-CI-007` (a–n). Patches `fetch`, `http.request` and `https.request`; loopback and the compose service names stay reachable; mutation-proven with a `fetch` and a raw `https.request` to an external host. ⚠ Installed per-suite, not globally: global wiring needs `setupFiles` in `vitest.config.ts`, which no lane may edit — see the finding below. |
 | `TASK-129` | `todo` | — |
 | `TASK-130` | `todo` | — |
 | `TASK-131` | `todo` | — |
