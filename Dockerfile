@@ -85,6 +85,23 @@ COPY --from=build /app/apps/web/dist apps/web/dist
 # the platform query engine binary, so both directories are required.
 COPY --from=build /app/node_modules/.prisma node_modules/.prisma
 
+# sharp's native libvips binaries. `sharp` itself is a normal dependency and
+# installs above, but every one of its 25 platform binaries is an
+# OPTIONAL dependency — so `--omit=optional` on the line above installs sharp
+# WITHOUT the binary it needs and it throws "Could not load the sharp module"
+# at the first image upload. Nothing fails at build time; the image looks fine
+# and dies in production on the HEIC path (REQ-077).
+#
+# Copying from the build stage keeps `--omit=optional` (which is there for
+# attack surface) and still ships the binary. Both stages use the same base
+# image, so the build stage resolved the correct libc variant — `node:20-alpine`
+# is musl, so this is `@img/sharp-linuxmusl-x64`. If the base image ever moves
+# to a glibc variant this keeps working, because the resolution happens in the
+# build stage rather than being hard-coded here.
+#
+# `T-INFRA-006` asserts this COPY exists for as long as `--omit=optional` does.
+COPY --from=build /app/node_modules/@img node_modules/@img
+
 # `node` is an unprivileged user that already exists in the base image.
 USER node
 

@@ -11,8 +11,22 @@ third-party packages below, each under its own licence.
 
 ## Components carrying a retained-notice obligation
 
-_None currently installed._ The HEIC decode chain (TASK-147) will add
-`libheif-js` (LGPL-3.0) here; the owner approved carrying it at TASK-153.
+These are weak-copyleft. They are used **unmodified** and are replaceable,
+so they do not relicense this work — but their notices must be retained.
+
+| Package | Version | Licence |
+|---|---|---|
+| `@img/sharp-libvips-darwin-arm64` | 1.3.2 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-darwin-x64` | 1.3.2 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-linux-arm` | 1.3.2 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-linux-arm64` | 1.3.2 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-linux-ppc64` | 1.3.2 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-linux-riscv64` | 1.3.2 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-linux-s390x` | 1.3.2 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-linux-x64` | 1.3.2 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-linuxmusl-arm64` | 1.3.2 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-linuxmusl-x64` | 1.3.2 | **LGPL-3.0-or-later** |
+| `libheif-js` | 1.19.8 | **LGPL-3.0** |
 
 ## All production dependencies
 
@@ -22,6 +36,34 @@ _None currently installed._ The HEIC decode chain (TASK-147) will add
 | `@babel/helper-validator-identifier` | 7.29.7 | MIT |
 | `@babel/parser` | 7.29.8 | MIT |
 | `@babel/types` | 7.29.8 | MIT |
+| `@emnapi/runtime` | 1.11.3 | MIT |
+| `@img/colour` | 1.1.0 | MIT |
+| `@img/sharp-darwin-arm64` | 0.35.3 | Apache-2.0 |
+| `@img/sharp-darwin-x64` | 0.35.3 | Apache-2.0 |
+| `@img/sharp-freebsd-wasm32` | 0.35.3 | Apache-2.0 |
+| `@img/sharp-libvips-darwin-arm64` | 1.3.2 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-darwin-x64` | 1.3.2 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-linux-arm` | 1.3.2 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-linux-arm64` | 1.3.2 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-linux-ppc64` | 1.3.2 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-linux-riscv64` | 1.3.2 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-linux-s390x` | 1.3.2 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-linux-x64` | 1.3.2 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-linuxmusl-arm64` | 1.3.2 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-linuxmusl-x64` | 1.3.2 | LGPL-3.0-or-later |
+| `@img/sharp-linux-arm` | 0.35.3 | Apache-2.0 |
+| `@img/sharp-linux-arm64` | 0.35.3 | Apache-2.0 |
+| `@img/sharp-linux-ppc64` | 0.35.3 | Apache-2.0 |
+| `@img/sharp-linux-riscv64` | 0.35.3 | Apache-2.0 |
+| `@img/sharp-linux-s390x` | 0.35.3 | Apache-2.0 |
+| `@img/sharp-linux-x64` | 0.35.3 | Apache-2.0 |
+| `@img/sharp-linuxmusl-arm64` | 0.35.3 | Apache-2.0 |
+| `@img/sharp-linuxmusl-x64` | 0.35.3 | Apache-2.0 |
+| `@img/sharp-wasm32` | 0.35.3 | Apache-2.0 AND LGPL-3.0-or-later AND MIT |
+| `@img/sharp-webcontainers-wasm32` | 0.35.3 | Apache-2.0 |
+| `@img/sharp-win32-arm64` | 0.35.3 | Apache-2.0 AND LGPL-3.0-or-later |
+| `@img/sharp-win32-ia32` | 0.35.3 | Apache-2.0 AND LGPL-3.0-or-later |
+| `@img/sharp-win32-x64` | 0.35.3 | Apache-2.0 AND LGPL-3.0-or-later |
 | `@noble/hashes` | 2.2.0 | MIT |
 | `@prisma/client` | 6.19.3 | Apache-2.0 |
 | `@prisma/config` | 6.19.3 | Apache-2.0 |
@@ -54,6 +96,7 @@ _None currently installed._ The HEIC decode chain (TASK-147) will add
 | `defu` | 6.1.7 | MIT |
 | `depd` | 2.0.0 | MIT |
 | `destr` | 2.0.5 | MIT |
+| `detect-libc` | 2.1.2 | Apache-2.0 |
 | `dotenv` | 16.6.1 | BSD-2-Clause |
 | `dunder-proto` | 1.0.1 | MIT |
 | `ee-first` | 1.1.1 | MIT |
@@ -78,6 +121,8 @@ _None currently installed._ The HEIC decode chain (TASK-147) will add
 | `gopd` | 1.2.0 | MIT |
 | `has-symbols` | 1.1.0 | MIT |
 | `hasown` | 2.0.4 | MIT |
+| `heic-convert` | 2.1.0 | ISC |
+| `heic-decode` | 2.1.0 | ISC |
 | `http-errors` | 2.0.1 | MIT |
 | `iconv-lite` | 0.7.3 | MIT |
 | `iconv-lite` | 0.7.3 | MIT |
@@ -85,6 +130,9 @@ _None currently installed._ The HEIC decode chain (TASK-147) will add
 | `ipaddr.js` | 1.9.1 | MIT |
 | `is-promise` | 4.0.0 | MIT |
 | `jiti` | 2.7.0 | MIT |
+| `jpeg-js` | 0.4.4 | BSD-3-Clause |
+| `libheif-js` | 1.19.8 | LGPL-3.0 |
+| `magicast` | 0.5.4 | MIT |
 | `math-intrinsics` | 1.1.0 | MIT |
 | `media-typer` | 1.1.1 | MIT |
 | `merge-descriptors` | 2.0.0 | MIT |
@@ -109,6 +157,7 @@ _None currently installed._ The HEIC decode chain (TASK-147) will add
 | `pathe` | 2.0.3 | MIT |
 | `perfect-debounce` | 1.0.0 | MIT |
 | `pkg-types` | 2.3.1 | MIT |
+| `pngjs` | 6.0.0 | MIT |
 | `prisma` | 6.19.3 | Apache-2.0 |
 | `proxy-addr` | 2.0.7 | MIT |
 | `pure-rand` | 6.1.0 | MIT |
@@ -124,10 +173,12 @@ _None currently installed._ The HEIC decode chain (TASK-147) will add
 | `router` | 2.2.0 | MIT |
 | `safer-buffer` | 2.1.2 | MIT |
 | `scheduler` | 0.27.0 | MIT |
+| `semver` | 7.8.5 | ISC |
 | `send` | 1.2.1 | MIT |
 | `serve-static` | 2.2.1 | MIT |
 | `set-cookie-parser` | 2.7.2 | MIT |
 | `setprototypeof` | 1.2.0 | ISC |
+| `sharp` | 0.35.3 | Apache-2.0 |
 | `side-channel` | 1.1.1 | MIT |
 | `side-channel-list` | 1.0.1 | MIT |
 | `side-channel-map` | 1.0.1 | MIT |
@@ -136,6 +187,7 @@ _None currently installed._ The HEIC decode chain (TASK-147) will add
 | `statuses` | 2.0.2 | MIT |
 | `tinyexec` | 1.3.0 | MIT |
 | `toidentifier` | 1.0.1 | MIT |
+| `tslib` | 2.8.1 | 0BSD |
 | `type-is` | 2.1.0 | MIT |
 | `typescript` | 6.0.3 | Apache-2.0 |
 | `unpipe` | 1.0.0 | MIT |

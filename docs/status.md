@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 129 |
+| ⬜ todo | 128 |
 | 🚧 doing | 0 |
-| ✅ done | 25 |
+| ✅ done | 26 |
 | 🙋 owner | 7 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -43,7 +43,7 @@ Not done, and every task they depend on is done.
 | `TASK-128` | XS | Epic K — Platform, safety, and the shell |
 | `TASK-132` | XS | Epic K — Platform, safety, and the shell |
 | `TASK-143` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
-| `TASK-147` | S | Epic B — Capture & import |
+| `TASK-148` | M | Epic B — Capture & import |
 
 ## Waiting on the owner
 
@@ -59,7 +59,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-109 tasks cannot start yet.
+108 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -155,7 +155,6 @@ Not done, and every task they depend on is done.
 | `TASK-131` | `TASK-044` |
 | `TASK-133` | `TASK-007`, `TASK-156` |
 | `TASK-145` | `TASK-033` |
-| `TASK-148` | `TASK-147` |
 | `TASK-149` | `TASK-148`, `TASK-145` |
 | `TASK-150` | `TASK-149` |
 | `TASK-151` | `TASK-149`, `TASK-150` |
@@ -200,5 +199,6 @@ Not done, and every task they depend on is done.
 | `TASK-025` | `a9e3483` | `T-UI-023` |
 | `TASK-144` | `eb07409` — a CI grep gate over `prisma/migrations/**` | `T-MIG-001` |
 | `TASK-146` | **ahead-of:TASK-007.** `docs/ghcr-pat.md` written. **No PAT is needed at all** — a fine-grained PAT cannot authenticate to `ghcr.io` and a classic one is account-wide, so the package is public and CI pushes with `GITHUB_TOKEN` (R8). Remaining: the `deploy.yml` link + image secret-scan land with TASK-007, and the one-time visibility flip runs after the first successful push. | _no test id declared_ |
-| `TASK-153` | `d6796b3` — owner approved the LGPL-3.0 obligation; gate proven on synthetic fixtures ahead-of:TASK-147 | `T-LICENSE-001` |
+| `TASK-147` | HEIC decode chain (`heic-convert` → `heic-decode` → `libheif-js`, LGPL-3.0, decode-only) + `sharp` installed; `T-DEP-001` runtime allow-list, `T-DEP-002` encoder ban and `T-DEP-003` prebuilt-only added to `tools/check-deps.mjs`; `T-LICENSE-001` now green against the REAL tree, completing TASK-153's other half. Three corrections found at implementation: (a) `sharp@0.34` carried high-severity libvips CVEs and would have been blocked by `npm audit` in CI — pinned `^0.35.3`, 0 vulnerabilities; (b) `sharp` is Apache-2.0 with LGPL-3.0-or-later libvips binaries, **not MIT** as the spec claimed — corrected in `specs/security.md` §8 and the TASK-147 row; (c) **the runtime container stage installed with `--omit=optional`, which excludes all 25 sharp platform binaries** — proven by building the image both ways (`require('sharp')` threw "Could not load the sharp module using the linuxmusl-x64 runtime"), fixed with a `COPY --from=build` and guarded by `T-INFRA-007`. | _no test id declared_ |
+| `TASK-153` | `d6796b3` — owner approved the LGPL-3.0 obligation; gate proven on synthetic fixtures | `T-LICENSE-001` |
 | `TASK-167` | this commit — the ledger, the gate and `docs/status.md` | `T-STATUS-001` |

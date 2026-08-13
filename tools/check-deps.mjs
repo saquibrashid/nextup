@@ -200,6 +200,160 @@ export async function checkDependencies() {
 }
 
 /**
+ * `T-DEP-001` — the DIRECT runtime dependency allow-list (TASK-147, NFR-004).
+ *
+ * `specs/security.md` §8 "New dependency policy" names the runtime set and
+ * calls it "deliberately small". Left as prose that is a review convention,
+ * and a reviewer skimming a package.json diff does not notice one new import
+ * among twelve. This turns the named set into a gate: a runtime dependency
+ * that nobody wrote down fails the build.
+ *
+ * ⚠ Deliberately scoped to **direct** `dependencies` in the workspace
+ * manifests. It is NOT a transitive allow-list — pinning the whole tree would
+ * be unmaintainable and would fail on every patch bump. Transitive risk is
+ * covered by the licence gate (`T-LICENSE-001`) and by `checkImageCodecs()`
+ * below, which are the two things that actually bite.
+ *
+ * `devDependencies` are excluded: they are not distributed, NFR-004 is about
+ * what ships, and gating the test tooling would make every lane fight this
+ * file instead of writing tests.
+ *
+ * The list includes packages the spec approves but that are NOT installed yet
+ * (`zod`, `multer`, the Azure SDKs …). That is intentional — the list encodes
+ * the SPEC's approved set, not today's snapshot, so a lane implementing a
+ * later task does not get a spurious CI failure for using an already-approved
+ * package. Adding anything else is a spec change first.
+ */
+export const RUNTIME_DEPENDENCY_ALLOWLIST = new Set([
+  // Workspace-internal, not third party.
+  '@nextup/domain',
+  // specs/security.md §8, verbatim.
+  'express',
+  'zod',
+  '@prisma/client',
+  '@azure/storage-blob',
+  '@azure/identity',
+  '@azure-rest/ai-vision-image-analysis',
+  'ulid',
+  'jaro-winkler',
+  'compression',
+  'multer',
+  // A42 — the HEIC ingest path. See the licence row in specs/security.md §8.
+  'heic-convert',
+  'sharp',
+  // The SPA itself (ADR-0004). §8's prose list enumerated the API's
+  // dependencies and silently omitted the front end's; these three have
+  // shipped since TASK-005 and are the SPA, not an addition to it.
+  'react',
+  'react-dom',
+  'react-router-dom',
+  // Audited SHA-256 for the canonical id derivation in packages/domain.
+  // Deliberately NOT node:crypto: the domain package is isomorphic and these
+  // ids are computed in the browser as well as the API.
+  '@noble/hashes',
+]);
+
+/** Workspace manifests, in the order `npm` resolves them. */
+const WORKSPACE_MANIFESTS = [
+  'package.json',
+  'packages/domain/package.json',
+  'apps/api/package.json',
+  'apps/web/package.json',
+];
+
+/** @returns {string[]} findings */
+export function checkRuntimeDependencyAllowList(root = ROOT) {
+  const findings = [];
+
+  for (const relPath of WORKSPACE_MANIFESTS) {
+    const file = path.join(root, relPath);
+    let pkg;
+    try {
+      pkg = JSON.parse(readFileSync(file, 'utf8'));
+    } catch {
+      continue; // A workspace that does not exist yet is not a violation.
+    }
+
+    for (const name of Object.keys(pkg.dependencies ?? {})) {
+      if (!RUNTIME_DEPENDENCY_ALLOWLIST.has(name)) {
+        findings.push(
+          `${relPath}: runtime dependency "${name}" is not on the allow-list (NFR-004, T-DEP-001). ` +
+            `Justify it in specs/security.md §8 and add it to RUNTIME_DEPENDENCY_ALLOWLIST, or move it to devDependencies if it does not ship.`,
+        );
+      }
+    }
+  }
+
+  return findings;
+}
+
+/**
+ * `T-DEP-002` — no HEIC/H.26x ENCODER anywhere in the tree (TASK-147).
+ *
+ * The HEIC decode chain is `heic-convert` → `heic-decode` → `libheif-js`,
+ * which is **LGPL-3.0** and **decode-only** (it carries `libde265`, a
+ * decoder). That is what keeps this MIT repository's licence floor at weak
+ * copyleft, which `T-LICENSE-001` permits with a retained notice.
+ *
+ * An **encoder** breaks that in two ways at once: `x265` is **GPL-2.0**, which
+ * would relicense the app outright, and it is patent-encumbered. nextup never
+ * writes HEIC — the transcode goes HEIC → PNG, one direction only — so an
+ * encoder appearing in the tree is always an accident, and always a serious
+ * one.
+ *
+ * This scans the **whole lockfile**, transitives included, because that is the
+ * realistic failure: not someone typing `npm i x265`, but a patch bump to an
+ * image package quietly pulling an encoder in three levels down.
+ *
+ * ⚠ `libde265`, `libheif-js` and `heic-decode` must NOT match. Broadening
+ * these patterns to "anything containing heif" re-bans the decoder and takes
+ * every iPhone upload (ASM-058) with it.
+ */
+const FORBIDDEN_CODEC_PACKAGES = [
+  /^x26[45]$/i,
+  /^(lib)?x26[45](-.*)?$/i,
+  /^@?[\w-]*\/?x26[45](-.*)?$/i,
+  /^heic-enc(ode|oder)?(-.*)?$/i,
+  /^heif-enc(ode|oder)?(-.*)?$/i,
+  /^libheif-enc(ode|oder)?(-.*)?$/i,
+];
+
+/** The package name for a `package-lock.json` v3 path key. */
+export function lockfilePackageName(key, entry) {
+  if (entry?.name) return entry.name;
+  const marker = 'node_modules/';
+  const at = key.lastIndexOf(marker);
+  return at === -1 ? '' : key.slice(at + marker.length);
+}
+
+/** @returns {string[]} findings */
+export function checkImageCodecs(lockfilePath = path.join(ROOT, 'package-lock.json')) {
+  const findings = [];
+
+  let lockfile;
+  try {
+    lockfile = JSON.parse(readFileSync(lockfilePath, 'utf8'));
+  } catch {
+    return [`${rel(lockfilePath)}: package-lock.json is missing or unreadable (T-DEP-002)`];
+  }
+
+  for (const [key, entry] of Object.entries(lockfile.packages ?? {})) {
+    if (key === '') continue; // the root project itself
+    const name = lockfilePackageName(key, entry);
+    if (!name) continue;
+
+    if (FORBIDDEN_CODEC_PACKAGES.some((re) => re.test(name))) {
+      findings.push(
+        `package-lock.json: "${name}" is a HEIC/H.26x ENCODER (T-DEP-002). ` +
+          `The HEIC path is decode-only: an encoder raises the licence floor to GPL and is patent-encumbered. See specs/security.md §8.`,
+      );
+    }
+  }
+
+  return findings;
+}
+
+/**
  * `T-CI-006` — every GitHub Action is pinned to a full 40-character commit
  * SHA, not a tag. A tag is mutable: `@v2` can be re-pointed at new code by
  * anyone who can push to that repository, which makes it a supply-chain hole
@@ -241,7 +395,12 @@ export async function checkActionPinning() {
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 
 if (isMain) {
-  const findings = [...(await checkDependencies()), ...(await checkActionPinning())];
+  const findings = [
+    ...(await checkDependencies()),
+    ...checkRuntimeDependencyAllowList(),
+    ...checkImageCodecs(),
+    ...(await checkActionPinning()),
+  ];
   if (findings.length > 0) {
     console.error('Supply-chain check FAILED:\n');
     for (const f of findings) console.error(`  ✗ ${f}`);
@@ -249,5 +408,6 @@ if (isMain) {
     process.exit(1);
   }
   console.log('Supply-chain check passed: no telemetry packages, no third-party');
-  console.log('scripts, no analytics hosts, all actions pinned to commit SHAs.');
+  console.log('scripts, no analytics hosts, every runtime dependency allow-listed,');
+  console.log('no HEIC/H.26x encoder, all actions pinned to commit SHAs.');
 }
