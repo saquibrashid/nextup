@@ -1551,8 +1551,27 @@ homework (NFR-003).
 | **`T-UX-007`** | C | `BatchStatusPage` polls the batch and renders per-image progress and per-image failure states **without navigating away**. LLM latency makes this screen visible for minutes (`ADR-0001`), so it is a primary surface, not a spinner. `T-EXT-010` asserts progress at integration level — the wrong layer for the page. |
 | **`T-UX-008`** | C | `BatchStatusPage` renders the degraded / cross-check-unavailable banner when either extraction leg is missing. `T-AI-036` asserts the degraded batch outcome at integration level and states a banner is shown, but no component test proves the page actually renders one. ⚠ Whenever this banner shows, full-update removals are withheld (`specs/ai.md` §2.2) — product invariant 2 — so a banner that silently fails to render hides the reason the owner's removals disappeared. |
 | **`T-UX-011`** | C | `ReviewPage` renders a sticky action bar that stays visible while the candidate list scrolls. With a long review list the confirm and close actions would otherwise scroll out of reach on a phone (US-037). |
-| **`T-UX-020`** | E | Each primary surface — list, upload, review, removed, suppressions, batches, about — renders a **distinct offline state**, not a blank page and not the generic load-failure error. `ux-states.md` §11 requires it per surface; US-037 held only responsive and a11y tests. |
-| **`T-UX-021`** | E | On reconnect each surface recovers — retry or refetch — **without losing in-progress owner input**. The pair with `T-UX-020`: an offline state that clears by discarding a half-finished review is a data-loss bug wearing an error message. |
+| **`T-UX-023`** | E | Each primary surface — list, upload, review, removed, suppressions, batches, about — renders a **distinct offline state**, not a blank page and not the generic load-failure error. `ux-states.md` §11 requires it per surface; US-037 held only responsive and a11y tests. |
+| **`T-UX-024`** | E | On reconnect each surface recovers — retry or refetch — **without losing in-progress owner input**. The pair with `T-UX-023`: an offline state that clears by discarding a half-finished review is a data-loss bug wearing an error message. |
+| **`T-UX-025`** | C | The **403 refusal** renders full-page: the copy, the signed-in email and a sign-out control, with **no list data, no nav and no partial UI**. `ux-states.md` §2.11 pairs the state with `T-SEC-010`, which asserts the API refusal — not that the SPA renders a refusal instead of an empty list. Without this, a 403 that silently renders an empty list looks to the owner exactly like a list that lost everything. |
+
+> ⚠ **CORRECTION (TASK-024 review, raised by the web lane).** The two offline
+> entries above were first published here as **`T-UX-020`** and **`T-UX-021`**,
+> and `docs/backlog.md` TASK-125 cited them under those ids. Both were already
+> taken: `specs/ux-states.md` §2 allocates `T-UX-010`–`T-UX-022` **contiguously**
+> to the fourteen list-surface states, where **`T-UX-020` is the 403 refusal
+> (§2.11)** and **`T-UX-021` is the row-action submitting state (§2.13)**.
+> Offline already has its own id there (`T-UX-003`, §2.12).
+>
+> The systematic, dense allocation in `ux-states.md` is the original and wins;
+> the offline pair is renumbered to `T-UX-023`/`T-UX-024`, and TASK-125 is
+> re-pointed to match. This is the same defect class as the phantom ids §12
+> removed, arriving from the opposite direction: an id that is *defined twice*
+> lets one task's green test discharge a different task's acceptance criterion.
+> **Enumerate a family for free numbers before naming a test.**
+>
+> ~~`T-UX-020` — offline state per surface. `T-UX-021` — reconnect recovery.~~
+
 | **`T-AI-023`** | I | `POST /api/batches/:batchId/candidates` creates an owner-supplied candidate on an **open** batch — the manual-entry fallback for the artwork-only tile that carries no readable text — returns it in the review response, and rejects entry on a closed batch. `T-UNM-010` covers actions on an *unmatched* candidate, not creation of a new one, and `T-AI-041` covers only rendering the untitled tile. |
 
 ### 12.3 Defined in a SISTER spec, never imported here

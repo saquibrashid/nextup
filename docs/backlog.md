@@ -475,7 +475,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-021` | `done` | `apps/api/dev/devPrincipal.ts` — the shim is excluded **structurally** (outside the production `include: ["src/**/*.ts"]`), not by a flag or an exclude list; `createApp` injects the reader. `T-SEC-019a-f`. ⚠ The task row said `apps/api/src/auth/devPrincipal.ts`; corrected in place below and in `specs/security.md` §2.3. |
 | `TASK-022` | `done` | `d95a1ea` |
 | `TASK-023` | `done` | `apps/api/src/app.ts` + `routes/index.ts` in the mandated order, no CORS middleware, `/api` 404 fallback **inside** the chain. `T-SEC-005`, `T-SEC-012`, `T-SEC-030`, `T-API-001`. Driven over real HTTP on an ephemeral port — no new dependency. |
-| `TASK-024` | `todo` | — |
+| `TASK-024` | `done` | `T-ATTR-001` |
 | `TASK-025` | `done` | `a9e3483` |
 | `TASK-026` | `todo` | — |
 | `TASK-027` | `todo` | — |
@@ -747,7 +747,7 @@ Traces to: US-001 (NFR-015, NFR-016, NFR-017) · Milestone M1 · Depends on: TAS
 | TASK-021 | `apps/api/dev/devPrincipal.ts` — dev shim excluded from production builds by the **directory boundary**: it sits outside `apps/api/tsconfig.json`'s `include: ["src/**/*.ts"]`, so the production compiler cannot emit it, and `createApp` takes the reader as an injected parameter so nothing under `src/` names it. Not a runtime flag, and not an exclude list (a denylist protects the files you thought of, never the next one). | S | 018 | `T-SEC-019` |
 | ~~TASK-021~~ | ~~`apps/api/src/auth/devPrincipal.ts` — dev shim **excluded at compile time** from production builds (not a runtime flag).~~ ⚠ Superseded: a file inside `src/` can only be excluded by a list, and the cited `tsconfig.build.json` / esbuild `external` mechanism does not exist in this repo (`apps/api` builds with plain `tsc --build`). See `specs/security.md` §2.3. | S | 018 | `T-SEC-019` |
 | TASK-027 | Easy Auth configuration in `infra/aca.bicep`: Entra ID provider, redirect to the requested path, deep-link preservation across sign-in, sign-out route. **Zero auth code in the app.** | S | 006, 019 | `T-AUTH-001`, `T-AUTH-002`, `T-AUTH-003` |
-| TASK-028 | `apps/web/src/pages/RefusalPage.tsx` + 401 and IdP-failure states; copy from `ui.md` §9. | S | 025, 019 | `T-SEC-018`, `T-UX-019` |
+| TASK-028 | `apps/web/src/pages/RefusalPage.tsx` + 401 and IdP-failure states; copy from `ui.md` §9. | S | 025, 019 | `T-SEC-018`, `T-UX-019`, `T-UX-025` |
 | TASK-031 | `tests/smoke/deployed.spec.ts` — post-deploy smoke run against the 0%-traffic revision. | S | 007, 027 | `T-SMOKE-001`, `T-SMOKE-003` |
 
 #### US-002 — Everything I store is mine alone
@@ -1141,7 +1141,7 @@ Traces to: US-037 (NFR-006, NFR-007; SD-12 WCAG 2.1 AA) · Milestone M1/M7
 | TASK-025 | `apps/web/src/AppShell.tsx` + nav + router with all **nine** routes stubbed + `NotFoundPage.tsx`. | S | 001 | `T-UI-023` |
 | TASK-123 **(REVISED, R7)** | Viewport suite at 320 / 1024 / 280 px. **↳ R7 (`A45`): include the three ingest affordances at 320 px** — the "Paste screenshot" button ≥ 44×44 px and in tab order, `PASTE_IOS_HINT` visible beneath it on a touch viewport, and **"Choose files" still visible beside it, never displaced** (`ui.md` §3.2b placement rule). | M | 038, 069, 096, 162 | `T-A11Y-001`, `T-A11Y-002`, `T-A11Y-013`, `T-A11Y-015`; **(R7)** all three affordances operable at 320 px |
 | TASK-124 | axe-core suite across all nine routes — **zero serious or critical**. | S | 123 | `T-A11Y-012 ~~T-A11Y-003~~` … `T-A11Y-012` |
-| TASK-125 | Offline states across every surface, per `ux-states.md` §11 checklist. | M | 123 | `T-UX-020`, `T-UX-021` |
+| TASK-125 | Offline states across every surface, per `ux-states.md` §11 checklist. | M | 123 | `T-UX-023`, `T-UX-024` |
 
 #### US-038 — No streaming credentials, no automation of the services
 Traces to: US-038 (NFR-009, NFR-010) · Milestone M1/M7
