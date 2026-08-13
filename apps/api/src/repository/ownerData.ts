@@ -504,6 +504,28 @@ export async function deactivateSuppression(
   });
 }
 
+/**
+ * Re-arm a previously lifted suppression, in one statement.
+ *
+ * `active: false` in the `where` is what makes the suppress route idempotent
+ * (US-027 AC-4): an ALREADY-ACTIVE suppression matches nothing, so `count` is
+ * 0 and `suppressedAt` is left exactly as it was. Written as a conditional
+ * `updateMany` rather than read-then-write so the decision and the write are
+ * one statement — a plain update would silently reset `suppressedAt` on every
+ * repeat press, quietly rewriting the date the owner made the decision.
+ */
+export async function reactivateSuppression(
+  ownerId: OwnerId,
+  workIdentity: string,
+  suppressedAt: Date,
+  tx?: Db,
+) {
+  return db(tx).suppression.updateMany({
+    where: { ownerId, workIdentity, active: false },
+    data: { active: true, suppressedAt, unsuppressedAt: null },
+  });
+}
+
 /* ------------------------------------------------------------------ *
  * uploaded_image / extraction_candidate
  * ------------------------------------------------------------------ */

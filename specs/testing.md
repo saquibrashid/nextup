@@ -1711,3 +1711,91 @@ The static gate `npm run check:outbound` (`T-SEC-031`) is what covers that
 route, by refusing any source file that contacts a host outside the
 three-destination allow-list. **Do not treat the runtime guard as sufficient on
 its own** — the two gates are complementary and both must stay.
+
+---
+
+## 15. TASK-101 — suppression (`POST /api/titles/:titleId/suppress`)
+
+### 15.1 The second done-when mis-citation (`A48`)
+
+TASK-101's "Done when" cited **`T-SUP-002`**, which is US-028 AC-2: *a
+suppressed work in a later batch is filtered before any record is created.*
+That is the **extraction gate** (`specs/ai.md` §5) — it needs a batch, an
+extraction pass and reconciliation, none of which TASK-101 builds and none of
+which it depends on (deps are 015 and 017). `T-SUP-003`, its sibling in the
+same story, is already correctly assigned to **TASK-103**; `T-SUP-002` belongs
+with it.
+
+This is the **second** occurrence of the same defect class in one sweep — see
+§14.1 for TASK-032. Both share a shape worth naming: **a task whose done-when
+names a test that the task's own dependencies cannot satisfy.** It is not
+detectable by `check:test-ids` (the id exists) nor by `check:status` (the
+ledger is consistent), because both check that the id is *real*, not that it is
+*reachable*. The visible symptom is a test nobody writes, in a task nobody can
+close.
+
+TASK-101 is re-pointed to the five tests it can actually discharge:
+`T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014`.
+
+⚠ **`T-SUP-011` (US-027 AC-2) is deliberately NOT claimed and is currently
+unowned.** It requires the work to be absent from *"the combined list and any
+review pass"*. The list half is asserted here as `T-SUP-011a`, but the review
+half needs an open batch's review, which TASK-105 builds. **Do not mark
+`T-SUP-011` discharged on the strength of the list half alone** — that would
+repeat exactly the defect this section documents. Whichever task delivers
+review must claim it.
+
+### 15.2 Suffixes added
+
+| id | L | Assertion |
+|---|---|---|
+| `T-SUP-001a` | I | The response key is `supp:` + the work identity, spelled out independently of the constant that produces it |
+| `T-SUP-001b` | I | **Neither the title id, the listing id nor the batch id appears in the stored key or identity** — product invariant 1 as an assertion |
+| `T-SUP-001c` | I | A foreign owner's title answers **404, not 403**, and writes nothing |
+| `T-SUP-001d` | I | An unknown title id answers 404 and writes nothing |
+| `T-SUP-001e` | U | `suppressionIdFor` maps identity → `supp:<identity>` for `tmdb:movie`, `tmdb:tv` and `unmatched` |
+| `T-SUP-001f` | U | It is **pure** — no clock, no randomness, no counter. Were it not, the route would mint a new document per press and idempotency would go with it while every single-call test still passed |
+| `T-SUP-001g` | U | Distinct identities never collide; `tmdb:movie:1` vs `tmdb:tv:1` is the pair a scheme dropping the media type would merge |
+| `T-SUP-001h` | U | A **row id is refused, not silently accepted** — a ULID, an already-prefixed id, and malformed identities all throw |
+| `T-SUP-010a` | I | The suppression row is created active, owner-scoped, with `unsuppressedAt` null |
+| `T-SUP-010b` | I | The display snapshot is **frozen by copy**, so the suppressed view renders after the title is gone (US-029 AC-1) |
+| `T-SUP-010c` | I | An **unmatched** title can be suppressed (OQ-015 closed) and snapshots its raw text |
+| `T-SUP-010d`–`f` | U | `toDisplaySnapshot` for matched, unmatched, and the metadata-less last resort |
+| `T-SUP-011a` | I | The work leaves the **combined list** (the list half of AC-2 only — see the warning above) |
+| `T-SUP-012a` | I | Title and **both** listings keep `state: 'active'` and a null `removedAt`; nothing is deleted (REQ-028) |
+| `T-SUP-013a` | I | A repeat press is 200, reports `alreadySuppressed: true`, and leaves exactly one row |
+| `T-SUP-013b` | I | A repeat press **does not rewrite `suppressedAt`** |
+| `T-SUP-013c` | I | Re-suppressing a **lifted** suppression re-arms the same document rather than creating a second |
+| `T-SUP-014a` | I | Suppressing a two-badge title hides the **whole row** |
+| `T-SUP-014b` | I | A **different** work on the same services is untouched |
+
+### 15.3 What the mutation testing showed
+
+`T-SUP-001` is strongly pinned: keying the suppression on the title id instead
+of the work identity fails **six** tests across both layers.
+
+⚠ **Idempotency is guarded by two defences that MASK EACH OTHER under
+mutation, and this is deliberate.** Removing *either* the already-active early
+return in the route *or* the `active: false` predicate in
+`reactivateSuppression` leaves all 249 tests green — the surviving defence
+covers for the other (the create then fails on the unique index and is caught
+as idempotent). Removing **both** fails `T-SUP-013`, so the property is
+genuinely asserted and the suite is not vacuous.
+
+The consequence to know before refactoring: **no single test names the
+mechanism.** If you delete one defence the suite will tell you nothing, and the
+next person to delete the second will see a failure whose cause is two commits
+old. Keep both, or replace them with one mechanism and say so here.
+
+`T-SUP-014b` exists because `T-SUP-014a` alone is satisfied by a suppression
+scoped to the **service** rather than the work — that would empty the list
+entirely and still pass. The two are only meaningful together.
+
+### 15.4 A trap for integration suites
+
+The owner id **must be read from `GET /api/me`, never constructed**. It is a
+one-way function of the principal (`ownerId.ts`), so a literal such as
+`asOwnerId(\`${ISSUER}|${SUBJECT}\`)` seeds rows under an owner no request is
+ever scoped to. Every assertion then fails as a **404 that looks exactly like a
+routing bug** — the handler is fine, the fixture is invisible. `titles.spec.ts`
+already carried the warning; this suite hit it anyway.

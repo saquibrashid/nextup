@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 125 |
+| ⬜ todo | 124 |
 | 🚧 doing | 0 |
-| ✅ done | 29 |
+| ✅ done | 30 |
 | 🙋 owner | 7 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -41,7 +41,8 @@ Not done, and every task they depend on is done.
 | `TASK-049` | S | Epic B — Capture & import |
 | `TASK-054` | M | Epic B — Capture & import |
 | `TASK-055` | S | Epic C — Extraction |
-| `TASK-101` | S | Epic H — History, removal ledger, suppression |
+| `TASK-102` | S | Epic H — History, removal ledger, suppression |
+| `TASK-106` | S | Epic H — History, removal ledger, suppression |
 | `TASK-121` | S | Epic K — Platform, safety, and the shell |
 | `TASK-122` | S | Epic K — Platform, safety, and the shell |
 | `TASK-126` | M | Epic K — Platform, safety, and the shell |
@@ -65,7 +66,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-99 tasks cannot start yet.
+97 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -122,18 +123,16 @@ Not done, and every task they depend on is done.
 | `TASK-095` | `TASK-088`, `TASK-047` |
 | `TASK-096` | `TASK-095` |
 | `TASK-097` | `TASK-095` |
-| `TASK-098` | `TASK-095`, `TASK-101` |
+| `TASK-098` | `TASK-095` |
 | `TASK-099` | `TASK-098` |
 | `TASK-100` | `TASK-095`, `TASK-071` |
-| `TASK-102` | `TASK-101` |
-| `TASK-103` | `TASK-101`, `TASK-071` |
+| `TASK-103` | `TASK-071` |
 | `TASK-104` | `TASK-103` |
 | `TASK-105` | `TASK-103`, `TASK-083` |
-| `TASK-106` | `TASK-101` |
 | `TASK-107` | `TASK-106` |
 | `TASK-108` | `TASK-103`, `TASK-096` |
 | `TASK-109` | `TASK-074`, `TASK-060` |
-| `TASK-110` | `TASK-109`, `TASK-101` |
+| `TASK-110` | `TASK-109` |
 | `TASK-111` | `TASK-109` |
 | `TASK-112` | `TASK-074` |
 | `TASK-113` | `TASK-112`, `TASK-075` |
@@ -197,6 +196,7 @@ Not done, and every task they depend on is done.
 | `TASK-025` | `a9e3483` | `T-UI-023` |
 | `TASK-033` | `T-LIST-010`, `T-LIST-011`, `T-API-017` | `T-API-017`, `T-LIST-010`, `T-LIST-011` |
 | `TASK-048` | `T-BATCH-010`, `T-BATCH-015` | `T-API-003`, `T-BATCH-010`, `T-BATCH-015` |
+| `TASK-101` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` |
 | `TASK-144` | `eb07409` — a CI grep gate over `prisma/migrations/**` | `T-MIG-001` |
 | `TASK-146` | **ahead-of:TASK-007.** `docs/ghcr-pat.md` written. **No PAT is needed at all** — a fine-grained PAT cannot authenticate to `ghcr.io` and a classic one is account-wide, so the package is public and CI pushes with `GITHUB_TOKEN` (R8). Remaining: the `deploy.yml` link + image secret-scan land with TASK-007, and the one-time visibility flip runs after the first successful push. | _no test id declared_ |
 | `TASK-147` | HEIC decode chain (`heic-convert` → `heic-decode` → `libheif-js`, LGPL-3.0, decode-only) + `sharp` installed; `T-DEP-001` runtime allow-list, `T-DEP-002` encoder ban and `T-DEP-003` prebuilt-only added to `tools/check-deps.mjs`; `T-LICENSE-001` now green against the REAL tree, completing TASK-153's other half. Three corrections found at implementation: (a) `sharp@0.34` carried high-severity libvips CVEs and would have been blocked by `npm audit` in CI — pinned `^0.35.3`, 0 vulnerabilities; (b) `sharp` is Apache-2.0 with LGPL-3.0-or-later libvips binaries, **not MIT** as the spec claimed — corrected in `specs/security.md` §8 and the TASK-147 row; (c) **the runtime container stage installed with `--omit=optional`, which excludes all 25 sharp platform binaries** — proven by building the image both ways (`require('sharp')` threw "Could not load the sharp module using the linuxmusl-x64 runtime"), fixed with a `COPY --from=build` and guarded by `T-INFRA-007`. | _no test id declared_ |

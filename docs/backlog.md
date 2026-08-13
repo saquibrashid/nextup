@@ -552,7 +552,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-098` | `todo` | — |
 | `TASK-099` | `todo` | — |
 | `TASK-100` | `todo` | — |
-| `TASK-101` | `todo` | — |
+| `TASK-101` | `done` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` |
 | `TASK-102` | `todo` | — |
 | `TASK-103` | `todo` | — |
 | `TASK-104` | `todo` | — |
@@ -1048,7 +1048,7 @@ Traces to: US-027 (REQ-070) · Milestone M5
 
 | Task | Description | Size | Depends on | Done when |
 |---|---|---|---|---|
-| TASK-101 | `suppression` document + `POST /api/works/:workIdentity/suppress` — idempotent, **per-work not per-listing**. | S | 015, 017 | `T-SUP-001`, `T-SUP-002` |
+| TASK-101 **(PATH + DONE-WHEN CORRECTED, `A48`)** | `suppression` document + `POST /api/titles/:titleId/suppress` — idempotent, **per-work not per-listing**. **↳ The route takes a TITLE id and derives the WORK identity; `specs/api.md` §6.6 and the `check:mutating-routes` registry are authoritative and both say `/api/titles/:titleId/suppress`. ~~`POST /api/works/:workIdentity/suppress`~~ never existed.** | S | 015, 017 | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` ~~`T-SUP-002`~~ |
 | TASK-102 | `components/SuppressDialog.tsx` + immediate undo + rollback on failure. | S | 101 | `T-UX-085`, `T-UX-022` |
 
 #### US-029 — See and reverse suppressions

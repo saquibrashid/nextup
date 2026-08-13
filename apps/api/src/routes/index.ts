@@ -27,6 +27,7 @@ import type { PrincipalReader } from '../auth/principal.js';
 import { AppError } from '../errors/AppError.js';
 import { registerBatchRoutes } from './batches.js';
 import { registerMeRoutes } from './me.js';
+import { registerSuppressionRoutes } from './suppressions.js';
 import { registerTitleRoutes } from './titles.js';
 
 /**
@@ -83,6 +84,7 @@ export function createApiRouter(): Router {
   registerMeRoutes(apiRouter);
   registerBatchRoutes(apiRouter);
   registerTitleRoutes(apiRouter);
+  registerSuppressionRoutes(apiRouter);
   return apiRouter;
 }
 

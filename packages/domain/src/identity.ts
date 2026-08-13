@@ -84,3 +84,26 @@ export function workIdentityForUnmatched(rawText: string): string {
   }
   return `unmatched:${hex}`;
 }
+
+/**
+ * The id of the suppression document for a work (`specs/data-model.md` §3.5).
+ *
+ * ⚠ **A pure function of the WORK IDENTITY, and of nothing else** (REQ-071,
+ * product invariant 1). No title id, no listing id, no service, no batch —
+ * because a suppressed work that reappears in a later capture becomes a
+ * BRAND-NEW title row (product invariant 7). Mix a row id into this key and
+ * suppression appears to work, then silently stops on the next upload,
+ * re-showing something the owner explicitly said they were not interested in.
+ * That is a data-loss-shaped failure the owner would have to notice by hand.
+ *
+ * It is deterministic rather than generated for the same reason the store
+ * relies on it as the primary key: "suppress this work" must resolve to the
+ * same document however many times, and from however many rows, it is invoked
+ * — which is what makes the route idempotent (US-027 AC-4) without a lookup.
+ */
+export function suppressionIdFor(workIdentity: string): string {
+  if (!WORK_IDENTITY_RE.test(workIdentity)) {
+    throw new TypeError(`Not a work identity: ${workIdentity}`);
+  }
+  return `supp:${workIdentity}`;
+}
