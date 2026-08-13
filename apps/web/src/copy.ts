@@ -23,9 +23,24 @@
 /* specs/ui.md §9                                                             */
 /* -------------------------------------------------------------------------- */
 
-/** US-011 AC-2 - verbatim, compliance. Never re-typed, never paraphrased. */
-export const TMDB_DISCLAIMER =
-  'This product uses the TMDB API but is not endorsed or certified by TMDB.';
+/**
+ * US-011 AC-2 - verbatim, compliance. Never re-typed, never paraphrased.
+ *
+ * ⚠ RE-EXPORTED, NOT DEFINED HERE. `packages/domain/src/attribution.ts` is the
+ * one source: the API serves that constant as `attribution.tmdbDisclaimer`
+ * (`GET /api/me`, `specs/api.md` §6.1) and `T-ATTR-001` asserts the constant,
+ * the API value and the rendered DOM text are all byte-equal. A second literal
+ * here would satisfy that chain today and diverge the first time either side is
+ * reworded - which is exactly the failure the chain exists to prevent, and it
+ * is invisible from inside the product.
+ *
+ * ⚠ Unlike `MODE_APPEND_ONLY_CONSEQUENCE` below, which is deliberately NOT
+ * collapsed. The difference is what guards each one: this sentence is pinned to
+ * TMDB's required wording by `T-ATTR-001` at three layers, whereas the domain's
+ * mode copy is guarded only by a `toContain`, so re-exporting that one would
+ * trade a constant proven byte-equal to `specs/ui.md` §9 for one that is not.
+ */
+export { TMDB_DISCLAIMER } from '@nextup/domain';
 
 /** US-023 AC-2, US-024 AC-6 - the removed view is a log, not a recycle bin. */
 export const REMOVED_VIEW_SUBTITLE =

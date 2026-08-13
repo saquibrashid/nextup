@@ -17,24 +17,32 @@
  *   offline or erroring is a compliance statement that is absent exactly when
  *   the owner is most likely to be looking at an error screen.
  *
- * The sentence itself is not written in this file. `specs/api.md` §6.1 and
- * `specs/ui.md` §8 require ONE source, verbatim, never re-typed - which is what
- * `T-ATTR-001` asserts by comparing the constant, the API value and the
- * rendered DOM text for byte equality.
+ * The sentence itself is not written in this file, and is no longer written in
+ * `copy.ts` either. `packages/domain/src/attribution.ts` is the one source;
+ * `specs/api.md` §6.1 and `specs/ui.md` §8 require ONE source, verbatim, never
+ * re-typed - which is what `T-ATTR-001` asserts by comparing the constant, the
+ * API value and the rendered DOM text for byte equality.
  *
- * The props exist for that third leg. `TASK-024` adds `attribution` to
- * `GET /api/me` and `packages/domain/src/attribution.ts`; at that point the
- * caller passes the API's values straight in and `T-ATTR-001` compares all
- * three. Until then the defaults come from `copy.ts`, which is byte-equal to
- * the required wording.
+ * The props are the third leg of that chain: once `GET /api/me` is wired up the
+ * caller passes the API's `attribution` values straight in, and all three are
+ * compared. They default to the domain constants, which are the same bytes the
+ * API serves - so an unwired caller renders the correct sentence rather than
+ * nothing, and the fallback can never drift from what the API would have said.
  */
 
 import type { JSX } from 'react';
 
-import { TMDB_DISCLAIMER } from '../copy';
+import { TMDB_DISCLAIMER, TMDB_LOGO_PATH } from '@nextup/domain';
 
-/** `specs/api.md` §6.1 - `attribution.tmdbLogoPath`. */
-export const TMDB_LOGO_PATH = '/assets/tmdb-logo.svg';
+/**
+ * `specs/api.md` §6.1 - `attribution.tmdbLogoPath`.
+ *
+ * Re-exported from `packages/domain/src/attribution.ts` rather than redeclared,
+ * so the path the API advertises and the path the SPA actually requests cannot
+ * disagree. A second literal would 404 silently: the disclaimer would still
+ * render, so the page would look compliant while the logo was missing.
+ */
+export { TMDB_LOGO_PATH };
 
 /** `specs/ui.md` §10.2 - the TMDB logo is the one image with meaningful alt text. */
 export const TMDB_LOGO_ALT = 'TMDB';
