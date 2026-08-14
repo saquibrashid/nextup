@@ -2734,3 +2734,51 @@ sized for, so `maxDecodePixels()` falls back and `T-IMG-022d` pins it. **The
 one behaviour that is NOT acceptable - silently disabling the guard, e.g. by
 treating an unparseable value as `Infinity` - is what that case exists to
 prevent.**
+
+---
+
+## 27. The synthesised file name (TASK-158)
+
+`specs/data-model.md` §3.8.1 is normative. `packages/domain/src/pastedFileName.ts`
+is pure and takes an injected clock, so `T-PASTE-005a`-`s` (19 cases in
+`packages/domain/test/pastedFileName.spec.ts`) need no container.
+
+### 27.1 What TASK-158 claims
+
+`T-PASTE-005` **unit half only.** The function produces
+`pasted-<YYYYMMDD>-<HHMMSS>-<NN>.<ext>` from server UTC time and the 1-based
+batch ordinal; `drop`/`upload` keep the device name and fall back to the
+`dropped-`/`uploaded-` prefixes; the extension follows the SNIFFED format
+(`jpeg` maps to `.jpg`, not `.jpeg`); `paste` ignores any client-supplied name
+entirely.
+
+### 27.2 What it does NOT claim
+
+The **integration half** of `T-PASTE-005` -- that `ingestSource` and the
+synthesised `fileName` actually round-trip through
+`POST /api/batches/:batchId/images` and are persisted write-once, that
+`seqInBatch` is assigned server-side in receipt order under the insert, and
+that `blobPath` contains no part of any client-supplied name -- belongs to
+**TASK-050** and is asserted in `apps/api/test/integration/ingestSources.spec.ts`
+(§11). TASK-158 supplies the function; it cannot assert its own call site.
+
+### 27.3 Findings
+
+**(a) A UTC assertion made from a fixed instant is vacuous in CI.**
+`T-PASTE-005f` pins a 23:30 UTC instant so that a `getHours()` implementation
+produces a different string. That discriminates on a developer host in an
+offset timezone -- and **not at all in CI**, where the container is UTC and
+`getHours() === getUTCHours()`. The mutation was caught locally (Eastern) and
+would have passed on the only machine whose verdict counts. `T-PASTE-005s`
+closes it host-independently by reading the module source and asserting no
+non-UTC date accessor appears, with a non-vacuity check that the six `getUTC*`
+calls are actually present. Both directions mutation-verified.
+
+**(b) `fileName` is `NVARCHAR(255)`; a device name is not.**
+`specs/data-model.md` §3.8.1 says the device name is kept, and says nothing
+about length. A browser will happily supply a 400-character name, which then
+fails the zod ceiling or the insert -- a real file from a real device, rejected
+for a reason the owner cannot act on. `resolveFileName()` truncates to
+`MAX_FILE_NAME_LENGTH` preserving the extension; `T-PASTE-005p` asserts the
+result satisfies `uploadedImageSchema.shape.fileName`. Reported as a spec gap,
+not a spec change.

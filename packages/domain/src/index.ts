@@ -21,6 +21,7 @@ export * from './ordering.js';
 // TASK-145 — the pure half of the pre-decode pixel guard (`specs/api.md`
 // §5.0.1). Pure so the decision table can be tested without a container, a
 // fixture or a decoder; the header read is in `apps/api/src/images`.
+export * from './pastedFileName.js';
 export * from './pixelGuard.js';
 export * from './schemas.js';
 export * from './types.js';

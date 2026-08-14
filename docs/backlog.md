@@ -603,7 +603,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-155` | `todo` | — |
 | `TASK-156` | `todo` | — |
 | `TASK-157` | `todo` | — |
-| `TASK-158` | `todo` | — |
+| `TASK-158` | `done` | `packages/domain/src/pastedFileName.ts` + `T-PASTE-005a`-`s` (19 unit cases). `INGEST_SOURCES`/`IngestSource` already existed from TASK-012, so this task is the synthesiser alone. The INTEGRATION half of `T-PASTE-005` (round-trip of `ingestSource`, server-assigned `seqInBatch`, `blobPath` free of any client name) belongs to TASK-050 — see `specs/testing.md` §27.2. |
 | `TASK-159` | `todo` | — |
 | `TASK-160` | `todo` | — |
 | `TASK-161` | `todo` | — |
