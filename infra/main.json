@@ -51,6 +51,18 @@
       "metadata": {
         "description": "Entra ID UPN of the SQL Entra administrator."
       }
+    },
+    "entraClientId": {
+      "type": "string",
+      "metadata": {
+        "description": "Application (client) id of the Entra app registration used by Easy Auth (TASK-027)."
+      }
+    },
+    "entraClientSecret": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Client secret of the Easy Auth app registration. Supplied at deploy time."
+      }
     }
   },
   "variables": {
@@ -502,6 +514,12 @@
           },
           "containerImage": {
             "value": "[parameters('containerImage')]"
+          },
+          "entraClientId": {
+            "value": "[parameters('entraClientId')]"
+          },
+          "entraClientSecret": {
+            "value": "[parameters('entraClientSecret')]"
           }
         },
         "template": {
@@ -556,10 +574,23 @@
               "metadata": {
                 "description": "Fully-qualified container image, e.g. ghcr.io/saquibrashid/nextup:sha-abc123."
               }
+            },
+            "entraClientId": {
+              "type": "string",
+              "metadata": {
+                "description": "Application (client) id of the Entra app registration used by Easy Auth."
+              }
+            },
+            "entraClientSecret": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Client secret of the Entra app registration. Supplied at deploy time; never committed."
+              }
             }
           },
           "variables": {
-            "isProd": "[equals(parameters('environmentName'), 'prod')]"
+            "isProd": "[equals(parameters('environmentName'), 'prod')]",
+            "entraClientSecretName": "entra-client-secret"
           },
           "resources": [
             {
@@ -600,7 +631,12 @@
                       }
                     ]
                   },
-                  "secrets": []
+                  "secrets": [
+                    {
+                      "name": "[variables('entraClientSecretName')]",
+                      "value": "[parameters('entraClientSecret')]"
+                    }
+                  ]
                 },
                 "template": {
                   "containers": [
@@ -635,6 +671,44 @@
               },
               "dependsOn": [
                 "[resourceId('Microsoft.App/managedEnvironments', parameters('managedEnvironmentName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.App/containerApps/authConfigs",
+              "apiVersion": "2024-03-01",
+              "name": "[format('{0}/{1}', parameters('containerAppName'), 'current')]",
+              "properties": {
+                "platform": {
+                  "enabled": true
+                },
+                "globalValidation": {
+                  "unauthenticatedClientAction": "RedirectToLoginPage",
+                  "redirectToProvider": "azureactivedirectory"
+                },
+                "identityProviders": {
+                  "azureActiveDirectory": {
+                    "enabled": true,
+                    "registration": {
+                      "openIdIssuer": "https://login.microsoftonline.com/common/v2.0",
+                      "clientId": "[parameters('entraClientId')]",
+                      "clientSecretSettingName": "[variables('entraClientSecretName')]"
+                    },
+                    "validation": {
+                      "allowedAudiences": [
+                        "[parameters('entraClientId')]"
+                      ]
+                    }
+                  }
+                },
+                "login": {
+                  "preserveUrlFragmentsForLogins": true,
+                  "tokenStore": {
+                    "enabled": false
+                  }
+                }
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.App/containerApps', parameters('containerAppName'))]"
               ]
             }
           ],

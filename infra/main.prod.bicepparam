@@ -23,3 +23,10 @@ param sqlAdminPassword = readEnvironmentVariable('NEXTUP_SQL_ADMIN_PASSWORD')
 
 param entraAdminLogin = readEnvironmentVariable('NEXTUP_ENTRA_ADMIN_LOGIN')
 param entraAdminObjectId = readEnvironmentVariable('NEXTUP_ENTRA_ADMIN_OBJECT_ID')
+
+// Easy Auth (TASK-027). The app registration must list BOTH environments'
+// callback URLs — https://<fqdn>/.auth/login/aad/callback — because prod and
+// staging share one client id. No default: a missing secret must fail the
+// deployment, not silently produce an auth config nobody can sign in through.
+param entraClientId = readEnvironmentVariable('NEXTUP_ENTRA_CLIENT_ID')
+param entraClientSecret = readEnvironmentVariable('NEXTUP_ENTRA_CLIENT_SECRET')

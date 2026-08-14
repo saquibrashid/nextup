@@ -33,6 +33,36 @@ param logAnalyticsSharedKey string
 param containerImage string
 
 // ---------------------------------------------------------------------------
+// EASY AUTH (TASK-027, ADR-0002, specs/security.md §2.1).
+//
+// ⚠ THE ISSUER IS `/common` ON PURPOSE, AND IT ACCEPTS *EVERY* MICROSOFT
+// ACCOUNT IN THE WORLD. ADR-0002 requires both organisational and personal
+// Microsoft accounts, and there is no issuer that admits both while admitting
+// only one person. Easy Auth is AUTHENTICATION; the only thing standing
+// between "signed in" and the owner's data is the NFR-017 allow-list in
+// apps/api/src/middleware/allowList.ts (TASK-019), which fails CLOSED.
+//
+// ADR-0002 names this as the one part of the auth story that can fail
+// SILENTLY: if the allow-list is missing or misconfigured everything still
+// works perfectly for the owner, and the app is open to the internet. Do not
+// "simplify" this to a tenant-scoped issuer and conclude the allow-list is
+// now redundant — a tenant issuer would lock the owner's personal Microsoft
+// account out instead, and the allow-list is still the only per-person check.
+// ---------------------------------------------------------------------------
+// ⚠ THE ISSUER IS A LITERAL in the authConfig below, not a parameter, for the
+// same reason the compute triple is: a parameterised default can be overridden
+// at the call site while this file still reads correctly. Changing WHO MAY
+// SIGN IN should require a visible, reviewable Bicep diff — and T-INFRA-008
+// asserts on the compiled value, which it cannot do through a `parameters()`
+// reference.
+@description('Application (client) id of the Entra app registration used by Easy Auth.')
+param entraClientId string
+
+@description('Client secret of the Entra app registration. Supplied at deploy time; never committed.')
+@secure()
+param entraClientSecret string
+
+// ---------------------------------------------------------------------------
 // THE COMPUTE / DECODE-GUARD PAIR (REQ-079, A43, invariant 14).
 //
 // cpu / memory and NEXTUP_MAX_DECODE_PIXELS are ONE SETTING IN TWO PLACES and
@@ -61,6 +91,12 @@ param containerImage string
 // break the pair while this file still looked correct.
 
 var isProd = environmentName == 'prod'
+
+// The secret NAME is referenced from two places that must agree: the
+// `secrets` entry below and `clientSecretSettingName` in the authConfig. If
+// they drift, Easy Auth starts with no secret — and a misconfigured provider
+// fails CLOSED (nobody, including the owner, can sign in), which is loud.
+var entraClientSecretName = 'entra-client-secret'
 
 // Shared across both environments — one managed environment, one Log Analytics
 // workspace (ADR-0003 R2.4: "no separate Log Analytics workspace").
@@ -115,10 +151,17 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
       // narrow it to one repository. Adding a half-configured `registries`
       // entry is also strictly worse than none: it fails CLOSED, because the
       // anonymous pull path is no longer attempted.
-      secrets: []
-      // Easy Auth (authConfigs) is NOT configured here — it is TASK-027,
-      // which depends on TASK-006 and TASK-019. Zero auth code in the app
-      // (ADR-0002).
+      // The ONLY secret in this system. It is the Entra app registration's
+      // client secret, supplied at deploy time from a GitHub secret via
+      // `readEnvironmentVariable` in the .bicepparam — never a literal, never
+      // committed. Everything else authenticates with the system-assigned
+      // managed identity, and there is deliberately no registry credential.
+      secrets: [
+        {
+          name: entraClientSecretName
+          value: entraClientSecret
+        }
+      ]
     }
     template: {
       containers: [
@@ -152,6 +195,82 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         minReplicas: isProd ? 1 : 0
         maxReplicas: isProd ? 2 : 1
       }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// EASY AUTH — TASK-027, ADR-0002, specs/security.md §2.1.
+//
+// This resource is the WHOLE of nextup's authentication. There is no OIDC
+// client, no JWT library, no session store and no cookie signing anywhere in
+// the application (T-SEC-011 asserts the packages are absent). US-001 AC-1
+// ("no nextup content is rendered before authentication completes") is a
+// platform property enforced ahead of application code, not an application
+// invariant that has to be tested.
+//
+// The name MUST be `current` — Easy Auth reads exactly one auth config per
+// container app and ignores any other name, silently and while deploying
+// successfully.
+// ---------------------------------------------------------------------------
+resource authConfig 'Microsoft.App/containerApps/authConfigs@2024-03-01' = {
+  parent: app
+  name: 'current'
+  properties: {
+    platform: {
+      enabled: true
+    }
+    globalValidation: {
+      // Unauthenticated requests are redirected to sign-in rather than served
+      // anything (US-001 AC-1, T-AUTH-001). `redirectToProvider` skips the
+      // provider-chooser page, which would otherwise offer a single choice.
+      unauthenticatedClientAction: 'RedirectToLoginPage'
+      redirectToProvider: 'azureactivedirectory'
+      // ⚠ NO `excludedPaths`, deliberately. Every entry here is an
+      // authentication BYPASS by path prefix, evaluated before any
+      // application code runs, and `/api/*` in this list would expose the
+      // owner's entire list to the internet while every application-level
+      // test still passed. There is no health endpoint that needs one: the
+      // Container Apps default probe is TCP, not HTTP.
+    }
+    identityProviders: {
+      azureActiveDirectory: {
+        enabled: true
+        registration: {
+          openIdIssuer: 'https://login.microsoftonline.com/common/v2.0'
+          clientId: entraClientId
+          clientSecretSettingName: entraClientSecretName
+        }
+        validation: {
+          allowedAudiences: [
+            entraClientId
+          ]
+          // NO `defaultAuthorizationPolicy`. Per-person authorisation is
+          // NFR-017's allow-list in application middleware (TASK-019), and
+          // splitting it across two places would leave two half-checks that
+          // each look complete.
+        }
+      }
+    }
+    login: {
+      // US-001 AC-2 / T-AUTH-002: the requested deep link survives the
+      // round trip through Entra. The path is preserved by Easy Auth's
+      // `post_login_redirect_uri`; this flag is what additionally preserves
+      // the URL FRAGMENT, which that redirect parameter cannot carry because
+      // a fragment is never sent to a server.
+      preserveUrlFragmentsForLogins: true
+      tokenStore: {
+        // Explicitly OFF. nextup calls no downstream API on the owner's
+        // behalf, so it needs no access token — and a token store would
+        // persist C3 identity material (specs/security.md §5 says `email` is
+        // display-only and lives in memory only). It also requires a
+        // configured blob store, so enabling it without one breaks sign-in.
+        enabled: false
+      }
+      // NO sign-out configuration. `/.auth/logout` is a PLATFORM route that
+      // exists as soon as `platform.enabled` is true (specs/security.md §2.1);
+      // the header links to it. Declaring a custom logout endpoint here would
+      // shadow it.
     }
   }
 }

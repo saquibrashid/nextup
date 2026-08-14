@@ -42,6 +42,13 @@ param entraAdminObjectId string
 @description('Entra ID UPN of the SQL Entra administrator.')
 param entraAdminLogin string
 
+@description('Application (client) id of the Entra app registration used by Easy Auth (TASK-027).')
+param entraClientId string
+
+@description('Client secret of the Easy Auth app registration. Supplied at deploy time.')
+@secure()
+param entraClientSecret string
+
 // Deterministic, globally-unique names derived from the resource group id, so
 // main.bicep can declare `existing` child resources for RBAC scoping without
 // depending on a module output.
@@ -100,6 +107,8 @@ module aca 'aca.bicep' = {
     logAnalyticsCustomerId: logAnalytics.properties.customerId
     logAnalyticsSharedKey: logAnalytics.listKeys().primarySharedKey
     containerImage: containerImage
+    entraClientId: entraClientId
+    entraClientSecret: entraClientSecret
   }
 }
 
@@ -125,7 +134,6 @@ module blobRbac 'rbac.bicep' = {
 
 // ---------------------------------------------------------------------------
 // NOT COMPOSED HERE, deliberately:
-//   - Easy Auth (authConfigs)          -> TASK-027 (depends on 006, 019)
 //   - Managed-identity DB user + smoke migration -> TASK-141
 //   - Budget alerts (1.0x informational + 1.5x, NO auto-remediation)
 //                                      -> TASK-142

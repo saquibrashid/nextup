@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 123 |
+| ⬜ todo | 122 |
 | 🚧 doing | 0 |
-| ✅ done | 31 |
+| ✅ done | 32 |
 | 🙋 owner | 7 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -25,7 +25,6 @@ Not done, and every task they depend on is done.
 | Task | Size | Section |
 |---|---|---|
 | `TASK-026` | S | Epic G — Attribution & compliance |
-| `TASK-027` | S | Epic A — Access & identity |
 | `TASK-028` | S | Epic A — Access & identity |
 | `TASK-029` | S | Epic A — Access & identity |
 | `TASK-030` | XS | Epic K — Platform, safety, and the shell |
@@ -70,7 +69,7 @@ Not done, and every task they depend on is done.
 
 | Task | Waiting on |
 |---|---|
-| `TASK-031` | `TASK-007`, `TASK-027` |
+| `TASK-031` | `TASK-007` |
 | `TASK-039` | `TASK-037`, `TASK-038` |
 | `TASK-040` | `TASK-038` |
 | `TASK-043` | `TASK-045` |
@@ -193,6 +192,7 @@ Not done, and every task they depend on is done.
 | `TASK-023` | `apps/api/src/app.ts` + `routes/index.ts` in the mandated order, no CORS middleware, `/api` 404 fallback **inside** the chain. `T-SEC-005`, `T-SEC-012`, `T-SEC-030`, `T-API-001`. Driven over real HTTP on an ephemeral port — no new dependency. | `T-API-001`, `T-SEC-005` |
 | `TASK-024` | `T-ATTR-001` | `T-ATTR-001` |
 | `TASK-025` | `a9e3483` | `T-UI-023` |
+| `TASK-027` | `T-INFRA-008` | `T-INFRA-008` |
 | `TASK-033` | `T-LIST-010`, `T-LIST-011`, `T-API-017` | `T-API-017`, `T-LIST-010`, `T-LIST-011` |
 | `TASK-041` | `apps/api/src/routes/serviceState.ts` + `packages/domain/src/freshness.ts` — `GET /api/service-state`, one entry per service in `SERVICES` so a never-captured service reads "has never been updated" rather than vanishing. `ageInDays` counts UTC calendar days, not 24-hour blocks, and clamps clock skew. `T-FRESH-010` (a–h), `T-FRESH-012` (a–f), `T-FRESH-015` (a–c, the A46 no-nudge regression guard). All four mutations caught; see `specs/testing.md` §16. | `T-FRESH-010`, `T-FRESH-012`, `T-FRESH-015` |
 | `TASK-048` | `T-BATCH-010`, `T-BATCH-015` | `T-API-003`, `T-BATCH-010`, `T-BATCH-015` |

@@ -314,6 +314,88 @@ export function skuViolations(template) {
 }
 
 /**
+ * T-INFRA-008 — Easy Auth is configured, and configured CLOSED (TASK-027).
+ *
+ * ADR-0002's whole argument is that the safest authentication is the
+ * authentication nobody writes. That only holds if the configuration is
+ * right, and every failure mode below deploys successfully and looks fine:
+ *
+ *   - `platform.enabled: false`      — the app serves everything anonymously.
+ *   - `unauthenticatedClientAction: 'AllowAnonymous'` — likewise.
+ *   - a name other than `current`    — Easy Auth reads one config per app and
+ *                                      ignores the rest, without complaint.
+ *   - an `excludedPaths` entry       — an auth BYPASS by path prefix,
+ *                                      evaluated before any application code,
+ *                                      so every app-level test still passes.
+ *   - a literal client secret        — a credential in the repository.
+ *
+ * None of these is observable from the application, which is exactly why they
+ * are asserted against the compiled ARM.
+ */
+export function authPolicyViolations(template) {
+  const violations = [];
+  const configs = resourcesOfType(template, 'Microsoft.App/containerApps/authConfigs');
+
+  if (configs.length === 0) {
+    violations.push('auth: no authConfig — the app would serve anonymously (ADR-0002)');
+    return violations;
+  }
+
+  for (const config of configs) {
+    // ARM emits the child name as an expression:
+    // `[format('{0}/{1}', parameters('containerAppName'), 'current')]`.
+    // Splitting on `/` is not safe (the format string contains one), so match
+    // the QUOTED literal — `'currentish'` compiles to `'currentish'` and does
+    // not match, which a substring test on `current` would wave through.
+    const name = String(config.name);
+    if (!/'current'/.test(name) && name !== 'current') {
+      violations.push(`auth: authConfig must be named "current", not ${config.name}`);
+    }
+
+    const props = config.properties ?? {};
+    if (props.platform?.enabled !== true) {
+      violations.push('auth: platform.enabled must be true');
+    }
+
+    const global = props.globalValidation ?? {};
+    if (global.unauthenticatedClientAction !== 'RedirectToLoginPage') {
+      violations.push(
+        `auth: unauthenticatedClientAction must be RedirectToLoginPage (found ${global.unauthenticatedClientAction})`,
+      );
+    }
+    if ((global.excludedPaths ?? []).length > 0) {
+      violations.push(
+        `auth: excludedPaths is an authentication bypass by path prefix — none may exist (found ${JSON.stringify(global.excludedPaths)})`,
+      );
+    }
+
+    const aad = props.identityProviders?.azureActiveDirectory;
+    if (!aad || aad.enabled !== true) {
+      violations.push('auth: the azureActiveDirectory provider must be enabled (ADR-0002)');
+      continue;
+    }
+
+    const registration = aad.registration ?? {};
+    if (!registration.clientSecretSettingName) {
+      violations.push('auth: registration must reference a secret by name');
+    }
+    // The secret must be a REFERENCE, never a value. A compiled template
+    // carries `[parameters('entraClientSecret')]` here; a literal would be a
+    // credential committed to the repository.
+    if (registration.clientSecret !== undefined) {
+      violations.push('auth: registration.clientSecret must never be set — use a secret reference');
+    }
+    if (!String(registration.openIdIssuer ?? '').includes('login.microsoftonline.com')) {
+      violations.push(
+        `auth: openIdIssuer must be a Microsoft identity platform issuer (found ${registration.openIdIssuer})`,
+      );
+    }
+  }
+
+  return violations;
+}
+
+/**
  * T-INV-013 — soft delete is FOREVER.
  *
  * The ABSENCE of any expiry mechanism IS the requirement (REQ-028), so this

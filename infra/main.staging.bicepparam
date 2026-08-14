@@ -23,3 +23,9 @@ param sqlAdminPassword = readEnvironmentVariable('NEXTUP_SQL_ADMIN_PASSWORD')
 
 param entraAdminLogin = readEnvironmentVariable('NEXTUP_ENTRA_ADMIN_LOGIN')
 param entraAdminObjectId = readEnvironmentVariable('NEXTUP_ENTRA_ADMIN_OBJECT_ID')
+
+// Easy Auth (TASK-027). Same app registration as prod — its redirect-URI list
+// must include the staging FQDN's /.auth/login/aad/callback as well, or
+// staging sign-in fails with AADSTS50011 while prod is fine.
+param entraClientId = readEnvironmentVariable('NEXTUP_ENTRA_CLIENT_ID')
+param entraClientSecret = readEnvironmentVariable('NEXTUP_ENTRA_CLIENT_SECRET')

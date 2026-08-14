@@ -145,7 +145,42 @@ describe('T-INFRA-005 SKU pinning and the compute/guard pair', () => {
     // fail CLOSED: once one is present the anonymous pull is not attempted, so
     // a wrong or expired secret breaks every revision.
     expect(app.properties.configuration.registries ?? []).toEqual([]);
-    expect(app.properties.configuration.secrets ?? []).toEqual([]);
+
+    // ⚠ REWRITTEN AT TASK-027. This line previously read
+    // `expect(...secrets ?? []).toEqual([])`, which was a PROXY for "no
+    // registry credential" that held only while the app had no secrets at
+    // all. Easy Auth's client secret is a legitimate, spec-mandated secret
+    // (ADR-0002), so the old form left only two exits: delete the guard, or
+    // hard-code the Entra secret somewhere it does not belong. Both are worse
+    // than narrowing the assertion to the property that actually matters.
+    //
+    // A secret cannot feed a registry while `registries` is empty (asserted
+    // above and mutation-covered by T-INFRA-005r), so what is left to protect
+    // is that the secret INVENTORY stays closed: exactly one secret, and it is
+    // the one Easy Auth references. A second secret — a restored `ghcr-token`
+    // among them — fails here and needs a reviewable diff to justify.
+    const secrets = app.properties.configuration.secrets ?? [];
+    const authConfig = resourceOfType(template, 'Microsoft.App/containerApps/authConfigs');
+    const easyAuthSecret =
+      authConfig.properties.identityProviders.azureActiveDirectory.registration
+        .clientSecretSettingName;
+    expect(secrets.map((s) => String(s.name))).toEqual([String(easyAuthSecret)]);
+  });
+
+  it('T-INFRA-005s: catches a second, unexplained secret joining the inventory', () => {
+    // The specific regression: a `ghcr-token` re-added alongside the Easy Auth
+    // secret. T-INFRA-005r catches the `registries` half; this catches the
+    // credential arriving first, which is how it would actually happen.
+    const app = resourceOfType(template, 'Microsoft.App/containerApps');
+    const secrets = [
+      ...(app.properties.configuration.secrets ?? []),
+      { name: 'ghcr-token', value: "[parameters('ghcrToken')]" },
+    ];
+    const authConfig = resourceOfType(template, 'Microsoft.App/containerApps/authConfigs');
+    const easyAuthSecret =
+      authConfig.properties.identityProviders.azureActiveDirectory.registration
+        .clientSecretSettingName;
+    expect(secrets.map((s) => String(s.name))).not.toEqual([String(easyAuthSecret)]);
   });
 
   it('T-INFRA-005n: catches an Azure Container Registry being reintroduced', () => {

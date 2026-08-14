@@ -1393,6 +1393,7 @@ tests/infra/                   …, supplyChain.spec.ts   # T-SEC-009, T-CI-006
                                 …, status.spec.ts        # TASK-167 — T-STATUS-001a…q (§9A)
                                 …, infra.spec.ts         # TASK-006 — T-INFRA-001a…d, T-INFRA-002a…m, T-INFRA-003a…c
                                 …, sku.spec.ts           # TASK-008 — T-INFRA-005a…r (§9A)
+                                …, easyAuth.spec.ts      # TASK-027 — T-INFRA-008a…n (§9A)
                                 …, no-ttl.spec.ts        # TASK-008 — T-INV-013a…h (§9A)
                                 …, test-locations.spec.ts # T-CI-008a…g (§9A) — no spec may live where no runner collects it
                                 …, no-scheduler.spec.ts  # TASK-044 — T-CI-005 (static gate; was mis-specced as tests/ci/)
@@ -1623,6 +1624,7 @@ check what "done" means.
 | **`T-CI-007`** | I | An outbound-blocking proxy observes **zero** requests during the CI test run. Egress in CI means a test is really an integration test against someone else's service: it fails on their outage, passes on their cached response, and quietly breaks the offline guarantee `T-AI-033` depends on. | §2 prose |
 | **`T-E2E-001`** | E | The full owner journey — sign in → upload → extract → match → review → confirm → see the combined list — specified end to end in §5 and called there **"the single most valuable test in the suite"**. It was cited by five backlog tasks (`TASK-080`, `094`, `108`, `130`, `164`) as their exit criterion while having no table cell anywhere. | §5 |
 | **`T-INFRA-004`** | S | The Bicep 30-day blob-lifecycle purge rule **exists and is correctly shaped** (§3.4, `NFR-019`). Pairs with `T-INFRA-002`, which asserts soft delete and versioning are OFF: a correct lifecycle rule plus soft delete still retains the owner's screenshots past 30 days, so neither test is sufficient alone. | §3.4 prose |
+| **`T-INFRA-008` (new, TASK-027)** | S | The Bicep **Easy Auth `authConfigs` resource exists and is shaped CLOSED**: named `current`, `platform.enabled = true`, `unauthenticatedClientAction = RedirectToLoginPage`, the Entra provider enabled against a `login.microsoftonline.com` issuer, the client secret held only as a **secret reference** whose name matches a declared `secrets` entry, and **no `excludedPaths` of any kind**. Same relationship to `T-AUTH-001/002/003` that `T-INFRA-004` has to the purge behaviour: those three are level `E` and need a deployment, so without this cell TASK-027 has **no CI-verifiable definition of done at all**. Every failure it catches deploys successfully and looks normal to the owner — `excludedPaths: ['/api/*']` in particular exposes the whole list at the platform edge while `T-SEC-010`/`T-SEC-014` and every other allow-list test still pass, because application code never runs. | ADR-0002, `specs/security.md` §2.1 |
 | **`T-SMOKE-001`** | E | An authenticated request against the freshly deployed **staging** revision succeeds. The `T-SMOKE-*` family was defined only as a **glob** in §11.2, which no id-level gate can resolve — `T-SMOKE-003` was already enumerated as a real cell, so the family was half-addressable and the missing half looked like a phantom. | §11.2 glob |
 | **`T-UI-004`** | C | `ImageDropzone` names **PNG, JPEG and HEIC** in its accept list and its copy (`specs/ui.md`). ⚠ Load-bearing per product invariant 11: without HEIC in `accept`, an iOS file picker greys out the owner's own camera photos and the failure looks like a broken phone, not a missing format. Deliberately distinct from `T-UI-014`, which TASK-162 owns. | `specs/ui.md` |
 | **`T-UX-041`** | C | The empty dropzone shows **all three** ingest affordances — paste, file selection and drag-and-drop (`specs/ux-states.md` §4.3). Product invariant 16: paste was added, not swapped in, and a tidied-up single-affordance dropzone silently removes a working capture path. | `specs/ux-states.md` §4.3 |
@@ -2003,3 +2005,112 @@ exist:
 ```sql
 CREATE DATABASE [nextup_test] COLLATE Latin1_General_100_BIN2;
 ```
+
+---
+
+## 18. TASK-027 (Easy Auth) — a level-`E` "Done when", and what CI can honestly assert
+
+TASK-027's own "Done when" column names `T-AUTH-001`, `T-AUTH-002` and
+`T-AUTH-003`. All three are level **`E`**: Playwright driving a real sign-in
+against a **deployed** revision. None of them can run in CI, and `tests/e2e/`
+is empty, so citing them on a task marked `done` would have meant one of two
+things — either `check:status` fails (the honest outcome), or somebody writes
+three files named after them that assert something else entirely and every
+gate goes green. That second outcome is exactly the failure `check-test-ids`
+was built for, arriving through a different door.
+
+Applying §16.2a — *before citing a test id, find the code path that would make
+it FAIL* — the answer for `T-AUTH-001/002/003` is "a browser talking to
+Azure", which no CI job has. So they are **struck through** in the backlog's
+"Done when" cell (the convention: corrected in place, the superseded text
+retained and dead) and **`T-INFRA-008`** takes their place as the assertion
+CI actually runs. The `E`-level three remain the deployment-time definition of
+done and are named in the struck-through text so they are not lost.
+
+This is the same shape as `T-INFRA-004`, which asserts the blob-lifecycle
+**rule exists and is correctly shaped** rather than asserting that a blob was
+purged 30 days later. Configuration is what an infrastructure task delivers,
+and configuration is assertable.
+
+### 18.1 Why every mutation in `easyAuth.spec.ts` is silent
+
+`tests/infra/easyAuth.spec.ts` feeds `authPolicyViolations()` a deliberately
+broken template for each rule. What makes the file worth its length is that
+**every one of those mutations deploys successfully** and leaves an app that
+behaves normally for the owner:
+
+| Mutation | What the owner sees | What is actually true |
+|---|---|---|
+| `platform.enabled: false` | Signs in fine — the browser still has a cookie | Everyone else does too |
+| `unauthenticatedClientAction: 'AllowAnonymous'` | Nothing changes | The app is public |
+| name is not `current` | Deployment succeeds | Easy Auth reads one config per app and **ignores the rest without an error** |
+| `excludedPaths: ['/api/*']` | Sign-in still required for pages | The entire list is readable unauthenticated |
+| a literal `clientSecret` | Works | A credential is committed to a **public** repository |
+| `clientSecretSettingName` drifts from the `secrets` entry | *(this one is loud)* | Nobody can sign in, including the owner |
+
+The `excludedPaths` row is the important one. It is evaluated at the platform
+edge, **before any application code runs**, so `T-SEC-010`, `T-SEC-014`,
+`T-SEC-016` and every other allow-list test still pass — the middleware they
+exercise is simply never reached. ADR-0002 names this class ("it fails
+silently, because everything appears to work for the owner"); this is a second
+instance of it that the ADR does not name, and it is not reachable from any
+application-level test.
+
+`T-INFRA-008e` exists for a smaller reason: the obvious implementation of the
+name check is a substring test for `current`, which passes `currentish`. The
+compiled ARM name is an expression — `[format('{0}/{1}', …, 'current')]` — so
+splitting on `/` is also wrong (the format string contains one). The check
+matches the **quoted literal**.
+
+### 18.2 ⚠ Open spec defect: `T-SMOKE-001` contradicts `RedirectToLoginPage`
+
+`specs/security.md` §2.1 fixes the mechanism as
+`unauthenticatedClientAction: RedirectToLoginPage`, and TASK-027 is built to
+it. But §11.2 defines **`T-SMOKE-001`** as *"unauthenticated `/api/titles`
+returns 401 JSON"* against the deployed revision — and Easy Auth's redirect
+action is **global**. It has no per-path variant, so an unauthenticated
+`/api/titles` at the edge answers **302 to the Microsoft sign-in page**, not
+`401 JSON`. `T-SMOKE-001` as written cannot pass against a correctly
+configured deployment.
+
+Both halves are individually right and only one of them can hold:
+
+- `RedirectToLoginPage` is what makes US-001 AC-1 a platform property.
+- A JSON API answering a fetch with an HTML redirect is a real defect for the
+  SPA, and `T-SEC-005` asserts 401-vs-403 stay distinct **inside the
+  application chain** — which is unaffected, because that suite runs the
+  Express app directly, with no Easy Auth in front of it.
+
+⚠ **Do not "fix" this by adding `/api/*` to `excludedPaths`.** That is the
+bypass in the table above; it would make `T-SMOKE-001` pass by publishing the
+owner's list. The two real options are (a) keep `RedirectToLoginPage` and
+re-specify `T-SMOKE-001` to assert a 302 to `login.microsoftonline.com`, or
+(b) switch to `Return401` and have the SPA navigate to
+`/.auth/login/aad?post_login_redirect_uri=…` itself — which reintroduces a
+piece of application auth code ADR-0002 exists to avoid.
+
+Left open deliberately rather than decided here: the smoke suite is
+**TASK-007**'s deliverable, it does not exist yet, and inventing its behaviour
+from an infrastructure task is how a spec acquires a contradiction it cannot
+later see. Recorded so TASK-007 meets it as a decision instead of a bug.
+### 18.3 `T-INFRA-005m` was a proxy, and TASK-027 broke it
+
+`T-INFRA-005m` asserted `configuration.secrets` was **empty**. That was never
+the property it was named for — it was a proxy for *"no registry credential"*
+that happened to hold because the app had **no secrets at all**. Easy Auth's
+client secret is the first legitimate one (ADR-0002 makes it mandatory), so
+the assertion failed the moment TASK-027 landed.
+
+This is the shape to watch for: a guard that passes for a reason narrower than
+its name, whose two obvious exits are both wrong. Deleting it drops a real
+protection (`ghcr-token` is exactly the credential ADR-0003 R8 removed);
+"fixing" the code to satisfy it would mean not configuring Easy Auth, or
+smuggling the secret somewhere it does not belong.
+
+It is now narrowed to the property that survives: `registries` is empty (so no
+secret **can** feed a registry — `T-INFRA-005r` covers the other half), and the
+secret **inventory is closed** — exactly one, and it is the one the authConfig
+references by name. `T-INFRA-005s` is the new mutation: a `ghcr-token`
+arriving alongside the Easy Auth secret, which is how the regression would
+really happen, and which the `registries` check alone does not see because the
+credential appears before the entry that uses it.

@@ -478,7 +478,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-024` | `done` | `T-ATTR-001` |
 | `TASK-025` | `done` | `a9e3483` |
 | `TASK-026` | `todo` | — |
-| `TASK-027` | `todo` | — |
+| `TASK-027` | `done` | `T-INFRA-008` |
 | `TASK-028` | `todo` | — |
 | `TASK-029` | `todo` | — |
 | `TASK-030` | `todo` | — |
@@ -746,7 +746,7 @@ Traces to: US-001 (NFR-015, NFR-016, NFR-017) · Milestone M1 · Depends on: TAS
 | TASK-019 | `apps/api/src/middleware/allowList.ts` — **fail-closed** against `NEXTUP_ALLOWED_SUBJECTS`; explicit bootstrap mode when unset-and-empty. | S | 018 | `T-SEC-010`, `T-SEC-014`, `T-SEC-015`, `T-SEC-016` |
 | TASK-021 | `apps/api/dev/devPrincipal.ts` — dev shim excluded from production builds by the **directory boundary**: it sits outside `apps/api/tsconfig.json`'s `include: ["src/**/*.ts"]`, so the production compiler cannot emit it, and `createApp` takes the reader as an injected parameter so nothing under `src/` names it. Not a runtime flag, and not an exclude list (a denylist protects the files you thought of, never the next one). | S | 018 | `T-SEC-019` |
 | ~~TASK-021~~ | ~~`apps/api/src/auth/devPrincipal.ts` — dev shim **excluded at compile time** from production builds (not a runtime flag).~~ ⚠ Superseded: a file inside `src/` can only be excluded by a list, and the cited `tsconfig.build.json` / esbuild `external` mechanism does not exist in this repo (`apps/api` builds with plain `tsc --build`). See `specs/security.md` §2.3. | S | 018 | `T-SEC-019` |
-| TASK-027 | Easy Auth configuration in `infra/aca.bicep`: Entra ID provider, redirect to the requested path, deep-link preservation across sign-in, sign-out route. **Zero auth code in the app.** | S | 006, 019 | `T-AUTH-001`, `T-AUTH-002`, `T-AUTH-003` |
+| TASK-027 | Easy Auth configuration in `infra/aca.bicep`: Entra ID provider, redirect to the requested path, deep-link preservation across sign-in, sign-out route. **Zero auth code in the app.** | S | 006, 019 | `T-INFRA-008` — the `authConfigs` resource exists and is shaped **closed** (named `current`, `platform.enabled`, `RedirectToLoginPage`, secret held by reference, **no `excludedPaths`**), asserted against the compiled ARM with every rule mutation-proven. ~~`T-AUTH-001`, `T-AUTH-002`, `T-AUTH-003`~~ — struck through **only as CI's definition of done**: all three are level `E` (Playwright against a deployed revision) and cannot run in CI, so citing them here would leave this task with no machine-verifiable exit criterion. They remain the **deployment-time** definition of done. Reasoning, and the smoke-test contradiction found while building this: `specs/testing.md` §18. |
 | TASK-028 | `apps/web/src/pages/RefusalPage.tsx` + 401 and IdP-failure states; copy from `ui.md` §9. | S | 025, 019 | `T-SEC-018`, `T-UX-019`, `T-UX-025` |
 | TASK-031 | `tests/smoke/deployed.spec.ts` — post-deploy smoke run against the 0%-traffic revision. | S | 007, 027 | `T-SMOKE-001`, `T-SMOKE-003` |
 
