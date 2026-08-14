@@ -443,6 +443,15 @@ jobs:
       - name: dateAdded is write-once
         run: npm run check:write-once
 
+      # The mirror of `check:test-ids`. That gate walks backlog → spec ("is the
+      # id the work order cites real?"); this one walks spec → backlog ("does
+      # every id the spec defines have someone who will build it?"). The second
+      # failure is the quieter one — an unowned criterion never blocks a task,
+      # so the ledger reaches 100% with the behaviour missing. It found
+      # TASK-037's genre filter doing nothing and US-018 AC-4 unimplemented.
+      - name: Every defined test id is owned
+        run: npm run check:orphans
+
   # ── 11 ────────────────────────────────────────────────────────────────────
   meta:
     name: '11 · meta'

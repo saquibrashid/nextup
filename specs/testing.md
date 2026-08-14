@@ -2358,3 +2358,88 @@ sibling-spread form.
 ⚠ This hazard is a property of the object literal, not of these two
 predicates. **Any future filter expressed with `OR` must join the `AND` array
 rather than be spread alongside it.**
+---
+
+## 22. The orphan class, measured (TASK-033 reopened)
+
+### 22.1 84 of 347 defined test ids were owned by nobody
+
+`check-test-ids.mjs` walks **backlog → spec**: *are the ids the work order
+cites real?* Nothing walked the other way. §20.1 and §21.1 each recorded that
+the mirror was the highest-value unbuilt gate; `tools/check-orphan-tests.mjs`
+is that gate, and the first run measured the problem:
+
+| | count | share |
+| --- | --- | --- |
+| ids DEFINED in this document | 347 | — |
+| cited by no task in `docs/backlog.md` | 84 | 24% |
+| ...and implemented by no suite either | 63 | 18% |
+
+The 63 are the dangerous set: an acceptance criterion with a written test id
+that nobody has been asked to build and nobody has built. It fails no gate, it
+blocks no task, and the ledger reaches 100% without it. They include every one
+of US-021's date-added criteria (`T-DATE-010`-`013`), all five undo criteria
+(`T-UNDO-008`-`012`), all five reappearance criteria (`T-REX-010`-`014`) and
+all five grouping criteria (`T-GRP-010`-`014`).
+
+⚠ **`T-DATE-011` is among them, and this document cited it as coverage.** §19.2
+states that the residual path the write-once static scan cannot see "is covered
+behaviourally by `T-DATE-011`". It is not: `T-DATE-011` does not exist. A spec
+claiming coverage from a phantom is the same defect as a backlog row citing
+one, and it is why the mirror gate had to exist rather than being a tidiness
+exercise.
+
+The 63 are listed in `BASELINE_ORPHANS` so the gate can fail on anything **new**
+without blocking on a 63-way assignment that would have to guess which task
+owns each criterion — and a guess there reproduces the mis-citation class this
+project has already hit seven times. ⚠ **The baseline is a ratchet: it may only
+shrink.** `T-META-006e` fails if it grows, because "add it to the list" is
+otherwise always the cheapest way to make the gate pass, and that reinstates
+exactly the silence it exists to break. `resolvedBaselineIds()` reports which
+entries have become owned and can be struck.
+
+### 22.2 `T-LIST-013` is double-defined
+
+Line 960 defines it as US-018 AC-4, *"A work with no active listings has no
+row"*. Line 1026 assigns the **same id** to US-019 AC-2, *"Hidden from the
+list, present in the removed view"*. These are different assertions with
+different dependencies — the second needs a removed-view endpoint that does not
+exist yet.
+
+This is the second instance of the class (`T-SEC-028` is the first: §9 line 744
+vs TASK-141's row). The US-018 sense is implemented in
+`apps/api/test/integration/titleGrouping.spec.ts`. **The removed-view half needs
+its own id, on the removed-view task** — not this one, which is now closed
+against a different meaning.
+
+### 22.3 US-018 AC-4 was not implemented
+
+Writing the orphan produced a live bug on the first run, which is the whole
+argument for the gate. `listTitlePage` filtered on `Title.state = 'active'` and
+never required a live listing, so a work whose only listing had been removed
+**stayed in the list as a row with zero badges** — `badges` derive from active
+listings, so it rendered as a title belonging to no service at all.
+
+The fix requires at least one active listing in the query. ⚠ It deliberately
+does **not** lean on `Title.state`: that flag is written by the reconciliation
+pipeline, so trusting it makes the list's correctness depend on another
+component remembering to write a field. `T-LIST-013c` pins the discriminating
+case — one removed and one active listing **keeps** its row — because "no
+active listings" and "has a removed listing" agree on the simple case and
+differ on the one that matters, and the wrong one silently deletes
+half-removed works from the owner's list.
+
+### 22.4 The sibling-key hazard has a second form
+
+§21 recorded that two `OR` predicates cannot be sibling keys in a Prisma
+`where` — the second silently replaces the first. The same trap applies to
+**any** repeated key, and the AC-4 fix walked straight into it: the service
+filter already occupies `listings`, so adding the general "has an active
+listing" condition as a second `listings` key would have silently disabled the
+service filter.
+
+It is therefore expressed as **one** `listings` key with two branches, not two
+keys. Mutation-verified: restoring the sibling form fails five existing cases
+(`T-LIST-020a`, `020c`, `023a`, `023c`, `023d`). The general rule for this
+schema: **before adding a key to a Prisma `where`, check whether a conditional
+spread above it already sets that key.**

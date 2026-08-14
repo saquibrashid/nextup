@@ -961,7 +961,7 @@ Traces to: US-018 (REQ-024, REQ-025, REQ-026, REQ-031) · Milestone M2 · Depend
 
 | Task | Description | Size | Depends on | Done when |
 |---|---|---|---|---|
-| TASK-033 | `GET /api/titles` — active and visible only, suppression anti-join, service badges, cursor pagination. | M | 017, 023 | `T-LIST-010 ~~T-LIST-001~~`, `T-LIST-011 ~~T-LIST-002~~`, `T-API-017 ~~T-API-004~~` |
+| TASK-033 | `GET /api/titles` — active and visible only, suppression anti-join, service badges, cursor pagination. | M | 017, 023 | `T-LIST-010 ~~T-LIST-001~~`, `T-LIST-011 ~~T-LIST-002~~`, `T-API-017 ~~T-API-004~~`, `T-LIST-012`, `T-LIST-013`, `T-LIST-019` (US-018 AC-3/4/6 — adopted; they were orphans, and AC-4 was unimplemented: `specs/testing.md` §22) |
 | TASK-034 | `GET /api/titles/:titleId`. | XS | 033 | `T-LIST-028`, `T-LIST-035 ~~T-LIST-003~~` |
 | TASK-038 | `apps/web/src/pages/ListPage.tsx` + `components/TitleList.tsx` + `TitleRow.tsx` — badges, poster, **deep links out to the service**. | M | 033, 025 | `T-UI-010 ~~T-UI-001~~`, `T-UI-010 ~~T-UI-002~~`, `T-UI-012 ~~T-LINK-001~~`, `T-LIST-018` (relocated from TASK-035 — the rendered-label assertion needs `TitleRow.tsx`, which lands here; see `specs/testing.md` §19.3) |
 | TASK-040 | Two **distinct** empty states (nothing imported yet vs everything filtered out) + a load-failure error state. | S | 038 | `T-UX-012 ~~T-UX-001~~`, `T-UX-014 ~~T-UX-002~~`, `T-UX-018 ~~T-UX-003~~` |

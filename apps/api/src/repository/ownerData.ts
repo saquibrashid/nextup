@@ -306,12 +306,33 @@ export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions,
         ? { workIdentity: { notIn: suppressed.map((s) => s.workIdentity) } }
         : {}),
       ...(mediaType === undefined ? {} : { tmdbMediaType: mediaType }),
-      // A service filter selects titles HOLDING an active listing on one of
-      // the named services. It deliberately does not narrow `badges` below:
-      // filtering by Netflix must not hide the row's Max badge (REQ-032).
+      // A row requires at least one ACTIVE listing (US-018 AC-4). Without it a
+      // work whose only listing was removed stayed in the list as a row with
+      // zero badges — `badges` is derived from active listings, so the row
+      // rendered as a title belonging to no service at all. `T-LIST-013a` is
+      // that guard.
+      //
+      // ⚠ This is deliberately NOT a check on `Title.state`. That flag is set
+      // by the reconciliation pipeline, so relying on it makes the list's
+      // correctness depend on another component remembering to write a field;
+      // requiring a live listing is the same rule the badges already follow
+      // and cannot be bypassed by a pipeline bug. `T-LIST-013c` pins the
+      // discriminating case — one removed and one active listing KEEPS its
+      // row, which is what separates "no active listings" from "has a removed
+      // listing".
+      //
+      // ⚠ The two branches are one `listings` key, not two. A service filter
+      // selects titles holding an active listing on one of the named services,
+      // which already implies the general condition — but writing the general
+      // condition as a SECOND `listings` key would silently replace the first
+      // (the same object-shape hazard as the `OR` keys below), and the service
+      // filter would stop filtering.
+      //
+      // It deliberately does not narrow `badges` below: filtering by Netflix
+      // must not hide the row's Max badge (REQ-032).
       ...(services.length > 0
         ? { listings: { some: { ownerId, state: 'active', service: { in: [...services] } } } }
-        : {}),
+        : { listings: { some: { ownerId, state: 'active' } } }),
       // GENRE — OR within the dimension, AND against every other filter
       // (US-019 AC-4). Genres live as a JSON array in one `NVARCHAR(MAX)`
       // column (`specs/data-model.md` §16), so the match is on the QUOTED
