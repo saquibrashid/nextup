@@ -488,7 +488,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-034` | `done` | `T-LIST-028` — `apps/api/test/integration/titleDetail.spec.ts` (8 cases): owner scoping, and the foreign-id refusal asserted byte-identical to the unknown-id refusal with `T-LIST-028g` as its non-vacuity guard. `T-LIST-035` — `apps/api/test/unit/titlesShape.spec.ts` (8 cases) for the §6.3 shaping, where coverage is measured. The active/removed badge split is mutation-proven at both layers. |
 | `TASK-035` | `done` | `tools/check-write-once-date-added.mjs` + `tests/infra/writeOnceDateAdded.spec.ts` — `T-INV-006` (a–n), a static gate proving no assignment to `.dateAdded` and no `dateAdded` key in a Prisma `update`/`updateMany`/`upsert` exists outside `createServiceListing()`. Three mutations of the checker itself caught (loosened `dateAddedEdited` lookahead, exemption failing open, `create` treated as mutating). Server-side `dateAddedLabel` was already delivered and is asserted by `T-LIST-011c`. `~~T-LIST-018~~` relocated to TASK-038 — see `specs/testing.md` §19. |
 | `TASK-036` | `done` | `packages/domain/src/ordering.ts` + `packages/domain/test/ordering.spec.ts` (19 cases) + `apps/api/test/integration/titleOrdering.spec.ts` (16 cases) — `T-LIST-014`, `T-LIST-015`, `T-LIST-016`, `T-LIST-017` (U) and `T-LIST-025`, `T-LIST-026`, `T-LIST-027` (I); `T-LIST-010` was already delivered by TASK-033. **Two live ordering bugs fixed**, both silent: the tie-breaker was `{ id: dir }`, so tie order flipped when the owner reversed the sort AND the keyset predicate stopped mirroring the `ORDER BY`, dropping rows between pages; and `nulls` placement relied on SQL Server's default, which is last on `desc` and **first** on `asc`. Five mutations caught — three of the query, two of the comparator. Four orphaned ids adopted; see `specs/testing.md` §20. |
-| `TASK-037` | `todo` | — |
+| `TASK-037` | `done` | `apps/api/test/integration/titleFilters.spec.ts` (26 cases) — `T-LIST-020` (a–e), `T-LIST-021` (a–d), `T-LIST-022` (a–h), `T-LIST-023` (a–e), `T-LIST-024` (a–d). **The genre filter did not exist**: `genre` was parsed, validated, and then never passed to the query, so `?genre=Comedy` returned 200 and listed everything. Implemented as a quoted-token match inside the JSON column, which makes `genres: []` exclusion (AC-6) fall out by construction. Four mutations caught, including the sibling-`OR` hazard that would have dropped the filter on page 2 only. `T-LIST-021`/`T-LIST-022` were orphaned ids, adopted here — `specs/testing.md` §20.1. |
 | `TASK-038` | `todo` | — |
 | `TASK-039` | `todo` | — |
 | `TASK-040` | `todo` | — |
@@ -971,7 +971,7 @@ Traces to: US-019 (REQ-032, REQ-033, REQ-034) · Milestone M2
 
 | Task | Description | Size | Depends on | Done when |
 |---|---|---|---|---|
-| TASK-037 | Filters by service, type, genre — **AND across dimensions, OR within**; a work with `genres: []` matches no genre filter. | S | 033 | `T-LIST-020 ~~T-LIST-006~~`, `T-LIST-023 ~~T-LIST-007~~`, `T-LIST-024 ~~T-LIST-008~~` |
+| TASK-037 | Filters by service, type, genre — **AND across dimensions, OR within**; a work with `genres: []` matches no genre filter. | S | 033 | `T-LIST-020 ~~T-LIST-006~~`, `T-LIST-021`, `T-LIST-022`, `T-LIST-023 ~~T-LIST-007~~`, `T-LIST-024 ~~T-LIST-008~~` |
 | TASK-039 | `components/FilterBar.tsx` + query-string sync + zero-match state. | S | 037, 038 | `T-UI-016`, `T-UX-013 ~~T-UX-004~~` |
 
 #### US-020 — Sort it

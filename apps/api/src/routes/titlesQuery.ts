@@ -39,6 +39,27 @@ export const DEFAULT_SORT_DIRECTION: SortDirection = 'desc';
 const MAX_REPEATED_VALUES = 20;
 const MAX_GENRE_LENGTH = 60;
 
+/**
+ * Characters refused in a genre name (TASK-037).
+ *
+ * ⚠ This is a CORRECTNESS guard, not decoration, and it is load-bearing for
+ * the genre filter's implementation. Genres are stored as a JSON array in one
+ * `NVARCHAR(MAX)` column (`specs/data-model.md` §16), and the filter matches
+ * the quoted token `"Name"` inside that text. Two character classes break
+ * that match in ways that are silent:
+ *
+ *   - `%`, `_`, `[`, `]` are LIKE metacharacters. Prisma's `contains` compiles
+ *     to `LIKE '%value%'` and does **not** escape them, so `?genre=%` would
+ *     match every title and read as a filter that had simply found everything.
+ *   - `"` and `\` are JSON escapes. A genre containing either is stored
+ *     escaped, so the literal token would never match and the filter would
+ *     silently return nothing.
+ *
+ * No TMDB genre name contains any of them, so refusing them costs nothing real
+ * and turns both silent behaviours into a loud 400.
+ */
+const GENRE_FORBIDDEN_CHARS = /[%_[\]"\\]/;
+
 export interface TitleListQuery {
   services: Service[];
   mediaType: MediaType | undefined;
@@ -112,8 +133,15 @@ export function parseTitleListQuery(query: Request['query']): TitleListQuery {
     if (trimmed.length === 0 || trimmed.length > MAX_GENRE_LENGTH) {
       fail('genre', '"genre" must be a non-empty genre name.', { maxLength: MAX_GENRE_LENGTH });
     }
+    if (GENRE_FORBIDDEN_CHARS.test(trimmed)) {
+      // The rejected value is deliberately not echoed back.
+      fail('genre', '"genre" contains characters that are not part of a genre name.');
+    }
     return trimmed;
   });
+  // De-duplicated for the same reason as `service`: repeating a value within a
+  // dimension is an OR against itself and only widens the generated predicate.
+  const uniqueGenres = [...new Set(genres)];
 
   const sortRaw = query['sort'];
   if (sortRaw !== undefined && !(TITLE_SORTS as readonly unknown[]).includes(sortRaw)) {
@@ -137,7 +165,7 @@ export function parseTitleListQuery(query: Request['query']): TitleListQuery {
   return {
     services,
     mediaType: mediaTypes[0],
-    genres,
+    genres: uniqueGenres,
     sort: (sortRaw as TitleSort | undefined) ?? 'dateAdded',
     dir: (dirRaw as SortDirection | undefined) ?? DEFAULT_SORT_DIRECTION,
     limit: parseLimit(query['limit']),

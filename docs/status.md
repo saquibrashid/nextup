@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 108 |
+| ⬜ todo | 107 |
 | 🚧 doing | 3 |
-| ✅ done | 43 |
+| ✅ done | 44 |
 | 🙋 owner | 7 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -26,7 +26,6 @@ Not done, and every task they depend on is done.
 |---|---|---|
 | `TASK-026` | S | Epic G — Attribution & compliance |
 | `TASK-028` | S | Epic A — Access & identity |
-| `TASK-037` | S | Epic F — The list itself (the value loop) |
 | `TASK-038` | M | Epic F — The list itself (the value loop) |
 | `TASK-042` | XS | Epic F — The list itself (the value loop) |
 | `TASK-045` | S | Epic D — Matching & identity |
@@ -60,7 +59,7 @@ Not done, and every task they depend on is done.
 | Task | Waiting on |
 |---|---|
 | `TASK-031` | `TASK-007` |
-| `TASK-039` | `TASK-037`, `TASK-038` |
+| `TASK-039` | `TASK-038` |
 | `TASK-040` | `TASK-038` |
 | `TASK-043` | `TASK-045` |
 | `TASK-044` | `TASK-043` |
@@ -189,6 +188,7 @@ Not done, and every task they depend on is done.
 | `TASK-034` | `T-LIST-028` — `apps/api/test/integration/titleDetail.spec.ts` (8 cases): owner scoping, and the foreign-id refusal asserted byte-identical to the unknown-id refusal with `T-LIST-028g` as its non-vacuity guard. `T-LIST-035` — `apps/api/test/unit/titlesShape.spec.ts` (8 cases) for the §6.3 shaping, where coverage is measured. The active/removed badge split is mutation-proven at both layers. | `T-LIST-028`, `T-LIST-035` |
 | `TASK-035` | `tools/check-write-once-date-added.mjs` + `tests/infra/writeOnceDateAdded.spec.ts` — `T-INV-006` (a–n), a static gate proving no assignment to `.dateAdded` and no `dateAdded` key in a Prisma `update`/`updateMany`/`upsert` exists outside `createServiceListing()`. Three mutations of the checker itself caught (loosened `dateAddedEdited` lookahead, exemption failing open, `create` treated as mutating). Server-side `dateAddedLabel` was already delivered and is asserted by `T-LIST-011c`. `~~T-LIST-018~~` relocated to TASK-038 — see `specs/testing.md` §19. | `T-INV-006` |
 | `TASK-036` | `packages/domain/src/ordering.ts` + `packages/domain/test/ordering.spec.ts` (19 cases) + `apps/api/test/integration/titleOrdering.spec.ts` (16 cases) — `T-LIST-014`, `T-LIST-015`, `T-LIST-016`, `T-LIST-017` (U) and `T-LIST-025`, `T-LIST-026`, `T-LIST-027` (I); `T-LIST-010` was already delivered by TASK-033. **Two live ordering bugs fixed**, both silent: the tie-breaker was `{ id: dir }`, so tie order flipped when the owner reversed the sort AND the keyset predicate stopped mirroring the `ORDER BY`, dropping rows between pages; and `nulls` placement relied on SQL Server's default, which is last on `desc` and **first** on `asc`. Five mutations caught — three of the query, two of the comparator. Four orphaned ids adopted; see `specs/testing.md` §20. | `T-LIST-010`, `T-LIST-014`, `T-LIST-015`, `T-LIST-016`, `T-LIST-017`, `T-LIST-025`, `T-LIST-026`, `T-LIST-027` |
+| `TASK-037` | `apps/api/test/integration/titleFilters.spec.ts` (26 cases) — `T-LIST-020` (a–e), `T-LIST-021` (a–d), `T-LIST-022` (a–h), `T-LIST-023` (a–e), `T-LIST-024` (a–d). **The genre filter did not exist**: `genre` was parsed, validated, and then never passed to the query, so `?genre=Comedy` returned 200 and listed everything. Implemented as a quoted-token match inside the JSON column, which makes `genres: []` exclusion (AC-6) fall out by construction. Four mutations caught, including the sibling-`OR` hazard that would have dropped the filter on page 2 only. `T-LIST-021`/`T-LIST-022` were orphaned ids, adopted here — `specs/testing.md` §20.1. | `T-LIST-020`, `T-LIST-021`, `T-LIST-022`, `T-LIST-023`, `T-LIST-024` |
 | `TASK-041` | `apps/api/src/routes/serviceState.ts` + `packages/domain/src/freshness.ts` — `GET /api/service-state`, one entry per service in `SERVICES` so a never-captured service reads "has never been updated" rather than vanishing. `ageInDays` counts UTC calendar days, not 24-hour blocks, and clamps clock skew. `T-FRESH-010` (a–h), `T-FRESH-012` (a–f), `T-FRESH-015` (a–c, the A46 no-nudge regression guard). All four mutations caught; see `specs/testing.md` §16. | `T-FRESH-010`, `T-FRESH-012`, `T-FRESH-015` |
 | `TASK-048` | `T-BATCH-010`, `T-BATCH-015` | `T-API-003`, `T-BATCH-010`, `T-BATCH-015` |
 | `TASK-049` | `T-UI-003a`…`j` green in `apps/web/test/uploadStep1.spec.tsx`; mutation-proven against a defaulted mode and against revealing the consequence on selection | `T-UI-003` |

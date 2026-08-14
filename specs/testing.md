@@ -2276,3 +2276,85 @@ property directly**. Both halves are mutation-proven independently: three
 mutations of the query (tie-breaker follows `dir`, keyset follows `dir`,
 `nulls` dropped) and two of the comparator (nulls first, tie-break
 descending), each caught by the cases named for it.
+---
+
+## 21. TASK-037 — list filters (US-019)
+
+### 21.1 The orphan count is six, not four — and it hid a missing feature
+
+`T-LIST-021` (type filter) and `T-LIST-022` (genre filter) are defined in §9
+and were, like the four in §20.1, cited by **no task**. TASK-037's row named
+only `T-LIST-020`, `T-LIST-023` and `T-LIST-024`. Both are adopted into
+TASK-037.
+
+⚠ **This orphan pair concealed an entirely unimplemented feature.** The genre
+filter was parsed and validated in `titlesQuery.ts` — repeatable, trimmed,
+length-bounded, de-duplicated — and then **never passed to the query**. The
+handler simply did not forward it. So `?genre=Comedy` validated, returned
+**200**, and listed every title. There was no test for the genre filter
+because the id that would have owned one belonged to no task.
+
+A filter that silently does nothing is worse than one that errors: the owner
+reads the unfiltered list as the filtered answer. `T-LIST-022a` is the case
+that catches it, and it fails against the previous code.
+
+This is the concrete cost of the orphan class, and it strengthens §20.1's
+conclusion: the missing **§9 → backlog** gate is not spec hygiene, it is the
+difference between a feature existing and not.
+
+### 21.2 Why the genre match is a quoted token and not `OPENJSON`
+
+Genres are one JSON array in an `NVARCHAR(MAX)` column (`specs/data-model.md`
+§16). The literal reading of that storage is
+`EXISTS (SELECT 1 FROM OPENJSON(tmdb_genres) WHERE value IN (…))`. It is not
+used, because Prisma cannot express a raw fragment inside `where`: adopting it
+means hand-writing the *entire* page query — keyset predicate, suppression
+anti-join, and the listings `include` — in raw SQL. That is a far larger
+surface to get wrong than one quoted token, and the keyset predicate is
+precisely the part of this query that has already produced a silent
+row-dropping bug once (§20.2).
+
+The filter therefore matches the token `"Name"`, **with its JSON quotes**,
+inside the stored text. Three consequences, each with a named guard:
+
+- **The quotes are load-bearing.** Matching the bare name `Drama` also matches
+  a title whose only genre is `Dramatic Arts`. `T-LIST-022c` fails if they are
+  dropped — a wrong row appearing in a filtered list, which is the least
+  visible kind of bug.
+- **`genres: []` is excluded by construction.** `"[]"` contains no token, so
+  AC-6 needs no special case that could later be forgotten (`T-LIST-024`).
+  `T-LIST-024c` separately asserts the payload still reports `[]`, so nothing
+  can satisfy the exclusion by quietly defaulting a genre instead.
+- **Matching is case- and accent-SENSITIVE**, because the column collates
+  `Latin1_General_100_BIN2`. That is correct here — the values come from
+  TMDB's fixed vocabulary and the filter bar offers them from the owner's own
+  data — but it is a behaviour, not an accident, so `T-LIST-022d` records it.
+
+`GENRE_FORBIDDEN_CHARS` in `titlesQuery.ts` is part of the implementation, not
+tidiness. Prisma's `contains` compiles to `LIKE '%value%'` and does **not**
+escape LIKE metacharacters, so `?genre=%` would match every title and read as
+a filter that had found everything; and `"` or `\` are JSON escapes, which are
+stored escaped and so could never match, giving a silent empty result. No TMDB
+genre contains any of them. `T-LIST-022f`/`022g` are the guards.
+
+### 21.3 ⚠ Two `OR` predicates cannot be sibling keys
+
+The genre filter is an `OR` across the requested genres. The keyset predicate
+is **also** an `OR`. Written as sibling spreads into one Prisma `where`
+object —
+
+```ts
+...(genres.length > 0 ? { OR: [...] } : {}),
+...keyset,                                  // ← replaces the OR above
+```
+
+— the second `OR` key silently **replaces** the first. The visible effect is
+that page 1 filters and page 2 does not: the owner scrolls and unrelated
+titles appear. Nothing errors, and the bug is invisible to any test that does
+not page a filtered list. They are combined under `AND` instead, and
+`T-LIST-022h` pages a filtered six-row set two at a time; it fails under the
+sibling-spread form.
+
+⚠ This hazard is a property of the object literal, not of these two
+predicates. **Any future filter expressed with `OR` must join the `AND` array
+rather than be spread alongside it.**

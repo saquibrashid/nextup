@@ -258,11 +258,12 @@ export interface TitlePageOptions {
   cursor?: { sortDateAdded: string; id: string } | undefined;
   services?: readonly string[];
   mediaType?: string | undefined;
+  genres?: readonly string[];
 }
 
 export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions, tx?: Db) {
   const conn = db(tx);
-  const { limit, dir, cursor, services = [], mediaType } = options;
+  const { limit, dir, cursor, services = [], mediaType, genres = [] } = options;
 
   const suppressed = await conn.suppression.findMany({
     where: { ownerId, active: true },
@@ -311,7 +312,47 @@ export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions,
       ...(services.length > 0
         ? { listings: { some: { ownerId, state: 'active', service: { in: [...services] } } } }
         : {}),
-      ...keyset,
+      // GENRE — OR within the dimension, AND against every other filter
+      // (US-019 AC-4). Genres live as a JSON array in one `NVARCHAR(MAX)`
+      // column (`specs/data-model.md` §16), so the match is on the QUOTED
+      // token `"Name"` within that text, never on the bare name.
+      //
+      // ⚠ The quotes are what make this exact rather than a prefix match.
+      // Searching for `Drama` would also match a title whose only genre is
+      // `Dramatic Arts`; searching for `"Drama"` cannot, because the stored
+      // text has `"Dramatic Arts"` and the closing quote does not line up.
+      // `T-LIST-022c` is that guard, and it fails if the quotes are dropped.
+      //
+      // A title with `genres: []` stores `"[]"`, which contains no token at
+      // all, so it is excluded from every genre-filtered result and included
+      // when none is set — US-019 AC-6, for free and by construction rather
+      // than by a special case that could be forgotten (`T-LIST-024`).
+      //
+      // ⚠ Matching is CASE- and ACCENT-SENSITIVE, because the column collates
+      // `Latin1_General_100_BIN2`. That is correct here: the values come from
+      // TMDB's fixed genre vocabulary and the filter bar offers them from the
+      // owner's own data, so a near-miss spelling should return nothing rather
+      // than guess. `T-LIST-022d` records the behaviour so it cannot change by
+      // accident.
+      //
+      // The alternative was `EXISTS (SELECT 1 FROM OPENJSON(tmdb_genres) …)`,
+      // which is the more literal reading of the storage. It is not used
+      // because Prisma cannot express a raw fragment inside `where`, so it
+      // would mean hand-writing this entire query — the keyset predicate, the
+      // suppression anti-join and the listings `include` — in raw SQL, and
+      // that is a much larger surface to get wrong than one quoted token.
+      // ⚠ The genre and keyset predicates are combined under `AND` and NOT
+      // spread as sibling keys. Both are expressed with `OR`, and two `OR`
+      // keys in one object literal means the second silently REPLACES the
+      // first — so spreading them would drop the genre filter the moment a
+      // cursor was present. Page 1 would filter and page 2 would not, which
+      // reads as the filter randomly giving up rather than as an error.
+      AND: [
+        genres.length > 0
+          ? { OR: genres.map((genre) => ({ tmdbGenres: { contains: `"${genre}"` } })) }
+          : {},
+        keyset,
+      ],
     },
     // `compareTitlesForList` in `@nextup/domain` is the same order expressed
     // as a comparator, and the integration suite checks this query against it.

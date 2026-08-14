@@ -174,6 +174,7 @@ export function registerTitleRoutes(router: Router): void {
       cursor: query.cursor,
       services: query.services,
       mediaType: query.mediaType,
+      genres: query.genres,
     });
 
     const items = rows.map((row) => toListItem(row as unknown as TitleRow));
