@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 105 |
+| ⬜ todo | 104 |
 | 🚧 doing | 3 |
-| ✅ done | 46 |
+| ✅ done | 47 |
 | 🙋 owner | 7 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -36,7 +36,7 @@ Not done, and every task they depend on is done.
 | `TASK-132` | XS | Epic K — Platform, safety, and the shell |
 | `TASK-143` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-145` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
-| `TASK-148` | M | Epic B — Capture & import |
+| `TASK-158` | S | Epic B — Capture & import |
 
 ## Waiting on the owner
 
@@ -52,7 +52,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-95 tasks cannot start yet.
+94 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -62,7 +62,7 @@ Not done, and every task they depend on is done.
 | `TASK-043` | `TASK-045` |
 | `TASK-044` | `TASK-043` |
 | `TASK-046` | `TASK-026`, `TASK-038` |
-| `TASK-050` | `TASK-148`, `TASK-158` |
+| `TASK-050` | `TASK-158` |
 | `TASK-051` | `TASK-050` |
 | `TASK-052` | `TASK-050` |
 | `TASK-053` | `TASK-050` |
@@ -135,7 +135,7 @@ Not done, and every task they depend on is done.
 | `TASK-130` | `TASK-124`, `TASK-108` |
 | `TASK-131` | `TASK-044` |
 | `TASK-133` | `TASK-007`, `TASK-156` |
-| `TASK-149` | `TASK-148`, `TASK-145` |
+| `TASK-149` | `TASK-145` |
 | `TASK-150` | `TASK-149` |
 | `TASK-151` | `TASK-149`, `TASK-150` |
 | `TASK-152` | `TASK-053` |
@@ -143,7 +143,6 @@ Not done, and every task they depend on is done.
 | `TASK-155` | `TASK-149`, `TASK-152` |
 | `TASK-156` | `TASK-007` |
 | `TASK-157` | `TASK-010`, `TASK-142`, `TASK-149` |
-| `TASK-158` | `TASK-148` |
 | `TASK-159` | `TASK-053`, `TASK-050` |
 | `TASK-160` | `TASK-053`, `TASK-158` |
 | `TASK-161` | `TASK-160` |
@@ -200,5 +199,6 @@ Not done, and every task they depend on is done.
 | `TASK-144` | `eb07409` — a CI grep gate over `prisma/migrations/**` | `T-MIG-001` |
 | `TASK-146` | **ahead-of:TASK-007.** `docs/ghcr-pat.md` written. **No PAT is needed at all** — a fine-grained PAT cannot authenticate to `ghcr.io` and a classic one is account-wide, so the package is public and CI pushes with `GITHUB_TOKEN` (R8). Remaining: the `deploy.yml` link + image secret-scan land with TASK-007, and the one-time visibility flip runs after the first successful push. | _no test id declared_ |
 | `TASK-147` | HEIC decode chain (`heic-convert` → `heic-decode` → `libheif-js`, LGPL-3.0, decode-only) + `sharp` installed; `T-DEP-001` runtime allow-list, `T-DEP-002` encoder ban and `T-DEP-003` prebuilt-only added to `tools/check-deps.mjs`; `T-LICENSE-001` now green against the REAL tree, completing TASK-153's other half. Three corrections found at implementation: (a) `sharp@0.34` carried high-severity libvips CVEs and would have been blocked by `npm audit` in CI — pinned `^0.35.3`, 0 vulnerabilities; (b) `sharp` is Apache-2.0 with LGPL-3.0-or-later libvips binaries, **not MIT** as the spec claimed — corrected in `specs/security.md` §8 and the TASK-147 row; (c) **the runtime container stage installed with `--omit=optional`, which excludes all 25 sharp platform binaries** — proven by building the image both ways (`require('sharp')` threw "Could not load the sharp module using the linuxmusl-x64 runtime"), fixed with a `COPY --from=build` and guarded by `T-INFRA-007`. | _no test id declared_ |
+| `TASK-148` | `apps/api/src/images/sniffFormat.ts` + `T-IMG-024a`-`p` (16 unit cases). `UPLOAD_FORMATS`, `uploadedFormat` and the format error codes already existed from TASK-012, so this task is the sniffer itself. Two findings recorded in `specs/testing.md` §25.3: (a) the spec and the backlog name different module paths for this file AND for the TASK-145 pixel guard - the guard divergence is still unbuilt and should be settled before TASK-149 imports it; (b) a printable-ASCII guard in the brand reader was proven unfalsifiable by mutation and removed rather than left under a test that could not fail. The two ids the Done-when column originally named are integration properties of the upload endpoint and are already owned by TASK-050 - struck through, not relocated. | `T-IMG-024a` |
 | `TASK-153` | `d6796b3` — owner approved the LGPL-3.0 obligation; gate proven on synthetic fixtures | `T-LICENSE-001` |
 | `TASK-167` | this commit — the ledger, the gate and `docs/status.md` | `T-STATUS-001` |

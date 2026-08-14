@@ -2601,3 +2601,57 @@ are TASK-072/073's, and no close endpoint exists yet. Squatting them here would
 let an unbuilt reconciliation pipeline report as verified. The row cites the
 ids it actually delivers and the three remain owned by the tasks that will
 build them.
+---
+
+## 25. Magic-byte format sniffing (TASK-148)
+
+`apps/api/src/images/sniffFormat.ts`, asserted by
+`apps/api/test/unit/sniffFormat.spec.ts`. The module decides
+`uploadedFormat` from the leading bytes of an uploaded, pasted or dropped
+image, per `specs/api.md` §5.
+
+### 25.1 New id
+
+| Id | Level | Asserts |
+|---|---|---|
+| **`T-IMG-024`** (`a`-`p`) | U | The sniff classifies PNG, JPEG and the HEIF family from magic bytes alone. `a` PNG signature; `b` every legitimate JPEG second marker (`E0`/`E1`/`DB`/`EE`/`FE`), because pinning the fourth byte to `E0` rejects every Exif photo an iPhone writes; `c` every HEIF-family major brand, with `heic` and `heif` kept distinct; `d` a HEIF brand found only in the COMPATIBLE list (a burst frame or Live Photo still declares `mif1`/`msf1` as major with `heic` only among the compatible brands); `e` **an `ftyp` box with no HEIF-family brand is REJECTED** - the discriminating case for `c`/`d`, without which an MP4 classifies as a HEIC and video bytes reach the image decoder; `f` non-images (PDF, ZIP, GIF, HTML) are `null` and never coerced to a default; `g` empty, short and truncated buffers return `null` and never throw, so one hostile file cannot fail the whole multipart request (REQ-080/081); `h` **the structural assertion** - `sniffUploadFormat` has arity 1, so there is no parameter through which a declared `Content-Type`/`Blob.type` could reach the decision; `i` a box size larger than the buffer never reads past the end; `j` a brand beyond the DECLARED box size is not claimed by the file; `k` an illegal or `largesize` box length is refused rather than misparsed; `l` a corrupted brand byte defeats the match; `m` **all four members of `UPLOAD_FORMATS` are reachable** - the add-not-swap guard, and the only case here that fails if the format list is "tidied"; `n` `SNIFF_BYTES` is large enough for the `ftyp` shapes classified; `o`/`p` `isAcceptedUploadFormat` accepts exactly `UPLOAD_FORMATS`. |
+
+### 25.2 What TASK-148 does NOT claim
+
+`T-IMG-006` (a non-image is 415 and named in `rejected[]`) and `T-IMG-013` (a
+HEIC declared `application/octet-stream` is accepted and transcoded to a valid
+lossless PNG) are cited by the backlog row for this task. Both are
+**integration** properties of `POST /api/batches/:batchId/images`, which is
+TASK-050 and does not exist. Both are **already cited on TASK-050's row**, so
+no relocation is needed - the citations on TASK-148 are duplicates and are
+struck through there. Claiming them from a pure sniffer would let an unbuilt
+endpoint report as verified.
+
+### 25.3 Findings recorded while building it
+
+**(a) Spec/backlog path divergence, reported not resolved.** `specs/api.md` §5
+names the module `apps/api/src/images/format.ts`; the backlog row for TASK-148
+names `apps/api/src/images/sniffFormat.ts`. The backlog is the work order, so
+`sniffFormat.ts` is what exists. The same divergence appears for the pixel
+guard - `specs/api.md` §5.0 names `apps/api/src/images/pixelGuard.ts` and
+`packages/domain/src/pixelGuard.ts`, while the backlog row for TASK-145 names
+`apps/api/src/images/decodeGuard.ts` with an `assertDecodable()` entry point.
+**TASK-145 has not been built, so this one is still cheap to settle** - it
+should be settled before it is, or the transcode in TASK-149 will import a path
+that the spec says is somewhere else.
+
+**(b) A dead guard, caught by mutation.** The first draft of `readBrand`
+validated that each of the four bytes was printable ASCII, and `T-IMG-024l`
+appeared to cover it. Deleting the check changed no verdict: every brand
+produced is compared against a fixed set of seven printable ASCII literals, so
+a non-printable byte can never match anything. The check was removed and the
+reason recorded on `readBrand`, because a test that appears to cover an
+unfalsifiable guard reports assurance that does not exist. `T-IMG-024l` is
+retained for what it genuinely asserts - that the compatible-brand scan matches
+exact bytes and nothing looser - and says so.
+
+**(c) `heic` vs `heif` is presentational and must stay that way.** Both are in
+`UPLOAD_FORMATS`, both take the transcode branch in TASK-149, and nothing
+downstream may branch between them. The distinction is kept only because
+`uploadedFormat` is persisted and surfaces in error text, where reporting the
+brand family the file actually declares is worth more than a single label.
