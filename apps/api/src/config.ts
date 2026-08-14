@@ -2,6 +2,8 @@
 //
 // TASK-014 · US-035 AC-7 · `T-INV-008`.
 
+import { DEFAULT_MAX_DECODE_PIXELS } from '@nextup/domain';
+
 /**
  * How long an uploaded screenshot is retained before the Azure Blob Storage
  * lifecycle rule purges it (NFR-019, ADR-0006, REQ-078). Drives
@@ -37,3 +39,35 @@ export const IMAGE_RETENTION_DAYS = 30;
  * nag about it.
  */
 export const TMDB_METADATA_MAX_AGE_DAYS = 183;
+
+// ── The pre-decode pixel budget (`specs/api.md` §5.0.2, REQ-079) ────────────
+
+/**
+ * `NEXTUP_MAX_DECODE_PIXELS` — the pixel budget the pre-decode guard enforces.
+ *
+ * ⚠ READ AT REQUEST TIME, NEVER CAPTURED IN A MODULE-LEVEL CONSTANT. This is a
+ * function and not a `const` on purpose: a revision that changes the env var
+ * must take effect without a code change, and the runbook that up-sizes the
+ * container sets this in the same command. `T-IMG-022` asserts the request-time
+ * read, and it fails if this is ever "simplified" into a constant evaluated at
+ * import — which would silently pin the value to whatever the environment held
+ * when the module was first loaded.
+ *
+ * ⚠ THIS VALUE AND THE CONTAINER MEMORY ARE ONE SETTING IN TWO PLACES
+ * (REQ-079). The only permitted pairs are `(0.25 vCPU, 0.5 GiB, 25000000)` and
+ * `(0.5 vCPU, 1.0 GiB, 50000000)`; `T-INFRA-005` fails CI on anything else.
+ * Raising this alone removes the crash protection and adds no capacity.
+ *
+ * An unset, empty, non-numeric, zero, negative or non-integer value falls back
+ * to {@link DEFAULT_MAX_DECODE_PIXELS}. Falling back is deliberate: a
+ * mistyped env var must not silently disable the guard, and it must not take
+ * the process down at startup either — the safe default is the one the
+ * container is actually sized for.
+ */
+export function maxDecodePixels(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env['NEXTUP_MAX_DECODE_PIXELS'];
+  if (raw === undefined || raw.trim() === '') return DEFAULT_MAX_DECODE_PIXELS;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed <= 0) return DEFAULT_MAX_DECODE_PIXELS;
+  return parsed;
+}

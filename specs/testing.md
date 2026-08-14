@@ -2655,3 +2655,82 @@ exact bytes and nothing looser - and says so.
 downstream may branch between them. The distinction is kept only because
 `uploadedFormat` is persisted and surfaces in error text, where reporting the
 brand family the file actually declares is worth more than a single label.
+
+---
+
+## 26. The pre-decode pixel guard (TASK-145)
+
+Three modules, one decision. `packages/domain/src/pixelGuard.ts` is the pure
+verdict table (`specs/api.md` §5.0.1), `apps/api/src/images/readDimensions.ts`
+reads dimensions out of a container header without decoding (§5.0.3), and
+`apps/api/src/images/decodeGuard.ts` composes them behind `assertDecodable()`.
+Asserted by `apps/api/test/unit/pixelGuard.spec.ts`, the path
+`specs/testing.md` §11 already names.
+
+### 26.1 Ids
+
+| Id | Level | Asserts |
+|---|---|---|
+| **`T-IMG-017`** (`a`-`l`, UNIT HALF) | U | The decision table and the entry point. `a` a 48 MP header is refused `IMAGE_TOO_LARGE_TO_DECODE` at 25 MP; `b` **the SAME header is accepted at `50000000`** - the discriminating case, without which a guard hard-coded to reject `8064x5952` passes `a`; `c` a 24 MP image passes; `d` an unparseable header is REJECTED, never decoded to find out; `e` both axis bounds at both ends; `f` **an axis violation is reported BEFORE a budget violation** when both hold, because telling the owner to up-size the container cannot help an image Read 4.0 would refuse at any size; `g` the budget boundary is strictly greater-than; `h` **no decoder is IMPORTED by either guard module** (see §26.3(b)); `i` the thrown `AppError` carries the per-reason status (413/400/415); `j` the memory refusal names `memory` and cites the runbook and the corrupt-file refusal names NEITHER (`A43-M3`); `k` a passing header returns its declared dimensions; `l` `inspectDecodable` reports the same verdict without throwing, which is the shape a per-file loop needs (REQ-080/081). |
+| **`T-IMG-022`** (`a`-`d`) | U | `a` `NEXTUP_MAX_DECODE_PIXELS` defaults to `25000000`; `b` it is **read at request time**, not captured at import - the discriminating case, since a module-level `const` would pin the value to whatever the environment held at first load and every other assertion here would still pass; `c` the guard honours the configured value end to end; `d` an empty, non-numeric, zero, negative or non-integer value falls back to the default rather than disabling the guard or crashing the process at startup. |
+| **`T-IMG-025`** (`a`-`g`, NEW) | U | The header readers. `a` PNG `IHDR`, non-square, not transposed; `b` JPEG `SOFn` across baseline `C0`, extended `C1` and progressive `C2`, with **height before width** - the classic bug here, and silent, because the pixel-budget product is identical either way; `c` `DHT`/`JPG`/`DAC` sit inside the `SOF` marker range and are skipped; `d` **the LARGEST `ispe` is taken, never the first** - a real iPhone file lists the thumbnail first, so a first-match reader waves a 48 MP master through; `e` a single-`ispe` HEIF still reads, so `d` is not passing by accident; `f` unparseable, truncated, empty and unrecognised headers return `null` and never throw; `g` a zero-size or under-length ISO-BMFF box terminates instead of looping - the failure mode there is a hang, not a wrong answer, so termination is what is asserted. |
+
+Mutation-tested in six directions, all six caught: JPEG width/height swapped;
+`ispe` first-match instead of maximum; budget checked before axis bounds;
+budget boundary `>=` instead of `>`; an unparseable header accepted; and a
+decoder import added to `readDimensions.ts`.
+
+### 26.2 What TASK-145 does NOT claim
+
+**(a) The integration half of `T-IMG-017`** - a 413 envelope from
+`POST /api/batches/:batchId/images` with peak RSS asserted flat across the
+call - needs the upload endpoint, which is TASK-050 and does not exist.
+
+**(b) Serial image processing (`concurrency = 1`).** TASK-145's row also
+requires the extraction worker to process a batch's images strictly serially
+and release each buffer before loading the next. That worker is
+`apps/api/src/jobs/runExtraction.ts` (TASK-057/058) and does not exist, so
+there is nothing to set `concurrency` on and no batch to feed a peak-RSS
+assertion. The guard is the half that TASK-149 blocks on and it is complete;
+**the serial-processing half is recorded as outstanding on the TASK-145 row
+rather than quietly counted as delivered.**
+
+### 26.3 Findings recorded while building it
+
+**(a) Module naming - resolved, not guessed.** `specs/api.md` §5.0 names
+`apps/api/src/images/pixelGuard.ts` for the guard, §5.0.1 names
+`packages/domain/src/pixelGuard.ts` for the pure decision and §5.0.3 names
+`apps/api/src/images/readDimensions.ts` for the header read; the backlog row
+for TASK-145 names `apps/api/src/images/decodeGuard.ts` exposing
+`assertDecodable(header)`. The backlog is the work order and TASK-149's row
+mandates calling `assertDecodable()` from `decodeGuard.ts` **by name**, so that
+is the entry point. The pure decision is in the domain exactly where §5.0.1
+puts it and the header read is exactly where §5.0.3 puts it, so there is one
+implementation and not two. This closes the divergence reported at §25.3(a).
+
+**(b) A vacuous structural test, caught before it shipped.** The first draft of
+`T-IMG-017h` `vi.mock`ed `heic-convert` and asserted it was never called. That
+proves nothing: **a module nothing imports can be mocked and "not called"
+forever**, so the assertion would have passed identically against an
+implementation that delegated the HEIC branch to the decoder - the exact trap
+§5.0.3 warns about. It now reads both guard modules' sources and asserts no
+decoder appears among their imports, with a non-vacuity check that the import
+regex is finding anything at all. Mutation-verified: adding
+`import convert from 'heic-convert'` to `readDimensions.ts` fails it.
+
+**(c) A PNG signature compared four bytes from offset 1.** The detection read
+`P`, `N`, `G` and the following `0x0D` as a four-character tag and compared it
+to `'PNG'`, so every PNG returned `null` and would have been rejected `415`.
+Caught by `T-IMG-025a` on the first run. Worth recording because the sniffer in
+TASK-148 uses a full eight-byte signature comparison and this module had
+quietly reimplemented the check a shorter way.
+
+**(d) A malformed `NEXTUP_MAX_DECODE_PIXELS` falls back rather than throwing.**
+`specs/api.md` §5.0.2 types it `z.coerce.number().int().positive()`, which on a
+mistyped value would throw. Throwing at startup takes the whole app down over a
+typo; throwing at request time fails an upload with an error the owner cannot
+act on. Both are worse than falling back to the value the container is actually
+sized for, so `maxDecodePixels()` falls back and `T-IMG-022d` pins it. **The
+one behaviour that is NOT acceptable - silently disabling the guard, e.g. by
+treating an unparseable value as `Infinity` - is what that case exists to
+prevent.**
