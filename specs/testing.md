@@ -2114,3 +2114,22 @@ references by name. `T-INFRA-005s` is the new mutation: a `ghcr-token`
 arriving alongside the Easy Auth secret, which is how the regression would
 really happen, and which the `registries` check alone does not see because the
 credential appears before the entry that uses it.
+### 18.4 The ledger's blind spot runs in BOTH directions
+
+`check-status.mjs` falsifies *"done but the tests are absent"*. It cannot
+falsify the opposite — **done work still recorded as `todo`** — because a
+task with no claim has nothing to check.
+
+That direction is not harmless. `docs/status.md` §"Ready to start" is what
+tells an agent which work is unblocked, so a delivered task sitting at `todo`
+is actively advertised as available. TASK-029 and TASK-030 were both fully
+implemented (`apps/api/test/integration/security.spec.ts`, 23 cases including
+the route-enumeration walk and its own mutation; `tools/check-no-credentials.mjs`
+with 24 cases and four false-positive guards) and both were listed as ready.
+An agent picking either up would have rewritten a passing, mutation-proven
+suite from scratch — and the second version would have looked exactly as
+green.
+
+Both are corrected. The general rule: **when a task's named tests all exist
+and pass, the ledger is wrong, not the suite.** Check the ledger against the
+suite before starting anything the ready list offers, not after.

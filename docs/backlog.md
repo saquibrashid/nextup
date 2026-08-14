@@ -480,8 +480,8 @@ finished, so the exception cannot outlive its reason.
 | `TASK-026` | `todo` | — |
 | `TASK-027` | `done` | `T-INFRA-008` |
 | `TASK-028` | `todo` | — |
-| `TASK-029` | `todo` | — |
-| `TASK-030` | `todo` | — |
+| `TASK-029` | `done` | `apps/api/test/integration/security.spec.ts` — delivered with the auth chain and never recorded. `T-SEC-002` (a–h, route-enumerated over the REAL router; `T-SEC-002f` is the mutation proving the walk catches a 403), `T-SEC-017` (a–d), `T-SEC-028` (a–c), `T-SEC-030` (d–g). |
+| `TASK-030` | `done` | `tools/check-no-credentials.mjs` + `tests/infra/noCredentials.spec.ts` — `T-SEC-011` (a–k) and `T-SEC-001` (a–m), both with false-positive cases (`passwordless`, the SQL connection string, the `netflix`/`max` enum values, playwright in devDependencies). Wired as `npm run check:credentials`. |
 | `TASK-031` | `todo` | — |
 | `TASK-032` | `todo` | — |
 | `TASK-033` | `done` | `T-LIST-010`, `T-LIST-011`, `T-API-017` |
