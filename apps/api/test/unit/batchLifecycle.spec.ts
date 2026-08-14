@@ -20,7 +20,7 @@
  */
 
 import { BATCH_STATUSES, TERMINAL_BATCH_STATUSES, type BatchStatus } from '@nextup/domain';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AppError } from '../../src/errors/AppError.js';
 import { createApiRouter } from '../../src/routes/index.js';
@@ -30,9 +30,49 @@ import {
   MUTABLE_BATCH_STATUSES,
   assertBatchMutable,
   canTransition,
+  discardBatch,
+  loadOwnedBatch,
   openStatuses,
   statusesWithNoOutgoingTransitions,
+  submitBatch,
+  transitionBatch,
 } from '../../src/services/batchLifecycle.js';
+import {
+  findUploadBatch,
+  listImagesForBatch,
+  transitionUploadBatchStatus,
+  type OwnerId,
+} from '../../src/repository/ownerData.js';
+
+// The repository is stubbed HERE and only here. Everything in this file is a
+// branch of the service's own logic — a refusal, a 404, an empty-batch check —
+// and none of it needs a database to be decided. The properties that DO depend
+// on the store (the conditional write actually being atomic, a discarded batch
+// leaving the list byte-identical) stay in
+// `apps/api/test/integration/batchLifecycle.spec.ts`, where a stub would be
+// agreement rather than evidence.
+vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/repository/ownerData.js')>();
+  return {
+    ...actual,
+    findUploadBatch: vi.fn(),
+    listImagesForBatch: vi.fn(),
+    transitionUploadBatchStatus: vi.fn(),
+  };
+});
+
+const OWNER = 'owner-hash' as OwnerId;
+const mockFind = vi.mocked(findUploadBatch);
+const mockImages = vi.mocked(listImagesForBatch);
+const mockTransition = vi.mocked(transitionUploadBatchStatus);
+
+/** The subset of an `UploadBatch` these branches read. */
+const batchRow = (status: string) =>
+  ({ id: 'b-1', status, service: 'netflix', mode: 'append-only' }) as never;
+
+beforeEach(() => {
+  vi.resetAllMocks();
+});
 
 /** Reads the registered routes out of an Express router (see `authChain.spec.ts`). */
 function enumerateRoutes(layers: unknown): { method: string; path: string }[] {
@@ -193,5 +233,145 @@ describe('T-BATCH-013 — service and mode are immutable after submit (US-003 AC
     const paths = enumerateRoutes(createApiRouter()).map((route) => route.path);
     expect(paths).toContain('/batches/:batchId/submit');
     expect(paths).toContain('/batches/:batchId/discard');
+  });
+});
+
+describe('T-BATCH-017 — the refusal branches, without a store', () => {
+  it('T-BATCH-017i: an illegal transition is refused before any write is attempted', async () => {
+    // Order matters. If the write were attempted first and the refusal derived
+    // from its row count, an illegal transition would still touch the database
+    // — and on a table with a status CHECK it would fail as a 500 rather than
+    // the 409 the SPA knows how to act on.
+    await expect(
+      transitionBatch(
+        OWNER,
+        { id: 'b-1', status: 'applied' },
+        'submitted',
+        'BATCH_NOT_DRAFT',
+        'no',
+      ),
+    ).rejects.toBeInstanceOf(AppError);
+    expect(mockTransition).not.toHaveBeenCalled();
+  });
+
+  it('T-BATCH-017j: losing the conditional write is refused with the caller code', async () => {
+    // A zero row count means another request moved the batch first. It is
+    // reported with the SAME code as an outright illegal transition, because
+    // to the client they are the same event: the batch is no longer in the
+    // state the request assumed.
+    mockTransition.mockResolvedValue(0);
+    let thrown: unknown;
+    try {
+      await transitionBatch(
+        OWNER,
+        { id: 'b-1', status: 'draft' },
+        'submitted',
+        'BATCH_NOT_DRAFT',
+        'no',
+      );
+    } catch (error) {
+      thrown = error;
+    }
+    expect((thrown as AppError).code).toBe('BATCH_NOT_DRAFT');
+    expect((thrown as AppError).httpStatus).toBe(409);
+    expect((thrown as AppError).details['expectedOneOf']).toEqual(['draft', 'extraction-failed']);
+  });
+
+  it('T-BATCH-017k: a status the enum does not contain is refused, not trusted', async () => {
+    // The row comes from the database as a plain string. A value outside the
+    // enum — a hand-edited row, a migration mid-flight — must not index into
+    // the table and read `undefined`.
+    await expect(
+      transitionBatch(
+        OWNER,
+        { id: 'b-1', status: 'nonsense' },
+        'submitted',
+        'BATCH_NOT_DRAFT',
+        'no',
+      ),
+    ).rejects.toBeInstanceOf(AppError);
+    expect(mockTransition).not.toHaveBeenCalled();
+  });
+
+  it('T-BATCH-017l: a legal transition does reach the store', async () => {
+    // The non-vacuity guard for `017i` and `017k`: a `transitionBatch` that
+    // never called the repository at all would satisfy both.
+    mockTransition.mockResolvedValue(1);
+    await expect(
+      transitionBatch(OWNER, { id: 'b-1', status: 'draft' }, 'submitted', 'BATCH_NOT_DRAFT', 'no'),
+    ).resolves.toBe('submitted');
+    expect(mockTransition).toHaveBeenCalledTimes(1);
+    expect(mockTransition.mock.calls[0]?.[2]).toBe('draft');
+  });
+
+  it('T-BATCH-019e: an unknown batch is 404, never 403', async () => {
+    mockFind.mockResolvedValue(null);
+    let thrown: unknown;
+    try {
+      await loadOwnedBatch(OWNER, 'missing');
+    } catch (error) {
+      thrown = error;
+    }
+    expect((thrown as AppError).code).toBe('NOT_FOUND');
+    expect((thrown as AppError).httpStatus).toBe(404);
+  });
+
+  it('T-BATCH-019f: NO_IMAGES applies only while the batch is still a draft', async () => {
+    // An already-submitted batch with no images must report the 409 the client
+    // is waiting for, not change its answer to a 400. Otherwise a double
+    // submit of an empty batch tells the SPA to add screenshots to a batch
+    // that is already extracting.
+    mockFind.mockResolvedValue(batchRow('submitted'));
+    mockImages.mockResolvedValue([]);
+    mockTransition.mockResolvedValue(0);
+
+    let thrown: unknown;
+    try {
+      await submitBatch(OWNER, 'b-1');
+    } catch (error) {
+      thrown = error;
+    }
+    expect((thrown as AppError).code).toBe('BATCH_NOT_DRAFT');
+  });
+
+  it('T-BATCH-019g: a draft with no images is NO_IMAGES and is never written', async () => {
+    mockFind.mockResolvedValue(batchRow('draft'));
+    mockImages.mockResolvedValue([]);
+
+    let thrown: unknown;
+    try {
+      await submitBatch(OWNER, 'b-1');
+    } catch (error) {
+      thrown = error;
+    }
+    expect((thrown as AppError).code).toBe('NO_IMAGES');
+    expect((thrown as AppError).httpStatus).toBe(400);
+    expect(mockTransition).not.toHaveBeenCalled();
+  });
+
+  it('T-BATCH-019h: a successful submit reports the image count and the poll interval', async () => {
+    mockFind.mockResolvedValue(batchRow('draft'));
+    mockImages.mockResolvedValue([{ id: 'i-1' }, { id: 'i-2' }] as never);
+    mockTransition.mockResolvedValue(1);
+
+    const at = new Date('2026-08-10T20:04:11.902Z');
+    expect(await submitBatch(OWNER, 'b-1', at)).toEqual({
+      batchId: 'b-1',
+      status: 'submitted',
+      imageCount: 2,
+      submittedAt: '2026-08-10T20:04:11.902Z',
+      pollAfterMs: 2000,
+    });
+  });
+
+  it('T-BATCH-006g: discard reports that the list did not change', async () => {
+    mockFind.mockResolvedValue(batchRow('draft'));
+    mockTransition.mockResolvedValue(1);
+
+    expect(await discardBatch(OWNER, 'b-1')).toEqual({
+      batchId: 'b-1',
+      status: 'discarded',
+      listStateChanged: false,
+    });
   });
 });
