@@ -313,6 +313,44 @@ export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions,
   return { rows: rows.slice(0, limit), hasMore: rows.length > limit };
 }
 
+/**
+ * ONE title with ALL of its listings, for `GET /api/titles/:titleId`
+ * (`specs/api.md` §6.3, TASK-034).
+ *
+ * Three scoping decisions, each deliberate:
+ *
+ * 1. **No `state` filter on the title.** The removed view is a historical LOG
+ *    the owner browses and restores from (product invariant 7), so a
+ *    soft-deleted title must still be openable — otherwise the row the removed
+ *    view renders has no detail page and restore has nothing to confirm
+ *    against.
+ * 2. **No suppression filter.** `listTitlePage` excludes suppressed works
+ *    because they must not appear in the LIST (REQ-024); "not interested" is
+ *    not deletion, and the undo-refusal flow (US-033) exists precisely to read
+ *    a suppressed work back. Applying the list's filter here would make the
+ *    escape hatch unreachable.
+ * 3. **ALL listings, active and removed.** §6.3 requires `removedListings[]`
+ *    alongside the active badges, so the route splits one fetched set rather
+ *    than issuing two queries that could observe different states.
+ *
+ * ⚠ Scoping is `{ ownerId, id }` and `findFirst`, never `findUnique({ id })`
+ * with an ownership check afterwards. The check-afterwards shape leaks
+ * existence through timing and through any future code path that forgets it;
+ * this one cannot return another owner's row at all, which is what lets the
+ * route answer a flat 404 (`T-LIST-028`, `T-SEC-002`).
+ */
+export async function findTitleDetail(ownerId: OwnerId, id: string, tx?: Db) {
+  return db(tx).title.findFirst({
+    where: { ownerId, id },
+    include: {
+      listings: {
+        where: { ownerId },
+        orderBy: [{ dateAdded: 'asc' }, { listingId: 'asc' }],
+      },
+    },
+  });
+}
+
 export async function updateTitle(
   ownerId: OwnerId,
   id: string,

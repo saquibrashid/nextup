@@ -485,7 +485,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-031` | `todo` | — |
 | `TASK-032` | `todo` | — |
 | `TASK-033` | `done` | `T-LIST-010`, `T-LIST-011`, `T-API-017` |
-| `TASK-034` | `todo` | — |
+| `TASK-034` | `done` | `T-LIST-028` — `apps/api/test/integration/titleDetail.spec.ts` (8 cases): owner scoping, and the foreign-id refusal asserted byte-identical to the unknown-id refusal with `T-LIST-028g` as its non-vacuity guard. `T-LIST-035` — `apps/api/test/unit/titlesShape.spec.ts` (8 cases) for the §6.3 shaping, where coverage is measured. The active/removed badge split is mutation-proven at both layers. |
 | `TASK-035` | `todo` | — |
 | `TASK-036` | `todo` | — |
 | `TASK-037` | `todo` | — |
@@ -962,7 +962,7 @@ Traces to: US-018 (REQ-024, REQ-025, REQ-026, REQ-031) · Milestone M2 · Depend
 | Task | Description | Size | Depends on | Done when |
 |---|---|---|---|---|
 | TASK-033 | `GET /api/titles` — active and visible only, suppression anti-join, service badges, cursor pagination. | M | 017, 023 | `T-LIST-010 ~~T-LIST-001~~`, `T-LIST-011 ~~T-LIST-002~~`, `T-API-017 ~~T-API-004~~` |
-| TASK-034 | `GET /api/titles/:titleId`. | XS | 033 | `T-LIST-028 ~~T-LIST-003~~` |
+| TASK-034 | `GET /api/titles/:titleId`. | XS | 033 | `T-LIST-028`, `T-LIST-035 ~~T-LIST-003~~` |
 | TASK-038 | `apps/web/src/pages/ListPage.tsx` + `components/TitleList.tsx` + `TitleRow.tsx` — badges, poster, **deep links out to the service**. | M | 033, 025 | `T-UI-010 ~~T-UI-001~~`, `T-UI-010 ~~T-UI-002~~`, `T-UI-012 ~~T-LINK-001~~` |
 | TASK-040 | Two **distinct** empty states (nothing imported yet vs everything filtered out) + a load-failure error state. | S | 038 | `T-UX-012 ~~T-UX-001~~`, `T-UX-014 ~~T-UX-002~~`, `T-UX-018 ~~T-UX-003~~` |
 

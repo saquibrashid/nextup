@@ -14,7 +14,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { parseGenres, toIsoDate, toListItem } from '../../src/routes/titles.js';
+import { parseGenres, toDetailItem, toIsoDate, toListItem } from '../../src/routes/titles.js';
 
 /** The shape `listTitlePage` returns, with sensible defaults per test. */
 function row(overrides: Record<string, unknown> = {}) {
@@ -136,5 +136,125 @@ describe('T-LIST-033 dates never shift by a day', () => {
     expect(toIsoDate(new Date('2026-04-02T00:00:00.000Z'))).toBe('2026-04-02');
     expect(toIsoDate(new Date('2026-01-01T00:00:00.000Z'))).toBe('2026-01-01');
     expect(toIsoDate(new Date('2026-12-31T00:00:00.000Z'))).toBe('2026-12-31');
+  });
+});
+
+/* ================================================================== *
+ * T-LIST-035 — the DETAIL item (`specs/api.md` §6.3, TASK-034)
+ * ================================================================== */
+
+/** The shape `findTitleDetail` returns: every listing, active and removed. */
+function detailRow(listings: unknown[], overrides: Record<string, unknown> = {}) {
+  return {
+    ...row(),
+    createdByBatchId: 'b-1',
+    createdAt: new Date('2026-04-02T09:15:00.000Z'),
+    listings,
+    ...overrides,
+  } as Parameters<typeof toDetailItem>[0];
+}
+
+const activeListing = {
+  listingId: 'l-netflix',
+  service: 'netflix',
+  state: 'active',
+  dateAdded: new Date('2026-04-02T00:00:00.000Z'),
+  removedAt: null,
+};
+
+const removedListing = {
+  listingId: 'l-max',
+  service: 'max',
+  state: 'removed',
+  dateAdded: new Date('2026-06-11T00:00:00.000Z'),
+  removedAt: new Date('2026-07-01T10:30:00.000Z'),
+};
+
+describe('T-LIST-035 the detail item is the list item plus the removal history', () => {
+  it('T-LIST-035a: carries the list-item fields and the three §6.3 extras', () => {
+    const item = toDetailItem(detailRow([activeListing]));
+
+    expect(item).toMatchObject({
+      titleId: 't-1',
+      name: 'Dune',
+      sortDateAdded: '2026-04-02',
+      createdByBatchId: 'b-1',
+      createdAt: '2026-04-02T09:15:00.000Z',
+    });
+    expect(item['removedListings']).toEqual([]);
+  });
+
+  it('T-LIST-035b: badges are built from the ACTIVE listings alone', () => {
+    // ⚠ The load-bearing case. This function is handed ALL listings — that is
+    // the point, `removedListings[]` needs the others — so passing the array
+    // straight through to `toListItem` is the natural mistake, and it puts a
+    // removed service's badge back on the row in the one view that shows the
+    // removal right beside it.
+    const item = toDetailItem(detailRow([activeListing, removedListing]));
+
+    expect((item['badges'] as { service: string }[]).map((b) => b.service)).toEqual(['netflix']);
+    expect(item['removedListings']).toHaveLength(1);
+  });
+
+  it('T-LIST-035c: a removed listing keeps its write-once dateAdded', () => {
+    // REQ-030: `dateAdded` is written once and never rewritten, so removal
+    // must not restamp it. A removal that reset the date would silently
+    // rewrite the owner's own history of when they saved the title.
+    const item = toDetailItem(detailRow([removedListing]));
+    const removed = (item['removedListings'] as Record<string, unknown>[])[0];
+
+    expect(removed).toMatchObject({
+      listingId: 'l-max',
+      service: 'max',
+      state: 'removed',
+      dateAdded: '2026-06-11',
+    });
+  });
+
+  it('T-LIST-035d: removedAt is a full timestamp, not a date', () => {
+    // The removed view is an ordered LOG, not a set. Truncating to a day makes
+    // two removals on one day indistinguishable and unorderable — and the log
+    // is exactly what the owner reads to answer "what did that batch take?".
+    const item = toDetailItem(detailRow([removedListing]));
+    const removed = (item['removedListings'] as Record<string, unknown>[])[0];
+
+    expect(removed?.['removedAt']).toBe('2026-07-01T10:30:00.000Z');
+    expect(removed?.['removedAt']).not.toBe('2026-07-01');
+  });
+
+  it('T-LIST-035e: a removed listing with no removedAt yields null, not a crash', () => {
+    // The column is nullable, and a row soft-deleted by an older path may
+    // carry no stamp. A `.toISOString()` on null would take down the detail
+    // page for the one title whose history is already incomplete.
+    const item = toDetailItem(detailRow([{ ...removedListing, removedAt: null }]));
+    const removed = (item['removedListings'] as Record<string, unknown>[])[0];
+
+    expect(removed?.['removedAt']).toBeNull();
+  });
+
+  it('T-LIST-035f: a title with no listings at all is still renderable', () => {
+    // Reachable: every listing removed leaves the title row alive (REQ-028,
+    // soft delete forever). Empty badges plus empty removals must not be an
+    // error — the row is the thing restore acts on.
+    const item = toDetailItem(detailRow([]));
+
+    expect(item['badges']).toEqual([]);
+    expect(item['removedListings']).toEqual([]);
+  });
+
+  it('T-LIST-035g: any non-active state counts as removed, not just "removed"', () => {
+    // The split tests `state === active`, not `state === removed`. If a third
+    // state is ever added, an unknown value must fall to the removal log
+    // rather than silently earning a badge it has no right to.
+    const item = toDetailItem(detailRow([{ ...removedListing, state: 'unknown-future-state' }]));
+
+    expect(item['badges']).toEqual([]);
+    expect(item['removedListings']).toHaveLength(1);
+  });
+
+  it('T-LIST-035h: createdByBatchId survives as null', () => {
+    const item = toDetailItem(detailRow([activeListing], { createdByBatchId: null }));
+
+    expect(item['createdByBatchId']).toBeNull();
   });
 });

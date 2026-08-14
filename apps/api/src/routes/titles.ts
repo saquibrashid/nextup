@@ -22,7 +22,8 @@ import { dateAddedLabel } from '@nextup/domain';
 import { type Router } from 'express';
 
 import { encodeCursor } from '../pagination.js';
-import { listTitlePage } from '../repository/ownerData.js';
+import { AppError } from '../errors/AppError.js';
+import { findTitleDetail, listTitlePage } from '../repository/ownerData.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import { parseTitleListQuery } from './titlesQuery.js';
 
@@ -107,6 +108,57 @@ export function toListItem(row: TitleRow): Record<string, unknown> {
   };
 }
 
+/**
+ * One removed listing, for the detail response's `removedListings[]`.
+ *
+ * `removedAt` is a timestamp, not a date: the removed view is an ordered LOG
+ * (product invariant 7) and two removals on the same day must stay
+ * distinguishable. `dateAdded` beside it is still a date — it is the same
+ * write-once value the badge carried before the listing was removed.
+ */
+export function toRemovedListing(listing: DetailListingRow): Record<string, unknown> {
+  return {
+    listingId: listing.listingId,
+    service: listing.service,
+    state: listing.state,
+    dateAdded: toIsoDate(listing.dateAdded),
+    removedAt: listing.removedAt === null ? null : listing.removedAt.toISOString(),
+  };
+}
+
+interface DetailListingRow extends ListingRow {
+  state: string;
+  removedAt: Date | null;
+}
+
+interface TitleDetailRow extends Omit<TitleRow, 'listings'> {
+  createdByBatchId: string | null;
+  createdAt: Date;
+  listings: DetailListingRow[];
+}
+
+/**
+ * The detail item: the list item's shape plus `removedListings[]`,
+ * `createdByBatchId` and `createdAt` (`specs/api.md` §6.3).
+ *
+ * ⚠ `badges` is built from the ACTIVE listings only, exactly as in the list
+ * (REQ-026). This handler receives ALL listings — that is the point, since
+ * `removedListings[]` needs the others — so the split happens here, and
+ * getting it wrong would put a removed service's badge back on the row in the
+ * one view that shows removals next to it.
+ */
+export function toDetailItem(row: TitleDetailRow): Record<string, unknown> {
+  const active = row.listings.filter((listing) => listing.state === 'active');
+  const removed = row.listings.filter((listing) => listing.state !== 'active');
+
+  return {
+    ...toListItem({ ...row, listings: active }),
+    removedListings: removed.map(toRemovedListing),
+    createdByBatchId: row.createdByBatchId,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
 export function registerTitleRoutes(router: Router): void {
   router.get('/titles', async (req, res) => {
     const ownerId = requireOwnerId(req);
@@ -136,5 +188,27 @@ export function registerTitleRoutes(router: Router): void {
         : null;
 
     res.status(200).json({ items, nextCursor, limit: query.limit });
+  });
+
+  /**
+   * `GET /api/titles/:titleId` (§6.3, TASK-034, `T-LIST-028`).
+   *
+   * ⚠ A row belonging to another owner answers **404, never 403**. 403 would
+   * confirm the id exists, which turns id enumeration into a membership
+   * oracle — the caller learns the owner's inventory without reading a single
+   * title. `findTitleDetail` is owner-scoped, so a foreign id and a missing id
+   * arrive here as the same `null` and cannot be told apart by construction
+   * rather than by this handler remembering to conflate them (`T-SEC-002`).
+   */
+  router.get('/titles/:titleId', async (req, res) => {
+    const ownerId = requireOwnerId(req);
+    const titleId = req.params.titleId ?? '';
+
+    const row = await findTitleDetail(ownerId, titleId);
+    if (row === null) {
+      throw new AppError('NOT_FOUND', 404, 'No such title.');
+    }
+
+    res.status(200).json(toDetailItem(row as unknown as TitleDetailRow));
   });
 }

@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 120 |
+| ⬜ todo | 119 |
 | 🚧 doing | 0 |
-| ✅ done | 34 |
+| ✅ done | 35 |
 | 🙋 owner | 7 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -27,7 +27,6 @@ Not done, and every task they depend on is done.
 | `TASK-026` | S | Epic G — Attribution & compliance |
 | `TASK-028` | S | Epic A — Access & identity |
 | `TASK-032` | S | Epic K — Platform, safety, and the shell |
-| `TASK-034` | XS | Epic F — The list itself (the value loop) |
 | `TASK-035` | S | Epic F — The list itself (the value loop) |
 | `TASK-036` | S | Epic F — The list itself (the value loop) |
 | `TASK-037` | S | Epic F — The list itself (the value loop) |
@@ -194,6 +193,7 @@ Not done, and every task they depend on is done.
 | `TASK-029` | `apps/api/test/integration/security.spec.ts` — delivered with the auth chain and never recorded. `T-SEC-002` (a–h, route-enumerated over the REAL router; `T-SEC-002f` is the mutation proving the walk catches a 403), `T-SEC-017` (a–d), `T-SEC-028` (a–c), `T-SEC-030` (d–g). | `T-SEC-002`, `T-SEC-017`, `T-SEC-028`, `T-SEC-030` |
 | `TASK-030` | `tools/check-no-credentials.mjs` + `tests/infra/noCredentials.spec.ts` — `T-SEC-011` (a–k) and `T-SEC-001` (a–m), both with false-positive cases (`passwordless`, the SQL connection string, the `netflix`/`max` enum values, playwright in devDependencies). Wired as `npm run check:credentials`. | `T-SEC-001`, `T-SEC-011` |
 | `TASK-033` | `T-LIST-010`, `T-LIST-011`, `T-API-017` | `T-API-017`, `T-LIST-010`, `T-LIST-011` |
+| `TASK-034` | `T-LIST-028` — `apps/api/test/integration/titleDetail.spec.ts` (8 cases): owner scoping, and the foreign-id refusal asserted byte-identical to the unknown-id refusal with `T-LIST-028g` as its non-vacuity guard. `T-LIST-035` — `apps/api/test/unit/titlesShape.spec.ts` (8 cases) for the §6.3 shaping, where coverage is measured. The active/removed badge split is mutation-proven at both layers. | `T-LIST-028`, `T-LIST-035` |
 | `TASK-041` | `apps/api/src/routes/serviceState.ts` + `packages/domain/src/freshness.ts` — `GET /api/service-state`, one entry per service in `SERVICES` so a never-captured service reads "has never been updated" rather than vanishing. `ageInDays` counts UTC calendar days, not 24-hour blocks, and clamps clock skew. `T-FRESH-010` (a–h), `T-FRESH-012` (a–f), `T-FRESH-015` (a–c, the A46 no-nudge regression guard). All four mutations caught; see `specs/testing.md` §16. | `T-FRESH-010`, `T-FRESH-012`, `T-FRESH-015` |
 | `TASK-048` | `T-BATCH-010`, `T-BATCH-015` | `T-API-003`, `T-BATCH-010`, `T-BATCH-015` |
 | `TASK-101` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` |
