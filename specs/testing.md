@@ -2541,3 +2541,63 @@ The search is **not** index-backed and `T-PERF-001` does not assert that it is:
 a leading wildcard cannot use a B-tree and Azure SQL Basic has no `pg_trgm`
 analogue. Fuzzy matching and typo tolerance are gone. Full-Text Search is the
 named escalation and is an ADR-level decision.
+---
+
+## 24. The batch state machine (TASK-054)
+
+### 24.1 New test ids
+
+| Test | L | Asserts |
+|---|---|---|
+| **`T-BATCH-017`** | U | The transition table in `apps/api/src/services/batchLifecycle.ts` is **total** over `BATCH_STATUSES`, names only real statuses as targets, leaves **no open status a dead end**, and **never leads from a terminal status back to an open one**. The discardable set is exactly the three §6.23 names. Every existing `T-BATCH-*` id asserts an OUTCOME of a transition; nothing asserted the table that decides which transitions exist, so a missing or extra edge would have surfaced only as whichever endpoint happened to be tested next. |
+| **`T-BATCH-018`** | I | A status change is applied **conditionally on the source status, in the same statement that writes the new one**. Two concurrent transitions from the same observed status change exactly one row. Without this, `submitBatch` is a read-modify-write across an `await`: two simultaneous submits both observe `draft`, both pass the guard, and one batch is extracted twice. |
+| **`T-BATCH-019`** | I | `POST /api/batches/:batchId/submit` (§6.14) answers **202** with `imageCount`, `submittedAt` and `pollAfterMs`; **400 `NO_IMAGES`** on an empty batch, **without moving it**; **409 `BATCH_NOT_DRAFT`** on a second submit, carrying the states the transition is legal from; and **404, never 403**, for another owner's batch. §9 assigns ids to submit's *consequences* (`T-BATCH-013` immutability, `T-EXT-*` extraction) but none to the endpoint's own status codes, so the 202 body and the `NO_IMAGES` refusal were unowned. ⚠ The `NO_IMAGES` refusal is cheap protection for product invariant 2: an extraction over zero images can only report zero candidates, and in `full-update` zero candidates is indistinguishable downstream from a service whose list is genuinely now empty. |
+
+⚠ **`T-BATCH-018a` was vacuous in its first form, and the mutation is what
+found it.** It originally fired two simultaneous `POST /submit` requests and
+asserted `[202, 409]`. That passed — and passed **identically** with the
+`status: from` predicate deleted from the query, because the adversarial
+interleaving never occurred: both handlers `await` a load before writing, and
+the second load resolved after the first write, so the JavaScript-level check
+refused it. **A window that does not open cannot be proven closed.** The case
+now drives `transitionUploadBatchStatus` directly from one already-read state,
+which is the shape of the bug; `T-BATCH-018c` keeps the end-to-end version but
+is explicitly labelled as NOT the discriminating case.
+
+### 24.2 What TASK-054 found in the specs
+
+**(a) `T-BATCH-013` has no request to send.** §9 defines it as "changing
+`service`/`mode` after submit → 409 `BATCH_IMMUTABLE`", but **no route in
+`specs/api.md` §4 accepts a change to either field.** Immutability is enforced
+today by the *absence* of an endpoint. Asserting only `assertBatchMutable`
+would prove a guard nothing calls, so the test has two legs: the guard refuses
+in every non-`draft` status, **and** no registered route can accept the change
+(`T-BATCH-013c`, which fails the moment someone adds a `PATCH /api/batches/:batchId`
+without wiring the guard). `T-BATCH-013d` is `013c`'s non-vacuity guard.
+
+**(b) §6.23 names no error code for an illegal discard.** Every other batch
+endpoint names one — `BATCH_NOT_DRAFT`, `BATCH_NOT_FAILED`,
+`BATCH_NOT_IN_REVIEW`, `BATCH_NOT_APPLIED`. Discard has none, and §8 forbids
+inventing one. `BATCH_IMMUTABLE` is used because it is the only member of the
+closed enumeration that means "this batch can no longer be changed". **Reported,
+not silently patched** — a code chosen here is a UI remedy chosen here.
+
+**(c) "Terminal" and "dead end" are different words and this file conflated
+them.** The first draft of `T-BATCH-017c` asserted that the statuses with no
+outgoing edge are exactly `TERMINAL_BATCH_STATUSES`. It failed immediately:
+`applied` is terminal — the owner may start another batch — and still
+transitions, to `undone` (§6.25). Terminal means *no longer blocks a new
+batch*. The property that must hold is **one-way-ness**: a terminal status can
+never lead back to an open one, or the owner ends up with two open batches and
+two full-update reconciliations that can interleave (product invariant 3).
+
+### 24.3 What TASK-054 does NOT claim
+
+`T-BATCH-011`, `T-BATCH-012` and `T-BATCH-014` are cited by the backlog row for
+this task and are **not** implemented by it. All three are properties of
+reconciliation and close — "reconciliation touches only the batch's service",
+"close applies additions, corrections and confirmed removals together" — which
+are TASK-072/073's, and no close endpoint exists yet. Squatting them here would
+let an unbuilt reconciliation pipeline report as verified. The row cites the
+ids it actually delivers and the three remain owned by the tasks that will
+build them.

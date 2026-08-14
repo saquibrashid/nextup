@@ -32,6 +32,7 @@ import {
 
 import { AppError } from '../errors/AppError.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
+import { discardBatch, submitBatch } from '../services/batchLifecycle.js';
 import { createUploadBatch, findOpenUploadBatch } from '../repository/ownerData.js';
 
 /** The status every batch starts in. Images attach to a draft; nothing applies. */
@@ -103,5 +104,24 @@ export function registerBatchRoutes(router: Router): void {
       // shown (US-003 AC-2/AC-3). Do not re-type this sentence in the SPA.
       modeExplanation: modeExplanation(mode, service),
     });
+  });
+
+  // §6.14. **202, not 200**: extraction runs in-process and asynchronously,
+  // and the client polls `GET /api/batches/:batchId` (US-006 AC-1). A 200
+  // would tell the SPA the work is finished, and the review pass would be
+  // requested against a batch with no candidates in it yet.
+  router.post('/batches/:batchId/submit', async (req, res) => {
+    const ownerId = requireOwnerId(req);
+    const result = await submitBatch(ownerId, req.params.batchId ?? '');
+    res.status(202).json(result);
+  });
+
+  // §6.23. 200 with `listStateChanged: false` — the SPA states plainly that
+  // nothing was lost from the list, which is the whole reassurance US-005 AC-4
+  // is asking for. Images are retained; NFR-019's purge governs them.
+  router.post('/batches/:batchId/discard', async (req, res) => {
+    const ownerId = requireOwnerId(req);
+    const result = await discardBatch(ownerId, req.params.batchId ?? '');
+    res.status(200).json(result);
   });
 }

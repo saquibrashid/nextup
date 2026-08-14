@@ -178,6 +178,38 @@ export async function updateUploadBatchStatus(
   return db(tx).uploadBatch.updateMany({ where: { ownerId, id }, data });
 }
 
+/**
+ * A status change applied ONLY if the batch is still in `from` (TASK-054).
+ *
+ * ⚠ This is not a convenience wrapper over `updateUploadBatchStatus` — the
+ * `status: from` predicate is the concurrency control. Reading the status,
+ * deciding in JavaScript and then writing is a read-modify-write across an
+ * `await`: two concurrent submits both observe `draft`, both pass the guard,
+ * and the batch is extracted twice. Here the check and the write are one
+ * statement, so exactly one caller can see a count of 1.
+ *
+ * Returns the number of rows changed — 0 means the batch moved first (or is
+ * not this owner's). The caller decides which of those it is; this function
+ * deliberately does not, because distinguishing them requires a second read
+ * that would reintroduce the race it exists to close.
+ */
+export async function transitionUploadBatchStatus(
+  ownerId: OwnerId,
+  id: string,
+  from: string,
+  data: Pick<
+    Prisma.UploadBatchUncheckedUpdateInput,
+    'status' | 'submittedAt' | 'completedAt' | 'undoneAt'
+  >,
+  tx?: Db,
+): Promise<number> {
+  const result = await db(tx).uploadBatch.updateMany({
+    where: { ownerId, id, status: from },
+    data,
+  });
+  return result.count;
+}
+
 /* ------------------------------------------------------------------ *
  * title
  * ------------------------------------------------------------------ */

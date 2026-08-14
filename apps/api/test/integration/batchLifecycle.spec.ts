@@ -1,0 +1,369 @@
+/**
+ * TASK-054 — submit and discard, through the real app (`specs/api.md` §6.14,
+ * §6.23).
+ *
+ * Integration rather than unit because both properties under test are
+ * properties of the DATABASE, not of the handlers:
+ *
+ *   • `T-BATCH-006` asserts that an abandoned batch writes nothing to the
+ *     list. A stubbed repository proves nothing about that — the only
+ *     convincing evidence is a list read back from real rows before and after.
+ *
+ *   • `T-BATCH-018` asserts that two concurrent submits produce exactly ONE
+ *     transition. That is a race between two statements reaching SQL Server,
+ *     and it cannot exist in a test that fakes the store: an in-memory stub
+ *     has no interleaving to lose.
+ *
+ * ⚠ `T-BATCH-018` is defined in `specs/testing.md` §24.1 with its reason. It
+ * is not a hypothetical: `submitBatch` reads the batch, decides, and then
+ * writes, and every `await` between those is a window. The naive
+ * implementation passes every single-threaded test in this file.
+ */
+
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+
+import type { Express } from 'express';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { createApp } from '../../src/app.js';
+import { CLIENT_PRINCIPAL_HEADER } from '../../src/auth/principal.js';
+import { resetAllowListWarning } from '../../src/middleware/allowList.js';
+import {
+  asOwnerId,
+  createServiceListing,
+  createTitle,
+  createUploadBatch,
+  createUploadedImage,
+  findUploadBatch,
+  listImagesForBatch,
+  transitionUploadBatchStatus,
+  type OwnerId,
+} from '../../src/repository/ownerData.js';
+import { closeTestPrisma, resetDatabase, testPrisma } from './harness.js';
+
+const OID = 'http://schemas.microsoft.com/identity/claims/objectidentifier';
+const SUBJECT = 'oid-owner-lifecycle';
+const OTHER_SUBJECT = 'oid-owner-lifecycle-other';
+const ISSUER = 'https://sts.windows.net/tenant/';
+
+const principalHeader = (subject: string): string =>
+  Buffer.from(
+    JSON.stringify({
+      claims: [
+        { typ: 'iss', val: ISSUER },
+        { typ: OID, val: subject },
+      ],
+    }),
+    'utf8',
+  ).toString('base64');
+
+let server: Server;
+let app: Express;
+let origin: string;
+let owner: OwnerId;
+
+interface ErrorBody {
+  error: { code: string; message: string; details: Record<string, unknown> };
+}
+
+const post = (path: string, subject = SUBJECT, body?: unknown): Promise<Response> =>
+  fetch(`${origin}${path}`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      [CLIENT_PRINCIPAL_HEADER]: principalHeader(subject),
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  });
+
+/** A batch in an arbitrary status, so every edge of the table is reachable. */
+async function seedBatch(id: string, status: string, service = 'netflix') {
+  return createUploadBatch(owner, { id, service, mode: 'append-only', status });
+}
+
+/** One image on a batch, so a submit is not refused for being empty. */
+async function seedImage(batchId: string, id: string) {
+  return createUploadedImage(owner, {
+    id,
+    batchId,
+    blobPath: `owner/${batchId}/${id}.png`,
+    fileName: 'IMG_0001.PNG',
+    ingestSource: 'upload',
+    uploadedFormat: 'png',
+    format: 'png',
+    byteSize: BigInt(1024),
+    retainUntil: new Date('2026-09-09T00:00:00.000Z'),
+  });
+}
+
+/** A snapshot of everything the OWNER'S LIST is made of. */
+async function listSnapshot(): Promise<string> {
+  const prisma = testPrisma();
+  const [titles, listings, states] = await Promise.all([
+    prisma.title.findMany({ orderBy: { id: 'asc' } }),
+    prisma.serviceListing.findMany({ orderBy: { listingId: 'asc' } }),
+    prisma.serviceState.findMany({ orderBy: { service: 'asc' } }),
+  ]);
+  return JSON.stringify({ titles, listings, states }, (_key, value: unknown) =>
+    typeof value === 'bigint' ? value.toString() : value,
+  );
+}
+
+beforeEach(async () => {
+  resetAllowListWarning();
+  vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+  process.env['NEXTUP_ALLOWED_SUBJECTS'] = `${SUBJECT},${OTHER_SUBJECT}`;
+  testPrisma();
+  await resetDatabase();
+
+  app = createApp();
+  server = app.listen(0);
+  await new Promise<void>((resolve) => server.once('listening', resolve));
+  origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+
+  // Read the owner id back from the API rather than composing it here. It is
+  // a hash of the verified principal (`deriveOwnerId`), and a locally
+  // reconstructed copy would seed rows under an id no request can ever reach —
+  // which shows up as a wall of 404s that look like missing routes.
+  const me = await fetch(`${origin}/api/me`, {
+    headers: { [CLIENT_PRINCIPAL_HEADER]: principalHeader(SUBJECT) },
+  });
+  owner = asOwnerId(((await me.json()) as { ownerId: string }).ownerId);
+});
+
+afterEach(async () => {
+  vi.restoreAllMocks();
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+});
+
+afterAll(async () => {
+  await closeTestPrisma();
+});
+
+describe('POST /api/batches/:batchId/submit (§6.14)', () => {
+  it('T-BATCH-019a: accepts a draft with images and answers 202', async () => {
+    await seedBatch('b-submit', 'draft');
+    await seedImage('b-submit', 'i-1');
+
+    const res = await post('/api/batches/b-submit/submit');
+    expect(res.status).toBe(202);
+
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body['status']).toBe('submitted');
+    expect(body['imageCount']).toBe(1);
+    expect(body['pollAfterMs']).toBe(2000);
+    expect(typeof body['submittedAt']).toBe('string');
+
+    const stored = await findUploadBatch(owner, 'b-submit');
+    expect(stored?.status).toBe('submitted');
+    // `submittedAt` is what `GET /api/batches/:batchId` reports and what the
+    // 15-minute extraction ceiling is measured from; a transition that moved
+    // the status without stamping it would look correct in every response.
+    expect(stored?.submittedAt).toBeInstanceOf(Date);
+  });
+
+  it('T-BATCH-019b: refuses an empty batch with 400 NO_IMAGES', async () => {
+    await seedBatch('b-empty', 'draft');
+
+    const res = await post('/api/batches/b-empty/submit');
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as ErrorBody).error.code).toBe('NO_IMAGES');
+
+    // And it did NOT move: a refused submit that had already transitioned
+    // would strand the batch in `submitted` with nothing to extract.
+    expect((await findUploadBatch(owner, 'b-empty'))?.status).toBe('draft');
+  });
+
+  it('T-BATCH-019c: refuses a second submit with 409 BATCH_NOT_DRAFT', async () => {
+    await seedBatch('b-twice', 'draft');
+    await seedImage('b-twice', 'i-2');
+
+    expect((await post('/api/batches/b-twice/submit')).status).toBe(202);
+
+    const res = await post('/api/batches/b-twice/submit');
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as ErrorBody;
+    expect(body.error.code).toBe('BATCH_NOT_DRAFT');
+    // The remedy hint: the SPA can say what state the batch would have to be
+    // in, rather than only that the request was refused.
+    expect(body.error.details['expectedOneOf']).toEqual(['draft', 'extraction-failed']);
+  });
+
+  it('T-BATCH-019d: answers 404, never 403, for another owner’s batch', async () => {
+    await seedBatch('b-mine', 'draft');
+    await seedImage('b-mine', 'i-3');
+
+    const res = await post('/api/batches/b-mine/submit', OTHER_SUBJECT);
+    expect(res.status).toBe(404);
+    expect(((await res.json()) as ErrorBody).error.code).toBe('NOT_FOUND');
+  });
+});
+
+describe('T-BATCH-018 — submit is atomic under concurrency (TASK-054)', () => {
+  it('T-BATCH-018a: two concurrent transitions from the same status change exactly one row', async () => {
+    // ⚠ This case is written against `transitionUploadBatchStatus` and NOT
+    // through HTTP, and that is the whole point. The first draft of this test
+    // fired two simultaneous `POST …/submit` requests and asserted
+    // `[202, 409]` — it passed, and it passed IDENTICALLY when the
+    // `status: from` predicate was deleted from the query. Mutation-verified,
+    // and the mutation survived.
+    //
+    // The reason is that the adversarial interleaving never actually occurred:
+    // both handlers `await` a load before writing, and in practice the second
+    // load resolved after the first write, so the JavaScript-level
+    // `canTransition` check refused it. A window that does not open cannot be
+    // proven closed. Here both calls are issued from the same already-read
+    // state, which is exactly the shape of the bug: two requests that both
+    // observed `draft`.
+    await seedBatch('b-atomic', 'draft');
+
+    const results = await Promise.all([
+      transitionUploadBatchStatus(owner, 'b-atomic', 'draft', { status: 'submitted' }),
+      transitionUploadBatchStatus(owner, 'b-atomic', 'draft', { status: 'submitted' }),
+    ]);
+
+    expect(results.reduce((a, b) => a + b, 0)).toBe(1);
+    expect((await findUploadBatch(owner, 'b-atomic'))?.status).toBe('submitted');
+  });
+
+  it('T-BATCH-018b: a transition from the right status does change a row', async () => {
+    // `018a`'s non-vacuity guard: a predicate that matched nothing at all
+    // would make the sum 0, not 1, but a helper that always returned 0 would
+    // need this case to be caught.
+    await seedBatch('b-atomic-solo', 'draft');
+    expect(
+      await transitionUploadBatchStatus(owner, 'b-atomic-solo', 'draft', { status: 'submitted' }),
+    ).toBe(1);
+  });
+
+  it('T-BATCH-018c: two simultaneous submit requests never both succeed', async () => {
+    // The end-to-end companion. It is NOT the discriminating case — see the
+    // note on `018a` — but it asserts the property the owner actually
+    // experiences, and it would catch a route that bypassed the service.
+    await seedBatch('b-race', 'draft');
+    await seedImage('b-race', 'i-4');
+
+    const [a, b] = await Promise.all([
+      post('/api/batches/b-race/submit'),
+      post('/api/batches/b-race/submit'),
+    ]);
+
+    expect([a.status, b.status].sort()).toEqual([202, 409]);
+    const loser = a.status === 409 ? a : b;
+    expect(((await loser.json()) as ErrorBody).error.code).toBe('BATCH_NOT_DRAFT');
+  });
+});
+
+describe('T-BATCH-006 · US-005 AC-4 · a discarded batch writes nothing to the list', () => {
+  /** An existing list, so "nothing changed" has something to be true of. */
+  async function seedExistingList(): Promise<void> {
+    const applied = await createUploadBatch(owner, {
+      id: 'b-applied',
+      service: 'netflix',
+      mode: 'append-only',
+      status: 'applied',
+    });
+    await createTitle(owner, {
+      id: 't-existing',
+      workIdentity: 'tmdb:movie:7001',
+      state: 'active',
+      matchState: 'matched',
+      tmdbId: 7001,
+      tmdbMediaType: 'movie',
+      tmdbName: 'Existing',
+      tmdbGenres: JSON.stringify(['Drama']),
+      sortDateAdded: new Date('2026-03-01T00:00:00.000Z'),
+      createdByBatchId: applied.id,
+    });
+    await createServiceListing(owner, {
+      listingId: 'l-existing',
+      titleId: 't-existing',
+      service: 'netflix',
+      state: 'active',
+      dateAdded: new Date('2026-03-01T00:00:00.000Z'),
+      createdByBatchId: applied.id,
+    });
+  }
+
+  it('T-BATCH-006a: discarding a draft leaves every title, listing and service state byte-identical', async () => {
+    await seedExistingList();
+    await seedBatch('b-discard', 'draft', 'max');
+    await seedImage('b-discard', 'i-6');
+    const before = await listSnapshot();
+
+    const res = await post('/api/batches/b-discard/discard');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      batchId: 'b-discard',
+      status: 'discarded',
+      listStateChanged: false,
+    });
+
+    expect(await listSnapshot()).toBe(before);
+  });
+
+  it('T-BATCH-006b: the snapshot is not vacuously equal', async () => {
+    // `006a`'s guard. A snapshot function that returned a constant — a typo in
+    // a table name, a serialiser that dropped everything — would make
+    // "nothing changed" true no matter what the discard did.
+    const empty = await listSnapshot();
+    await seedExistingList();
+    expect(await listSnapshot()).not.toBe(empty);
+  });
+
+  it('T-BATCH-006c: the images are RETAINED, not deleted', async () => {
+    // §6.23. Discard abandons the review, it does not destroy the capture —
+    // NFR-019's 30-day purge governs the bytes, and deleting here would take
+    // away the owner's ability to re-extract (§6.24).
+    await seedBatch('b-discard-img', 'draft');
+    await seedImage('b-discard-img', 'i-7');
+
+    expect((await post('/api/batches/b-discard-img/discard')).status).toBe(200);
+    expect(await listImagesForBatch(owner, 'b-discard-img')).toHaveLength(1);
+  });
+
+  it('T-BATCH-006d: discarding releases the one-open-batch ceiling', async () => {
+    // The reason discard exists (US-005 AC-5 / §5): an abandoned batch that
+    // still counted as open would lock the owner out of every future capture.
+    await seedBatch('b-blocking', 'draft');
+
+    const blocked = await post('/api/batches', SUBJECT, {
+      service: 'max',
+      mode: 'append-only',
+    });
+    expect(blocked.status).toBe(409);
+    expect(((await blocked.json()) as ErrorBody).error.code).toBe('OPEN_BATCH_EXISTS');
+
+    expect((await post('/api/batches/b-blocking/discard')).status).toBe(200);
+
+    const allowed = await post('/api/batches', SUBJECT, {
+      service: 'max',
+      mode: 'append-only',
+    });
+    expect(allowed.status).toBe(201);
+  });
+
+  it('T-BATCH-006e: discard is refused from a status §6.23 does not list', async () => {
+    // `submitted` and `extracting` are deliberately absent from the
+    // discardable set: extraction is running against that batch in-process.
+    await seedBatch('b-mid-extract', 'extracting');
+
+    const res = await post('/api/batches/b-mid-extract/discard');
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as ErrorBody).error.code).toBe('BATCH_IMMUTABLE');
+    expect((await findUploadBatch(owner, 'b-mid-extract'))?.status).toBe('extracting');
+  });
+
+  it('T-BATCH-006f: a second discard is refused rather than silently repeated', async () => {
+    // Not made idempotent on purpose: a 200 to a discard of an already
+    // discarded batch would let the SPA report that it threw away work it
+    // never touched.
+    await seedBatch('b-double-discard', 'draft');
+    expect((await post('/api/batches/b-double-discard/discard')).status).toBe(200);
+
+    const res = await post('/api/batches/b-double-discard/discard');
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as ErrorBody).error.code).toBe('BATCH_IMMUTABLE');
+  });
+});
