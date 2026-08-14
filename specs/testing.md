@@ -2443,3 +2443,101 @@ keys. Mutation-verified: restoring the sibling form fails five existing cases
 (`T-LIST-020a`, `020c`, `023a`, `023c`, `023d`). The general rule for this
 schema: **before adding a key to a Prisma `where`, check whether a conditional
 spread above it already sets that key.**
+---
+
+## 23. Query plans, and two errors the harness caught in itself (TASK-047)
+
+### 23.1 Why the plan is read from the cache, not from the session
+
+§9 offers `SET STATISTICS PROFILE ON` / `sys.dm_exec_query_plan`, and §11-R4.1
+also mentions `SET SHOWPLAN_XML ON`. **Only the DMV route works here.**
+`SHOWPLAN` must be the only statement in its batch and applies to a SESSION;
+Prisma pools connections, so the session you set it on is not reliably the
+session your query runs on, and the plan you capture is not reliably the plan
+you meant. `sys.dm_exec_query_plan` is connection-independent.
+
+Three things make the DMV route trustworthy, and each was needed:
+
+1. **The lookup query must exclude itself.** It names `dm_exec_query_stats`, so
+   without a `NOT LIKE` guard it reliably captures its own plan and every
+   assertion becomes a statement about the harness.
+2. **`UPDATE STATISTICS` after bulk-seeding.** The optimiser reasons from
+   statistics, not from rows. Without it the plan can be chosen against an
+   estimate of one row — a seek that was picked *because the table looked
+   empty* is the exact opposite of a scale assertion.
+3. **Both scan forms must be excluded.** `service_listing` has a clustered
+   primary key, so a full read appears as a **Clustered Index Scan** and the
+   `Table Scan` operator never appears however bad the plan is. Asserting only
+   the latter is vacuous.
+
+### 23.2 Two errors in the harness, and what they cost
+
+⚠ **A plan-cache clear placed between running a query and reading its cost.**
+`total_logical_reads` is cumulative per cached plan, so the cache has to be
+cleared *between* measurements — but clearing it *before* reading the first
+measurement returned 0, and the comparison silently degraded into an assertion
+against a hard-coded floor. It reported the deep page at 296 logical reads
+against a "first page" of 0, i.e. a phantom regression.
+
+That phantom sent a full round of optimisation after a problem that did not
+exist: a leading `removed_at <= @cursor` predicate was added to
+`listRemovedListingPage` on the widely repeated claim that the bare keyset `OR`
+is not sargable on SQL Server, and a confident comment was written explaining
+the 296-vs-50 improvement it had made. **It had made none.** Mutating it out
+left every case green. It was then measured properly — cursor taken from row
+15,000 of 20,000, both forms, plan cache honestly isolated — and the two are
+indistinguishable. The predicate and the comment were both removed.
+
+**The rule this repository already had, restated where it bit:** a guard is not
+a guard until it has been seen to fail. That applies to *performance* changes
+exactly as it applies to tests, and a plausible mechanism plus a number that
+moved is not evidence when you have not checked which of the two produced the
+number.
+
+⚠ **`T-PERF-001d` originally compared page 1 with page 2.** That tests nothing:
+both are cheap under every plan, including one that collapses deep in the list.
+It now takes its cursor from row 15,000. The fixture reaches that row with
+`OFFSET`, deliberately — the ban is on the PRODUCT paging that way, and a test
+that cannot construct the state it is checking is not a test. Mutation-verified:
+defeating the keyset predicate makes the "page" return all 20,000 rows.
+
+### 23.3 The index set is built exactly as §16.6 names it, including the one that is useless
+
+`candidate_by_batch (owner_id, batch_id)` is a strict **prefix** of
+`extraction_candidate_owner_batch_disposition (owner_id, batch_id,
+review_disposition)`, which `0001_init` already created. It therefore serves no
+seek the existing index does not, and costs a write on every candidate insert.
+
+It is built anyway, because §16.6 is the authoritative index set and a spec
+that looks wrong is a finding to report, not something to quietly not build.
+**Reported here as that finding.** Retiring it — or the three narrower init
+indexes the §16.6 forms supersede — requires `DROP INDEX`, which `T-MIG-001`
+fails the build on (§16.8, additive-only). That is the correct default: an
+index is dropped by an explicit reviewed change, never as a side effect of a
+performance migration.
+
+### 23.4 `prisma/migrations/migration_lock.toml` was missing
+
+`prisma migrate deploy` tolerates its absence, which is why nobody noticed, but
+`prisma migrate diff --from-migrations` cannot determine the connector without
+it and **drift detection silently does not work**. Added with
+`provider = "sqlserver"`.
+
+### 23.5 Search: what was actually lost
+
+`escapeLikeTerm` escapes its own escape character **first**. Escaping it last
+turns `!%` into `!!%` — a literal `!` followed by a live wildcard — so the
+guard leaks exactly the metacharacter it exists to neutralise
+(`T-PERF-001h`).
+
+Escaping is a **correctness** control, not only a safety one: `LIKE` treats
+`%`, `_` and `[` as syntax, so searching for `100%` unescaped matches every
+row. Parameterisation is the separate SQL-injection control, and both are
+required — escaping without parameterisation is still injectable,
+parameterisation without escaping still returns wrong answers
+(`T-PERF-001g`, `T-PERF-001i`).
+
+The search is **not** index-backed and `T-PERF-001` does not assert that it is:
+a leading wildcard cannot use a B-tree and Azure SQL Basic has no `pg_trgm`
+analogue. Fuzzy matching and typo tolerance are gone. Full-Text Search is the
+named escalation and is an ADR-level decision.

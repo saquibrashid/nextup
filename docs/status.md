@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 107 |
+| ⬜ todo | 106 |
 | 🚧 doing | 3 |
-| ✅ done | 44 |
+| ✅ done | 45 |
 | 🙋 owner | 7 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -29,7 +29,6 @@ Not done, and every task they depend on is done.
 | `TASK-038` | M | Epic F — The list itself (the value loop) |
 | `TASK-042` | XS | Epic F — The list itself (the value loop) |
 | `TASK-045` | S | Epic D — Matching & identity |
-| `TASK-047` | S | Epic H — History, removal ledger, suppression |
 | `TASK-054` | M | Epic B — Capture & import |
 | `TASK-056` | S | Epic C — Extraction |
 | `TASK-102` | S | Epic H — History, removal ledger, suppression |
@@ -106,7 +105,7 @@ Not done, and every task they depend on is done.
 | `TASK-092` | `TASK-081` |
 | `TASK-093` | `TASK-081` |
 | `TASK-094` | `TASK-088` |
-| `TASK-095` | `TASK-088`, `TASK-047` |
+| `TASK-095` | `TASK-088` |
 | `TASK-096` | `TASK-095` |
 | `TASK-097` | `TASK-095` |
 | `TASK-098` | `TASK-095` |
@@ -190,6 +189,7 @@ Not done, and every task they depend on is done.
 | `TASK-036` | `packages/domain/src/ordering.ts` + `packages/domain/test/ordering.spec.ts` (19 cases) + `apps/api/test/integration/titleOrdering.spec.ts` (16 cases) — `T-LIST-014`, `T-LIST-015`, `T-LIST-016`, `T-LIST-017` (U) and `T-LIST-025`, `T-LIST-026`, `T-LIST-027` (I); `T-LIST-010` was already delivered by TASK-033. **Two live ordering bugs fixed**, both silent: the tie-breaker was `{ id: dir }`, so tie order flipped when the owner reversed the sort AND the keyset predicate stopped mirroring the `ORDER BY`, dropping rows between pages; and `nulls` placement relied on SQL Server's default, which is last on `desc` and **first** on `asc`. Five mutations caught — three of the query, two of the comparator. Four orphaned ids adopted; see `specs/testing.md` §20. | `T-LIST-010`, `T-LIST-014`, `T-LIST-015`, `T-LIST-016`, `T-LIST-017`, `T-LIST-025`, `T-LIST-026`, `T-LIST-027` |
 | `TASK-037` | `apps/api/test/integration/titleFilters.spec.ts` (26 cases) — `T-LIST-020` (a–e), `T-LIST-021` (a–d), `T-LIST-022` (a–h), `T-LIST-023` (a–e), `T-LIST-024` (a–d). **The genre filter did not exist**: `genre` was parsed, validated, and then never passed to the query, so `?genre=Comedy` returned 200 and listed everything. Implemented as a quoted-token match inside the JSON column, which makes `genres: []` exclusion (AC-6) fall out by construction. Four mutations caught, including the sibling-`OR` hazard that would have dropped the filter on page 2 only. `T-LIST-021`/`T-LIST-022` were orphaned ids, adopted here — `specs/testing.md` §20.1. | `T-LIST-020`, `T-LIST-021`, `T-LIST-022`, `T-LIST-023`, `T-LIST-024` |
 | `TASK-041` | `apps/api/src/routes/serviceState.ts` + `packages/domain/src/freshness.ts` — `GET /api/service-state`, one entry per service in `SERVICES` so a never-captured service reads "has never been updated" rather than vanishing. `ageInDays` counts UTC calendar days, not 24-hour blocks, and clamps clock skew. `T-FRESH-010` (a–h), `T-FRESH-012` (a–f), `T-FRESH-015` (a–c, the A46 no-nudge regression guard). All four mutations caught; see `specs/testing.md` §16. | `T-FRESH-010`, `T-FRESH-012`, `T-FRESH-015` |
+| `TASK-047` | `prisma/migrations/0002_perf_indexes/` (the five §16.6 indexes) + `apps/api/test/integration/queryPlan.spec.ts` (12 cases) — `T-PERF-001` (a-i), `T-PERF-003` (a-c), plus `listRemovedListingPage` / `searchRemovedListings` / `escapeLikeTerm` in the repository. Plans are read from `sys.dm_exec_query_plan`, NOT `SET SHOWPLAN_XML ON`, because Prisma pools connections and a session-scoped plan setting captures the wrong statement. Two of my own errors caught by the harness: a plan-cache clear placed before its own measurement manufactured a phantom 296-vs-50 regression and sent one round of optimisation after nothing, and the resulting "sargable leading predicate" was measured at depth 15,000, found to make no difference, and removed. Search is deliberately NOT index-backed (no `pg_trgm` on Basic); `escapeLikeTerm` escapes its own escape character first. See `specs/testing.md` §23. | `T-PERF-001`, `T-PERF-003` |
 | `TASK-048` | `T-BATCH-010`, `T-BATCH-015` | `T-API-003`, `T-BATCH-010`, `T-BATCH-015` |
 | `TASK-049` | `T-UI-003a`…`j` green in `apps/web/test/uploadStep1.spec.tsx`; mutation-proven against a defaulted mode and against revealing the consequence on selection | `T-UI-003` |
 | `TASK-055` | `packages/domain/src/extraction/` (contract + degraded projections) + `apps/api/src/extraction/` (recordings, `StubExtractor`, factory). `T-STUB-001a`…`r`, incl. the three fault tokens and byte-identical output over three runs. | `T-STUB-001` |

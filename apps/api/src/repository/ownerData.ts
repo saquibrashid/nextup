@@ -491,6 +491,138 @@ export async function listActiveListingsForTitle(ownerId: OwnerId, titleId: stri
   });
 }
 
+/** One page of the removed view. Newest removal first, ties by listing id. */
+export interface RemovedListingRow {
+  listing_id: string;
+  title_id: string;
+  service: string;
+  removed_at: Date;
+  tmdb_name: string | null;
+}
+
+export interface RemovedPageCursor {
+  removedAt: Date;
+  listingId: string;
+}
+
+/**
+ * The removed view, keyset-paginated (TASK-047, `specs/data-model.md` §16.6).
+ *
+ * ⚠ `OFFSET` MUST NOT be used here. The removed view is append-only for the
+ * life of the product — REQ-028 keeps every removal for ever — so an `OFFSET`
+ * page cost grows without bound and would break the exact `NFR-018` claim the
+ * `listing_removed_view` index exists to defend. `T-PERF-001` asserts the plan
+ * at 20,000 rows.
+ *
+ * The predicate mirrors the `ORDER BY` exactly, and the two branches use
+ * DIFFERENT operators for the same reason `listTitlePage` does: `removed_at`
+ * descends, the `listing_id` tie-breaker ASCENDS. Writing both as `<` reads as
+ * symmetric and silently drops rows sharing a removal timestamp — and a
+ * full-update close removes many listings in ONE transaction, so identical
+ * timestamps are the normal case here, not a rare tie.
+ *
+ * ⚠ There is deliberately NO redundant `removed_at <= @cursor` leading
+ * predicate here. One was added, on the belief that the bare `OR` form is not
+ * sargable on SQL Server — a widely repeated claim. It was then MEASURED and
+ * removed: at 20,000 rows, with the cursor taken from row 15,000, both forms
+ * cost the same (`T-PERF-001d`). The apparent regression that motivated it was
+ * an artefact of the test clearing the plan cache before reading its own
+ * measurement. Do not reintroduce it without a number.
+ */
+export async function listRemovedListingPage(
+  ownerId: OwnerId,
+  options: { limit: number; cursor?: RemovedPageCursor },
+  tx?: Db,
+): Promise<RemovedListingRow[]> {
+  const { limit, cursor } = options;
+  const conn = db(tx);
+
+  const rows = cursor
+    ? await conn.$queryRaw<RemovedListingRow[]>`
+        SELECT TOP (${limit})
+          l.listing_id, l.title_id, l.service, l.removed_at, t.tmdb_name
+        FROM service_listing l
+        JOIN title t ON t.owner_id = l.owner_id AND t.id = l.title_id
+        WHERE l.owner_id = ${ownerId}
+          AND l.state = 'removed'
+          AND (l.removed_at < ${cursor.removedAt}
+               OR (l.removed_at = ${cursor.removedAt} AND l.listing_id > ${cursor.listingId}))
+        ORDER BY l.removed_at DESC, l.listing_id ASC`
+    : await conn.$queryRaw<RemovedListingRow[]>`
+        SELECT TOP (${limit})
+          l.listing_id, l.title_id, l.service, l.removed_at, t.tmdb_name
+        FROM service_listing l
+        JOIN title t ON t.owner_id = l.owner_id AND t.id = l.title_id
+        WHERE l.owner_id = ${ownerId}
+          AND l.state = 'removed'
+        ORDER BY l.removed_at DESC, l.listing_id ASC`;
+
+  return rows;
+}
+
+/** The `ESCAPE` character for {@link escapeLikeTerm}. Not a backslash. */
+export const LIKE_ESCAPE_CHAR = '!';
+
+/**
+ * Neutralise T-SQL `LIKE` metacharacters in a user-supplied search term.
+ *
+ * ⚠ This is a CORRECTNESS control as well as a safety one. `LIKE` treats `%`,
+ * `_` and `[` as syntax, so a term containing any of them silently matches the
+ * wrong rows — searching for `100%` would match every title. Escaping them
+ * makes the search mean what the owner typed.
+ *
+ * ⚠ The escape character itself must be escaped FIRST, or escaping `%` would
+ * then have its own escape character escaped again and the pattern would be
+ * corrupt. `!` is used rather than `\` because a backslash has to survive both
+ * a JavaScript string literal and T-SQL, and every extra layer of quoting here
+ * is a place for the guard to be silently defeated.
+ *
+ * This is NOT the SQL-injection control — parameterisation is, and every call
+ * site passes the term as a bound parameter through a tagged template. Both
+ * are required: escaping without parameterisation is still injectable, and
+ * parameterisation without escaping still returns wrong answers.
+ */
+export function escapeLikeTerm(term: string): string {
+  return term
+    .replaceAll(LIKE_ESCAPE_CHAR, `${LIKE_ESCAPE_CHAR}${LIKE_ESCAPE_CHAR}`)
+    .replaceAll('%', `${LIKE_ESCAPE_CHAR}%`)
+    .replaceAll('_', `${LIKE_ESCAPE_CHAR}_`)
+    .replaceAll('[', `${LIKE_ESCAPE_CHAR}[`);
+}
+
+/**
+ * Substring search over the removed view's title names.
+ *
+ * ⚠ This is deliberately NOT index-backed, and that is a known, accepted cost
+ * of the move to Azure SQL Basic (`specs/data-model.md` §16.6). There is no
+ * `pg_trgm` analogue on this tier, so fuzzy matching and typo tolerance are
+ * GONE: this is exact substring only. A leading wildcard cannot use a B-tree,
+ * so the plan is a scan by design — `T-PERF-001` asserts a seek for the
+ * LISTING path and explicitly does not assert one here. Full-Text Search is
+ * the named escalation and is an ADR-level decision, not silent scope.
+ *
+ * The column is collated `Latin1_General_100_BIN2`, which would make search
+ * case- AND accent-sensitive; §16.6 overrides it to `Latin1_General_100_CI_AI`
+ * per query so that searching `amelie` finds `Amélie`.
+ */
+export async function searchRemovedListings(
+  ownerId: OwnerId,
+  term: string,
+  take = 50,
+  tx?: Db,
+): Promise<RemovedListingRow[]> {
+  const pattern = `%${escapeLikeTerm(term)}%`;
+  return db(tx).$queryRaw<RemovedListingRow[]>`
+    SELECT TOP (${take})
+      l.listing_id, l.title_id, l.service, l.removed_at, t.tmdb_name
+    FROM service_listing l
+    JOIN title t ON t.owner_id = l.owner_id AND t.id = l.title_id
+    WHERE l.owner_id = ${ownerId}
+      AND l.state = 'removed'
+      AND t.tmdb_name COLLATE Latin1_General_100_CI_AI LIKE ${pattern} ESCAPE ${LIKE_ESCAPE_CHAR}
+    ORDER BY l.removed_at DESC, l.listing_id ASC`;
+}
+
 /**
  * Soft-delete a listing.
  *

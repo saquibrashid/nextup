@@ -130,6 +130,11 @@ model Title {
   candidates ExtractionCandidate[]
 
   @@index([ownerId, state, sortDateAdded], map: "title_owner_state_sortdate")
+  /// TASK-047, `specs/data-model.md` §16.6. Matches the list ORDER BY exactly:
+  /// newest first, ties broken by id ASCENDING in BOTH directions. The narrower
+  /// `title_owner_state_sortdate` above stays because `T-MIG-001` forbids
+  /// `DROP INDEX` (§16.8, additive-only).
+  @@index([ownerId, state, sortDateAdded(sort: Desc), id(sort: Asc)], map: "title_list_default")
   @@index([createdByBatchId], map: "title_created_by_batch")
   @@map("title")
 }
@@ -167,6 +172,9 @@ model ServiceListing {
 
   @@index([ownerId, service, state], map: "service_listing_owner_service_state")
   @@index([titleId], map: "service_listing_title")
+  /// TASK-047 §16.6. Owner-first, so badge resolution seeks without an
+  /// owner_id residual predicate.
+  @@index([ownerId, titleId], map: "listing_by_title")
   @@index([removedByBatchId], map: "service_listing_removed_by_batch")
   @@index([removedByGroupId], map: "service_listing_removed_by_group")
   @@index([createdByBatchId], map: "service_listing_created_by_batch")
@@ -201,6 +209,8 @@ model BatchChange {
   createdAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_change_created") @map("created_at") @db.DateTime2
 
   @@index([ownerId, batchId], map: "batch_change_owner_batch")
+  /// TASK-047 §16.6. Adds `kind`, which the ledger reads narrow by.
+  @@index([ownerId, batchId, kind], map: "batch_change_by_batch")
   @@index([titleId], map: "batch_change_title")
   @@index([listingId], map: "batch_change_listing")
   @@map("batch_change")
@@ -339,6 +349,10 @@ model ExtractionCandidate {
   sourceImages CandidateSourceImage[]
 
   @@index([ownerId, batchId, reviewDisposition], map: "extraction_candidate_owner_batch_disposition")
+  /// TASK-047 §16.6. ⚠ A strict PREFIX of the index above, so it serves no
+  /// seek that one does not. Built because §16.6 is the authoritative index
+  /// set; reported as a finding in `specs/testing.md` §23.
+  @@index([ownerId, batchId], map: "candidate_by_batch")
   @@index([resolvedTitleId], map: "extraction_candidate_resolved_title")
   @@map("extraction_candidate")
 }
