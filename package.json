@@ -44,6 +44,7 @@
     "check:credentials": "node tools/check-no-credentials.mjs",
     "check:outbound": "node tools/check-outbound-hosts.mjs",
     "check:mutating-routes": "node tools/check-mutating-routes.mjs",
+    "check:write-once": "node tools/check-write-once-date-added.mjs",
     "test:meta": "vitest run --project meta --passWithNoTests",
     "coverage": "vitest run --project unit --project web --coverage",
     "test": "npm run test:unit && npm run test:int && npm run test:web"

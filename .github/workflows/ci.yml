@@ -434,6 +434,15 @@ jobs:
       - name: Mutating-route registry
         run: npm run check:mutating-routes
 
+      # TASK-035 / `T-INV-006` — dateAdded is write-once. The corruption this
+      # guards is silent and permanent: an update that rewrites dateAdded
+      # destroys the only record of when a title entered the list, and nothing
+      # downstream can tell the difference between a corrupted date and a real
+      # one. The infra suite above already executes the assertions; this step
+      # exists so the failure names the offending file and line directly.
+      - name: dateAdded is write-once
+        run: npm run check:write-once
+
   # ── 11 ────────────────────────────────────────────────────────────────────
   meta:
     name: '11 · meta'

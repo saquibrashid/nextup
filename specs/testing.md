@@ -2134,3 +2134,66 @@ green.
 Both are corrected. The general rule: **when a task's named tests all exist
 and pass, the ledger is wrong, not the suite.** Check the ledger against the
 suite before starting anything the ready list offers, not after.
+---
+
+## 19. TASK-035 — `dateAdded` is write-once (`T-INV-006`)
+
+### 19.1 The sole writer is `createServiceListing`, not `createListing`
+
+§9's AC-6 row above and `packages/domain/src/types.ts` both name the exempt
+writer **`createListing`**. No such function exists. The real sole writer is
+**`createServiceListing()`** in `apps/api/src/repository/ownerData.ts`, and
+`tools/check-write-once-date-added.mjs` encodes that name (`ALLOWED_WRITER`).
+
+The drift is recorded here rather than repaired in §9 because the spec is the
+input to the work, not an output of it — but a reader comparing the two must
+know which one the gate actually enforces. **If `createServiceListing` is ever
+renamed, the exemption evaporates rather than silently widening to the whole
+file**: `functionBodyRange()` returns `null` when the function is absent and
+the caller treats that as "nothing is exempt". `T-INV-006e` is that guard.
+
+### 19.2 What the static gate cannot see, and what covers the gap
+
+`T-INV-006` reasons about source text. It catches `.dateAdded =` and a literal
+`dateAdded` key inside a Prisma `update` / `updateMany` / `upsert`. It **cannot**
+see a value reaching an update through a spread of a variable —
+`softDeleteServiceListing` writes `data: { state: 'removed', ...removal }`, so a
+`dateAdded` added to that object's type would pass the scan.
+
+That residual path is covered behaviourally by **`T-DATE-011`** (seeing the same
+listing in a later batch does not change `dateAdded`). **Neither test replaces
+the other**; deleting either leaves a real hole, and the static half is the one
+that fails at the moment the offending line is written rather than at the moment
+a second capture happens to exercise it.
+
+⚠ The adjacent field **`dateAddedEdited`** (REQ-059, always `false` in v1 per
+`T-INV-007`) is legitimately assignable. A prefix match on `.dateAdded` fires on
+it, and the cheapest way to silence that false positive is to weaken the real
+rule. The assignment pattern therefore carries an explicit negative lookahead,
+and `T-INV-006f` fails if it is ever dropped.
+
+### 19.3 `T-LIST-018` was mis-cited to TASK-035 — a dependency-ordering defect
+
+TASK-035's "Done when" named `T-LIST-018` (layer **C**: *every **rendered** date
+label contains "to nextup"*). TASK-035 is a server-side task. The component that
+renders the label — `apps/web/src/components/TitleRow.tsx` — is built by
+**TASK-038**, which was still `todo` when TASK-035 came up; `ListPage.tsx` was a
+seven-line stub. There was therefore **no rendered label in the product that
+`T-LIST-018` could have failed on**, and any implementation of it at TASK-035
+would have had to invent the component it asserts against, or assert against a
+fixture — passing without testing the product.
+
+This is a sixth mis-citation, and a **new shape**: the id is correct and the
+level is correct; the *dependency* is wrong. TASK-035's row lists `033` only.
+
+Resolution follows the TASK-027 precedent: `~~T-LIST-018~~` is struck in place in
+TASK-035's row and relocated to **TASK-038's**, where the component lands. The
+domain half is already delivered and asserted by `T-LIST-034`, and the
+server-side `dateAddedLabel` half of TASK-035's description is delivered and
+asserted by `T-LIST-011c` — so nothing is lost by the move, only correctly
+placed.
+
+Neither `check:test-ids` (are the cited ids defined?) nor `check:decisions` (are
+the decisions' tests defined?) nor `check:status` (do a done task's tests exist?)
+detects this class: every id involved is real, defined and at a plausible level.
+Six occurrences now. A gate for it remains the highest-value meta-work unbuilt.

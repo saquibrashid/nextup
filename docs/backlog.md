@@ -486,7 +486,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-032` | `done` | `tests/fixtures/seed.ts` (fixture) + `tests/infra/seedFixture.spec.ts` — a seed fixture with an injected clock, a pure `planSeed()`, `asOwner()` and owner-scoped writes under the DERIVED `ownerId`. `T-SEED-001` (a–e) determinism, `T-SEED-002` (a–d) derived identity, `T-SEED-003` (a–e) the clock as the only time source, per `specs/testing.md` §14.1. The original done-when `~~T-META-003~~` was a mis-citation (`A48`); it is delivered separately as `tools/check-decision-verifiability.mjs` + `tests/meta/decisionVerifiability.spec.ts`. |
 | `TASK-033` | `done` | `T-LIST-010`, `T-LIST-011`, `T-API-017` |
 | `TASK-034` | `done` | `T-LIST-028` — `apps/api/test/integration/titleDetail.spec.ts` (8 cases): owner scoping, and the foreign-id refusal asserted byte-identical to the unknown-id refusal with `T-LIST-028g` as its non-vacuity guard. `T-LIST-035` — `apps/api/test/unit/titlesShape.spec.ts` (8 cases) for the §6.3 shaping, where coverage is measured. The active/removed badge split is mutation-proven at both layers. |
-| `TASK-035` | `todo` | — |
+| `TASK-035` | `done` | `tools/check-write-once-date-added.mjs` + `tests/infra/writeOnceDateAdded.spec.ts` — `T-INV-006` (a–n), a static gate proving no assignment to `.dateAdded` and no `dateAdded` key in a Prisma `update`/`updateMany`/`upsert` exists outside `createServiceListing()`. Three mutations of the checker itself caught (loosened `dateAddedEdited` lookahead, exemption failing open, `create` treated as mutating). Server-side `dateAddedLabel` was already delivered and is asserted by `T-LIST-011c`. `~~T-LIST-018~~` relocated to TASK-038 — see `specs/testing.md` §19. |
 | `TASK-036` | `todo` | — |
 | `TASK-037` | `todo` | — |
 | `TASK-038` | `todo` | — |
@@ -963,7 +963,7 @@ Traces to: US-018 (REQ-024, REQ-025, REQ-026, REQ-031) · Milestone M2 · Depend
 |---|---|---|---|---|
 | TASK-033 | `GET /api/titles` — active and visible only, suppression anti-join, service badges, cursor pagination. | M | 017, 023 | `T-LIST-010 ~~T-LIST-001~~`, `T-LIST-011 ~~T-LIST-002~~`, `T-API-017 ~~T-API-004~~` |
 | TASK-034 | `GET /api/titles/:titleId`. | XS | 033 | `T-LIST-028`, `T-LIST-035 ~~T-LIST-003~~` |
-| TASK-038 | `apps/web/src/pages/ListPage.tsx` + `components/TitleList.tsx` + `TitleRow.tsx` — badges, poster, **deep links out to the service**. | M | 033, 025 | `T-UI-010 ~~T-UI-001~~`, `T-UI-010 ~~T-UI-002~~`, `T-UI-012 ~~T-LINK-001~~` |
+| TASK-038 | `apps/web/src/pages/ListPage.tsx` + `components/TitleList.tsx` + `TitleRow.tsx` — badges, poster, **deep links out to the service**. | M | 033, 025 | `T-UI-010 ~~T-UI-001~~`, `T-UI-010 ~~T-UI-002~~`, `T-UI-012 ~~T-LINK-001~~`, `T-LIST-018` (relocated from TASK-035 — the rendered-label assertion needs `TitleRow.tsx`, which lands here; see `specs/testing.md` §19.3) |
 | TASK-040 | Two **distinct** empty states (nothing imported yet vs everything filtered out) + a load-failure error state. | S | 038 | `T-UX-012 ~~T-UX-001~~`, `T-UX-014 ~~T-UX-002~~`, `T-UX-018 ~~T-UX-003~~` |
 
 #### US-019 — Filter it
@@ -988,7 +988,7 @@ Traces to: US-021 (REQ-030, REQ-060, REQ-061) · Milestone M2
 
 | Task | Description | Size | Depends on | Done when |
 |---|---|---|---|---|
-| TASK-035 | **Server-side** `dateAddedLabel` + a write-once guard on `dateAdded`. | S | 033 | `T-LIST-018`, `T-INV-006` |
+| TASK-035 | **Server-side** `dateAddedLabel` + a write-once guard on `dateAdded`. | S | 033 | `T-INV-006` ~~`T-LIST-018`~~ (relocated to TASK-038: layer C, needs the unbuilt `TitleRow.tsx` — `specs/testing.md` §19.3) |
 
 #### US-022 — Know how fresh each service is
 Traces to: US-022 (REQ-039) · Milestone M2
