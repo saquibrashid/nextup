@@ -78,11 +78,33 @@ npm run dev            # Vite dev server (apps/web), proxying /api to the API
 
 ```bash
 docker compose -f docker-compose.test.yml up -d   # mssql 2022 + Azurite
+npm run db:test        # create nextup_test with the REQUIRED collation, then migrate
 npm run test:unit      # Vitest — pure domain logic
 npm run test:int       # Vitest — API surface against the mssql + Azurite containers
 npm run test:web       # Vitest + Testing Library — component/screen states
 npm run test:e2e       # Playwright — the value loop and the irreversible paths
 ```
+
+> ⚠ **Do not create the test database any other way.** It must be
+> `nextup_test` and it must be created with
+> `COLLATE Latin1_General_100_BIN2` — which is exactly what `npm run db:test`
+> does, and what CI does. A database created by any other route (a bare
+> `prisma migrate deploy` against a new name, a manual `CREATE DATABASE`) gets
+> the **server default**, `SQL_Latin1_General_CP1_CI_AS`, and then Prisma's
+> `create()` joins its internal `@generated_keys` table variable — which takes
+> the database default collation — against the `BIN2` `[id]` column. **Every
+> insert fails with Msg 468.**
+>
+> The symptom points at the wrong layer: dozens of integration failures whose
+> stacks all end in `ownerData.ts`, reading unmistakably as an application bug.
+> Two people have now lost time to it. **`T-INV-018a` is the only test that
+> names the real cause — if it fails, fix the database, not the code:**
+>
+> ```sql
+> SELECT name, collation_name FROM sys.databases;   -- must read Latin1_General_100_BIN2
+> ```
+>
+> See [specs/testing.md](specs/testing.md) §17.
 
 After a one-time `npm ci` and image pull, the whole suite runs **offline** —
 `NFR-003` makes CI the only feedback loop, so the loop must not depend on a

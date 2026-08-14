@@ -253,12 +253,22 @@ suite locally has no feedback signal at all.
   is exercised, not stubbed.
 - An unknown hash returns both empty — the zero-yield case, so a forgotten
   fixture surfaces as the low-yield path rather than a crash.
-- Fault injection by filename convention:
-  `__fail_error__.png` → throws; `__fail_429__.png` → throws a 429-shaped
-  error; `__slow__.png` → exceeds the per-image timeout;
-  **`__llm_down__.png` → LLM leg fails, OCR leg succeeds (degraded mode);
-  `__ocr_down__.png` → OCR leg fails, LLM leg succeeds;
-  `__truncated__.png` → LLM returns `finish_reason: 'length'`.**
+- Fault injection is keyed on the **sha256 of the image bytes**, exactly like
+  the recordings above — **not on a filename** (corrected in place, A48).
+  Each fault has a dedicated fixture whose bytes hash to a registered sentinel:
+  `fail_error` → throws; `fail_429` → throws a 429-shaped error; `slow` →
+  exceeds the per-image timeout; **`llm_down` → LLM leg fails, OCR leg
+  succeeds (degraded mode); `ocr_down` → OCR leg fails, LLM leg succeeds;
+  `truncated` → LLM returns `finish_reason: 'length'`.**
+
+  > ⚠ ~~*"Fault injection by filename convention: `__fail_error__.png` →
+  > throws…"*~~ — **superseded.** `TitleExtractor.extract(imageBytes,
+  > mimeType)` receives **only bytes and a MIME type**; it is handed no
+  > filename and, by `T-PASTE-005`, the stored name is synthesised server-side
+  > anyway, so a client-supplied name reaches nothing. The filename convention
+  > was therefore not merely awkward — it was **unimplementable against the
+  > interface in §2.3**, and any attempt to honour it would have meant widening
+  > `extract()` to take a name it must never trust.
 - **Byte-for-byte deterministic.** `T-STUB-001` runs the same batch three
   times and asserts identical `ExtractionCandidate` documents.
   `T-AI-034` asserts `crossCheck()` alone is a pure function over three runs.

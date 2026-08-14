@@ -453,7 +453,11 @@ export interface TitleExtractor {
    *  upload. THE EXTRACTOR IS NOT TOLD WHICH, and must not be: there is no
    *  ingestSource parameter here and none is to be added. A pasted PNG and an
    *  uploaded (transcoded) PNG are byte-equivalent inputs. */
-  extract(imageBytes: Buffer, mimeType: 'image/png' | 'image/jpeg'): Promise<ExtractionResult>;
+  extract(imageBytes: Uint8Array, mimeType: 'image/png' | 'image/jpeg'): Promise<ExtractionResult>;
+  // ⚠ `Uint8Array`, NOT `Buffer` (corrected in place, A48). This interface
+  // lives in `packages/domain`, which `apps/web` imports verbatim (ADR-0004).
+  // `Buffer` is Node-only, so typing it here makes the shared domain
+  // un-importable in the browser. ~~`imageBytes: Buffer`~~ — superseded.
 }
 ```
 
@@ -462,7 +466,9 @@ export interface TitleExtractor {
 the type.
 
 ```ts
-// apps/api/src/extraction/index.ts — the ONLY factory
+// apps/api/src/extraction/factory.ts — the ONLY factory (path corrected, A48;
+// ~~`extraction/index.ts`~~ — the backlog and the implementation both use
+// `factory.ts`, and a barrel named `index.ts` invites re-export sprawl)
 export function createExtractor(cfg: Config): TitleExtractor {
   switch (cfg.NEXTUP_EXTRACTOR) {
     case 'hybrid':            return new HybridExtractor(cfg);   // DEFAULT (ADR-0001 R2)

@@ -399,7 +399,7 @@ tested rather than documented.
 
 | Secret | Storage | Consumer | Rotation |
 |---|---|---|---|
-| `TMDB_API_KEY` | Container Apps secret, referenced as a secret env var | `apps/api/src/matching/tmdbClient.ts` only | Manual; regenerate at TMDB, update the Container App, restart |
+| `TMDB_API_KEY` | Container Apps secret, referenced as a secret env var | `apps/api/src/clients/tmdbClient.ts` only (path corrected, A48; ~~`src/matching/`~~) | Manual; regenerate at TMDB, update the Container App, restart |
 | ~~**`GHCR_PULL_TOKEN` (R4 — RETURNS)**~~ **DELETED at R8.** No registry credential exists. The ghcr.io **package is public**, so Container Apps pulls it anonymously and CI pushes with the built-in `GITHUB_TOKEN`. | — | — | **None — there is nothing to rotate.** |
 | **DB credential (R4 — conditional)** | **Secretless if managed-identity auth works** (preferred). **Else** a least-privilege SQL login password stored in **Key Vault**, surfaced as a Key-Vault-referenced Container Apps secret. | `apps/api` Prisma `sqlserver` connection | MI: none. SQL-auth fallback: manual; **does not auto-expire** |
 
