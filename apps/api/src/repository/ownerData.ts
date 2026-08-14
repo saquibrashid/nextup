@@ -209,8 +209,11 @@ export async function listActiveTitles(
   const { take = 200, skip = 0, dir = 'desc' } = options;
   return db(tx).title.findMany({
     where: { ownerId, state: 'active' },
-    // `id` breaks ties so paging is stable when several titles share a date.
-    orderBy: [{ sortDateAdded: dir }, { id: dir }],
+    // Ordering must match `listTitlePage` and `compareTitlesForList` exactly:
+    // `id` ASCENDING in both directions (`T-LIST-016`), nulls last in both
+    // (`T-LIST-027`). Two list queries that order differently is the shape a
+    // "the list looks different depending on where you came from" bug takes.
+    orderBy: [{ sortDateAdded: { sort: dir, nulls: 'last' } }, { id: 'asc' }],
     take,
     skip,
   });
@@ -270,6 +273,16 @@ export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions,
   // comparison Prisma can express. `(sortDateAdded, id) < (@d, @id)` becomes
   // "an earlier date, OR the same date and a smaller id" — and the second
   // branch is what stops rows sharing a date from being skipped between pages.
+  //
+  // ⚠ The two branches use DIFFERENT operators, and that asymmetry is
+  // deliberate. The date branch follows `dir`; the id branch is always `gt`,
+  // because the tie-breaker is `id` ASCENDING in both directions
+  // (`T-LIST-016`). Writing both as `[before]` reads as symmetric and is what
+  // this function did originally — it makes the tie order flip when the owner
+  // reverses the sort, and, worse, it makes page 2 skip or repeat rows that
+  // share a date, because the keyset would then disagree with the `ORDER BY`.
+  // A keyset predicate must mirror its `ORDER BY` exactly or paging silently
+  // loses rows.
   const before = dir === 'desc' ? 'lt' : 'gt';
   const keyset =
     cursor === undefined
@@ -279,7 +292,7 @@ export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions,
             { sortDateAdded: { [before]: new Date(`${cursor.sortDateAdded}T00:00:00.000Z`) } },
             {
               sortDateAdded: new Date(`${cursor.sortDateAdded}T00:00:00.000Z`),
-              id: { [before]: cursor.id },
+              id: { gt: cursor.id },
             },
           ],
         };
@@ -300,7 +313,13 @@ export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions,
         : {}),
       ...keyset,
     },
-    orderBy: [{ sortDateAdded: dir }, { id: dir }],
+    // `compareTitlesForList` in `@nextup/domain` is the same order expressed
+    // as a comparator, and the integration suite checks this query against it.
+    // Nulls last is stated EXPLICITLY: SQL Server puts them last on `desc` for
+    // free and first on `asc`, so relying on the default is correct in the
+    // default direction and wrong the moment the owner reverses it
+    // (`T-LIST-027`). `id` is `asc` in both directions (`T-LIST-016`).
+    orderBy: [{ sortDateAdded: { sort: dir, nulls: 'last' } }, { id: 'asc' }],
     take: limit + 1,
     include: {
       listings: {

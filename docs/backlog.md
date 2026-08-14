@@ -487,7 +487,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-033` | `done` | `T-LIST-010`, `T-LIST-011`, `T-API-017` |
 | `TASK-034` | `done` | `T-LIST-028` — `apps/api/test/integration/titleDetail.spec.ts` (8 cases): owner scoping, and the foreign-id refusal asserted byte-identical to the unknown-id refusal with `T-LIST-028g` as its non-vacuity guard. `T-LIST-035` — `apps/api/test/unit/titlesShape.spec.ts` (8 cases) for the §6.3 shaping, where coverage is measured. The active/removed badge split is mutation-proven at both layers. |
 | `TASK-035` | `done` | `tools/check-write-once-date-added.mjs` + `tests/infra/writeOnceDateAdded.spec.ts` — `T-INV-006` (a–n), a static gate proving no assignment to `.dateAdded` and no `dateAdded` key in a Prisma `update`/`updateMany`/`upsert` exists outside `createServiceListing()`. Three mutations of the checker itself caught (loosened `dateAddedEdited` lookahead, exemption failing open, `create` treated as mutating). Server-side `dateAddedLabel` was already delivered and is asserted by `T-LIST-011c`. `~~T-LIST-018~~` relocated to TASK-038 — see `specs/testing.md` §19. |
-| `TASK-036` | `todo` | — |
+| `TASK-036` | `done` | `packages/domain/src/ordering.ts` + `packages/domain/test/ordering.spec.ts` (19 cases) + `apps/api/test/integration/titleOrdering.spec.ts` (16 cases) — `T-LIST-014`, `T-LIST-015`, `T-LIST-016`, `T-LIST-017` (U) and `T-LIST-025`, `T-LIST-026`, `T-LIST-027` (I); `T-LIST-010` was already delivered by TASK-033. **Two live ordering bugs fixed**, both silent: the tie-breaker was `{ id: dir }`, so tie order flipped when the owner reversed the sort AND the keyset predicate stopped mirroring the `ORDER BY`, dropping rows between pages; and `nulls` placement relied on SQL Server's default, which is last on `desc` and **first** on `asc`. Five mutations caught — three of the query, two of the comparator. Four orphaned ids adopted; see `specs/testing.md` §20. |
 | `TASK-037` | `todo` | — |
 | `TASK-038` | `todo` | — |
 | `TASK-039` | `todo` | — |
@@ -980,7 +980,7 @@ Traces to: US-020 (REQ-036, REQ-038) · Milestone M1/M2
 | Task | Description | Size | Depends on | Done when |
 |---|---|---|---|---|
 | TASK-016 | `packages/domain/src/derive.ts` — `deriveTitleState`, `deriveSortDateAdded` (earliest `dateAdded` across **non-removed** listings). | S | 012 | `T-INV-009`, `T-INV-010` |
-| TASK-036 **(done-when EXTENDED, A48)** | Ordering with a `title.id` ascending tie-breaker, nulls last, `dir` parameter. | S | 016, 033 | `T-LIST-016 ~~T-LIST-009~~`, `T-LIST-010`, `T-LIST-014`, `T-LIST-015` |
+| TASK-036 **(done-when EXTENDED, A48; EXTENDED AGAIN — see `specs/testing.md` §20)** | Ordering with a `title.id` ascending tie-breaker, nulls last, `dir` parameter. | S | 016, 033 | `T-LIST-016 ~~T-LIST-009~~`, `T-LIST-010`, `T-LIST-014`, `T-LIST-015`, `T-LIST-017`, `T-LIST-025`, `T-LIST-026`, `T-LIST-027` |
 | TASK-166 **(new, R8 — `A44`; `must` as of `A47` — NOT optional scope)** | `components/SortControl.tsx` (spec: `specs/ui.md`) — the client-side control AC-6 needs. Wires the existing `GET /api/titles` `dir` parameter (`desc`/newest-first default \| `asc`/oldest-first); reflects the selection in the URL query string so it is deep-linkable and back/forward-safe; persists the selection for the session (US-020 AC-6). Date-added label stays honest per **REQ-061** — it is the date the title entered *nextup*, never the streaming service's own saved date. | S | 036, 039 | `T-UI-024` |
 
 #### US-021 — Know when something was added

@@ -2197,3 +2197,82 @@ Neither `check:test-ids` (are the cited ids defined?) nor `check:decisions` (are
 the decisions' tests defined?) nor `check:status` (do a done task's tests exist?)
 detects this class: every id involved is real, defined and at a plausible level.
 Six occurrences now. A gate for it remains the highest-value meta-work unbuilt.
+---
+
+## 20. TASK-036 — list ordering (US-020)
+
+### 20.1 Four ordering ids were owned by no task at all
+
+`T-LIST-017`, `T-LIST-025`, `T-LIST-026` and `T-LIST-027` are defined in §9 —
+they carry US-020's AC-2, AC-6 and AC-7 — and were cited in `docs/backlog.md`
+by **no task whatsoever**. A grep of the work order for each returned nothing.
+
+That is a **seventh** finding and a second new shape. The previous six were
+*mis-citations*: a task pointing at the wrong id. This is the inverse — a
+defined, acceptance-criterion-bearing test that no task claims, so no agent
+will ever be asked to write it. It is strictly worse, because a mis-citation
+at least stops the wrong task from closing, whereas an orphan is invisible:
+every gate passes, the ledger reaches 100%, and three acceptance criteria are
+simply never implemented.
+
+⚠ **No gate detects this, and `check:test-ids` in particular cannot.** That
+gate walks from the backlog to this file — *are the ids the work order cites
+real?* An orphan is real; nothing cites it. The mirror walk (from §9's AC
+tables back to the backlog: *does every id with an AC row have an owning
+task?*) does not exist. `check:decisions` is a different mirror again — it
+walks the A-decision tables, not §9. **This is now the highest-value unbuilt
+gate, and it should be built to look in the §9 → backlog direction**; the
+mis-citation class and the orphan class would both fall out of the same walk.
+
+Resolution follows §17's precedent for the orphaned `T-LIST-014/015`: the four
+are adopted into **TASK-036**, which is the task that makes ordering
+observable through the API, and its "Done when" is extended a second time.
+`T-LIST-026`'s partner `T-UI-024` stays with TASK-166 — that is the
+affordance-existence half and needs the unbuilt `SortControl.tsx`.
+
+### 20.2 Two live bugs, both silent, both in the default path
+
+The backlog row for TASK-036 already said *"`title.id` ascending tie-breaker,
+nulls last"*. The implementation shipped with TASK-033 did neither, and every
+test in the suite passed.
+
+**(a) `orderBy: [{ sortDateAdded: dir }, { id: dir }]`.** It reads as
+symmetric and correct. It is not: the tie-breaker **flips with the sort
+direction**, so reversing the list reshuffles every group of rows sharing a
+date. A first import gives *every* title the same date (`T-DATE-012`), so the
+tied group is typically the whole list, not a corner case.
+
+Worse, the same `dir`-dependent operator was used in the **keyset predicate**.
+A keyset must mirror its `ORDER BY` exactly. With `ORDER BY … id ASC` and a
+predicate asking for `id < cursor.id`, page 2 of a tied group is **empty** —
+rows vanish, no error is raised, and the owner sees a short list. Losing rows
+silently is the one failure this product is designed against. `T-LIST-026e`
+walks a five-row tied group two at a time and asserts all five arrive exactly
+once; it fails under the original code.
+
+**(b) Null placement was left to the dialect.** SQL Server sorts `NULL`
+**first** on `ASC` and **last** on `DESC`. So "nulls last" was free in the
+default direction and wrong the moment the owner used the oldest-first
+control — which product invariant 6 makes `must`, not optional. The fix states
+it explicitly (`nulls: 'last'`); `T-LIST-027b` is the guard. ⚠ Prisma's
+generated types offer `nulls` for every connector, so accepting the option is
+**not** evidence the connector emits it — SQL Server has no `NULLS LAST`
+syntax and needs a `CASE` expression. That it works was verified against a
+live SQL Server before being relied on, and `T-LIST-027b` keeps verifying it.
+
+### 20.3 Why a comparator exists for an order computed in SQL
+
+`packages/domain/src/ordering.ts` does not order the list — ordering in the
+application would mean reading every row before paging, which §3 forbids. It
+exists because the rule has three parts (key, tie-breaker, null placement)
+that SQL states *implicitly*, in dialect defaults invisible at the call site.
+Writing it once as a total order gives the integration suite something to
+check the database against, instead of a hand-written expected sequence that
+agrees with whatever the author believed.
+
+⚠ The cross-check alone would be vacuous if the comparator broke the same way
+the query did, so every case that compares the two **also pins one concrete
+property directly**. Both halves are mutation-proven independently: three
+mutations of the query (tie-breaker follows `dir`, keyset follows `dir`,
+`nulls` dropped) and two of the comparator (nulls first, tie-break
+descending), each caught by the cases named for it.

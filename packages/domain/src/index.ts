@@ -15,5 +15,8 @@ export * from './extraction/index.js';
 export * from './freshness.js';
 export * from './identity.js';
 export * from './ids.js';
+// TASK-036 — the list ordering rule (US-020), stated once so the SQL
+// `ORDER BY` has something to be checked against.
+export * from './ordering.js';
 export * from './schemas.js';
 export * from './types.js';
