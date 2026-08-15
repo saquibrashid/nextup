@@ -36,6 +36,7 @@ import { AppError } from '../errors/AppError.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import { batchImageTotals, createUploadedImage, findUploadBatch } from '../repository/ownerData.js';
 import { ingestFiles, type IncomingFile, type IngestStages } from '../images/ingest.js';
+import { transcodeHeicToPng } from '../images/transcode.js';
 import { azureImageBlobStore, type ImageBlobStore } from '../storage/blobStore.js';
 
 /**
@@ -55,30 +56,34 @@ const upload = multer({
 });
 
 /**
- * The transcode (TASK-149) and the metadata strip (TASK-150) are not built.
+ * The metadata strip (TASK-150) is not built.
  *
  * ⚠ THE STRIP DEFAULT IS A PASS-THROUGH AND THAT IS A KNOWN GAP, NOT A
  * DECISION. REQ-078 requires EXIF/XMP — including GPS — to be stripped from
  * every uploaded image, and until TASK-150 lands this route does not do it.
  * The seam exists so that landing TASK-150 is a one-line wiring change rather
- * than surgery on the pipeline. The transcode default THROWS rather than
- * passing HEIC bytes through: storing an un-transcoded HEIC would violate the
- * `format ∈ {png,jpeg}` invariant and hand extraction bytes it cannot read.
+ * than surgery on the pipeline.
+ *
+ * The transcode is BUILT (TASK-149) and wired here. ⚠ It is injected, not
+ * imported by `ingest.ts`, so a test can prove the branch is chosen by the
+ * SNIFFED format and never by `ingestSource` (`T-IMG-023`).
+ * ~~Superseded: "The transcode default THROWS rather than passing HEIC bytes
+ * through."~~ — the stage exists now; nothing passes through.
  */
-export const UNBUILT_STAGES: IngestStages = {
-  transcode() {
-    return Promise.reject(
-      new AppError(
-        'IMAGE_DECODE_FAILED',
-        415,
-        "That image couldn't be read. Try re-exporting the screenshot as PNG and attaching it again.",
-      ),
-    );
+export const DEFAULT_STAGES: IngestStages = {
+  transcode(bytes, from) {
+    return transcodeHeicToPng(bytes, from);
   },
   stripMetadata(bytes) {
     return Promise.resolve(bytes);
   },
 };
+
+/**
+ * ⚠ Retained name — `UNBUILT_STAGES` is cited by `specs/testing.md` §28. It is
+ * an alias, not a second implementation, and only the strip is still unbuilt.
+ */
+export const UNBUILT_STAGES: IngestStages = DEFAULT_STAGES;
 
 function parseIngestSource(req: Request): IngestSource {
   // Absent means `upload` (§6.12) so a simpler client keeps working. An
@@ -101,7 +106,7 @@ function parseIngestSource(req: Request): IngestSource {
 export function registerBatchImageRoutes(
   router: Router,
   store: ImageBlobStore = azureImageBlobStore,
-  stages: IngestStages = UNBUILT_STAGES,
+  stages: IngestStages = DEFAULT_STAGES,
 ): void {
   router.post('/batches/:batchId/images', upload.array('files'), async (req, res) => {
     const ownerId = requireOwnerId(req);

@@ -9,6 +9,7 @@ import {
   suppressionSchema,
   titleSchema,
   uploadBatchSchema,
+  MAX_STORED_IMAGE_BYTES,
   uploadedImageSchema,
 } from '../src/index.js';
 import type {
@@ -334,10 +335,30 @@ describe('T-DM-025 uploaded image — ingest source and file name (R7, A45)', ()
     expect(uploadedImageSchema.safeParse(stored).success).toBe(false);
   });
 
-  it('T-DM-025e: an image over 10 MiB is rejected', () => {
-    expect(uploadedImageSchema.safeParse(anImage({ byteSize: 10 * 1024 * 1024 + 1 })).success).toBe(
-      false,
-    );
+  it('T-DM-025e: a stored PNG larger than the 10 MiB UPLOAD ceiling is accepted', () => {
+    // ⚠ CORRECTED IN PLACE (TASK-149). The stored blob for a HEIC upload is
+    // its LOSSLESS PNG transcode, which is routinely several times the size of
+    // the file the device sent — a compliant 10 MiB HEIC can store as 30 MiB.
+    // Bounding the stored size by the UPLOAD ceiling made a legal upload
+    // unrepresentable, and nothing would have found that until a real phone
+    // photo arrived.
+    // ~~Superseded: `it('T-DM-025e: an image over 10 MiB is rejected')`,
+    // asserting `byteSize: 10 * 1024 * 1024 + 1` fails.~~
+    const transcoded = anImage({
+      uploadedFormat: 'heic',
+      format: 'png',
+      byteSize: 30 * 1024 * 1024,
+    });
+    expect(uploadedImageSchema.parse(transcoded)).toEqual(transcoded);
+  });
+
+  it('T-DM-025f: a stored image beyond the whole-batch ceiling is still rejected', () => {
+    // Relaxing the bound is not removing it: one image can never exceed what
+    // the entire batch may hold, and the batch tally counts STORED bytes.
+    expect(
+      uploadedImageSchema.safeParse(anImage({ byteSize: MAX_STORED_IMAGE_BYTES + 1 })).success,
+    ).toBe(false);
+    expect(uploadedImageSchema.safeParse(anImage({ byteSize: 0 })).success).toBe(false);
   });
 });
 

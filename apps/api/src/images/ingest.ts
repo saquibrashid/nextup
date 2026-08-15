@@ -45,6 +45,7 @@ import {
 } from '@nextup/domain';
 
 import { IMAGE_RETENTION_DAYS } from '../config.js';
+import { AppError } from '../errors/AppError.js';
 import { inspectDecodable } from './decodeGuard.js';
 import { isAcceptedUploadFormat, sniffUploadFormat } from './sniffFormat.js';
 import { blobPathFor, type ImageBlobStore } from '../storage/blobStore.js';
@@ -87,8 +88,16 @@ export interface IngestStages {
   /**
    * Transcode HEIC/HEIF to LOSSLESS PNG. Called ONLY when the sniffed format
    * is `heic`/`heif`. Must not be reached for PNG/JPEG from any source.
+   *
+   * The optional dimensions are the DECODED raster's. libheif applies the
+   * `irot` transform that the HEIF `ispe` header ignores, so a rotated phone
+   * photo's stored PNG can legitimately be the transpose of its header — and
+   * the row must record what was stored, not what the header claimed.
    */
-  transcode(bytes: Uint8Array, from: UploadFormat): Promise<{ bytes: Uint8Array }>;
+  transcode(
+    bytes: Uint8Array,
+    from: UploadFormat,
+  ): Promise<{ bytes: Uint8Array; width?: number; height?: number }>;
   /** Strip EXIF/XMP, including GPS and device model (REQ-078). Every image. */
   stripMetadata(bytes: Uint8Array, format: ImageFormat): Promise<Uint8Array>;
 }
@@ -202,8 +211,35 @@ async function ingestOne(
   const needsTranscode = uploadedFormat === 'heic' || uploadedFormat === 'heif';
   const format: ImageFormat = needsTranscode ? 'png' : uploadedFormat;
   let bytes = file.bytes;
+  let width = verdict.width;
+  let height = verdict.height;
   if (needsTranscode) {
-    bytes = (await context.stages.transcode(bytes, uploadedFormat)).bytes;
+    // ⚠ A TRANSCODE FAILURE FAILS ONE IMAGE, NOT THE BATCH (REQ-080/081,
+    // invariant 15). The stage throws `AppError` — a decision we made about
+    // THIS file (`IMAGE_DECODE_FAILED`, `IMAGE_DECODE_OOM`) — and that becomes
+    // a `rejected[]` entry so the rest of the batch still processes and the
+    // file stays retryable. ⚠ Anything that is NOT an `AppError` propagates:
+    // an Azure outage or a programming error is not a verdict about one image
+    // and must not be reported to the owner as "that screenshot was bad".
+    try {
+      const transcoded = await context.stages.transcode(bytes, uploadedFormat);
+      bytes = transcoded.bytes;
+      // The row records the STORED raster. See `IngestStages.transcode`.
+      width = transcoded.width ?? width;
+      height = transcoded.height ?? height;
+    } catch (error) {
+      if (!(error instanceof AppError)) {
+        throw error;
+      }
+      return {
+        rejected: {
+          fileName,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+        },
+      };
+    }
   }
 
   // 6. THE METADATA STRIP — OUTSIDE the transcode condition, for every image
@@ -228,8 +264,8 @@ async function ingestOne(
       uploadedFormat,
       ingestSource: context.ingestSource,
       byteSize: bytes.byteLength,
-      width: verdict.width,
-      height: verdict.height,
+      width,
+      height,
       blobPath,
       seqInBatch,
       retainUntil,

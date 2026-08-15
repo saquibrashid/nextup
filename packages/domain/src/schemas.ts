@@ -344,6 +344,21 @@ export const MAX_BATCH_BYTES = 60 * 1024 * 1024;
 /** 10 file parts per multipart request — §5. */
 export const MAX_FILES_PER_REQUEST = 10;
 
+/**
+ * The ceiling on a STORED image, which is not the ceiling on an UPLOADED one.
+ *
+ * ⚠ THESE TWO ARE DIFFERENT NUMBERS ON PURPOSE — do not collapse them.
+ * `MAX_IMAGE_BYTES` bounds what the device sends. The stored blob for a HEIC
+ * is the LOSSLESS PNG transcode of it (`api.md` §5.1, TASK-149), and lossless
+ * PNG is routinely several times the size of the HEIC it came from: a
+ * compliant 10 MiB HEIC can easily store as a 30 MiB PNG. Bounding the stored
+ * size by the upload ceiling would make a legal upload unrepresentable, which
+ * is the kind of defect that only appears once a real phone photo arrives.
+ * The batch ceiling is the honest bound — a single image cannot exceed what
+ * the whole batch may hold, and the batch tally counts STORED bytes.
+ */
+export const MAX_STORED_IMAGE_BYTES = MAX_BATCH_BYTES;
+
 export const uploadedImageSchema = z
   .object({
     id: idSchema,
@@ -363,7 +378,10 @@ export const uploadedImageSchema = z
     // Always png|jpeg by the time it is persisted: HEIC/HEIF is transcoded to
     // lossless PNG on ingest, before storage and before extraction.
     format: imageFormatSchema,
-    byteSize: z.number().int().positive().max(MAX_IMAGE_BYTES),
+    // ⚠ `MAX_STORED_IMAGE_BYTES`, NOT `MAX_IMAGE_BYTES`. This is the stored
+    // blob — for a HEIC upload, the lossless PNG transcode, which is larger
+    // than the file the device sent. See the constant.
+    byteSize: z.number().int().positive().max(MAX_STORED_IMAGE_BYTES),
     width: z.number().int().positive().nullable(),
     height: z.number().int().positive().nullable(),
     uploadedAt: isoDateTimeSchema,

@@ -11,7 +11,7 @@
  *    a genuine 60 MiB body;
  *  - the all-rejected mapping, where the request takes the FAILING code's own
  *    status — including `IMAGE_DECODE_OOM` → **503, not 500**;
- *  - the unbuilt-transcode arm, which is the current answer to a HEIC.
+ *  - the transcode-refusal arm, which is the answer to an undecodable HEIC.
  *
  * It also carries the coverage. `npm run coverage` scores only the `unit` and
  * `web` projects, so a route proven only in integration scores ~6% against the
@@ -260,10 +260,15 @@ describe('T-IMG-020 the surfaced error is diagnostic', () => {
   });
 });
 
-describe('T-IMG-023 the unbuilt transcode refuses HEIC rather than storing it raw', () => {
-  it('T-IMG-023f: a HEIC is sniffed and guarded, then fails at the missing transcode stage', async () => {
+describe('T-IMG-023 an undecodable HEIC is refused — nothing is stored raw', () => {
+  it('T-IMG-023f: a HEIC is sniffed and guarded, then refused by the transcode', async () => {
     const res = await postImages([{ name: 'IMG_0001.HEIC', bytes: heicBytes() }]);
 
+    // ⚠ CORRECTED IN PLACE (TASK-149): the transcode is BUILT now, and this
+    // fixture is a bare `ftyp`+`ispe` header with no HEVC payload, so the real
+    // decoder refuses it. The assertions are unchanged and still load-bearing.
+    // ~~Superseded wording: "fails at the missing transcode stage".~~
+    //
     // 415 with a re-export remedy, NOT a 500. And critically: nothing was
     // stored. Passing HEIC bytes through would break the `format in
     // {png,jpeg}` invariant and hand extraction bytes it cannot read.

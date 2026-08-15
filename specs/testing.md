@@ -2821,27 +2821,29 @@ exist, and they must not be deleted as "duplicates" of the integration run.
 
 ### 28.2 What it does NOT claim
 
-**`T-IMG-013` is NOT claimed, and must not be marked done.** It requires a HEIC
-to be *accepted, transcoded to PNG and stored*. `UNBUILT_STAGES.transcode` in
-`apps/api/src/routes/batchImages.ts` **throws** -- deliberately, because storing
-an un-transcoded HEIC would violate the `format in {png,jpeg}` invariant and
-hand extraction bytes it cannot read. The sniff half is asserted
-(`T-IMG-012`/`T-PASTE-006`); the transcode half lands with **TASK-149**.
+**`T-IMG-013` is NOT claimed by TASK-050, and was struck from its row.** It
+requires a HEIC to be *accepted, transcoded to PNG and stored*. The sniff half
+is asserted here (`T-IMG-012`/`T-PASTE-006`); the transcode half lands with
+**TASK-149** and is claimed in **§29**.
+~~*Superseded (TASK-149 has landed): "`UNBUILT_STAGES.transcode` in
+`apps/api/src/routes/batchImages.ts` **throws** -- deliberately, because
+storing an un-transcoded HEIC would violate the `format in {png,jpeg}`
+invariant."*~~ The stage is real now; `UNBUILT_STAGES` survives as an **alias**
+of `DEFAULT_STAGES` so this section's citation still resolves.
 
-**REQ-078 IS NOT DISCHARGED.** `UNBUILT_STAGES.stripMetadata` is a
+**REQ-078 IS NOT DISCHARGED.** `DEFAULT_STAGES.stripMetadata` is a
 **pass-through**, so EXIF/XMP -- including GPS -- is currently NOT stripped.
 The seam exists and is asserted to be called for every image
 (`T-IMG-023b`), so **TASK-150** is a one-line wiring change; until it lands
 this is a live gap, recorded here rather than only in a code comment.
 
-**`IMAGE_DECODE_OOM` is mapped but UNREACHABLE.** `statusForRejection()` maps
-it to **503, not 500** -- a capacity condition with a known one-command remedy,
-after which the identical request succeeds (`specs/api.md` §5.2.3). Nothing in
-the pipeline emits that code yet, because it is raised by the decoder, which
-arrives with **TASK-149**. The branch is therefore deliberately uncovered here
-and must be asserted by that task. Recorded so the uncovered line is a known
-debt rather than an oversight, and so nobody "simplifies" the 503 to a 500 on
-the grounds that no test names it.
+**`IMAGE_DECODE_OOM` is mapped but was UNREACHABLE at TASK-050.**
+`statusForRejection()` maps it to **503, not 500** -- a capacity condition with
+a known one-command remedy, after which the identical request succeeds
+(`specs/api.md` §5.2.3). Nothing in the pipeline emitted that code, because it
+is raised by the decoder, which arrived with **TASK-149**; `T-IMG-015e`/`f` now
+assert it. Recorded so nobody "simplifies" the 503 to a 500 on the grounds that
+no test names it.
 
 The `T-PASTE-003` **e2e** leg -- three real Ctrl/Cmd+V events in a browser
 producing exactly one `POST /api/batches` -- belongs to TASK-159+. The
@@ -2894,3 +2896,82 @@ rather than as a broken baseline. Every battery here now asserts the baseline
 is green **first**. Recorded because the failure mode is silent in the
 direction that matters: a mutation left in a file that no test covers would
 have been committed.
+## 29. The HEIC/HEIF transcode (TASK-149)
+
+`apps/api/src/images/transcode.ts`, asserted by
+`apps/api/test/unit/transcode.spec.ts` (21 cases). The stage is injected into
+the pipeline through `IngestStages.transcode` and wired to the route by
+`DEFAULT_STAGES` in `apps/api/src/routes/batchImages.ts`.
+
+### 29.1 What it claims
+
+| Test | Level | Claim |
+|---|---|---|
+| `T-IMG-013a`-`d` | U | HEIC and HEIF decode to a PNG whose signature is asserted; the decoder is handed the ORIGINAL bytes and asked for **`PNG`**, never a lossy format (NFR-012a); the decoded raster's dimensions are what the row records. |
+| `T-IMG-015a`-`d` | U | A decoder failure, an empty result and a result that is not a readable PNG all become `IMAGE_DECODE_FAILED` **415** -- gracefully, with no crash -- and the refusal names **neither memory nor the runbook** (`T-IMG-020`'s standing constraint: more memory cannot fix a truncated file). |
+| `T-IMG-015e`-`g` | U | A **catchable WASM allocation failure** becomes `IMAGE_DECODE_OOM` **503**, naming memory and citing `docs/runbooks/scale-up-memory.md`; four real Emscripten/V8 wordings are recognised; and a `RangeError` that is **not** about memory is still `IMAGE_DECODE_FAILED`. |
+| `T-IMG-016a`-`b` | U | `assertDecodable` runs as the FIRST statement: a 48.0 MP header is refused with `IMAGE_TOO_LARGE_TO_DECODE` and the decoder is **never invoked**, and the SAME header is accepted once `NEXTUP_MAX_DECODE_PIXELS=50000000` -- proving the ceiling is the env var, not a constant. |
+| `T-IMG-016c`-`e` | U | A raster that contradicts the header is `IMAGE_DECODE_FAILED` (§5.1 step 4, a secondary consistency check -- never `IMAGE_TOO_LARGE_TO_DECODE`); an under-size image is refused pre-decode. |
+| `T-IMG-016d` | U | A **transposed** raster is accepted. See 29.3(a). |
+| `T-IMG-023h`-`l` | U | The branch is the caller's and reads the **sniffed** format: transcoding a PNG is a programming error, not an `AppError`; a HEIC labelled `ingestSource: 'paste'` by a lying client is transcoded anyway; a transcode failure fails **one image**, never the batch; and a non-`AppError` propagates instead of blaming the image. |
+| `T-DM-025e`-`f` | U | A stored PNG larger than the 10 MiB **upload** ceiling is representable; one beyond the whole-batch ceiling is not. See 29.3(b). |
+
+Every claim above was mutation-verified in both directions: removing the
+`assertDecodable` call, requesting `JPEG` instead of `PNG`, deleting the
+raster/header comparison, disabling the out-of-memory classifier, and removing
+the per-file `AppError` catch each fail their named case and pass with it
+restored.
+
+### 29.2 What it does NOT claim
+
+**No test here decodes a REAL HEIC, and that is a constraint rather than an
+omission.** `T-DEP-002` forbids a HEIC **encoder** anywhere in the dependency
+tree (patent exposure and a GPL licence floor), so **nothing in this repository
+can produce HEIC bytes**. A real decode therefore requires a **committed**
+fixture, which is **TASK-151** -- whose row already wires `T-IMG-013`,
+`T-IMG-015` and `T-IMG-016` against `tests/fixtures/golden/ingest/`. The
+injected decoder buys what a well-formed fixture cannot: the out-of-memory path
+and the header-lie path.
+
+**The KERNEL out-of-memory kill is not asserted and cannot be.** It restarts
+the container and raises no catchable error, so no in-process assertion can
+observe it (ADR-0008 R2.4). The pre-decode pixel guard exists precisely because
+that path cannot be handled; `T-IMG-016a` is its assertion.
+
+**REQ-078 is still NOT discharged** -- see §28.2. The transcode drops metadata
+incidentally (it re-encodes from a raw raster), and **incidental is exactly what
+TASK-150 forbids relying on**. A PNG or JPEG that skips the transcode still
+carries its EXIF today.
+
+### 29.3 Findings
+
+**(a) `ispe` ignores `irot`, so a correct decode can legitimately transpose the
+dimensions.** The HEIF `ispe` box records the STORED extent; libheif applies
+the `irot`/`imir` transform properties when it decodes. A portrait iPhone photo
+stored 4032x3024 with a 90-degree rotation therefore decodes to 3024x4032.
+Reading §5.1 step 4 literally -- *"any mismatch between the header-declared
+dimensions and the decoded raster is itself a rejection"* -- **rejects ordinary
+camera-roll uploads, the exact case A42 exists to support.** The transposed
+pair is accepted explicitly, and it costs nothing the guard cared about: the
+pixel COUNT is identical either way, and a genuine header lie changes the
+count and is still caught. `T-IMG-016d`.
+
+**(b) The upload ceiling and the stored ceiling are different numbers.**
+`uploadedImageSchema.byteSize` was bounded by `MAX_IMAGE_BYTES` (10 MiB), which
+is the ceiling on what the **device sends**. The stored blob for a HEIC is its
+**lossless PNG** transcode and is routinely several times larger, so a
+compliant 10 MiB HEIC could be stored and then be **unrepresentable in its own
+schema**. Nothing would have found that until a real phone photo arrived, since
+no fixture in the tree is a real HEIC. `MAX_STORED_IMAGE_BYTES` is now a
+separate constant, and `T-DM-025e` -- which had encoded the bug by asserting
+that anything over 10 MiB is rejected -- was corrected in place.
+
+**(c) A per-file stage that THROWS silently converts a per-file failure into a
+whole-request failure.** `ingestOne` did not catch stage errors, because no
+stage could fail while the transcode was a stub. Wiring a real decoder made
+`IMAGE_DECODE_OOM` and `IMAGE_DECODE_FAILED` propagate out of `ingestFiles`,
+which would have failed the **batch** on one bad screenshot -- REQ-080/081, and
+invariant 15 of the build instructions. The catch is scoped to `AppError`
+deliberately: an Azure outage or a `TypeError` is not a verdict about one
+image, and reporting it as one tells the owner to re-export a file that is
+perfectly fine. `T-IMG-023k` and `T-IMG-023l` are the pair.

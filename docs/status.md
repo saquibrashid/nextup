@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 101 |
+| ⬜ todo | 100 |
 | 🚧 doing | 4 |
-| ✅ done | 49 |
+| ✅ done | 50 |
 | 🙋 owner | 7 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -39,6 +39,8 @@ Not done, and every task they depend on is done.
 | `TASK-132` | XS | Epic K — Platform, safety, and the shell |
 | `TASK-143` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-145` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
+| `TASK-150` | S | Epic B — Capture & import |
+| `TASK-154` | M | Epic B — Capture & import |
 
 ## Waiting on the owner
 
@@ -54,7 +56,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-90 tasks cannot start yet.
+87 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -65,7 +67,7 @@ Not done, and every task they depend on is done.
 | `TASK-044` | `TASK-043` |
 | `TASK-046` | `TASK-026`, `TASK-038` |
 | `TASK-057` | `TASK-056` |
-| `TASK-058` | `TASK-056`, `TASK-057`, `TASK-149`, `TASK-154` |
+| `TASK-058` | `TASK-056`, `TASK-057`, `TASK-154` |
 | `TASK-059` | `TASK-058` |
 | `TASK-060` | `TASK-045` |
 | `TASK-061` | `TASK-060` |
@@ -133,19 +135,16 @@ Not done, and every task they depend on is done.
 | `TASK-130` | `TASK-124`, `TASK-108` |
 | `TASK-131` | `TASK-044` |
 | `TASK-133` | `TASK-007`, `TASK-156` |
-| `TASK-149` | `TASK-145` |
-| `TASK-150` | `TASK-149` |
-| `TASK-151` | `TASK-149`, `TASK-150` |
+| `TASK-151` | `TASK-150` |
 | `TASK-152` | `TASK-053` |
-| `TASK-154` | `TASK-149` |
-| `TASK-155` | `TASK-149`, `TASK-152` |
+| `TASK-155` | `TASK-152` |
 | `TASK-156` | `TASK-007` |
-| `TASK-157` | `TASK-010`, `TASK-142`, `TASK-149` |
+| `TASK-157` | `TASK-010`, `TASK-142` |
 | `TASK-159` | `TASK-053` |
 | `TASK-160` | `TASK-053` |
 | `TASK-161` | `TASK-160` |
 | `TASK-162` | `TASK-053`, `TASK-159`, `TASK-160` |
-| `TASK-163` | `TASK-149`, `TASK-150`, `TASK-160`, `TASK-162` |
+| `TASK-163` | `TASK-150`, `TASK-160`, `TASK-162` |
 | `TASK-164` | `TASK-080`, `TASK-160`, `TASK-162` |
 | `TASK-166` | `TASK-039` |
 
@@ -199,6 +198,7 @@ Not done, and every task they depend on is done.
 | `TASK-146` | **ahead-of:TASK-007.** `docs/ghcr-pat.md` written. **No PAT is needed at all** — a fine-grained PAT cannot authenticate to `ghcr.io` and a classic one is account-wide, so the package is public and CI pushes with `GITHUB_TOKEN` (R8). Remaining: the `deploy.yml` link + image secret-scan land with TASK-007, and the one-time visibility flip runs after the first successful push. | _no test id declared_ |
 | `TASK-147` | HEIC decode chain (`heic-convert` → `heic-decode` → `libheif-js`, LGPL-3.0, decode-only) + `sharp` installed; `T-DEP-001` runtime allow-list, `T-DEP-002` encoder ban and `T-DEP-003` prebuilt-only added to `tools/check-deps.mjs`; `T-LICENSE-001` now green against the REAL tree, completing TASK-153's other half. Three corrections found at implementation: (a) `sharp@0.34` carried high-severity libvips CVEs and would have been blocked by `npm audit` in CI — pinned `^0.35.3`, 0 vulnerabilities; (b) `sharp` is Apache-2.0 with LGPL-3.0-or-later libvips binaries, **not MIT** as the spec claimed — corrected in `specs/security.md` §8 and the TASK-147 row; (c) **the runtime container stage installed with `--omit=optional`, which excludes all 25 sharp platform binaries** — proven by building the image both ways (`require('sharp')` threw "Could not load the sharp module using the linuxmusl-x64 runtime"), fixed with a `COPY --from=build` and guarded by `T-INFRA-007`. | _no test id declared_ |
 | `TASK-148` | `apps/api/src/images/sniffFormat.ts` + `T-IMG-024a`-`p` (16 unit cases). `UPLOAD_FORMATS`, `uploadedFormat` and the format error codes already existed from TASK-012, so this task is the sniffer itself. Two findings recorded in `specs/testing.md` §25.3: (a) the spec and the backlog name different module paths for this file AND for the TASK-145 pixel guard - the guard divergence is still unbuilt and should be settled before TASK-149 imports it; (b) a printable-ASCII guard in the brand reader was proven unfalsifiable by mutation and removed rather than left under a test that could not fail. The two ids the Done-when column originally named are integration properties of the upload endpoint and are already owned by TASK-050 - struck through, not relocated. | `T-IMG-024a` |
+| `TASK-149` | **ahead-of:TASK-145** — TASK-145's pixel-guard half is delivered and is what this task depends on; its remaining half is serial EXTRACTION, which belongs to TASK-057/058 and is not on this path. `apps/api/src/images/transcode.ts` + `apps/api/test/unit/transcode.spec.ts` (21 cases), claims table in `specs/testing.md` §29. `transcodeHeicToPng` calls `assertDecodable` as its first statement, decodes with `heic-convert` to **lossless PNG**, maps a catchable WASM allocation failure to `IMAGE_DECODE_OOM` (503) and everything else to `IMAGE_DECODE_FAILED` (415), and re-asserts the header dimensions against the decoded raster. Wired to the route by `DEFAULT_STAGES`; `UNBUILT_STAGES` survives as an alias so §28's citation resolves. Three findings in §29.3: (a) `ispe` ignores `irot`, so a correct decode legitimately **transposes** the dimensions - reading §5.1 step 4 literally would reject ordinary rotated camera-roll uploads, the exact case A42 exists to support; (b) the stored ceiling is not the upload ceiling - a lossless PNG transcode of a compliant 10 MiB HEIC was **unrepresentable in its own schema**, and the domain schema case had encoded the bug, so `MAX_STORED_IMAGE_BYTES` was separated and that case corrected in place; (c) wiring a stage that can genuinely fail turned a per-file failure into a **whole-request** failure - `ingestOne` now catches `AppError` only (REQ-080/081, `T-IMG-023k`/`l`). The real-fixture legs of `T-IMG-013/015/016` stay with **TASK-151**: `T-DEP-002` forbids a HEIC encoder in the tree, so nothing here can generate HEIC bytes and a committed fixture is the only route. | `T-IMG-013`, `T-IMG-015`, `T-IMG-016`, `T-IMG-023` |
 | `TASK-153` | `d6796b3` — owner approved the LGPL-3.0 obligation; gate proven on synthetic fixtures | `T-LICENSE-001` |
 | `TASK-158` | `packages/domain/src/pastedFileName.ts` + `T-PASTE-005a`-`s` (19 unit cases). `INGEST_SOURCES`/`IngestSource` already existed from TASK-012, so this task is the synthesiser alone. The INTEGRATION half of `T-PASTE-005` (round-trip of `ingestSource`, server-assigned `seqInBatch`, `blobPath` free of any client name) belongs to TASK-050 — see `specs/testing.md` §27.2. | `T-PASTE-005` |
 | `TASK-167` | this commit — the ledger, the gate and `docs/status.md` | `T-STATUS-001` |
