@@ -44,6 +44,18 @@ services:
       start_period: 30s
 
   # Blob emulator for the screenshot store (ADR-0006).
+  #
+  # ⚠ THE command BELOW IS LOAD-BEARING AND MUST MATCH ci.yml's
+  # Start Azurite STEP EXACTLY. --skipApiVersionCheck is not a nicety:
+  # @azure/storage-blob sends a service version newer than the emulator
+  # knows, and without the flag EVERY blob write fails with
+  # RestError: The API version … is not supported by Azurite, surfacing as
+  # INTERNAL_ERROR on the upload route.
+  #
+  # CI cannot express this as a services: entry — a service container takes
+  # no command ARGUMENTS — which is why Azurite is started as a STEP there
+  # while mssql remains a service. That asymmetry is deliberate; keeping the
+  # two argument lists identical is what makes a CI failure reproduce here.
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite:latest
     command: ['azurite-blob', '--blobHost', '0.0.0.0', '--skipApiVersionCheck']

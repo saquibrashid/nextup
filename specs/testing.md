@@ -2871,7 +2871,22 @@ that way asserts the **client's** normalisation and would pass against a server
 that composed paths from the client name. `T-SEC-003b` keeps the marker in a
 percent-encoded form that survives the wire.
 
-**(d) An interrupted mutation run can leave a mutation in the file, and the
+**(d) A green local integration run does NOT prove the CI emulator agrees.**
+`docker-compose.test.yml` starts Azurite with `--skipApiVersionCheck`; the CI
+job started it as a **service container**, which cannot pass command
+arguments, so it ran without the flag. `@azure/storage-blob` sends a service
+version newer than the emulator knows, and **every** blob write failed with
+`RestError: The API version … is not supported by Azurite` -- surfacing as
+`INTERNAL_ERROR` on the upload route, which reads as an application bug. It was
+invisible locally in both directions: the flag had always been present here and
+absent there. Reproduced by running a flagless Azurite on a second port
+(19 failures), then re-running with the exact CI command line (19 passed).
+Azurite is now a **step** in `ci.yml`, and both argument lists carry a comment
+saying they must stay identical. **The general lesson: any test dependency
+configured in two places is a place CI and local silently diverge, and the
+first symptom will point at the application.**
+
+**(e) An interrupted mutation run can leave a mutation in the file, and the
 next battery then measures the wrong baseline.** A prior run of this suite left
 the "strip inside the transcode branch" mutation in `ingest.ts`; the following
 battery reported two extra failures in **every** cell, which reads as noise

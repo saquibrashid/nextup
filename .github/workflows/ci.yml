@@ -225,13 +225,43 @@ jobs:
           --health-retries 12
           --health-start-period 30s
 
-      azurite:
-        image: mcr.microsoft.com/azure-storage/azurite:latest
-        ports:
-          - 10000:10000
-
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # ⚠ AZURITE IS NOT A SERVICE CONTAINER, AND MUST NOT BE TURNED BACK INTO
+      # ONE. A `services:` entry cannot pass command ARGUMENTS — it accepts
+      # only `image`, `env`, `ports`, `volumes` and docker-create `options` —
+      # and Azurite needs `--skipApiVersionCheck`. Without it every blob write
+      # fails with:
+      #
+      #   RestError: The API version 2026-06-06 is not supported by Azurite.
+      #
+      # …because `@azure/storage-blob` sends a service version newer than the
+      # emulator knows. That surfaces as `INTERNAL_ERROR` on the upload route,
+      # so it reads as an application bug rather than an emulator one, and it
+      # is INVISIBLE locally because `docker-compose.test.yml` has always
+      # passed the flag. The two must stay in step: this is the CI half of
+      # that file's promise to mirror it.
+      #
+      # Started as a step for exactly that reason. `--blobHost 0.0.0.0` is
+      # required too, or the container binds loopback and the port mapping
+      # connects to nothing.
+      - name: Start Azurite (blob emulator)
+        run: |
+          docker run -d --name azurite -p 10000:10000 \
+            mcr.microsoft.com/azure-storage/azurite:latest \
+            azurite-blob --blobHost 0.0.0.0 --skipApiVersionCheck
+          for i in $(seq 1 30); do
+            # No `-f`: an unauthenticated request to Azurite answers 400/403,
+            # which is proof the service is LISTENING. `-f` would treat that
+            # as failure and the loop would never succeed.
+            if curl -s -o /dev/null "http://127.0.0.1:10000/devstoreaccount1"; then
+              echo "Azurite is up"; exit 0
+            fi
+            sleep 2
+          done
+          echo "Azurite did not become ready"; docker logs azurite; exit 1
+
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
