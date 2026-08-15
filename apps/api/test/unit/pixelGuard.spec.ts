@@ -209,7 +209,7 @@ describe('evaluatePixelGuard', () => {
     // Without this, a guard hard-coded to reject 8064x5952 would pass T-IMG-017a.
     expect(evaluatePixelGuard({ width: 8064, height: 5952 }, 50_000_000)).toMatchObject({
       ok: true,
-      megapixels: 47_996_928,
+      megapixels: 47.996928,
     });
   });
 
@@ -331,12 +331,23 @@ describe('assertDecodable', () => {
     expect(corruptMessage).not.toContain('scale-up-memory.md');
   });
 
-  it('T-IMG-017k: a passing header returns its declared dimensions', () => {
+  it('T-IMG-017k: a passing header returns its dimensions, and megapixels are MEGApixels', () => {
+    // ⚠ THE UNIT TRAP, and it shipped once. `NEXTUP_MAX_DECODE_PIXELS` is a
+    // raw pixel count (25000000) while `megapixels`/`maxMegapixels` are the
+    // values `specs/api.md` §6.12 puts in `details` and §5.2.4 renders to one
+    // decimal place. Assigning the budget straight through compiles, satisfies
+    // every comparison in this file, and renders the refusal as
+    // "25000000.0 MP". Only an assertion on the VALUE catches it.
     expect(assertDecodable(pngHeader(1179, 2556))).toEqual({
       width: 1179,
       height: 2556,
-      megapixels: 1179 * 2556,
+      megapixels: 3.013524,
     });
+    const refused = evaluatePixelGuard({ width: 8064, height: 5952 }, DEFAULT_MAX_DECODE_PIXELS);
+    expect(refused).toMatchObject({ maxMegapixels: 25 });
+    // What the owner actually reads. Anything in raw pixels renders absurdly.
+    expect((refused as { megapixels: number }).megapixels.toFixed(1)).toBe('48.0');
+    expect((refused as { maxMegapixels: number }).maxMegapixels.toFixed(1)).toBe('25.0');
   });
 
   it('T-IMG-017l: inspectDecodable reports the same verdict WITHOUT throwing', () => {

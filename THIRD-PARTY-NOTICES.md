@@ -32,6 +32,19 @@ so they do not relicense this work — but their notices must be retained.
 
 | Package | Version | Licence |
 |---|---|---|
+| `@azure/abort-controller` | 2.2.0 | MIT |
+| `@azure/core-auth` | 1.11.0 | MIT |
+| `@azure/core-client` | 1.11.0 | MIT |
+| `@azure/core-http-compat` | 2.5.0 | MIT |
+| `@azure/core-lro` | 2.7.2 | MIT |
+| `@azure/core-paging` | 1.7.0 | MIT |
+| `@azure/core-rest-pipeline` | 1.25.0 | MIT |
+| `@azure/core-tracing` | 1.4.0 | MIT |
+| `@azure/core-util` | 1.14.0 | MIT |
+| `@azure/core-xml` | 1.6.0 | MIT |
+| `@azure/logger` | 1.4.0 | MIT |
+| `@azure/storage-blob` | 12.33.0 | MIT |
+| `@azure/storage-common` | 12.5.0 | MIT |
 | `@babel/helper-string-parser` | 7.29.7 | MIT |
 | `@babel/helper-validator-identifier` | 7.29.7 | MIT |
 | `@babel/parser` | 7.29.8 | MIT |
@@ -65,6 +78,7 @@ so they do not relicense this work — but their notices must be retained.
 | `@img/sharp-win32-ia32` | 0.35.3 | Apache-2.0 AND LGPL-3.0-or-later |
 | `@img/sharp-win32-x64` | 0.35.3 | Apache-2.0 AND LGPL-3.0-or-later |
 | `@noble/hashes` | 2.2.0 | MIT |
+| `@nodable/entities` | 3.0.0 | MIT |
 | `@prisma/client` | 6.19.3 | Apache-2.0 |
 | `@prisma/config` | 6.19.3 | Apache-2.0 |
 | `@prisma/debug` | 6.19.3 | Apache-2.0 |
@@ -73,8 +87,14 @@ so they do not relicense this work — but their notices must be retained.
 | `@prisma/fetch-engine` | 6.19.3 | Apache-2.0 |
 | `@prisma/get-platform` | 6.19.3 | Apache-2.0 |
 | `@standard-schema/spec` | 1.1.0 | MIT |
+| `@typespec/ts-http-runtime` | 0.3.8 | MIT |
 | `accepts` | 2.0.0 | MIT |
+| `agent-base` | 7.1.4 | MIT |
+| `anynum` | 1.0.1 | MIT |
+| `append-field` | 1.0.0 | MIT |
 | `body-parser` | 2.3.0 | MIT |
+| `buffer-from` | 1.1.2 | MIT |
+| `busboy` | 1.6.0 | MIT |
 | `bytes` | 3.1.2 | MIT |
 | `c12` | 3.1.0 | MIT |
 | `call-bind-apply-helpers` | 1.0.2 | MIT |
@@ -82,6 +102,7 @@ so they do not relicense this work — but their notices must be retained.
 | `chokidar` | 4.0.3 | MIT |
 | `citty` | 0.1.6 | MIT |
 | `citty` | 0.2.2 | MIT |
+| `concat-stream` | 2.0.0 | MIT |
 | `confbox` | 0.2.4 | MIT |
 | `consola` | 3.4.2 | MIT |
 | `content-disposition` | 1.1.0 | MIT |
@@ -108,9 +129,12 @@ so they do not relicense this work — but their notices must be retained.
 | `es-object-atoms` | 1.1.2 | MIT |
 | `escape-html` | 1.0.3 | MIT |
 | `etag` | 1.8.1 | MIT |
+| `events` | 3.3.0 | MIT |
 | `express` | 5.2.1 | MIT |
 | `exsolve` | 1.1.1 | MIT |
 | `fast-check` | 3.23.2 | MIT |
+| `fast-xml-builder` | 1.3.0 | MIT |
+| `fast-xml-parser` | 5.10.1 | MIT |
 | `finalhandler` | 2.1.1 | MIT |
 | `forwarded` | 0.2.0 | MIT |
 | `fresh` | 2.0.0 | MIT |
@@ -124,27 +148,34 @@ so they do not relicense this work — but their notices must be retained.
 | `heic-convert` | 2.1.0 | ISC |
 | `heic-decode` | 2.1.0 | ISC |
 | `http-errors` | 2.0.1 | MIT |
+| `http-proxy-agent` | 7.0.2 | MIT |
+| `https-proxy-agent` | 7.0.6 | MIT |
 | `iconv-lite` | 0.7.3 | MIT |
 | `iconv-lite` | 0.7.3 | MIT |
 | `inherits` | 2.0.4 | ISC |
 | `ipaddr.js` | 1.9.1 | MIT |
 | `is-promise` | 4.0.0 | MIT |
+| `is-unsafe` | 2.0.0 | MIT |
 | `jiti` | 2.7.0 | MIT |
 | `jpeg-js` | 0.4.4 | BSD-3-Clause |
 | `libheif-js` | 1.19.8 | LGPL-3.0 |
 | `magicast` | 0.5.4 | MIT |
 | `math-intrinsics` | 1.1.0 | MIT |
+| `media-typer` | 0.3.0 | MIT |
 | `media-typer` | 1.1.1 | MIT |
 | `merge-descriptors` | 2.0.0 | MIT |
+| `mime-db` | 1.52.0 | MIT |
 | `mime-db` | 1.54.0 | MIT |
 | `mime-db` | 1.54.0 | MIT |
 | `mime-db` | 1.54.0 | MIT |
 | `mime-db` | 1.54.0 | MIT |
+| `mime-types` | 2.1.35 | MIT |
 | `mime-types` | 3.0.2 | MIT |
 | `mime-types` | 3.0.2 | MIT |
 | `mime-types` | 3.0.2 | MIT |
 | `mime-types` | 3.0.2 | MIT |
 | `ms` | 2.1.3 | MIT |
+| `multer` | 2.2.0 | MIT |
 | `negotiator` | 1.0.0 | MIT |
 | `node-fetch-native` | 1.6.7 | MIT |
 | `nypm` | 0.6.9 | MIT |
@@ -153,6 +184,7 @@ so they do not relicense this work — but their notices must be retained.
 | `on-finished` | 2.4.1 | MIT |
 | `once` | 1.4.0 | ISC |
 | `parseurl` | 1.3.3 | MIT |
+| `path-expression-matcher` | 1.6.2 | MIT |
 | `path-to-regexp` | 8.4.2 | MIT |
 | `pathe` | 2.0.3 | MIT |
 | `perfect-debounce` | 1.0.0 | MIT |
@@ -169,8 +201,10 @@ so they do not relicense this work — but their notices must be retained.
 | `react-dom` | 19.2.8 | MIT |
 | `react-router` | 7.18.2 | MIT |
 | `react-router-dom` | 7.18.2 | MIT |
+| `readable-stream` | 3.6.2 | MIT |
 | `readdirp` | 4.1.2 | MIT |
 | `router` | 2.2.0 | MIT |
+| `safe-buffer` | 5.2.1 | MIT |
 | `safer-buffer` | 2.1.2 | MIT |
 | `scheduler` | 0.27.0 | MIT |
 | `semver` | 7.8.5 | ISC |
@@ -185,12 +219,19 @@ so they do not relicense this work — but their notices must be retained.
 | `side-channel-weakmap` | 1.0.2 | MIT |
 | `source-map-js` | 1.2.1 | BSD-3-Clause |
 | `statuses` | 2.0.2 | MIT |
+| `streamsearch` | 1.1.0 | MIT |
+| `string_decoder` | 1.3.0 | MIT |
+| `strnum` | 2.4.1 | MIT |
 | `tinyexec` | 1.3.0 | MIT |
 | `toidentifier` | 1.0.1 | MIT |
 | `tslib` | 2.8.1 | 0BSD |
+| `type-is` | 1.6.18 | MIT |
 | `type-is` | 2.1.0 | MIT |
+| `typedarray` | 0.0.6 | MIT |
 | `typescript` | 6.0.3 | Apache-2.0 |
 | `unpipe` | 1.0.0 | MIT |
+| `util-deprecate` | 1.0.2 | MIT |
 | `vary` | 1.1.2 | MIT |
 | `wrappy` | 1.0.2 | ISC |
+| `xml-naming` | 0.3.0 | MIT |
 | `zod` | 4.4.3 | MIT |

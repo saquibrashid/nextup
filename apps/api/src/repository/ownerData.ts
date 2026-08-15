@@ -825,6 +825,28 @@ export async function listImagesForBatch(ownerId: OwnerId, batchId: string, tx?:
   return db(tx).uploadedImage.findMany({ where: { ownerId, batchId } });
 }
 
+/**
+ * Current image count and cumulative bytes for one batch (`specs/api.md` §5).
+ *
+ * ⚠ COUNTED ACROSS ALL THREE INGEST SOURCES — there is no `ingestSource`
+ * filter here and there must never be one. 30 pasted plus 11 uploaded is 41
+ * and is refused; a per-source tally would let a batch hold 120 images.
+ */
+export async function batchImageTotals(ownerId: OwnerId, batchId: string, tx?: Db) {
+  const result = await db(tx).uploadedImage.aggregate({
+    where: { ownerId, batchId },
+    _count: { _all: true },
+    _sum: { byteSize: true },
+  });
+  return {
+    imageCount: result._count._all,
+    // `byteSize` is BigInt in the store; the ceilings are Numbers. 60 MiB is
+    // nowhere near `Number.MAX_SAFE_INTEGER`, so the narrowing is safe here
+    // and keeps the ceiling comparison ordinary arithmetic.
+    byteSize: Number(result._sum.byteSize ?? 0n),
+  };
+}
+
 export async function createExtractionCandidate(
   ownerId: OwnerId,
   data: Omit<Prisma.ExtractionCandidateUncheckedCreateInput, 'ownerId'>,

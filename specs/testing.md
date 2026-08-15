@@ -2782,3 +2782,100 @@ for a reason the owner cannot act on. `resolveFileName()` truncates to
 `MAX_FILE_NAME_LENGTH` preserving the extension; `T-PASTE-005p` asserts the
 result satisfies `uploadedImageSchema.shape.fileName`. Reported as a spec gap,
 not a spec change.
+
+---
+
+## 28. The ingest endpoint (TASK-050)
+
+`POST /api/batches/:batchId/images` -- ONE route, THREE affordances
+(`specs/api.md` §6.12, §5.3.1; `A45`). Two suites:
+`apps/api/test/unit/ingest.spec.ts` (21 cases, the pipeline in
+`apps/api/src/images/ingest.ts`) and
+`apps/api/test/integration/ingestSources.spec.ts` (19 cases, the path §11
+names, against a real `mssql/server:2022` and a real Azurite). Two further unit
+suites carry the branch arms **and the coverage**:
+`apps/api/test/unit/batchImagesRoute.spec.ts` (10 cases, repository and store
+mocked) and `apps/api/test/unit/blobStore.spec.ts` (8 cases,
+`@azure/storage-blob` mocked). ⚠ `npm run coverage` scores only the `unit` and
+`web` projects, so a route proven ONLY in integration scores ~6% against the
+`apps/api/src/**` floor -- it fails the gate. That is why those two suites
+exist, and they must not be deleted as "duplicates" of the integration run.
+
+### 28.1 What TASK-050 claims
+
+| Id | Where | Claim |
+| --- | --- | --- |
+| `T-IMG-002a`-`d` | U + I | Partial acceptance. A valid file beside an invalid one is **201**, the bad one is named in `rejected[]`, and the failed file is the ONLY one missing from storage. |
+| `T-IMG-006a`-`f` | U + I | A non-image is `415` and named per file; the ordinal is consumed by a rejected file too; `blobPath` carries no part of any client name. |
+| `T-IMG-010a`-`e` | U + I | Per-file rejection reasons; ceilings; byte totals accumulate across requests and match the stored rows. |
+| `T-IMG-012a`-`d` | U + I | `uploadedFormat` (as received) is recorded distinct from the stored `format`. |
+| `T-IMG-018a`-`b` | U | Files are processed **serially**, never concurrently, and one failure never removes an accepted file. |
+| `T-IMG-023a`-`e` | U + I | The transcode is conditional on the **sniffed format**, never on `ingestSource`; the metadata strip runs for every image outside that condition; images attach to a **draft** batch only (`409 BATCH_NOT_DRAFT`, `404` for a batch that is not the owner's). |
+| `T-PASTE-003a`-`b` | I | Three successive pastes append to the **one** open batch with ordinals `01`/`02`/`03`; paste, drop and upload land in the same batch and are counted together. |
+| `T-PASTE-005t`-`w` | I | The integration half §27.2 left open: `ingestSource` and the synthesised `fileName` round-trip and are persisted; provenance is read from the FIELD, never inferred from a filename prefix; an absent value defaults to `upload` and an unknown one is refused. |
+| `T-PASTE-006a`-`c` | U + I | The declared `Content-Type` is never trusted in either direction. |
+| `T-PASTE-007a`-`c` | U + I | Every ceiling applies identically to pasted images. |
+| `T-SEC-003a`-`b` | I | No `blobPath`, URL or SAS in any response -- asserted against the **raw serialised body**, because the leak guarded against is a future `...spread`. |
+| `T-RET-014a`-`d` | U + I | `retainUntil` is stamped at ingest from `IMAGE_RETENTION_DAYS` alone; a purged blob reads as `null` rather than throwing, and `remove` is idempotent. |
+| `T-IMG-020a`-`b` | U | The memory refusal names memory, renders **MEGApixels** to one decimal place and cites the runbook; the unsupported-format refusal names neither. |
+
+### 28.2 What it does NOT claim
+
+**`T-IMG-013` is NOT claimed, and must not be marked done.** It requires a HEIC
+to be *accepted, transcoded to PNG and stored*. `UNBUILT_STAGES.transcode` in
+`apps/api/src/routes/batchImages.ts` **throws** -- deliberately, because storing
+an un-transcoded HEIC would violate the `format in {png,jpeg}` invariant and
+hand extraction bytes it cannot read. The sniff half is asserted
+(`T-IMG-012`/`T-PASTE-006`); the transcode half lands with **TASK-149**.
+
+**REQ-078 IS NOT DISCHARGED.** `UNBUILT_STAGES.stripMetadata` is a
+**pass-through**, so EXIF/XMP -- including GPS -- is currently NOT stripped.
+The seam exists and is asserted to be called for every image
+(`T-IMG-023b`), so **TASK-150** is a one-line wiring change; until it lands
+this is a live gap, recorded here rather than only in a code comment.
+
+**`IMAGE_DECODE_OOM` is mapped but UNREACHABLE.** `statusForRejection()` maps
+it to **503, not 500** -- a capacity condition with a known one-command remedy,
+after which the identical request succeeds (`specs/api.md` §5.2.3). Nothing in
+the pipeline emits that code yet, because it is raised by the decoder, which
+arrives with **TASK-149**. The branch is therefore deliberately uncovered here
+and must be asserted by that task. Recorded so the uncovered line is a known
+debt rather than an oversight, and so nobody "simplifies" the 503 to a 500 on
+the grounds that no test names it.
+
+The `T-PASTE-003` **e2e** leg -- three real Ctrl/Cmd+V events in a browser
+producing exactly one `POST /api/batches` -- belongs to TASK-159+. The
+integration leg above proves the server side of the same claim.
+
+### 28.3 Findings
+
+**(a) A megapixel field that holds pixels compiles, passes every comparison,
+and renders `25000000.0 MP`.** `NEXTUP_MAX_DECODE_PIXELS` is a raw pixel count;
+`megapixels`/`maxMegapixels` in the guard verdict are what `specs/api.md` §6.12
+puts in `details` and §5.2.4 renders to one decimal place. `pixelGuard.ts`
+assigned the budget straight through, and **two existing cases in
+`apps/api/test/unit/pixelGuard.spec.ts` had encoded the bug** (`megapixels:
+47_996_928`). It shipped in `fb213b4`. Only an assertion on the RENDERED value
+catches it; `T-IMG-017k` now asserts `48.0`/`25.0`. This amends §26. The
+comparison stays in pixels; only reported values convert.
+
+**(b) A multipart part with no filename is a FIELD, not a file.** Modelling a
+paste as `form.append('files', blob, '')` makes the request look **empty** to
+multer, and the test fails `400 VALIDATION_FAILED` for a reason that has
+nothing to do with pasting. Pasted fixtures use a plausible name; that the name
+is ignored is what `T-PASTE-005t` asserts.
+
+**(c) `FormData` strips path segments before the request is sent.** A traversal
+fixture named `../../etc/passwd.png` arrives as `passwd.png`, so a test written
+that way asserts the **client's** normalisation and would pass against a server
+that composed paths from the client name. `T-SEC-003b` keeps the marker in a
+percent-encoded form that survives the wire.
+
+**(d) An interrupted mutation run can leave a mutation in the file, and the
+next battery then measures the wrong baseline.** A prior run of this suite left
+the "strip inside the transcode branch" mutation in `ingest.ts`; the following
+battery reported two extra failures in **every** cell, which reads as noise
+rather than as a broken baseline. Every battery here now asserts the baseline
+is green **first**. Recorded because the failure mode is silent in the
+direction that matters: a mutation left in a file that no test covers would
+have been committed.

@@ -52,6 +52,7 @@ export type PixelGuardVerdict =
       readonly ok: true;
       readonly width: number;
       readonly height: number;
+      /** ⚠ MEGApixels — `width * height / 1e6`. See `PIXELS_PER_MEGAPIXEL`. */
       readonly megapixels: number;
     }
   | {
@@ -59,9 +60,22 @@ export type PixelGuardVerdict =
       readonly code: PixelGuardRejectionCode;
       readonly width?: number;
       readonly height?: number;
+      /** ⚠ MEGApixels, not a raw pixel count. */
       readonly megapixels?: number;
       readonly maxMegapixels: number;
     };
+
+/**
+ * ⚠ THE UNIT TRAP. `NEXTUP_MAX_DECODE_PIXELS` is a raw PIXEL count
+ * (`25000000`); `megapixels`/`maxMegapixels` in the verdict are MEGApixels
+ * (`25.0`), because that is what `specs/api.md` §6.12 puts in `details` and
+ * what §5.2.4's message renders to one decimal place. Assigning the budget
+ * straight into `maxMegapixels` compiles, satisfies every comparison, and
+ * renders the refusal as "25000000.0 MP" — a message the owner cannot act on.
+ * The comparison below is done in PIXELS; only the reported values are
+ * converted. `T-IMG-017k` pins the unit.
+ */
+export const PIXELS_PER_MEGAPIXEL = 1_000_000;
 
 /**
  * Decide accept or reject from header-declared dimensions alone.
@@ -80,14 +94,15 @@ export function evaluatePixelGuard(
   dims: { readonly width: number; readonly height: number } | null,
   maxDecodePixels: number,
 ): PixelGuardVerdict {
-  const maxMegapixels = maxDecodePixels;
+  const maxMegapixels = maxDecodePixels / PIXELS_PER_MEGAPIXEL;
 
   if (dims === null) {
     return { ok: false, code: 'UNSUPPORTED_IMAGE_FORMAT', maxMegapixels };
   }
 
   const { width, height } = dims;
-  const megapixels = width * height;
+  const pixels = width * height;
+  const megapixels = pixels / PIXELS_PER_MEGAPIXEL;
 
   if (
     width < MIN_IMAGE_AXIS_PX ||
@@ -105,7 +120,7 @@ export function evaluatePixelGuard(
     };
   }
 
-  if (megapixels > maxDecodePixels) {
+  if (pixels > maxDecodePixels) {
     return {
       ok: false,
       code: 'IMAGE_TOO_LARGE_TO_DECODE',

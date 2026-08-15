@@ -319,8 +319,30 @@ export const uploadBatchSchema = z
 
 // ── Images ─────────────────────────────────────────────────────────────────
 
-/** 10 MiB per image — `specs/api.md` §5. */
+/**
+ * 10 MiB per image — `specs/api.md` §5.
+ *
+ * ⚠ THIS IS A FIRST CHEAP FILTER, NOT THE MEMORY GUARD. HEIC's compression
+ * ratio varies wildly, so bytes do not predict raster size and a 6 MiB HEIC
+ * can decode to 48 MP. The memory guard is the PIXEL guard (`pixelGuard.ts`,
+ * REQ-079) and a byte ceiling is not a substitute for it.
+ */
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+
+/**
+ * 40 images per batch — `specs/api.md` §5.
+ *
+ * ⚠ Counted across ALL THREE ingest sources combined (`A45`): 30 pasted plus
+ * 11 uploaded is 41 and is refused. `ingestSource` is provenance and never
+ * buys an image its own allowance.
+ */
+export const MAX_IMAGES_PER_BATCH = 40;
+
+/** 60 MiB cumulative per batch, again across all ingest sources — §5. */
+export const MAX_BATCH_BYTES = 60 * 1024 * 1024;
+
+/** 10 file parts per multipart request — §5. */
+export const MAX_FILES_PER_REQUEST = 10;
 
 export const uploadedImageSchema = z
   .object({

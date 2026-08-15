@@ -26,6 +26,7 @@ import { attachOwnerScope, makeRequirePrincipal } from '../middleware/ownerScope
 import type { PrincipalReader } from '../auth/principal.js';
 import { AppError } from '../errors/AppError.js';
 import { registerBatchRoutes } from './batches.js';
+import { registerBatchImageRoutes } from './batchImages.js';
 import { registerMeRoutes } from './me.js';
 import { registerServiceStateRoutes } from './serviceState.js';
 import { registerSuppressionRoutes } from './suppressions.js';
@@ -86,6 +87,8 @@ export function createApiRouter(): Router {
   const apiRouter = Router();
   registerMeRoutes(apiRouter);
   registerBatchRoutes(apiRouter);
+  // §6.12 — the ONE ingest route for paste, drop and file selection alike.
+  registerBatchImageRoutes(apiRouter);
   registerTitleRoutes(apiRouter);
   registerSuppressionRoutes(apiRouter);
   registerServiceStateRoutes(apiRouter);

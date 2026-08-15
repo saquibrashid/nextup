@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 102 |
+| ⬜ todo | 101 |
 | 🚧 doing | 4 |
-| ✅ done | 48 |
+| ✅ done | 49 |
 | 🙋 owner | 7 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -29,7 +29,9 @@ Not done, and every task they depend on is done.
 | `TASK-038` | M | Epic F — The list itself (the value loop) |
 | `TASK-042` | XS | Epic F — The list itself (the value loop) |
 | `TASK-045` | S | Epic D — Matching & identity |
-| `TASK-050` | M | Epic B — Capture & import |
+| `TASK-051` | XS | Epic B — Capture & import |
+| `TASK-052` | S | Epic B — Capture & import |
+| `TASK-053` | S | Epic B — Capture & import |
 | `TASK-056` | S | Epic C — Extraction |
 | `TASK-102` | S | Epic H — History, removal ledger, suppression |
 | `TASK-106` | S | Epic H — History, removal ledger, suppression |
@@ -52,7 +54,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-93 tasks cannot start yet.
+90 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -62,9 +64,6 @@ Not done, and every task they depend on is done.
 | `TASK-043` | `TASK-045` |
 | `TASK-044` | `TASK-043` |
 | `TASK-046` | `TASK-026`, `TASK-038` |
-| `TASK-051` | `TASK-050` |
-| `TASK-052` | `TASK-050` |
-| `TASK-053` | `TASK-050` |
 | `TASK-057` | `TASK-056` |
 | `TASK-058` | `TASK-056`, `TASK-057`, `TASK-149`, `TASK-154` |
 | `TASK-059` | `TASK-058` |
@@ -138,15 +137,15 @@ Not done, and every task they depend on is done.
 | `TASK-150` | `TASK-149` |
 | `TASK-151` | `TASK-149`, `TASK-150` |
 | `TASK-152` | `TASK-053` |
-| `TASK-154` | `TASK-050`, `TASK-149` |
+| `TASK-154` | `TASK-149` |
 | `TASK-155` | `TASK-149`, `TASK-152` |
 | `TASK-156` | `TASK-007` |
 | `TASK-157` | `TASK-010`, `TASK-142`, `TASK-149` |
-| `TASK-159` | `TASK-053`, `TASK-050` |
+| `TASK-159` | `TASK-053` |
 | `TASK-160` | `TASK-053` |
 | `TASK-161` | `TASK-160` |
 | `TASK-162` | `TASK-053`, `TASK-159`, `TASK-160` |
-| `TASK-163` | `TASK-050`, `TASK-149`, `TASK-150`, `TASK-160`, `TASK-162` |
+| `TASK-163` | `TASK-149`, `TASK-150`, `TASK-160`, `TASK-162` |
 | `TASK-164` | `TASK-080`, `TASK-160`, `TASK-162` |
 | `TASK-166` | `TASK-039` |
 
@@ -189,6 +188,7 @@ Not done, and every task they depend on is done.
 | `TASK-047` | `prisma/migrations/0002_perf_indexes/` (the five §16.6 indexes) + `apps/api/test/integration/queryPlan.spec.ts` (12 cases) — `T-PERF-001` (a-i), `T-PERF-003` (a-c), plus `listRemovedListingPage` / `searchRemovedListings` / `escapeLikeTerm` in the repository. Plans are read from `sys.dm_exec_query_plan`, NOT `SET SHOWPLAN_XML ON`, because Prisma pools connections and a session-scoped plan setting captures the wrong statement. Two of my own errors caught by the harness: a plan-cache clear placed before its own measurement manufactured a phantom 296-vs-50 regression and sent one round of optimisation after nothing, and the resulting "sargable leading predicate" was measured at depth 15,000, found to make no difference, and removed. Search is deliberately NOT index-backed (no `pg_trgm` on Basic); `escapeLikeTerm` escapes its own escape character first. See `specs/testing.md` §23. | `T-PERF-001`, `T-PERF-003` |
 | `TASK-048` | `T-BATCH-010`, `T-BATCH-015` | `T-API-003`, `T-BATCH-010`, `T-BATCH-015` |
 | `TASK-049` | `T-UI-003a`…`j` green in `apps/web/test/uploadStep1.spec.tsx`; mutation-proven against a defaulted mode and against revealing the consequence on selection | `T-UI-003` |
+| `TASK-050` | `T-IMG-002`, `T-IMG-006`, `T-IMG-010`, `T-IMG-012`, `T-IMG-018`, `T-IMG-023`, `T-PASTE-003`, `T-PASTE-005`, `T-PASTE-006`, `T-PASTE-007`, `T-SEC-003`, `T-RET-014`; ~~`T-IMG-013`~~ | `T-IMG-002`, `T-IMG-006`, `T-IMG-010`, `T-IMG-012`, `T-PASTE-003`, `T-PASTE-005`, `T-PASTE-006`, `T-PASTE-007` |
 | `TASK-054` | `apps/api/src/services/batchLifecycle.ts` — the transition table, `submitBatch`, `discardBatch`, `assertBatchMutable`, plus `transitionUploadBatchStatus` (the conditional write). Routes `POST /api/batches/:batchId/submit` (§6.14) and `/discard` (§6.23). `T-BATCH-017a`…`h` (table totality, one-way-ness, discardable set), `T-BATCH-019a`…`d` (the submit endpoint's status codes), `T-BATCH-018a`…`c` (atomic transition — `018a` mutation-verified after its first form proved vacuous), `T-BATCH-013a`…`d` (immutability: the guard **and** the absence of a mutating route), `T-BATCH-006a`…`f` (a discarded batch writes nothing, retains images, releases the ceiling). ⚠ **The three close/reconciliation ids this row originally cited are NOT delivered here** — they belong to TASK-072 and no close endpoint exists yet; see `specs/testing.md` §24.3. Two spec gaps reported in §24.2. | `T-BATCH-006`, `T-BATCH-013`, `T-BATCH-017`, `T-BATCH-018`, `T-BATCH-019` |
 | `TASK-055` | `packages/domain/src/extraction/` (contract + degraded projections) + `apps/api/src/extraction/` (recordings, `StubExtractor`, factory). `T-STUB-001a`…`r`, incl. the three fault tokens and byte-identical output over three runs. | `T-STUB-001` |
 | `TASK-101` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` |
