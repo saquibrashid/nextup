@@ -36,7 +36,7 @@ import { AppError } from '../errors/AppError.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import { batchImageTotals, createUploadedImage, findUploadBatch } from '../repository/ownerData.js';
 import { ingestFiles, type IncomingFile, type IngestStages } from '../images/ingest.js';
-import { transcodeHeicToPng } from '../images/transcode.js';
+import { stripAllMetadata, transcodeHeicToPng } from '../images/transcode.js';
 import { azureImageBlobStore, type ImageBlobStore } from '../storage/blobStore.js';
 
 /**
@@ -56,32 +56,34 @@ const upload = multer({
 });
 
 /**
- * The metadata strip (TASK-150) is not built.
+ * The pipeline's two byte-level stages, wired.
  *
- * ⚠ THE STRIP DEFAULT IS A PASS-THROUGH AND THAT IS A KNOWN GAP, NOT A
- * DECISION. REQ-078 requires EXIF/XMP — including GPS — to be stripped from
- * every uploaded image, and until TASK-150 lands this route does not do it.
- * The seam exists so that landing TASK-150 is a one-line wiring change rather
- * than surgery on the pipeline.
+ * ⚠ THEY ARE INJECTED, NOT IMPORTED BY `ingest.ts`, so a test can prove the
+ * transcode branch is chosen by the SNIFFED format and never by `ingestSource`
+ * (`T-IMG-023`), and that the strip is called for EVERY image.
  *
- * The transcode is BUILT (TASK-149) and wired here. ⚠ It is injected, not
- * imported by `ingest.ts`, so a test can prove the branch is chosen by the
- * SNIFFED format and never by `ingestSource` (`T-IMG-023`).
- * ~~Superseded: "The transcode default THROWS rather than passing HEIC bytes
- * through."~~ — the stage exists now; nothing passes through.
+ * ~~Superseded (TASK-149, TASK-150 have landed): "The metadata strip (TASK-150)
+ * is not built… the strip default is a pass-through and that is a known gap.
+ * The transcode default THROWS rather than passing HEIC bytes through."~~ Both
+ * stages are real; nothing passes through and nothing is unbuilt.
  */
 export const DEFAULT_STAGES: IngestStages = {
   transcode(bytes, from) {
     return transcodeHeicToPng(bytes, from);
   },
-  stripMetadata(bytes) {
-    return Promise.resolve(bytes);
+  // ⚠ UNCONDITIONAL — every accepted image, every ingest source, PNG and JPEG
+  // included (REQ-078, `security.md` §4.2). WebKit strips EXIF on clipboard
+  // READ but not on file upload, so this is the only control covering the
+  // route a GPS-bearing camera-roll photo actually arrives on.
+  stripMetadata(bytes, format) {
+    return Promise.resolve(stripAllMetadata(bytes, format));
   },
 };
 
 /**
  * ⚠ Retained name — `UNBUILT_STAGES` is cited by `specs/testing.md` §28. It is
- * an alias, not a second implementation, and only the strip is still unbuilt.
+ * an alias of `DEFAULT_STAGES`, not a second implementation, and nothing about
+ * it is unbuilt any more.
  */
 export const UNBUILT_STAGES: IngestStages = DEFAULT_STAGES;
 

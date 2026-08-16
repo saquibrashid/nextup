@@ -37,7 +37,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { createApp } from '../../src/app.js';
 import { CLIENT_PRINCIPAL_HEADER } from '../../src/auth/principal.js';
 import { resetAllowListWarning } from '../../src/middleware/allowList.js';
-import { resetBlobStoreForTests } from '../../src/storage/blobStore.js';
+import { azureImageBlobStore, resetBlobStoreForTests } from '../../src/storage/blobStore.js';
 import { closeTestPrisma, resetDatabase, testPrisma } from './harness.js';
 
 const OID = 'http://schemas.microsoft.com/identity/claims/objectidentifier';
@@ -81,7 +81,12 @@ function pngBytes(width = 1179, height = 2556, pad = 0): Uint8Array {
  * broken sniffer.
  */
 function jpegBytes(width = 1200, height = 1600): Uint8Array {
-  const bytes = new Uint8Array(29);
+  // ⚠ 29 bytes was a header stub that stopped mid-SOF0. It was enough while
+  // nothing walked the file, but the REQ-078 metadata strip does walk it, and
+  // it fails closed on a stream it cannot account for -- correctly, since
+  // storing bytes whose contents were never established is the thing REQ-078
+  // exists to prevent. A truncated fixture is not a JPEG; complete it.
+  const bytes = new Uint8Array(53);
   const view = new DataView(bytes.buffer);
   bytes.set([0xff, 0xd8], 0); // SOI
   bytes.set([0xff, 0xe0], 2); // APP0
@@ -92,6 +97,10 @@ function jpegBytes(width = 1200, height = 1600): Uint8Array {
   bytes[24] = 8; // sample precision
   view.setUint16(25, height);
   view.setUint16(27, width);
+  bytes.set([0xff, 0xda], 39); // SOS
+  view.setUint16(41, 8);
+  bytes.set([0x12, 0x34], 49); // entropy-coded data
+  bytes.set([0xff, 0xd9], 51); // EOI
   return bytes;
 }
 
@@ -500,6 +509,110 @@ describe('T-RET-014 retention is stamped at ingest', () => {
     // (183). The two 30-ish constants are separate on purpose (`T-INV-008`).
     expect(days).toBeGreaterThan(29.9);
     expect(days).toBeLessThan(30.1);
+  });
+});
+
+/**
+ * ⚠ THE ONE PLACE THE STORED BYTES THEMSELVES ARE INSPECTED.
+ *
+ * Everything else asserts responses and rows. REQ-078 is a claim about what
+ * landed in the blob, so it is read back out of a REAL Azurite here. And it is
+ * asserted for an UPLOADED image: WebKit strips EXIF on clipboard read but not
+ * on file upload, so a pasted fixture would pass no matter what our code did.
+ */
+describe('T-SEC-032 the STORED blob carries no EXIF or GPS', () => {
+  /** SOI, JFIF APP0, an APP1 EXIF block with a GPS IFD, SOF0, SOS, EOI. */
+  function jpegWithGps(): Uint8Array {
+    const exif = [
+      0x45, 0x78, 0x69, 0x66, 0x00, 0x00, 0x4d, 0x4d, 0x00, 0x2a, 0x00, 0x00, 0x00, 0x08, 0x00,
+      0x01, 0x88, 0x25, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x1a, 0x00, 0x00,
+      0x00, 0x2f, 0x00, 0x00, 0x00, 0x01,
+    ];
+    const app1 = [0xff, 0xe1, ((exif.length + 2) >> 8) & 0xff, (exif.length + 2) & 0xff, ...exif];
+    return new Uint8Array([
+      0xff,
+      0xd8,
+      0xff,
+      0xe0,
+      0x00,
+      0x10,
+      0x4a,
+      0x46,
+      0x49,
+      0x46,
+      0x00,
+      0x01,
+      0x02,
+      0x00,
+      0x00,
+      0x01,
+      0x00,
+      0x01,
+      0x00,
+      0x00,
+      ...app1,
+      0xff,
+      0xc0,
+      0x00,
+      0x11,
+      0x08,
+      0x06,
+      0x40,
+      0x04,
+      0xb0,
+      0x03,
+      0x01,
+      0x11,
+      0x00,
+      0x02,
+      0x11,
+      0x01,
+      0x03,
+      0x11,
+      0x01,
+      0xff,
+      0xda,
+      0x00,
+      0x08,
+      0x01,
+      0x01,
+      0x00,
+      0x00,
+      0x3f,
+      0x00,
+      0x12,
+      0x34,
+      0x56,
+      0x78,
+      0xff,
+      0xd9,
+    ]);
+  }
+
+  const has = (bytes: Uint8Array, needle: readonly number[]): boolean =>
+    Buffer.from(bytes).includes(Buffer.from(needle));
+
+  it('T-SEC-032g: an UPLOADED JPEG lands stripped in the blob store', async () => {
+    const batchId = await openBatch();
+    const source = jpegWithGps();
+    // The non-vacuity guard: if the fixture ever stops carrying EXIF, the
+    // assertion below would pass against a strip that did nothing at all.
+    expect(has(source, [0x45, 0x78, 0x69, 0x66])).toBe(true);
+
+    const res = await postImages(batchId, [{ name: 'IMG_0042.jpg', bytes: source }], 'upload');
+    expect(res.status).toBe(201);
+
+    const row = await testPrisma().uploadedImage.findFirst({ where: { ownerId, batchId } });
+    const stored = await azureImageBlobStore.get(row?.blobPath ?? '');
+
+    expect(stored).not.toBeNull();
+    expect(has(stored ?? new Uint8Array(), [0x45, 0x78, 0x69, 0x66])).toBe(false);
+    expect(has(stored ?? new Uint8Array(), [0x00, 0x00, 0x00, 0x2f, 0x00, 0x00, 0x00, 0x01])).toBe(
+      false,
+    );
+    // The raster survived: SOF0 and the entropy-coded data are still there.
+    expect(has(stored ?? new Uint8Array(), [0xff, 0xc0])).toBe(true);
+    expect(has(stored ?? new Uint8Array(), [0x12, 0x34, 0x56, 0x78])).toBe(true);
   });
 });
 

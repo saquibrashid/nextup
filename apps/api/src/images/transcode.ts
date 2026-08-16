@@ -27,7 +27,7 @@ import convert from 'heic-convert';
 import { AppError } from '../errors/AppError.js';
 import { assertDecodable } from './decodeGuard.js';
 import { readDimensions } from './readDimensions.js';
-import type { UploadFormat } from '@nextup/domain';
+import type { ImageFormat, UploadFormat } from '@nextup/domain';
 
 /**
  * Errors raised when a WASM heap cannot grow. This is the COMMON out-of-memory
@@ -166,4 +166,123 @@ export async function transcodeHeicToPng(
   }
 
   return { bytes: png, width: actual.width, height: actual.height };
+}
+
+/**
+ * Strip EXIF, XMP, GPS and device model from an accepted image (TASK-150,
+ * REQ-078, `specs/security.md` §4.2).
+ *
+ * ⚠ THIS RUNS FOR EVERY ACCEPTED IMAGE FROM EVERY INGEST SOURCE, and it is
+ * OUTSIDE the transcode condition. WebKit strips EXIF when a page reads an
+ * image from the CLIPBOARD but does NOT strip it on FILE UPLOAD, so this is
+ * the only control removing GPS from a camera-roll photo — the route that
+ * actually needs it. Deleting it because "pasted screenshots have no EXIF
+ * anyway" removes the privacy control from the wrong route (`api.md` §5.1a).
+ *
+ * ⚠ STRUCTURAL REMOVAL, NOT A RE-ENCODE. Chunks and segments are dropped and
+ * the pixel data is copied through untouched. Re-encoding a JPEG to launder
+ * its metadata would be a LOSSY operation on the tile captions the extractor
+ * reads, and NFR-012a makes that non-compliance rather than a shortcut.
+ */
+export function stripAllMetadata(bytes: Uint8Array, format: ImageFormat): Uint8Array {
+  return format === 'png' ? stripPngMetadata(bytes) : stripJpegMetadata(bytes);
+}
+
+/**
+ * PNG ancillary chunks that can carry personal data.
+ *
+ * `eXIf` is a verbatim EXIF payload — GPS included. `tEXt`/`zTXt`/`iTXt` carry
+ * arbitrary text and are where XMP lives. `tIME` is a modification timestamp:
+ * not identifying on its own, but it is metadata about the owner's activity
+ * and nothing renders it.
+ */
+const PNG_METADATA_CHUNKS: ReadonlySet<string> = new Set(['eXIf', 'tEXt', 'zTXt', 'iTXt', 'tIME']);
+
+const PNG_SIGNATURE_BYTES = 8;
+const PNG_CHUNK_OVERHEAD = 12; // length (4) + type (4) + CRC (4)
+
+function stripPngMetadata(bytes: Uint8Array): Uint8Array {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const kept: Uint8Array[] = [bytes.subarray(0, PNG_SIGNATURE_BYTES)];
+  let offset = PNG_SIGNATURE_BYTES;
+
+  while (offset + 8 <= bytes.byteLength) {
+    const length = view.getUint32(offset);
+    const end = offset + PNG_CHUNK_OVERHEAD + length;
+    if (length > bytes.byteLength || end > bytes.byteLength) {
+      // Truncated. ⚠ Fail rather than store the bytes unexamined: the whole
+      // point of this step is that we KNOW what reached the blob.
+      throw decodeFailed('the PNG chunk stream is truncated');
+    }
+    const type = String.fromCharCode(
+      bytes[offset + 4] ?? 0,
+      bytes[offset + 5] ?? 0,
+      bytes[offset + 6] ?? 0,
+      bytes[offset + 7] ?? 0,
+    );
+    if (!PNG_METADATA_CHUNKS.has(type)) {
+      // Whole chunks are copied, so every surviving CRC stays valid — nothing
+      // is recomputed and nothing can be recomputed wrongly.
+      kept.push(bytes.subarray(offset, end));
+    }
+    offset = end;
+    if (type === 'IEND') {
+      break;
+    }
+  }
+
+  return concat(kept);
+}
+
+/**
+ * JPEG application segments that can carry personal data.
+ *
+ * `APP1` is EXIF **and** XMP. `APP13` is the Photoshop IRB (IPTC). `APP12` is
+ * a Ducky/Picture-Info block some cameras write. `COM` is a free-text comment.
+ *
+ * ⚠ `APP0` (JFIF) and `APP2` (ICC colour profile) are KEPT ON PURPOSE. Neither
+ * identifies the owner, and discarding the ICC profile changes how the image
+ * renders — a quality regression NFR-012a forbids, dressed up as privacy.
+ */
+const JPEG_METADATA_MARKERS: ReadonlySet<number> = new Set([0xe1, 0xec, 0xed, 0xfe]);
+
+function stripJpegMetadata(bytes: Uint8Array): Uint8Array {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const kept: Uint8Array[] = [bytes.subarray(0, 2)]; // SOI
+  let offset = 2;
+
+  while (offset + 4 <= bytes.byteLength) {
+    if (bytes[offset] !== 0xff) {
+      throw decodeFailed('the JPEG marker stream is malformed');
+    }
+    const marker = bytes[offset + 1] ?? 0;
+    if (marker === 0xda) {
+      // Start of scan: entropy-coded data runs to the end and is copied
+      // verbatim. Nothing after here is a metadata segment.
+      kept.push(bytes.subarray(offset));
+      return concat(kept);
+    }
+    const length = view.getUint16(offset + 2);
+    const end = offset + 2 + length;
+    if (length < 2 || end > bytes.byteLength) {
+      throw decodeFailed('the JPEG segment stream is truncated');
+    }
+    if (!JPEG_METADATA_MARKERS.has(marker)) {
+      kept.push(bytes.subarray(offset, end));
+    }
+    offset = end;
+  }
+
+  return concat(kept);
+}
+
+function concat(parts: readonly Uint8Array[]): Uint8Array {
+  const total = parts.reduce((sum, part) => sum + part.byteLength, 0);
+  const out = new Uint8Array(total);
+  let at = 0;
+  for (const part of parts) {
+    out.set(part, at);
+    at += part.byteLength;
+  }
+  return out;
 }

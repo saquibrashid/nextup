@@ -2831,11 +2831,16 @@ storing an un-transcoded HEIC would violate the `format in {png,jpeg}`
 invariant."*~~ The stage is real now; `UNBUILT_STAGES` survives as an **alias**
 of `DEFAULT_STAGES` so this section's citation still resolves.
 
-**REQ-078 IS NOT DISCHARGED.** `DEFAULT_STAGES.stripMetadata` is a
+**REQ-078 IS NOW DISCHARGED (TASK-150).** `DEFAULT_STAGES.stripMetadata` calls
+`stripAllMetadata()`; `T-SEC-032a`--`g` and `T-SEC-033a`--`d` assert it, and
+`T-SEC-032g` reads the **stored blob back out of Azurite** rather than trusting
+the response. See §30.
+
+~~*Superseded (TASK-150 has landed): "`DEFAULT_STAGES.stripMetadata` is a
 **pass-through**, so EXIF/XMP -- including GPS -- is currently NOT stripped.
-The seam exists and is asserted to be called for every image
-(`T-IMG-023b`), so **TASK-150** is a one-line wiring change; until it lands
-this is a live gap, recorded here rather than only in a code comment.
+The seam exists and is asserted to be called for every image (`T-IMG-023b`), so
+**TASK-150** is a one-line wiring change; until it lands this is a live gap,
+recorded here rather than only in a code comment."*~~
 
 **`IMAGE_DECODE_OOM` is mapped but was UNREACHABLE at TASK-050.**
 `statusForRejection()` maps it to **503, not 500** -- a capacity condition with
@@ -2938,10 +2943,12 @@ the container and raises no catchable error, so no in-process assertion can
 observe it (ADR-0008 R2.4). The pre-decode pixel guard exists precisely because
 that path cannot be handled; `T-IMG-016a` is its assertion.
 
-**REQ-078 is still NOT discharged** -- see §28.2. The transcode drops metadata
-incidentally (it re-encodes from a raw raster), and **incidental is exactly what
-TASK-150 forbids relying on**. A PNG or JPEG that skips the transcode still
-carries its EXIF today.
+~~*Superseded (TASK-150 has landed): "**REQ-078 is still NOT discharged** -- see
+§28.2. A PNG or JPEG that skips the transcode still carries its EXIF today."*~~
+The transcode's incidental metadata loss (it re-encodes from a raw raster) is
+**still not** what discharges REQ-078 -- incidental is exactly what TASK-150
+forbids relying on, and the explicit strip in §30 runs for every image from
+every source, transcoded or not.
 
 ### 29.3 Findings
 
@@ -2975,3 +2982,68 @@ invariant 15 of the build instructions. The catch is scoped to `AppError`
 deliberately: an Azure outage or a `TypeError` is not a verdict about one
 image, and reporting it as one tells the owner to re-export a file that is
 perfectly fine. `T-IMG-023k` and `T-IMG-023l` are the pair.
+
+## 30. The EXIF/XMP/GPS metadata strip (TASK-150)
+
+`stripAllMetadata()` in `apps/api/src/images/transcode.ts`, wired into
+`DEFAULT_STAGES.stripMetadata`. REQ-078, `specs/security.md` §4.2.
+
+### 30.1 What it claims
+
+`T-SEC-032a`--`f` and `T-SEC-033a`--`d` (`apps/api/test/unit/stripMetadata.spec.ts`)
+plus `T-SEC-032g` (`apps/api/test/integration/ingestSources.spec.ts`):
+
+- **JPEG**: `APP1` (EXIF **and** XMP), `APP12`, `APP13` (IPTC) and `COM` are
+  removed. `APP0` (JFIF) and `APP2` (ICC) are **kept** -- the ICC profile
+  decides how the image renders and identifies nobody, so dropping it is a
+  quality regression wearing a privacy badge (NFR-012a).
+- **PNG**: `eXIf`, `tEXt`, `zTXt`, `iTXt` and `tIME` are removed.
+- **The raster is untouched.** Removal is **structural** -- whole segments and
+  whole chunks are copied or dropped, never re-encoded -- so surviving CRCs
+  stay valid and no pixel changes. A JPEG re-encode to launder metadata would
+  be lossy, which NFR-012a forbids.
+- **It fails closed.** A stream that cannot be walked raises
+  `IMAGE_DECODE_FAILED` rather than storing bytes whose contents were never
+  established.
+- **It runs for every image from every source**, outside the HEIC condition
+  (`T-IMG-023b`), so a PNG that skips the transcode is still stripped.
+- `T-SEC-032e` is a **non-vacuity guard**: it asserts the fixtures really do
+  carry `Exif\0\0` and a GPS payload to begin with. Without it every "absent"
+  assertion would pass against a strip that did nothing.
+- `T-SEC-032g` uploads a GPS-bearing JPEG over **HTTP** and re-reads the
+  **stored blob from Azurite**, so the claim is about what landed in the store,
+  not about what a unit-level seam returned.
+
+### 30.2 What it does NOT claim
+
+**`T-SEC-033`'s spec-mandated leg -- a REAL HEIC upload carrying GPS -- is not
+asserted here, and belongs to TASK-151.** Nothing in this repository can
+generate HEIC bytes: `T-DEP-002` forbids a HEIC **encoder** anywhere in the
+tree, and prebuilt `sharp` has no HEIF encode. A real HEIC decode therefore
+needs a **committed fixture**, which is TASK-151's job. `T-SEC-033a`--`d`
+assert the fail-closed behaviour and the wiring instead. This is a constraint,
+not an omission -- but it is a genuine divergence from `specs/security.md` §4.2
+and is recorded as one.
+
+**The paste path's free stripping is NOT coverage.** WebKit strips EXIF on
+`navigator.clipboard.read()` but **not** on file upload. A test asserting "no
+EXIF in the stored blob" against a **pasted** image passes whatever our code
+does. `T-SEC-032g` deliberately uses the **upload** path (invariant 18).
+
+**Video/audio containers, and PNG chunk types not listed above, are out of
+scope.** Only `png` and `jpeg` reach this stage -- the transcode has already
+converted everything else.
+
+### 30.3 Findings
+
+**(a) The integration JPEG fixture was a 29-byte header stub that stopped
+mid-`SOF0`.** It was sufficient while nothing walked the file; the strip does
+walk it, and correctly refused it as truncated, which surfaced as a `415` on a
+test expecting `201`. The **fixture** was wrong, not the refusal -- storing
+bytes whose structure was never established is the thing REQ-078 exists to
+prevent. `jpegBytes()` now emits a complete `SOI/APP0/SOF0/SOS/EOI` stream.
+
+**(b) The strip must not recompute PNG CRCs.** Copying whole chunks verbatim
+keeps every surviving CRC correct by construction. A filter that rebuilt
+chunks would have to recompute them, and a wrong CRC turns a privacy control
+into a corruption bug that only some decoders notice.
