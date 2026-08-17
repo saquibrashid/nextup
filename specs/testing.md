@@ -1626,6 +1626,7 @@ check what "done" means.
 | **`T-INFRA-004`** | S | The Bicep 30-day blob-lifecycle purge rule **exists and is correctly shaped** (§3.4, `NFR-019`). Pairs with `T-INFRA-002`, which asserts soft delete and versioning are OFF: a correct lifecycle rule plus soft delete still retains the owner's screenshots past 30 days, so neither test is sufficient alone. | §3.4 prose |
 | **`T-INFRA-008` (new, TASK-027)** | S | The Bicep **Easy Auth `authConfigs` resource exists and is shaped CLOSED**: named `current`, `platform.enabled = true`, `unauthenticatedClientAction = RedirectToLoginPage`, the Entra provider enabled against a `login.microsoftonline.com` issuer, the client secret held only as a **secret reference** whose name matches a declared `secrets` entry, and **no `excludedPaths` of any kind**. Same relationship to `T-AUTH-001/002/003` that `T-INFRA-004` has to the purge behaviour: those three are level `E` and need a deployment, so without this cell TASK-027 has **no CI-verifiable definition of done at all**. Every failure it catches deploys successfully and looks normal to the owner — `excludedPaths: ['/api/*']` in particular exposes the whole list at the platform edge while `T-SEC-010`/`T-SEC-014` and every other allow-list test still pass, because application code never runs. | ADR-0002, `specs/security.md` §2.1 |
 | **`T-INFRA-009` (new, TASK-142)** | S | The **subscription budget and its two alert thresholds** exist in Bicep and **only ever send email**: exactly one `Microsoft.Consumption/budgets`, category `Cost`, `timeGrain Monthly`, exactly two notifications at **100 %** (informational) and **150 %** (action required), both enabled, both `Actual`, both with a recipient — and **no `actionGroups`, `contactGroups`, `contactRoles`, `webhooks` or `actions` on either**. The last clause is the one that matters: an action group can invoke an automation runbook, so wiring one to a billing threshold turns "you have spent $20" into "stop the container app" — it deploys cleanly, it looks responsible, and it would be added by someone being helpful. TASK-142 forbids it in terms ("no auto-shutdown or any automated remediation") and `REQ-028` forbids automatic deletion. Thresholds are **percentages of one amount** so the 1.0× and 1.5× figures cannot drift apart; a second budget would let them. | TASK-142, `REQ-028` |
+| **`T-SEC-034` (new, TASK-142)** | S | The **production audit gate suppresses by named exception, never by blanket**. `tools/check-audit.mjs` collects only **high and critical** advisories, ignores bare-string `via` edges (they are dependency paths, not advisories — inventing an id from one makes the gate permanently and unfixably red), fails on **any advisory not explicitly listed**, and — the half that matters — fails on **any listed exception that is no longer reported**. An allow-list that only suppresses is a permanent hole that outlives its reason; this one deletes itself the moment upstream ships a fix. `d` requires every entry to carry an id, a date and a justification over 200 characters, because the point of the list is the reasoning, not the silence. `f` asserts CI actually **calls** the gate and has not reverted to a bare `npm audit --omit=dev`, and `g` that the non-blocking full-tree report survives so dev-tooling findings stay visible. ⚠ Accepted exception `GHSA-ggr8-5vv4-36mx`: npm reports its "fix" as `prisma@6.12.0`, which is a **downgrade** from the installed `6.19.3` presented in the same field as an upgrade. | TASK-142, `NFR-004` |
 | **`T-SMOKE-001`** | E | An authenticated request against the freshly deployed **staging** revision succeeds. The `T-SMOKE-*` family was defined only as a **glob** in §11.2, which no id-level gate can resolve — `T-SMOKE-003` was already enumerated as a real cell, so the family was half-addressable and the missing half looked like a phantom. | §11.2 glob |
 | **`T-UI-004`** | C | `ImageDropzone` names **PNG, JPEG and HEIC** in its accept list and its copy (`specs/ui.md`). ⚠ Load-bearing per product invariant 11: without HEIC in `accept`, an iOS file picker greys out the owner's own camera photos and the failure looks like a broken phone, not a missing format. Deliberately distinct from `T-UI-014`, which TASK-162 owns. | `specs/ui.md` |
 | **`T-UX-041`** | C | The empty dropzone shows **all three** ingest affordances — paste, file selection and drag-and-drop (`specs/ux-states.md` §4.3). Product invariant 16: paste was added, not swapped in, and a tidied-up single-affordance dropzone silently removes a working capture path. | `specs/ux-states.md` §4.3 |
@@ -3135,3 +3136,47 @@ template first reported `monthlyTotalUsd * 3 / 2` as **$19**, where the
 threshold Azure evaluates is **$19.50**. Bicep integer maths truncated it. The
 output now reports the base amount plus percentages, because a number that is
 50 cents wrong is exactly the number a reader would quote.
+
+### 31.5 The audit gate (`T-SEC-034`)
+
+A new advisory landed on `main` between two green commits and turned CI red
+without anything in the repository changing: **GHSA-ggr8-5vv4-36mx**, stack
+exhaustion in `deepmerge-ts`, reached as
+`@prisma/client -> prisma -> @prisma/config -> deepmerge-ts`.
+
+It is a **real** high-severity finding in the production tree, and our
+classification was already correct -- `@prisma/client` is the runtime
+dependency and `prisma` is a devDependency; `prisma` arrives in the production
+tree because `@prisma/client` itself depends on it. There was nothing to
+reclassify.
+
+It is also **unfixable**: `deepmerge-ts` has no patched version (latest 7.1.5,
+the advisory covers `*`). That left three bad options -- block every commit
+indefinitely, weaken `--audit-level` and lose the whole class of finding, or
+take the suggested fix.
+
+**The suggested fix is a trap.** npm reports
+`fixAvailable: { name: 'prisma', version: '6.12.0' }` against an installed
+**6.19.3**. It is a **downgrade**, reported in the same field, with the same
+wording, as an upgrade. `npm audit fix --force` would have moved the datastore
+layer seven minor versions backwards to silence a warning.
+
+So the blocking step now runs `tools/check-audit.mjs`, which allow-lists
+**individual advisory ids** with a written justification and fails on anything
+else -- and **fails on a listed exception that is no longer reported**. That
+second rule is the whole design: a suppression nobody removes is a permanent
+hole, so this one forces its own deletion once upstream publishes a fix rather
+than quietly becoming policy.
+
+Reachability, recorded because it is what makes the exception acceptable: the
+vulnerable code is the Prisma **CLI config loader**, running at build and
+migrate time against our own committed config. `@prisma/client` does not load
+`@prisma/config` at runtime, and no owner-supplied input -- screenshots
+included -- reaches a config merge. Exploitation needs attacker-controlled
+cyclic input, which does not exist on any path in this product.
+
+**Finding: a shebang makes a `.mjs` gate untestable.** `#!/usr/bin/env node`
+passes `node --check` but makes Vite's parser throw `SyntaxError: Invalid or
+unexpected token` **with no file or line**, at import, reported against the
+*spec* file. The gate was correct; only the first line was wrong. It is
+removed, and no other `tools/*.mjs` gate carries one.

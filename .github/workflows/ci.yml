@@ -124,8 +124,19 @@ jobs:
       # The production tree reported zero vulnerabilities throughout.
       # REVISIT when the registry mirrors 3.3.18: restore the unscoped
       # command and delete the reporting step below.
-      - name: npm audit (production dependencies — blocking)
-        run: npm audit --omit=dev --audit-level=high
+      #
+      # ⚠ Scoped again on 2026-08-17 for GHSA-ggr8-5vv4-36mx (`deepmerge-ts`,
+      # high), reachable only as `@prisma/client → prisma → @prisma/config`,
+      # i.e. the Prisma CLI config loader. No patched version exists, and
+      # npm's suggested fix is a DOWNGRADE of prisma 6.19.3 → 6.12.0 reported
+      # in the same field as an upgrade. Rather than weaken --audit-level or
+      # block indefinitely on an unfixable finding, the gate now runs through
+      # tools/check-audit.mjs, which allow-lists individual advisories with a
+      # written justification AND fails on an allow-list entry that is no
+      # longer reported — so the exception deletes itself once upstream ships
+      # a fix, instead of quietly becoming policy.
+      - name: npm audit (production dependencies — blocking, T-SEC-034)
+        run: npm run check:audit
       # NON-BLOCKING, and deliberately not deleted: a dev-tooling compromise
       # is a real supply-chain path (it runs on every developer machine and
       # in CI with repository credentials), so the findings must stay visible
