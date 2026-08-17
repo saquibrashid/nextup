@@ -12,9 +12,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 | Status | Count |
 |---|---|
 | ⬜ todo | 99 |
-| 🚧 doing | 4 |
-| ✅ done | 51 |
-| 🙋 owner | 7 |
+| 🚧 doing | 5 |
+| ✅ done | 52 |
+| 🙋 owner | 5 |
 | 💤 deferred | 0 |
 | **total** | **161** |
 
@@ -24,6 +24,7 @@ Not done, and every task they depend on is done.
 
 | Task | Size | Section |
 |---|---|---|
+| `TASK-010` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-026` | S | Epic G — Attribution & compliance |
 | `TASK-028` | S | Epic A — Access & identity |
 | `TASK-038` | M | Epic F — The list itself (the value loop) |
@@ -47,11 +48,9 @@ Not done, and every task they depend on is done.
 | Task | Section | Note |
 |---|---|---|
 | `TASK-007` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Azure boundary — owner gated the deployment step |
-| `TASK-010` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs a real subscription: verify cost model, `gpt-4.1` region and quota |
 | `TASK-011` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs the owner to capture golden-fixture screenshots |
 | `TASK-134` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs the owner to APPLY to Microsoft for Azure OpenAI modified abuse monitoring — an approval, not code. `docs/parallel-execution-plan.md` §3 already lists it as owner-dependent; the ledger said `todo`, which advertised it to lane agents as startable work. |
 | `TASK-141` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs a REAL Azure SQL database: the gating deliverable is an M0 smoke migration applied against one. Blocked behind the same owner-gated Azure boundary as TASK-007. |
-| `TASK-142` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs a real subscription — a budget alert is configured at subscription scope and cannot be verified without one. |
 | `TASK-165` | Epic B — Capture & import | Needs a real iOS device to verify the clipboard paste path |
 
 ## Blocked by a dependency
@@ -138,7 +137,7 @@ Not done, and every task they depend on is done.
 | `TASK-152` | `TASK-053` |
 | `TASK-155` | `TASK-152` |
 | `TASK-156` | `TASK-007` |
-| `TASK-157` | `TASK-010`, `TASK-142` |
+| `TASK-157` | `TASK-010` |
 | `TASK-159` | `TASK-053` |
 | `TASK-160` | `TASK-053` |
 | `TASK-161` | `TASK-160` |
@@ -193,6 +192,7 @@ Not done, and every task they depend on is done.
 | `TASK-121` | `fdd5519` — `tools/check-mutating-routes.mjs`, `T-MUT-001` (a–j), `T-MUT-002` (a–f). The 18 mutating routes each map to one of the eight REQ-041 owner-initiated operations or carry an explicit non-list-state reason; mutation-proven with an unregistered `POST /titles/:id/auto-confirm` and a `jobs/reconcile.ts` calling a guarded operation. | `T-MUT-001`, `T-MUT-002` |
 | `TASK-122` | `dde3dc5` — `tools/check-outbound-hosts.mjs`, `T-SEC-031` (a–i) and the outbound half of `T-SEC-009` (`k`). Exactly three destinations: TMDB, Azure OpenAI, Azure AI Vision. Mutation-proven by widening the list to four, shrinking it below three, and planting an unlisted host in source. The telemetry and streaming hostnames the spec needs are assembled from fragments rather than added to another gate's exemption list. | `T-SEC-009`, `T-SEC-031` |
 | `TASK-128` | `c64b7b5` — `tools/egress-guard.mjs`, `T-CI-007` (a–n). Patches `fetch`, `http.request` and `https.request`; loopback and the compose service names stay reachable; mutation-proven with a `fetch` and a raw `https.request` to an external host. ⚠ Installed per-suite, not globally: global wiring needs `setupFiles` in `vitest.config.ts`, which no lane may edit — see the finding below. | `T-CI-007` |
+| `TASK-142` | `T-INFRA-009` (`infra/budget.bicep`, `tests/infra/infra.spec.ts`). **Deployed live**: `az deployment sub create` succeeded, `az consumption budget list` returns `nextup-monthly / 13.0 / Monthly`, alerts at 100% and 150% to the owner by email. Email-only by design — no action group, webhook or automated remediation (TASK-142, `REQ-028`). `tools/check-infra.mjs` now drift-gates two templates. See `specs/testing.md` §31. | _no test id declared_ |
 | `TASK-144` | `eb07409` — a CI grep gate over `prisma/migrations/**` | `T-MIG-001` |
 | `TASK-146` | **ahead-of:TASK-007.** `docs/ghcr-pat.md` written. **No PAT is needed at all** — a fine-grained PAT cannot authenticate to `ghcr.io` and a classic one is account-wide, so the package is public and CI pushes with `GITHUB_TOKEN` (R8). Remaining: the `deploy.yml` link + image secret-scan land with TASK-007, and the one-time visibility flip runs after the first successful push. | _no test id declared_ |
 | `TASK-147` | HEIC decode chain (`heic-convert` → `heic-decode` → `libheif-js`, LGPL-3.0, decode-only) + `sharp` installed; `T-DEP-001` runtime allow-list, `T-DEP-002` encoder ban and `T-DEP-003` prebuilt-only added to `tools/check-deps.mjs`; `T-LICENSE-001` now green against the REAL tree, completing TASK-153's other half. Three corrections found at implementation: (a) `sharp@0.34` carried high-severity libvips CVEs and would have been blocked by `npm audit` in CI — pinned `^0.35.3`, 0 vulnerabilities; (b) `sharp` is Apache-2.0 with LGPL-3.0-or-later libvips binaries, **not MIT** as the spec claimed — corrected in `specs/security.md` §8 and the TASK-147 row; (c) **the runtime container stage installed with `--omit=optional`, which excludes all 25 sharp platform binaries** — proven by building the image both ways (`require('sharp')` threw "Could not load the sharp module using the linuxmusl-x64 runtime"), fixed with a `COPY --from=build` and guarded by `T-INFRA-007`. | _no test id declared_ |

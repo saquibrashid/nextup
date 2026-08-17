@@ -1,0 +1,83 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2018-05-01/subscriptionDeploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "nextup cost guardrail — one budget, two notification thresholds, zero automation."
+  },
+  "parameters": {
+    "monthlyTotalUsd": {
+      "type": "int",
+      "defaultValue": 13,
+      "minValue": 1,
+      "metadata": {
+        "description": "The published monthly total from docs/architecture.md §Cost summary, in USD.\n\nThis is the TOP of the as-designed Variant A band ($11-13), not the midpoint:\na budget anchored to the optimistic end of a band would alert on ordinary\nvariation, and an alert that cries wolf is worse than no alert because it\ntrains the owner to ignore it.\n"
+      }
+    },
+    "ownerEmail": {
+      "type": "string",
+      "metadata": {
+        "description": "Where both notifications are emailed. No default: a budget nobody is told about is not a control."
+      }
+    },
+    "budgetStartDate": {
+      "type": "string",
+      "defaultValue": "[utcNow('yyyy-MM-01')]",
+      "metadata": {
+        "description": "Budget anchor. Must be the first day of a month.\n\nDefaults to the first of the current month via utcNow(), which is only legal\nas a parameter default -- do not move this expression into the resource body.\n"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Consumption/budgets",
+      "apiVersion": "2023-11-01",
+      "name": "nextup-monthly",
+      "properties": {
+        "category": "Cost",
+        "timeGrain": "Monthly",
+        "amount": "[parameters('monthlyTotalUsd')]",
+        "timePeriod": {
+          "startDate": "[parameters('budgetStartDate')]"
+        },
+        "notifications": {
+          "informational": {
+            "enabled": true,
+            "operator": "GreaterThan",
+            "threshold": 100,
+            "thresholdType": "Actual",
+            "contactEmails": ["[parameters('ownerEmail')]"],
+            "locale": "en-us"
+          },
+          "actionRequired": {
+            "enabled": true,
+            "operator": "GreaterThan",
+            "threshold": 150,
+            "thresholdType": "Actual",
+            "contactEmails": ["[parameters('ownerEmail')]"],
+            "locale": "en-us"
+          }
+        }
+      }
+    }
+  ],
+  "outputs": {
+    "budgetId": {
+      "type": "string",
+      "metadata": {
+        "description": "The budget resource id, so a deployment can be verified without a portal visit."
+      },
+      "value": "[subscriptionResourceId('Microsoft.Consumption/budgets', 'nextup-monthly')]"
+    },
+    "thresholds": {
+      "type": "object",
+      "metadata": {
+        "description": "What the two thresholds mean, for the deployment log.\n\n⚠ Reported as the base amount plus PERCENTAGES, not as computed dollar\nfigures. Bicep integer division truncates, so `13 * 3 / 2` renders as 19 when\nthe threshold Azure actually evaluates is $19.50 — an output that understates\nthe real alert point by 50 cents is worse than no output, because it is the\nnumber a reader would quote.\n"
+      },
+      "value": {
+        "baseAmountUsd": "[parameters('monthlyTotalUsd')]",
+        "informationalPercent": 100,
+        "actionRequiredPercent": 150
+      }
+    }
+  }
+}

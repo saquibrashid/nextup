@@ -765,3 +765,37 @@ Checked explicitly, and rejected again:
 
 **Cost unchanged: ~$0.50–$0.70/month.** `RSK-028` and `TASK-134`
 (abuse-monitoring exemption) are unaffected.
+
+---
+
+## Addendum — 2026-08-17: live pricing verification (TASK-010)
+
+Every figure below was read from the **Azure Retail Prices API**
+(`https://prices.azure.com/api/retail/prices`, `api-version=2023-01-01-preview`)
+for **`eastus2`** on **2026-08-17**, and availability from `az cognitiveservices`
+/ `az sql db list-editions` against the live subscription. This supersedes the
+"recalled from model knowledge, UNVERIFIED" provenance note that stood before.
+### Extraction — verified
+
+| Item | Published | Verified `eastus2`, 2026-08-17 |
+|---|---|---|
+| `gpt-4.1` availability | assumed | ✅ `gpt-4.1` **2025-04-14**, SKUs `Standard` **and** `GlobalStandard` |
+| `gpt-4.1` input tokens | — | **$0.0022 / 1K** regional (`$0.0020` global) |
+| `gpt-4.1` output tokens | — | **$0.0088 / 1K** regional (`$0.0080` global) |
+| Cost per screenshot | ~$0.0094 | **~$0.0070** (≈2,000 in + 300 out) |
+| ~50 images/month | ~$0.47 | **~$0.35** |
+| Azure AI Vision Read **F0** | free, must exist | ✅ `F0` offered for kind `ComputerVision` in `eastus2` |
+
+**Extraction is CHEAPER than published, and `NFR-012a` is unaffected** — no
+quality lever was touched to get there. `gpt-4.1` remains the primary reader on
+`Standard` PAYG; nothing here justifies a downgrade.
+
+### ⚠ Trap for whoever re-runs this
+
+**Azure OpenAI no longer bills under `serviceName eq 'Azure OpenAI'`.** The
+retail API now files these meters under **`serviceName eq 'Foundry Models'`**
+with `productName eq 'Azure OpenAI'`. A verification query written against the
+old service name returns **zero rows**, which reads exactly like "the model is
+not available in this region" rather than "your filter is stale". That
+misreading would push a future reviewer toward an unnecessary region change or
+a model downgrade.

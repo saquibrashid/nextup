@@ -1184,12 +1184,37 @@ is likewise gone.)*
 > as-designed), and Variant B (~$0.65 full revert) is retained. A future
 > reader can still see what each dollar bought and what was traded away.
 
-⚠ **Every figure is an Azure list price recalled from model knowledge
-and is UNVERIFIED.** Web retrieval is unavailable to this role, so no
-price here was checked against a live pricing page. **`TASK-010` is
-extended** to re-verify all of them — including **Azure SQL Basic** and
-the **serverless staging floor**. Treat them as ±30 % until `TASK-010`
-lands.
+**✅ VERIFIED 2026-08-17 (TASK-010) — the total holds, but two line items
+did not.** Every figure below has now been checked against the **live Azure
+Retail Prices API** for `eastus2`. The verified total is **$11.77/month**,
+inside the published $11–13 band, so no `OQ-026` escalation is triggered.
+
+⚠ **The total is right partly by CANCELLATION, not because each line was
+right.** Compute came in **under** the estimate and absorbed two overages:
+
+| Line | Published | Verified (2026-08-17, `eastus2`) | Verdict |
+|---|---|---|---|
+| ACA 0.25 vCPU / 0.5 GiB always-warm | ~$5–8 | **$4.30** | **under** — free grant confirmed to cover idle |
+| Azure SQL Basic, prod | ~$5 | **$4.90** ($0.161/day) | ✅ Basic still exists |
+| Alert rules (2 metric + 1 log-search @5 min) | ~$0.60–1.00 | **$1.70** | ⚠ **over by 70–183 %** |
+| Compute up-size remedy, delta | **+~$4** | **+$5.92** | ⚠ **understated by 48 %** — corrected below and in the runbook |
+| `gpt-4.1` vision, ~50 images | ~$0.47 | **~$0.35** | under |
+| Blob Hot LRS <1 GB | ~$0.02 | **$0.02** | ✅ |
+| Log Analytics (5 GB free grant) | $0.00 | **$0.00** | ✅ |
+| ghcr.io | $0.00 | **$0.00** | ✅ public package |
+
+~~*Superseded 2026-08-17 by the verification above: "**Every figure is an
+Azure list price recalled from model knowledge and is UNVERIFIED.** Web
+retrieval is unavailable to this role, so no price here was checked against a
+live pricing page. **`TASK-010` is extended** to re-verify all of them —
+including **Azure SQL Basic** and the **serverless staging floor**. Treat them
+as ±30 % until `TASK-010` lands."*~~
+
+**Still unverified, deliberately:** item (h), whether `RestartCount` /
+`WorkingSetBytes` exist as alertable metrics and whether any OOM-distinct
+signal exists. Metric definitions can only be listed against a **deployed**
+container app, so that leg is owed the moment staging exists — it is a
+TASK-157 input, not a pricing question.
 
 Volume assumptions are structurally bounded: there is exactly one owner
 (`NFR-017`), so volume cannot grow by user acquisition.
@@ -1199,8 +1224,8 @@ Volume assumptions are structurally bounded: there is exactly one owner
 
 | Component | Service / tier | MVP monthly | What this buys you |
 |---|---|---|---|
-| **Compute** | Azure Container Apps, **`minReplicas = 1`**, **0.25 vCPU / 0.5 GiB** — **as designed, owner-confirmed at `A43`** | **~$5–8** | **The value loop still has no cold start** (`SUC-001`, `RSK-023` closed). At 0.5 GiB the extraction worker processes images **serially** and ingest applies a **pre-decode pixel guard at 25 MP** to contain OOM (`RSK-016`, ADR-0003 R3.2/R4, ADR-0008 R2). **R6/A43: the owner has seen the priced OOM risk and deliberately chose to start here.** |
-| ↳ **Known remedy (pre-authorised, reactive — NOT an alternative)** | Same app at **0.5 vCPU / 1.0 GiB**, guard raised to **50 MP** | **~$9–12** *(**+~$4**)* | **Taken only when a real OOM occurs.** One `az` command + one Bicep change: **`runbooks/scale-up-memory.md`**. **System total becomes ~$15–18/month.** No re-architecture, no data migration, no downtime. |
+| **Compute** | Azure Container Apps, **`minReplicas = 1`**, **0.25 vCPU / 0.5 GiB** — **as designed, owner-confirmed at `A43`** | ~~**~$5–8**~~ **$4.30** *(verified 2026-08-17)* | **The value loop still has no cold start** (`SUC-001`, `RSK-023` closed). At 0.5 GiB the extraction worker processes images **serially** and ingest applies a **pre-decode pixel guard at 25 MP** to contain OOM (`RSK-016`, ADR-0003 R3.2/R4, ADR-0008 R2). **R6/A43: the owner has seen the priced OOM risk and deliberately chose to start here.** The monthly free grant (180,000 vCPU-s + 360,000 GiB-s) is confirmed to apply to **idle** usage on an always-on replica — the single least-certain figure in the model, and it landed favourably. |
+| ↳ **Known remedy (pre-authorised, reactive — NOT an alternative)** | Same app at **0.5 vCPU / 1.0 GiB**, guard raised to **50 MP** | **~$10.22** *(**+$5.92**, verified 2026-08-17)* | **Taken only when a real OOM occurs.** One `az` command + one Bicep change: **`runbooks/scale-up-memory.md`**. **System total becomes ~$17.69/month.** No re-architecture, no data migration, no downtime. ⚠ **The delta was published as +~$4 and is really +$5.92** — 48 % higher. It is quoted to the owner in the runbook, so it is corrected there too. Still pre-authorised; the decision does not change at this price. |
 | **Database (prod)** | **Azure SQL Database, Basic (5 DTU, 2 GB)**, 7-day PITR | **~$5** | **The product's highest-risk silent defects stay database constraints** via filtered unique indexes (one active title per work; one listing per service; one active suppression per work). Batch close stays one transaction. Still always-warm (Basic does not auto-pause). |
 | **Database (staging)** | **Azure SQL serverless, auto-pause enabled** (~storage only) | **~$0.50** | Staging keeps a *real* Azure database to rehearse RBAC/Easy-Auth/deploy; auto-pause is fine because nobody judges staging's cold start. *(Azure SQL bills per database, so this is ~$0.50, not the literal $0 the shared-PG server gave — ADR-0003 R3.3.)* |
 | **Container registry** | **ghcr.io** | **$0.00** | Free. The trade is the **returning PAT** — a quietly-expiring secret (ADR-0003 R3.1). |
@@ -1213,9 +1238,9 @@ Volume assumptions are structurally bounded: there is exactly one owner
 | **Metadata** | TMDB, free non-commercial | **$0.00** | — |
 | **CI/CD** | GitHub Actions | **$0.00** | — |
 | **TLS / DNS** | ACA managed certificate, default domain | **$0.00** | — |
-| **Alerting** *(new, R6 — `A43-M5`)* | Azure Monitor: 2 metric alert rules + 1 log-search alert (`RestartCount`, `WorkingSetBytes`, decode-sentinel query) | **~$0.60–1.00** | **The trigger for the reactive up-size.** "Up-size only if it OOMs" is not a strategy unless the OOM is *observed*. Inside the ±30 % band. |
-| **TOTAL, as designed (Variant A)** | | **≈ $11–13 / month** | keeps *always-warm compute, a relational store with real constraints, and staging* |
-| **TOTAL if the memory remedy is taken** *(R6)* | | **≈ $15–18 / month** | the same design, one size up — see `runbooks/scale-up-memory.md` |
+| **Alerting** *(new, R6 — `A43-M5`)* | Azure Monitor: 2 metric alert rules + 1 log-search alert (`RestartCount`, `WorkingSetBytes`, decode-sentinel query) | ~~**~$0.60–1.00**~~ **$1.70** *(verified 2026-08-17)* | **The trigger for the reactive up-size.** "Up-size only if it OOMs" is not a strategy unless the OOM is *observed*. ⚠ **The estimate was low.** `eastus2` list: metric rule **$0.10** each, log-search alert at 5-minute frequency **$1.50** — the log-search rule is 15× a metric rule, which is what the estimate missed. Dropping to 15-minute frequency would cost $0.50 and is the lever if this ever matters; it is **not** taken now, because a 15-minute detection delay on an OOM is most of a batch. |
+| **TOTAL, as designed (Variant A)** | | **≈ $11–13 / month** — **verified $11.77 on 2026-08-17** | keeps *always-warm compute, a relational store with real constraints, and staging* |
+| **TOTAL if the memory remedy is taken** *(R6)* | | **≈ $15–18 / month** — **verified $17.69** | the same design, one size up — see `runbooks/scale-up-memory.md` |
 | *Bulk-import month* | +~$1.40 extraction | *≈ $12–14* | |
 
 > ### R6 — the memory question is now DECIDED (`OQ-028` closed at `A43`)

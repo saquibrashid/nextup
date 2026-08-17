@@ -28,6 +28,22 @@ import { fileURLToPath } from 'node:url';
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const BICEP_FILE = join(ROOT, 'infra', 'main.bicep');
 export const ARM_FILE = join(ROOT, 'infra', 'main.json');
+export const BUDGET_BICEP_FILE = join(ROOT, 'infra', 'budget.bicep');
+export const BUDGET_ARM_FILE = join(ROOT, 'infra', 'budget.json');
+
+/**
+ * Every Bicep template with a committed ARM artifact.
+ *
+ * The budget is SEPARATE rather than a module of main.bicep because it is
+ * subscription-scoped, and Bicep cannot deploy upward from a resource group.
+ * It therefore needs its own compile + drift pair; folding it into the single
+ * `main` pair above would leave it ungated, which is how an untested template
+ * ends up deployed by hand.
+ */
+export const TEMPLATES = [
+  { name: 'main', bicep: BICEP_FILE, arm: ARM_FILE },
+  { name: 'budget', bicep: BUDGET_BICEP_FILE, arm: BUDGET_ARM_FILE },
+];
 
 /**
  * Recursively remove Bicep's `_generator` stamp (version + templateHash) so a
@@ -50,12 +66,12 @@ export function stripGenerator(node) {
   return out;
 }
 
-/** Compile infra/main.bicep and return the normalised ARM template. */
-export function compileArm() {
+/** Compile a Bicep file and return the normalised ARM template. */
+export function compileArm(bicepFile = BICEP_FILE) {
   const dir = mkdtempSync(join(tmpdir(), 'nextup-infra-'));
-  const outfile = join(dir, 'main.json');
+  const outfile = join(dir, 'out.json');
   try {
-    execFileSync('az', ['bicep', 'build', '--file', BICEP_FILE, '--outfile', outfile], {
+    execFileSync('az', ['bicep', 'build', '--file', bicepFile, '--outfile', outfile], {
       stdio: 'pipe',
       shell: process.platform === 'win32',
     });
@@ -65,9 +81,14 @@ export function compileArm() {
   }
 }
 
-/** Read the committed ARM template. */
-export function readCommittedArm() {
-  return stripGenerator(JSON.parse(readFileSync(ARM_FILE, 'utf8')));
+/** Read a committed ARM template. */
+export function readCommittedArm(armFile = ARM_FILE) {
+  return stripGenerator(JSON.parse(readFileSync(armFile, 'utf8')));
+}
+
+/** Read the committed budget template (TASK-142). */
+export function readCommittedBudgetArm() {
+  return readCommittedArm(BUDGET_ARM_FILE);
 }
 
 export function renderArm(template) {
@@ -278,6 +299,28 @@ export function skuViolations(template) {
         `sql: unpinned SKU ${sku.name}/${sku.tier} — expected Basic or GP_S_ serverless`,
       );
     }
+
+    // ⚠ AUTO-PAUSE IS THE ENTIRE STAGING COST MODEL (TASK-010, 2026-08-17).
+    //
+    // Verified list price: GP_S Gen5 compute is $0.521758 per vCore-hour, so at
+    // the 0.5-vCore serverless minimum a staging database that never pauses
+    // costs ~$190/month — SIXTEEN TIMES the entire published system total of
+    // $11.77. The ~$0.50/month figure in architecture.md is not a list price;
+    // it is an assumption that the database is paused almost all of the time.
+    //
+    // Deleting `autoPauseDelay` deploys cleanly, passes every other test, and
+    // serves staging perfectly well. The only symptom is the bill. This is the
+    // single most expensive one-line change anyone can make to this repo.
+    if (isServerless) {
+      const delay = db.properties?.autoPauseDelay;
+      if (typeof delay !== 'number' || delay <= 0) {
+        violations.push(
+          `sql: serverless ${db.name} must declare a positive autoPauseDelay — ` +
+            'without it staging never pauses and costs ~$190/month instead of ~$0.50 ' +
+            '(verified 2026-08-17, ADR-0005 addendum)',
+        );
+      }
+    }
     if (db.properties?.zoneRedundant !== false) {
       violations.push(`sql: ${db.name} must not be zone-redundant`);
     }
@@ -457,32 +500,128 @@ export function ttlViolations(template) {
   return violations;
 }
 
+/**
+ * T-INFRA-009 — the cost guardrail exists, and it only ever SENDS EMAIL.
+ *
+ * TASK-142. Two independent failure modes, both of which deploy successfully:
+ *
+ *   - a budget with one threshold, or a disabled one, looks configured in the
+ *     portal while silently monitoring nothing above it;
+ *   - a notification wired to an ACTION GROUP turns a cost alert into an
+ *     actuator. Action groups can run automation runbooks, and an automated
+ *     response to a billing threshold could stop the container app or delete a
+ *     resource. REQ-028 says deletion is never automatic, and TASK-142 says in
+ *     terms: "Do not add auto-shutdown or any automated remediation".
+ *
+ * The second is the dangerous one, because it would be added by someone being
+ * helpful, and nothing else in the suite would notice.
+ */
+export const BUDGET_ACTIONABLE_KEYS = [
+  'actionGroups',
+  'contactGroups',
+  'contactRoles',
+  'webhooks',
+  'actions',
+];
+
+export function budgetPolicyViolations(template) {
+  const violations = [];
+  const budgets = resourcesOfType(template, 'Microsoft.Consumption/budgets');
+
+  if (budgets.length !== 1) {
+    violations.push(`budget: expected exactly 1 budget, found ${budgets.length}`);
+    return violations;
+  }
+
+  const props = budgets[0].properties ?? {};
+  if (props.category !== 'Cost') {
+    violations.push(`budget: category must be Cost (found ${props.category})`);
+  }
+  if (props.timeGrain !== 'Monthly') {
+    violations.push(`budget: timeGrain must be Monthly (found ${props.timeGrain})`);
+  }
+
+  const notifications = props.notifications ?? {};
+  const entries = Object.entries(notifications);
+  if (entries.length !== 2) {
+    violations.push(
+      `budget: expected exactly 2 notifications (1.0x informational, 1.5x action-required), found ${entries.length}`,
+    );
+  }
+
+  const thresholds = new Set();
+  for (const [name, notification] of entries) {
+    if (notification?.enabled !== true) {
+      violations.push(`budget: notification ${name} must be enabled`);
+    }
+    if ((notification?.contactEmails ?? []).length === 0) {
+      violations.push(`budget: notification ${name} must email someone`);
+    }
+    for (const key of BUDGET_ACTIONABLE_KEYS) {
+      const value = notification?.[key];
+      if (value !== undefined && !(Array.isArray(value) && value.length === 0)) {
+        violations.push(
+          `budget: notification ${name} declares "${key}" — a cost alert must NOTIFY, never act ` +
+            '(TASK-142: no auto-shutdown, no automated remediation)',
+        );
+      }
+    }
+    thresholds.add(Number(notification?.threshold));
+  }
+
+  // 100 = the published monthly total, 150 = 1.5x it. Percentages of ONE
+  // amount, so the pair cannot drift apart.
+  for (const required of [100, 150]) {
+    if (!thresholds.has(required)) {
+      violations.push(
+        `budget: missing the ${required}% threshold (found ${[...thresholds].join(', ')})`,
+      );
+    }
+  }
+
+  for (const resource of allResources(template)) {
+    if (PROHIBITED_TYPES.includes(resource.type)) {
+      violations.push(`budget: prohibited automation resource ${resource.type}`);
+    }
+  }
+
+  return violations;
+}
+
 function main() {
   const check = process.argv.includes('--check');
-  const compiled = compileArm();
-  const rendered = renderArm(compiled);
+  let failed = false;
 
-  if (!check) {
-    writeFileSync(ARM_FILE, rendered);
-    console.log(`wrote infra/main.json (${allResources(compiled).length} resources)`);
-    return;
+  for (const { name, bicep, arm } of TEMPLATES) {
+    const compiled = compileArm(bicep);
+    const rendered = renderArm(compiled);
+
+    if (!check) {
+      writeFileSync(arm, rendered);
+      console.log(`wrote infra/${name}.json (${allResources(compiled).length} resources)`);
+      continue;
+    }
+
+    let committed;
+    try {
+      committed = renderArm(readCommittedArm(arm));
+    } catch (error) {
+      console.error(`infra/${name}.json is missing or unreadable: ${error.message}`);
+      console.error('Run `npm run infra:build` and commit the result.');
+      failed = true;
+      continue;
+    }
+
+    if (committed !== rendered) {
+      console.error(`infra/${name}.json is STALE — it does not match infra/${name}.bicep.`);
+      console.error('Run `npm run infra:build` and commit the result.');
+      failed = true;
+      continue;
+    }
+    console.log(`infra/${name}.json is up to date.`);
   }
 
-  let committed;
-  try {
-    committed = renderArm(readCommittedArm());
-  } catch (error) {
-    console.error(`infra/main.json is missing or unreadable: ${error.message}`);
-    console.error('Run `npm run infra:build` and commit the result.');
-    process.exit(1);
-  }
-
-  if (committed !== rendered) {
-    console.error('infra/main.json is STALE — it does not match infra/main.bicep.');
-    console.error('Run `npm run infra:build` and commit the result.');
-    process.exit(1);
-  }
-  console.log('infra/main.json is up to date.');
+  if (failed) process.exit(1);
 }
 
 if (process.argv[1] && process.argv[1].endsWith('check-infra.mjs')) main();

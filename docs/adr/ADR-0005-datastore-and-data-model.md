@@ -816,3 +816,42 @@ the strongest available reading of `REQ-041`.
   REQ-070…REQ-076, NFR-001, NFR-008, NFR-012, NFR-014, NFR-018
 - `artifacts/PRD.md` §7.1 (title states and transitions), §7.3, §7.4
 - ADR-0003 (hosting), ADR-0006 (image storage), ADR-0007 (work identity)
+
+---
+
+## Addendum — 2026-08-17: live pricing verification (TASK-010)
+
+Read from the **Azure Retail Prices API** for **`eastus2`** on **2026-08-17**,
+plus `az sql db list-editions` against the live subscription.
+
+### Azure SQL Basic still exists, and it is still ~$5
+
+R4 flagged a specific worry: *"verify it is a flat ~$5/mo and that Basic still
+exists (Microsoft has signalled DTU-model changes)"*. Both hold.
+
+| Item | Published | Verified `eastus2`, 2026-08-17 |
+|---|---|---|
+| **SQL Database Single Basic** (`B`, 5 DTU, 2 GB) | ~$5.00 | **$0.161/day → $4.90/month** |
+| Basic edition offered in region | assumed | ✅ `az sql db list-editions --edition Basic` returns `Basic` |
+| Staging: GP_S serverless Gen5 compute | ~$0.50 | **$0.521758 / vCore-hour** when *active*; **$0 compute while auto-paused** |
+
+**The staging figure depends entirely on auto-pause actually pausing.** At the
+0.5-vCore serverless minimum, staging costs about **$0.26 per active hour**, so
+the published ~$0.50/month assumes roughly **two hours of use per month** plus
+storage. That is realistic for a rehearsal environment, but it is an
+*assumption about behaviour*, not a list price: a staging database left
+un-paused for a month would cost **~$190**, which is 16× the entire system.
+
+⚠ **This is the one line in the model that can run away**, and it is the reason
+`autoPauseDelay` in `infra/sqldb.bicep` is load-bearing rather than a tuning
+detail. The budget alert deployed by TASK-142 is the backstop: at $19.50 the
+owner hears about it within a day or so, long before a month of un-paused
+serverless compute accrues.
+
+### Prod is flat, and that is the point
+
+Basic is a **fixed daily rate** — it does not vary with query volume, so no
+usage pattern can make the production database surprise anyone. Combined with
+`REQ-028` (no scheduled deletion, no jobs), the production database has no
+mechanism by which its cost can change without a visible Bicep diff pinned by
+`T-INFRA-005`.

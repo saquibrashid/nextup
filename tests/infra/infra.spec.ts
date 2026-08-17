@@ -2,12 +2,17 @@ import { describe, expect, it } from 'vitest';
 
 import {
   allResources,
+  budgetPolicyViolations,
   ingressPolicyViolations,
   rbacPolicyViolations,
   readCommittedArm,
+  readCommittedBudgetArm,
   resourceOfType,
   resourcesOfType,
+  skuViolations,
   storagePolicyViolations,
+  ttlViolations,
+  PROHIBITED_TYPES,
   stripGenerator,
 } from '../../tools/check-infra.mjs';
 
@@ -220,5 +225,160 @@ describe('infra template plumbing', () => {
     const stripped = stripGenerator(stamped);
     expect(stripped.metadata).toBeUndefined();
     expect(stripped.resources[0].metadata).toEqual({ other: 'keep' });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T-INFRA-009 — the cost guardrail (TASK-142).
+//
+// The budget is a SEPARATE subscription-scoped template, so it needs its own
+// committed artifact and its own mutations. Same discipline as above: showing
+// the current template is clean proves nothing, so every rule is fed a
+// deliberately broken template and asserted to be caught.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const budgetTemplate = readCommittedBudgetArm();
+
+function mutateBudget(fn) {
+  const clone = structuredClone(budgetTemplate);
+  fn(clone);
+  return clone;
+}
+
+function budgetResource(t) {
+  return resourceOfType(t, 'Microsoft.Consumption/budgets');
+}
+
+describe('T-INFRA-009 the budget alerts (TASK-142)', () => {
+  it('T-INFRA-009a: the committed budget template has no violation', () => {
+    expect(budgetPolicyViolations(budgetTemplate)).toEqual([]);
+  });
+
+  it('T-INFRA-009b: both thresholds exist — 1.0x informational and 1.5x action-required', () => {
+    const notifications = budgetResource(budgetTemplate).properties.notifications;
+    const thresholds = Object.values(notifications)
+      .map((n) => n.threshold)
+      .sort((a, b) => a - b);
+    expect(thresholds).toEqual([100, 150]);
+    for (const notification of Object.values(notifications)) {
+      expect(notification.enabled).toBe(true);
+      expect(notification.thresholdType).toBe('Actual');
+    }
+  });
+
+  it('T-INFRA-009c: dropping the 1.5x threshold is caught', () => {
+    const broken = mutateBudget((t) => {
+      delete budgetResource(t).properties.notifications.actionRequired;
+    });
+    expect(budgetPolicyViolations(broken).join(' ')).toMatch(/expected exactly 2 notifications/);
+  });
+
+  it('T-INFRA-009d: a disabled notification is caught', () => {
+    const broken = mutateBudget((t) => {
+      budgetResource(t).properties.notifications.informational.enabled = false;
+    });
+    expect(budgetPolicyViolations(broken).join(' ')).toMatch(/must be enabled/);
+  });
+
+  // ⚠ THE ONE THAT MATTERS. An action group can run an automation runbook, so
+  // wiring one to a billing threshold turns "you have spent $20" into "stop the
+  // container app". It deploys fine, it looks responsible, and it would be
+  // added by someone being helpful. REQ-028 and TASK-142 both forbid it.
+  it('T-INFRA-009e: a notification wired to an action group is caught', () => {
+    for (const key of ['actionGroups', 'contactGroups', 'contactRoles', 'webhooks', 'actions']) {
+      const broken = mutateBudget((t) => {
+        budgetResource(t).properties.notifications.actionRequired[key] = ['/subscriptions/x/ag'];
+      });
+      expect(budgetPolicyViolations(broken).join(' ')).toMatch(/must NOTIFY, never act/);
+    }
+  });
+
+  it('T-INFRA-009f: an empty actionable array is NOT reported — absence is the requirement, not noise', () => {
+    const benign = mutateBudget((t) => {
+      budgetResource(t).properties.notifications.actionRequired.contactGroups = [];
+    });
+    expect(budgetPolicyViolations(benign)).toEqual([]);
+  });
+
+  it('T-INFRA-009g: exactly ONE budget, so 1.0x and 1.5x cannot drift apart', () => {
+    // The thresholds are PERCENTAGES of a single amount. A second budget with
+    // its own amount would let the pair diverge silently, which is the whole
+    // reason this is one resource rather than two.
+    expect(resourcesOfType(budgetTemplate, 'Microsoft.Consumption/budgets')).toHaveLength(1);
+    const properties = budgetResource(budgetTemplate).properties;
+    expect(properties.amount).toBe("[parameters('monthlyTotalUsd')]");
+    expect(properties.timeGrain).toBe('Monthly');
+
+    const broken = mutateBudget((t) => {
+      t.resources.push(structuredClone(budgetResource(t)));
+    });
+    expect(budgetPolicyViolations(broken).join(' ')).toMatch(/expected exactly 1 budget/);
+  });
+
+  it('T-INFRA-009h: the budget carries no automation resource and no TTL-shaped property', () => {
+    expect(ttlViolations(budgetTemplate)).toEqual([]);
+    for (const resource of allResources(budgetTemplate)) {
+      expect(PROHIBITED_TYPES).not.toContain(resource.type);
+    }
+  });
+
+  it('T-INFRA-009i: the published total is the parameter default, so the alert tracks the spec', () => {
+    // docs/architecture.md §Cost summary publishes ~$11-13/month for Variant A.
+    // Anchoring to the TOP of the band is deliberate: a budget set at the
+    // optimistic end alerts on ordinary variation, and an alert that cries
+    // wolf trains the owner to ignore the one that matters.
+    expect(budgetTemplate.parameters.monthlyTotalUsd.defaultValue).toBe(13);
+    // No default for the recipient: a budget nobody is told about is not a control.
+    expect(budgetTemplate.parameters.ownerEmail.defaultValue).toBeUndefined();
+  });
+});
+
+describe('T-INFRA-005 the staging auto-pause cost trap (TASK-010, verified 2026-08-17)', () => {
+  it('T-INFRA-005t: the serverless staging database declares a positive autoPauseDelay', () => {
+    const serverless = resourcesOfType(template, 'Microsoft.Sql/servers/databases').filter((db) =>
+      String(db.sku?.name).startsWith('GP_S_'),
+    );
+    expect(serverless.length).toBeGreaterThan(0);
+    for (const db of serverless) {
+      expect(db.properties?.autoPauseDelay).toBeGreaterThan(0);
+    }
+    expect(skuViolations(template)).toEqual([]);
+  });
+
+  // The mutation is a ONE-LINE deletion that deploys cleanly, serves staging
+  // perfectly, and costs ~$190/month — 16x the whole system. Verified rate:
+  // $0.521758/vCore-hour at the 0.5-vCore serverless minimum.
+  it('T-INFRA-005u: deleting autoPauseDelay is caught', () => {
+    const broken = mutate((t) => {
+      for (const db of resourcesOfType(t, 'Microsoft.Sql/servers/databases')) {
+        if (String(db.sku?.name).startsWith('GP_S_')) delete db.properties.autoPauseDelay;
+      }
+    });
+    expect(skuViolations(broken).join(' ')).toMatch(/must declare a positive autoPauseDelay/);
+  });
+
+  it('T-INFRA-005v: a zero or negative autoPauseDelay is caught, not just an absent one', () => {
+    for (const bad of [0, -1]) {
+      const broken = mutate((t) => {
+        for (const db of resourcesOfType(t, 'Microsoft.Sql/servers/databases')) {
+          if (String(db.sku?.name).startsWith('GP_S_')) db.properties.autoPauseDelay = bad;
+        }
+      });
+      expect(skuViolations(broken).join(' ')).toMatch(/positive autoPauseDelay/);
+    }
+  });
+
+  it('T-INFRA-005w: the rule does not fire on the Basic prod database, which cannot pause', () => {
+    // Basic is a flat daily rate with no auto-pause concept. A rule that
+    // demanded autoPauseDelay everywhere would be unsatisfiable for prod and
+    // would be "fixed" by deleting the rule.
+    const basic = resourcesOfType(template, 'Microsoft.Sql/servers/databases').filter(
+      (db) => db.sku?.name === 'Basic',
+    );
+    expect(basic.length).toBeGreaterThan(0);
+    for (const db of basic) {
+      expect(db.properties?.autoPauseDelay).toBeUndefined();
+    }
+    expect(skuViolations(template)).toEqual([]);
   });
 });

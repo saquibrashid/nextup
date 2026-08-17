@@ -20,12 +20,23 @@ forcedBy: A43 / OQ-028 (owner accepted the reactive up-size strategy), RSK-016
 > explicitly disclosed (`OQ-028`, closed; `RSK-016` is an
 > **owner-accepted residual risk**, not a defect).
 >
-> **Cost of doing this: +~$4/month.** Compute goes ~$5–8 → ~$9–12; the
-> system total goes ~$11–13 → **~$15–18/month**.
-> ⚠ Every figure here is an unverified Azure list price recalled from
-> model knowledge — **treat as ±30 % (`RSK-029`)** until `TASK-010`
-> re-verifies it. The *direction* and the *shape* of the change are
-> certain; the exact dollar figure is not.
+> **Cost of doing this: +$5.92/month** *(verified against live Azure retail
+> prices for `eastus2`, 2026-08-17, TASK-010)*. Compute goes **$4.30 →
+> $10.22**; the system total goes **$11.77 → $17.69/month**.
+>
+> ⚠ **This was published as "+~$4/month" and that was 48 % low.** The
+> correction is recorded rather than quietly swapped, because the +$4 figure
+> is what the owner saw when pre-authorising this remedy at `A43`. **The
+> decision does not change at $5.92** — the remedy is still pre-authorised
+> and still the right move when a real OOM occurs — but nobody should
+> discover the true figure from a bill.
+>
+> ~~*Superseded 2026-08-17 by TASK-010's live verification: "**Cost of doing
+> this: +~$4/month.** Compute goes ~$5–8 → ~$9–12; the system total goes
+> ~$11–13 → **~$15–18/month**. ⚠ Every figure here is an unverified Azure
+> list price recalled from model knowledge — **treat as ±30 % (`RSK-029`)**
+> until `TASK-010` re-verifies it. The direction and the shape of the change
+> are certain; the exact dollar figure is not."*~~
 
 ---
 
@@ -99,7 +110,7 @@ value is a function of the container's memory size:
 
 If you up-size the container but leave the guard at 25 MP, the image
 that triggered this runbook **will still be refused** and you will have
-spent $4/month for nothing. If you raise the guard without up-sizing,
+spent $5.92/month for nothing. If you raise the guard without up-sizing,
 you have removed the thing that was keeping a bad image from killing the
 whole container. **They move together, always.**
 
@@ -243,7 +254,7 @@ Then revert the `infra/aca.bicep` and `T-INFRA-005` changes from §4
 Confirm with §3a — expect `"cpu": 0.25, "memory": "0.5Gi"`.
 
 **Why you might roll back:** the up-size did not fix the failure, so the
-$4/month is buying nothing and the real cause is elsewhere (see §7).
+$5.92/month is buying nothing and the real cause is elsewhere (see §7).
 **Why you probably should not:** if a real OOM happened once at 0.5 GiB,
 the image class that caused it still exists in the owner's camera roll.
 

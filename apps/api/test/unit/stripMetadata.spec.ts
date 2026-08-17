@@ -337,5 +337,9 @@ describe('T-SEC-033 the strip is unconditional and fails closed', () => {
 
     expect(contains(stripped, EXIF_MAGIC)).toBe(false);
     expect(contains(stripped, GPS_LATITUDE)).toBe(false);
-  });
+    // 20s, not the 5s default: this is the only case here that cold-imports the
+    // whole route graph (sharp + prisma + blob) through a dynamic import. It
+    // runs in ~600ms alone but times out under five-project contention, which
+    // makes CI intermittently red for a reason unrelated to what it asserts.
+  }, 20_000);
 });

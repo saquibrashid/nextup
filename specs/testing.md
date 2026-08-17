@@ -1625,6 +1625,7 @@ check what "done" means.
 | **`T-E2E-001`** | E | The full owner journey — sign in → upload → extract → match → review → confirm → see the combined list — specified end to end in §5 and called there **"the single most valuable test in the suite"**. It was cited by five backlog tasks (`TASK-080`, `094`, `108`, `130`, `164`) as their exit criterion while having no table cell anywhere. | §5 |
 | **`T-INFRA-004`** | S | The Bicep 30-day blob-lifecycle purge rule **exists and is correctly shaped** (§3.4, `NFR-019`). Pairs with `T-INFRA-002`, which asserts soft delete and versioning are OFF: a correct lifecycle rule plus soft delete still retains the owner's screenshots past 30 days, so neither test is sufficient alone. | §3.4 prose |
 | **`T-INFRA-008` (new, TASK-027)** | S | The Bicep **Easy Auth `authConfigs` resource exists and is shaped CLOSED**: named `current`, `platform.enabled = true`, `unauthenticatedClientAction = RedirectToLoginPage`, the Entra provider enabled against a `login.microsoftonline.com` issuer, the client secret held only as a **secret reference** whose name matches a declared `secrets` entry, and **no `excludedPaths` of any kind**. Same relationship to `T-AUTH-001/002/003` that `T-INFRA-004` has to the purge behaviour: those three are level `E` and need a deployment, so without this cell TASK-027 has **no CI-verifiable definition of done at all**. Every failure it catches deploys successfully and looks normal to the owner — `excludedPaths: ['/api/*']` in particular exposes the whole list at the platform edge while `T-SEC-010`/`T-SEC-014` and every other allow-list test still pass, because application code never runs. | ADR-0002, `specs/security.md` §2.1 |
+| **`T-INFRA-009` (new, TASK-142)** | S | The **subscription budget and its two alert thresholds** exist in Bicep and **only ever send email**: exactly one `Microsoft.Consumption/budgets`, category `Cost`, `timeGrain Monthly`, exactly two notifications at **100 %** (informational) and **150 %** (action required), both enabled, both `Actual`, both with a recipient — and **no `actionGroups`, `contactGroups`, `contactRoles`, `webhooks` or `actions` on either**. The last clause is the one that matters: an action group can invoke an automation runbook, so wiring one to a billing threshold turns "you have spent $20" into "stop the container app" — it deploys cleanly, it looks responsible, and it would be added by someone being helpful. TASK-142 forbids it in terms ("no auto-shutdown or any automated remediation") and `REQ-028` forbids automatic deletion. Thresholds are **percentages of one amount** so the 1.0× and 1.5× figures cannot drift apart; a second budget would let them. | TASK-142, `REQ-028` |
 | **`T-SMOKE-001`** | E | An authenticated request against the freshly deployed **staging** revision succeeds. The `T-SMOKE-*` family was defined only as a **glob** in §11.2, which no id-level gate can resolve — `T-SMOKE-003` was already enumerated as a real cell, so the family was half-addressable and the missing half looked like a phantom. | §11.2 glob |
 | **`T-UI-004`** | C | `ImageDropzone` names **PNG, JPEG and HEIC** in its accept list and its copy (`specs/ui.md`). ⚠ Load-bearing per product invariant 11: without HEIC in `accept`, an iOS file picker greys out the owner's own camera photos and the failure looks like a broken phone, not a missing format. Deliberately distinct from `T-UI-014`, which TASK-162 owns. | `specs/ui.md` |
 | **`T-UX-041`** | C | The empty dropzone shows **all three** ingest affordances — paste, file selection and drag-and-drop (`specs/ux-states.md` §4.3). Product invariant 16: paste was added, not swapped in, and a tidied-up single-affordance dropzone silently removes a working capture path. | `specs/ux-states.md` §4.3 |
@@ -3047,3 +3048,90 @@ prevent. `jpegBytes()` now emits a complete `SOI/APP0/SOF0/SOS/EOI` stream.
 keeps every surviving CRC correct by construction. A filter that rebuilt
 chunks would have to recompute them, and a wrong CRC turns a privacy control
 into a corruption bug that only some decoders notice.
+
+## 31. The Azure boundary — budget guardrail and cost verification (TASK-142, TASK-010)
+
+The first tasks that touch a real subscription and real money.
+
+### 31.1 What TASK-142 claims
+
+`infra/budget.bicep` + `infra/budget.bicepparam`, asserted by `T-INFRA-009a`--`i`
+in `tests/infra/infra.spec.ts` against the committed `infra/budget.json`.
+
+- One subscription budget, `Monthly`, amount = the published total, with
+  notifications at **100 %** (informational) and **150 %** (action required).
+- **Email only.** No action group, contact group, contact role, webhook or
+  action on either notification. `T-INFRA-009e` sweeps all five keys.
+- Thresholds are **percentages of a single amount**, so 1.0x and 1.5x cannot
+  drift apart. `T-INFRA-009g` fails if a second budget appears.
+- **Deployed and verified live**, not merely written: `az deployment sub create`
+  succeeded and `az consumption budget list` returns `nextup-monthly / 13.0 /
+  Monthly`.
+
+`tools/check-infra.mjs` now compiles **two** templates rather than one, so the
+budget gets the same drift gate `main.bicep` has. A subscription-scoped
+template cannot be a module of a resource-group-scoped one -- Bicep scope
+nesting only goes downward -- so this is a second `az deployment sub create`,
+which is also the correct order: **the guardrail exists before the first
+billable resource.**
+
+### 31.2 What TASK-010 claims
+
+Every figure in `docs/architecture.md` §Cost summary is now checked against the
+**live Azure Retail Prices API** for `eastus2`, dated **2026-08-17**, with
+dated addenda on **ADR-0001**, **ADR-0003** and **ADR-0005**.
+
+**Verified total $11.77/month against a published band of $11-13.** The
+`OQ-026` escalation rule (>50 % over) does not fire.
+
+### 31.3 What it does NOT claim
+
+**Item (h) -- metric existence -- is NOT verified and cannot be yet.** Whether
+`RestartCount` and `WorkingSetBytes` exist as alertable metrics for
+`Microsoft.App/containerApps`, and whether any OOM-distinct signal exists at
+all, requires listing metric definitions against a **deployed** container app.
+It is owed the moment staging exists, and it is a **TASK-157** input.
+`architecture.md`'s claim that ACA does not surface OOM-kill distinctly
+therefore remains **UNVERIFIED** and is still labelled so.
+
+**A budget alert is not a spend limit.** It emails; it does not cap. That is
+deliberate -- capping would mean automated remediation, which TASK-142 and
+`REQ-028` both forbid.
+
+### 31.4 Findings
+
+**(a) The total was right by CANCELLATION, not because the lines were right.**
+Compute came in at **$4.30** against a published ~$5-8 and absorbed two
+overages. Anyone checking only the bottom line would have concluded the model
+was sound and moved on.
+
+**(b) The pre-authorised up-size costs +$5.92/month, not the +~$4 quoted to the
+owner** -- 48 % low. Corrected in `architecture.md` and in
+`docs/runbooks/scale-up-memory.md`, in place, with the old figure struck
+through. The decision does not change at the true price; the owner meeting it
+on a bill would have been the problem.
+
+**(c) Alert rules cost $1.70/month, not $0.60-1.00** -- 70-183 % over. A
+log-search alert at 5-minute frequency is **$1.50**, fifteen times a metric
+rule's $0.10. The estimate priced them alike.
+
+**(d) `autoPauseDelay` had no test, and it is the most expensive one-line
+deletion in the repository.** Serverless GP_S Gen5 is **$0.521758/vCore-hour**;
+at the 0.5-vCore minimum a staging database that never pauses costs
+**~$190/month -- 16x the entire system**. Deleting the property deploys
+cleanly, serves staging perfectly, and is invisible until the bill.
+`T-INFRA-005t`--`w` now guard it, including `w`, which proves the rule does
+**not** fire on the Basic prod database -- a rule unsatisfiable for prod would
+be "fixed" by deleting it.
+
+**(e) Azure OpenAI no longer bills under `serviceName eq 'Azure OpenAI'`.** The
+retail API files these meters under **`Foundry Models`**. A verification query
+written against the old name returns **zero rows**, which reads like "the model
+is unavailable in this region" rather than "your filter is stale" -- and would
+push a reviewer toward an unnecessary region change or model downgrade.
+
+**(f) An integer-division output understated the alert threshold.** The budget
+template first reported `monthlyTotalUsd * 3 / 2` as **$19**, where the
+threshold Azure evaluates is **$19.50**. Bicep integer maths truncated it. The
+output now reports the base amount plus percentages, because a number that is
+50 cents wrong is exactly the number a reader would quote.

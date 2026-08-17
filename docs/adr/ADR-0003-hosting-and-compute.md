@@ -694,3 +694,70 @@ architecture implements both **without a scheduler**:
 - **Pricing provenance:** Azure list prices from model knowledge; web
   retrieval unavailable to this agent. Re-verify the ACA free grant,
   idle-rate billing and the SWA Standard price before deployment.
+
+---
+
+## Addendum — 2026-08-17: live pricing verification (TASK-010)
+
+Every figure below was read from the **Azure Retail Prices API**
+(`https://prices.azure.com/api/retail/prices`, `api-version=2023-01-01-preview`)
+for **`eastus2`** on **2026-08-17**. This supersedes the "Azure list prices from
+model knowledge; web retrieval unavailable" provenance note above.
+### Compute — the least-certain figure in the model, resolved favourably
+
+| Meter (`eastus2`, Consumption) | Rate |
+|---|---|
+| Standard vCPU **Idle** Usage | **$0.000003 / vCPU-second** |
+| Standard Memory **Idle** Usage | **$0.000003 / GiB-second** |
+| Standard vCPU **Active** Usage | $0.000024 / vCPU-second (8× idle) |
+| Standard Memory Active Usage | $0.000003 / GiB-second |
+| Requests | $0.40 / 1M |
+
+**The free grant DOES apply to an always-on replica's idle usage.** This was
+the open question — `minReplicas = 1` means the replica never scales to zero,
+and the worry was that the 180,000 vCPU-second / 360,000 GiB-second monthly
+grant might be reserved for active usage only. It is not: both active and idle
+consumption draw down the same grant (Microsoft Learn, *Billing in Azure
+Container Apps*).
+
+| Configuration | Verified monthly |
+|---|---|
+| **0.25 vCPU / 0.5 GiB, `minReplicas = 1`** (as designed) | **$4.30** — *published ~$5–8, so **under*** |
+| 0.5 vCPU / 1.0 GiB (the pre-authorised remedy) | **$10.22** |
+| **Up-size delta** | **+$5.92** — *published **+~$4**, so **48 % low*** |
+
+⚠ **The +$4 figure was quoted to the owner at `A43`** when the reactive up-size
+was pre-authorised, and it is repeated in `docs/runbooks/scale-up-memory.md`.
+Both are corrected in place. **The decision stands at $5.92** — the remedy is
+still right when a real OOM occurs — but the owner should not meet the true
+number on a bill.
+
+### Registry and alerting
+
+- **ghcr.io = $0.00** confirmed: the package is public, and GitHub does not bill
+  storage or bandwidth for public packages. No ACR, no `AcrPull`, no credential.
+- **Alert rules cost $1.70/month, not the published $0.60–1.00** — an overage of
+  70–183 %. `eastus2` list: a metric alert rule is **$0.10/month**, but a
+  **log-search** alert at **5-minute** frequency is **$1.50/month**, i.e. 15× a
+  metric rule. The estimate priced the log-search rule like a metric rule.
+  Dropping it to 15-minute frequency would cost $0.50 and is the available
+  lever; it is **not** taken, because a 15-minute detection delay on an OOM is
+  most of a batch (`A43-M5` exists to make the OOM *observed*).
+
+### Still owed — item (h), and it is not a pricing question
+
+Whether **`RestartCount`** and **`WorkingSetBytes`** exist as alertable metrics
+for `Microsoft.App/containerApps`, and whether **any OOM-distinct signal**
+exists, cannot be answered from the pricing API or from `az` without a
+**deployed** container app: metric definitions are listed against a resource
+id. This leg is owed the moment staging exists and is a **TASK-157 input**. The
+architecture's claim that ACA does not surface OOM-kill distinctly therefore
+remains **UNVERIFIED**, and is still recorded as such.
+
+### Total
+
+**$11.77/month verified**, against a published band of **$11–13** — inside it,
+so the `OQ-026` escalation rule (verified total exceeding the published
+estimate by more than 50 %) does **not** fire. ⚠ But the total is right partly
+by **cancellation**: compute came in under and absorbed the alerting and
+up-size overages. Two line items were individually wrong.
