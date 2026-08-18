@@ -50,7 +50,7 @@ Not done, and every task they depend on is done.
 
 | Task | Section | Note |
 |---|---|---|
-| `TASK-011` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs the owner to capture golden-fixture screenshots |
+| `TASK-011` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Owner captured five real screenshots (`4a3da2c`); still owed the per-surface text-vs-artwork evidence file. ⚠ Its "Done when" names `Context/evidence/` — a directory that does not exist in this repo (authoring tree). |
 | `TASK-134` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs the owner to APPLY to Microsoft for Azure OpenAI modified abuse monitoring — an approval, not code. `docs/parallel-execution-plan.md` §3 already lists it as owner-dependent; the ledger said `todo`, which advertised it to lane agents as startable work. |
 | `TASK-141` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs a REAL Azure SQL database: the gating deliverable is an M0 smoke migration applied against one. Blocked behind the same owner-gated Azure boundary as TASK-007. |
 | `TASK-165` | Epic B — Capture & import | Needs a real iOS device to verify the clipboard paste path |
