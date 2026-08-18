@@ -11,12 +11,12 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 95 |
+| ⬜ todo | 96 |
 | 🚧 doing | 6 |
 | ✅ done | 60 |
 | 🙋 owner | 4 |
 | 💤 deferred | 0 |
-| **total** | **165** |
+| **total** | **166** |
 
 ## Ready to start
 
@@ -57,7 +57,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-80 tasks cannot start yet.
+81 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -141,6 +141,7 @@ Not done, and every task they depend on is done.
 | `TASK-163` | `TASK-160`, `TASK-162` |
 | `TASK-164` | `TASK-080`, `TASK-160`, `TASK-162` |
 | `TASK-166` | `TASK-039` |
+| `TASK-168` | `TASK-079`, `TASK-010` |
 
 ## Done
 

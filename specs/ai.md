@@ -859,12 +859,24 @@ tests/fixtures/golden/
     rotated-01.png
     dark-mode-01.png
   llm/
-    <image>.llm.json                     # RECORDED gpt-4.1 response (raw HTTP body)
+    <modelId>/<image>.llm.json           # RECORDED primary-reader response (raw HTTP body)
   ocr/
     <image>.ocr.json                     # RECORDED Vision Read response
   expected/
     <image>.expected.json                # the ASSERTED pipeline output
 ```
+
+⚠ **`llm/` is scoped BY MODEL, `ocr/` and `expected/` are not** — and the
+asymmetry is the point. `expected/` is ground truth about the *image*: it must
+be identical for every model, or a comparison between two models is really a
+comparison between two answer keys. `ocr/` is the deterministic cross-check and
+does not vary with the primary reader. Only the reader's own response is
+model-specific. The incumbent's directory is `llm/gpt-4.1/`.
+
+~~`llm/<image>.llm.json` — recorded `gpt-4.1` response~~ *(superseded: a flat
+`llm/` directory can hold exactly one model's recordings, so evaluating a
+replacement reader would mean overwriting the incumbent's evidence and losing
+the ability to compare. See §9.7.)*
 
 `manifest.json` records, per image: `id`, `service`, `surface`,
 `deviceClass`, `captureNotes`, `expectedTitleCount`, `expectedArtworkOnly`,
@@ -985,11 +997,85 @@ on, now with an explicit artefact.
 
 ### 9.6 Refreshing the recordings
 
-`npm run golden:record` re-records `llm/*.llm.json` and `ocr/*.ocr.json`
-from the live services and is **manual and human-reviewed**. Because the
-LLM response is sampled, a refresh **will** produce a diff even with no
-provider change — so the review question is *"did the metrics in §9.2
-move?"*, never *"is the diff empty?"*. `T-CI-004`.
+`npm run golden:record` re-records `llm/<modelId>/*.llm.json` and
+`ocr/*.ocr.json` from the live services and is **manual and human-reviewed**.
+It takes `--model <deployment>` and writes into that model's directory only;
+with no flag it targets the incumbent (`gpt-4.1`). Because the LLM response is
+sampled, a refresh **will** produce a diff even with no provider change — so
+the review question is *"did the metrics in §9.2 move?"*, never *"is the diff
+empty?"*. `T-CI-004`.
+
+### 9.7 Choosing the primary reader — the bake-off protocol (`T-AI-045`)
+
+The model named in ADR-0001 is a **quality** decision (`NFR-012a`). This
+section defines how it may be changed, so that the change is driven by measured
+evidence rather than by price or novelty. It applies to any candidate primary
+reader — `gpt-5.4-mini` is the first one to be evaluated under it.
+
+**⚠ The decision rule below is PRE-COMMITTED. It is written here, and must be
+merged, BEFORE any candidate's numbers are known.** Deciding the rule after
+seeing the results is not evaluation; it is choosing the threshold that
+selects the answer you already preferred, and the cheaper model will always be
+the one that benefits. If the rule needs to change, change it in a separate
+commit that states why, before the run.
+
+**Stage 0 — disqualifiers, checked before a single image is spent.**
+A candidate is rejected outright, with no measurement, if it does not support
+all of: vision input, **strict** Structured Outputs (`additionalProperties:
+false` honoured, per §2.1a), `temperature: 0`, `seed`, and availability in the
+deployment region. Any of these missing changes the *contract*, not the
+quality, and §2.1a's guarantees stop holding.
+
+**Stage 1 — identical inputs.** Both models are recorded against the **same**
+`images/`, scored against the **same** `expected/`, and cross-checked against
+the **same** `ocr/`. The prompt (`EXTRACTION_SYSTEM_PROMPT`), the schema
+(`TILE_SCHEMA`), `detail: 'high'`, `max_tokens`, `temperature` and `seed` are
+byte-identical between arms. **The only permitted difference is the deployment
+name.** A prompt tuned for one arm invalidates the comparison.
+
+**Stage 2 — three runs per image per model.** `temperature: 0` and a fixed
+seed make a hosted service *nearly* deterministic, not deterministic. Report
+per-run variation; a candidate whose own three runs disagree more than the
+incumbent's is less suitable regardless of its mean, because §9.5's stability
+floor (Jaccard ≥ 0.95) is a product requirement.
+
+**Stage 3 — the decision rule.**
+
+| Metric | Rule for the challenger |
+|---|---|
+| **Omission recovery** | **= 1.0. No trade, no exception.** REQ-012 |
+| **Fabrication rate** | ≤ 0.05 **and** ≤ the incumbent's |
+| Title recall (aggregate) | ≥ 0.95 **and** ≥ the incumbent's |
+| Artwork-only recall | ≥ 0.80 **and** ≥ the incumbent's |
+| False-title rate | ≤ 0.10 **and** ≤ the incumbent's |
+| Chrome rejection | ≥ 0.80 |
+| Run-to-run stability | Jaccard ≥ 0.95, and ≥ the incumbent's |
+| **Cost** | **Tie-breaker ONLY.** Never a reason to accept a worse reader |
+
+**The challenger replaces the incumbent only if it wins or ties on every row.**
+Better-on-some / worse-on-others means **the incumbent stays** — a mixed result
+is not an upgrade, and defaulting to the incumbent under uncertainty is what
+keeps `NFR-012a` from being eroded one small regression at a time.
+
+**Stage 4 — what counts as a difference.** The corpus is **12 images**. One
+title found or missed moves aggregate recall by roughly 1/N of a surface's
+titles, so **a single-title delta is noise, not evidence.** The report states
+per-image counts, not only aggregates, and any conclusion drawn from a
+difference smaller than two titles on any single metric must say so
+explicitly. If the two arms differ only inside that band, the honest finding is
+**"no measured difference"** — which, by Stage 3, means the incumbent stays.
+
+**Outputs.** A report at `docs/evaluation/model-bakeoff-<date>.md` carrying
+both arms' full metric tables, the per-image deltas, the observed cost of the
+run, and the resulting decision — **including when the decision is "no
+change", which is a result worth recording and not a wasted run.** A change of
+reader additionally requires an ADR-0001 revision; the model is named there,
+in this section, in §10's cost model and in `.env.example`.
+
+**Cost and safety of running it.** 12 images × 3 runs × 2 arms = **72 vision
+calls**, ≈ **$0.68** at §10's per-image figure. This is manual-only and never
+runs in CI — `T-CI-007` forbids egress from the test run, and these are real
+calls carrying real screenshots.
 
 
 ---
