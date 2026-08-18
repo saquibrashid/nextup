@@ -145,9 +145,60 @@ export const DROPZONE_IDLE_LABEL =
 /** `specs/ui.md` §3.2c. */
 export const DROPZONE_ACTIVE_LABEL = 'Drop screenshots here';
 
+/**
+ * `specs/ui.md` §3.2 - the client-side rejection message for a file that is
+ * not one of the three accepted formats. `T-UI-004` asserts it enumerates PNG,
+ * JPEG **and** HEIC, so a refused owner knows what is allowed.
+ *
+ * Quoted from §3.2's prose rather than §9's table (§9 has no row for it), so
+ * this is the spec's own wording, not invented copy.
+ */
+export const UNSUPPORTED_FORMAT_REJECTION =
+  "That file isn't a screenshot nextup can read — attach a PNG, JPEG or HEIC image.";
+
+/**
+ * `specs/ui.md` §3.2 - the file input's `accept`.
+ *
+ * ⚠ ALL THREE FORMATS, AND THE EXTENSIONS AS WELL AS THE MIME TYPES (product
+ * invariant 11). iOS screenshots are PNG, iOS camera photos default to HEIC and
+ * "Most Compatible" gives JPEG; without HEIC here the iOS picker greys out the
+ * owner's own photos and it looks like a broken phone, not a missing format.
+ * The extension aliases matter because iOS frequently reports HEIC with an
+ * empty or `application/octet-stream` type.
+ *
+ * A convenience filter only - the server's magic-byte sniff is authoritative.
+ */
+export const IMAGE_ACCEPT_ATTRIBUTE = 'image/png,image/jpeg,image/heic,image/heif,.heic,.heif';
+
+/** `specs/ui.md` §3.2 - the file-selection affordance, never a fallback. */
+export const CHOOSE_FILES_LABEL = 'Choose files';
+
+/**
+ * `specs/ui.md` §3.2 - a selected HEIC/HEIF tile.
+ *
+ * Only Safari renders HEIC in an `<img>`, so every other browser would show a
+ * broken image. The placeholder states the format and promises the preview
+ * rather than failing silently.
+ */
+export const HEIC_PREVIEW_PLACEHOLDER = 'HEIC — preview after upload';
+
+/**
+ * `specs/ui.md` §2.1 - the freshness strip when the dates cannot be computed
+ * (`T-FRESH-014`).
+ *
+ * ⚠ FINDING - INVENTED COPY, PENDING OWNER REVIEW. `T-FRESH-014` requires the
+ * strip to "degrade visibly", but no spec supplies the wording: `specs/ui.md`
+ * §9 has no constant for it and `specs/ux-states.md` §2 has no row for it.
+ *
+ * Worded as an admission about nextup, not a statement about the owner's list:
+ * "unavailable right now" cannot be misread as "you have never updated this"
+ * (the US-022 AC-3 misreading `T-FRESH-012` exists to prevent) and carries no
+ * instruction to go and capture anything, which `A46` forbids.
+ */
+export const FRESHNESS_UNAVAILABLE = 'Last updated dates are unavailable right now.';
+
 /** `specs/ui.md` §2.1 item 2 - the default (`dir=desc`). Never "date saved" (REQ-061). */
 export const SORT_NEWEST_LABEL = 'Newest first';
-
 /** `specs/ui.md` §2.1 item 2 - `dir=asc`, the accepted mitigation for SUC-003. */
 export const SORT_OLDEST_LABEL = 'Oldest first';
 
