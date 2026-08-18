@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 102 |
+| ⬜ todo | 101 |
 | 🚧 doing | 5 |
-| ✅ done | 54 |
+| ✅ done | 55 |
 | 🙋 owner | 4 |
 | 💤 deferred | 0 |
 | **total** | **165** |
@@ -28,7 +28,8 @@ Not done, and every task they depend on is done.
 | `TASK-026` | S | Epic G — Attribution & compliance |
 | `TASK-028` | S | Epic A — Access & identity |
 | `TASK-031` | S | Epic A — Access & identity |
-| `TASK-038` | M | Epic F — The list itself (the value loop) |
+| `TASK-039` | S | Epic F — The list itself (the value loop) |
+| `TASK-040` | S | Epic F — The list itself (the value loop) |
 | `TASK-042` | XS | Epic F — The list itself (the value loop) |
 | `TASK-045` | S | Epic D — Matching & identity |
 | `TASK-051` | XS | Epic B — Capture & import |
@@ -58,15 +59,13 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-85 tasks cannot start yet.
+83 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
-| `TASK-039` | `TASK-038` |
-| `TASK-040` | `TASK-038` |
 | `TASK-043` | `TASK-045` |
 | `TASK-044` | `TASK-043` |
-| `TASK-046` | `TASK-026`, `TASK-038` |
+| `TASK-046` | `TASK-026` |
 | `TASK-058` | `TASK-057`, `TASK-154` |
 | `TASK-059` | `TASK-058` |
 | `TASK-059b` | `TASK-058`, `TASK-067` |
@@ -129,7 +128,7 @@ Not done, and every task they depend on is done.
 | `TASK-118` | `TASK-052` |
 | `TASK-119` | `TASK-118` |
 | `TASK-120` | `TASK-026`, `TASK-118` |
-| `TASK-123` | `TASK-038`, `TASK-069`, `TASK-096`, `TASK-162` |
+| `TASK-123` | `TASK-069`, `TASK-096`, `TASK-162` |
 | `TASK-124` | `TASK-123` |
 | `TASK-125` | `TASK-123` |
 | `TASK-127` | `TASK-126` |
@@ -184,6 +183,7 @@ Not done, and every task they depend on is done.
 | `TASK-035` | `tools/check-write-once-date-added.mjs` + `tests/infra/writeOnceDateAdded.spec.ts` — `T-INV-006` (a–n), a static gate proving no assignment to `.dateAdded` and no `dateAdded` key in a Prisma `update`/`updateMany`/`upsert` exists outside `createServiceListing()`. Three mutations of the checker itself caught (loosened `dateAddedEdited` lookahead, exemption failing open, `create` treated as mutating). Server-side `dateAddedLabel` was already delivered and is asserted by `T-LIST-011c`. `~~T-LIST-018~~` relocated to TASK-038 — see `specs/testing.md` §19. | `T-INV-006` |
 | `TASK-036` | `packages/domain/src/ordering.ts` + `packages/domain/test/ordering.spec.ts` (19 cases) + `apps/api/test/integration/titleOrdering.spec.ts` (16 cases) — `T-LIST-014`, `T-LIST-015`, `T-LIST-016`, `T-LIST-017` (U) and `T-LIST-025`, `T-LIST-026`, `T-LIST-027` (I); `T-LIST-010` was already delivered by TASK-033. **Two live ordering bugs fixed**, both silent: the tie-breaker was `{ id: dir }`, so tie order flipped when the owner reversed the sort AND the keyset predicate stopped mirroring the `ORDER BY`, dropping rows between pages; and `nulls` placement relied on SQL Server's default, which is last on `desc` and **first** on `asc`. Five mutations caught — three of the query, two of the comparator. Four orphaned ids adopted; see `specs/testing.md` §20. | `T-LIST-010`, `T-LIST-014`, `T-LIST-015`, `T-LIST-016`, `T-LIST-017`, `T-LIST-025`, `T-LIST-026`, `T-LIST-027` |
 | `TASK-037` | `apps/api/test/integration/titleFilters.spec.ts` (26 cases) — `T-LIST-020` (a–e), `T-LIST-021` (a–d), `T-LIST-022` (a–h), `T-LIST-023` (a–e), `T-LIST-024` (a–d). **The genre filter did not exist**: `genre` was parsed, validated, and then never passed to the query, so `?genre=Comedy` returned 200 and listed everything. Implemented as a quoted-token match inside the JSON column, which makes `genres: []` exclusion (AC-6) fall out by construction. Four mutations caught, including the sibling-`OR` hazard that would have dropped the filter on page 2 only. `T-LIST-021`/`T-LIST-022` were orphaned ids, adopted here — `specs/testing.md` §20.1. | `T-LIST-020`, `T-LIST-021`, `T-LIST-022`, `T-LIST-023`, `T-LIST-024` |
+| `TASK-038` | `components/TitleRow.tsx` + `components/TitleList.tsx` + `pages/ListPage.tsx` — `T-UI-010` (a–k), `T-LIST-018` (a–d), `T-UI-012` (a–d). Three mutations caught: a component-built date label (fails `T-LIST-018a/b/c` + `T-UI-010a`), one row per listing instead of per work (fails `T-UI-010e`, `T-LIST-018b/c`, `T-UI-012d`), a credentialed `netflix.com` anchor in a badge (fails all four `T-UI-012`). ⚠ **Deep links out to the service are NOT built** — this row and `T-UI-012`/US-038 AC-3 presume one, but `specs/ui.md` §2.2 lists no such element and `specs/api.md` §6.2 carries no URL field, so a URL scheme would have to be invented. Built the conservative reading instead: no row addresses a streaming host at all, asserted universally by `T-UI-012b`. Needs an owner decision. | `T-LIST-018`, `T-UI-010`, `T-UI-012` |
 | `TASK-041` | `apps/api/src/routes/serviceState.ts` + `packages/domain/src/freshness.ts` — `GET /api/service-state`, one entry per service in `SERVICES` so a never-captured service reads "has never been updated" rather than vanishing. `ageInDays` counts UTC calendar days, not 24-hour blocks, and clamps clock skew. `T-FRESH-010` (a–h), `T-FRESH-012` (a–f), `T-FRESH-015` (a–c, the A46 no-nudge regression guard). All four mutations caught; see `specs/testing.md` §16. | `T-FRESH-010`, `T-FRESH-012`, `T-FRESH-015` |
 | `TASK-047` | `prisma/migrations/0002_perf_indexes/` (the five §16.6 indexes) + `apps/api/test/integration/queryPlan.spec.ts` (12 cases) — `T-PERF-001` (a-i), `T-PERF-003` (a-c), plus `listRemovedListingPage` / `searchRemovedListings` / `escapeLikeTerm` in the repository. Plans are read from `sys.dm_exec_query_plan`, NOT `SET SHOWPLAN_XML ON`, because Prisma pools connections and a session-scoped plan setting captures the wrong statement. Two of my own errors caught by the harness: a plan-cache clear placed before its own measurement manufactured a phantom 296-vs-50 regression and sent one round of optimisation after nothing, and the resulting "sargable leading predicate" was measured at depth 15,000, found to make no difference, and removed. Search is deliberately NOT index-backed (no `pg_trgm` on Basic); `escapeLikeTerm` escapes its own escape character first. See `specs/testing.md` §23. | `T-PERF-001`, `T-PERF-003` |
 | `TASK-048` | `T-BATCH-010`, `T-BATCH-015` | `T-API-003`, `T-BATCH-010`, `T-BATCH-015` |
