@@ -75,7 +75,12 @@ describe('T-CI-009 the deployment pipeline cannot skip its own gates', () => {
   });
 
   it('T-CI-009g: production traffic is shifted only AFTER the production smoke suite', () => {
-    const hold = deploy.indexOf('Hold new revision at 0% traffic');
+    // The anchor is the step that PINS traffic for the duration of the deploy.
+    // It was renamed when the gate was made real (it used to run after the
+    // deployment, where it held nothing) — the ordering property it asserts is
+    // unchanged, and is now reinforced by T-CI-009o.
+    const hold = deploy.indexOf('Read the revision currently serving traffic');
+    // ~~const hold = deploy.indexOf('Hold new revision at 0% traffic');~~
     const smoke = deploy.lastIndexOf('Production smoke suite');
     const shift = deploy.indexOf('Shift traffic to 100%');
 
@@ -154,5 +159,58 @@ describe('T-CI-009 the deployment pipeline cannot skip its own gates', () => {
     expect(sqlLoc).toBeTruthy();
     expect(sqlLoc).not.toBe(loc);
     expect(sqlLoc).not.toMatch(/\$/);
+  });
+  // ── The blue/green gate (added after the first production deployment) ──────
+  //
+  // The first prod run failed at the last step: the app was in Single revision
+  // mode, where `ingress traffic set` is rejected outright. The steps BEFORE it
+  // all reported success — including a "hold at 0%" that had held nothing and a
+  // smoke suite that had tested the already-live revision. These assert the
+  // three properties that make the gate real, each of which was individually
+  // absent while the pipeline looked correct.
+
+  it('T-CI-009o: the held revision is read BEFORE the deployment, not after', () => {
+    // Order is the whole mechanism. ARM applies the traffic block as part of
+    // `deployment group create`, so a hold computed afterwards is a hold on a
+    // revision that is already serving the owner — and it reads identically in
+    // a diff. Asserted as an index comparison because both steps exist in
+    // either arrangement. Scoped to the production job: an unscoped
+    // `indexOf('az deployment group create')` finds STAGING's copy, which
+    // precedes the whole production job and makes the assertion unsatisfiable
+    // no matter how the steps are ordered.
+    const prodJob = deployCode.slice(deployCode.indexOf('  production:'));
+    const prev = prodJob.indexOf('az containerapp ingress traffic show');
+    const create = prodJob.indexOf('az deployment group create');
+    expect(prev).toBeGreaterThan(-1);
+    expect(create).toBeGreaterThan(-1);
+    expect(prev).toBeLessThan(create);
+    expect(deployCode).toMatch(/holdRevisionName="\$\{\{ steps\.prev\.outputs\.revision \}\}"/);
+  });
+
+  it('T-CI-009p: production smoke targets the new revision, not the app FQDN', () => {
+    // The app FQDN is exactly what is still pinned to the OLD revision while
+    // the hold is in force, so smoking it exercises the code already known to
+    // work and reports green for a revision nobody contacted. Distinguishing
+    // the two URLs is the only thing that makes the gate load-bearing.
+    const prodJob = deployCode.slice(deployCode.indexOf('  production:'));
+    expect(prodJob).toMatch(/SMOKE_BASE_URL:\s*https:\/\/\$\{\{ steps\.target\.outputs\.fqdn \}\}/);
+    expect(prodJob).not.toMatch(
+      /SMOKE_BASE_URL:\s*https:\/\/\$\{\{ steps\.deploy\.outputs\.fqdn \}\}/,
+    );
+  });
+
+  it('T-CI-009q: the superseded revision is deactivated, and only after the shift', () => {
+    // Prod runs minReplicas = 1, so every revision left Active bills a replica
+    // for ever: without this the gate doubles the standing cost of the app on
+    // each deploy. But it must NOT run unconditionally — if the traffic shift
+    // did not happen, the old revision is still the one serving the owner.
+    const deact = deployCode.indexOf('az containerapp revision deactivate');
+    const shift = deployCode.indexOf('--revision-weight');
+    expect(deact).toBeGreaterThan(-1);
+    expect(shift).toBeGreaterThan(-1);
+    expect(deact).toBeGreaterThan(shift);
+    const step = deployCode.slice(deployCode.lastIndexOf('- name:', deact), deact);
+    expect(step).toMatch(/if:\s*steps\.prev\.outputs\.revision != ''/);
+    expect(step).not.toMatch(/if:\s*always\(\)/);
   });
 });

@@ -450,3 +450,39 @@ describe('T-INFRA-010 the ingress port matches the port the container listens on
     expect(portViolations(template, undeclared).join(' ')).toMatch(/listening port is undeclared/);
   });
 });
+
+// The traffic/revision configuration. Both of these were absent on the first
+// production deployment, and neither absence produced a failing signal: the
+// template built, validated and deployed, and the app ran.
+describe('T-INFRA-011 the container app can actually hold traffic', () => {
+  const aca = readFileSync(path.join(import.meta.dirname, '../..', 'infra/aca.bicep'), 'utf8');
+
+  it('T-INFRA-011a: revision mode is Multiple', () => {
+    // Single mode — which is the DEFAULT, so this is what you get by writing
+    // nothing at all — permits exactly one revision with a weight. Every
+    // blue/green step in deploy.yml then fails with "configured for single
+    // revision", but only the last one, after the smoke suite has passed.
+    expect(aca).toMatch(/activeRevisionsMode:\s*'Multiple'/);
+  });
+
+  it('T-INFRA-011b: traffic is pinned to the held revision when one is named', () => {
+    // An unconditional `latestRevision: true` makes ARM promote the new
+    // revision to 100% as part of the deployment itself — before
+    // `prisma migrate deploy` has run — so the hold, the smoke suite and the
+    // shift all operate on a revision that is already live. The template still
+    // deploys cleanly, which is why this is asserted rather than reviewed.
+    expect(aca).toMatch(/param holdRevisionName string = ''/);
+    expect(aca).toMatch(/traffic: empty\(holdRevisionName\)/);
+    expect(aca).toMatch(/revisionName: holdRevisionName/);
+  });
+
+  it('T-INFRA-011c: the bootstrap branch still routes traffic somewhere', () => {
+    // The mirror of 011b. A conditional that pins to a named revision but
+    // leaves the empty case with no weighted entry produces an app with no
+    // reachable revision on a first deploy — and there is no previous
+    // revision to fall back to, so it fails closed and unrecoverably.
+    const bootstrap = /empty\(holdRevisionName\)\s*\?([\s\S]*?):\s*\[/.exec(aca)?.[1] ?? '';
+    expect(bootstrap).toMatch(/latestRevision: true/);
+    expect(bootstrap).toMatch(/weight: 100/);
+  });
+});

@@ -33,6 +33,30 @@ param logAnalyticsSharedKey string
 param containerImage string
 
 // ---------------------------------------------------------------------------
+// THE 0%-TRAFFIC HOLD (TASK-007). This parameter is the whole mechanism, and
+// it is not optional decoration.
+//
+// The workflow reads the revision currently serving 100% and passes it here
+// BEFORE deploying. ARM then creates the new revision while traffic stays
+// pinned to the named old one, so the new code is reachable only on its own
+// per-revision FQDN and the owner keeps hitting the known-good revision until
+// the smoke suite has passed against the new one.
+//
+// ⚠ Do NOT "simplify" this back to an unconditional `latestRevision: true`.
+// That is what shipped first, and it silently made the gate a no-op in two
+// separate ways at once: the app defaulted to Single revision mode (so
+// `az containerapp ingress traffic set` errored outright), and — had the mode
+// been fixed alone — ARM would have promoted the new revision to 100% as part
+// of the deployment itself, BEFORE `prisma migrate deploy` ran. The workflow
+// then "held" traffic on a revision that was already live and smoked a URL
+// that was already serving the new code. Every step reported success.
+//
+// Empty means bootstrap: there is no previous revision, so the latest one must
+// take the traffic or the app has no route at all.
+@description('Revision to pin 100% of traffic to during a deployment. Empty on first deploy.')
+param holdRevisionName string = ''
+
+// ---------------------------------------------------------------------------
 // EASY AUTH (TASK-027, ADR-0002, specs/security.md §2.1).
 //
 // ⚠ THE ISSUER IS `/common` ON PURPOSE, AND IT ACCEPTS *EVERY* MICROSOFT
@@ -142,13 +166,35 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         // security one: navigator.clipboard is absent on http://, so the
         // paste ingest affordance (REQ-001/REQ-004) simply would not exist.
         allowInsecure: false
-        traffic: [
-          {
-            latestRevision: true
-            weight: 100
-          }
-        ]
+        traffic: empty(holdRevisionName)
+          ? [
+              {
+                latestRevision: true
+                weight: 100
+              }
+            ]
+          : [
+              {
+                revisionName: holdRevisionName
+                weight: 100
+              }
+            ]
       }
+      // Multiple revision mode is REQUIRED, not a preference: it is the only
+      // mode in which more than one revision can exist with a traffic weight,
+      // and therefore the only mode in which the new revision can be held at
+      // 0% and smoke-tested before the owner is exposed to it. In Single mode
+      // `az containerapp ingress traffic set` fails outright with
+      // "configured for single revision" — which is exactly how the first
+      // production deployment failed, at the last step, after the smoke suite
+      // had already reported green against the live revision.
+      //
+      // The cost consequence is real and is handled in deploy.yml: prod runs
+      // minReplicas = 1, so every revision left Active bills a replica for
+      // ever. The workflow deactivates the superseded revision after the
+      // traffic shift. A deactivated revision is still restorable, which is
+      // what makes rollback a revision switch (docs/runbooks/rollback.md).
+      activeRevisionsMode: 'Multiple'
       // NO `registries` block, deliberately. The ghcr.io package is PUBLIC and
       // Container Apps pulls it anonymously, so there is no registry credential
       // anywhere in this system (TASK-146, docs/ghcr-pat.md).

@@ -35,6 +35,13 @@
         "description": "Fully-qualified container image in ghcr.io."
       }
     },
+    "holdRevisionName": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Revision to pin 100% of traffic to during a deployment. Empty on first deploy."
+      }
+    },
     "sqlAdminLogin": {
       "type": "string",
       "metadata": {
@@ -527,6 +534,9 @@
           },
           "entraClientSecret": {
             "value": "[parameters('entraClientSecret')]"
+          },
+          "holdRevisionName": {
+            "value": "[parameters('holdRevisionName')]"
           }
         },
         "template": {
@@ -582,6 +592,13 @@
                 "description": "Fully-qualified container image, e.g. ghcr.io/saquibrashid/nextup:sha-abc123."
               }
             },
+            "holdRevisionName": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Revision to pin 100% of traffic to during a deployment. Empty on first deploy."
+              }
+            },
             "entraClientId": {
               "type": "string",
               "metadata": {
@@ -631,13 +648,9 @@
                     "targetPort": 3000,
                     "transport": "auto",
                     "allowInsecure": false,
-                    "traffic": [
-                      {
-                        "latestRevision": true,
-                        "weight": 100
-                      }
-                    ]
+                    "traffic": "[if(empty(parameters('holdRevisionName')), createArray(createObject('latestRevision', true(), 'weight', 100)), createArray(createObject('revisionName', parameters('holdRevisionName'), 'weight', 100)))]"
                   },
+                  "activeRevisionsMode": "Multiple",
                   "secrets": [
                     {
                       "name": "[variables('entraClientSecretName')]",

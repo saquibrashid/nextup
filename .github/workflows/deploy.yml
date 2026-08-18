@@ -184,6 +184,21 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      # Read the revision the owner is currently being served BEFORE anything
+      # changes, and pin traffic to it for the duration of the deployment. This
+      # must happen before `az deployment group create`, not after: ARM applies
+      # the traffic block as part of the deployment, so a hold applied
+      # afterwards is a hold on a revision that is already live.
+      # `|| true` covers the bootstrap case where the app does not exist yet.
+      - id: prev
+        name: Read the revision currently serving traffic
+        run: |
+          set -euo pipefail
+          CUR=$(az containerapp ingress traffic show -n "ca-nextup-prod" -g "$RESOURCE_GROUP" \
+                  --query "[?weight>\`0\`]|[0].revisionName" -o tsv 2>/dev/null || true)
+          echo "revision=${CUR}" >> "$GITHUB_OUTPUT"
+          echo "Holding traffic on: ${CUR:-<none — first deployment>}"
+
       - id: deploy
         name: az deployment group create (prod, new revision at 0% traffic)
         run: |
@@ -195,6 +210,7 @@ jobs:
                          location="$LOCATION" \
                          sqlLocation="$SQL_LOCATION" \
                          containerImage="${{ needs.build.outputs.image }}" \
+                         holdRevisionName="${{ steps.prev.outputs.revision }}" \
                          sqlAdminLogin="${{ secrets.SQL_ADMIN_LOGIN }}" \
                          sqlAdminPassword="${{ secrets.SQL_ADMIN_PASSWORD }}" \
                          entraAdminObjectId="${{ secrets.ENTRA_ADMIN_OBJECT_ID }}" \
@@ -212,37 +228,55 @@ jobs:
           DATABASE_URL: sqlserver://${{ steps.deploy.outputs.sql }}:1433;database=${{ steps.deploy.outputs.db }};user=${{ secrets.SQL_ADMIN_LOGIN }};password=${{ secrets.SQL_ADMIN_PASSWORD }};encrypt=true;trustServerCertificate=false
         run: npx prisma migrate deploy --schema prisma/schema.prisma
 
-      # Pin the incoming revision to 0% before it can serve anyone, so the
-      # smoke suite below runs against the new code on a real production
-      # database while live traffic is still on the old revision.
-      - id: hold
-        name: Hold new revision at 0% traffic
+      # ⚠ The smoke suite MUST target the new revision's own FQDN, not the app
+      # FQDN. The app FQDN is precisely what is still pinned to the OLD
+      # revision, so smoking it would test the code that is already known to
+      # work and report green for a new revision nobody ever contacted. That
+      # is not a hypothetical: it is what the first production run did.
+      # On a first deployment there is no hold, the latest revision owns the
+      # app FQDN, and the two URLs are equivalent.
+      - id: target
+        name: Resolve the new revision and its private FQDN
         run: |
           set -euo pipefail
           APP="${{ steps.deploy.outputs.app }}"
           NEW=$(az containerapp revision list -n "$APP" -g "$RESOURCE_GROUP" \
                   --query "sort_by([].{n:name,t:properties.createdTime},&t)[-1].n" -o tsv)
-          echo "revision=$NEW" >> "$GITHUB_OUTPUT"
-          CUR=$(az containerapp ingress traffic show -n "$APP" -g "$RESOURCE_GROUP" \
-                  --query "[?latestRevision==\`false\` && weight>\`0\`]|[0].revisionName" -o tsv || true)
-          if [ -n "$CUR" ] && [ "$CUR" != "$NEW" ]; then
-            az containerapp ingress traffic set -n "$APP" -g "$RESOURCE_GROUP" \
-              --revision-weight "$CUR=100" "$NEW=0"
-          else
-            echo "No previous revision to hold traffic on — first deployment."
+          FQDN=$(az containerapp revision show -n "$APP" -g "$RESOURCE_GROUP" \
+                  --revision "$NEW" --query properties.fqdn -o tsv)
+          if [ -z "$FQDN" ]; then
+            echo "::error::Revision $NEW has no FQDN; refusing to smoke a URL that may be the old revision."
+            exit 1
           fi
+          echo "revision=$NEW" >> "$GITHUB_OUTPUT"
+          echo "fqdn=$FQDN" >> "$GITHUB_OUTPUT"
 
       - name: Production smoke suite (T-SMOKE-*)
         env:
-          SMOKE_BASE_URL: https://${{ steps.deploy.outputs.fqdn }}
+          SMOKE_BASE_URL: https://${{ steps.target.outputs.fqdn }}
         run: npm run test:smoke
 
       # Only now. A failure in any step above leaves production serving the
-      # previous revision, and rollback is this same command with the weights
-      # reversed — see docs/runbooks/rollback.md.
+      # previous revision, and rollback is this same command naming the old
+      # revision — see docs/runbooks/rollback.md.
       - name: Shift traffic to 100%
         run: |
           set -euo pipefail
           az containerapp ingress traffic set \
             -n "${{ steps.deploy.outputs.app }}" -g "$RESOURCE_GROUP" \
-            --revision-weight "${{ steps.hold.outputs.revision }}=100"
+            --revision-weight "${{ steps.target.outputs.revision }}=100"
+
+      # Prod runs minReplicas = 1, so a superseded revision left Active bills a
+      # replica for ever — the blue/green gate above would otherwise double the
+      # standing cost of the app on every single deploy. Deactivating does NOT
+      # delete it: it stays listed and reactivatable, which is what makes
+      # rollback a revision switch rather than a rebuild.
+      # `if: always()` is deliberately NOT used — if the shift did not happen,
+      # the old revision is still serving the owner and must stay up.
+      - name: Deactivate the superseded revision
+        if: steps.prev.outputs.revision != ''
+        run: |
+          set -euo pipefail
+          az containerapp revision deactivate \
+            -n "${{ steps.deploy.outputs.app }}" -g "$RESOURCE_GROUP" \
+            --revision "${{ steps.prev.outputs.revision }}"

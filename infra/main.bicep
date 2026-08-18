@@ -45,6 +45,12 @@ param sqlLocation string = location
 @description('Fully-qualified container image in ghcr.io.')
 param containerImage string
 
+// Passed straight through to aca.bicep, where the reasoning lives. Empty on a
+// first deployment; otherwise the revision that must keep serving traffic
+// until the new one has passed its smoke suite.
+@description('Revision to pin 100% of traffic to during a deployment. Empty on first deploy.')
+param holdRevisionName string = ''
+
 // No ghcr credential parameters: the package is public and ACA pulls it
 // anonymously (TASK-146 / R8, docs/ghcr-pat.md).
 
@@ -128,6 +134,7 @@ module aca 'aca.bicep' = {
     containerImage: containerImage
     entraClientId: entraClientId
     entraClientSecret: entraClientSecret
+    holdRevisionName: holdRevisionName
   }
 }
 
