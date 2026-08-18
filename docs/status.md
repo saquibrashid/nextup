@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 97 |
-| 🚧 doing | 5 |
-| ✅ done | 59 |
+| ⬜ todo | 95 |
+| 🚧 doing | 6 |
+| ✅ done | 60 |
 | 🙋 owner | 4 |
 | 💤 deferred | 0 |
 | **total** | **165** |
@@ -42,7 +42,6 @@ Not done, and every task they depend on is done.
 | `TASK-145` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-151` | S | Epic B — Capture & import |
 | `TASK-152` | XS | Epic B — Capture & import |
-| `TASK-154` | M | Epic B — Capture & import |
 | `TASK-156` | XS | Epic K — Platform, safety, and the shell |
 | `TASK-159` | M | Epic B — Capture & import |
 | `TASK-160` | M | Epic B — Capture & import |
@@ -65,7 +64,7 @@ Not done, and every task they depend on is done.
 | `TASK-043` | `TASK-045` |
 | `TASK-044` | `TASK-043` |
 | `TASK-046` | `TASK-026` |
-| `TASK-058` | `TASK-057`, `TASK-154` |
+| `TASK-058` | `TASK-057` |
 | `TASK-059` | `TASK-058` |
 | `TASK-059b` | `TASK-058`, `TASK-067` |
 | `TASK-060` | `TASK-045` |
@@ -204,5 +203,6 @@ Not done, and every task they depend on is done.
 | `TASK-149` | **ahead-of:TASK-145** — TASK-145's pixel-guard half is delivered and is what this task depends on; its remaining half is serial EXTRACTION, which belongs to TASK-057/058 and is not on this path. `apps/api/src/images/transcode.ts` + `apps/api/test/unit/transcode.spec.ts` (21 cases), claims table in `specs/testing.md` §29. `transcodeHeicToPng` calls `assertDecodable` as its first statement, decodes with `heic-convert` to **lossless PNG**, maps a catchable WASM allocation failure to `IMAGE_DECODE_OOM` (503) and everything else to `IMAGE_DECODE_FAILED` (415), and re-asserts the header dimensions against the decoded raster. Wired to the route by `DEFAULT_STAGES`; `UNBUILT_STAGES` survives as an alias so §28's citation resolves. Three findings in §29.3: (a) `ispe` ignores `irot`, so a correct decode legitimately **transposes** the dimensions - reading §5.1 step 4 literally would reject ordinary rotated camera-roll uploads, the exact case A42 exists to support; (b) the stored ceiling is not the upload ceiling - a lossless PNG transcode of a compliant 10 MiB HEIC was **unrepresentable in its own schema**, and the domain schema case had encoded the bug, so `MAX_STORED_IMAGE_BYTES` was separated and that case corrected in place; (c) wiring a stage that can genuinely fail turned a per-file failure into a **whole-request** failure - `ingestOne` now catches `AppError` only (REQ-080/081, `T-IMG-023k`/`l`). The real-fixture legs of `T-IMG-013/015/016` stay with **TASK-151**: `T-DEP-002` forbids a HEIC encoder in the tree, so nothing here can generate HEIC bytes and a committed fixture is the only route. | `T-IMG-013`, `T-IMG-015`, `T-IMG-016`, `T-IMG-023` |
 | `TASK-150` | `stripAllMetadata()` in `apps/api/src/images/transcode.ts`, wired into `DEFAULT_STAGES.stripMetadata` so it runs for **every** accepted image from **every** source, outside the HEIC condition — never selected by `ingestSource`. `apps/api/test/unit/stripMetadata.spec.ts` (10 cases) plus an integration case that uploads a GPS-bearing JPEG over HTTP and re-reads the **stored blob out of Azurite**, so the claim is about what landed in the store rather than what a seam returned; it uses the **upload** path deliberately, because WebKit strips EXIF on clipboard read but not on file upload and a pasted fixture would pass whatever our code did. Removal is **structural** — whole JPEG segments and whole PNG chunks are copied or dropped, never re-encoded — so surviving CRCs stay valid and no pixel changes; a JPEG re-encode to launder metadata would be lossy, which NFR-012a forbids. `APP0` (JFIF) and `APP2` (ICC) are kept on purpose: the ICC profile decides how the image renders and identifies nobody. Unparseable streams fail closed. Six mutations verified, each caught by its named case. Claims, non-claims and two findings in `specs/testing.md` §30; §28.2 and §29.2 corrected in place now that REQ-078 is discharged. §30.2 records honestly that the **real-HEIC-with-GPS** leg named in `specs/security.md` §4.2 stays with **TASK-151** — the encoder ban means nothing in this tree can generate HEIC bytes, so a committed fixture is the only route. Finding: the integration JPEG fixture was a 29-byte header stub that stopped mid-`SOF0` and the strip correctly refused it as truncated; the fixture was wrong, not the refusal. | `T-SEC-032`, `T-SEC-033` |
 | `TASK-153` | `d6796b3` — owner approved the LGPL-3.0 obligation; gate proven on synthetic fixtures | `T-LICENSE-001` |
+| `TASK-154` | `apps/api/test/integration/ingestGuard.spec.ts` (9 tests) — `T-IMG-018` (c–h) and `T-IMG-019` (a–c) asserted end to end through the real route, real Azurite and a real database. The isolation itself was already implemented by TASK-050/149; this task PROVES it and found one real defect doing so: `OOM_PATTERNS` in `apps/api/src/images/transcode.ts` did not match Emscripten's `abort(OOM)` / `Aborted(OOM)` shape, so a genuine out-of-memory decode was classified `IMAGE_DECODE_FAILED` (415, no runbook) instead of `IMAGE_DECODE_OOM` (503) — fixed here, and `specs/testing.md` §AC-10/P1 requires exactly that case. The double is `heic-convert` itself, not `transcodeHeicToPng` and not `IngestStages`, so the real OOM-vs-corrupt classification is under test rather than stubbed out. `T-IMG-018h` asserts NEGATIVELY that no compensating-cleanup path exists (orphan blobs are left to the `NFR-019` purge) and was mutation-verified. Per the task's own scope note this does NOT depend on TASK-072. | _no test id declared_ |
 | `TASK-158` | `packages/domain/src/pastedFileName.ts` + `T-PASTE-005a`-`s` (19 unit cases). `INGEST_SOURCES`/`IngestSource` already existed from TASK-012, so this task is the synthesiser alone. The INTEGRATION half of `T-PASTE-005` (round-trip of `ingestSource`, server-assigned `seqInBatch`, `blobPath` free of any client name) belongs to TASK-050 — see `specs/testing.md` §27.2. | `T-PASTE-005` |
 | `TASK-167` | this commit — the ledger, the gate and `docs/status.md` | `T-STATUS-001` |

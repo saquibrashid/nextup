@@ -49,11 +49,32 @@ const OOM_PATTERNS: readonly RegExp[] = [
   /memory allocation failed/i,
   /cannot enlarge memory/i,
   /allocation size overflow/i,
+  // ⚠ Emscripten's abort path does NOT always spell the words out: it raises
+  // `abort(OOM)` / `Aborted(OOM)` with the reason as a bare token, so none of
+  // the phrase patterns above match it. Missing this shape classifies a real
+  // out-of-memory condition as a corrupt file — a 415 telling the owner to
+  // re-export an image that is perfectly fine, with no mention of the runbook
+  // that actually fixes it (`T-IMG-019`, `specs/testing.md` §AC-10/P1).
+  /\babort(?:ed)?\(\s*oom\s*\)/i,
 ];
 
-function isOutOfMemory(error: unknown): boolean {
+/**
+ * Does this error mean the decoder ran out of memory?
+ *
+ * Exported because the extraction runner (TASK-058) must make the same
+ * judgement about the same failure at a later stage, and TWO independently
+ * maintained pattern lists would drift — at which point one layer reports
+ * `IMAGE_DECODE_OOM` and the other reports a corrupt file for the identical
+ * condition, and `T-IMG-020`'s guarantee that the message names the real cause
+ * quietly stops holding on one of the two paths.
+ */
+export function isOutOfMemoryError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return OOM_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+function isOutOfMemory(error: unknown): boolean {
+  return isOutOfMemoryError(error);
 }
 
 /**
