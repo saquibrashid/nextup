@@ -23,6 +23,25 @@ param environmentName string
 @description('Azure region for all resources.')
 param location string = resourceGroup().location
 
+// ⚠ SQL is regionally separable ON PURPOSE — do NOT "simplify" this back to
+// `location`. Azure SQL refuses new logical servers in whole regions for
+// capacity reasons, per subscription and without notice: on 2026-08-18 this
+// subscription could not create a server in eastus2, eastus or westus2
+// (`ProvisioningDisabled` / `RegionDoesNotAllowProvisioning`), while centralus
+// and westus3 accepted. Every other resource here deployed into eastus2
+// perfectly happily, so pinning the whole stack to SQL's availability would
+// relocate working infrastructure to work around one service.
+//
+// `az deployment group validate` does NOT catch this — validation does not
+// consult regional capacity, so the template validates in a region that will
+// then reject the write. See docs/runbooks/deployment-identity.md.
+//
+// Cross-region latency is acceptable here and is NOT a silent regression: this
+// is a single-owner app whose requests are dominated by vision-model calls
+// measured in seconds (NFR-002 budgets the interactive path accordingly).
+@description('Azure region for the SQL logical server. Separate from `location` because Azure SQL restricts new-server provisioning per region and per subscription.')
+param sqlLocation string = location
+
 @description('Fully-qualified container image in ghcr.io.')
 param containerImage string
 
@@ -88,7 +107,7 @@ module sqldb 'sqldb.bicep' = {
   name: 'sqldb'
   params: {
     environmentName: environmentName
-    location: location
+    location: sqlLocation
     sqlServerName: sqlServerName
     sqlAdminLogin: sqlAdminLogin
     sqlAdminPassword: sqlAdminPassword

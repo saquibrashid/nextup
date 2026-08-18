@@ -9,6 +9,13 @@ using './main.bicep'
 
 param environmentName = 'prod'
 param location = 'eastus2'
+// SQL is pinned to a DIFFERENT region than everything else, deliberately.
+// Azure SQL refuses new logical servers in whole regions per subscription
+// (ProvisioningDisabled); on 2026-08-18 eastus2, eastus and westus2 all
+// refused this subscription while centralus and westus3 accepted. Do not
+// collapse this into location - see infra/main.bicep and
+// docs/runbooks/deployment-identity.md.
+param sqlLocation = 'centralus'
 
 // TASK-007's deploy workflow overrides this with the immutable sha- tag it
 // just pushed. The default is a public bootstrap image so the very first

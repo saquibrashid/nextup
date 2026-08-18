@@ -3202,7 +3202,7 @@ removed, and no other `tools/*.mjs` gate carries one.
 
 ## 32. The deployment pipeline (TASK-007)
 
-`.github/workflows/deploy.yml`, asserted by `T-CI-009a`--`l` in
+`.github/workflows/deploy.yml`, asserted by `T-CI-009a`--`n` in
 `tests/infra/deployWorkflow.spec.ts`, and `T-SMOKE-001`--`003` in
 `tests/smoke/smoke.spec.ts` (Playwright, `playwright.smoke.config.ts`).
 
@@ -3251,3 +3251,43 @@ layer even after the tag is deleted.
 **(c) `cancel-in-progress` is false on purpose.** Cancelling a deployment
 part-way through a migration or a traffic shift leaves the environment in a
 state nobody chose. `T-CI-009k` guards it.
+
+### 32.1 The SQL region is separate from every other region (`T-CI-009m`/`n`)
+
+`az deployment group create` failed at the `sqldb` module with
+`ProvisioningDisabled`: **Azure SQL refuses new logical servers in whole
+regions, per subscription and without notice.** On 2026-08-18 this subscription
+could not create a server in `eastus2`, `eastus` or `westus2`, while
+`centralus` and `westus3` accepted one. Every other resource deployed into
+`eastus2` without complaint, so `infra/main.bicep` gained a `sqlLocation`
+parameter rather than relocating working infrastructure to follow one service.
+
+Three properties of this failure make it worth two tests rather than a comment:
+
+1. **`az deployment group validate` does not catch it.** Validation does not
+   consult regional capacity, so the template validates cleanly in a region that
+   then rejects the write. The pre-flight check that exists specifically to
+   avoid a CI round-trip is blind to it.
+2. **It fails late and partially.** Log Analytics, storage, the managed
+   environment and the container app were all created before the SQL module
+   failed, so the symptom is a half-built environment, not a rejected template.
+3. **The obvious tidy-up restores it.** Two region parameters where one would
+   "do" is exactly the kind of thing a later reader collapses.
+
+`T-CI-009m` asserts each of the two deploy jobs passes `sqlLocation`
+**individually**, not that the file contains it at least once — passing it in
+staging only would satisfy a count and then fail production, the one environment
+with no later stage to catch anything.
+
+`T-CI-009n` exists because `T-CI-009m` alone is satisfiable while fully
+reintroducing the bug: `SQL_LOCATION: $LOCATION` and `SQL_LOCATION: eastus2`
+both keep the parameter present and both send SQL back to a region that refuses
+it. All three mutations -- alias, equal literal, and dropping it from the
+production job only -- were confirmed to fail.
+
+**Cost note.** The move is not free but is close to it: prod's SQL **Basic** tier
+is `.16`/day in both regions, so the verified `.90`/month is unchanged.
+Staging's serverless vCore rate is `.63`/hour in `centralus` against
+`.52` in `eastus2` (+21%); with `autoPauseDelay` in force staging bills
+essentially nothing, but the **worst case if `autoPauseDelay` is ever deleted
+rises from ~`` to ~``/month** (`T-INFRA-005t`--`w`).

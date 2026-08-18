@@ -121,4 +121,38 @@ describe('T-CI-009 the deployment pipeline cannot skip its own gates', () => {
   it('T-CI-009l: the ghcr credential note is linked where someone would look for it', () => {
     expect(deploy).toMatch(/docs\/ghcr-pat\.md/);
   });
+
+  it('T-CI-009m: BOTH environments pass an explicit sqlLocation', () => {
+    // Azure SQL refuses new logical servers in whole regions, per subscription
+    // and without notice (`ProvisioningDisabled`). eastus2 is refused for this
+    // subscription today while everything else deploys there, so SQL is pinned
+    // separately. If `sqlLocation` is dropped it defaults to `location` and the
+    // deployment fails — but only at the sqldb module, after the rest of the
+    // stack has already been written, and NOT during `az deployment group
+    // validate`, which does not consult regional capacity.
+    //
+    // Asserted per deploy job rather than as a total count: passing it in
+    // staging only would go green on a count of >= 1 and then fail production,
+    // which is the one environment with no stage after it to catch anything.
+    const jobs = deployCode
+      .split(/^ {2}[a-z]+:$/m)
+      .filter((s) => s.includes('az deployment group create'));
+    expect(jobs).toHaveLength(2);
+    for (const job of jobs) {
+      expect(job).toMatch(/sqlLocation="\$SQL_LOCATION"/);
+    }
+    expect(deployCode).toMatch(/SQL_LOCATION:\s*\S+/);
+  });
+
+  it('T-CI-009n: sqlLocation is a distinct value, not an alias of LOCATION', () => {
+    // The whole point of the parameter is that the two regions differ. Setting
+    // SQL_LOCATION to $LOCATION, or to the same literal, satisfies T-CI-009m
+    // while restoring exactly the failure it exists to prevent.
+    const loc = /^\s*LOCATION:\s*(\S+)\s*$/m.exec(deployCode)?.[1];
+    const sqlLoc = /^\s*SQL_LOCATION:\s*(\S+)\s*$/m.exec(deployCode)?.[1];
+    expect(loc).toBeTruthy();
+    expect(sqlLoc).toBeTruthy();
+    expect(sqlLoc).not.toBe(loc);
+    expect(sqlLoc).not.toMatch(/\$/);
+  });
 });

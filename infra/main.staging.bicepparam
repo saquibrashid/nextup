@@ -12,6 +12,13 @@ using './main.bicep'
 
 param environmentName = 'staging'
 param location = 'eastus2'
+// SQL is pinned to a DIFFERENT region than everything else, deliberately.
+// Azure SQL refuses new logical servers in whole regions per subscription
+// (ProvisioningDisabled); on 2026-08-18 eastus2, eastus and westus2 all
+// refused this subscription while centralus and westus3 accepted. Do not
+// collapse this into location - see infra/main.bicep and
+// docs/runbooks/deployment-identity.md.
+param sqlLocation = 'centralus'
 
 param containerImage = readEnvironmentVariable(
   'NEXTUP_IMAGE',

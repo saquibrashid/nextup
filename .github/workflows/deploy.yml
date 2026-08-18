@@ -29,6 +29,11 @@ env:
   IMAGE: ghcr.io/${{ github.repository }}
   RESOURCE_GROUP: nextup-rg
   LOCATION: eastus2
+  # ⚠ Deliberately NOT $LOCATION. Azure SQL refused new logical servers in
+  # eastus2 for this subscription (`ProvisioningDisabled`), while every other
+  # resource deploys there fine. See infra/main.bicep `sqlLocation` and
+  # docs/runbooks/deployment-identity.md before collapsing these into one.
+  SQL_LOCATION: centralus
 
 jobs:
   # ── 1 ───────────────────────────────────────────────────────────────────────
@@ -129,6 +134,7 @@ jobs:
             --template-file infra/main.bicep \
             --parameters environmentName=staging \
                          location="$LOCATION" \
+                         sqlLocation="$SQL_LOCATION" \
                          containerImage="${{ needs.build.outputs.image }}" \
                          sqlAdminLogin="${{ secrets.SQL_ADMIN_LOGIN }}" \
                          sqlAdminPassword="${{ secrets.SQL_ADMIN_PASSWORD }}" \
@@ -187,6 +193,7 @@ jobs:
             --template-file infra/main.bicep \
             --parameters environmentName=prod \
                          location="$LOCATION" \
+                         sqlLocation="$SQL_LOCATION" \
                          containerImage="${{ needs.build.outputs.image }}" \
                          sqlAdminLogin="${{ secrets.SQL_ADMIN_LOGIN }}" \
                          sqlAdminPassword="${{ secrets.SQL_ADMIN_PASSWORD }}" \
