@@ -49,3 +49,10 @@ dist-dev/
 # 'az ad app credential reset' writes the client secret to whatever file
 # it is redirected to, and this repository is public.
 .az-*
+
+# Coordination briefs handed to parallel lane agents. Working artefacts of a
+# build session, not part of the product: they name branch strategy, path
+# allow-lists and hard stops, all of which go stale the moment the lanes
+# converge. Kept in the working tree only so a freshly spawned agent can read
+# one with a relative path.
+.lane-briefs/
