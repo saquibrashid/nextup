@@ -557,7 +557,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-099` | `todo` | — |
 | `TASK-100` | `todo` | — |
 | `TASK-101` | `done` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` |
-| `TASK-102` | `todo` | — |
+| `TASK-102` | `done` | `components/SuppressDialog.tsx` — `T-UX-085` (a–f), `T-UX-022` (a–l). The row is reported `pending` while the request is in flight and `suppressed` only once the server has persisted it, so a rejected request cannot leave a hidden row behind — `T-UX-085a` asserts `suppressed` is never reported **at all** on the failure path, which an optimistic-hide-then-reconcile implementation would not satisfy even though it ends on `present`. Undo goes back through the `suppressionId` the server returned (`supp:<workIdentity>`), never a row-scoped key (REQ-071); an idempotent 200 offers Close only, because nothing changed. Five mutations caught: optimistic hide before persistence (`T-UX-085a/e`, `T-UX-022d`), undo failure showing the row again (`T-UX-022f`), an idempotent 200 rendered as a fresh hide (`T-UX-022g`), the same 200 still offering Undo (`T-UX-022g`), and the undo affordance removed (`T-UX-022b/c/d/e/f/k`). Four invented copy constants live in the component, not `copy.ts`, each with a ⚠ FINDING note — see the spec defects below. |
 | `TASK-103` | `todo` | — |
 | `TASK-104` | `todo` | — |
 | `TASK-105` | `todo` | — |

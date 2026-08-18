@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 99 |
+| ⬜ todo | 98 |
 | 🚧 doing | 6 |
-| ✅ done | 56 |
+| ✅ done | 57 |
 | 🙋 owner | 4 |
 | 💤 deferred | 0 |
 | **total** | **165** |
@@ -37,7 +37,6 @@ Not done, and every task they depend on is done.
 | `TASK-056b` | M | Epic C — Extraction |
 | `TASK-056c` | M | Epic C — Extraction |
 | `TASK-057` | M | Epic C — Extraction |
-| `TASK-102` | S | Epic H — History, removal ledger, suppression |
 | `TASK-106` | S | Epic H — History, removal ledger, suppression |
 | `TASK-126` | M | Epic K — Platform, safety, and the shell |
 | `TASK-132` | XS | Epic K — Platform, safety, and the shell |
@@ -193,6 +192,7 @@ Not done, and every task they depend on is done.
 | `TASK-055` | `packages/domain/src/extraction/` (contract + degraded projections) + `apps/api/src/extraction/` (recordings, `StubExtractor`, factory). `T-STUB-001a`…`r`, incl. the three fault tokens and byte-identical output over three runs. | `T-STUB-001` |
 | `TASK-056` | `AzureVisionExtractor` (`apps/api/src/extraction/azureVisionExtractor.ts`) + offline `msw` contract suite (`T-AI-033a`–`s`, recordings in `tests/fixtures/msw/vision/`) + static boundary gates (`T-AI-009a`–`j`, `T-AI-010a`–`d`). Retry/timeout policy is implemented LOCALLY with an injectable `sleep` and the SDK's own retry pipeline disabled, because two retry layers compose multiplicatively against a 5,000/month free tier. ⚠ In standalone `azure-vision-read` mode `extract()` always reports `crossCheck: 'llm-unavailable'` — the primary reader is deliberately not called, so the read genuinely was never corroborated, and reporting `ok` would let a strictly-worse read propose mass removals. The ADR-0001 Rev 1 revert path therefore runs in degraded mode (§2.2a) and withholds removals. `T-AI-009` request half + `T-AI-010` land here; the `LlmVisionExtractor` half of `T-AI-033` is TASK-056b. | `T-AI-009`, `T-AI-010`, `T-AI-033` |
 | `TASK-101` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` |
+| `TASK-102` | `components/SuppressDialog.tsx` — `T-UX-085` (a–f), `T-UX-022` (a–l). The row is reported `pending` while the request is in flight and `suppressed` only once the server has persisted it, so a rejected request cannot leave a hidden row behind — `T-UX-085a` asserts `suppressed` is never reported **at all** on the failure path, which an optimistic-hide-then-reconcile implementation would not satisfy even though it ends on `present`. Undo goes back through the `suppressionId` the server returned (`supp:<workIdentity>`), never a row-scoped key (REQ-071); an idempotent 200 offers Close only, because nothing changed. Five mutations caught: optimistic hide before persistence (`T-UX-085a/e`, `T-UX-022d`), undo failure showing the row again (`T-UX-022f`), an idempotent 200 rendered as a fresh hide (`T-UX-022g`), the same 200 still offering Undo (`T-UX-022g`), and the undo affordance removed (`T-UX-022b/c/d/e/f/k`). Four invented copy constants live in the component, not `copy.ts`, each with a ⚠ FINDING note — see the spec defects below. | `T-UX-022`, `T-UX-085` |
 | `TASK-121` | `fdd5519` — `tools/check-mutating-routes.mjs`, `T-MUT-001` (a–j), `T-MUT-002` (a–f). The 18 mutating routes each map to one of the eight REQ-041 owner-initiated operations or carry an explicit non-list-state reason; mutation-proven with an unregistered `POST /titles/:id/auto-confirm` and a `jobs/reconcile.ts` calling a guarded operation. | `T-MUT-001`, `T-MUT-002` |
 | `TASK-122` | `dde3dc5` — `tools/check-outbound-hosts.mjs`, `T-SEC-031` (a–i) and the outbound half of `T-SEC-009` (`k`). Exactly three destinations: TMDB, Azure OpenAI, Azure AI Vision. Mutation-proven by widening the list to four, shrinking it below three, and planting an unlisted host in source. The telemetry and streaming hostnames the spec needs are assembled from fragments rather than added to another gate's exemption list. | `T-SEC-009`, `T-SEC-031` |
 | `TASK-128` | `c64b7b5` — `tools/egress-guard.mjs`, `T-CI-007` (a–n). Patches `fetch`, `http.request` and `https.request`; loopback and the compose service names stay reachable; mutation-proven with a `fetch` and a raw `https.request` to an external host. ⚠ Installed per-suite, not globally: global wiring needs `setupFiles` in `vitest.config.ts`, which no lane may edit — see the finding below. | `T-CI-007` |
