@@ -12,8 +12,8 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 | Status | Count |
 |---|---|
 | ⬜ todo | 98 |
-| 🚧 doing | 6 |
-| ✅ done | 57 |
+| 🚧 doing | 5 |
+| ✅ done | 58 |
 | 🙋 owner | 4 |
 | 💤 deferred | 0 |
 | **total** | **165** |
@@ -33,7 +33,6 @@ Not done, and every task they depend on is done.
 | `TASK-045` | S | Epic D — Matching & identity |
 | `TASK-051` | XS | Epic B — Capture & import |
 | `TASK-052` | S | Epic B — Capture & import |
-| `TASK-053` | S | Epic B — Capture & import |
 | `TASK-056b` | M | Epic C — Extraction |
 | `TASK-056c` | M | Epic C — Extraction |
 | `TASK-057` | M | Epic C — Extraction |
@@ -43,8 +42,11 @@ Not done, and every task they depend on is done.
 | `TASK-143` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-145` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-151` | S | Epic B — Capture & import |
+| `TASK-152` | XS | Epic B — Capture & import |
 | `TASK-154` | M | Epic B — Capture & import |
 | `TASK-156` | XS | Epic K — Platform, safety, and the shell |
+| `TASK-159` | M | Epic B — Capture & import |
+| `TASK-160` | M | Epic B — Capture & import |
 
 ## Waiting on the owner
 
@@ -57,7 +59,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-83 tasks cannot start yet.
+80 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -134,13 +136,10 @@ Not done, and every task they depend on is done.
 | `TASK-130` | `TASK-124`, `TASK-108` |
 | `TASK-131` | `TASK-044` |
 | `TASK-133` | `TASK-156` |
-| `TASK-152` | `TASK-053` |
 | `TASK-155` | `TASK-152` |
 | `TASK-157` | `TASK-010` |
-| `TASK-159` | `TASK-053` |
-| `TASK-160` | `TASK-053` |
 | `TASK-161` | `TASK-160` |
-| `TASK-162` | `TASK-053`, `TASK-159`, `TASK-160` |
+| `TASK-162` | `TASK-159`, `TASK-160` |
 | `TASK-163` | `TASK-160`, `TASK-162` |
 | `TASK-164` | `TASK-080`, `TASK-160`, `TASK-162` |
 | `TASK-166` | `TASK-039` |
@@ -188,6 +187,7 @@ Not done, and every task they depend on is done.
 | `TASK-048` | `T-BATCH-010`, `T-BATCH-015` | `T-API-003`, `T-BATCH-010`, `T-BATCH-015` |
 | `TASK-049` | `T-UI-003a`…`j` green in `apps/web/test/uploadStep1.spec.tsx`; mutation-proven against a defaulted mode and against revealing the consequence on selection | `T-UI-003` |
 | `TASK-050` | `T-IMG-002`, `T-IMG-006`, `T-IMG-010`, `T-IMG-012`, `T-IMG-018`, `T-IMG-023`, `T-PASTE-003`, `T-PASTE-005`, `T-PASTE-006`, `T-PASTE-007`, `T-SEC-003`, `T-RET-014`; ~~`T-IMG-013`~~ | `T-IMG-002`, `T-IMG-006`, `T-IMG-010`, `T-IMG-012`, `T-PASTE-003`, `T-PASTE-005`, `T-PASTE-006`, `T-PASTE-007` |
+| `TASK-053` | `components/ImageDropzone.tsx` — `T-UI-004` (a–e), `T-UX-041` (a–e), `T-UX-042` (a–f). All three affordances render at once (paste button when `navigator.clipboard.read` exists, `Choose files` always, drop target); one `addFiles` path with the source reported but never branched on. Validation is lenient — empty **and** `application/octet-stream` types are accepted and left to the server sniff. Four mutations caught: HEIC dropped from `accept` (`T-UI-004a`), hard-filtering on `File.type` (`T-UI-004d`), the paste affordance replacing rather than joining file selection (`T-UX-041a/b/c`), rejections hiding the accepted list (`T-UX-042a/e`). New copy constants `UNSUPPORTED_FORMAT_REJECTION`, `IMAGE_ACCEPT_ATTRIBUTE`, `CHOOSE_FILES_LABEL`, `HEIC_PREVIEW_PLACEHOLDER` — quoted from `specs/ui.md` §3.2 prose, which §9 has no rows for. `PasteCapture` (TASK-160) and the drop target's full behaviour (TASK-162, `T-UI-014`) fill the slots; the ceiling messages are rendered here but the ceiling-copy test id named on TASK-162 is not defined in specs/testing.md, so it is reported as a spec defect rather than cited here. | `T-UI-004`, `T-UX-041`, `T-UX-042` |
 | `TASK-054` | `apps/api/src/services/batchLifecycle.ts` — the transition table, `submitBatch`, `discardBatch`, `assertBatchMutable`, plus `transitionUploadBatchStatus` (the conditional write). Routes `POST /api/batches/:batchId/submit` (§6.14) and `/discard` (§6.23). `T-BATCH-017a`…`h` (table totality, one-way-ness, discardable set), `T-BATCH-019a`…`d` (the submit endpoint's status codes), `T-BATCH-018a`…`c` (atomic transition — `018a` mutation-verified after its first form proved vacuous), `T-BATCH-013a`…`d` (immutability: the guard **and** the absence of a mutating route), `T-BATCH-006a`…`f` (a discarded batch writes nothing, retains images, releases the ceiling). ⚠ **The three close/reconciliation ids this row originally cited are NOT delivered here** — they belong to TASK-072 and no close endpoint exists yet; see `specs/testing.md` §24.3. Two spec gaps reported in §24.2. | `T-BATCH-006`, `T-BATCH-013`, `T-BATCH-017`, `T-BATCH-018`, `T-BATCH-019` |
 | `TASK-055` | `packages/domain/src/extraction/` (contract + degraded projections) + `apps/api/src/extraction/` (recordings, `StubExtractor`, factory). `T-STUB-001a`…`r`, incl. the three fault tokens and byte-identical output over three runs. | `T-STUB-001` |
 | `TASK-056` | `AzureVisionExtractor` (`apps/api/src/extraction/azureVisionExtractor.ts`) + offline `msw` contract suite (`T-AI-033a`–`s`, recordings in `tests/fixtures/msw/vision/`) + static boundary gates (`T-AI-009a`–`j`, `T-AI-010a`–`d`). Retry/timeout policy is implemented LOCALLY with an injectable `sleep` and the SDK's own retry pipeline disabled, because two retry layers compose multiplicatively against a 5,000/month free tier. ⚠ In standalone `azure-vision-read` mode `extract()` always reports `crossCheck: 'llm-unavailable'` — the primary reader is deliberately not called, so the read genuinely was never corroborated, and reporting `ok` would let a strictly-worse read propose mass removals. The ADR-0001 Rev 1 revert path therefore runs in degraded mode (§2.2a) and withholds removals. `T-AI-009` request half + `T-AI-010` land here; the `LlmVisionExtractor` half of `T-AI-033` is TASK-056b. | `T-AI-009`, `T-AI-010`, `T-AI-033` |
