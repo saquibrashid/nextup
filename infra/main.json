@@ -628,7 +628,7 @@
                 "configuration": {
                   "ingress": {
                     "external": true,
-                    "targetPort": 8080,
+                    "targetPort": 3000,
                     "transport": "auto",
                     "allowInsecure": false,
                     "traffic": [

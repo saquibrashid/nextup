@@ -95,7 +95,6 @@ even for a job running on `main`, because a job with an `environment:` gets the
 environment form.
 
 ## Other preconditions the error will not tell you about
-
 - **`permissions: id-token: write`** must be on the job, not just the workflow.
   Without it no OIDC token is minted at all and the error is different
   (`Unable to get ACTIONS_ID_TOKEN_REQUEST_URL`).
@@ -137,3 +136,48 @@ az deployment group validate --resource-group nextup-rg --template-file infra/ma
   --parameters environmentName=staging location=eastus2 containerImage=<image> ... `
   --query "{state:properties.provisioningState}" -o json
 ```
+
+## ⚠ `InvalidResourceLocation` after a region change — the ARM ghost
+
+Changing a resource's region and redeploying can fail with:
+
+```
+The resource 'sql-nextup-hriut4gw7lgg4' already exists in location 'eastus2'
+in resource group 'nextup-rg'. A resource with the same name cannot be
+created in location 'centralus'. Please select a new resource name.
+```
+
+even though **the resource does not exist**:
+
+```powershell
+az sql server show -g nextup-rg -n sql-nextup-hriut4gw7lgg4
+# ERROR: (ResourceNotFound) ...
+az resource list -g nextup-rg -o table
+# does not list it either
+```
+
+ARM keeps a resource-group-scoped **name to location** registry that outlives a
+*failed* create. The service provider has no such server, so every read says it
+is absent, while every write says it is present in the old region. The error
+message's own advice — "select a new resource name" — is the wrong fix here and
+would permanently distort the deterministic naming scheme.
+
+**The fix is to delete the resource that reads as non-existent.** The delete is
+idempotent and exits 0:
+
+```powershell
+az sql server delete -g nextup-rg -n sql-nextup-hriut4gw7lgg4 --yes
+```
+
+Confirm before spending a CI run — create and delete the name directly in the
+target region rather than pushing a commit to find out:
+
+```powershell
+az sql server create -g nextup-rg -n sql-nextup-hriut4gw7lgg4 -l centralus -u nextupadmin -p <pw>
+az sql server delete -g nextup-rg -n sql-nextup-hriut4gw7lgg4 --yes
+```
+
+A logical SQL server carries no charge on its own — only its databases do — so
+this probe is free. The same technique establishes **whether a region will
+accept SQL at all**, which is how the `centralus` / `westus3` shortlist above
+was found.

@@ -41,7 +41,7 @@
     "check:test-ids": "node tools/check-test-ids.mjs",
     "check:orphans": "node tools/check-orphan-tests.mjs",
     "check:decisions": "node tools/check-decision-verifiability.mjs",
-    "infra:build": "node tools/check-infra.mjs",
+    "infra:build": "node tools/check-infra.mjs && prettier --write --log-level warn infra/main.json infra/budget.json",
     "check:infra": "node tools/check-infra.mjs --check",
     "check:test-locations": "node tools/check-test-locations.mjs",
     "check:credentials": "node tools/check-no-credentials.mjs",

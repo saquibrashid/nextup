@@ -210,6 +210,62 @@ export function ingressPolicyViolations(template) {
 }
 
 /**
+ * T-INFRA-010 — the ingress port must match the port the container listens on.
+ *
+ * `targetPort` lives in infra/aca.bicep and `ENV PORT` / `EXPOSE` live in the
+ * Dockerfile. Nothing reads both, and a mismatch is invisible at every stage
+ * that would normally catch it:
+ *
+ *   - `az bicep build` and `az deployment group validate` both pass — the
+ *     value is a legal port either way.
+ *   - `az deployment group create` reports **Succeeded**.
+ *   - The revision provisions and the container starts cleanly, logging
+ *     `listening on :3000`.
+ *
+ * The only symptom is `startup probe failed: connection refused` in the
+ * container-app system log, and an app that answers nothing at all. This is
+ * not hypothetical: it shipped once, with targetPort 8080 against PORT 3000.
+ *
+ * Both Dockerfile declarations are checked, not just one. `EXPOSE` is
+ * documentation that ACA ignores, while `ENV PORT` is what the app reads, so
+ * an inconsistency between them means the Dockerfile disagrees with itself and
+ * the next reader cannot tell which is authoritative.
+ */
+export function portViolations(
+  template,
+  dockerfile = readFileSync(join(ROOT, 'Dockerfile'), 'utf8'),
+) {
+  const violations = [];
+  const envPort = /^\s*ENV\s+PORT=(\d+)\s*$/m.exec(dockerfile)?.[1];
+  const exposePort = /^\s*EXPOSE\s+(\d+)\s*$/m.exec(dockerfile)?.[1];
+
+  if (!envPort) {
+    violations.push('dockerfile: no `ENV PORT=<n>` — the listening port is undeclared');
+  }
+  if (!exposePort) {
+    violations.push('dockerfile: no `EXPOSE <n>`');
+  }
+  if (envPort && exposePort && envPort !== exposePort) {
+    violations.push(`dockerfile: ENV PORT=${envPort} disagrees with EXPOSE ${exposePort}`);
+  }
+
+  for (const app of resourcesOfType(template, 'Microsoft.App/containerApps')) {
+    const target = app.properties?.configuration?.ingress?.targetPort;
+    if (target === undefined) {
+      violations.push(`aca: ${app.name} ingress has no targetPort`);
+      continue;
+    }
+    if (envPort && String(target) !== envPort) {
+      violations.push(
+        `aca: ${app.name} targetPort ${target} does not match the container's PORT ${envPort} — ` +
+          'the deployment will succeed and the app will refuse every connection',
+      );
+    }
+  }
+  return violations;
+}
+
+/**
  * T-INFRA-001 — least-privilege RBAC.
  *
  * The blob grant must be scoped to a single CONTAINER. An account-scoped grant

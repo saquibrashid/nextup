@@ -128,7 +128,15 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
     configuration: {
       ingress: {
         external: true
-        targetPort: 8080
+        // ⚠ MUST equal the port the container actually listens on, which is
+        // set by `ENV PORT` / `EXPOSE` in the Dockerfile. These live in two
+        // files that are never read together, and a mismatch does NOT fail the
+        // deployment: ARM reports Succeeded, the revision provisions, the app
+        // logs "listening on :3000" — and every request is refused, because
+        // the startup probe dials a port nothing is bound to. That is exactly
+        // how this shipped once (targetPort 8080 vs PORT 3000). Tied together
+        // by `portViolations()` in tools/check-infra.mjs (T-INFRA-010).
+        targetPort: 3000
         transport: 'auto'
         // T-INFRA-003. HTTPS is also a FUNCTIONAL dependency, not merely a
         // security one: navigator.clipboard is absent on http://, so the

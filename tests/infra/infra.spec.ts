@@ -1,9 +1,13 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import {
   allResources,
   budgetPolicyViolations,
   ingressPolicyViolations,
+  portViolations,
   rbacPolicyViolations,
   readCommittedArm,
   readCommittedBudgetArm,
@@ -380,5 +384,69 @@ describe('T-INFRA-005 the staging auto-pause cost trap (TASK-010, verified 2026-
       expect(db.properties?.autoPauseDelay).toBeUndefined();
     }
     expect(skuViolations(template)).toEqual([]);
+  });
+});
+
+// T-INFRA-010 — the ingress port and the container's listening port.
+//
+// This rule exists because the mismatch it catches ALREADY SHIPPED, and every
+// signal that should have caught it said the deployment was fine: bicep built,
+// validate passed, `az deployment group create` reported Succeeded, the
+// revision provisioned, and the container logged `listening on :3000`. The
+// only evidence was `startup probe failed: connection refused` in the system
+// log, and a smoke suite that timed out against an app answering nothing.
+describe('T-INFRA-010 the ingress port matches the port the container listens on', () => {
+  const dockerfile = readFileSync(path.join(import.meta.dirname, '../..', 'Dockerfile'), 'utf8');
+
+  it('T-INFRA-010a: the committed template and the real Dockerfile agree', () => {
+    expect(portViolations(template, dockerfile)).toEqual([]);
+  });
+
+  it('T-INFRA-010b: a targetPort that no process listens on is caught', () => {
+    // The exact defect: 8080 against a container bound to 3000.
+    const broken = mutate((t) => {
+      for (const app of resourcesOfType(t, 'Microsoft.App/containerApps')) {
+        app.properties.configuration.ingress.targetPort = 8080;
+      }
+    });
+    expect(portViolations(broken, dockerfile).join(' ')).toMatch(
+      /does not match the container's PORT/,
+    );
+  });
+
+  it('T-INFRA-010c: a missing targetPort is caught, not treated as agreement', () => {
+    const broken = mutate((t) => {
+      for (const app of resourcesOfType(t, 'Microsoft.App/containerApps')) {
+        delete app.properties.configuration.ingress.targetPort;
+      }
+    });
+    expect(portViolations(broken, dockerfile).join(' ')).toMatch(/no targetPort/);
+  });
+
+  it('T-INFRA-010d: moving the Dockerfile port instead of the template is caught', () => {
+    // The rule has to bind BOTH directions. One that only ever read the
+    // template would be satisfied by editing the Dockerfile alone, which is
+    // the more likely half of the pair to be changed.
+    const moved = dockerfile.replace(/^ENV PORT=\d+$/m, 'ENV PORT=4000');
+    expect(moved).not.toBe(dockerfile);
+    expect(portViolations(template, moved).join(' ')).toMatch(
+      /does not match the container's PORT/,
+    );
+  });
+
+  it('T-INFRA-010e: a Dockerfile that disagrees with itself is caught', () => {
+    // EXPOSE is documentation ACA ignores; ENV PORT is what the app reads. If
+    // they differ, the Dockerfile has no single answer to "which port?".
+    const inconsistent = dockerfile.replace(/^EXPOSE \d+$/m, 'EXPOSE 8080');
+    expect(inconsistent).not.toBe(dockerfile);
+    expect(portViolations(template, inconsistent).join(' ')).toMatch(/disagrees with EXPOSE/);
+  });
+
+  it('T-INFRA-010f: an undeclared port is caught rather than defaulting', () => {
+    // Deleting `ENV PORT` makes the app fall back to its own default, which
+    // may still happen to work — so the absence must fail loudly instead of
+    // the rule silently having nothing to compare against.
+    const undeclared = dockerfile.replace(/^ENV PORT=\d+$/m, '');
+    expect(portViolations(template, undeclared).join(' ')).toMatch(/listening port is undeclared/);
   });
 });
