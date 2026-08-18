@@ -54,6 +54,22 @@ export const DESTRUCTIVE_PATTERNS = [
     pattern: /\bsp_rename\b[\s\S]{0,200}?['"]COLUMN['"]/i,
     why: 'renames a column, orphaning every reader of the old name',
   },
+  {
+    // Not destructive — this one destroys the DEPLOY. `GO` is a sqlcmd batch
+    // separator, not T-SQL, and Prisma hands the file straight to the driver,
+    // which fails with "Incorrect syntax near 'GO'". Verified by running
+    // `prisma migrate deploy` against mssql/server:2022-latest.
+    //
+    // It is an easy thing to reach for, because every SQL Server example on
+    // the web is written for sqlcmd or SSMS, where it works. The consequence
+    // here is a half-applied migration recorded as FAILED, which then blocks
+    // every later migration until someone runs `migrate resolve` by hand.
+    // Use `EXEC('...')` for the deferred-compilation the batch boundary was
+    // wanted for.
+    name: 'GO batch separator',
+    pattern: /^[ \t]*GO[ \t]*$/im,
+    why: 'is sqlcmd syntax, not T-SQL; Prisma sends the file to the driver and the migration fails to apply',
+  },
 ] as const;
 
 export interface MigrationViolation {

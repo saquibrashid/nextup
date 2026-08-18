@@ -25,7 +25,7 @@ import { type Request, type Router } from 'express';
 import multer from 'multer';
 import {
   INGEST_SOURCES,
-  MAX_BATCH_BYTES,
+  MAX_BATCH_UPLOAD_BYTES,
   MAX_FILES_PER_REQUEST,
   MAX_IMAGES_PER_BATCH,
   MAX_IMAGE_BYTES,
@@ -161,12 +161,24 @@ export function registerBatchImageRoutes(
       );
     }
     const incomingBytes = files.reduce((sum, file) => sum + file.size, 0);
-    if (totals.byteSize + incomingBytes > MAX_BATCH_BYTES) {
+    // ⚠ UPLOADED vs UPLOADED. `totals.uploadedByteSize`, never
+    // `totals.storedByteSize`: this ceiling bounds what the owner SENDS, and
+    // the stored total for the same batch can be many times larger after the
+    // HEIC→PNG transcode. Summing the stored total with incoming uploaded
+    // bytes — which this line used to do — is wrong in both directions at
+    // once: it under-counts arriving HEIC so the ceiling never fires, and
+    // inflates what is already held so a later request is refused with a
+    // 60 MiB message after ~7 MiB of files.
+    if (totals.uploadedByteSize + incomingBytes > MAX_BATCH_UPLOAD_BYTES) {
       throw new AppError(
         'BATCH_TOO_LARGE',
         413,
-        `A batch holds at most ${MAX_BATCH_BYTES / (1024 * 1024)} MiB of images.`,
-        { max: MAX_BATCH_BYTES, current: totals.byteSize, incoming: incomingBytes },
+        `A batch holds at most ${MAX_BATCH_UPLOAD_BYTES / (1024 * 1024)} MiB of images.`,
+        {
+          max: MAX_BATCH_UPLOAD_BYTES,
+          current: totals.uploadedByteSize,
+          incoming: incomingBytes,
+        },
       );
     }
 
@@ -200,6 +212,7 @@ export function registerBatchImageRoutes(
         uploadedFormat: image.uploadedFormat,
         format: image.format,
         byteSize: BigInt(image.byteSize),
+        uploadedByteSize: BigInt(image.uploadedByteSize),
         width: image.width,
         height: image.height,
         retainUntil: image.retainUntil,
@@ -234,9 +247,17 @@ export function registerBatchImageRoutes(
         height: image.height,
       })),
       rejected,
+      // ⚠ BOTH totals, each named for its unit. A single `byteSize` here was
+      // ambiguous in exactly the way that produced the ceiling defect: the
+      // client would render one number against a limit expressed in the
+      // other. `uploadedByteSize` is the one `MAX_BATCH_UPLOAD_BYTES` bounds.
       batchTotals: {
         imageCount: totals.imageCount + accepted.length,
-        byteSize: totals.byteSize + accepted.reduce((sum, image) => sum + image.byteSize, 0),
+        uploadedByteSize:
+          totals.uploadedByteSize +
+          accepted.reduce((sum, image) => sum + image.uploadedByteSize, 0),
+        storedByteSize:
+          totals.storedByteSize + accepted.reduce((sum, image) => sum + image.byteSize, 0),
       },
     });
   });

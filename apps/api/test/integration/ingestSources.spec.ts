@@ -129,7 +129,7 @@ interface AcceptedBody {
 interface ImagesBody {
   accepted: AcceptedBody[];
   rejected: { fileName: string; code: string; message: string }[];
-  batchTotals: { imageCount: number; byteSize: number };
+  batchTotals: { imageCount: number; uploadedByteSize: number; storedByteSize: number };
 }
 
 interface ErrorBody {
@@ -442,7 +442,14 @@ describe('T-IMG-002 / T-IMG-006 / T-IMG-010 partial acceptance across a real req
     const stored = rows.reduce((sum, r) => sum + Number(r.byteSize), 0);
 
     expect(body.batchTotals.imageCount).toBe(2);
-    expect(body.batchTotals.byteSize).toBe(stored);
+    expect(body.batchTotals.storedByteSize).toBe(stored);
+    // ⚠ These do NOT coincide even without a transcode. The metadata strip
+    // (REQ-078) rewrites the file too, so a plain PNG stores smaller than it
+    // arrived. Asserting equality here failed on exactly that — 106 uploaded,
+    // 102 stored. The invariant is the ORDER, not equality.
+    const uploaded = rows.reduce((sum, r) => sum + Number(r.uploadedByteSize), 0);
+    expect(body.batchTotals.uploadedByteSize).toBe(uploaded);
+    expect(uploaded).toBeGreaterThanOrEqual(stored);
   });
 });
 

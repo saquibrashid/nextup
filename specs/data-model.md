@@ -590,7 +590,17 @@ export interface UploadedImage {
                                // not one of them (evidence Q3). It is still SNIFFED, never assumed:
                                // the field records what the bytes ARE, not what the path implies.
   format: ImageFormat;         // STORED/DERIVED format actually persisted (always png|jpeg); HEIC/HEIF is transcoded to lossless PNG on ingest (api.md §5.1). by MAGIC BYTES
-  byteSize: number;            // <= 10 * 1024 * 1024
+  byteSize: number;            // STORED bytes, post-transcode. ⚠ NOT bounded by the 10 MiB upload
+                               // ceiling: a 1.76 MiB HEIC stores as a 17.8 MiB lossless PNG.
+                               // Bounded by MAX_STORED_IMAGE_BYTES instead — see below.
+  uploadedByteSize: number;    // what the DEVICE sent, <= 10 * 1024 * 1024. ⚠ NOT equal to
+                               // byteSize even for PNG/JPEG: the metadata strip (REQ-078) rewrites
+                               // every image, so a PNG stores slightly smaller and a HEIC several
+                               // times larger. ⚠ THIS is the unit the 60 MiB
+                               // per-batch ceiling counts (api.md §5). Never sum it with byteSize.
+                               // ~~Superseded: a single `byteSize: number; // <= 10 * 1024 * 1024`
+                               // — the comment described the upload but the value was the store, so
+                               // the batch tally mixed units and refused batches at ~7 MiB.~~
   width: number | null;
   height: number | null;
   uploadedAt: string;          // ISO-8601 UTC
@@ -2006,6 +2016,14 @@ CREATE TABLE uploaded_image (
   -- the API boundary against the UPLOADED bytes, not here: a lossless PNG
   -- transcode of a compliant HEIC can legitimately exceed it.
   byte_size      BIGINT        NOT NULL CONSTRAINT ck_image_byte_size CHECK (byte_size > 0),
+  -- What the DEVICE sent, before any transcode. Bounded here at 10 MiB because
+  -- this column IS the upload, and it is the column the per-batch 60 MiB
+  -- ceiling sums (api.md §5). Migration 0003 adds it and backfills from
+  -- byte_size: every pre-migration row predates the transcode, so for those
+  -- rows uploaded == stored is the true value, not a placeholder.
+  uploaded_byte_size BIGINT    NOT NULL
+                     CONSTRAINT ck_image_uploaded_byte_size CHECK (uploaded_byte_size > 0)
+                     CONSTRAINT ck_image_uploaded_byte_size_ceiling CHECK (uploaded_byte_size <= 10485760),
   width          INT           NULL,
   height         INT           NULL,
   uploaded_at    DATETIME2(3)  NOT NULL CONSTRAINT df_image_uploaded DEFAULT SYSUTCDATETIME(),

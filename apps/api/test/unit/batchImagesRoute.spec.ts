@@ -21,7 +21,7 @@
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 
-import { MAX_BATCH_BYTES, MAX_IMAGES_PER_BATCH } from '@nextup/domain';
+import { MAX_BATCH_UPLOAD_BYTES, MAX_IMAGES_PER_BATCH } from '@nextup/domain';
 import type { Express } from 'express';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -141,7 +141,7 @@ beforeEach(async () => {
   process.env['NEXTUP_ALLOWED_SUBJECTS'] = SUBJECT;
 
   findUploadBatch.mockResolvedValue({ id: 'batch-1', status: 'draft', service: 'netflix' });
-  batchImageTotals.mockResolvedValue({ imageCount: 0, byteSize: 0 });
+  batchImageTotals.mockResolvedValue({ imageCount: 0, uploadedByteSize: 0, storedByteSize: 0 });
   createUploadedImage.mockResolvedValue(undefined);
   put.mockClear();
 
@@ -163,7 +163,11 @@ afterEach(async () => {
 
 describe('T-IMG-010 whole-request ceilings refuse the request, not a file', () => {
   it('T-IMG-010f: a batch already at the image ceiling refuses with 400 TOO_MANY_IMAGES', async () => {
-    batchImageTotals.mockResolvedValue({ imageCount: MAX_IMAGES_PER_BATCH, byteSize: 0 });
+    batchImageTotals.mockResolvedValue({
+      imageCount: MAX_IMAGES_PER_BATCH,
+      uploadedByteSize: 0,
+      storedByteSize: 0,
+    });
 
     const res = await postImages([{ name: 'a.png', bytes: pngBytes() }]);
 
@@ -177,7 +181,11 @@ describe('T-IMG-010 whole-request ceilings refuse the request, not a file', () =
   });
 
   it('T-IMG-010g: a batch already at the byte ceiling refuses with 413 BATCH_TOO_LARGE', async () => {
-    batchImageTotals.mockResolvedValue({ imageCount: 1, byteSize: MAX_BATCH_BYTES });
+    batchImageTotals.mockResolvedValue({
+      imageCount: 1,
+      uploadedByteSize: MAX_BATCH_UPLOAD_BYTES,
+      storedByteSize: MAX_BATCH_UPLOAD_BYTES,
+    });
 
     const res = await postImages([{ name: 'a.png', bytes: pngBytes() }]);
 
@@ -191,7 +199,11 @@ describe('T-IMG-010 whole-request ceilings refuse the request, not a file', () =
   it('T-IMG-010h: the ceiling counts what is ALREADY in the batch, not just what arrived', async () => {
     // One short of the ceiling: one more file is fine, two is not. A route
     // that compared only the incoming count would accept both.
-    batchImageTotals.mockResolvedValue({ imageCount: MAX_IMAGES_PER_BATCH - 1, byteSize: 0 });
+    batchImageTotals.mockResolvedValue({
+      imageCount: MAX_IMAGES_PER_BATCH - 1,
+      uploadedByteSize: 0,
+      storedByteSize: 0,
+    });
 
     const ok = await postImages([{ name: 'a.png', bytes: pngBytes() }]);
     expect(ok.status).toBe(201);
@@ -202,6 +214,51 @@ describe('T-IMG-010 whole-request ceilings refuse the request, not a file', () =
     ]);
     expect(tooMany.status).toBe(400);
     expect(((await tooMany.json()) as ErrorBody).error.code).toBe('TOO_MANY_IMAGES');
+  });
+
+  // ── The unit rule ────────────────────────────────────────────────────────
+  // The batch ceiling bounds UPLOADED bytes. It used to be enforced as
+  // `storedSoFar + uploadedIncoming`, summing two units that differ by the
+  // HEIC→PNG transcode ratio (measured on the owner's phone: 1.49 MiB →
+  // 12.7 MiB, 1.76 MiB → 17.8 MiB). Both of these fail on that code, and
+  // neither would be caught by a PNG-only fixture, because for PNG the two
+  // totals are identical.
+  it('T-IMG-010i: a batch whose STORED bytes exceed the ceiling still accepts, if uploads do not', async () => {
+    // The realistic HEIC case: the owner has sent ~7 MiB of phone photos that
+    // store as ~60 MiB of lossless PNG. They are nowhere near the 60 MiB
+    // UPLOAD ceiling and must not be refused.
+    batchImageTotals.mockResolvedValue({
+      imageCount: 4,
+      uploadedByteSize: 7 * 1024 * 1024,
+      storedByteSize: MAX_BATCH_UPLOAD_BYTES + 8 * 1024 * 1024,
+    });
+
+    const res = await postImages([{ name: 'a.png', bytes: pngBytes() }]);
+
+    // On the old comparison this was a 413 quoting "at most 60 MiB" after
+    // about 7 MiB of files — a number the owner cannot reconcile with
+    // anything they can see.
+    expect(res.status).toBe(201);
+    expect(createUploadedImage).toHaveBeenCalled();
+  });
+
+  it('T-IMG-010j: the ceiling reports the UPLOADED total, not the stored one', async () => {
+    // Same batch, now genuinely at the upload ceiling. `details.current` is
+    // what the SPA renders, so it has to be in the unit the message names.
+    batchImageTotals.mockResolvedValue({
+      imageCount: 4,
+      uploadedByteSize: MAX_BATCH_UPLOAD_BYTES,
+      storedByteSize: MAX_BATCH_UPLOAD_BYTES * 3,
+    });
+
+    const res = await postImages([{ name: 'a.png', bytes: pngBytes() }]);
+
+    expect(res.status).toBe(413);
+    const body = (await res.json()) as ErrorBody;
+    expect(body.error.code).toBe('BATCH_TOO_LARGE');
+    expect(body.error.details['max']).toBe(MAX_BATCH_UPLOAD_BYTES);
+    expect(body.error.details['current']).toBe(MAX_BATCH_UPLOAD_BYTES);
+    expect(body.error.details['current']).not.toBe(MAX_BATCH_UPLOAD_BYTES * 3);
   });
 });
 

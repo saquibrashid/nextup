@@ -268,7 +268,7 @@ handled by a second code path. §5.3.
 |---|---|---|
 | Images per batch | 40 — **counted across all three ingest sources combined** (A45): 30 pasted + 11 uploaded is 41 and is refused | 400 `TOO_MANY_IMAGES` |
 | Bytes per image | 10 MiB — **a first cheap filter only. It is NOT the memory guard** (R5, `A43-M1`): HEIC's compression ratio is highly variable, so bytes do not predict raster size and a 6 MiB HEIC can be 48 MP. The guard is §5.0. | 413 `IMAGE_TOO_LARGE` |
-| Bytes per batch (cumulative) | 60 MiB — **cumulative across all ingest sources** (A45) | 413 `BATCH_TOO_LARGE` |
+| Bytes per batch (cumulative) | 60 MiB of **UPLOADED** bytes — **cumulative across all ingest sources** (A45). ⚠ **The unit is what the device SENT, never what is stored.** A HEIC batch stores ~8.5× its upload size after the transcode; measuring the tally in stored bytes fires this ceiling after ~7 MiB of real uploads while letting the incoming file through under-counted. There is deliberately **no stored-bytes batch ceiling** — stored total is already bounded transitively by the 40-image cap and the pixel guard (§5.3.1). | 413 `BATCH_TOO_LARGE` |
 | Accepted formats | **PNG, JPEG, and HEIC/HEIF** — **determined by magic bytes**, not by extension or `Content-Type` (A42; was PNG/JPEG only). HEIC/HEIF is transcoded to lossless PNG on ingest — §5.1 | 415 `UNSUPPORTED_IMAGE_FORMAT` |
 | **Decodable pixel count (`width × height`)** *(new, R5, `A43-M1`)* | **`≤ NEXTUP_MAX_DECODE_PIXELS`**, default **`25000000`** (25 MP) at 0.25 vCPU / 0.5 GiB, **`50000000`** (50 MP) at the 0.5 vCPU / 1.0 GiB remedy. Read from the **container header only** and evaluated **before any decode buffer is allocated** — §5.0 | 413 `IMAGE_TOO_LARGE_TO_DECODE` |
 | **Image dimensions — evaluated PRE-DECODE, from the header** *(corrected in place, R5)* | > 50×50 px and < 16,000×16,000 px on each axis — the Azure AI Vision Read 4.0 input bounds. Rejected, **not** silently downscaled (NFR-012a is quality-first) | 400 `IMAGE_DIMENSIONS_UNSUPPORTED` |
@@ -653,7 +653,7 @@ does — this is the existing multi-image batch model (`data-model.md` §3.8,
 
 | Server-side consequence | Rule |
 |---|---|
-| Multiple pastes in succession | Each is one more `POST .../images` call appending to the same open batch. `batchTotals` accumulates. The 40-image and 60 MiB ceilings are the only stop. |
+| Multiple pastes in succession | Each is one more `POST .../images` call appending to the same open batch. `batchTotals` accumulates **in two separately-named units** — `uploadedByteSize` and `storedByteSize`, never summed together (§6.12). The 40-image cap and the 60 MiB **uploaded**-bytes ceiling are the only stop; there is deliberately no stored-bytes ceiling, because 40 images × the pixel guard already bounds the stored total, and rejecting a legitimate 40-photo batch (≈700 MiB stored, ≈$0.01 of blob for its 30-day life) would trade a real capture path for nothing. |
 | Ordering | `seqInBatch` (and therefore the synthesised name, `data-model.md` §3.8.1) is assigned **server-side in receipt order**. Two pastes racing cannot collide, because ordinals are assigned under the same write that inserts the row. |
 | Mixing sources in one batch | **Explicitly allowed and normal.** A batch may hold pasted, dropped and uploaded images together; `ingestSource` is per-image, not per-batch. |
 | `service`/`mode` immutability | Unchanged (§6.11, §6.14). Paste does not create a batch — a batch must already be open, exactly as for upload. Pasting with no open batch is a **client-side** condition: the client creates the batch first (`ux-states.md` §4.0a). |
@@ -982,7 +982,7 @@ display, never to compose a path (`security.md` T4). `T-PASTE-005`.
                   "message": "beach-list-03.heic is 48.0 MP (8064 × 5952). nextup decodes images in a 0.5 GiB container and refuses anything above 25.0 MP before allocating memory, because decoding this one would exhaust container memory and kill the import. This is a memory limit, not a problem with your image. Remedy: up-size compute to 0.5 vCPU / 1.0 GiB (+~$4/month) — one command, see runbooks/scale-up-memory.md. No other image in this batch was affected; re-attach this file after up-sizing.",
                   "details": { "width": 8064, "height": 5952, "megapixels": 48.0,
                                "maxMegapixels": 25.0, "remedy": "runbooks/scale-up-memory.md" } } ],
-  "batchTotals": { "imageCount": 7, "byteSize": 5931002 } }
+  "batchTotals": { "imageCount": 7, "uploadedByteSize": 5931002, "storedByteSize": 41209884 } }
 ```
 `format` is the **stored/derived** format (always `png`/`jpeg`);
 `uploadedFormat` is what the device delivered (`png`/`jpeg`/`heic`/`heif`);
@@ -992,6 +992,17 @@ upload is accepted, then transcoded to lossless PNG on ingest (§5.1), so
 `uploadedFormat: 'png'` in practice and skips the transcode as a no-op — the
 stage is still there, and still runs for the HEIC upload above** (§5.1).
 `byteSize`/`width`/`height` describe the **stored** (post-transcode) bytes.
+⚠ **`batchTotals` carries TWO totals and they are never summed together.**
+`uploadedByteSize` is what the device sent — the unit
+`MAX_BATCH_UPLOAD_BYTES` (60 MiB) bounds. `storedByteSize` is what is held in
+Blob Storage after the transcode, and is **not** bounded by a batch ceiling
+(§5.3.1). They differ by the transcode ratio, which is ~8.5× on real phone
+HEIC (1.76 MiB in, 17.8 MiB stored), so the example above shows a 5.9 MiB
+upload holding 41 MiB. ~~Superseded: a single `"byteSize"` total. It mixed the
+two units into one number and compared it against the upload ceiling, so the
+ceiling under-counted the incoming file and over-counted everything already
+held — firing a `413 BATCH_TOO_LARGE` reading "at most 60 MiB" after ~7 MiB of
+actual uploads.~~
 **Partial acceptance is deliberate** (US-004 AC-6): valid files in a
 multi-file request are accepted and invalid ones are named individually. The
 response is **201** whenever `accepted.length > 0`, and **415/413/400/503**

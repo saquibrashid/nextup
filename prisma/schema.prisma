@@ -262,8 +262,18 @@ model UploadedImage {
 
   /// Bytes as STORED. The 10 MiB ceiling is enforced at the API boundary
   /// against the UPLOADED bytes — a lossless PNG transcode of a compliant
-  /// HEIC can legitimately exceed it.
+  /// HEIC can legitimately exceed it. See `uploadedByteSize`.
   byteSize BigInt @map("byte_size")
+
+  /// Bytes as UPLOADED — what the device sent, before any transcode. Equal to
+  /// `byteSize` for PNG and JPEG, smaller for a transcoded HEIC.
+  ///
+  /// ⚠ The per-batch ceiling is an UPLOAD ceiling, so enforcing it needs a
+  /// running total in the uploaded unit. Without this column the route summed
+  /// stored bytes against incoming uploaded bytes: the ceiling under-counted
+  /// HEIC arrivals and over-counted what was already held, so it both failed
+  /// to fire when it should and fired spuriously when it should not.
+  uploadedByteSize BigInt @map("uploaded_byte_size")
 
   width  Int?
   height Int?

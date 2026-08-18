@@ -87,6 +87,25 @@ describe('T-MIG-001 destructive migration gate', () => {
     expect(found[0]?.line).toBe(4);
   });
 
+  it('T-MIG-001m: catches a GO batch separator, which breaks the deploy rather than the data', () => {
+    const sql = ['ALTER TABLE [t] ADD [c] BIGINT NULL;', 'GO', 'UPDATE [t] SET [c] = 1;'].join(
+      '\n',
+    );
+    const found = scanSql('m/migration.sql', sql);
+    expect(found.map((v) => v.statement)).toContain('GO batch separator');
+    expect(found[0]?.line).toBe(2);
+  });
+
+  it('T-MIG-001n: does NOT fire on the letters GO inside an identifier or a word', () => {
+    // A gate that flagged `ALTER TABLE [go_live]` would be turned off within a
+    // week. The separator is a line that is ONLY `GO`.
+    const sql = [
+      "EXEC('UPDATE [t] SET [category] = ''GOTHIC'' WHERE [go_live] IS NOT NULL;');",
+      'ALTER TABLE [logo] ADD [ago] INT NULL;',
+    ].join('\n');
+    expect(scanSql('m/migration.sql', sql)).toEqual([]);
+  });
+
   it('T-MIG-001k: an additive migration passes', () => {
     const sql = [
       'CREATE TABLE [dbo].[suppression] (',

@@ -136,7 +136,7 @@ interface AcceptedBody {
 interface ImagesBody {
   accepted: AcceptedBody[];
   rejected: { fileName: string; code: string; message: string }[];
-  batchTotals: { imageCount: number; byteSize: number };
+  batchTotals: { imageCount: number; uploadedByteSize: number; storedByteSize: number };
 }
 
 let server: Server;

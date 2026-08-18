@@ -831,19 +831,27 @@ export async function listImagesForBatch(ownerId: OwnerId, batchId: string, tx?:
  * ⚠ COUNTED ACROSS ALL THREE INGEST SOURCES — there is no `ingestSource`
  * filter here and there must never be one. 30 pasted plus 11 uploaded is 41
  * and is refused; a per-source tally would let a batch hold 120 images.
+ *
+ * ⚠ TWO BYTE TOTALS, IN TWO DIFFERENT UNITS, AND THEY ARE NOT INTERCHANGEABLE.
+ * `uploadedByteSize` is what the owner sent; `storedByteSize` is what is kept
+ * after the HEIC→PNG transcode and can be many times larger. The per-batch
+ * ceiling is an UPLOAD ceiling, so it compares against `uploadedByteSize`
+ * only. This function used to return a single `byteSize` (the stored sum),
+ * which the route then added to incoming uploaded bytes.
  */
 export async function batchImageTotals(ownerId: OwnerId, batchId: string, tx?: Db) {
   const result = await db(tx).uploadedImage.aggregate({
     where: { ownerId, batchId },
     _count: { _all: true },
-    _sum: { byteSize: true },
+    _sum: { byteSize: true, uploadedByteSize: true },
   });
   return {
     imageCount: result._count._all,
     // `byteSize` is BigInt in the store; the ceilings are Numbers. 60 MiB is
     // nowhere near `Number.MAX_SAFE_INTEGER`, so the narrowing is safe here
     // and keeps the ceiling comparison ordinary arithmetic.
-    byteSize: Number(result._sum.byteSize ?? 0n),
+    uploadedByteSize: Number(result._sum.uploadedByteSize ?? 0n),
+    storedByteSize: Number(result._sum.byteSize ?? 0n),
   };
 }
 

@@ -248,6 +248,10 @@ export function planSeed(
       uploadedFormat: 'png',
       format: 'png',
       byteSize: 4096,
+      // Deliberately NOT equal to `byteSize`. A fixture where the two match
+      // lets a caller read either one and look correct, which is the whole
+      // failure mode this pair of columns exists to prevent.
+      uploadedByteSize: 4352,
       width: 1170,
       height: 2532,
       uploadedAt: lastWeek,

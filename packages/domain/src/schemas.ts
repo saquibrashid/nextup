@@ -338,8 +338,33 @@ export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
  */
 export const MAX_IMAGES_PER_BATCH = 40;
 
-/** 60 MiB cumulative per batch, again across all ingest sources — §5. */
-export const MAX_BATCH_BYTES = 60 * 1024 * 1024;
+/**
+ * 60 MiB cumulative per batch, across all ingest sources — §5.
+ *
+ * ⚠ THIS BOUNDS **UPLOADED** BYTES — what the device sent — and it may only
+ * ever be compared against uploaded bytes. It is deliberately NOT named
+ * `MAX_BATCH_BYTES` any more, because "bytes" is exactly the ambiguity that
+ * produced the defect this rename fixes.
+ *
+ * The route used to enforce it as `storedSoFar + uploadedIncoming`, summing
+ * two different units. For HEIC that is wrong in BOTH directions at once:
+ *
+ *   - the incoming half is under-counted by the transcode ratio, so the
+ *     ceiling never fires on the batch it exists to stop (measured on the
+ *     owner's own phone: 1.49 MiB HEIC → 12.7 MiB PNG, 1.76 MiB → 17.8 MiB);
+ *   - the already-stored half is inflated by the same ratio, so a LATER
+ *     request is refused with "a batch holds at most 60 MiB" after the owner
+ *     has sent about 7 MiB of files — a number they cannot reconcile with
+ *     anything they can see.
+ *
+ * The stored total is NOT bounded by a byte ceiling of its own, deliberately.
+ * It is already bounded transitively by `MAX_IMAGES_PER_BATCH` × the pixel
+ * guard (REQ-079), and at these volumes 30 days of blob storage for a full
+ * batch costs on the order of a cent. Inventing a stored-bytes ceiling would
+ * add a new way to refuse a legitimate batch of phone photos in order to save
+ * nothing.
+ */
+export const MAX_BATCH_UPLOAD_BYTES = 60 * 1024 * 1024;
 
 /** 10 file parts per multipart request — §5. */
 export const MAX_FILES_PER_REQUEST = 10;
@@ -354,10 +379,20 @@ export const MAX_FILES_PER_REQUEST = 10;
  * compliant 10 MiB HEIC can easily store as a 30 MiB PNG. Bounding the stored
  * size by the upload ceiling would make a legal upload unrepresentable, which
  * is the kind of defect that only appears once a real phone photo arrives.
- * The batch ceiling is the honest bound — a single image cannot exceed what
- * the whole batch may hold, and the batch tally counts STORED bytes.
+ *
+ * ⚠ It is also NOT the batch ceiling. It used to be defined as exactly that,
+ * on the reasoning that "one image cannot exceed what the whole batch holds" —
+ * true, but the batch ceiling counts UPLOADED bytes and this counts STORED
+ * ones, so the two were never in the same unit and the alias quietly asserted
+ * they were.
+ *
+ * The honest bound is the raster: a lossless PNG cannot meaningfully exceed
+ * its own decoded raster, and the largest raster this system will ever decode
+ * is the maximum sanctioned pixel guard — 50 MP at 4 bytes per pixel = 200 MB
+ * ≈ 191 MiB (invariant 14 permits only 25 MP and 50 MP). 256 MiB clears that
+ * with headroom for PNG container overhead, and nothing legal can reach it.
  */
-export const MAX_STORED_IMAGE_BYTES = MAX_BATCH_BYTES;
+export const MAX_STORED_IMAGE_BYTES = 256 * 1024 * 1024;
 
 export const uploadedImageSchema = z
   .object({
@@ -382,6 +417,10 @@ export const uploadedImageSchema = z
     // blob — for a HEIC upload, the lossless PNG transcode, which is larger
     // than the file the device sent. See the constant.
     byteSize: z.number().int().positive().max(MAX_STORED_IMAGE_BYTES),
+    // ⚠ `MAX_IMAGE_BYTES` here, and that asymmetry with `byteSize` above is
+    // the whole point: this is what the device sent, so the 10 MiB upload
+    // ceiling is exactly the right bound for it.
+    uploadedByteSize: z.number().int().positive().max(MAX_IMAGE_BYTES),
     width: z.number().int().positive().nullable(),
     height: z.number().int().positive().nullable(),
     uploadedAt: isoDateTimeSchema,

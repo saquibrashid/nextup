@@ -2885,8 +2885,8 @@ exist, and they must not be deleted as "duplicates" of the integration run.
 | --- | --- | --- |
 | `T-IMG-002a`-`d` | U + I | Partial acceptance. A valid file beside an invalid one is **201**, the bad one is named in `rejected[]`, and the failed file is the ONLY one missing from storage. |
 | `T-IMG-006a`-`f` | U + I | A non-image is `415` and named per file; the ordinal is consumed by a rejected file too; `blobPath` carries no part of any client name. |
-| `T-IMG-010a`-`e` | U + I | Per-file rejection reasons; ceilings; byte totals accumulate across requests and match the stored rows. |
-| `T-IMG-012a`-`d` | U + I | `uploadedFormat` (as received) is recorded distinct from the stored `format`. |
+| `T-IMG-010a`-`j` | U + I | Per-file rejection reasons; ceilings; byte totals accumulate across requests and match the stored rows. **`i`/`j`: the whole-batch ceiling is measured in UPLOADED bytes** — a batch whose STORED bytes exceed it still accepts, and the 413 reports the uploaded total. |
+| `T-IMG-012a`-`f` | U + I | `uploadedFormat` (as received) is recorded distinct from the stored `format`. **`e`/`f`: `uploadedByteSize` (what the device sent) is recorded distinct from `byteSize` (what is stored)**, which diverge across the transcode AND the metadata strip — they are never assumed equal. |
 | `T-IMG-018a`-`b` | U | Files are processed **serially**, never concurrently, and one failure never removes an accepted file. |
 | `T-IMG-023a`-`e` | U + I | The transcode is conditional on the **sniffed format**, never on `ingestSource`; the metadata strip runs for every image outside that condition; images attach to a **draft** batch only (`409 BATCH_NOT_DRAFT`, `404` for a batch that is not the owner's). |
 | `T-PASTE-003a`-`b` | I | Three successive pastes append to the **one** open batch with ordinals `01`/`02`/`03`; paste, drop and upload land in the same batch and are counted together. |

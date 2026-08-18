@@ -93,6 +93,7 @@ async function seedImage(batchId: string, id: string) {
     uploadedFormat: 'png',
     format: 'png',
     byteSize: BigInt(1024),
+    uploadedByteSize: BigInt(1088),
     retainUntil: new Date('2026-09-09T00:00:00.000Z'),
   });
 }

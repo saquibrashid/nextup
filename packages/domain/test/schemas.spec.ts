@@ -10,6 +10,7 @@ import {
   titleSchema,
   uploadBatchSchema,
   MAX_STORED_IMAGE_BYTES,
+  MAX_IMAGE_BYTES,
   uploadedImageSchema,
 } from '../src/index.js';
 import type {
@@ -83,6 +84,7 @@ function anImage(overrides: Partial<UploadedImage> = {}): UploadedImage {
     uploadedFormat: 'png',
     format: 'png',
     byteSize: 1024,
+    uploadedByteSize: 1024,
     width: 1170,
     height: 2532,
     uploadedAt: NOW,
@@ -352,13 +354,40 @@ describe('T-DM-025 uploaded image — ingest source and file name (R7, A45)', ()
     expect(uploadedImageSchema.parse(transcoded)).toEqual(transcoded);
   });
 
-  it('T-DM-025f: a stored image beyond the whole-batch ceiling is still rejected', () => {
-    // Relaxing the bound is not removing it: one image can never exceed what
-    // the entire batch may hold, and the batch tally counts STORED bytes.
+  it('T-DM-025f: a stored image beyond the STORED ceiling is still rejected', () => {
+    // Relaxing the bound is not removing it. The bound is the raster: a
+    // lossless PNG cannot meaningfully exceed its own decoded raster, and the
+    // largest this system will ever decode is the maximum sanctioned pixel
+    // guard (50 MP × 4 bytes ≈ 191 MiB), so nothing legal reaches 256 MiB.
+    // ~~Superseded: "one image can never exceed what the entire batch may
+    // hold, and the batch tally counts STORED bytes" — the batch ceiling
+    // counts UPLOADED bytes, so aliasing this to it asserted that two
+    // different units were the same number.~~
     expect(
       uploadedImageSchema.safeParse(anImage({ byteSize: MAX_STORED_IMAGE_BYTES + 1 })).success,
     ).toBe(false);
     expect(uploadedImageSchema.safeParse(anImage({ byteSize: 0 })).success).toBe(false);
+  });
+
+  it('T-DM-025g: the UPLOADED size is bounded by the 10 MiB upload ceiling, not the stored one', () => {
+    // The asymmetry is the point. The same row carries a 30 MiB stored PNG
+    // and an uploaded figure that may not exceed 10 MiB, because they measure
+    // different things. A schema that bounded both by the same constant would
+    // accept a 30 MiB "upload" — which the API boundary already refuses, so
+    // the store would be asserting something weaker than the route.
+    expect(
+      uploadedImageSchema.safeParse(
+        anImage({
+          uploadedFormat: 'heic',
+          byteSize: 30 * 1024 * 1024,
+          uploadedByteSize: 9_000_000,
+        }),
+      ).success,
+    ).toBe(true);
+    expect(
+      uploadedImageSchema.safeParse(anImage({ uploadedByteSize: MAX_IMAGE_BYTES + 1 })).success,
+    ).toBe(false);
+    expect(uploadedImageSchema.safeParse(anImage({ uploadedByteSize: 0 })).success).toBe(false);
   });
 });
 

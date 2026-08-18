@@ -219,6 +219,48 @@ describe('T-IMG-012 uploadedFormat is distinct from the stored format', () => {
     expect(outcome.accepted[0]).toMatchObject({ format: 'png', uploadedFormat: 'heic' });
   });
 
+  it('T-IMG-012e: uploadedByteSize is what the DEVICE sent, byteSize what is STORED', async () => {
+    // The two diverge across a transcode most dramatically — the owner's own
+    // phone
+    // expands ~8.5x (1.76 MiB HEIC -> 17.8 MiB PNG). Reading the post-transcode
+    // buffer for BOTH looks correct in every PNG test and silently restores the
+    // unit mix that made the batch ceiling fire at ~7 MiB of a 60 MiB budget.
+    const incoming = heicBytes(1179, 2556);
+    const stored = pngBytes(1179, 2556, 4096);
+    expect(stored.byteLength).toBeGreaterThan(incoming.byteLength);
+    const ctx = context({
+      stages: {
+        transcode: vi.fn(() => Promise.resolve({ bytes: stored })),
+        stripMetadata: vi.fn((bytes: Uint8Array) => Promise.resolve(bytes)),
+      } as never,
+    });
+
+    const outcome = await ingestFiles([file(incoming, 'IMG.HEIC')], ctx);
+
+    expect(outcome.accepted[0]?.uploadedByteSize).toBe(incoming.byteLength);
+    expect(outcome.accepted[0]?.byteSize).toBe(stored.byteLength);
+  });
+
+  it('T-IMG-012f: the STRIP moves the two apart as well, not only the transcode', async () => {
+    // The metadata strip (REQ-078) rewrites the file for every image from
+    // every source, so a plain PNG that never transcodes still stores smaller
+    // than it arrived. An integration test that asserted these two were equal
+    // for PNG failed on exactly this — 106 uploaded, 102 stored.
+    const incoming = pngBytes(600, 400, 64);
+    const ctx = context({
+      stages: {
+        transcode: vi.fn(() => Promise.resolve({ bytes: pngBytes(600, 400) })),
+        stripMetadata: vi.fn(() => Promise.resolve(pngBytes(600, 400))),
+      } as never,
+    });
+
+    const outcome = await ingestFiles([file(incoming, 'shot.png')], ctx);
+
+    expect(ctx.stages.transcode).not.toHaveBeenCalled();
+    expect(outcome.accepted[0]?.uploadedByteSize).toBe(incoming.byteLength);
+    expect(outcome.accepted[0]?.byteSize).toBeLessThan(incoming.byteLength);
+  });
+
   it('T-IMG-012c: the declared name is NOT what decides the format', async () => {
     // PNG bytes under a .heic name. Trusting the name would transcode it.
     const ctx = context();

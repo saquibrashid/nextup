@@ -267,8 +267,30 @@ export interface UploadedImage {
    * transcoded to LOSSLESS PNG on ingest. Also determined by magic bytes.
    */
   format: ImageFormat;
-  /** `<= 10 * 1024 * 1024`. */
+  /**
+   * Bytes AS STORED — for a HEIC upload this is the lossless PNG transcode,
+   * which is routinely several times the file the device sent. Bounded by
+   * `MAX_STORED_IMAGE_BYTES`.
+   *
+   * ⚠ NOT bounded by the 10 MiB upload ceiling, and this comment used to say
+   * it was. Use `uploadedByteSize` for anything that must reason about what
+   * the owner actually sent.
+   */
   byteSize: number;
+  /**
+   * Bytes AS UPLOADED — what the device sent, before any transcode or strip.
+   * `<= 10 * 1024 * 1024` (`MAX_IMAGE_BYTES`).
+   *
+   * ⚠ It does NOT equal `byteSize` for PNG and JPEG. Those are not "stored as
+   * received": the metadata strip (REQ-078) rewrites every image from every
+   * source, so a PNG typically stores a little smaller than it arrived.
+   *
+   * ⚠ Recorded separately because the per-batch ceiling
+   * (`MAX_BATCH_UPLOAD_BYTES`) is an UPLOAD ceiling, and enforcing it needs a
+   * running total in the uploaded unit. Summing stored bytes against incoming
+   * uploaded bytes is the defect this field exists to make impossible.
+   */
+  readonly uploadedByteSize: number;
   width: number | null;
   height: number | null;
   uploadedAt: IsoDateTime;

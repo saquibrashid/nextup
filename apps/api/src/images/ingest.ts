@@ -64,6 +64,18 @@ export interface AcceptedImage {
   readonly uploadedFormat: UploadFormat;
   readonly ingestSource: IngestSource;
   readonly byteSize: number;
+  /**
+   * What the DEVICE sent, before any transcode or strip.
+   *
+   * ⚠ It is NOT equal to `byteSize` for PNG and JPEG. The metadata strip
+   * (REQ-078) rewrites every image from every source, so a plain PNG stores
+   * slightly *smaller* than it arrived; a HEIC stores several times *larger*.
+   * The only reliable relation is that these are different numbers measuring
+   * different things.
+   *
+   * The per-batch UPLOAD ceiling is enforced against a running total of this.
+   */
+  readonly uploadedByteSize: number;
   readonly width: number;
   readonly height: number;
   readonly blobPath: string;
@@ -264,6 +276,12 @@ async function ingestOne(
       uploadedFormat,
       ingestSource: context.ingestSource,
       byteSize: bytes.byteLength,
+      // ⚠ `file.bytes`, NOT `bytes` — `bytes` has been reassigned by the
+      // transcode above and is the STORED raster by this point. Reading the
+      // wrong one here would silently reintroduce the unit mix that the
+      // separate column exists to prevent, and for PNG/JPEG the two are
+      // identical, so it would look correct in every non-HEIC test.
+      uploadedByteSize: file.bytes.byteLength,
       width,
       height,
       blobPath,
