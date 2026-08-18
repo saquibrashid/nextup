@@ -25,6 +25,7 @@ import {
   isExtractorName,
 } from '@nextup/domain';
 
+import { AzureVisionExtractor, type AzureVisionExtractorOptions } from './azureVisionExtractor.js';
 import { type RecordingStore } from './recordings.js';
 import { StubExtractor } from './stubExtractor.js';
 
@@ -37,6 +38,8 @@ export interface ExtractorConfig {
   recordings?: RecordingStore;
   /** The real merge (TASK-056c). Required by `'stub'` and `'hybrid'`. */
   crossCheck?: CrossCheckFn;
+  /** Required by `'azure-vision-read'`, and later by `'hybrid'` (TASK-056c). */
+  vision?: AzureVisionExtractorOptions;
 }
 
 /**
@@ -93,10 +96,18 @@ export function createExtractor(cfg: ExtractorConfig): TitleExtractor {
       throw new ExtractorNotAvailableError('hybrid', 'TASK-056c (hybridExtractor.ts)');
     case 'llm-vision':
       throw new ExtractorNotAvailableError('llm-vision', 'TASK-056b (llmVisionExtractor.ts)');
-    case 'azure-vision-read':
-      throw new ExtractorNotAvailableError(
-        'azure-vision-read',
-        'TASK-056 (azureVisionExtractor.ts)',
-      );
+    case 'azure-vision-read': {
+      // The ADR-0001 Revision 1 revert path (TASK-056). It runs, and it is
+      // materially worse than `'hybrid'` — see `AzureVisionExtractor.extract`
+      // on why it always reports `crossCheck: 'llm-unavailable'` and therefore
+      // withholds removals. Selecting it is a deliberate, temporary act.
+      if (!cfg.vision) {
+        throw new Error(
+          'The "azure-vision-read" extractor requires a Vision endpoint and credential ' +
+            '(specs/ai.md §2.1b). There is no API-key fallback: auth is managed identity.',
+        );
+      }
+      return new AzureVisionExtractor(cfg.vision);
+    }
   }
 }

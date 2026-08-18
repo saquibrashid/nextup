@@ -246,9 +246,21 @@ describe('T-STUB-001h the factory selects one extractor and never silently downg
       createExtractor({ NEXTUP_EXTRACTOR: 'stub', recordings: inMemoryRecordingStore({}) }),
     ).toThrow(/crossCheck/);
 
-    for (const name of ['hybrid', 'llm-vision', 'azure-vision-read'] as const) {
+    for (const name of ['hybrid', 'llm-vision'] as const) {
       expect(() => createExtractor({ NEXTUP_EXTRACTOR: name })).toThrow(ExtractorNotAvailableError);
     }
+
+    // `azure-vision-read` is BUILT as of TASK-056, so it no longer reports
+    // "not available" — it reports a misconfiguration, which is a different
+    // fault with a different fix. It must still refuse rather than fall back:
+    // a silent downgrade to the stub would return zero titles from a real
+    // batch, and in full-update mode zero titles reads as "remove everything".
+    expect(() => createExtractor({ NEXTUP_EXTRACTOR: 'azure-vision-read' })).toThrow(
+      /requires a Vision endpoint and credential/,
+    );
+    expect(() => createExtractor({ NEXTUP_EXTRACTOR: 'azure-vision-read' })).not.toThrow(
+      ExtractorNotAvailableError,
+    );
   });
 });
 

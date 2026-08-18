@@ -32,6 +32,8 @@ so they do not relicense this work — but their notices must be retained.
 
 | Package | Version | Licence |
 |---|---|---|
+| `@azure-rest/ai-vision-image-analysis` | 1.0.0-beta.3 | MIT |
+| `@azure-rest/core-client` | 1.4.0 | MIT |
 | `@azure/abort-controller` | 2.2.0 | MIT |
 | `@azure/core-auth` | 1.11.0 | MIT |
 | `@azure/core-client` | 1.11.0 | MIT |
@@ -42,7 +44,11 @@ so they do not relicense this work — but their notices must be retained.
 | `@azure/core-tracing` | 1.4.0 | MIT |
 | `@azure/core-util` | 1.14.0 | MIT |
 | `@azure/core-xml` | 1.6.0 | MIT |
+| `@azure/identity` | 4.13.1 | MIT |
 | `@azure/logger` | 1.4.0 | MIT |
+| `@azure/msal-browser` | 5.18.0 | MIT |
+| `@azure/msal-common` | 16.12.0 | MIT |
+| `@azure/msal-node` | 5.5.0 | MIT |
 | `@azure/storage-blob` | 12.33.0 | MIT |
 | `@azure/storage-common` | 12.5.0 | MIT |
 | `@babel/helper-string-parser` | 7.29.7 | MIT |
@@ -93,7 +99,9 @@ so they do not relicense this work — but their notices must be retained.
 | `anynum` | 1.0.1 | MIT |
 | `append-field` | 1.0.0 | MIT |
 | `body-parser` | 2.3.0 | MIT |
+| `buffer-equal-constant-time` | 1.0.1 | BSD-3-Clause |
 | `buffer-from` | 1.1.2 | MIT |
+| `bundle-name` | 4.1.0 | MIT |
 | `busboy` | 1.6.0 | MIT |
 | `bytes` | 3.1.2 | MIT |
 | `c12` | 3.1.0 | MIT |
@@ -114,12 +122,16 @@ so they do not relicense this work — but their notices must be retained.
 | `cookie-signature` | 1.2.2 | MIT |
 | `debug` | 4.4.3 | MIT |
 | `deepmerge-ts` | 7.1.5 | BSD-3-Clause |
+| `default-browser` | 5.5.0 | MIT |
+| `default-browser-id` | 5.0.1 | MIT |
+| `define-lazy-prop` | 3.0.0 | MIT |
 | `defu` | 6.1.7 | MIT |
 | `depd` | 2.0.0 | MIT |
 | `destr` | 2.0.5 | MIT |
 | `detect-libc` | 2.1.2 | Apache-2.0 |
 | `dotenv` | 16.6.1 | BSD-2-Clause |
 | `dunder-proto` | 1.0.1 | MIT |
+| `ecdsa-sig-formatter` | 1.0.11 | Apache-2.0 |
 | `ee-first` | 1.1.1 | MIT |
 | `effect` | 3.21.0 | MIT |
 | `empathic` | 2.0.0 | MIT |
@@ -154,11 +166,24 @@ so they do not relicense this work — but their notices must be retained.
 | `iconv-lite` | 0.7.3 | MIT |
 | `inherits` | 2.0.4 | ISC |
 | `ipaddr.js` | 1.9.1 | MIT |
+| `is-docker` | 3.0.0 | MIT |
+| `is-inside-container` | 1.0.0 | MIT |
 | `is-promise` | 4.0.0 | MIT |
 | `is-unsafe` | 2.0.0 | MIT |
+| `is-wsl` | 3.1.1 | MIT |
 | `jiti` | 2.7.0 | MIT |
 | `jpeg-js` | 0.4.4 | BSD-3-Clause |
+| `jsonwebtoken` | 9.0.3 | MIT |
+| `jwa` | 2.0.1 | MIT |
+| `jws` | 4.0.1 | MIT |
 | `libheif-js` | 1.19.8 | LGPL-3.0 |
+| `lodash.includes` | 4.3.0 | MIT |
+| `lodash.isboolean` | 3.0.3 | MIT |
+| `lodash.isinteger` | 4.0.4 | MIT |
+| `lodash.isnumber` | 3.0.3 | MIT |
+| `lodash.isplainobject` | 4.0.6 | MIT |
+| `lodash.isstring` | 4.0.1 | MIT |
+| `lodash.once` | 4.1.1 | MIT |
 | `magicast` | 0.5.4 | MIT |
 | `math-intrinsics` | 1.1.0 | MIT |
 | `media-typer` | 0.3.0 | MIT |
@@ -183,6 +208,7 @@ so they do not relicense this work — but their notices must be retained.
 | `ohash` | 2.0.11 | MIT |
 | `on-finished` | 2.4.1 | MIT |
 | `once` | 1.4.0 | ISC |
+| `open` | 10.2.0 | MIT |
 | `parseurl` | 1.3.3 | MIT |
 | `path-expression-matcher` | 1.6.2 | MIT |
 | `path-to-regexp` | 8.4.2 | MIT |
@@ -204,6 +230,7 @@ so they do not relicense this work — but their notices must be retained.
 | `readable-stream` | 3.6.2 | MIT |
 | `readdirp` | 4.1.2 | MIT |
 | `router` | 2.2.0 | MIT |
+| `run-applescript` | 7.1.0 | MIT |
 | `safe-buffer` | 5.2.1 | MIT |
 | `safer-buffer` | 2.1.2 | MIT |
 | `scheduler` | 0.27.0 | MIT |
@@ -233,5 +260,6 @@ so they do not relicense this work — but their notices must be retained.
 | `util-deprecate` | 1.0.2 | MIT |
 | `vary` | 1.1.2 | MIT |
 | `wrappy` | 1.0.2 | ISC |
+| `wsl-utils` | 0.1.0 | MIT |
 | `xml-naming` | 0.3.0 | MIT |
 | `zod` | 4.4.3 | MIT |

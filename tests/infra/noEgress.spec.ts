@@ -23,7 +23,7 @@
  * switched on, which is the correct order.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -33,20 +33,55 @@ import {
   EgressBlockedError,
   LOOPBACK_HOSTS,
   blockedAttempts,
+  clearMockedHosts,
   egressAttempts,
   hostOf,
   installEgressGuard,
   isEgressGuardInstalled,
   isLoopback,
+  isMockedHost,
+  mockedAttempts,
+  registerMockedHost,
   resetEgressAttempts,
   uninstallEgressGuard,
+  unregisterMockedHost,
 } from '../../tools/egress-guard.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 
+/** Every first-party TS/JS source file, for the static halves below. */
+function collectSources(): Array<{ relPath: string; text: string }> {
+  const out: Array<{ relPath: string; text: string }> = [];
+  const walk = (absolute: string): void => {
+    for (const entry of readdirSync(absolute, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === 'dist' || entry.name === '.git') continue;
+      const next = path.join(absolute, entry.name);
+      if (entry.isDirectory()) {
+        walk(next);
+        continue;
+      }
+      if (!/\.(ts|tsx|mts|cts|mjs|js)$/.test(entry.name)) continue;
+      out.push({
+        relPath: path.relative(ROOT, next).split(path.sep).join('/'),
+        text: readFileSync(next, 'utf8'),
+      });
+    }
+  };
+  for (const dir of ['apps', 'packages', 'tests', 'tools']) walk(path.join(ROOT, dir));
+  return out;
+}
+
+function filesCalling(
+  files: ReadonlyArray<{ relPath: string; text: string }>,
+  fn: string,
+): string[] {
+  return files.filter((f) => new RegExp(`\\b${fn}\\s*\\(`).test(f.text)).map((f) => f.relPath);
+}
+
 afterEach(() => {
   uninstallEgressGuard();
   resetEgressAttempts();
+  clearMockedHosts();
 });
 
 /** A host that is definitely not loopback, assembled so no gate trips on it. */
@@ -198,5 +233,69 @@ describe('T-CI-007 · specs/testing.md §3 · the suite runs offline', () => {
     const guard = readFileSync(path.join(ROOT, 'tools', 'egress-guard.mjs'), 'utf8');
     const offenders = liveHosts.filter((h) => config.includes(h) || guard.includes(h));
     expect(offenders).toEqual([]);
+  });
+
+  // ── The `msw`-mocked-host seam (TASK-056) ────────────────────────────────
+  //
+  // `msw` mocks `fetch` by REPLACING it, so a mocked fetch never reaches the
+  // guard. It cannot do that for `http.request`: to return a `ClientRequest`
+  // at all it must call the real one, having swapped the socket underneath.
+  // The Azure SDKs speak `https.request`, so without a seam an offline,
+  // fully-recorded extractor suite is indistinguishable from a live one.
+  //
+  // The seam is only safe while it stays narrow, so all three properties are
+  // asserted: it works, it is SCOPED, and nothing outside the fixtures uses it.
+
+  it('T-CI-007o · a registered mocked host is allowed and recorded as mocked', () => {
+    installEgressGuard();
+    registerMockedHost(EXTERNAL);
+    try {
+      // The request is allowed to be CONSTRUCTED — that is the property. It
+      // is then torn down immediately, with an error listener attached first:
+      // a `ClientRequest` starts resolving on construction, and destroying one
+      // without a listener surfaces as an unhandled ECONNRESET that fails the
+      // whole file from outside any test.
+      expect(() => {
+        const request = http.request({ hostname: EXTERNAL });
+        request.on('error', () => undefined);
+        request.destroy();
+      }).not.toThrow();
+    } finally {
+      unregisterMockedHost(EXTERNAL);
+    }
+    expect(blockedAttempts()).toHaveLength(0);
+    expect(mockedAttempts().map((a) => a.host)).toEqual([EXTERNAL]);
+  });
+
+  it('T-CI-007p · deregistering restores blocking, so the seam cannot outlive its server', () => {
+    // The mutation that matters: if registration leaked past `server.close()`
+    // a later suite could make a REAL call to that host and the guard would
+    // wave it through, silently.
+    installEgressGuard();
+    registerMockedHost(EXTERNAL);
+    unregisterMockedHost(EXTERNAL);
+    expect(() => http.request({ hostname: EXTERNAL })).toThrow(EgressBlockedError);
+  });
+
+  it('T-CI-007q · clearMockedHosts empties the register', () => {
+    registerMockedHost(EXTERNAL);
+    expect(isMockedHost(EXTERNAL)).toBe(true);
+    clearMockedHosts();
+    expect(isMockedHost(EXTERNAL)).toBe(false);
+  });
+
+  it('T-CI-007r · only the msw fixture modules may register a mocked host', () => {
+    // A production file, or an ordinary spec, calling this would be a real
+    // hole — it would allow live egress for the rest of the run.
+    const callers = filesCalling(collectSources(), 'registerMockedHost');
+    for (const caller of callers) {
+      expect(
+        caller.startsWith('tests/fixtures/msw/') ||
+          caller === 'tools/egress-guard.mjs' ||
+          caller === 'tests/infra/noEgress.spec.ts',
+      ).toBe(true);
+    }
+    // And the sanctioned caller must actually exist, or this passes vacuously.
+    expect(callers.some((c) => c.startsWith('tests/fixtures/msw/'))).toBe(true);
   });
 });

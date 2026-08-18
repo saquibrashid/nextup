@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "429",
+    "message": "Requests to the ImageAnalysis Operation have exceeded rate limit."
+  }
+}

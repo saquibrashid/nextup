@@ -11,12 +11,12 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 99 |
+| ⬜ todo | 102 |
 | 🚧 doing | 5 |
-| ✅ done | 53 |
+| ✅ done | 54 |
 | 🙋 owner | 4 |
 | 💤 deferred | 0 |
-| **total** | **161** |
+| **total** | **165** |
 
 ## Ready to start
 
@@ -34,7 +34,9 @@ Not done, and every task they depend on is done.
 | `TASK-051` | XS | Epic B — Capture & import |
 | `TASK-052` | S | Epic B — Capture & import |
 | `TASK-053` | S | Epic B — Capture & import |
-| `TASK-056` | S | Epic C — Extraction |
+| `TASK-056b` | M | Epic C — Extraction |
+| `TASK-056c` | M | Epic C — Extraction |
+| `TASK-057` | M | Epic C — Extraction |
 | `TASK-102` | S | Epic H — History, removal ledger, suppression |
 | `TASK-106` | S | Epic H — History, removal ledger, suppression |
 | `TASK-126` | M | Epic K — Platform, safety, and the shell |
@@ -56,7 +58,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-84 tasks cannot start yet.
+85 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -65,9 +67,9 @@ Not done, and every task they depend on is done.
 | `TASK-043` | `TASK-045` |
 | `TASK-044` | `TASK-043` |
 | `TASK-046` | `TASK-026`, `TASK-038` |
-| `TASK-057` | `TASK-056` |
-| `TASK-058` | `TASK-056`, `TASK-057`, `TASK-154` |
+| `TASK-058` | `TASK-057`, `TASK-154` |
 | `TASK-059` | `TASK-058` |
+| `TASK-059b` | `TASK-058`, `TASK-067` |
 | `TASK-060` | `TASK-045` |
 | `TASK-061` | `TASK-060` |
 | `TASK-062` | `TASK-060` |
@@ -88,6 +90,7 @@ Not done, and every task they depend on is done.
 | `TASK-077` | `TASK-058` |
 | `TASK-078` | `TASK-057` |
 | `TASK-079` | `TASK-078` |
+| `TASK-079b` | `TASK-079` |
 | `TASK-080` | `TASK-071` |
 | `TASK-081` | `TASK-071` |
 | `TASK-082` | `TASK-081` |
@@ -188,6 +191,7 @@ Not done, and every task they depend on is done.
 | `TASK-050` | `T-IMG-002`, `T-IMG-006`, `T-IMG-010`, `T-IMG-012`, `T-IMG-018`, `T-IMG-023`, `T-PASTE-003`, `T-PASTE-005`, `T-PASTE-006`, `T-PASTE-007`, `T-SEC-003`, `T-RET-014`; ~~`T-IMG-013`~~ | `T-IMG-002`, `T-IMG-006`, `T-IMG-010`, `T-IMG-012`, `T-PASTE-003`, `T-PASTE-005`, `T-PASTE-006`, `T-PASTE-007` |
 | `TASK-054` | `apps/api/src/services/batchLifecycle.ts` — the transition table, `submitBatch`, `discardBatch`, `assertBatchMutable`, plus `transitionUploadBatchStatus` (the conditional write). Routes `POST /api/batches/:batchId/submit` (§6.14) and `/discard` (§6.23). `T-BATCH-017a`…`h` (table totality, one-way-ness, discardable set), `T-BATCH-019a`…`d` (the submit endpoint's status codes), `T-BATCH-018a`…`c` (atomic transition — `018a` mutation-verified after its first form proved vacuous), `T-BATCH-013a`…`d` (immutability: the guard **and** the absence of a mutating route), `T-BATCH-006a`…`f` (a discarded batch writes nothing, retains images, releases the ceiling). ⚠ **The three close/reconciliation ids this row originally cited are NOT delivered here** — they belong to TASK-072 and no close endpoint exists yet; see `specs/testing.md` §24.3. Two spec gaps reported in §24.2. | `T-BATCH-006`, `T-BATCH-013`, `T-BATCH-017`, `T-BATCH-018`, `T-BATCH-019` |
 | `TASK-055` | `packages/domain/src/extraction/` (contract + degraded projections) + `apps/api/src/extraction/` (recordings, `StubExtractor`, factory). `T-STUB-001a`…`r`, incl. the three fault tokens and byte-identical output over three runs. | `T-STUB-001` |
+| `TASK-056` | `AzureVisionExtractor` (`apps/api/src/extraction/azureVisionExtractor.ts`) + offline `msw` contract suite (`T-AI-033a`–`s`, recordings in `tests/fixtures/msw/vision/`) + static boundary gates (`T-AI-009a`–`j`, `T-AI-010a`–`d`). Retry/timeout policy is implemented LOCALLY with an injectable `sleep` and the SDK's own retry pipeline disabled, because two retry layers compose multiplicatively against a 5,000/month free tier. ⚠ In standalone `azure-vision-read` mode `extract()` always reports `crossCheck: 'llm-unavailable'` — the primary reader is deliberately not called, so the read genuinely was never corroborated, and reporting `ok` would let a strictly-worse read propose mass removals. The ADR-0001 Rev 1 revert path therefore runs in degraded mode (§2.2a) and withholds removals. `T-AI-009` request half + `T-AI-010` land here; the `LlmVisionExtractor` half of `T-AI-033` is TASK-056b. | `T-AI-009`, `T-AI-010`, `T-AI-033` |
 | `TASK-101` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` |
 | `TASK-121` | `fdd5519` — `tools/check-mutating-routes.mjs`, `T-MUT-001` (a–j), `T-MUT-002` (a–f). The 18 mutating routes each map to one of the eight REQ-041 owner-initiated operations or carry an explicit non-list-state reason; mutation-proven with an unregistered `POST /titles/:id/auto-confirm` and a `jobs/reconcile.ts` calling a guarded operation. | `T-MUT-001`, `T-MUT-002` |
 | `TASK-122` | `dde3dc5` — `tools/check-outbound-hosts.mjs`, `T-SEC-031` (a–i) and the outbound half of `T-SEC-009` (`k`). Exactly three destinations: TMDB, Azure OpenAI, Azure AI Vision. Mutation-proven by widening the list to four, shrinking it below three, and planting an unlisted host in source. The telemetry and streaming hostnames the spec needs are assembled from fragments rather than added to another gate's exemption list. | `T-SEC-009`, `T-SEC-031` |

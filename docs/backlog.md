@@ -507,10 +507,13 @@ finished, so the exception cannot outlive its reason.
 | `TASK-053` | `todo` | — |
 | `TASK-054` | `done` | `apps/api/src/services/batchLifecycle.ts` — the transition table, `submitBatch`, `discardBatch`, `assertBatchMutable`, plus `transitionUploadBatchStatus` (the conditional write). Routes `POST /api/batches/:batchId/submit` (§6.14) and `/discard` (§6.23). `T-BATCH-017a`…`h` (table totality, one-way-ness, discardable set), `T-BATCH-019a`…`d` (the submit endpoint's status codes), `T-BATCH-018a`…`c` (atomic transition — `018a` mutation-verified after its first form proved vacuous), `T-BATCH-013a`…`d` (immutability: the guard **and** the absence of a mutating route), `T-BATCH-006a`…`f` (a discarded batch writes nothing, retains images, releases the ceiling). ⚠ **The three close/reconciliation ids this row originally cited are NOT delivered here** — they belong to TASK-072 and no close endpoint exists yet; see `specs/testing.md` §24.3. Two spec gaps reported in §24.2. |
 | `TASK-055` | `done` | `packages/domain/src/extraction/` (contract + degraded projections) + `apps/api/src/extraction/` (recordings, `StubExtractor`, factory). `T-STUB-001a`…`r`, incl. the three fault tokens and byte-identical output over three runs. |
-| `TASK-056` | `todo` | — |
+| `TASK-056` | `done` | `AzureVisionExtractor` (`apps/api/src/extraction/azureVisionExtractor.ts`) + offline `msw` contract suite (`T-AI-033a`–`s`, recordings in `tests/fixtures/msw/vision/`) + static boundary gates (`T-AI-009a`–`j`, `T-AI-010a`–`d`). Retry/timeout policy is implemented LOCALLY with an injectable `sleep` and the SDK's own retry pipeline disabled, because two retry layers compose multiplicatively against a 5,000/month free tier. ⚠ In standalone `azure-vision-read` mode `extract()` always reports `crossCheck: 'llm-unavailable'` — the primary reader is deliberately not called, so the read genuinely was never corroborated, and reporting `ok` would let a strictly-worse read propose mass removals. The ADR-0001 Rev 1 revert path therefore runs in degraded mode (§2.2a) and withholds removals. `T-AI-009` request half + `T-AI-010` land here; the `LlmVisionExtractor` half of `T-AI-033` is TASK-056b. |
+| `TASK-056b` | `todo` | — |
+| `TASK-056c` | `todo` | — |
 | `TASK-057` | `todo` | — |
 | `TASK-058` | `todo` | — |
 | `TASK-059` | `todo` | — |
+| `TASK-059b` | `todo` | — |
 | `TASK-060` | `todo` | — |
 | `TASK-061` | `todo` | — |
 | `TASK-062` | `todo` | — |
@@ -531,6 +534,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-077` | `todo` | — |
 | `TASK-078` | `todo` | — |
 | `TASK-079` | `todo` | — |
+| `TASK-079b` | `todo` | — |
 | `TASK-080` | `todo` | — |
 | `TASK-081` | `todo` | — |
 | `TASK-082` | `todo` | — |

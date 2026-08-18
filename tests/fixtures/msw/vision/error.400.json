@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "InvalidRequest",
+    "message": "The image dimensions are outside the supported range."
+  }
+}

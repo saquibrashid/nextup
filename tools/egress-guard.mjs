@@ -51,6 +51,53 @@ export const LOOPBACK_HOSTS = new Set([
 /** Every attempt seen since the guard was installed. */
 const attempts = [];
 
+/**
+ * Hosts an `msw` interceptor is currently serving from committed recordings.
+ *
+ * ⚠ WHY THIS EXISTS, AND WHY IT IS NOT A HOLE.
+ *
+ * `msw` intercepts `fetch` by REPLACING it, so a mocked `fetch` never reaches
+ * this guard at all — which is why the TMDB suite needs nothing here. It
+ * cannot do the same for `http.request`: to hand back a `ClientRequest`
+ * object at all it must call the real `http.request`, having first swapped
+ * the socket for a mock. The bytes never leave the machine, but this guard
+ * sees a request to a public hostname and cannot tell the two apart.
+ *
+ * That matters for the extractor suites (`T-AI-033`): the Azure SDKs use
+ * `@azure/core-rest-pipeline`, which speaks `https.request`, not `fetch`.
+ * Without this seam an offline, fully-recorded suite is indistinguishable
+ * from a live one.
+ *
+ * ⚠ THE SEAM IS NARROW BY CONSTRUCTION. A registered host is recorded as
+ * `mocked`, never as `blocked` — because no packet leaves — but it is still
+ * recorded, so `egressAttempts()` remains a complete log. The only sanctioned
+ * callers are the `msw` fixture modules under `tests/fixtures/msw/**`, and
+ * `T-CI-007a` fails if anything else calls it. Registering a host without an
+ * `msw` server listening on `onUnhandledRequest: 'error'` would let a REAL
+ * request through — which is precisely why registration lives next to the
+ * server that guarantees it.
+ */
+const mockedHosts = new Set();
+
+/** @param {string} host */
+export function registerMockedHost(host) {
+  mockedHosts.add(String(host).toLowerCase());
+}
+
+/** @param {string} host */
+export function unregisterMockedHost(host) {
+  mockedHosts.delete(String(host).toLowerCase());
+}
+
+export function clearMockedHosts() {
+  mockedHosts.clear();
+}
+
+export function isMockedHost(host) {
+  if (host === undefined || host === null || host === '') return false;
+  return mockedHosts.has(String(host).toLowerCase());
+}
+
 let installed = false;
 let originalFetch;
 let originalHttpRequest;
@@ -123,9 +170,15 @@ export function egressAttempts() {
   return attempts.slice();
 }
 
-/** Attempts that were NOT loopback — the ones `T-CI-007` requires to be zero. */
+/** Attempts that were NOT loopback and NOT served from a recording — the ones
+ * `T-CI-007` requires to be zero. */
 export function blockedAttempts() {
   return attempts.filter((a) => a.blocked);
+}
+
+/** Attempts an `msw` interceptor served from a committed recording. */
+export function mockedAttempts() {
+  return attempts.filter((a) => a.mocked);
 }
 
 export function resetEgressAttempts() {
@@ -133,8 +186,9 @@ export function resetEgressAttempts() {
 }
 
 function record(host, via) {
-  const blocked = !isLoopback(host);
-  attempts.push({ host: host ?? '<unknown>', blocked, via });
+  const mocked = isMockedHost(host);
+  const blocked = !mocked && !isLoopback(host);
+  attempts.push({ host: host ?? '<unknown>', blocked, mocked, via });
   return blocked;
 }
 

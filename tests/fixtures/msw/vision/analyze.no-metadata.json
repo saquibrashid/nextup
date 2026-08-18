@@ -1,0 +1,21 @@
+{
+  "modelVersion": "2023-10-01",
+  "readResult": {
+    "blocks": [
+      {
+        "lines": [
+          {
+            "text": "Stranger Things",
+            "boundingPolygon": [
+              { "x": 100, "y": 400 },
+              { "x": 500, "y": 400 },
+              { "x": 500, "y": 500 },
+              { "x": 100, "y": 500 }
+            ],
+            "words": []
+          }
+        ]
+      }
+    ]
+  }
+}

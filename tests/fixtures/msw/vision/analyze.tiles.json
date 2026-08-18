@@ -1,0 +1,88 @@
+{
+  "modelVersion": "2023-10-01",
+  "metadata": { "width": 1000, "height": 2000 },
+  "readResult": {
+    "blocks": [
+      {
+        "lines": [
+          {
+            "text": "Stranger Things",
+            "boundingPolygon": [
+              { "x": 100, "y": 400 },
+              { "x": 500, "y": 400 },
+              { "x": 500, "y": 500 },
+              { "x": 100, "y": 500 }
+            ],
+            "words": [
+              {
+                "text": "Stranger",
+                "confidence": 0.994,
+                "boundingPolygon": [
+                  { "x": 100, "y": 400 },
+                  { "x": 300, "y": 400 },
+                  { "x": 300, "y": 500 },
+                  { "x": 100, "y": 500 }
+                ]
+              },
+              {
+                "text": "Things",
+                "confidence": 0.986,
+                "boundingPolygon": [
+                  { "x": 310, "y": 400 },
+                  { "x": 500, "y": 400 },
+                  { "x": 500, "y": 500 },
+                  { "x": 310, "y": 500 }
+                ]
+              }
+            ]
+          },
+          {
+            "text": "Continue Watching",
+            "boundingPolygon": [
+              { "x": 0, "y": 100 },
+              { "x": 640, "y": 100 },
+              { "x": 640, "y": 160 },
+              { "x": 0, "y": 160 }
+            ],
+            "words": []
+          }
+        ]
+      },
+      {
+        "lines": [
+          {
+            "text": "The Last of Us",
+            "boundingPolygon": [
+              { "x": -4, "y": 1900 },
+              { "x": 1004, "y": 1900 },
+              { "x": 1004, "y": 2010 },
+              { "x": -4, "y": 2010 }
+            ],
+            "words": [
+              {
+                "text": "The",
+                "confidence": 0.5,
+                "boundingPolygon": [
+                  { "x": 0, "y": 1900 },
+                  { "x": 200, "y": 1900 },
+                  { "x": 200, "y": 2000 },
+                  { "x": 0, "y": 2000 }
+                ]
+              },
+              {
+                "text": "Last",
+                "confidence": 0.7,
+                "boundingPolygon": [
+                  { "x": 210, "y": 1900 },
+                  { "x": 400, "y": 1900 },
+                  { "x": 400, "y": 2000 },
+                  { "x": 210, "y": 2000 }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

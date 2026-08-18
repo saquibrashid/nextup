@@ -52,7 +52,15 @@ export const LEDGER_HEADING = '### 1.2 Task status ledger';
 const LEDGER_START = '<!-- STATUS-LEDGER:START -->';
 const LEDGER_END = '<!-- STATUS-LEDGER:END -->';
 
-const TASK_RE = /TASK-\d{3}/;
+// Suffixed splits (`TASK-056b`, `056c`, `059b`, `079b`) are SEPARATE task
+// units — §1 of the backlog says so explicitly and counts them separately.
+// Without the `[a-z]?` this regex silently folded each split into its numeric
+// parent, so `TASK-056`'s "Done when" set became the UNION of 056, 056b and
+// 056c. The visible symptom is the wrong one: finishing 056 honestly is
+// reported as a false claim, naming tests that belong to work nobody has
+// started. The invisible symptom is worse — marking 056b done would have
+// silently satisfied part of 056's gate.
+const TASK_RE = /TASK-\d{3}[a-z]?/;
 const TEST_ID_RE = /T-[A-Z0-9]+-\d+[a-z]?/g;
 
 const norm = (s) => s.replace(/\r\n/g, '\n');
