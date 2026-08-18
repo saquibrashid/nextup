@@ -45,7 +45,7 @@ _env.txt
 
 dist-dev/
 
-# Scratch output from ad-hoc z CLI calls. NEVER commit these: z ad app
-# credential reset writes the client secret to the file it is redirected to,
-# and this repository is public.
+# Scratch output from ad-hoc Azure CLI calls. NEVER commit these:
+# 'az ad app credential reset' writes the client secret to whatever file
+# it is redirected to, and this repository is public.
 .az-*
