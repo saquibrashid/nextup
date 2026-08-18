@@ -146,6 +146,43 @@ export const DROPZONE_IDLE_LABEL =
 export const DROPZONE_ACTIVE_LABEL = 'Drop screenshots here';
 
 /**
+ * `specs/ui.md` §3.2 - the client-side rejection message for a file that is
+ * not one of the three accepted formats. `T-UI-004` asserts it enumerates PNG,
+ * JPEG **and** HEIC, so a refused owner knows what is allowed.
+ *
+ * Quoted from §3.2's prose rather than §9's table (§9 has no row for it), so
+ * this is the spec's own wording, not invented copy.
+ */
+export const UNSUPPORTED_FORMAT_REJECTION =
+  "That file isn't a screenshot nextup can read — attach a PNG, JPEG or HEIC image.";
+
+/**
+ * `specs/ui.md` §3.2 - the file input's `accept`.
+ *
+ * ⚠ ALL THREE FORMATS, AND THE EXTENSIONS AS WELL AS THE MIME TYPES (product
+ * invariant 11). iOS screenshots are PNG, iOS camera photos default to HEIC and
+ * "Most Compatible" gives JPEG; without HEIC here the iOS picker greys out the
+ * owner's own photos and it looks like a broken phone, not a missing format.
+ * The extension aliases matter because iOS frequently reports HEIC with an
+ * empty or `application/octet-stream` type.
+ *
+ * A convenience filter only - the server's magic-byte sniff is authoritative.
+ */
+export const IMAGE_ACCEPT_ATTRIBUTE = 'image/png,image/jpeg,image/heic,image/heif,.heic,.heif';
+
+/** `specs/ui.md` §3.2 - the file-selection affordance, never a fallback. */
+export const CHOOSE_FILES_LABEL = 'Choose files';
+
+/**
+ * `specs/ui.md` §3.2 - a selected HEIC/HEIF tile.
+ *
+ * Only Safari renders HEIC in an `<img>`, so every other browser would show a
+ * broken image. The placeholder states the format and promises the preview
+ * rather than failing silently.
+ */
+export const HEIC_PREVIEW_PLACEHOLDER = 'HEIC — preview after upload';
+
+/**
  * `specs/ui.md` §2.1 - the freshness strip when the dates cannot be computed
  * (`T-FRESH-014`).
  *
