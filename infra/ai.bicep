@@ -72,6 +72,9 @@ param openAiCapacity int = 50
 @allowed(['F0', 'S1'])
 param visionSkuName string = 'F0'
 
+@description('Provision the Vision account. Off allows an AOAI-only deployment while the F0 conflict is unresolved.')
+param deployVision bool = true
+
 // Cognitive Services OpenAI User — inference only. Deliberately NOT
 // "Cognitive Services OpenAI Contributor", which can create and delete model
 // deployments; the app never needs to. Consumed by csrbac.bicep.
@@ -113,7 +116,7 @@ resource openAiDeployment 'Microsoft.CognitiveServices/accounts/deployments@2024
   }
 }
 
-resource vision 'Microsoft.CognitiveServices/accounts@2024-10-01' = {
+resource vision 'Microsoft.CognitiveServices/accounts@2024-10-01' = if (deployVision) {
   name: visionAccountName
   location: location
   kind: 'ComputerVision'
@@ -141,10 +144,11 @@ output openAiEndpoint string = openAi.properties.endpoint
 output openAiDeploymentName string = openAiDeployment.name
 
 @description('NEXTUP_VISION_ENDPOINT.')
-output visionEndpoint string = vision.properties.endpoint
+output visionEndpoint string = deployVision ? vision!.properties.endpoint : ''
 
 @description('Account name, for the role assignment module.')
 output openAiAccountName string = openAi.name
 
 @description('Account name, for the role assignment module.')
-output visionAccountName string = vision.name
+output visionAccountName string = deployVision ? vision!.name : ''
+

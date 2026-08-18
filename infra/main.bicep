@@ -70,6 +70,25 @@ param entraAdminLogin string
 @description('Application (client) id of the Entra app registration used by Easy Auth (TASK-027).')
 param entraClientId string
 
+// ⚠ DEFAULTS TO FALSE ON PURPOSE — this is a safety interlock, not a feature
+// flag. `deploy.yml` runs on every push to `main`, so the moment ai.bicep was
+// wired in here, any lane merge would have provisioned Azure OpenAI and Azure
+// AI Vision with nobody approving it. The owner has HELD provisioning pending
+// the TASK-168 bake-off, so the wiring ships switched off and a deployment is
+// a no-op for these resources until someone sets this to true deliberately.
+@description('Provision the Azure OpenAI and Azure AI Vision accounts. Off by default; see the TASK-010 hold.')
+param deployAi bool = false
+
+// Separate from `deployAi` because the two halves are blocked by DIFFERENT
+// things. Azure OpenAI is only waiting on the owner's go-ahead, while Vision
+// F0 is additionally blocked by a hard Azure constraint: one F0 account per
+// subscription per kind, and this subscription already holds one in an
+// unrelated resource group. This switch is what makes an AOAI-only deployment
+// possible — which is what the TASK-168 bake-off actually needs, since it
+// cannot report without live model calls.
+@description('Provision the Azure AI Vision account. Requires deployAi.')
+param deployVision bool = true
+
 // ⚠ F0 is limited to ONE ComputerVision account per SUBSCRIPTION. Verified on
 // 2026-08-18: this subscription already holds `vision-f4n7ptoeq44pk` (F0,
 // eastus2, resource group rg-coffee-dev) belonging to an unrelated project, so
@@ -141,14 +160,26 @@ module sqldb 'sqldb.bicep' = {
   }
 }
 
-module ai 'ai.bicep' = {
+module ai 'ai.bicep' = if (deployAi) {
   name: 'ai'
   params: {
     location: location
     openAiAccountName: openAiAccountName
     visionAccountName: visionAccountName
     visionSkuName: visionSkuName
+    deployVision: deployVision
   }
+}
+
+// Empty when the accounts are not provisioned. The app then fails its own
+// documented configuration check ("NEXTUP_AOAI_ENDPOINT is not set") at
+// extraction time rather than at boot, which is the behaviour the extractor
+// tests already assert — a half-configured app that looks healthy and then
+// silently mis-extracts would be far worse.
+var aiEndpoints = {
+  openAi: deployAi ? ai!.outputs.openAiEndpoint : ''
+  deployment: deployAi ? ai!.outputs.openAiDeploymentName : ''
+  vision: deployAi && deployVision ? ai!.outputs.visionEndpoint : ''
 }
 
 module aca 'aca.bicep' = {
@@ -164,9 +195,9 @@ module aca 'aca.bicep' = {
     entraClientId: entraClientId
     entraClientSecret: entraClientSecret
     holdRevisionName: holdRevisionName
-    openAiEndpoint: ai.outputs.openAiEndpoint
-    openAiDeployment: ai.outputs.openAiDeploymentName
-    visionEndpoint: ai.outputs.visionEndpoint
+    openAiEndpoint: aiEndpoints.openAi
+    openAiDeployment: aiEndpoints.deployment
+    visionEndpoint: aiEndpoints.vision
   }
 }
 
@@ -200,7 +231,7 @@ module blobRbac 'rbac.bicep' = {
 // role assignment against a not-yet-existent scope fails the deployment. The
 // dependency is what we actually mean, so it stays stated.
 #disable-next-line no-unnecessary-dependson
-module openAiRbac 'csrbac.bicep' = {
+module openAiRbac 'csrbac.bicep' = if (deployAi) {
   name: 'aoai-rbac-${environmentName}'
   params: {
     accountName: openAiAccountName
@@ -211,7 +242,7 @@ module openAiRbac 'csrbac.bicep' = {
 }
 
 #disable-next-line no-unnecessary-dependson
-module visionRbac 'csrbac.bicep' = {
+module visionRbac 'csrbac.bicep' = if (deployAi && deployVision) {
   name: 'vision-rbac-${environmentName}'
   params: {
     accountName: visionAccountName

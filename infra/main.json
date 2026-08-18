@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.46.1.21595",
-      "templateHash": "10099693602173414714"
+      "templateHash": "10244344247045078277"
     },
     "description": "nextup infrastructure composition root (Variant A)."
   },
@@ -75,6 +75,20 @@
       "type": "string",
       "metadata": {
         "description": "Application (client) id of the Entra app registration used by Easy Auth (TASK-027)."
+      }
+    },
+    "deployAi": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Provision the Azure OpenAI and Azure AI Vision accounts. Off by default; see the TASK-010 hold."
+      }
+    },
+    "deployVision": {
+      "type": "bool",
+      "defaultValue": true,
+      "metadata": {
+        "description": "Provision the Azure AI Vision account. Requires deployAi."
       }
     },
     "visionSkuName": {
@@ -529,6 +543,7 @@
       }
     },
     {
+      "condition": "[parameters('deployAi')]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "ai",
@@ -549,6 +564,9 @@
           },
           "visionSkuName": {
             "value": "[parameters('visionSkuName')]"
+          },
+          "deployVision": {
+            "value": "[parameters('deployVision')]"
           }
         },
         "template": {
@@ -558,7 +576,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.46.1.21595",
-              "templateHash": "11447429618794181185"
+              "templateHash": "7036441873063715625"
             },
             "description": "Azure OpenAI + Azure AI Vision accounts and the gpt-4.1 vision deployment."
           },
@@ -626,6 +644,13 @@
               "metadata": {
                 "description": "Azure AI Vision SKU. F0 is free and limited to one account per subscription."
               }
+            },
+            "deployVision": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Provision the Vision account. Off allows an AOAI-only deployment while the F0 conflict is unresolved."
+              }
             }
           },
           "resources": [
@@ -669,6 +694,7 @@
               ]
             },
             {
+              "condition": "[parameters('deployVision')]",
               "type": "Microsoft.CognitiveServices/accounts",
               "apiVersion": "2024-10-01",
               "name": "[parameters('visionAccountName')]",
@@ -707,7 +733,7 @@
               "metadata": {
                 "description": "NEXTUP_VISION_ENDPOINT."
               },
-              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('visionAccountName')), '2024-10-01').endpoint]"
+              "value": "[if(parameters('deployVision'), reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('visionAccountName')), '2024-10-01').endpoint, '')]"
             },
             "openAiAccountName": {
               "type": "string",
@@ -721,7 +747,7 @@
               "metadata": {
                 "description": "Account name, for the role assignment module."
               },
-              "value": "[parameters('visionAccountName')]"
+              "value": "[if(parameters('deployVision'), parameters('visionAccountName'), '')]"
             }
           }
         }
@@ -768,13 +794,13 @@
             "value": "[parameters('holdRevisionName')]"
           },
           "openAiEndpoint": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiEndpoint.value]"
+            "value": "[createObject('openAi', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiEndpoint.value, ''), 'deployment', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiDeploymentName.value, ''), 'vision', if(and(parameters('deployAi'), parameters('deployVision')), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.visionEndpoint.value, '')).openAi]"
           },
           "openAiDeployment": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiDeploymentName.value]"
+            "value": "[createObject('openAi', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiEndpoint.value, ''), 'deployment', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiDeploymentName.value, ''), 'vision', if(and(parameters('deployAi'), parameters('deployVision')), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.visionEndpoint.value, '')).deployment]"
           },
           "visionEndpoint": {
-            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.visionEndpoint.value]"
+            "value": "[createObject('openAi', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiEndpoint.value, ''), 'deployment', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiDeploymentName.value, ''), 'vision', if(and(parameters('deployAi'), parameters('deployVision')), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.visionEndpoint.value, '')).vision]"
           }
         },
         "template": {
@@ -1116,6 +1142,7 @@
       ]
     },
     {
+      "condition": "[parameters('deployAi')]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "[format('aoai-rbac-{0}', parameters('environmentName'))]",
@@ -1187,6 +1214,7 @@
       ]
     },
     {
+      "condition": "[and(parameters('deployAi'), parameters('deployVision'))]",
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
       "name": "[format('vision-rbac-{0}', parameters('environmentName'))]",
