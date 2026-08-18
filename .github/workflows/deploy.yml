@@ -189,15 +189,34 @@ jobs:
       # must happen before `az deployment group create`, not after: ARM applies
       # the traffic block as part of the deployment, so a hold applied
       # afterwards is a hold on a revision that is already live.
-      # `|| true` covers the bootstrap case where the app does not exist yet.
+      #
+      # ⚠ Two DIFFERENT empty results, which must not be conflated:
+      #   * the command fails      → the app does not exist. True bootstrap.
+      #   * revisionName is null   → a `latestRevision: true` weight, which is
+      #                              what the bicep bootstrap branch and Single
+      #                              revision mode both produce. The app IS
+      #                              serving something; the entry just doesn't
+      #                              name it. Treating this as "first
+      #                              deployment" silently skips the hold on a
+      #                              live app — observed on the first prod run.
+      # So a null name is resolved to the newest revision rather than dropped.
       - id: prev
         name: Read the revision currently serving traffic
         run: |
           set -euo pipefail
-          CUR=$(az containerapp ingress traffic show -n "ca-nextup-prod" -g "$RESOURCE_GROUP" \
-                  --query "[?weight>\`0\`]|[0].revisionName" -o tsv 2>/dev/null || true)
+          APP="ca-nextup-prod"
+          if TRAFFIC=$(az containerapp ingress traffic show -n "$APP" -g "$RESOURCE_GROUP" -o json 2>/dev/null); then
+            CUR=$(echo "$TRAFFIC" | node -e 'const t=JSON.parse(require("fs").readFileSync(0,"utf8"));const e=(t||[]).find(x=>x.weight>0);process.stdout.write(e&&e.revisionName?e.revisionName:"")')
+            if [ -z "$CUR" ]; then
+              CUR=$(az containerapp revision list -n "$APP" -g "$RESOURCE_GROUP" \
+                      --query "sort_by([].{n:name,t:properties.createdTime},&t)[-1].n" -o tsv)
+              echo "Traffic entry named no revision; resolved the live one to: $CUR"
+            fi
+          else
+            CUR=""
+          fi
           echo "revision=${CUR}" >> "$GITHUB_OUTPUT"
-          echo "Holding traffic on: ${CUR:-<none — first deployment>}"
+          echo "Holding traffic on: ${CUR:-<none — the app does not exist yet>}"
 
       - id: deploy
         name: az deployment group create (prod, new revision at 0% traffic)

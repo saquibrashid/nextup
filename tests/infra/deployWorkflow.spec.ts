@@ -213,4 +213,20 @@ describe('T-CI-009 the deployment pipeline cannot skip its own gates', () => {
     expect(step).toMatch(/if:\s*steps\.prev\.outputs\.revision != ''/);
     expect(step).not.toMatch(/if:\s*always\(\)/);
   });
+  it('T-CI-009r: a traffic entry that names no revision is resolved, not treated as bootstrap', () => {
+    // Two different empty results reach this code. The command FAILING means
+    // the app does not exist — a real first deployment. A successful read whose
+    // weighted entry has a null `revisionName` means something entirely
+    // different: the app is live and serving, the entry is just
+    // `latestRevision: true`, which is what both Single revision mode and the
+    // bicep bootstrap branch produce. Conflating them skips the hold on a
+    // RUNNING production app and logs "first deployment" while doing it —
+    // observed on the first real prod run, where it also skipped the
+    // deactivation and left a second replica billing indefinitely.
+    const prodJob = deployCode.slice(deployCode.indexOf('  production:'));
+    const step = prodJob.slice(0, prodJob.indexOf('az deployment group create'));
+    expect(step).toMatch(/if TRAFFIC=\$\(az containerapp ingress traffic show/);
+    expect(step).toMatch(/if \[ -z "\$CUR" \]; then/);
+    expect(step).toMatch(/az containerapp revision list/);
+  });
 });
