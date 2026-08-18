@@ -28,6 +28,7 @@
     "test:int": "vitest run --project integration --passWithNoTests",
     "test:web": "vitest run --project web --passWithNoTests",
     "test:e2e": "playwright test --pass-with-no-tests",
+    "test:smoke": "playwright test --config playwright.smoke.config.ts",
     "test:a11y": "playwright test tests/e2e/a11y.spec.ts --pass-with-no-tests",
     "golden": "vitest run --project golden --passWithNoTests",
     "test:infra": "vitest run --project infra",

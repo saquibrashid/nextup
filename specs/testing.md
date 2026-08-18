@@ -1627,6 +1627,7 @@ check what "done" means.
 | **`T-INFRA-008` (new, TASK-027)** | S | The Bicep **Easy Auth `authConfigs` resource exists and is shaped CLOSED**: named `current`, `platform.enabled = true`, `unauthenticatedClientAction = RedirectToLoginPage`, the Entra provider enabled against a `login.microsoftonline.com` issuer, the client secret held only as a **secret reference** whose name matches a declared `secrets` entry, and **no `excludedPaths` of any kind**. Same relationship to `T-AUTH-001/002/003` that `T-INFRA-004` has to the purge behaviour: those three are level `E` and need a deployment, so without this cell TASK-027 has **no CI-verifiable definition of done at all**. Every failure it catches deploys successfully and looks normal to the owner — `excludedPaths: ['/api/*']` in particular exposes the whole list at the platform edge while `T-SEC-010`/`T-SEC-014` and every other allow-list test still pass, because application code never runs. | ADR-0002, `specs/security.md` §2.1 |
 | **`T-INFRA-009` (new, TASK-142)** | S | The **subscription budget and its two alert thresholds** exist in Bicep and **only ever send email**: exactly one `Microsoft.Consumption/budgets`, category `Cost`, `timeGrain Monthly`, exactly two notifications at **100 %** (informational) and **150 %** (action required), both enabled, both `Actual`, both with a recipient — and **no `actionGroups`, `contactGroups`, `contactRoles`, `webhooks` or `actions` on either**. The last clause is the one that matters: an action group can invoke an automation runbook, so wiring one to a billing threshold turns "you have spent $20" into "stop the container app" — it deploys cleanly, it looks responsible, and it would be added by someone being helpful. TASK-142 forbids it in terms ("no auto-shutdown or any automated remediation") and `REQ-028` forbids automatic deletion. Thresholds are **percentages of one amount** so the 1.0× and 1.5× figures cannot drift apart; a second budget would let them. | TASK-142, `REQ-028` |
 | **`T-SEC-034` (new, TASK-142)** | S | The **production audit gate suppresses by named exception, never by blanket**. `tools/check-audit.mjs` collects only **high and critical** advisories, ignores bare-string `via` edges (they are dependency paths, not advisories — inventing an id from one makes the gate permanently and unfixably red), fails on **any advisory not explicitly listed**, and — the half that matters — fails on **any listed exception that is no longer reported**. An allow-list that only suppresses is a permanent hole that outlives its reason; this one deletes itself the moment upstream ships a fix. `d` requires every entry to carry an id, a date and a justification over 200 characters, because the point of the list is the reasoning, not the silence. `f` asserts CI actually **calls** the gate and has not reverted to a bare `npm audit --omit=dev`, and `g` that the non-blocking full-tree report survives so dev-tooling findings stay visible. ⚠ Accepted exception `GHSA-ggr8-5vv4-36mx`: npm reports its "fix" as `prisma@6.12.0`, which is a **downgrade** from the installed `6.19.3` presented in the same field as an upgrade. | TASK-142, `NFR-004` |
+| **`T-CI-009` (new, TASK-007)** | S | The **deployment pipeline cannot skip its own gates**. `deploy.yml` is asserted for ORDER and PROHIBITIONS, both invisible in review: production `needs: [build, staging]` (`a`); no `prisma migrate dev` and no `prisma db push` anywhere (`b`, run against a **comment-stripped** copy so the ban does not fire on the text explaining it); `migrate deploy` twice (`c`); ghcr.io with `GITHUB_TOKEN` and no `azurecr.io`/`AcrPush` (`d`); the image secret-scan **precedes** the push (`e`) and the build itself does not push (`f`, or the scan is bypassed entirely); production traffic shifts **after** the production smoke suite (`g`); staging smoke precedes the production job (`h`); every action pinned to a 40-char SHA (`i`); the migration gate re-runs in the deploy pipeline (`j`); `cancel-in-progress: false` (`k`); the ghcr note is linked (`l`). Each banned edit leaves a workflow that still reads plausibly and still goes green. | TASK-007, `REQ-028` |
 | **`T-SMOKE-001`** | E | An authenticated request against the freshly deployed **staging** revision succeeds. The `T-SMOKE-*` family was defined only as a **glob** in §11.2, which no id-level gate can resolve — `T-SMOKE-003` was already enumerated as a real cell, so the family was half-addressable and the missing half looked like a phantom. | §11.2 glob |
 | **`T-UI-004`** | C | `ImageDropzone` names **PNG, JPEG and HEIC** in its accept list and its copy (`specs/ui.md`). ⚠ Load-bearing per product invariant 11: without HEIC in `accept`, an iOS file picker greys out the owner's own camera photos and the failure looks like a broken phone, not a missing format. Deliberately distinct from `T-UI-014`, which TASK-162 owns. | `specs/ui.md` |
 | **`T-UX-041`** | C | The empty dropzone shows **all three** ingest affordances — paste, file selection and drag-and-drop (`specs/ux-states.md` §4.3). Product invariant 16: paste was added, not swapped in, and a tidied-up single-affordance dropzone silently removes a working capture path. | `specs/ux-states.md` §4.3 |
@@ -2065,16 +2066,34 @@ compiled ARM name is an expression — `[format('{0}/{1}', …, 'current')]` —
 splitting on `/` is also wrong (the format string contains one). The check
 matches the **quoted literal**.
 
-### 18.2 ⚠ Open spec defect: `T-SMOKE-001` contradicts `RedirectToLoginPage`
+### 18.2 ✅ RESOLVED at TASK-007: `T-SMOKE-001` asserts the 302, not a 401
 
-`specs/security.md` §2.1 fixes the mechanism as
+**Resolution (2026-08-17, TASK-007 — this section's own condition for closing
+was "the smoke suite is TASK-007's deliverable"; it now exists).** Option (a)
+below is taken. `RedirectToLoginPage` **stays**, and `T-SMOKE-001` is
+re-specified to assert **302 to `login.microsoftonline.com`**, implemented in
+`tests/smoke/smoke.spec.ts`.
+
+Option (b) was rejected on ADR-0002 grounds: switching to `Return401` would
+put a sign-in redirect back into application code, which is the exact thing
+"zero application auth code" exists to prevent. Nothing in the SPA currently
+depends on a 401 from the edge, so (a) costs nothing.
+
+⚠ The assertion is now **load-bearing in the opposite direction**: a 401 or a
+200 from `/api/titles` at the edge is the signature of `/api/*` having been
+added to `excludedPaths`, i.e. the owner's list published to the internet.
+`T-SMOKE-001` failing that way is not a broken test.
+
+~~Superseded — retained for the reasoning, which is still correct:~~
+
+~~`specs/security.md` §2.1 fixes the mechanism as
 `unauthenticatedClientAction: RedirectToLoginPage`, and TASK-027 is built to
 it. But §11.2 defines **`T-SMOKE-001`** as *"unauthenticated `/api/titles`
 returns 401 JSON"* against the deployed revision — and Easy Auth's redirect
 action is **global**. It has no per-path variant, so an unauthenticated
 `/api/titles` at the edge answers **302 to the Microsoft sign-in page**, not
 `401 JSON`. `T-SMOKE-001` as written cannot pass against a correctly
-configured deployment.
+configured deployment.~~
 
 Both halves are individually right and only one of them can hold:
 
@@ -3180,3 +3199,55 @@ passes `node --check` but makes Vite's parser throw `SyntaxError: Invalid or
 unexpected token` **with no file or line**, at import, reported against the
 *spec* file. The gate was correct; only the first line was wrong. It is
 removed, and no other `tools/*.mjs` gate carries one.
+
+## 32. The deployment pipeline (TASK-007)
+
+`.github/workflows/deploy.yml`, asserted by `T-CI-009a`--`l` in
+`tests/infra/deployWorkflow.spec.ts`, and `T-SMOKE-001`--`003` in
+`tests/smoke/smoke.spec.ts` (Playwright, `playwright.smoke.config.ts`).
+
+### 32.1 What it claims
+
+Build -> secret-scan the built image -> push to **ghcr.io** with the built-in
+`GITHUB_TOKEN` -> deploy **staging** -> `prisma migrate deploy` -> **staging
+smoke suite** -> deploy **production** -> migrate -> hold the new revision at
+**0 % traffic** -> **production smoke suite** -> shift to 100 %.
+
+Azure auth is an **OIDC federated credential**; no Azure secret is stored.
+Registry auth is `GITHUB_TOKEN`; **no PAT exists on this path** (a fine-grained
+PAT cannot authenticate to ghcr.io at all -- `docs/ghcr-pat.md`).
+
+The order assertions are the point. `T-CI-009e` fails if the scan moves after
+the push, `T-CI-009g` if traffic shifts before the smoke suite, `T-CI-009h` if
+staging smoke stops preceding production, and `T-CI-009a` if production stops
+needing `staging`. Each of those edits leaves a workflow that still reads
+plausibly top to bottom and still goes green.
+
+### 32.2 What it does NOT claim
+
+**There is no authenticated happy-path smoke case, deliberately.** Signing in
+requires an interactive Entra login as the owner, which cannot run unattended
+without storing owner credentials -- precisely what ADR-0002 exists to avoid.
+A smoke suite that required them would trade the product's central security
+property for a green tick. The suite proves the inverse instead: that nothing
+is reachable **without** signing in, which is the property a deployment can
+actually break. §11.2's "authenticated request succeeds" wording is therefore
+**not** implemented as written, and this is the reason.
+
+### 32.3 Findings
+
+**(a) A prohibition test fires on the comment explaining the prohibition.**
+`T-CI-009b` bans `prisma migrate dev` and initially failed against
+`deploy.yml`'s own comment saying why it is banned. The cheapest way to make
+that pass is to **delete the explanation**, leaving the rule in place and its
+reasoning gone. The checks now run against a comment-stripped copy.
+
+**(b) The build must not push.** `docker/build-push-action` with `push: true`
+would publish the image before the secret-scan step is ever reached -- leaving
+the scan present, passing, and controlling nothing. `T-CI-009f` pins
+`push: false`. Scanning after the push is also not a fix: ghcr retains the
+layer even after the tag is deleted.
+
+**(c) `cancel-in-progress` is false on purpose.** Cancelling a deployment
+part-way through a migration or a traffic shift leaves the environment in a
+state nobody chose. `T-CI-009k` guards it.

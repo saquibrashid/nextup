@@ -458,7 +458,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-004` | `done` | `eab919a` |
 | `TASK-005` | `done` | `ecec349` |
 | `TASK-006` | `done` | `f496055` — Bicep authored, what-if clean for both environments; live deployment stays owner-gated |
-| `TASK-007` | `owner` | Azure boundary — owner gated the deployment step |
+| `TASK-007` | `doing` | `T-CI-009a`–`l` (`.github/workflows/deploy.yml`, `tests/infra/deployWorkflow.spec.ts`) and `T-SMOKE-001`–`003` (`tests/smoke/smoke.spec.ts`, `playwright.smoke.config.ts`). Build → secret-scan → ghcr.io push with `GITHUB_TOKEN` (no PAT) → staging → `prisma migrate deploy` → staging smoke → prod → hold at 0% traffic → prod smoke → shift to 100%. Azure auth is OIDC federated (app `nextup-github-deploy`, Owner scoped to `nextup-rg` only); Easy Auth app `nextup` registered. `doing` until a first live run proves it end to end. See `specs/testing.md` §32. |
 | `TASK-008` | `done` | `T-INFRA-005` + `T-INV-013`, both mutation-proven against half-applied up-sizes |
 | `TASK-009` | `done` | `6d47f55` |
 | `TASK-010` | `doing` | Pricing verification **complete** against the live Retail Prices API for `eastus2`, dated 2026-08-17: dated addenda on ADR-0001/0003/0005, `architecture.md` §Cost summary and `runbooks/scale-up-memory.md` corrected in place. Verified total **$11.77/mo** vs published $11-13, so `OQ-026` does not fire. `gpt-4.1` (2025-04-14), Vision `F0` and SQL `Basic` all confirmed available in `eastus2`. **Remaining: item (h) only** — metric existence (`RestartCount` / `WorkingSetBytes` / any OOM-distinct signal) needs `az monitor metrics list-definitions` against a **deployed** container app, so it is owed the moment staging exists and is a TASK-157 input. See `specs/testing.md` §31. |

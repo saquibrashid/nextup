@@ -12,9 +12,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 | Status | Count |
 |---|---|
 | ⬜ todo | 99 |
-| 🚧 doing | 5 |
+| 🚧 doing | 6 |
 | ✅ done | 52 |
-| 🙋 owner | 5 |
+| 🙋 owner | 4 |
 | 💤 deferred | 0 |
 | **total** | **161** |
 
@@ -24,6 +24,7 @@ Not done, and every task they depend on is done.
 
 | Task | Size | Section |
 |---|---|---|
+| `TASK-007` | M | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-010` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-026` | S | Epic G — Attribution & compliance |
 | `TASK-028` | S | Epic A — Access & identity |
@@ -47,7 +48,6 @@ Not done, and every task they depend on is done.
 
 | Task | Section | Note |
 |---|---|---|
-| `TASK-007` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Azure boundary — owner gated the deployment step |
 | `TASK-011` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs the owner to capture golden-fixture screenshots |
 | `TASK-134` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs the owner to APPLY to Microsoft for Azure OpenAI modified abuse monitoring — an approval, not code. `docs/parallel-execution-plan.md` §3 already lists it as owner-dependent; the ledger said `todo`, which advertised it to lane agents as startable work. |
 | `TASK-141` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs a REAL Azure SQL database: the gating deliverable is an M0 smoke migration applied against one. Blocked behind the same owner-gated Azure boundary as TASK-007. |
