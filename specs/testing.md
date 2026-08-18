@@ -1504,7 +1504,7 @@ project that collects it.
 
 | Test / fixture | Why |
 |---|---|
-| Cosmos DB Emulator service in `docker-compose.test.yml` | Replaced by `postgres:16-alpine` (§3.3). |
+| Cosmos DB Emulator service in `docker-compose.test.yml` | Replaced by **`mcr.microsoft.com/mssql/server:2022-latest`** (§3.3a). ~~Replaced by `postgres:16-alpine` (§3.3).~~ ⚠ This row records a deletion made in R1→R3, and its replacement was itself replaced in R4. Corrected in place rather than left as a historical note, because §11.3 carries no revision banner and a reader arriving here has no signal that the right-hand column is two revisions stale. |
 | Any assertion about `visible`, the visibility protocol, or the `visible = true OR createdByBatchId IN (...)` predicate | The mechanism no longer exists (`specs/data-model.md` §15.5). |
 | Any assertion that a Bicep SKU is free | Superseded by SKU pinning; `NFR-012` is a SHOULD now. |
 
