@@ -1042,7 +1042,7 @@ history (data-model I-7 exempts pre-submit draft images).
   "extractionStats": { "imagesProcessed": 7, "imagesWithZeroCandidates": 1,
                        "candidatesRaw": 96, "candidatesAfterCleanup": 71,
                        "candidatesCollapsed": 6, "matched": 63, "unmatched": 2,
-                       "suppressedGated": 1 },
+                       "suppressedGated": 1, "estimatedCostUsd": 0.0312 },
   "extractionError": null,
   "lowYield": false,
   "progress": { "imagesDone": 7, "imagesTotal": 7 } }
