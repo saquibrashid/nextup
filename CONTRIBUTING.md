@@ -69,6 +69,36 @@ Fill in [the PR template](.github/PULL_REQUEST_TEMPLATE.md). A PR must:
 - Contain no destructive migration (`T-MIG-001`).
 - Add no scheduler, TTL, Azure SQL Agent job, or Elastic Job (REQ-028, REQ-041).
 
+## Dependency updates (Dependabot)
+
+**A bump of a _production_ dependency needs one extra commit that Dependabot
+cannot make for you.** `THIRD-PARTY-NOTICES.md` is a committed artifact
+generated from the installed tree, so a changed version string makes it stale
+and fails **two** jobs for one cause — `check:licences` in the `audit` job and
+`T-LICENSE-001` in the `infra` job. Fix it on the PR branch:
+
+```bash
+npm ci && npx prisma generate --schema prisma/schema.prisma
+npm run notices && git commit -am "build(deps): regenerate notices"
+```
+
+Dev-dependency bumps are unaffected: the notices file covers production
+packages only. That asymmetry is why some Dependabot PRs are green on arrival
+and others are not, and it is not a flake.
+
+Two further rules live in
+[`.github/dependabot.yml`](.github/dependabot.yml), both learned the hard way:
+
+- **Peer packages must be grouped**, or Dependabot proposes half an upgrade
+  and the PR cannot pass in any order — `@typescript-eslint/*`, the vite and
+  vitest lines, react, and `prisma` + `@prisma/*` (the client is generated
+  _by_ the CLI, so a skew fails at `prisma generate`, not at install).
+- **An `ignore` entry must name the condition that unblocks it.** A
+  suppression with no exit criterion silently becomes permanent. The same
+  principle is enforced in code by `tools/check-audit.mjs`, which fails when an
+  allow-listed advisory **stops** being reported, so a stale suppression cannot
+  quietly outlive the problem it was written for.
+
 ## What CI enforces
 
 On every push to `main` and every PR (see
