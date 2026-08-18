@@ -78,7 +78,10 @@ function readAscii(buf, t, le, entry) {
   const count = u32(entry + 4);
   const off = count > 4 ? t + u32(entry + 8) : entry + 8;
   if (off + count > buf.length) return null;
-  return buf.subarray(off, off + count).toString('latin1').replace(/\0+$/, '');
+  return buf
+    .subarray(off, off + count)
+    .toString('latin1')
+    .replace(/\0+$/, '');
 }
 
 function rational(buf, t, le, entry) {
@@ -118,7 +121,8 @@ function walk(buf, t) {
       for (let k = 0; k < gn; k++) {
         const e = gpsOff + 2 + k * 12;
         const tag = u16(e);
-        if (tag === 1 || tag === 3) gps[tag === 1 ? 'latRef' : 'lonRef'] = String.fromCharCode(buf[e + 8]);
+        if (tag === 1 || tag === 3)
+          gps[tag === 1 ? 'latRef' : 'lonRef'] = String.fromCharCode(buf[e + 8]);
         if (tag === 2 || tag === 4) {
           const v = rational(buf, t, le, e);
           gps[tag === 2 ? 'lat' : 'lon'] = v;
@@ -218,7 +222,9 @@ for (const file of files) {
         `${located ? '⚠ ' : ''}GPS ${r.gps.tagCount} tags lat=${r.gps.lat?.toFixed(5)}${r.gps.latRef ?? ''} lon=${r.gps.lon?.toFixed(5)}${r.gps.lonRef ?? ''}`,
       );
     }
-    console.log(`${name} @0x${t.toString(16)}: ${bits.length ? bits.join(', ') : 'EXIF present, no notable tags'}`);
+    console.log(
+      `${name} @0x${t.toString(16)}: ${bits.length ? bits.join(', ') : 'EXIF present, no notable tags'}`,
+    );
   }
 }
 process.exit(dirty ? 1 : 0);

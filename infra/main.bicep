@@ -70,6 +70,16 @@ param entraAdminLogin string
 @description('Application (client) id of the Entra app registration used by Easy Auth (TASK-027).')
 param entraClientId string
 
+// ⚠ F0 is limited to ONE ComputerVision account per SUBSCRIPTION. Verified on
+// 2026-08-18: this subscription already holds `vision-f4n7ptoeq44pk` (F0,
+// eastus2, resource group rg-coffee-dev) belonging to an unrelated project, so
+// an F0 deployment here will be rejected until that one is removed. Exposed as
+// a parameter so the fallback to S1 — which is NOT free and departs from
+// ADR-0001 Rev 2 — is a recorded decision in a .bicepparam, never a quiet edit.
+@description('Azure AI Vision SKU. F0 is free but one-per-subscription.')
+@allowed(['F0', 'S1'])
+param visionSkuName string = 'F0'
+
 @description('Client secret of the Easy Auth app registration. Supplied at deploy time.')
 @secure()
 param entraClientSecret string
@@ -84,10 +94,19 @@ var managedEnvironmentName = 'cae-nextup'
 var logAnalyticsName = 'log-nextup'
 var containerAppName = 'ca-nextup-${environmentName}'
 var blobContainerName = environmentName == 'prod' ? 'screenshots' : 'screenshots-staging'
+var openAiAccountName = 'oai-nextup-${suffix}'
+var visionAccountName = 'vis-nextup-${suffix}'
 
 // Storage Blob Data Contributor. The app reads and writes screenshots; it must
 // not be able to manage the account itself.
 var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+
+// Cognitive Services OpenAI User — inference only. Deliberately NOT
+// "...OpenAI Contributor", which can create and delete model deployments.
+var openAiUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+
+// Cognitive Services User — the inference role for non-OpenAI accounts.
+var cognitiveServicesUserRoleId = 'a97b65f3-24c7-4388-baec-2e87135dc908'
 
 resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: logAnalyticsName
@@ -122,6 +141,16 @@ module sqldb 'sqldb.bicep' = {
   }
 }
 
+module ai 'ai.bicep' = {
+  name: 'ai'
+  params: {
+    location: location
+    openAiAccountName: openAiAccountName
+    visionAccountName: visionAccountName
+    visionSkuName: visionSkuName
+  }
+}
+
 module aca 'aca.bicep' = {
   name: 'aca'
   params: {
@@ -135,6 +164,9 @@ module aca 'aca.bicep' = {
     entraClientId: entraClientId
     entraClientSecret: entraClientSecret
     holdRevisionName: holdRevisionName
+    openAiEndpoint: ai.outputs.openAiEndpoint
+    openAiDeployment: ai.outputs.openAiDeploymentName
+    visionEndpoint: ai.outputs.visionEndpoint
   }
 }
 
@@ -156,6 +188,37 @@ module blobRbac 'rbac.bicep' = {
     roleDefinitionId: storageBlobDataContributorRoleId
   }
   dependsOn: [storage]
+}
+
+// Issued AFTER the container app, because they need its managed identity. The
+// accounts themselves are created BEFORE it, because it needs their endpoints.
+//
+// ⚠ The linter calls the `dependsOn` below unnecessary, and today it is right:
+// ai -> aca (endpoint params) -> csrbac (principalId) already orders it. That
+// chain is incidental, though. The day someone stops passing the endpoints
+// through aca.bicep the grants would start racing account creation, and a
+// role assignment against a not-yet-existent scope fails the deployment. The
+// dependency is what we actually mean, so it stays stated.
+#disable-next-line no-unnecessary-dependson
+module openAiRbac 'csrbac.bicep' = {
+  name: 'aoai-rbac-${environmentName}'
+  params: {
+    accountName: openAiAccountName
+    principalId: aca.outputs.principalId
+    roleDefinitionId: openAiUserRoleId
+  }
+  dependsOn: [ai]
+}
+
+#disable-next-line no-unnecessary-dependson
+module visionRbac 'csrbac.bicep' = {
+  name: 'vision-rbac-${environmentName}'
+  params: {
+    accountName: visionAccountName
+    principalId: aca.outputs.principalId
+    roleDefinitionId: cognitiveServicesUserRoleId
+  }
+  dependsOn: [ai]
 }
 
 // ---------------------------------------------------------------------------

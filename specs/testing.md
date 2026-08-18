@@ -1391,7 +1391,7 @@ tests/meta/                    acMapping.spec.ts
 tests/infra/                   …, supplyChain.spec.ts   # T-SEC-009, T-CI-006
                                …, licences.spec.ts      # TASK-153 — T-LICENSE-001a…l (§9A)
                                 …, status.spec.ts        # TASK-167 — T-STATUS-001a…q (§9A)
-                                …, infra.spec.ts         # TASK-006 — T-INFRA-001a…d, T-INFRA-002a…m, T-INFRA-003a…c
+                                …, infra.spec.ts         # TASK-006 — T-INFRA-001a…g, T-INFRA-002a…m, T-INFRA-003a…c
                                 …, sku.spec.ts           # TASK-008 — T-INFRA-005a…r (§9A)
                                 …, easyAuth.spec.ts      # TASK-027 — T-INFRA-008a…n (§9A)
                                 …, no-ttl.spec.ts        # TASK-008 — T-INV-013a…h (§9A)

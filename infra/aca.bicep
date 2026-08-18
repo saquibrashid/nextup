@@ -86,6 +86,18 @@ param entraClientId string
 @secure()
 param entraClientSecret string
 
+// Endpoints only — NOT keys. Both accounts run with `disableLocalAuth: true`,
+// so there is no key to pass and the app authenticates with this container
+// app's managed identity (specs/security.md §6, `T-INFRA-001`).
+@description('Azure OpenAI endpoint. Config, not a secret.')
+param openAiEndpoint string
+
+@description('Azure OpenAI deployment name the app addresses.')
+param openAiDeployment string
+
+@description('Azure AI Vision endpoint. Config, not a secret.')
+param visionEndpoint string
+
 // ---------------------------------------------------------------------------
 // THE COMPUTE / DECODE-GUARD PAIR (REQ-079, A43, invariant 14).
 //
@@ -238,6 +250,18 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'NEXTUP_ENVIRONMENT'
               value: environmentName
+            }
+            {
+              name: 'NEXTUP_AOAI_ENDPOINT'
+              value: openAiEndpoint
+            }
+            {
+              name: 'NEXTUP_AOAI_DEPLOYMENT'
+              value: openAiDeployment
+            }
+            {
+              name: 'NEXTUP_VISION_ENDPOINT'
+              value: visionEndpoint
             }
           ]
         }

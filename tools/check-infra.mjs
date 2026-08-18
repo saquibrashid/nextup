@@ -268,10 +268,78 @@ export function portViolations(
 /**
  * T-INFRA-001 — least-privilege RBAC.
  *
- * The blob grant must be scoped to a single CONTAINER. An account-scoped grant
- * would silently hand the staging identity read/write access to every
- * production screenshot, which is precisely what the spec forbids.
+ * Every grant must be scoped to the NARROWEST resource that can carry it, and
+ * must be an inference/data role rather than a management one.
+ *
+ *   - The blob grant is scoped to a single CONTAINER. An account-scoped grant
+ *     would silently hand the staging identity read/write access to every
+ *     production screenshot, which is precisely what the spec forbids.
+ *   - The Cognitive Services grants are scoped to a single ACCOUNT, which is
+ *     the narrowest scope those services offer — there is no per-deployment
+ *     scope to reach for. What matters there is the ROLE: the app must only be
+ *     able to run inference, never to create or delete model deployments. A
+ *     "Cognitive Services OpenAI Contributor" would let a compromised app swap
+ *     the pinned model, which is invariant-9 territory.
+ *
+ * Anything scoped above a resource — a resource group or a subscription — is
+ * rejected outright regardless of role.
  */
+
+// Inference/data-plane roles only. Deliberately an ALLOW-list: a new role id
+// appearing here should require someone to justify it in review.
+const ALLOWED_ROLE_IDS = new Map([
+  ['ba92f5b4-2d11-453d-a403-e96b0029c9fe', 'Storage Blob Data Contributor'],
+  ['5e0bd9bd-7b93-4f28-af87-19fc36ad61bd', 'Cognitive Services OpenAI User'],
+  ['a97b65f3-24c7-4388-baec-2e87135dc908', 'Cognitive Services User'],
+]);
+
+/**
+ * Collect every LITERAL role definition guid the template actually grants.
+ *
+ * ⚠ Do not look for the guid on the roleAssignment resource. Both grant
+ * modules take the role as a parameter, so inside the nested template the
+ * value is the string `[subscriptionResourceId(..., parameters('roleDefinitionId'))]`
+ * and the guid is nowhere in sight. The literals live where the modules are
+ * INVOKED, as deployment parameter values — and even there they are usually
+ * `[variables('someRoleId')]` rather than the guid itself, so one level of
+ * variable resolution is required. A check that reads the assignment resource
+ * finds no guid at all and — depending on how it is written — either fails
+ * everything or, far worse, passes everything vacuously.
+ */
+export function roleDefinitionIdsInUse(template) {
+  const found = new Set();
+  const guid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const variables = template?.variables ?? {};
+
+  const resolve = (value) => {
+    if (typeof value !== 'string') return null;
+    if (guid.test(value)) return value;
+    const ref = /^\[variables\('([^']+)'\)\]$/.exec(value);
+    if (ref) {
+      const resolved = variables[ref[1]];
+      if (typeof resolved === 'string' && guid.test(resolved)) return resolved;
+    }
+    return null;
+  };
+
+  const walk = (node) => {
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item);
+      return;
+    }
+    if (!node || typeof node !== 'object') return;
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'roleDefinitionId' && value && typeof value === 'object') {
+        const id = resolve(value.value);
+        if (id) found.add(id);
+      }
+      walk(value);
+    }
+  };
+  walk(template);
+  return found;
+}
+
 export function rbacPolicyViolations(template) {
   const violations = [];
   const assignments = resourcesOfType(template, 'Microsoft.Authorization/roleAssignments');
@@ -280,13 +348,36 @@ export function rbacPolicyViolations(template) {
   }
   for (const assignment of assignments) {
     const scope = assignment.scope ?? '';
-    if (!scope.includes('Microsoft.Storage/storageAccounts/blobServices/containers')) {
+    const isBlobContainer = scope.includes(
+      'Microsoft.Storage/storageAccounts/blobServices/containers',
+    );
+    const isStorageAccount =
+      scope.includes('Microsoft.Storage/storageAccounts') && !isBlobContainer;
+    const isCognitiveAccount = scope.includes('Microsoft.CognitiveServices/accounts');
+
+    if (isStorageAccount) {
       violations.push(
         `rbac: grant must be scoped to a blob CONTAINER, not the account (scope: ${scope})`,
       );
+    } else if (!isBlobContainer && !isCognitiveAccount) {
+      // Catches a grant that has escaped to the resource group or higher.
+      violations.push(`rbac: grant is not scoped to a supported resource (scope: ${scope})`);
     }
+
     if (assignment.properties?.principalType !== 'ServicePrincipal') {
       violations.push('rbac: principalType must be ServicePrincipal');
+    }
+  }
+
+  const roles = roleDefinitionIdsInUse(template);
+  if (roles.size === 0) {
+    // Vacuity guard: if this ever finds nothing, the allow-list below is
+    // checking an empty set and proves precisely nothing.
+    violations.push('rbac: no literal role definition id found — the role allow-list is vacuous');
+  }
+  for (const roleId of roles) {
+    if (!ALLOWED_ROLE_IDS.has(roleId)) {
+      violations.push(`rbac: role ${roleId} is not on the inference/data-plane allow-list`);
     }
   }
   return violations;

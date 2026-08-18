@@ -13,6 +13,7 @@ import {
   readCommittedBudgetArm,
   resourceOfType,
   resourcesOfType,
+  roleDefinitionIdsInUse,
   skuViolations,
   storagePolicyViolations,
   ttlViolations,
@@ -178,18 +179,70 @@ describe('T-INFRA-001 least-privilege RBAC', () => {
   });
 
   it('T-INFRA-001b: the blob grant is scoped to a container, not the account', () => {
-    const assignment = resourceOfType(template, 'Microsoft.Authorization/roleAssignments');
-    expect(assignment.scope).toContain('Microsoft.Storage/storageAccounts/blobServices/containers');
+    const assignments = resourcesOfType(template, 'Microsoft.Authorization/roleAssignments');
+    const blob = assignments.filter((a) =>
+      String(a.scope ?? '').includes('Microsoft.Storage/storageAccounts/blobServices/containers'),
+    );
+    expect(blob).toHaveLength(1);
+    expect(blob[0].scope).toContain('Microsoft.Storage/storageAccounts/blobServices/containers');
   });
 
   it('T-INFRA-001c: catches a grant widened to the whole storage account', () => {
     // The exact silent-privilege-escalation this rule exists to stop: staging
     // would gain read/write on every production screenshot.
     const bad = mutate((t) => {
-      resourceOfType(t, 'Microsoft.Authorization/roleAssignments').scope =
-        "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]";
+      for (const a of resourcesOfType(t, 'Microsoft.Authorization/roleAssignments')) {
+        if (String(a.scope ?? '').includes('blobServices/containers')) {
+          a.scope =
+            "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccountName'))]";
+        }
+      }
     });
     expect(rbacPolicyViolations(bad).join('\n')).toMatch(/scoped to a blob CONTAINER/);
+  });
+
+  it('T-INFRA-001e: the Cognitive Services grants are account-scoped and inference-only', () => {
+    const assignments = resourcesOfType(template, 'Microsoft.Authorization/roleAssignments');
+    const cognitive = assignments.filter((a) =>
+      String(a.scope ?? '').includes('Microsoft.CognitiveServices/accounts'),
+    );
+    // One for Azure OpenAI, one for Azure AI Vision.
+    expect(cognitive).toHaveLength(2);
+    // Cognitive Services OpenAI User, Cognitive Services User, Storage Blob
+    // Data Contributor. NONE is a Contributor/management role, so the app
+    // cannot create or delete a model deployment.
+    expect([...roleDefinitionIdsInUse(template)].sort()).toEqual([
+      '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd',
+      'a97b65f3-24c7-4388-baec-2e87135dc908',
+      'ba92f5b4-2d11-453d-a403-e96b0029c9fe',
+    ]);
+  });
+
+  it('T-INFRA-001f: catches an inference grant promoted to a management role', () => {
+    // Cognitive Services OpenAI Contributor can create and delete model
+    // deployments — enough to swap the pinned model out from under the golden
+    // corpus without a commit. It must never appear.
+    const bad = mutate((t) => {
+      // The guid lives in a template variable, not on the assignment — mutate
+      // it where it actually is, or this test passes vacuously.
+      for (const [name, value] of Object.entries(t.variables ?? {})) {
+        if (value === '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd') {
+          t.variables[name] = 'a001fd3d-188f-4b5d-821b-7da978bf7442';
+        }
+      }
+    });
+    expect(rbacPolicyViolations(bad).join('\n')).toMatch(/not on the inference\/data-plane/);
+  });
+
+  it('T-INFRA-001g: catches a grant escaping to the resource group', () => {
+    const bad = mutate((t) => {
+      for (const a of resourcesOfType(t, 'Microsoft.Authorization/roleAssignments')) {
+        if (String(a.scope ?? '').includes('Microsoft.CognitiveServices/accounts')) {
+          a.scope = '[resourceGroup().id]';
+        }
+      }
+    });
+    expect(rbacPolicyViolations(bad).join('\n')).toMatch(/not scoped to a supported resource/);
   });
 
   it('T-INFRA-001d: catches a missing role assignment', () => {

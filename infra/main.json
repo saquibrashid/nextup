@@ -2,6 +2,11 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
   "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.46.1.21595",
+      "templateHash": "10099693602173414714"
+    },
     "description": "nextup infrastructure composition root (Variant A)."
   },
   "parameters": {
@@ -72,6 +77,17 @@
         "description": "Application (client) id of the Entra app registration used by Easy Auth (TASK-027)."
       }
     },
+    "visionSkuName": {
+      "type": "string",
+      "defaultValue": "F0",
+      "allowedValues": [
+        "F0",
+        "S1"
+      ],
+      "metadata": {
+        "description": "Azure AI Vision SKU. F0 is free but one-per-subscription."
+      }
+    },
     "entraClientSecret": {
       "type": "securestring",
       "metadata": {
@@ -87,7 +103,11 @@
     "logAnalyticsName": "log-nextup",
     "containerAppName": "[format('ca-nextup-{0}', parameters('environmentName'))]",
     "blobContainerName": "[if(equals(parameters('environmentName'), 'prod'), 'screenshots', 'screenshots-staging')]",
-    "storageBlobDataContributorRoleId": "ba92f5b4-2d11-453d-a403-e96b0029c9fe"
+    "openAiAccountName": "[format('oai-nextup-{0}', variables('suffix'))]",
+    "visionAccountName": "[format('vis-nextup-{0}', variables('suffix'))]",
+    "storageBlobDataContributorRoleId": "ba92f5b4-2d11-453d-a403-e96b0029c9fe",
+    "openAiUserRoleId": "5e0bd9bd-7b93-4f28-af87-19fc36ad61bd",
+    "cognitiveServicesUserRoleId": "a97b65f3-24c7-4388-baec-2e87135dc908"
   },
   "resources": [
     {
@@ -126,6 +146,11 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "304084418123119981"
+            },
             "description": "Private screenshot blob storage with a 30-day lifecycle purge."
           },
           "parameters": {
@@ -320,6 +345,11 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "12880557086815054577"
+            },
             "description": "Azure SQL logical server with a Basic prod database and a serverless staging database."
           },
           "parameters": {
@@ -501,6 +531,205 @@
     {
       "type": "Microsoft.Resources/deployments",
       "apiVersion": "2025-04-01",
+      "name": "ai",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "openAiAccountName": {
+            "value": "[variables('openAiAccountName')]"
+          },
+          "visionAccountName": {
+            "value": "[variables('visionAccountName')]"
+          },
+          "visionSkuName": {
+            "value": "[parameters('visionSkuName')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "11447429618794181185"
+            },
+            "description": "Azure OpenAI + Azure AI Vision accounts and the gpt-4.1 vision deployment."
+          },
+          "parameters": {
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region for both accounts."
+              }
+            },
+            "openAiAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure OpenAI account name. Globally unique."
+              }
+            },
+            "visionAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure AI Vision account name. Globally unique."
+              }
+            },
+            "openAiModelName": {
+              "type": "string",
+              "defaultValue": "gpt-4.1",
+              "metadata": {
+                "description": "Azure OpenAI model name for the primary vision reader."
+              }
+            },
+            "openAiModelVersion": {
+              "type": "string",
+              "defaultValue": "2025-04-14",
+              "metadata": {
+                "description": "Pinned model version. Never \"latest\", never auto-upgraded."
+              }
+            },
+            "openAiDeploymentName": {
+              "type": "string",
+              "defaultValue": "gpt-4.1",
+              "metadata": {
+                "description": "Deployment (deployment name) the app addresses via NEXTUP_AOAI_DEPLOYMENT."
+              }
+            },
+            "openAiSkuName": {
+              "type": "string",
+              "defaultValue": "GlobalStandard",
+              "metadata": {
+                "description": "Deployment SKU. GlobalStandard is the only Standard-family SKU with quota for gpt-4.1 in eastus2."
+              }
+            },
+            "openAiCapacity": {
+              "type": "int",
+              "defaultValue": 50,
+              "metadata": {
+                "description": "Rate limit in thousands of tokens per minute. Pay-per-token: capacity costs nothing, it only caps the rate."
+              }
+            },
+            "visionSkuName": {
+              "type": "string",
+              "defaultValue": "F0",
+              "allowedValues": [
+                "F0",
+                "S1"
+              ],
+              "metadata": {
+                "description": "Azure AI Vision SKU. F0 is free and limited to one account per subscription."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.CognitiveServices/accounts",
+              "apiVersion": "2024-10-01",
+              "name": "[parameters('openAiAccountName')]",
+              "location": "[parameters('location')]",
+              "kind": "OpenAI",
+              "sku": {
+                "name": "S0"
+              },
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "customSubDomainName": "[parameters('openAiAccountName')]",
+                "disableLocalAuth": true,
+                "publicNetworkAccess": "Enabled"
+              }
+            },
+            {
+              "type": "Microsoft.CognitiveServices/accounts/deployments",
+              "apiVersion": "2024-10-01",
+              "name": "[format('{0}/{1}', parameters('openAiAccountName'), parameters('openAiDeploymentName'))]",
+              "sku": {
+                "name": "[parameters('openAiSkuName')]",
+                "capacity": "[parameters('openAiCapacity')]"
+              },
+              "properties": {
+                "model": {
+                  "format": "OpenAI",
+                  "name": "[parameters('openAiModelName')]",
+                  "version": "[parameters('openAiModelVersion')]"
+                },
+                "versionUpgradeOption": "NoAutoUpgrade",
+                "raiPolicyName": "Microsoft.DefaultV2"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.CognitiveServices/accounts', parameters('openAiAccountName'))]"
+              ]
+            },
+            {
+              "type": "Microsoft.CognitiveServices/accounts",
+              "apiVersion": "2024-10-01",
+              "name": "[parameters('visionAccountName')]",
+              "location": "[parameters('location')]",
+              "kind": "ComputerVision",
+              "sku": {
+                "name": "[parameters('visionSkuName')]"
+              },
+              "identity": {
+                "type": "SystemAssigned"
+              },
+              "properties": {
+                "customSubDomainName": "[parameters('visionAccountName')]",
+                "disableLocalAuth": true,
+                "publicNetworkAccess": "Enabled"
+              }
+            }
+          ],
+          "outputs": {
+            "openAiEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "NEXTUP_AOAI_ENDPOINT."
+              },
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('openAiAccountName')), '2024-10-01').endpoint]"
+            },
+            "openAiDeploymentName": {
+              "type": "string",
+              "metadata": {
+                "description": "NEXTUP_AOAI_DEPLOYMENT."
+              },
+              "value": "[parameters('openAiDeploymentName')]"
+            },
+            "visionEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "NEXTUP_VISION_ENDPOINT."
+              },
+              "value": "[reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('visionAccountName')), '2024-10-01').endpoint]"
+            },
+            "openAiAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Account name, for the role assignment module."
+              },
+              "value": "[parameters('openAiAccountName')]"
+            },
+            "visionAccountName": {
+              "type": "string",
+              "metadata": {
+                "description": "Account name, for the role assignment module."
+              },
+              "value": "[parameters('visionAccountName')]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
       "name": "aca",
       "properties": {
         "expressionEvaluationOptions": {
@@ -537,12 +766,26 @@
           },
           "holdRevisionName": {
             "value": "[parameters('holdRevisionName')]"
+          },
+          "openAiEndpoint": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiEndpoint.value]"
+          },
+          "openAiDeployment": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiDeploymentName.value]"
+          },
+          "visionEndpoint": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.visionEndpoint.value]"
           }
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "1717347974523616786"
+            },
             "description": "Container Apps environment and the per-environment app, pulling from ghcr.io."
           },
           "parameters": {
@@ -609,6 +852,24 @@
               "type": "securestring",
               "metadata": {
                 "description": "Client secret of the Entra app registration. Supplied at deploy time; never committed."
+              }
+            },
+            "openAiEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure OpenAI endpoint. Config, not a secret."
+              }
+            },
+            "openAiDeployment": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure OpenAI deployment name the app addresses."
+              }
+            },
+            "visionEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure AI Vision endpoint. Config, not a secret."
               }
             }
           },
@@ -679,6 +940,18 @@
                         {
                           "name": "NEXTUP_ENVIRONMENT",
                           "value": "[parameters('environmentName')]"
+                        },
+                        {
+                          "name": "NEXTUP_AOAI_ENDPOINT",
+                          "value": "[parameters('openAiEndpoint')]"
+                        },
+                        {
+                          "name": "NEXTUP_AOAI_DEPLOYMENT",
+                          "value": "[parameters('openAiDeployment')]"
+                        },
+                        {
+                          "name": "NEXTUP_VISION_ENDPOINT",
+                          "value": "[parameters('visionEndpoint')]"
                         }
                       ]
                     }
@@ -758,6 +1031,7 @@
         }
       },
       "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'ai')]",
         "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName'))]"
       ]
     },
@@ -788,6 +1062,11 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "7100843257089610165"
+            },
             "description": "Grants a principal a role scoped to a single blob container."
           },
           "parameters": {
@@ -834,6 +1113,148 @@
       "dependsOn": [
         "[resourceId('Microsoft.Resources/deployments', 'aca')]",
         "[resourceId('Microsoft.Resources/deployments', 'storage')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('aoai-rbac-{0}', parameters('environmentName'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "accountName": {
+            "value": "[variables('openAiAccountName')]"
+          },
+          "principalId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'aca'), '2025-04-01').outputs.principalId.value]"
+          },
+          "roleDefinitionId": {
+            "value": "[variables('openAiUserRoleId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "2218706414898512223"
+            },
+            "description": "Grants a principal a role scoped to a single Cognitive Services account."
+          },
+          "parameters": {
+            "accountName": {
+              "type": "string",
+              "metadata": {
+                "description": "The Cognitive Services account to scope the grant to — NOT the resource group."
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "Principal id of the system-assigned managed identity."
+              }
+            },
+            "roleDefinitionId": {
+              "type": "string",
+              "metadata": {
+                "description": "Role definition guid to grant."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName'))]",
+              "name": "[guid(resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName')), parameters('principalId'), parameters('roleDefinitionId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('roleDefinitionId'))]",
+                "principalId": "[parameters('principalId')]",
+                "principalType": "ServicePrincipal"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'aca')]",
+        "[resourceId('Microsoft.Resources/deployments', 'ai')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2025-04-01",
+      "name": "[format('vision-rbac-{0}', parameters('environmentName'))]",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "accountName": {
+            "value": "[variables('visionAccountName')]"
+          },
+          "principalId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'aca'), '2025-04-01').outputs.principalId.value]"
+          },
+          "roleDefinitionId": {
+            "value": "[variables('cognitiveServicesUserRoleId')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "2218706414898512223"
+            },
+            "description": "Grants a principal a role scoped to a single Cognitive Services account."
+          },
+          "parameters": {
+            "accountName": {
+              "type": "string",
+              "metadata": {
+                "description": "The Cognitive Services account to scope the grant to — NOT the resource group."
+              }
+            },
+            "principalId": {
+              "type": "string",
+              "metadata": {
+                "description": "Principal id of the system-assigned managed identity."
+              }
+            },
+            "roleDefinitionId": {
+              "type": "string",
+              "metadata": {
+                "description": "Role definition guid to grant."
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Authorization/roleAssignments",
+              "apiVersion": "2022-04-01",
+              "scope": "[resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName'))]",
+              "name": "[guid(resourceId('Microsoft.CognitiveServices/accounts', parameters('accountName')), parameters('principalId'), parameters('roleDefinitionId'))]",
+              "properties": {
+                "roleDefinitionId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', parameters('roleDefinitionId'))]",
+                "principalId": "[parameters('principalId')]",
+                "principalType": "ServicePrincipal"
+              }
+            }
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'aca')]",
+        "[resourceId('Microsoft.Resources/deployments', 'ai')]"
       ]
     }
   ],
