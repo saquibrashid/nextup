@@ -12,13 +12,20 @@
  * rebuilding it.
  */
 
-import { render, screen, within } from '@testing-library/react';
+import { render as rtlRender, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { DATE_ADDED_LABEL_MARKER } from '@nextup/domain';
+import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { TitleRow, TMDB_IMAGE_BASE, type TitleListItem } from '../src/components/TitleRow';
 import { ListPage } from '../src/pages/ListPage';
+
+/** `ListPage` mounts the freshness strip, whose chips are router `Link`s. */
+function render(ui: ReactElement): ReturnType<typeof rtlRender> {
+  return rtlRender(ui, { wrapper: MemoryRouter });
+}
 
 const DUNE: TitleListItem = {
   titleId: '01J8ZC',

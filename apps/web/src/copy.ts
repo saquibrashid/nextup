@@ -145,9 +145,23 @@ export const DROPZONE_IDLE_LABEL =
 /** `specs/ui.md` §3.2c. */
 export const DROPZONE_ACTIVE_LABEL = 'Drop screenshots here';
 
+/**
+ * `specs/ui.md` §2.1 - the freshness strip when the dates cannot be computed
+ * (`T-FRESH-014`).
+ *
+ * ⚠ FINDING - INVENTED COPY, PENDING OWNER REVIEW. `T-FRESH-014` requires the
+ * strip to "degrade visibly", but no spec supplies the wording: `specs/ui.md`
+ * §9 has no constant for it and `specs/ux-states.md` §2 has no row for it.
+ *
+ * Worded as an admission about nextup, not a statement about the owner's list:
+ * "unavailable right now" cannot be misread as "you have never updated this"
+ * (the US-022 AC-3 misreading `T-FRESH-012` exists to prevent) and carries no
+ * instruction to go and capture anything, which `A46` forbids.
+ */
+export const FRESHNESS_UNAVAILABLE = 'Last updated dates are unavailable right now.';
+
 /** `specs/ui.md` §2.1 item 2 - the default (`dir=desc`). Never "date saved" (REQ-061). */
 export const SORT_NEWEST_LABEL = 'Newest first';
-
 /** `specs/ui.md` §2.1 item 2 - `dir=asc`, the accepted mitigation for SUC-003. */
 export const SORT_OLDEST_LABEL = 'Oldest first';
 
