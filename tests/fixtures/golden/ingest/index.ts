@@ -1,9 +1,11 @@
 /**
  * The `golden/ingest/` fixture loader (TASK-151).
  *
- * WHY A LOADER AND NOT `readFileSync` AT EACH CALL SITE. One fixture in this
- * set — `heic-with-gps.heic` — CANNOT BE GENERATED and is not yet supplied.
- * The honest handling of that is neither a fabricated file nor a skipped test:
+ * WHY A LOADER AND NOT `readFileSync` AT EACH CALL SITE. Two fixtures in this
+ * set — `heic-with-gps.heic` and `ios-screenshot.jpeg` — CANNOT BE GENERATED.
+ * They came off the owner's phone. If either is ever lost, renamed or dropped
+ * from a checkout, the honest handling is neither a fabricated file nor a
+ * skipped test:
  *
  *   - A fabricated HEIC proves only that our writer and our reader agree. It
  *     cannot prove the EXIF stripper survives what an actual iPhone produces,
@@ -14,7 +16,9 @@
  *
  * So the loader THROWS a named, explicit error naming the missing file and
  * what it must contain, and the tests that need it fail LOUDLY. A red test
- * that says exactly what is missing is the correct state of the world.
+ * that says exactly what is missing is the correct state of the world. The
+ * fixtures ARE present today and those tests pass; the loader stays because
+ * the failure mode it guards against is silent.
  *
  * ⚠ `declaredContentType` IS RECORDED HERE AND IS NEVER AN INPUT TO A
  * DECISION. It is carried so a test can HAND A LIE to the pipeline and assert
@@ -165,19 +169,58 @@ export const INGEST_FIXTURES = {
     description: 'A minimal but genuine PDF whose declared Blob.type claims image/png.',
   },
   /**
-   * ⚠ BLOCKED — OWNER-SUPPLIED, NOT YET DELIVERED. This single file backs both
-   * blocked legs of TASK-151: the real HEIC with EXIF/GPS, and that same file
-   * driven through the FILE-UPLOAD path for `T-SEC-033`.
+   * OWNER-SUPPLIED, DELIVERED. A genuine Apple iPhone photograph, 4032x3024,
+   * carrying its original 15-tag GPS sub-IFD plus Make/Model/Software and an
+   * XMP packet. This single file backs both previously-blocked legs of
+   * TASK-151: the real HEIC with EXIF/GPS, and that same file driven through
+   * the FILE-UPLOAD path for `T-SEC-033`.
+   *
+   * ⚠ ITS COORDINATES ARE REDACTED AND THE REDACTION IS DELIBERATE. This is a
+   * PUBLIC repository, and as supplied the file carried the owner's real
+   * position. `redact-gps.mjs` overwrote four GPS tags in place — the two
+   * reference characters and the six latitude/longitude rationals — with a
+   * public landmark, changing no offset and no length. Everything the test
+   * actually depends on is still what the iPhone wrote: the ISO-BMFF
+   * container, the EXIF item layout, IFD0, the device model, and the other
+   * eleven GPS tags. Redaction, not fabrication.
    */
   heicWithGps: {
     file: 'heic-with-gps.heic',
     declaredContentType: 'application/octet-stream',
     sniffsAs: 'heic',
     description:
-      'A real iPhone HEIC photograph still carrying its original EXIF, including a GPS IFD and the device model.',
+      'A real iPhone HEIC photograph (4032x3024) still carrying its original EXIF, including a 15-tag GPS IFD and the device model. Coordinates redacted; structure untouched.',
     ownerSupplied: {
       requirement:
         "a REAL HEIC photograph taken on the owner's phone, delivered UNEDITED — not re-exported, not opened in a photo editor, not stripped — still carrying its original EXIF including a GPS IFD (GPSLatitude/GPSLongitude) and the device model",
+    },
+  },
+  /**
+   * OWNER-SUPPLIED, DELIVERED. A real iOS screenshot of the Max "My Stuff /
+   * My List" screen — the product's actual input, from the actual device.
+   *
+   * ⚠ IT IS A JPEG, AND THAT CONTRADICTS A STATED PROJECT ASSUMPTION.
+   * `.github/copilot-instructions.md` invariant 11 and ASM-058 both reason
+   * from "iOS SCREENSHOTS are normally PNG, iOS CAMERA PHOTOS default to
+   * HEIC". On the owner's device screenshots save as JPEG. The CONCLUSION —
+   * accept PNG and JPEG and HEIC, all three, and sniff by magic bytes — is
+   * unaffected and in fact reinforced; only the rationale is wrong. Recorded
+   * here as a finding, not fixed: `specs/**` is out of this lane.
+   *
+   * It carries an EXIF block (IFD0 plus an Exif sub-IFD) but NO GPS sub-IFD
+   * and no Make/Model — which is the evidence for the other half of the
+   * claim: the screenshot route needs the strip too, but HEIC remains the
+   * only route by which location actually arrives.
+   */
+  iosScreenshotJpeg: {
+    file: 'ios-screenshot.jpeg',
+    declaredContentType: 'image/jpeg',
+    sniffsAs: 'jpeg',
+    description:
+      'A real iOS screenshot of a Max watchlist, saved by the device as JPEG. Carries EXIF but no GPS IFD and no device model.',
+    ownerSupplied: {
+      requirement:
+        "a REAL screenshot taken on the owner's phone, delivered UNEDITED, showing a streaming service's saved-list screen",
     },
   },
 } as const satisfies Record<string, IngestFixture>;

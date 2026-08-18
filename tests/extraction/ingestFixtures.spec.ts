@@ -32,6 +32,13 @@ import { sniffUploadFormat } from '../../apps/api/src/images/sniffFormat.js';
 import { stripAllMetadata, transcodeHeicToPng } from '../../apps/api/src/images/transcode.js';
 import type { ImageBlobStore } from '../../apps/api/src/storage/blobStore.js';
 import {
+  EXIF_TAG,
+  hasGpsCoordinates,
+  isPngMetadataChunk,
+  pngChunkTypes,
+  readExif,
+} from '../fixtures/golden/ingest/exifProbe.js';
+import {
   INGEST_FIXTURES,
   loadIngestFixture,
   type IngestFixtureName,
@@ -223,31 +230,39 @@ describe('T-SEC-032 · EXIF, XMP, IPTC and GPS never reach the blob store', () =
   it('T-SEC-032h: NON-VACUITY — the fixtures really do carry a GPS payload before anything strips it', () => {
     // ⚠ Without this, every "absent" assertion below passes against a strip
     // that does nothing at all.
-    const png = text(loadIngestFixture('pngWithMetadata'));
-    expect(png).toContain('eXIf');
-    expect(png).toContain('tEXt');
-    expect(png).toContain('zTXt');
-    expect(png).toContain('iTXt');
-    expect(png).toContain('tIME');
+    //
+    // ⚠ AND IT IS ASSERTED STRUCTURALLY. Searching the bytes for `eXIf` or for
+    // the two bytes of tag 0x8825 is unsound on anything bigger than these
+    // hand-built fixtures — in the real 1.8 MB HEIC next door those two bytes
+    // occur 33 times by chance. Walk the chunk table and the IFD instead; see
+    // `exifProbe.ts`.
+    const pngChunks = pngChunkTypes(loadIngestFixture('pngWithMetadata'));
+    for (const chunk of ['eXIf', 'tEXt', 'zTXt', 'iTXt', 'tIME']) {
+      expect(pngChunks).toContain(chunk);
+    }
+    expect(hasGpsCoordinates(loadIngestFixture('pngWithMetadata'))).toBe(true);
 
-    const jpeg = text(loadIngestFixture('jpegWithGps'));
-    expect(jpeg).toContain('Exif\0\0');
-    expect(jpeg).toContain('Apple'); // device model
+    const jpegBytes = loadIngestFixture('jpegWithGps');
+    const jpeg = text(jpegBytes);
     expect(jpeg).toContain('Photoshop 3.0'); // APP13 / IPTC
     expect(jpeg).toContain('Captured on iPhone 15 Pro at 51.5N 0.1W'); // COM
-    // The GPSInfoIFDPointer tag (0x8825), little-endian, as it sits in IFD0.
-    expect(jpeg).toContain('\x25\x88');
+
+    const exif = readExif(jpegBytes);
+    expect(exif).not.toBeNull();
+    expect(exif?.ifd0Tags).toContain(EXIF_TAG.MAKE); // device model
+    expect(exif?.ifd0Tags).toContain(EXIF_TAG.GPS_IFD_POINTER);
+    expect(hasGpsCoordinates(jpegBytes)).toBe(true);
   });
 
   it('T-SEC-032i: every metadata chunk is removed from the PNG and the image chunks survive', () => {
-    const stripped = text(stripAllMetadata(loadIngestFixture('pngWithMetadata'), 'png'));
-    for (const chunk of ['eXIf', 'tEXt', 'zTXt', 'iTXt', 'tIME']) {
-      expect(stripped).not.toContain(chunk);
-    }
-    expect(stripped).toContain('IHDR');
-    expect(stripped).toContain('IDAT');
-    expect(stripped).toContain('IEND');
-    expect(stripped).not.toContain('\x25\x88');
+    const stripped = stripAllMetadata(loadIngestFixture('pngWithMetadata'), 'png');
+    const chunks = pngChunkTypes(stripped);
+
+    // The whole chunk table, not a search: exact in both directions.
+    expect(chunks.filter(isPngMetadataChunk)).toEqual([]);
+    expect(chunks).toEqual(['IHDR', 'IDAT', 'IEND']);
+    expect(readExif(stripped)).toBeNull();
+    expect(hasGpsCoordinates(stripped)).toBe(false);
   });
 
   it('T-SEC-032j: APP1/APP13/COM are removed from the JPEG, and the ICC profile SURVIVES', () => {
@@ -287,10 +302,11 @@ describe('T-SEC-032 · EXIF, XMP, IPTC and GPS never reach the blob store', () =
     expect(store.written.size).toBe(2);
     for (const bytes of store.written.values()) {
       const stored = text(bytes);
-      expect(stored).not.toContain('eXIf');
-      expect(stored).not.toContain('Exif\0\0');
-      expect(stored).not.toContain('Apple');
-      expect(stored).not.toContain('\x25\x88');
+      expect(stored).not.toContain('Photoshop 3.0');
+      expect(stored).not.toContain('Captured on iPhone 15 Pro');
+      // Structural, not a byte search — see T-SEC-032h.
+      expect(readExif(bytes)).toBeNull();
+      expect(hasGpsCoordinates(bytes)).toBe(false);
     }
     // The strip runs OUTSIDE the transcode condition — neither of these is a
     // HEIC, so nothing was transcoded, and both were still stripped.
