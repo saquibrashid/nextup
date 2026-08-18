@@ -276,8 +276,15 @@ jobs:
         run: npm run test:smoke
 
       # Only now. A failure in any step above leaves production serving the
-      # previous revision, and rollback is this same command naming the old
-      # revision — see docs/runbooks/rollback.md.
+      # previous revision, so no rollback is needed in that case.
+      #
+      # If a bad deploy DOES reach production, rollback is TWO commands in a
+      # fixed order — `revision activate` and only then this traffic command.
+      # Verified on live Azure 2026-08-18: pointing traffic at a deactivated
+      # revision exits 0, prints the new weight table, and then serves 404.
+      # Since the step below deactivates the superseded revision, the rollback
+      # target is always inactive, so the one-command form is always wrong.
+      # Full procedure: docs/runbooks/rollback.md.
       - name: Shift traffic to 100%
         run: |
           set -euo pipefail
