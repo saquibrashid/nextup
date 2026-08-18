@@ -36,6 +36,14 @@ updates:
           - 'react-dom'
           - '@types/react'
           - '@types/react-dom'
+      # `prisma` (CLI) and `@prisma/client` are generated-code peers: the client
+      # is emitted BY the CLI, so a version skew fails at `prisma generate`, not
+      # at install. Ungrouped, Dependabot raised them as #27 and #30 — two PRs
+      # that could not pass in any order or combination, 8 red jobs each.
+      prisma:
+        patterns:
+          - 'prisma'
+          - '@prisma/*'
     # Majors that CANNOT be taken yet. Each names the condition that unblocks
     # it, because an `ignore` with no exit criterion silently becomes permanent.
     ignore:
@@ -63,6 +71,29 @@ updates:
       # typescript-eslint/typescript-eslint#10940.
       - dependency-name: 'typescript'
         versions: ['>=7.0.0 <7.1.0']
+      # Prisma 7 is a migration, not a bump. Verified locally on 2026-08-18 by
+      # taking `prisma` and `@prisma/client` to 7.9.1 together: `prisma
+      # generate` fails outright with P1012 — "The datasource property `url` is
+      # no longer supported in schema files." v7 moves the connection URL to a
+      # new `prisma.config.ts` and requires a DRIVER ADAPTER passed to the
+      # PrismaClient constructor for a direct connection.
+      #
+      # For nextup that means, at minimum: a new `prisma.config.ts`; a new
+      # runtime dependency on the SQL Server driver adapter (which needs an
+      # NFR-004 justification and an entry in the `tools/check-deps.mjs`
+      # allow-list); every PrismaClient construction site rewritten; and the
+      # migrate steps in CI and in `deploy.yml` revalidated against a live
+      # Azure SQL database. Grouping alone does NOT make it green.
+      #
+      # There is no pressure to take it: v6 carries no advisory, and the audit
+      # exception in `tools/check-audit.mjs` exists because npm's suggested
+      # "fix" for GHSA-ggr8-5vv4-36mx is a prisma DOWNGRADE.
+      # UNBLOCKED BY: a dedicated task that does the adapter migration against
+      # a real Azure SQL database, with T-MIG-001 still passing.
+      - dependency-name: 'prisma'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@prisma/client'
+        update-types: ['version-update:semver-major']
 
   # GitHub Actions used by the workflows.
   - package-ecosystem: github-actions
