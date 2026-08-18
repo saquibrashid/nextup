@@ -1577,3 +1577,30 @@ No new assumptions were introduced by this document, other than recording **ASM-
 
 
 
+
+### A.9 Phase-8 acceptance-criteria amendments recorded in traceability (AC-6′, AC-7)
+
+Recorded here because both criteria **originate in the specs rather than in an
+owner statement**, and §A.1 traces requirements to stories, not criteria — so
+without this subsection the only record of their provenance is the story body,
+where a reader checking traceability would not look. This closes the errata
+item raised at `docs/backlog.md` §8.1 (TASK-132).
+
+| Criterion | Story | Requirement | Origin | Replaces | Verified by |
+|---|---|---|---|---|---|
+| **US-028 AC-6′** | US-028 | REQ-071 | Spec decision **SD-01** (phase 8), which closed **OQ-015** | **US-028 AC-6**, struck through in place and retained above it | `T-SUP-006` |
+| **US-028 AC-7** | US-028 | REQ-071 | Spec decision **SD-06** (phase 8) | — (a new criterion; nothing superseded) | `T-FIX-005` |
+
+**Why AC-7 has no requirement of its own.** It is a consequence of REQ-071
+rather than a new capability: if suppression is keyed on canonical work
+identity, then changing a work's identity via fix-match must carry the
+suppression with it, or correcting a match would silently resurrect a work the
+owner had dismissed. It is traced to REQ-071 for that reason, and implemented
+by TASK-110 — **not** TASK-104, which implements AC-6′.
+
+⚠ **AC-6′ is a rename, not an addition — it must not be counted twice.** The
+PRD's acceptance-criteria total counts **AC-6′ and not AC-6**; AC-6 is retained
+only as struck-through history. AC-7 **is** an addition and does increment the
+total. Any recount of the AC headline (owned by TASK-126, and binding in
+`specs/testing.md`) must apply that rule, or US-028 will appear to have gained
+two criteria in phase 8 when it gained one.

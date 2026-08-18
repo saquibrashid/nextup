@@ -136,18 +136,19 @@ nextup/
 
 ## Documentation
 
-| Document                                              | What's in it                                                                              |
-| ----------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| [Getting started](docs/getting-started.md)            | Clone → install → run the whole suite offline; the HTTPS/clipboard trap                   |
-| [PRD](docs/PRD.md)                                    | User stories and the 230 acceptance criteria                                              |
-| [Architecture](docs/architecture.md)                  | System design, the locked stack, and the cost model                                       |
-| [Specs](specs/specs.md)                               | Implementation detail; [testing.md](specs/testing.md) carries the AC → named-test mapping |
-| [Backlog](docs/backlog.md)                            | What to build, in order (the work order)                                                  |
-| [Roadmap](docs/roadmap.md)                            | Sequencing and milestones                                                                 |
-| [Parallel execution](docs/parallel-execution-plan.md) | How to run multiple coding agents at once, and the lane boundaries they must respect      |
-| [ADRs](docs/adr/)                                     | Why the load-bearing decisions are what they are                                          |
-| [BRD](docs/BRD.md)                                    | The (personal, non-commercial) business case                                              |
-| [Review report](docs/review-report.md)                | Known open items from the pre-build review                                                |
+| Document                                              | What's in it                                                                                        |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| [Getting started](docs/getting-started.md)            | Clone → install → run the whole suite offline; the HTTPS/clipboard trap                             |
+| [PRD](docs/PRD.md)                                    | User stories and the 230 acceptance criteria                                                        |
+| [Architecture](docs/architecture.md)                  | System design, the locked stack, and the cost model                                                 |
+| [Specs](specs/specs.md)                               | Implementation detail; [testing.md](specs/testing.md) carries the AC → named-test mapping           |
+| [Backlog](docs/backlog.md)                            | What to build, in order (the work order)                                                            |
+| [Roadmap](docs/roadmap.md)                            | Sequencing and milestones                                                                           |
+| [Parallel execution](docs/parallel-execution-plan.md) | How to run multiple coding agents at once, and the lane boundaries they must respect                |
+| [ADRs](docs/adr/)                                     | Why the load-bearing decisions are what they are                                                    |
+| [Runbooks](docs/runbooks/)                            | Operational procedures, incl. the pre-authorised [memory up-size](docs/runbooks/scale-up-memory.md) |
+| [BRD](docs/BRD.md)                                    | The (personal, non-commercial) business case                                                        |
+| [Review report](docs/review-report.md)                | Known open items from the pre-build review                                                          |
 
 If you are a coding agent, start with
 [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
