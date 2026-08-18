@@ -27,19 +27,45 @@ function baseUrl(): string {
 
 const IDP = /login\.microsoftonline\.com/;
 
+/**
+ * Assert that a response was produced by the Easy Auth middleware and NOT by
+ * the application.
+ *
+ * ⚠ This is the whole point of the suite, and a bare status-code check does
+ * not do it. `401` is also exactly what the app itself returns when it sees no
+ * principal — so if someone put `/api/*` into `excludedPaths`, publishing the
+ * owner's list at the platform edge, a status-only assertion would still pass
+ * while the request now reaches application code. The three markers below can
+ * only come from the platform:
+ *
+ *   - `x-ms-middleware-request-id` is stamped by the Easy Auth middleware.
+ *   - `www-authenticate` names the Microsoft sign-in host and the Entra app.
+ *   - The body is EMPTY. The app never answers with a zero-length body; every
+ *     application refusal carries the JSON error envelope.
+ */
+async function expectPlatformChallenge(
+  res: { status: () => number; headers: () => Record<string, string>; body: () => Promise<Buffer> },
+  what: string,
+): Promise<void> {
+  expect(res.status(), `${what}: must not be served`).not.toBe(200);
+  expect(res.status(), `${what}: expected the Easy Auth challenge`).toBe(401);
+
+  const headers = res.headers();
+  expect(
+    headers['x-ms-middleware-request-id'],
+    `${what}: not handled by Easy Auth middleware`,
+  ).toBeTruthy();
+  expect(headers['www-authenticate'] ?? '', `${what}: no IdP challenge`).toMatch(IDP);
+
+  const body = await res.body();
+  expect(body.length, `${what}: a body means application code ran — check excludedPaths`).toBe(0);
+}
+
 test('T-SMOKE-001 · an unauthenticated API request is intercepted by Easy Auth', async ({
   request,
 }) => {
-  // ⚠ 302 to the Microsoft sign-in page, NOT 401 JSON. security.md §2.1
-  // fixes `unauthenticatedClientAction: RedirectToLoginPage`, which is
-  // global and has no per-path variant, so this is what a CORRECTLY
-  // configured deployment does. See specs/testing.md §18.2 — asserting 401
-  // here would only pass if someone had added `/api/*` to `excludedPaths`,
-  // i.e. published the owner's list to the internet.
   const res = await request.get(`${baseUrl()}/api/titles`, { maxRedirects: 0 });
-
-  expect(res.status(), 'expected a redirect to the IdP').toBe(302);
-  expect(res.headers()['location'] ?? '').toMatch(IDP);
+  await expectPlatformChallenge(res, 'GET /api/titles');
 });
 
 test('T-SMOKE-002 · the SPA itself is behind the same boundary', async ({ request }) => {
@@ -47,9 +73,7 @@ test('T-SMOKE-002 · the SPA itself is behind the same boundary', async ({ reque
   // protected /api but served the SPA shell openly would leak nothing on its
   // own, but it is the shape a misconfiguration takes on the way to leaking.
   const res = await request.get(`${baseUrl()}/`, { maxRedirects: 0 });
-
-  expect(res.status()).toBe(302);
-  expect(res.headers()['location'] ?? '').toMatch(IDP);
+  await expectPlatformChallenge(res, 'GET /');
 });
 
 test('T-SMOKE-003 · a forged principal header does not get past Easy Auth', async ({ request }) => {
@@ -75,7 +99,21 @@ test('T-SMOKE-003 · a forged principal header does not get past Easy Auth', asy
     headers: { 'x-ms-client-principal': forged },
   });
 
-  expect(res.status(), 'a forged principal header must not authenticate').not.toBe(200);
-  expect(res.status()).toBe(302);
-  expect(res.headers()['location'] ?? '').toMatch(IDP);
+  await expectPlatformChallenge(res, 'forged x-ms-client-principal');
+});
+
+test('T-SMOKE-004 · the sign-in route exists and points at the tenant IdP', async ({ request }) => {
+  // The three tests above prove nothing is reachable. On their own they would
+  // ALSO pass against a deployment where sign-in is impossible — a wrong
+  // client id, a broken provider block, or an app registration that has been
+  // deleted all present as "everything is refused", which is indistinguishable
+  // from "correctly secured" if you only ever assert refusal.
+  const res = await request.get(`${baseUrl()}/.auth/login/aad`, { maxRedirects: 0 });
+
+  expect(res.status(), 'the Easy Auth login route must exist').toBe(302);
+  const location = res.headers()['location'] ?? '';
+  expect(location, 'sign-in must go to the Microsoft IdP').toMatch(IDP);
+  expect(location, 'the redirect must come back to THIS deployment').toContain(
+    encodeURIComponent(`${baseUrl()}/.auth/login/aad/callback`),
+  );
 });

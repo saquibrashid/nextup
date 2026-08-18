@@ -1629,6 +1629,7 @@ check what "done" means.
 | **`T-SEC-034` (new, TASK-142)** | S | The **production audit gate suppresses by named exception, never by blanket**. `tools/check-audit.mjs` collects only **high and critical** advisories, ignores bare-string `via` edges (they are dependency paths, not advisories — inventing an id from one makes the gate permanently and unfixably red), fails on **any advisory not explicitly listed**, and — the half that matters — fails on **any listed exception that is no longer reported**. An allow-list that only suppresses is a permanent hole that outlives its reason; this one deletes itself the moment upstream ships a fix. `d` requires every entry to carry an id, a date and a justification over 200 characters, because the point of the list is the reasoning, not the silence. `f` asserts CI actually **calls** the gate and has not reverted to a bare `npm audit --omit=dev`, and `g` that the non-blocking full-tree report survives so dev-tooling findings stay visible. ⚠ Accepted exception `GHSA-ggr8-5vv4-36mx`: npm reports its "fix" as `prisma@6.12.0`, which is a **downgrade** from the installed `6.19.3` presented in the same field as an upgrade. | TASK-142, `NFR-004` |
 | **`T-INFRA-010` (new, TASK-007)** | S | The **ingress `targetPort` equals the port the container actually listens on** (`ENV PORT` / `EXPOSE` in the Dockerfile). Cross-file, and every signal that should catch a mismatch reports success: `az bicep build` and `az deployment group validate` both pass (either value is a legal port), `az deployment group create` reports **Succeeded**, the revision provisions, and the container logs `listening on :3000`. The only evidence is `startup probe failed: connection refused` in the container-app system log and an app that answers **nothing at all** — the smoke suite times out rather than failing an assertion, so it reads as a flaky or slow deployment, not a broken one. ⚠ This shipped: `targetPort: 8080` against a container bound to `3000`. `d` binds the rule in **both** directions, since editing the Dockerfile alone is the likelier half; `e` catches a Dockerfile whose own `ENV PORT` and `EXPOSE` disagree, leaving no single answer to "which port?"; `f` fails on an undeclared port rather than silently having nothing to compare. | TASK-007, ADR-0003 |
 | **`T-CI-009` (new, TASK-007)** | S | The **deployment pipeline cannot skip its own gates**. `deploy.yml` is asserted for ORDER and PROHIBITIONS, both invisible in review: production `needs: [build, staging]` (`a`); no `prisma migrate dev` and no `prisma db push` anywhere (`b`, run against a **comment-stripped** copy so the ban does not fire on the text explaining it); `migrate deploy` twice (`c`); ghcr.io with `GITHUB_TOKEN` and no `azurecr.io`/`AcrPush` (`d`); the image secret-scan **precedes** the push (`e`) and the build itself does not push (`f`, or the scan is bypassed entirely); production traffic shifts **after** the production smoke suite (`g`); staging smoke precedes the production job (`h`); every action pinned to a 40-char SHA (`i`); the migration gate re-runs in the deploy pipeline (`j`); `cancel-in-progress: false` (`k`); the ghcr note is linked (`l`). Each banned edit leaves a workflow that still reads plausibly and still goes green. | TASK-007, `REQ-028` |
+| **`T-SMOKE-004` (new, TASK-007)** | E | The **sign-in route works**, asserted because the other three `T-SMOKE-*` cases prove only that nothing is reachable — which is equally true of a deployment where signing in is **impossible**. A wrong client id, a deleted app registration or a malformed provider block all present as "everything is refused", indistinguishable from "correctly secured" to a suite that only asserts refusal. `/.auth/login/aad` must return **302 to `login.microsoftonline.com`** with a `redirect_uri` belonging to **this** deployment, so a copy-pasted callback from the other environment fails too. | TASK-007, ADR-0002 |
 | **`T-SMOKE-001`** | E | An authenticated request against the freshly deployed **staging** revision succeeds. The `T-SMOKE-*` family was defined only as a **glob** in §11.2, which no id-level gate can resolve — `T-SMOKE-003` was already enumerated as a real cell, so the family was half-addressable and the missing half looked like a phantom. | §11.2 glob |
 | **`T-UI-004`** | C | `ImageDropzone` names **PNG, JPEG and HEIC** in its accept list and its copy (`specs/ui.md`). ⚠ Load-bearing per product invariant 11: without HEIC in `accept`, an iOS file picker greys out the owner's own camera photos and the failure looks like a broken phone, not a missing format. Deliberately distinct from `T-UI-014`, which TASK-162 owns. | `specs/ui.md` |
 | **`T-UX-041`** | C | The empty dropzone shows **all three** ingest affordances — paste, file selection and drag-and-drop (`specs/ux-states.md` §4.3). Product invariant 16: paste was added, not swapped in, and a tidied-up single-affordance dropzone silently removes a working capture path. | `specs/ux-states.md` §4.3 |
@@ -2067,13 +2068,62 @@ compiled ARM name is an expression — `[format('{0}/{1}', …, 'current')]` —
 splitting on `/` is also wrong (the format string contains one). The check
 matches the **quoted literal**.
 
-### 18.2 ✅ RESOLVED at TASK-007: `T-SMOKE-001` asserts the 302, not a 401
+### 18.2 ✅ RESOLVED at TASK-007, then CORRECTED against a live deployment
 
-**Resolution (2026-08-17, TASK-007 — this section's own condition for closing
+**Correction (2026-08-18, first real staging deployment).** The resolution
+below asserted a **302**. That is wrong for Container Apps, and it was wrong on
+the basis of a plausible inference rather than an observation. Measured against
+a correctly configured live revision (`RedirectToLoginPage`, `excludedPaths`
+null, provider enabled):
+
+```
+$ curl -s -D - https://<fqdn>/api/titles
+HTTP/1.1 401 Unauthorized
+www-authenticate: Bearer realm="<fqdn>" authorization_uri="https://login.microsoftonline.com/common/oauth2/v2.0/authorize" resource_id="<clientId>"
+x-ms-middleware-request-id: 5bf0eb83-...
+<empty body>
+```
+
+**Container Apps Easy Auth answers 401 with a `WWW-Authenticate` challenge, not
+a 302** — and it does so regardless of the `Accept` header, so this is not the
+usual browser-versus-API branch. `/.auth/login/aad` is what returns the 302.
+`unauthenticatedClientAction: RedirectToLoginPage` remains correct and stays;
+it governs the sign-in route, not the API challenge.
+
+This matters more than a status code, because the old assertion's own stated
+purpose was to detect `/api/*` being added to `excludedPaths` — and **a status
+code cannot detect that at all**: `401` is *also* exactly what the application
+returns when it sees no principal. Had the spec's 302 assertion been "fixed"
+later by relaxing it to 401, the suite would have gone green while the owner's
+list was being served at the edge.
+
+`T-SMOKE-001`/`002`/`003` therefore assert the response is **from the
+platform**, which the application cannot imitate:
+
+| Marker | Why the app cannot produce it |
+| --- | --- |
+| `x-ms-middleware-request-id` | Stamped by the Easy Auth middleware. |
+| `www-authenticate` naming `login.microsoftonline.com` and the Entra app | The app has no client id and issues no challenge. |
+| **A zero-length body** | Every application refusal carries the JSON error envelope. |
+
+`T-SMOKE-004` was added at the same time. The other three prove that *nothing
+is reachable*, which is also true of a deployment where **sign-in is
+impossible** — a wrong client id, a deleted app registration or a broken
+provider block all present as "everything is refused". Asserting only refusal
+cannot tell a secured deployment from a bricked one, so `T-SMOKE-004` asserts
+`/.auth/login/aad` returns 302 to the Microsoft IdP **with a callback URI
+belonging to this deployment**.
+
+Verified: 4/4 pass against staging.
+
+~~Superseded — the ADR-0002 reasoning below stands; only the expected status
+code was wrong.~~
+
+~~**Resolution (2026-08-17, TASK-007 — this section's own condition for closing
 was "the smoke suite is TASK-007's deliverable"; it now exists).** Option (a)
 below is taken. `RedirectToLoginPage` **stays**, and `T-SMOKE-001` is
 re-specified to assert **302 to `login.microsoftonline.com`**, implemented in
-`tests/smoke/smoke.spec.ts`.
+`tests/smoke/smoke.spec.ts`.~~
 
 Option (b) was rejected on ADR-0002 grounds: switching to `Return401` would
 put a sign-in redirect back into application code, which is the exact thing
@@ -2084,6 +2134,9 @@ depends on a 401 from the edge, so (a) costs nothing.
 200 from `/api/titles` at the edge is the signature of `/api/*` having been
 added to `excludedPaths`, i.e. the owner's list published to the internet.
 `T-SMOKE-001` failing that way is not a broken test.
+~~Corrected above: the platform's own refusal IS a 401, so the signature of an
+`excludedPaths` bypass is a 401 **carrying a body and no platform headers** —
+not the status code.~~
 
 ~~Superseded — retained for the reasoning, which is still correct:~~
 
