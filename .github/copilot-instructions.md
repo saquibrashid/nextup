@@ -129,12 +129,16 @@ project's design already; treat them as hard rules.
     adding one fails CI.
 11. **Uploads accept PNG _and_ JPEG _and_ HEIC/HEIF — all three (REQ-007,
     ASM-058).** ⚠ **This is not a swap and the list must not be "tidied".** iOS
-    _screenshots_ are normally PNG, iOS _camera photos_ default to HEIC, an iOS
-    Safari file input can deliver any of the three, and the laptop-web capture
-    path produces PNG. Dropping any one of them breaks a real capture path —
-    an earlier PNG/JPEG-only spec would have rejected the owner's own phone
-    images on first use. Determine format by **magic bytes, never by the
-    declared `Content-Type`** (iOS commonly sends `application/octet-stream`).
+    _camera photos_ default to HEIC, an iOS Safari file input can deliver any
+    of the three, and the laptop-web capture path produces PNG. Dropping any
+    one of them breaks a real capture path — an earlier PNG/JPEG-only spec
+    would have rejected the owner's own phone images on first use.
+    ⚠ **The format is NOT predictable from the capture path.** This text used
+    to say iOS _screenshots_ are normally PNG; the owner's own screenshot
+    fixture (TASK-151) is **JPEG**, so that reasoning is falsified — the
+    conclusion is unchanged and strengthened. Determine format by **magic
+    bytes, never by the declared `Content-Type`** (iOS commonly sends
+    `application/octet-stream`) and never by the ingest source.
 12. **HEIC/HEIF must be transcoded server-side to lossless PNG on ingest
     (REQ-077, ADR-0008), before storage and before extraction.** No extraction
     service accepts HEIC and only Safari renders it, so there is no
