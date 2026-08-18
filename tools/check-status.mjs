@@ -61,7 +61,7 @@ const LEDGER_END = '<!-- STATUS-LEDGER:END -->';
 // started. The invisible symptom is worse — marking 056b done would have
 // silently satisfied part of 056's gate.
 const TASK_RE = /TASK-\d{3}[a-z]?/;
-const TEST_ID_RE = /T-[A-Z0-9]+-\d+[a-z]?/g;
+const TEST_ID_RE = /T-[A-Z0-9]+-\d+[a-z]{0,2}/g;
 
 const norm = (s) => s.replace(/\r\n/g, '\n');
 
@@ -268,7 +268,7 @@ export function mentionedTestIds(root = ROOT) {
       const full = path.join(dir, entry);
       if (statSync(full).isDirectory()) walk(full);
       else if (/\.(spec|test)\.[cm]?[tj]sx?$/.test(entry)) {
-        for (const m of readFileSync(full, 'utf8').matchAll(/T-[A-Z0-9]+-\d+[a-z]?/g))
+        for (const m of readFileSync(full, 'utf8').matchAll(/T-[A-Z0-9]+-\d+[a-z]{0,2}/g))
           ids.add(m[0]);
       }
     }
@@ -305,7 +305,7 @@ export function collectDefinedTestIds(root = ROOT) {
   for (const file of files) {
     for (const line of norm(readFileSync(file, 'utf8')).split('\n')) {
       if (!/^[ \t]*(?:it|test|describe)\b/.test(line)) continue;
-      const found = line.match(/T-[A-Z0-9]+-\d+[a-z]?/);
+      const found = line.match(/T-[A-Z0-9]+-\d+[a-z]{0,2}/);
       if (found) ids.add(found[0]);
     }
   }

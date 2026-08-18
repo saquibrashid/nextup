@@ -234,6 +234,13 @@ export const RUNTIME_DEPENDENCY_ALLOWLIST = new Set([
   '@azure/storage-blob',
   '@azure/identity',
   '@azure-rest/ai-vision-image-analysis',
+  // specs/ai.md §2.1a mandates the `openai` package with an `AzureOpenAI`
+  // client for the PRIMARY reader. It was absent from specs/security.md §8's
+  // prose list — an omission, not a prohibition: the same section fixes the
+  // model, the API version and the module that may import it. The §8 row is
+  // corrected in place alongside this entry, because that row is what this
+  // list is a gate on.
+  'openai',
   'ulid',
   'jaro-winkler',
   'compression',

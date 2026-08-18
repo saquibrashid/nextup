@@ -1,0 +1,8 @@
+{
+  "error": {
+    "code": "BadRequest",
+    "message": "Invalid image data. The image could not be decoded.",
+    "param": "messages",
+    "type": "invalid_request_error"
+  }
+}

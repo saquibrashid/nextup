@@ -35,6 +35,14 @@ const VISION_SDK = '@azure-rest/ai-vision-image-analysis';
 const SOLE_ADAPTER = 'apps/api/src/extraction/azureVisionExtractor.ts';
 
 /**
+ * The same confinement rule for the second provider SDK (`specs/ai.md` §2.1a,
+ * TASK-056b). Two adapters, two SDKs, one importer each — that symmetry is
+ * what makes ADR-0001's "swap the primary reader" a configuration change.
+ */
+const LLM_SDK = 'openai';
+const SOLE_LLM_ADAPTER = 'apps/api/src/extraction/llmVisionExtractor.ts';
+
+/**
  * The visual features `imageanalysis:analyze` offers. `Read` is the only one
  * nextup may ever request: `Caption`/`DenseCaptions` would push a generated
  * natural-language description of a personal screenshot through a captioning
@@ -152,6 +160,30 @@ describe('T-AI-010 — the Vision SDK is confined to one adapter', () => {
       { relPath: 'apps/api/src/other.ts', text: `// never import from '${VISION_SDK}'` },
     ];
     expect(filesImporting(planted, VISION_SDK)).toEqual([]);
+  });
+});
+
+describe('T-AI-010 — the LLM SDK is confined to one adapter', () => {
+  it('T-AI-010e · is imported by exactly one file, and that file is the adapter', () => {
+    expect(filesImporting(repoFiles, LLM_SDK)).toEqual([SOLE_LLM_ADAPTER]);
+  });
+
+  it('T-AI-010f · catches a second importer', () => {
+    const planted: SourceFile[] = [
+      { relPath: SOLE_LLM_ADAPTER, text: `import { AzureOpenAI } from '${LLM_SDK}';` },
+      { relPath: 'apps/api/src/routes/batches.ts', text: `import y from '${LLM_SDK}';` },
+    ];
+    expect(filesImporting(planted, LLM_SDK)).toEqual([
+      SOLE_LLM_ADAPTER,
+      'apps/api/src/routes/batches.ts',
+    ]);
+  });
+
+  it('T-AI-010g · does not count the SDK named only in a comment', () => {
+    const planted: SourceFile[] = [
+      { relPath: 'apps/api/src/other.ts', text: `// do not import from '${LLM_SDK}'` },
+    ];
+    expect(filesImporting(planted, LLM_SDK)).toEqual([]);
   });
 });
 

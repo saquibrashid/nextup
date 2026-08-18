@@ -62,7 +62,7 @@ import { baseId, citedTestIds, definedTestIds } from './check-test-ids.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const TEST_ID_RE = /T-[A-Z0-9]+-\d+[a-z]?/g;
+const TEST_ID_RE = /T-[A-Z0-9]+-\d+[a-z]{0,2}/g;
 
 /** Directories that never hold a first-party suite. */
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'dist-dev', 'coverage', '.turbo']);

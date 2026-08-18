@@ -1,0 +1,18 @@
+{
+  "id": "chatcmpl-fixture-tiles",
+  "object": "chat.completion",
+  "created": 1755000000,
+  "model": "gpt-4.1-2025-04-14",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "refusal": null,
+        "content": "{\"tiles\":[{\"visibleText\":\"The Diplomat\",\"identifiedTitle\":\"The Diplomat\",\"basis\":\"both\",\"confidence\":0.94,\"box\":{\"x\":0.04,\"y\":0.18,\"w\":0.22,\"h\":0.31}},{\"visibleText\":\"Slow Horses\",\"identifiedTitle\":\"Slow Horses\",\"basis\":\"text\",\"confidence\":0.88,\"box\":{\"x\":0.28,\"y\":0.18,\"w\":0.22,\"h\":0.31}},{\"visibleText\":null,\"identifiedTitle\":null,\"basis\":\"unknown\",\"confidence\":0.12,\"box\":{\"x\":0.52,\"y\":0.18,\"w\":0.22,\"h\":0.31}},{\"visibleText\":\"A Very Long Truncated Title Th\\u2026\",\"identifiedTitle\":null,\"basis\":\"unknown\",\"confidence\":1.31,\"box\":{\"x\":-0.02,\"y\":0.55,\"w\":1.06,\"h\":0.31}}]}"
+      }
+    }
+  ],
+  "usage": { "prompt_tokens": 1204, "completion_tokens": 288, "total_tokens": 1492 }
+}

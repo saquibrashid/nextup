@@ -1,0 +1,15 @@
+{
+  "error": {
+    "code": "content_filter",
+    "message": "The response was filtered due to the prompt triggering Azure OpenAI's content management policy.",
+    "param": "prompt",
+    "type": null,
+    "innererror": {
+      "code": "ResponsibleAIPolicyViolation",
+      "content_filter_result": {
+        "sexual": { "filtered": true, "severity": "medium" },
+        "violence": { "filtered": false, "severity": "safe" }
+      }
+    }
+  }
+}

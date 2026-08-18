@@ -46,7 +46,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const BACKLOG = path.join(ROOT, 'docs', 'backlog.md');
 export const TESTING_SPEC = path.join(ROOT, 'specs', 'testing.md');
 
-const TEST_ID_RE = /T-[A-Z0-9]+-\d+[a-z]?/g;
+const TEST_ID_RE = /T-[A-Z0-9]+-\d+[a-z]{0,2}/g;
 const TASK_RE = /TASK-\d{3}/;
 
 /** Drop `~~struck-through~~` spans. Non-greedy: see `check-status.mjs`. */

@@ -1,0 +1,18 @@
+{
+  "id": "chatcmpl-fixture-bad-shape",
+  "object": "chat.completion",
+  "created": 1755000005,
+  "model": "gpt-4.1-2025-04-14",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "refusal": null,
+        "content": "{\"tiles\":[{\"visibleText\":\"The Diplomat\",\"identifiedTitle\":\"The Diplomat\",\"basis\":\"guessed\",\"confidence\":0.9,\"box\":{\"x\":0.04,\"y\":0.18,\"w\":0.22,\"h\":0.31}}]}"
+      }
+    }
+  ],
+  "usage": { "prompt_tokens": 1204, "completion_tokens": 55, "total_tokens": 1259 }
+}

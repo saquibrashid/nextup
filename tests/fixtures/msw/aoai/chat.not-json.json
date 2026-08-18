@@ -1,0 +1,18 @@
+{
+  "id": "chatcmpl-fixture-not-json",
+  "object": "chat.completion",
+  "created": 1755000006,
+  "model": "gpt-4.1-2025-04-14",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "refusal": null,
+        "content": "I can see four tiles in this screenshot."
+      }
+    }
+  ],
+  "usage": { "prompt_tokens": 1204, "completion_tokens": 9, "total_tokens": 1213 }
+}

@@ -34,8 +34,18 @@
  * which is the opposite of "a failure names exactly one thing".
  *
  * e.g. T-SUP-003, T-E2E-001, T-INV-013, T-AI-010b
+ *
+ * ⚠ The suffix is up to TWO letters (`aa`, `ab`, …), not one. A one-letter
+ * suffix caps a spec id at 26 cases, and `T-AI-033` is defined in
+ * `specs/testing.md` as ONE suite spanning BOTH extraction adapters — it
+ * exceeds 26 by design. With `[a-z]?` the overflow ids did not error as
+ * unknown: `T-AI-033aa` matched as `T-AI-033a`, so every overflow case
+ * silently collapsed onto one existing id and was reported as a DUPLICATE of
+ * a test in a different file. The same single-optional-letter mistake lived in
+ * `check-status.mjs`'s `TASK_RE` (`TASK-056b` → `TASK-056`); keep all seven of
+ * these regexes in step.
  */
-const TEST_ID = /^(T-[A-Z][A-Z0-9]*-\d+[a-z]?)/;
+const TEST_ID = /^(T-[A-Z][A-Z0-9]*-\d+[a-z]{0,2})/;
 
 /** Call names that declare a test case. `describe` blocks are deliberately exempt. */
 const TEST_CALLERS = new Set(['it', 'test']);

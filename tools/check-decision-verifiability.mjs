@@ -53,7 +53,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export const TESTING_SPEC = path.join(ROOT, 'specs', 'testing.md');
 
-const TEST_ID_RE = /T-[A-Z0-9]+-\d+[a-z]?/g;
+const TEST_ID_RE = /T-[A-Z0-9]+-\d+[a-z]{0,2}/g;
 const US_HEADING_RE = /^#{2,4}\s+(US-\d{3})\b/;
 const SECTION_10_RE = /^##\s+10\.\s/;
 const NEXT_H2_RE = /^##\s+(?!10\.)/;

@@ -1,0 +1,18 @@
+{
+  "id": "chatcmpl-fixture-extra-field",
+  "object": "chat.completion",
+  "created": 1755000004,
+  "model": "gpt-4.1-2025-04-14",
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "stop",
+      "message": {
+        "role": "assistant",
+        "refusal": null,
+        "content": "{\"tiles\":[{\"visibleText\":\"The Diplomat\",\"identifiedTitle\":\"The Diplomat\",\"basis\":\"both\",\"confidence\":0.9,\"service\":\"netflix\",\"platform\":\"Netflix\",\"box\":{\"x\":0.04,\"y\":0.18,\"w\":0.22,\"h\":0.31}}]}"
+      }
+    }
+  ],
+  "usage": { "prompt_tokens": 1204, "completion_tokens": 60, "total_tokens": 1264 }
+}

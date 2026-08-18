@@ -26,6 +26,7 @@ import {
 } from '@nextup/domain';
 
 import { AzureVisionExtractor, type AzureVisionExtractorOptions } from './azureVisionExtractor.js';
+import { LlmVisionExtractor, type LlmVisionExtractorOptions } from './llmVisionExtractor.js';
 import { type RecordingStore } from './recordings.js';
 import { StubExtractor } from './stubExtractor.js';
 
@@ -40,6 +41,8 @@ export interface ExtractorConfig {
   crossCheck?: CrossCheckFn;
   /** Required by `'azure-vision-read'`, and later by `'hybrid'` (TASK-056c). */
   vision?: AzureVisionExtractorOptions;
+  /** Required by `'llm-vision'`, and later by `'hybrid'` (TASK-056c). */
+  llm?: LlmVisionExtractorOptions;
 }
 
 /**
@@ -94,8 +97,20 @@ export function createExtractor(cfg: ExtractorConfig): TitleExtractor {
     // here would change extraction quality without anything saying so.
     case 'hybrid':
       throw new ExtractorNotAvailableError('hybrid', 'TASK-056c (hybridExtractor.ts)');
-    case 'llm-vision':
-      throw new ExtractorNotAvailableError('llm-vision', 'TASK-056b (llmVisionExtractor.ts)');
+    case 'llm-vision': {
+      // The primary reader on its own (TASK-056b). Usable, and BETTER than
+      // `'azure-vision-read'` — see `LlmVisionExtractor.extract` on why it
+      // reports `crossCheck: 'ocr-unavailable'` and therefore still permits
+      // removals. It is still not the shipped design: `'hybrid'` is.
+      if (!cfg.llm) {
+        throw new Error(
+          'The "llm-vision" extractor requires an Azure OpenAI endpoint, deployment and ' +
+            'credential (specs/ai.md §2.1a). There is no API-key fallback: auth is ' +
+            'managed identity.',
+        );
+      }
+      return new LlmVisionExtractor(cfg.llm);
+    }
     case 'azure-vision-read': {
       // The ADR-0001 Revision 1 revert path (TASK-056). It runs, and it is
       // materially worse than `'hybrid'` — see `AzureVisionExtractor.extract`

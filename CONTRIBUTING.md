@@ -19,8 +19,28 @@ the revision banners in the docs.
 ```bash
 nvm use            # Node 20 (see .nvmrc)
 npm ci
+npx prisma generate --schema prisma/schema.prisma
 cp .env.example .env
 ```
+
+> ⚠ **`npx prisma generate` is a SEPARATE step and it is not optional.** `npm ci`
+> deletes `node_modules/.prisma`, and nothing in the install regenerates it.
+> **Run it again after every `npm ci`, and after any rebase that moves the
+> lockfile.** The symptom looks nothing like the cause: `tsc` fails with
+> `TS2694`/`TS7006` deep inside `apps/api` (`ownerData.ts`, `titles.ts`,
+> `batchLifecycle.ts`) complaining about the `Prisma` namespace, in files you
+> did not touch. Two people have lost a debugging cycle to this.
+
+> ⚠ **A local integration database MUST be created with
+> `COLLATE Latin1_General_100_BIN2`.** Without it, every Prisma `create()` dies
+> with `Msg 468` (_"Cannot resolve the collation conflict"_) and you get a wall
+> of dozens of identical failures that look like a code defect. It is not —
+> **fix the database, not the code.** CI gets this right in
+> `.github/workflows/ci.yml`; a hand-rolled local container does not, because
+> the SQL Server image defaults to `SQL_Latin1_General_CP1_CI_AS`. The
+> collation is required by `specs/data-model.md` §16: canonical identity
+> comparison must be byte-exact, and a case-insensitive collation would
+> silently merge two distinct works.
 
 Run the suite locally against the SQL Server 2022 container and Azurite (see
 [specs/testing.md](specs/testing.md) §3.3a). No network egress is required or

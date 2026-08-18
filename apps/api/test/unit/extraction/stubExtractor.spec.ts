@@ -246,15 +246,23 @@ describe('T-STUB-001h the factory selects one extractor and never silently downg
       createExtractor({ NEXTUP_EXTRACTOR: 'stub', recordings: inMemoryRecordingStore({}) }),
     ).toThrow(/crossCheck/);
 
-    for (const name of ['hybrid', 'llm-vision'] as const) {
-      expect(() => createExtractor({ NEXTUP_EXTRACTOR: name })).toThrow(ExtractorNotAvailableError);
-    }
+    expect(() => createExtractor({ NEXTUP_EXTRACTOR: 'hybrid' })).toThrow(
+      ExtractorNotAvailableError,
+    );
 
-    // `azure-vision-read` is BUILT as of TASK-056, so it no longer reports
-    // "not available" — it reports a misconfiguration, which is a different
-    // fault with a different fix. It must still refuse rather than fall back:
-    // a silent downgrade to the stub would return zero titles from a real
-    // batch, and in full-update mode zero titles reads as "remove everything".
+    // `azure-vision-read` (TASK-056) and `llm-vision` (TASK-056b) are BUILT, so
+    // they no longer report "not available" — they report a misconfiguration,
+    // which is a different fault with a different fix. Both must still refuse
+    // rather than fall back: a silent downgrade to the stub would return zero
+    // titles from a real batch, and in full-update mode zero titles reads as
+    // "remove everything".
+    expect(() => createExtractor({ NEXTUP_EXTRACTOR: 'llm-vision' })).toThrow(
+      /requires an Azure OpenAI endpoint/,
+    );
+    expect(() => createExtractor({ NEXTUP_EXTRACTOR: 'llm-vision' })).not.toThrow(
+      ExtractorNotAvailableError,
+    );
+
     expect(() => createExtractor({ NEXTUP_EXTRACTOR: 'azure-vision-read' })).toThrow(
       /requires a Vision endpoint and credential/,
     );
