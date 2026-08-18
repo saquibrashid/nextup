@@ -83,7 +83,7 @@ so they do not relicense this work — but their notices must be retained.
 | `@img/sharp-win32-arm64` | 0.35.3 | Apache-2.0 AND LGPL-3.0-or-later |
 | `@img/sharp-win32-ia32` | 0.35.3 | Apache-2.0 AND LGPL-3.0-or-later |
 | `@img/sharp-win32-x64` | 0.35.3 | Apache-2.0 AND LGPL-3.0-or-later |
-| `@noble/hashes` | 2.2.0 | MIT |
+| `@noble/hashes` | 2.3.0 | MIT |
 | `@nodable/entities` | 3.0.0 | MIT |
 | `@prisma/client` | 6.19.3 | Apache-2.0 |
 | `@prisma/config` | 6.19.3 | Apache-2.0 |
