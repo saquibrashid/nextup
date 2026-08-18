@@ -11,12 +11,12 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 97 |
-| 🚧 doing | 5 |
-| ✅ done | 55 |
+| ⬜ todo | 93 |
+| 🚧 doing | 7 |
+| ✅ done | 62 |
 | 🙋 owner | 4 |
 | 💤 deferred | 0 |
-| **total** | **161** |
+| **total** | **166** |
 
 ## Ready to start
 
@@ -28,45 +28,44 @@ Not done, and every task they depend on is done.
 | `TASK-026` | S | Epic G — Attribution & compliance |
 | `TASK-028` | S | Epic A — Access & identity |
 | `TASK-031` | S | Epic A — Access & identity |
-| `TASK-038` | M | Epic F — The list itself (the value loop) |
-| `TASK-042` | XS | Epic F — The list itself (the value loop) |
+| `TASK-039` | S | Epic F — The list itself (the value loop) |
+| `TASK-040` | S | Epic F — The list itself (the value loop) |
 | `TASK-045` | S | Epic D — Matching & identity |
 | `TASK-051` | XS | Epic B — Capture & import |
 | `TASK-052` | S | Epic B — Capture & import |
-| `TASK-053` | S | Epic B — Capture & import |
-| `TASK-056` | S | Epic C — Extraction |
-| `TASK-102` | S | Epic H — History, removal ledger, suppression |
+| `TASK-056c` | M | Epic C — Extraction |
+| `TASK-057` | M | Epic C — Extraction |
 | `TASK-106` | S | Epic H — History, removal ledger, suppression |
 | `TASK-126` | M | Epic K — Platform, safety, and the shell |
 | `TASK-133` | S | Epic K — Platform, safety, and the shell |
 | `TASK-143` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-145` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-151` | S | Epic B — Capture & import |
-| `TASK-154` | M | Epic B — Capture & import |
+| `TASK-152` | XS | Epic B — Capture & import |
+| `TASK-159` | M | Epic B — Capture & import |
+| `TASK-160` | M | Epic B — Capture & import |
 
 ## Waiting on the owner
 
 | Task | Section | Note |
 |---|---|---|
-| `TASK-011` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs the owner to capture golden-fixture screenshots |
+| `TASK-011` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Owner captured five real screenshots (`4a3da2c`); still owed the per-surface text-vs-artwork evidence file. ⚠ Its "Done when" names `Context/evidence/` — a directory that does not exist in this repo (authoring tree). |
 | `TASK-134` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs the owner to APPLY to Microsoft for Azure OpenAI modified abuse monitoring — an approval, not code. `docs/parallel-execution-plan.md` §3 already lists it as owner-dependent; the ledger said `todo`, which advertised it to lane agents as startable work. |
 | `TASK-141` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs a REAL Azure SQL database: the gating deliverable is an M0 smoke migration applied against one. Blocked behind the same owner-gated Azure boundary as TASK-007. |
 | `TASK-165` | Epic B — Capture & import | Needs a real iOS device to verify the clipboard paste path |
 
 ## Blocked by a dependency
 
-83 tasks cannot start yet.
+80 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
-| `TASK-039` | `TASK-038` |
-| `TASK-040` | `TASK-038` |
 | `TASK-043` | `TASK-045` |
 | `TASK-044` | `TASK-043` |
-| `TASK-046` | `TASK-026`, `TASK-038` |
-| `TASK-057` | `TASK-056` |
-| `TASK-058` | `TASK-056`, `TASK-057`, `TASK-154` |
+| `TASK-046` | `TASK-026` |
+| `TASK-058` | `TASK-057` |
 | `TASK-059` | `TASK-058` |
+| `TASK-059b` | `TASK-058`, `TASK-067` |
 | `TASK-060` | `TASK-045` |
 | `TASK-061` | `TASK-060` |
 | `TASK-062` | `TASK-060` |
@@ -87,6 +86,7 @@ Not done, and every task they depend on is done.
 | `TASK-077` | `TASK-058` |
 | `TASK-078` | `TASK-057` |
 | `TASK-079` | `TASK-078` |
+| `TASK-079b` | `TASK-079` |
 | `TASK-080` | `TASK-071` |
 | `TASK-081` | `TASK-071` |
 | `TASK-082` | `TASK-081` |
@@ -125,23 +125,21 @@ Not done, and every task they depend on is done.
 | `TASK-118` | `TASK-052` |
 | `TASK-119` | `TASK-118` |
 | `TASK-120` | `TASK-026`, `TASK-118` |
-| `TASK-123` | `TASK-038`, `TASK-069`, `TASK-096`, `TASK-162` |
+| `TASK-123` | `TASK-069`, `TASK-096`, `TASK-162` |
 | `TASK-124` | `TASK-123` |
 | `TASK-125` | `TASK-123` |
 | `TASK-127` | `TASK-126` |
 | `TASK-129` | `TASK-070`, `TASK-081` |
 | `TASK-130` | `TASK-124`, `TASK-108` |
 | `TASK-131` | `TASK-044` |
-| `TASK-152` | `TASK-053` |
 | `TASK-155` | `TASK-152` |
 | `TASK-157` | `TASK-010` |
-| `TASK-159` | `TASK-053` |
-| `TASK-160` | `TASK-053` |
 | `TASK-161` | `TASK-160` |
-| `TASK-162` | `TASK-053`, `TASK-159`, `TASK-160` |
+| `TASK-162` | `TASK-159`, `TASK-160` |
 | `TASK-163` | `TASK-160`, `TASK-162` |
 | `TASK-164` | `TASK-080`, `TASK-160`, `TASK-162` |
 | `TASK-166` | `TASK-039` |
+| `TASK-168` | `TASK-079`, `TASK-010` |
 
 ## Done
 
@@ -179,14 +177,20 @@ Not done, and every task they depend on is done.
 | `TASK-035` | `tools/check-write-once-date-added.mjs` + `tests/infra/writeOnceDateAdded.spec.ts` — `T-INV-006` (a–n), a static gate proving no assignment to `.dateAdded` and no `dateAdded` key in a Prisma `update`/`updateMany`/`upsert` exists outside `createServiceListing()`. Three mutations of the checker itself caught (loosened `dateAddedEdited` lookahead, exemption failing open, `create` treated as mutating). Server-side `dateAddedLabel` was already delivered and is asserted by `T-LIST-011c`. `~~T-LIST-018~~` relocated to TASK-038 — see `specs/testing.md` §19. | `T-INV-006` |
 | `TASK-036` | `packages/domain/src/ordering.ts` + `packages/domain/test/ordering.spec.ts` (19 cases) + `apps/api/test/integration/titleOrdering.spec.ts` (16 cases) — `T-LIST-014`, `T-LIST-015`, `T-LIST-016`, `T-LIST-017` (U) and `T-LIST-025`, `T-LIST-026`, `T-LIST-027` (I); `T-LIST-010` was already delivered by TASK-033. **Two live ordering bugs fixed**, both silent: the tie-breaker was `{ id: dir }`, so tie order flipped when the owner reversed the sort AND the keyset predicate stopped mirroring the `ORDER BY`, dropping rows between pages; and `nulls` placement relied on SQL Server's default, which is last on `desc` and **first** on `asc`. Five mutations caught — three of the query, two of the comparator. Four orphaned ids adopted; see `specs/testing.md` §20. | `T-LIST-010`, `T-LIST-014`, `T-LIST-015`, `T-LIST-016`, `T-LIST-017`, `T-LIST-025`, `T-LIST-026`, `T-LIST-027` |
 | `TASK-037` | `apps/api/test/integration/titleFilters.spec.ts` (26 cases) — `T-LIST-020` (a–e), `T-LIST-021` (a–d), `T-LIST-022` (a–h), `T-LIST-023` (a–e), `T-LIST-024` (a–d). **The genre filter did not exist**: `genre` was parsed, validated, and then never passed to the query, so `?genre=Comedy` returned 200 and listed everything. Implemented as a quoted-token match inside the JSON column, which makes `genres: []` exclusion (AC-6) fall out by construction. Four mutations caught, including the sibling-`OR` hazard that would have dropped the filter on page 2 only. `T-LIST-021`/`T-LIST-022` were orphaned ids, adopted here — `specs/testing.md` §20.1. | `T-LIST-020`, `T-LIST-021`, `T-LIST-022`, `T-LIST-023`, `T-LIST-024` |
+| `TASK-038` | `components/TitleRow.tsx` + `components/TitleList.tsx` + `pages/ListPage.tsx` — `T-UI-010` (a–k), `T-LIST-018` (a–d), `T-UI-012` (a–d). Three mutations caught: a component-built date label (fails `T-LIST-018a/b/c` + `T-UI-010a`), one row per listing instead of per work (fails `T-UI-010e`, `T-LIST-018b/c`, `T-UI-012d`), a credentialed `netflix.com` anchor in a badge (fails all four `T-UI-012`). ⚠ **Deep links out to the service are NOT built** — this row and `T-UI-012`/US-038 AC-3 presume one, but `specs/ui.md` §2.2 lists no such element and `specs/api.md` §6.2 carries no URL field, so a URL scheme would have to be invented. Built the conservative reading instead: no row addresses a streaming host at all, asserted universally by `T-UI-012b`. Needs an owner decision. | `T-LIST-018`, `T-UI-010`, `T-UI-012` |
 | `TASK-041` | `apps/api/src/routes/serviceState.ts` + `packages/domain/src/freshness.ts` — `GET /api/service-state`, one entry per service in `SERVICES` so a never-captured service reads "has never been updated" rather than vanishing. `ageInDays` counts UTC calendar days, not 24-hour blocks, and clamps clock skew. `T-FRESH-010` (a–h), `T-FRESH-012` (a–f), `T-FRESH-015` (a–c, the A46 no-nudge regression guard). All four mutations caught; see `specs/testing.md` §16. | `T-FRESH-010`, `T-FRESH-012`, `T-FRESH-015` |
+| `TASK-042` | `components/FreshnessStrip.tsx` + `pages/ListPage.tsx` wiring — `T-FRESH-014` (a–i), 100% covered. Degrades **visibly**: a `role="status"` notice plus per-chip unknown labels, and a partial payload degrades only the missing service. Three mutations caught: rendering nothing when the payload is missing (fails `T-FRESH-014b/c/e/g` + `014i`), reporting missing data as "never updated" (fails `T-FRESH-014c`), nag wording in the degraded copy (fails `T-FRESH-014h`, the `A46` guard). ⚠ **`FRESHNESS_UNAVAILABLE` is invented copy pending owner review** — `T-FRESH-014` requires a visible degraded state but `specs/ui.md` §9 and `specs/ux-states.md` §2 supply no wording. ⚠ **`/upload` does NOT yet consume `?service=`** — the chips link there (asserted by `T-FRESH-014i`) but REQ-039's "pre-selecting that service" has no test id in `specs/testing.md` §9's US-022 table (AC-1/3/4/5 only) and `T-META-004` forbids an unnamed test; **a new id is requested from the coordinator — see the FINDING in `apps/web/test/freshnessStrip.spec.tsx`** (not cited here: `check:test-ids` rightly rejects an id `specs/testing.md` does not define). | `T-FRESH-014` |
 | `TASK-047` | `prisma/migrations/0002_perf_indexes/` (the five §16.6 indexes) + `apps/api/test/integration/queryPlan.spec.ts` (12 cases) — `T-PERF-001` (a-i), `T-PERF-003` (a-c), plus `listRemovedListingPage` / `searchRemovedListings` / `escapeLikeTerm` in the repository. Plans are read from `sys.dm_exec_query_plan`, NOT `SET SHOWPLAN_XML ON`, because Prisma pools connections and a session-scoped plan setting captures the wrong statement. Two of my own errors caught by the harness: a plan-cache clear placed before its own measurement manufactured a phantom 296-vs-50 regression and sent one round of optimisation after nothing, and the resulting "sargable leading predicate" was measured at depth 15,000, found to make no difference, and removed. Search is deliberately NOT index-backed (no `pg_trgm` on Basic); `escapeLikeTerm` escapes its own escape character first. See `specs/testing.md` §23. | `T-PERF-001`, `T-PERF-003` |
 | `TASK-048` | `T-BATCH-010`, `T-BATCH-015` | `T-API-003`, `T-BATCH-010`, `T-BATCH-015` |
 | `TASK-049` | `T-UI-003a`…`j` green in `apps/web/test/uploadStep1.spec.tsx`; mutation-proven against a defaulted mode and against revealing the consequence on selection | `T-UI-003` |
 | `TASK-050` | `T-IMG-002`, `T-IMG-006`, `T-IMG-010`, `T-IMG-012`, `T-IMG-018`, `T-IMG-023`, `T-PASTE-003`, `T-PASTE-005`, `T-PASTE-006`, `T-PASTE-007`, `T-SEC-003`, `T-RET-014`; ~~`T-IMG-013`~~ | `T-IMG-002`, `T-IMG-006`, `T-IMG-010`, `T-IMG-012`, `T-PASTE-003`, `T-PASTE-005`, `T-PASTE-006`, `T-PASTE-007` |
+| `TASK-053` | `components/ImageDropzone.tsx` — `T-UI-004` (a–e), `T-UX-041` (a–e), `T-UX-042` (a–f). All three affordances render at once (paste button when `navigator.clipboard.read` exists, `Choose files` always, drop target); one `addFiles` path with the source reported but never branched on. Validation is lenient — empty **and** `application/octet-stream` types are accepted and left to the server sniff. Four mutations caught: HEIC dropped from `accept` (`T-UI-004a`), hard-filtering on `File.type` (`T-UI-004d`), the paste affordance replacing rather than joining file selection (`T-UX-041a/b/c`), rejections hiding the accepted list (`T-UX-042a/e`). New copy constants `UNSUPPORTED_FORMAT_REJECTION`, `IMAGE_ACCEPT_ATTRIBUTE`, `CHOOSE_FILES_LABEL`, `HEIC_PREVIEW_PLACEHOLDER` — quoted from `specs/ui.md` §3.2 prose, which §9 has no rows for. `PasteCapture` (TASK-160) and the drop target's full behaviour (TASK-162, `T-UI-014`) fill the slots; the ceiling messages are rendered here but the ceiling-copy test id named on TASK-162 is not defined in specs/testing.md, so it is reported as a spec defect rather than cited here. | `T-UI-004`, `T-UX-041`, `T-UX-042` |
 | `TASK-054` | `apps/api/src/services/batchLifecycle.ts` — the transition table, `submitBatch`, `discardBatch`, `assertBatchMutable`, plus `transitionUploadBatchStatus` (the conditional write). Routes `POST /api/batches/:batchId/submit` (§6.14) and `/discard` (§6.23). `T-BATCH-017a`…`h` (table totality, one-way-ness, discardable set), `T-BATCH-019a`…`d` (the submit endpoint's status codes), `T-BATCH-018a`…`c` (atomic transition — `018a` mutation-verified after its first form proved vacuous), `T-BATCH-013a`…`d` (immutability: the guard **and** the absence of a mutating route), `T-BATCH-006a`…`f` (a discarded batch writes nothing, retains images, releases the ceiling). ⚠ **The three close/reconciliation ids this row originally cited are NOT delivered here** — they belong to TASK-072 and no close endpoint exists yet; see `specs/testing.md` §24.3. Two spec gaps reported in §24.2. | `T-BATCH-006`, `T-BATCH-013`, `T-BATCH-017`, `T-BATCH-018`, `T-BATCH-019` |
 | `TASK-055` | `packages/domain/src/extraction/` (contract + degraded projections) + `apps/api/src/extraction/` (recordings, `StubExtractor`, factory). `T-STUB-001a`…`r`, incl. the three fault tokens and byte-identical output over three runs. | `T-STUB-001` |
+| `TASK-056` | `AzureVisionExtractor` (`apps/api/src/extraction/azureVisionExtractor.ts`) + offline `msw` contract suite (`T-AI-033a`–`s`, recordings in `tests/fixtures/msw/vision/`) + static boundary gates (`T-AI-009a`–`j`, `T-AI-010a`–`d`). Retry/timeout policy is implemented LOCALLY with an injectable `sleep` and the SDK's own retry pipeline disabled, because two retry layers compose multiplicatively against a 5,000/month free tier. ⚠ In standalone `azure-vision-read` mode `extract()` always reports `crossCheck: 'llm-unavailable'` — the primary reader is deliberately not called, so the read genuinely was never corroborated, and reporting `ok` would let a strictly-worse read propose mass removals. The ADR-0001 Rev 1 revert path therefore runs in degraded mode (§2.2a) and withholds removals. `T-AI-009` request half + `T-AI-010` land here; the `LlmVisionExtractor` half of `T-AI-033` is TASK-056b. | `T-AI-009`, `T-AI-010`, `T-AI-033` |
+| `TASK-056b` | `LlmVisionExtractor` (`apps/api/src/extraction/llmVisionExtractor.ts`) + committed prompt/schema (`prompts.ts`) + offline `msw` contract suite (`T-AI-033t`–`an`, recordings in `tests/fixtures/msw/aoai/`) and the `openai` half of the boundary gate (`T-AI-010e`–`g`). ⚠ Three judgement calls, all load-bearing. (1) `finish_reason: 'length'` is checked BEFORE the body is parsed — the truncation fixture carries *valid JSON with one complete tile*, so a parse-first implementation returns one title and looks entirely successful. (2) A schema-invalid or non-JSON body is TERMINAL, not retried: §2.2's retry set is explicit and exclusive (429/5xx/network only), and at `temperature: 0` with a fixed seed and strict Structured Outputs a repeat is near-deterministic, so retrying would spend the batch ceiling to get the same answer. (3) In standalone `llm-vision` mode `extract()` reports `crossCheck: 'ocr-unavailable'`, which — deliberately unlike TASK-056's `llm-unavailable` — still PERMITS removals: the primary, higher-quality reader did run, so a title's absence is evidence. SDK retry is disabled (`maxRetries: 0`) and §2.2's policy implemented locally with an injectable `sleep`, for the same multiplicative reason as TASK-056. | `T-AI-011b`, `T-AI-033`, `T-AI-040`, `T-AI-044` |
 | `TASK-101` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` |
+| `TASK-102` | `components/SuppressDialog.tsx` — `T-UX-085` (a–f), `T-UX-022` (a–l). The row is reported `pending` while the request is in flight and `suppressed` only once the server has persisted it, so a rejected request cannot leave a hidden row behind — `T-UX-085a` asserts `suppressed` is never reported **at all** on the failure path, which an optimistic-hide-then-reconcile implementation would not satisfy even though it ends on `present`. Undo goes back through the `suppressionId` the server returned (`supp:<workIdentity>`), never a row-scoped key (REQ-071); an idempotent 200 offers Close only, because nothing changed. Five mutations caught: optimistic hide before persistence (`T-UX-085a/e`, `T-UX-022d`), undo failure showing the row again (`T-UX-022f`), an idempotent 200 rendered as a fresh hide (`T-UX-022g`), the same 200 still offering Undo (`T-UX-022g`), and the undo affordance removed (`T-UX-022b/c/d/e/f/k`). Four invented copy constants live in the component, not `copy.ts`, each with a ⚠ FINDING note — see the spec defects below. | `T-UX-022`, `T-UX-085` |
 | `TASK-121` | `fdd5519` — `tools/check-mutating-routes.mjs`, `T-MUT-001` (a–j), `T-MUT-002` (a–f). The 18 mutating routes each map to one of the eight REQ-041 owner-initiated operations or carry an explicit non-list-state reason; mutation-proven with an unregistered `POST /titles/:id/auto-confirm` and a `jobs/reconcile.ts` calling a guarded operation. | `T-MUT-001`, `T-MUT-002` |
 | `TASK-122` | `dde3dc5` — `tools/check-outbound-hosts.mjs`, `T-SEC-031` (a–i) and the outbound half of `T-SEC-009` (`k`). Exactly three destinations: TMDB, Azure OpenAI, Azure AI Vision. Mutation-proven by widening the list to four, shrinking it below three, and planting an unlisted host in source. The telemetry and streaming hostnames the spec needs are assembled from fragments rather than added to another gate's exemption list. | `T-SEC-009`, `T-SEC-031` |
 | `TASK-128` | `c64b7b5` — `tools/egress-guard.mjs`, `T-CI-007` (a–n). Patches `fetch`, `http.request` and `https.request`; loopback and the compose service names stay reachable; mutation-proven with a `fetch` and a raw `https.request` to an external host. ⚠ Installed per-suite, not globally: global wiring needs `setupFiles` in `vitest.config.ts`, which no lane may edit — see the finding below. | `T-CI-007` |
@@ -199,6 +203,7 @@ Not done, and every task they depend on is done.
 | `TASK-149` | **ahead-of:TASK-145** — TASK-145's pixel-guard half is delivered and is what this task depends on; its remaining half is serial EXTRACTION, which belongs to TASK-057/058 and is not on this path. `apps/api/src/images/transcode.ts` + `apps/api/test/unit/transcode.spec.ts` (21 cases), claims table in `specs/testing.md` §29. `transcodeHeicToPng` calls `assertDecodable` as its first statement, decodes with `heic-convert` to **lossless PNG**, maps a catchable WASM allocation failure to `IMAGE_DECODE_OOM` (503) and everything else to `IMAGE_DECODE_FAILED` (415), and re-asserts the header dimensions against the decoded raster. Wired to the route by `DEFAULT_STAGES`; `UNBUILT_STAGES` survives as an alias so §28's citation resolves. Three findings in §29.3: (a) `ispe` ignores `irot`, so a correct decode legitimately **transposes** the dimensions - reading §5.1 step 4 literally would reject ordinary rotated camera-roll uploads, the exact case A42 exists to support; (b) the stored ceiling is not the upload ceiling - a lossless PNG transcode of a compliant 10 MiB HEIC was **unrepresentable in its own schema**, and the domain schema case had encoded the bug, so `MAX_STORED_IMAGE_BYTES` was separated and that case corrected in place; (c) wiring a stage that can genuinely fail turned a per-file failure into a **whole-request** failure - `ingestOne` now catches `AppError` only (REQ-080/081, `T-IMG-023k`/`l`). The real-fixture legs of `T-IMG-013/015/016` stay with **TASK-151**: `T-DEP-002` forbids a HEIC encoder in the tree, so nothing here can generate HEIC bytes and a committed fixture is the only route. | `T-IMG-013`, `T-IMG-015`, `T-IMG-016`, `T-IMG-023` |
 | `TASK-150` | `stripAllMetadata()` in `apps/api/src/images/transcode.ts`, wired into `DEFAULT_STAGES.stripMetadata` so it runs for **every** accepted image from **every** source, outside the HEIC condition — never selected by `ingestSource`. `apps/api/test/unit/stripMetadata.spec.ts` (10 cases) plus an integration case that uploads a GPS-bearing JPEG over HTTP and re-reads the **stored blob out of Azurite**, so the claim is about what landed in the store rather than what a seam returned; it uses the **upload** path deliberately, because WebKit strips EXIF on clipboard read but not on file upload and a pasted fixture would pass whatever our code did. Removal is **structural** — whole JPEG segments and whole PNG chunks are copied or dropped, never re-encoded — so surviving CRCs stay valid and no pixel changes; a JPEG re-encode to launder metadata would be lossy, which NFR-012a forbids. `APP0` (JFIF) and `APP2` (ICC) are kept on purpose: the ICC profile decides how the image renders and identifies nobody. Unparseable streams fail closed. Six mutations verified, each caught by its named case. Claims, non-claims and two findings in `specs/testing.md` §30; §28.2 and §29.2 corrected in place now that REQ-078 is discharged. §30.2 records honestly that the **real-HEIC-with-GPS** leg named in `specs/security.md` §4.2 stays with **TASK-151** — the encoder ban means nothing in this tree can generate HEIC bytes, so a committed fixture is the only route. Finding: the integration JPEG fixture was a 29-byte header stub that stopped mid-`SOF0` and the strip correctly refused it as truncated; the fixture was wrong, not the refusal. | `T-SEC-032`, `T-SEC-033` |
 | `TASK-153` | `d6796b3` — owner approved the LGPL-3.0 obligation; gate proven on synthetic fixtures | `T-LICENSE-001` |
+| `TASK-154` | `apps/api/test/integration/ingestGuard.spec.ts` (9 tests) — `T-IMG-018` (c–h) and `T-IMG-019` (a–c) asserted end to end through the real route, real Azurite and a real database. The isolation itself was already implemented by TASK-050/149; this task PROVES it and found one real defect doing so: `OOM_PATTERNS` in `apps/api/src/images/transcode.ts` did not match Emscripten's `abort(OOM)` / `Aborted(OOM)` shape, so a genuine out-of-memory decode was classified `IMAGE_DECODE_FAILED` (415, no runbook) instead of `IMAGE_DECODE_OOM` (503) — fixed here, and `specs/testing.md` §AC-10/P1 requires exactly that case. The double is `heic-convert` itself, not `transcodeHeicToPng` and not `IngestStages`, so the real OOM-vs-corrupt classification is under test rather than stubbed out. `T-IMG-018h` asserts NEGATIVELY that no compensating-cleanup path exists (orphan blobs are left to the `NFR-019` purge) and was mutation-verified. Per the task's own scope note this does NOT depend on TASK-072. | _no test id declared_ |
 | `TASK-156` | Runbook verified against the **live** deployment (read-only: `az containerapp list/show`, `az containerapp ingress traffic show`, `az containerapp revision show`, `az monitor metrics alert list`, and `az deployment group what-if` — **no up-size was applied**; prod remains `0.25 vCPU / 0.5 GiB` with `NEXTUP_MAX_DECODE_PIXELS=25000000`). Ten inaccuracies corrected in place with the superseded text struck through beneath (F-001 rule). Three were load-bearing: **(1)** every command named `nextup` / `rg-nextup`, neither of which exists — the real names are `ca-nextup-prod` / `nextup-rg`; **(2)** prod runs `activeRevisionsMode: 'Multiple'` with traffic pinned to a **named** revision, so the documented one-command remedy builds a revision that serves **nobody** — a traffic-shift step is now §2b; **(3)** §3a's "authoritative check" read the **app-level** template, which reflects the newest revision regardless of traffic and so reports success on the exact failure mode in (2) — now checks the **serving** revision. Both backlog-mandated gaps closed: the `nextup-prod-memory-pressure` 400→800 MiB step (§2d, with its §5 revert) and the explicit **not-owner-approved** caveat on the §7 escalation. `README.md` now links `docs/runbooks/`; `infra/aca.bicep` already links the runbook (lines 103, 112). | `T-INFRA-005` |
 | `TASK-158` | `packages/domain/src/pastedFileName.ts` + `T-PASTE-005a`-`s` (19 unit cases). `INGEST_SOURCES`/`IngestSource` already existed from TASK-012, so this task is the synthesiser alone. The INTEGRATION half of `T-PASTE-005` (round-trip of `ingestSource`, server-assigned `seqInBatch`, `blobPath` free of any client name) belongs to TASK-050 — see `specs/testing.md` §27.2. | `T-PASTE-005` |
 | `TASK-167` | this commit — the ledger, the gate and `docs/status.md` | `T-STATUS-001` |

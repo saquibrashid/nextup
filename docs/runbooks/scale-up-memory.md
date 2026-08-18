@@ -494,10 +494,20 @@ Do **not** keep climbing the SKU ladder blindly. In order:
 - **`docs/adr/ADR-0008-heic-transcode-on-ingest.md`** Revision 2 —
   the pre-decode guard, per-image failure isolation, and the surfaced
   error text that points here.
-- **`docs/runbooks/rollback.md`** — the general deploy rollback. ⚠ **Does not
-  exist as of 2026-08-18** although `.github/workflows/deploy.yml` and
-  `infra/aca.bicep` both cite it; `TASK-133` owns it. §5 above is
-  self-contained and does not depend on it.
+- **`docs/runbooks/rollback.md`** — the general deploy rollback, delivered by
+  `TASK-133`. Read it before §5 if you are rolling back for any reason other
+  than memory: it documents that the rollback target is **always a deactivated
+  revision** (the deploy workflow deactivates the superseded one every time,
+  because `minReplicas = 1` bills every active revision for ever), and that
+  shifting traffic to a deactivated revision **exits 0, prints the new weight
+  table, and then serves 404**. §5 below is self-contained and already orders
+  `revision activate` before the traffic shift for that reason.
+
+> ~~*Superseded 2026-08-18 (TASK-156), corrected 2026-08-19: this entry said
+> `docs/runbooks/rollback.md` "does not exist as of 2026-08-18 … `TASK-133`
+> owns it". `TASK-133` has since delivered it, and it carries a silent-failure
+> trap this runbook's §5 depends on, so the cross-reference is now load-bearing
+> rather than a dangling link.*~~
 - **`tools/check-infra.mjs`** / **`tests/infra/sku.spec.ts`** — the closed set
   of permitted compute pairs and the `T-INFRA-005` assertions you must update
   in §4.
