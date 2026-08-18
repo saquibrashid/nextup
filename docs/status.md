@@ -12,8 +12,8 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 | Status | Count |
 |---|---|
 | ⬜ todo | 99 |
-| 🚧 doing | 6 |
-| ✅ done | 52 |
+| 🚧 doing | 5 |
+| ✅ done | 53 |
 | 🙋 owner | 4 |
 | 💤 deferred | 0 |
 | **total** | **161** |
@@ -24,10 +24,10 @@ Not done, and every task they depend on is done.
 
 | Task | Size | Section |
 |---|---|---|
-| `TASK-007` | M | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-010` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-026` | S | Epic G — Attribution & compliance |
 | `TASK-028` | S | Epic A — Access & identity |
+| `TASK-031` | S | Epic A — Access & identity |
 | `TASK-038` | M | Epic F — The list itself (the value loop) |
 | `TASK-042` | XS | Epic F — The list itself (the value loop) |
 | `TASK-045` | S | Epic D — Matching & identity |
@@ -43,6 +43,7 @@ Not done, and every task they depend on is done.
 | `TASK-145` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-151` | S | Epic B — Capture & import |
 | `TASK-154` | M | Epic B — Capture & import |
+| `TASK-156` | XS | Epic K — Platform, safety, and the shell |
 
 ## Waiting on the owner
 
@@ -55,11 +56,10 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-86 tasks cannot start yet.
+84 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
-| `TASK-031` | `TASK-007` |
 | `TASK-039` | `TASK-038` |
 | `TASK-040` | `TASK-038` |
 | `TASK-043` | `TASK-045` |
@@ -133,10 +133,9 @@ Not done, and every task they depend on is done.
 | `TASK-129` | `TASK-070`, `TASK-081` |
 | `TASK-130` | `TASK-124`, `TASK-108` |
 | `TASK-131` | `TASK-044` |
-| `TASK-133` | `TASK-007`, `TASK-156` |
+| `TASK-133` | `TASK-156` |
 | `TASK-152` | `TASK-053` |
 | `TASK-155` | `TASK-152` |
-| `TASK-156` | `TASK-007` |
 | `TASK-157` | `TASK-010` |
 | `TASK-159` | `TASK-053` |
 | `TASK-160` | `TASK-053` |
@@ -156,6 +155,7 @@ Not done, and every task they depend on is done.
 | `TASK-004` | `eab919a` | `T-SEC-009` |
 | `TASK-005` | `ecec349` | _no test id declared_ |
 | `TASK-006` | `f496055` — Bicep authored, what-if clean for both environments; live deployment stays owner-gated | `T-INFRA-002`, `T-INFRA-005` |
+| `TASK-007` | `T-CI-009a`–`l` (`.github/workflows/deploy.yml`, `tests/infra/deployWorkflow.spec.ts`) and `T-SMOKE-001`–`003` (`tests/smoke/smoke.spec.ts`, `playwright.smoke.config.ts`). Build → secret-scan → ghcr.io push with `GITHUB_TOKEN` (no PAT) → staging → `prisma migrate deploy` → staging smoke → prod → hold at 0% traffic → prod smoke → shift to 100%. Azure auth is OIDC federated (app `nextup-github-deploy`, Owner scoped to `nextup-rg` only); Easy Auth app `nextup` registered. **Proven end to end on 2026-08-18**: staging and production both deployed, migrations applied, `T-SMOKE-001`--`004` green against both live FQDNs, and the blue/green gate observed engaging (traffic held on the prior revision, the new one smoked on its own private FQDN, shifted, prior revision deactivated). Four defects were found only by running it: the OIDC subject is emitted in immutable numeric form; Azure SQL refuses `eastus2` for this subscription (hence `sqlLocation`); `targetPort` disagreed with the Dockerfile `PORT`; and the 0%-traffic hold was a no-op in three independent ways (`T-INFRA-011`, `T-CI-009o`--`r`). See `specs/testing.md` §32. | `T-MIG-001` |
 | `TASK-008` | `T-INFRA-005` + `T-INV-013`, both mutation-proven against half-applied up-sizes | `T-INFRA-005`, `T-INV-013` |
 | `TASK-009` | `6d47f55` | _no test id declared_ |
 | `TASK-012` | `9ae0a0f` | _no test id declared_ |
@@ -194,7 +194,7 @@ Not done, and every task they depend on is done.
 | `TASK-128` | `c64b7b5` — `tools/egress-guard.mjs`, `T-CI-007` (a–n). Patches `fetch`, `http.request` and `https.request`; loopback and the compose service names stay reachable; mutation-proven with a `fetch` and a raw `https.request` to an external host. ⚠ Installed per-suite, not globally: global wiring needs `setupFiles` in `vitest.config.ts`, which no lane may edit — see the finding below. | `T-CI-007` |
 | `TASK-142` | `T-INFRA-009` (`infra/budget.bicep`, `tests/infra/infra.spec.ts`). **Deployed live**: `az deployment sub create` succeeded, `az consumption budget list` returns `nextup-monthly / 13.0 / Monthly`, alerts at 100% and 150% to the owner by email. Email-only by design — no action group, webhook or automated remediation (TASK-142, `REQ-028`). `tools/check-infra.mjs` now drift-gates two templates. Also `T-SEC-034` (`tools/check-audit.mjs`): the production audit gate now suppresses by named, self-deleting exception after GHSA-ggr8-5vv4-36mx turned `main` red with an unfixable advisory whose npm-suggested "fix" is a prisma **downgrade**. See `specs/testing.md` §31. | _no test id declared_ |
 | `TASK-144` | `eb07409` — a CI grep gate over `prisma/migrations/**` | `T-MIG-001` |
-| `TASK-146` | **ahead-of:TASK-007.** `docs/ghcr-pat.md` written. **No PAT is needed at all** — a fine-grained PAT cannot authenticate to `ghcr.io` and a classic one is account-wide, so the package is public and CI pushes with `GITHUB_TOKEN` (R8). Remaining: the `deploy.yml` link + image secret-scan land with TASK-007, and the one-time visibility flip runs after the first successful push. | _no test id declared_ |
+| `TASK-146` | `docs/ghcr-pat.md` written. **No PAT is needed at all** — a fine-grained PAT cannot authenticate to `ghcr.io` and a classic one is account-wide, so the package is public and CI pushes with `GITHUB_TOKEN` (R8). Closed out with TASK-007: the `deploy.yml` link and the pre-push image secret-scan are in place, and the visibility flip is confirmed by the property that actually matters — an **unauthenticated** manifest GET against `ghcr.io/saquibrashid/nextup` returns 200, and both live Container Apps pull it with no `registries` block and no credential. | _no test id declared_ |
 | `TASK-147` | HEIC decode chain (`heic-convert` → `heic-decode` → `libheif-js`, LGPL-3.0, decode-only) + `sharp` installed; `T-DEP-001` runtime allow-list, `T-DEP-002` encoder ban and `T-DEP-003` prebuilt-only added to `tools/check-deps.mjs`; `T-LICENSE-001` now green against the REAL tree, completing TASK-153's other half. Three corrections found at implementation: (a) `sharp@0.34` carried high-severity libvips CVEs and would have been blocked by `npm audit` in CI — pinned `^0.35.3`, 0 vulnerabilities; (b) `sharp` is Apache-2.0 with LGPL-3.0-or-later libvips binaries, **not MIT** as the spec claimed — corrected in `specs/security.md` §8 and the TASK-147 row; (c) **the runtime container stage installed with `--omit=optional`, which excludes all 25 sharp platform binaries** — proven by building the image both ways (`require('sharp')` threw "Could not load the sharp module using the linuxmusl-x64 runtime"), fixed with a `COPY --from=build` and guarded by `T-INFRA-007`. | _no test id declared_ |
 | `TASK-148` | `apps/api/src/images/sniffFormat.ts` + `T-IMG-024a`-`p` (16 unit cases). `UPLOAD_FORMATS`, `uploadedFormat` and the format error codes already existed from TASK-012, so this task is the sniffer itself. Two findings recorded in `specs/testing.md` §25.3: (a) the spec and the backlog name different module paths for this file AND for the TASK-145 pixel guard - the guard divergence is still unbuilt and should be settled before TASK-149 imports it; (b) a printable-ASCII guard in the brand reader was proven unfalsifiable by mutation and removed rather than left under a test that could not fail. The two ids the Done-when column originally named are integration properties of the upload endpoint and are already owned by TASK-050 - struck through, not relocated. | `T-IMG-024a` |
 | `TASK-149` | **ahead-of:TASK-145** — TASK-145's pixel-guard half is delivered and is what this task depends on; its remaining half is serial EXTRACTION, which belongs to TASK-057/058 and is not on this path. `apps/api/src/images/transcode.ts` + `apps/api/test/unit/transcode.spec.ts` (21 cases), claims table in `specs/testing.md` §29. `transcodeHeicToPng` calls `assertDecodable` as its first statement, decodes with `heic-convert` to **lossless PNG**, maps a catchable WASM allocation failure to `IMAGE_DECODE_OOM` (503) and everything else to `IMAGE_DECODE_FAILED` (415), and re-asserts the header dimensions against the decoded raster. Wired to the route by `DEFAULT_STAGES`; `UNBUILT_STAGES` survives as an alias so §28's citation resolves. Three findings in §29.3: (a) `ispe` ignores `irot`, so a correct decode legitimately **transposes** the dimensions - reading §5.1 step 4 literally would reject ordinary rotated camera-roll uploads, the exact case A42 exists to support; (b) the stored ceiling is not the upload ceiling - a lossless PNG transcode of a compliant 10 MiB HEIC was **unrepresentable in its own schema**, and the domain schema case had encoded the bug, so `MAX_STORED_IMAGE_BYTES` was separated and that case corrected in place; (c) wiring a stage that can genuinely fail turned a per-file failure into a **whole-request** failure - `ingestOne` now catches `AppError` only (REQ-080/081, `T-IMG-023k`/`l`). The real-fixture legs of `T-IMG-013/015/016` stay with **TASK-151**: `T-DEP-002` forbids a HEIC encoder in the tree, so nothing here can generate HEIC bytes and a committed fixture is the only route. | `T-IMG-013`, `T-IMG-015`, `T-IMG-016`, `T-IMG-023` |
