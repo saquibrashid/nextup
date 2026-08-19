@@ -1,0 +1,20 @@
+# gitleaks fingerprint allowlist — CI job "2 · secrets".
+#
+# ⚠ ONE LINE PER FINDING, AND EACH ONE MUST NAME WHAT THE STRING ACTUALLY IS.
+# A fingerprint pins commit + file + rule + line, so it can never suppress
+# anything but the exact finding it was written for — which is why this file is
+# preferred over widening `.gitleaks.toml`'s regex allowlist. It is also why a
+# fingerprint must never be added without reading the flagged line first: an
+# entry here is invisible in the job output afterwards.
+#
+# Policy is unchanged (`.github/copilot-instructions.md` §6): no secrets in the
+# repo, ever, in the working tree OR in history.
+
+# `// The grouping key for collapse, BIN2-collated in the migration.` — an
+# ordinary code comment. `Latin1_General_100_BIN2` is the SQL Server collation
+# the migration applies to `normalisedText` (ADR-0005 Rev 3,
+# `specs/data-model.md` §16); `generic-api-key` scored the hyphenated token on
+# entropy alone at 3.55. The line no longer exists at HEAD — it was rewritten
+# when TASK-057 took over the column — but gitleaks scans history, so without
+# this the job would fail on every future push forever.
+cfef69882f5b6a80f442290a35ef4ab4936fa52e:apps/api/src/jobs/startExtraction.ts:generic-api-key:156
