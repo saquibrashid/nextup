@@ -1,0 +1,5 @@
+# The `.heic` fixtures are BINARY. The root `.gitattributes` lists png/jpg/jpeg
+# but not heic, and `* text=auto` would leave that to git's content heuristic —
+# which is exactly the kind of silent decision that corrupts a fixture the day
+# a CRLF checkout normalises a byte inside an ISO-BMFF box.
+*.heic binary
