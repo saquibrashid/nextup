@@ -2,11 +2,6 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
   "metadata": {
-    "_generator": {
-      "name": "bicep",
-      "version": "0.46.1.21595",
-      "templateHash": "10244344247045078277"
-    },
     "description": "nextup infrastructure composition root (Variant A)."
   },
   "parameters": {
@@ -102,6 +97,20 @@
         "description": "Azure AI Vision SKU. F0 is free but one-per-subscription."
       }
     },
+    "existingVisionEndpoint": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Endpoint of a pre-existing Vision account to re-use when deployVision is false."
+      }
+    },
+    "deployBakeOffModel": {
+      "type": "bool",
+      "defaultValue": false,
+      "metadata": {
+        "description": "Deploy the gpt-5.4-mini bake-off challenger alongside the primary reader."
+      }
+    },
     "entraClientSecret": {
       "type": "securestring",
       "metadata": {
@@ -160,11 +169,6 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "304084418123119981"
-            },
             "description": "Private screenshot blob storage with a 30-day lifecycle purge."
           },
           "parameters": {
@@ -359,11 +363,6 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "12880557086815054577"
-            },
             "description": "Azure SQL logical server with a Basic prod database and a serverless staging database."
           },
           "parameters": {
@@ -567,17 +566,18 @@
           },
           "deployVision": {
             "value": "[parameters('deployVision')]"
+          },
+          "existingVisionEndpoint": {
+            "value": "[parameters('existingVisionEndpoint')]"
+          },
+          "deployBakeOffModel": {
+            "value": "[parameters('deployBakeOffModel')]"
           }
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "7036441873063715625"
-            },
             "description": "Azure OpenAI + Azure AI Vision accounts and the gpt-4.1 vision deployment."
           },
           "parameters": {
@@ -651,6 +651,55 @@
               "metadata": {
                 "description": "Provision the Vision account. Off allows an AOAI-only deployment while the F0 conflict is unresolved."
               }
+            },
+            "existingVisionEndpoint": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Endpoint of a pre-existing Vision account to re-use. Used only when deployVision is false."
+              }
+            },
+            "deployBakeOffModel": {
+              "type": "bool",
+              "defaultValue": false,
+              "metadata": {
+                "description": "Deploy a second model as the bake-off challenger. Does NOT change the primary reader."
+              }
+            },
+            "bakeOffModelName": {
+              "type": "string",
+              "defaultValue": "gpt-5.4-mini",
+              "metadata": {
+                "description": "Challenger model for the §9.7 bake-off."
+              }
+            },
+            "bakeOffModelVersion": {
+              "type": "string",
+              "defaultValue": "2026-03-17",
+              "metadata": {
+                "description": "Pinned challenger version. Verified available in eastus2 on 2026-08-19."
+              }
+            },
+            "bakeOffDeploymentName": {
+              "type": "string",
+              "defaultValue": "gpt-5-4-mini",
+              "metadata": {
+                "description": "Challenger deployment name — the ONLY permitted difference between bake-off arms."
+              }
+            },
+            "bakeOffSkuName": {
+              "type": "string",
+              "defaultValue": "GlobalStandard",
+              "metadata": {
+                "description": "Challenger SKU. GlobalStandard is the only family with non-zero quota for gpt-5.4-mini in eastus2."
+              }
+            },
+            "bakeOffCapacity": {
+              "type": "int",
+              "defaultValue": 50,
+              "metadata": {
+                "description": "Challenger rate limit, thousands of tokens/minute. Pay-per-token: capacity caps rate, not cost."
+              }
             }
           },
           "resources": [
@@ -694,6 +743,29 @@
               ]
             },
             {
+              "condition": "[parameters('deployBakeOffModel')]",
+              "type": "Microsoft.CognitiveServices/accounts/deployments",
+              "apiVersion": "2024-10-01",
+              "name": "[format('{0}/{1}', parameters('openAiAccountName'), parameters('bakeOffDeploymentName'))]",
+              "sku": {
+                "name": "[parameters('bakeOffSkuName')]",
+                "capacity": "[parameters('bakeOffCapacity')]"
+              },
+              "properties": {
+                "model": {
+                  "format": "OpenAI",
+                  "name": "[parameters('bakeOffModelName')]",
+                  "version": "[parameters('bakeOffModelVersion')]"
+                },
+                "versionUpgradeOption": "NoAutoUpgrade",
+                "raiPolicyName": "Microsoft.DefaultV2"
+              },
+              "dependsOn": [
+                "[resourceId('Microsoft.CognitiveServices/accounts', parameters('openAiAccountName'))]",
+                "[resourceId('Microsoft.CognitiveServices/accounts/deployments', parameters('openAiAccountName'), parameters('openAiDeploymentName'))]"
+              ]
+            },
+            {
               "condition": "[parameters('deployVision')]",
               "type": "Microsoft.CognitiveServices/accounts",
               "apiVersion": "2024-10-01",
@@ -731,9 +803,16 @@
             "visionEndpoint": {
               "type": "string",
               "metadata": {
-                "description": "NEXTUP_VISION_ENDPOINT."
+                "description": "NEXTUP_VISION_ENDPOINT. Falls back to a re-used pre-existing account when we do not provision one."
               },
-              "value": "[if(parameters('deployVision'), reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('visionAccountName')), '2024-10-01').endpoint, '')]"
+              "value": "[if(parameters('deployVision'), reference(resourceId('Microsoft.CognitiveServices/accounts', parameters('visionAccountName')), '2024-10-01').endpoint, parameters('existingVisionEndpoint'))]"
+            },
+            "bakeOffDeploymentName": {
+              "type": "string",
+              "metadata": {
+                "description": "The bake-off challenger deployment name, or empty. Consumed by the §9.7 harness, never by the app."
+              },
+              "value": "[if(parameters('deployBakeOffModel'), parameters('bakeOffDeploymentName'), '')]"
             },
             "openAiAccountName": {
               "type": "string",
@@ -794,24 +873,19 @@
             "value": "[parameters('holdRevisionName')]"
           },
           "openAiEndpoint": {
-            "value": "[createObject('openAi', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiEndpoint.value, ''), 'deployment', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiDeploymentName.value, ''), 'vision', if(and(parameters('deployAi'), parameters('deployVision')), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.visionEndpoint.value, '')).openAi]"
+            "value": "[createObject('openAi', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiEndpoint.value, ''), 'deployment', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiDeploymentName.value, ''), 'vision', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.visionEndpoint.value, '')).openAi]"
           },
           "openAiDeployment": {
-            "value": "[createObject('openAi', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiEndpoint.value, ''), 'deployment', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiDeploymentName.value, ''), 'vision', if(and(parameters('deployAi'), parameters('deployVision')), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.visionEndpoint.value, '')).deployment]"
+            "value": "[createObject('openAi', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiEndpoint.value, ''), 'deployment', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiDeploymentName.value, ''), 'vision', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.visionEndpoint.value, '')).deployment]"
           },
           "visionEndpoint": {
-            "value": "[createObject('openAi', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiEndpoint.value, ''), 'deployment', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiDeploymentName.value, ''), 'vision', if(and(parameters('deployAi'), parameters('deployVision')), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.visionEndpoint.value, '')).vision]"
+            "value": "[createObject('openAi', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiEndpoint.value, ''), 'deployment', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiDeploymentName.value, ''), 'vision', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.visionEndpoint.value, '')).vision]"
           }
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "1717347974523616786"
-            },
             "description": "Container Apps environment and the per-environment app, pulling from ghcr.io."
           },
           "parameters": {
@@ -1088,11 +1162,6 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "7100843257089610165"
-            },
             "description": "Grants a principal a role scoped to a single blob container."
           },
           "parameters": {
@@ -1166,11 +1235,6 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "2218706414898512223"
-            },
             "description": "Grants a principal a role scoped to a single Cognitive Services account."
           },
           "parameters": {
@@ -1238,11 +1302,6 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "2218706414898512223"
-            },
             "description": "Grants a principal a role scoped to a single Cognitive Services account."
           },
           "parameters": {

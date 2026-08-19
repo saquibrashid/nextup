@@ -99,6 +99,22 @@ param deployVision bool = true
 @allowed(['F0', 'S1'])
 param visionSkuName string = 'F0'
 
+// ⚠ THE OWNER RESOLVED THE F0 CONFLICT BY RE-USE, NOT BY CREATION (2026-08-19).
+// `deployVision = false` + this endpoint points the app at the pre-existing
+// `vision-f4n7ptoeq44pk`. Its role assignment is issued OUT-OF-BAND by the
+// subscription owner, because the deploy principal is Owner on `nextup-rg`
+// only and must not be given RBAC-write over another project's resource group.
+// See `infra/ai.bicep` and `docs/runbooks/vision-account-reuse.md`.
+@description('Endpoint of a pre-existing Vision account to re-use when deployVision is false.')
+param existingVisionEndpoint string = ''
+
+// TASK-168, `specs/ai.md` §9.7. A second deployment on the SAME account, so
+// the two bake-off arms differ only in deployment name. Does NOT change the
+// primary reader — only §9.7's pre-committed rule plus an ADR-0001 revision
+// can do that.
+@description('Deploy the gpt-5.4-mini bake-off challenger alongside the primary reader.')
+param deployBakeOffModel bool = false
+
 @description('Client secret of the Easy Auth app registration. Supplied at deploy time.')
 @secure()
 param entraClientSecret string
@@ -168,6 +184,8 @@ module ai 'ai.bicep' = if (deployAi) {
     visionAccountName: visionAccountName
     visionSkuName: visionSkuName
     deployVision: deployVision
+    existingVisionEndpoint: existingVisionEndpoint
+    deployBakeOffModel: deployBakeOffModel
   }
 }
 
@@ -176,10 +194,17 @@ module ai 'ai.bicep' = if (deployAi) {
 // extraction time rather than at boot, which is the behaviour the extractor
 // tests already assert — a half-configured app that looks healthy and then
 // silently mis-extracts would be far worse.
+//
+// ⚠ `vision` is NOT gated on `deployVision`. It was, and that was wrong the
+// moment re-use became an option: with `deployVision = false` and a re-used
+// account the endpoint is real, and gating on the create-flag would have
+// blanked it — silently disabling the OCR cross-check while the account sat
+// there working. The module already returns '' when there is nothing to point
+// at, so the gate belonged there, not here.
 var aiEndpoints = {
   openAi: deployAi ? ai!.outputs.openAiEndpoint : ''
   deployment: deployAi ? ai!.outputs.openAiDeploymentName : ''
-  vision: deployAi && deployVision ? ai!.outputs.visionEndpoint : ''
+  vision: deployAi ? ai!.outputs.visionEndpoint : ''
 }
 
 module aca 'aca.bicep' = {
@@ -241,6 +266,13 @@ module openAiRbac 'csrbac.bicep' = if (deployAi) {
   dependsOn: [ai]
 }
 
+// ⚠ GATED ON `deployVision`, AND THAT IS CORRECT FOR THE RE-USE CASE TOO.
+// When the app points at a pre-existing account (`existingVisionEndpoint`),
+// there is NO grant here on purpose — `csrbac.bicep` resolves `accountName`
+// in THIS resource group, so it would either fail or, worse, bind to the wrong
+// account. Widening this condition to "grant whenever there is an endpoint"
+// does not work and must not be attempted; the re-use grant is issued
+// out-of-band by the subscription owner (`docs/runbooks/vision-account-reuse.md`).
 #disable-next-line no-unnecessary-dependson
 module visionRbac 'csrbac.bicep' = if (deployAi && deployVision) {
   name: 'vision-rbac-${environmentName}'
