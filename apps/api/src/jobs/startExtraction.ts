@@ -307,3 +307,48 @@ function emptyStats(): RunExtractionResult['stats'] {
     estimatedCostUsd: 0,
   };
 }
+
+/* ------------------------------------------------------------------ *
+ * The fire-and-forget entry point, and its test seam
+ * ------------------------------------------------------------------ */
+
+const inFlight = new Map<string, Promise<void>>();
+
+/**
+ * Start extraction without waiting for it. The route's only entry point.
+ *
+ * ⚠ WHY THIS EXISTS RATHER THAN A BARE `void startExtraction(...)`. The moment
+ * the 202 is written, extraction is racing the client — and, in a test, racing
+ * the assertion on the next line. `T-BATCH-019a` read the batch row straight
+ * after submit and got `extraction-failed`, because CI configures no extractor
+ * and the capability gate correctly refuses in microseconds. That is not a
+ * test artefact to be papered over with a looser assertion: the race is real,
+ * it is nondeterministic, and it would have surfaced later as an intermittent
+ * failure in whichever test happened to lose it that day. Tracking the promise
+ * lets a test await the settled state deterministically WITHOUT the route
+ * awaiting anything, so production behaviour is byte-for-byte unchanged.
+ */
+export function beginExtraction(
+  ownerId: OwnerId,
+  batchId: string,
+  deps: StartExtractionDeps = {},
+): void {
+  // `.catch` is the belt to `startExtraction`'s braces: an unhandled rejection
+  // on a single-process container kills the API.
+  const run: Promise<void> = startExtraction(ownerId, batchId, deps)
+    .catch(() => undefined)
+    .finally(() => {
+      // Only clear our own entry — a resubmit of the same batch may already
+      // have registered a newer run.
+      if (inFlight.get(batchId) === run) inFlight.delete(batchId);
+    });
+  inFlight.set(batchId, run);
+}
+
+/**
+ * TEST SEAM. Resolves once the extraction started for `batchId` has settled,
+ * or immediately if none is running. Never rejects.
+ */
+export async function extractionSettled(batchId: string): Promise<void> {
+  await inFlight.get(batchId);
+}

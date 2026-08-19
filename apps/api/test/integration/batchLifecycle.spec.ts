@@ -29,6 +29,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { createApp } from '../../src/app.js';
 import { CLIENT_PRINCIPAL_HEADER } from '../../src/auth/principal.js';
 import { resetAllowListWarning } from '../../src/middleware/allowList.js';
+import { extractionSettled } from '../../src/jobs/startExtraction.js';
 import {
   asOwnerId,
   createServiceListing,
@@ -156,8 +157,17 @@ describe('POST /api/batches/:batchId/submit (§6.14)', () => {
     expect(body['pollAfterMs']).toBe(2000);
     expect(typeof body['submittedAt']).toBe('string');
 
+    // ⚠ The 202 body is a SNAPSHOT taken before extraction starts; the stored
+    // row is not, because extraction is already running by the time this line
+    // executes. Reading the row without settling first asserted a transient
+    // and got `extraction-failed` roughly whenever CI was fast.
+    await extractionSettled('b-submit');
+
     const stored = await findUploadBatch(owner, 'b-submit');
-    expect(stored?.status).toBe('submitted');
+    // No reader is configured here, and refusing LOUDLY is the specified
+    // behaviour — a batch left in `extracting` while the SPA polls looks like
+    // it is working. This is the wired end of `T-EXT-010k`.
+    expect(stored?.status).toBe('extraction-failed');
     // `submittedAt` is what `GET /api/batches/:batchId` reports and what the
     // 15-minute extraction ceiling is measured from; a transition that moved
     // the status without stamping it would look correct in every response.
@@ -177,10 +187,15 @@ describe('POST /api/batches/:batchId/submit (§6.14)', () => {
   });
 
   it('T-BATCH-019c: refuses a second submit with 409 BATCH_NOT_DRAFT', async () => {
-    await seedBatch('b-twice', 'draft');
+    // ⚠ SEEDED `extracting`, NOT "submit twice". Submitting twice used to be
+    // deterministic; it no longer is, because the first submit now starts
+    // extraction, and an unconfigured reader lands the batch on
+    // `extraction-failed` — which is a RESUBMITTABLE state by design, so the
+    // second request would sometimes answer 202 and sometimes 409 depending on
+    // who won the race. Seeding the state the rule is actually about asserts
+    // the rule instead of the timing.
+    await seedBatch('b-twice', 'extracting');
     await seedImage('b-twice', 'i-2');
-
-    expect((await post('/api/batches/b-twice/submit')).status).toBe(202);
 
     const res = await post('/api/batches/b-twice/submit');
     expect(res.status).toBe(409);
@@ -189,6 +204,16 @@ describe('POST /api/batches/:batchId/submit (§6.14)', () => {
     // The remedy hint: the SPA can say what state the batch would have to be
     // in, rather than only that the request was refused.
     expect(body.error.details['expectedOneOf']).toEqual(['draft', 'extraction-failed']);
+  });
+
+  it('T-BATCH-019e: lets the owner retry a batch whose extraction failed', async () => {
+    // The other half of the hint above, and the reason 019c can no longer
+    // submit twice: `extraction-failed` is deliberately NOT terminal.
+    await seedBatch('b-retry', 'extraction-failed');
+    await seedImage('b-retry', 'i-r');
+
+    expect((await post('/api/batches/b-retry/submit')).status).toBe(202);
+    await extractionSettled('b-retry');
   });
 
   it('T-BATCH-019d: answers 404, never 403, for another owner’s batch', async () => {
@@ -253,6 +278,11 @@ describe('T-BATCH-018 — submit is atomic under concurrency (TASK-054)', () => 
     expect([a.status, b.status].sort()).toEqual([202, 409]);
     const loser = a.status === 409 ? a : b;
     expect(((await loser.json()) as ErrorBody).error.code).toBe('BATCH_NOT_DRAFT');
+
+    // Settle before the suite tears the database down. An extraction still
+    // running here would write to rows the next test has already truncated,
+    // and the resulting failure would land on an innocent test.
+    await extractionSettled('b-race');
   });
 });
 

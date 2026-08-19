@@ -33,7 +33,7 @@ import {
 import { AppError } from '../errors/AppError.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import { discardBatch, submitBatch } from '../services/batchLifecycle.js';
-import { startExtraction } from '../jobs/startExtraction.js';
+import { beginExtraction } from '../jobs/startExtraction.js';
 import { createUploadBatch, findOpenUploadBatch } from '../repository/ownerData.js';
 
 /** The status every batch starts in. Images attach to a draft; nothing applies. */
@@ -119,10 +119,10 @@ export function registerBatchRoutes(router: Router): void {
 
     // ⚠ FIRE-AND-FORGET, AND DELIBERATELY AFTER THE RESPONSE. Awaiting it
     // would turn the 202 into a synchronous wait of up to fifteen minutes and
-    // make the "client polls" contract above a lie. `startExtraction` is
-    // documented never to reject, and the `.catch` is the belt to that braces:
-    // an unhandled rejection on a single-process container kills the API.
-    void startExtraction(ownerId, batchId).catch(() => undefined);
+    // make the "client polls" contract above a lie. `beginExtraction` neither
+    // awaits nor rejects; it only records the promise so a test can await
+    // the settled state instead of racing it.
+    beginExtraction(ownerId, batchId);
   });
 
   // §6.23. 200 with `listStateChanged: false` — the SPA states plainly that

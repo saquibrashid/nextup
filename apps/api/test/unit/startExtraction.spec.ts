@@ -19,7 +19,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ExtractedTextItem, ExtractionResult, TitleExtractor } from '@nextup/domain';
 
-import { extractionPorts, startExtraction } from '../../src/jobs/startExtraction.js';
+import {
+  beginExtraction,
+  extractionPorts,
+  extractionSettled,
+  startExtraction,
+} from '../../src/jobs/startExtraction.js';
 import {
   createExtractionCandidate,
   listImagesForBatch,
@@ -322,5 +327,43 @@ describe('extractionPorts', () => {
     });
 
     expect(mockCreate.mock.calls[0]?.[1]).toMatchObject({ cleanupVerdict: 'unreadable-tile' });
+  });
+
+  it('T-EXT-010s returns before the run settles, and the seam waits for it', async () => {
+    // The route must not await extraction — a 202 that waited up to fifteen
+    // minutes would make the "client polls" contract a lie. The seam exists so
+    // a test can be deterministic about that WITHOUT the route changing.
+    let settled = false;
+    const extractor: TitleExtractor = {
+      name: 'stub',
+      async extract() {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        settled = true;
+        return { items: [], degraded: false } as unknown as ExtractionResult;
+      },
+    } as unknown as TitleExtractor;
+
+    beginExtraction(OWNER, BATCH, { blobStore, extractor });
+    expect(settled).toBe(false);
+
+    await extractionSettled(BATCH);
+    expect(settled).toBe(true);
+  });
+
+  it('T-EXT-010t resolves immediately for a batch that was never started', async () => {
+    // Otherwise a test awaiting a batch it never submitted would hang rather
+    // than fail, and the suite would time out with no useful message.
+    await expect(extractionSettled('never-started')).resolves.toBeUndefined();
+  });
+
+  it('T-EXT-010u never rejects, even when the run throws outright', async () => {
+    // An unhandled rejection on a single-process container kills the API.
+    const extractor = {
+      name: 'stub',
+      extract: () => Promise.reject(new Error('boom')),
+    } as unknown as TitleExtractor;
+
+    beginExtraction(OWNER, BATCH, { blobStore, extractor });
+    await expect(extractionSettled(BATCH)).resolves.toBeUndefined();
   });
 });
