@@ -454,15 +454,41 @@ describe('T-IMG-018 no compensating cleanup exists to get wrong', () => {
     // runs in exactly the conditions — out of memory, mid-request — where it is
     // least likely to work, and its worst outcome is deleting the bytes of an
     // image that DID succeed. One fewer thing to get wrong.
-    const sources = await Promise.all(
-      ['../../src/images/ingest.ts', '../../src/routes/batchImages.ts'].map((relative) =>
-        readFile(new URL(relative, import.meta.url), 'utf8'),
-      ),
+    //
+    // ⚠ SCOPED TO THE INGEST PATH, not to the whole route file (TASK-051).
+    // `batchImages.ts` also hosts `DELETE /batches/:batchId/images/:imageId`,
+    // the ONE sanctioned hard delete (`data-model.md` I-7), which removes the
+    // blob deliberately and must do so. That is a user-initiated deletion of a
+    // pre-submit draft image, not compensating cleanup on a failure path, and
+    // the two claims are unrelated. Before this narrowing the whole-file scan
+    // conflated them and failed on a correct implementation.
+    const ingest = await readFile(new URL('../../src/images/ingest.ts', import.meta.url), 'utf8');
+    const route = await readFile(
+      new URL('../../src/routes/batchImages.ts', import.meta.url),
+      'utf8',
     );
 
-    for (const source of sources) {
+    // Everything up to the DELETE handler: the imports, the multer wiring and
+    // the whole POST handler — i.e. every line that can run during an ingest.
+    const deleteHandlerAt = route.indexOf("router.delete('/batches/:batchId/images/:imageId'");
+    expect(
+      deleteHandlerAt,
+      'the DELETE handler moved or was renamed; re-derive this boundary rather ' +
+        'than widening the scan back to the whole file',
+    ).toBeGreaterThan(-1);
+    const ingestPath = route.slice(0, deleteHandlerAt);
+
+    // NON-VACUITY. A slice that missed the POST handler would pass forever.
+    expect(ingestPath).toContain("router.post('/batches/:batchId/images'");
+    expect(ingestPath).toContain('ingestFiles(');
+
+    for (const source of [ingest, ingestPath]) {
       expect(source).not.toMatch(/\.remove\(/);
       expect(source).not.toMatch(/deleteBlob/);
     }
+
+    // And the exemption really is confined to the DELETE handler — the scan
+    // above is a narrowing, not a way of ignoring a `remove` that drifted up.
+    expect(route.slice(deleteHandlerAt)).toMatch(/\.remove\(/);
   });
 });

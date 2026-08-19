@@ -2768,6 +2768,29 @@ asserted end to end in `apps/api/test/integration/ingestGuard.spec.ts`
 same file accepted once the budget is raised, and mixed failure kinds reported
 individually.
 
+**⚠ `T-IMG-018h` IS SCOPED TO THE INGEST PATH, NOT TO THE WHOLE ROUTE FILE.**
+As first written it read `batchImages.ts` end to end and asserted the file
+contained no `.remove(` anywhere. That was correct only for as long as the
+file held nothing but the ingest route. TASK-051 added
+`DELETE /batches/:batchId/images/:imageId` to the same file — the **one
+sanctioned hard delete** (`data-model.md` I-7), which removes the blob
+deliberately and must — and the whole-file scan failed against a correct
+implementation. The two claims were never in tension: `T-IMG-018h` is about
+**compensating cleanup on a failure path**, and the DELETE handler is a
+user-initiated deletion of a pre-submit draft image. The test now slices the
+route at the DELETE handler and scans only what precedes it, guards that the
+slice really does contain the POST handler and `ingestFiles(` (so a
+mis-derived boundary cannot pass vacuously), and asserts the tail **does**
+contain the `remove` — so the narrowing cannot silently absorb a compensating
+delete that drifts down into it. Mutation-checked: a `store.remove(...)`
+inserted into the POST handler is still caught.
+
+This is worth stating as a general rule: **a structural test that scans a
+whole file is implicitly asserting what else that file is allowed to
+contain.** It will fail the first time an unrelated but legitimate feature
+lands beside its subject, and the failure looks like a defect in the new
+feature rather than an over-broad assertion in the old test.
+
 ~~Superseded: "needs the upload endpoint, which is TASK-050 and does not
 exist."~~
 
