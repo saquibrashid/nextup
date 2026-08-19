@@ -37,3 +37,21 @@ param entraAdminObjectId = readEnvironmentVariable('NEXTUP_ENTRA_ADMIN_OBJECT_ID
 // deployment, not silently produce an auth config nobody can sign in through.
 param entraClientId = readEnvironmentVariable('NEXTUP_ENTRA_CLIENT_ID')
 param entraClientSecret = readEnvironmentVariable('NEXTUP_ENTRA_CLIENT_SECRET')
+
+// ⚠ LOAD-BEARING, AND EASY TO LOSE. The prod deploy creates the new revision
+// with 100% of traffic still pinned HERE, to the revision that is currently
+// serving, so the new one takes no user traffic until its smoke suite passes.
+// The workflow discovers the value at run time and exports it as
+// NEXTUP_HOLD_REVISION.
+//
+// The default is '' for the FIRST deploy only, when no previous revision
+// exists. If this is ever empty on a subsequent deploy, the new revision
+// takes traffic immediately and the staged rollout silently becomes a
+// deploy-straight-to-prod — so `deploy.yml` fails the job rather than
+// defaulting when it cannot read the current revision.
+param holdRevisionName = readEnvironmentVariable('NEXTUP_HOLD_REVISION', '')
+
+// ── AI provisioning (TASK-010) ─────────────────────────────────────────────
+// Production is deliberately LEFT OFF until the §9.7 bake-off reports. See
+// main.staging.bicepparam and docs/runbooks/vision-account-reuse.md.
+param deployAi = false

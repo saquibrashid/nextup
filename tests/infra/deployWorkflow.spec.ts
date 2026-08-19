@@ -5,6 +5,20 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = path.resolve(import.meta.dirname, '../..');
 const deploy = readFileSync(path.join(repoRoot, '.github/workflows/deploy.yml'), 'utf8');
 
+// ⚠ THE PARAMETER FILES ARE PART OF THE PIPELINE'S CONTRACT, so they are read
+// here rather than only in the bicep specs. `deploy.yml` used to pass every
+// parameter inline and never open these files, while infra/README.md and
+// docs/architecture.md both documented them as the per-environment source of
+// truth. The result was a silent trap: `deployAi = true` was set in the
+// staging file, `what-if` against that file showed the AI resources being
+// created, CI reported a green deploy, and nothing was provisioned. Assertions
+// about "what the deployment passes" must therefore look where the deployment
+// actually reads.
+const bicepparam = {
+  staging: readFileSync(path.join(repoRoot, 'infra/main.staging.bicepparam'), 'utf8'),
+  prod: readFileSync(path.join(repoRoot, 'infra/main.prod.bicepparam'), 'utf8'),
+};
+
 // Comments stripped for the PROHIBITION checks below. A ban on
 // `prisma migrate dev` that also fires on the comment explaining why it is
 // banned is a false positive, and the cheapest way to make it pass is to
@@ -136,29 +150,38 @@ describe('T-CI-009 the deployment pipeline cannot skip its own gates', () => {
     // stack has already been written, and NOT during `az deployment group
     // validate`, which does not consult regional capacity.
     //
-    // Asserted per deploy job rather than as a total count: passing it in
+    // Asserted per environment rather than as a total count: setting it in
     // staging only would go green on a count of >= 1 and then fail production,
     // which is the one environment with no stage after it to catch anything.
+    //
+    // ⚠ Asserted against the .bicepparam files, because that is where the
+    // deployment now reads its parameters from. The previous form matched
+    // `sqlLocation="$SQL_LOCATION"` in the workflow's inline arguments.
     const jobs = deployCode
       .split(/^ {2}[a-z]+:$/m)
       .filter((s) => s.includes('az deployment group create'));
     expect(jobs).toHaveLength(2);
     for (const job of jobs) {
-      expect(job).toMatch(/sqlLocation="\$SQL_LOCATION"/);
+      expect(job).toMatch(/--parameters infra\/main\.(staging|prod)\.bicepparam/);
     }
-    expect(deployCode).toMatch(/SQL_LOCATION:\s*\S+/);
+    for (const [env, text] of Object.entries(bicepparam)) {
+      expect(text, `${env} must pin sqlLocation explicitly`).toMatch(
+        /^param sqlLocation = '[a-z0-9]+'$/m,
+      );
+    }
   });
 
-  it('T-CI-009n: sqlLocation is a distinct value, not an alias of LOCATION', () => {
+  it('T-CI-009n: sqlLocation is a distinct value, not an alias of location', () => {
     // The whole point of the parameter is that the two regions differ. Setting
-    // SQL_LOCATION to $LOCATION, or to the same literal, satisfies T-CI-009m
-    // while restoring exactly the failure it exists to prevent.
-    const loc = /^\s*LOCATION:\s*(\S+)\s*$/m.exec(deployCode)?.[1];
-    const sqlLoc = /^\s*SQL_LOCATION:\s*(\S+)\s*$/m.exec(deployCode)?.[1];
-    expect(loc).toBeTruthy();
-    expect(sqlLoc).toBeTruthy();
-    expect(sqlLoc).not.toBe(loc);
-    expect(sqlLoc).not.toMatch(/\$/);
+    // it to the same literal satisfies T-CI-009m while restoring exactly the
+    // failure it exists to prevent.
+    for (const [env, text] of Object.entries(bicepparam)) {
+      const loc = /^param location = '([a-z0-9]+)'$/m.exec(text)?.[1];
+      const sqlLoc = /^param sqlLocation = '([a-z0-9]+)'$/m.exec(text)?.[1];
+      expect(loc, `${env} location`).toBeTruthy();
+      expect(sqlLoc, `${env} sqlLocation`).toBeTruthy();
+      expect(sqlLoc, `${env} must not collapse the two regions`).not.toBe(loc);
+    }
   });
   // ── The blue/green gate (added after the first production deployment) ──────
   //
@@ -184,7 +207,17 @@ describe('T-CI-009 the deployment pipeline cannot skip its own gates', () => {
     expect(prev).toBeGreaterThan(-1);
     expect(create).toBeGreaterThan(-1);
     expect(prev).toBeLessThan(create);
-    expect(deployCode).toMatch(/holdRevisionName="\$\{\{ steps\.prev\.outputs\.revision \}\}"/);
+
+    // ⚠ BOTH HALVES ARE REQUIRED. The workflow must export the discovered
+    // revision, AND the parameter file must actually read that variable —
+    // exporting it to a file that ignores it, or reading a variable nobody
+    // sets, each leaves the hold silently empty while every step still goes
+    // green. `holdRevisionName` defaults to '' precisely so the first-ever
+    // deploy works, which is what makes a broken wiring invisible.
+    expect(prodJob).toMatch(/NEXTUP_HOLD_REVISION:\s*\$\{\{ steps\.prev\.outputs\.revision \}\}/);
+    expect(bicepparam.prod).toMatch(
+      /param holdRevisionName = readEnvironmentVariable\(\s*'NEXTUP_HOLD_REVISION'/,
+    );
   });
 
   it('T-CI-009p: production smoke targets the new revision, not the app FQDN', () => {

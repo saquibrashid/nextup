@@ -246,7 +246,15 @@ describe('T-STUB-001h the factory selects one extractor and never silently downg
       createExtractor({ NEXTUP_EXTRACTOR: 'stub', recordings: inMemoryRecordingStore({}) }),
     ).toThrow(/crossCheck/);
 
+    // `hybrid` (TASK-056c) is now BUILT too. Like the two single-leg readers
+    // it reports a MISCONFIGURATION rather than "not available", and it names
+    // each missing leg separately — "hybrid" with one leg is not a hybrid, and
+    // must never silently become the other reader while still reporting
+    // `crossCheck: 'ok'`.
     expect(() => createExtractor({ NEXTUP_EXTRACTOR: 'hybrid' })).toThrow(
+      /requires an Azure OpenAI endpoint/,
+    );
+    expect(() => createExtractor({ NEXTUP_EXTRACTOR: 'hybrid' })).not.toThrow(
       ExtractorNotAvailableError,
     );
 

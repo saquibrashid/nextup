@@ -26,6 +26,7 @@ import {
 } from '@nextup/domain';
 
 import { AzureVisionExtractor, type AzureVisionExtractorOptions } from './azureVisionExtractor.js';
+import { HybridExtractor } from './hybridExtractor.js';
 import { LlmVisionExtractor, type LlmVisionExtractorOptions } from './llmVisionExtractor.js';
 import { type RecordingStore } from './recordings.js';
 import { StubExtractor } from './stubExtractor.js';
@@ -95,8 +96,36 @@ export function createExtractor(cfg: ExtractorConfig): TitleExtractor {
     // Each of these is one line's work once its task lands. They throw a named
     // error rather than silently falling back to another reader: a fallback
     // here would change extraction quality without anything saying so.
-    case 'hybrid':
-      throw new ExtractorNotAvailableError('hybrid', 'TASK-056c (hybridExtractor.ts)');
+    case 'hybrid': {
+      // The shipped design (ADR-0001 Rev 2). Both legs are hard requirements:
+      // a "hybrid" missing one leg is not a hybrid, it is the other reader
+      // wearing the name — and it would report `crossCheck: 'ok'` for output
+      // that was never cross-checked, which is the one lie this system cannot
+      // afford (product invariant 2).
+      if (!cfg.llm) {
+        throw new Error(
+          'The "hybrid" extractor requires an Azure OpenAI endpoint, deployment and ' +
+            'credential (specs/ai.md §2.1a). There is no API-key fallback: auth is ' +
+            'managed identity.',
+        );
+      }
+      if (!cfg.vision) {
+        throw new Error(
+          'The "hybrid" extractor requires a Vision endpoint and credential ' +
+            '(specs/ai.md §2.1b). To run without the OCR leg deliberately, select ' +
+            'NEXTUP_EXTRACTOR=llm-vision — which reports crossCheck: "ocr-unavailable" ' +
+            'and says so, rather than silently claiming corroboration.',
+        );
+      }
+      // `crossCheck` is NOT taken from `cfg` here. Unlike the stub — which is
+      // handed the real merge so a test cannot accidentally exercise a second
+      // implementation — production must never be able to configure the merge
+      // at all. `HybridExtractor` defaults to the shipped `crossCheck()`.
+      return new HybridExtractor({
+        llm: new LlmVisionExtractor(cfg.llm),
+        vision: new AzureVisionExtractor(cfg.vision),
+      });
+    }
     case 'llm-vision': {
       // The primary reader on its own (TASK-056b). Usable, and BETTER than
       // `'azure-vision-read'` — see `LlmVisionExtractor.extract` on why it

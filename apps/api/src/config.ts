@@ -2,7 +2,27 @@
 //
 // TASK-014 · US-035 AC-7 · `T-INV-008`.
 
-import { DEFAULT_MAX_DECODE_PIXELS } from '@nextup/domain';
+import {
+  DEFAULT_MAX_DECODE_PIXELS,
+  OCR_BOX_OVERLAP_MIN,
+  OCR_SUPPORT_EXACT,
+  OCR_SUPPORT_PARTIAL,
+} from '@nextup/domain';
+
+// ── The OCR cross-check thresholds (`specs/ai.md` §5, §7) ───────────────────
+//
+// RE-EXPORTED, not redeclared. §7 requires every tuning threshold to be
+// readable in one place, and this file is that place — but the values must
+// LIVE in `packages/domain` because `crossCheck()` does, and domain is pure
+// TypeScript that cannot import from `apps/api` (ADR-0004).
+//
+// ⚠ Never turn these into local `const` declarations here. A second copy
+// would drift from the one the merge actually reads, and the symptom would be
+// a corroboration rate that disagrees with the documented threshold — with
+// both numbers looking correct in isolation. `T-AI-019` asserts the merge
+// contains no inlined numeric literals; nothing asserts that a duplicate here
+// stays in sync, because it cannot.
+export { OCR_BOX_OVERLAP_MIN, OCR_SUPPORT_EXACT, OCR_SUPPORT_PARTIAL };
 
 /**
  * How long an uploaded screenshot is retained before the Azure Blob Storage

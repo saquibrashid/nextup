@@ -28,12 +28,17 @@ permissions:
 env:
   IMAGE: ghcr.io/${{ github.repository }}
   RESOURCE_GROUP: nextup-rg
-  LOCATION: eastus2
-  # ⚠ Deliberately NOT $LOCATION. Azure SQL refused new logical servers in
-  # eastus2 for this subscription (`ProvisioningDisabled`), while every other
-  # resource deploys there fine. See infra/main.bicep `sqlLocation` and
+  # ⚠ REGIONS ARE NOT SET HERE. They live in infra/main.{prod,staging}.bicepparam,
+  # which is what the deploy steps read. Two env vars named LOCATION and
+  # SQL_LOCATION used to sit here and were passed inline; they are gone rather
+  # than left unused, because a stale-but-authoritative-looking value in this
+  # file is precisely the failure this workflow already had once.
+  #
+  # The regions are eastus2 for everything except Azure SQL, which is
+  # centralus: Azure SQL refused new logical servers in eastus2 for this
+  # subscription (`ProvisioningDisabled`) while every other resource deploys
+  # there fine. See infra/main.bicep `sqlLocation` and
   # docs/runbooks/deployment-identity.md before collapsing these into one.
-  SQL_LOCATION: centralus
 
 jobs:
   # ── 1 ───────────────────────────────────────────────────────────────────────
@@ -127,21 +132,33 @@ jobs:
 
       - id: deploy
         name: az deployment group create (staging)
+        # ⚠ USES infra/main.staging.bicepparam. This workflow previously passed
+        # every parameter inline and never opened the .bicepparam files at all,
+        # while infra/README.md and docs/architecture.md both documented them
+        # as the per-environment source of truth. The result was a silent trap:
+        # `deployAi = true` was set in the staging parameter file, `what-if`
+        # against that file showed the AI resources being created, CI reported
+        # a green deploy — and nothing was provisioned, because CI was reading
+        # a different set of parameters. Never reintroduce inline parameters
+        # here; the file that is reviewed must be the file that deploys.
+        #
+        # Dynamic values reach the file through readEnvironmentVariable(), so
+        # they are set as env: below rather than as --parameters.
+        env:
+          NEXTUP_IMAGE: ${{ needs.build.outputs.image }}
+          NEXTUP_SQL_ADMIN_LOGIN: ${{ secrets.SQL_ADMIN_LOGIN }}
+          NEXTUP_SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
+          NEXTUP_ENTRA_ADMIN_OBJECT_ID: ${{ secrets.ENTRA_ADMIN_OBJECT_ID }}
+          NEXTUP_ENTRA_ADMIN_LOGIN: ${{ secrets.ENTRA_ADMIN_LOGIN }}
+          NEXTUP_ENTRA_CLIENT_ID: ${{ secrets.ENTRA_CLIENT_ID }}
+          NEXTUP_ENTRA_CLIENT_SECRET: ${{ secrets.ENTRA_CLIENT_SECRET }}
         run: |
           set -euo pipefail
+          # ⚠ NO --template-file. A .bicepparam declares its own template with
+          # `using`, and az rejects the combination.
           az deployment group create \
             --resource-group "$RESOURCE_GROUP" \
-            --template-file infra/main.bicep \
-            --parameters environmentName=staging \
-                         location="$LOCATION" \
-                         sqlLocation="$SQL_LOCATION" \
-                         containerImage="${{ needs.build.outputs.image }}" \
-                         sqlAdminLogin="${{ secrets.SQL_ADMIN_LOGIN }}" \
-                         sqlAdminPassword="${{ secrets.SQL_ADMIN_PASSWORD }}" \
-                         entraAdminObjectId="${{ secrets.ENTRA_ADMIN_OBJECT_ID }}" \
-                         entraAdminLogin="${{ secrets.ENTRA_ADMIN_LOGIN }}" \
-                         entraClientId="${{ secrets.ENTRA_CLIENT_ID }}" \
-                         entraClientSecret="${{ secrets.ENTRA_CLIENT_SECRET }}" \
+            --parameters infra/main.staging.bicepparam \
             --query properties.outputs -o json > outputs.json
           echo "fqdn=$(node -p "require('./outputs.json').appFqdn.value")" >> "$GITHUB_OUTPUT"
           echo "sql=$(node -p "require('./outputs.json').sqlServerFqdn.value")" >> "$GITHUB_OUTPUT"
@@ -220,22 +237,22 @@ jobs:
 
       - id: deploy
         name: az deployment group create (prod, new revision at 0% traffic)
+        # ⚠ USES infra/main.prod.bicepparam — see the equivalent staging step
+        # for why inline parameters must never come back.
+        env:
+          NEXTUP_IMAGE: ${{ needs.build.outputs.image }}
+          NEXTUP_HOLD_REVISION: ${{ steps.prev.outputs.revision }}
+          NEXTUP_SQL_ADMIN_LOGIN: ${{ secrets.SQL_ADMIN_LOGIN }}
+          NEXTUP_SQL_ADMIN_PASSWORD: ${{ secrets.SQL_ADMIN_PASSWORD }}
+          NEXTUP_ENTRA_ADMIN_OBJECT_ID: ${{ secrets.ENTRA_ADMIN_OBJECT_ID }}
+          NEXTUP_ENTRA_ADMIN_LOGIN: ${{ secrets.ENTRA_ADMIN_LOGIN }}
+          NEXTUP_ENTRA_CLIENT_ID: ${{ secrets.ENTRA_CLIENT_ID }}
+          NEXTUP_ENTRA_CLIENT_SECRET: ${{ secrets.ENTRA_CLIENT_SECRET }}
         run: |
           set -euo pipefail
           az deployment group create \
             --resource-group "$RESOURCE_GROUP" \
-            --template-file infra/main.bicep \
-            --parameters environmentName=prod \
-                         location="$LOCATION" \
-                         sqlLocation="$SQL_LOCATION" \
-                         containerImage="${{ needs.build.outputs.image }}" \
-                         holdRevisionName="${{ steps.prev.outputs.revision }}" \
-                         sqlAdminLogin="${{ secrets.SQL_ADMIN_LOGIN }}" \
-                         sqlAdminPassword="${{ secrets.SQL_ADMIN_PASSWORD }}" \
-                         entraAdminObjectId="${{ secrets.ENTRA_ADMIN_OBJECT_ID }}" \
-                         entraAdminLogin="${{ secrets.ENTRA_ADMIN_LOGIN }}" \
-                         entraClientId="${{ secrets.ENTRA_CLIENT_ID }}" \
-                         entraClientSecret="${{ secrets.ENTRA_CLIENT_SECRET }}" \
+            --parameters infra/main.prod.bicepparam \
             --query properties.outputs -o json > outputs.json
           echo "fqdn=$(node -p "require('./outputs.json').appFqdn.value")" >> "$GITHUB_OUTPUT"
           echo "app=$(node -p "require('./outputs.json').containerAppName.value")" >> "$GITHUB_OUTPUT"

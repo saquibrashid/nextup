@@ -6,3 +6,6 @@
 
 export * from './TitleExtractor.js';
 export * from './degraded.js';
+export * from './crossCheck.js';
+export * from './jaroWinkler.js';
+export * from './thresholds.js';
