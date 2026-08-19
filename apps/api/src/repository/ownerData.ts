@@ -199,7 +199,7 @@ export async function transitionUploadBatchStatus(
   from: string,
   data: Pick<
     Prisma.UploadBatchUncheckedUpdateInput,
-    'status' | 'submittedAt' | 'completedAt' | 'undoneAt'
+    'status' | 'submittedAt' | 'extractionStartedAt' | 'completedAt' | 'undoneAt'
   >,
   tx?: Db,
 ): Promise<number> {
@@ -208,6 +208,41 @@ export async function transitionUploadBatchStatus(
     data,
   });
   return result.count;
+}
+
+/**
+ * Write the outcome of a stage-1 extraction run (TASK-058 wiring).
+ *
+ * ⚠ `degradedExtraction`, `lowYield` and `crossCheck` are SAFETY STATE, not
+ * statistics: each forces `computeRemovals: false` at review close, which is
+ * the invariant that a failed extraction is never misread as a removal.
+ * Extraction and review are separate requests, so they are persisted here and
+ * must never be recomputed on read.
+ *
+ * Unlike `transitionUploadBatchStatus` there is deliberately no `from`
+ * predicate: the caller already claimed the batch by moving it into
+ * `extracting`, and re-checking here would leave a genuinely finished run
+ * unable to record its own result if the claim row was touched meanwhile —
+ * i.e. it would lose the outcome to protect against a race that has already
+ * been won.
+ */
+export async function recordExtractionOutcome(
+  ownerId: OwnerId,
+  id: string,
+  data: Pick<
+    Prisma.UploadBatchUncheckedUpdateInput,
+    | 'status'
+    | 'extractionStats'
+    | 'extractionErrorCode'
+    | 'extractionErrorMessage'
+    | 'extractionErrorAt'
+    | 'degradedExtraction'
+    | 'lowYield'
+    | 'crossCheck'
+  >,
+  tx?: Db,
+) {
+  return db(tx).uploadBatch.updateMany({ where: { ownerId, id }, data });
 }
 
 /* ------------------------------------------------------------------ *
