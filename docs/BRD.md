@@ -19,10 +19,18 @@
 >
 > **Scope authority:** `Context/mvp-definition.md` **§15 lock addendum**,
 > which overrides the body of that document wherever they disagree, plus
-> `Context/requirements.md` (63 functional — 62 in v1, REQ-069 deferred —
-> 20 NFR, 13 `wont-v1`). `Context/intake.md` is **partially superseded**
+> `Context/requirements.md` (63 functional — **59 in v1**; REQ-035,
+> REQ-037, REQ-059 and REQ-069 each deferred to v1.1 — 20 NFR, 13
+> `wont-v1`). `Context/intake.md` is **partially superseded**
 > and is cited here only for the problem statement and success signals,
 > never for mechanism.
+>
+> ~~*Superseded 2026-08-18 (TASK-132): "63 functional — 62 in v1, REQ-069
+> deferred". That headline subtracted only REQ-069, but REQ-035, REQ-037 and
+> REQ-059 are each marked "DEFERRED TO v1.1" in their own requirement rows
+> under decisions D1/D2, taken at the same phase 4 lock. The correct v1 count
+> is **59**, as `docs/PRD.md` §A.1 and §A.5 have said all along — this
+> document was the last place the wrong figure survived.*~~
 
 ---
 

@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 95 |
+| ⬜ todo | 93 |
 | 🚧 doing | 7 |
-| ✅ done | 60 |
+| ✅ done | 62 |
 | 🙋 owner | 4 |
 | 💤 deferred | 0 |
 | **total** | **166** |
@@ -37,12 +37,11 @@ Not done, and every task they depend on is done.
 | `TASK-057` | M | Epic C — Extraction |
 | `TASK-106` | S | Epic H — History, removal ledger, suppression |
 | `TASK-126` | M | Epic K — Platform, safety, and the shell |
-| `TASK-132` | XS | Epic K — Platform, safety, and the shell |
+| `TASK-133` | S | Epic K — Platform, safety, and the shell |
 | `TASK-143` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-145` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-151` | S | Epic B — Capture & import |
 | `TASK-152` | XS | Epic B — Capture & import |
-| `TASK-156` | XS | Epic K — Platform, safety, and the shell |
 | `TASK-159` | M | Epic B — Capture & import |
 | `TASK-160` | M | Epic B — Capture & import |
 
@@ -57,7 +56,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-81 tasks cannot start yet.
+80 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -133,7 +132,6 @@ Not done, and every task they depend on is done.
 | `TASK-129` | `TASK-070`, `TASK-081` |
 | `TASK-130` | `TASK-124`, `TASK-108` |
 | `TASK-131` | `TASK-044` |
-| `TASK-133` | `TASK-156` |
 | `TASK-155` | `TASK-152` |
 | `TASK-157` | `TASK-010` |
 | `TASK-161` | `TASK-160` |
@@ -196,6 +194,7 @@ Not done, and every task they depend on is done.
 | `TASK-121` | `fdd5519` — `tools/check-mutating-routes.mjs`, `T-MUT-001` (a–j), `T-MUT-002` (a–f). The 18 mutating routes each map to one of the eight REQ-041 owner-initiated operations or carry an explicit non-list-state reason; mutation-proven with an unregistered `POST /titles/:id/auto-confirm` and a `jobs/reconcile.ts` calling a guarded operation. | `T-MUT-001`, `T-MUT-002` |
 | `TASK-122` | `dde3dc5` — `tools/check-outbound-hosts.mjs`, `T-SEC-031` (a–i) and the outbound half of `T-SEC-009` (`k`). Exactly three destinations: TMDB, Azure OpenAI, Azure AI Vision. Mutation-proven by widening the list to four, shrinking it below three, and planting an unlisted host in source. The telemetry and streaming hostnames the spec needs are assembled from fragments rather than added to another gate's exemption list. | `T-SEC-009`, `T-SEC-031` |
 | `TASK-128` | `c64b7b5` — `tools/egress-guard.mjs`, `T-CI-007` (a–n). Patches `fetch`, `http.request` and `https.request`; loopback and the compose service names stay reachable; mutation-proven with a `fetch` and a raw `https.request` to an external host. ⚠ Installed per-suite, not globally: global wiring needs `setupFiles` in `vitest.config.ts`, which no lane may edit — see the finding below. | `T-CI-007` |
+| `TASK-132` | Verified against the delivered repo, not the authoring tree. **AC-6′/AC-7 recorded in PRD traceability** as new `docs/PRD.md` §A.9, with the provenance §A.1 cannot carry (it traces requirements to stories, not criteria), AC-7 traced to REQ-071 via SD-06, and the counting rule that AC-6′ **replaces** AC-6 rather than adding to it. **"62 in v1" → 59**: the two files the task names (`Context/requirements.md`, `Context/mvp-definition.md`) **do not exist in this repo** — `Context/` is an authoring tree, like `artifacts/`. The one live stale headline in the delivered repo was `docs/BRD.md` §Scope authority, corrected in place with the superseded figure struck through beneath it. `docs/PRD.md` §A.1/§A.5 already said 59. ⚠ `docs/review-report.md:141` asserted "No stale '62 in v1' survives ✅" while `BRD.md` still carried one — the claim was true of the authoring tree only, and is true here only as of this commit. | _no test id declared_ |
 | `TASK-142` | `T-INFRA-009` (`infra/budget.bicep`, `tests/infra/infra.spec.ts`). **Deployed live**: `az deployment sub create` succeeded, `az consumption budget list` returns `nextup-monthly / 13.0 / Monthly`, alerts at 100% and 150% to the owner by email. Email-only by design — no action group, webhook or automated remediation (TASK-142, `REQ-028`). `tools/check-infra.mjs` now drift-gates two templates. Also `T-SEC-034` (`tools/check-audit.mjs`): the production audit gate now suppresses by named, self-deleting exception after GHSA-ggr8-5vv4-36mx turned `main` red with an unfixable advisory whose npm-suggested "fix" is a prisma **downgrade**. See `specs/testing.md` §31. | _no test id declared_ |
 | `TASK-144` | `eb07409` — a CI grep gate over `prisma/migrations/**` | `T-MIG-001` |
 | `TASK-146` | `docs/ghcr-pat.md` written. **No PAT is needed at all** — a fine-grained PAT cannot authenticate to `ghcr.io` and a classic one is account-wide, so the package is public and CI pushes with `GITHUB_TOKEN` (R8). Closed out with TASK-007: the `deploy.yml` link and the pre-push image secret-scan are in place, and the visibility flip is confirmed by the property that actually matters — an **unauthenticated** manifest GET against `ghcr.io/saquibrashid/nextup` returns 200, and both live Container Apps pull it with no `registries` block and no credential. | _no test id declared_ |
@@ -205,5 +204,6 @@ Not done, and every task they depend on is done.
 | `TASK-150` | `stripAllMetadata()` in `apps/api/src/images/transcode.ts`, wired into `DEFAULT_STAGES.stripMetadata` so it runs for **every** accepted image from **every** source, outside the HEIC condition — never selected by `ingestSource`. `apps/api/test/unit/stripMetadata.spec.ts` (10 cases) plus an integration case that uploads a GPS-bearing JPEG over HTTP and re-reads the **stored blob out of Azurite**, so the claim is about what landed in the store rather than what a seam returned; it uses the **upload** path deliberately, because WebKit strips EXIF on clipboard read but not on file upload and a pasted fixture would pass whatever our code did. Removal is **structural** — whole JPEG segments and whole PNG chunks are copied or dropped, never re-encoded — so surviving CRCs stay valid and no pixel changes; a JPEG re-encode to launder metadata would be lossy, which NFR-012a forbids. `APP0` (JFIF) and `APP2` (ICC) are kept on purpose: the ICC profile decides how the image renders and identifies nobody. Unparseable streams fail closed. Six mutations verified, each caught by its named case. Claims, non-claims and two findings in `specs/testing.md` §30; §28.2 and §29.2 corrected in place now that REQ-078 is discharged. §30.2 records honestly that the **real-HEIC-with-GPS** leg named in `specs/security.md` §4.2 stays with **TASK-151** — the encoder ban means nothing in this tree can generate HEIC bytes, so a committed fixture is the only route. Finding: the integration JPEG fixture was a 29-byte header stub that stopped mid-`SOF0` and the strip correctly refused it as truncated; the fixture was wrong, not the refusal. | `T-SEC-032`, `T-SEC-033` |
 | `TASK-153` | `d6796b3` — owner approved the LGPL-3.0 obligation; gate proven on synthetic fixtures | `T-LICENSE-001` |
 | `TASK-154` | `apps/api/test/integration/ingestGuard.spec.ts` (9 tests) — `T-IMG-018` (c–h) and `T-IMG-019` (a–c) asserted end to end through the real route, real Azurite and a real database. The isolation itself was already implemented by TASK-050/149; this task PROVES it and found one real defect doing so: `OOM_PATTERNS` in `apps/api/src/images/transcode.ts` did not match Emscripten's `abort(OOM)` / `Aborted(OOM)` shape, so a genuine out-of-memory decode was classified `IMAGE_DECODE_FAILED` (415, no runbook) instead of `IMAGE_DECODE_OOM` (503) — fixed here, and `specs/testing.md` §AC-10/P1 requires exactly that case. The double is `heic-convert` itself, not `transcodeHeicToPng` and not `IngestStages`, so the real OOM-vs-corrupt classification is under test rather than stubbed out. `T-IMG-018h` asserts NEGATIVELY that no compensating-cleanup path exists (orphan blobs are left to the `NFR-019` purge) and was mutation-verified. Per the task's own scope note this does NOT depend on TASK-072. | _no test id declared_ |
+| `TASK-156` | Runbook verified against the **live** deployment (read-only: `az containerapp list/show`, `az containerapp ingress traffic show`, `az containerapp revision show`, `az monitor metrics alert list`, and `az deployment group what-if` — **no up-size was applied**; prod remains `0.25 vCPU / 0.5 GiB` with `NEXTUP_MAX_DECODE_PIXELS=25000000`). Ten inaccuracies corrected in place with the superseded text struck through beneath (F-001 rule). Three were load-bearing: **(1)** every command named `nextup` / `rg-nextup`, neither of which exists — the real names are `ca-nextup-prod` / `nextup-rg`; **(2)** prod runs `activeRevisionsMode: 'Multiple'` with traffic pinned to a **named** revision, so the documented one-command remedy builds a revision that serves **nobody** — a traffic-shift step is now §2b; **(3)** §3a's "authoritative check" read the **app-level** template, which reflects the newest revision regardless of traffic and so reports success on the exact failure mode in (2) — now checks the **serving** revision. Both backlog-mandated gaps closed: the `nextup-prod-memory-pressure` 400→800 MiB step (§2d, with its §5 revert) and the explicit **not-owner-approved** caveat on the §7 escalation. `README.md` now links `docs/runbooks/`; `infra/aca.bicep` already links the runbook (lines 103, 112). | `T-INFRA-005` |
 | `TASK-158` | `packages/domain/src/pastedFileName.ts` + `T-PASTE-005a`-`s` (19 unit cases). `INGEST_SOURCES`/`IngestSource` already existed from TASK-012, so this task is the synthesiser alone. The INTEGRATION half of `T-PASTE-005` (round-trip of `ingestSource`, server-assigned `seqInBatch`, `blobPath` free of any client name) belongs to TASK-050 — see `specs/testing.md` §27.2. | `T-PASTE-005` |
 | `TASK-167` | this commit — the ledger, the gate and `docs/status.md` | `T-STATUS-001` |
