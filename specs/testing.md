@@ -2910,9 +2910,11 @@ invariant."*~~ The stage is real now; `UNBUILT_STAGES` survives as an **alias**
 of `DEFAULT_STAGES` so this section's citation still resolves.
 
 **REQ-078 IS NOW DISCHARGED (TASK-150).** `DEFAULT_STAGES.stripMetadata` calls
-`stripAllMetadata()`; `T-SEC-032a`--`g` and `T-SEC-033a`--`d` assert it, and
+`stripAllMetadata()`; `T-SEC-032a`--`m` and `T-SEC-033a`--`g` assert it, and
 `T-SEC-032g` reads the **stored blob back out of Azurite** rather than trusting
-the response. See §30.
+the response. See §30. ⚠ Note `T-SEC-033g`: the HEIC leg is **vacuous** with
+respect to the strip (the transcode re-encodes), so the strip's own evidence is
+`T-SEC-032m`, on the JPEG path.
 
 ~~*Superseded (TASK-150 has landed): "`DEFAULT_STAGES.stripMetadata` is a
 **pass-through**, so EXIF/XMP -- including GPS -- is currently NOT stripped.
@@ -3069,7 +3071,8 @@ perfectly fine. `T-IMG-023k` and `T-IMG-023l` are the pair.
 ### 30.1 What it claims
 
 `T-SEC-032a`--`f` and `T-SEC-033a`--`d` (`apps/api/test/unit/stripMetadata.spec.ts`)
-plus `T-SEC-032g` (`apps/api/test/integration/ingestSources.spec.ts`):
+plus `T-SEC-032g` (`apps/api/test/integration/ingestSources.spec.ts`), extended
+by `T-SEC-032h`--`m` and `T-SEC-033e`--`g` (`tests/extraction/**`, §30.1a):
 
 - **JPEG**: `APP1` (EXIF **and** XMP), `APP12`, `APP13` (IPTC) and `COM` are
   removed. `APP0` (JFIF) and `APP2` (ICC) are **kept** -- the ICC profile
@@ -3092,16 +3095,46 @@ plus `T-SEC-032g` (`apps/api/test/integration/ingestSources.spec.ts`):
   **stored blob from Azurite**, so the claim is about what landed in the store,
   not about what a unit-level seam returned.
 
+#### 30.1a The committed-fixture leg (TASK-151, `tests/extraction/**`)
+
+Registered here because they are asserted in the tree and were previously
+defined nowhere -- `check:test-ids` does not catch that, since it gates only
+ids **cited from the backlog**.
+
+| Id | Type | What it asserts |
+|---|---|---|
+| `T-SEC-032h` | S | **Non-vacuity.** The synthetic fixtures really do carry a GPS payload before anything strips it. The sibling of `T-SEC-032e`, for the `tests/extraction` fixture set. |
+| `T-SEC-032i` | S | Every metadata chunk is removed from the PNG and the **image** chunks survive. |
+| `T-SEC-032j` | S | `APP1`/`APP13`/`COM` are removed from the JPEG and the **ICC profile survives** -- dropping it is a quality regression wearing a privacy badge (NFR-012a). |
+| `T-SEC-032k` | I | The bytes that reach the **blob store** carry no GPS -- asserted on what landed, not on a seam's return value. |
+| `T-SEC-032l` | S | The **owner's own iOS screenshot** is a **JPEG** with an EXIF block, no GPS and no device model. ⚠ **The format is the finding** -- see §30.3. |
+| `T-SEC-032m` | I | Uploaded, that real screenshot lands with its EXIF removed **and its pixels intact** (SOS present, length preserved). ⚠ **This is where the strip's real evidence lives**: the JPEG is stored as a JPEG with no re-encode, so `stripAllMetadata` is the only thing removing `APP1`. |
+| `T-SEC-033e` | S | **Non-vacuity.** The owner-supplied HEIC really does carry a GPS sub-IFD and a device model. |
+| `T-SEC-033f` | I | Driven through the **file-upload** path (invariant 18, never paste) it lands in the blob store with no metadata at all. |
+| `T-SEC-033g` | I | ⚠ **A deliberate vacuity proof.** The same real HEIC with the strip replaced by an **identity function** still stores clean, because the transcode re-encodes. This is why `T-SEC-033f` must not be read as discharging REQ-078 on its own. |
+
 ### 30.2 What it does NOT claim
 
-**`T-SEC-033`'s spec-mandated leg -- a REAL HEIC upload carrying GPS -- is not
-asserted here, and belongs to TASK-151.** Nothing in this repository can
-generate HEIC bytes: `T-DEP-002` forbids a HEIC **encoder** anywhere in the
-tree, and prebuilt `sharp` has no HEIF encode. A real HEIC decode therefore
-needs a **committed fixture**, which is TASK-151's job. `T-SEC-033a`--`d`
-assert the fail-closed behaviour and the wiring instead. This is a constraint,
-not an omission -- but it is a genuine divergence from `specs/security.md` §4.2
-and is recorded as one.
+**`T-SEC-033`'s spec-mandated leg -- a REAL HEIC upload carrying GPS -- is
+asserted by `T-SEC-033e`--`g` in `tests/extraction/ingestRealDevice.spec.ts`
+(TASK-151, landed).** Nothing in this repository can *generate* HEIC bytes:
+`T-DEP-002` forbids a HEIC **encoder** anywhere in the tree, and prebuilt
+`sharp` has no HEIF encode. A real HEIC decode therefore needs a **committed
+fixture**, which TASK-151 supplied -- the owner's own iPhone file, with only
+its lat/lon rationals overwritten by a public landmark. `T-SEC-033a`--`d`
+continue to assert the fail-closed behaviour and the wiring.
+
+⚠ **But that leg is VACUOUS with respect to the strip, and `T-SEC-033g`
+exists to say so out loud.** The transcode decodes to a raster and re-encodes,
+so metadata cannot survive it and the stored blob is clean *whether or not*
+`stripAllMetadata` ever runs. `T-SEC-033g` re-runs the same real fixture with
+the strip replaced by an identity function and shows the blob is still clean.
+The strip's own evidence therefore has to come from the **PNG and JPEG** paths,
+where bytes pass through un-re-encoded -- which is `T-SEC-032m`.
+
+~~Superseded: "`T-SEC-033`'s spec-mandated leg ... is not asserted here, and
+belongs to TASK-151 ... This is a genuine divergence from `specs/security.md`
+§4.2 and is recorded as one." TASK-151 has landed; the divergence is closed.~~
 
 **The paste path's free stripping is NOT coverage.** WebKit strips EXIF on
 `navigator.clipboard.read()` but **not** on file upload. A test asserting "no
@@ -3125,6 +3158,18 @@ prevent. `jpegBytes()` now emits a complete `SOI/APP0/SOF0/SOS/EOI` stream.
 keeps every surviving CRC correct by construction. A filter that rebuilt
 chunks would have to recompute them, and a wrong CRC turns a privacy control
 into a corruption bug that only some decoders notice.
+
+**(c) ⚠ The "iOS screenshots are normally PNG" rationale is FALSIFIED, and the
+conclusion it supports is unaffected.** `ASM-058` and invariant 11 argue for
+accepting all three formats partly from the premise that iOS *screenshots* are
+PNG while *camera photos* are HEIC. The owner's own screenshot fixture
+(TASK-151, asserted by `T-SEC-032l`) is **JPEG**, with an EXIF block, no GPS
+and no device model. The correct conclusion is **strengthened, not weakened**:
+accept PNG **and** JPEG **and** HEIC, and determine the format by **magic
+bytes only** -- never by the declared `Content-Type`, and never by inferring it
+from the ingest source. There is no capture path whose output format can be
+predicted. `specs/security.md` and the ASM-058 rationale should be corrected in
+place to reason from *unpredictability* rather than from a per-path format map.
 
 ## 31. The Azure boundary — budget guardrail and cost verification (TASK-142, TASK-010)
 
