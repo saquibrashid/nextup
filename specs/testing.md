@@ -2964,6 +2964,48 @@ exist, and they must not be deleted as "duplicates" of the integration run.
 | `T-RET-014a`-`d` | U + I | `retainUntil` is stamped at ingest from `IMAGE_RETENTION_DAYS` alone; a purged blob reads as `null` rather than throwing, and `remove` is idempotent. |
 | `T-IMG-020a`-`b` | U | The memory refusal names memory, renders **MEGApixels** to one decimal place and cites the runbook; the unsupported-format refusal names neither. |
 
+### 28.1a What TASK-051 claims (`DELETE /api/batches/:batchId/images/:imageId`)
+
+The **one sanctioned hard delete in the product** (`specs/data-model.md` I-7,
+`specs/api.md` §6.13). Everything else is soft delete forever (REQ-028).
+
+| Id | Where | Claim |
+| --- | --- | --- |
+| `T-IMG-006g`-`i` | U | The happy path. `g` **204**, with both the blob and the row gone. `h` the **blob is removed BEFORE the row**, asserted as an order and not merely as two calls -- the reverse orphans the bytes forever, since nothing then knows the blob exists. `i` a failed blob delete leaves the row in place, so a retry can still finish the job. |
+| `T-INV-012a`-`e` | U | The scope of the exemption, at the route. `a` each of the five non-`draft` statuses answers **409 `BATCH_NOT_DRAFT`** and deletes nothing; `b` the **draft check runs BEFORE the image lookup**, so a submitted batch cannot be probed for which image ids it holds; `c` an image id belonging to a different batch is a 404; `d` a missing batch is a 404 and never reaches the image; `e` the `:batchId` from the path is the one actually queried -- non-vacuity a handler ignoring the param would otherwise satisfy. |
+| `T-INV-012g`-`j` | S | The source-tree half of REQ-028, in `tests/infra/hardDelete.spec.ts`. `g` every hard delete of a persisted row is sanctioned; `h` the sanctioned entry is **real**, not a stale allow-list line pre-authorising whatever is written next to it; `i` the sanctioned delete is guarded by a draft check **at its call site**, which the repository function cannot enforce on its own; `j` non-vacuity in both directions -- the scan matches Prisma model deletes and does **not** match `Map`/`Set`/`Headers` deletes. |
+
+Mutation-tested in four directions, all four caught: the draft guard removed
+from the handler (7 cases fail); the blob/row delete order swapped
+(`T-IMG-006h`, `i`); a `title.delete` added **inside the sanctioned file**
+(`g`, `j`); and the sanctioned delete itself removed (`h`, `j`).
+
+**Why `T-INV-012` exists, and why it is keyed on file AND model.** `T-INV-013`
+proves only the infrastructure half of REQ-028 -- no TTL, no Agent job, no
+scheduled deletion -- while its own wording promises "`DELETE` in exactly one
+module", which nothing implemented. Until now soft-delete-forever was enforced
+against Bicep and against nothing a developer would actually write: a hard
+delete is one plausible line, it typechecks, its tests pass, and the row it
+removes was the only copy. The exemption is keyed on `file::modelAccessor`,
+**not on file alone**, because `ownerData.ts` holds all forty-odd repository
+functions -- a file-scoped exemption silently pre-authorises a `title.delete`
+written beside it. That is precisely what the third mutant did, and what the
+first version of this gate failed to catch.
+
+**The scan is deliberately narrowed to Prisma model accessors.** A bare
+`/\.delete\(/` also matches `Map.delete`, `Set.delete` and
+`URLSearchParams.delete` -- `startExtraction.ts` already calls
+`inFlight.delete(batchId)` -- and a gate that fires on those acquires an
+allow-list within a week and stops meaning anything. The accessor list is
+derived from `prisma/schema.prisma` at run time, so a new model is covered
+without anyone remembering to extend it.
+
+**Finding.** TASK-051's Done-when cites `T-IMG-006`, but `T-IMG-006a`-`f`
+belong to TASK-050 and concern non-image **415** sniffing, which has nothing
+to do with deletion. Rather than invent a prefix, the deletion cases were
+appended as `g`-`i`; the id is therefore shared across two tasks. Recorded,
+not corrected.
+
 ### 28.2 What it does NOT claim
 
 **`T-IMG-013` is NOT claimed by TASK-050, and was struck from its row.** It

@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 91 |
+| ⬜ todo | 90 |
 | 🚧 doing | 8 |
-| ✅ done | 63 |
+| ✅ done | 64 |
 | 🙋 owner | 4 |
 | 💤 deferred | 0 |
 | **total** | **166** |
@@ -31,7 +31,6 @@ Not done, and every task they depend on is done.
 | `TASK-039` | S | Epic F — The list itself (the value loop) |
 | `TASK-040` | S | Epic F — The list itself (the value loop) |
 | `TASK-045` | S | Epic D — Matching & identity |
-| `TASK-051` | XS | Epic B — Capture & import |
 | `TASK-052` | S | Epic B — Capture & import |
 | `TASK-056c` | M | Epic C — Extraction |
 | `TASK-057` | M | Epic C — Extraction |
@@ -183,6 +182,7 @@ Not done, and every task they depend on is done.
 | `TASK-048` | `T-BATCH-010`, `T-BATCH-015` | `T-API-003`, `T-BATCH-010`, `T-BATCH-015` |
 | `TASK-049` | `T-UI-003a`…`j` green in `apps/web/test/uploadStep1.spec.tsx`; mutation-proven against a defaulted mode and against revealing the consequence on selection | `T-UI-003` |
 | `TASK-050` | `T-IMG-002`, `T-IMG-006`, `T-IMG-010`, `T-IMG-012`, `T-IMG-018`, `T-IMG-023`, `T-PASTE-003`, `T-PASTE-005`, `T-PASTE-006`, `T-PASTE-007`, `T-SEC-003`, `T-RET-014`; ~~`T-IMG-013`~~ | `T-IMG-002`, `T-IMG-006`, `T-IMG-010`, `T-IMG-012`, `T-PASTE-003`, `T-PASTE-005`, `T-PASTE-006`, `T-PASTE-007` |
+| `TASK-051` | `T-IMG-006g`-`i`, `T-INV-012a`-`e` (`apps/api/test/unit/deleteBatchImage.spec.ts`, 12 cases), `T-INV-012g`-`j` (`tests/infra/hardDelete.spec.ts`, 4 cases). Route in `apps/api/src/routes/batchImages.ts`, repository in `ownerData.ts`. 4 mutants, all caught. Spec §28.1a. | `T-IMG-006`, `T-INV-012` |
 | `TASK-053` | `components/ImageDropzone.tsx` — `T-UI-004` (a–e), `T-UX-041` (a–e), `T-UX-042` (a–f). All three affordances render at once (paste button when `navigator.clipboard.read` exists, `Choose files` always, drop target); one `addFiles` path with the source reported but never branched on. Validation is lenient — empty **and** `application/octet-stream` types are accepted and left to the server sniff. Four mutations caught: HEIC dropped from `accept` (`T-UI-004a`), hard-filtering on `File.type` (`T-UI-004d`), the paste affordance replacing rather than joining file selection (`T-UX-041a/b/c`), rejections hiding the accepted list (`T-UX-042a/e`). New copy constants `UNSUPPORTED_FORMAT_REJECTION`, `IMAGE_ACCEPT_ATTRIBUTE`, `CHOOSE_FILES_LABEL`, `HEIC_PREVIEW_PLACEHOLDER` — quoted from `specs/ui.md` §3.2 prose, which §9 has no rows for. `PasteCapture` (TASK-160) and the drop target's full behaviour (TASK-162, `T-UI-014`) fill the slots; the ceiling messages are rendered here but the ceiling-copy test id named on TASK-162 is not defined in specs/testing.md, so it is reported as a spec defect rather than cited here. | `T-UI-004`, `T-UX-041`, `T-UX-042` |
 | `TASK-054` | `apps/api/src/services/batchLifecycle.ts` — the transition table, `submitBatch`, `discardBatch`, `assertBatchMutable`, plus `transitionUploadBatchStatus` (the conditional write). Routes `POST /api/batches/:batchId/submit` (§6.14) and `/discard` (§6.23). `T-BATCH-017a`…`h` (table totality, one-way-ness, discardable set), `T-BATCH-019a`…`d` (the submit endpoint's status codes), `T-BATCH-018a`…`c` (atomic transition — `018a` mutation-verified after its first form proved vacuous), `T-BATCH-013a`…`d` (immutability: the guard **and** the absence of a mutating route), `T-BATCH-006a`…`f` (a discarded batch writes nothing, retains images, releases the ceiling). ⚠ **The three close/reconciliation ids this row originally cited are NOT delivered here** — they belong to TASK-072 and no close endpoint exists yet; see `specs/testing.md` §24.3. Two spec gaps reported in §24.2. | `T-BATCH-006`, `T-BATCH-013`, `T-BATCH-017`, `T-BATCH-018`, `T-BATCH-019` |
 | `TASK-055` | `packages/domain/src/extraction/` (contract + degraded projections) + `apps/api/src/extraction/` (recordings, `StubExtractor`, factory). `T-STUB-001a`…`r`, incl. the three fault tokens and byte-identical output over three runs. | `T-STUB-001` |

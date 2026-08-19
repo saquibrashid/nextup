@@ -34,7 +34,13 @@ import {
 
 import { AppError } from '../errors/AppError.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
-import { batchImageTotals, createUploadedImage, findUploadBatch } from '../repository/ownerData.js';
+import {
+  batchImageTotals,
+  createUploadedImage,
+  deleteUploadedImage,
+  findUploadBatch,
+  findUploadedImage,
+} from '../repository/ownerData.js';
 import { ingestFiles, type IncomingFile, type IngestStages } from '../images/ingest.js';
 import { stripAllMetadata, transcodeHeicToPng } from '../images/transcode.js';
 import { azureImageBlobStore, type ImageBlobStore } from '../storage/blobStore.js';
@@ -112,11 +118,7 @@ export function registerBatchImageRoutes(
 ): void {
   router.post('/batches/:batchId/images', upload.array('files'), async (req, res) => {
     const ownerId = requireOwnerId(req);
-    const raw = req.params.batchId;
-    // Express 5 types a param as `string | string[]` (a repeated `:batchId`
-    // cannot occur on this path, but the type is honest about the general
-    // case). Normalising here keeps every downstream signature `string`.
-    const batchId = Array.isArray(raw) ? (raw[0] ?? '') : (raw ?? '');
+    const batchId = firstParam(req.params.batchId);
 
     const batch = await findUploadBatch(ownerId, batchId);
     if (!batch) {
@@ -261,6 +263,70 @@ export function registerBatchImageRoutes(
       },
     });
   });
+
+  /**
+   * `DELETE /api/batches/:batchId/images/:imageId` (§6.13, US-004 AC-4).
+   *
+   * ⚠ THE ONE SANCTIONED HARD DELETE (`data-model.md` I-7, `T-INV-012`), and
+   * the reason it is sanctioned is the DRAFT check below — not the endpoint.
+   * REQ-028 is soft-delete-forever, but a draft batch is not history: nothing
+   * has been reconciled against the list, no extraction candidate references
+   * the image, and the owner is still assembling the upload. Removing a
+   * mis-attached screenshot before submitting is a correction, not a deletion
+   * of a record.
+   *
+   * Once the batch leaves `draft` the exemption is gone and the answer is a
+   * **409**, because the image is by then evidence for candidates that were
+   * reviewed and changes that were applied. Deleting it would leave the batch
+   * detail page citing a screenshot that no longer exists.
+   */
+  router.delete('/batches/:batchId/images/:imageId', async (req, res) => {
+    const ownerId = requireOwnerId(req);
+    const batchId = firstParam(req.params.batchId);
+    const imageId = firstParam(req.params.imageId);
+
+    const batch = await findUploadBatch(ownerId, batchId);
+    if (!batch) {
+      throw new AppError('NOT_FOUND', 404, "That batch doesn't exist.");
+    }
+    // ⚠ THE DRAFT CHECK IS THE EXEMPTION. Checked BEFORE the image lookup so
+    // that a submitted batch answers 409 whether or not the id resolves - a
+    // 404-then-409 order would leak, by timing and by status code, which image
+    // ids exist in a batch the caller may no longer modify.
+    if (batch.status !== 'draft') {
+      throw new AppError(
+        'BATCH_NOT_DRAFT',
+        409,
+        'That batch has already been submitted, so its images are part of the record.',
+        { batchId, status: batch.status },
+      );
+    }
+
+    const image = await findUploadedImage(ownerId, batchId, imageId);
+    if (!image) {
+      throw new AppError('NOT_FOUND', 404, "That image doesn't exist in this batch.");
+    }
+
+    // ⚠ BLOB FIRST, ROW SECOND. The reverse order can orphan bytes forever:
+    // once the row is gone nothing names the `blobPath`, so a failed blob
+    // delete leaves an unreferenced screenshot that only the 30-day lifecycle
+    // purge will ever reach. This order can only fail the other way - a row
+    // whose blob is already gone - which the delete below then removes, and
+    // which a retry of the same request resolves either way.
+    await store.remove(image.blobPath);
+    await deleteUploadedImage(ownerId, imageId);
+
+    res.status(204).end();
+  });
+}
+
+/**
+ * Express 5 types a route param as `string | string[]`: a repeated param
+ * cannot occur on these paths, but the type is honest about the general case.
+ * Normalising here keeps every downstream signature `string`.
+ */
+function firstParam(raw: string | string[] | undefined): string {
+  return Array.isArray(raw) ? (raw[0] ?? '') : (raw ?? '');
 }
 
 function statusForRejection(code: string | undefined): number {

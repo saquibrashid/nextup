@@ -860,6 +860,55 @@ export async function listImagesForBatch(ownerId: OwnerId, batchId: string, tx?:
   return db(tx).uploadedImage.findMany({ where: { ownerId, batchId } });
 }
 
+export async function findUploadedImage(
+  ownerId: OwnerId,
+  batchId: string,
+  imageId: string,
+  tx?: Db,
+) {
+  // Scoped by `batchId` as well as `imageId` so that a correct id under the
+  // WRONG batch is a 404 rather than a successful delete. Both are
+  // owner-scoped; neither is guessable, but a route that ignored the batch
+  // would let a stale client page delete from a batch it is not looking at.
+  return db(tx).uploadedImage.findFirst({ where: { ownerId, batchId, id: imageId } });
+}
+
+/**
+ * ⚠ THE ONLY HARD DELETE OF OWNER DATA IN THIS CODEBASE (`T-INV-012`).
+ *
+ * REQ-028 is soft-delete-forever: a removed listing is a STATE, never a
+ * deletion, and the removed view is a historical log. `data-model.md` I-7
+ * carves out exactly one exemption, and this is it — a **pre-submit draft**
+ * image. That is a correction to an upload the owner has not yet submitted,
+ * not history: nothing has been reconciled against the list, no candidate has
+ * been extracted from it, and no row anywhere references it. Deleting it
+ * removes something that never became part of the record.
+ *
+ * The exemption is scoped by the CALLER, and the caller must check
+ * `status === 'draft'` before calling. It is not re-checked here, because a
+ * repository function that silently no-ops on a non-draft batch would hide a
+ * routing bug rather than surface it; §6.13's answer to a submitted batch is a
+ * 409, which only the route can produce.
+ *
+ * ⚠ Do not generalise this into a `deleteX` for any other model. `T-INV-012`
+ * scans the source tree for exactly that and fails on a new one.
+ *
+ * ⚠ `deleteMany`, NOT `delete`, and that is about the OWNER SCOPE rather than
+ * about cardinality. `UploadedImage` has no composite `(ownerId, id)` unique,
+ * so Prisma's `delete` would accept only `{ id }` and would happily delete a
+ * row belonging to somebody else. `deleteMany` takes a non-unique filter, so
+ * `ownerId` stays in the predicate. It returns a count, which the caller uses
+ * to tell "deleted" from "was not there".
+ */
+export async function deleteUploadedImage(
+  ownerId: OwnerId,
+  imageId: string,
+  tx?: Db,
+): Promise<number> {
+  const { count } = await db(tx).uploadedImage.deleteMany({ where: { ownerId, id: imageId } });
+  return count;
+}
+
 /**
  * Current image count and cumulative bytes for one batch (`specs/api.md` §5).
  *
