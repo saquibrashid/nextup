@@ -78,7 +78,6 @@ const SPEC_FILE_RE = /\.(spec|test)\.[cm]?[jt]sx?$/;
  */
 export const BASELINE_ORPHANS = new Set([
   'T-A11Y-014',
-  'T-AI-014',
   'T-ATTR-005',
   'T-AUTH-003',
   'T-CLS-013',
@@ -94,10 +93,6 @@ export const BASELINE_ORPHANS = new Set([
   'T-GRP-013',
   'T-GRP-014',
   'T-IMG-011',
-  'T-IMG-018',
-  'T-IMG-019',
-  'T-IMG-020',
-  'T-IMG-022',
   'T-INFRA-006',
   'T-INV-014',
   'T-INV-016',

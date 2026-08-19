@@ -2760,21 +2760,88 @@ decoder import added to `readDimensions.ts`.
 
 ### 26.2 What TASK-145 does NOT claim
 
-**(a) The integration half of `T-IMG-017`** - a 413 envelope from
-`POST /api/batches/:batchId/images` with peak RSS asserted flat across the
-call - needs the upload endpoint, which is TASK-050 and does not exist.
+**(a) The integration half of `T-IMG-017` - NOW DELIVERED by `T-IMG-018`.** A
+413 envelope from `POST /api/batches/:batchId/images` needed the upload
+endpoint, which has since landed (TASK-050), and the guard's behaviour there is
+asserted end to end in `apps/api/test/integration/ingestGuard.spec.ts`
+(`T-IMG-018c`-`h`, TASK-154): a per-file `rejected[]` entry, a 413 status, the
+same file accepted once the budget is raised, and mixed failure kinds reported
+individually.
 
-**(b) Serial image processing (`concurrency = 1`).** TASK-145's row also
-requires the extraction worker to process a batch's images strictly serially
-and release each buffer before loading the next. That worker is
-`apps/api/src/jobs/runExtraction.ts` (TASK-057/058) and does not exist, so
-there is nothing to set `concurrency` on and no batch to feed a peak-RSS
-assertion. The guard is the half that TASK-149 blocks on and it is complete;
-**the serial-processing half is recorded as outstanding on the TASK-145 row
-rather than quietly counted as delivered.**
+~~Superseded: "needs the upload endpoint, which is TASK-050 and does not
+exist."~~
+
+**(b) Serial image processing (`concurrency = 1`) - NOW DELIVERED, see
+`T-IMG-026`.** TASK-145's row also requires the extraction worker to process a
+batch's images strictly serially and release each buffer before loading the
+next. That worker is `apps/api/src/jobs/runExtraction.ts` (TASK-057/058), and
+it now exists and is wired, so the half is built and asserted in
+`apps/api/test/unit/serialImageProcessing.spec.ts`. TASK-145 is `done`.
+
+~~Superseded: "That worker ... does not exist, so there is nothing to set
+`concurrency` on and no batch to feed a peak-RSS assertion. The guard is the
+half that TASK-149 blocks on and it is complete; the serial-processing half is
+recorded as outstanding on the TASK-145 row rather than quietly counted as
+delivered."~~
+
+### 26.2b Ids for the serial-processing half
+
+| Id | Type | What it pins |
+| --- | --- | --- |
+| **`T-IMG-026`** (`a`-`g`, NEW) | U | Serial image processing in `runExtraction` (REQ-079, REQ-080/081, `RSK-016`). `a` `EXTRACTION_IMAGE_CONCURRENCY` is `1`, stated on its own so a change fails with an obvious message; `b` **at most one image's bytes are live at any instant across a batch** - the load-bearing claim; `c` **the instrument can actually observe an overlap**, driving the same ports in parallel by hand, without which `b` would report `1` against a fully parallel worker too; `d` every `load` is immediately followed by its own `record`; `e` the `image.decode.begin`/`end` sentinels are matched and never interleaved (`A43-M5` - a `begin` with no `end` is the only signal naming which image killed the container, and interleaving would make it unreadable in exactly the incident it exists for); `f` a contained per-image failure does not break the serial discipline or leak the live count (REQ-080/081); `g` peak RSS across a 24-image batch of 32 MiB rasters stays under a **384 MiB** ceiling. |
+
+Mutation-tested in two directions, both caught: hoisting the loads into a
+`Promise.all` prefetch (caught by `b`, `d`, `f` and `g`); and deleting the
+`image.decode.end` sentinel (caught by `e`).
+
+**Why the primary claim is OVERLAP and not megabytes.** The obvious test - run
+a batch, assert `rss` stays under N MB - is a GC race wearing an assertion's
+clothes. Node frees a buffer's backing store when the collector gets round to
+it, not when the last reference dies. Measured on this worker's actual shape,
+serial peak growth varied between **65 MiB and 160 MiB across otherwise
+identical runs**. A ceiling tuned to the low end fails on an unrelated pull
+request, and the fix everyone reaches for is to raise it until it stops
+complaining - at which point it asserts nothing. So the deterministic property
+is asserted directly, and `g`'s ceiling is kept as a deliberately coarse
+cross-check **sized from measurement**: serial growth *plateaus* at ~160 MiB and
+stays there as the batch size rises (that plateau is V8's collection threshold,
+not the batch), while parallel growth scales linearly and reaches ~770 MiB at 24
+images. 384 MiB sits 2.4x above the plateau and 2x below the parallel figure.
+**If `g` ever fails, the first thing to check is whether the worker started
+holding every image's bytes - not whether the ceiling needs raising.**
 
 ### 26.3 Findings recorded while building it
 
+**(0a) An RSS assertion over unwritten buffers passes against everything.**
+The first `T-IMG-026g` allocated 24 x 32 MiB `Uint8Array`s and never touched
+them. Untouched pages are not resident, so **RSS moved by ~0 MiB for the serial
+AND the parallel case** - measured at 10.7 MiB serial versus 0.1 MiB parallel,
+i.e. the wrong way round and both meaningless. The harness now writes each
+buffer, at which point the two separate cleanly (65-160 MiB versus ~385 MiB at
+12 images). Any future memory test in this repo has to write what it allocates
+or it is measuring nothing.
+
+**(0b) The buffer-lifetime instrument had the wrong release point, and it
+failed in the SAFE-LOOKING direction.** The tracker first decremented its live
+count in `recordItems`. But `recordItems` is skipped entirely when an image
+fails in a contained way, so the counter leaked one per failed image and
+`T-IMG-026f` reported an overlap of **2 against a perfectly serial worker**.
+The release point is `reportProgress`, the one call the loop makes on both the
+success and the contained-failure path, exactly once per image. Worth stating
+because the failure was a false positive - had the leak been one image smaller
+it would have read as a pass.
+
+**(0c) A `loadImageBytes` failure is batch-fatal by design, and only the
+decode step is contained.** `T-IMG-026f` was first written throwing
+`IMAGE_TOO_LARGE_TO_DECODE` from `loadImageBytes` and failed, because
+`runExtraction` handles only `IMAGES_PURGED` there and rethrows the rest.
+That is correct and deliberate, not a REQ-080/081 breach: a blob that cannot be
+fetched leaves an image **unread**, and in full-update mode an unread image is
+indistinguishable from a shelf of titles the owner deleted - the same reasoning
+the `IMAGES_PURGED` branch already carries. Containment is scoped to the
+decode/read step (`imageScopedFailure`), which is also where the pixel guard's
+own failures would surface. Recorded so the asymmetry is not "fixed" later by
+someone reading REQ-080/081 alone.
 **(a) Module naming - resolved, not guessed.** `specs/api.md` §5.0 names
 `apps/api/src/images/pixelGuard.ts` for the guard, §5.0.1 names
 `packages/domain/src/pixelGuard.ts` for the pure decision and §5.0.3 names
