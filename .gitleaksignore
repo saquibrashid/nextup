@@ -7,14 +7,23 @@
 # fingerprint must never be added without reading the flagged line first: an
 # entry here is invisible in the job output afterwards.
 #
+# ⚠ NEVER QUOTE THE FLAGGED TEXT IN THESE COMMENTS. The first version of this
+# file reproduced the offending line so the next reader could see it, and
+# gitleaks promptly flagged THIS FILE for containing it — one suppression per
+# suppression, forever. Describe the string; do not paste it.
+#
 # Policy is unchanged (`.github/copilot-instructions.md` §6): no secrets in the
 # repo, ever, in the working tree OR in history.
 
-# `// The grouping key for collapse, BIN2-collated in the migration.` — an
-# ordinary code comment. `Latin1_General_100_BIN2` is the SQL Server collation
-# the migration applies to `normalisedText` (ADR-0005 Rev 3,
-# `specs/data-model.md` §16); `generic-api-key` scored the hyphenated token on
-# entropy alone at 3.55. The line no longer exists at HEAD — it was rewritten
-# when TASK-057 took over the column — but gitleaks scans history, so without
-# this the job would fail on every future push forever.
+# An ordinary code comment in the extraction job, naming the SQL Server binary
+# collation that the migration applies to `normalisedText` (ADR-0005 Rev 3,
+# `specs/data-model.md` §16). `generic-api-key` scored that hyphenated
+# identifier on entropy alone at 3.55. The line no longer exists at HEAD — it
+# was rewritten when TASK-057 took over the column — but gitleaks scans
+# history, so without this the job would fail on every future push forever.
 cfef69882f5b6a80f442290a35ef4ab4936fa52e:apps/api/src/jobs/startExtraction.ts:generic-api-key:156
+
+# The self-inflicted one described above: the commit that added this file
+# quoted the line it was suppressing. The quote is gone from HEAD; this covers
+# the commit that still carries it.
+c955fdc942a4530111788be40278422eb92602d4:.gitleaksignore:generic-api-key:13
