@@ -4,6 +4,7 @@
 
 import {
   DEFAULT_MAX_DECODE_PIXELS,
+  EXTRACT_CONFIDENCE_FLOOR,
   OCR_BOX_OVERLAP_MIN,
   OCR_SUPPORT_EXACT,
   OCR_SUPPORT_PARTIAL,
@@ -22,7 +23,7 @@ import {
 // both numbers looking correct in isolation. `T-AI-019` asserts the merge
 // contains no inlined numeric literals; nothing asserts that a duplicate here
 // stays in sync, because it cannot.
-export { OCR_BOX_OVERLAP_MIN, OCR_SUPPORT_EXACT, OCR_SUPPORT_PARTIAL };
+export { EXTRACT_CONFIDENCE_FLOOR, OCR_BOX_OVERLAP_MIN, OCR_SUPPORT_EXACT, OCR_SUPPORT_PARTIAL };
 
 /**
  * How long an uploaded screenshot is retained before the Azure Blob Storage

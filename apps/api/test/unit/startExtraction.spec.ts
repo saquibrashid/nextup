@@ -262,18 +262,55 @@ describe('extractionPorts', () => {
     expect(log).toHaveBeenCalledWith('extraction.progress_write_failed', expect.anything());
   });
 
-  it('T-EXT-010p marks a model title with no legible text as inferred-unverified', async () => {
-    // Provisional until TASK-057 owns the column, and deliberately erring
-    // toward a visible caution: `title-candidate` would assert it passed
-    // heuristics that have not been written.
+  it('T-EXT-010p writes the stage-2 verdict, not a verdict of its own', async () => {
+    // The column belongs to `cleanup()` (TASK-057). This asserts the wiring
+    // hands the item over rather than re-deciding — an artwork-only title the
+    // OCR reader could not corroborate is the RSK-028 fabrication case and
+    // must reach review carrying its mandatory thumbnail caution.
     await startExtraction(OWNER, BATCH, {
       blobStore,
       extractor: extractorReturning({
-        items: [item({ rawText: '', inferredTitle: 'Arcane', basis: 'artwork' })],
+        items: [
+          item({ rawText: '', inferredTitle: 'Arcane', basis: 'artwork', ocrSupport: 'none' }),
+        ],
       }),
     });
 
-    expect(mockCreate.mock.calls[0]?.[1]).toMatchObject({ cleanupVerdict: 'inferred-unverified' });
+    expect(mockCreate.mock.calls[0]?.[1]).toMatchObject({
+      cleanupVerdict: 'inferred-unverified',
+      // §3.1a — the identified work drives matching, and `rawText` stays
+      // verbatim beside it even when it is empty.
+      normalisedText: 'arcane',
+      rawText: '',
+    });
+  });
+
+  it('T-EXT-010r persists the merged candidates, not the raw items', async () => {
+    // `cleanup()` may return FEWER rows than it was given (step-1 fragment
+    // merging). Iterating the raw items instead would write both fragments as
+    // separate candidates and duplicate the title in review.
+    await startExtraction(OWNER, BATCH, {
+      blobStore,
+      extractor: extractorReturning({
+        items: [
+          item({
+            rawText: 'Breaking',
+            inferredTitle: null,
+            provider: 'ocr-only',
+            boundingBox: { x: 0.1, y: 0.2, w: 0.15, h: 0.04 },
+          }),
+          item({
+            rawText: 'Bad',
+            inferredTitle: null,
+            provider: 'ocr-only',
+            boundingBox: { x: 0.26, y: 0.2, w: 0.08, h: 0.04 },
+          }),
+        ],
+      }),
+    });
+
+    expect(mockCreate).toHaveBeenCalledTimes(1);
+    expect(mockCreate.mock.calls[0]?.[1]).toMatchObject({ rawText: 'Breaking Bad' });
   });
 
   it('T-EXT-010q marks a tile with neither text nor an identification unreadable', async () => {

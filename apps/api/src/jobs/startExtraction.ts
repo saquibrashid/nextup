@@ -27,12 +27,7 @@
  * review and the owner closes the batch later (product invariant 5).
  */
 
-import {
-  normaliseTitleText,
-  ulid,
-  type ExtractedTextItem,
-  type TitleExtractor,
-} from '@nextup/domain';
+import { cleanup, ulid, type TitleExtractor } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
 import { createExtractor } from '../extraction/factory.js';
@@ -81,28 +76,6 @@ interface PersistedExtractionStats {
 }
 
 /**
- * PROVISIONAL stage-1 verdict. TASK-057 owns this column and will replace it.
- *
- * ⚠ Every candidate is shown in review whatever the verdict — REQ-012, nothing
- * is dropped — so this only affects how an item is FLAGGED, never whether it
- * survives. It errs toward flagging: an item wrongly marked
- * `inferred-unverified` is a visible caution, whereas one wrongly marked
- * `title-candidate` asserts it passed heuristics that have not been written
- * yet. `'chrome-suspected'` and `'low-confidence'` are deliberately never
- * produced here — they are §3.2 classifications and inventing them from
- * stage-1 fields would pre-empt the classifier with a worse one.
- */
-function provisionalVerdict(item: ExtractedTextItem): string {
-  if (item.inferredTitle === null && item.rawText.trim() === '') {
-    return 'unreadable-tile';
-  }
-  if (item.inferredTitle !== null && item.rawText.trim() === '') {
-    return 'inferred-unverified';
-  }
-  return 'title-candidate';
-}
-
-/**
  * Ports over the real store and database.
  *
  * `imageOrdinals` is closed over rather than derived inside `recordItems`,
@@ -141,27 +114,33 @@ export function extractionPorts(
 
     async recordItems(image, items) {
       const ordinal = imageOrdinals.get(image.imageId) ?? 0;
+      // Stage 2 (`specs/ai.md` §3, TASK-057). It classifies and may MERGE
+      // `ocr-only` fragments of one caption; it never drops one, so the rows
+      // written below still account for every piece of text the readers saw.
+      const cleaned = cleanup(items);
       // Serial, and NOT `Promise.all`. These are inserts against a 5-DTU Basic
       // database from a 0.25-vCPU container; fanning out a screenshot's worth
       // of rows buys nothing and competes with the next image's extraction.
-      for (const item of items) {
+      for (const candidate of cleaned) {
+        const item = candidate.item;
         await createExtractionCandidate(ownerId, {
           id: ulid(),
           batchId,
+          // ALWAYS verbatim, and always shown beside the resolved match
+          // (§3.1a, US-007 AC-3) so the owner can see what was on screen
+          // versus what the reader concluded. Never replaced by `matchText`.
           rawText: item.rawText,
           inferredTitle: item.inferredTitle,
           basis: item.basis,
           ocrSupport: item.ocrSupport,
           provider: item.provider,
           // The grouping key for collapse, BIN2-collated in the migration.
-          // Built from the inferred title when there is one, because that is
-          // what two capture of the same work agree on; `rawText` may differ
-          // by a badge or a truncation.
-          normalisedText: normaliseTitleText(item.inferredTitle ?? item.rawText),
+          normalisedText: candidate.normalisedText,
+          extractedYear: candidate.extractedYear,
           boundingBoxes: JSON.stringify([item.boundingBox]),
           boxSource: item.boxSource,
           ocrConfidence: item.confidence,
-          cleanupVerdict: provisionalVerdict(item),
+          cleanupVerdict: candidate.cleanupVerdict,
           sourceImages: { create: [{ ownerId, imageId: image.imageId, ordinal }] },
         });
       }

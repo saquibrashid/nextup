@@ -30,3 +30,15 @@ export const OCR_SUPPORT_PARTIAL = 0.75;
  * exactly the pairs it exists to accept.
  */
 export const OCR_BOX_OVERLAP_MIN = 0.2;
+
+/**
+ * Provider confidence below this → `cleanupVerdict: 'low-confidence'`
+ * (`specs/ai.md` §3.2 step 7, §7).
+ *
+ * ⚠ A FLAG ON A VISIBLE CANDIDATE, NEVER AN EXCLUSION (§3.1). Nothing below
+ * this floor is dropped, hidden or withheld from matching — it is shown in the
+ * main review list carrying a "low confidence — check this" caution. Using it
+ * as a filter would make a heuristic silently delete real titles, which is the
+ * single failure class this product exists to avoid.
+ */
+export const EXTRACT_CONFIDENCE_FLOOR = 0.55;

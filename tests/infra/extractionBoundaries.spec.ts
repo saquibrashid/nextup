@@ -63,6 +63,27 @@ const FORBIDDEN_FEATURES = ['Caption', 'DenseCaptions', 'Tags', 'Objects', 'Smar
  */
 const SERVICE_NAMES = ['netflix', 'max', 'hbo'];
 
+/**
+ * The ONE file exempt from the service-name ban, and the reason.
+ *
+ * ⚠ A GENUINE CONFLICT BETWEEN TWO SPECS, resolved here rather than by moving
+ * the file somewhere the scanner cannot see it. `specs/ai.md` §3.2 step 3
+ * lists the chrome vocabulary VERBATIM and it includes `hbo max`, `max` and
+ * `netflix` — those words are printed on the screenshots, so an OCR orphan of
+ * a Netflix page header reads exactly `NETFLIX`. Drop them and that orphan
+ * becomes a `title-candidate`, i.e. a false title, which is the rate
+ * `T-AI-030` measures. §2.1b's ban exists for a different reason: RULE B says
+ * the READER is never told which service it is looking at, so nothing may
+ * prompt, branch or steer on the service.
+ *
+ * A fixed vocabulary of on-screen words does neither. What makes that
+ * verifiable rather than asserted is `T-AI-009g` below: the exempt file
+ * IMPORTS NOTHING. A module with no imports has no reader, no request and no
+ * batch to branch on — it cannot become service-conditional without first
+ * failing that case.
+ */
+const CHROME_VOCABULARY = 'packages/domain/src/extraction/chromeTerms.ts';
+
 interface SourceFile {
   relPath: string;
   text: string;
@@ -211,7 +232,27 @@ describe('T-AI-009 — only the Read feature, and no service ever', () => {
   });
 
   it('T-AI-009d · names no streaming service anywhere under extraction/', () => {
-    expect(filesNaming(extractionFiles, SERVICE_NAMES)).toEqual([]);
+    const scanned = extractionFiles.filter((f) => f.relPath !== CHROME_VOCABULARY);
+    // The exemption must never become vacuous by the file being renamed away.
+    expect(extractionFiles.map((f) => f.relPath)).toContain(CHROME_VOCABULARY);
+    expect(filesNaming(scanned, SERVICE_NAMES)).toEqual([]);
+  });
+
+  it('T-AI-009g · the exempt vocabulary imports nothing, so it cannot branch', () => {
+    // This is what buys the exemption. A pure data module has no reader, no
+    // request and no batch in scope, so it cannot be made service-conditional
+    // without first importing something and failing here.
+    const vocabulary = extractionFiles.find((f) => f.relPath === CHROME_VOCABULARY);
+    expect(vocabulary).toBeDefined();
+    expect(stripComments(vocabulary?.text ?? '')).not.toMatch(/(?:^|\n)\s*import\s/);
+    expect(filesNaming([vocabulary!], FORBIDDEN_FEATURES)).toEqual([]);
+  });
+
+  it('T-AI-009h · catches an import added to the exempt vocabulary', () => {
+    const planted: SourceFile[] = [
+      { relPath: CHROME_VOCABULARY, text: `import { service } from '../x.js';` },
+    ];
+    expect(stripComments(planted[0]!.text)).toMatch(/(?:^|\n)\s*import\s/);
   });
 
   it('T-AI-009e · catches a service name leaking into the reader', () => {
