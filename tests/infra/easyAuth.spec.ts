@@ -143,11 +143,19 @@ describe('T-INFRA-008 Easy Auth is configured, and configured closed', () => {
 describe('T-INFRA-008 the secret is a reference, and the two names agree', () => {
   it('T-INFRA-008l: the client secret is a parameter reference, never a literal', () => {
     const app = resourceOfType(template, 'Microsoft.App/containerApps');
-    const secrets = app.properties.configuration.secrets;
-    expect(secrets).toHaveLength(1);
-    // `[parameters('…')]` — supplied at deploy time from a GitHub secret. A
-    // literal here would be a credential committed to a PUBLIC repository.
-    expect(String(secrets[0].value)).toMatch(/^\[parameters\('/);
+    const secrets = app.properties.configuration.secrets as { name: string; value: unknown }[];
+    // ⚠ This used to assert `toHaveLength(1)` and read `secrets[0]`, which
+    // encoded "there is one secret" into a test about what a secret's VALUE
+    // may be. A48 added the TMDB key and the count changed, so the assertion
+    // failed while the property it names was still perfectly true. Checking
+    // EVERY secret is both the stated intent and strictly stronger: a second
+    // secret can no longer be added as a committed literal.
+    expect(secrets.length).toBeGreaterThan(0);
+    for (const secret of secrets) {
+      // `[parameters('…')]` — supplied at deploy time from a GitHub secret. A
+      // literal here would be a credential committed to a PUBLIC repository.
+      expect(String(secret.value)).toMatch(/^\[parameters\('/);
+    }
   });
 
   it('T-INFRA-008m: clientSecretSettingName names a secret that actually exists', () => {

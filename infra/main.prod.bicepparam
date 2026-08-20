@@ -51,6 +51,23 @@ param entraClientSecret = readEnvironmentVariable('NEXTUP_ENTRA_CLIENT_SECRET')
 // defaulting when it cannot read the current revision.
 param holdRevisionName = readEnvironmentVariable('NEXTUP_HOLD_REVISION', '')
 
+// ── Application configuration (A48) ────────────────────────────────────────
+// ⚠ NO DEFAULT ON THE TMDB KEY, AND THAT IS THE POINT. Container Apps rejects
+// an empty secret value, so there is no "deploy now, configure later" state
+// available for it. Failing the deployment when the GitHub secret is missing
+// is strictly better than the alternative it replaces: a green deploy whose
+// app reports every metadata lookup as a transient TMDB outage, forever, with
+// no 401 in any log to say otherwise (docs/runbooks/config-checklist.md §1.4).
+//
+// ⚠ IT MUST BE THE 32-HEX v3 API KEY, NOT THE v4 READ ACCESS TOKEN. Both
+// strings sit on the same TMDB settings page; only the v3 key authenticates
+// this app's query-parameter scheme.
+param tmdbApiKey = readEnvironmentVariable('NEXTUP_TMDB_API_KEY')
+
+// May be empty — the allow-list fails closed, so an empty value denies
+// everyone rather than admitting them. Empty is a locked door, not an open one.
+param allowedSubjects = readEnvironmentVariable('NEXTUP_ALLOWED_SUBJECTS', '')
+
 // ── AI provisioning (TASK-010) ─────────────────────────────────────────────
 // Production is deliberately LEFT OFF until the §9.7 bake-off reports. See
 // main.staging.bicepparam and docs/runbooks/vision-account-reuse.md.

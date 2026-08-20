@@ -152,6 +152,14 @@ jobs:
           NEXTUP_ENTRA_ADMIN_LOGIN: ${{ secrets.ENTRA_ADMIN_LOGIN }}
           NEXTUP_ENTRA_CLIENT_ID: ${{ secrets.ENTRA_CLIENT_ID }}
           NEXTUP_ENTRA_CLIENT_SECRET: ${{ secrets.ENTRA_CLIENT_SECRET }}
+          # A48. ⚠ TMDB_API_KEY IS NOW REQUIRED: a missing repository secret
+          # resolves to '', the .bicepparam has no default for it, and the
+          # deployment FAILS. That is deliberate — Container Apps rejects an
+          # empty secret, so the alternative was never "deploy unconfigured",
+          # it was "deploy something that looks fine and cannot reach TMDB".
+          NEXTUP_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          # Optional. Empty denies everyone; the allow-list fails closed.
+          NEXTUP_ALLOWED_SUBJECTS: ${{ secrets.ALLOWED_SUBJECTS }}
         run: |
           set -euo pipefail
           # ⚠ NO --template-file. A .bicepparam declares its own template with
@@ -248,6 +256,9 @@ jobs:
           NEXTUP_ENTRA_ADMIN_LOGIN: ${{ secrets.ENTRA_ADMIN_LOGIN }}
           NEXTUP_ENTRA_CLIENT_ID: ${{ secrets.ENTRA_CLIENT_ID }}
           NEXTUP_ENTRA_CLIENT_SECRET: ${{ secrets.ENTRA_CLIENT_SECRET }}
+          # A48 — see the staging job above.
+          NEXTUP_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          NEXTUP_ALLOWED_SUBJECTS: ${{ secrets.ALLOWED_SUBJECTS }}
         run: |
           set -euo pipefail
           az deployment group create \

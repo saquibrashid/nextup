@@ -119,6 +119,22 @@ param deployBakeOffModel bool = false
 @secure()
 param entraClientSecret string
 
+// ── Application configuration (A48) ────────────────────────────────────────
+// See the block in aca.bicep for why the TMDB key is REQUIRED (Container Apps
+// rejects an empty secret, so it has no absent state) and why DATABASE_URL is
+// deliberately not here at all (its shape is TASK-141's open decision, and the
+// same rejection means the slot cannot be added empty and filled later).
+//
+// The storage pair is not a parameter because it is not a choice: it is taken
+// from the storage module's own outputs below.
+
+@description('TMDB v3 API key — NOT the v4 read access token. Held as a Container Apps secret.')
+@secure()
+param tmdbApiKey string
+
+@description('Comma-separated Entra subject ids for the NFR-017 allow-list. May be empty; the allow-list fails closed.')
+param allowedSubjects string = ''
+
 // Deterministic, globally-unique names derived from the resource group id, so
 // main.bicep can declare `existing` child resources for RBAC scoping without
 // depending on a module output.
@@ -223,6 +239,13 @@ module aca 'aca.bicep' = {
     openAiEndpoint: aiEndpoints.openAi
     openAiDeployment: aiEndpoints.deployment
     visionEndpoint: aiEndpoints.vision
+    tmdbApiKey: tmdbApiKey
+    allowedSubjects: allowedSubjects
+    // From the storage module's own outputs, so the app can never be pointed
+    // at a container that was not created here — and staging can never be
+    // handed production's.
+    storageBlobEndpoint: storage.outputs.blobEndpoint
+    storageContainerName: storage.outputs.containerName
   }
 }
 

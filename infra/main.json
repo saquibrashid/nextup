@@ -2,6 +2,11 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
   "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.46.1.21595",
+      "templateHash": "17205265843912833964"
+    },
     "description": "nextup infrastructure composition root (Variant A)."
   },
   "parameters": {
@@ -116,6 +121,19 @@
       "metadata": {
         "description": "Client secret of the Easy Auth app registration. Supplied at deploy time."
       }
+    },
+    "tmdbApiKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "TMDB v3 API key — NOT the v4 read access token. Held as a Container Apps secret."
+      }
+    },
+    "allowedSubjects": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Comma-separated Entra subject ids for the NFR-017 allow-list. May be empty; the allow-list fails closed."
+      }
     }
   },
   "variables": {
@@ -169,6 +187,11 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "304084418123119981"
+            },
             "description": "Private screenshot blob storage with a 30-day lifecycle purge."
           },
           "parameters": {
@@ -363,6 +386,11 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "12880557086815054577"
+            },
             "description": "Azure SQL logical server with a Basic prod database and a serverless staging database."
           },
           "parameters": {
@@ -578,6 +606,11 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "17808675744871672526"
+            },
             "description": "Azure OpenAI + Azure AI Vision accounts and the gpt-4.1 vision deployment."
           },
           "parameters": {
@@ -880,12 +913,29 @@
           },
           "visionEndpoint": {
             "value": "[createObject('openAi', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiEndpoint.value, ''), 'deployment', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.openAiDeploymentName.value, ''), 'vision', if(parameters('deployAi'), reference(resourceId('Microsoft.Resources/deployments', 'ai'), '2025-04-01').outputs.visionEndpoint.value, '')).vision]"
+          },
+          "tmdbApiKey": {
+            "value": "[parameters('tmdbApiKey')]"
+          },
+          "allowedSubjects": {
+            "value": "[parameters('allowedSubjects')]"
+          },
+          "storageBlobEndpoint": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'storage'), '2025-04-01').outputs.blobEndpoint.value]"
+          },
+          "storageContainerName": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'storage'), '2025-04-01').outputs.containerName.value]"
           }
         },
         "template": {
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "8565550026873801056"
+            },
             "description": "Container Apps environment and the per-environment app, pulling from ghcr.io."
           },
           "parameters": {
@@ -971,11 +1021,37 @@
               "metadata": {
                 "description": "Azure AI Vision endpoint. Config, not a secret."
               }
+            },
+            "tmdbApiKey": {
+              "type": "securestring",
+              "metadata": {
+                "description": "TMDB v3 API key (32 hex chars) — NOT the v4 read access token, which cannot authenticate this app's query-parameter scheme. Required: see the empty-secret note above."
+              }
+            },
+            "allowedSubjects": {
+              "type": "string",
+              "defaultValue": "",
+              "metadata": {
+                "description": "Comma-separated Entra subject ids permitted by the NFR-017 allow-list. NOT a secret: knowing a subject id grants nothing. Plain config, so unlike the secret above it may legitimately be empty — the allow-list fails CLOSED."
+              }
+            },
+            "storageBlobEndpoint": {
+              "type": "string",
+              "metadata": {
+                "description": "Blob service endpoint for this environment. Config, not a secret — auth is managed identity (ADR-0006), so there is no account key or SAS to hold."
+              }
+            },
+            "storageContainerName": {
+              "type": "string",
+              "metadata": {
+                "description": "Blob container this environment writes to: screenshots for prod, screenshots-staging for staging."
+              }
             }
           },
           "variables": {
             "isProd": "[equals(parameters('environmentName'), 'prod')]",
-            "entraClientSecretName": "entra-client-secret"
+            "entraClientSecretName": "entra-client-secret",
+            "tmdbApiKeySecretName": "tmdb-api-key"
           },
           "resources": [
             {
@@ -1016,6 +1092,10 @@
                     {
                       "name": "[variables('entraClientSecretName')]",
                       "value": "[parameters('entraClientSecret')]"
+                    },
+                    {
+                      "name": "[variables('tmdbApiKeySecretName')]",
+                      "value": "[parameters('tmdbApiKey')]"
                     }
                   ]
                 },
@@ -1052,6 +1132,22 @@
                         {
                           "name": "NEXTUP_VISION_ENDPOINT",
                           "value": "[parameters('visionEndpoint')]"
+                        },
+                        {
+                          "name": "TMDB_API_KEY",
+                          "secretRef": "[variables('tmdbApiKeySecretName')]"
+                        },
+                        {
+                          "name": "NEXTUP_ALLOWED_SUBJECTS",
+                          "value": "[parameters('allowedSubjects')]"
+                        },
+                        {
+                          "name": "AZURE_STORAGE_BLOB_ENDPOINT",
+                          "value": "[parameters('storageBlobEndpoint')]"
+                        },
+                        {
+                          "name": "AZURE_STORAGE_CONTAINER",
+                          "value": "[parameters('storageContainerName')]"
                         }
                       ]
                     }
@@ -1132,7 +1228,8 @@
       },
       "dependsOn": [
         "[resourceId('Microsoft.Resources/deployments', 'ai')]",
-        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName'))]"
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName'))]",
+        "[resourceId('Microsoft.Resources/deployments', 'storage')]"
       ]
     },
     {
@@ -1162,6 +1259,11 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "7100843257089610165"
+            },
             "description": "Grants a principal a role scoped to a single blob container."
           },
           "parameters": {
@@ -1235,6 +1337,11 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "2218706414898512223"
+            },
             "description": "Grants a principal a role scoped to a single Cognitive Services account."
           },
           "parameters": {
@@ -1302,6 +1409,11 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.46.1.21595",
+              "templateHash": "2218706414898512223"
+            },
             "description": "Grants a principal a role scoped to a single Cognitive Services account."
           },
           "parameters": {

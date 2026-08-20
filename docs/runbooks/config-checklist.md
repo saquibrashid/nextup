@@ -29,8 +29,11 @@ Verified read-only against the **serving** revision on 2026-08-20 (see
 `docs/runbooks/scale-up-memory.md` §3a for why you must query the serving
 revision and not the app-level template).
 
-`infra/aca.bicep` sets **six** environment variables, and the deployment
-matches it exactly — so what follows is a **template gap, not drift**:
+**A48 closed most of this gap in the template.** `infra/aca.bicep` now
+sets **ten** environment variables and declares **two** secrets. The rows
+below marked *A48* are wired in the template but will not reach a running
+container until the next deployment, and the two secret-backed ones will
+not reach it at all unless the matching **GitHub secret** exists.
 
 | Set in production | Value source |
 | --- | --- |
@@ -40,30 +43,47 @@ matches it exactly — so what follows is a **template gap, not drift**:
 | `NEXTUP_AOAI_ENDPOINT` | `infra/aca.bicep` |
 | `NEXTUP_AOAI_DEPLOYMENT` | `infra/aca.bicep` |
 | `NEXTUP_VISION_ENDPOINT` | `infra/aca.bicep` |
+| `TMDB_API_KEY` *(A48)* | secret `tmdb-api-key` ← GitHub secret `TMDB_API_KEY` |
+| `NEXTUP_ALLOWED_SUBJECTS` *(A48)* | GitHub secret `ALLOWED_SUBJECTS` (may be empty) |
+| `AZURE_STORAGE_BLOB_ENDPOINT` *(A48)* | `storage.bicep` output — no key, managed identity |
+| `AZURE_STORAGE_CONTAINER` *(A48)* | `storage.bicep` output — per environment |
 
-The only Container Apps **secret** that exists is `entra-client-secret`.
+Container Apps **secrets**: `entra-client-secret` and `tmdb-api-key`.
+That inventory is a **closed set** asserted by `T-INFRA-005m`; a third
+needs a reviewable diff.
 
-🛑 **Not wired at all, in either the template or the deployment:**
-`DATABASE_URL`, `NEXTUP_ALLOWED_SUBJECTS`, `TMDB_API_KEY`,
-`AZURE_STORAGE_ACCOUNT` / `AZURE_STORAGE_BLOB_ENDPOINT`.
+🛑 **THE REQUIRED ACTION BEFORE THE NEXT DEPLOY.** `TMDB_API_KEY` has
+**no default**, because Container Apps rejects an empty secret value
+outright — so a secret-backed setting has no "absent" state available to
+it. If the GitHub secret is missing, **the deployment fails**. That is
+deliberate: the alternative was never "deploy unconfigured", it was
+"deploy something that looks fine and reports every metadata lookup as a
+transient TMDB outage forever" (§1.4).
 
-This is **expected at the current milestone** — `TASK-141` (a real Azure
-SQL database) and `TASK-134` (Azure OpenAI abuse-monitoring approval) are
-both owner-gated and unstarted — but it must not be mistaken for a
-working deployment. Until they are wired:
+Add these repository secrets, then push:
 
-- **Nobody can use the app.** `NEXTUP_ALLOWED_SUBJECTS` fails **closed**:
-  an unset or empty list admits **nobody** (`specs/security.md` §3). This
-  is the correct default and must not be "fixed" by removing the check.
-- **No request that touches data can succeed** — there is no
-  `DATABASE_URL`.
-- **No screenshot can be stored** — there is no storage configuration.
-- **No metadata can be enriched** — there is no `TMDB_API_KEY`.
+| GitHub secret | Required? | Value |
+| --- | --- | --- |
+| `TMDB_API_KEY` | **yes — deploy fails without it** | the **32-hex v3 key**, not the v4 token (§1.4) |
+| `ALLOWED_SUBJECTS` | no, but nobody can sign in without it | comma-separated Entra subject ids |
 
-⚠ **This gap is not visible from the outside.** Easy Auth answers first,
+🛑 **Still not wired: `DATABASE_URL`.** Its shape is `TASK-141`'s open
+decision — managed identity (preferred) versus a Key Vault SQL login —
+and the same empty-secret rejection means the slot **cannot** be added
+now and filled later. Adding it means choosing. Until then **no request
+that touches data can succeed**, and the app's own startup failure keeps
+naming the real cause.
+
+⚠ **None of this is visible from the outside.** Easy Auth answers first,
 so an unauthenticated caller — including the smoke suite — gets an
 identical, correct-looking `401` whether the app behind it is fully
-configured or entirely unconfigured.
+configured or entirely unconfigured. A green `T-SMOKE-*` run is not
+evidence that the app works.
+
+⚠ **`AZURE_STORAGE_ACCOUNT` is read by no code**, in either environment.
+It is a convenient handle for `az storage` commands and nothing more; do
+not write code that depends on it without first adding it to
+`infra/aca.bicep`, where it is deliberately absent.
 
 ---
 

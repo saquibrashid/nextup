@@ -37,6 +37,19 @@ param entraAdminObjectId = readEnvironmentVariable('NEXTUP_ENTRA_ADMIN_OBJECT_ID
 param entraClientId = readEnvironmentVariable('NEXTUP_ENTRA_CLIENT_ID')
 param entraClientSecret = readEnvironmentVariable('NEXTUP_ENTRA_CLIENT_SECRET')
 
+// ── Application configuration (A48) ────────────────────────────────────────
+// Same reasoning as main.prod.bicepparam — see the block there.
+//
+// ⚠ THE VARIABLE NAMES ARE INTENTIONALLY THE SAME as production's. Staging and
+// prod are separate workflow jobs bound to separate GitHub environments, so
+// the isolation is the environment boundary, not the variable name. Renaming
+// these to NEXTUP_STAGING_* would look more careful and would in fact leave
+// staging silently unconfigured.
+param tmdbApiKey = readEnvironmentVariable('NEXTUP_TMDB_API_KEY')
+param allowedSubjects = readEnvironmentVariable('NEXTUP_ALLOWED_SUBJECTS', '')
+
+// ── AI provisioning (TASK-010), owner-approved 2026-08-19, STAGING FIRST ────
+
 // ── AI provisioning (TASK-010), owner-approved 2026-08-19, STAGING FIRST ────
 //
 // Approved here and NOT in main.prod.bicepparam on purpose: the TASK-168

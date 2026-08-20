@@ -17,6 +17,13 @@
  *    store would report 201 while losing the bytes: the row would exist, the
  *    review pass would run, and the image would be unviewable with nothing to
  *    explain why. That is the worst available failure.
+ *  - **The managed-identity path WINS over a connection string (A48).** Both
+ *    variables set is a misconfiguration either way; which one wins decides
+ *    whether it degrades production to a long-lived account key silently, or
+ *    is inert. Only the choice is testable — Azurite has no identity to offer.
+ *  - **The container name comes from the environment (A48).** It was a
+ *    hard-coded constant, which made rbac.bicep's per-container scoping
+ *    pointless: staging asked for production's container by name.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -29,9 +36,30 @@ const deleteIfExists = vi.fn(() => Promise.resolve());
 const getBlockBlobClient = vi.fn(() => ({ uploadData, exists, downloadToBuffer, deleteIfExists }));
 const getContainerClient = vi.fn(() => ({ createIfNotExists, getBlockBlobClient }));
 const fromConnectionString = vi.fn(() => ({ getContainerClient }));
+/** Records the (endpoint, credential) pair the identity path constructs with. */
+const blobServiceCtor = vi.fn();
+const credentialCtor = vi.fn();
 
 vi.mock('@azure/storage-blob', () => ({
-  BlobServiceClient: { fromConnectionString: () => fromConnectionString() },
+  BlobServiceClient: Object.assign(
+    class {
+      constructor(...args: unknown[]) {
+        blobServiceCtor(...args);
+      }
+      getContainerClient(name: string) {
+        return getContainerClient(name);
+      }
+    },
+    { fromConnectionString: () => fromConnectionString() },
+  ),
+}));
+
+vi.mock('@azure/identity', () => ({
+  DefaultAzureCredential: class {
+    constructor() {
+      credentialCtor();
+    }
+  },
 }));
 
 const { azureImageBlobStore, blobPathFor, IMAGE_CONTAINER, resetBlobStoreForTests } =
@@ -44,11 +72,15 @@ beforeEach(() => {
   vi.clearAllMocks();
   exists.mockResolvedValue(true);
   process.env['AZURE_STORAGE_CONNECTION_STRING'] = 'UseDevelopmentStorage=true';
+  delete process.env['AZURE_STORAGE_BLOB_ENDPOINT'];
+  delete process.env['AZURE_STORAGE_CONTAINER'];
 });
 
 afterEach(() => {
   resetBlobStoreForTests();
   delete process.env['AZURE_STORAGE_CONNECTION_STRING'];
+  delete process.env['AZURE_STORAGE_BLOB_ENDPOINT'];
+  delete process.env['AZURE_STORAGE_CONTAINER'];
 });
 
 describe('T-SEC-003 the screenshot container is private and its paths carry no client input', () => {
@@ -125,5 +157,104 @@ describe('T-SEC-003 configuration failures are loud', () => {
     resetBlobStoreForTests();
     await azureImageBlobStore.put(PATH, new Uint8Array([1]), 'png');
     expect(fromConnectionString).toHaveBeenCalledTimes(2);
+  });
+
+  it('T-SEC-003h: the error names BOTH variables, so neither path is a guess', async () => {
+    delete process.env['AZURE_STORAGE_CONNECTION_STRING'];
+    resetBlobStoreForTests();
+
+    // Naming only the connection string would send whoever reads it towards
+    // the account-key path ADR-0006 forbids — the message would be steering
+    // them at the wrong fix while sounding authoritative.
+    await expect(azureImageBlobStore.put(PATH, new Uint8Array([1]), 'png')).rejects.toThrow(
+      /AZURE_STORAGE_BLOB_ENDPOINT/,
+    );
+  });
+});
+
+describe('T-SEC-003 the identity path wins, and the container is per-environment (A48)', () => {
+  it('T-SEC-003i: an endpoint alone uses managed identity, never a key', async () => {
+    delete process.env['AZURE_STORAGE_CONNECTION_STRING'];
+    process.env['AZURE_STORAGE_BLOB_ENDPOINT'] = 'https://stnextupprod.blob.core.windows.net/';
+    resetBlobStoreForTests();
+
+    await azureImageBlobStore.put(PATH, new Uint8Array([1]), 'png');
+
+    expect(credentialCtor).toHaveBeenCalledTimes(1);
+    expect(fromConnectionString).not.toHaveBeenCalled();
+    expect(blobServiceCtor.mock.calls[0]?.[0]).toBe('https://stnextupprod.blob.core.windows.net/');
+  });
+
+  it('T-SEC-003j: with BOTH set the endpoint wins, so a stray key is inert', async () => {
+    // ⚠ THE ORDER IS THE SECURITY PROPERTY, not a preference. A connection
+    // string carries an AccountKey. If it won, one stray variable would
+    // silently downgrade production from identity auth to a long-lived
+    // credential — and everything would keep working, which is what makes
+    // that direction dangerous. This way the same mistake changes nothing.
+    process.env['AZURE_STORAGE_CONNECTION_STRING'] = 'UseDevelopmentStorage=true';
+    process.env['AZURE_STORAGE_BLOB_ENDPOINT'] = 'https://stnextupprod.blob.core.windows.net/';
+    resetBlobStoreForTests();
+
+    await azureImageBlobStore.put(PATH, new Uint8Array([1]), 'png');
+
+    expect(fromConnectionString).not.toHaveBeenCalled();
+    expect(credentialCtor).toHaveBeenCalledTimes(1);
+  });
+
+  it('T-SEC-003k: createIfNotExists is NOT called against a real account', async () => {
+    // In Azure the container is made by storage.bicep and the app's grant is
+    // scoped to that one container, so a create call is at best redundant and
+    // at worst a 403 on the first upload of every deployment.
+    delete process.env['AZURE_STORAGE_CONNECTION_STRING'];
+    process.env['AZURE_STORAGE_BLOB_ENDPOINT'] = 'https://stnextupprod.blob.core.windows.net/';
+    resetBlobStoreForTests();
+
+    await azureImageBlobStore.put(PATH, new Uint8Array([1]), 'png');
+
+    expect(createIfNotExists).not.toHaveBeenCalled();
+    expect(uploadData).toHaveBeenCalledTimes(1);
+  });
+
+  it('T-SEC-003m: staging writes to ITS OWN container, not production\u2019s', async () => {
+    // The bug this replaces: the name was a constant, so staging asked for
+    // `screenshots` every time. rbac.bicep scopes each environment's grant to
+    // its own container, so that guaranteed only that staging would be
+    // REFUSED — and had the two ever shared a credential, staging would have
+    // written the owner's test screenshots into the production container.
+    process.env['AZURE_STORAGE_CONTAINER'] = 'screenshots-staging';
+    resetBlobStoreForTests();
+
+    await azureImageBlobStore.put(PATH, new Uint8Array([1]), 'png');
+
+    expect(getContainerClient).toHaveBeenCalledWith('screenshots-staging');
+    expect(getContainerClient).not.toHaveBeenCalledWith(IMAGE_CONTAINER);
+  });
+
+  it('T-SEC-003n: an unset or blank container name falls back to the default', async () => {
+    // Blank as well as unset: an ARM parameter that resolves to '' is the
+    // realistic failure, and treating it as a container named '' would fail
+    // far from the cause.
+    process.env['AZURE_STORAGE_CONTAINER'] = '   ';
+    resetBlobStoreForTests();
+
+    await azureImageBlobStore.put(PATH, new Uint8Array([1]), 'png');
+
+    expect(getContainerClient).toHaveBeenCalledWith(IMAGE_CONTAINER);
+  });
+
+  it('T-SEC-003p: the credential is memoised, and the reset seam forgets it too', async () => {
+    // A fresh DefaultAzureCredential per call re-walks the credential chain
+    // and re-hits IMDS instead of using the token cache the instance holds.
+    delete process.env['AZURE_STORAGE_CONNECTION_STRING'];
+    process.env['AZURE_STORAGE_BLOB_ENDPOINT'] = 'https://stnextupprod.blob.core.windows.net/';
+    resetBlobStoreForTests();
+
+    await azureImageBlobStore.put(PATH, new Uint8Array([1]), 'png');
+    await azureImageBlobStore.put(PATH, new Uint8Array([1]), 'png');
+    expect(credentialCtor).toHaveBeenCalledTimes(1);
+
+    resetBlobStoreForTests();
+    await azureImageBlobStore.put(PATH, new Uint8Array([1]), 'png');
+    expect(credentialCtor).toHaveBeenCalledTimes(2);
   });
 });

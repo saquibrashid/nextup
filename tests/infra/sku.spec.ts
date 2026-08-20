@@ -156,15 +156,32 @@ describe('T-INFRA-005 SKU pinning and the compute/guard pair', () => {
     //
     // A secret cannot feed a registry while `registries` is empty (asserted
     // above and mutation-covered by T-INFRA-005r), so what is left to protect
-    // is that the secret INVENTORY stays closed: exactly one secret, and it is
-    // the one Easy Auth references. A second secret — a restored `ghcr-token`
-    // among them — fails here and needs a reviewable diff to justify.
+    // is that the secret INVENTORY stays closed: a known, enumerated set, and
+    // Easy Auth's reference resolves into it. A second secret — a restored
+    // `ghcr-token` among them — fails here and needs a reviewable diff to
+    // justify.
+    //
+    // ⚠ WIDENED ONCE, AT A48, AND THIS IS THAT REVIEWABLE DIFF. `tmdb-api-key`
+    // joined the set: TMDB is a third-party HTTP API with no managed-identity
+    // option, so unlike blob storage, AOAI and Vision it cannot be reached
+    // without a held credential. The set stays CLOSED and exhaustive — adding
+    // a third still fails here.
+    //
+    // The names are ARM VARIABLE REFERENCES, not literals, because aca.bicep
+    // declares each name once in a `var` and uses it in both the secret and
+    // the matching `secretRef`. That indirection is what T-INFRA-008m relies
+    // on to prove the two halves cannot drift apart.
+    const ALLOWED_SECRETS = [
+      "[variables('entraClientSecretName')]",
+      "[variables('tmdbApiKeySecretName')]",
+    ];
     const secrets = app.properties.configuration.secrets ?? [];
     const authConfig = resourceOfType(template, 'Microsoft.App/containerApps/authConfigs');
     const easyAuthSecret =
       authConfig.properties.identityProviders.azureActiveDirectory.registration
         .clientSecretSettingName;
-    expect(secrets.map((s) => String(s.name))).toEqual([String(easyAuthSecret)]);
+    expect(secrets.map((s) => String(s.name)).sort()).toEqual([...ALLOWED_SECRETS].sort());
+    expect(ALLOWED_SECRETS).toContain(String(easyAuthSecret));
   });
 
   it('T-INFRA-005s: catches a second, unexplained secret joining the inventory', () => {

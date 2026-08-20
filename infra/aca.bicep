@@ -99,6 +99,46 @@ param openAiDeployment string
 param visionEndpoint string
 
 // ---------------------------------------------------------------------------
+// THE SETTINGS THAT MADE A DEPLOYED APP A NON-WORKING ONE (A48).
+//
+// Until now this template set six environment variables and no more, so a
+// deployment that ARM reported as Succeeded had no allow-list, no metadata key
+// and nowhere to put screenshots. That was invisible from outside: Easy Auth
+// answers before any application code runs, so a fully configured app and an
+// entirely unconfigured one both return an identical, correct-looking 401 —
+// which is why a green T-SMOKE-* run is not evidence that the app works.
+//
+// ⚠ `secrets` AND `env` MUST STAY LITERAL ARRAYS. The obvious implementation
+// here is conditional array concatenation, so an unsupplied value emits no
+// entry. It compiles, and it silently disarms the infra gates: `concat()`
+// becomes a single ARM expression STRING, so `tests/infra/**` — which reads
+// the committed main.json statically — can no longer see any element. That
+// took T-INFRA-005's compute/decode-guard pair (invariant 14) and
+// T-INFRA-008's secret-name agreement down together, 21 tests, while the
+// template itself still deployed. A dynamic template is an unguarded one.
+//
+// ⚠ AND AN EMPTY SECRET VALUE IS NOT A FALLBACK. Container Apps rejects
+// `value: ''` outright (azure-container-apps#660, #1291), so a secret-backed
+// setting has no "absent" state available to it at all: it is supplied, or the
+// deployment fails. Hence tmdbApiKey has NO default — a missing GitHub secret
+// must fail the deploy loudly rather than produce a running app that reports
+// every metadata lookup as a transient TMDB outage forever.
+// ---------------------------------------------------------------------------
+
+@description('TMDB v3 API key (32 hex chars) — NOT the v4 read access token, which cannot authenticate this app\'s query-parameter scheme. Required: see the empty-secret note above.')
+@secure()
+param tmdbApiKey string
+
+@description('Comma-separated Entra subject ids permitted by the NFR-017 allow-list. NOT a secret: knowing a subject id grants nothing. Plain config, so unlike the secret above it may legitimately be empty — the allow-list fails CLOSED.')
+param allowedSubjects string = ''
+
+@description('Blob service endpoint for this environment. Config, not a secret — auth is managed identity (ADR-0006), so there is no account key or SAS to hold.')
+param storageBlobEndpoint string
+
+@description('Blob container this environment writes to: screenshots for prod, screenshots-staging for staging.')
+param storageContainerName string
+
+// ---------------------------------------------------------------------------
 // THE COMPUTE / DECODE-GUARD PAIR (REQ-079, A43, invariant 14).
 //
 // cpu / memory and NEXTUP_MAX_DECODE_PIXELS are ONE SETTING IN TWO PLACES and
@@ -133,6 +173,10 @@ var isProd = environmentName == 'prod'
 // they drift, Easy Auth starts with no secret — and a misconfigured provider
 // fails CLOSED (nobody, including the owner, can sign in), which is loud.
 var entraClientSecretName = 'entra-client-secret'
+
+// Same drift risk as the Easy Auth name above, and the same mitigation: named
+// once, referenced from both the `secrets` array and the matching `secretRef`.
+var tmdbApiKeySecretName = 'tmdb-api-key'
 
 // Shared across both environments — one managed environment, one Log Analytics
 // workspace (ADR-0003 R2.4: "no separate Log Analytics workspace").
@@ -217,15 +261,29 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
       // narrow it to one repository. Adding a half-configured `registries`
       // entry is also strictly worse than none: it fails CLOSED, because the
       // anonymous pull path is no longer attempted.
-      // The ONLY secret in this system. It is the Entra app registration's
-      // client secret, supplied at deploy time from a GitHub secret via
-      // `readEnvironmentVariable` in the .bicepparam — never a literal, never
-      // committed. Everything else authenticates with the system-assigned
-      // managed identity, and there is deliberately no registry credential.
+      // Two secrets, and no more. The Entra app registration's client secret
+      // and the TMDB key are both supplied at deploy time from GitHub secrets
+      // via `readEnvironmentVariable` in the .bicepparam — never literals,
+      // never committed.
+      //
+      // Everything else authenticates with the system-assigned managed
+      // identity: Azure OpenAI, Azure AI Vision and — since A48 — Blob
+      // Storage, which is why the storage settings below are plain config and
+      // NOT secrets. There is deliberately no registry credential.
+      //
+      // ⚠ DATABASE_URL IS NOT HERE. Its shape is TASK-141's open decision
+      // (managed identity, preferred, vs a Key Vault SQL login), and because
+      // Container Apps rejects an empty secret there is no way to add the slot
+      // now and fill it later — adding it means choosing. Left absent so the
+      // app's own startup failure keeps naming the real cause.
       secrets: [
         {
           name: entraClientSecretName
           value: entraClientSecret
+        }
+        {
+          name: tmdbApiKeySecretName
+          value: tmdbApiKey
         }
       ]
     }
@@ -262,6 +320,35 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'NEXTUP_VISION_ENDPOINT'
               value: visionEndpoint
+            }
+            {
+              name: 'TMDB_API_KEY'
+              secretRef: tmdbApiKeySecretName
+            }
+            // May be empty, and empty DENIES everyone — `allowList.ts` fails
+            // closed. That is the safe direction for a control whose failure
+            // mode would otherwise be an open door.
+            {
+              name: 'NEXTUP_ALLOWED_SUBJECTS'
+              value: allowedSubjects
+            }
+            // Config, not secrets: auth is the managed identity, so there is
+            // no account key and no SAS to hold (ADR-0006).
+            //
+            // ⚠ THE CONTAINER NAME MUST BE PASSED PER ENVIRONMENT. It used to
+            // be hard-coded in apps/api/src/storage/blobStore.ts, which made
+            // rbac.bicep's per-container scoping pointless: staging asked for
+            // the production container by name every time, so the isolation
+            // guaranteed only that staging would be REFUSED — and had the two
+            // ever shared a credential, staging would have written the owner's
+            // test screenshots into production's container instead.
+            {
+              name: 'AZURE_STORAGE_BLOB_ENDPOINT'
+              value: storageBlobEndpoint
+            }
+            {
+              name: 'AZURE_STORAGE_CONTAINER'
+              value: storageContainerName
             }
           ]
         }
