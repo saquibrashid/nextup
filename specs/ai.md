@@ -177,8 +177,16 @@ owner will see is computed.
 ⚠ **`NFR-012a` — model selection is a quality decision, never a cost
 decision.** `gpt-4.1-mini` is configurable and is ~$0.40/month cheaper.
 **It must not be selected to save money.** The only admissible reason to
-change `NEXTUP_AOAI_MODEL` is a measured improvement on the §9 gates,
+change **`NEXTUP_AOAI_DEPLOYMENT`** is a measured improvement on the §9 gates,
 recorded as an ADR-0001 addendum.
+
+⚠ **The model is pinned by `NEXTUP_AOAI_DEPLOYMENT`, not by a model name.**
+An Azure OpenAI *deployment* binds a model and a version, and the SDK call
+takes the deployment name; there is no separate model parameter to set.
+~~`NEXTUP_AOAI_MODEL`~~ was named here and in `docs/backlog.md` TASK-133, is
+read by no code and set nowhere, and **setting it would silently do nothing** —
+which is worse than its absence, because an operator changing it would believe
+they had changed the model (found by lane D at `A48`).
 
 **Call parameters — every one of these is load-bearing:**
 
