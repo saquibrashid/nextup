@@ -352,6 +352,7 @@ Ordered by the trigger that promotes each, not by preference.
 
 | Item | Requirement | Promotion trigger |
 |---|---|---|
+| **Waiting to stream — rental-release discovery** *(first v1.1 epic, owner-decided `A48`)* | **REQ-082 – REQ-087** | **v1 closes.** This is the first epic after v1 and is already **specified in full** — PRD Epic L / US-040…US-043, and **ADR-0010** for the load-bearing decisions. It depends on Epics C (matching), D (review pass) and I (suppression), which is the only reason it is not in v1. ⚠️ **Read ADR-0010 §5 before starting.** "Fandango at Home" also appears in `BRD.md` §6.2 under REQ-048 as a deferred *service*; building this as a service inverts it and makes the first full-update capture propose deleting the entire waiting list. ⚠️ Promotion also **requires amending US-036 AC-2, product invariant 5 and `T-CI-005` from two non-owner processes to three**, in the same change (ADR-0010 §4). |
 | Owner-controlled backup/export **UI** | OQ-025 | The owner runs `scripts/export-owner-data.ts` (TASK-131) more than twice. REQ-028 forbids the store from ever deleting anything, but provides no owner-controlled way to get the data *out* — the script closes that gap at MVP; a UI is the follow-up. |
 | Bulk edit in the review pass | **REQ-037** | Checkpoint 1 shows the review pass is intolerable **and** the diagnosed cause is per-row editing. If the cause is something else, this is the wrong fix. |
 | Multi-user / sharing | **REQ-035** | A second real user exists. Until then it only adds an authorisation surface. |

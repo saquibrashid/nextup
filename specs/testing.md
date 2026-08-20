@@ -3525,3 +3525,34 @@ Staging's serverless vCore rate is `.63`/hour in `centralus` against
 `.52` in `eastus2` (+21%); with `autoPauseDelay` in force staging bills
 essentially nothing, but the **worst case if `autoPauseDelay` is ever deleted
 rises from ~`` to ~``/month** (`T-INFRA-005t`--`w`).
+
+---
+
+## 33. Waiting to stream (v1.1) — where its test ids live, and why not here
+
+The v1.1 rental-discovery epic (PRD Epic L, US-040 - US-043, REQ-082 - REQ-087,
+ADR-0010) has a complete id-to-AC mapping already written. It lives in
+**ADR-0010 section 6**, not in this document.
+
+That is deliberate. `check:orphans` (`T-META-006e`) fails on any id defined
+here that no backlog task owns and no suite implements, and it is correct to:
+per section 21.1, a defined-but-unbuilt acceptance criterion is the failure
+mode where every gate passes, the ledger reaches 100%, and the behaviour is
+simply absent. Defining a whole epic's ids here before the epic is scheduled
+would manufacture exactly that state.
+
+**When Epic L is promoted, move those tables into this document in the same
+change that adds its tasks to `docs/backlog.md`** - the two must land
+together, so the ids are never defined without an owner. Do **not** route
+around the gate by adding them to `BASELINE_ORPHANS`; that list may only
+shrink.
+
+One consequence is already recorded in ADR-0010 section 6.3 and is worth
+repeating here, because it lands on a gate this document owns: **`T-CI-005`
+asserts that exactly two non-owner-initiated processes exist.** The
+availability refresh is a third, so `T-CI-005` goes red the moment Epic L
+lands. The correct response is to **amend the count to three** - naming the
+refresh, and asserting it is metadata-only and access-triggered - alongside
+`PRD.md` US-036 AC-2 and product invariant 5. The wrong response is to relax
+the gate into counting nothing in particular: its entire value is that the
+number is exact and small.

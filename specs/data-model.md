@@ -2321,3 +2321,73 @@ Mitigations, none of which fully restores the 35-day window:
   mitigation and it is nearly free.
 - **Long-Term Retention (LTR)** is the named escalation if exports prove
   insufficient; it is not configured at MVP (cost/complexity).
+
+---
+
+## 17. WAITING TO STREAM — v1.1 DATA MODEL (NOT PART OF v1)
+
+> ⚠️ **DO NOT BUILD THIS IN v1, AND DO NOT WRITE A MIGRATION FOR IT.**
+> This section exists so the v1.1 epic is not re-derived from scratch, and so
+> that v1 choices do not accidentally preclude it. It is **not** part of §15
+> or §16, which remain the authoritative v1 model. A v1 lane agent that finds
+> this section should treat it as documentation, not as work.
+>
+> Decisions and traps: **ADR-0010**. Requirements: **REQ-082 – REQ-087**.
+> Stories: **PRD Epic L, US-040 – US-043**.
+
+### 17.1 `WatchIntent`
+
+*"The owner wants this work and it is not on a service they have."*
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | `uuid` | |
+| `ownerId` | `uuid` | Every query is owner-scoped, as everywhere else |
+| `titleId` | `uuid` → `Title` | The matched canonical work |
+| `workIdentity` | `nvarchar` | Denormalised for the suppression join, exactly as elsewhere (REQ-071) |
+| `discoveredAt` | `datetime2` | ⚠️ A **discovery** date, NOT a date-added. It must never feed the REQ-038 title-level date sort, which is defined over `ServiceListing.dateAdded` |
+| `sourceBatchId` | `uuid` → `UploadBatch` | Provenance, as for every other record |
+| `discoverySource` | `nvarchar` | The storefront browsed, e.g. `fandango-at-home`. ⚠️ **NOT a `SERVICES` member** and must not be stored in, validated against, or widened into that enum (ADR-0010 D-1) |
+| `state` | `nvarchar` | `waiting` \| `satisfied` \| `suppressed`. Soft only — see 17.4 |
+| `satisfiedAt` | `datetime2?` | Set when the work enters the combined list by the ordinary capture path |
+| `availabilityCheckedAt` | `datetime2?` | `NULL` = never checked. Drives the lazy refresh (REQ-086) |
+| `availableOn` | `nvarchar?` | JSON array of provider identifiers reported `flatrate` for the owner's region. `NULL` ≠ "not streaming anywhere" — it means *not known* (ADR-0010 Trap 4) |
+| `availabilityRegion` | `nvarchar` | Explicit, never implicit. `US` assumed; **OQ-030** must confirm before build, because a wrong region makes every availability answer wrong |
+
+**Constraints**
+
+- Unique on `(ownerId, titleId)` **filtered to `state = 'waiting'`** — one open
+  intent per work, while still allowing a historical satisfied row and a later
+  re-discovery. Filtered unique index, therefore raw migration SQL (§16).
+- Index `(ownerId, state, availabilityCheckedAt)` — the refresh query is
+  "waiting intents for this owner whose check is older than
+  `WATCH_PROVIDER_MAX_AGE_DAYS`", and it must not table-scan.
+
+### 17.2 What must NOT change
+
+- ⚠️ **`SERVICES` stays `['netflix','max']`.** A discovery source is not a
+  service. `listings` stays capped at `SERVICES.length`.
+- ⚠️ **`ServiceListing` is NOT reused** for the waiting state (ADR-0010 Trap
+  3). It asserts membership of a saved list on a service; a `WatchIntent`
+  asserts the opposite. Overloading it would put waiting rows into the combined
+  list's own query path and make the REQ-025 badge count wrong.
+- ⚠️ **`TITLE_STATES` does not gain a `waiting` member.** For the same reason
+  `'suppressed'` is deliberately absent (see the comment in
+  `packages/domain/src/enums.ts`): the waiting set is a different relation, not
+  a state of a combined-list row.
+
+### 17.3 The third age constant
+
+`WATCH_PROVIDER_MAX_AGE_DAYS` is declared in `apps/api/src/config.ts`
+**independently** of `TMDB_METADATA_MAX_AGE_DAYS = 183` (NFR-014) and
+`IMAGE_RETENTION_DAYS = 30` (NFR-019). `T-INV-008` currently forces the
+existing two apart and must be extended to three. ⚠️ Binding availability to
+the 183-day metadata age would make the feature inert — availability is the
+fast-moving signal the epic exists to catch.
+
+### 17.4 Retention
+
+REQ-028 applies unchanged: **nothing is ever hard-deleted.** A satisfied or
+suppressed `WatchIntent` is retained forever. There is no TTL and no scheduled
+deletion, here or anywhere. `T-INV-012` (the sanctioned-hard-delete gate) must
+continue to show exactly one sanctioned hard delete after this epic ships.

@@ -210,8 +210,9 @@ A title was removed months ago. It shows up again in a new capture. nextup creat
 | I | Suppression | Not-interested that survives reappearance. | US-027, US-028, US-029 |
 | J | Recovery | Fix match, batch undo, undo refusal, re-extraction, image retention. | US-030, US-031, US-032, US-033, US-034, US-035 |
 | K | Platform guarantees | The invariants that make the rest safe. | US-036, US-037, US-038, US-039 |
+| **L** *(v1.1 — specified, not scheduled)* | **Waiting to stream** | Record what I noticed on a rental storefront, and tell me when it reaches a service I have. | US-040, US-041, US-042, US-043 |
 
-Story order within an epic is dependency order. Epic order A → K is a viable build order; see §12.1.
+Story order within an epic is dependency order. Epic order A → K is a viable build order; see §12.1. **Epic L is v1.1 and follows the whole of A–K** — it depends on Epics C, D and I being complete. See ADR-0010 and `roadmap.md` §5.
 
 ---
 
@@ -226,6 +227,13 @@ Terminology used throughout the acceptance criteria:
 - **Batch (UploadBatch)** — one upload event: exactly one service, exactly one mode, one or more images, one review pass, one close.
 - **Suppression** — a per-owner record keyed on canonical work identity that hides a work and blocks its re-creation.
 - **Closed** — the owner has completed the review pass and committed the batch. Before close, no list state has changed.
+
+Added at `A48` for **Epic L (v1.1)** — these terms have no meaning in v1:
+
+- **Discovery source** — a place the owner *browses*, whose contents are editorial rather than curated by them (e.g. a rental storefront's new-release page). ⚠ **Not a service:** no `SERVICES` member, no badge, no `ServiceListing`, no reconciliation, append-only always (ADR-0010 D-1/D-2).
+- **WatchIntent** — a per-owner record meaning *"I want to watch this and it is not on a service I have."* It has **no service** and its date is a **discovery** date, not a date-added. It is not a `ServiceListing` and must never be modelled as one (ADR-0010 Trap 3).
+- **Availability** — a **cached, region-specific** answer from TMDB's watch-provider (JustWatch-sourced) data about where a work can be streamed. It is a lagging cache, never a fact, and is always rendered with its as-of date (ADR-0010 Trap 4).
+- **Graduation** — a `WatchIntent` being satisfied because the owner added the work on a real service and a capture picked it up. Always owner-initiated; never an automatic consequence of an availability refresh.
 
 ### Epic A — Access and ownership
 
@@ -1121,6 +1129,139 @@ Terminology used throughout the acceptance criteria:
 
 **Out of scope for this story:** the technology selection itself, which belongs to the architecture phase and its ADRs.
 **Open questions:** OQ-005 (AC-5), OQ-019 (identity provider).
+
+---
+
+### Epic L — Waiting to stream (rental-release discovery) — **v1.1**
+
+**Status: specified, not scheduled for v1.** Promotion trigger and rationale
+in `roadmap.md` §5; the load-bearing decisions and their traps in
+**ADR-0010**. This epic depends on the review pass (Epic D), suppression
+(Epic I) and TMDB matching (Epic C) all being complete, which is why it
+follows v1 rather than joining it.
+
+**The problem, in the owner's words (`A48`):** *"I'd also like to track movies
+/ shows that are just released for rent… I wait for them to be available via
+one of the streaming apps. But sometimes I lose track of what I wanted to
+watch as these movies drop off of the recent rent movies list and I don't
+always see them and able to connect them to the streaming apps… it's not a
+formal list or app capability that I use. Instead, I just peruse the list and
+make a mental list."*
+
+Two failures, and the second is the one that justifies the epic:
+
+- **F-1 (memory):** the title is forgotten once it rotates off the rental
+  storefront's new-release page.
+- **F-2 (connection):** it later lands on Netflix or Max and the owner never
+  notices.
+
+⚠ **A rental storefront is a DISCOVERY SOURCE, not a service (ADR-0010 D-1).**
+It has no member in `SERVICES`, no badge and no `ServiceListing`. See the
+`REQ-048` trap in ADR-0010 §5 before writing any code: the same brand name
+("Fandango at Home") appears in `BRD.md` §6.2 as a deferred *service*, and
+building this as that is a data-loss defect, not a shortcut.
+
+#### US-040 — Capture a rental storefront's new-release page
+
+**As** the owner
+**I want** to screenshot the new-for-rent page and have nextup read it
+**So that** a title I noticed is recorded instead of being remembered
+
+**Traces to:** REQ-082, REQ-083
+**Priority:** must *(within v1.1)*
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | A batch whose source is a rental storefront | It is created | Its mode is **append-only**, and the API **refuses** `full-update` for this source with an explanatory error (REQ-083, ADR-0010 D-2) |
+| AC-2 | Such a batch | Extraction runs | It uses the **same** ingest, extraction, cross-check and TMDB matching path as a service capture — no parallel pipeline exists (REQ-082) |
+| AC-3 | Such a batch | It is closed | No `ServiceListing` is created, no service badge is affected, and the combined list is byte-identical before and after (ADR-0010 D-1, Trap 3) |
+| AC-4 | The reconciliation logic | A discovery batch is closed | It never runs. Absence of a title from a later capture of the same page means **nothing** and can never propose a removal (REQ-083) |
+| AC-5 (edge) | A work already in the combined list | It appears on the rental page and is confirmed | No `WatchIntent` is created — the owner already has it; the review pass says so rather than silently doing nothing (REQ-084) |
+| AC-6 (failure) | A caller that attempts `full-update` on a discovery batch by crafting the request directly | The request is made | It is refused at the API boundary, not merely hidden in the UI (REQ-083) |
+
+**Out of scope for this story:** adding the storefront as a service (REQ-048, v2).
+**Open questions:** none.
+
+#### US-041 — Curate the rental page down to what I actually want
+
+**As** the owner
+**I want** to keep the two or three titles I care about and never see the rest again
+**So that** a page of forty new releases does not become forty rows of noise
+
+**Traces to:** REQ-084, REQ-085
+**Priority:** must *(within v1.1)*
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | A discovery review pass | It is rendered | **Every** extracted title is shown, and every disposition defaults to `pending` — nothing enters the waiting list without an explicit action (REQ-014, no accept-by-inaction) |
+| AC-2 | A candidate the owner **discards** in a discovery review pass | The batch is closed | A `Suppression` is created for that canonical work (REQ-085, ADR-0010 D-5) |
+| AC-3 | A suppressed work | The same page is captured again next week | It does not appear in the review pass **at all** — the check is before record creation (US-028 AC-2, REQ-071) |
+| AC-4 | The rationale | Any implementation review | Without AC-2, a rotating editorial feed re-presents the same rejects on every capture and the review pass is unusable within about three captures. This MUST be asserted by a test that captures the same page twice with a discard in between and verifies the second review pass is empty of it (NFR-003) |
+| AC-5 (edge) | The **same** discard behaviour in a Netflix or Max review pass | A candidate is discarded | It does **not** suppress. Discard-suppresses is scoped to discovery sources only, because a curated saved list does not re-present its rejects (REQ-085) |
+| AC-6 (failure) | Suppression fails to persist while closing a discovery batch | The owner closes the batch | The close fails as one transaction; no partial curation is committed |
+
+**Out of scope for this story:** a reason or rating on the suppression.
+**Open questions:** none.
+
+#### US-042 — Be told when a waiting title starts streaming
+
+**As** the owner
+**I want** nextup to notice when something I'm waiting on reaches Netflix or Max
+**So that** I stop missing the moment it becomes watchable
+
+**Traces to:** REQ-086, REQ-087
+**Priority:** must *(within v1.1 — this is the story that justifies the epic)*
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | A `WatchIntent` whose availability was last checked longer ago than `WATCH_PROVIDER_MAX_AGE_DAYS` | The owner **opens the waiting view** | Its availability is refreshed from TMDB's watch-provider data for the owner's region (REQ-086, ADR-0010 D-3) |
+| AC-2 | That refresh | It runs | It happens **on access only**. No scheduler, timer, queue or background worker exists for it, and if the owner never opens the view no request is ever made (REQ-041, ADR-0010 §4) |
+| AC-3 | A work TMDB reports as `flatrate` on a service in `SERVICES` | The waiting view renders | It is flagged **"Now on <service> — add it to your list"** with a link, and it is **not** added to the combined list (ADR-0010 D-4, §4) |
+| AC-4 | The refresh | It completes | It changes availability metadata **only**. No `Title`, `ServiceListing` or `Suppression` is created, deleted or re-stated; no combined-list membership or ordering changes (REQ-041) |
+| AC-5 (edge) | A work available only to **rent or buy**, with no `flatrate` offer | The waiting view renders | It stays in the waiting state and is **not** flagged as streaming. Rent-availability is what the owner is waiting to escape, so presenting it as a hit inverts the feature |
+| AC-6 (edge) | TMDB has no watch-provider data, or the region has none | The view renders | It reads *"not seen on your services as of <date>"* — never *"not streaming anywhere"*, which the data cannot support (ADR-0010 Trap 4) |
+| AC-7 (failure) | TMDB is unreachable during the refresh | The owner opens the view | The view renders from the last-known availability with its as-of date, and an unobtrusive note that the refresh failed. It is never blank and never an error page (NFR-014 pattern) |
+| AC-8 | `WATCH_PROVIDER_MAX_AGE_DAYS` | The source is inspected | It is a **third, independent** constant, declared separately from `TMDB_METADATA_MAX_AGE_DAYS = 183` (NFR-014) and `IMAGE_RETENTION_DAYS = 30` (NFR-019), with no shared call site — the `T-INV-008` rule extended to three (ADR-0010 Trap 5) |
+| AC-9 | Any surface rendering availability | It is rendered | It carries the **JustWatch** attribution TMDB requires for watch-provider data, which is a condition of use and stricter than NFR-013's general TMDB attribution (REQ-087) |
+
+**Out of scope for this story:** push notification or email of any kind — there is no notification channel and NFR-005 forbids the infrastructure.
+**Open questions:** **OQ-030** — the owner's TMDB region is assumed `US`; if it is ever wrong, every availability answer is wrong. Confirm before build.
+
+#### US-043 — Browse and clear the waiting list
+
+**As** the owner
+**I want** a view of everything I'm waiting on
+**So that** the mental list becomes a real one I can consult
+
+**Traces to:** REQ-082, REQ-084
+**Priority:** must *(within v1.1)*
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | The waiting view | It renders | It shows one row per `WatchIntent`, with the discovery date, the storefront it was seen on, and the availability state with its as-of date |
+| AC-2 | The combined list | It renders | It is **unaffected** by the waiting view's contents — no waiting title appears in it, and no badge count (REQ-025) counts a `WatchIntent` (ADR-0010 Trap 3) |
+| AC-3 | A waiting work that the owner later adds to Netflix, which is then captured normally | The service capture closes | The work enters the combined list by the ordinary path, and its `WatchIntent` is satisfied and leaves the waiting view (ADR-0010, step 7) |
+| AC-4 | A waiting work | The owner chooses "not interested" | It is suppressed on canonical work identity like any other work (REQ-070/071) and leaves the waiting view |
+| AC-5 (edge) | A `WatchIntent` satisfied by AC-3 | The removed/history surfaces render | The satisfied intent is retained, never hard-deleted — REQ-028 applies to `WatchIntent` exactly as to every other record |
+| AC-6 (failure) | An empty waiting list | The view renders | It explains what the view is for and how to fill it, rather than rendering an unexplained empty state (§9) |
+
+**Out of scope for this story:** sorting and filtering beyond date; promote from `roadmap.md` if the list grows past roughly fifty rows.
+**Open questions:** none.
+
+#### Required amendment to Epic K when this epic is promoted
+
+⚠ **US-036 AC-2 currently reads "exactly two" non-owner-initiated processes,
+and `T-CI-005` asserts that count.** The availability refresh is a third.
+Promoting Epic L therefore **requires amending US-036 AC-2 and `T-CI-005` to
+three, in the same change**, naming the availability refresh explicitly and
+recording that it is metadata-only and access-triggered. This is part of the
+epic, not a follow-up: discovering it as a red `T-CI-005` at the end of the
+build is the predictable failure. The amendment must be made **in place**, per
+the editing convention in `.github/copilot-instructions.md` §5.
 
 ---
 
