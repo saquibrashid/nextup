@@ -297,3 +297,36 @@ export const MODE_STEP_LEGEND = 'Is this a complete capture of that list?';
  * literal `{Service}` on screen would ship a visible template.
  */
 export const MODE_FULL_UPDATE_SERVICE_PLACEHOLDER = 'the service you choose';
+
+/**
+ * The combined list's filter bar and its empty/error states
+ * (`specs/ux-states.md` §2.3/§2.4/§2.5/§2.9, `specs/ui.md` §2.1 item 2).
+ *
+ * ⚠ THESE THREE "NOTHING TO SHOW" MESSAGES ARE NOT INTERCHANGEABLE (US-019
+ * AC-5, `ux-states.md` §2.4). `LIST_EMPTY_NEVER_UPLOADED_TITLE` is a
+ * first-run fact, `ZERO_MATCH_TITLE` is a filter hiding rows that still
+ * exist, and `LIST_EMPTY_ALL_GONE_TITLE` is a list whose every title was
+ * removed or suppressed - each with a different way out. Showing the first
+ * when the truth is either of the others reads as data loss.
+ *
+ * ⚠ `ui.md` §9 has NO ROWS for any of these. They are transcribed from the
+ * `ux-states.md` §2 prose, which writes each of them out in full; the §9
+ * table is missing them. Reported as a spec defect rather than drafted.
+ */
+export const CLEAR_FILTERS_LABEL = 'Clear filters';
+export const ZERO_MATCH_TITLE = 'No titles match these filters.';
+export const LIST_EMPTY_NEVER_UPLOADED_TITLE = 'Nothing here yet.';
+export const LIST_EMPTY_NEVER_UPLOADED_BODY =
+  'Upload screenshots of your saved lists on Netflix or Max and nextup will build one combined list.';
+export const UPLOAD_SCREENSHOTS_LABEL = 'Upload screenshots';
+export const LIST_EMPTY_ALL_GONE_TITLE = 'Nothing on your list right now.';
+
+/**
+ * ⚠ "Nothing has changed" is the load-bearing half of this sentence
+ * (`ux-states.md` §2.9). A failed read must not leave the owner wondering
+ * whether their list was lost - the whole product promise is that nothing
+ * disappears without being asked. `Retry` is offered because the fetch is
+ * safe to repeat; nothing was written.
+ */
+export const LIST_LOAD_FAILED_BODY = "Couldn't load your list. Nothing has changed.";
+export const RETRY_LABEL = 'Retry';

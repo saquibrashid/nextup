@@ -1,24 +1,22 @@
 // `/` - the combined list (`specs/ui.md` §2, TASK-038).
 //
-// This task owns the information hierarchy, the row and the freshness strip.
-// The other pieces §2.1 calls for arrive with their own tasks and their own
-// tests, and are NOT stubbed here - a placeholder that renders would report as
-// shipped:
-//   - the filter bar           `T-UI-016`
-//   - the sort control         TASK-166
-//   - the empty states 2.3/2.4/2.5, load-more, error and offline states
-//     (`specs/ux-states.md` §2) `T-UX-012`…`T-UX-018`
+// The filter bar (TASK-039) and the empty/error states (TASK-040) are wired in
+// here. Still absent, deliberately, because a placeholder that renders would
+// report as shipped: the sort control (TASK-166) and the load-more and offline
+// states.
 //
 // ⚠ THE EMPTY STATES ARE NOT INTERCHANGEABLE (US-019 AC-5). "Nothing here yet"
 // (never uploaded), "No titles match these filters" and "Nothing on your list
 // right now" (all removed or suppressed) are three different facts, and showing
-// the first when the truth is the second reads as data loss. Rendering one
-// generic "no results" here would be worse than rendering none, so this
-// component renders none and leaves the distinction to `T-UX-012`…`T-UX-014`.
+// the first when the truth is the second reads as data loss. The choice is made
+// by `listEmptyKind()` from the facts, never by this page picking a message.
 
 import type { JSX } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
+import { FilterBar, parseFilters, applyFilters, NO_FILTERS } from '../components/FilterBar';
 import { FreshnessStrip, type ServiceFreshness } from '../components/FreshnessStrip';
+import { ListEmptyState, ListLoadError } from '../components/ListEmptyState';
 import { TitleList } from '../components/TitleList';
 import type { TitleListItem } from '../components/TitleRow';
 
@@ -26,9 +24,31 @@ export interface ListPageProps {
   readonly items?: readonly TitleListItem[];
   /** `null` when `GET /api/service-state` could not be read (`T-FRESH-014`). */
   readonly serviceState?: readonly ServiceFreshness[] | null;
+  /** Rows the API would return unfiltered — the empty-state discriminator. */
+  readonly total?: number;
+  readonly genres?: readonly string[];
+  readonly removedCount?: number;
+  readonly suppressedCount?: number;
+  /** True when `GET /api/titles` failed (`ux-states.md` §2.9). */
+  readonly loadFailed?: boolean;
+  readonly onRetry?: () => void;
 }
 
-export function ListPage({ items = [], serviceState = null }: ListPageProps): JSX.Element {
+export function ListPage({
+  items = [],
+  serviceState = null,
+  total,
+  genres = [],
+  removedCount = 0,
+  suppressedCount = 0,
+  loadFailed = false,
+  onRetry,
+}: ListPageProps): JSX.Element {
+  const [params, setParams] = useSearchParams();
+  const filters = parseFilters(params);
+  const shown = items.length;
+  const unfilteredTotal = total ?? shown;
+
   return (
     <>
       <h1>Your list</h1>
@@ -38,7 +58,24 @@ export function ListPage({ items = [], serviceState = null }: ListPageProps): JS
         showing, the rows below render unchanged.
       */}
       <FreshnessStrip services={serviceState} />
-      <TitleList items={items} />
+
+      {loadFailed ? (
+        // ⚠ The filter bar is NOT rendered over a failed read. Its live count
+        // would have to invent numbers it does not have, and "Showing 0 of 0"
+        // beside "Nothing has changed" contradicts the reassurance.
+        <ListLoadError {...(onRetry === undefined ? {} : { onRetry })} />
+      ) : (
+        <>
+          <FilterBar genres={genres} shown={shown} total={unfilteredTotal} />
+          <TitleList items={items} />
+          <ListEmptyState
+            facts={{ shown, total: unfilteredTotal, filters, removedCount, suppressedCount }}
+            onClearFilters={() => {
+              setParams(applyFilters(params, NO_FILTERS));
+            }}
+          />
+        </>
+      )}
     </>
   );
 }
