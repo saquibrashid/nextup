@@ -47,9 +47,9 @@ import {
   type BakeoffInput,
   type ReaderCapabilities,
   type ReaderMetrics,
-} from '../../packages/domain/src/extraction/chooseReader.js';
+} from '../src/extraction/chooseReader.js';
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const ALL_CAPABILITIES: ReaderCapabilities = {
   vision: true,

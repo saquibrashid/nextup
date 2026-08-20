@@ -1344,6 +1344,7 @@ in CI either:**
 packages/domain/test/          identity.spec.ts, derive.spec.ts, reconcile.spec.ts, schemas.spec.ts,
                                pixelGuard.spec.ts        # R5 — T-IMG-017 (unit half), T-IMG-022
                                pastedFileName.spec.ts    # A45 — T-PASTE-005 (unit half)
+                               bakeoff.spec.ts           # A48 — T-AI-045d/e/f (§9.7 decision rule)
 apps/api/test/unit/            cleanup.spec.ts, matcher.spec.ts, undo.spec.ts, principal.spec.ts,
                                readDimensions.spec.ts,   # R5 — header-only parse, all 3 formats
                                decodeErrors.spec.ts      # R5 — isDecodeOom() classification (T-IMG-019 unit half)
