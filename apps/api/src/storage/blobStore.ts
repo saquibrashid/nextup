@@ -32,6 +32,18 @@ const CONTENT_TYPE_BY_FORMAT: Readonly<Record<ImageFormat, string>> = Object.fre
 });
 
 /**
+ * The `Content-Type` for a STORED format.
+ *
+ * ⚠ Keyed on the stored format, never on `uploadedFormat`. A HEIC upload is
+ * transcoded to PNG on ingest (`specs/api.md` §5.1), so serving `image/heic`
+ * would mislabel PNG bytes — and only Safari would even try to render it.
+ * `image/heic` is therefore not a value this map can produce, by construction.
+ */
+export function contentTypeFor(format: ImageFormat): string {
+  return CONTENT_TYPE_BY_FORMAT[format];
+}
+
+/**
  * Compose the storage path.
  *
  * Takes ULIDs and a stored format — deliberately NOT a file name. See the

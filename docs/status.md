@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 89 |
+| ⬜ todo | 87 |
 | 🚧 doing | 8 |
-| ✅ done | 65 |
+| ✅ done | 67 |
 | 🙋 owner | 4 |
 | 💤 deferred | 0 |
 | **total** | **166** |
@@ -31,10 +31,10 @@ Not done, and every task they depend on is done.
 | `TASK-039` | S | Epic F — The list itself (the value loop) |
 | `TASK-040` | S | Epic F — The list itself (the value loop) |
 | `TASK-045` | S | Epic D — Matching & identity |
-| `TASK-052` | S | Epic B — Capture & import |
 | `TASK-056c` | M | Epic C — Extraction |
 | `TASK-057` | M | Epic C — Extraction |
-| `TASK-106` | S | Epic H — History, removal ledger, suppression |
+| `TASK-107` | S | Epic H — History, removal ledger, suppression |
+| `TASK-118` | S | Epic J — Recovery |
 | `TASK-126` | M | Epic K — Platform, safety, and the shell |
 | `TASK-133` | S | Epic K — Platform, safety, and the shell |
 | `TASK-143` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
@@ -53,7 +53,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-80 tasks cannot start yet.
+78 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -108,7 +108,6 @@ Not done, and every task they depend on is done.
 | `TASK-103` | `TASK-071` |
 | `TASK-104` | `TASK-103` |
 | `TASK-105` | `TASK-103`, `TASK-083` |
-| `TASK-107` | `TASK-106` |
 | `TASK-108` | `TASK-103`, `TASK-096` |
 | `TASK-109` | `TASK-074`, `TASK-060` |
 | `TASK-110` | `TASK-109` |
@@ -119,7 +118,6 @@ Not done, and every task they depend on is done.
 | `TASK-115` | `TASK-114` |
 | `TASK-116` | `TASK-114` |
 | `TASK-117` | `TASK-112`, `TASK-103`, `TASK-118` |
-| `TASK-118` | `TASK-052` |
 | `TASK-119` | `TASK-118` |
 | `TASK-120` | `TASK-026`, `TASK-118` |
 | `TASK-123` | `TASK-069`, `TASK-096`, `TASK-162` |
@@ -182,6 +180,7 @@ Not done, and every task they depend on is done.
 | `TASK-049` | `T-UI-003a`…`j` green in `apps/web/test/uploadStep1.spec.tsx`; mutation-proven against a defaulted mode and against revealing the consequence on selection | `T-UI-003` |
 | `TASK-050` | `T-IMG-002`, `T-IMG-006`, `T-IMG-010`, `T-IMG-012`, `T-IMG-018`, `T-IMG-023`, `T-PASTE-003`, `T-PASTE-005`, `T-PASTE-006`, `T-PASTE-007`, `T-SEC-003`, `T-RET-014`; ~~`T-IMG-013`~~ | `T-IMG-002`, `T-IMG-006`, `T-IMG-010`, `T-IMG-012`, `T-PASTE-003`, `T-PASTE-005`, `T-PASTE-006`, `T-PASTE-007` |
 | `TASK-051` | `T-IMG-006g`-`i`, `T-INV-012a`-`e` (`apps/api/test/unit/deleteBatchImage.spec.ts`, 12 cases), `T-INV-012g`-`j` (`tests/infra/hardDelete.spec.ts`, 4 cases). Route in `apps/api/src/routes/batchImages.ts`, repository in `ownerData.ts`. 4 mutants, all caught. Spec §28.1a. | `T-IMG-006`, `T-INV-012` |
+| `TASK-052` | `apps/api/src/routes/images.ts` (`GET /api/images/:imageId`, `specs/api.md` §6.27) + `findUploadedImageById` and `contentTypeFor`. `T-IMG-002i`-`m`, `T-IMG-004a`-`d`, `T-IMG-005a`-`b`, `T-SEC-002g`-`h`, `T-SEC-003h`-`i` (`apps/api/test/unit/imagesRoute.spec.ts`, 15 cases); `T-IMG-002n`-`o`, `T-IMG-004e`-`g`, `T-IMG-005c`, `T-SEC-002i`-`j`, `T-SEC-003j` (`apps/api/test/integration/imageServe.spec.ts`, 10 cases). ⚠ **Three absences, two answers, and never a 500.** A purged image's NORMAL steady state is a live row pointing at bytes that are gone — the lifecycle rule writes nothing back (REQ-028 keeps the row forever) — so `T-IMG-005` treats a missing blob as 410 `IMAGE_EXPIRED`, identical to a passed `retainUntil`; a 500 there would fire an alert every day from day 31. `T-IMG-004e` deliberately leaves the blob IN PLACE while moving `retainUntil` into the past, so the assertion is the APPLICATION boundary and cannot pass for `T-IMG-005`'s reason instead. `isExpired` is exported and its `<=` boundary asserted directly (US-035 AC-1 is "**at** `retainUntil`"), because no HTTP request can pin the clock to the millisecond. Lookup is by id alone but keeps `ownerId` in the predicate — a `findUnique({ id })` would serve another owner's screenshot and look identical in any single-owner test. `res.end`, not `res.send`, so no `ETag` invites a conditional request for bytes marked `no-store`. | `T-IMG-004`, `T-SEC-003` |
 | `TASK-053` | `components/ImageDropzone.tsx` — `T-UI-004` (a–e), `T-UX-041` (a–e), `T-UX-042` (a–f). All three affordances render at once (paste button when `navigator.clipboard.read` exists, `Choose files` always, drop target); one `addFiles` path with the source reported but never branched on. Validation is lenient — empty **and** `application/octet-stream` types are accepted and left to the server sniff. Four mutations caught: HEIC dropped from `accept` (`T-UI-004a`), hard-filtering on `File.type` (`T-UI-004d`), the paste affordance replacing rather than joining file selection (`T-UX-041a/b/c`), rejections hiding the accepted list (`T-UX-042a/e`). New copy constants `UNSUPPORTED_FORMAT_REJECTION`, `IMAGE_ACCEPT_ATTRIBUTE`, `CHOOSE_FILES_LABEL`, `HEIC_PREVIEW_PLACEHOLDER` — quoted from `specs/ui.md` §3.2 prose, which §9 has no rows for. `PasteCapture` (TASK-160) and the drop target's full behaviour (TASK-162, `T-UI-014`) fill the slots; the ceiling messages are rendered here but the ceiling-copy test id named on TASK-162 is not defined in specs/testing.md, so it is reported as a spec defect rather than cited here. | `T-UI-004`, `T-UX-041`, `T-UX-042` |
 | `TASK-054` | `apps/api/src/services/batchLifecycle.ts` — the transition table, `submitBatch`, `discardBatch`, `assertBatchMutable`, plus `transitionUploadBatchStatus` (the conditional write). Routes `POST /api/batches/:batchId/submit` (§6.14) and `/discard` (§6.23). `T-BATCH-017a`…`h` (table totality, one-way-ness, discardable set), `T-BATCH-019a`…`d` (the submit endpoint's status codes), `T-BATCH-018a`…`c` (atomic transition — `018a` mutation-verified after its first form proved vacuous), `T-BATCH-013a`…`d` (immutability: the guard **and** the absence of a mutating route), `T-BATCH-006a`…`f` (a discarded batch writes nothing, retains images, releases the ceiling). ⚠ **The three close/reconciliation ids this row originally cited are NOT delivered here** — they belong to TASK-072 and no close endpoint exists yet; see `specs/testing.md` §24.3. Two spec gaps reported in §24.2. | `T-BATCH-006`, `T-BATCH-013`, `T-BATCH-017`, `T-BATCH-018`, `T-BATCH-019` |
 | `TASK-055` | `packages/domain/src/extraction/` (contract + degraded projections) + `apps/api/src/extraction/` (recordings, `StubExtractor`, factory). `T-STUB-001a`…`r`, incl. the three fault tokens and byte-identical output over three runs. | `T-STUB-001` |
@@ -189,6 +188,7 @@ Not done, and every task they depend on is done.
 | `TASK-056b` | `LlmVisionExtractor` (`apps/api/src/extraction/llmVisionExtractor.ts`) + committed prompt/schema (`prompts.ts`) + offline `msw` contract suite (`T-AI-033t`–`an`, recordings in `tests/fixtures/msw/aoai/`) and the `openai` half of the boundary gate (`T-AI-010e`–`g`). ⚠ Three judgement calls, all load-bearing. (1) `finish_reason: 'length'` is checked BEFORE the body is parsed — the truncation fixture carries *valid JSON with one complete tile*, so a parse-first implementation returns one title and looks entirely successful. (2) A schema-invalid or non-JSON body is TERMINAL, not retried: §2.2's retry set is explicit and exclusive (429/5xx/network only), and at `temperature: 0` with a fixed seed and strict Structured Outputs a repeat is near-deterministic, so retrying would spend the batch ceiling to get the same answer. (3) In standalone `llm-vision` mode `extract()` reports `crossCheck: 'ocr-unavailable'`, which — deliberately unlike TASK-056's `llm-unavailable` — still PERMITS removals: the primary, higher-quality reader did run, so a title's absence is evidence. SDK retry is disabled (`maxRetries: 0`) and §2.2's policy implemented locally with an injectable `sleep`, for the same multiplicative reason as TASK-056. | `T-AI-011b`, `T-AI-033`, `T-AI-040`, `T-AI-044` |
 | `TASK-101` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` |
 | `TASK-102` | `components/SuppressDialog.tsx` — `T-UX-085` (a–f), `T-UX-022` (a–l). The row is reported `pending` while the request is in flight and `suppressed` only once the server has persisted it, so a rejected request cannot leave a hidden row behind — `T-UX-085a` asserts `suppressed` is never reported **at all** on the failure path, which an optimistic-hide-then-reconcile implementation would not satisfy even though it ends on `present`. Undo goes back through the `suppressionId` the server returned (`supp:<workIdentity>`), never a row-scoped key (REQ-071); an idempotent 200 offers Close only, because nothing changed. Five mutations caught: optimistic hide before persistence (`T-UX-085a/e`, `T-UX-022d`), undo failure showing the row again (`T-UX-022f`), an idempotent 200 rendered as a fresh hide (`T-UX-022g`), the same 200 still offering Undo (`T-UX-022g`), and the undo affordance removed (`T-UX-022b/c/d/e/f/k`). Four invented copy constants live in the component, not `copy.ts`, each with a ⚠ FINDING note — see the spec defects below. | `T-UX-022`, `T-UX-085` |
+| `TASK-106` | `GET /api/suppressions` + `POST /api/suppressions/:suppressionId/unsuppress` in `apps/api/src/routes/suppressions.ts` (§6.7/§6.8) + `findSuppression`, `listActiveSuppressions` ordering, `identityStabilityOf`, `toSuppressionItem`. `T-SUP-020a`-`h`, `T-SUP-021a`-`i` (`apps/api/test/unit/suppressionsListRoute.spec.ts`, 17 cases); `T-SUP-020i`-`l`, `T-SUP-021j`-`n` (`apps/api/test/integration/suppressions.spec.ts`, 9 added cases). ⚠ **`restoredAnything` is a CONSTANT `false`, not a count, and must never become one** — un-suppression lifts a filter and restores nothing (product invariant 7). Computing it from the update count would make it true one day and silently turn an honest sentence in `ui.md` §7 into a false one; `T-SUP-021d` pins it across both counts. ⚠ `findSuppression` is deliberately **not** filtered on `active`: a second press from a stale page must be 200, not a 404 for a record that plainly exists (`T-SUP-021e`/`f`). The route resolves the path id to a **work identity** and deactivates on that (`T-SUP-021c`, invariant 1) — passing the path string through would answer 200 having changed nothing. Items are shaped field by field, never spread, so `migratedFrom` (a fix-matched title's previous identity) cannot leak (`T-SUP-020d`, asserted against the raw body). `T-SUP-020j` proves the suppressed view renders after the Title row itself is gone, which is the entire reason `displaySnapshot` is frozen at suppress time. | `T-SUP-020`, `T-SUP-021` |
 | `TASK-121` | `fdd5519` — `tools/check-mutating-routes.mjs`, `T-MUT-001` (a–j), `T-MUT-002` (a–f). The 18 mutating routes each map to one of the eight REQ-041 owner-initiated operations or carry an explicit non-list-state reason; mutation-proven with an unregistered `POST /titles/:id/auto-confirm` and a `jobs/reconcile.ts` calling a guarded operation. | `T-MUT-001`, `T-MUT-002` |
 | `TASK-122` | `dde3dc5` — `tools/check-outbound-hosts.mjs`, `T-SEC-031` (a–i) and the outbound half of `T-SEC-009` (`k`). Exactly three destinations: TMDB, Azure OpenAI, Azure AI Vision. Mutation-proven by widening the list to four, shrinking it below three, and planting an unlisted host in source. The telemetry and streaming hostnames the spec needs are assembled from fragments rather than added to another gate's exemption list. | `T-SEC-009`, `T-SEC-031` |
 | `TASK-128` | `c64b7b5` — `tools/egress-guard.mjs`, `T-CI-007` (a–n). Patches `fetch`, `http.request` and `https.request`; loopback and the compose service names stay reachable; mutation-proven with a `fetch` and a raw `https.request` to an external host. ⚠ Installed per-suite, not globally: global wiring needs `setupFiles` in `vitest.config.ts`, which no lane may edit — see the finding below. | `T-CI-007` |

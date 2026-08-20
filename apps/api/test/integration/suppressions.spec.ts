@@ -23,6 +23,7 @@ import {
   createTitle,
   createUploadBatch,
   deactivateSuppression,
+  softDeleteServiceListing,
   type OwnerId,
 } from '../../src/repository/ownerData.js';
 import { closeTestPrisma, resetDatabase, testPrisma } from './harness.js';
@@ -54,6 +55,21 @@ interface Item {
   titleId: string;
   workIdentity: string;
   badges: { service: string }[];
+}
+
+/** One row of `GET /api/suppressions` (`specs/api.md` §6.7). */
+interface SuppressionItemBody {
+  suppressionId: string;
+  workIdentity: string;
+  suppressedAt: string;
+  identityStability: 'stable' | 'text-derived';
+  displaySnapshot: {
+    name: string;
+    releaseYear: number | null;
+    mediaType: string | null;
+    posterPath: string | null;
+  };
+  unsuppressHref: string;
 }
 
 let server: Server;
@@ -395,5 +411,164 @@ describe('POST /api/titles/:titleId/suppress', () => {
     const res = await suppress('no-such-title');
     expect(res.status).toBe(404);
     expect(await testPrisma().suppression.count()).toBe(0);
+  });
+});
+
+describe('TASK-106 · `GET /api/suppressions` and `/unsuppress` against the real store', () => {
+  const listSuppressions = async (subject = SUBJECT): Promise<SuppressionItemBody[]> => {
+    const res = await fetch(`${origin}/api/suppressions`, {
+      headers: { [CLIENT_PRINCIPAL_HEADER]: principalHeader(subject) },
+    });
+    expect(res.status).toBe(200);
+    return ((await res.json()) as { items: SuppressionItemBody[] }).items;
+  };
+
+  const unsuppress = (suppressionId: string, subject = SUBJECT): Promise<Response> =>
+    fetch(`${origin}/api/suppressions/${encodeURIComponent(suppressionId)}/unsuppress`, {
+      method: 'POST',
+      headers: {
+        [CLIENT_PRINCIPAL_HEADER]: principalHeader(subject),
+        'content-type': 'application/json',
+      },
+      body: '{}',
+    });
+
+  it('T-SUP-020i · US-029 AC-1 · every active suppression is listed with a renderable snapshot', async () => {
+    const { title } = await seedTitle({ workIdentity: 'tmdb:movie:701', tmdbName: 'Heat' });
+    await suppress(title.id);
+
+    const items = await listSuppressions();
+    expect(items).toHaveLength(1);
+    expect(items[0]?.workIdentity).toBe('tmdb:movie:701');
+    expect(items[0]?.displaySnapshot.name).toBe('Heat');
+    expect(items[0]?.identityStability).toBe('stable');
+  });
+
+  it('T-SUP-020j · US-029 AC-1 · it renders after the TITLE ITSELF is gone', async () => {
+    // The property a mock cannot hold and the reason `displaySnapshot` exists:
+    // the suppressed view must not join back to `Title`. Deleting the row here
+    // is a test fixture, not a sanctioned operation -- it stands in for a title
+    // that was removed and reconciled away long after the decision was made.
+    const { title } = await seedTitle({ workIdentity: 'tmdb:movie:702', tmdbName: 'Collateral' });
+    await suppress(title.id);
+    await testPrisma().serviceListing.deleteMany({ where: { titleId: title.id } });
+    await testPrisma().title.deleteMany({ where: { id: title.id } });
+
+    const items = await listSuppressions();
+    expect(items).toHaveLength(1);
+    expect(items[0]?.displaySnapshot.name).toBe('Collateral');
+  });
+
+  it('T-SUP-020k · an unmatched identity is reported text-derived', async () => {
+    const { title } = await seedTitle({
+      workIdentity: 'unmatched:9f2c1a7b4e0d5c83',
+      matchState: 'unmatched',
+      rawExtractedText: 'the mtrix',
+    });
+    await suppress(title.id);
+
+    const items = await listSuppressions();
+    expect(items[0]?.identityStability).toBe('text-derived');
+    expect(items[0]?.displaySnapshot.name).toBe('the mtrix');
+  });
+
+  it('T-SUP-020l · NFR-008 · one owner never sees the other owner’s suppressions', async () => {
+    const { title } = await seedTitle({ ownerId: otherOwner, workIdentity: 'tmdb:movie:703' });
+    await suppress(title.id, OTHER_SUBJECT);
+
+    expect(await listSuppressions(OTHER_SUBJECT)).toHaveLength(1);
+    expect(await listSuppressions(SUBJECT)).toHaveLength(0);
+  });
+
+  it('T-SUP-021j · US-029 AC-2 · un-suppress deactivates and DELETES NOTHING', async () => {
+    const { title } = await seedTitle({ workIdentity: 'tmdb:movie:704' });
+    await suppress(title.id);
+    const [item] = await listSuppressions();
+
+    const res = await unsuppress(item?.suppressionId ?? '');
+    expect(res.status).toBe(200);
+    expect((await res.json()) as { restoredAnything: boolean }).toMatchObject({
+      active: false,
+      restoredAnything: false,
+    });
+
+    // REQ-028, asserted against the STORE rather than against the handler’s
+    // own claim: the row survives, keeps the date the decision was made, and
+    // records when it was lifted.
+    const row = await testPrisma().suppression.findFirst({ where: { ownerId: owner } });
+    expect(row).not.toBeNull();
+    expect(row?.active).toBe(false);
+    expect(row?.unsuppressedAt).not.toBeNull();
+    expect(await testPrisma().suppression.count({ where: { ownerId: owner } })).toBe(1);
+  });
+
+  it('T-SUP-021k · US-029 AC-4 · the filter lifts; the REMOVED LISTING stays removed', async () => {
+    // Invariant 7. Un-suppression lifts a filter; it restores nothing. This is
+    // the store-level half of `restoredAnything: false`, and no unit test can
+    // hold it: it is a property of what un-suppress does NOT write.
+    const { title, listings, batch } = await seedTitle({ workIdentity: 'tmdb:movie:705' });
+    const listingId = listings[0]?.listingId ?? '';
+    await suppress(title.id);
+
+    await softDeleteServiceListing(owner, listingId, {
+      removedAt: new Date(),
+      removedByBatchId: batch.id,
+    });
+
+    const [item] = await listSuppressions();
+    await unsuppress(item?.suppressionId ?? '');
+
+    expect(await listSuppressions()).toHaveLength(0);
+    // The assertion that matters, stated positively so it cannot pass
+    // vacuously on an empty list: the listing is STILL removed afterwards.
+    const listing = await testPrisma().serviceListing.findFirst({ where: { listingId } });
+    expect(listing?.state).toBe('removed');
+    expect(listing?.removedAt).not.toBeNull();
+    // And the title is still not on the combined list, because nothing
+    // restored its only listing.
+    expect((await listTitles()).some((t) => t.titleId === title.id)).toBe(false);
+  });
+
+  it('T-SUP-021l · un-suppress then re-suppress reuses the SAME row', async () => {
+    // Why deactivation rather than deletion matters at the store level: the
+    // `suppression_one_active` filtered unique index frees the identity for a
+    // future suppression, so re-suppressing must not raise a duplicate-key
+    // error and must not create a second document.
+    const { title } = await seedTitle({ workIdentity: 'tmdb:movie:706' });
+    await suppress(title.id);
+    const [item] = await listSuppressions();
+    await unsuppress(item?.suppressionId ?? '');
+
+    expect((await suppress(title.id)).status).toBe(200);
+    expect(await testPrisma().suppression.count({ where: { ownerId: owner } })).toBe(1);
+    expect((await listSuppressions())[0]?.suppressionId).toBe(item?.suppressionId);
+  });
+
+  it('T-SUP-021m · a second press is 200 and rewrites nothing', async () => {
+    const { title } = await seedTitle({ workIdentity: 'tmdb:movie:707' });
+    await suppress(title.id);
+    const [item] = await listSuppressions();
+
+    await unsuppress(item?.suppressionId ?? '');
+    const first = await testPrisma().suppression.findFirst({ where: { ownerId: owner } });
+
+    expect((await unsuppress(item?.suppressionId ?? '')).status).toBe(200);
+    const second = await testPrisma().suppression.findFirst({ where: { ownerId: owner } });
+
+    // `deactivateSuppression` matches only ACTIVE rows, so the moment the
+    // owner actually changed their mind survives a repeat press.
+    expect(second?.unsuppressedAt?.toISOString()).toBe(first?.unsuppressedAt?.toISOString());
+  });
+
+  it('T-SUP-021n · NFR-008 · a foreign suppression id answers 404 and writes nothing', async () => {
+    const { title } = await seedTitle({ ownerId: otherOwner, workIdentity: 'tmdb:movie:708' });
+    await suppress(title.id, OTHER_SUBJECT);
+    const [item] = await listSuppressions(OTHER_SUBJECT);
+
+    const res = await unsuppress(item?.suppressionId ?? '', SUBJECT);
+    expect(res.status).toBe(404);
+
+    const row = await testPrisma().suppression.findFirst({ where: { ownerId: otherOwner } });
+    expect(row?.active).toBe(true);
   });
 });

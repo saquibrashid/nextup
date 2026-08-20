@@ -27,6 +27,7 @@ import type { PrincipalReader } from '../auth/principal.js';
 import { AppError } from '../errors/AppError.js';
 import { registerBatchRoutes } from './batches.js';
 import { registerBatchImageRoutes } from './batchImages.js';
+import { registerImageRoutes } from './images.js';
 import { registerMeRoutes } from './me.js';
 import { registerServiceStateRoutes } from './serviceState.js';
 import { registerSuppressionRoutes } from './suppressions.js';
@@ -89,6 +90,8 @@ export function createApiRouter(): Router {
   registerBatchRoutes(apiRouter);
   // §6.12 — the ONE ingest route for paste, drop and file selection alike.
   registerBatchImageRoutes(apiRouter);
+  // §6.27 — the ONE route that serves image bytes. No SAS, no blob URL.
+  registerImageRoutes(apiRouter);
   registerTitleRoutes(apiRouter);
   registerSuppressionRoutes(apiRouter);
   registerServiceStateRoutes(apiRouter);

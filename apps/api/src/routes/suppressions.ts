@@ -30,9 +30,12 @@ import { type Router } from 'express';
 import { AppError } from '../errors/AppError.js';
 import {
   createSuppression,
+  deactivateSuppression,
   findActiveSuppression,
+  findSuppression,
   findTitle,
   isUniqueViolation,
+  listActiveSuppressions,
   reactivateSuppression,
 } from '../repository/ownerData.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
@@ -74,6 +77,73 @@ export function toDisplaySnapshot(title: SuppressibleTitle): DisplaySnapshot {
     displayReleaseYear: title.tmdbReleaseYear,
     displayMediaType: title.tmdbMediaType,
     displayPosterPath: title.tmdbPosterPath,
+  };
+}
+
+/**
+ * How much the identity this suppression is keyed on can be trusted
+ * (`specs/api.md` §6.7, `specs/data-model.md` §2.3.1).
+ *
+ * A `tmdb:*` identity is a stable external key: the same work reads the same
+ * way whatever the screenshot looked like. An `unmatched:*` identity is a hash
+ * of the TEXT WE READ, so a future capture that OCRs one character differently
+ * produces a different identity — and the suppression legitimately stops
+ * applying. That is not a bug to be hidden; `ui.md` §7 renders a caveat line
+ * for exactly this row, and it can only do so if the API says which kind it is.
+ *
+ * Derived, never stored: it is a function of `workIdentity`, and a persisted
+ * copy could disagree with it after a fix-match migration (SD-06).
+ */
+export function identityStabilityOf(workIdentity: string): 'stable' | 'text-derived' {
+  return workIdentity.startsWith('unmatched:') ? 'text-derived' : 'stable';
+}
+
+/** One row of the suppressed view, shaped so it renders WITHOUT a title row. */
+export interface SuppressionItem {
+  suppressionId: string;
+  workIdentity: string;
+  suppressedAt: string;
+  identityStability: 'stable' | 'text-derived';
+  displaySnapshot: {
+    name: string;
+    releaseYear: number | null;
+    mediaType: string | null;
+    posterPath: string | null;
+  };
+  unsuppressHref: string;
+}
+
+interface StoredSuppression {
+  id: string;
+  workIdentity: string;
+  suppressedAt: Date;
+  displayName: string;
+  displayReleaseYear: number | null;
+  displayMediaType: string | null;
+  displayPosterPath: string | null;
+}
+
+/**
+ * ⚠ Shaped field by field, NEVER spread from the row.
+ *
+ * `T-SEC-003` guards against a future `...row` leaking a column that was never
+ * meant for a client; here the same discipline keeps `migratedFrom` — the
+ * PREVIOUS work identity of a fix-matched title — out of a response that has no
+ * use for it.
+ */
+export function toSuppressionItem(row: StoredSuppression): SuppressionItem {
+  return {
+    suppressionId: row.id,
+    workIdentity: row.workIdentity,
+    suppressedAt: row.suppressedAt.toISOString(),
+    identityStability: identityStabilityOf(row.workIdentity),
+    displaySnapshot: {
+      name: row.displayName,
+      releaseYear: row.displayReleaseYear,
+      mediaType: row.displayMediaType,
+      posterPath: row.displayPosterPath,
+    },
+    unsuppressHref: `/api/suppressions/${encodeURIComponent(row.id)}/unsuppress`,
   };
 }
 
@@ -133,5 +203,62 @@ export function registerSuppressionRoutes(router: Router): void {
     }
 
     res.status(200).json({ suppressionId, workIdentity, alreadySuppressed: false });
+  });
+
+  /**
+   * `GET /api/suppressions` — the "Not interested" view (§6.7, US-029 AC-1).
+   *
+   * Reads the frozen `displaySnapshot` and never joins back to `Title`. The
+   * suppressed work may have no title row at all — it may have been removed
+   * since, or it may be an `unmatched:*` identity that never had TMDB metadata
+   * — and a join would render the owner an empty row for a decision they
+   * definitely made.
+   */
+  router.get('/suppressions', async (req, res) => {
+    const ownerId = requireOwnerId(req);
+    const rows = await listActiveSuppressions(ownerId);
+    res.status(200).json({ items: rows.map(toSuppressionItem) });
+  });
+
+  /**
+   * `POST /api/suppressions/:suppressionId/unsuppress` — "interested again"
+   * (§6.8, US-029 AC-2/AC-4).
+   *
+   * ⚠ `restoredAnything` IS ALWAYS `false`, AND THAT IS THE FEATURE.
+   * Un-suppressing lifts a filter; it does not restore anything (product
+   * invariant 7 — restore is an explicit user action, never an automatic
+   * consequence). The field is not a status flag that happens to be false
+   * today and might be true later: it exists so the client can state the
+   * limitation plainly (`ui.md` §7) instead of leaving the owner to discover
+   * that the removed row they were expecting never came back. Computing it —
+   * counting rows and reporting the count — would make it true one day and
+   * silently turn an honest sentence into a false one.
+   *
+   * ⚠ Nothing is deleted (REQ-028, `T-SUP-021`). The row is flipped to
+   * `active: false` and keeps `suppressedAt`, so the history of the decision
+   * survives; the filtered unique index `suppression_one_active` then frees
+   * the identity for a future suppression without losing this one.
+   */
+  router.post('/suppressions/:suppressionId/unsuppress', async (req, res) => {
+    const ownerId = requireOwnerId(req);
+    const suppressionId = req.params.suppressionId ?? '';
+
+    // Owner-scoped, and NOT filtered on `active` — see `findSuppression`.
+    const suppression = await findSuppression(ownerId, suppressionId);
+    if (suppression === null) {
+      throw new AppError('NOT_FOUND', 404, 'No such suppression.');
+    }
+
+    // Idempotent by construction: `deactivateSuppression` matches only active
+    // rows, so a second press writes nothing and leaves the original
+    // `unsuppressedAt` — the moment the owner actually changed their mind —
+    // exactly as it was. Both presses answer 200.
+    await deactivateSuppression(ownerId, suppression.workIdentity, new Date());
+
+    res.status(200).json({
+      suppressionId: suppression.id,
+      active: false,
+      restoredAnything: false,
+    });
   });
 }

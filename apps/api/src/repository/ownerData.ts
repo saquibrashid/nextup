@@ -791,8 +791,37 @@ export async function findActiveSuppression(ownerId: OwnerId, workIdentity: stri
   });
 }
 
+/**
+ * Active suppressions, most recent decision first (`specs/api.md` §6.7).
+ *
+ * The ordering is here rather than in the route so that it is a property of
+ * the read and not of one caller: the suppressed view is the owner's record of
+ * decisions they made, and the one they are most likely to want to reverse is
+ * the one they made last.
+ *
+ * `id` is the tie-break because `suppressedAt` is `DATETIME2` defaulted from
+ * `SYSUTCDATETIME()` and two suppressions written in the same millisecond
+ * would otherwise come back in an order the store is free to change between
+ * reads — which reads as rows jumping around for no reason.
+ */
 export async function listActiveSuppressions(ownerId: OwnerId, tx?: Db) {
-  return db(tx).suppression.findMany({ where: { ownerId, active: true } });
+  return db(tx).suppression.findMany({
+    where: { ownerId, active: true },
+    orderBy: [{ suppressedAt: 'desc' }, { id: 'desc' }],
+  });
+}
+
+/**
+ * One suppression by its id, owner-scoped.
+ *
+ * ⚠ NOT filtered on `active`. Un-suppressing an already-lifted suppression has
+ * to answer **200 with `active: false`**, not 404: the owner is looking at a
+ * stale page and pressing a button whose outcome has already happened, and
+ * telling them the record does not exist would be false as well as alarming.
+ * The route decides idempotency; this read must not pre-empt it.
+ */
+export async function findSuppression(ownerId: OwnerId, id: string, tx?: Db) {
+  return db(tx).suppression.findFirst({ where: { ownerId, id } });
 }
 
 export async function createSuppression(
@@ -871,6 +900,24 @@ export async function findUploadedImage(
   // owner-scoped; neither is guessable, but a route that ignored the batch
   // would let a stale client page delete from a batch it is not looking at.
   return db(tx).uploadedImage.findFirst({ where: { ownerId, batchId, id: imageId } });
+}
+
+/**
+ * One image by id alone, owner-scoped (`specs/api.md` §6.27, TASK-052).
+ *
+ * Deliberately NOT batch-scoped, unlike {@link findUploadedImage}: `GET
+ * /api/images/:imageId` is reached from an `href` that carries no batch, and
+ * the id is a server-generated ULID that is not guessable. The batch scope on
+ * the delete route guards a *destructive* action against a stale client page;
+ * there is nothing here for a wrong batch id to protect.
+ *
+ * ⚠ `ownerId` stays in the predicate. `findUnique({ id })` would serve another
+ * owner's screenshot to anyone holding an id — the exact failure US-036 AC-3
+ * is written against, and it would look identical in every test that only ever
+ * uses one owner.
+ */
+export async function findUploadedImageById(ownerId: OwnerId, imageId: string, tx?: Db) {
+  return db(tx).uploadedImage.findFirst({ where: { ownerId, id: imageId } });
 }
 
 /**
