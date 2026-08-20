@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 86 |
+| ⬜ todo | 82 |
 | 🚧 doing | 8 |
-| ✅ done | 68 |
+| ✅ done | 72 |
 | 🙋 owner | 4 |
 | 💤 deferred | 0 |
 | **total** | **166** |
@@ -28,8 +28,6 @@ Not done, and every task they depend on is done.
 | `TASK-026` | S | Epic G — Attribution & compliance |
 | `TASK-028` | S | Epic A — Access & identity |
 | `TASK-031` | S | Epic A — Access & identity |
-| `TASK-039` | S | Epic F — The list itself (the value loop) |
-| `TASK-040` | S | Epic F — The list itself (the value loop) |
 | `TASK-045` | S | Epic D — Matching & identity |
 | `TASK-056c` | M | Epic C — Extraction |
 | `TASK-057` | M | Epic C — Extraction |
@@ -41,6 +39,7 @@ Not done, and every task they depend on is done.
 | `TASK-155` | S | Epic B — Capture & import |
 | `TASK-161` | S | Epic B — Capture & import |
 | `TASK-162` | S | Epic B — Capture & import |
+| `TASK-166` | S | Epic F — The list itself (the value loop) |
 
 ## Waiting on the owner
 
@@ -53,7 +52,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-77 tasks cannot start yet.
+74 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -130,7 +129,6 @@ Not done, and every task they depend on is done.
 | `TASK-157` | `TASK-010` |
 | `TASK-163` | `TASK-162` |
 | `TASK-164` | `TASK-080`, `TASK-162` |
-| `TASK-166` | `TASK-039` |
 | `TASK-168` | `TASK-079`, `TASK-010` |
 
 ## Done
@@ -170,6 +168,8 @@ Not done, and every task they depend on is done.
 | `TASK-036` | `packages/domain/src/ordering.ts` + `packages/domain/test/ordering.spec.ts` (19 cases) + `apps/api/test/integration/titleOrdering.spec.ts` (16 cases) — `T-LIST-014`, `T-LIST-015`, `T-LIST-016`, `T-LIST-017` (U) and `T-LIST-025`, `T-LIST-026`, `T-LIST-027` (I); `T-LIST-010` was already delivered by TASK-033. **Two live ordering bugs fixed**, both silent: the tie-breaker was `{ id: dir }`, so tie order flipped when the owner reversed the sort AND the keyset predicate stopped mirroring the `ORDER BY`, dropping rows between pages; and `nulls` placement relied on SQL Server's default, which is last on `desc` and **first** on `asc`. Five mutations caught — three of the query, two of the comparator. Four orphaned ids adopted; see `specs/testing.md` §20. | `T-LIST-010`, `T-LIST-014`, `T-LIST-015`, `T-LIST-016`, `T-LIST-017`, `T-LIST-025`, `T-LIST-026`, `T-LIST-027` |
 | `TASK-037` | `apps/api/test/integration/titleFilters.spec.ts` (26 cases) — `T-LIST-020` (a–e), `T-LIST-021` (a–d), `T-LIST-022` (a–h), `T-LIST-023` (a–e), `T-LIST-024` (a–d). **The genre filter did not exist**: `genre` was parsed, validated, and then never passed to the query, so `?genre=Comedy` returned 200 and listed everything. Implemented as a quoted-token match inside the JSON column, which makes `genres: []` exclusion (AC-6) fall out by construction. Four mutations caught, including the sibling-`OR` hazard that would have dropped the filter on page 2 only. `T-LIST-021`/`T-LIST-022` were orphaned ids, adopted here — `specs/testing.md` §20.1. | `T-LIST-020`, `T-LIST-021`, `T-LIST-022`, `T-LIST-023`, `T-LIST-024` |
 | `TASK-038` | `components/TitleRow.tsx` + `components/TitleList.tsx` + `pages/ListPage.tsx` — `T-UI-010` (a–k), `T-LIST-018` (a–d), `T-UI-012` (a–d). Three mutations caught: a component-built date label (fails `T-LIST-018a/b/c` + `T-UI-010a`), one row per listing instead of per work (fails `T-UI-010e`, `T-LIST-018b/c`, `T-UI-012d`), a credentialed `netflix.com` anchor in a badge (fails all four `T-UI-012`). ⚠ **Deep links out to the service are NOT built** — this row and `T-UI-012`/US-038 AC-3 presume one, but `specs/ui.md` §2.2 lists no such element and `specs/api.md` §6.2 carries no URL field, so a URL scheme would have to be invented. Built the conservative reading instead: no row addresses a streaming host at all, asserted universally by `T-UI-012b`. Needs an owner decision. | `T-LIST-018`, `T-UI-010`, `T-UI-012` |
+| `TASK-039` | `components/FilterBar.tsx` — `T-UI-016` (a–n), `T-UX-013` (a–e). The query string is the **only** store of filter state: there is no `useState` mirror, so the two directions `T-UI-016` demands are one direction of data flow rather than two that can drift. `T-UI-016b` is the case a write-only implementation passes today and fails on a shared link; `T-UI-016g`/`l` prove `sort`/`dir` survive a filter change, because rebuilding the query string from the filters alone would silently reset REQ-038's oldest-first escape hatch on the first checkbox click. Values repeat (`service=netflix&service=max`) rather than comma-joining, which the API would reject; unknown values are dropped rather than forwarded, so a stale link degrades to a wider list instead of a 400. `T-UX-013b` asserts the zero-match copy cannot read as data loss. Seven mutations caught. **The sort control is deliberately NOT stubbed here** — it is TASK-166 and `ui.md` gives it the opposite persistence rule (client view state, not re-derived from the URL). New copy constants `CLEAR_FILTERS_LABEL`, `ZERO_MATCH_TITLE`, quoted from `ux-states.md` §2.4, which `ui.md` §9 has no rows for. | `T-UI-016`, `T-UX-013` |
+| `TASK-040` | `components/ListEmptyState.tsx` — `T-UX-012` (a–d), `T-UX-014` (a–d), `T-UX-018` (a–e). The three "nothing to show" states are chosen by `listEmptyKind()` **from the facts**, not by a caller passing a message — the tempting shape (one `EmptyState` with a `message` prop) is exactly the shape that lets the wrong one through, and all three render fine while only one is true. Order is load-bearing and tested: the filter check runs **first**, so an owner who filtered everything out never reads the first-run message; and a single removed or suppressed title makes "Nothing here yet" false (`T-UX-012b`). `T-UX-018a` asserts the failure message keeps *"Nothing has changed"* — a failed read is the one moment the owner cannot verify the no-silent-loss promise themselves — and `T-UX-018e` proves the filter bar is not rendered over it, since its live count would have to invent numbers the API never returned. Six mutations caught, including collapsing all-gone into never-uploaded, dropping the filter check, pointing both recovery links at `/removed`, and downgrading `role="alert"`. New copy constants `LIST_EMPTY_NEVER_UPLOADED_TITLE`/`_BODY`, `UPLOAD_SCREENSHOTS_LABEL`, `LIST_EMPTY_ALL_GONE_TITLE`, `LIST_LOAD_FAILED_BODY`, `RETRY_LABEL` from `ux-states.md` §2.3/§2.5/§2.9 prose; `ui.md` §9 has no rows for any of them. | `T-UX-012`, `T-UX-014`, `T-UX-018` |
 | `TASK-041` | `apps/api/src/routes/serviceState.ts` + `packages/domain/src/freshness.ts` — `GET /api/service-state`, one entry per service in `SERVICES` so a never-captured service reads "has never been updated" rather than vanishing. `ageInDays` counts UTC calendar days, not 24-hour blocks, and clamps clock skew. `T-FRESH-010` (a–h), `T-FRESH-012` (a–f), `T-FRESH-015` (a–c, the A46 no-nudge regression guard). All four mutations caught; see `specs/testing.md` §16. | `T-FRESH-010`, `T-FRESH-012`, `T-FRESH-015` |
 | `TASK-042` | `components/FreshnessStrip.tsx` + `pages/ListPage.tsx` wiring — `T-FRESH-014` (a–i), 100% covered. Degrades **visibly**: a `role="status"` notice plus per-chip unknown labels, and a partial payload degrades only the missing service. Three mutations caught: rendering nothing when the payload is missing (fails `T-FRESH-014b/c/e/g` + `014i`), reporting missing data as "never updated" (fails `T-FRESH-014c`), nag wording in the degraded copy (fails `T-FRESH-014h`, the `A46` guard). ⚠ **`FRESHNESS_UNAVAILABLE` is invented copy pending owner review** — `T-FRESH-014` requires a visible degraded state but `specs/ui.md` §9 and `specs/ux-states.md` §2 supply no wording. ⚠ **`/upload` does NOT yet consume `?service=`** — the chips link there (asserted by `T-FRESH-014i`) but REQ-039's "pre-selecting that service" has no test id in `specs/testing.md` §9's US-022 table (AC-1/3/4/5 only) and `T-META-004` forbids an unnamed test; **a new id is requested from the coordinator — see the FINDING in `apps/web/test/freshnessStrip.spec.tsx`** (not cited here: `check:test-ids` rightly rejects an id `specs/testing.md` does not define). | `T-FRESH-014` |
 | `TASK-047` | `prisma/migrations/0002_perf_indexes/` (the five §16.6 indexes) + `apps/api/test/integration/queryPlan.spec.ts` (12 cases) — `T-PERF-001` (a-i), `T-PERF-003` (a-c), plus `listRemovedListingPage` / `searchRemovedListings` / `escapeLikeTerm` in the repository. Plans are read from `sys.dm_exec_query_plan`, NOT `SET SHOWPLAN_XML ON`, because Prisma pools connections and a session-scoped plan setting captures the wrong statement. Two of my own errors caught by the harness: a plan-cache clear placed before its own measurement manufactured a phantom 296-vs-50 regression and sent one round of optimisation after nothing, and the resulting "sargable leading predicate" was measured at depth 15,000, found to make no difference, and removed. Search is deliberately NOT index-backed (no `pg_trgm` on Basic); `escapeLikeTerm` escapes its own escape character first. See `specs/testing.md` §23. | `T-PERF-001`, `T-PERF-003` |
