@@ -111,6 +111,37 @@ purpose would be to control extraction quality.
 | --- | --- |
 | `TMDB_API_KEY` | Container Apps **secret**. Never logged; **never sent to any AI service** (`specs/ai.md`, `specs/security.md` §6). |
 
+⚠ **TMDB issues TWO credentials and only one of them works here.** Use the
+**"API Key (v3 auth)"** — a 32-character hex string. Do **not** use the
+**"API Read Access Token (v4 auth)"**, the long JWT beginning `eyJ`, even
+though it is the more modern-looking of the two: `tmdbClient.ts` uses TMDB's
+**v3 scheme**, sending the credential as the `api_key` **query parameter**,
+and v4 tokens are only accepted in an `Authorization: Bearer` header. Both
+strings are copied from the same TMDB settings page, so picking the wrong one
+is a one-click mistake.
+
+🛑 **And the wrong one fails as though TMDB were merely down.** TMDB answers a
+bad credential with **401**, `tmdbClient.ts` correctly treats it as
+non-retryable — but `apps/api/src/routes/tmdb.ts` converts every
+`TmdbUnavailableError` into the same `TMDB_UNAVAILABLE` envelope, discarding
+the status. The owner sees *"Couldn't reach TMDB. Try again in a moment."*,
+**no 401 is written to any log**, and the invitation to retry is wrong: no
+amount of waiting fixes a wrong key. If metadata never enriches and the logs
+show only `TMDB_UNAVAILABLE`, **suspect the credential before suspecting
+TMDB** — and confirm it outside the app with the one-line check below, which
+is the fastest way to tell the two apart.
+
+```bash
+# 200 => the v3 key is good. 401 => wrong credential (most likely the v4 token).
+curl -s -o /dev/null -w '%{http_code}\n' \
+  "https://api.themoviedb.org/3/configuration?api_key=$TMDB_API_KEY"
+```
+
+⚠ Run that against a **shell variable**, never a literal pasted into a
+terminal you keep — the key is inside the URL, so it lands in shell history
+and in any proxy log that records URLs. That is the same property that stops
+this codebase logging TMDB URLs at all.
+
 ### 1.5 Image and memory
 
 | Setting | Notes |
