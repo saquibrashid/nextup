@@ -11,3 +11,4 @@ export * from './jaroWinkler.js';
 export * from './thresholds.js';
 export * from './chromeTerms.js';
 export * from './cleanup.js';
+export * from './chooseReader.js';
