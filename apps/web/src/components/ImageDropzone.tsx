@@ -30,10 +30,11 @@ import {
   DROPZONE_IDLE_LABEL,
   HEIC_PREVIEW_PLACEHOLDER,
   IMAGE_ACCEPT_ATTRIBUTE,
-  PASTE_BUTTON_LABEL,
-  PASTE_IOS_HINT,
   UNSUPPORTED_FORMAT_REJECTION,
 } from '../copy';
+import { useHeldImages } from '../lib/useHeldImages';
+import { PasteButton, type PasteFailure } from './PasteButton';
+import { PasteCapture } from './PasteCapture';
 
 /** Where a file entered from. Reported to the server, never branched on here. */
 export type IngestSource = 'paste' | 'upload' | 'drop';
@@ -136,15 +137,18 @@ export function isPasteSupported(): boolean {
 export interface ImageDropzoneProps {
   /** Every affordance funnels here - the single submit path (`api.md` §5.3.1). */
   readonly onFilesAccepted?: (files: readonly File[], source: IngestSource) => void;
-  /** TASK-160 wires `navigator.clipboard.read()` to this. */
-  readonly onPasteRequested?: () => void;
+  /** Whether service and mode are chosen, so a batch exists (`ux-states.md` §4.0a). */
+  readonly batchReady?: boolean;
+  /** TASK-161 maps this to the four §4.13–§4.15 messages. */
+  readonly onPasteFailed?: (failure: PasteFailure) => void;
   /** Forces the touch hint on in tests; otherwise inferred from the viewport. */
   readonly touch?: boolean;
 }
 
 export function ImageDropzone({
   onFilesAccepted,
-  onPasteRequested,
+  batchReady = false,
+  onPasteFailed,
   touch,
 }: ImageDropzoneProps = {}): JSX.Element {
   const [accepted, setAccepted] = useState<readonly File[]>([]);
@@ -168,6 +172,17 @@ export function ImageDropzone({
     [accepted, onFilesAccepted],
   );
 
+  const pastedByListener = useCallback(
+    (files: readonly File[]): void => {
+      addFiles(files, 'paste');
+    },
+    [addFiles],
+  );
+  // The desktop listener holds too. A hold implemented only behind the button
+  // would leave Ctrl/Cmd+V silently lossy before service/mode are chosen —
+  // the same defect, on the platform where paste is used most.
+  const listener = useHeldImages(batchReady, pastedByListener);
+
   function onDrop(event: DragEvent<HTMLDivElement>): void {
     event.preventDefault();
     setDragging(false);
@@ -178,6 +193,14 @@ export function ImageDropzone({
 
   return (
     <section className="dropzone" data-testid="dropzone" aria-label="Attach screenshots">
+      {/*
+        Primitive 1 (TASK-159). Mounted HERE, not globally, so the listener's
+        lifetime is exactly the attach area's — on `/upload` and on the
+        open-draft view alike — and it cannot outlive the page and swallow a
+        paste meant for the fix-match search box.
+      */}
+      <PasteCapture onImagesPasted={listener.deliver} />
+
       <div
         className="dropzone__target"
         data-testid="drop-target"
@@ -193,26 +216,19 @@ export function ImageDropzone({
       >
         <p data-testid="dropzone-label">{dragging ? DROPZONE_ACTIVE_LABEL : DROPZONE_IDLE_LABEL}</p>
 
-        {isPasteSupported() && (
-          <div className="dropzone__paste" data-testid="paste-slot">
-            {/*
-              A real button, not a hint: on iOS a document-level `paste`
-              listener never fires, so this is the ONLY paste path there
-              (§3.2b). TASK-160 puts `navigator.clipboard.read()` behind it -
-              synchronously inside this click handler, which is what iOS
-              requires.
-            */}
-            <button
-              type="button"
-              className="tap-target"
-              data-testid="paste-button"
-              onClick={onPasteRequested}
-            >
-              {PASTE_BUTTON_LABEL}
-            </button>
-            {touch === true && <p data-testid="paste-hint">{PASTE_IOS_HINT}</p>}
-          </div>
-        )}
+        {/*
+          Primitive 2 (TASK-160). Absent entirely where `navigator.clipboard`
+          is - which includes every `http://` origin, so on a LAN IP this slot
+          is simply not there and the other two affordances carry the load.
+        */}
+        <PasteButton
+          batchReady={batchReady}
+          onImagesPasted={(files) => {
+            addFiles(files, 'paste');
+          }}
+          {...(onPasteFailed === undefined ? {} : { onPasteFailed })}
+          {...(touch === undefined ? {} : { touch })}
+        />
 
         {/*
           ⚠ ALWAYS PRESENT, never behind a menu, never replaced by paste. This

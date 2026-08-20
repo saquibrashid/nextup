@@ -39,8 +39,8 @@ Not done, and every task they depend on is done.
 | `TASK-133` | S | Epic K — Platform, safety, and the shell |
 | `TASK-143` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-152` | XS | Epic B — Capture & import |
-| `TASK-159` | M | Epic B — Capture & import |
-| `TASK-160` | M | Epic B — Capture & import |
+| `TASK-161` | S | Epic B — Capture & import |
+| `TASK-162` | S | Epic B — Capture & import |
 
 ## Waiting on the owner
 
@@ -129,10 +129,8 @@ Not done, and every task they depend on is done.
 | `TASK-131` | `TASK-044` |
 | `TASK-155` | `TASK-152` |
 | `TASK-157` | `TASK-010` |
-| `TASK-161` | `TASK-160` |
-| `TASK-162` | `TASK-159`, `TASK-160` |
-| `TASK-163` | `TASK-160`, `TASK-162` |
-| `TASK-164` | `TASK-080`, `TASK-160`, `TASK-162` |
+| `TASK-163` | `TASK-162` |
+| `TASK-164` | `TASK-080`, `TASK-162` |
 | `TASK-166` | `TASK-039` |
 | `TASK-168` | `TASK-079`, `TASK-010` |
 
@@ -206,4 +204,6 @@ Not done, and every task they depend on is done.
 | `TASK-154` | `apps/api/test/integration/ingestGuard.spec.ts` (9 tests) — `T-IMG-018` (c–h) and `T-IMG-019` (a–c) asserted end to end through the real route, real Azurite and a real database. The isolation itself was already implemented by TASK-050/149; this task PROVES it and found one real defect doing so: `OOM_PATTERNS` in `apps/api/src/images/transcode.ts` did not match Emscripten's `abort(OOM)` / `Aborted(OOM)` shape, so a genuine out-of-memory decode was classified `IMAGE_DECODE_FAILED` (415, no runbook) instead of `IMAGE_DECODE_OOM` (503) — fixed here, and `specs/testing.md` §AC-10/P1 requires exactly that case. The double is `heic-convert` itself, not `transcodeHeicToPng` and not `IngestStages`, so the real OOM-vs-corrupt classification is under test rather than stubbed out. `T-IMG-018h` asserts NEGATIVELY that no compensating-cleanup path exists (orphan blobs are left to the `NFR-019` purge) and was mutation-verified. Per the task's own scope note this does NOT depend on TASK-072. | _no test id declared_ |
 | `TASK-156` | Runbook verified against the **live** deployment (read-only: `az containerapp list/show`, `az containerapp ingress traffic show`, `az containerapp revision show`, `az monitor metrics alert list`, and `az deployment group what-if` — **no up-size was applied**; prod remains `0.25 vCPU / 0.5 GiB` with `NEXTUP_MAX_DECODE_PIXELS=25000000`). Ten inaccuracies corrected in place with the superseded text struck through beneath (F-001 rule). Three were load-bearing: **(1)** every command named `nextup` / `rg-nextup`, neither of which exists — the real names are `ca-nextup-prod` / `nextup-rg`; **(2)** prod runs `activeRevisionsMode: 'Multiple'` with traffic pinned to a **named** revision, so the documented one-command remedy builds a revision that serves **nobody** — a traffic-shift step is now §2b; **(3)** §3a's "authoritative check" read the **app-level** template, which reflects the newest revision regardless of traffic and so reports success on the exact failure mode in (2) — now checks the **serving** revision. Both backlog-mandated gaps closed: the `nextup-prod-memory-pressure` 400→800 MiB step (§2d, with its §5 revert) and the explicit **not-owner-approved** caveat on the §7 escalation. `README.md` now links `docs/runbooks/`; `infra/aca.bicep` already links the runbook (lines 103, 112). | `T-INFRA-005` |
 | `TASK-158` | `packages/domain/src/pastedFileName.ts` + `T-PASTE-005a`-`s` (19 unit cases). `INGEST_SOURCES`/`IngestSource` already existed from TASK-012, so this task is the synthesiser alone. The INTEGRATION half of `T-PASTE-005` (round-trip of `ingestSource`, server-assigned `seqInBatch`, `blobPath` free of any client name) belongs to TASK-050 — see `specs/testing.md` §27.2. | `T-PASTE-005` |
+| `TASK-159` | `components/PasteCapture.tsx` (renders `null`, mounted by `ImageDropzone` so the listener lives exactly as long as the attach area) — `T-PASTE-001` (a–l). Handler order is normative and asserted step by step: editable target → return with no `preventDefault()`; zero images → return with no `preventDefault()`; otherwise `preventDefault()` and deliver **every** image. `navigator.clipboard.read` is asserted **never** called on this path, and no `contenteditable` node is added to the DOM. Four mutations caught: guard removed (`T-PASTE-001b`), `removeEventListener` deleted (`T-PASTE-001d`), zero-image guard neutered (`T-PASTE-001c/g/h`), clipboard truncated to one image (`T-PASTE-001e/f`). | `T-PASTE-001` |
+| `TASK-160` | `components/PasteButton.tsx` + `lib/useHeldImages.ts` — `T-PASTE-002` (a–j), `T-PASTE-009` (a–c). `navigator.clipboard.read()` is the **first statement** of the click handler, asserted by a mutation that merely wraps it in `setTimeout`. The §4.0a pre-batch hold was extracted to `useHeldImages` and wired to **both** primitives — a hold behind the button alone would leave Ctrl/Cmd+V silently lossy on the platform where paste is used most. Feature detection returns `null` (not disabled), which is every `http://` origin. Four further mutations caught: `read()` deferred (`T-PASTE-002a`), feature detect short-circuited (`T-PASTE-009a/b`), held images dropped (`T-PASTE-002c/d/e`), empty clipboard conflated with no-image (`T-PASTE-002g`). The four `PASTE_*` rejection messages are **TASK-161** and are deliberately not rendered here; `onPasteFailed` + `classifyRejection()` are the seam. New copy constant `PASTE_HELD_BODY` quoted from `ux-states.md` §4.0a, which `ui.md` §9 has no row for. | `T-PASTE-002`, `T-PASTE-009` |
 | `TASK-167` | this commit — the ledger, the gate and `docs/status.md` | `T-STATUS-001` |
