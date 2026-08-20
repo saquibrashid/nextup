@@ -201,7 +201,9 @@ typed data and never re-check it.
 - Query params: `limit` (integer, 1..200, default 50), `cursor` (opaque string).
   **(R3) The cursor is a base64url-encoded keyset position**
   (`{sortDateAdded, id}` for the combined list, `{removedAt, listingId}` for
-  the removed view) — see `specs/data-model.md` §15.6. It was a Cosmos
+  the removed view) — see `specs/data-model.md` **§16.6** *(R4: keyset
+  pagination is carried over unchanged from §15.6, but §15 is now
+  superseded — cite §16.6)*. It was a Cosmos
   continuation token in Revision 1. **Clients MUST treat it as opaque and MUST
   NOT parse it**; it is echoed back unmodified or not at all. An unparseable or
   tampered cursor is **400 `INVALID_CURSOR`**, never a silent reset to page 1,

@@ -639,16 +639,30 @@ here. What *is* specified is mechanism:
   PostgreSQL it replaced — does not auto-pause** (only the serverless
   *staging* database auto-pauses, and nobody judges staging's cold start).
   `RSK-023` is closed.
-  **`components/ColdStartNotice.tsx` is KEPT anyway, and its name is
-  the only thing that is now slightly wrong.** It fires on any request
-  outstanding for **> 1200 ms** and renders *"Waking things up…"* instead
-  of an indefinite spinner (`specs/ux-states.md` §2.1). A phone on a weak
-  mobile connection will still cross 1200 ms, and the honest-slowness
-  affordance is worth more than the deleted code. **Consider renaming it
-  `SlowResponseNotice` and softening the copy to "Still working…"** —
-  "Waking things up" is now a lie about the cause. Tracked in `TASK-143`.
-  The 1200 ms figure remains an interface-affordance threshold, **not** a
-  performance target, and does not pre-empt OQ-014.
+  **`components/SlowResponseNotice.tsx` is KEPT — only RENAMED.** It fires
+  on any request outstanding for **> 1200 ms** and renders *"Still
+  working…"* instead of an indefinite spinner (`specs/ux-states.md` §2.1).
+  A phone on a weak mobile connection will still cross 1200 ms, and the
+  honest-slowness affordance is worth more than the deleted code.
+  **DECIDED (`TASK-143`, 2026-08-20): the rename and the copy change are
+  both binding, not "consider".** With `minReplicas = 1` there is no cold
+  start, so *"Waking things up…"* names a cause that cannot occur — it
+  would send anyone debugging a genuinely slow request (weak mobile link,
+  a slow TMDB call, a scan-based search) to look for a container that was
+  never asleep. ⚠ **No code carried the old name at the time of the
+  rename** — the component is unbuilt — so this is the spec's name for it
+  and there is nothing to migrate. The 1200 ms figure remains an
+  interface-affordance threshold, **not** a performance target, and does
+  not pre-empt OQ-014.
+
+  > ~~*Superseded 2026-08-20 (`TASK-143`): "**`components/ColdStartNotice.tsx`
+  > is KEPT anyway, and its name is the only thing that is now slightly
+  > wrong.** … renders *"Waking things up…"* … **Consider renaming it
+  > `SlowResponseNotice` and softening the copy to "Still working…"** —
+  > "Waking things up" is now a lie about the cause. Tracked in
+  > `TASK-143`." `TASK-143` is the task that was tracking it, so leaving
+  > it as "consider" would have closed the task without deciding the thing
+  > it was opened to decide.*~~
 
 ---
 

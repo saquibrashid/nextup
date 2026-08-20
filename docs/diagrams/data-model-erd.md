@@ -223,7 +223,7 @@ which is why adding a title on a second service does not move the row.
   instead of array surgery. `erDiagram` has no array type, and this note
   is the reconciliation.
 - **(R4)** The physical representation is **Azure SQL Database Basic** —
-  nine tables, real foreign keys, a **filtered unique index** for the
+  **ten tables**, real foreign keys, a **filtered unique index** for the
   one-non-removed-title invariant (`WHERE state = 'active'`),
   `NVARCHAR(MAX)` + `CHECK(ISJSON()=1)` only where the data is genuinely
   document-shaped (`match_candidates`, `bounding_boxes`,
@@ -231,6 +231,30 @@ which is why adding a title on a second service does not move the row.
   specified in **`specs/data-model.md` §16** and decided in ADR-0005
   Rev 3. *(R3 was PostgreSQL, §15, retained; R1 was Cosmos.)* This diagram
   remains the logical model.
+
+  > ~~*Superseded 2026-08-20 (`TASK-143`): this note said "**nine
+  > tables**". §15 (PostgreSQL, R3) had nine; §16 (Azure SQL, R4) has
+  > **ten** — R4 added `candidate_source_image`. The count was carried
+  > over from §15 when the note was re-tagged (R4) and not recounted.*~~
+
+- **(R4) Three physical tables are deliberately NOT drawn**, and this
+  note is the reconciliation the "names must match" rule above requires:
+  - **`batch_change`** — the three `provenance*` fields, per the note
+    above. `erDiagram` has no array type.
+  - **`removal_group`** — the full-update review grouping (§8). It is a
+    lifecycle/provenance structure, not part of the list's logical shape.
+  - **`candidate_source_image`** *(new in R4)* — the many-to-many join
+    between `EXTRACTIONCANDIDATE` and `UPLOADEDIMAGE`. It exists because
+    intra-batch overlap collapse makes the surviving candidate **absorb
+    the losers' provenance** (SD-02, `T-AI-007`), so a candidate can cite
+    more than one source image. ⚠ It is a **join table with a surrogate
+    key**, not a logical entity: three `NVARCHAR(200)` columns exceed SQL
+    Server's 900-byte clustered-key cap, which creates with only a
+    warning and then fails at `INSERT` time (§16, D-3).
+
+  A physical table absent from this diagram is only acceptable **while it
+  is listed here**. Adding one to §16 without adding it to this list is
+  the blocking review finding the first note describes.
 - **(R3)** `OWNER` is not a stored row. It is the authenticated
   principal, materialised as an `owner_id` **column on every table**,
   leading every index and passed as the first argument of every
