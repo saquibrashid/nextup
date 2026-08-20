@@ -33,7 +33,7 @@ Each state below names: **what the owner sees**, **what they can do**, and the
 
 | Rule | Detail |
 |---|---|
-| **Never an indefinite spinner** | Any pending request that passes 1200 ms swaps the spinner for `ColdStartNotice` — *"Waking things up…"* (ADR-0003 cold start). Past 15 s it becomes the `slow` error state with a **Retry**. `T-UX-001`. |
+| **Never an indefinite spinner** | Any pending request that passes 1200 ms swaps the spinner for `SlowResponseNotice` — *"Still working…"* (renamed from `ColdStartNotice` / *"Waking things up…"* by `TASK-143`: `minReplicas = 1` means there is no cold start, so the old copy named a cause that cannot occur). Past 15 s it becomes the `slow` error state with a **Retry**. `T-UX-001`. |
 | **Never a silent failure** | Every non-2xx response renders a visible message derived from `error.message`, plus the remedy from `error.details` when present. `T-UX-002` asserts no fetch rejection path ends without a rendered message. |
 | **Errors say what was NOT changed** | Every 4xx/5xx surface states, explicitly, that nothing was written when nothing was written. This is the ASM-029 defence: the owner must never have to guess whether a failed action half-applied. |
 | **Offline** | `navigator.onLine === false` renders a persistent banner: *"You're offline. nextup needs a connection."* Mutating controls are disabled with that reason as visible text. Cached list data stays on screen, marked *"Showing what was loaded earlier."* `T-UX-003`. |

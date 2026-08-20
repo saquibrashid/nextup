@@ -863,13 +863,22 @@ asserts nulls sort last under both `dir=desc` and `dir=asc`.
 
 ### 5.4 Invariants (~~application-enforced; Cosmos cannot enforce them~~ — see §15.4)
 
-> ⚠ **SUPERSEDED (R3) by §15.4.** The invariants themselves are unchanged.
-> What changed is **who enforces them**: I-1, I-2 and suppression
-> uniqueness are now **database constraints**, not tests hoping to catch a
-> violation after the fact. The heading's parenthetical was true of Cosmos
-> and is false of PostgreSQL. The tests remain — a constraint you have not
-> tested is a constraint you have not got — but they now assert that the
-> *database* refuses, which is a much stronger assertion.
+> ⚠ **SUPERSEDED (R3) by §15.4, and now (R4) by §16.4** — go to **§16.4**;
+> §15.4 is itself superseded and describes PostgreSQL partial indexes.
+> The invariants themselves are unchanged. What changed is **who enforces
+> them**: I-1, I-2 and suppression uniqueness are now **database
+> constraints**, not tests hoping to catch a violation after the fact —
+> expressed in R4 as Azure SQL **filtered unique indexes** raising
+> **`2627`/`2601`** (§16.4), not Postgres partial indexes raising `23505`.
+> The heading's parenthetical was true of Cosmos and is false of any
+> relational store. The tests remain — a constraint you have not tested is
+> a constraint you have not got — but they now assert that the *database*
+> refuses, which is a much stronger assertion.
+>
+> ~~*Superseded 2026-08-20 (`TASK-143`): this banner pointed only at
+> §15.4 and said the parenthetical "is false of PostgreSQL". Both were
+> written before §16 existed, so every reader arriving at §5.4 was routed
+> into the superseded PostgreSQL chapter.*~~
 
 | ID | Invariant | Test |
 |---|---|---|
@@ -880,7 +889,7 @@ asserts nulls sort last under both `dir=desc` and `dir=asc`.
 | **I-5** | `matchState === 'matched'` ⟺ `workIdentity` starts `tmdb:` ⟺ `tmdb !== null` | `T-INV-011` |
 | **I-6** | No `title.listings[].dateAdded` changes after creation | `T-INV-006` |
 | **I-7** | No document type is ever hard-deleted **except** by creates-only batch undo (§8.3) | `T-INV-012` |
-| **I-8** | No Cosmos container, database or document carries a TTL | `T-INV-013` |
+| **I-8** | **No mechanism exists that could expire or schedule the deletion of list data** — no TTL, no `pg_cron`, no Azure SQL Agent job, no Elastic Job, no trigger (§16.7). ~~No Cosmos container, database or document carries a TTL~~ | `T-INV-013` |
 
 **I-1 permits duplicates deliberately.** US-025 AC-5 and US-030 AC-4 both allow
 the owner to *confirm* creating a second active row for the same work. In those
@@ -1210,10 +1219,17 @@ charge is within 3× the RU charge of the same query over 100 removed listings.
 **Resolution (spec-writer owns OQ-022): v1 implements exactly four
 affordances**, and no more:
 
-1. **Title text search** (REQ-064, US-024 AC-3) — *(R3)* a case-insensitive
-   trigram match on `tmdb.name` **or** on `normalised_text`, so unmatched
-   rows are findable, backed by the `pg_trgm` GIN index in §15.6.
-   ~~Cosmos `CONTAINS(LOWER(c.tmdb.name), @q)`.~~
+1. **Title text search** (REQ-064, US-024 AC-3) — *(R4)* a case-insensitive
+   **exact-substring** match on `tmdb.name` **or** on `normalised_text`, so
+   unmatched rows are findable: `LIKE N'%' + @term + N'%'` under
+   `Latin1_General_100_CI_AI`, per §16.6. ⚠ **Three consequences the R3
+   wording did not carry:** it is **not** index-backed (a leading wildcard
+   cannot use a B-tree), so `T-PERF-001` asserts an index scan for the
+   *listing* path only and no longer for *search*; there is **no fuzzy or
+   typo tolerance and no trigram ranking** (`NFR-018`, accepted); and
+   `@term` **must** be parameterised and `ESCAPE`d for `%`, `_` and `[`.
+   ~~*(R3)* a case-insensitive trigram match … backed by the `pg_trgm` GIN
+   index in §15.6.~~ ~~Cosmos `CONTAINS(LOWER(c.tmdb.name), @q)`.~~
 2. **Service filter** (REQ-064, US-024 AC-4) — matches rows whose *removed*
    listing was on that service.
 3. **Default ordering: most-recently-removed first**, tie-broken by
@@ -1278,18 +1294,46 @@ recommended for early promotion (architecture §Deliberately deferred); it is
 | OQ-014 | Accessibility answered provisionally in `specs/ui.md` §10 (SD-12); performance, availability and i18n remain open |
 | OQ-023 | v1.1 only; untouched |
 | OQ-024 | Untouched — `specs/ai.md` §8 specifies behaviour under both answers without assuming either |
-| **OQ-025 (new)** | ~~No user-controlled backup or export exists.~~ **NARROWED (R3):** the store is now PostgreSQL Flexible Server with **35-day point-in-time restore** included, so an accidental destructive change is recoverable by the owner's operator within 35 days. What is still missing is a *user-controlled* export the owner can hold themselves, and PITR does not survive subscription loss. Severity **medium → low-medium**. Owner: the owner, post-v1. |
+| **OQ-025 (new)** | ~~No user-controlled backup or export exists.~~ **NARROWED (R3), RE-WIDENED (R4):** the store is **Azure SQL Database Basic**, whose point-in-time restore window is **7 days** — the Basic-tier maximum — not the 35 days the R3 PostgreSQL design gave (§16.1, §16.10). An accidental destructive change is recoverable by the owner's operator **only within 7 days of it happening**, so the window can close before a single-owner product is next opened. Still missing on top of that: a *user-controlled* export the owner can hold themselves; and PITR of any length does not survive subscription loss. Severity **medium → low-medium (R3) → medium (R4)** — the R3 narrowing was justified by a 35-day window that no longer exists. Owner: the owner, post-v1. ~~**NARROWED (R3):** the store is now PostgreSQL Flexible Server with **35-day point-in-time restore** included, so an accidental destructive change is recoverable by the owner's operator within 35 days. … Severity **medium → low-medium**.~~ |
 | **OQ-026 (A41)** | **CLOSED at `A40`: the owner selected Variant A (~$11–13/mo).** The closing mechanism was the per-component cost table in `artifacts/architecture.md` §Cost summary. This document's only cost-relevant content is that the store is now a paid **Azure SQL Basic** database (~$5/mo prod + ~$0.50/mo serverless staging) rather than PostgreSQL B1ms (~$15/mo) or a free tier. |
 
 
 ---
 
-## 15. THE RELATIONAL MODEL (REVISION 3 — AUTHORITATIVE)
+## 15. THE RELATIONAL MODEL (REVISION 3 — SUPERSEDED BY §16, RETAINED AS HISTORY)
 
-> **Added 2026-08-10T21:45 after constraint change A41/CC-002.** This
-> chapter is the authoritative physical model. Where it disagrees with §1,
-> the physical framing of §3, §5.4, §7.3, §10 or §13, **this chapter wins**.
-> Decision and full reasoning: **ADR-0005 Revision 2**.
+> 🛑 **SUPERSEDED. Do not implement anything in this chapter.** The
+> authoritative physical model is **§16 — THE AZURE SQL MODEL (REVISION
+> 4)**. This chapter describes the **PostgreSQL** design that R4 replaced;
+> it is retained, with its body unedited, so the relational reasoning that
+> still underpins §16 stays visible. Everything below that reads as an
+> instruction — the `CREATE EXTENSION pg_trgm` DDL of §15.6, the `jsonb`
+> column types of §15.2, the Postgres `23505` error code of §15.4, the
+> B1ms / PostgreSQL 16 Flexible Server SKU of §15.1, and the
+> `EXPLAIN (ANALYZE, BUFFERS)` verification of §15.6 — is **historical**.
+> Its current equivalent is in §16: `LIKE` search (§16.7), `NVARCHAR(MAX)`
+> + `ISJSON` (§16.2), Azure SQL **`2627`/`2601`** (§16.4), Azure SQL Basic
+> (§16.1), and `SET STATISTICS PROFILE ON` (§16.7).
+>
+> What this chapter is still good for: **§15.0's argument for a relational
+> store over Cosmos**, which R4 did not revisit and which §16 inherits
+> whole. Decision and full reasoning: **ADR-0005 Revision 2** (this
+> chapter) and **Revision 3** (§16).
+
+> ~~*Superseded 2026-08-20 (`TASK-143`). The heading read "(REVISION 3 —
+> AUTHORITATIVE)" and this banner read: "**Added 2026-08-10T21:45 after
+> constraint change A41/CC-002.** This chapter is the authoritative
+> physical model. Where it disagrees with §1, the physical framing of §3,
+> §5.4, §7.3, §10 or §13, **this chapter wins**. Decision and full
+> reasoning: **ADR-0005 Revision 2**." Both were written before §16
+> existed and were left unedited when it was added, so §15 declared itself
+> current while §16 — 400 lines below it — declared §15 superseded. A
+> reader or agent working top-to-bottom reached executable PostgreSQL DDL
+> under a live "this chapter wins" banner with no signal to keep reading.
+> That is the F-001 defect exactly: supersede-by-banner from below is
+> acceptable for narrative, never for an instruction a machine executes in
+> order. The chapter BODY is deliberately still unedited — the correction
+> is scoped to the two elements that made a false claim of authority.*~~
 
 ### 15.0 Why this chapter exists
 
@@ -1693,16 +1737,35 @@ rather than at the next convenient milestone.
 > the authoritative physical model. Where it disagrees with §15 (the R3
 > PostgreSQL chapter) or any earlier physical framing, **this chapter
 > wins**. Decision and full reasoning: **ADR-0005 Revision 3**. §15 is
-> retained, unedited, so the PostgreSQL reasoning stays visible.
+> retained with its **body** unedited, so the PostgreSQL reasoning stays
+> visible; only §15's heading and banner were corrected (`TASK-143`,
+> 2026-08-20) because they still claimed current authority from *above*
+> this chapter, which made §15's DDL read as an instruction.
+
+> ~~*Superseded 2026-08-20 (`TASK-143`): the last sentence read "§15 is
+> retained, unedited, so the PostgreSQL reasoning stays visible." That was
+> true when written and stopped being true when §15's false authority
+> claim was corrected. Left uncorrected it would have licensed a future
+> reader to restore §15's "this chapter wins" banner on the grounds that
+> §16 says §15 is unedited.*~~
 
 ### 16.0 What changed from §15, and what did not
 
 **Unchanged (still binding, verbatim from §15):** every domain rule; the
-nine-table logical model; the three invariants I-1/I-2/I-9 as *database
+nine-table **logical** model; the three invariants I-1/I-2/I-9 as *database
 constraints*; batch close as one transaction (§15.5); keyset pagination;
 SD-04's "no scheduled deletion mechanism exists"; the additive-only
 migration rule; `owner_id` first everywhere; ULID text ids; Prisma as the
 client.
+
+> ⚠ **The nine logical tables are realised as TEN physical tables here.**
+> R4 adds **`candidate_source_image`** (D-3), the many-to-many join
+> between `extraction_candidate` and `uploaded_image` that intra-batch
+> overlap collapse requires (SD-02, `T-AI-007`). It is a join table with a
+> surrogate key, not a new logical entity — which is why the logical count
+> is still nine — but anything that counts `CREATE TABLE` statements,
+> including `docs/diagrams/data-model-erd.md`, must say **ten**
+> (`TASK-143`).
 
 **Changed (this chapter):** the SKU (PostgreSQL B1ms → **Azure SQL
 Database Basic, 5 DTU, 2 GB**); the Prisma provider (`postgresql` →

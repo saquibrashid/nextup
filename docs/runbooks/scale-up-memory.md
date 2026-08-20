@@ -508,6 +508,13 @@ Do **not** keep climbing the SKU ladder blindly. In order:
 > owns it". `TASK-133` has since delivered it, and it carries a silent-failure
 > trap this runbook's §5 depends on, so the cross-reference is now load-bearing
 > rather than a dangling link.*~~
+- **`docs/runbooks/config-checklist.md`** — every production setting and
+  what breaks if it is wrong. It carries the `NEXTUP_MAX_DECODE_PIXELS` /
+  memory pairing rule (§2) that this runbook implements, so a reader who
+  arrives there first is sent here rather than improvising an up-size.
+- **`docs/runbooks/incident-playbook.md`** — symptom routing. It states
+  explicitly that an OOM is **not** an incident to be debugged but a
+  decided, pre-authorised remedy (`A43`), and points at this runbook.
 - **`tools/check-infra.mjs`** / **`tests/infra/sku.spec.ts`** — the closed set
   of permitted compute pairs and the `T-INFRA-005` assertions you must update
   in §4.

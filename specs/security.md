@@ -223,9 +223,11 @@ that is weaker than Revision 1, deliberately and knowingly (R3).**
 Revision 1 could write: "`ownerId` is the Cosmos partition key, so a
 cross-partition read is not merely refused — it is not expressed."
 That was a genuinely strong property, and the datastore change
-(ADR-0005 Rev 2) gives it up. On PostgreSQL, `owner_id` is a column: a
+(ADR-0005 Rev 2) gives it up. On **any relational store** — R3
+PostgreSQL, R4 Azure SQL alike — `owner_id` is an ordinary column: a
 handler that forgets its `WHERE` clause returns another owner's rows
-**at full speed and with no error**.
+**at full speed and with no error**. ~~On PostgreSQL, `owner_id` is a
+column…~~
 
 This was weighed and accepted, because the same change makes the
 invariants that actually corrupt this data into database constraints, and
@@ -247,7 +249,7 @@ must not be papered over. The compensating controls, all mandatory:
    that weakens, skips or deletes either is a blocking review finding.
 
 **Row-level security was considered and rejected** (`specs/data-model.md`
-§15.9): it would restore a store-level guarantee, but via per-request
+**§16.9**, restating §15.9): it would restore a store-level guarantee, but via per-request
 session variables that interact badly with a pooled Prisma client — a
 second, subtler enforcement path for an autonomous implementer to keep
 correct, which is its own risk (`RSK-016`). It is recorded as the leading
@@ -540,7 +542,7 @@ a **CI allow-list check**, not a review convention.
 | Symptom | First action |
 |---|---|
 | Someone else's account can sign in | Remove their subject from `NEXTUP_ALLOWED_SUBJECTS`, restart the app, then check logs for their `ownerIdHash` |
-| A secret is suspected leaked | **(R4)** Rotate the affected one: `TMDB_API_KEY` at TMDB; the **`GHCR_PULL_TOKEN`** at GitHub (regenerate the PAT, update the Container Apps registry secret); the DB SQL-auth password (if the fallback is in use) in Key Vault. **If MI database auth is in use there is no DB password to rotate.** |
+| A secret is suspected leaked | **(R4; R8)** Rotate the affected one: `TMDB_API_KEY` at TMDB; the **`entra-client-secret`** (Easy Auth) in Container Apps secrets / Key Vault; the DB SQL-auth password (if the fallback is in use) in Key Vault. **If MI database auth is in use there is no DB password to rotate.** ⚠ **There is no registry credential to rotate** — the ghcr.io package is public and Container Apps pulls anonymously (§ the R8 row above, `docs/ghcr-pat.md`). ~~the **`GHCR_PULL_TOKEN`** at GitHub (regenerate the PAT, update the Container Apps registry secret)~~ *(deleted at R8 with the credential itself; retained struck through because rotating a secret that does not exist reads as a missing step rather than an absent one — `TASK-133`, 2026-08-20)* |
 | Unexpected Azure cost | Check `extractionStats` totals and the ACA free-grant usage; the only metered inference is OCR (`specs/ai.md` §10) |
 | Data appears lost | **Do not run a repair script.** Check `/removed` (nothing is ever deleted), then batch provenance at `/batches`, then **Azure SQL point-in-time restore (7 days)** — restore to a NEW database and compare before repointing anything. **If the loss is older than 7 days, use the latest `TASK-131` `BACPAC` export** *(R4 — window shortened from 35 days; see data-model §16.11)* |
 | A TTL or purge is discovered in the codebase | Revert it. `T-INV-013`/`T-INV-012` should have blocked it; if they did not, fix the test first |
