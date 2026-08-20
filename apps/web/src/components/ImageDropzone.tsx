@@ -35,15 +35,17 @@ import {
 import { useHeldImages } from '../lib/useHeldImages';
 import { PasteButton, type PasteFailure } from './PasteButton';
 import { PasteCapture } from './PasteCapture';
+import {
+  RejectionList,
+  mergeRejections,
+  type RejectedFile,
+  type ServerRejection,
+} from './RejectionList';
 
 /** Where a file entered from. Reported to the server, never branched on here. */
 export type IngestSource = 'paste' | 'upload' | 'drop';
 
-export interface RejectedFile {
-  readonly name: string;
-  /** Why this file alone was refused. Shown next to its name (§4.4). */
-  readonly reason: string;
-}
+export type { RejectedFile, ServerRejection };
 
 export interface DropzoneReview {
   readonly accepted: readonly File[];
@@ -141,6 +143,11 @@ export interface ImageDropzoneProps {
   readonly batchReady?: boolean;
   /** TASK-161 maps this to the four §4.13–§4.15 messages. */
   readonly onPasteFailed?: (failure: PasteFailure) => void;
+  /**
+   * The server's `rejected[]` from `POST /api/batches/:batchId/images`
+   * (`api.md` §6.12), rendered verbatim in the same list as client refusals.
+   */
+  readonly serverRejected?: readonly ServerRejection[];
   /** Forces the touch hint on in tests; otherwise inferred from the viewport. */
   readonly touch?: boolean;
 }
@@ -149,6 +156,7 @@ export function ImageDropzone({
   onFilesAccepted,
   batchReady = false,
   onPasteFailed,
+  serverRejected = [],
   touch,
 }: ImageDropzoneProps = {}): JSX.Element {
   const [accepted, setAccepted] = useState<readonly File[]>([]);
@@ -281,19 +289,13 @@ export function ImageDropzone({
         </>
       )}
 
-      {rejected.length > 0 && (
-        // Listed per file, by name, with the reason (US-004 AC-3/AC-6), and
-        // NEVER in place of the accepted list - partial acceptance is the
-        // normal case, not a failure.
-        <ul data-testid="rejected-list">
-          {rejected.map((file) => (
-            <li key={file.name} data-testid="rejected-file">
-              <span data-testid="rejected-name">{file.name}</span>
-              <span data-testid="rejected-reason">{file.reason}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {/*
+        ⚠ ONE list for client and server refusals, and it is rendered
+        UNCONDITIONALLY alongside the accepted list — never in place of it.
+        Partial acceptance is the normal case (`api.md` §6.12), so a rejection
+        that clears the grid reads as "everything failed".
+      */}
+      <RejectionList entries={mergeRejections(rejected, serverRejected)} />
     </section>
   );
 }
