@@ -24,7 +24,7 @@ by grepping the whole tree, because no table would have shown it.
 | **REQ-083** | A discovery-source batch is **append-only by construction**. `full-update` is refused at the API boundary, and reconciliation never runs for such a batch. Absence of a title from a later capture carries no meaning and can never propose a removal. |
 | **REQ-084** | Confirmed discovery candidates become **`WatchIntent`** records, shown in a **separate waiting view**. They create no `ServiceListing`, no service badge, and no row in the combined list. |
 | **REQ-085** | **Discarding** a candidate during a discovery review pass creates a **`Suppression`** on canonical work identity, so a rotating feed never re-presents it. |
-| **REQ-086** | Availability is read from **TMDB watch-provider data**, for the owner's region, refreshed **lazily on access only** and limited to availability metadata. A work found streaming on a service in `SERVICES` is **flagged with an invitation**; list state is never mutated automatically. |
+| **REQ-086** | Availability is read from **TMDB watch-provider data**, for the owner's region (**`US`** — `ASM-059`, confirmed at `A49`; stored and passed explicitly, never hard-coded), refreshed **lazily on access only** and limited to availability metadata. A work found streaming on a service in `SERVICES` is **flagged with an invitation**; list state is never mutated automatically. |
 | **REQ-087** | Any surface rendering availability carries the **JustWatch attribution** TMDB requires for watch-provider data — a condition of use, stricter than NFR-013's general TMDB attribution. |
 
 ## Context
@@ -276,7 +276,7 @@ feature inert.
 | **`T-AVAIL-007`** | I | TMDB unreachable: the view renders from last-known availability with its as-of date plus an unobtrusive failure note. Never blank, never an error page (US-042 AC-7). |
 | **`T-AVAIL-008`** | U | `WATCH_PROVIDER_MAX_AGE_DAYS` is a **third independent constant**, sharing no call site with `TMDB_METADATA_MAX_AGE_DAYS` or `IMAGE_RETENTION_DAYS`. **`T-INV-008` is extended from two constants to three** (US-042 AC-8, ADR-0010 Trap 5). |
 | **`T-AVAIL-009`** | E | Every surface rendering availability carries the **JustWatch** attribution (US-042 AC-9, REQ-087). |
-| **`T-AVAIL-010`** | U | `availabilityRegion` is stored explicitly and never defaulted implicitly at the call site (**OQ-030**). |
+| **`T-AVAIL-010`** | U | `availabilityRegion` is **`US`** (`ASM-059`, owner-confirmed at `A49`) and is stored on the row and passed explicitly, never defaulted or hard-coded at the call site. |
 
 ### 6.3 The gate that must be amended, not weakened
 

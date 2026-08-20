@@ -1226,9 +1226,10 @@ building this as that is a data-loss defect, not a shortcut.
 | AC-7 (failure) | TMDB is unreachable during the refresh | The owner opens the view | The view renders from the last-known availability with its as-of date, and an unobtrusive note that the refresh failed. It is never blank and never an error page (NFR-014 pattern) |
 | AC-8 | `WATCH_PROVIDER_MAX_AGE_DAYS` | The source is inspected | It is a **third, independent** constant, declared separately from `TMDB_METADATA_MAX_AGE_DAYS = 183` (NFR-014) and `IMAGE_RETENTION_DAYS = 30` (NFR-019), with no shared call site — the `T-INV-008` rule extended to three (ADR-0010 Trap 5) |
 | AC-9 | Any surface rendering availability | It is rendered | It carries the **JustWatch** attribution TMDB requires for watch-provider data, which is a condition of use and stricter than NFR-013's general TMDB attribution (REQ-087) |
+| AC-10 *(added `A49`)* | The availability region | Any availability request is made or any answer is stored | It is **`US`** (`ASM-059`, owner-confirmed), **stored on the record and passed explicitly**. ⚠️ It is never hard-coded at the call site: a literal `'US'` scattered through the availability path is unfindable the day it changes, and the stored value is the only way to tell an answer computed for one region from one computed for another |
 
 **Out of scope for this story:** push notification or email of any kind — there is no notification channel and NFR-005 forbids the infrastructure.
-**Open questions:** **OQ-030** — the owner's TMDB region is assumed `US`; if it is ever wrong, every availability answer is wrong. Confirm before build.
+**Open questions:** none. ~~**OQ-030** — the owner's TMDB region is assumed `US`; if it is ever wrong, every availability answer is wrong. Confirm before build.~~ ✅ **RESOLVED at `A49`** — the owner confirmed the region is **`US`**. `ASM-059`: availability is requested for `US` and rendered as a `US` answer. This is now a **confirmed value, not an assumption**, but it must still be **stored and passed explicitly** (AC-10) rather than defaulted at the call site — a hard-coded `'US'` scattered through the availability path is unfindable the day it changes.
 
 #### US-043 — Browse and clear the waiting list
 

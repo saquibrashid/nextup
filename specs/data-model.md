@@ -2352,7 +2352,7 @@ Mitigations, none of which fully restores the 35-day window:
 | `satisfiedAt` | `datetime2?` | Set when the work enters the combined list by the ordinary capture path |
 | `availabilityCheckedAt` | `datetime2?` | `NULL` = never checked. Drives the lazy refresh (REQ-086) |
 | `availableOn` | `nvarchar?` | JSON array of provider identifiers reported `flatrate` for the owner's region. `NULL` ≠ "not streaming anywhere" — it means *not known* (ADR-0010 Trap 4) |
-| `availabilityRegion` | `nvarchar` | Explicit, never implicit. `US` assumed; **OQ-030** must confirm before build, because a wrong region makes every availability answer wrong |
+| `availabilityRegion` | `nvarchar` | Explicit, never implicit. **`US`, confirmed by the owner at `A49`** (`ASM-059`) — a settled value, not an assumption. ⚠️ Still **stored on the row and passed explicitly**: a hard-coded `'US'` scattered through the availability path is unfindable the day it changes, and a stored row is also the only way to tell an availability answer computed for one region from one computed for another |
 
 **Constraints**
 
