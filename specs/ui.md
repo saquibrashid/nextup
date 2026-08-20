@@ -216,8 +216,11 @@ exists to prevent.
 
 The file input's `accept` attribute and the client-side
 validation both admit **PNG, JPEG and HEIC/HEIF** — the three formats an iOS
-Safari file input can deliver (camera photos default to HEIC, screenshots are
-PNG, "Most Compatible" photos are JPEG). **The client must not reject HEIC/HEIF
+Safari file input can deliver. ⚠ **Which one arrives is NOT predictable from
+the capture path:** the owner's own iOS *screenshot* measured at TASK-151 is
+**JPEG**, falsifying the "screenshots are PNG, camera photos are HEIC" map this
+paragraph used to assert. That makes lenient client validation more important,
+not less. **The client must not reject HEIC/HEIF
 that the server accepts** — a client that rejects what §5.1 transcodes
 reintroduces the very defect A42 fixes. Because iOS often reports HEIC with an
 empty or `application/octet-stream` MIME type, the client validates

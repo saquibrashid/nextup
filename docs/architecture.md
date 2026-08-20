@@ -203,10 +203,13 @@ sourceOfTruth: artifacts/PRD.md, Context/requirements.md, Context/mvp-definition
 > agent-derived inference, never owner-confirmed, and it is FALSIFIED.**
 > The owner stated verbatim *"iOS screenshots save as heic."* **`ASM-058`
 > supersedes it: ingest accepts PNG *and* JPEG *and* HEIC/HEIF** — all
-> three, because iOS delivers all three depending on the capture path
-> (screenshots normally PNG, camera photos default HEIC, an iOS Safari
-> file input may hand over any of them; laptop-web is PNG). **PNG is not
-> swapped out.**
+> three, because iOS delivers all three and **which one is NOT predictable
+> from the capture path**. ⚠ This wording previously read *"screenshots
+> normally PNG, camera photos default HEIC"*; that map was **falsified at
+> TASK-151** — the owner's own iOS screenshot is **JPEG**. The conclusion is
+> unchanged and strengthened: accept all three, and classify by **magic bytes
+> only**, never by the declared `Content-Type` and never by the ingest source.
+> **PNG is not swapped out.**
 >
 > **Why this is a new architectural stage, not a footnote.** Neither
 > extraction service accepts HEIC/HEIF (Azure OpenAI vision:

@@ -348,12 +348,16 @@ export const REVIEW_DISPOSITIONS = [
 export type ReviewDisposition = typeof REVIEW_DISPOSITIONS[number];
 
 // Formats ACCEPTED AT UPLOAD (api.md §5). An iOS Safari file input can deliver
-// any of these depending on the capture/export path: camera photos default to
-// HEIC, screenshots are normally PNG, "Most Compatible" photos are JPEG, and the
-// laptop-web capture path produces PNG. ALL FOUR ARE ACCEPTED — do NOT "tidy" the
+// ANY of these, and WHICH ONE IS NOT PREDICTABLE FROM THE CAPTURE PATH.
+// Measured at TASK-151: the owner's own iOS *screenshot* arrived as JPEG, which
+// falsifies the per-path format map this comment used to assert ("screenshots
+// are normally PNG"). Determine the format by MAGIC BYTES ONLY -- never from the
+// declared Content-Type (iOS commonly sends application/octet-stream) and never
+// inferred from the ingest source. ALL FOUR ARE ACCEPTED -- do NOT "tidy" the
 // list by dropping HEIC/HEIF or swapping PNG out for it; the phone is the primary
 // capture device and rejecting HEIC rejects the owner's own photos at attach time.
-// (A42 — ASM-034 falsified, superseded by ASM-058; was PNG/JPEG only.)
+// (A42 -- ASM-034 falsified, superseded by ASM-058; was PNG/JPEG only.
+//  TASK-151 -- ASM-058's rationale corrected; its conclusion is unchanged.)
 export const UPLOAD_FORMATS = ['png', 'jpeg', 'heic', 'heif'] as const;
 export type UploadFormat = typeof UPLOAD_FORMATS[number];
 
