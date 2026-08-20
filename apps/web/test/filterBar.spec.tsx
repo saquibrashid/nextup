@@ -60,10 +60,12 @@ function url(): string {
 }
 
 function box(name: string, value: string): HTMLInputElement {
-  const found = document
-    .querySelectorAll<HTMLInputElement>(`input[name="${name}"]`)
-    .values()
-    .find((input) => input.value === value);
+  // ⚠ `Array.from`, NOT `.values().find(...)`. Iterator helpers are ES2025 and
+  // absent on Node 20, which is what `.nvmrc` and `engines` pin and what CI
+  // runs; a newer local Node makes the iterator form pass here and fail there.
+  const found = Array.from(
+    document.querySelectorAll<HTMLInputElement>(`input[name="${name}"]`),
+  ).find((input) => input.value === value);
   if (found === undefined) throw new Error(`no ${name} checkbox for ${value}`);
   return found;
 }
