@@ -138,6 +138,12 @@ param storageBlobEndpoint string
 @description('Blob container this environment writes to: screenshots for prod, screenshots-staging for staging.')
 param storageContainerName string
 
+@description('Fully-qualified Azure SQL server hostname for this environment.')
+param sqlServerFqdn string
+
+@description('Database this environment uses: nextup for prod, nextup_staging for staging.')
+param sqlDatabaseName string
+
 // ---------------------------------------------------------------------------
 // THE COMPUTE / DECODE-GUARD PAIR (REQ-079, A43, invariant 14).
 //
@@ -271,11 +277,19 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
       // Storage, which is why the storage settings below are plain config and
       // NOT secrets. There is deliberately no registry credential.
       //
-      // ⚠ DATABASE_URL IS NOT HERE. Its shape is TASK-141's open decision
-      // (managed identity, preferred, vs a Key Vault SQL login), and because
-      // Container Apps rejects an empty secret there is no way to add the slot
-      // now and fill it later — adding it means choosing. Left absent so the
-      // app's own startup failure keeps naming the real cause.
+      // ⚠ DATABASE_URL IS DELIBERATELY NOT A SECRET (TASK-141, A48).
+      //
+      // It carries NO credential. The app authenticates to Azure SQL with the
+      // system-assigned managed identity, so the URL is server + database and
+      // nothing else — and `apps/api/src/db/connection.ts` DERIVES the
+      // auth mode from exactly that absence: a URL with no `user`/`password`
+      // has nothing to authenticate with except the managed identity.
+      // (`apps/api/src/db/connection.ts`.)
+      //
+      // Adding a `user=`/`password=` here would silently switch the running
+      // app back to SQL-login auth while every test still passed. If this ever
+      // needs a credential, it must become a `secretRef` AND the change must be
+      // argued against specs/security.md §7.
       secrets: [
         {
           name: entraClientSecretName
@@ -349,6 +363,14 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'AZURE_STORAGE_CONTAINER'
               value: storageContainerName
+            }
+            // TASK-141. Credential-free by construction — see the note on the
+            // `secrets` array above. `encrypt=true` is explicit rather than
+            // relying on a client default, because this is the one setting
+            // whose silent downgrade would not fail anything.
+            {
+              name: 'DATABASE_URL'
+              value: 'sqlserver://${sqlServerFqdn}:1433;database=${sqlDatabaseName};encrypt=true;trustServerCertificate=false'
             }
           ]
         }

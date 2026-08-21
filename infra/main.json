@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.46.1.21595",
-      "templateHash": "17205265843912833964"
+      "templateHash": "9724871446371329628"
     },
     "description": "nextup infrastructure composition root (Variant A)."
   },
@@ -925,6 +925,12 @@
           },
           "storageContainerName": {
             "value": "[reference(resourceId('Microsoft.Resources/deployments', 'storage'), '2025-04-01').outputs.containerName.value]"
+          },
+          "sqlServerFqdn": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'sqldb'), '2025-04-01').outputs.serverFqdn.value]"
+          },
+          "sqlDatabaseName": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'sqldb'), '2025-04-01').outputs.databaseName.value]"
           }
         },
         "template": {
@@ -934,7 +940,7 @@
             "_generator": {
               "name": "bicep",
               "version": "0.46.1.21595",
-              "templateHash": "8565550026873801056"
+              "templateHash": "8004481265910540335"
             },
             "description": "Container Apps environment and the per-environment app, pulling from ghcr.io."
           },
@@ -1046,6 +1052,18 @@
               "metadata": {
                 "description": "Blob container this environment writes to: screenshots for prod, screenshots-staging for staging."
               }
+            },
+            "sqlServerFqdn": {
+              "type": "string",
+              "metadata": {
+                "description": "Fully-qualified Azure SQL server hostname for this environment."
+              }
+            },
+            "sqlDatabaseName": {
+              "type": "string",
+              "metadata": {
+                "description": "Database this environment uses: nextup for prod, nextup_staging for staging."
+              }
             }
           },
           "variables": {
@@ -1148,6 +1166,10 @@
                         {
                           "name": "AZURE_STORAGE_CONTAINER",
                           "value": "[parameters('storageContainerName')]"
+                        },
+                        {
+                          "name": "DATABASE_URL",
+                          "value": "[format('sqlserver://{0}:1433;database={1};encrypt=true;trustServerCertificate=false', parameters('sqlServerFqdn'), parameters('sqlDatabaseName'))]"
                         }
                       ]
                     }
@@ -1229,6 +1251,7 @@
       "dependsOn": [
         "[resourceId('Microsoft.Resources/deployments', 'ai')]",
         "[resourceId('Microsoft.OperationalInsights/workspaces', variables('logAnalyticsName'))]",
+        "[resourceId('Microsoft.Resources/deployments', 'sqldb')]",
         "[resourceId('Microsoft.Resources/deployments', 'storage')]"
       ]
     },

@@ -3560,3 +3560,87 @@ refresh, and asserting it is metadata-only and access-triggered - alongside
 `PRD.md` US-036 AC-2 and product invariant 5. The wrong response is to relax
 the gate into counting nothing in particular: its entire value is that the
 number is exact and small.
+
+
+## 34. Database authentication (TASK-141)
+
+**Implemented by:** `apps/api/test/unit/sqlConnection.spec.ts`.
+
+### 34.1 Why these are `T-SEC-035` and not `T-SEC-028`
+
+TASK-141's backlog row cites **`T-SEC-028`** for its token-refresh assertion.
+That id was **already taken**: §9 line 744 defines `T-SEC-028` as US-002 AC-1,
+*"Every domain type declares required `ownerId`"*, and it is implemented under
+that meaning in `apps/api/test/integration/security.spec.ts`. §22.1 records the
+collision; this is where it is resolved.
+
+Reusing the id would have silently retired one of the two meanings - the suite
+would still be green, and the owner-stamping assertion or the auth assertion
+would quietly stop being checked. **The TASK-141 sense is therefore `T-SEC-035`**
+(the `T-SEC-0xx` family reached 034). The backlog row is corrected in place.
+
+### 34.2 What is asserted
+
+| Id | L | Assertion |
+|---|---|---|
+| `T-SEC-035a` | U | Parses server, port and database from a credential-free URL |
+| `T-SEC-035b` | U | Parses a URL carrying a SQL login |
+| `T-SEC-035c` | U | Port defaults to 1433 when omitted |
+| `T-SEC-035d` | U | `encrypt` defaults to **true** when omitted |
+| `T-SEC-035e` | U | `trustServerCertificate` defaults to **false** when omitted |
+| `T-SEC-035f` | U | A brace-quoted value containing `;` survives parsing |
+| `T-SEC-035g` | U | Parameter names are case-insensitive |
+| `T-SEC-035h` | U | A non-`sqlserver://` URL is rejected |
+| `T-SEC-035i` | U | A URL naming no database is rejected |
+| `T-SEC-035j` | U | A non-numeric port is rejected, not silently defaulted |
+| `T-SEC-035k` | U | A URL with a credential selects the SQL-login path |
+| `T-SEC-035l` | U | A URL with no credential selects the managed-identity path |
+| `T-SEC-035m` | U | A user with no password is managed identity, not a half-login |
+| `T-SEC-035n` | U | `user=;password=` (an unset deploy secret) is *absent*, not a credential |
+| `T-SEC-035o` | U | The MI path sets `azure-active-directory-default` and no user/password |
+| `T-SEC-035p` | U | The MI path **never** uses `azure-active-directory-access-token` |
+| `T-SEC-035q` | U | The SQL-login path carries the credential and sets no Entra auth |
+| `T-SEC-035r` | U | `encrypt` / `trustServerCertificate` reach the driver options |
+| `T-SEC-035s` | U | Idle connections drain (`pool.min = 0`), so reconnection re-authenticates |
+| `T-SEC-035t` | U | The module hard-codes **no** token lifetime and starts no refresh timer |
+| `T-SEC-035u` | U | The log-safe description never reveals the credential |
+| `T-SEC-035v` | U | `createSqlAdapter` returns a `sqlserver` driver-adapter factory |
+| `T-SEC-035w` | U | A bad URL surfaces as a configuration error from the factory |
+
+### 34.3 The trap `T-SEC-035p` and `T-SEC-035t` exist for
+
+TASK-141 warns that "a naive implementation passes every test on day one and
+fails silently in production overnight". The naive implementation is concrete:
+tedious offers `azure-active-directory-access-token`, which takes a token
+**string**. Fetch one at startup, hand it over, and the pool reuses it for its
+lifetime - so the app works perfectly for about an hour after each deploy and
+then starts failing, at a time nobody is deploying.
+
+`azure-active-directory-default` hands the **credential** to the driver, which
+calls it during each connection's login. There is consequently **no token
+lifetime for this code to know, cache, or get wrong**, which is why the
+correct implementation contains no refresh timer at all - and why `T-SEC-035t`
+asserts the *absence* of one. A refresh timer here would be a guess at a value
+the identity provider owns.
+
+`pool.min = 0` (`T-SEC-035s`) is the other half and is **not** a tuning choice:
+a token is acquired at LOGIN, so a connection that is never closed never
+re-authenticates.
+
+### 34.4 What is deliberately not asserted here
+
+**That the managed identity can actually log in.** That needs Azure, an Entra
+token and the database grant from `docs/runbooks/database-access.md`; it cannot
+run in CI, where the store is a local `mssql/server:2022` container with SQL
+auth. The integration suite therefore exercises the **SQL-login** branch of the
+same code path - same adapter, same driver, same parser - and the
+managed-identity branch is covered by unit assertions on the configuration plus
+the deployed smoke check.
+
+**The M0 smoke migration.** It is not a test in this document because it is a
+pipeline step: `prisma migrate deploy (prod)` in `.github/workflows/deploy.yml`.
+It has been applying `prisma/migrations/**` against the real **Azure SQL Basic**
+database on every deploy, which is TASK-141's gating deliverable. It runs on
+Prisma's built-in `sqlserver` connector with the SQL admin login, **not** through
+the driver adapter - see `apps/api/src/db/connection.ts` for why that split is
+correct rather than a leftover.

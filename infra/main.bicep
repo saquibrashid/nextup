@@ -246,6 +246,11 @@ module aca 'aca.bicep' = {
     // handed production's.
     storageBlobEndpoint: storage.outputs.blobEndpoint
     storageContainerName: storage.outputs.containerName
+    // From the sqldb module's own outputs, for the same reason: the app can
+    // never be pointed at a database that was not created here, and staging
+    // can never be handed production's.
+    sqlServerFqdn: sqldb.outputs.serverFqdn
+    sqlDatabaseName: sqldb.outputs.databaseName
   }
 }
 

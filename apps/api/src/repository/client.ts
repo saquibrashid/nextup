@@ -16,7 +16,27 @@
 
 import { PrismaClient } from '@prisma/client';
 
+import { createSqlAdapter } from '../db/connection.js';
+
 let client: PrismaClient | undefined;
+
+/**
+ * Build a client for an explicit connection URL.
+ *
+ * Exported so the integration harness builds its client the SAME way the
+ * application does. That matters more than it looks: the adapter replaces the
+ * query engine, so a harness that kept constructing `new PrismaClient({
+ * datasources })` would be exercising tiberius while production runs
+ * `mssql`/`tedious` — two different drivers with different type coercion and
+ * different error shapes, and every integration test would still pass.
+ */
+export function createPrismaClient(url: string): PrismaClient {
+  return new PrismaClient({
+    adapter: createSqlAdapter(url),
+    // `error` and `warn` only. See the note above on query logging.
+    log: ['error', 'warn'],
+  });
+}
 
 /**
  * The process-wide client, created on first use.
@@ -27,11 +47,21 @@ let client: PrismaClient | undefined;
  * runs depend on a container being up.
  */
 export function getPrisma(): PrismaClient {
-  client ??= new PrismaClient({
-    // `error` and `warn` only. See the note above on query logging.
-    log: ['error', 'warn'],
-  });
+  client ??= createPrismaClient(requireDatabaseUrl());
   return client;
+}
+
+/**
+ * ⚠ Read at CALL time, not at module load. Reading it at import time would
+ * make merely importing repository code fail without a database configured,
+ * which is the property the laziness above exists to preserve.
+ */
+function requireDatabaseUrl(): string {
+  const url = process.env.DATABASE_URL;
+  if (url === undefined || url === '') {
+    throw new Error('DATABASE_URL is not set.');
+  }
+  return url;
 }
 
 /** Test-suite hook: point the repository at a caller-owned client. */

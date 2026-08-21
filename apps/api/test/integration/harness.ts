@@ -10,7 +10,7 @@
 
 import { PrismaClient } from '@prisma/client';
 
-import { setPrisma } from '../../src/repository/client.js';
+import { createPrismaClient, setPrisma } from '../../src/repository/client.js';
 import { asOwnerId, type OwnerId } from '../../src/repository/ownerData.js';
 
 /**
@@ -37,7 +37,11 @@ export const TEST_DATABASE_URL =
 let prisma: PrismaClient | undefined;
 
 export function testPrisma(): PrismaClient {
-  prisma ??= new PrismaClient({ datasources: { db: { url: TEST_DATABASE_URL } } });
+  // ⚠ Built through `createPrismaClient` rather than `new PrismaClient(...)`
+  // so the suite runs on the SAME driver the application ships (TASK-141).
+  // The URL above carries `user`/`password`, so this resolves to the SQL-login
+  // path — the managed-identity path needs Azure and cannot run in CI.
+  prisma ??= createPrismaClient(TEST_DATABASE_URL);
   setPrisma(prisma);
   return prisma;
 }

@@ -231,6 +231,12 @@ export const RUNTIME_DEPENDENCY_ALLOWLIST = new Set([
   'express',
   'zod',
   '@prisma/client',
+  // TASK-141. The Entra/managed-identity path for Azure SQL. Prisma's built-in
+  // `sqlserver` connector (Rust `tiberius`) cannot authenticate with a managed
+  // identity at all, so this is not a convenience — without it the container
+  // must hold a database password, which specs/security.md §7 exists to avoid.
+  // Published by Prisma at our exact pinned version; adds no new advisory.
+  '@prisma/adapter-mssql',
   '@azure/storage-blob',
   '@azure/identity',
   '@azure-rest/ai-vision-image-analysis',
