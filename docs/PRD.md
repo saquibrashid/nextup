@@ -211,8 +211,9 @@ A title was removed months ago. It shows up again in a new capture. nextup creat
 | J | Recovery | Fix match, batch undo, undo refusal, re-extraction, image retention. | US-030, US-031, US-032, US-033, US-034, US-035 |
 | K | Platform guarantees | The invariants that make the rest safe. | US-036, US-037, US-038, US-039 |
 | **L** *(v1.1 — specified, not scheduled)* | **Waiting to stream** | Record what I noticed on a rental storefront, and tell me when it reaches a service I have. | US-040, US-041, US-042, US-043 |
+| **M** *(v1.1 — specified, not scheduled)* | **IMDb ratings** | Show me the IMDb rating on my list, and let me look up a rating for anything I haven't saved. | US-044, US-045, US-046 |
 
-Story order within an epic is dependency order. Epic order A → K is a viable build order; see §12.1. **Epic L is v1.1 and follows the whole of A–K** — it depends on Epics C, D and I being complete. See ADR-0010 and `roadmap.md` §5.
+Story order within an epic is dependency order. Epic order A → K is a viable build order; see §12.1. **Epic L is v1.1 and follows the whole of A–K** — it depends on Epics C, D and I being complete. See ADR-0010 and `roadmap.md` §5. **Epic M is v1.1 and depends on Epic F** (the combined list) and on TMDB matching being in place, because a rating is keyed on the `imdb_id` that matching produces. See ADR-0011.
 
 ---
 
@@ -1263,6 +1264,86 @@ recording that it is metadata-only and access-triggered. This is part of the
 epic, not a follow-up: discovering it as a red `T-CI-005` at the end of the
 build is the predictable failure. The amendment must be made **in place**, per
 the editing convention in `.github/copilot-instructions.md` §5.
+
+---
+
+### Epic M — IMDb ratings — **v1.1**
+
+**Why this epic exists.** The owner stated the need at `A50`:
+
+> *"I'd like to add additional features. I'd like to be able to query a movie
+> and check its imdb rating."*
+
+The saved list answers *what could I watch*. It does not answer *is it any
+good*, so the decision of what to actually put on tonight still happens
+somewhere else — which is the same "leaves the app to decide" gap Epic L
+identified for rentals.
+
+⚠ **IMDb has no free API.** The official one is an AWS Data Exchange contract at
+roughly **$150,000/year**. Every option is therefore a proxy, and the owner
+chose **OMDb** — the genuine IMDb number, free at 1,000 requests/day, but
+unofficial — over TMDB's already-integrated `vote_average`. The free bulk
+dataset was rejected on architecture, not cost: ingesting it needs a scheduled
+job. See ADR-0011 for the full comparison.
+
+**Traces to:** REQ-088 – REQ-093, ADR-0011.
+
+#### US-044 — See the IMDb rating on my list
+
+> As the owner, when I look at my combined list, I want each row to show its
+> IMDb rating, so I can decide what to watch without leaving the app.
+
+**Traces to:** REQ-088, REQ-089, REQ-090, REQ-091
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | A work with a known `imdb_id` and a cached rating | The list is rendered | The row shows the IMDb rating (REQ-088) |
+| AC-2 | A work whose cached rating is older than `IMDB_RATING_MAX_AGE_DAYS` | The owner **opens the list** | The rating is refreshed lazily, on access only — never by a scheduler (REQ-090) |
+| AC-3 | A work TMDB matched **without** an `imdb_id` | The list is rendered | The row shows the explicit **no-rating** state. It does **not** fall back to a title-text lookup (REQ-089, REQ-091) |
+| AC-4 | A work OMDb has no rating for | The list is rendered | The no-rating state is shown. It is **never** rendered as `0`, `0.0`, or an empty star row (REQ-091) |
+| AC-5 (failure) | OMDb is unreachable, errors, or the daily budget is exhausted | The list is rendered | The list **still loads**, showing cached or absent ratings. A rating never fails the page (REQ-093) |
+| AC-6 (edge) | A list of several hundred works with a cold cache | The list is rendered | Ratings are fetched only for works actually rendered, serially and bounded — never as a bulk backfill of the whole table (REQ-093) |
+
+#### US-045 — Look up a rating for something I haven't saved
+
+> As the owner, I want to type any movie name and see its IMDb rating, so I can
+> check something I heard about without adding it to a list first.
+
+**Traces to:** REQ-092, REQ-089, REQ-091
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | Any title the owner types | The lookup is run | It resolves through TMDB search → `imdb_id` → OMDb, and returns the rating (REQ-092, REQ-089) |
+| AC-2 | A completed lookup | The result is shown | **Nothing is written.** No `Title`, no `ServiceListing`, no `WatchIntent`, no `Suppression` (REQ-092) |
+| AC-3 | A lookup matching nothing in TMDB | The lookup is run | It reports "not found" plainly — it does not present an unrated empty result as though a work were found (REQ-091) |
+| AC-4 | A work already in the owner's list | It is looked up | The result says so, rather than appearing to be an unrelated title the owner could add |
+| AC-5 (failure) | OMDb unavailable but TMDB reachable | The lookup is run | The title resolves and the rating shows the no-rating state; the lookup itself does not error (REQ-091, REQ-093) |
+
+#### US-046 — Trust that a rating belongs to the right film
+
+> As the owner, I want to be sure the rating I see is for the film on that row,
+> because a confidently wrong rating is worse than no rating at all.
+
+**Traces to:** REQ-089, REQ-091
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | Any rating retrieval, anywhere in the product | It is issued | It is keyed on `imdb_id` (`?i=`). A title-text query (`?t=`) is **never** issued (REQ-089) |
+| AC-2 | Two works sharing a title and year | Ratings are retrieved | Each gets its own rating, because the key is an identifier and not a string (REQ-089) |
+| AC-3 (failure) | A work with no `imdb_id` | A rating is wanted | The no-rating state is returned. Falling back to a title search is a defect, not a degradation (REQ-089, REQ-091) |
+
+#### Required amendment to Epic K when this epic is promoted
+
+⚠ **US-036 AC-2's non-owner-process count and `T-CI-005` must be incremented in
+the same change**, naming the rating refresh explicitly and recording that it is
+metadata-only and access-triggered.
+
+⚠ **Do not write a literal number here.** Epic L already claims one increment
+for its availability refresh, so the correct value depends on which epic is
+promoted first. The instruction is **"read the current count and raise it by
+one"** — hard-coding "three" or "four" is wrong under one of the two merge
+orders. A lazy, access-triggered refresh does **not** escape this count: ADR-0010
+set that precedent and ADR-0011 follows it.
 
 ---
 
