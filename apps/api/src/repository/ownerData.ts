@@ -192,6 +192,32 @@ export async function updateUploadBatchStatus(
  * not this owner's). The caller decides which of those it is; this function
  * deliberately does not, because distinguishing them requires a second read
  * that would reintroduce the race it exists to close.
+ *
+ * ⚠ WHY THIS IS RAW SQL WITH `OUTPUT`, AND NOT `updateMany().count`.
+ * `updateMany` was correct SQL but its COUNT could not be trusted under the
+ * `@prisma/adapter-mssql` driver adapter (TASK-141). `T-BATCH-018c` — "two
+ * simultaneous submits never both succeed" — went from 12 consecutive green
+ * runs to failing 2 of the 3 runs immediately after the driver changed,
+ * always as `[202, 202]`: BOTH callers were told they had won.
+ *
+ * The adapter returns `rowsAffected[0]` — the FIRST element of an array that
+ * holds one entry per statement in the emitted batch. If the batch begins
+ * with a read that selects the rows to update, that first count is the number
+ * of rows MATCHED BY THE READ, not the number UPDATED. Two concurrent callers
+ * can both read `draft` before either commits, so both see a non-zero count.
+ * That reintroduces, inside the driver, precisely the read-modify-write race
+ * the paragraph above says this function exists to close — and it is
+ * intermittent, because a slower second read sees the committed new status
+ * and correctly reports zero.
+ *
+ * `OUTPUT INSERTED.[id]` is emitted by the UPDATE itself and yields one row
+ * per row ACTUALLY updated. Counting those rows cannot be confused with a
+ * preceding read's count, on any driver. This is deliberately not a fix to
+ * the count plumbing: it removes the dependency on that plumbing entirely.
+ *
+ * ⚠ Unknown keys THROW rather than being ignored. Silently dropping an
+ * unrecognised field would produce a transition that reports success while
+ * leaving a timestamp unwritten.
  */
 export async function transitionUploadBatchStatus(
   ownerId: OwnerId,
@@ -203,11 +229,38 @@ export async function transitionUploadBatchStatus(
   >,
   tx?: Db,
 ): Promise<number> {
-  const result = await db(tx).uploadBatch.updateMany({
-    where: { ownerId, id, status: from },
-    data,
-  });
-  return result.count;
+  const columns: Record<string, string> = {
+    status: 'status',
+    submittedAt: 'submitted_at',
+    extractionStartedAt: 'extraction_started_at',
+    completedAt: 'completed_at',
+    undoneAt: 'undone_at',
+  };
+
+  const assignments: Prisma.Sql[] = [];
+  for (const [field, value] of Object.entries(data)) {
+    const column = columns[field];
+    if (column === undefined) {
+      throw new Error(
+        `transitionUploadBatchStatus: unmapped field "${field}". Add it to the column map — ` +
+          'it must never be silently dropped.',
+      );
+    }
+    assignments.push(Prisma.sql`[${Prisma.raw(column)}] = ${value as string | Date | null}`);
+  }
+
+  if (assignments.length === 0) {
+    throw new Error('transitionUploadBatchStatus: no fields to update.');
+  }
+
+  const updated = await db(tx).$queryRaw<Array<{ id: string }>>(
+    Prisma.sql`UPDATE [upload_batch]
+       SET ${Prisma.join(assignments, ', ')}
+       OUTPUT INSERTED.[id]
+       WHERE [owner_id] = ${ownerId} AND [id] = ${id} AND [status] = ${from}`,
+  );
+
+  return updated.length;
 }
 
 /**
