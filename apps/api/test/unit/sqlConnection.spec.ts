@@ -24,7 +24,7 @@ import {
 
 const PROD_URL = 'sqlserver://sql-nextup.database.windows.net:1433;database=nextup;encrypt=true';
 const CI_URL =
-  'sqlserver://localhost:1433;database=nextup_test;user=sa;password=Str0ng_Passw0rd_ci;encrypt=true;trustServerCertificate=true';
+  'sqlserver://localhost:1433;database=nextup_test;user=sa;password=pw-test-fixture-only;encrypt=true;trustServerCertificate=true';
 
 describe('T-SEC-035 · Azure SQL connection settings (TASK-141)', () => {
   /* ---------------------------------------------------------------- *
@@ -43,7 +43,7 @@ describe('T-SEC-035 · Azure SQL connection settings (TASK-141)', () => {
   it('T-SEC-035b · parses a URL that carries a SQL login', () => {
     const settings = parseSqlServerUrl(CI_URL);
     expect(settings.user).toBe('sa');
-    expect(settings.password).toBe('Str0ng_Passw0rd_ci');
+    expect(settings.password).toBe('pw-test-fixture-only');
     expect(settings.trustServerCertificate).toBe(true);
   });
 
@@ -184,7 +184,7 @@ describe('T-SEC-035 · Azure SQL connection settings (TASK-141)', () => {
 
   it('T-SEC-035u · the describe helper never reveals the credential', () => {
     const described = describeConnection(parseSqlServerUrl(CI_URL));
-    expect(described).not.toContain('Str0ng_Passw0rd_ci');
+    expect(described).not.toContain('pw-test-fixture-only');
     expect(described).toContain('nextup_test');
     expect(described).toContain('sql-login');
   });

@@ -27,3 +27,13 @@ cfef69882f5b6a80f442290a35ef4ab4936fa52e:apps/api/src/jobs/startExtraction.ts:ge
 # quoted the line it was suppressing. The quote is gone from HEAD; this covers
 # the commit that still carries it.
 c955fdc942a4530111788be40278422eb92602d4:.gitleaksignore:generic-api-key:13
+
+# A parsing fixture in the TASK-141 connection spec: a Prisma `sqlserver://`
+# URL for the EPHEMERAL CI test container, carrying that container's throwaway
+# SA password. It is not a credential to anything that outlives a CI job — the
+# same value is set on the service container in `ci.yml` — but it should never
+# have been written as a literal, so HEAD now uses an obviously-inert
+# placeholder instead. This entry covers only the one commit that introduced
+# it, because gitleaks scans history and would otherwise fail every future
+# push forever.
+9dac8f1241487f9ba6a3f428053bb2bfbb187e9b:apps/api/test/unit/sqlConnection.spec.ts:generic-api-key:27
