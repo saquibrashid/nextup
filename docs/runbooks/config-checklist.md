@@ -29,11 +29,10 @@ Verified read-only against the **serving** revision on 2026-08-20 (see
 `docs/runbooks/scale-up-memory.md` §3a for why you must query the serving
 revision and not the app-level template).
 
-**A48 closed most of this gap in the template.** `infra/aca.bicep` now
-sets **ten** environment variables and declares **two** secrets. The rows
-below marked *A48* are wired in the template but will not reach a running
-container until the next deployment, and the two secret-backed ones will
-not reach it at all unless the matching **GitHub secret** exists.
+**A48 closed most of this gap, and it is now DEPLOYED.** Re-verified
+read-only against serving revision `ca-nextup-prod--0000038` on
+2026-08-21: `infra/aca.bicep` sets **ten** environment variables and
+declares **two** secrets, and the serving revision matches exactly.
 
 | Set in production | Value source |
 | --- | --- |
@@ -60,12 +59,37 @@ deliberate: the alternative was never "deploy unconfigured", it was
 "deploy something that looks fine and reports every metadata lookup as a
 transient TMDB outage forever" (§1.4).
 
-Add these repository secrets, then push:
+| GitHub secret | Required? | Value | Status |
+| --- | --- | --- | --- |
+| `TMDB_API_KEY` | **yes — deploy fails without it** | the **32-hex v3 key**, not the v4 token (§1.4) | ✅ set 2026-08-21 |
+| `ALLOWED_SUBJECTS` | no, but nobody can sign in without it | comma-separated Entra subject ids | ⬜ **outstanding** |
 
-| GitHub secret | Required? | Value |
-| --- | --- | --- |
-| `TMDB_API_KEY` | **yes — deploy fails without it** | the **32-hex v3 key**, not the v4 token (§1.4) |
-| `ALLOWED_SUBJECTS` | no, but nobody can sign in without it | comma-separated Entra subject ids |
+**To find your subject id.** It is the Entra **object id** (`oid`), not a
+sign-in address — `apps/api/src/auth/principal.ts` reads the
+`objectidentifier` claim and falls back to `sub`, and `T-SEC-015` fails
+on the word "email" appearing in the allow-list path at all. Sign in and
+read:
+
+```
+https://ca-nextup-prod.purplebush-4ede0f22.eastus2.azurecontainerapps.io/.auth/me
+```
+
+Easy Auth serves that itself, ahead of application code, so it works
+while the allow-list is empty and refusing every request.
+
+⚠ **Prefer `/.auth/me` over looking the user up in the portal.**
+`aca.bicep` pins the issuer to the `/common` endpoint, so the account you
+actually sign in with decides which `oid` you get — a personal Microsoft
+account and a work account are different objects with different ids. The
+portal shows the id of the user you searched for; `/.auth/me` shows the
+id of whoever signed in. When they differ, the portal value locks you out
+of your own deployment.
+
+⚠ `allowList.ts` also has a bootstrap mode
+(`NEXTUP_BOOTSTRAP_ALLOW_FIRST=true` logs the refused subject id and
+still refuses it). It is **set nowhere in `infra/`**, so using it needs a
+manual `az containerapp update` and an extra revision. `/.auth/me` yields
+the same value with no deployment change.
 
 🛑 **Still not wired: `DATABASE_URL`.** Its shape is `TASK-141`'s open
 decision — managed identity (preferred) versus a Key Vault SQL login —
@@ -84,6 +108,22 @@ evidence that the app works.
 It is a convenient handle for `az storage` commands and nothing more; do
 not write code that depends on it without first adding it to
 `infra/aca.bicep`, where it is deliberately absent.
+
+**Storage isolation, verified 2026-08-21.** Both environments share one
+storage account and are separated by container:
+
+| Environment | `AZURE_STORAGE_CONTAINER` |
+| --- | --- |
+| prod | `screenshots` |
+| staging | `screenshots-staging` |
+
+`rbac.bicep` grants each environment's identity access to **its own
+container only**, so this separation is now enforced rather than merely
+intended. Before A48 the name was hard-coded in `blobStore.ts`, which
+meant staging asked for the production container by name every time — the
+grant guaranteed only that staging would be **refused**, and had the two
+ever shared a credential, staging would have written into production's
+container instead.
 
 ---
 
