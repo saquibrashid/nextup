@@ -77,20 +77,57 @@ identity is missing when in fact the *session type* is wrong.
 
 ## 2. Verify
 
-```bash
-# Should return rows, not a login error.
-curl -sS https://ca-nextup-prod.<region>.azurecontainerapps.io/api/titles
+⚠ **The two obvious checks both prove nothing, and one of them looks like
+proof.** `curl`ing the public URL signed out returns Easy Auth's `401`
+identically whether the grant worked or not, and an *absence* of login errors
+in the container log is not evidence either — Prisma opens the connection
+lazily, so a container that has never served a request has never authenticated.
+
+The only conclusive check runs a real query **from inside the running
+container**, past Easy Auth, using the app's own identity and its own
+`DATABASE_URL`. This is read-only and writes nothing.
+
+```powershell
+$js = @'
+const s = (process.env.NEXTUP_ALLOWED_SUBJECTS || '').split(',')[0];
+const h = Buffer.from(JSON.stringify({ claims: [ { typ: 'iss', val: 'x' }, { typ: 'http://schemas.microsoft.com/identity/claims/objectidentifier', val: s } ] })).toString('base64');
+console.log('SUBJECT_PRESENT', Boolean(s), 'DBURL_PRESENT', Boolean(process.env.DATABASE_URL));
+fetch('http://127.0.0.1:3000/api/titles', { headers: { 'x-ms-client-principal': h } })
+  .then(r => r.text().then(t => console.log('DBPROBE_STATUS', r.status, t.slice(0, 400))))
+  .catch(e => console.log('DBPROBE_ERR', e.message));
+'@
+$b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($js))
+$rev = az containerapp revision list -n ca-nextup-prod -g nextup-rg `
+  --query "sort_by([].{n:name,t:properties.createdTime},&t)[-1].n" -o tsv
+az containerapp exec -n ca-nextup-prod -g nextup-rg --revision $rev `
+  --command "node -e eval(Buffer.from('$b64','base64').toString())"
 ```
 
-Signed out you will get Easy Auth's `401` regardless — that is not evidence of
-anything. Check while signed in, or read the container log:
+A healthy system answers:
 
-```bash
-az containerapp logs show -n ca-nextup-prod -g nextup-rg \
-  --subscription d2030464-c98d-4d14-acf2-378afb0bd760 --tail 50
+```text
+SUBJECT_PRESENT true DBURL_PRESENT true
+DBPROBE_STATUS 200 {"items":[],"nextCursor":null,"limit":50}
 ```
 
-A missing grant shows as `Login failed for user '<token-identified principal>'`.
+`200` with a JSON page body is the proof: the app obtained a token for its
+managed identity, logged in to Azure SQL, and ran a `SELECT`. A missing grant
+shows as `DBPROBE_STATUS 500` plus
+`Login failed for user '<token-identified principal>'`.
+
+⚠ **Two quoting traps, both of which fail silently by printing nothing.**
+`az containerapp exec` splits `--command` on spaces, so `sh -c "a | b"` runs
+`sh -c a` and discards the rest — hence the single-token
+`node -e eval(Buffer.from(...))` form, which contains no spaces inside the
+argument. And the probe must stay asynchronous: the pending `fetch` is what
+keeps the event loop alive long enough to print.
+
+~~Superseded, because neither step is conclusive: "`curl -sS
+https://ca-nextup-prod.<region>.azurecontainerapps.io/api/titles` — should
+return rows, not a login error. Signed out you will get Easy Auth's `401`
+regardless; check while signed in, or read the container log with `az
+containerapp logs show -n ca-nextup-prod -g nextup-rg --subscription
+d2030464-c98d-4d14-acf2-378afb0bd760 --tail 50`."~~
 
 ---
 
