@@ -43,6 +43,45 @@ import {
 } from '../../src/repository/ownerData.js';
 import { closeTestPrisma, resetDatabase, testPrisma } from './harness.js';
 
+/**
+ * A switch that suppresses the fire-and-forget extraction for ONE test.
+ *
+ * ⚠ This exists because of a real, diagnosed CI failure, and the diagnosis is
+ * worth keeping: `T-BATCH-018c` failed intermittently with `[202, 202]`, and
+ * the second 202 was CORRECT BEHAVIOUR rather than a lost race.
+ *
+ * The sequence is: request A wins the `draft -> submitted` transition and
+ * answers 202; `beginExtraction` then drives the batch to `extraction-failed`
+ * "in microseconds", because CI configures no reader (see the docblock on
+ * `beginExtraction`, and `T-BATCH-019a`, which asserts exactly that status).
+ * If request B's `loadOwnedBatch` happens to resolve after all of that, B
+ * observes `extraction-failed` — from which `submitted` is a LEGAL transition,
+ * because retry deliberately re-enters the same batch (§6.16). B is therefore
+ * not a duplicate submit at all; it is a valid retry of a failed extraction,
+ * and 202 is the specified answer.
+ *
+ * That confound also explains why the earlier attempts to "fix" this failed:
+ * both `UPDATE`s genuinely matched a row, so neither the row-count plumbing
+ * nor the `status: from` predicate was ever implicated. The two statements
+ * simply had different `from` values.
+ *
+ * Suppressing extraction removes the confound WITHOUT weakening the case: the
+ * request still travels the whole route -> service -> SQL Server path, so a
+ * route that bypassed the service is still caught. What is removed is an
+ * asynchronous job this test was never about.
+ */
+const extraction = vi.hoisted(() => ({ suppressed: false }));
+
+vi.mock('../../src/jobs/startExtraction.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/jobs/startExtraction.js')>();
+  return {
+    ...actual,
+    beginExtraction: (...args: Parameters<typeof actual.beginExtraction>): void => {
+      if (!extraction.suppressed) actual.beginExtraction(...args);
+    },
+  };
+});
+
 const OID = 'http://schemas.microsoft.com/identity/claims/objectidentifier';
 const SUBJECT = 'oid-owner-lifecycle';
 const OTHER_SUBJECT = 'oid-owner-lifecycle-other';
@@ -135,6 +174,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  extraction.suppressed = false;
   vi.restoreAllMocks();
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
@@ -267,6 +307,14 @@ describe('T-BATCH-018 — submit is atomic under concurrency (TASK-054)', () => 
     // The end-to-end companion. It is NOT the discriminating case — see the
     // note on `018a` — but it asserts the property the owner actually
     // experiences, and it would catch a route that bypassed the service.
+    //
+    // ⚠ Extraction is suppressed for this case ONLY, and the reason is on
+    // `extraction` at the top of this file: without it the loser of the race
+    // can legitimately answer 202, because A's extraction has already failed
+    // and `extraction-failed -> submitted` is a lawful retry. That made this
+    // case intermittently red while the product was behaving correctly.
+    extraction.suppressed = true;
+
     await seedBatch('b-race', 'draft');
     await seedImage('b-race', 'i-4');
 
@@ -279,10 +327,27 @@ describe('T-BATCH-018 — submit is atomic under concurrency (TASK-054)', () => 
     const loser = a.status === 409 ? a : b;
     expect(((await loser.json()) as ErrorBody).error.code).toBe('BATCH_NOT_DRAFT');
 
-    // Settle before the suite tears the database down. An extraction still
-    // running here would write to rows the next test has already truncated,
-    // and the resulting failure would land on an innocent test.
-    await extractionSettled('b-race');
+    // The batch moved exactly once, and stayed moved.
+    expect((await findUploadBatch(owner, 'b-race'))?.status).toBe('submitted');
+  });
+
+  it('T-BATCH-018d: a second submit after a FAILED extraction is a lawful retry, not a race', async () => {
+    // The non-vacuity guard for `018c`'s suppression. If suppressing
+    // extraction were quietly disabling the submit path rather than just the
+    // job, `018c` would still be green and mean nothing. This case runs with
+    // extraction LIVE and pins the behaviour that used to leak into `018c`:
+    // once extraction has failed, a further submit is accepted (§6.16), so
+    // `018c`'s 409 must come from the concurrency guard and not from submit
+    // being refused a second time in general.
+    await seedBatch('b-retry-race', 'draft');
+    await seedImage('b-retry-race', 'i-5');
+
+    expect((await post('/api/batches/b-retry-race/submit')).status).toBe(202);
+    await extractionSettled('b-retry-race');
+    expect((await findUploadBatch(owner, 'b-retry-race'))?.status).toBe('extraction-failed');
+
+    expect((await post('/api/batches/b-retry-race/submit')).status).toBe(202);
+    await extractionSettled('b-retry-race');
   });
 });
 

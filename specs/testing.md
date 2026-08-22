@@ -2644,6 +2644,26 @@ now drives `transitionUploadBatchStatus` directly from one already-read state,
 which is the shape of the bug; `T-BATCH-018c` keeps the end-to-end version but
 is explicitly labelled as NOT the discriminating case.
 
+⚠ **`T-BATCH-018c` was also intermittently red for a reason that was not a
+race at all, and the diagnosis belongs in the record.** It failed with
+`[202, 202]`, and the second `202` was **correct behaviour**: request A wins
+the `draft → submitted` transition and answers 202, `beginExtraction` then
+drives the batch to `extraction-failed` within microseconds because CI
+configures no reader (`T-BATCH-019a` asserts exactly that status), and if
+request B's load resolves after all of that, B observes `extraction-failed` —
+from which `submitted` is a **lawful retry** (§6.16), not a duplicate submit.
+Both `UPDATE`s therefore genuinely matched a row, with **different `from`
+values**, which is why neither the row-count plumbing nor the `status: from`
+predicate was ever implicated. The case now suppresses the fire-and-forget
+extraction for itself only, so the request still travels the whole
+route → service → SQL Server path; **`T-BATCH-018d`** is its non-vacuity
+guard, running with extraction live to pin that a post-failure resubmit is
+still accepted — so `018c`'s 409 can only come from the concurrency guard.
+
+| Id | Kind | Property |
+| --- | --- | --- |
+| **`T-BATCH-018d`** | I | A submit issued **after** an extraction has failed is accepted (202), because `extraction-failed → submitted` is retry (§6.16) and deliberately re-enters the same batch. This is the non-vacuity guard for `T-BATCH-018c`'s extraction suppression: without it, a suppression that disabled the submit path rather than only the job would leave `018c` green and meaningless. |
+
 ### 24.2 What TASK-054 found in the specs
 
 **(a) `T-BATCH-013` has no request to send.** §9 defines it as "changing
