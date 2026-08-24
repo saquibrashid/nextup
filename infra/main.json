@@ -2,11 +2,6 @@
   "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
   "metadata": {
-    "_generator": {
-      "name": "bicep",
-      "version": "0.46.1.21595",
-      "templateHash": "9724871446371329628"
-    },
     "description": "nextup infrastructure composition root (Variant A)."
   },
   "parameters": {
@@ -128,6 +123,12 @@
         "description": "TMDB v3 API key — NOT the v4 read access token. Held as a Container Apps secret."
       }
     },
+    "omdbApiKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "OMDb API key for IMDb ratings (REQ-092). Held as a Container Apps secret."
+      }
+    },
     "allowedSubjects": {
       "type": "string",
       "defaultValue": "",
@@ -187,11 +188,6 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "304084418123119981"
-            },
             "description": "Private screenshot blob storage with a 30-day lifecycle purge."
           },
           "parameters": {
@@ -386,11 +382,6 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "12880557086815054577"
-            },
             "description": "Azure SQL logical server with a Basic prod database and a serverless staging database."
           },
           "parameters": {
@@ -606,11 +597,6 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "17808675744871672526"
-            },
             "description": "Azure OpenAI + Azure AI Vision accounts and the gpt-4.1 vision deployment."
           },
           "parameters": {
@@ -917,6 +903,9 @@
           "tmdbApiKey": {
             "value": "[parameters('tmdbApiKey')]"
           },
+          "omdbApiKey": {
+            "value": "[parameters('omdbApiKey')]"
+          },
           "allowedSubjects": {
             "value": "[parameters('allowedSubjects')]"
           },
@@ -937,11 +926,6 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "8004481265910540335"
-            },
             "description": "Container Apps environment and the per-environment app, pulling from ghcr.io."
           },
           "parameters": {
@@ -1034,6 +1018,12 @@
                 "description": "TMDB v3 API key (32 hex chars) — NOT the v4 read access token, which cannot authenticate this app's query-parameter scheme. Required: see the empty-secret note above."
               }
             },
+            "omdbApiKey": {
+              "type": "securestring",
+              "metadata": {
+                "description": "OMDb API key (8 hex chars) for IMDb ratings (REQ-092, ADR-0011). Required: same empty-secret note above — Container Apps has no absent state for a secret-backed setting."
+              }
+            },
             "allowedSubjects": {
               "type": "string",
               "defaultValue": "",
@@ -1069,7 +1059,8 @@
           "variables": {
             "isProd": "[equals(parameters('environmentName'), 'prod')]",
             "entraClientSecretName": "entra-client-secret",
-            "tmdbApiKeySecretName": "tmdb-api-key"
+            "tmdbApiKeySecretName": "tmdb-api-key",
+            "omdbApiKeySecretName": "omdb-api-key"
           },
           "resources": [
             {
@@ -1114,6 +1105,10 @@
                     {
                       "name": "[variables('tmdbApiKeySecretName')]",
                       "value": "[parameters('tmdbApiKey')]"
+                    },
+                    {
+                      "name": "[variables('omdbApiKeySecretName')]",
+                      "value": "[parameters('omdbApiKey')]"
                     }
                   ]
                 },
@@ -1154,6 +1149,10 @@
                         {
                           "name": "TMDB_API_KEY",
                           "secretRef": "[variables('tmdbApiKeySecretName')]"
+                        },
+                        {
+                          "name": "OMDB_API_KEY",
+                          "secretRef": "[variables('omdbApiKeySecretName')]"
                         },
                         {
                           "name": "NEXTUP_ALLOWED_SUBJECTS",
@@ -1282,11 +1281,6 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "7100843257089610165"
-            },
             "description": "Grants a principal a role scoped to a single blob container."
           },
           "parameters": {
@@ -1360,11 +1354,6 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "2218706414898512223"
-            },
             "description": "Grants a principal a role scoped to a single Cognitive Services account."
           },
           "parameters": {
@@ -1432,11 +1421,6 @@
           "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
           "contentVersion": "1.0.0.0",
           "metadata": {
-            "_generator": {
-              "name": "bicep",
-              "version": "0.46.1.21595",
-              "templateHash": "2218706414898512223"
-            },
             "description": "Grants a principal a role scoped to a single Cognitive Services account."
           },
           "parameters": {
