@@ -1034,7 +1034,7 @@ Added at `A48` for **Epic L (v1.1)** — these terms have no meaning in v1:
 |---|---|---|---|
 | AC-1 | An uploaded image | 30 days have elapsed since its upload | Its bytes are permanently deleted (NFR-019) |
 | AC-2 | The purge | It runs | It deletes **image bytes only**. It MUST NOT delete or alter any Title, ServiceListing, Suppression, UploadBatch, ExtractionCandidate or provenance record (REQ-028, REQ-041) |
-| AC-3 | The purge | It runs | It changes no user-visible list state, and is therefore one of exactly two permitted non-owner-initiated processes (REQ-041, US-036) |
+| AC-3 | The purge | It runs | It changes no user-visible list state, and is therefore one of exactly three permitted non-owner-initiated processes (REQ-041, US-036) |
 | AC-4 | Image bytes at any point in their life | They are requested | They are served only to the authenticated owner over an authenticated path (NFR-011, NFR-020) |
 | AC-5 (edge) | A batch still open when its images reach 30 days | The purge runs | The purge still applies; the batch is marked as having lost its images and re-extraction is no longer offered (US-034 AC-4) |
 | AC-6 (failure) | The purge fails for an image | The failure occurs | It is retried on the next run; a failed purge never cascades into deleting anything else, and never blocks owner activity |
@@ -1058,7 +1058,7 @@ Added at `A48` for **Epic L (v1.1)** — these terms have no meaning in v1:
 | # | Given | When | Then |
 |---|---|---|---|
 | AC-1 | The set of operations that mutate user-visible list state | The system is inspected | It is exactly the closed enumeration in §7.4, all of them owner-initiated (REQ-041) |
-| AC-2 | Non-owner-initiated processes | The system is inspected | Exactly two exist: the lazy TMDB metadata refresh on access (REQ-076, US-010) and the screenshot image purge (NFR-019, US-035). Neither changes user-visible list state (REQ-041) |
+| AC-2 | Non-owner-initiated processes | The system is inspected | Exactly **three** exist: the lazy TMDB metadata refresh on access (REQ-076, US-010), the screenshot image purge (NFR-019, US-035), and the lazy IMDb rating refresh on access (REQ-093, Epic M). None changes user-visible list state (REQ-041) — the rating in particular is display-only and is never sorted or filtered on (ADR-0011 OQ-A). ~~Superseded (Epic M): "Exactly two exist: the lazy TMDB metadata refresh on access (REQ-076, US-010) and the screenshot image purge (NFR-019, US-035). Neither changes user-visible list state (REQ-041)."~~ |
 | AC-3 | Any operation not in the §7.4 enumeration | It is proposed | It is **forbidden by default**. The enumeration is closed; extending it is an explicit amendment to REQ-041, which has already been widened five times |
 | AC-4 (edge) | A convenience feature that would auto-confirm, auto-restore, auto-merge or auto-clean anything | It is considered | It is prohibited, regardless of how safe it seems |
 | AC-5 (failure) | Any scheduled job, webhook, timer or background worker that writes list state | Automated verification runs | The test fails (NFR-003, NFR-005) |
@@ -1256,14 +1256,21 @@ building this as that is a data-loss defect, not a shortcut.
 
 #### Required amendment to Epic K when this epic is promoted
 
-⚠ **US-036 AC-2 currently reads "exactly two" non-owner-initiated processes,
-and `T-CI-005` asserts that count.** The availability refresh is a third.
+⚠ **US-036 AC-2 reads "exactly three" non-owner-initiated processes, and
+`T-CI-005` asserts that count.** The availability refresh is a **fourth**.
 Promoting Epic L therefore **requires amending US-036 AC-2 and `T-CI-005` to
-three, in the same change**, naming the availability refresh explicitly and
+four, in the same change**, naming the availability refresh explicitly and
 recording that it is metadata-only and access-triggered. This is part of the
 epic, not a follow-up: discovering it as a red `T-CI-005` at the end of the
 build is the predictable failure. The amendment must be made **in place**, per
 the editing convention in `.github/copilot-instructions.md` §5.
+
+~~Superseded (Epic M): "US-036 AC-2 currently reads 'exactly two' … The
+availability refresh is a third … amending US-036 AC-2 and `T-CI-005` to
+three."~~ Epic M was promoted first and took the increment from two to three,
+so Epic L's is now the increment from three to four. The instruction remains
+**read the current count and raise it by one** — the number above is a
+statement of the count at the time of writing, not a literal to copy.
 
 ---
 
@@ -1332,18 +1339,24 @@ job. See ADR-0011 for the full comparison.
 | AC-2 | Two works sharing a title and year | Ratings are retrieved | Each gets its own rating, because the key is an identifier and not a string (REQ-089) |
 | AC-3 (failure) | A work with no `imdb_id` | A rating is wanted | The no-rating state is returned. Falling back to a title search is a defect, not a degradation (REQ-089, REQ-091) |
 
-#### Required amendment to Epic K when this epic is promoted
+#### Required amendment to Epic K when this epic is promoted — **DONE**
 
-⚠ **US-036 AC-2's non-owner-process count and `T-CI-005` must be incremented in
-the same change**, naming the rating refresh explicitly and recording that it is
-metadata-only and access-triggered.
+✅ **Discharged.** US-036 AC-2 and `PERMITTED_BACKGROUND_PROCESSES` were raised
+from two to three in the same change that added the rating refresh, naming
+`imdb-rating-refresh` explicitly and recording that it is metadata-only,
+access-triggered and display-only. `T-MUT-001f` asserts the three ids.
 
-⚠ **Do not write a literal number here.** Epic L already claims one increment
-for its availability refresh, so the correct value depends on which epic is
-promoted first. The instruction is **"read the current count and raise it by
-one"** — hard-coding "three" or "four" is wrong under one of the two merge
-orders. A lazy, access-triggered refresh does **not** escape this count: ADR-0010
-set that precedent and ADR-0011 follows it.
+~~Superseded (now done): "⚠ US-036 AC-2's non-owner-process count and
+`T-CI-005` must be incremented in the same change… ⚠ Do not write a literal
+number here. Epic L already claims one increment for its availability refresh,
+so the correct value depends on which epic is promoted first. The instruction
+is 'read the current count and raise it by one' — hard-coding 'three' or 'four'
+is wrong under one of the two merge orders."~~ The instruction was followed:
+the count was read (two) and raised by one. Epic L's own note now correctly
+describes its increment as three → four. **The reasoning is retained rather
+than deleted because it still governs Epic L.** A lazy, access-triggered
+refresh does **not** escape this count: ADR-0010 set that precedent and
+ADR-0011 followed it.
 
 ---
 
@@ -1413,10 +1426,13 @@ The reason full update shows already-known titles (REQ-057) is the product's mos
 7. Suppressing a work (US-027).
 8. Un-suppressing a work (US-029).
 
-**Non-owner-initiated processes permitted to exist — exactly two, and neither changes user-visible list state:**
+**Non-owner-initiated processes permitted to exist — exactly three, and none changes user-visible list state:**
 
 1. Lazy TMDB metadata refresh on access (REQ-076, US-010) — touches TMDB-sourced descriptive fields only (NFR-014).
 2. Screenshot image purge at 30 days (NFR-019, US-035) — touches image bytes only.
+3. Lazy IMDb rating refresh on access (REQ-093, ADR-0011) — touches one display-only numeric field and its timestamp. It is admissible here for the same reason as (1): access-triggered, metadata-only, and — decisively — the rating is **never sorted or filtered on** (ADR-0011 OQ-A), so it cannot change membership, ordering or service badges.
+
+~~Superseded (Epic M): "exactly two, and neither changes user-visible list state," with entries 1 and 2 only.~~
 
 Anything not on these lists is **forbidden by default**. REQ-041 has already been widened five times during requirements work; widening it again is an explicit amendment, not an implementation decision.
 

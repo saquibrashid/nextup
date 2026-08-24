@@ -1157,7 +1157,7 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 | AC | L | Test | Assertion |
 |---|---|---|---|
 | AC-1 | S/I | `T-MUT-001` | Every mutating route maps to an entry in the REQ-041 enumeration, asserted from a committed list; a new mutating route fails until added |
-| AC-2 | S | **`T-CI-005`** | Exactly two non-owner processes exist: lazy TMDB refresh and the blob lifecycle rule. No timer/cron/worker |
+| AC-2 | S | **`T-CI-005`** | Exactly three non-owner processes exist: lazy TMDB refresh, the blob lifecycle rule, and the lazy IMDb rating refresh (Epic M). No timer/cron/worker. ~~Superseded (Epic M): "Exactly two non-owner processes exist: lazy TMDB refresh and the blob lifecycle rule."~~ |
 | AC-3 | S | `T-MUT-001` | An operation outside the enumeration cannot be registered |
 | AC-4 | I | `T-MUT-002` | No auto-confirm, auto-restore or auto-suppress path exists: `restoreListing`, `createTitle` and `suppress` have only their sanctioned call sites |
 | AC-5 | S | `T-CI-005` | No scheduled job, webhook, timer or background worker touches list state |
@@ -1650,7 +1650,7 @@ rather than renumbering the work order for no benefit.
 |---|---|---|
 | **`T-BATCH-007`** | I | The inline extraction runner honours its operational ceilings: image concurrency **2**, a **15-minute** batch ceiling, and `estimatedCostUsd` recorded in `extractionStats`. `T-EXT-010` covers progress and `T-AI-036` the degraded path; nothing asserted the limits that stop a runaway batch from exhausting the 0.5 GiB container (`RSK-016`). |
 | **`T-PERF-003`** | I | The `batch_change_by_batch` and `candidate_by_batch` queries resolve by **index seek, not scan**, under the §16.6 indexes, and pagination is **keyset** — no `OFFSET`. `T-PERF-001` covers only the list and removed views. On Azure SQL Basic (5 DTU) a scan that is invisible at 50 rows is a timeout at 5,000. |
-| **`T-EXPORT-001`** | I | `scripts/export-owner-data.ts` writes every owner row to a restorable artefact, is **never scheduled** and **never deletes** — and `docs/restore.md` documents the 7-day PITR and BACPAC paths. ⚠ Must not become a background job: product invariant 5 permits exactly two non-owner processes, and `T-CI-005` fails if a third appears. `REQ-028` forbids deletion but gives the owner no backup of their own, which is what this closes (`OQ-025`). |
+| **`T-EXPORT-001`** | I | `scripts/export-owner-data.ts` writes every owner row to a restorable artefact, is **never scheduled** and **never deletes** — and `docs/restore.md` documents the 7-day PITR and BACPAC paths. ⚠ Must not become a background job: product invariant 5 permits exactly three non-owner processes (Epic M raised it from two), and `T-CI-005` fails if a fourth appears. `REQ-028` forbids deletion but gives the owner no backup of their own, which is what this closes (`OQ-025`). |
 
 ---
 
@@ -3572,11 +3572,11 @@ around the gate by adding them to `BASELINE_ORPHANS`; that list may only
 shrink.
 
 One consequence is already recorded in ADR-0010 section 6.3 and is worth
-repeating here, because it lands on a gate this document owns: **`T-CI-005`
-asserts that exactly two non-owner-initiated processes exist.** The
-availability refresh is a third, so `T-CI-005` goes red the moment Epic L
-lands. The correct response is to **amend the count to three** - naming the
-refresh, and asserting it is metadata-only and access-triggered - alongside
+repeating here, because it lands on a gate this document owns: **`T-CI-005` asserts that
+exactly **three** non-owner-initiated processes exist (raised from two by
+Epic M, which added the IMDb rating refresh).** The availability refresh is a
+**fourth**, so `T-CI-005` goes red the moment Epic L lands. The correct
+response is to **amend the count to four** - naming the refresh, and asserting it is metadata-only and access-triggered - alongside
 `PRD.md` US-036 AC-2 and product invariant 5. The wrong response is to relax
 the gate into counting nothing in particular: its entire value is that the
 number is exact and small.

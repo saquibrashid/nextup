@@ -1,20 +1,35 @@
 /**
  * Outbound host allow-list gate (TASK-122 — `T-SEC-031`, `T-SEC-009`).
  *
- * **Exactly three hosts may ever be contacted from server-side code:**
+ * **Exactly four hosts may ever be contacted from server-side code:**
  *
  *   1. Azure OpenAI — `*.openai.azure.com` (gpt-4.1 vision, ADR-0001 Rev 2)
  *   2. Azure AI Vision — `*.cognitiveservices.azure.com` (Read F0 cross-check)
  *   3. TMDB — `api.themoviedb.org` / `image.tmdb.org` (metadata, NFR-014)
+ *   4. OMDb — `www.omdbapi.com` (the IMDb rating, ADR-0011 / REQ-088)
  *
  * The threat this closes is **T18** (`specs/security.md` §7): screenshot bytes
- * reaching a fourth host after a well-meaning change. `specs/ai.md` §11 and
- * `docs/architecture.md` §NFR-010 both pin the number at three, and the count
- * is asserted here precisely so that "we also need X" is a decision somebody
- * has to make in the open rather than a line in a diff.
+ * reaching a further host after a well-meaning change.
  *
- * ⚠ **The check fails BOTH ways, and that is deliberate.** A fourth host is a
- * violation; so is one of the three going missing. A one-sided check would let
+ * ⚠ **THE COUNT IS NOT THE SECURITY PROPERTY — `sends` IS.** This file used to
+ * pin the list at three and describe that number as the guarantee. It is not:
+ * T18 is about screenshot bytes, and a count says nothing about what a host
+ * receives. Widening from three to four for OMDb (which is sent an IMDb id and
+ * nothing else) would have looked exactly like widening it for a host that is
+ * posted the images. Every entry therefore declares what it is sent, and
+ * `checkAllowListShape` asserts that **exactly two** entries — the two
+ * extractors — are ever sent image bytes. That assertion survives the list
+ * growing; a count does not.
+ *
+ * ~~Superseded (Epic M): "Exactly three hosts… `specs/ai.md` §11 and
+ * `docs/architecture.md` §NFR-010 both pin the number at three, and the count
+ * is asserted here precisely so that 'we also need X' is a decision somebody
+ * has to make in the open rather than a line in a diff."~~ The open-decision
+ * intent is retained and still enforced — an amendment to this list is an
+ * amendment to NFR-010 — but it is now carried by `sends` as well as by length.
+ *
+ * ⚠ **The check fails BOTH ways, and that is deliberate.** An unlisted host is
+ * a violation; so is one of the four going missing. A one-sided check would let
  * an allow-list quietly shrink to nothing and still report success — at which
  * point it permits nothing and asserts nothing.
  *
@@ -36,10 +51,17 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * THE closed list. Three entries, one per extraction/metadata destination.
+ * THE closed list. Four entries, one per extraction/metadata destination.
  *
- * ⚠ Adding a fourth entry is an amendment to NFR-010 and `specs/ai.md` §11,
- * not an implementation decision. `T-SEC-031` asserts the length.
+ * ⚠ Adding an entry is an amendment to NFR-010 and `specs/ai.md` §11, not an
+ * implementation decision. `T-SEC-031` asserts the length AND the `sends`
+ * classification — see the `sends` note in the file header.
+ *
+ * `sends` values:
+ *   `'image-bytes'` — the screenshot itself. T18's subject. Only the two
+ *                     extractors may ever carry this.
+ *   `'title-text'`  — a search string derived from an extracted title.
+ *   `'imdb-id'`     — an opaque `tt…` identifier and nothing else.
  */
 export const ALLOWED_OUTBOUND_HOSTS = [
   {
@@ -47,19 +69,29 @@ export const ALLOWED_OUTBOUND_HOSTS = [
     /** Matches the tenant-specific subdomain the endpoint actually uses. */
     pattern: /(^|\.)openai\.azure\.com$/,
     example: 'nextup-aoai.openai.azure.com',
+    sends: 'image-bytes',
     why: 'Azure OpenAI gpt-4.1 vision — the primary extractor (ADR-0001 Rev 2)',
   },
   {
     id: 'azure-ai-vision',
     pattern: /(^|\.)cognitiveservices\.azure\.com$/,
     example: 'nextup-vision.cognitiveservices.azure.com',
+    sends: 'image-bytes',
     why: 'Azure AI Vision Read F0 — the deterministic OCR cross-check (ADR-0001 Rev 2)',
   },
   {
     id: 'tmdb',
     pattern: /(^|\.)(api\.)?themoviedb\.org$|(^|\.)tmdb\.org$/,
     example: 'api.themoviedb.org',
+    sends: 'title-text',
     why: 'TMDB — title metadata and artwork (NFR-013 attribution, NFR-014 refresh)',
+  },
+  {
+    id: 'omdb',
+    pattern: /(^|\.)omdbapi\.com$/,
+    example: 'www.omdbapi.com',
+    sends: 'imdb-id',
+    why: 'OMDb — the IMDb rating for an already-matched work (ADR-0011, REQ-088)',
   },
 ];
 
@@ -192,25 +224,44 @@ export function isExempt(host) {
 }
 
 /**
- * `T-SEC-031` half one — the allow-list itself is exactly three entries, one
- * per named destination, and none of them is a telemetry host.
+ * `T-SEC-031` half one — the allow-list itself is exactly four entries, one
+ * per named destination, none of them a telemetry host, and **exactly two of
+ * them ever sent image bytes**.
  *
  * @returns {string[]} findings
  */
 export function checkAllowListShape(list = ALLOWED_OUTBOUND_HOSTS) {
   const findings = [];
 
-  if (list.length !== 3) {
+  if (list.length !== 4) {
     findings.push(
-      `the outbound allow-list has ${list.length} entries, not 3. NFR-010 and specs/security.md §7 T18 pin it at exactly three: Azure OpenAI, Azure AI Vision and TMDB. Widening it is an amendment, not a change (T-SEC-031).`,
+      `the outbound allow-list has ${list.length} entries, not 4. NFR-010 and specs/security.md §7 T18 pin it at exactly four: Azure OpenAI, Azure AI Vision, TMDB and OMDb. Widening it is an amendment, not a change (T-SEC-031).`,
     );
   }
 
   const ids = list.map((h) => h.id).sort();
-  const expected = ['azure-ai-vision', 'azure-openai', 'tmdb'];
+  const expected = ['azure-ai-vision', 'azure-openai', 'omdb', 'tmdb'];
   if (ids.join(',') !== expected.join(',')) {
     findings.push(
       `the outbound allow-list is [${ids.join(', ')}], expected [${expected.join(', ')}] (T-SEC-031)`,
+    );
+  }
+
+  // ⚠ THE ACTUAL T18 GUARANTEE. The list may grow again; this may not.
+  const SENDS = new Set(['image-bytes', 'title-text', 'imdb-id']);
+  for (const entry of list) {
+    if (!SENDS.has(entry.sends)) {
+      findings.push(
+        `allow-list entry "${entry.id}" declares sends="${entry.sends}", which is not one of ${[...SENDS].join(', ')}. Every destination must say what it receives — T18 is about the payload, not the count (T-SEC-031).`,
+      );
+    }
+  }
+
+  const imageBytes = list.filter((h) => h.sends === 'image-bytes').map((h) => h.id);
+  const expectedImageBytes = ['azure-openai', 'azure-ai-vision'];
+  if (imageBytes.join(',') !== expectedImageBytes.join(',')) {
+    findings.push(
+      `screenshot bytes are declared to reach [${imageBytes.join(', ') || 'nothing'}], expected exactly [${expectedImageBytes.join(', ')}]. Only the two extractors may ever be sent an image — specs/security.md §7 T18, NFR-010 (T-SEC-031).`,
     );
   }
 
@@ -244,7 +295,7 @@ export async function checkOutboundHosts(root = ROOT) {
       for (const host of extractHosts(readFileSync(file, 'utf8'))) {
         if (isAllowed(host) || isExempt(host)) continue;
         findings.push(
-          `${rel}: contacts host "${host}", which is not one of the three allow-listed outbound destinations (Azure OpenAI, Azure AI Vision, TMDB). Screenshot bytes must never reach a fourth host — specs/security.md §7 T18, NFR-010, T-SEC-031.`,
+          `${rel}: contacts host "${host}", which is not one of the four allow-listed outbound destinations (Azure OpenAI, Azure AI Vision, TMDB, OMDb). Screenshot bytes must never reach a further host — specs/security.md §7 T18, NFR-010, T-SEC-031.`,
         );
       }
     }
@@ -264,6 +315,6 @@ if (isMain) {
     console.error(`\n${findings.length} finding(s). See specs/security.md §7 (T18) and NFR-010.`);
     process.exit(1);
   }
-  console.log('Outbound host check passed: exactly three allow-listed destinations,');
-  console.log('no source file contacts a fourth host.');
+  console.log('Outbound host check passed: exactly four allow-listed destinations,');
+  console.log('no source file contacts a further host.');
 }

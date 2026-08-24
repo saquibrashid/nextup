@@ -182,11 +182,30 @@ export class TmdbClient {
     return items;
   }
 
-  /** `GET /3/{movie|tv}/{id}` — the metadata read (REQ-029). */
+  /**
+   * `GET /3/{movie|tv}/{id}` — the metadata read (REQ-029), plus `imdb_id`
+   * (REQ-094, ADR-0011 D-2a).
+   *
+   * ⚠ `append_to_response=external_ids` COSTS NOTHING AND IS NOT OPTIONAL.
+   * Measured against the live API: `/movie/{id}` carries `imdb_id` at the top
+   * level, but **`/tv/{id}` does not carry it at all** — only
+   * `external_ids.imdb_id` has it for a series, and that is the *series-level*
+   * id (`tt0903747` for Breaking Bad), which is the number a watch decision
+   * wants. Reading `body.imdb_id` alone therefore works for films and silently
+   * returns `undefined` for every series, which renders as REQ-091's "no
+   * rating" state and looks like correct behaviour.
+   *
+   * Appending here rather than calling `/external_ids` separately keeps TMDB
+   * traffic unchanged: one request per work, as before.
+   */
   async getWork(mediaType: MediaType, tmdbId: number): Promise<TmdbWorkDetail> {
-    const body = await this.#get<TmdbDetailResponse>(`/${mediaType}/${tmdbId}`, {}, () => {
-      throw new TmdbWorkNotFoundError(mediaType, tmdbId);
-    });
+    const body = await this.#get<TmdbDetailResponse>(
+      `/${mediaType}/${tmdbId}`,
+      { append_to_response: 'external_ids' },
+      () => {
+        throw new TmdbWorkNotFoundError(mediaType, tmdbId);
+      },
+    );
 
     return {
       tmdbId,
@@ -198,6 +217,7 @@ export class TmdbClient {
       genres: Array.isArray(body.genres)
         ? body.genres.map((g) => (typeof g?.name === 'string' ? g.name : '')).filter(Boolean)
         : [],
+      imdbId: readImdbId(body),
     };
   }
 
@@ -313,6 +333,11 @@ export interface TmdbWorkDetail {
   posterPath: string | null;
   runtimeMinutes: number | null;
   genres: string[];
+  /**
+   * The IMDb id, or `null` (REQ-094). The key OMDb is queried with — and the
+   * ONLY way a rating is ever looked up (ADR-0011 D-2).
+   */
+  imdbId: string | null;
 }
 
 // ── Wire shapes (only what is read; everything else is ignored) ─────────────
@@ -330,6 +355,10 @@ interface TmdbDetailResponse {
   runtime?: unknown;
   episode_run_time?: unknown;
   genres?: Array<{ name?: unknown }>;
+  /** Present for a film. **Absent for a series** — see `readImdbId`. */
+  imdb_id?: unknown;
+  /** Present for both, once `append_to_response=external_ids` is sent. */
+  external_ids?: { imdb_id?: unknown };
 }
 
 function toSearchItem(raw: unknown): TmdbSearchItem | null {
@@ -376,6 +405,27 @@ function readRuntime(body: TmdbDetailResponse): number | null {
   // Series carry a list of per-episode runtimes; the first is the usual one.
   if (Array.isArray(body.episode_run_time) && typeof body.episode_run_time[0] === 'number') {
     return body.episode_run_time[0];
+  }
+  return null;
+}
+
+/**
+ * The IMDb id (REQ-094), from `external_ids` first and the top level second.
+ *
+ * ⚠ THE ORDER MATTERS AND IS NOT ARBITRARY. Measured against the live API:
+ * `/movie/{id}` carries `imdb_id` at the top level *and* (when appended) under
+ * `external_ids`; `/tv/{id}` carries it **only** under `external_ids`. Reading
+ * `external_ids` first is therefore the one branch that works for both media
+ * types, and the top-level read is a fallback for the case where
+ * `append_to_response` was somehow dropped from the request.
+ *
+ * Returns `null` for anything that is not a well-formed `tt…` id, so a
+ * malformed value can never be interpolated into an OMDb URL.
+ */
+function readImdbId(body: TmdbDetailResponse): string | null {
+  for (const candidate of [body.external_ids?.imdb_id, body.imdb_id]) {
+    // TMDB returns `''` or `null` for a work it has no IMDb mapping for.
+    if (typeof candidate === 'string' && /^tt\d{7,}$/.test(candidate)) return candidate;
   }
   return null;
 }

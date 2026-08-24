@@ -577,7 +577,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-119` | `todo` | — |
 | `TASK-120` | `todo` | — |
 | `TASK-121` | `done` | `fdd5519` — `tools/check-mutating-routes.mjs`, `T-MUT-001` (a–j), `T-MUT-002` (a–f). The 18 mutating routes each map to one of the eight REQ-041 owner-initiated operations or carry an explicit non-list-state reason; mutation-proven with an unregistered `POST /titles/:id/auto-confirm` and a `jobs/reconcile.ts` calling a guarded operation. |
-| `TASK-122` | `done` | `dde3dc5` — `tools/check-outbound-hosts.mjs`, `T-SEC-031` (a–i) and the outbound half of `T-SEC-009` (`k`). Exactly three destinations: TMDB, Azure OpenAI, Azure AI Vision. Mutation-proven by widening the list to four, shrinking it below three, and planting an unlisted host in source. The telemetry and streaming hostnames the spec needs are assembled from fragments rather than added to another gate's exemption list. |
+| `TASK-122` | `done` | `dde3dc5` — `tools/check-outbound-hosts.mjs`, `T-SEC-031` (a–i) and the outbound half of `T-SEC-009` (`k`). Mutation-proven by widening the list, shrinking it, and planting an unlisted host in source. The telemetry and streaming hostnames the spec needs are assembled from fragments rather than added to another gate's exemption list. **Amended by Epic M:** the list is now **four** destinations (TMDB, Azure OpenAI, Azure AI Vision, OMDb) and each entry declares a `sends` class, with `T-SEC-031u`/`v` pinning `image-bytes` to the two extractors — the count was never the T18 guarantee. ~~Superseded: "Exactly three destinations: TMDB, Azure OpenAI, Azure AI Vision."~~ |
 | `TASK-123` | `todo` | — |
 | `TASK-124` | `todo` | — |
 | `TASK-125` | `todo` | — |
@@ -1154,7 +1154,7 @@ Traces to: US-038 (NFR-009, NFR-010) · Milestone M1/M7
 | Task | Description | Size | Depends on | Done when |
 |---|---|---|---|---|
 | TASK-030 | Static assertions: no auth library, no password handling, no streaming credential or automation dependency. | XS | 023 | `T-SEC-011`, `T-SEC-001` |
-| TASK-122 | No-telemetry assertion + outbound host allow-list (**TMDB, Azure OpenAI and Azure AI Vision only — exactly three hosts**). | S | 004 | `T-SEC-009`, `T-SEC-031` |
+| TASK-122 | No-telemetry assertion + outbound host allow-list (**TMDB, Azure OpenAI, Azure AI Vision and OMDb only — exactly four hosts, of which exactly two may be sent screenshot bytes**). | S | 004 | `T-SEC-009`, `T-SEC-031` |
 
 #### US-023 — Nothing is ever deleted
 Traces to: US-023 (REQ-028; SD-04) · Milestone M0/M4/M7

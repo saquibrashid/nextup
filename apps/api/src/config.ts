@@ -61,6 +61,29 @@ export const IMAGE_RETENTION_DAYS = 30;
  */
 export const TMDB_METADATA_MAX_AGE_DAYS = 183;
 
+/**
+ * How stale a cached IMDb rating may be before the next *access* refreshes it
+ * lazily (REQ-090, ADR-0011). Fourteen days.
+ *
+ * ⚠ **THIRD MEMBER OF THE NEVER-UNIFY FAMILY.** {@link IMAGE_RETENTION_DAYS},
+ * {@link TMDB_METADATA_MAX_AGE_DAYS} and this constant are three separate
+ * declarations with three separate call sites, permanently. `T-INV-008`
+ * asserts it. The warning on `IMAGE_RETENTION_DAYS` applies here unchanged.
+ *
+ * `14` is deliberately **not** another "30-ish" number, so a future reader
+ * cannot mistake it for the retention constant at a glance.
+ *
+ * Why so much shorter than metadata's 183 days: a film's title, year and
+ * poster are effectively immutable, whereas a rating moves — fastest in the
+ * weeks after release, which is exactly the window a watch decision cares
+ * about.
+ *
+ * ⚠ "Stale" is overloaded here too. This is rating staleness. It is NOT
+ * `metadataStale` (TMDB, 183 days), and the two must not be collapsed because
+ * they share a word.
+ */
+export const IMDB_RATING_MAX_AGE_DAYS = 14;
+
 // ── The pre-decode pixel budget (`specs/api.md` §5.0.2, REQ-079) ────────────
 
 /**

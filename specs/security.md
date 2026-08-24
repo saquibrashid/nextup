@@ -371,7 +371,13 @@ left to the browser**:
 | T15 | Tampering (**self-inflicted, highest likelihood**) | A future change adds a TTL or a purge job and destroys history | data-model §9; two blocking tests | `T-INV-013`, `T-INV-012` |
 | T16 | Tampering (self-inflicted) | A future change sends TMDB content to an AI service | `specs/ai.md` Rule A; lint rule plus a network-shaped test, now covering **both** inference hosts (Azure OpenAI and Azure AI Vision) | `T-AI-012`, `T-AI-013` |
 | T17 | Tampering *(new — R2)* | A crafted screenshot carries text that the vision model treats as instructions (**prompt injection**) | Structural: the image is the **only** untrusted input in the request; Structured Outputs `strict: true` fixes the response shape so an injected instruction cannot change it; extracted text is **never interpreted, executed or used to build a further prompt** — it goes only to a deterministic string matcher | `T-AI-044` |
-| T18 | Information disclosure *(new — R2)* | Screenshot bytes reach a fourth host after a well-meaning change | Outbound host allow-list pinned to **exactly three** hosts (Azure OpenAI, Azure AI Vision, TMDB) | `T-SEC-031` |
+| T18 | Information disclosure *(new — R2; amended Epic M)* | Screenshot bytes reach a further host after a well-meaning change | Outbound host allow-list pinned to **exactly four** hosts (Azure OpenAI, Azure AI Vision, TMDB, OMDb), **and — the actual guarantee — every entry declares what it is sent, with exactly two (the extractors) permitted `image-bytes`.** ⚠ The count alone is *not* the mitigation: widening the list for OMDb, which receives an opaque `tt…` id and nothing else, is indistinguishable from widening it for a host the images are posted to. The payload classification is what T18 is about, and it survives the list growing again | `T-SEC-031` |
+
+~~Superseded (Epic M): "Screenshot bytes reach a **fourth** host after a
+well-meaning change | Outbound host allow-list pinned to **exactly three**
+hosts (Azure OpenAI, Azure AI Vision, TMDB)."~~ The list is four since
+ADR-0011 added OMDb; the wording is corrected in place rather than
+banner-superseded because it is an instruction a gate executes.
 
 **T15 and T16 are the two most likely real incidents on this project**, because
 the implementer is an autonomous agent and both changes look like

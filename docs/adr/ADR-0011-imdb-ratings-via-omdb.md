@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| **Status** | **Accepted** (scoped to v1.1 — specified now, built after the v1 value loop closes) |
+| **Status** | **Accepted** — build in progress. OQ-A and OQ-B both resolved (`A51`, and by measurement against the live TMDB API). |
 | **Date** | 2026-08-21 |
-| **Deciders** | owner (`A50` — the requirement, the source choice and the surface choice), coordinator |
+| **Deciders** | owner (`A50` — the requirement, the source choice and the surface choice; `A51` — display-only, no sort by rating), coordinator |
 | **Forced by** | **`A50`**, REQ-088…REQ-093, NFR-004, NFR-010, NFR-013, NFR-014, ADR-0007, ADR-0010 |
 | **Supersedes** | Nothing. |
 
@@ -12,8 +12,8 @@
 
 ⚠ Same caveat as ADR-0010: **there is no authoritative REQ register above
 REQ-076**, so this ADR defines its own ids in full. REQ-082 – REQ-087 are
-ADR-0010's; this file starts at **REQ-088** and the whole tree was grepped for
-collisions before numbering (ADR-0010 was numbered twice for exactly this
+ADR-0010's; this file runs **REQ-088 – REQ-095** and the whole tree was grepped
+for collisions before numbering (ADR-0010 was numbered twice for exactly this
 reason).
 
 | REQ | Statement |
@@ -24,6 +24,8 @@ reason).
 | **REQ-091** | "No rating" is a **first-class, rendered state**. A work with no IMDb rating is never shown as `0`, `0.0`, or an empty star row. |
 | **REQ-092** | The owner can **look up any title by name** and see its IMDb rating **without adding it to any list**. The lookup writes nothing. |
 | **REQ-093** | Rating retrieval respects OMDb's **free-tier daily budget**. Exhausting it degrades to the cached or absent state; it never fails the page, and it never triggers a bulk backfill. |
+| **REQ-094** | A matched work's **`imdb_id` is captured at match time**, from the TMDB detail response the metadata read already makes (`append_to_response=external_ids`), and stored on the work. It is **never** fetched per render, and **never** obtained by a second TMDB call. |
+| **REQ-095** | The IMDb rating is **display-only**. It is not a sort key, and no sort option for it exists (`A51`, OQ-A). |
 
 ## Context
 
@@ -77,14 +79,55 @@ decision must be revisited before launch, not after.
 
 OMDb accepts both `?t=<title>` and `?i=<imdb_id>`. **Only `?i=` may be used.**
 
-TMDB already gives us `imdb_id` for every matched work, so the identifier is
-free. A title-text lookup would reintroduce fuzzy matching *after* the pipeline
-has already done the hard work of resolving a canonical work — and would do it
+A title-text lookup would reintroduce fuzzy matching *after* the pipeline has
+already done the hard work of resolving a canonical work — and would do it
 against a different vendor's index, with different normalisation. The failure
 mode is silent and awful: a plausible rating attached to the wrong film.
 
 **Corollary:** a work with no `imdb_id` from TMDB has **no rating**, and that is
 REQ-091's rendered state — not an invitation to fall back to a title search.
+
+#### D-2a — Where `imdb_id` actually comes from (measured, not assumed)
+
+⚠ **`imdb_id` is NOT already available, and an earlier revision of this ADR
+asserted that it was.** It appears nowhere in `prisma/schema.prisma`, nowhere in
+`packages/domain`, and nowhere in `apps/api` — the `Title` model stores
+`tmdbId`, `tmdbMediaType`, `tmdbName`, `tmdbReleaseYear` and friends, and no
+IMDb identifier at all. TMDB's **search** endpoints never return one.
+
+The following was measured against the live TMDB API using the production key,
+rather than reasoned about:
+
+| Call | `imdb_id` |
+|---|---|
+| `GET /3/movie/{id}` | ✅ `"tt1375666"` — **top level** |
+| `GET /3/movie/{id}?append_to_response=external_ids` | ✅ top level *and* `external_ids.imdb_id` |
+| `GET /3/tv/{id}` | ❌ **absent** |
+| `GET /3/tv/{id}?append_to_response=external_ids` | ✅ `external_ids.imdb_id` = `"tt0903747"` |
+
+Two things follow, and both are load-bearing.
+
+**First, the identifier is obtainable at zero additional API calls — but only
+via `append_to_response`.** `TmdbClient.getWork` already issues
+`GET /3/{movie|tv}/{id}` for the REQ-029 metadata read. Adding
+`append_to_response=external_ids` to *that existing call* yields `imdb_id` for
+both media types without a second request, so the original claim's *conclusion*
+(the identifier is effectively free) survives — its *premise* did not. A
+separate `/external_ids` call, or a per-render lookup, would double TMDB traffic
+for no reason and must not be written.
+
+**Second, `/tv/{id}` alone silently omits the field.** A movie-first
+implementation that reads `body.imdb_id` and is then pointed at a series gets
+`undefined` — indistinguishable, at the call site, from a work IMDb has genuinely
+never heard of. Every series would render REQ-091's "no rating" state and look
+like correct behaviour. **Read `external_ids.imdb_id` for both media types**,
+falling back to the top-level field only as a belt-and-braces second choice.
+
+**Consequence:** `Title` gains an `imdbId` column, populated at match time from
+the same detail response that already fills the other `tmdb*` fields.
+
+~~Superseded, and it was false: "TMDB already gives us `imdb_id` for every
+matched work, so the identifier is free."~~
 
 ### D-3 — Lazy refresh on access, with its own constant
 
@@ -187,17 +230,35 @@ the two merge orders. Read the current assertion, then raise it by one.
 
 This is part of the epic, not a follow-up.
 
-## Open questions for the owner
+## Open questions — both now resolved
 
-**OQ-A — Sorting by rating vs invariant 5.** If the list can be *sorted* by
-rating, then a lazy refresh that changes a rating changes **list ordering** —
-which is user-visible list state. Invariant 5 forbids a *scheduler* from doing
-that; lazy-refresh-on-access is explicitly permitted, so this is arguably
-compliant. But it is close enough to the line that it should be an explicit
-owner decision rather than a coordinator's reading. **Not resolved here.**
-Displaying a rating raises no such question; only sorting by it does.
+**OQ-A — Sorting by rating vs invariant 5. RESOLVED at `A51`: display-only.**
+The owner chose **no sort by rating** in v1.1. The rating is rendered on list
+rows and on the lookup surface; it is **not** a sort key and no
+`SortControl` option is added for it.
 
-**OQ-B — Ratings for TV.** IMDb rates a series and each episode separately.
-nextup's works include series. Which number is shown for a series is
-undecided; OMDb returns the series-level rating for a series `imdb_id`, which
-is the assumed default but has not been confirmed.
+This settles the question the ADR raised rather than merely satisfying it: if
+the list could be *sorted* by rating, a lazy refresh that changed a rating would
+change **list ordering**, which is user-visible list state. Invariant 5 forbids
+a *scheduler* from doing that and explicitly permits lazy-refresh-on-access, so
+sorting was arguably compliant — but "arguably" is the wrong standard for the
+invariant that protects the list. Display-only keeps the feature entirely
+outside the argument.
+
+⚠ **Do not add a rating sort as a convenience later without reopening this.**
+The trade-off is recorded here precisely so that a future edit cannot make it
+by accident. Note also that this is *not* symmetric with REQ-038's date sort:
+the sort date is owner-supplied and immutable once captured, whereas a rating
+is vendor-supplied and moves on its own.
+
+**OQ-B — Ratings for TV. RESOLVED by measurement: the series-level rating.**
+IMDb rates a series and each episode separately, so which number a series shows
+had to be pinned. `GET /3/tv/1396?append_to_response=external_ids` returns
+`external_ids.imdb_id = "tt0903747"`, which is *Breaking Bad the series* — not a
+season and not an episode. OMDb keyed on that id therefore returns the
+series-level rating, which is the number the owner is choosing a watch from.
+
+The ADR previously called this "the assumed default … not confirmed". It is now
+confirmed against the live API, and the assumption was correct. Episode-level
+ratings are **out of scope**: nextup's unit of work is the title, and a rating
+per episode has nothing to attach to.

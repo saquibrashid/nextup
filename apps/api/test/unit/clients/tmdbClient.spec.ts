@@ -263,6 +263,9 @@ describe('T-TMDB-010 the TMDB client reads only what nextup is allowed to keep',
       posterPath: '/d5NXSklXo0qyIYkgV94XAgMIckC.jpg',
       runtimeMinutes: 155,
       genres: ['Science Fiction', 'Adventure'],
+      // The recording predates Epic M and carries no `imdb_id`; a work TMDB
+      // has no IMDb mapping for is `null`, never `undefined` or `''`.
+      imdbId: null,
     });
   });
 
@@ -356,6 +359,7 @@ describe('T-TMDB-010 the client refuses to invent data from a malformed body', (
       posterPath: null,
       runtimeMinutes: null,
       genres: [],
+      imdbId: null,
     });
 
     // A series carries per-episode runtimes; the first is the usual one.
@@ -422,5 +426,100 @@ describe('T-TMDB-010 the client refuses to invent data from a malformed body', (
     expect(slept.filter((ms) => TMDB_RETRY_BACKOFF_MS.includes(ms))).toEqual([
       ...TMDB_RETRY_BACKOFF_MS,
     ]);
+  });
+});
+
+/**
+ * `T-TMDB-011` — the IMDb id (REQ-094, ADR-0011 D-2a). Epic M.
+ *
+ * ⚠ THE ASYMMETRY IS THE WHOLE POINT, AND IT FAILS SILENTLY.
+ * Measured against the live TMDB API: `/3/movie/{id}` carries `imdb_id` at the
+ * top level, but `/3/tv/{id}` does NOT carry it at all — only
+ * `external_ids.imdb_id` has it for a series. An implementation that reads
+ * `body.imdb_id` alone therefore works for every film and returns `null` for
+ * every series, which renders as REQ-091's legitimate "no rating yet" state
+ * and looks entirely correct. Nothing but a test that feeds it a TV-shaped
+ * body catches it.
+ */
+describe('T-TMDB-011 the IMDb id survives both media types', () => {
+  function clientServing(body: unknown): TmdbClient {
+    return new TmdbClient({
+      apiKey: 'fixture-key-not-a-real-secret',
+      fetch: (() =>
+        Promise.resolve(
+          new Response(JSON.stringify(body), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          }),
+        )) as typeof globalThis.fetch,
+      sleep: () => Promise.resolve(),
+    });
+  }
+
+  it('T-TMDB-011a · the detail request asks for `external_ids`, at no extra call', async () => {
+    // If this drops out of the query string the series path goes quietly dark,
+    // so the request itself is asserted rather than only its parsed result.
+    const { client, calls } = makeClient();
+    await client.getWork('movie', 438631);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toContain('append_to_response=external_ids');
+    // Appended, NOT a second round trip to `/external_ids`.
+    expect(calls[0]).toContain('/3/movie/438631');
+  });
+
+  it('T-TMDB-011b · the top-level `imdb_id` a film carries is read', async () => {
+    expect(
+      await clientServing({ title: 'Dune', imdb_id: 'tt1160419' }).getWork('movie', 438631),
+    ).toMatchObject({ imdbId: 'tt1160419' });
+  });
+
+  it('T-TMDB-011c · a series has it ONLY under `external_ids`, and it is still read', async () => {
+    // The exact body `/3/tv/{id}?append_to_response=external_ids` returns:
+    // no top-level `imdb_id` key at all.
+    const detail = await clientServing({
+      name: 'The Office',
+      external_ids: { imdb_id: 'tt0386676', tvdb_id: 73244 },
+    }).getWork('tv', 2316);
+
+    expect(detail.imdbId).toBe('tt0386676');
+  });
+
+  it('T-TMDB-011d · `external_ids` wins over the top level when both are present', async () => {
+    // A film carries both. They agree in practice, but the order must be fixed
+    // so the series-safe branch is the one that always runs.
+    expect(
+      await clientServing({
+        imdb_id: 'tt1111111',
+        external_ids: { imdb_id: 'tt2222222' },
+      }).getWork('movie', 1),
+    ).toMatchObject({ imdbId: 'tt2222222' });
+  });
+
+  it('T-TMDB-011e · absent, empty, null and junk ids all become null, never a lookup key', async () => {
+    // TMDB returns `''` or `null` for a work with no IMDb mapping. Passing any
+    // of these to OMDb would spend budget on a request that cannot succeed.
+    for (const body of [
+      {},
+      { imdb_id: '' },
+      { imdb_id: null },
+      { imdb_id: 42 },
+      { imdb_id: 'nm0000138' },
+      { imdb_id: 'tt' },
+      { imdb_id: 'not-an-id' },
+      { external_ids: { imdb_id: '' } },
+      { external_ids: null },
+      { external_ids: 'nope' },
+    ]) {
+      expect((await clientServing(body).getWork('tv', 1)).imdbId).toBeNull();
+    }
+  });
+
+  it('T-TMDB-011f · an empty `external_ids` falls back to the top level rather than to null', async () => {
+    // A film whose appended block is present but blank must not lose an id it
+    // did return.
+    expect(
+      await clientServing({ imdb_id: 'tt1375666', external_ids: {} }).getWork('movie', 1),
+    ).toMatchObject({ imdbId: 'tt1375666' });
   });
 });

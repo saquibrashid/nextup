@@ -135,15 +135,27 @@ describe('T-MUT-001 · US-036 AC-1/AC-3 · REQ-041 is a closed enumeration (PRD 
     ]);
   });
 
-  it('T-MUT-001f · exactly two non-owner background processes are permitted', () => {
-    // Invariant 5: no scheduler may change user-visible list state, and the
-    // only permitted background work is metadata-only lazy refresh and the
-    // 30-day blob purge.
-    expect(PERMITTED_BACKGROUND_PROCESSES).toHaveLength(2);
+  it('T-MUT-001f · exactly three non-owner background processes are permitted', () => {
+    // Invariant 5: no scheduler may change user-visible list state. The only
+    // permitted background work is metadata-only lazy refresh (TMDB fields,
+    // and since ADR-0011 the IMDb rating) and the 30-day blob purge.
+    //
+    // ⚠ The count is the tripwire, not the rule. Each of the three is
+    // permitted because it cannot add, remove, reorder or re-badge a row —
+    // and the rating specifically is display-only (ADR-0011 OQ-A: no sort by
+    // rating), which is what keeps it on this side of invariant 5.
+    expect(PERMITTED_BACKGROUND_PROCESSES).toHaveLength(3);
     expect(PERMITTED_BACKGROUND_PROCESSES.map((p: { op: string }) => p.op).sort()).toEqual([
+      'imdb-rating-refresh',
       'screenshot-purge',
       'tmdb-metadata-refresh',
     ]);
+
+    // None of them is an owner operation, and none shadows one.
+    const ops = new Set(REQ_041_OPERATIONS.map((o: { op: string }) => o.op));
+    for (const p of PERMITTED_BACKGROUND_PROCESSES as Array<{ op: string }>) {
+      expect(ops.has(p.op)).toBe(false);
+    }
   });
 
   it('T-MUT-001g · every REQ-041 operation is reachable by exactly one route', () => {
