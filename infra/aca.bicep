@@ -129,6 +129,10 @@ param visionEndpoint string
 @secure()
 param tmdbApiKey string
 
+@description('OMDb API key (8 hex chars) for IMDb ratings (REQ-092, ADR-0011). Required: same empty-secret note above — Container Apps has no absent state for a secret-backed setting.')
+@secure()
+param omdbApiKey string
+
 @description('Comma-separated Entra subject ids permitted by the NFR-017 allow-list. NOT a secret: knowing a subject id grants nothing. Plain config, so unlike the secret above it may legitimately be empty — the allow-list fails CLOSED.')
 param allowedSubjects string = ''
 
@@ -183,6 +187,7 @@ var entraClientSecretName = 'entra-client-secret'
 // Same drift risk as the Easy Auth name above, and the same mitigation: named
 // once, referenced from both the `secrets` array and the matching `secretRef`.
 var tmdbApiKeySecretName = 'tmdb-api-key'
+var omdbApiKeySecretName = 'omdb-api-key'
 
 // Shared across both environments — one managed environment, one Log Analytics
 // workspace (ADR-0003 R2.4: "no separate Log Analytics workspace").
@@ -299,6 +304,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           name: tmdbApiKeySecretName
           value: tmdbApiKey
         }
+        {
+          name: omdbApiKeySecretName
+          value: omdbApiKey
+        }
       ]
     }
     template: {
@@ -338,6 +347,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'TMDB_API_KEY'
               secretRef: tmdbApiKeySecretName
+            }
+            {
+              name: 'OMDB_API_KEY'
+              secretRef: omdbApiKeySecretName
             }
             // May be empty, and empty DENIES everyone — `allowList.ts` fails
             // closed. That is the safe direction for a control whose failure
