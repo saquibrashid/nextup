@@ -26,8 +26,10 @@ function renderAt(path: string) {
 }
 
 describe('AppShell and routing', () => {
-  it('T-UI-023a · specs/ui.md §1 · the route table holds exactly the nine specified screens', () => {
-    expect(ROUTES).toHaveLength(9);
+  it('T-UI-023a · specs/ui.md §1 · the route table holds exactly the ten specified screens', () => {
+    // ⚠ The EXACT PATH LIST is the assertion; the length is a redundant
+    // restatement of it kept only so a diff reads clearly. Epic M added
+    // `/rating` (REQ-092), which is why this is ten and not nine.
     expect(ROUTES.map((route) => route.path)).toStrictEqual([
       '/',
       '/upload',
@@ -37,8 +39,10 @@ describe('AppShell and routing', () => {
       '/removed',
       '/not-interested',
       '/about',
+      '/rating',
       '*',
     ]);
+    expect(ROUTES).toHaveLength(10);
   });
 
   it('T-UI-023b · specs/ui.md §1 · every route renders its own screen inside the shell', () => {
@@ -87,7 +91,7 @@ describe('AppShell and routing', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Batch history');
   });
 
-  it('T-UI-023f · specs/ui.md §1 · the nav exposes the six top-level destinations', () => {
+  it('T-UI-023f · specs/ui.md §1 · the nav exposes the seven top-level destinations', () => {
     renderAt('/');
 
     const nav = screen.getByRole('navigation', { name: 'Primary' });
@@ -102,6 +106,10 @@ describe('AppShell and routing', () => {
       'Removal history',
       'Not interested',
       'About',
+      // Epic M (REQ-092). Reachable from the nav rather than only from a row,
+      // because US-045 is about checking something the owner has NOT saved -
+      // so there is no row to start from.
+      'Check a rating',
     ]);
   });
 

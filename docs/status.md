@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 80 |
 | 🚧 doing | 7 |
-| ✅ done | 76 |
+| ✅ done | 82 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **166** |
+| **total** | **172** |
 
 ## Ready to start
 
@@ -207,3 +207,9 @@ Not done, and every task they depend on is done.
 | `TASK-159` | `components/PasteCapture.tsx` (renders `null`, mounted by `ImageDropzone` so the listener lives exactly as long as the attach area) — `T-PASTE-001` (a–l). Handler order is normative and asserted step by step: editable target → return with no `preventDefault()`; zero images → return with no `preventDefault()`; otherwise `preventDefault()` and deliver **every** image. `navigator.clipboard.read` is asserted **never** called on this path, and no `contenteditable` node is added to the DOM. Four mutations caught: guard removed (`T-PASTE-001b`), `removeEventListener` deleted (`T-PASTE-001d`), zero-image guard neutered (`T-PASTE-001c/g/h`), clipboard truncated to one image (`T-PASTE-001e/f`). | `T-PASTE-001` |
 | `TASK-160` | `components/PasteButton.tsx` + `lib/useHeldImages.ts` — `T-PASTE-002` (a–j), `T-PASTE-009` (a–c). `navigator.clipboard.read()` is the **first statement** of the click handler, asserted by a mutation that merely wraps it in `setTimeout`. The §4.0a pre-batch hold was extracted to `useHeldImages` and wired to **both** primitives — a hold behind the button alone would leave Ctrl/Cmd+V silently lossy on the platform where paste is used most. Feature detection returns `null` (not disabled), which is every `http://` origin. Four further mutations caught: `read()` deferred (`T-PASTE-002a`), feature detect short-circuited (`T-PASTE-009a/b`), held images dropped (`T-PASTE-002c/d/e`), empty clipboard conflated with no-image (`T-PASTE-002g`). The four `PASTE_*` rejection messages are **TASK-161** and are deliberately not rendered here; `onPasteFailed` + `classifyRejection()` are the seam. New copy constant `PASTE_HELD_BODY` quoted from `ux-states.md` §4.0a, which `ui.md` §9 has no row for. | `T-PASTE-002`, `T-PASTE-009` |
 | `TASK-167` | this commit — the ledger, the gate and `docs/status.md` | `T-STATUS-001` |
+| `TASK-169` | `fc85ae4` — OMDb client | `T-OMDB-001`, `T-OMDB-007` |
+| `TASK-170` | `fc85ae4` — `external_ids` read first; `T-IMDB-009` (renamed from the already-taken `T-TMDB-011`) | `T-IMDB-009` |
+| `TASK-171` | `fc85ae4` — migration `0004`, the `sends` classification on the outbound gate, `T-CI-005` raised 2→3 | `T-INV-008`, `T-MIG-001`, `T-MUT-001f`, `T-SEC-031u` |
+| `TASK-172` | this branch — service, job and the closed two-column writer | `T-IMDB-001`, `T-IMDB-007` |
+| `TASK-173` | this branch — `GET /api/imdb/lookup` | `T-IMDB-006` |
+| `TASK-174` | this branch — row rating, `/rating` screen, OMDb footer line | `T-ATTR-006`, `T-IMDB-008`, `T-UI-023a` |

@@ -3664,3 +3664,47 @@ database on every deploy, which is TASK-141's gating deliverable. It runs on
 Prisma's built-in `sqlserver` connector with the SQL admin login, **not** through
 the driver adapter - see `apps/api/src/db/connection.ts` for why that split is
 correct rather than a leftover.
+
+---
+
+## 35. IMDb ratings (Epic M, ADR-0011)
+
+Epic M was specified at ADR and REQ level; this section is the AC → named-test
+mapping, which is the definition of done (NFR-003).
+
+### 35.1 The ids
+
+| Id | Level | What it asserts | AC |
+|---|---|---|---|
+| `T-OMDB-001` | U | The client requests OMDb at all, and only over HTTPS | REQ-089 |
+| `T-OMDB-002` | U | `"Response":"False"` is a FAILURE despite HTTP 200 — status-code-only handling sees success | REQ-093 |
+| `T-OMDB-003` | U | Transport failure raises `OmdbUnavailableError`, and one retry is attempted | REQ-093 |
+| `T-OMDB-004` | U | The lookup is keyed `?i=<imdb_id>`. A `?t=` title query is **never** issued | US-046 AC-1 |
+| `T-OMDB-005` | U | The daily budget is module-scoped and rolls over from the clock, so **no reset job exists** | REQ-093, US-036 AC-2 |
+| `T-OMDB-006` | U | A rating parses to tenths; `"N/A"`, `0` and `>10` all become `null` | REQ-091 |
+| `T-OMDB-007` | U | An unparseable body degrades to the absent state rather than throwing | REQ-091 |
+| `T-IMDB-001` | U | Staleness: `fetchedAt === null` means "never asked", not "no rating" | REQ-090 |
+| `T-IMDB-002` | U | Selection is bounded per request and dedupes by IMDb id | REQ-093 |
+| `T-IMDB-003` | U | Tenths round-trip exactly, and `null` survives both directions | REQ-091 |
+| `T-IMDB-004` | U | The refresh is serial, never throws, and stops the pass on transport failure | REQ-093 |
+| `T-IMDB-005` | U | A write names **only** the two rating columns, and the module exports no sort helper | REQ-095, US-036 AC-2 |
+| `T-IMDB-006` | U | `GET /api/imdb/lookup`: the chain, not-found distinct from unrated, no `?t=` fallback, `inList`, and that the module **writes nothing** | US-045 AC-1, US-045 AC-2, US-045 AC-3, US-045 AC-4, US-045 AC-5 |
+| `T-IMDB-007` | U | The access-triggered refresh persists through the narrow writer, never rejects, survives a failing write, and no-ops without a key | REQ-090, REQ-093 |
+| `T-IMDB-008` | U | Display: one decimal place, `8` renders `8.0`, and `null` renders **the words** — never `0` | US-044 AC-3, US-044 AC-4 |
+| `T-IMDB-009` | U | `imdb_id` is read from `external_ids` FIRST, so a **series** resolves at all | REQ-094 |
+| `T-ATTR-006` | U | The OMDb provenance line names OMDb, denies IMDb endorsement, and renders on **every** route | ADR-0011 D-1a |
+
+⚠ `T-IMDB-009` is **not** `T-TMDB-011`, which §17 L851 already defines as an
+integration test for stored match metadata. Reusing it would have let
+`check-status` report an unbuilt integration assertion as delivered.
+
+### 35.2 What is deliberately not asserted here
+
+**That OMDb returns the right number.** That is OMDb's correctness, not ours,
+and pinning a live rating in a test would make the suite fail the day a film's
+score moves. What IS asserted is that the number is keyed on `imdb_id`
+(`T-OMDB-004`) — the property that makes it the *right film's* number.
+
+**A rating sort.** There is none, by decision (REQ-095, OQ-A), and its absence
+is what keeps the lazy refresh legal under REQ-041. `T-IMDB-005b` asserts the
+service module exports no sort or rank helper.

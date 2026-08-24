@@ -32,7 +32,7 @@
 
 import type { JSX } from 'react';
 
-import { TMDB_DISCLAIMER, TMDB_LOGO_PATH } from '@nextup/domain';
+import { TMDB_DISCLAIMER, TMDB_LOGO_PATH, OMDB_DISCLAIMER } from '@nextup/domain';
 
 /**
  * `specs/api.md` §6.1 - `attribution.tmdbLogoPath`.
@@ -52,11 +52,14 @@ export interface TmdbAttributionProps {
   readonly disclaimer?: string;
   /** `attribution.tmdbLogoPath` from `GET /api/me`, once TASK-024 lands. */
   readonly logoPath?: string;
+  /** `attribution.omdbDisclaimer` from `GET /api/me` (ADR-0011 D-1a). */
+  readonly omdbDisclaimer?: string;
 }
 
 export function TmdbAttribution({
   disclaimer = TMDB_DISCLAIMER,
   logoPath = TMDB_LOGO_PATH,
+  omdbDisclaimer = OMDB_DISCLAIMER,
 }: TmdbAttributionProps = {}): JSX.Element {
   return (
     <div className="tmdb-attribution" data-testid="tmdb-attribution">
@@ -68,6 +71,15 @@ export function TmdbAttribution({
         `white-space: nowrap`, or a fixed height.
       */}
       <p className="tmdb-attribution__disclaimer">{disclaimer}</p>
+      {/*
+        ADR-0011 D-1a. Rendered under the same rules and for a related reason:
+        a number labelled "IMDb" that in fact came from a third-party
+        republisher misstates its own provenance, and that is invisible from
+        inside the product exactly like a missing TMDB line.
+      */}
+      <p className="tmdb-attribution__disclaimer" data-testid="omdb-disclaimer">
+        {omdbDisclaimer}
+      </p>
     </div>
   );
 }

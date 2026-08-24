@@ -430,7 +430,15 @@ describe('T-TMDB-010 the client refuses to invent data from a malformed body', (
 });
 
 /**
- * `T-TMDB-011` — the IMDb id (REQ-094, ADR-0011 D-2a). Epic M.
+ * `T-IMDB-009` — the IMDb id (REQ-094, ADR-0011 D-2a). Epic M.
+ *
+ * ⚠ RENAMED FROM `T-TMDB-011`, which was ALREADY TAKEN. `specs/testing.md`
+ * L851 defines `T-TMDB-011` as an INTEGRATION test — "confirmed match stores
+ * exactly type, year, runtime, genres, poster path, tmdbId, fetchedAt". Had
+ * these unit cases kept that id, `check-status` would have seen it in the
+ * suite and reported an unbuilt integration assertion as delivered. That is
+ * the exact failure `tools/check-test-ids.mjs` exists to stop, and it is why
+ * `tmdbSearchRoute.spec.ts` refused `T-AI-017` for the same reason.
  *
  * ⚠ THE ASYMMETRY IS THE WHOLE POINT, AND IT FAILS SILENTLY.
  * Measured against the live TMDB API: `/3/movie/{id}` carries `imdb_id` at the
@@ -441,7 +449,7 @@ describe('T-TMDB-010 the client refuses to invent data from a malformed body', (
  * and looks entirely correct. Nothing but a test that feeds it a TV-shaped
  * body catches it.
  */
-describe('T-TMDB-011 the IMDb id survives both media types', () => {
+describe('T-IMDB-009 the IMDb id survives both media types', () => {
   function clientServing(body: unknown): TmdbClient {
     return new TmdbClient({
       apiKey: 'fixture-key-not-a-real-secret',
@@ -456,7 +464,7 @@ describe('T-TMDB-011 the IMDb id survives both media types', () => {
     });
   }
 
-  it('T-TMDB-011a · the detail request asks for `external_ids`, at no extra call', async () => {
+  it('T-IMDB-009a · the detail request asks for `external_ids`, at no extra call', async () => {
     // If this drops out of the query string the series path goes quietly dark,
     // so the request itself is asserted rather than only its parsed result.
     const { client, calls } = makeClient();
@@ -468,13 +476,13 @@ describe('T-TMDB-011 the IMDb id survives both media types', () => {
     expect(calls[0]).toContain('/3/movie/438631');
   });
 
-  it('T-TMDB-011b · the top-level `imdb_id` a film carries is read', async () => {
+  it('T-IMDB-009b · the top-level `imdb_id` a film carries is read', async () => {
     expect(
       await clientServing({ title: 'Dune', imdb_id: 'tt1160419' }).getWork('movie', 438631),
     ).toMatchObject({ imdbId: 'tt1160419' });
   });
 
-  it('T-TMDB-011c · a series has it ONLY under `external_ids`, and it is still read', async () => {
+  it('T-IMDB-009c · a series has it ONLY under `external_ids`, and it is still read', async () => {
     // The exact body `/3/tv/{id}?append_to_response=external_ids` returns:
     // no top-level `imdb_id` key at all.
     const detail = await clientServing({
@@ -485,7 +493,7 @@ describe('T-TMDB-011 the IMDb id survives both media types', () => {
     expect(detail.imdbId).toBe('tt0386676');
   });
 
-  it('T-TMDB-011d · `external_ids` wins over the top level when both are present', async () => {
+  it('T-IMDB-009d · `external_ids` wins over the top level when both are present', async () => {
     // A film carries both. They agree in practice, but the order must be fixed
     // so the series-safe branch is the one that always runs.
     expect(
@@ -496,7 +504,7 @@ describe('T-TMDB-011 the IMDb id survives both media types', () => {
     ).toMatchObject({ imdbId: 'tt2222222' });
   });
 
-  it('T-TMDB-011e · absent, empty, null and junk ids all become null, never a lookup key', async () => {
+  it('T-IMDB-009e · absent, empty, null and junk ids all become null, never a lookup key', async () => {
     // TMDB returns `''` or `null` for a work with no IMDb mapping. Passing any
     // of these to OMDb would spend budget on a request that cannot succeed.
     for (const body of [
@@ -515,7 +523,7 @@ describe('T-TMDB-011 the IMDb id survives both media types', () => {
     }
   });
 
-  it('T-TMDB-011f · an empty `external_ids` falls back to the top level rather than to null', async () => {
+  it('T-IMDB-009f · an empty `external_ids` falls back to the top level rather than to null', async () => {
     // A film whose appended block is present but blank must not lose an id it
     // did return.
     expect(

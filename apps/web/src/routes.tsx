@@ -2,12 +2,16 @@
  * The route table (TASK-025), transcribed from `specs/ui.md` §1.
  *
  * Exported as DATA rather than as JSX so tests, the nav and the future
- * accessibility suites can all enumerate the same nine routes from one place.
- * `specs/ui.md` §8 and §10.1 both require assertions across "all nine routes"
+ * accessibility suites can all enumerate the same routes from one place.
+ * `specs/ui.md` §8 and §10.1 both require assertions across every route
  * (`T-ATTR-002`, `T-ATTR-003`, `T-A11Y-001`, `T-A11Y-012`); a hand-maintained
  * second list in each of those suites would drift the moment a route is added,
  * and would drift SILENTLY - the suite would keep passing while no longer
  * covering the new screen.
+ *
+ * ⚠ TEN ROUTES SINCE EPIC M, not nine. `/rating` (REQ-092) was added, and the
+ * enumerate-from-here design is exactly what made that a one-line change
+ * rather than a four-suite coverage hole.
  */
 
 import type { ComponentType } from 'react';
@@ -17,6 +21,7 @@ import { BatchHistoryPage } from './pages/BatchHistoryPage';
 import { BatchStatusPage } from './pages/BatchStatusPage';
 import { ListPage } from './pages/ListPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { RatingLookupPage } from './pages/RatingLookupPage';
 import { RemovedPage } from './pages/RemovedPage';
 import { ReviewPage } from './pages/ReviewPage';
 import { SuppressedPage } from './pages/SuppressedPage';
@@ -82,6 +87,12 @@ export const ROUTES: readonly RouteDefinition[] = [
     Component: AboutPage,
     examplePath: '/about',
     navLabel: 'About',
+  },
+  {
+    path: '/rating',
+    Component: RatingLookupPage,
+    examplePath: '/rating',
+    navLabel: 'Check a rating',
   },
   {
     path: '*',

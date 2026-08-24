@@ -23,6 +23,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   attributionPayload,
+  OMDB_DISCLAIMER,
   TMDB_DISCLAIMER as DOMAIN_TMDB_DISCLAIMER,
   TMDB_LOGO_PATH as DOMAIN_TMDB_LOGO_PATH,
 } from '@nextup/domain';
@@ -140,11 +141,12 @@ describe('TMDB attribution', () => {
     expect(logo).toHaveAttribute('alt', 'TMDB');
   });
 
-  it('T-ATTR-001g · US-011 AC-3/AC-5 · the disclaimer is in the footer of every one of the nine routes', () => {
-    // The nine routes are enumerated from ROUTES rather than listed here, so a
-    // tenth screen is covered the day it is added. T-ATTR-002/003 assert the
-    // same property in a real browser; this is the fast-suite tripwire that
-    // fails at the moment a page breaks out of AppShell.
+  it('T-ATTR-001g · US-011 AC-3/AC-5 · the disclaimer is in the footer of every route', () => {
+    // The routes are enumerated from ROUTES rather than listed here, so a
+    // tenth screen is covered the day it is added — and Epic M's `/rating`
+    // duly was. T-ATTR-002/003 assert the same property in a real browser;
+    // this is the fast-suite tripwire that fails at the moment a page breaks
+    // out of AppShell.
     for (const route of ROUTES) {
       const view = renderAt(route.examplePath);
 
@@ -154,6 +156,21 @@ describe('TMDB attribution', () => {
       expect(footer).toContainElement(rendered);
       expect(rendered.textContent).toBe(TMDB_DISCLAIMER);
       expect(screen.getByRole('img', { name: TMDB_LOGO_ALT })).toBeInTheDocument();
+
+      view.unmount();
+    }
+  });
+
+  it('T-ATTR-006b · ADR-0011 D-1a · the OMDb provenance line sits in the same footer, on every route', () => {
+    // ⚠ Its failure is invisible from inside the product, exactly like the
+    // TMDB line's: a rating labelled "IMDb" renders perfectly while
+    // misstating where it came from.
+    for (const route of ROUTES) {
+      const view = renderAt(route.examplePath);
+
+      const line = screen.getByTestId('omdb-disclaimer');
+      expect(screen.getByTestId('app-footer')).toContainElement(line);
+      expect(line.textContent).toBe(OMDB_DISCLAIMER);
 
       view.unmount();
     }

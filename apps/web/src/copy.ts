@@ -330,3 +330,31 @@ export const LIST_EMPTY_ALL_GONE_TITLE = 'Nothing on your list right now.';
  */
 export const LIST_LOAD_FAILED_BODY = "Couldn't load your list. Nothing has changed.";
 export const RETRY_LABEL = 'Retry';
+
+/* -------------------------------------------------------------------------- */
+/* Epic M — IMDb ratings (REQ-088…REQ-092, ADR-0011)                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * ⚠ DRAFTED, NOT TRANSCRIBED — and that is a reportable spec gap, not a licence
+ * to improvise elsewhere. `specs/ui.md` §9 has no rows for the rating surface
+ * at all, and neither does `ux-states.md`; Epic M was specified at the ADR and
+ * REQ level only. The wording below is therefore mine, and is recorded as such
+ * so a later spec pass overwrites it rather than agreeing with it.
+ *
+ * The one constraint that is NOT drafting is `IMDB_RATING_ABSENT`: REQ-091
+ * makes "no rating" a rendered state and forbids `0`, `0.0` and an empty star
+ * row, so this string may be reworded but may not become blank.
+ */
+export const IMDB_RATING_SOURCE = 'IMDb';
+export const IMDB_RATING_ABSENT = 'No IMDb rating';
+
+/** The §6.31 lookup surface (REQ-092, US-045). */
+export const IMDB_LOOKUP_TITLE = 'Check a rating';
+export const IMDB_LOOKUP_BODY =
+  'Look up any film or series to see its IMDb rating. Nothing is added to your list.';
+export const IMDB_LOOKUP_INPUT_LABEL = 'Film or series name';
+export const IMDB_LOOKUP_SUBMIT_LABEL = 'Look it up';
+export const IMDB_LOOKUP_NOT_FOUND = "Couldn't find that title.";
+export const IMDB_LOOKUP_FAILED = "Couldn't run that lookup. Nothing has changed.";
+export const IMDB_LOOKUP_IN_LIST = 'Already on your list.';
