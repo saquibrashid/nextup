@@ -28,12 +28,14 @@ import { AppError } from '../errors/AppError.js';
 import { registerBatchRoutes } from './batches.js';
 import { registerBatchImageRoutes } from './batchImages.js';
 import { registerImageRoutes } from './images.js';
+import { registerImdbRoutes } from './imdb.js';
 import { registerMeRoutes } from './me.js';
 import { registerServiceStateRoutes } from './serviceState.js';
 import { registerSuppressionRoutes } from './suppressions.js';
 import { registerTitleRoutes } from './titles.js';
 import { registerTmdbRoutes } from './tmdb.js';
 import { TmdbClient } from '../clients/tmdbClient.js';
+import { OmdbClient } from '../clients/omdbClient.js';
 
 /**
  * Ceiling for a JSON request body.
@@ -112,6 +114,14 @@ export function createApiRouter(): Router {
     apiRouter,
     () => new TmdbClient({ apiKey: process.env['TMDB_API_KEY'] ?? '' }),
   );
+  // TASK-170 (REQ-092). Same per-request lifetime, same reason. The OMDb
+  // client's DAILY BUDGET is unaffected by it: like `tmdbClient`'s rate gate,
+  // the counter is module scoped, so 1,000/day holds across the process no
+  // matter how many clients are built (`T-OMDB-005`).
+  registerImdbRoutes(apiRouter, () => ({
+    tmdb: new TmdbClient({ apiKey: process.env['TMDB_API_KEY'] ?? '' }),
+    omdb: new OmdbClient({ apiKey: process.env['OMDB_API_KEY'] ?? '' }),
+  }));
   return apiRouter;
 }
 

@@ -23,7 +23,9 @@ import { type Router } from 'express';
 
 import { encodeCursor } from '../pagination.js';
 import { AppError } from '../errors/AppError.js';
+import { beginRatingRefresh } from '../jobs/refreshRatings.js';
 import { findTitleDetail, listTitlePage } from '../repository/ownerData.js';
+import { fromTenths, type RatingRow } from '../services/imdbRatings.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import { parseTitleListQuery } from './titlesQuery.js';
 
@@ -70,6 +72,9 @@ interface TitleRow {
   tmdbRuntimeMinutes: number | null;
   tmdbGenres: string;
   tmdbPosterPath: string | null;
+  imdbId?: string | null;
+  imdbRatingTenths?: number | null;
+  imdbRatingFetchedAt?: Date | null;
   listings: ListingRow[];
 }
 
@@ -100,11 +105,32 @@ export function toListItem(row: TitleRow): Record<string, unknown> {
     genres: parseGenres(row.tmdbGenres),
     runtimeMinutes: row.tmdbRuntimeMinutes,
     posterPath: row.tmdbPosterPath,
+    // REQ-091. `null` means "no rating to show" and is rendered as such; it is
+    // NEVER coerced to 0, which would read as the worst film ever made. It
+    // covers both "never asked" and "OMDb has no rating for this work" —
+    // indistinguishable to the owner, and deliberately so.
+    imdbRating: fromTenths(row.imdbRatingTenths ?? null),
     badges,
     sortDateAdded,
     // Computed server-side so REQ-061's "to nextup" wording has exactly one
     // implementation; the SPA renders this verbatim (`specs/ui.md` §row).
     dateAddedLabel: sortDateAdded === null ? null : dateAddedLabel(sortDateAdded),
+  };
+}
+
+/**
+ * Project a served row down to what the rating refresh is allowed to see.
+ *
+ * ⚠ Narrow ON PURPOSE. The refresh reads four fields and writes two; handing
+ * it the whole row would let a future edit reach a list-bearing column and
+ * quietly violate product invariant 5. This projection is the boundary.
+ */
+export function toRatingRow(row: TitleRow): RatingRow {
+  return {
+    id: row.id,
+    imdbId: row.imdbId ?? null,
+    imdbRatingTenths: row.imdbRatingTenths ?? null,
+    imdbRatingFetchedAt: row.imdbRatingFetchedAt ?? null,
   };
 }
 
@@ -189,6 +215,15 @@ export function registerTitleRoutes(router: Router): void {
         : null;
 
     res.status(200).json({ items, nextCursor, limit: query.limit });
+
+    // REQ-090. AFTER the response, deliberately — see `refreshRatings.ts`.
+    // The owner's list is already on the wire; anything stale here shows up on
+    // the next render. Awaiting this would charge every page load for up to
+    // eight serial calls to a free-tier API, for decoration.
+    beginRatingRefresh(
+      ownerId,
+      rows.map((row) => toRatingRow(row as unknown as TitleRow)),
+    );
   });
 
   /**
