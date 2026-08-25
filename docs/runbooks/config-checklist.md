@@ -142,6 +142,39 @@ identity everywhere**; key-based auth to Azure OpenAI is *prohibited*
 | `NEXTUP_BOOTSTRAP_ALLOW_FIRST` | Default `false`. Logs the first rejected subject id and **still refuses** (403). 🛑 **Never `true` in production.** Its name reads like "allow the first user in"; it does not, and must not be made to. |
 | `entra-client-secret` (secret) | Easy Auth's Entra app credential. Platform-level; the application never reads it (ADR-0002, zero application auth code). |
 
+#### 1.1a The Entra app registration itself — three settings, none of them in Bicep
+
+⚠ **These live in Entra, not in `infra/`, so no deploy sets them and no gate
+reads them.** All three were wrong on first sign-in and the failure surfaced
+only as a Microsoft-branded error page, after the redirect, with nothing
+logged on the nextup side.
+
+| Setting | Required value | What a wrong value looks like |
+| --- | --- | --- |
+| `signInAudience` | **`AzureADandPersonalMicrosoftAccount`** | `AADSTS700016: Application with identifier '…' was not found in the directory '…'`. The single-tenant default (`AzureADMyOrg`) **contradicts the `/common` issuer that ADR-0002 mandates**: `/common` routes to whatever tenant the browser session is in, and a single-tenant app exists in exactly one. Signing in from any other tenant fails. |
+| `api.requestedAccessTokenVersion` | **`2`** | Entra refuses the audience change with `Application must accept Access Token Version 2`. It must be set **first**; `az ad app update --sign-in-audience` cannot set both. |
+| `web.redirectUris` | The `/.auth/login/aad/callback` URL of **each** environment | `AADSTS50011: redirect URI … does not match`. Both must be listed — prod **and** staging. |
+
+⚠ **`T-SMOKE-004` CANNOT CATCH ANY OF THIS, BY CONSTRUCTION.** It asserts that
+`/.auth/login/aad` returns a 302 to `login.microsoftonline.com` carrying a
+`redirect_uri` belonging to this deployment — and that was true throughout.
+Every one of these three faults is evaluated by **Entra, after the redirect**,
+so from the container's side a completely unusable sign-in is indistinguishable
+from a working one. The smoke suite proves the request is *well-formed*, never
+that it is *accepted*. Verify the last step in a browser after any change here.
+
+To read the current state:
+
+```powershell
+az ad app show --id <client-id> --query "{audience:signInAudience, tokenVersion:api.requestedAccessTokenVersion, uris:web.redirectUris}" -o json
+```
+
+⚠ **Widening the audience does NOT widen access.** That is the whole point of
+ADR-0002: `/common` already accepts every Microsoft account in the world, and
+the only per-person check is the fail-closed `NEXTUP_ALLOWED_SUBJECTS`
+allow-list above. A narrower audience would have locked the owner's *personal*
+Microsoft account out while protecting nothing.
+
 ### 1.2 Data and storage
 
 | Setting | Notes |
