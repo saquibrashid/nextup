@@ -336,15 +336,14 @@ export const RETRY_LABEL = 'Retry';
 /* -------------------------------------------------------------------------- */
 
 /**
- * ⚠ DRAFTED, NOT TRANSCRIBED — and that is a reportable spec gap, not a licence
- * to improvise elsewhere. `specs/ui.md` §9 has no rows for the rating surface
- * at all, and neither does `ux-states.md`; Epic M was specified at the ADR and
- * REQ level only. The wording below is therefore mine, and is recorded as such
- * so a later spec pass overwrites it rather than agreeing with it.
+ * ⚠ TRANSCRIBED FROM `specs/ui.md` §9, like every other constant in this file.
+ * These were drafted here first, while Epic M was specified at the ADR and REQ
+ * level only; §9 and §7a now carry them, so the spec is the source of truth
+ * and a change belongs there first.
  *
- * The one constraint that is NOT drafting is `IMDB_RATING_ABSENT`: REQ-091
- * makes "no rating" a rendered state and forbids `0`, `0.0` and an empty star
- * row, so this string may be reworded but may not become blank.
+ * The one constraint that is not a wording choice is `IMDB_RATING_ABSENT`:
+ * REQ-091 makes "no rating" a rendered state and forbids `0`, `0.0` and an
+ * empty star row, so this string may be reworded but may not become blank.
  */
 export const IMDB_RATING_SOURCE = 'IMDb';
 export const IMDB_RATING_ABSENT = 'No IMDb rating';

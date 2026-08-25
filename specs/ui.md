@@ -87,10 +87,11 @@ under `apps/web/src/`. Routing: `react-router-dom`, `BrowserRouter`.
 (ADR-0011). Four suites — `T-ATTR-002`, `T-ATTR-003`, `T-A11Y-001`,
 `T-A11Y-012` — assert something across *the whole route set*, and every one of
 them enumerates `ROUTES` rather than a literal list precisely so that adding a
-screen extends their coverage instead of silently leaving it uncovered. The
-phrase "all nine routes" survives below only where it has not yet been
-retyped; read it as "every route in `ROUTES`".
-~~Superseded: the table above listed nine screens and omitted `/rating`.~~
+screen extends their coverage instead of silently leaving it uncovered. Those
+passages now read "every route" rather than a number, so they cannot go stale
+again.
+~~Superseded: the table above listed nine screens and omitted `/rating`; the
+phrase "all nine routes" survived at §8 and §10 until it was retyped.~~
 
 Every screen sits inside `components/AppShell.tsx`, which renders the header,
 the nav, and the **global footer carrying TMDB attribution** (§8).
@@ -525,6 +526,43 @@ the interface, or repeated rows read as a bug (L1/A33).
 
 ---
 
+## 7a. `/rating` — Check a rating (US-045, Epic M)
+
+`pages/RatingLookupPage.tsx`. The tenth screen (§1). A **read-only** surface:
+the owner types a name, nextup resolves it through TMDB to an `imdb_id` and
+asks OMDb for the rating.
+
+⚠ **It writes nothing.** No title is created, no listing is touched, nothing
+joins the list. `T-IMDB-006h` asserts that against the route's source. The
+copy says so explicitly (`IMDB_LOOKUP_BODY`), because a search box inside a
+list-building product otherwise reads as "add to list" and the owner would
+reasonably expect the film to appear on `/`.
+
+**Five states**, a closed union in the page:
+
+| State | Renders |
+|---|---|
+| `idle` | The labelled input and `IMDB_LOOKUP_SUBMIT_LABEL` |
+| `loading` | The pending affordance; the input stays visible and readable |
+| `found` | Title, year, and the rating — or `IMDB_RATING_ABSENT` when the work exists but carries no rating. Plus `IMDB_LOOKUP_IN_LIST` when the work is already on the list |
+| `not-found` | `IMDB_LOOKUP_NOT_FOUND` |
+| `failed` | `IMDB_LOOKUP_FAILED` and a retry |
+
+⚠ **`not-found` and "found but unrated" are DIFFERENT states and must not be
+merged** (US-045 AC-3). A 404 from `GET /api/imdb/lookup` is a *result*, not a
+failure; every other non-ok response is `failed`. Collapsing the two tells the
+owner a film does not exist when it does, or that one exists when it does not.
+
+⚠ **`inList` is matched on canonical `workIdentity`**, never on the typed
+string — the same identity rule the whole product uses (REQ-071), so a lookup
+for *"the matrix"* recognises a listed *"The Matrix"*.
+
+The rating renders through the same rule as the list row: one decimal place
+always, so `8` shows as **8.0**. A bare "8" beside an "8.7" elsewhere on the
+page reads as a coarser scale.
+
+---
+
 ## 8. TMDB attribution (US-011, NFR-016) — compliance, and invisible when broken
 
 `components/TmdbAttribution.tsx` renders, in the **global footer of
@@ -546,9 +584,30 @@ forever (US-023 AC-2), and that no analytics are collected (NFR-005).
 
 **Its failure is invisible from inside the product**, so it is tested three
 ways: `T-ATTR-001` (string equality across constant/API/DOM), `T-ATTR-002`
-(Playwright: the disclaimer text is visible on all nine routes without
+(Playwright: the disclaimer text is visible on **every** route without
 interaction), `T-ATTR-003` (the logo image renders with a non-zero bounding box
-on all nine routes).
+on **every** route).
+
+⚠ Phrased as "every route", not a number. All four of these suites enumerate
+`ROUTES` from `apps/web/src/routes.tsx`, so their coverage grows with the route
+table on its own — a written count is a redundant restatement that goes stale
+the moment a screen is added, as "nine" did when `/rating` arrived.
+~~Superseded: "on all nine routes".~~
+
+### 8a. OMDb provenance (Epic M, ADR-0011 D-1a)
+
+The same footer carries a second line, `OMDB_DISCLAIMER`, backed by
+`packages/domain/src/attribution.ts` and delivered on the same `attribution`
+object.
+
+⚠ **This is NOT a licensing obligation, and the difference matters.** TMDB's
+disclaimer is contractual and therefore asserted **verbatim**. OMDb's is not:
+it is there because OMDb is an unendorsed third-party republisher of IMDb data
+which can lag behind the source, and a number labelled simply "IMDb" hides
+that. So the wording **may be improved**, but the two facts — that the data
+comes from OMDb, and that IMDb does not endorse it — may not be dropped.
+`T-ATTR-006` therefore asserts the **facts**, deliberately not byte-equality:
+a byte guard here would falsely imply a contract that does not exist.
 
 ---
 
@@ -582,6 +641,15 @@ change is one diff and a test can assert it.
 | **`DROPZONE_ACTIVE_LABEL`** *(new, A45)* | *Drop screenshots here* | §3.2c |
 | **`SORT_NEWEST_LABEL`** *(new, `A44`)* | *Newest first* | §2.1 item 2 — the default (`dir=desc`); REQ-061 honest wording, never "date saved" |
 | **`SORT_OLDEST_LABEL`** *(new, `A44`)* | *Oldest first* | §2.1 item 2 — `dir=asc`, the accepted mitigation for SUC-003 (old saves surfacing) |
+| **`IMDB_RATING_SOURCE`** *(new, Epic M)* | *IMDb* | §7a — labels the number on the row. The rating is **display-only** (REQ-095): it never sorts or filters |
+| **`IMDB_RATING_ABSENT`** *(new, Epic M)* | *No IMDb rating* | REQ-091 — ⚠ **a rendered state, not an omission.** May be reworded; may **not** become blank, `0`, `0.0` or an empty star row. Without it, "this work has no rating" and "nextup failed to fetch one" look identical |
+| **`IMDB_LOOKUP_TITLE`** *(new, Epic M)* | *Check a rating* | §7a — the `/rating` screen (US-045) |
+| **`IMDB_LOOKUP_BODY`** *(new, Epic M)* | *Look up any film or series to see its IMDb rating. Nothing is added to your list.* | US-045 — **the second sentence is load-bearing.** A search box inside a list-building product otherwise reads as "add to list", and the route writes nothing (`T-IMDB-006h`) |
+| **`IMDB_LOOKUP_INPUT_LABEL`** *(new, Epic M)* | *Film or series name* | §10 — a real label, not placeholder text |
+| **`IMDB_LOOKUP_SUBMIT_LABEL`** *(new, Epic M)* | *Look it up* | §7a |
+| **`IMDB_LOOKUP_NOT_FOUND`** *(new, Epic M)* | *Couldn't find that title.* | US-045 AC-3 — ⚠ **distinct from `IMDB_RATING_ABSENT`.** "No such title" and "found, but unrated" are different answers; conflating them tells the owner a film exists when it does not |
+| **`IMDB_LOOKUP_FAILED`** *(new, Epic M)* | *Couldn't run that lookup. Nothing has changed.* | Mirrors `LIST_LOAD_FAILED_BODY` — same reassurance, same reason |
+| **`IMDB_LOOKUP_IN_LIST`** *(new, Epic M)* | *Already on your list.* | US-045 AC-4 — matched on canonical `workIdentity`, never on the typed string |
 
 **(R5) The three memory/decode messages themselves are deliberately NOT copy
 constants.** `IMAGE_TOO_LARGE_TO_DECODE`, `IMAGE_DECODE_OOM` and
@@ -605,7 +673,7 @@ contains **neither** "memory" nor `MEMORY_REMEDY_PATH` for
 
 | Width | Behaviour |
 |---|---|
-| **320 px (floor)** | Single column. Filter bar collapses into a **"Filters (2)"** button opening a full-screen sheet. Title rows stack: poster left, text right, badges wrapping beneath. **No horizontal scrolling anywhere**, on any screen, in any state. `T-A11Y-001` (Playwright at 320×640: `document.documentElement.scrollWidth <= clientWidth` on all nine routes, and on the review page with a 200-candidate fixture). |
+| **320 px (floor)** | Single column. Filter bar collapses into a **"Filters (2)"** button opening a full-screen sheet. Title rows stack: poster left, text right, badges wrapping beneath. **No horizontal scrolling anywhere**, on any screen, in any state. `T-A11Y-001` (Playwright at 320×640: `document.documentElement.scrollWidth <= clientWidth` on **every** route, and on the review page with a 200-candidate fixture). |
 | 640 px | Two-line rows; filter bar inline. |
 | **1024 px+** | Filter bar as a persistent left rail; list in a max-width column (`max-w-4xl`) so lines stay readable. **No function is available only at ≥1024 px** — `T-A11Y-002` runs the full e2e journey at 320 px. |
 
@@ -632,7 +700,7 @@ Touch targets: minimum **44×44 CSS px** for every interactive element
 | **Paste is never the only way in** *(A45)* | The **"Paste screenshot"** button is a real `<button>` in tab order with a 44×44 px target; the `paste` listener is a **shortcut, not a requirement**, and every image can also be attached with **"Choose files"** by keyboard alone. A clipboard result is announced in the `aria-live="polite"` region (*"Added 1 screenshot — 3 in this batch."*); a clipboard failure renders in `role="alert"`. Drag-and-drop is **never** the only route to any capability | `T-UI-014`, `T-A11Y-005` |
 | Images | Posters `alt=""` (decorative); the TMDB logo `alt="TMDB"`; screenshot thumbnails `alt="Screenshot {n} of {total}"` | `T-A11Y-010` |
 | Forms | Every input has a `<label>`; errors linked by `aria-describedby`; checkbox labels name the title | `T-A11Y-011` |
-| Automated scan | `axe-core` via `@axe-core/playwright` on all nine routes, in every state fixture — **zero `serious` or `critical` violations blocks the merge** | `T-A11Y-012` |
+| Automated scan | `axe-core` via `@axe-core/playwright` on **every** route, in every state fixture — **zero `serious` or `critical` violations blocks the merge** | `T-A11Y-012` |
 
 ### 10.3 Performance posture (OQ-014 open — no invented targets)
 
