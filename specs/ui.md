@@ -80,7 +80,17 @@ under `apps/web/src/`. Routing: `react-router-dom`, `BrowserRouter`.
 | `/not-interested` | `pages/SuppressedPage.tsx` | Works you dismissed | Undoing a mistaken dismiss |
 | `/batches` | `pages/BatchHistoryPage.tsx` | Batch history, provenance, undo | Understanding and reversing one import |
 | `/about` | `pages/AboutPage.tsx` | Attribution and retention statements | Compliance and honesty |
+| `/rating` | `pages/RatingLookupPage.tsx` | Look up any title's IMDb rating (REQ-092, US-045) | Answering "is it any good?" **without adding anything** |
 | `*` | `pages/NotFoundPage.tsx` | Unknown route | Getting back to `/` |
+
+⚠ **THERE ARE TEN SCREENS, NOT NINE.** `/rating` was added by Epic M
+(ADR-0011). Four suites — `T-ATTR-002`, `T-ATTR-003`, `T-A11Y-001`,
+`T-A11Y-012` — assert something across *the whole route set*, and every one of
+them enumerates `ROUTES` rather than a literal list precisely so that adding a
+screen extends their coverage instead of silently leaving it uncovered. The
+phrase "all nine routes" survives below only where it has not yet been
+retyped; read it as "every route in `ROUTES`".
+~~Superseded: the table above listed nine screens and omitted `/rating`.~~
 
 Every screen sits inside `components/AppShell.tsx`, which renders the header,
 the nav, and the **global footer carrying TMDB attribution** (§8).

@@ -18,6 +18,8 @@ import type { Server } from 'node:http';
 import type { Express } from 'express';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { OMDB_DISCLAIMER } from '@nextup/domain';
+
 import { createApp } from '../../src/app.js';
 import { CLIENT_PRINCIPAL_HEADER } from '../../src/auth/principal.js';
 import { resetAllowListWarning } from '../../src/middleware/allowList.js';
@@ -82,6 +84,8 @@ describe('T-ATTR-001 GET /api/me serves the attribution payload', () => {
     expect(body['attribution']).toStrictEqual({
       tmdbDisclaimer: REQUIRED_WORDING,
       tmdbLogoPath: '/assets/tmdb-logo.svg',
+      // ADR-0011 D-1a — served from the same one source as the rest.
+      omdbDisclaimer: OMDB_DISCLAIMER,
     });
   });
 

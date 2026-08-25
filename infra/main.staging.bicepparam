@@ -46,6 +46,7 @@ param entraClientSecret = readEnvironmentVariable('NEXTUP_ENTRA_CLIENT_SECRET')
 // these to NEXTUP_STAGING_* would look more careful and would in fact leave
 // staging silently unconfigured.
 param tmdbApiKey = readEnvironmentVariable('NEXTUP_TMDB_API_KEY')
+param omdbApiKey = readEnvironmentVariable('NEXTUP_OMDB_API_KEY')
 param allowedSubjects = readEnvironmentVariable('NEXTUP_ALLOWED_SUBJECTS', '')
 
 // ── AI provisioning (TASK-010), owner-approved 2026-08-19, STAGING FIRST ────

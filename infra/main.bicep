@@ -132,6 +132,10 @@ param entraClientSecret string
 @secure()
 param tmdbApiKey string
 
+@description('OMDb API key for IMDb ratings (REQ-092). Held as a Container Apps secret.')
+@secure()
+param omdbApiKey string
+
 @description('Comma-separated Entra subject ids for the NFR-017 allow-list. May be empty; the allow-list fails closed.')
 param allowedSubjects string = ''
 
@@ -240,6 +244,7 @@ module aca 'aca.bicep' = {
     openAiDeployment: aiEndpoints.deployment
     visionEndpoint: aiEndpoints.vision
     tmdbApiKey: tmdbApiKey
+    omdbApiKey: omdbApiKey
     allowedSubjects: allowedSubjects
     // From the storage module's own outputs, so the app can never be pointed
     // at a container that was not created here — and staging can never be

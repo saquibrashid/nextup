@@ -4,7 +4,7 @@
  *
  * **REQ-041 is a CLOSED list.** PRD §7.4 enumerates exactly eight owner-
  * initiated operations that may change user-visible list state, and exactly
- * two non-owner processes that may exist at all — neither of which changes
+ * three non-owner processes that may exist at all — none of which changes
  * list state. *"Anything not on these lists is forbidden by default. REQ-041
  * has already been widened five times during requirements work; widening it
  * again is an explicit amendment, not an implementation decision."*
@@ -66,9 +66,20 @@ export const REQ_041_OPERATIONS = [
 ];
 
 /**
- * PRD §7.4 — the only two non-owner-initiated processes permitted to exist,
- * neither of which changes user-visible list state. Invariant 5 of the
+ * PRD §7.4 — the only THREE non-owner-initiated processes permitted to exist,
+ * none of which changes user-visible list state. Invariant 5 of the
  * contributor instructions restates this as a hard rule.
+ *
+ * ⚠ THE TEST IS NOT THE COUNT — IT IS `changes user-visible LIST state`.
+ * Invariant 5 forbids a scheduler touching membership, ordering or service
+ * badges. All three entries below are metadata- or bytes-only, access- or
+ * time-triggered, and none of them can add, remove, reorder or re-badge a row.
+ * A fourth entry is admissible only on the same terms, and is an amendment to
+ * PRD §7.4 rather than an implementation decision.
+ *
+ * ~~Superseded (Epic M): "the only two non-owner-initiated processes."~~
+ * ADR-0011 added the IMDb rating refresh, which is the same shape as the TMDB
+ * one it sits beside.
  */
 export const PERMITTED_BACKGROUND_PROCESSES = [
   {
@@ -78,6 +89,10 @@ export const PERMITTED_BACKGROUND_PROCESSES = [
   {
     op: 'screenshot-purge',
     why: 'screenshot image purge at 30 days — image bytes only (NFR-019, US-035)',
+  },
+  {
+    op: 'imdb-rating-refresh',
+    why: 'lazy IMDb rating refresh on access — a display-only numeric field, never sorted or filtered on (REQ-093, ADR-0011 OQ-A)',
   },
 ];
 
@@ -380,9 +395,9 @@ export function checkRegistryAgainstReq041(registry = MUTATING_ROUTE_REGISTRY) {
     );
   }
 
-  if (PERMITTED_BACKGROUND_PROCESSES.length !== 2) {
+  if (PERMITTED_BACKGROUND_PROCESSES.length !== 3) {
     findings.push(
-      `PRD §7.4 permits exactly two non-owner processes; this list has ${PERMITTED_BACKGROUND_PROCESSES.length}. No scheduler may change user-visible list state (T-MUT-001, T-CI-005).`,
+      `PRD §7.4 permits exactly three non-owner processes; this list has ${PERMITTED_BACKGROUND_PROCESSES.length}. No scheduler may change user-visible list state (T-MUT-001, T-CI-005).`,
     );
   }
 

@@ -24,10 +24,27 @@ export const TMDB_DISCLAIMER =
  */
 export const TMDB_LOGO_PATH = '/assets/tmdb-logo.svg';
 
+/**
+ * OMDb provenance (ADR-0011 D-1a, REQ-088).
+ *
+ * ⚠ NOT a licensing obligation like `TMDB_DISCLAIMER` — OMDb requires no
+ * wording, and this sentence is ours. It exists because D-1 records that OMDb
+ * is a **third-party republisher, not endorsed by IMDb, and its data can lag**,
+ * and a number labelled "IMDb" that the owner believes came from IMDb itself
+ * makes that recorded trade invisible at exactly the surface where it matters.
+ *
+ * So the wording may be improved, unlike the TMDB sentence above — but the two
+ * facts in it (that the source is OMDb, and that it is not IMDb) may not be
+ * dropped. `T-ATTR-006` asserts both terms are present.
+ */
+export const OMDB_DISCLAIMER =
+  'IMDb ratings are supplied by OMDb, which is not endorsed or certified by IMDb.';
+
 /** The `attribution` object of `GET /api/me` (`specs/api.md` §6.1). */
 export interface Attribution {
   readonly tmdbDisclaimer: string;
   readonly tmdbLogoPath: string;
+  readonly omdbDisclaimer: string;
 }
 
 /**
@@ -40,5 +57,6 @@ export function attributionPayload(): Attribution {
   return {
     tmdbDisclaimer: TMDB_DISCLAIMER,
     tmdbLogoPath: TMDB_LOGO_PATH,
+    omdbDisclaimer: OMDB_DISCLAIMER,
   };
 }

@@ -1157,7 +1157,7 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 | AC | L | Test | Assertion |
 |---|---|---|---|
 | AC-1 | S/I | `T-MUT-001` | Every mutating route maps to an entry in the REQ-041 enumeration, asserted from a committed list; a new mutating route fails until added |
-| AC-2 | S | **`T-CI-005`** | Exactly two non-owner processes exist: lazy TMDB refresh and the blob lifecycle rule. No timer/cron/worker |
+| AC-2 | S | **`T-CI-005`** | Exactly three non-owner processes exist: lazy TMDB refresh, the blob lifecycle rule, and the lazy IMDb rating refresh (Epic M). No timer/cron/worker. ~~Superseded (Epic M): "Exactly two non-owner processes exist: lazy TMDB refresh and the blob lifecycle rule."~~ |
 | AC-3 | S | `T-MUT-001` | An operation outside the enumeration cannot be registered |
 | AC-4 | I | `T-MUT-002` | No auto-confirm, auto-restore or auto-suppress path exists: `restoreListing`, `createTitle` and `suppress` have only their sanctioned call sites |
 | AC-5 | S | `T-CI-005` | No scheduled job, webhook, timer or background worker touches list state |
@@ -1650,7 +1650,7 @@ rather than renumbering the work order for no benefit.
 |---|---|---|
 | **`T-BATCH-007`** | I | The inline extraction runner honours its operational ceilings: image concurrency **2**, a **15-minute** batch ceiling, and `estimatedCostUsd` recorded in `extractionStats`. `T-EXT-010` covers progress and `T-AI-036` the degraded path; nothing asserted the limits that stop a runaway batch from exhausting the 0.5 GiB container (`RSK-016`). |
 | **`T-PERF-003`** | I | The `batch_change_by_batch` and `candidate_by_batch` queries resolve by **index seek, not scan**, under the §16.6 indexes, and pagination is **keyset** — no `OFFSET`. `T-PERF-001` covers only the list and removed views. On Azure SQL Basic (5 DTU) a scan that is invisible at 50 rows is a timeout at 5,000. |
-| **`T-EXPORT-001`** | I | `scripts/export-owner-data.ts` writes every owner row to a restorable artefact, is **never scheduled** and **never deletes** — and `docs/restore.md` documents the 7-day PITR and BACPAC paths. ⚠ Must not become a background job: product invariant 5 permits exactly two non-owner processes, and `T-CI-005` fails if a third appears. `REQ-028` forbids deletion but gives the owner no backup of their own, which is what this closes (`OQ-025`). |
+| **`T-EXPORT-001`** | I | `scripts/export-owner-data.ts` writes every owner row to a restorable artefact, is **never scheduled** and **never deletes** — and `docs/restore.md` documents the 7-day PITR and BACPAC paths. ⚠ Must not become a background job: product invariant 5 permits exactly three non-owner processes (Epic M raised it from two), and `T-CI-005` fails if a fourth appears. `REQ-028` forbids deletion but gives the owner no backup of their own, which is what this closes (`OQ-025`). |
 
 ---
 
@@ -3572,11 +3572,11 @@ around the gate by adding them to `BASELINE_ORPHANS`; that list may only
 shrink.
 
 One consequence is already recorded in ADR-0010 section 6.3 and is worth
-repeating here, because it lands on a gate this document owns: **`T-CI-005`
-asserts that exactly two non-owner-initiated processes exist.** The
-availability refresh is a third, so `T-CI-005` goes red the moment Epic L
-lands. The correct response is to **amend the count to three** - naming the
-refresh, and asserting it is metadata-only and access-triggered - alongside
+repeating here, because it lands on a gate this document owns: **`T-CI-005` asserts that
+exactly **three** non-owner-initiated processes exist (raised from two by
+Epic M, which added the IMDb rating refresh).** The availability refresh is a
+**fourth**, so `T-CI-005` goes red the moment Epic L lands. The correct
+response is to **amend the count to four** - naming the refresh, and asserting it is metadata-only and access-triggered - alongside
 `PRD.md` US-036 AC-2 and product invariant 5. The wrong response is to relax
 the gate into counting nothing in particular: its entire value is that the
 number is exact and small.
@@ -3664,3 +3664,47 @@ database on every deploy, which is TASK-141's gating deliverable. It runs on
 Prisma's built-in `sqlserver` connector with the SQL admin login, **not** through
 the driver adapter - see `apps/api/src/db/connection.ts` for why that split is
 correct rather than a leftover.
+
+---
+
+## 35. IMDb ratings (Epic M, ADR-0011)
+
+Epic M was specified at ADR and REQ level; this section is the AC → named-test
+mapping, which is the definition of done (NFR-003).
+
+### 35.1 The ids
+
+| Id | Level | What it asserts | AC |
+|---|---|---|---|
+| `T-OMDB-001` | U | The client requests OMDb at all, and only over HTTPS | REQ-089 |
+| `T-OMDB-002` | U | `"Response":"False"` is a FAILURE despite HTTP 200 — status-code-only handling sees success | REQ-093 |
+| `T-OMDB-003` | U | Transport failure raises `OmdbUnavailableError`, and one retry is attempted | REQ-093 |
+| `T-OMDB-004` | U | The lookup is keyed `?i=<imdb_id>`. A `?t=` title query is **never** issued | US-046 AC-1 |
+| `T-OMDB-005` | U | The daily budget is module-scoped and rolls over from the clock, so **no reset job exists** | REQ-093, US-036 AC-2 |
+| `T-OMDB-006` | U | A rating parses to tenths; `"N/A"`, `0` and `>10` all become `null` | REQ-091 |
+| `T-OMDB-007` | U | An unparseable body degrades to the absent state rather than throwing | REQ-091 |
+| `T-IMDB-001` | U | Staleness: `fetchedAt === null` means "never asked", not "no rating" | REQ-090 |
+| `T-IMDB-002` | U | Selection is bounded per request and dedupes by IMDb id | REQ-093 |
+| `T-IMDB-003` | U | Tenths round-trip exactly, and `null` survives both directions | REQ-091 |
+| `T-IMDB-004` | U | The refresh is serial, never throws, and stops the pass on transport failure | REQ-093 |
+| `T-IMDB-005` | U | A write names **only** the two rating columns, and the module exports no sort helper | REQ-095, US-036 AC-2 |
+| `T-IMDB-006` | U | `GET /api/imdb/lookup`: the chain, not-found distinct from unrated, no `?t=` fallback, `inList`, and that the module **writes nothing** | US-045 AC-1, US-045 AC-2, US-045 AC-3, US-045 AC-4, US-045 AC-5 |
+| `T-IMDB-007` | U | The access-triggered refresh persists through the narrow writer, never rejects, survives a failing write, and no-ops without a key | REQ-090, REQ-093 |
+| `T-IMDB-008` | U | Display: one decimal place, `8` renders `8.0`, and `null` renders **the words** — never `0` | US-044 AC-3, US-044 AC-4 |
+| `T-IMDB-009` | U | `imdb_id` is read from `external_ids` FIRST, so a **series** resolves at all | REQ-094 |
+| `T-ATTR-006` | U | The OMDb provenance line names OMDb, denies IMDb endorsement, and renders on **every** route | ADR-0011 D-1a |
+
+⚠ `T-IMDB-009` is **not** `T-TMDB-011`, which §17 L851 already defines as an
+integration test for stored match metadata. Reusing it would have let
+`check-status` report an unbuilt integration assertion as delivered.
+
+### 35.2 What is deliberately not asserted here
+
+**That OMDb returns the right number.** That is OMDb's correctness, not ours,
+and pinning a live rating in a test would make the suite fail the day a film's
+score moves. What IS asserted is that the number is keyed on `imdb_id`
+(`T-OMDB-004`) — the property that makes it the *right film's* number.
+
+**A rating sort.** There is none, by decision (REQ-095, OQ-A), and its absence
+is what keeps the lazy refresh legal under REQ-041. `T-IMDB-005b` asserts the
+service module exports no sort or rank helper.

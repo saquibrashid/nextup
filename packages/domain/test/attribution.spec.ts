@@ -15,7 +15,12 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { attributionPayload, TMDB_DISCLAIMER, TMDB_LOGO_PATH } from '../src/attribution.js';
+import {
+  attributionPayload,
+  OMDB_DISCLAIMER,
+  TMDB_DISCLAIMER,
+  TMDB_LOGO_PATH,
+} from '../src/attribution.js';
 
 /**
  * Spelled out rather than imported: importing the constant and comparing it to
@@ -37,11 +42,24 @@ describe('T-ATTR-001 TMDB attribution constants', () => {
     expect(TMDB_DISCLAIMER).not.toMatch(/\s{2}|\u00a0|[\u2018\u2019\u201c\u201d]/u);
   });
 
-  it('T-ATTR-001m · specs/api.md §6.1 · the payload carries both fields, byte-equal', () => {
+  it('T-ATTR-001m · specs/api.md §6.1 · the payload carries every field, byte-equal', () => {
     expect(attributionPayload()).toStrictEqual({
       tmdbDisclaimer: REQUIRED_WORDING,
       tmdbLogoPath: '/assets/tmdb-logo.svg',
+      // ADR-0011 D-1a. Unlike the TMDB sentence this wording is ours and may
+      // be improved — but it may not lose either fact, which is what
+      // `T-ATTR-006a` guards.
+      omdbDisclaimer: OMDB_DISCLAIMER,
     });
+  });
+
+  it('T-ATTR-006a · ADR-0011 D-1a · the OMDb line names OMDb and denies IMDb endorsement', () => {
+    // Asserted on the two FACTS, not on the sentence, because the sentence is
+    // ours to reword and a byte-equality guard here would be a false claim
+    // that it is a licensing obligation.
+    expect(OMDB_DISCLAIMER).toContain('OMDb');
+    expect(OMDB_DISCLAIMER).toContain('IMDb');
+    expect(OMDB_DISCLAIMER).toMatch(/not endorsed|not certified/i);
   });
 
   it('T-ATTR-001n · a caller cannot mutate the payload for every later response', () => {

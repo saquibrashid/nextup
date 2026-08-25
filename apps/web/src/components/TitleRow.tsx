@@ -18,6 +18,8 @@
 import type { JSX } from 'react';
 import { SERVICE_LABELS, type Service } from '@nextup/domain';
 
+import { IMDB_RATING_ABSENT, IMDB_RATING_SOURCE } from '../copy';
+
 /** `specs/ui.md` §2.2 - the poster size the row requests. */
 export const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w154';
 
@@ -43,6 +45,13 @@ export interface TitleListItem {
   readonly sortDateAdded: string | null;
   /** `null` when the title has no non-removed listing to date it by. */
   readonly dateAddedLabel: string | null;
+  /**
+   * 1.0-10.0, or `null` (REQ-091). ⚠ `null` covers BOTH "not fetched yet" and
+   * "IMDb has no rating for this work" - deliberately indistinguishable here,
+   * because the owner can do nothing about either and a "checking..." state
+   * would flicker on every first render of every page.
+   */
+  readonly imdbRating?: number | null;
 }
 
 export interface TitleRowProps {
@@ -107,6 +116,37 @@ export function TitleRow({ item, onOpenMenu, onFixMatch }: TitleRowProps): JSX.E
           */}
           {item.genres.length > 0 && <span data-testid="genres">{item.genres.join(', ')}</span>}
         </p>
+
+        {/*
+          REQ-091 - "no rating" is a FIRST-CLASS RENDERED STATE, and the two
+          branches below are the whole requirement:
+
+          - a rating renders as `IMDb 8.7`, always to one decimal place. The
+            server stores tenths as an integer precisely so 8.8 does not arrive
+            as 8.800000000000001, and `toFixed(1)` keeps `8` from rendering as
+            a bare "8" that reads like a different, coarser scale.
+          - no rating renders the WORDS. Never `0`, never `0.0`, never an empty
+            star row (REQ-091) - each of those is a claim about the film rather
+            than an absence of data, and `0` in particular reads as the worst
+            rating possible.
+
+          ⚠ It is NOT omitted the way an empty genre list is. A missing rating
+          and a rating of nothing look identical when the element simply is not
+          there, and the owner would be left wondering whether nextup failed.
+        */}
+        {item.imdbRating == null ? (
+          <p
+            className="title-row__rating title-row__rating--absent"
+            data-testid="imdb-rating-absent"
+          >
+            {IMDB_RATING_ABSENT}
+          </p>
+        ) : (
+          <p className="title-row__rating" data-testid="imdb-rating">
+            <span className="title-row__rating-source">{IMDB_RATING_SOURCE}</span>{' '}
+            <span data-testid="imdb-rating-value">{item.imdbRating.toFixed(1)}</span>
+          </p>
+        )}
 
         {/*
           Verbatim from the API. Rendered only when the API supplied one: with

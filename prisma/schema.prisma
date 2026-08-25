@@ -122,6 +122,25 @@ model Title {
   /// constant, which is a different number for a different purpose (T-INV-008).
   tmdbFetchedAt DateTime? @map("tmdb_fetched_at") @db.DateTime2
 
+  /// The IMDb id from TMDB (REQ-094). NULL means TMDB has no IMDb mapping for
+  /// this work, which is a real answer, not a missing read.
+  /// ⚠ Read from `external_ids` first — a series carries it nowhere else
+  /// (ADR-0011 D-2a).
+  imdbId String? @map("imdb_id") @db.NVarChar(20)
+
+  /// The IMDb rating in TENTHS (1..100 == 0.1..10.0), never a float — see the
+  /// 0004 migration for why. Divide by 10 at the display edge only.
+  imdbRatingTenths Int? @map("imdb_rating_tenths")
+
+  /// When the rating above was read from OMDb. Its max age is
+  /// IMDB_RATING_MAX_AGE_DAYS (14) — never the TMDB metadata or the screenshot
+  /// retention constant, which are different numbers for different purposes
+  /// (T-INV-008).
+  /// ⚠ Set even when OMDb had NO rating: that records "asked, none available"
+  /// and is what stops an unrated work being re-queried on every render. A
+  /// rating without this timestamp is rejected by `ck_title_imdb_rating_dated`.
+  imdbRatingFetchedAt DateTime? @map("imdb_rating_fetched_at") @db.DateTime2
+
   createdAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_title_created") @map("created_at") @db.DateTime2
   updatedAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_title_updated") @map("updated_at") @db.DateTime2
 

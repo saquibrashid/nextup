@@ -64,6 +64,11 @@ param holdRevisionName = readEnvironmentVariable('NEXTUP_HOLD_REVISION', '')
 // this app's query-parameter scheme.
 param tmdbApiKey = readEnvironmentVariable('NEXTUP_TMDB_API_KEY')
 
+// Epic M (REQ-092, ADR-0011). Also no default, for the identical reason: an
+// empty secret value is rejected outright, so "configure it later" is not a
+// state this parameter can occupy.
+param omdbApiKey = readEnvironmentVariable('NEXTUP_OMDB_API_KEY')
+
 // May be empty — the allow-list fails closed, so an empty value denies
 // everyone rather than admitting them. Empty is a locked door, not an open one.
 param allowedSubjects = readEnvironmentVariable('NEXTUP_ALLOWED_SUBJECTS', '')

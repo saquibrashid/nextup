@@ -739,7 +739,8 @@ nonexistent one — NFR-008, `T-SEC-002`).
   "signOutUrl": "/.auth/logout",
   "attribution": {
     "tmdbDisclaimer": "This product uses the TMDB API but is not endorsed or certified by TMDB.",
-    "tmdbLogoPath": "/assets/tmdb-logo.svg"
+    "tmdbLogoPath": "/assets/tmdb-logo.svg",
+    "omdbDisclaimer": "IMDb ratings are supplied by OMDb, which is not endorsed or certified by IMDb."
   }
 }
 ```
@@ -747,6 +748,12 @@ The disclaimer string is served from the API — **one source, verbatim,
 never re-typed in a component** (US-011 AC-2/AC-5). It is exported as
 `TMDB_DISCLAIMER` from `packages/domain/src/attribution.ts`, and `T-ATTR-001`
 asserts the API value, the constant and the rendered DOM text are byte-equal.
+
+`omdbDisclaimer` (Epic M, ADR-0011 D-1a) is served the same way but is **not**
+a licensing obligation — OMDb requires no wording. It exists because a number
+labelled "IMDb" that in fact came from a third-party republisher misstates its
+own provenance. The **wording may be improved; the two facts in it may not be
+dropped**, which is what `T-ATTR-006a` asserts rather than byte equality.
 
 ### 6.2 `GET /api/titles` — the combined list (US-018, US-019, US-020)
 
@@ -788,7 +795,8 @@ Semantics:
         { "service": "max",     "listingId": "01J8ZE...", "dateAdded": "2026-06-11" }
       ],
       "sortDateAdded": "2026-04-02",
-      "dateAddedLabel": "Added to nextup 2 Apr 2026"
+      "dateAddedLabel": "Added to nextup 2 Apr 2026",
+      "imdbRating": 8.7
     }
   ],
   "nextCursor": null,
@@ -800,6 +808,19 @@ Semantics:
 rule has exactly one implementation. It **never** reads as a bare "Added" and
 **never** implies a streaming-service date. `T-LIST-018` asserts every rendered
 date label contains the substring `"to nextup"`.
+
+**`imdbRating`** (Epic M, REQ-088/REQ-091) is `1.0`–`10.0` or **`null`**. It is
+served from the cached value on the row and is **never fetched during the
+request** — a lazy refresh of what is stale is fired **after** the response
+(REQ-090, REQ-093), so ratings appear on the *next* render and a first-ever
+load legitimately shows none.
+
+⚠ **`null` is never `0`.** It covers both "not fetched yet" and "IMDb has no
+rating for this work", deliberately indistinguishable — the owner can act on
+neither. `imdbRating` is **display-only**: it is not a sort key and no
+`sort=rating` option exists (REQ-095, ADR-0011 OQ-A). That is precisely what
+keeps the refresh legal under REQ-041 — a background write that changed the
+list's ORDER would not be.
 
 `badges` contains only `active` listings (REQ-026).
 
@@ -1332,6 +1353,43 @@ default 10).
 **200** `{ "items": [ { "tmdbId": 438631, "mediaType": "movie", "name": "Dune", "releaseYear": 2021, "posterPath": "/d5NXS.jpg" } ] }`
 **502 `TMDB_UNAVAILABLE`** when TMDB cannot be reached — *"Couldn't reach TMDB.
 Try again in a moment."* The API key is never proxied to the client.
+
+### 6.31 `GET /api/imdb/lookup` — IMDb rating for any title (US-045, REQ-092)
+
+Query: `q` (1..100, required), `type` (`movie|tv`, optional). `limit` is
+accepted and ignored — this route answers with the **single best match**, not a
+page.
+
+**200**
+```jsonc
+{
+  "tmdbId": 603, "mediaType": "movie", "name": "The Matrix",
+  "releaseYear": 1999, "posterPath": "/p.jpg",
+  "imdbId": "tt0133093", "imdbRating": 8.7, "voteCount": 1900000,
+  "inList": true, "titleId": "ttl_01J…"
+}
+```
+
+⚠ **THIS ROUTE WRITES NOTHING** — no `Title`, no `ServiceListing`, no
+`WatchIntent`, no `Suppression` (US-045 AC-2). `T-IMDB-006h` asserts that
+against the module's source, because "I checked and it doesn't write" is a
+property that decays the first time somebody adds a convenience cache-write.
+
+Resolution is fixed: **TMDB search → `imdb_id` → OMDb `?i=`**. There is **no
+title-text fallback** — a work with no `imdb_id` returns `"imdbRating": null`
+and OMDb is not called at all (US-046 AC-1/AC-3, REQ-093).
+
+`imdbRating` is `null` for REQ-091's no-rating state and is **never `0`**.
+`inList` is matched on `workIdentity`, so it agrees with the identity the rest
+of the product deduplicates on, and it is `true` for a work in the removed log
+as well as an active one — a work sitting in the log IS already known.
+
+**404 `NOT_FOUND`** when TMDB matches nothing — *"Couldn't find that title."*
+⚠ Not a 200 with an empty result: US-045 AC-3 requires "no such title" and
+"found, but unrated" to stay distinguishable.
+**502 `TMDB_UNAVAILABLE`** as §6.29. An unreachable **OMDb** is not an error
+here — it degrades to `"imdbRating": null` and the lookup still answers
+(US-045 AC-5).
 
 ---
 

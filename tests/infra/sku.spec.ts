@@ -161,11 +161,19 @@ describe('T-INFRA-005 SKU pinning and the compute/guard pair', () => {
     // `ghcr-token` among them — fails here and needs a reviewable diff to
     // justify.
     //
-    // ⚠ WIDENED ONCE, AT A48, AND THIS IS THAT REVIEWABLE DIFF. `tmdb-api-key`
-    // joined the set: TMDB is a third-party HTTP API with no managed-identity
-    // option, so unlike blob storage, AOAI and Vision it cannot be reached
-    // without a held credential. The set stays CLOSED and exhaustive — adding
-    // a third still fails here.
+    // ⚠ WIDENED TWICE. FIRST AT A48: `tmdb-api-key` joined the set — TMDB is a
+    // third-party HTTP API with no managed-identity option, so unlike blob
+    // storage, AOAI and Vision it cannot be reached without a held credential.
+    // SECOND FOR EPIC M: `omdb-api-key` joins for exactly the same reason —
+    // OMDb is a third-party HTTP API keyed on a query-string key with no
+    // federated-identity path (ADR-0011). This is that second reviewable diff.
+    //
+    // ⚠ THE PROPERTY BEING PROTECTED IS "NO REGISTRY CREDENTIAL", NOT A COUNT.
+    // Widening for an outbound third-party API key does not weaken it; the set
+    // stays CLOSED and exhaustive, so a `ghcr-token` still fails here. Note
+    // this guard reads the COMPILED template, so it only sees a new secret
+    // once `infra/main.json` is recompiled — check:infra is what makes that
+    // true, and a stale artifact hid this very entry for one commit.
     //
     // The names are ARM VARIABLE REFERENCES, not literals, because aca.bicep
     // declares each name once in a `var` and uses it in both the secret and
@@ -174,6 +182,7 @@ describe('T-INFRA-005 SKU pinning and the compute/guard pair', () => {
     const ALLOWED_SECRETS = [
       "[variables('entraClientSecretName')]",
       "[variables('tmdbApiKeySecretName')]",
+      "[variables('omdbApiKeySecretName')]",
     ];
     const secrets = app.properties.configuration.secrets ?? [];
     const authConfig = resourceOfType(template, 'Microsoft.App/containerApps/authConfigs');

@@ -536,6 +536,53 @@ export async function findTitlesWithStaleMetadata(
   });
 }
 
+/**
+ * Is this work already on the owner's list? (REQ-092 / US-045 AC-4.)
+ *
+ * ⚠ Keyed on `workIdentity`, not on a TMDB id, so it agrees with the identity
+ * every other part of the product deduplicates on. Returns the row whatever
+ * its `state`: a work sitting in the removed log IS "already known", and
+ * telling the owner it is unknown would invite a duplicate capture.
+ */
+export async function findTitleByWorkIdentity(ownerId: OwnerId, workIdentity: string, tx?: Db) {
+  return db(tx).title.findFirst({
+    where: { ownerId, workIdentity },
+    orderBy: [{ createdAt: 'desc' }],
+  });
+}
+
+/**
+ * Persist ONE work's IMDb rating (REQ-090, ADR-0011).
+ *
+ * ⚠ **THE COLUMN SET IS CLOSED, AND THAT IS WHAT MAKES THE LAZY REFRESH
+ * LEGAL.** This is the write executed by the access-triggered refresh — the
+ * third and last of the non-owner processes product invariant 5 permits. It is
+ * permitted only because it cannot change user-visible LIST state, and the
+ * only reason it cannot is that it writes exactly these two columns.
+ *
+ * Widening it to take a `data` object, or adding any field that participates
+ * in membership, ordering or service badges, would put a background write
+ * inside invariant 5 while every existing test still passed. `T-IMDB-005a`
+ * asserts the write's shape from the other end.
+ *
+ * Owner-scoped via `updateMany` like every other writer here: `update({ id })`
+ * would touch another owner's row if an id ever leaked.
+ */
+export async function updateTitleRating(
+  ownerId: OwnerId,
+  id: string,
+  rating: { imdbRatingTenths: number | null; imdbRatingFetchedAt: Date },
+  tx?: Db,
+) {
+  return db(tx).title.updateMany({
+    where: { ownerId, id },
+    data: {
+      imdbRatingTenths: rating.imdbRatingTenths,
+      imdbRatingFetchedAt: rating.imdbRatingFetchedAt,
+    },
+  });
+}
+
 /* ------------------------------------------------------------------ *
  * service_listing
  * ------------------------------------------------------------------ */
