@@ -525,7 +525,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-068` | `todo` | — |
 | `TASK-069` | `todo` | — |
 | `TASK-070` | `todo` | — |
-| `TASK-071` | `todo` | — |
+| `TASK-071` | `done` | `POST /batches/:batchId/close`. Pure close grammar in `packages/domain/src/close.ts`; the transactional apply in `apps/api/src/services/batchClose.ts`. Refuses a pending addition with 409 `PENDING_ADDITIONS` before opening the transaction (no accept by inaction, REQ-014). Applies `confirmed` and `corrected` under the corrected identity, keeps unmatched confirmations as unresolved titles (US-008), re-checks the suppression gate INSIDE the transaction on work identity (REQ-071), keeps the earliest `sortDateAdded`, and writes only this batch's service. Removals stay untouched (REQ-020) until TASK-083–086. Proven by `T-REV-012` across three layers, including a mid-transaction fault injection that proves rollback, and mutation-tested: 10/10 mutants killed. |
 | `TASK-072` | `todo` | — |
 | `TASK-073` | `todo` | — |
 | `TASK-074` | `todo` | — |
