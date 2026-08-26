@@ -40,5 +40,8 @@ export * from './provenance.js';
 // TASK-065 — the pure half of the review response (`specs/api.md` §6.17):
 // section routing, the mode contract and removal withholding.
 export * from './review.js';
+// TASK-083 — full-update removal computation (US-014). Pure: it decides WHAT
+// disappeared; `review.ts` decides whether the owner may see it.
+export * from './removals.js';
 export * from './schemas.js';
 export * from './types.js';

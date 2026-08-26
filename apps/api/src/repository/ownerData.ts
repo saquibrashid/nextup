@@ -655,6 +655,10 @@ export async function listActiveListingsForService(ownerId: OwnerId, service: st
       listingId: true,
       titleId: true,
       service: true,
+      // Selected even though the WHERE above hard-codes `active`: TASK-083's
+      // `computeRemovals` re-checks it, and a filter that cannot see the value
+      // it filters on is a guard in name only.
+      state: true,
       dateAdded: true,
       title: {
         select: {

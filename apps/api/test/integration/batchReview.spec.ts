@@ -595,3 +595,40 @@ describe('T-UI-006 · US-013 AC-3 · the mode contract: omitted means "not appli
     expect(body.sections.additions.count).toBe(1);
   });
 });
+
+describe('T-REM-010 · US-014 · removals as the owner actually receives them', () => {
+  it('T-REM-010a: a full-update proposes exactly the active listings nothing extracted', async () => {
+    const batchId = await makeBatch({ service: 'netflix', mode: 'full-update' });
+    await makeActiveListing(DUNE, 'netflix', 'Dune');
+    await makeActiveListing(HEAT, 'netflix', 'Heat');
+    // A third work, active on the OTHER service. (It must be a third work:
+    // `title_one_active_per_work` allows only one title row per identity, so a
+    // cross-service fixture cannot reuse one of the two above.)
+    await makeActiveListing('tmdb:movie:603', 'max', 'The Matrix');
+    await makeCandidate(batchId, { workIdentity: DUNE, rawText: 'Dune' });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    // Heat only. Dune was extracted; the Max listing is out of scope, because
+    // a Netflix screenshot is evidence about Netflix and nothing else.
+    expect(body.sections.removals.items.map((i) => i.name)).toEqual(['Heat']);
+    expect(body.sections.removals.count).toBe(1);
+    expect(body.sections.removals.items[0]?.ticked).toBe(true);
+  });
+
+  it('T-REM-013a: a listing already in the removed state is never proposed again', async () => {
+    const batchId = await makeBatch({ mode: 'full-update' });
+    const { listingId } = await makeActiveListing(HEAT, 'netflix', 'Heat');
+    await testPrisma().serviceListing.update({
+      where: { listingId },
+      data: { state: 'removed', removedAt: new Date() },
+    });
+    // Nothing in this batch mentions Heat, so only the state stops it. A
+    // second proposal would let this batch re-remove a listing the owner
+    // restored between the two.
+    await makeCandidate(batchId, { workIdentity: DUNE, rawText: 'Dune' });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(body.sections.removals.items).toEqual([]);
+    expect(body.sections.removals.count).toBe(0);
+  });
+});
