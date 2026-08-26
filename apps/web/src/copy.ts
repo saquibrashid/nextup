@@ -331,6 +331,22 @@ export const LIST_EMPTY_ALL_GONE_TITLE = 'Nothing on your list right now.';
 export const LIST_LOAD_FAILED_BODY = "Couldn't load your list. Nothing has changed.";
 export const RETRY_LABEL = 'Retry';
 
+/**
+ * The initial read, before an answer has arrived (`ux-states.md` §2.1).
+ *
+ * ⚠ THIS EXISTS TO PREVENT A FALSE EMPTY STATE. Without a loading state the
+ * container renders zero rows for the duration of the request, and
+ * `listEmptyKind` reads zero rows with no filters as **"Nothing here yet"** —
+ * the never-uploaded message — on every single page load, for an owner whose
+ * list is full. That is precisely the data-loss reading US-019 AC-5 forbids,
+ * and it would flash on the way to the correct list rather than fail outright.
+ *
+ * ⚠ The skeletons and the 1200 ms `SlowResponseNotice` that §2.1 also
+ * specifies are NOT built here; they are their own task (`T-UX-001`,
+ * `T-UX-010`). This is the honest minimum that keeps the empty state truthful.
+ */
+export const LIST_LOADING_BODY = 'Loading your list…';
+
 /* -------------------------------------------------------------------------- */
 /* Epic M — IMDb ratings (REQ-088…REQ-092, ADR-0011)                           */
 /* -------------------------------------------------------------------------- */

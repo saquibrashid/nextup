@@ -16,6 +16,7 @@
 import type { ErrorCode } from '@nextup/domain';
 
 import type { TitleListItem as WireTitleListItem } from '../components/TitleRow';
+import type { ServiceFreshness as WireServiceFreshness } from '../components/FreshnessStrip';
 
 /** The wire shape of a failure (`apps/api/src/middleware/errorEnvelope.ts`). */
 export interface ErrorEnvelope {
@@ -203,6 +204,7 @@ async function request<T>(path: string, options: RequestOptions, deps: ApiClient
 // ---------------------------------------------------------------------------
 
 export type { TitleBadge, TitleListItem } from '../components/TitleRow';
+export type { ServiceFreshness } from '../components/FreshnessStrip';
 
 export interface TitleListResponse {
   items: WireTitleListItem[];
@@ -210,21 +212,28 @@ export interface TitleListResponse {
   limit: number;
 }
 
-export interface ServiceStateItem {
-  service: string;
-  lastUpdatedAt: string | null;
-  label: string;
-}
-
 export interface ServiceStateResponse {
-  services: ServiceStateItem[];
+  services: WireServiceFreshness[];
 }
 
+/**
+ * ⚠ The full §6.7 item, including `displaySnapshot`. That snapshot is FROZEN
+ * at suppression time and the API deliberately never joins back to `Title`
+ * (product invariant 1: suppression is keyed on work identity, and the row it
+ * came from may no longer exist).
+ */
 export interface SuppressionItem {
   suppressionId: string;
   workIdentity: string;
-  name: string;
   suppressedAt: string;
+  identityStability: string;
+  displaySnapshot: {
+    name: string;
+    releaseYear: number | null;
+    mediaType: string | null;
+    posterPath: string | null;
+  };
+  unsuppressHref: string;
 }
 
 export interface SuppressionsResponse {

@@ -19,7 +19,7 @@ import type { ComponentType } from 'react';
 import { AboutPage } from './pages/AboutPage';
 import { BatchHistoryPage } from './pages/BatchHistoryPage';
 import { BatchStatusPage } from './pages/BatchStatusPage';
-import { ListPage } from './pages/ListPage';
+import { ListRoute } from './containers/ListRoute';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { RatingLookupPage } from './pages/RatingLookupPage';
 import { RemovedPage } from './pages/RemovedPage';
@@ -45,7 +45,7 @@ export interface RouteDefinition {
 export const EXAMPLE_BATCH_ID = '01J0000000000000000000BTCH';
 
 export const ROUTES: readonly RouteDefinition[] = [
-  { path: '/', Component: ListPage, examplePath: '/', navLabel: 'List' },
+  { path: '/', Component: ListRoute, examplePath: '/', navLabel: 'List' },
   {
     path: '/upload',
     Component: UploadPage,
