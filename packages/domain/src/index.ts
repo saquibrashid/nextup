@@ -30,5 +30,11 @@ export * from './overlap.js';
 // fixture or a decoder; the header read is in `apps/api/src/images`.
 export * from './pastedFileName.js';
 export * from './pixelGuard.js';
+// TASK-066 — the pure half of the candidate PATCH and confirm-all bodies
+// (`specs/api.md` §6.18, §6.19): what the owner is allowed to have meant.
+export * from './candidatePatch.js';
+// TASK-065 — the pure half of the review response (`specs/api.md` §6.17):
+// section routing, the mode contract and removal withholding.
+export * from './review.js';
 export * from './schemas.js';
 export * from './types.js';

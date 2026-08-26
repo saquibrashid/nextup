@@ -605,6 +605,48 @@ export async function listActiveListingsForTitle(ownerId: OwnerId, titleId: stri
   });
 }
 
+/**
+ * Every ACTIVE listing on ONE service, with just enough of its title to render
+ * a removal proposal (`specs/api.md` §6.17) and to key classification
+ * (`packages/domain/src/classify.ts`).
+ *
+ * ⚠ `state: 'active'` is not an optimisation and there is deliberately no
+ * parameter to relax it. Two callers depend on it:
+ *
+ * 1. Classification — a `removed` listing for this service must classify as
+ *    `new`, because a reappearance is a brand-new row dated today (invariant
+ *    L1/A33). Including removed rows here would classify it `already-present`,
+ *    the row would never be created, and the title would silently never come
+ *    back. `T-CLS-012`.
+ * 2. The removal proposal — a listing already removed cannot disappear again,
+ *    and proposing it would double-count the removal in the owner's summary.
+ *
+ * Scoped to ONE service because a batch is scoped to one service (product
+ * invariant 3); a cross-service read here would let a Netflix batch propose
+ * removing a Max listing.
+ */
+export async function listActiveListingsForService(ownerId: OwnerId, service: string, tx?: Db) {
+  return db(tx).serviceListing.findMany({
+    where: { ownerId, service, state: 'active' },
+    select: {
+      listingId: true,
+      titleId: true,
+      service: true,
+      dateAdded: true,
+      title: {
+        select: {
+          workIdentity: true,
+          tmdbName: true,
+          tmdbReleaseYear: true,
+          tmdbPosterPath: true,
+          rawExtractedText: true,
+        },
+      },
+    },
+    orderBy: { listingId: 'asc' },
+  });
+}
+
 /** One page of the removed view. Newest removal first, ties by listing id. */
 export interface RemovedListingRow {
   listing_id: string;
@@ -1058,16 +1100,61 @@ export async function listCandidatesForBatch(ownerId: OwnerId, batchId: string, 
   });
 }
 
+/**
+ * The same read as `listCandidatesForBatch`, plus each candidate's source
+ * images — which the review response needs so a tile thumbnail can be shown
+ * (`T-AI-041`) and so an SD-02 survivor can show the provenance it absorbed.
+ *
+ * ⚠ Same rule as `listCandidatesForBatch`: **no disposition filter, ever.**
+ * Full-update review must show ALL extracted titles (product invariant 2).
+ */
+export async function listCandidatesForReview(ownerId: OwnerId, batchId: string, tx?: Db) {
+  return db(tx).extractionCandidate.findMany({
+    where: { ownerId, batchId },
+    include: { sourceImages: { select: { imageId: true }, orderBy: { id: 'asc' } } },
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
+export async function findExtractionCandidate(ownerId: OwnerId, id: string, tx?: Db) {
+  return db(tx).extractionCandidate.findFirst({ where: { ownerId, id } });
+}
+
 export async function updateCandidateDisposition(
   ownerId: OwnerId,
   id: string,
   data: Pick<
     Prisma.ExtractionCandidateUncheckedUpdateInput,
-    'reviewDisposition' | 'resolvedTitleId' | 'collapsedIntoCandidateId'
+    | 'reviewDisposition'
+    | 'resolvedTitleId'
+    | 'collapsedIntoCandidateId'
+    | 'resolvedWorkIdentity'
+    | 'correctedToTmdbId'
+    | 'cleanupVerdict'
+    | 'classification'
+    | 'matchCandidates'
   >,
   tx?: Db,
 ) {
   return db(tx).extractionCandidate.updateMany({ where: { ownerId, id }, data });
+}
+
+/**
+ * Bulk `pending` → `confirmed` for the ids given (`specs/api.md` §6.19).
+ *
+ * ⚠ `reviewDisposition: 'pending'` is in the WHERE, not just in the caller's
+ * filter. The caller reads, decides, then writes, and in between the owner may
+ * have discarded one of those items in another tab; without this predicate the
+ * bulk press would silently reverse an explicit decision. It also makes the
+ * returned `count` the number of decisions this press really made, which is
+ * what §6.19 reports back.
+ */
+export async function confirmPendingCandidates(ownerId: OwnerId, ids: readonly string[], tx?: Db) {
+  if (ids.length === 0) return { count: 0 };
+  return db(tx).extractionCandidate.updateMany({
+    where: { ownerId, id: { in: [...ids] }, reviewDisposition: 'pending' },
+    data: { reviewDisposition: 'confirmed' },
+  });
 }
 
 /* ------------------------------------------------------------------ *
