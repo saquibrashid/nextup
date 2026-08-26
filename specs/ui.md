@@ -675,7 +675,7 @@ contains **neither** "memory" nor `MEMORY_REMEDY_PATH` for
 |---|---|
 | **320 px (floor)** | Single column. Filter bar collapses into a **"Filters (2)"** button opening a full-screen sheet. Title rows stack: poster left, text right, badges wrapping beneath. **No horizontal scrolling anywhere**, on any screen, in any state. `T-A11Y-001` (Playwright at 320×640: `document.documentElement.scrollWidth <= clientWidth` on **every** route, and on the review page with a 200-candidate fixture). |
 | 640 px | Two-line rows; filter bar inline. |
-| **1024 px+** | Filter bar as a persistent left rail; list in a max-width column (`max-w-4xl`) so lines stay readable. **No function is available only at ≥1024 px** — `T-A11Y-002` runs the full e2e journey at 320 px. |
+| **1024 px+** | Filter bar as a persistent left rail; list in a max-width column (`--layout-max-width`, §13) so lines stay readable. **No function is available only at ≥1024 px** — `T-A11Y-002` runs the full e2e journey at 320 px. ~~`max-w-4xl`~~ *(R2: a Tailwind utility name, and Tailwind is not used — ADR-0004 Rev 2. The token replaces it.)* |
 
 Touch targets: minimum **44×44 CSS px** for every interactive element
 (`.tap-target` utility). `T-A11Y-003` asserts it across the review page.
@@ -755,3 +755,192 @@ here. What *is* specified is mechanism:
 | Date-added editing | v1.1 (REQ-059). The label is displayed, read-only. |
 | Bulk restore in the removed view | Out of scope by the OQ-022 closure (data-model §11). |
 | Analytics, cookie banners, consent dialogs | NFR-005 — nothing is collected. |
+
+---
+
+## 12. Data access (Epic N, ADR-0012)
+
+⚠ **This section exists because the SPA had none.** Every screen was a stub
+rendering hardcoded state — "Showing 0 of 0", "Nothing here yet" — against a
+complete, working API. Every gate stayed green because every web test injects
+props into a component and nothing asserted that anything ever fetched.
+
+### 12.1 One client, one place
+
+All API access goes through `apps/web/src/lib/apiClient.ts` (REQ-097). No
+component calls `fetch` (`T-DATA-001`).
+
+Every screen that displays owner data **issues a request** for it (REQ-096,
+`T-DATA-002`). ⚠ **That assertion is the one that was missing**, and its
+absence is why every gate was green on an app that fetched nothing: a test
+that injects props proves a component renders what it is given, and says
+nothing about whether anything ever gives it real data. `T-DATA-002` asserts
+against a mocked client that mounting each data screen calls it.
+
+Every request carries **`credentials: 'same-origin'`** — Easy Auth is
+cookie-based and the SPA and API share one origin (ADR-0003 / ADR-0012 D-4) —
+and `T-DATA-003` asserts it on every method the client exposes, not on one
+sample call. Omitting it returns 401 on every call, which by §12.3 becomes a
+redirect loop rather than a visible error.
+
+### 12.2 Four states, and only four
+
+```ts
+type Resource<T> =
+  | { kind: 'loading' }
+  | { kind: 'ok'; value: T }
+  | { kind: 'refused' }
+  | { kind: 'failed' };
+```
+
+Every screen renders all four. `isLoading` + `error` + `data` admits states
+that cannot be rendered sensibly and pushes the decision into each component,
+differently each time.
+
+⚠ **`refused` and `failed` are different facts** — *"nextup will not show you
+this"* versus *"nextup could not reach the server"*. Merging them offers a
+retry that can never succeed.
+
+### 12.3 401 and 403 are not the same thing
+
+| Status | Behaviour | Test |
+|---|---|---|
+| **401** | Redirect to `/.auth/login/aad?post_login_redirect_uri=<current path>` | `T-DATA-004` |
+| **403** | Render the refusal screen | `T-DATA-005` |
+
+⚠ **A 401 SHOWN AS AN ERROR IS THE FAILURE THIS ROW PREVENTS.** Easy Auth
+sessions expire on a timer. Rendered as a generic failure, a correctly
+signed-in owner is told their list could not be loaded and offered a retry that
+fails identically forever, with nothing pointing at the actual remedy.
+
+The redirect preserves the path, so a deep link survives expiry (US-001 AC-2).
+
+### 12.4 Retry is always the owner's decision
+
+No automatic retry, no backoff loop, anywhere (REQ-100, `T-DATA-006`).
+Production is **one replica at 0.25 vCPU** — automatic retries turn a
+struggling container into a harder-hit one. `LIST_LOAD_FAILED_BODY` carries the
+honest half (*"Nothing has changed."*); `RETRY_LABEL` is the affordance.
+
+### 12.5 The query string is the request
+
+Filters, sort and pagination are read from `useSearchParams` and nothing
+mirrors them into component state (REQ-101, `T-DATA-007`). A mirrored copy
+desynchronises on the back button, a shared link and reload — silently, showing
+a list that contradicts its own visible controls.
+
+### 12.6 Mutations only from event handlers
+
+Never from a render effect (REQ-102, `T-DATA-008`).
+
+⚠ **React 19 StrictMode double-invokes effects in development** and `main.tsx`
+mounts inside `<StrictMode>`. A `POST` in a mount effect fires **twice** —
+two batches, two extraction runs — and is invisible in production builds, so it
+surfaces first in the owner's real data.
+
+### 12.7 Polling — narrow, and not a background process
+
+`/batches/:batchId` may poll while a batch is running (REQ-103). It stops on a
+terminal state, on unmount, and while `document.hidden` (`T-DATA-009`).
+
+⚠ **This does not engage REQ-041.** That invariant forbids a *non-owner*
+process changing *user-visible list state*. This is the owner's own browser,
+looking at the screen, issuing a **read** of a status endpoint. `T-MUT-001f`
+counts **server-side** processes and is unaffected.
+
+The `document.hidden` stop is not politeness: without it a forgotten tab polls
+a single-replica container indefinitely, which is a background process by
+behaviour whatever the intent.
+
+### 12.8 Server error text is rendered verbatim
+
+The envelope's `message` is the string shown (REQ-104, `T-DATA-010`). A
+client-side table keyed on error code is a second source of truth that keeps
+displaying yesterday's limit after the owner up-sizes memory — in the very
+message whose job is to state the limit (§3.2a, `T-UI-013`).
+
+---
+
+## 13. Design tokens and the stylesheet (Epic O, ADR-0004 Rev 2)
+
+⚠ **This section exists because the project had no CSS at all** — no
+stylesheet, no import in `main.tsx`, and no Tailwind, while 43 `className`
+attributes across the components already used a consistent semantic vocabulary.
+ADR-0004 Revision 2 keeps that vocabulary and drops Tailwind.
+
+### 13.1 The vocabulary is already fixed — do not invent a second one
+
+Components ship these names. The stylesheet defines them; it does not rename
+them (`T-CSS-001`).
+
+⚠ **`T-CSS-002` asserts `main.tsx` imports the stylesheet.** Without it every
+other assertion in this section passes on a document that renders unstyled —
+the same vacuous-green failure mode as §12.1's `T-DATA-002`, and the one that
+put the owner in front of an unstyled page. A stylesheet that exists but is
+never imported is indistinguishable from no stylesheet at build time, and Vite
+will not warn.
+
+`app-shell`, `app-shell__logo`, `dropzone`, `dropzone__target`,
+`dropzone__choose`, `dropzone__paste`, `filter-bar`, `freshness-strip`,
+`freshness-strip__chip`, `freshness-strip__notice`, `refusal`,
+`refusal__account`, `tap-target`, `title-list`, `title-row`, `title-row__name`,
+`title-row__poster`, `title-row__badges`, `title-row__body`, `title-row__chip`,
+`title-row__date`, `title-row__meta`, `title-row__menu`, `title-row__action`,
+`title-row__actions`, `title-row__rating`, `title-row__rating-source`,
+`tmdb-attribution`, `tmdb-attribution__disclaimer`, `tmdb-attribution__logo`.
+
+Modifiers use the `--` suffix already in use: `title-row__poster--empty`,
+`title-row__rating--absent`.
+
+### 13.2 Tokens — declared once, in `:root`
+
+| Token | Value | Why it is a token |
+|---|---|---|
+| `--bp-sm` | `640px` | §10.1. Named so a breakpoint cannot be typed twice with different values |
+| `--bp-lg` | `1024px` | §10.1 |
+| `--layout-max-width` | `56rem` | §10.1's readable column. Replaces the stray `max-w-4xl` |
+| `--tap-target-min` | `44px` | NFR-006. **The one definition**; `.tap-target` is its only consumer |
+| `--color-text` | `#111827` | 17.7:1 on `--color-surface`, 17.0:1 on `--color-bg` |
+| `--color-text-muted` | `#4b5563` | 7.6:1 / 7.2:1. Comfortably over the 4.5:1 floor even on the tinted background |
+| `--color-bg` | `#f9fafb` | |
+| `--color-surface` | `#ffffff` | |
+| `--color-border` | `#878d99` | ⚠ **3.3:1 / 3.2:1 — chosen by calculation, not by eye.** §10.2 requires ≥ 3:1 for UI boundaries, and the conventional light-grey border (`#d1d5db`) is **1.47:1** — it fails by a factor of two while looking entirely normal |
+| `--color-accent` | `#1d4ed8` | Links and primary actions; 6.7:1 on white |
+| `--color-danger` | `#b91c1c` | 6.5:1 on white. Destructive confirmation only |
+| `--space-1` … `--space-6` | `4px` `8px` `12px` `16px` `24px` `32px` | A closed scale |
+| `--radius` | `6px` | |
+| `--font-stack` | system UI stack | No web font: no third-party request (NFR-005), no layout shift |
+
+⚠ **EVERY RATIO ABOVE WAS COMPUTED, AND FOUR DRAFTED VALUES WERE WRONG.** The
+first draft of this table asserted `#d1d5db` was "≥ 3:1" when it is **1.47:1**,
+and claimed `#6b7280` **failed** at "4.28:1" when it actually **passes** at
+4.83:1 — a wrong number in each direction, both plausible enough to survive
+review. Non-text contrast is the trap: a border can look obviously visible and
+still be less than half the required ratio.
+
+⚠ **`T-CSS-004` computes the WCAG ratio for every token pair from the token
+values themselves** and fails below 4.5:1 for text and 3:1 for boundaries. A
+token file is exactly where a "slightly nicer" grey gets substituted, and
+`axe-core` only catches it on a page that happens to render that pair — it
+never checks a token that is momentarily unused.
+
+### 13.3 Mobile-first, and no dark mode in v1
+
+Base rules are the 320 px layout; `min-width` media queries add the wider ones.
+Writing it desktop-first means the **floor** — the width NFR-006 actually
+mandates and `T-A11Y-001` actually tests — is the case reached by subtraction.
+
+No dark mode: it doubles every contrast obligation in §13.2 for a
+single-owner app that never asked for it. `prefers-reduced-motion: reduce`
+**is** honoured (`T-CSS-005`) because it is one rule and an accessibility
+obligation, not a preference.
+
+### 13.4 What the stylesheet may not do
+
+| Not allowed | Why |
+|---|---|
+| A web font, an icon font, or any external `@import` | A third-party request per page load. NFR-005 and `T-CI-007`'s egress rule |
+| `!important` outside a `prefers-reduced-motion` reset | It is how a token gets bypassed rather than changed |
+| Styling on a `data-testid` | Couples the test contract to presentation, so a visual tidy-up silently breaks tests |
+| A hard-coded colour or breakpoint outside `:root` | Defeats §13.2. `T-CSS-003` greps for hex literals and `px` breakpoints in rule bodies |
+| Hiding content with `display: none` where §10.2 needs it announced | Removes it from the accessibility tree; use a visually-hidden pattern |

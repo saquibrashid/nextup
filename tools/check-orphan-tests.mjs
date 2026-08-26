@@ -115,7 +115,6 @@ export const BASELINE_ORPHANS = new Set([
   'T-SUP-017',
   'T-SUP-022',
   'T-SUP-023',
-  'T-TMDB-011',
   'T-TMDB-012',
   'T-TMDB-014',
   'T-TMDB-015',

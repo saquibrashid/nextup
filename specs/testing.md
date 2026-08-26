@@ -3708,3 +3708,97 @@ score moves. What IS asserted is that the number is keyed on `imdb_id`
 **A rating sort.** There is none, by decision (REQ-095, OQ-A), and its absence
 is what keeps the lazy refresh legal under REQ-041. `T-IMDB-005b` asserts the
 service module exports no sort or rank helper.
+
+---
+
+## 36. SPA data access (Epic N, ADR-0012)
+
+⚠ **This section exists because of a green suite on an app that fetched
+nothing.** Every web test injects props into a component. That measures
+component correctness and says nothing whatever about product integration —
+`T-A11Y-001` (no horizontal scroll at 320 px) and `T-A11Y-012` (axe-core)
+both pass comfortably on an empty document, because an empty document has no
+overflow and no contrast failures. The assertions below are the ones whose
+absence was invisible.
+
+All of these live in **`apps/web/test/`** (§11 — not `tests/web/`, which no
+Vitest project collects).
+
+### 36.1 The ids
+
+| Id | Level | What it asserts | Req |
+|---|---|---|---|
+| `T-DATA-001` | U | No component calls `fetch` directly — the check is over `apps/web/src/**` source, so it holds for screens not yet written | REQ-097 |
+| `T-DATA-002` | U | **Every data screen actually issues a request on mount**, asserted against a mocked client | REQ-096 |
+| `T-DATA-003` | U | **Every** client method sends `credentials: 'same-origin'` — enumerated over the exported surface, not sampled on one call | REQ-097 |
+| `T-DATA-004` | U | A 401 redirects to `/.auth/login/aad` with the current path as `post_login_redirect_uri`, and renders no error | REQ-098 |
+| `T-DATA-005` | U | A 403 renders the refusal screen, and is distinct from both 401 and a transport failure | REQ-099 |
+| `T-DATA-006` | U | A failed read states nothing has changed and offers retry; **no automatic retry or backoff is issued** | REQ-100 |
+| `T-DATA-007` | U | Filter/sort/pagination derive from the query string; no component mirrors them into state | REQ-101 |
+| `T-DATA-008` | U | Mutations are issued from event handlers only — no mutating call occurs on mount under `StrictMode` | REQ-102 |
+| `T-DATA-009` | U | Status polling stops at a terminal state, on unmount, and while `document.hidden` | REQ-103 |
+| `T-DATA-010` | U | The envelope `message` is rendered verbatim — no client-side code→copy table | REQ-104 |
+
+### 36.2 Why `T-DATA-008` mounts under `StrictMode`
+
+React 19 **double-invokes effects in development** and `main.tsx` mounts inside
+`<StrictMode>`. A `POST` placed in a mount effect therefore fires **twice** —
+two batches, two extraction runs — and the doubling **disappears in a
+production build**, so it would surface first in the owner's real data rather
+than in any test. Asserting under `StrictMode` is what makes the violation
+observable at all; a plain `render()` would pass on the broken code.
+
+### 36.3 What is deliberately not asserted here
+
+**Cache coherence and revalidation.** There is no cache to be coherent (D-1),
+and REQ-041 forbids background revalidation outright.
+
+**That a screen re-fetches after a mutation.** Mutating flows navigate or
+re-request explicitly at the call site; there is no invalidation graph to
+verify.
+
+---
+
+## 37. The stylesheet and design tokens (Epic O, ADR-0004 Rev 2)
+
+⚠ **This section exists because the project had no CSS at all.** The owner
+opened a fully working, fully signed-in application and reported it as broken.
+Nothing failed; nothing was styled.
+
+These live in **`apps/web/test/`**, except `T-CSS-005`, which is exercised in
+`tests/e2e/**` where a real engine applies the media query.
+
+### 37.1 The ids
+
+| Id | Level | What it asserts | Req |
+|---|---|---|---|
+| `T-CSS-001` | U | Every class name used in `apps/web/src/**` is defined in the stylesheet, and every defined rule is used — both directions, so a rename breaks the build rather than the page | ADR-0004 R2-A |
+| `T-CSS-002` | U | **`main.tsx` imports the stylesheet.** Without this every other id here passes on an unstyled document | ADR-0004 R2-A |
+| `T-CSS-003` | U | No hex literal and no `px` breakpoint appears in a rule body — colours and breakpoints come from `:root` only | §13.2 |
+| `T-CSS-004` | U | The WCAG ratio of every token pair, **computed from the token values**: ≥ 4.5:1 for text, ≥ 3:1 for UI boundaries | NFR-011, §10.2 |
+| `T-CSS-005` | E2E | `prefers-reduced-motion: reduce` is honoured | §10.2 |
+
+### 37.2 Why `T-CSS-004` computes ratios instead of trusting `axe-core`
+
+`axe-core` only evaluates a pair that a rendered page happens to use, so a
+token that is momentarily unused — or used only on a screen the a11y test does
+not visit — is never checked. A token file is precisely where a "slightly
+nicer" grey gets substituted.
+
+⚠ **This is not hypothetical: four of the five ratios in §13.2's first draft
+were wrong**, in both directions. `#d1d5db` was asserted at "≥ 3:1" and is
+**1.47:1** — failing by more than half while looking like an entirely normal
+border — and `#6b7280` was rejected as failing at "4.28:1" when it in fact
+**passes** at 4.83:1. Non-text contrast is the trap, because a boundary that
+is clearly visible can still be nowhere near the threshold. Eyeballing does
+not detect either error; arithmetic does.
+
+### 37.3 What is deliberately not asserted here
+
+**Visual appearance.** No screenshot baselines. One owner, two viewports, and
+a screenshot suite fails on font-rendering differences between a laptop and CI
+far more often than it catches a real regression.
+
+**That Tailwind is absent.** The dependency allow-list (`tools/check-deps.mjs`)
+already governs what may be installed; a second assertion would duplicate it.
+

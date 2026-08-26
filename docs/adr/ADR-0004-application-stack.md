@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Accepted |
+| **Status** | Accepted — **Revision 2 (2026-08-25)**: styling is hand-authored CSS, not Tailwind; client data access is ADR-0012's typed `fetch` client, not TanStack Query. Two stale entries (`@azure/cosmos`, React 18) corrected in place. |
 | **Date** | 2026-08-10 |
 | **Deciders** | solution-architect (phase 7), autonomous |
 | **Forced by** | **NFR-002, NFR-003, NFR-004** (and ASM-028/ASM-029), NFR-006, NFR-007, NFR-012 |
@@ -99,13 +99,13 @@ Selected components:
 
 | Concern | Selection | Note |
 |---|---|---|
-| UI framework | React 18 + TypeScript | Most-represented UI framework in training data (NFR-004) |
+| UI framework | **React 19** + TypeScript | Most-represented UI framework in training data (NFR-004). ~~React 18~~ — R2: 19 is what is installed and what `StrictMode` double-invoke behaviour (ADR-0012 D-7) is reasoned against |
 | Build / dev server | Vite | Fast, minimal configuration, no framework opinions |
-| Styling | Tailwind CSS | Utility classes make the 320px/1024px responsive work (NFR-006/007) explicit and reviewable in the markup rather than hidden in a stylesheet |
-| Client state / data | TanStack Query | Standard, well documented; gives caching and request de-duplication on the value loop for free |
+| Styling | **Hand-authored CSS over a semantic class vocabulary** | **R2 — see Revision 2 below.** ~~Tailwind CSS — utility classes make the 320px/1024px responsive work (NFR-006/007) explicit and reviewable in the markup rather than hidden in a stylesheet~~ |
+| Client state / data | **One typed `fetch` client — no library** | **R2 — ADR-0012.** ~~TanStack Query — standard, well documented; gives caching and request de-duplication on the value loop for free~~ |
 | HTTP server | Express 4 | Maximum documentation surface, minimum magic |
 | Validation | Zod | One schema per boundary, shared between client and server; runtime validation of the OCR/TMDB responses that cross a trust boundary |
-| Data access | `@azure/cosmos` | First-party SDK (ADR-0005) |
+| Data access | **Prisma, provider `sqlserver`** | **R2 — ADR-0005 Rev 3.** ~~`@azure/cosmos` — first-party SDK~~ |
 | Blob access | `@azure/storage-blob` + `@azure/identity` | Managed identity (ADR-0006) |
 | OCR | `@azure-rest/ai-vision-image-analysis` | Behind the `TitleExtractor` interface (ADR-0001) |
 | Unit / integration tests | Vitest | Same runner both halves |
@@ -139,9 +139,9 @@ than eliminating the second language.
   by both halves — no hand-maintained parity, no drift.
 - Every choice in the table is a first-page, heavily-documented default
   in its category, which is the property NFR-004 actually asks for.
-- Tailwind puts responsive breakpoints in the markup, so the NFR-006 /
+- ~~Tailwind puts responsive breakpoints in the markup, so the NFR-006 /
   NFR-007 obligations are visible at the point of use and reviewable in
-  a diff.
+  a diff.~~ *(R2: this benefit was never realised — see Revision 2.)*
 - Zod at the OCR and TMDB boundaries means both untrusted external
   payloads are validated before they reach domain logic — a security
   benefit as well as a correctness one.
@@ -187,6 +187,60 @@ than eliminating the second language.
   US-001 AC-4 (allow-list refusal) — are the non-negotiable core.
 - Node 20 LTS is pinned in `.nvmrc`, `package.json` engines, the
   Dockerfile and the GitHub Actions workflow, so all four agree.
+
+## Revision 2 — 2026-08-25 — **styling and the data layer, corrected to reality**
+
+⚠ **The table above is corrected IN PLACE; the superseded selections are struck
+through beside their replacements.** Read the current values.
+
+### R2-A — Styling: hand-authored CSS, not Tailwind
+
+**What was found.** When the deployed app was first opened in a browser it
+rendered entirely unstyled. The project contained **no CSS file of any kind**,
+no stylesheet import in `main.tsx`, and **no Tailwind dependency** — while the
+components had already been built with **43 `className` attributes drawn from a
+consistent semantic BEM vocabulary** (`title-row__poster`,
+`freshness-strip__chip`, `tap-target`) and **zero utility classes**.
+
+**Why the original rationale no longer holds.** Tailwind was chosen so that
+"utility classes make the responsive work explicit and reviewable in the
+markup". The markup was written the opposite way. That benefit is not
+available to collect — it can only be *bought*, by rewriting 43 attributes
+across working, tested components. Adopting Tailwind now would pay a
+migration cost to reach a state the code has already declined.
+
+**The decision.** Keep the semantic vocabulary and hand-author a stylesheet
+against it. No new dependency (NFR-004 favours the smaller tree), no churn on
+tested call sites, and the class names already read as documentation.
+
+**The cost, stated honestly.** Responsive breakpoints now live in a stylesheet
+rather than in the markup, so NFR-006/NFR-007 obligations are one file away
+from their point of use. That is a real loss and it is why `specs/ui.md` §13
+pins the breakpoints and the 44 px tap target in **one** token block, and why
+§36 asserts them from the rendered page rather than from the source.
+
+⚠ **`@apply` was considered and rejected.** It would install Tailwind to
+generate the same semantic classes, paying the dependency without gaining the
+in-markup visibility that was the entire argument for it.
+
+### R2-B — Client state: no data-fetching library
+
+Superseded by **ADR-0012**, which also records that the SPA had no API client
+at all. The short reason: TanStack Query's core value is cache coherence and
+background revalidation, and **REQ-041 forbids background revalidation
+outright**.
+
+### R2-C — Two entries had simply gone stale
+
+`@azure/cosmos` was superseded by ADR-0005 Revision 3 (Prisma on Azure SQL)
+and had never been corrected here; React 18 has been React 19 in
+`apps/web/package.json` since the scaffold. Both are corrected in place.
+
+⚠ **Neither was load-bearing on its own, but both were readable as current
+instructions** — which is the F-001 defect this project has already been bitten
+by once. An ADR table is executed, not narrated.
+
+---
 
 ## Reversal
 

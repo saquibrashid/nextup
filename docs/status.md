@@ -11,12 +11,12 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 80 |
+| ⬜ todo | 86 |
 | 🚧 doing | 7 |
 | ✅ done | 82 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **172** |
+| **total** | **178** |
 
 ## Ready to start
 
@@ -37,6 +37,8 @@ Not done, and every task they depend on is done.
 | `TASK-161` | S | Epic B — Capture & import |
 | `TASK-162` | S | Epic B — Capture & import |
 | `TASK-166` | S | Epic F — The list itself (the value loop) |
+| `TASK-175` | S | Epic K — Platform, safety, and the shell |
+| `TASK-179` | S | Epic K — Platform, safety, and the shell |
 
 ## Waiting on the owner
 
@@ -48,7 +50,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-74 tasks cannot start yet.
+78 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -126,6 +128,10 @@ Not done, and every task they depend on is done.
 | `TASK-163` | `TASK-162` |
 | `TASK-164` | `TASK-080`, `TASK-162` |
 | `TASK-168` | `TASK-079`, `TASK-010` |
+| `TASK-176` | `TASK-175` |
+| `TASK-177` | `TASK-176` |
+| `TASK-178` | `TASK-177` |
+| `TASK-180` | `TASK-179` |
 
 ## Done
 
