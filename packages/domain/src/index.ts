@@ -15,9 +15,14 @@ export * from './extraction/index.js';
 export * from './freshness.js';
 export * from './identity.js';
 export * from './ids.js';
+// TASK-060 — deterministic TMDB match scoring (`specs/ai.md` §4). Its own
+// barrel, following the `extraction/` precedent.
+export * from './matching/index.js';
 // TASK-036 — the list ordering rule (US-020), stated once so the SQL
 // `ORDER BY` has something to be checked against.
 export * from './ordering.js';
+// TASK-063 — intra-batch overlap collapse (SD-02, `specs/data-model.md` §7.4).
+export * from './overlap.js';
 // TASK-145 — the pure half of the pre-decode pixel guard (`specs/api.md`
 // §5.0.1). Pure so the decision table can be tested without a container, a
 // fixture or a decoder; the header read is in `apps/api/src/images`.

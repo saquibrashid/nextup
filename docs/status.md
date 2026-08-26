@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 81 |
+| ⬜ todo | 79 |
 | 🚧 doing | 7 |
-| ✅ done | 87 |
+| ✅ done | 89 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **178** |
@@ -30,6 +30,9 @@ Not done, and every task they depend on is done.
 | `TASK-045` | S | Epic D — Matching & identity |
 | `TASK-056c` | M | Epic C — Extraction |
 | `TASK-057` | M | Epic C — Extraction |
+| `TASK-061` | S | Epic D — Matching & identity |
+| `TASK-062` | S | Epic D — Matching & identity |
+| `TASK-064` | S | Epic E — Review & apply |
 | `TASK-107` | S | Epic H — History, removal ledger, suppression |
 | `TASK-118` | S | Epic J — Recovery |
 | `TASK-126` | M | Epic K — Platform, safety, and the shell |
@@ -49,7 +52,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-74 tasks cannot start yet.
+69 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -59,11 +62,6 @@ Not done, and every task they depend on is done.
 | `TASK-058` | `TASK-057` |
 | `TASK-059` | `TASK-058` |
 | `TASK-059b` | `TASK-058`, `TASK-067` |
-| `TASK-060` | `TASK-045` |
-| `TASK-061` | `TASK-060` |
-| `TASK-062` | `TASK-060` |
-| `TASK-063` | `TASK-057` |
-| `TASK-064` | `TASK-060`, `TASK-063` |
 | `TASK-065` | `TASK-064` |
 | `TASK-066` | `TASK-065` |
 | `TASK-067` | `TASK-065` |
@@ -105,7 +103,7 @@ Not done, and every task they depend on is done.
 | `TASK-104` | `TASK-103` |
 | `TASK-105` | `TASK-103`, `TASK-083` |
 | `TASK-108` | `TASK-103`, `TASK-096` |
-| `TASK-109` | `TASK-074`, `TASK-060` |
+| `TASK-109` | `TASK-074` |
 | `TASK-110` | `TASK-109` |
 | `TASK-111` | `TASK-109` |
 | `TASK-112` | `TASK-074` |
@@ -181,6 +179,8 @@ Not done, and every task they depend on is done.
 | `TASK-055` | `packages/domain/src/extraction/` (contract + degraded projections) + `apps/api/src/extraction/` (recordings, `StubExtractor`, factory). `T-STUB-001a`…`r`, incl. the three fault tokens and byte-identical output over three runs. | `T-STUB-001` |
 | `TASK-056` | `AzureVisionExtractor` (`apps/api/src/extraction/azureVisionExtractor.ts`) + offline `msw` contract suite (`T-AI-033a`–`s`, recordings in `tests/fixtures/msw/vision/`) + static boundary gates (`T-AI-009a`–`j`, `T-AI-010a`–`d`). Retry/timeout policy is implemented LOCALLY with an injectable `sleep` and the SDK's own retry pipeline disabled, because two retry layers compose multiplicatively against a 5,000/month free tier. ⚠ In standalone `azure-vision-read` mode `extract()` always reports `crossCheck: 'llm-unavailable'` — the primary reader is deliberately not called, so the read genuinely was never corroborated, and reporting `ok` would let a strictly-worse read propose mass removals. The ADR-0001 Rev 1 revert path therefore runs in degraded mode (§2.2a) and withholds removals. `T-AI-009` request half + `T-AI-010` land here; the `LlmVisionExtractor` half of `T-AI-033` is TASK-056b. | `T-AI-009`, `T-AI-010`, `T-AI-033` |
 | `TASK-056b` | `LlmVisionExtractor` (`apps/api/src/extraction/llmVisionExtractor.ts`) + committed prompt/schema (`prompts.ts`) + offline `msw` contract suite (`T-AI-033t`–`an`, recordings in `tests/fixtures/msw/aoai/`) and the `openai` half of the boundary gate (`T-AI-010e`–`g`). ⚠ Three judgement calls, all load-bearing. (1) `finish_reason: 'length'` is checked BEFORE the body is parsed — the truncation fixture carries *valid JSON with one complete tile*, so a parse-first implementation returns one title and looks entirely successful. (2) A schema-invalid or non-JSON body is TERMINAL, not retried: §2.2's retry set is explicit and exclusive (429/5xx/network only), and at `temperature: 0` with a fixed seed and strict Structured Outputs a repeat is near-deterministic, so retrying would spend the batch ceiling to get the same answer. (3) In standalone `llm-vision` mode `extract()` reports `crossCheck: 'ocr-unavailable'`, which — deliberately unlike TASK-056's `llm-unavailable` — still PERMITS removals: the primary, higher-quality reader did run, so a title's absence is evidence. SDK retry is disabled (`maxRetries: 0`) and §2.2's policy implemented locally with an injectable `sleep`, for the same multiplicative reason as TASK-056. | `T-AI-011b`, `T-AI-033`, `T-AI-040`, `T-AI-044` |
+| `TASK-060` | `packages/domain/src/matching/tmdbMatcher.ts` + `packages/domain/test/tmdbMatcher.spec.ts` (20 tests) — deterministic TMDB scoring on the SHARED `jaroWinkler` (`extraction/jaroWinkler.ts`), `MATCH_AUTO_THRESHOLD = 0.92`, `MATCH_REVIEW_FLOOR = 0.70`, `MATCH_AMBIGUITY_MARGIN = 0.05`, `YEAR_HINT_BONUS = 0.05`, `YEAR_HINT_PENALTY = 0.15`, `MATCH_ALTERNATIVES_LIMIT = 5`. `T-TMDB-010` (a–o), `T-TMDB-012` (a–e). Four mutations applied and each caught by its named test (year penalty dropped, tie-break reversed to the higher `tmdbId`, ambiguity-margin comparison flipped, alternatives cap removed). No ML and no AI call: pure string scoring, so RSK-022 cannot be reached from this module. `T-AI-010`/`T-AI-011` are extractor-boundary statics already covered by `tests/infra/extractionBoundaries.spec.ts` and `apps/api/test/unit/extraction/llmVisionExtractor.spec.ts`. ⚠ **Spec discrepancy reported, not silently resolved:** `specs/ai.md` §4 heads the matcher `apps/api/src/matching/tmdbMatcher.ts` while this row says `packages/domain/`; the backlog is the work order so the pure scoring half lives in the domain, and the deviation is documented in the file header — same resolution as TASK-056c/057. ⚠ **NOT done:** nothing calls the matcher yet; the TMDB query leg and persistence are TASK-061/062. **ahead-of:TASK-045** — deliberate: the matcher is pure string scoring over a `TmdbSearchResult` shape and imports nothing from the extractor; `apps/api/src/clients/tmdbClient.ts` already returns exactly that shape, so the module is complete and testable before TASK-045 closes. | `T-AI-010`, `T-AI-011`, `T-TMDB-010` |
+| `TASK-063` | `packages/domain/src/overlap.ts` + `packages/domain/test/overlap.spec.ts` (11 tests) — intra-batch overlap collapse per **SD-02**, ONE implementation parameterised by `pass`: pass A keys on `normalisedText` (pre-match), pass B on `resolvedWorkIdentity` (post-match). `T-AI-007` (a–k). Two mutations applied and each caught (survivor-ordering comparator reversed, losers silently dropped). **Losers are RETAINED, never deleted** — marked `reviewDisposition: 'discarded'` + `collapsedIntoCandidateId`, with `cleanupVerdict` untouched, so an owner can still see what was folded in; the survivor absorbs the union of `sourceImageIds`, the concatenated `boundingBoxes` and the max `ocrConfidence`. Empty/null keys never collapse (an `unreadable-tile` has `normalisedText === ''` and must not swallow every other unreadable tile). Already-collapsed candidates are skipped so pass B cannot re-parent a pass-A loser. ⚠ **Spec gap resolved explicitly:** SD-02's ordering tuple `(imageIndex, yTop, xLeft)` is NOT guaranteed unique, and `Array.prototype.sort` on ties is then order-dependent, so a candidate-id tie-break was added — without it the surviving candidate for a genuinely tied pair is undefined behaviour. Pure: returns new objects, mutates nothing. **ahead-of:TASK-057** — deliberate: `overlap.ts` consumes only the `ExtractionCandidate` shape from `packages/domain/src/types.ts`, never TASK-057's `cleanup()`; it passes `cleanupVerdict` through untouched, so it is complete and testable before the cleanup pass lands. | `T-AI-007` |
 | `TASK-101` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` |
 | `TASK-102` | `components/SuppressDialog.tsx` — `T-UX-085` (a–f), `T-UX-022` (a–l). The row is reported `pending` while the request is in flight and `suppressed` only once the server has persisted it, so a rejected request cannot leave a hidden row behind — `T-UX-085a` asserts `suppressed` is never reported **at all** on the failure path, which an optimistic-hide-then-reconcile implementation would not satisfy even though it ends on `present`. Undo goes back through the `suppressionId` the server returned (`supp:<workIdentity>`), never a row-scoped key (REQ-071); an idempotent 200 offers Close only, because nothing changed. Five mutations caught: optimistic hide before persistence (`T-UX-085a/e`, `T-UX-022d`), undo failure showing the row again (`T-UX-022f`), an idempotent 200 rendered as a fresh hide (`T-UX-022g`), the same 200 still offering Undo (`T-UX-022g`), and the undo affordance removed (`T-UX-022b/c/d/e/f/k`). Four invented copy constants live in the component, not `copy.ts`, each with a ⚠ FINDING note — see the spec defects below. | `T-UX-022`, `T-UX-085` |
 | `TASK-106` | `GET /api/suppressions` + `POST /api/suppressions/:suppressionId/unsuppress` in `apps/api/src/routes/suppressions.ts` (§6.7/§6.8) + `findSuppression`, `listActiveSuppressions` ordering, `identityStabilityOf`, `toSuppressionItem`. `T-SUP-020a`-`h`, `T-SUP-021a`-`i` (`apps/api/test/unit/suppressionsListRoute.spec.ts`, 17 cases); `T-SUP-020i`-`l`, `T-SUP-021j`-`n` (`apps/api/test/integration/suppressions.spec.ts`, 9 added cases). ⚠ **`restoredAnything` is a CONSTANT `false`, not a count, and must never become one** — un-suppression lifts a filter and restores nothing (product invariant 7). Computing it from the update count would make it true one day and silently turn an honest sentence in `ui.md` §7 into a false one; `T-SUP-021d` pins it across both counts. ⚠ `findSuppression` is deliberately **not** filtered on `active`: a second press from a stale page must be 200, not a 404 for a record that plainly exists (`T-SUP-021e`/`f`). The route resolves the path id to a **work identity** and deactivates on that (`T-SUP-021c`, invariant 1) — passing the path string through would answer 200 having changed nothing. Items are shaped field by field, never spread, so `migratedFrom` (a fix-matched title's previous identity) cannot leak (`T-SUP-020d`, asserted against the raw body). `T-SUP-020j` proves the suppressed view renders after the Title row itself is gone, which is the entire reason `displaySnapshot` is frozen at suppress time. | `T-SUP-020`, `T-SUP-021` |
