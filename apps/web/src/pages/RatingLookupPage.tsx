@@ -7,13 +7,16 @@
 // button - there is no capture path except a screenshot batch (REQ-001), and
 // a button here would create a second one.
 //
-// ⚠ THE LOOKUP IS INJECTED, NOT PERFORMED HERE. No other screen in this SPA
-// fetches yet; the data layer is still TASK-030's. Defaulting the prop to a
-// real `fetch` keeps this page working standalone without inventing a
-// convention that ListPage will later have to contradict - and it is what
-// lets `T-IMDB-008` drive every state without a server or a mock server.
+// ⚠ THE LOOKUP IS INJECTED SO THE TEST CAN DRIVE EVERY STATE. The default is
+// the shared client (REQ-097, `T-DATA-001`); it was a bare `fetch` here until
+// TASK-175, which is exactly the duplication REQ-097 exists to prevent — that
+// copy predated the client and knew nothing of the 401 redirect rule, so an
+// expired session on this screen showed a lookup failure instead of sending
+// the owner to sign in.
 
 import { useState, type FormEvent, type JSX } from 'react';
+
+import { apiClient } from '../lib/apiClient';
 
 import {
   IMDB_LOOKUP_BODY,
@@ -39,14 +42,9 @@ export interface RatingLookupResult {
 export type RatingLookupFn = (query: string) => Promise<RatingLookupResult | null>;
 
 async function defaultLookup(query: string): Promise<RatingLookupResult | null> {
-  const response = await fetch(`/api/imdb/lookup?q=${encodeURIComponent(query)}`, {
-    headers: { accept: 'application/json' },
-  });
-  // ⚠ 404 is a RESULT, not a failure. It means "no such title", and reporting
-  // it as an error would tell the owner nextup broke when in fact it answered.
-  if (response.status === 404) return null;
-  if (!response.ok) throw new Error(`lookup failed: ${response.status}`);
-  return (await response.json()) as RatingLookupResult;
+  // 404-is-a-result now lives in the client, so every future caller of the
+  // lookup inherits it rather than re-deciding it.
+  return apiClient.lookupImdb(query);
 }
 
 type State =

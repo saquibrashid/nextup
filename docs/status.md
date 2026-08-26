@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 86 |
+| ⬜ todo | 85 |
 | 🚧 doing | 7 |
-| ✅ done | 82 |
+| ✅ done | 83 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **178** |
@@ -37,7 +37,7 @@ Not done, and every task they depend on is done.
 | `TASK-161` | S | Epic B — Capture & import |
 | `TASK-162` | S | Epic B — Capture & import |
 | `TASK-166` | S | Epic F — The list itself (the value loop) |
-| `TASK-175` | S | Epic K — Platform, safety, and the shell |
+| `TASK-176` | S | Epic K — Platform, safety, and the shell |
 | `TASK-179` | S | Epic K — Platform, safety, and the shell |
 
 ## Waiting on the owner
@@ -50,7 +50,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-78 tasks cannot start yet.
+77 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -128,7 +128,6 @@ Not done, and every task they depend on is done.
 | `TASK-163` | `TASK-162` |
 | `TASK-164` | `TASK-080`, `TASK-162` |
 | `TASK-168` | `TASK-079`, `TASK-010` |
-| `TASK-176` | `TASK-175` |
 | `TASK-177` | `TASK-176` |
 | `TASK-178` | `TASK-177` |
 | `TASK-180` | `TASK-179` |
@@ -219,3 +218,4 @@ Not done, and every task they depend on is done.
 | `TASK-172` | this branch — service, job and the closed two-column writer | `T-IMDB-001`, `T-IMDB-007` |
 | `TASK-173` | this branch — `GET /api/imdb/lookup` | `T-IMDB-006` |
 | `TASK-174` | this branch — row rating, `/rating` screen, OMDb footer line | `T-ATTR-006`, `T-IMDB-008`, `T-UI-023a` |
+| `TASK-175` | this branch — `lib/apiClient.ts`; `T-DATA-001` caught the one real offender (the `/rating` page's own `fetch`, written before the client existed and unaware of the 401 rule) | `T-DATA-001`, `T-DATA-003`, `T-DATA-004`, `T-DATA-005`, `T-DATA-006`, `T-DATA-010` |
