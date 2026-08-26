@@ -216,11 +216,11 @@ export function registerBatchCandidateRoutes(
     const batchId = req.params.batchId ?? '';
     const candidateId = req.params.candidateId ?? '';
 
-    // Body BEFORE state, so a malformed request is a 400 regardless of what
-    // else is in flight. Reversed, the same bad body answers 400 or 409
-    // depending on unrelated state.
-    const patch = unwrap<CandidatePatch>(parseCandidatePatch(req.body));
-
+    // Existence and ownership BEFORE the body, matching every other write
+    // here (see `batchImages.ts`). `T-SEC-002g` walks every id-bearing route
+    // on the real router with another owner's ids and requires a flat 404;
+    // parsing first answers 400 for a foreign id, which is a different answer
+    // from the one a missing id gets and so is a disclosure.
     const batch = await requireReviewableBatch(ownerId, batchId);
 
     const row = await findExtractionCandidate(ownerId, candidateId);
@@ -229,6 +229,8 @@ export function registerBatchCandidateRoutes(
     if (row === null || row.batchId !== batch.id) {
       throw new AppError('NOT_FOUND', 404, 'No such candidate.');
     }
+
+    const patch = unwrap<CandidatePatch>(parseCandidatePatch(req.body));
 
     if (patch.kind === 'disposition') {
       await updateCandidateDisposition(ownerId, candidateId, {
@@ -255,11 +257,13 @@ export function registerBatchCandidateRoutes(
     const ownerId = requireOwnerId(req);
     const batchId = req.params.batchId ?? '';
 
+    // Ownership before the body, for the reason given on the PATCH above.
+    const batch = await requireReviewableBatch(ownerId, batchId);
+
     const section = unwrap<'additions' | 'unmatched' | 'alreadyOnYourList'>(
       parseConfirmAllSection(req.body),
     );
 
-    const batch = await requireReviewableBatch(ownerId, batchId);
     const { candidates } = await loadReviewCandidates(ownerId, batch.id, batch.service as Service);
 
     // ⚠ Sections are decided by the SAME code the review response uses. A

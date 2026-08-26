@@ -282,14 +282,41 @@ describe('T-REV-011 · per-item confirm, discard and re-pend', () => {
     expect(row?.reviewDisposition).toBe('pending');
   });
 
-  it('T-REV-011y: the body is validated BEFORE the batch state, so a bad body is always 400', async () => {
-    // Reversed, the same bad request answers 400 or 409 depending on unrelated
-    // state — untestable and unhelpful.
+  it('T-REV-011y: batch state is resolved BEFORE the body, so a foreign id cannot 400', async () => {
+    // ⚠ This assertion is the inverse of the one it replaces. The original
+    // ordering — body first, so a bad body is always 400 — failed `T-SEC-002g`,
+    // which walks every id-bearing route on the real router with another
+    // owner's ids and requires a flat 404. Parsing first answers 400 for a
+    // foreign batch id and 404 for a missing one, and that difference IS the
+    // disclosure the security walk exists to catch. Existence and ownership
+    // now come first, matching every other write route (`batchImages.ts`).
     const batchId = await makeBatch({ status: 'applied' });
     const candidateId = await makeCandidate(batchId);
 
     const res = await patchCandidate(batchId, candidateId, { disposition: 'applied' });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as ErrorBody).error.code).toBe('BATCH_NOT_IN_REVIEW');
+
+    // The accept half: on a batch that IS reviewable, the same bad body is
+    // still 400 — the state gate has not swallowed body validation whole.
+    const openBatch = await makeBatch();
+    const openCandidate = await makeCandidate(openBatch);
+    const bad = await patchCandidate(openBatch, openCandidate, { disposition: 'applied' });
+    expect(bad.status).toBe(400);
+  });
+
+  it('T-REV-011ay: an unknown batch id is 404, not a body-validation 400', async () => {
+    // The disclosure half of `T-SEC-002g` expressed locally: an id that does
+    // not resolve must answer the same way whether or not the body is valid.
+    const bad = await patchCandidate('bch_00000000000000000000000000', 'exc_missing', {
+      disposition: 'applied',
+    });
+    expect(bad.status).toBe(404);
+
+    const good = await patchCandidate('bch_00000000000000000000000000', 'exc_missing', {
+      disposition: 'confirmed',
+    });
+    expect(good.status).toBe(404);
   });
 
   it('T-REV-011z: a batch that is not in-review is 409 BATCH_NOT_IN_REVIEW', async () => {
