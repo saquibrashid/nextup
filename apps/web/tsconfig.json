@@ -10,6 +10,6 @@
     "noEmit": true,
     "composite": false
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts"],
   "references": [{ "path": "../../packages/domain" }]
 }
