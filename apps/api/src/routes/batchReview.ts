@@ -28,6 +28,7 @@ import {
   buildActiveListingIndex,
   buildReviewResponse,
   classifyWorkIdentity,
+  computeRemovals,
   type BatchMode,
   type CandidateBasis,
   type CandidateProvider,
@@ -196,21 +197,23 @@ export function registerBatchReviewRoutes(router: Router): void {
         .filter((c) => c.collapsedIntoCandidateId === null && c.resolvedWorkIdentity !== null)
         .map((c) => c.resolvedWorkIdentity as string),
     );
-    const disappearedListings = activeListings
-      .filter((listing) => !suppressed.has(listing.title.workIdentity))
-      .filter((listing) => !extracted.has(listing.title.workIdentity))
-      .map((listing) => ({
+    const disappearedListings = computeRemovals({
+      service,
+      activeListings: activeListings.map((listing) => ({
         listingId: listing.listingId,
         titleId: listing.titleId,
-        // An unmatched title has no TMDB name — its raw text IS its name, and
-        // rendering an empty string would offer the owner an anonymous row to
-        // tick. `T-UNM-011`.
-        name: listing.title.tmdbName ?? listing.title.rawExtractedText ?? '',
+        workIdentity: listing.title.workIdentity,
+        state: listing.state,
+        service: listing.service as Service,
+        tmdbName: listing.title.tmdbName,
+        rawExtractedText: listing.title.rawExtractedText,
         releaseYear: listing.title.tmdbReleaseYear,
         posterPath: listing.title.tmdbPosterPath,
-        service,
         dateAdded: toIsoDate(listing.dateAdded),
-      }));
+      })),
+      extractedWorkIdentities: extracted,
+      suppressed,
+    });
 
     // ⚠ `candidateCount` is the DATUM, and `null` (not extracted yet) and `0`
     // (extracted, found nothing) are DIFFERENT and both meaningful — US-006

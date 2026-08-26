@@ -42,6 +42,12 @@ interface ListingRow {
   listingId: string;
   titleId: string;
   service: string;
+  /**
+   * ⚠ Carried because `computeRemovals` (TASK-083) re-checks it. A stub that
+   * omits a column the route reads yields `undefined` and fails as though the
+   * implementation were broken.
+   */
+  state: string;
   dateAdded: Date;
   title: {
     workIdentity: string;
@@ -56,6 +62,7 @@ const makeListing = (listingId: string, workIdentity: string, name: string): Lis
   listingId,
   titleId: `t-${listingId}`,
   service: 'netflix',
+  state: 'active',
   dateAdded: new Date('2026-01-05T00:00:00Z'),
   title: {
     workIdentity,
@@ -354,6 +361,7 @@ describe('T-REV-010 · GET /review without a store', () => {
         listingId: 'l-3',
         titleId: 't-3',
         service: 'netflix',
+        state: 'active',
         dateAdded: new Date('2026-01-05T00:00:00Z'),
         title: {
           workIdentity: 'unmatched:0123456789abcdef',
