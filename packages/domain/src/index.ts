@@ -34,6 +34,9 @@ export * from './pixelGuard.js';
 // (`specs/api.md` §6.18, §6.19): what the owner is allowed to have meant.
 export * from './candidatePatch.js';
 export * from './close.js';
+// TASK-074 — provenance (REQ-068, US-031): how stored `batch_change` rows
+// fold back into the §3.7 three-array shape a batch undo reads.
+export * from './provenance.js';
 // TASK-065 — the pure half of the review response (`specs/api.md` §6.17):
 // section routing, the mode contract and removal withholding.
 export * from './review.js';

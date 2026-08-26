@@ -77,6 +77,12 @@ const store: {
   titleUpdates: { id: string; data: Record<string, unknown> }[];
   transitions: { to: string; extra: Record<string, unknown> | undefined }[];
   serviceState: { service: string; data: Record<string, unknown> }[];
+  changes: {
+    kind: string;
+    titleId: string | null;
+    listingId: string | null;
+    nextValue: string | null;
+  }[];
   transactions: number;
 } = {
   batch: null,
@@ -87,6 +93,7 @@ const store: {
   titleUpdates: [],
   transitions: [],
   serviceState: [],
+  changes: [],
   transactions: 0,
 };
 
@@ -136,6 +143,15 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
     upsertServiceState: (_ownerId: string, service: string, data: Record<string, unknown>) => {
       store.serviceState.push({ service, data });
       return Promise.resolve(undefined) as Promise<never>;
+    },
+    recordBatchChange: (_ownerId: string, data: Record<string, unknown>) => {
+      store.changes.push({
+        kind: data['kind'] as string,
+        titleId: (data['titleId'] as string | undefined) ?? null,
+        listingId: (data['listingId'] as string | undefined) ?? null,
+        nextValue: (data['nextValue'] as string | null | undefined) ?? null,
+      });
+      return Promise.resolve({ id: BigInt(store.changes.length) }) as Promise<never>;
     },
     transitionUploadBatchStatus: (
       _ownerId: string,
@@ -236,6 +252,7 @@ beforeEach(async () => {
   store.titleUpdates = [];
   store.transitions = [];
   store.serviceState = [];
+  store.changes = [];
   store.transactions = 0;
 
   const { createApp } = await import('../../src/app.js');
@@ -265,6 +282,11 @@ describe('T-REV-012 · POST /close without a store', () => {
     expect(store.listings[0]?.service).toBe('netflix');
     expect(store.transitions.map((t) => t.to)).toEqual(['applied']);
     expect(store.serviceState[0]?.service).toBe('netflix');
+    // TASK-074: the provenance rows are written in the SAME call as the
+    // mutation (REQ-068, US-031 AC-6) — one for the title, one for the
+    // listing. `T-PROV-001a` proves the atomicity; this pins that they are
+    // written at all, on the path a client actually takes.
+    expect(store.changes.map((c) => c.kind)).toEqual(['title_created', 'listing_added']);
     // Every write went through exactly one transaction call.
     expect(store.transactions).toBe(1);
   });

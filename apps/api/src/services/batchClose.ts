@@ -33,6 +33,7 @@
 import {
   applicableCandidates,
   discardedCount,
+  jsonScalar,
   pendingAdditionIds,
   ulid,
   workIdentityForUnmatched,
@@ -48,6 +49,7 @@ import {
   createTitle,
   findActiveSuppression,
   findTitleByWorkIdentity,
+  recordBatchChange,
   runInTransaction,
   updateTitle,
   upsertServiceState,
@@ -214,6 +216,21 @@ export async function closeBatch(
       if (existing === null || existing.state !== 'active') {
         titleId = await insertTitle(ownerId, tx, candidate, kind, workIdentity, batch.id, today);
         titlesCreated += 1;
+        // REQ-068 / US-031 AC-6. Written INSIDE the transaction, immediately
+        // after the mutation it describes: a change without provenance must
+        // not be persisted, and only sharing the transaction can guarantee
+        // that. A batch closed without this record can never be undone
+        // correctly later — the information does not exist anywhere else.
+        await recordBatchChange(
+          ownerId,
+          {
+            batchId: batch.id,
+            kind: 'title_created',
+            titleId,
+            nextValue: jsonScalar(workIdentity),
+          },
+          tx,
+        );
       } else {
         titleId = existing.id;
         // Product invariant 6: the title-level date is the EARLIEST across its
@@ -227,10 +244,11 @@ export async function closeBatch(
 
       if (kind === 'unresolved') unresolvedKept += 1;
 
+      const listingId = ulid();
       await createServiceListing(
         ownerId,
         {
-          listingId: ulid(),
+          listingId,
           titleId,
           service,
           state: 'active',
@@ -240,6 +258,16 @@ export async function closeBatch(
         tx,
       );
       listingsCreated += 1;
+      // §8.1: a listing added to an existing title is `created` with
+      // `titleWasCreated: false`; a listing on a title this batch created
+      // folds together with the row above into ONE §3.7 entry carrying both
+      // ids. `toBatchProvenance` does the folding, so the two flavours are
+      // distinguished in exactly one place.
+      await recordBatchChange(
+        ownerId,
+        { batchId: batch.id, kind: 'listing_added', titleId, listingId },
+        tx,
+      );
     }
 
     await transitionBatch(
