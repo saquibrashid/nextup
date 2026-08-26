@@ -62,34 +62,63 @@ transient TMDB outage forever" (§1.4).
 | GitHub secret | Required? | Value | Status |
 | --- | --- | --- | --- |
 | `TMDB_API_KEY` | **yes — deploy fails without it** | the **32-hex v3 key**, not the v4 token (§1.4) | ✅ set 2026-08-21 |
-| `ALLOWED_SUBJECTS` | no, but nobody can sign in without it | comma-separated Entra subject ids | ⬜ **outstanding** |
+| `ALLOWED_SUBJECTS` | no, but nobody can sign in without it | comma-separated Entra subject ids — the **user** `oid`, never the app `clientId` | ✅ set 2026-08-26 (was wrongly the client id 08-21 → 08-26) |
 
 **To find your subject id.** It is the Entra **object id** (`oid`), not a
 sign-in address — `apps/api/src/auth/principal.ts` reads the
 `objectidentifier` claim and falls back to `sub`, and `T-SEC-015` fails
-on the word "email" appearing in the allow-list path at all. Sign in and
-read:
+on the word "email" appearing in the allow-list path at all.
 
+🛑 **`/.auth/me` DOES NOT WORK ON THIS DEPLOYMENT. Do not send anyone to
+it.** That endpoint reads the Easy Auth **token store**, and
+`aca.bicep`'s `login.tokenStore.enabled` is deliberately **`false`** (it
+would persist C3 identity material, and enabling it without a configured
+blob store breaks sign-in outright). With the store off, `/.auth/me`
+returns nothing and the request falls through to the SPA catch-all — so
+you get the **application's own refusal page**, which looks exactly like
+a failed sign-in and tells you nothing. Observed 2026-08-26; cost a
+round trip to diagnose.
+
+**Use bootstrap mode instead — it is the only supported way to read your
+own `oid` here.** It logs the refused subject id and **grants nothing**
+(`T-SEC-016`); the request is still refused.
+
+```powershell
+# 1. Turn it on (creates one extra revision).
+az containerapp update --name ca-nextup-staging --resource-group nextup-rg `
+  --set-env-vars NEXTUP_BOOTSTRAP_ALLOW_FIRST=true
+
+# 2. Sign in to the site once, with the account you actually intend to use.
+# 3. Read the id back out.
+az containerapp logs show --name ca-nextup-staging --resource-group nextup-rg `
+  --tail 200 | Select-String "Refused subject id"
 ```
-https://ca-nextup-prod.purplebush-4ede0f22.eastus2.azurecontainerapps.io/.auth/me
-```
 
-Easy Auth serves that itself, ahead of application code, so it works
-while the allow-list is empty and refusing every request.
+You do **not** need to turn it off by hand: `NEXTUP_BOOTSTRAP_ALLOW_FIRST`
+is set nowhere in `infra/`, and `template.containers[].env` is declarative,
+so the next `deploy` run removes it automatically.
 
-⚠ **Prefer `/.auth/me` over looking the user up in the portal.**
-`aca.bicep` pins the issuer to the `/common` endpoint, so the account you
-actually sign in with decides which `oid` you get — a personal Microsoft
-account and a work account are different objects with different ids. The
-portal shows the id of the user you searched for; `/.auth/me` shows the
-id of whoever signed in. When they differ, the portal value locks you out
-of your own deployment.
+⚠ **Never take the value from the Azure portal.** `aca.bicep` pins the
+issuer to the `/common` endpoint, so the account you actually sign in
+with decides which `oid` you get — a personal Microsoft account and a
+work account are different objects with different ids. The portal shows
+the id of the user you searched for; bootstrap mode shows the id of
+whoever actually signed in. When they differ, the portal value locks you
+out of your own deployment.
 
-⚠ `allowList.ts` also has a bootstrap mode
-(`NEXTUP_BOOTSTRAP_ALLOW_FIRST=true` logs the refused subject id and
-still refuses it). It is **set nowhere in `infra/`**, so using it needs a
-manual `az containerapp update` and an extra revision. `/.auth/me` yields
-the same value with no deployment change.
+⚠ **The subject id is NOT the `clientId`, and confusing the two is the
+failure this checklist has already seen.** From 2026-08-21 to 2026-08-26
+`ALLOWED_SUBJECTS` held `b374ba10-…`, the Entra **application** id — a
+plausible-looking GUID that is already in `ENTRA_CLIENT_ID` and in the
+`authConfig`. No human being will ever present it as a subject, so
+sign-in succeeded and authorisation refused **every** request, with the
+same 403 an empty list produces. A deploy-time guard now rejects the
+equality (`deploy.yml`, "Guard: allow-list is not the client id").
+
+~~Superseded: "Sign in and read
+`https://ca-nextup-prod…/.auth/me`. Easy Auth serves that itself, ahead
+of application code, so it works while the allow-list is empty."
+Falsified — the token store is off, so that URL renders the SPA.~~
 
 🛑 **Still not wired: `DATABASE_URL`.** Its shape is `TASK-141`'s open
 decision — managed identity (preferred) versus a Key Vault SQL login —
