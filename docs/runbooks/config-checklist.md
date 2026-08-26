@@ -62,7 +62,7 @@ transient TMDB outage forever" (§1.4).
 | GitHub secret | Required? | Value | Status |
 | --- | --- | --- | --- |
 | `TMDB_API_KEY` | **yes — deploy fails without it** | the **32-hex v3 key**, not the v4 token (§1.4) | ✅ set 2026-08-21 |
-| `ALLOWED_SUBJECTS` | no, but nobody can sign in without it | comma-separated Entra subject ids — the **user** `oid`, never the app `clientId` | ✅ set 2026-08-26 (was wrongly the client id 08-21 → 08-26) |
+| `ALLOWED_SUBJECTS` | no, but nobody can sign in without it | **exactly one** Entra **user** `oid` — never the app `clientId`, and never two accounts belonging to the same human (each is a separate owner) | ✅ set 2026-08-26 to the owner's personal-account `oid` |
 
 **To find your subject id.** It is the Entra **object id** (`oid`), not a
 sign-in address — `apps/api/src/auth/principal.ts` reads the
@@ -97,6 +97,50 @@ az containerapp logs show --name ca-nextup-staging --resource-group nextup-rg `
 You do **not** need to turn it off by hand: `NEXTUP_BOOTSTRAP_ALLOW_FIRST`
 is set nowhere in `infra/`, and `template.containers[].env` is declarative,
 so the next `deploy` run removes it automatically.
+
+⚠ **ONE HUMAN CAN HAVE TWO OBJECT IDS, AND THEY ARE TWO DIFFERENT
+OWNERS. Allow-list exactly one.** This is the failure that followed the
+one above, on 2026-08-26, and it is far more dangerous than a lockout.
+
+Because `aca.bicep` pins the issuer to `/common`, the owner's **personal
+Microsoft account** and their **work/AAD account** are separate directory
+objects with separate `oid`s. Both are "him". Neither is wrong. But
+`auth/ownerId.ts` derives
+
+    ownerId = 'o_' + sha256(issuer + '|' + subject).slice(0, 16)
+
+so **each account is a completely separate owner with its own isolated
+data**. Measured directly against the real middleware: the same person
+signing in with his two accounts produced `o_3b62f52aebafd6ab` and
+`o_8a73340be951b1e3`.
+
+Putting both in `ALLOWED_SUBJECTS` therefore does **not** give one owner
+two ways in. It creates **two owners with two empty lists**, and lets a
+browser silently pick either. `ownerId.ts` names this exact outcome as
+the worst possible failure mode: the owner "would silently see an empty
+list rather than an error… indistinguishable from data loss, and
+invisible to every test that uses one identity." Uploads filed under the
+wrong owner cannot be merged back afterwards.
+
+**Telling the two apart from the id alone:**
+
+| Shape | Account type |
+| --- | --- |
+| `00000000-0000-0000-xxxx-xxxxxxxxxxxx` (zero-padded) | personal Microsoft account |
+| a fully random GUID | work / school (AAD) |
+
+⚠ **A browser will silently reuse whichever account it is already signed
+into**, so "I signed in and got refused" does not tell you *which*
+identity was presented — the two sign-ins during this incident produced
+two different ids without the owner choosing either. **An InPrivate /
+incognito window is the reliable way to get a clean, deliberate signal**;
+that is how the correct id was finally captured.
+
+nextup is a single-owner product and its data is personal media history,
+so the personal account is the correct owner and the work account is
+deliberately **not** on the list. Signing in from a browser defaulted to
+the work account will be refused — that is working as intended; use
+**Sign out** on the refusal page and pick the personal account.
 
 ⚠ **Never take the value from the Azure portal.** `aca.bicep` pins the
 issuer to the `/common` endpoint, so the account you actually sign in
