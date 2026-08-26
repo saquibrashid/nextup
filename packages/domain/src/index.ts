@@ -4,6 +4,8 @@
 // pure: no I/O, no Prisma, no Express, no React.
 
 export * from './attribution.js';
+// TASK-064 — new vs already-present, PER SERVICE (`specs/ai.md` §6.1, REQ-010).
+export * from './classify.js';
 export * from './copy.js';
 export * from './derive.js';
 export * from './enums.js';
