@@ -31,6 +31,7 @@ import { resetAllowListWarning } from '../../src/middleware/allowList.js';
 const OID = 'http://schemas.microsoft.com/identity/claims/objectidentifier';
 const SUBJECT = 'oid-owner-close-unit';
 const DUNE = 'tmdb:movie:438631';
+const HEAT = 'tmdb:movie:949';
 
 interface BatchRow {
   id: string;
@@ -124,6 +125,8 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
         id: data['titleId'] as string,
         workIdentity: data['workIdentity'] as string,
         state: 'active',
+        tmdbId: (data['tmdbId'] as number | undefined) ?? null,
+        tmdbName: (data['tmdbName'] as string | null | undefined) ?? null,
         sortDateAdded: data['sortDateAdded'] as Date,
       });
       return Promise.resolve({ id: data['titleId'] as string });
@@ -149,6 +152,8 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
         kind: data['kind'] as string,
         titleId: (data['titleId'] as string | undefined) ?? null,
         listingId: (data['listingId'] as string | undefined) ?? null,
+        attr: (data['attr'] as string | null | undefined) ?? null,
+        prevValue: (data['prevValue'] as string | null | undefined) ?? null,
         nextValue: (data['nextValue'] as string | null | undefined) ?? null,
       });
       return Promise.resolve({ id: BigInt(store.changes.length) }) as Promise<never>;
@@ -289,6 +294,36 @@ describe('T-REV-012 · POST /close without a store', () => {
     expect(store.changes.map((c) => c.kind)).toEqual(['title_created', 'listing_added']);
     // Every write went through exactly one transaction call.
     expect(store.transactions).toBe(1);
+  });
+
+  it('T-REV-012as: a corrected candidate stores the CORRECTED title and a modified record', async () => {
+    // The row a real correction leaves: `resolvedWorkIdentity` is the owner's
+    // choice, `matchCandidates` still holds the pipeline's rejected match.
+    makeCandidate({
+      resolvedWorkIdentity: HEAT,
+      correctedToTmdbId: 949,
+      reviewDisposition: 'corrected',
+    });
+
+    const res = await closeBatch('batch-1');
+    expect(res.status).toBe(200);
+
+    expect(store.titles[0]?.workIdentity).toBe(HEAT);
+    // Not 438631 — the identity and the metadata must name the same work, or
+    // the owner sees the title they corrected away from.
+    expect(store.titles[0]?.tmdbId).toBe(949);
+    expect(store.titles[0]?.tmdbName).toBeNull();
+
+    expect(store.changes.map((c) => c.kind)).toEqual([
+      'title_created',
+      'attr_modified',
+      'listing_added',
+    ]);
+    expect(store.changes[1]).toMatchObject({
+      attr: 'workIdentity',
+      prevValue: JSON.stringify(DUNE),
+      nextValue: JSON.stringify(HEAT),
+    });
   });
 
   it('T-REV-012aj: a pending addition refuses with 409 PENDING_ADDITIONS and writes nothing', async () => {

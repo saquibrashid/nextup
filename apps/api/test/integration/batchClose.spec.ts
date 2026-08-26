@@ -179,6 +179,14 @@ async function makeCandidate(
     verdict?: string;
     disposition?: string;
     tmdbId?: number;
+    /**
+     * The pipeline's own top match, when it differs from the resolved identity
+     * — i.e. what a REAL correction leaves behind, because applying one
+     * rewrites `resolvedWorkIdentity` and deliberately never touches
+     * `matchCandidates`. `null` means the pipeline proposed nothing.
+     */
+    originalTmdbId?: number | null;
+    originalName?: string;
     collapsedInto?: string | null;
   } = {},
 ): Promise<string> {
@@ -186,6 +194,8 @@ async function makeCandidate(
   const workIdentity = over.workIdentity === undefined ? DUNE : over.workIdentity;
   const tmdbId = over.tmdbId ?? Number(workIdentity?.split(':')[2] ?? 0);
   const matched = workIdentity?.startsWith('tmdb:') === true;
+  const altTmdbId =
+    over.originalTmdbId === undefined ? (matched ? tmdbId : null) : over.originalTmdbId;
 
   await testPrisma().extractionCandidate.create({
     data: {
@@ -203,18 +213,19 @@ async function makeCandidate(
       resolvedWorkIdentity: workIdentity,
       reviewDisposition: over.disposition ?? 'pending',
       collapsedIntoCandidateId: over.collapsedInto ?? null,
-      matchCandidates: matched
-        ? JSON.stringify([
-            {
-              tmdbId,
-              mediaType: 'movie',
-              name: over.rawText ?? 'Dune',
-              releaseYear: 2021,
-              posterPath: '/dune.jpg',
-              score: 1,
-            },
-          ])
-        : null,
+      matchCandidates:
+        altTmdbId === null
+          ? null
+          : JSON.stringify([
+              {
+                tmdbId: altTmdbId,
+                mediaType: 'movie',
+                name: over.originalName ?? over.rawText ?? 'Dune',
+                releaseYear: 2021,
+                posterPath: '/dune.jpg',
+                score: 1,
+              },
+            ]),
     },
   });
   return id;
@@ -763,5 +774,171 @@ describe('T-PROV-001 · a change without provenance is never persisted (US-031 A
     // Exactly two rows — `title_created` and `listing_added` — not four. The
     // failed attempt left nothing behind to be counted twice.
     expect(await testPrisma().batchChange.count({ where: { batchId } })).toBe(2);
+  });
+});
+
+describe('T-PROV-012 · a correction made in review is recorded as modified (REQ-068, §8.1)', () => {
+  const provenanceFor = async (batchId: string) =>
+    toBatchProvenance(await testPrisma().batchChange.findMany({ where: { batchId } }));
+
+  it('T-PROV-012h: a corrected candidate records attr workIdentity with the pipeline match as `before`', async () => {
+    const batchId = await makeBatch();
+    // What a real correction leaves on the row: the resolved identity is the
+    // owner's (Heat), `matchCandidates` still holds the pipeline's (Dune).
+    await makeCandidate(batchId, {
+      workIdentity: HEAT,
+      rawText: 'Heat',
+      disposition: 'corrected',
+      originalTmdbId: 438631,
+      originalName: 'Dune',
+    });
+
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+
+    const title = await testPrisma().title.findFirst({ where: { workIdentity: HEAT } });
+    expect(await provenanceFor(batchId)).toEqual({
+      created: [
+        {
+          titleId: title?.id,
+          listingId: expect.any(String) as unknown as string,
+          titleWasCreated: true,
+        },
+      ],
+      modified: [{ titleId: title?.id, attr: 'workIdentity', before: DUNE, after: HEAT }],
+      removed: [],
+    });
+  });
+
+  it('T-PROV-012i: the title is built from the CORRECTED identity, not the rejected match', async () => {
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, {
+      workIdentity: HEAT,
+      rawText: 'Heat',
+      disposition: 'corrected',
+      originalTmdbId: 438631,
+      originalName: 'Dune',
+    });
+
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+
+    const title = await testPrisma().title.findFirst({ where: { workIdentity: HEAT } });
+    // ⚠ The regression this guards: reading `alternatives[0]` for the metadata
+    // stored a row whose identity said Heat and whose tmdbId, name and poster
+    // all still said Dune — the very title the owner had just corrected away
+    // from, under an identity suppression and dedup would never match.
+    expect(title?.tmdbId).toBe(949);
+    expect(title?.tmdbMediaType).toBe('movie');
+    // Nothing knows Heat's name yet: the correction carries only an id and a
+    // media type. Left null with `tmdbFetchedAt` null, the lazy refresh
+    // (REQ-076, NFR-014) fills it on first access rather than a wrong name
+    // being invented here.
+    expect(title?.tmdbName).toBeNull();
+    expect(title?.tmdbPosterPath).toBeNull();
+    expect(title?.tmdbFetchedAt).toBeNull();
+  });
+
+  it('T-PROV-012j: a correction from an unmatched candidate records before as null', async () => {
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, {
+      workIdentity: HEAT,
+      rawText: 'Heat',
+      disposition: 'corrected',
+      originalTmdbId: null,
+    });
+
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+
+    const provenance = await provenanceFor(batchId);
+    // `null`, not the `unmatched:` hash: the row never actually held one, and
+    // recording a value it never had would make undo restore a fiction.
+    expect(provenance.modified).toEqual([
+      {
+        titleId: expect.any(String) as unknown as string,
+        attr: 'workIdentity',
+        before: null,
+        after: HEAT,
+      },
+    ]);
+  });
+
+  it('T-PROV-012k: a confirmed candidate the owner did not correct records nothing modified', async () => {
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, { disposition: 'confirmed' });
+
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+    expect((await provenanceFor(batchId)).modified).toEqual([]);
+  });
+
+  it('T-PROV-012l: a correction that lands back on the pipeline match records nothing modified', async () => {
+    const batchId = await makeBatch();
+    // The owner opened the picker and chose the title already proposed.
+    await makeCandidate(batchId, { disposition: 'corrected' });
+
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+    expect((await provenanceFor(batchId)).modified).toEqual([]);
+  });
+
+  it('T-PROV-012n: a keep-anyway unmatched title records nothing modified', async () => {
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, {
+      workIdentity: 'unmatched:0123456789abcdef',
+      rawText: 'Some Obscure Film',
+      disposition: 'confirmed',
+    });
+
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+    // ⚠ The owner corrected nothing here — the pipeline simply matched
+    // nothing. Recording this as `modified` (from null to the hash) would make
+    // an ordinary keep-anyway batch permanently un-undoable, because SD-03's
+    // creates-only undo refuses any batch that modified something.
+    expect((await provenanceFor(batchId)).modified).toEqual([]);
+  });
+
+  it('T-PROV-012m: the modified row is written INSIDE the close transaction', async () => {
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, {
+      workIdentity: HEAT,
+      rawText: 'Heat',
+      disposition: 'corrected',
+      originalTmdbId: 438631,
+    });
+
+    failProvenance = true;
+    expect((await closeBatchRequest(batchId)).status).toBe(500);
+    failProvenance = false;
+
+    expect(await testPrisma().batchChange.count({ where: { batchId } })).toBe(0);
+    expect(await countTitles()).toBe(0);
+  });
+});
+
+describe('T-PROV-013 · edits made OUTSIDE a batch write no batch provenance (US-031 AC-5)', () => {
+  const post = (path: string, body: unknown = {}): Promise<Response> =>
+    fetch(`${origin}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', [CLIENT_PRINCIPAL_HEADER]: principalHeader },
+      body: JSON.stringify(body),
+    });
+
+  it('T-PROV-013a: suppressing a title writes no batch_change row', async () => {
+    const titleId = await seedListing(DUNE, 'Dune', 'netflix');
+
+    expect((await post(`/api/titles/${titleId}/suppress`)).status).toBe(200);
+
+    // There is no batch to attribute it to — `batch_change.batch_id` is NOT
+    // NULL, so an out-of-batch edit cannot be recorded there even in
+    // principle. The batch history must not grow a phantom entry for an edit
+    // the owner made from the list.
+    expect(await testPrisma().batchChange.count()).toBe(0);
+  });
+
+  it('T-PROV-013b: un-suppressing writes no batch_change row either', async () => {
+    const titleId = await seedListing(HEAT, 'Heat', 'netflix');
+    expect((await post(`/api/titles/${titleId}/suppress`)).status).toBe(200);
+
+    const suppression = await testPrisma().suppression.findFirst({ where: { workIdentity: HEAT } });
+    expect((await post(`/api/suppressions/${suppression?.id}/unsuppress`)).status).toBe(200);
+
+    expect(await testPrisma().batchChange.count()).toBe(0);
   });
 });
