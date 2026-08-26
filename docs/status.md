@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 72 |
+| ⬜ todo | 71 |
 | 🚧 doing | 8 |
-| ✅ done | 95 |
+| ✅ done | 96 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **178** |
@@ -38,7 +38,10 @@ Not done, and every task they depend on is done.
 | `TASK-072` | M | Epic B — Capture & import |
 | `TASK-076` | S | Epic I — Provenance |
 | `TASK-080` | M | Epic K — Platform, safety, and the shell |
-| `TASK-081` | M | Epic E — Review & apply |
+| `TASK-082` | S | Epic E — Review & apply |
+| `TASK-083` | M | Epic E — Review & apply |
+| `TASK-092` | XS | Epic E — Review & apply |
+| `TASK-093` | S | Epic E — Review & apply |
 | `TASK-103` | M | Epic D — Matching & identity |
 | `TASK-107` | S | Epic H — History, removal ledger, suppression |
 | `TASK-109` | M | Epic J — Recovery |
@@ -61,7 +64,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-54 tasks cannot start yet.
+50 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -77,8 +80,6 @@ Not done, and every task they depend on is done.
 | `TASK-078` | `TASK-057` |
 | `TASK-079` | `TASK-078` |
 | `TASK-079b` | `TASK-079` |
-| `TASK-082` | `TASK-081` |
-| `TASK-083` | `TASK-081` |
 | `TASK-084` | `TASK-083`, `TASK-077` |
 | `TASK-085` | `TASK-083` |
 | `TASK-086` | `TASK-085` |
@@ -87,8 +88,6 @@ Not done, and every task they depend on is done.
 | `TASK-089` | `TASK-088` |
 | `TASK-090` | `TASK-088` |
 | `TASK-091` | `TASK-090` |
-| `TASK-092` | `TASK-081` |
-| `TASK-093` | `TASK-081` |
 | `TASK-094` | `TASK-088` |
 | `TASK-095` | `TASK-088` |
 | `TASK-096` | `TASK-095` |
@@ -112,7 +111,7 @@ Not done, and every task they depend on is done.
 | `TASK-124` | `TASK-123` |
 | `TASK-125` | `TASK-123` |
 | `TASK-127` | `TASK-126` |
-| `TASK-129` | `TASK-070`, `TASK-081` |
+| `TASK-129` | `TASK-070` |
 | `TASK-130` | `TASK-124`, `TASK-108` |
 | `TASK-131` | `TASK-044` |
 | `TASK-157` | `TASK-010` |
@@ -181,6 +180,7 @@ Not done, and every task they depend on is done.
 | `TASK-071` | `POST /batches/:batchId/close`. Pure close grammar in `packages/domain/src/close.ts`; the transactional apply in `apps/api/src/services/batchClose.ts`. Refuses a pending addition with 409 `PENDING_ADDITIONS` before opening the transaction (no accept by inaction, REQ-014). Applies `confirmed` and `corrected` under the corrected identity, keeps unmatched confirmations as unresolved titles (US-008), re-checks the suppression gate INSIDE the transaction on work identity (REQ-071), keeps the earliest `sortDateAdded`, and writes only this batch's service. Removals stay untouched (REQ-020) until TASK-083–086. Proven by `T-REV-012` across three layers, including a mid-transaction fault injection that proves rollback, and mutation-tested: 10/10 mutants killed. | `T-REV-011`, `T-REV-012` |
 | `TASK-074` | Provenance (REQ-068, US-031). Close writes a `batch_change` row for every title it creates and every listing it adds, INSIDE the same transaction as the mutation — `T-PROV-001` injects a provenance failure and proves the whole close rolls back, so a change without provenance is never persisted (US-031 AC-6). `packages/domain/src/provenance.ts` folds stored rows back into the `specs/data-model.md` §3.7 three-array shape, folding a title and its listing into ONE `created` entry so a creates-only undo cannot double-count. `createdByBatchId` is set on both records and never rewritten on a title an earlier batch created. Proven by `T-PROV-010`, `T-PROV-011`, `T-PROV-012` and `T-PROV-001`; mutation-tested, 10/10 mutants killed. `provenance.modified` for in-review corrections and the removal write path remain TASK-075 and TASK-083–086. | `T-PROV-001`, `T-PROV-010`, `T-PROV-011` |
 | `TASK-075` | `provenance.modified` for in-review corrections (REQ-068, §8.1). A corrected candidate now records an `attr_modified` row for `workIdentity` inside the close transaction, carrying the pipeline's own top match as the BEFORE value — read from `matchCandidates`, because applying a correction overwrites `resolvedWorkIdentity` and that column is the only surviving record of what was proposed. A pipeline that proposed nothing records `before: null` rather than an `unmatched:` hash the row never held, and a keep-anyway unmatched title records nothing modified at all (recording it would make an ordinary batch permanently un-undoable under SD-03's creates-only rule). ⚠ Fixed a defect this uncovered in TASK-071: the title was built from `alternatives[0]`, so a correction stored a row whose `work_identity` named the owner's choice while its `tmdb_id`, name and poster still named the title they had just rejected — `title_match_coherent` checks null-ness, not agreement, so nothing refused it. Metadata is now chosen BY IDENTITY, with the display fields left null for the lazy refresh (REQ-076) when the corrected target is not among the alternatives. `T-PROV-013` proves suppress and un-suppress write no `batch_change` row at all (US-031 AC-5). Proven by `T-PROV-012`, `T-PROV-013` and `T-REV-012`; mutation-tested, 10/10 mutants killed. | `T-PROV-012`, `T-PROV-013` |
+| `TASK-081` | `apps/api/test/integration/batchReview.spec.ts` — six new cases, `T-UI-006` (a–f), taking the file to 25. Six mutations applied and each caught (`omitted` hard-coded true; `omitted` derived from the section being EMPTY rather than from the mode; an omitted section still shipping its `items`; an omitted section still reporting a `count`; withheld removals dragging the known titles down with them; the review filtering out already-decided candidates). ⚠ **No source change was needed and none was made — the mode contract was already built, correctly, by TASK-065.** What was missing was the named test for US-013 AC-3, and under NFR-003 an unasserted invariant is not done. This is the AC→test mapping doing its job: the behaviour was right, the *proof* was absent, and the two mutants that had no killer before this task (`omitted` from emptiness, and withheld-removals suppressing the known titles) are both plausible refactors a future task could land silently. `T-UI-006` is level `I` in `specs/testing.md` L908 — integration only, no component half — so `apps/web` is untouched. ⚠ **The load-bearing case is `T-UI-006c`: an EMPTY full-update section is `omitted: false, count: 0`, NOT omitted.** `omitted: true` answers "this question does not apply to this batch"; `omitted: false, count: 0` answers "we looked, and nothing here is already on your list". Collapsing the two is exactly how a failed extraction of a known title comes to read as a removal — product invariant 2 — and no test distinguished them before. `T-UI-006b` is its discriminating twin: the SAME fixture data in full-update fills the section, so `omitted` cannot be satisfied by any function of the data alone. `T-UI-006d` iterates every section of the response rather than the two we know about, because a section the client is told not to render but which still carries rows is a leak waiting for the first client that trusts `items` over `omitted`; it embeds the section name in the expected string so a failure names the offender instead of reporting `1 !== 0`. `T-UI-006e` pairs `alreadyOnYourList` against a WITHHELD removals section — the two are both full-update-only and computed from the same read, making them the pair most likely to be conflated, and the owner must still see what was recognised even when nothing can be removed. `T-UI-006f` pins that the review never filters by disposition: the page is re-read after every decision, so a disposition filter would empty it as the owner worked through it, and in full-update a confirmed known title would look extracted-and-then-lost on the next read. `makeCandidate` gained a `disposition` override for that last case (previously the fixture could only produce `pending`, or `discarded` as a side effect of SD-02 collapse). | `T-REV-006`, `T-UI-006` |
 | `TASK-101` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` | `T-SUP-001`, `T-SUP-010`, `T-SUP-012`, `T-SUP-013`, `T-SUP-014` |
 | `TASK-102` | `components/SuppressDialog.tsx` — `T-UX-085` (a–f), `T-UX-022` (a–l). The row is reported `pending` while the request is in flight and `suppressed` only once the server has persisted it, so a rejected request cannot leave a hidden row behind — `T-UX-085a` asserts `suppressed` is never reported **at all** on the failure path, which an optimistic-hide-then-reconcile implementation would not satisfy even though it ends on `present`. Undo goes back through the `suppressionId` the server returned (`supp:<workIdentity>`), never a row-scoped key (REQ-071); an idempotent 200 offers Close only, because nothing changed. Five mutations caught: optimistic hide before persistence (`T-UX-085a/e`, `T-UX-022d`), undo failure showing the row again (`T-UX-022f`), an idempotent 200 rendered as a fresh hide (`T-UX-022g`), the same 200 still offering Undo (`T-UX-022g`), and the undo affordance removed (`T-UX-022b/c/d/e/f/k`). Four invented copy constants live in the component, not `copy.ts`, each with a ⚠ FINDING note — see the spec defects below. | `T-UX-022`, `T-UX-085` |
 | `TASK-106` | `GET /api/suppressions` + `POST /api/suppressions/:suppressionId/unsuppress` in `apps/api/src/routes/suppressions.ts` (§6.7/§6.8) + `findSuppression`, `listActiveSuppressions` ordering, `identityStabilityOf`, `toSuppressionItem`. `T-SUP-020a`-`h`, `T-SUP-021a`-`i` (`apps/api/test/unit/suppressionsListRoute.spec.ts`, 17 cases); `T-SUP-020i`-`l`, `T-SUP-021j`-`n` (`apps/api/test/integration/suppressions.spec.ts`, 9 added cases). ⚠ **`restoredAnything` is a CONSTANT `false`, not a count, and must never become one** — un-suppression lifts a filter and restores nothing (product invariant 7). Computing it from the update count would make it true one day and silently turn an honest sentence in `ui.md` §7 into a false one; `T-SUP-021d` pins it across both counts. ⚠ `findSuppression` is deliberately **not** filtered on `active`: a second press from a stale page must be 200, not a 404 for a record that plainly exists (`T-SUP-021e`/`f`). The route resolves the path id to a **work identity** and deactivates on that (`T-SUP-021c`, invariant 1) — passing the path string through would answer 200 having changed nothing. Items are shaped field by field, never spread, so `migratedFrom` (a fix-matched title's previous identity) cannot leak (`T-SUP-020d`, asserted against the raw body). `T-SUP-020j` proves the suppressed view renders after the Title row itself is gone, which is the entire reason `displaySnapshot` is frozen at suppress time. | `T-SUP-020`, `T-SUP-021` |
