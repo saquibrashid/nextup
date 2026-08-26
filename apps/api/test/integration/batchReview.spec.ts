@@ -477,7 +477,7 @@ describe('T-SUP-002 suppression is gated BEFORE classification and never appears
     expect(body.sections.unmatched.count).toBe(0);
   });
 
-  it('T-SUP-005a: suppression applies to unmatched: identities with no branch on prefix', async () => {
+  it('T-SUP-006a: an unmatched: identity is suppressible and gated identically — no branch on prefix', async () => {
     const batchId = await makeBatch();
     const raw = 'unmatched:9f2b1c4d5e6f7a80';
     await suppress(raw);
