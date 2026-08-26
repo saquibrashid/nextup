@@ -119,6 +119,7 @@ async function makeCandidate(
     rawText?: string;
     verdict?: string;
     collapsedInto?: string | null;
+    disposition?: string;
   } = {},
 ): Promise<string> {
   const id = `cand-${++candidateSeq}`;
@@ -136,7 +137,7 @@ async function makeCandidate(
       boxSource: 'llm',
       cleanupVerdict: over.verdict ?? 'title-candidate',
       resolvedWorkIdentity: over.workIdentity === undefined ? DUNE : over.workIdentity,
-      reviewDisposition: over.collapsedInto == null ? 'pending' : 'discarded',
+      reviewDisposition: over.disposition ?? (over.collapsedInto == null ? 'pending' : 'discarded'),
       collapsedIntoCandidateId: over.collapsedInto ?? null,
     },
   });
@@ -499,5 +500,98 @@ describe('T-SUP-002 suppression is gated BEFORE classification and never appears
 
     const body = (await (await getReview(batchId)).json()) as ReviewBody;
     expect(body.sections.removals.count).toBe(0);
+  });
+});
+
+describe('T-UI-006 · US-013 AC-3 · the mode contract: omitted means "not applicable", never "nothing found"', () => {
+  it('T-UI-006a: append-only marks alreadyOnYourList omitted with an empty item list', async () => {
+    const batchId = await makeBatch({ mode: 'append-only' });
+    // The data to fill the section EXISTS: this title is on the list and was
+    // extracted. Append-only omits the section anyway, because the owner has
+    // not told us the screenshots are a complete picture.
+    await makeActiveListing(DUNE, 'netflix', 'Dune');
+    await makeCandidate(batchId, { workIdentity: DUNE, rawText: 'Dune' });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(body.sections.alreadyOnYourList.omitted).toBe(true);
+    expect(body.sections.alreadyOnYourList.items).toEqual([]);
+    expect(body.sections.alreadyOnYourList.count).toBe(0);
+  });
+
+  it('T-UI-006b: the SAME data in full-update fills the section — the mode is what decides', async () => {
+    const batchId = await makeBatch({ mode: 'full-update' });
+    await makeActiveListing(DUNE, 'netflix', 'Dune');
+    await makeCandidate(batchId, { workIdentity: DUNE, rawText: 'Dune' });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    // ⚠ The discriminating half. Without it, hard-coding `omitted: true` — or
+    // omitting the section whenever it happens to be empty — passes every
+    // append-only assertion in this file.
+    expect(body.sections.alreadyOnYourList.omitted).toBe(false);
+    expect(body.sections.alreadyOnYourList.count).toBe(1);
+    expect(body.sections.alreadyOnYourList.items[0]?.rawText).toBe('Dune');
+  });
+
+  it('T-UI-006c: an EMPTY full-update section is present, not omitted — the two are different answers', async () => {
+    const batchId = await makeBatch({ mode: 'full-update' });
+    await makeCandidate(batchId, { workIdentity: DUNE, rawText: 'Dune' });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    // ⚠ THIS IS PRODUCT INVARIANT 2 IN ONE ASSERTION. `omitted: true` says
+    // "this question does not apply to this batch"; `omitted: false, count: 0`
+    // says "we looked and there is nothing already on your list". Collapsing
+    // them lets a failed extraction of a known title read as a removal, which
+    // is the one thing this product must never do.
+    expect(body.sections.alreadyOnYourList.omitted).toBe(false);
+    expect(body.sections.alreadyOnYourList.count).toBe(0);
+    expect(body.sections.alreadyOnYourList.items).toEqual([]);
+  });
+
+  it('T-UI-006d: no omitted section anywhere in the response ever carries items', async () => {
+    const batchId = await makeBatch({ mode: 'append-only' });
+    await makeActiveListing(DUNE, 'netflix', 'Dune');
+    await makeCandidate(batchId, { workIdentity: DUNE, rawText: 'Dune' });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    // Structural, over every section rather than the two we happen to know
+    // about: a section the client is told not to render but which still ships
+    // rows is a leak waiting for the first client that trusts `items` over
+    // `omitted`.
+    for (const [name, section] of Object.entries(body.sections)) {
+      if (section.omitted === true) {
+        expect(`${name}:${section.items.length}`).toBe(`${name}:0`);
+        expect(`${name}:${section.count}`).toBe(`${name}:0`);
+      }
+    }
+  });
+
+  it('T-UI-006e: full-update never omits alreadyOnYourList, whatever else is true of the batch', async () => {
+    // A withheld removals section is the case most likely to take the known
+    // titles down with it: both are full-update-only, and both are computed
+    // from the same read. They are independent — the owner must still see what
+    // was recognised even when removals are withheld.
+    const batchId = await makeBatch({ mode: 'full-update', lowYield: true });
+    await makeActiveListing(DUNE, 'netflix', 'Dune');
+    await makeCandidate(batchId, { workIdentity: DUNE, rawText: 'Dune' });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(body.sections.removals.withheld).toBe(true);
+    expect(body.sections.alreadyOnYourList.omitted).toBe(false);
+    expect(body.sections.alreadyOnYourList.count).toBe(1);
+  });
+
+  it('T-UI-006f: the review never filters candidates by disposition', async () => {
+    // The review is re-read after every decision. Filtering out the ones
+    // already decided would empty the page as the owner worked through it, and
+    // in full-update it would make a confirmed known title look extracted-and-
+    // then-lost on the next read.
+    const batchId = await makeBatch({ mode: 'full-update' });
+    await makeActiveListing(DUNE, 'netflix', 'Dune');
+    await makeCandidate(batchId, { workIdentity: DUNE, rawText: 'Dune', disposition: 'confirmed' });
+    await makeCandidate(batchId, { workIdentity: HEAT, rawText: 'Heat', disposition: 'discarded' });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(body.sections.alreadyOnYourList.count).toBe(1);
+    expect(body.sections.additions.count).toBe(1);
   });
 });
