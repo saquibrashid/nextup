@@ -22,6 +22,8 @@ import type { AddressInfo } from 'node:net';
 import type { Express } from 'express';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { toBatchProvenance } from '@nextup/domain';
+
 import { createApp } from '../../src/app.js';
 import { CLIENT_PRINCIPAL_HEADER } from '../../src/auth/principal.js';
 import { resetAllowListWarning } from '../../src/middleware/allowList.js';
@@ -57,6 +59,18 @@ let failServiceState = false;
  */
 let hideSuppressionsFromReview = false;
 
+/**
+ * TASK-074 — a provenance write that fails (`T-PROV-001`, US-031 AC-6).
+ *
+ * ⚠ "A change without provenance MUST NOT be persisted" is only testable by
+ * making the provenance write fail while the mutation succeeds. Nothing else
+ * distinguishes an implementation that writes provenance in the transaction
+ * from one that writes it afterwards, on the pooled client, where it would
+ * survive a rollback — or be skipped entirely on failure while the titles it
+ * was supposed to describe stayed.
+ */
+let failProvenance = false;
+
 vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/repository/ownerData.js')>();
   return {
@@ -68,6 +82,10 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
     listActiveSuppressions: async (...args: Parameters<typeof actual.listActiveSuppressions>) => {
       if (hideSuppressionsFromReview) return [];
       return actual.listActiveSuppressions(...args);
+    },
+    recordBatchChange: async (...args: Parameters<typeof actual.recordBatchChange>) => {
+      if (failProvenance) throw new Error('injected provenance failure');
+      return actual.recordBatchChange(...args);
     },
   };
 });
@@ -289,6 +307,7 @@ beforeEach(async () => {
 afterEach(async () => {
   hideSuppressionsFromReview = false;
   failServiceState = false;
+  failProvenance = false;
   vi.restoreAllMocks();
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
@@ -638,5 +657,111 @@ describe('T-REV-012 · close is ONE transaction (product invariant 3)', () => {
 
     expect((await closeBatchRequest(batchId)).status).toBe(200);
     expect(await countListings()).toBe(1);
+  });
+});
+
+/**
+ * TASK-074 — provenance (REQ-068, US-031, `specs/data-model.md` §8.1).
+ *
+ * The store keeps one `batch_change` row per event; `toBatchProvenance` folds
+ * them into the §3.7 three-array shape. Both halves are asserted here, because
+ * a row that is written but folds into nothing is not provenance.
+ */
+describe('T-PROV-010 · close records what it created', () => {
+  const provenanceFor = async (batchId: string) =>
+    toBatchProvenance(await testPrisma().batchChange.findMany({ where: { batchId } }));
+
+  it('T-PROV-010a: a created title and its listing carry createdByBatchId and appear in provenance.created', async () => {
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, { disposition: 'confirmed' });
+
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+
+    const title = await testPrisma().title.findFirst({ where: { workIdentity: DUNE } });
+    const listing = await testPrisma().serviceListing.findFirst({ where: { titleId: title?.id } });
+    expect(title?.createdByBatchId).toBe(batchId);
+    expect(listing?.createdByBatchId).toBe(batchId);
+
+    expect(await provenanceFor(batchId)).toEqual({
+      created: [{ titleId: title?.id, listingId: listing?.listingId, titleWasCreated: true }],
+      modified: [],
+      removed: [],
+    });
+  });
+
+  it('T-PROV-010b: a listing added to an EXISTING title records titleWasCreated false', async () => {
+    const titleId = await seedListing(DUNE, 'Dune', 'max');
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, { disposition: 'confirmed' });
+
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+
+    const provenance = await provenanceFor(batchId);
+    expect(provenance.created).toEqual([
+      { titleId, listingId: expect.any(String) as unknown as string, titleWasCreated: false },
+    ]);
+    // The title was not this batch's to create, so its `createdByBatchId` must
+    // not be rewritten — undo of this batch may remove the Netflix listing, but
+    // never the title the earlier Max batch created.
+    const title = await testPrisma().title.findFirst({ where: { id: titleId } });
+    expect(title?.createdByBatchId).toBeNull();
+  });
+
+  it('T-PROV-010c: a discarded or suppressed candidate produces NO provenance', async () => {
+    await testPrisma().suppression.create({
+      data: {
+        id: 'sup-prov-1',
+        ownerId,
+        workIdentity: HEAT,
+        active: true,
+        displayName: 'Heat',
+      },
+    });
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, { disposition: 'discarded' });
+    await makeCandidate(batchId, { workIdentity: HEAT, rawText: 'Heat', disposition: 'confirmed' });
+
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+    expect(await provenanceFor(batchId)).toEqual({ created: [], modified: [], removed: [] });
+  });
+});
+
+describe('T-PROV-001 · a change without provenance is never persisted (US-031 AC-6)', () => {
+  it('T-PROV-001a: if provenance cannot be written the close fails atomically', async () => {
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, { disposition: 'confirmed' });
+    await makeCandidate(batchId, { workIdentity: HEAT, rawText: 'Heat', disposition: 'confirmed' });
+
+    failProvenance = true;
+    const res = await closeBatchRequest(batchId);
+    failProvenance = false;
+
+    expect(res.status).toBe(500);
+    // Nothing at all: not the titles, not the listings, not the provenance
+    // rows, not the batch transition. Provenance is the record undo reads, so
+    // a close that persisted its writes and skipped its record would leave a
+    // batch that could never be undone correctly.
+    expect(await countTitles()).toBe(0);
+    expect(await countListings()).toBe(0);
+    expect(await testPrisma().batchChange.count({ where: { batchId } })).toBe(0);
+
+    const batch = await testPrisma().uploadBatch.findFirst({ where: { id: batchId } });
+    expect(batch?.status).toBe('in-review');
+    expect(batch?.completedAt).toBeNull();
+  });
+
+  it('T-PROV-001b: and the same batch closes cleanly, with provenance, on retry', async () => {
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, { disposition: 'confirmed' });
+
+    failProvenance = true;
+    expect((await closeBatchRequest(batchId)).status).toBe(500);
+    failProvenance = false;
+
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+    expect(await countListings()).toBe(1);
+    // Exactly two rows — `title_created` and `listing_added` — not four. The
+    // failed attempt left nothing behind to be counted twice.
+    expect(await testPrisma().batchChange.count({ where: { batchId } })).toBe(2);
   });
 });
