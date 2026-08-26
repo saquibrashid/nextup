@@ -26,6 +26,7 @@ import { attachOwnerScope, makeRequirePrincipal } from '../middleware/ownerScope
 import type { PrincipalReader } from '../auth/principal.js';
 import { AppError } from '../errors/AppError.js';
 import { registerBatchCandidateRoutes } from './batchCandidates.js';
+import { registerBatchCloseRoutes } from './batchClose.js';
 import { registerBatchRoutes } from './batches.js';
 import { registerBatchImageRoutes } from './batchImages.js';
 import { registerBatchReviewRoutes } from './batchReview.js';
@@ -103,6 +104,9 @@ export function createApiRouter(): Router {
     apiRouter,
     () => new TmdbClient({ apiKey: process.env['TMDB_API_KEY'] ?? '' }),
   );
+  // §6.22 — close. Registered after the candidate routes it depends on so the
+  // read order in this file matches the order the owner moves through them.
+  registerBatchCloseRoutes(apiRouter);
   // §6.12 — the ONE ingest route for paste, drop and file selection alike.
   registerBatchImageRoutes(apiRouter);
   // §6.27 — the ONE route that serves image bytes. No SAS, no blob URL.

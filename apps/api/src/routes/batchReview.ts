@@ -98,6 +98,16 @@ export async function loadReviewCandidates(
   candidates: ReviewCandidate[];
   suppressed: Set<string>;
   activeListings: Awaited<ReturnType<typeof listActiveListingsForService>>;
+  /**
+   * Every candidate row as stored, INCLUDING the ones the suppression gate
+   * removed from `candidates`.
+   *
+   * Returned because close reports `summary.suppressedGated`, and the gated
+   * rows are by definition absent from `candidates`. Deriving that count from
+   * a second read would be a second chance to disagree with this one about
+   * which rows the batch has.
+   */
+  rows: Awaited<ReturnType<typeof listCandidatesForReview>>;
 }> {
   const [rows, suppressions, activeListings] = await Promise.all([
     listCandidatesForReview(ownerId, batchId),
@@ -153,7 +163,7 @@ export async function loadReviewCandidates(
       };
     });
 
-  return { candidates, suppressed, activeListings };
+  return { candidates, suppressed, activeListings, rows };
 }
 
 export function registerBatchReviewRoutes(router: Router): void {

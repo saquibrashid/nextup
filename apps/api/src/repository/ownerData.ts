@@ -106,6 +106,29 @@ function db(tx?: Db): Db {
   return tx ?? getPrisma();
 }
 
+/**
+ * Run `work` inside ONE interactive transaction (product invariant 3).
+ *
+ * ⚠ THE HANDLE MUST BE THREADED THROUGH EVERY WRITE INSIDE `work`. Prisma's
+ * transaction client is a separate connection; a repository call inside the
+ * callback that omits its `tx` argument silently runs on the pooled client
+ * instead and is therefore NOT rolled back with the rest. Nothing about that
+ * mistake is visible at the call site or in a passing test — it only shows up
+ * as a half-applied batch after a failure, which is precisely the outcome the
+ * transaction exists to make impossible.
+ *
+ * ⚠ The timeout is deliberately generous. Azure SQL Basic is 5 DTU, and close
+ * is the largest write the product makes; the default 5 s aborts a realistic
+ * 200-title batch under load and reports it as a timeout rather than as
+ * anything the owner could act on.
+ */
+export async function runInTransaction<T>(work: (tx: Db) => Promise<T>): Promise<T> {
+  return getPrisma().$transaction(async (tx) => work(tx), {
+    maxWait: 10_000,
+    timeout: 30_000,
+  });
+}
+
 /* ------------------------------------------------------------------ *
  * upload_batch
  * ------------------------------------------------------------------ */

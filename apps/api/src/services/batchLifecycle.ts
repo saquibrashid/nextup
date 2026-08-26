@@ -53,6 +53,7 @@ import {
   findUploadBatch,
   listImagesForBatch,
   transitionUploadBatchStatus,
+  type Db,
   type OwnerId,
 } from '../repository/ownerData.js';
 
@@ -148,6 +149,13 @@ export async function transitionBatch(
   illegalCode: ErrorCode,
   message: string,
   fields: { submittedAt?: Date; completedAt?: Date; undoneAt?: Date } = {},
+  /**
+   * Optional transaction handle. Close threads its own through so the status
+   * flip and the list writes commit or roll back together (product invariant
+   * 3) — a batch marked `applied` beside listings that were never written is
+   * exactly the half-applied state the transaction exists to prevent.
+   */
+  tx?: Db,
 ): Promise<BatchStatus> {
   const from = batch.status as BatchStatus;
   const refuse = (): never => {
@@ -166,10 +174,16 @@ export async function transitionBatch(
     return refuse();
   }
 
-  const changed = await transitionUploadBatchStatus(ownerId, batch.id, from, {
-    status: to,
-    ...fields,
-  });
+  const changed = await transitionUploadBatchStatus(
+    ownerId,
+    batch.id,
+    from,
+    {
+      status: to,
+      ...fields,
+    },
+    tx,
+  );
   if (changed === 0) {
     return refuse();
   }
