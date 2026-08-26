@@ -130,6 +130,53 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
+      - name: 'Guard: allow-list is not the client id'
+        # ⚠ REGRESSION GUARD, 2026-08-26. `ALLOWED_SUBJECTS` held the Entra
+        # APPLICATION (client) id from 08-21 to 08-26, locking the owner out
+        # of his own deployment. Both values are GUIDs, both are repository
+        # secrets declared a few lines apart in this very file, and the wrong
+        # one is INDISTINGUISHABLE FROM AN UNSET LIST at runtime: Easy Auth
+        # authenticates fine, the allow-list simply never matches, and every
+        # request gets the same 403 an empty list produces. The deploy went
+        # green, the smoke tests passed, and all twelve CI checks stayed green
+        # for five days. Nothing else in the pipeline can tell the two apart,
+        # because to `allowList.ts` a wrong id is just a subject that is not
+        # in the set. Read the real value via bootstrap mode —
+        # docs/runbooks/config-checklist.md.
+        env:
+          ALLOWED: ${{ secrets.ALLOWED_SUBJECTS }}
+          CLIENT_ID: ${{ secrets.ENTRA_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          # ⚠ WARN, do not fail, on empty. An empty allow-list is a legitimate
+          # pre-configuration state and fails closed safely by design
+          # (T-SEC-014); only the client-id collision is unambiguously wrong.
+          if [ -z "${ALLOWED:-}" ]; then
+            echo "::warning::ALLOWED_SUBJECTS is empty. The allow-list fails closed, so nobody will be able to sign in."
+            exit 0
+          fi
+          if [ -z "${CLIENT_ID:-}" ]; then
+            echo "::error::ENTRA_CLIENT_ID is empty, so this guard cannot run. Refusing to deploy rather than skipping the check."
+            exit 1
+          fi
+          lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+          IFS=',' read -ra ENTRIES <<< "$ALLOWED"
+          count=0
+          for raw in "${ENTRIES[@]}"; do
+            entry="$(printf '%s' "$raw" | tr -d '[:space:]')"
+            [ -z "$entry" ] && continue
+            count=$((count + 1))
+            if [ "$(lower "$entry")" = "$(lower "$CLIENT_ID")" ]; then
+              echo "::error::ALLOWED_SUBJECTS contains the Entra application (client) id. That is not a user subject id, so every request will be refused with a 403 identical to an unset allow-list. See docs/runbooks/config-checklist.md."
+              exit 1
+            fi
+          done
+          if [ "$count" -eq 0 ]; then
+            echo "::warning::ALLOWED_SUBJECTS held only separators and whitespace, so the allow-list is effectively empty and nobody will be able to sign in."
+            exit 0
+          fi
+          echo "Allow-list holds ${count} subject id(s), none of which is the client id."
+
       - id: deploy
         name: az deployment group create (staging)
         # ⚠ USES infra/main.staging.bicepparam. This workflow previously passed
@@ -245,6 +292,42 @@ jobs:
           fi
           echo "revision=${CUR}" >> "$GITHUB_OUTPUT"
           echo "Holding traffic on: ${CUR:-<none — the app does not exist yet>}"
+
+      - name: 'Guard: allow-list is not the client id'
+        # See the staging job for why this exists. Repeated rather than
+        # shared because the two jobs run on separate runners with no
+        # ordering guarantee between them, and a guard that protects only
+        # staging would let the same misconfiguration reach production.
+        env:
+          ALLOWED: ${{ secrets.ALLOWED_SUBJECTS }}
+          CLIENT_ID: ${{ secrets.ENTRA_CLIENT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ALLOWED:-}" ]; then
+            echo "::warning::ALLOWED_SUBJECTS is empty. The allow-list fails closed, so nobody will be able to sign in."
+            exit 0
+          fi
+          if [ -z "${CLIENT_ID:-}" ]; then
+            echo "::error::ENTRA_CLIENT_ID is empty, so this guard cannot run. Refusing to deploy rather than skipping the check."
+            exit 1
+          fi
+          lower() { printf '%s' "$1" | tr '[:upper:]' '[:lower:]'; }
+          IFS=',' read -ra ENTRIES <<< "$ALLOWED"
+          count=0
+          for raw in "${ENTRIES[@]}"; do
+            entry="$(printf '%s' "$raw" | tr -d '[:space:]')"
+            [ -z "$entry" ] && continue
+            count=$((count + 1))
+            if [ "$(lower "$entry")" = "$(lower "$CLIENT_ID")" ]; then
+              echo "::error::ALLOWED_SUBJECTS contains the Entra application (client) id. That is not a user subject id, so every request will be refused with a 403 identical to an unset allow-list. See docs/runbooks/config-checklist.md."
+              exit 1
+            fi
+          done
+          if [ "$count" -eq 0 ]; then
+            echo "::warning::ALLOWED_SUBJECTS held only separators and whitespace, so the allow-list is effectively empty and nobody will be able to sign in."
+            exit 0
+          fi
+          echo "Allow-list holds ${count} subject id(s), none of which is the client id."
 
       - id: deploy
         name: az deployment group create (prod, new revision at 0% traffic)
