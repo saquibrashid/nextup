@@ -1,0 +1,438 @@
+/*
+ * nextup — the stylesheet (TASK-179/180, `specs/ui.md` §13, ADR-0004 Rev 2).
+ *
+ * ⚠ THIS FILE DID NOT EXIST UNTIL EPIC O. The project shipped 43 `className`
+ * attributes, an axe-core pass and a 320 px no-horizontal-scroll pass with no
+ * CSS at all — because an unstyled document has no overflow and no contrast
+ * pair to fail on. Both gates were vacuously green, and the owner met the
+ * result as an unstyled page.
+ *
+ * ⚠ THE CLASS VOCABULARY IS FIXED (§13.1) AND IS NOT RENAMED HERE. The
+ * components are the source of truth; `T-CSS-001` checks BOTH directions, so
+ * a rename fails the build rather than silently unstyling a screen.
+ *
+ * ⚠ NO HEX LITERAL AND NO `px` BREAKPOINT BELOW `:root` (§13.4, `T-CSS-003`).
+ * A hard-coded colour is how a token gets bypassed instead of changed.
+ *
+ * ⚠ NOTHING HERE SELECTS A `data-testid` (§13.4). Styling the test contract
+ * makes a visual tidy-up break tests for reasons no one can see.
+ */
+
+:root {
+  /* Breakpoints — named so the same width cannot be typed twice differently. */
+  --bp-sm: 640px;
+  --bp-lg: 1024px;
+
+  --layout-max-width: 56rem;
+
+  /*
+   * NFR-006. ⚠ THE ONE DEFINITION of the touch floor: `.tap-target` is its
+   * only consumer, so the minimum cannot drift between controls.
+   */
+  --tap-target-min: 44px;
+
+  /*
+   * ⚠ EVERY RATIO BELOW WAS COMPUTED, NOT EYEBALLED, AND `T-CSS-004`
+   * RECOMPUTES THEM FROM THESE VALUES. Four of the five ratios in the first
+   * draft of §13.2 were wrong — in both directions — and each was plausible
+   * enough to survive review.
+   */
+  --color-text: #111827; /* 17.7:1 on surface, 17.0:1 on bg */
+  --color-text-muted: #4b5563; /* 7.6:1 / 7.2:1 */
+  --color-bg: #f9fafb;
+  --color-surface: #ffffff;
+
+  /*
+   * ⚠ 3.3:1 / 3.2:1, chosen by calculation. The conventional light grey
+   * border (#d1d5db) is 1.47:1 — it fails §10.2's 3:1 boundary floor by a
+   * factor of two while looking entirely normal. Non-text contrast is the
+   * trap: a border can be obviously visible and still less than half.
+   */
+  --color-border: #878d99;
+
+  --color-accent: #1d4ed8; /* 6.7:1 on white */
+  --color-danger: #b91c1c; /* 6.5:1 on white — destructive confirmation only */
+
+  /* A closed scale. A one-off margin is a token that was not added. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  --radius: 6px;
+
+  /*
+   * No web font (NFR-005): a third-party request per page load, plus the
+   * layout shift while it arrives. The system stack costs neither.
+   */
+  --font-stack: system-ui, -apple-system, 'Segoe UI', roboto, helvetica, arial, sans-serif;
+}
+
+/* ---------------------------------------------------------------- reset -- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body,
+h1,
+h2,
+h3,
+p,
+ul,
+ol,
+figure {
+  margin: 0;
+}
+
+ul,
+ol {
+  padding: 0;
+  list-style: none;
+}
+
+html {
+  /* ⚠ Never a fixed px root size: it overrides the browser's text setting. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-stack);
+  font-size: 1rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  color: var(--color-accent);
+}
+
+/*
+ * ⚠ A VISIBLE FOCUS RING IS NOT OPTIONAL (§10.2). `outline: none` with no
+ * replacement makes the keyboard path invisible — usable, but unusable
+ * blind, which is the worst of both.
+ */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+/* --------------------------------------------------------------- layout -- */
+
+.app-shell {
+  margin: 0 auto;
+  max-width: var(--layout-max-width);
+  padding: var(--space-4);
+  /*
+   * ⚠ Mobile-first (§13.3): these ARE the 320 px rules. Writing this
+   * desktop-first makes the floor NFR-006 mandates the case reached by
+   * subtraction — the one nobody looks at.
+   */
+}
+
+.app-shell__logo {
+  align-items: center;
+  color: var(--color-text);
+  display: flex;
+  font-size: 1.25rem;
+  font-weight: 700;
+  gap: var(--space-2);
+  text-decoration: none;
+}
+
+/*
+ * NFR-006's touch floor. `inline-flex` + centring so the box is the target
+ * rather than just the text inside it.
+ */
+.tap-target {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  min-height: var(--tap-target-min);
+  min-width: var(--tap-target-min);
+  padding: var(--space-2) var(--space-3);
+}
+
+/* ------------------------------------------------------------- dropzone -- */
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.dropzone__target {
+  align-items: center;
+  background: var(--color-surface);
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  text-align: center;
+}
+
+.dropzone__choose,
+.dropzone__paste {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+/*
+ * ⚠ Paste is the PRIMARY affordance (ADR-0009) and file selection was NOT
+ * replaced by it — the iOS Photos path and the laptop screenshot path both
+ * still need the file input. Both are styled as real, equal controls.
+ */
+.dropzone__paste {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* ----------------------------------------------------------- filter bar -- */
+
+.filter-bar {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+/* ------------------------------------------------------ freshness strip -- */
+
+/*
+ * REQ-039. ⚠ Shows the FACT and never nags (`A46`): there is no staleness
+ * threshold in nextup, so nothing here goes red, bold or alarming with age.
+ */
+.freshness-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.freshness-strip__chip {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.freshness-strip__notice {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+/* -------------------------------------------------------------- refusal -- */
+
+.refusal {
+  margin: var(--space-6) auto;
+  max-width: 32rem;
+  text-align: center;
+}
+
+.refusal__account {
+  color: var(--color-text-muted);
+  /*
+   * ⚠ An email is DISPLAY ONLY here and is never an authorisation input
+   * anywhere in nextup (`specs/security.md` §2.2). It is shown so the owner
+   * can tell "nextup is broken" from "I am signed in as the wrong account".
+   */
+  word-break: break-all;
+}
+
+/* ------------------------------------------------------------ the list -- */
+
+.title-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.title-row {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.title-row__poster {
+  border-radius: var(--radius);
+  flex: 0 0 auto;
+  height: 4.5rem;
+  object-fit: cover;
+  width: 3rem;
+}
+
+/*
+ * ⚠ A MISSING POSTER IS A RENDERED STATE, NOT AN OMISSION. Collapsing the box
+ * would reflow every row that has one, so the placeholder holds the space.
+ */
+.title-row__poster--empty {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+
+.title-row__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0; /* ⚠ Without this a long title forces horizontal scroll at 320 px. */
+}
+
+.title-row__name {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.title-row__meta,
+.title-row__date {
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+.title-row__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/*
+ * One badge per service on one row (REQ-013) — the deduplication the whole
+ * product exists for is visible here or nowhere.
+ */
+.title-row__chip {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 0.75rem;
+  padding: var(--space-1) var(--space-2);
+}
+
+.title-row__rating {
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/*
+ * ⚠ "No IMDb rating" MUST REMAIN LEGIBLE (REQ-091). Fading it towards the
+ * background would make "this work has no rating" and "nextup failed to fetch
+ * one" look identical — muted, never invisible.
+ */
+.title-row__rating--absent {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.title-row__rating-source {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
+.title-row__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.title-row__menu {
+  position: relative;
+}
+
+.title-row__action {
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  cursor: pointer;
+  text-align: left;
+}
+
+/* ---------------------------------------------------------- attribution -- */
+
+/*
+ * ⚠ TMDB ATTRIBUTION IS A LICENCE OBLIGATION, NOT DECORATION. It may be
+ * quiet; it may not be hidden, and it is never `display: none` (§13.4).
+ */
+.tmdb-attribution {
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 0.75rem;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+}
+
+.tmdb-attribution__logo {
+  height: 1rem;
+  width: auto;
+}
+
+.tmdb-attribution__disclaimer {
+  color: var(--color-text-muted);
+}
+
+/* ---------------------------------------------------------- wider views -- */
+
+@media (min-width: 640px) {
+  .app-shell {
+    padding: var(--space-5);
+  }
+
+  .title-row__poster {
+    height: 6rem;
+    width: 4rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-shell {
+    padding: var(--space-6);
+  }
+}
+
+/* ------------------------------------------------------ reduced motion -- */
+
+/*
+ * §10.2, `T-CSS-005`. One rule, and an accessibility obligation rather than a
+ * preference. ⚠ `!important` is permitted HERE AND ONLY HERE (§13.4): a
+ * vestibular trigger must not be reachable by a more specific selector added
+ * later.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

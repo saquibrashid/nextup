@@ -3778,6 +3778,50 @@ These live in **`apps/web/test/`**, except `T-CSS-005`, which is exercised in
 | `T-CSS-004` | U | The WCAG ratio of every token pair, **computed from the token values**: ≥ 4.5:1 for text, ≥ 3:1 for UI boundaries | NFR-011, §10.2 |
 | `T-CSS-005` | E2E | `prefers-reduced-motion: reduce` is honoured | §10.2 |
 
+### 37.1a ⚠ `tests/e2e/` WAS EMPTY, AND TWO REQUIRED CHECKS MEASURED NOTHING
+
+Until Epic O landed, `tests/e2e/` contained a `.gitkeep` and nothing else,
+while `package.json` ran both jobs with `--pass-with-no-tests`:
+
+```
+"test:e2e":  "playwright test --pass-with-no-tests",
+"test:a11y": "playwright test tests/e2e/a11y.spec.ts --pass-with-no-tests",
+```
+
+So **two of the twelve required checks reported green over zero tests**, and
+`T-A11Y-001` and `T-A11Y-012` — cited as done-when evidence by other tasks —
+had no implementation at all. `playwright.config.ts` also had **no
+`webServer`**, so there was nothing for a test to open even had one existed.
+This is the same vacuous-green class as §36's `T-DATA-002` and §37's
+`T-CSS-002`, and together they are how an application with **no stylesheet and
+no data fetching** passed 12/12 and was handed to the owner, who reported the
+page as broken.
+
+⚠ **`--pass-with-no-tests` HIDES A DELETED SUITE AS EFFECTIVELY AS A MISSING
+ONE.** It is retained only because `tests/e2e/` is legitimately empty on some
+branches; the protection is `T-CI-008`'s location gate plus the fact that
+every id in §37.1 is now cited by a task, so `check:orphans` and
+`check:test-ids` both fail if one loses its implementation.
+
+⚠ **AN a11y ASSERTION MUST FIRST PROVE THE PAGE RENDERED AND IS STYLED.** A
+320 px overflow check and an axe scan both pass *perfectly* on a blank or
+unstyled document — there is no overflow to find and no rendered colour pair
+to fail on, so each is satisfied by exactly the state it exists to prevent.
+`tests/e2e/a11y.spec.ts` therefore asserts a token-derived computed
+`background-color` and a non-empty axe `color-contrast` **pass** count before
+it asserts anything else. Verified by mutation: removing the one-line
+stylesheet import from `main.tsx` fails **10 of the 12** tests in that file.
+
+⚠ **NEVER STRING-MATCH A COMPUTED CSS DURATION.** Chromium serialises
+`0.01ms` as `1e-05s` and WebKit as `0.00001s`; a string test written against
+one engine reports the other as broken while the CSS is identical. Parse it.
+
+⚠ **AN INVENTED FIXTURE PRODUCES A REAL-LOOKING FAILURE.** The first draft of
+the `service-state` stub guessed `{ service, lastUpdatedAt }` instead of the
+route's actual projection, leaving `label` undefined and rendering a link with
+**no accessible name** — a genuine `link-name` violation caused entirely by
+the test. E2E fixtures are copied from the route that produces them.
+
 ### 37.2 Why `T-CSS-004` computes ratios instead of trusting `axe-core`
 
 `axe-core` only evaluates a pair that a rendered page happens to use, so a

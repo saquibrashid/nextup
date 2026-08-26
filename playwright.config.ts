@@ -23,6 +23,21 @@ export default defineConfig({
   testDir: './tests/e2e',
   testMatch: '**/*.spec.ts',
 
+  /**
+   * ⚠ WITHOUT A `webServer` THERE IS NOTHING TO TEST AGAINST, and Playwright
+   * says so only once a test exists — for months `tests/e2e/` held nothing but
+   * a `.gitkeep`, so both the `test:e2e` and `test:a11y` CI jobs reported
+   * green over zero tests via `--pass-with-no-tests`. Two of the twelve checks
+   * were measuring nothing, which is how an entirely unstyled application
+   * reached the owner with a full green tick.
+   */
+  webServer: {
+    command: 'npm run preview --workspace apps/web -- --port 4173 --strictPort',
+    url: baseURL,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120_000,
+  },
+
   // CI is the gate, so a flake must not pass by luck: no retries locally,
   // and a single retry in CI only to absorb genuine infrastructure noise.
   retries: process.env.CI ? 1 : 0,

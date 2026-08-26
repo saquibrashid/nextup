@@ -628,8 +628,8 @@ finished, so the exception cannot outlive its reason.
 | `TASK-176` | `done` | `T-DATA-007` |
 | `TASK-177` | `done` | `T-DATA-002` |
 | `TASK-178` | `todo` | — |
-| `TASK-179` | `todo` | — |
-| `TASK-180` | `todo` | — |
+| `TASK-179` | `done` | `T-CSS-002`, `T-CSS-003`, `T-CSS-004` |
+| `TASK-180` | `done` | `T-CSS-001`, `T-CSS-005` |
 <!-- STATUS-LEDGER:END -->
 
 
@@ -1524,3 +1524,4 @@ device check is owned by **TASK-165**)*.
 removed view → attribution → a11y → 320 px) is a **first-class staged
 deliverable**, not an afterthought: TASK-080 (steps 1–4), TASK-094 (step 5),
 TASK-108 (steps 6–7), TASK-130 (steps 8–10).
+

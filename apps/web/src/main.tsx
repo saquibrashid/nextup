@@ -11,6 +11,12 @@ import { BrowserRouter } from 'react-router-dom';
 
 import { App } from './App';
 
+// ⚠ `T-CSS-002` ASSERTS THIS LINE EXISTS. A stylesheet that is never imported
+// is indistinguishable from no stylesheet at build time — Vite emits no
+// warning — so without it every other Epic O assertion passes on an unstyled
+// document, which is exactly how the owner ended up in front of one.
+import './index.css';
+
 const root = document.getElementById('root');
 if (root) {
   createRoot(root).render(
