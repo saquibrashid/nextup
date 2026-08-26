@@ -412,7 +412,12 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        # ⚠ WEBKIT IS NOT OPTIONAL HERE. The a11y spec runs the same
+        # `mobile-safari` project as the e2e job, and nextup is mobile-first
+        # at a 320 px floor — installing Chromium alone fails the job on a
+        # missing executable, which reads as a broken test rather than a
+        # missing browser. Keep this list identical to the e2e job's.
+        run: npx playwright install --with-deps chromium webkit
       - name: Build
         run: npm run build
       # axe on all nine routes; ZERO serious/critical (§8 job 9). The
