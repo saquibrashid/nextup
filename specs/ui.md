@@ -650,6 +650,7 @@ change is one diff and a test can assert it.
 | **`IMDB_LOOKUP_NOT_FOUND`** *(new, Epic M)* | *Couldn't find that title.* | US-045 AC-3 — ⚠ **distinct from `IMDB_RATING_ABSENT`.** "No such title" and "found, but unrated" are different answers; conflating them tells the owner a film exists when it does not |
 | **`IMDB_LOOKUP_FAILED`** *(new, Epic M)* | *Couldn't run that lookup. Nothing has changed.* | Mirrors `LIST_LOAD_FAILED_BODY` — same reassurance, same reason |
 | **`IMDB_LOOKUP_IN_LIST`** *(new, Epic M)* | *Already on your list.* | US-045 AC-4 — matched on canonical `workIdentity`, never on the typed string |
+| **`LIST_LOADING_BODY`** *(new, Epic N)* | *Loading your list…* | §12.2 — ⚠ **an empty list and a not-yet-loaded list are indistinguishable from the rows alone.** Without a distinct loading state, `listEmptyKind()` sees zero rows and no filters on every page load and renders *"Nothing here yet"* to an owner whose list is full — a data-loss misreading US-019 AC-5 exists to prevent. `T-DATA-002c` |
 
 **(R5) The three memory/decode messages themselves are deliberately NOT copy
 constants.** `IMAGE_TOO_LARGE_TO_DECODE`, `IMAGE_DECODE_OOM` and

@@ -19,6 +19,7 @@ import { FreshnessStrip, type ServiceFreshness } from '../components/FreshnessSt
 import { ListEmptyState, ListLoadError } from '../components/ListEmptyState';
 import { TitleList } from '../components/TitleList';
 import type { TitleListItem } from '../components/TitleRow';
+import { LIST_LOADING_BODY } from '../copy';
 
 export interface ListPageProps {
   readonly items?: readonly TitleListItem[];
@@ -31,6 +32,15 @@ export interface ListPageProps {
   readonly suppressedCount?: number;
   /** True when `GET /api/titles` failed (`ux-states.md` §2.9). */
   readonly loadFailed?: boolean;
+  /**
+   * True while the first read is in flight (`ux-states.md` §2.1).
+   *
+   * ⚠ NOT COSMETIC. Zero rows and no filters is indistinguishable from an
+   * empty library, so without this the never-uploaded empty state renders on
+   * every page load before the data arrives — telling an owner with a full
+   * list that they have never uploaded anything.
+   */
+  readonly loading?: boolean;
   readonly onRetry?: () => void;
 }
 
@@ -42,6 +52,7 @@ export function ListPage({
   removedCount = 0,
   suppressedCount = 0,
   loadFailed = false,
+  loading = false,
   onRetry,
 }: ListPageProps): JSX.Element {
   const [params, setParams] = useSearchParams();
@@ -64,6 +75,13 @@ export function ListPage({
         // would have to invent numbers it does not have, and "Showing 0 of 0"
         // beside "Nothing has changed" contradicts the reassurance.
         <ListLoadError {...(onRetry === undefined ? {} : { onRetry })} />
+      ) : loading ? (
+        // ⚠ Same reasoning as the failure branch, for the same reason: neither
+        // the filter counts nor the empty state can tell the truth about data
+        // that has not arrived, and the empty state's lie is the damaging one.
+        <p role="status" data-testid="list-loading">
+          {LIST_LOADING_BODY}
+        </p>
       ) : (
         <>
           <FilterBar genres={genres} shown={shown} total={unfilteredTotal} />
