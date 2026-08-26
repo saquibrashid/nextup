@@ -11,8 +11,8 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 73 |
-| 🚧 doing | 7 |
+| ⬜ todo | 72 |
+| 🚧 doing | 8 |
 | ✅ done | 95 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
