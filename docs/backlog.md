@@ -624,7 +624,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-172` | `done` | this branch — service, job and the closed two-column writer |
 | `TASK-173` | `done` | this branch — `GET /api/imdb/lookup` |
 | `TASK-174` | `done` | this branch — row rating, `/rating` screen, OMDb footer line |
-| `TASK-175` | `todo` | — |
+| `TASK-175` | `done` | this branch — `lib/apiClient.ts`; `T-DATA-001` caught the one real offender (the `/rating` page's own `fetch`, written before the client existed and unaware of the 401 rule) |
 | `TASK-176` | `todo` | — |
 | `TASK-177` | `todo` | — |
 | `TASK-178` | `todo` | — |
