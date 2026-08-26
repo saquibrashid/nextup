@@ -80,6 +80,82 @@ function isMatchRef(value: unknown): value is ReviewMatchRef {
   return typeof ref['tmdbId'] === 'number' && typeof ref['name'] === 'string';
 }
 
+/**
+ * Loads a batch's candidates, gated and classified exactly as the review
+ * response does.
+ *
+ * ⚠ Exported and SHARED with `PATCH …/candidates/confirm-all` (TASK-066) on
+ * purpose. `confirm-all` acts on "every pending item in this section", so it
+ * must agree with `GET /review` about which section each candidate is in. A
+ * second, simpler implementation there would drift — and the way it drifts is
+ * that a bulk press confirms items the owner never saw in that section.
+ */
+export async function loadReviewCandidates(
+  ownerId: ReturnType<typeof requireOwnerId>,
+  batchId: string,
+  service: Service,
+): Promise<{
+  candidates: ReviewCandidate[];
+  suppressed: Set<string>;
+  activeListings: Awaited<ReturnType<typeof listActiveListingsForService>>;
+}> {
+  const [rows, suppressions, activeListings] = await Promise.all([
+    listCandidatesForReview(ownerId, batchId),
+    listActiveSuppressions(ownerId),
+    listActiveListingsForService(ownerId, service),
+  ]);
+
+  // The suppression gate. Keyed on WORK IDENTITY, never on a row id
+  // (REQ-071, product invariant 1), and with NO branch on the `tmdb:` vs
+  // `unmatched:` prefix (`T-SUP-006a`).
+  const suppressed = new Set(suppressions.map((s) => s.workIdentity));
+
+  const index = buildActiveListingIndex(
+    activeListings
+      .filter((listing) => !suppressed.has(listing.title.workIdentity))
+      .map((listing) => ({
+        workIdentity: listing.title.workIdentity,
+        service: listing.service as Service,
+        state: 'active' as const,
+      })),
+  );
+
+  const candidates: ReviewCandidate[] = rows
+    .filter((row) => row.resolvedWorkIdentity === null || !suppressed.has(row.resolvedWorkIdentity))
+    .map((row) => {
+      const alternatives = parseMatchCandidates(row.matchCandidates);
+      const match: ReviewMatch | null =
+        alternatives[0] !== undefined && row.resolvedWorkIdentity?.startsWith('tmdb:') === true
+          ? {
+              ...alternatives[0],
+              uncertain: alternatives[0].score < 1,
+              ambiguous:
+                alternatives[1] !== undefined &&
+                alternatives[0].score - alternatives[1].score < 0.05,
+            }
+          : null;
+      return {
+        candidateId: row.id,
+        rawText: row.rawText,
+        inferredTitle: row.inferredTitle,
+        basis: row.basis as CandidateBasis,
+        ocrSupport: row.ocrSupport as OcrSupport,
+        provider: row.provider as CandidateProvider,
+        verdict: row.cleanupVerdict as CleanupVerdict,
+        ocrConfidence: row.ocrConfidence,
+        resolvedWorkIdentity: row.resolvedWorkIdentity,
+        match,
+        alternatives,
+        sourceImageIds: row.sourceImages.map((image) => image.imageId),
+        disposition: row.reviewDisposition as ReviewDisposition,
+        collapsedIntoCandidateId: row.collapsedIntoCandidateId,
+        classification: classifyWorkIdentity(row.resolvedWorkIdentity, service, index),
+      };
+    });
+
+  return { candidates, suppressed, activeListings };
+}
+
 export function registerBatchReviewRoutes(router: Router): void {
   router.get('/batches/:batchId/review', async (req, res) => {
     const ownerId = requireOwnerId(req);
@@ -96,63 +172,10 @@ export function registerBatchReviewRoutes(router: Router): void {
     }
 
     const service = batch.service as Service;
-    const [rows, suppressions, activeListings, images] = await Promise.all([
-      listCandidatesForReview(ownerId, batchId),
-      listActiveSuppressions(ownerId),
-      listActiveListingsForService(ownerId, service),
+    const [{ candidates, suppressed, activeListings }, images] = await Promise.all([
+      loadReviewCandidates(ownerId, batchId, service),
       listImagesForBatch(ownerId, batchId),
     ]);
-
-    // Step 3 — the suppression gate. Keyed on WORK IDENTITY, never on a row id
-    // (REQ-071, product invariant 1), and with NO branch on the `tmdb:` vs
-    // `unmatched:` prefix (`T-SUP-005`).
-    const suppressed = new Set(suppressions.map((s) => s.workIdentity));
-
-    const index = buildActiveListingIndex(
-      activeListings
-        .filter((listing) => !suppressed.has(listing.title.workIdentity))
-        .map((listing) => ({
-          workIdentity: listing.title.workIdentity,
-          service: listing.service as Service,
-          state: 'active' as const,
-        })),
-    );
-
-    const candidates: ReviewCandidate[] = rows
-      .filter(
-        (row) => row.resolvedWorkIdentity === null || !suppressed.has(row.resolvedWorkIdentity),
-      )
-      .map((row) => {
-        const alternatives = parseMatchCandidates(row.matchCandidates);
-        const match: ReviewMatch | null =
-          alternatives[0] !== undefined && row.resolvedWorkIdentity?.startsWith('tmdb:') === true
-            ? {
-                ...alternatives[0],
-                uncertain: alternatives[0].score < 1,
-                ambiguous:
-                  alternatives[1] !== undefined &&
-                  alternatives[0].score - alternatives[1].score < 0.05,
-              }
-            : null;
-        return {
-          candidateId: row.id,
-          rawText: row.rawText,
-          inferredTitle: row.inferredTitle,
-          basis: row.basis as CandidateBasis,
-          ocrSupport: row.ocrSupport as OcrSupport,
-          provider: row.provider as CandidateProvider,
-          verdict: row.cleanupVerdict as CleanupVerdict,
-          ocrConfidence: row.ocrConfidence,
-          resolvedWorkIdentity: row.resolvedWorkIdentity,
-          match,
-          alternatives,
-          sourceImageIds: row.sourceImages.map((image) => image.imageId),
-          disposition: row.reviewDisposition as ReviewDisposition,
-          collapsedIntoCandidateId: row.collapsedIntoCandidateId,
-          classification: classifyWorkIdentity(row.resolvedWorkIdentity, service, index),
-        };
-      });
-
     // Step 6. A listing "disappeared" when no SURVIVING candidate resolved to
     // its work. ⚠ SD-02 collapse losers are excluded from the extracted set
     // deliberately — their identity lives on in the survivor, so counting them

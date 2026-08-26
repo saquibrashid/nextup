@@ -25,6 +25,7 @@ import { errorEnvelope } from '../middleware/errorEnvelope.js';
 import { attachOwnerScope, makeRequirePrincipal } from '../middleware/ownerScope.js';
 import type { PrincipalReader } from '../auth/principal.js';
 import { AppError } from '../errors/AppError.js';
+import { registerBatchCandidateRoutes } from './batchCandidates.js';
 import { registerBatchRoutes } from './batches.js';
 import { registerBatchImageRoutes } from './batchImages.js';
 import { registerBatchReviewRoutes } from './batchReview.js';
@@ -95,6 +96,13 @@ export function createApiRouter(): Router {
   // review assembly share nothing but the batch id, and `batches.ts` is a
   // contended file that several lanes need to keep small.
   registerBatchReviewRoutes(apiRouter);
+  // §6.18/§6.19 — per-candidate disposition, correction and the bulk confirm.
+  // Needs a TMDB client for the `reclassifyAsTitle` re-match; same per-request
+  // lifetime and the same reason as `registerTmdbRoutes` below.
+  registerBatchCandidateRoutes(
+    apiRouter,
+    () => new TmdbClient({ apiKey: process.env['TMDB_API_KEY'] ?? '' }),
+  );
   // §6.12 — the ONE ingest route for paste, drop and file selection alike.
   registerBatchImageRoutes(apiRouter);
   // §6.27 — the ONE route that serves image bytes. No SAS, no blob URL.

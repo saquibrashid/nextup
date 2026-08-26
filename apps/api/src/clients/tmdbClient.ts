@@ -228,6 +228,18 @@ export class TmdbClient {
     params: Record<string, string>,
     onNotFound?: () => never,
   ): Promise<T> {
+    // ⚠ An UNCONFIGURED key is refused HERE, before any request is made.
+    // TMDB cannot possibly answer without one, so sending the request costs a
+    // real outbound call and two retry backoffs (5 s) to learn something
+    // already known locally. It also puts a live network dependency into every
+    // test that exercises a TMDB-touching route without stubbing the client,
+    // which is precisely how a suite becomes flaky offline.
+    //
+    // `retryable: false` — no amount of retrying supplies a missing secret.
+    if (this.#apiKey === '') {
+      throw new TmdbUnavailableError('TMDB is not configured.', null, false);
+    }
+
     const url = new URL(`${this.#baseUrl}${path}`);
     for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
     // The key is a query parameter because that is TMDB's v3 scheme. It is

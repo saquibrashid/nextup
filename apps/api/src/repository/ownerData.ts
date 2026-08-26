@@ -1116,16 +1116,45 @@ export async function listCandidatesForReview(ownerId: OwnerId, batchId: string,
   });
 }
 
+export async function findExtractionCandidate(ownerId: OwnerId, id: string, tx?: Db) {
+  return db(tx).extractionCandidate.findFirst({ where: { ownerId, id } });
+}
+
 export async function updateCandidateDisposition(
   ownerId: OwnerId,
   id: string,
   data: Pick<
     Prisma.ExtractionCandidateUncheckedUpdateInput,
-    'reviewDisposition' | 'resolvedTitleId' | 'collapsedIntoCandidateId'
+    | 'reviewDisposition'
+    | 'resolvedTitleId'
+    | 'collapsedIntoCandidateId'
+    | 'resolvedWorkIdentity'
+    | 'correctedToTmdbId'
+    | 'cleanupVerdict'
+    | 'classification'
+    | 'matchCandidates'
   >,
   tx?: Db,
 ) {
   return db(tx).extractionCandidate.updateMany({ where: { ownerId, id }, data });
+}
+
+/**
+ * Bulk `pending` → `confirmed` for the ids given (`specs/api.md` §6.19).
+ *
+ * ⚠ `reviewDisposition: 'pending'` is in the WHERE, not just in the caller's
+ * filter. The caller reads, decides, then writes, and in between the owner may
+ * have discarded one of those items in another tab; without this predicate the
+ * bulk press would silently reverse an explicit decision. It also makes the
+ * returned `count` the number of decisions this press really made, which is
+ * what §6.19 reports back.
+ */
+export async function confirmPendingCandidates(ownerId: OwnerId, ids: readonly string[], tx?: Db) {
+  if (ids.length === 0) return { count: 0 };
+  return db(tx).extractionCandidate.updateMany({
+    where: { ownerId, id: { in: [...ids] }, reviewDisposition: 'pending' },
+    data: { reviewDisposition: 'confirmed' },
+  });
 }
 
 /* ------------------------------------------------------------------ *
