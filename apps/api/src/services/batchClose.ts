@@ -36,6 +36,7 @@ import {
   jsonScalar,
   pendingAdditionIds,
   ulid,
+  workIdentityForTmdb,
   workIdentityForUnmatched,
   type CloseSummary,
   type ReviewCandidate,
@@ -93,6 +94,68 @@ function identityFor(candidate: ReviewCandidate): string {
 }
 
 /**
+ * The work identity the pipeline had proposed before the owner corrected it.
+ *
+ * `null` when it proposed nothing — an unmatched candidate the owner named by
+ * hand genuinely has no prior identity, and inventing the `unmatched:` hash
+ * here would record a value the row never actually held.
+ */
+function originalIdentityFor(candidate: ReviewCandidate): string | null {
+  const top = candidate.alternatives[0];
+  if (top === undefined) return null;
+  return workIdentityForTmdb(top.mediaType, top.tmdbId);
+}
+
+/**
+ * The TMDB metadata to store for `workIdentity` — chosen BY IDENTITY, never by
+ * position.
+ *
+ * ⚠ THIS IS WHY A CORRECTION USED TO STORE THE WRONG FILM. `candidate.match`
+ * is `alternatives[0]`, the original top match, and correcting a candidate
+ * deliberately does NOT rewrite `matchCandidates` (the owner corrected the
+ * decision, not the extraction). Reading `match` at close therefore built the
+ * title from the identity the owner rejected: the row said `tmdb:movie:949`
+ * while its `tmdb_id`, name, year and poster all still said 438631. Nothing
+ * refuses that — `title_match_coherent` only checks null-ness, not agreement —
+ * so the combined list would have shown the owner the very title they fixed,
+ * under a work identity that suppression and dedup key on and would never
+ * match it.
+ *
+ * When the corrected target is not among the alternatives there is no name to
+ * store and none is invented: `tmdbId` and `tmdbMediaType` come from the
+ * identity, and `tmdbFetchedAt` stays null so the lazy refresh (REQ-076,
+ * NFR-014) fills the display fields on first access.
+ */
+function tmdbFieldsFor(
+  candidate: ReviewCandidate,
+  workIdentity: string,
+): {
+  tmdbId: number;
+  tmdbMediaType: string;
+  tmdbName: string | null;
+  tmdbReleaseYear: number | null;
+  tmdbPosterPath: string | null;
+} | null {
+  const parts = workIdentity.split(':');
+  const mediaType = parts[1];
+  const tmdbId = Number(parts[2]);
+  if (parts[0] !== 'tmdb' || mediaType === undefined || !Number.isFinite(tmdbId)) return null;
+
+  const known = candidate.alternatives.find(
+    (alternative) =>
+      alternative.tmdbId === tmdbId && String(alternative.mediaType) === String(mediaType),
+  );
+
+  return {
+    tmdbId,
+    tmdbMediaType: mediaType,
+    tmdbName: known?.name ?? null,
+    tmdbReleaseYear: known?.releaseYear ?? null,
+    tmdbPosterPath: known?.posterPath ?? null,
+  };
+}
+
+/**
  * Create the title row for a confirmed candidate.
  *
  * ⚠ THE TWO SHAPES ARE MUTUALLY EXCLUSIVE AND THE DATABASE ENFORCES IT. The
@@ -111,9 +174,9 @@ async function insertTitle(
   today: Date,
 ): Promise<string> {
   const id = ulid();
-  const match = candidate.match;
+  const tmdb = tmdbFieldsFor(candidate, workIdentity);
 
-  if (kind === 'addition' && match !== null) {
+  if (kind === 'addition' && tmdb !== null) {
     await createTitle(
       ownerId,
       {
@@ -121,11 +184,7 @@ async function insertTitle(
         workIdentity,
         state: 'active',
         matchState: 'matched',
-        tmdbId: match.tmdbId,
-        tmdbMediaType: match.mediaType,
-        tmdbName: match.name,
-        tmdbReleaseYear: match.releaseYear,
-        tmdbPosterPath: match.posterPath,
+        ...tmdb,
         sortDateAdded: today,
         createdByBatchId: batchId,
       },
@@ -243,6 +302,35 @@ export async function closeBatch(
       }
 
       if (kind === 'unresolved') unresolvedKept += 1;
+
+      // REQ-068 / §8.1: "match corrected during review" is a `modified` entry
+      // carrying the BEFORE value. It is written here, at close, and not at
+      // PATCH time for two reasons: the title id the §3.7 shape requires does
+      // not exist until now, and a batch the owner discards must leave no
+      // provenance behind at all.
+      //
+      // ⚠ The before value is `alternatives[0]`, NOT `resolvedWorkIdentity` —
+      // the correction overwrote that column, and `matchCandidates` is the
+      // only surviving record of what the pipeline had proposed. `null` means
+      // the pipeline proposed nothing, which is a real answer and not a
+      // missing read.
+      if (candidate.disposition === 'corrected') {
+        const before = originalIdentityFor(candidate);
+        if (before !== workIdentity) {
+          await recordBatchChange(
+            ownerId,
+            {
+              batchId: batch.id,
+              kind: 'attr_modified',
+              titleId,
+              attr: 'workIdentity',
+              prevValue: before === null ? null : jsonScalar(before),
+              nextValue: jsonScalar(workIdentity),
+            },
+            tx,
+          );
+        }
+      }
 
       const listingId = ulid();
       await createServiceListing(
