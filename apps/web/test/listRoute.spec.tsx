@@ -149,12 +149,15 @@ describe('T-DATA-002 — the list screen reads its data from the API', () => {
 
     renderRoute(client);
 
-    // ⚠ A refusal must never offer retry: the owner is authenticated, so every
+    // ⚠ Wait for the POSITIVE first. `waitFor` on an absence resolves on the
+    // very first tick — before anything has rendered — so asserting the
+    // refusal text after it raced the render and failed on slower CI runners.
+    // Ordering it this way is also strictly stronger: it proves the refusal
+    // arrived AND that no retry came with it.
+    expect(await screen.findByText(/isn't set up for this account/i)).toBeInTheDocument();
+    // A refusal must never offer retry: the owner is authenticated, so every
     // retry produces the identical 403, forever.
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: /retry/i })).not.toBeInTheDocument();
-    });
-    expect(screen.getByText(/isn't set up for this account/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /retry/i })).not.toBeInTheDocument();
   });
 
   it('T-DATA-002f: a failed freshness strip does not blank the list', async () => {
