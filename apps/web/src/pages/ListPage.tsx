@@ -17,6 +17,7 @@ import { useSearchParams } from 'react-router-dom';
 import { FilterBar, parseFilters, applyFilters, NO_FILTERS } from '../components/FilterBar';
 import { FreshnessStrip, type ServiceFreshness } from '../components/FreshnessStrip';
 import { ListEmptyState, ListLoadError } from '../components/ListEmptyState';
+import { SortControl } from '../components/SortControl';
 import { TitleList } from '../components/TitleList';
 import type { TitleListItem } from '../components/TitleRow';
 import { LIST_LOADING_BODY } from '../copy';
@@ -85,6 +86,7 @@ export function ListPage({
       ) : (
         <>
           <FilterBar genres={genres} shown={shown} total={unfilteredTotal} />
+          <SortControl />
           <TitleList items={items} />
           <ListEmptyState
             facts={{ shown, total: unfilteredTotal, filters, removedCount, suppressedCount }}
