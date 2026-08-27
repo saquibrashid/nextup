@@ -36,6 +36,7 @@ import { registerFixMatchRoutes } from './fixMatch.js';
 import { registerImageRoutes } from './images.js';
 import { registerImdbRoutes } from './imdb.js';
 import { registerMeRoutes } from './me.js';
+import { registerRemovalGroupRoutes } from './removalGroups.js';
 import { registerRemovedRoutes } from './removed.js';
 import { registerServiceStateRoutes } from './serviceState.js';
 import { registerSuppressionRoutes } from './suppressions.js';
@@ -115,6 +116,11 @@ export function createApiRouter(): Router {
   // §6.25 — creates-only undo (SD-03). Registered after close because it only
   // ever acts on a batch close has already applied.
   registerBatchUndoRoutes(apiRouter);
+  // §6.26 (US-017) — undo a confirmed removal group. Registered after the
+  // close that creates the group and beside the batch undo it is often
+  // confused with: that one reverses a batch's ADDITIONS, this one its
+  // removals, and the two are neither substitutes nor alternatives.
+  registerRemovalGroupRoutes(apiRouter);
   // §6.12 — the ONE ingest route for paste, drop and file selection alike.
   registerBatchImageRoutes(apiRouter);
   // §6.27 — the ONE route that serves image bytes. No SAS, no blob URL.
