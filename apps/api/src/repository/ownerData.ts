@@ -643,10 +643,66 @@ export async function updateTitleRating(
   });
 }
 
+/**
+ * Persist ONE work's refreshed TMDB metadata (REQ-076, NFR-014).
+ *
+ * ⚠ **THE COLUMN SET IS CLOSED, FOR THE SAME REASON `updateTitleRating`'S IS.**
+ * This is the write executed by the lazy, access-triggered metadata refresh —
+ * the exemption product invariant 5 grants to metadata-only work. It stays an
+ * exemption only while it cannot change user-visible LIST state, and the only
+ * thing making that true is this closed column set.
+ *
+ * Specifically absent, and each for a reason: `workIdentity` (the dedup key —
+ * rewriting it would silently merge or split rows), `tmdbId`/`tmdbMediaType`
+ * (the identity's own components), `sortDateAdded` (the default ordering),
+ * `state`/`matchState` (membership), and everything on `service_listing`
+ * (the badges). `T-TMDB-014` asserts this from the other end.
+ *
+ * `imdbId` IS refreshable: it is TMDB's descriptive mapping to another
+ * catalogue, it is display-only via the rating (REQ-095), and TMDB adding one
+ * to a work that previously had none is the ordinary case a refresh exists to
+ * pick up.
+ *
+ * Owner-scoped via `updateMany`, like every other writer here.
+ */
+export async function updateTitleMetadata(
+  ownerId: OwnerId,
+  id: string,
+  metadata: {
+    tmdbName: string;
+    tmdbReleaseYear: number | null;
+    tmdbRuntimeMinutes: number | null;
+    tmdbGenres: string;
+    tmdbPosterPath: string | null;
+    imdbId: string | null;
+    tmdbFetchedAt: Date;
+  },
+  tx?: Db,
+) {
+  return db(tx).title.updateMany({
+    where: { ownerId, id },
+    data: {
+      tmdbName: metadata.tmdbName,
+      tmdbReleaseYear: metadata.tmdbReleaseYear,
+      tmdbRuntimeMinutes: metadata.tmdbRuntimeMinutes,
+      tmdbGenres: metadata.tmdbGenres,
+      tmdbPosterPath: metadata.tmdbPosterPath,
+      // ⚠ `null` means LEAVE IT ALONE, not "clear it". TMDB answers a detail
+      // request without an `imdb_id` more often than one would like — a series
+      // carries it only under `external_ids`, and an occasional response omits
+      // it entirely — and blanking a good id on one such answer would silently
+      // end the work's ratings (REQ-094) with no way to tell it apart from
+      // "TMDB never had one". Gaining an id is an ordinary refresh outcome;
+      // losing one is not.
+      ...(metadata.imdbId === null ? {} : { imdbId: metadata.imdbId }),
+      tmdbFetchedAt: metadata.tmdbFetchedAt,
+    },
+  });
+}
+
 /* ------------------------------------------------------------------ *
  * service_listing
  * ------------------------------------------------------------------ */
-
 export async function createServiceListing(
   ownerId: OwnerId,
   data: Omit<Prisma.ServiceListingUncheckedCreateInput, 'ownerId'>,
