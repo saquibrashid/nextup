@@ -674,6 +674,57 @@ export async function listActiveListingsForService(ownerId: OwnerId, service: st
   });
 }
 
+/**
+ * Every removal decision stored for a batch (TASK-085, US-015).
+ *
+ * ⚠ Returns ALL of them, ticked and unticked alike. Filtering to the unticked
+ * ones here would make "the owner ticked this back on" indistinguishable from
+ * "the owner never touched it" — the same value, two different histories — and
+ * the batch history has to be able to tell them apart.
+ */
+export async function listRemovalDecisions(ownerId: OwnerId, batchId: string, tx?: Db) {
+  return db(tx).removalDecision.findMany({
+    where: { ownerId, batchId },
+    select: { listingId: true, ticked: true },
+    orderBy: { listingId: 'asc' },
+  });
+}
+
+/**
+ * Record the owner's tick/untick for a set of proposed removals.
+ *
+ * ⚠ An explicit UPDATE-then-INSERT-if-zero-rows, NOT `upsert`. TASK-017
+ * requires that form everywhere: Prisma's `upsert()` compiles to SQL Server's
+ * `MERGE`, which has documented concurrency defects, and its unique selector
+ * cannot bind `ownerId` at the top level of the `where` — so `T-SEC-021`
+ * could not see whether the call was owner-scoped at all.
+ *
+ * ⚠ One statement pair per listing rather than a `createMany`/`updateMany`
+ * over the whole set: ticking a removal that was never unticked and unticking
+ * one twice must both be ordinary successes. The caller wraps the whole set in
+ * a transaction so a half-applied press cannot leave the owner looking at a
+ * removal list that is neither the old one nor the new one.
+ */
+export async function setRemovalDecisions(
+  ownerId: OwnerId,
+  batchId: string,
+  listingIds: readonly string[],
+  ticked: boolean,
+  tx?: Db,
+): Promise<void> {
+  for (const listingId of listingIds) {
+    const updated = await db(tx).removalDecision.updateMany({
+      where: { ownerId, batchId, listingId },
+      data: { ticked, decidedAt: new Date() },
+    });
+    if (updated.count === 0) {
+      await db(tx).removalDecision.create({
+        data: { ownerId, batchId, listingId, ticked },
+      });
+    }
+  }
+}
+
 /** One page of the removed view. Newest removal first, ties by listing id. */
 export interface RemovedListingRow {
   listing_id: string;

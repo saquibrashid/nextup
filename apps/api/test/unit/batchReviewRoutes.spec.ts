@@ -132,6 +132,10 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
     listCandidatesForReview: () => Promise.resolve(store.candidates),
     listActiveSuppressions: () => Promise.resolve(store.suppressions),
     listActiveListingsForService: () => Promise.resolve(store.listings),
+    // TASK-085 — the review route now reads the owner's tick/untick
+    // deviations. Stubbed empty: absence of a row means ticked (REQ-055), so
+    // this is the state every one of these cases is asserting against.
+    listRemovalDecisions: () => Promise.resolve([]),
     listImagesForBatch: () => Promise.resolve(store.images),
     findExtractionCandidate: (_ownerId: string, id: string) =>
       Promise.resolve(store.candidates.find((candidate) => candidate.id === id) ?? null),

@@ -29,6 +29,7 @@ import { registerBatchCandidateRoutes } from './batchCandidates.js';
 import { registerBatchCloseRoutes } from './batchClose.js';
 import { registerBatchRoutes } from './batches.js';
 import { registerBatchImageRoutes } from './batchImages.js';
+import { registerBatchRemovalRoutes } from './batchRemovals.js';
 import { registerBatchReviewRoutes } from './batchReview.js';
 import { registerImageRoutes } from './images.js';
 import { registerImdbRoutes } from './imdb.js';
@@ -97,6 +98,7 @@ export function createApiRouter(): Router {
   // review assembly share nothing but the batch id, and `batches.ts` is a
   // contended file that several lanes need to keep small.
   registerBatchReviewRoutes(apiRouter);
+  registerBatchRemovalRoutes(apiRouter);
   // §6.18/§6.19 — per-candidate disposition, correction and the bulk confirm.
   // Needs a TMDB client for the `reclassifyAsTitle` re-match; same per-request
   // lifetime and the same reason as `registerTmdbRoutes` below.

@@ -69,6 +69,7 @@ model UploadBatch {
 
   titlesCreated   Title[]
   removalGroups   RemovalGroup[]
+  removalDecisions RemovalDecision[]
   listingsCreated ServiceListing[]      @relation("ListingCreatedBy")
   listingsRemoved ServiceListing[]      @relation("ListingRemovedBy")
   changes         BatchChange[]
@@ -250,6 +251,42 @@ model RemovalGroup {
 
   @@index([ownerId, batchId], map: "removal_group_owner_batch")
   @@map("removal_group")
+}
+
+/// One owner decision about ONE proposed removal in ONE batch (US-015,
+/// REQ-021).
+///
+/// ⚠ **The absence of a row means TICKED** (REQ-055). Only a deviation from
+/// the default is stored, and that asymmetry is deliberate: a removal set is
+/// recomputed from the screenshots on every read, so a row per proposal would
+/// have to be created, reconciled and garbage-collected as the set changed,
+/// and any gap in that bookkeeping presents as a removal the owner never
+/// ticked. Storing only "the owner said no to this one" cannot drift, because
+/// the only thing that writes it is the owner saying no.
+///
+/// Rows are scoped to the BATCH, never to the listing alone: unticking a
+/// removal in one batch is a decision about that batch's evidence, and it must
+/// not silently rescue the same listing from a later full-update that has
+/// fresh evidence for it.
+///
+/// Rows survive the close, like every other row in this schema (REQ-028). They
+/// are the record of what the owner declined, which is what a batch history
+/// has to be able to show.
+model RemovalDecision {
+  ownerId String @map("owner_id") @db.NVarChar(200)
+
+  batchId String      @map("batch_id") @db.NVarChar(200)
+  batch   UploadBatch @relation(fields: [batchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_removal_decision_batch")
+
+  /// The proposed listing. NOT a foreign key on purpose — see the migration.
+  listingId String @map("listing_id") @db.NVarChar(200)
+
+  ticked Boolean @default(true, map: "df_removal_decision_ticked")
+
+  decidedAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_removal_decision_decided") @map("decided_at") @db.DateTime2
+
+  @@id([ownerId, batchId, listingId], map: "pk_removal_decision")
+  @@map("removal_decision")
 }
 
 /// An uploaded screenshot. Purged at 30 days (NFR-019, ADR-0006).
