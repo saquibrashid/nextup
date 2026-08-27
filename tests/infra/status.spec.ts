@@ -285,14 +285,17 @@ describe('T-STATUS-001 · the task status ledger and its gate', () => {
     // implemented. They were originally `T-SEC-021` and `T-INV-001`; TASK-017
     // then genuinely delivered both, and this case failed — correctly, because
     // the ids stopped being examples of the thing under test. `T-REV-006`
-    // replaced one of them and was in turn delivered by TASK-065, so it has
-    // been moved on again, to `T-PASTE-010` (TASK-164, unbuilt). If it fails
-    // that way again, the fix is to move the probe to another undelivered id,
-    // NEVER to relax the assertion.
+    // replaced one of them and was in turn delivered by TASK-065, so it moved
+    // on to `T-SUP-003`, which TASK-103 then delivered, and on again to
+    // `T-IMG-017` (unbuilt) — `T-PERF-001` was tried first and rejected by
+    // this very assertion, which is the gate working. The other probe is
+    // `T-PASTE-010` (TASK-164, unbuilt).
+    // If it fails that way again, the fix is to move the probe to another
+    // undelivered id, NEVER to relax the assertion.
     const defined = collectDefinedTestIds();
 
     // Both appear as fixtures in tools/eslint-rules/test-id-naming.spec.ts.
-    for (const probe of ['T-SUP-003', 'T-PASTE-010']) {
+    for (const probe of ['T-IMG-017', 'T-PASTE-010']) {
       expect(
         mentionedTestIds().has(probe),
         `${probe} is no longer mentioned anywhere, so it cannot probe anything`,
