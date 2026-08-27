@@ -84,8 +84,8 @@ const authed = (path: string, init: RequestInit = {}): Promise<Response> =>
     },
   });
 
-const closeBatchRequest = (batchId: string): Promise<Response> =>
-  authed(`/api/batches/${batchId}/close`, { method: 'POST', body: '{}' });
+const closeBatchRequest = (batchId: string, body: unknown = {}): Promise<Response> =>
+  authed(`/api/batches/${batchId}/close`, { method: 'POST', body: JSON.stringify(body) });
 
 /**
  * The combined list EXACTLY as the owner would see it.
@@ -427,17 +427,55 @@ describe('T-BATCH-011 · US-016 · reconciliation touches only the batch service
     // The dangerous case. Full-update reconciliation is the only path that
     // removes anything, and a scope bug here silently empties the other
     // service's list — the failure REQ-020 and product invariant 3 exist for.
-    await seedListing(HEAT, 'Heat', 'max');
+    //
+    // ⚠ THE NETFLIX REMOVAL MUST ACTUALLY HAPPEN. Until TASK-086 this test
+    // seeded only a Max listing, so the close removed nothing at all and the
+    // assertion held for the wrong reason. Heat is now listed on BOTH services
+    // and absent from the screenshots, so Netflix's copy is proposed and
+    // removed in the same close that must leave Max's alone.
+    const heatId = await seedListing(HEAT, 'Heat', 'max');
+    await testPrisma().uploadBatch.upsert({
+      where: { id: 'batch-atomic-seed-netflix' },
+      update: {},
+      create: {
+        id: 'batch-atomic-seed-netflix',
+        ownerId,
+        service: 'netflix',
+        mode: 'append-only',
+        status: 'applied',
+        lowYield: false,
+        degradedExtraction: false,
+      },
+    });
+    await testPrisma().serviceListing.create({
+      data: {
+        ownerId,
+        listingId: 'listing-atomic-heat-netflix',
+        titleId: heatId,
+        service: 'netflix',
+        state: 'active',
+        dateAdded: new Date('2026-01-04'),
+        createdByBatchId: 'batch-atomic-seed-netflix',
+      },
+    });
 
     const batchId = await makeBatch({ service: 'netflix', mode: 'full-update' });
     await makeCandidate(batchId, { disposition: 'confirmed' });
 
-    expect((await closeBatchRequest(batchId)).status).toBe(200);
+    expect((await closeBatchRequest(batchId, { confirmRemovals: true })).status).toBe(200);
 
+    // The Netflix copy is gone; the Max copy is untouched and the title stays
+    // in the list wearing its remaining badge.
+    expect(
+      await testPrisma().serviceListing.count({
+        where: { titleId: heatId, service: 'netflix', state: 'removed' },
+      }),
+    ).toBe(1);
     expect(await countListings('max')).toBe(1);
     expect(
       await testPrisma().serviceListing.count({ where: { service: 'max', state: 'active' } }),
     ).toBe(1);
+    expect((await testPrisma().title.findFirst({ where: { id: heatId } }))?.state).toBe('active');
   });
 });
 
@@ -501,5 +539,49 @@ describe('T-BATCH-014 · US-005 AC-3 · a close applies everything in one step',
     // close failed.
     expect(await testPrisma().title.count()).toBe(0);
     expect(await countListings()).toBe(0);
+  });
+
+  it('T-BATCH-014c: a confirmed removal and an addition are applied together', async () => {
+    // The half that could not be written before TASK-086. An addition and a
+    // removal are the two OPPOSITE directions a close moves the list in, and
+    // they are separate write loops — the shape most likely to end up in two
+    // transactions, leaving the list with the addition applied and the removal
+    // not, or worse the other way round.
+    const goneId = await seedListing(HEAT, 'Heat', 'netflix');
+    const batchId = await makeBatch({ service: 'netflix', mode: 'full-update' });
+    await makeCandidate(batchId, { disposition: 'confirmed' });
+
+    expect((await closeBatchRequest(batchId, { confirmRemovals: true })).status).toBe(200);
+
+    expect(
+      await testPrisma().serviceListing.count({ where: { titleId: goneId, state: 'removed' } }),
+    ).toBe(1);
+    expect(
+      await testPrisma().serviceListing.count({
+        where: { createdByBatchId: batchId, state: 'active' },
+      }),
+    ).toBe(1);
+  });
+
+  it('T-BATCH-014d: and neither lands when the close fails after both are written', async () => {
+    const goneId = await seedListing(HEAT, 'Heat', 'netflix');
+    const batchId = await makeBatch({ service: 'netflix', mode: 'full-update' });
+    await makeCandidate(batchId, { disposition: 'confirmed' });
+
+    failServiceState = true;
+    expect((await closeBatchRequest(batchId, { confirmRemovals: true })).status).toBe(500);
+    failServiceState = false;
+
+    // ⚠ The removal must roll back too. A removal that survives a failed close
+    // is the one direction the owner cannot recover from by simply retrying:
+    // the retry recomputes the proposal from the same screenshots and, finding
+    // the listing already gone, proposes nothing — so nobody is ever told.
+    expect(
+      (await testPrisma().serviceListing.findFirst({ where: { titleId: goneId } }))?.state,
+    ).toBe('active');
+    expect(await testPrisma().serviceListing.count({ where: { createdByBatchId: batchId } })).toBe(
+      0,
+    );
+    expect(await testPrisma().removalGroup.count()).toBe(0);
   });
 });
