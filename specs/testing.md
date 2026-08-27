@@ -1120,6 +1120,7 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 | AC-4 | I | **`T-UNDO-004`** | A creates-only batch whose title was since suppressed or fix-matched is **refused** and enumerated |
 | AC-5 | I | `T-UNDO-008` | A batch that created nothing undoes successfully as a no-op |
 | AC-6 | I | `T-UNDO-009` | Injected failure mid-undo → batch left applied, nothing partially reversed |
+| AC-2 | I | **`T-UNDO-010`** | The SD-03 discard module directly: the discard is REFUSED by `fk_change_listing` unless the provenance and candidate pointers are detached first; the detached rows themselves survive with their non-pointer columns intact (REQ-028, US-032 AC-3), and both deletes are owner-scoped |
 
 ### US-033 — Refuse a mixed-changeset undo and enumerate what it touched
 | AC | L | Test | Assertion |
