@@ -153,6 +153,21 @@ export const DROPZONE_ACTIVE_LABEL = 'Drop screenshots here';
  * Quoted from §3.2's prose rather than §9's table (§9 has no row for it), so
  * this is the spec's own wording, not invented copy.
  */
+/**
+ * `specs/ui.md` §3.2 - a folder dragged onto the drop target.
+ *
+ * The spec requires the folder be refused "by name" (`T-PASTE-004`) — the
+ * `{name}` placeholder is substituted at the call site with the entry name
+ * that `webkitGetAsEntry().name` provides, or the `File.name` fallback when
+ * the DataTransferItem API is unavailable.
+ *
+ * ⚠ FINDING - exact wording is not in `specs/ui.md` §9's table. The constant
+ * is required for `T-PASTE-004` but the spec only says "refused by name" in
+ * prose at §3.2. Using the nearest-matching pattern from `UNSUPPORTED_FORMAT_REJECTION`.
+ */
+export const FOLDER_REJECTION =
+  'That\u2019s a folder, not a screenshot \u2014 nextup can\u2019t open it. Try selecting the files inside instead.';
+
 export const UNSUPPORTED_FORMAT_REJECTION =
   "That file isn't a screenshot nextup can read — attach a PNG, JPEG or HEIC image.";
 

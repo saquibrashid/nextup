@@ -28,6 +28,7 @@ import {
   CHOOSE_FILES_LABEL,
   DROPZONE_ACTIVE_LABEL,
   DROPZONE_IDLE_LABEL,
+  FOLDER_REJECTION,
   HEIC_PREVIEW_PLACEHOLDER,
   IMAGE_ACCEPT_ATTRIBUTE,
   UNSUPPORTED_FORMAT_REJECTION,
@@ -165,13 +166,19 @@ export function ImageDropzone({
   const inputId = useId();
 
   const addFiles = useCallback(
-    (files: readonly File[], source: IngestSource): void => {
-      if (files.length === 0) return;
-      const review = reviewFiles(files, accepted.length);
+    (
+      files: readonly File[],
+      source: IngestSource,
+      extraRejections?: readonly RejectedFile[],
+    ): void => {
+      if (files.length === 0 && (extraRejections === undefined || extraRejections.length === 0))
+        return;
+      const review =
+        files.length > 0 ? reviewFiles(files, accepted.length) : { accepted: [], rejected: [] };
       // Rejections REPLACE the previous batch's rejections but never the
       // accepted list (§4.4): both are visible at once, because a rejection
       // that clears the grid reads as "everything failed".
-      setRejected(review.rejected);
+      setRejected([...(extraRejections ?? []), ...review.rejected]);
       if (review.accepted.length > 0) {
         setAccepted([...accepted, ...review.accepted]);
         onFilesAccepted?.(review.accepted, source);
@@ -194,6 +201,39 @@ export function ImageDropzone({
   function onDrop(event: DragEvent<HTMLDivElement>): void {
     event.preventDefault();
     setDragging(false);
+
+    // ⚠ FOLDER DETECTION: DataTransferItem.webkitGetAsEntry() is the only
+    // reliable way to distinguish a folder from a file at drop time. The check
+    // is synchronous (entry must be read before the event is recycled) and
+    // happens before we call addFiles so folder rejections go into the same
+    // RejectionList as every other client refusal.
+    const items = event.dataTransfer.items;
+    if (items !== null && items !== undefined && items.length > 0) {
+      const folderRejections: RejectedFile[] = [];
+      const filesToPass: File[] = [];
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item === undefined) continue;
+        const entry = typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null;
+        if (entry !== null && entry.isDirectory) {
+          folderRejections.push({ name: entry.name, reason: FOLDER_REJECTION });
+        } else {
+          const file = item.getAsFile?.();
+          if (file !== null && file !== undefined) {
+            filesToPass.push(file);
+          }
+        }
+      }
+
+      // Pass folder rejections as extra so addFiles merges them with file
+      // review rejections rather than one set overwriting the other.
+      addFiles(filesToPass, 'drop', folderRejections.length > 0 ? folderRejections : undefined);
+      return;
+    }
+
+    // DataTransferItem API unavailable (some legacy browsers): fall back to
+    // the FileList. No folder detection possible, but at least files work.
     addFiles([...event.dataTransfer.files], 'drop');
   }
 
@@ -260,7 +300,7 @@ export function ImageDropzone({
 
       {accepted.length > 0 && (
         <>
-          <p data-testid="dropzone-totals">
+          <p aria-live="polite" data-testid="dropzone-totals">
             {`${String(accepted.length)} screenshots · ${(totalBytes / MEGABYTE).toFixed(1)} MB`}
           </p>
           <ul data-testid="accepted-list">

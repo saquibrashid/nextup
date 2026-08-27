@@ -189,6 +189,18 @@ button {
   text-align: center;
 }
 
+/*
+ * TASK-162. ⚠ COLOUR IS NEVER THE SOLE CARRIER (specs/ui.md §10.2): the
+ * border changes from dashed to solid AND to the accent colour, so the
+ * distinction is shape + colour, not colour alone. `data-dragging` is an
+ * attribute selector, not a class, so it is outside the T-CSS-001 bidirectional
+ * class constraint.
+ */
+.dropzone__target[data-dragging='true'] {
+  border-color: var(--color-accent);
+  border-style: solid;
+}
+
 .dropzone__choose,
 .dropzone__paste {
   background: var(--color-surface);
@@ -216,6 +228,22 @@ button {
   flex-wrap: wrap;
   gap: var(--space-3);
   margin-bottom: var(--space-4);
+}
+
+/* --------------------------------------------------------- sort control -- */
+
+/*
+ * TASK-166. ⚠ LABEL SHOWS THE CURRENT DIRECTION, not what the next click
+ * will produce (`A47`). The button's `aria-pressed` state communicates
+ * "oldest-first is currently active" — styling mirrors that: visually distinct
+ * when pressed (oldest-first), plain when default (newest-first).
+ */
+.sort-control {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: inherit;
 }
 
 /* ------------------------------------------------------ freshness strip -- */
@@ -371,6 +399,42 @@ button {
   color: var(--color-accent);
   cursor: pointer;
   text-align: left;
+}
+
+/* -------------------------------------------------------- not interested -- */
+
+/*
+ * TASK-107 (`specs/ui.md` §7). Mirrors the title-row layout so a removed
+ * row and a not-interested row have the same visual weight.
+ */
+.suppressed-row {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.suppressed-row__poster {
+  border-radius: var(--radius);
+  flex: 0 0 auto;
+  height: 4.5rem;
+  object-fit: cover;
+  width: 3rem;
+}
+
+.suppressed-row__poster--empty {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+
+.suppressed-row__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
 }
 
 /* ---------------------------------------------------------- attribution -- */
