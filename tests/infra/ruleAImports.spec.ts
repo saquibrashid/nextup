@@ -55,82 +55,109 @@ async function lint(relativePath: string, source: string): Promise<string[]> {
   return (result?.messages ?? []).map((m) => `${String(m.ruleId)}: ${m.message}`);
 }
 
+/** Lints a file that really exists, through the same shared instance. */
+async function lintFile(absolutePath: string): Promise<string[]> {
+  const results = await (await eslint()).lintFiles([absolutePath]);
+  return (results[0]?.messages ?? []).map((m) => `${String(m.ruleId)}: ${m.message}`);
+}
+
+/**
+ * ⚠ EXPLICIT TIMEOUT, NOT THE 5 s DEFAULT. Resolving the flat config is
+ * seconds of real work even once, and these cases share a machine with the
+ * rest of the infra project; a default-timeout failure here reads as "Rule A
+ * is broken" when it only means the box was busy.
+ */
+const LINT_TIMEOUT_MS = 60_000;
+
 afterAll(() => {
   shared = undefined;
 });
 
 describe('T-AI-012 · RSK-022 · no AI SDK is importable from the matching path', () => {
-  it('T-AI-012a: importing an inference SDK from the matcher is an ESLint error', async () => {
-    const messages = await lint(
-      'packages/domain/src/matching/__ruleA_probe_sdk.ts',
-      "import OpenAI from 'openai';\nexport const probe = OpenAI;\n",
-    );
-    expect(messages.join('\n')).toContain('no-restricted-imports');
-    expect(messages.join('\n')).toContain('Rule A');
-  });
-
-  it('T-AI-012b: every inference SDK the repo could plausibly install is caught', async () => {
-    // A one-package rule is a rule that a `npm i @azure/openai` walks around
-    // without noticing. Each of these is a realistic install name for the same
-    // violation.
-    const sdks = [
-      '@azure/openai',
-      '@azure-rest/ai-vision-image-analysis',
-      '@azure/ai-form-recognizer',
-      '@anthropic-ai/sdk',
-      '@google/generative-ai',
-      'langchain',
-      '@langchain/core',
-      'ollama',
-      'replicate',
-      '@huggingface/inference',
-    ];
-    for (const sdk of sdks) {
+  it(
+    'T-AI-012a: importing an inference SDK from the matcher is an ESLint error',
+    async () => {
       const messages = await lint(
-        `packages/domain/src/matching/__ruleA_probe_${sdk.replace(/[^a-z]/gi, '_')}.ts`,
-        `import x from '${sdk}';\nexport const probe = x;\n`,
+        'packages/domain/src/matching/__ruleA_probe_sdk.ts',
+        "import OpenAI from 'openai';\nexport const probe = OpenAI;\n",
       );
-      expect(`${sdk} :: ${messages.join('\n')}`).toContain('no-restricted-imports');
-    }
-  });
+      expect(messages.join('\n')).toContain('no-restricted-imports');
+      expect(messages.join('\n')).toContain('Rule A');
+    },
+    LINT_TIMEOUT_MS,
+  );
 
-  it('T-AI-012c: the deterministic matcher itself lints CLEAN', async () => {
-    // The negative half. `tmdbMatcher.ts` imports `../extraction/jaroWinkler.js`
-    // — the PURE domain string arithmetic, which shares only a name with the
-    // API app's SDK-calling extraction layer. A rule broad enough to catch
-    // that would break the very matcher it protects.
-    const { ESLint } = await import('eslint');
-    const eslint = new ESLint({ cwd: REPO_ROOT });
-    const results = await eslint.lintFiles([join(MATCHING_DIR, 'tmdbMatcher.ts')]);
-    const messages = (results[0]?.messages ?? []).map((m) => `${String(m.ruleId)}: ${m.message}`);
-    expect(messages).toEqual([]);
-  });
+  it(
+    'T-AI-012b: every inference SDK the repo could plausibly install is caught',
+    async () => {
+      // A one-package rule is a rule that a `npm i @azure/openai` walks around
+      // without noticing. Each of these is a realistic install name for the same
+      // violation.
+      const sdks = [
+        '@azure/openai',
+        '@azure-rest/ai-vision-image-analysis',
+        '@azure/ai-form-recognizer',
+        '@anthropic-ai/sdk',
+        '@google/generative-ai',
+        'langchain',
+        '@langchain/core',
+        'ollama',
+        'replicate',
+        '@huggingface/inference',
+      ];
+      for (const sdk of sdks) {
+        const messages = await lint(
+          `packages/domain/src/matching/__ruleA_probe_${sdk.replace(/[^a-z]/gi, '_')}.ts`,
+          `import x from '${sdk}';\nexport const probe = x;\n`,
+        );
+        expect(`${sdk} :: ${messages.join('\n')}`).toContain('no-restricted-imports');
+      }
+    },
+    LINT_TIMEOUT_MS,
+  );
 
-  it('T-AI-012d: the TMDB client is covered too, not just the matcher', async () => {
-    // The matcher is the obvious path. The TMDB client is the one that HOLDS
-    // TMDB content, so an inference import there is the more direct violation
-    // of RSK-022 — and it lives in the API app, where the SDKs are already
-    // installed and resolvable. Linted as TEXT under the real file's path,
-    // because the rule is scoped to that exact filename.
-    const { ESLint } = await import('eslint');
-    const eslint = new ESLint({ cwd: REPO_ROOT });
-    const [result] = await eslint.lintText(
-      "import OpenAI from 'openai';\nexport const probe = OpenAI;\n",
-      { filePath: join(REPO_ROOT, 'apps/api/src/clients/tmdbClient.ts') },
-    );
-    expect((result?.messages ?? []).map((m) => String(m.ruleId))).toContain(
-      'no-restricted-imports',
-    );
-  });
+  it(
+    'T-AI-012c: the deterministic matcher itself lints CLEAN',
+    async () => {
+      // The negative half. `tmdbMatcher.ts` imports `../extraction/jaroWinkler.js`
+      // — the PURE domain string arithmetic, which shares only a name with the
+      // API app's SDK-calling extraction layer. A rule broad enough to catch
+      // that would break the very matcher it protects.
+      const messages = await lintFile(join(MATCHING_DIR, 'tmdbMatcher.ts'));
+      expect(messages).toEqual([]);
+    },
+    LINT_TIMEOUT_MS,
+  );
 
-  it('T-AI-012e: an ordinary domain import is still allowed', async () => {
-    // The rule must be a scalpel. If `import { normaliseTitleText } from
-    // '../identity.js'` started failing, the rule would be deleted rather
-    // than fixed.
-    const messages = await lint(
-      'packages/domain/src/matching/__ruleA_probe_ok.ts',
-      "import { jaroWinkler } from '../extraction/jaroWinkler.js';\nexport const probe = jaroWinkler;\n",
-    );
-    expect(messages.filter((m) => m.startsWith('no-restricted-imports'))).toEqual([]);
-  });
+  it(
+    'T-AI-012d: the TMDB client is covered too, not just the matcher',
+    async () => {
+      // The matcher is the obvious path. The TMDB client is the one that HOLDS
+      // TMDB content, so an inference import there is the more direct violation
+      // of RSK-022 — and it lives in the API app, where the SDKs are already
+      // installed and resolvable. Linted as TEXT under the real file's path,
+      // because the rule is scoped to that exact filename.
+      const messages = await lint(
+        'apps/api/src/clients/tmdbClient.ts',
+        "import OpenAI from 'openai';\nexport const probe = OpenAI;\n",
+      );
+      expect(messages.map((m) => m.split(':')[0])).toContain('no-restricted-imports');
+    },
+    LINT_TIMEOUT_MS,
+  );
+
+  it(
+    'T-AI-012e: an ordinary domain import is still allowed',
+    async () => {
+      // The rule must be a scalpel. If `import { normaliseTitleText } from
+      // '../identity.js'` started failing, the rule would be deleted rather
+      // than fixed.
+      const messages = await lint(
+        'packages/domain/src/matching/__ruleA_probe_ok.ts',
+        "import { jaroWinkler } from '../extraction/jaroWinkler.js';\nexport const probe = jaroWinkler;\n",
+      );
+      expect(messages.filter((m) => m.startsWith('no-restricted-imports'))).toEqual([]);
+    },
+    LINT_TIMEOUT_MS,
+  );
 });

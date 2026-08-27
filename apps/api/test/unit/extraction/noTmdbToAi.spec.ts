@@ -29,8 +29,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { HttpResponse, http, passthrough } from 'msw';
-import { setupServer, type SetupServerApi } from 'msw/node';
+import { type SetupServerApi } from 'msw/node';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { AzureVisionExtractor } from '../../../src/extraction/azureVisionExtractor.js';
@@ -38,16 +37,16 @@ import { LlmVisionExtractor } from '../../../src/extraction/llmVisionExtractor.j
 import {
   AOAI_DEPLOYMENT,
   AOAI_ENDPOINT,
-  VALID as AOAI_VALID,
   fakeAoaiCredential,
 } from '../../../../../tests/fixtures/msw/aoai/index.js';
 import {
   VISION_ENDPOINT,
-  VALID as VISION_VALID,
   fakeVisionCredential,
 } from '../../../../../tests/fixtures/msw/vision/index.js';
-// @ts-expect-error - the egress guard is plain ESM JavaScript with no types.
-import { registerMockedHost, unregisterMockedHost } from '../../../../../tools/egress-guard.mjs';
+import {
+  recordingInferenceServer,
+  type Wire,
+} from '../../../../../tests/fixtures/msw/ruleA/index.js';
 
 const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01, 0x02]);
 
@@ -105,13 +104,6 @@ const TMDB_CONTENT: readonly string[] = (() => {
 
 /* ── the recording transport ──────────────────────────────────────────── */
 
-interface Wire {
-  host: string;
-  url: string;
-  headers: Record<string, string>;
-  body: string;
-}
-
 /**
  * The whole request, serialised — URL, every header, and the raw body. This
  * is what "no TMDB content leaves for an AI host" has to be checked against,
@@ -130,55 +122,16 @@ function tmdbContentIn(wire: Wire): string[] {
 }
 
 let server: SetupServerApi | undefined;
-const mockedHosts: string[] = [];
-
-function recordingServer(wires: Wire[]): SetupServerApi {
-  const capture =
-    (host: string) =>
-    async ({ request }: { request: Request }): Promise<void> => {
-      const headers: Record<string, string> = {};
-      request.headers.forEach((value, key) => {
-        headers[key] = value;
-      });
-      wires.push({ host, url: request.url, headers, body: await request.clone().text() });
-    };
-
-  const aoai = capture('aoai');
-  const vision = capture('vision');
-
-  const created = setupServer(
-    http.all(`${AOAI_ENDPOINT}/*`, async ({ request }) => {
-      await aoai({ request });
-      return HttpResponse.json(AOAI_VALID.body, { status: AOAI_VALID.status });
-    }),
-    http.all(`${VISION_ENDPOINT}/computervision/*`, async ({ request }) => {
-      await vision({ request });
-      return HttpResponse.json(VISION_VALID.body, { status: VISION_VALID.status });
-    }),
-    http.all('http://127.0.0.1/*', () => passthrough()),
-    http.all('http://localhost/*', () => passthrough()),
-  );
-
-  for (const endpoint of [AOAI_ENDPOINT, VISION_ENDPOINT]) {
-    const host = new URL(endpoint).hostname;
-    registerMockedHost(host);
-    mockedHosts.push(host);
-  }
-
-  created.listen({ onUnhandledRequest: 'error' });
-  return created;
-}
 
 afterEach(() => {
   server?.close();
   server = undefined;
-  for (const host of mockedHosts.splice(0)) unregisterMockedHost(host);
 });
 
 /** Both inference hosts, driven through their real, shipped clients. */
 async function runBothExtractors(): Promise<Wire[]> {
   const wires: Wire[] = [];
-  server = recordingServer(wires);
+  server = recordingInferenceServer(wires);
 
   await new LlmVisionExtractor({
     endpoint: AOAI_ENDPOINT,
