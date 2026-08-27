@@ -19,7 +19,7 @@
 import { useState, type JSX } from 'react';
 
 import { RETRY_LABEL, UNMATCHED_SUPPRESSION_CAVEAT, UNSUPPRESS_CONFIRM_BODY } from '../copy';
-import { SuppressDialog, withName } from '../components/SuppressDialog';
+import { withName } from '../components/SuppressDialog';
 import type { SuppressionItem } from '../lib/apiClient';
 import { TMDB_IMAGE_BASE } from '../components/TitleRow';
 
