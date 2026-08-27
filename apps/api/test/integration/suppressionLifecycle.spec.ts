@@ -587,3 +587,112 @@ describe('T-SUP-003 · US-028 AC-3/AC-5 · suppress → remove → re-upload cre
     ).toBe(1);
   });
 });
+
+describe('T-SUP-016 · US-028 AC-5 · suppressing while an open batch is in review', () => {
+  it('T-SUP-016a · the work leaves the OPEN review it was already rendering in', async () => {
+    // The review is recomputed on every read rather than frozen when the batch
+    // entered review, and this is the case that makes that matter. A cached or
+    // materialised review would keep showing a work the owner has just said
+    // they never want to see again, and the only way out would be to close a
+    // batch they no longer agree with.
+    const { titleId } = await makeActiveTitle(DUNE, 'netflix', 'Dune');
+
+    const batchId = await makeBatch('netflix', 'full-update');
+    await makeConfirmedCandidate(batchId, DUNE, 'Dune');
+
+    const before = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(before.sections.alreadyOnYourList.count).toBe(1);
+
+    await suppressWork(titleId);
+
+    const after = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(after.sections.alreadyOnYourList.count).toBe(0);
+    expect(after.sections.additions.count).toBe(0);
+    expect(after.sections.unmatched.count).toBe(0);
+    expect(after.sections.probablyNotTitles.count).toBe(0);
+  });
+
+  it('T-SUP-016b · the extraction candidate ROW is not deleted, only un-rendered', async () => {
+    // REQ-012. Suppression is a rendering decision about a work, not a licence
+    // to destroy the record of what a screenshot said. If the owner presses
+    // "interested again" the review must be able to show the candidate exactly
+    // as it was read, and a deleted row cannot come back.
+    const { titleId } = await makeActiveTitle(DUNE, 'netflix', 'Dune');
+
+    const batchId = await makeBatch('netflix', 'full-update');
+    const candidateId = await makeConfirmedCandidate(batchId, DUNE, 'Dune');
+
+    await suppressWork(titleId);
+
+    const row = await testPrisma().extractionCandidate.findFirst({ where: { id: candidateId } });
+    expect(row).not.toBeNull();
+    expect(row?.rawText).toBe('Dune');
+    expect(row?.resolvedWorkIdentity).toBe(DUNE);
+  });
+
+  it('T-SUP-016c · everything else in that review is untouched', async () => {
+    // Rules out the over-matching failure at the review gate specifically: the
+    // owner suppresses one work mid-review and the section quietly loses two.
+    const { titleId } = await makeActiveTitle(DUNE, 'netflix', 'Dune');
+    await makeActiveTitle(HEAT, 'netflix', 'Heat');
+
+    const batchId = await makeBatch('netflix', 'full-update');
+    await makeConfirmedCandidate(batchId, DUNE, 'Dune');
+    await makeConfirmedCandidate(batchId, HEAT, 'Heat');
+
+    expect(
+      ((await (await getReview(batchId)).json()) as ReviewBody).sections.alreadyOnYourList.count,
+    ).toBe(2);
+
+    await suppressWork(titleId);
+
+    const after = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(after.sections.alreadyOnYourList.count).toBe(1);
+    expect(after.sections.alreadyOnYourList.items[0]?.rawText).toBe('Heat');
+  });
+
+  it('T-SUP-016d · un-suppressing brings it back into the same open review', async () => {
+    // Proves the disappearance is the suppression and not the candidate having
+    // been consumed, and pins US-029 AC-3 against the open-batch path.
+    const { titleId } = await makeActiveTitle(DUNE, 'netflix', 'Dune');
+
+    const batchId = await makeBatch('netflix', 'full-update');
+    await makeConfirmedCandidate(batchId, DUNE, 'Dune');
+
+    const suppressionId = await suppressWork(titleId);
+    expect(
+      ((await (await getReview(batchId)).json()) as ReviewBody).sections.alreadyOnYourList.count,
+    ).toBe(0);
+
+    expect((await unsuppress(suppressionId)).status).toBe(200);
+
+    const after = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(after.sections.alreadyOnYourList.count).toBe(1);
+    expect(after.sections.alreadyOnYourList.items[0]?.rawText).toBe('Dune');
+  });
+
+  it('T-SUP-016e · REQ-073 · the suppressed work is not proposed for removal either', async () => {
+    // TASK-105's other half, and the one the candidate filter alone does not
+    // give you: the removal set is computed from ACTIVE LISTINGS, not from
+    // candidates, so a suppressed work still holding a listing would keep
+    // being proposed for removal in every full-update. The owner would be
+    // asked, over and over, to confirm the removal of something they have
+    // already said they never want to hear about again.
+    const { titleId } = await makeActiveTitle(DUNE, 'netflix', 'Dune');
+    // No candidate for Dune: the screenshots no longer show it, which is
+    // exactly what makes it a removal proposal.
+    const batchId = await makeBatch('netflix', 'full-update');
+
+    const before = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(before.sections.removals.count).toBe(1);
+
+    await suppressWork(titleId);
+
+    const after = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(after.sections.removals.count).toBe(0);
+    // `count: 0` and not `omitted` — product invariant 2's distinction. The
+    // section was shown and had nothing in it; the owner was not kept in the
+    // dark about a whole category of change.
+    expect(after.sections.removals.omitted ?? false).toBe(false);
+  });
+});

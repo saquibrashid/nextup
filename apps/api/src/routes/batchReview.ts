@@ -123,6 +123,16 @@ export async function loadReviewCandidates(
   const suppressed = new Set(suppressions.map((s) => s.workIdentity));
 
   const index = buildActiveListingIndex(
+    // ⚠ REDUNDANT BY CONSTRUCTION, and deliberately kept. Mutation testing
+    // (TASK-105) proved this filter is unobservable: the index is keyed on
+    // work identity and `classifyWorkIdentity` only ever asks it about a
+    // candidate's OWN identity, and every suppressed identity has already
+    // been dropped from `candidates` below — so no lookup can reach a
+    // suppressed entry. It stays because the redundancy is the point: it
+    // makes the index correct on its own terms rather than correct only
+    // while the candidate filter below stays exactly as wide as it is today.
+    // Do not read its survival under mutation as evidence the candidate
+    // filter is optional — that one is load-bearing and pinned by `T-SUP-016`.
     activeListings
       .filter((listing) => !suppressed.has(listing.title.workIdentity))
       .map((listing) => ({
