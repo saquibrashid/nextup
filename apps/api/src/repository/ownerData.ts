@@ -189,6 +189,43 @@ export async function findOpenUploadBatch(ownerId: OwnerId, tx?: Db) {
   });
 }
 
+/**
+ * The batch whose completion `serviceState` should revert to when the newest
+ * one is undone (US-032 AC-2, `specs/data-model.md` §8.3).
+ *
+ * ⚠ ORDERED BY `completedAt`, NOT `createdAt`. Batches complete in the order
+ * the owner finishes reviewing them, which is not the order they were opened —
+ * a batch created on Monday and closed on Friday completed AFTER one created
+ * on Tuesday and closed on Wednesday. `serviceState.lastCompletedBatchAt` is a
+ * completion fact, so ordering it by creation would revert to a value that was
+ * never the last completion.
+ *
+ * ⚠ EXCLUDES `undone` batches, not just this one. Undoing two batches in a row
+ * must walk back past both; treating an already-undone batch as a predecessor
+ * would restore a completion the owner has explicitly reversed.
+ *
+ * Returns `null` when this was the first applied batch for the service — the
+ * caller then writes `lastCompletedBatchAt: null`, which is the honest "never
+ * updated" state `FreshnessStrip` renders (REQ-039).
+ */
+export async function findPreviousAppliedBatch(
+  ownerId: OwnerId,
+  service: string,
+  excludingBatchId: string,
+  tx?: Db,
+) {
+  return db(tx).uploadBatch.findFirst({
+    where: {
+      ownerId,
+      service,
+      status: 'applied',
+      id: { not: excludingBatchId },
+      completedAt: { not: null },
+    },
+    orderBy: { completedAt: 'desc' },
+  });
+}
+
 export async function updateUploadBatchStatus(
   ownerId: OwnerId,
   id: string,

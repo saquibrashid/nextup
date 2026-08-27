@@ -47,3 +47,4 @@ export * from './removals.js';
 export * from './removalPatch.js';
 export * from './schemas.js';
 export * from './types.js';
+export * from './undo.js';
