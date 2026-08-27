@@ -22,36 +22,60 @@
  *    suppressed it. The gate is keyed on WORK IDENTITY (REQ-071, product
  *    invariant 1), never on a candidate or listing id.
  *
- * ⚠ REMOVALS ARE NOT HANDLED HERE, AND THAT IS NOT AN OVERSIGHT. `summary
- * .listingsRemoved` is `0` and `removalGroupId` is `null` because full-update
- * removals, their tick state and the `confirmRemovals` gate are TASK-083 to
- * TASK-086. Until those land, closing a full-update batch applies its
- * additions and removes nothing — which is the safe direction: REQ-020 says
- * removal is never a side effect of closing.
+ * ⚠ REMOVALS ARE APPLIED HERE (TASK-086/087/088), AND EVERY PART OF THAT IS
+ * LOAD-BEARING.
+ *
+ * - **The confirmation gate counts PROPOSALS, not ticks.** An owner who
+ *   unticked every row still has to confirm: they were shown a removal section
+ *   and made a decision about it. Counting ticks would let a close the owner
+ *   believes rescued two hundred titles proceed without ever asking them.
+ * - **The gate runs BEFORE the transaction is opened**, so "a refusal writes
+ *   nothing" needs no rollback to be true.
+ * - **Unticking everything is a ZERO-MEMBER GROUP; a WITHHELD section is NO
+ *   GROUP AT ALL.** The same distinction the review draws between `count: 0`
+ *   and `omitted: true`. Withheld means the owner was never shown anything to
+ *   confirm, so recording a group would log a decision nobody made and
+ *   requiring confirmation would make the batch unclosable.
+ * - **A removal group applies in full or not at all** (`PARTIAL_FAILURE_
+ *   PREVENTED`). A half-applied group cannot be undone as a group, and the
+ *   owner has no way to see which half landed.
+ *
+ * REQ-020 still holds: removal is never a *side effect* of closing. It happens
+ * only when the owner explicitly confirmed it.
  */
 
 import {
   applicableCandidates,
+  deriveSortDateAdded,
+  deriveTitleState,
   discardedCount,
   jsonScalar,
   pendingAdditionIds,
+  removalWithheldReason,
   ulid,
   workIdentityForTmdb,
   workIdentityForUnmatched,
+  type BatchMode,
   type CloseSummary,
+  type CrossCheckOutcome,
   type ReviewCandidate,
   type Service,
 } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
-import { loadReviewCandidates } from '../routes/batchReview.js';
+import { loadReviewCandidates, proposedRemovalsFrom } from '../routes/batchReview.js';
+import { toIsoDate } from '../routes/titles.js';
 import {
+  createRemovalGroup,
   createServiceListing,
   createTitle,
   findActiveSuppression,
   findTitleByWorkIdentity,
+  listListingsForTitle,
+  listRemovalDecisions,
   recordBatchChange,
   runInTransaction,
+  softDeleteServiceListing,
   updateTitle,
   upsertServiceState,
   type Db,
@@ -209,17 +233,103 @@ async function insertTitle(
   return id;
 }
 
+export interface CloseOptions {
+  /** `specs/api.md` §6.22. REQUIRED in full-update when removals are proposed. */
+  confirmRemovals?: boolean;
+}
+
+/**
+ * The removals this close will apply, or `null` when removals are not on the
+ * table at all for this batch.
+ *
+ * ⚠ `null` and `{ ticked: [] }` are DIFFERENT and both meaningful — the same
+ * distinction `omitted: true` vs `count: 0` draws in the review (product
+ * invariant 2). `null` means the owner was never shown a removal section, so
+ * no group is recorded and no confirmation is required. `{ ticked: [] }` means
+ * they were shown one and unticked every row, which is a decision: a
+ * zero-member group is recorded and the close still required confirmation.
+ */
+interface RemovalPlan {
+  ticked: { listingId: string; titleId: string }[];
+  proposedCount: number;
+}
+
+/**
+ * Decide what this close will remove, and refuse it if the owner has not
+ * confirmed.
+ *
+ * Runs BEFORE the transaction on purpose: a refusal must write nothing, and
+ * the cheapest way to guarantee that is for the refusal to happen before
+ * anything is opened. `T-REV-005` asserts the "nothing written" half directly.
+ *
+ * ⚠ THE GATE COUNTS PROPOSALS, NOT TICKS. An owner who unticked every row
+ * still has to confirm: they were shown a removal section and made a decision
+ * about it, and that decision is recorded as a zero-member group (US-015 AC-5,
+ * `T-REV-007`). Counting ticks instead would let a close that the owner
+ * believes rescued two hundred titles proceed without ever asking them.
+ */
+async function planRemovals(
+  ownerId: OwnerId,
+  batch: { id: string; mode: string; lowYield: boolean; crossCheck: string | null },
+  service: Service,
+  loaded: Awaited<ReturnType<typeof loadReviewCandidates>>,
+  options: CloseOptions,
+): Promise<RemovalPlan | null> {
+  // REQ-022: an append-only batch proposes no removals, so absence changes
+  // nothing (`T-REM-019`). No group, no gate.
+  if ((batch.mode as BatchMode) !== 'full-update') return null;
+
+  // Withheld is NOT an empty group — see the `RemovalPlan` doc comment. The
+  // same function the review used, so the two cannot disagree about whether
+  // the owner was shown anything to confirm.
+  const withheld = removalWithheldReason({
+    lowYield: batch.lowYield,
+    crossCheck: (batch.crossCheck ?? 'ok') as CrossCheckOutcome,
+  });
+  if (withheld !== null) return null;
+
+  const proposed = proposedRemovalsFrom(service, loaded);
+  if (proposed.length === 0) return null;
+
+  if (options.confirmRemovals !== true) {
+    throw new AppError(
+      'REMOVALS_NOT_CONFIRMED',
+      409,
+      proposed.length === 1
+        ? '1 removal still needs confirming.'
+        : `${proposed.length} removals still need confirming.`,
+      { batchId: batch.id, removalCount: proposed.length },
+    );
+  }
+
+  // Absence of a decision row means TICKED (REQ-055, TASK-085). Read here
+  // rather than trusted from the request: the tick state belongs to the batch,
+  // and a close that took it from its own body would let a client remove rows
+  // the owner had rescued.
+  const decisions = await listRemovalDecisions(ownerId, batch.id);
+  const unticked = new Set(decisions.filter((d) => !d.ticked).map((d) => d.listingId));
+
+  return {
+    ticked: proposed
+      .filter((item) => !unticked.has(item.listingId))
+      .map((item) => ({ listingId: item.listingId, titleId: item.titleId })),
+    proposedCount: proposed.length,
+  };
+}
+
 /**
  * Apply a reviewed batch.
  *
- * Throws `PENDING_ADDITIONS` (409) or `BATCH_NOT_IN_REVIEW` (409) rather than
- * returning a refusal, so a refusal cannot be mistaken for a zero-count
- * success by a caller that forgot to check.
+ * Throws `PENDING_ADDITIONS` (409), `REMOVALS_NOT_CONFIRMED` (409) or
+ * `BATCH_NOT_IN_REVIEW` (409) rather than returning a refusal, so a refusal
+ * cannot be mistaken for a zero-count success by a caller that forgot to
+ * check.
  */
 export async function closeBatch(
   ownerId: OwnerId,
   batchId: string,
   now: Date = new Date(),
+  options: CloseOptions = {},
 ): Promise<CloseResult> {
   const batch = await loadOwnedBatch(ownerId, batchId);
   const service = batch.service as Service;
@@ -227,7 +337,8 @@ export async function closeBatch(
   // ⚠ Read BEFORE the transition, not after. The candidate load is the input
   // to the pending guard, and a guard that ran after the batch had already
   // been marked `applied` could only refuse a batch it had itself closed.
-  const { candidates, rows, suppressed } = await loadReviewCandidates(ownerId, batch.id, service);
+  const loaded = await loadReviewCandidates(ownerId, batch.id, service);
+  const { candidates, rows, suppressed } = loaded;
 
   const pending = pendingAdditionIds(candidates);
   if (pending.length > 0) {
@@ -250,6 +361,8 @@ export async function closeBatch(
   const suppressedGated = rows.filter(
     (row) => row.resolvedWorkIdentity !== null && suppressed.has(row.resolvedWorkIdentity),
   ).length;
+
+  const removalPlan = await planRemovals(ownerId, batch, service, loaded, options);
 
   const today = dateOnly(now);
 
@@ -358,6 +471,85 @@ export async function closeBatch(
       );
     }
 
+    // ── removals (TASK-086/087/088) ─────────────────────────────────────
+    //
+    // AFTER the additions, and in the same transaction. Order matters here in
+    // one direction only: a work that this batch both re-adds and would have
+    // removed cannot exist (a candidate resolving to a listing's work is
+    // exactly what stops it being proposed), but running removals first would
+    // make that assumption load-bearing instead of incidental.
+    let listingsRemoved = 0;
+    let removalGroupId: string | null = null;
+
+    if (removalPlan !== null) {
+      const groupId = ulid();
+      // ⚠ The group is created even when NOTHING is ticked (`T-REV-007`). The
+      // owner unticking every row is a decision they made about a group they
+      // were shown, and the batch history must be able to say so; a group that
+      // only appeared when something was removed would make "I rescued all of
+      // them" indistinguishable from "there was nothing to remove".
+      await createRemovalGroup(ownerId, { id: groupId, batchId: batch.id }, tx);
+      removalGroupId = groupId;
+
+      for (const item of removalPlan.ticked) {
+        const changed = await softDeleteServiceListing(
+          ownerId,
+          item.listingId,
+          { removedByBatchId: batch.id, removedByGroupId: groupId, removedAt: now },
+          tx,
+        );
+        // ⚠ PARTIAL-FAILURE PREVENTION (US-015 AC-7, `T-REM-015`). The update
+        // is guarded on `state: 'active'`, so zero rows means the listing
+        // stopped being active between the proposal and this write. Throwing
+        // rolls the WHOLE close back: a removal group is applied in full or
+        // not at all, because a half-applied group cannot be undone as a group
+        // and the owner has no way to see which half landed.
+        if (changed.count !== 1) {
+          throw new AppError(
+            'PARTIAL_FAILURE_PREVENTED',
+            409,
+            'One of those titles changed while you were reviewing. Nothing was changed.',
+            { batchId: batch.id, listingId: item.listingId },
+          );
+        }
+
+        // §3.7 requires the group id on every removed entry, because US-017
+        // undoes a GROUP rather than a listing. It travels in `nextValue`.
+        await recordBatchChange(
+          ownerId,
+          {
+            batchId: batch.id,
+            kind: 'listing_removed',
+            titleId: item.titleId,
+            listingId: item.listingId,
+            nextValue: jsonScalar(groupId),
+          },
+          tx,
+        );
+        listingsRemoved += 1;
+
+        // Invariant I-4: the stored derived fields must always equal what
+        // `derive.ts` returns. Recomputed from the title's WHOLE listing set,
+        // so a two-badge title keeps its other badge and stays in the list
+        // (`T-REM-017`) while a title whose last active listing just went
+        // becomes `removed` with a null date (`T-REM-018`).
+        const siblings = (await listListingsForTitle(ownerId, item.titleId, tx)).map((row) => ({
+          state: row.state as 'active' | 'removed',
+          dateAdded: toIsoDate(row.dateAdded),
+        }));
+        const nextDate = deriveSortDateAdded(siblings);
+        await updateTitle(
+          ownerId,
+          item.titleId,
+          {
+            state: deriveTitleState(siblings),
+            sortDateAdded: nextDate === null ? null : new Date(`${nextDate}T00:00:00.000Z`),
+          },
+          tx,
+        );
+      }
+    }
+
     await transitionBatch(
       ownerId,
       batch,
@@ -382,13 +574,11 @@ export async function closeBatch(
     return {
       titlesCreated,
       listingsCreated,
-      // TASK-083 to TASK-086. See the header: removal is never a side effect
-      // of closing (REQ-020).
-      listingsRemoved: 0,
+      listingsRemoved,
       unresolvedKept,
       discarded,
       suppressedGated: suppressedGated + gatedInTransaction,
-      removalGroupId: null,
+      removalGroupId,
     } satisfies CloseSummary;
   });
 

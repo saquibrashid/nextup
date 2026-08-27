@@ -38,6 +38,9 @@ interface BatchRow {
   service: string;
   status: string;
   mode: string;
+  lowYield: boolean;
+  degradedExtraction: boolean;
+  crossCheck: string | null;
 }
 
 interface CandidateRow {
@@ -85,6 +88,25 @@ const store: {
     nextValue: string | null;
   }[];
   transactions: number;
+  activeListings: {
+    listingId: string;
+    titleId: string;
+    service: string;
+    state: string;
+    dateAdded: Date;
+    title: {
+      workIdentity: string;
+      tmdbName: string | null;
+      rawExtractedText: string | null;
+      tmdbReleaseYear: number | null;
+      tmdbPosterPath: string | null;
+    };
+  }[];
+  decisions: { listingId: string; ticked: boolean }[];
+  removalGroups: string[];
+  softDeleted: { listingId: string; removedByGroupId?: string | null }[];
+  /** Listing ids whose soft delete reports zero rows — the injected race. */
+  softDeleteFails: string[];
 } = {
   batch: null,
   candidates: [],
@@ -96,6 +118,11 @@ const store: {
   serviceState: [],
   changes: [],
   transactions: 0,
+  activeListings: [],
+  decisions: [],
+  removalGroups: [],
+  softDeleted: [],
+  softDeleteFails: [],
 };
 
 vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
@@ -106,7 +133,35 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
       Promise.resolve(store.batch !== null && store.batch.id === batchId ? store.batch : null),
     listCandidatesForReview: () => Promise.resolve(store.candidates),
     listActiveSuppressions: () => Promise.resolve(store.suppressions),
-    listActiveListingsForService: () => Promise.resolve([]),
+    listActiveListingsForService: () => Promise.resolve(store.activeListings),
+    listRemovalDecisions: () => Promise.resolve(store.decisions),
+    createRemovalGroup: (_ownerId: string, data: Record<string, unknown>) => {
+      store.removalGroups.push(data['id'] as string);
+      return Promise.resolve({ id: data['id'] as string }) as Promise<never>;
+    },
+    softDeleteServiceListing: (
+      _ownerId: string,
+      listingId: string,
+      removal: Record<string, unknown>,
+    ) => {
+      if (store.softDeleteFails.includes(listingId)) return Promise.resolve({ count: 0 });
+      store.softDeleted.push({
+        listingId,
+        removedByGroupId: removal['removedByGroupId'] as string | null,
+      });
+      return Promise.resolve({ count: 1 });
+    },
+    listListingsForTitle: (_ownerId: string, titleId: string) =>
+      Promise.resolve(
+        store.activeListings
+          .filter((l) => l.titleId === titleId)
+          .map((l) => ({
+            listingId: l.listingId,
+            service: l.service,
+            state: store.softDeleted.some((d) => d.listingId === l.listingId) ? 'removed' : l.state,
+            dateAdded: l.dateAdded,
+          })),
+      ) as Promise<never>,
     // The stub runs the callback inline. It therefore proves ORDERING and the
     // fact that every write happens under one call — it proves NOTHING about
     // atomicity. `T-REV-012af` owns that, against a real engine.
@@ -249,7 +304,15 @@ beforeEach(async () => {
   process.env['NEXTUP_ALLOWED_SUBJECTS'] = SUBJECT;
   process.env['TMDB_API_KEY'] = 'unit-fixture-key-not-a-real-secret';
 
-  store.batch = { id: 'batch-1', service: 'netflix', status: 'in-review', mode: 'append-only' };
+  store.batch = {
+    id: 'batch-1',
+    service: 'netflix',
+    status: 'in-review',
+    mode: 'append-only',
+    lowYield: false,
+    degradedExtraction: false,
+    crossCheck: 'ok',
+  };
   store.candidates = [];
   store.suppressions = [];
   store.titles = [];
@@ -259,6 +322,11 @@ beforeEach(async () => {
   store.serviceState = [];
   store.changes = [];
   store.transactions = 0;
+  store.activeListings = [];
+  store.decisions = [];
+  store.removalGroups = [];
+  store.softDeleted = [];
+  store.softDeleteFails = [];
 
   const { createApp } = await import('../../src/app.js');
   app = createApp();
@@ -416,16 +484,170 @@ describe('T-REV-012 · POST /close without a store', () => {
     });
   });
 
-  it('T-REV-012ar: a body is accepted but confirmRemovals is NOT acted on yet', async () => {
-    // ⚠ Pinning the TASK-086 boundary. Removals are unimplemented, so a close
-    // must never report having removed anything however the flag is set —
-    // telling a client its removals were confirmed while nothing was removed
-    // is the silent-loss failure REQ-020 exists to prevent.
+  it('T-REV-012ar: confirmRemovals is read strictly — only a literal true confirms', async () => {
+    // ⚠ This was the TASK-086 boundary pin ("accepted but not acted on yet");
+    // it is now the strictness pin. A truthy coercion would let `"false"`, a
+    // stray `1`, or a half-built client stand in for the owner pressing the
+    // button, and REQ-020's whole point is that removal is never a side
+    // effect.
+    //
+    // These fixtures propose no removals, so the flag changes nothing here.
+    // The behavioural half is the `T-REV-012ba`-`bh` block below and, against a real
+    // store, `test/integration/batchCloseRemovals.spec.ts`.
     makeCandidate();
     const body = (await (
       await closeBatch('batch-1', { confirmRemovals: true })
     ).json()) as CloseBody;
     expect(body.summary.listingsRemoved).toBe(0);
     expect(body.summary.removalGroupId).toBeNull();
+  });
+});
+
+/* ── the removal path, without a store (TASK-086/087/088) ─────────────── */
+
+/**
+ * `test/integration/batchCloseRemovals.spec.ts` is the twin, and it owns every
+ * claim about what is actually IN the store afterwards. What these add is the
+ * branch coverage the `unit` project measures — CI job 4 runs it with no
+ * database, so a path proven only in `test/integration` scores zero against
+ * the `apps/api/src/**` floor — plus the ordering claims a stub can honestly
+ * make: what was called, in what order, and how many times.
+ */
+describe('T-REV-012ba-bh: removals at close, stubbed', () => {
+  /** One Netflix listing the batch's screenshots do not show. */
+  function listedButNotSeen(): void {
+    store.batch = {
+      id: 'batch-1',
+      service: 'netflix',
+      status: 'in-review',
+      mode: 'full-update',
+      lowYield: false,
+      degradedExtraction: false,
+      crossCheck: 'ok',
+    };
+    store.activeListings.push({
+      listingId: 'listing-heat',
+      titleId: 'title-heat',
+      service: 'netflix',
+      state: 'active',
+      dateAdded: new Date('2026-01-04T00:00:00.000Z'),
+      title: {
+        workIdentity: HEAT,
+        tmdbName: 'Heat',
+        rawExtractedText: null,
+        tmdbReleaseYear: 1995,
+        tmdbPosterPath: null,
+      },
+    });
+  }
+
+  it('T-REV-012ba: refuses an unconfirmed close and opens no transaction at all', async () => {
+    listedButNotSeen();
+
+    const res = await closeBatch('batch-1');
+
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe(
+      'REMOVALS_NOT_CONFIRMED',
+    );
+    // The refusal happens BEFORE the transaction is opened, which is why
+    // "nothing was written" needs no rollback to be true.
+    expect(store.transactions).toBe(0);
+  });
+
+  it('T-REV-012bb: a literal true confirms; anything merely truthy does not', async () => {
+    for (const value of ['true', 1, {}, [], 'yes']) {
+      store.activeListings = [];
+      store.removalGroups = [];
+      store.softDeleted = [];
+      listedButNotSeen();
+      expect((await closeBatch('batch-1', { confirmRemovals: value })).status).toBe(409);
+    }
+  });
+
+  it('T-REV-012bc: a confirmed close soft-deletes with the group id and reports it', async () => {
+    listedButNotSeen();
+
+    const body = (await (
+      await closeBatch('batch-1', { confirmRemovals: true })
+    ).json()) as CloseBody;
+
+    expect(body.summary.listingsRemoved).toBe(1);
+    expect(store.removalGroups).toHaveLength(1);
+    expect(body.summary.removalGroupId).toBe(store.removalGroups[0]);
+    expect(store.softDeleted).toHaveLength(1);
+    // US-017 undoes a GROUP, so the listing must carry the group id.
+    expect(store.softDeleted[0]?.removedByGroupId).toBe(store.removalGroups[0]);
+  });
+
+  it('T-REV-012bd: unticking the only proposal still records a zero-member group', async () => {
+    listedButNotSeen();
+    store.decisions.push({ listingId: 'listing-heat', ticked: false });
+
+    const body = (await (
+      await closeBatch('batch-1', { confirmRemovals: true })
+    ).json()) as CloseBody;
+
+    expect(body.summary.listingsRemoved).toBe(0);
+    expect(store.softDeleted).toHaveLength(0);
+    // ⚠ A group EXISTS. "I rescued all of them" must be distinguishable in
+    // history from "there was nothing to remove" (US-015 AC-5).
+    expect(store.removalGroups).toHaveLength(1);
+    expect(body.summary.removalGroupId).toBe(store.removalGroups[0]);
+  });
+
+  it('T-REV-012be: a withheld removal section creates NO group and needs no confirmation', async () => {
+    listedButNotSeen();
+    (store.batch as BatchRow).lowYield = true;
+
+    const body = (await (await closeBatch('batch-1')).json()) as CloseBody;
+
+    expect(body.summary.listingsRemoved).toBe(0);
+    // Withheld is NOT a zero-member group: the owner was never shown a
+    // section, so recording one would log a decision nobody made — and
+    // requiring confirmation would make the batch unclosable.
+    expect(store.removalGroups).toHaveLength(0);
+    expect(body.summary.removalGroupId).toBeNull();
+  });
+
+  it('T-REV-012bf: an append-only batch never proposes a removal, however it is confirmed', async () => {
+    listedButNotSeen();
+    (store.batch as BatchRow).mode = 'append-only';
+
+    const body = (await (
+      await closeBatch('batch-1', { confirmRemovals: true })
+    ).json()) as CloseBody;
+
+    expect(body.summary.listingsRemoved).toBe(0);
+    expect(store.removalGroups).toHaveLength(0);
+    expect(store.softDeleted).toHaveLength(0);
+  });
+
+  it('T-REV-012bg: a soft delete affecting zero rows raises PARTIAL_FAILURE_PREVENTED', async () => {
+    listedButNotSeen();
+    store.softDeleteFails.push('listing-heat');
+
+    const res = await closeBatch('batch-1', { confirmRemovals: true });
+
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe('PARTIAL_FAILURE_PREVENTED');
+    expect(body.error.message).toMatch(/nothing was changed/i);
+    // The stub runs the callback inline, so it cannot prove the rollback —
+    // `test/integration/batchCloseRemovals.spec.ts` T-REM-015b owns that. What
+    // it can prove is that the batch was never transitioned.
+    expect(store.transitions).toHaveLength(0);
+  });
+
+  it('T-REV-012bh: the removed title is re-derived from its whole listing set', async () => {
+    listedButNotSeen();
+
+    await closeBatch('batch-1', { confirmRemovals: true });
+
+    // Its only listing has gone, so the title is `removed` with no date to
+    // sort by — computed by `derive.ts`, never inline (invariant I-4).
+    const update = store.titleUpdates.find((u) => u.id === 'title-heat');
+    expect(update?.data['state']).toBe('removed');
+    expect(update?.data['sortDateAdded']).toBeNull();
   });
 });

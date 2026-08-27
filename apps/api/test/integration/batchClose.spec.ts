@@ -589,17 +589,20 @@ describe('T-REV-012 · US-012 AC-3 · close applies confirmed work and refuses p
     });
   });
 
-  it('T-REV-012ac: close removes NOTHING — removal is never a side effect (REQ-020)', async () => {
-    // TASK-083 to TASK-086 own removals. Until then a full-update close must
-    // still not remove anything, and this pins that the "safe direction" claim
-    // in the service header is true rather than merely intended.
+  it('T-REV-012ac: close removes NOTHING unconfirmed — removal is never a side effect (REQ-020)', async () => {
+    // Removals landed with TASK-086. The "safe direction" claim in the service
+    // header is now stronger than it was: a close that would remove something
+    // the owner has not confirmed REFUSES outright rather than quietly
+    // succeeding with a removal nobody asked for.
     const titleId = await seedListing(HEAT, 'Heat', 'netflix');
     const batchId = await makeBatch({ mode: 'full-update' });
     await makeCandidate(batchId, { disposition: 'confirmed' });
 
-    const body = (await (await closeBatchRequest(batchId)).json()) as CloseBody;
-    expect(body.summary.listingsRemoved).toBe(0);
-    expect(body.summary.removalGroupId).toBeNull();
+    const res = await closeBatchRequest(batchId);
+    expect(res.status).toBe(409);
+    expect(((await res.json()) as { error: { code: string } }).error.code).toBe(
+      'REMOVALS_NOT_CONFIRMED',
+    );
 
     const survivor = await testPrisma().serviceListing.findFirst({ where: { titleId } });
     expect(survivor?.state).toBe('active');
