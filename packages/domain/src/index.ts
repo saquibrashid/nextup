@@ -46,5 +46,8 @@ export * from './removals.js';
 // TASK-085 — the tick/untick body grammar for `PATCH …/removals` (§6.21).
 export * from './removalPatch.js';
 export * from './schemas.js';
+// TASK-061 — the TMDB storage allow-list POLICY (US-007 AC-6, REQ-029): an
+// unlisted field is rejected, never stripped. Also a Rule A defence.
+export * from './tmdbStorage.js';
 export * from './types.js';
 export * from './undo.js';

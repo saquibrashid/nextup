@@ -26,6 +26,11 @@ import { AppError } from '../errors/AppError.js';
 import { beginRatingRefresh } from '../jobs/refreshRatings.js';
 import { findTitleDetail, listTitlePage } from '../repository/ownerData.js';
 import { fromTenths, type RatingRow } from '../services/imdbRatings.js';
+import {
+  refreshStaleMetadata,
+  type MetadataRefreshResult,
+  type RefreshableTitle,
+} from '../services/tmdbRefresh.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import { parseTitleListQuery } from './titlesQuery.js';
 
@@ -66,16 +71,58 @@ interface TitleRow {
   matchState: string;
   rawExtractedText: string | null;
   sortDateAdded: Date | null;
+  tmdbId?: number | null;
   tmdbMediaType: string | null;
   tmdbName: string | null;
   tmdbReleaseYear: number | null;
   tmdbRuntimeMinutes: number | null;
   tmdbGenres: string;
   tmdbPosterPath: string | null;
+  tmdbFetchedAt?: Date | null;
   imdbId?: string | null;
   imdbRatingTenths?: number | null;
   imdbRatingFetchedAt?: Date | null;
   listings: ListingRow[];
+}
+
+/**
+ * Project a served row down to what the metadata refresh is allowed to see.
+ *
+ * ⚠ Narrow ON PURPOSE, exactly as `toRatingRow` is. The refresh reads three
+ * fields; handing it the whole row would let a future edit reach a
+ * list-bearing column and quietly violate product invariant 5.
+ */
+export function toRefreshableTitle(row: TitleRow): RefreshableTitle {
+  return {
+    id: row.id,
+    tmdbId: row.tmdbId ?? null,
+    tmdbMediaType: row.tmdbMediaType,
+    tmdbFetchedAt: row.tmdbFetchedAt ?? null,
+  };
+}
+
+/**
+ * Overlay what the refresh just wrote onto the row that was read before it.
+ *
+ * ⚠ Only the columns `updateTitleMetadata` is allowed to write. Overlaying the
+ * whole object would let a widened refresh reach a list-bearing field and
+ * change the rendered page without touching any query — which is the same
+ * invariant-5 hole the repository writer is narrow to prevent.
+ */
+export function applyRefresh<T extends TitleRow>(row: T, refresh: MetadataRefreshResult): T {
+  const written = refresh.refreshed.get(row.id);
+  if (written === undefined) return row;
+  return {
+    ...row,
+    tmdbName: written.tmdbName,
+    tmdbReleaseYear: written.tmdbReleaseYear,
+    tmdbRuntimeMinutes: written.tmdbRuntimeMinutes,
+    tmdbGenres: written.tmdbGenres,
+    tmdbPosterPath: written.tmdbPosterPath,
+    // `null` is "unchanged" here too, for the same reason the writer gives.
+    imdbId: written.imdbId ?? row.imdbId ?? null,
+    tmdbFetchedAt: written.tmdbFetchedAt,
+  };
 }
 
 /**
@@ -86,7 +133,7 @@ interface TitleRow {
  * placeholder would hide from the owner that the title never matched — which
  * is the state the fix-match flow exists to resolve.
  */
-export function toListItem(row: TitleRow): Record<string, unknown> {
+export function toListItem(row: TitleRow, metadataStale = false): Record<string, unknown> {
   const badges = row.listings.map((listing) => ({
     service: listing.service,
     listingId: listing.listingId,
@@ -112,6 +159,10 @@ export function toListItem(row: TitleRow): Record<string, unknown> {
     imdbRating: fromTenths(row.imdbRatingTenths ?? null),
     badges,
     sortDateAdded,
+    // `specs/api.md` §6.4. `true` means "what you are looking at is our
+    // STORED copy and we could not confirm it just now" — it never means the
+    // data is missing, and the fields above are always the stored values.
+    metadataStale,
     // Computed server-side so REQ-061's "to nextup" wording has exactly one
     // implementation; the SPA renders this verbatim (`specs/ui.md` §row).
     dateAddedLabel: sortDateAdded === null ? null : dateAddedLabel(sortDateAdded),
@@ -173,12 +224,12 @@ interface TitleDetailRow extends Omit<TitleRow, 'listings'> {
  * getting it wrong would put a removed service's badge back on the row in the
  * one view that shows removals next to it.
  */
-export function toDetailItem(row: TitleDetailRow): Record<string, unknown> {
+export function toDetailItem(row: TitleDetailRow, metadataStale = false): Record<string, unknown> {
   const active = row.listings.filter((listing) => listing.state === 'active');
   const removed = row.listings.filter((listing) => listing.state !== 'active');
 
   return {
-    ...toListItem({ ...row, listings: active }),
+    ...toListItem({ ...row, listings: active }, metadataStale),
     removedListings: removed.map(toRemovedListing),
     createdByBatchId: row.createdByBatchId,
     createdAt: row.createdAt.toISOString(),
@@ -203,8 +254,18 @@ export function registerTitleRoutes(router: Router): void {
       genres: query.genres,
     });
 
-    const items = rows.map((row) => toListItem(row as unknown as TitleRow));
-
+    // REQ-076 / NFR-014, `specs/api.md` §6.4. BEFORE the response, and only
+    // for the rows on this page: `metadataStale` has to be on the item being
+    // served, so the attempt must finish first. Bounded by the 5 s budget in
+    // `tmdbRefresh.ts`; a page with nothing stale on it costs one array scan.
+    const refresh = await refreshStaleMetadata(
+      ownerId,
+      rows.map((row) => toRefreshableTitle(row as unknown as TitleRow)),
+    );
+    const items = rows.map((row) => {
+      const typed = applyRefresh(row as unknown as TitleRow, refresh);
+      return toListItem(typed, refresh.stale.has(typed.id));
+    });
     // The cursor is built from the LAST ROW RETURNED, never from a count or an
     // index. That is what makes it a position rather than an offset, and it is
     // why a row inserted between two requests cannot shift the page boundary.
@@ -245,6 +306,11 @@ export function registerTitleRoutes(router: Router): void {
       throw new AppError('NOT_FOUND', 404, 'No such title.');
     }
 
-    res.status(200).json(toDetailItem(row as unknown as TitleDetailRow));
+    // §6.4 names this route too: a detail view is a display, so the same lazy
+    // refresh applies to the one row it renders.
+    const typed = row as unknown as TitleDetailRow;
+    const refresh = await refreshStaleMetadata(ownerId, [toRefreshableTitle(typed)]);
+
+    res.status(200).json(toDetailItem(applyRefresh(typed, refresh), refresh.stale.has(typed.id)));
   });
 }
