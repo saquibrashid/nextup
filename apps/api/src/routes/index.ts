@@ -31,6 +31,7 @@ import { registerBatchRoutes } from './batches.js';
 import { registerBatchImageRoutes } from './batchImages.js';
 import { registerBatchRemovalRoutes } from './batchRemovals.js';
 import { registerBatchReviewRoutes } from './batchReview.js';
+import { registerBatchUndoRoutes } from './batchUndo.js';
 import { registerImageRoutes } from './images.js';
 import { registerImdbRoutes } from './imdb.js';
 import { registerMeRoutes } from './me.js';
@@ -109,6 +110,9 @@ export function createApiRouter(): Router {
   // §6.22 — close. Registered after the candidate routes it depends on so the
   // read order in this file matches the order the owner moves through them.
   registerBatchCloseRoutes(apiRouter);
+  // §6.25 — creates-only undo (SD-03). Registered after close because it only
+  // ever acts on a batch close has already applied.
+  registerBatchUndoRoutes(apiRouter);
   // §6.12 — the ONE ingest route for paste, drop and file selection alike.
   registerBatchImageRoutes(apiRouter);
   // §6.27 — the ONE route that serves image bytes. No SAS, no blob URL.
