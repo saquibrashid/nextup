@@ -36,6 +36,7 @@ import { registerFixMatchRoutes } from './fixMatch.js';
 import { registerImageRoutes } from './images.js';
 import { registerImdbRoutes } from './imdb.js';
 import { registerMeRoutes } from './me.js';
+import { registerRemovedRoutes } from './removed.js';
 import { registerServiceStateRoutes } from './serviceState.js';
 import { registerSuppressionRoutes } from './suppressions.js';
 import { registerTitleRoutes } from './titles.js';
@@ -119,6 +120,10 @@ export function createApiRouter(): Router {
   // §6.27 — the ONE route that serves image bytes. No SAS, no blob URL.
   registerImageRoutes(apiRouter);
   registerTitleRoutes(apiRouter);
+  // §6.9 — the removed view. Registered next to the combined list because it
+  // is the same read surface seen from the other side, and it shares the
+  // list's date and name projections (`toIsoDate`, the raw-text name fallback).
+  registerRemovedRoutes(apiRouter);
   // §6.5 (US-030) — the owner corrects a wrong match. Registered after the
   // title routes it acts on, and given the same per-request TMDB client for
   // the same reason as `registerTmdbRoutes` below.

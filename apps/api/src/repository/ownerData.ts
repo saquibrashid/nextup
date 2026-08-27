@@ -999,6 +999,132 @@ export async function searchRemovedListings(
     ORDER BY l.removed_at DESC, l.listing_id ASC`;
 }
 
+/** One row of the removed view, widened for `GET /api/removed` (§6.9). */
+export interface RemovedViewRow {
+  listing_id: string;
+  title_id: string;
+  service: string;
+  removed_at: Date;
+  date_added: Date;
+  removed_by_batch_id: string | null;
+  removed_by_group_id: string | null;
+  work_identity: string;
+  match_state: string;
+  tmdb_name: string | null;
+  tmdb_media_type: string | null;
+  tmdb_release_year: number | null;
+  tmdb_poster_path: string | null;
+  raw_extracted_text: string | null;
+}
+
+/**
+ * One page of the removed view, with the §11 filters applied (TASK-095).
+ *
+ * ⚠ THIS IS NOT `listRemovedListingPage` WITH EXTRA COLUMNS, AND THE OLDER
+ * FUNCTION IS NOT A SUBSET OF IT. `searchRemovedListings` matches `tmdb_name`
+ * only, which silently makes every UNMATCHED row unfindable — and unmatched
+ * rows are precisely the ones an owner is most likely to go looking for.
+ * `specs/data-model.md` §11 rule 1 requires the term to match `tmdb_name`
+ * **or** `normalised_text`; `T-REM-021` asserts both halves.
+ *
+ * The `LIKE` is deliberately NOT index-backed: a leading wildcard cannot seek a
+ * B-tree, and §11 accepts that (NFR-018). `T-PERF-001` asserts the plan for the
+ * *listing* path only. The term is parameterised and `ESCAPE`d — see
+ * {@link escapeLikeTerm}; `q` reaches SQL Server as a bind, never as text.
+ *
+ * ⚠ ORDINALS ARE NOT COMPUTED HERE, AND NOT WITH A WINDOW FUNCTION. A
+ * `ROW_NUMBER() OVER (PARTITION BY work_identity)` would have to be evaluated
+ * over the owner's ENTIRE removed history before `TOP (n)` could be applied,
+ * which turns the keyset seek `T-PERF-001` asserts into a full scan of a table
+ * that grows for ever. {@link countRemovalsForWorks} ranks only the works on
+ * the page instead.
+ */
+export async function listRemovedView(
+  ownerId: OwnerId,
+  options: { limit: number; cursor?: RemovedPageCursor; q?: string; service?: string },
+  tx?: Db,
+): Promise<RemovedViewRow[]> {
+  const { limit, cursor, q, service } = options;
+
+  const filters: Prisma.Sql[] = [];
+  if (service) filters.push(Prisma.sql`AND l.service = ${service}`);
+  if (q) {
+    const pattern = `%${escapeLikeTerm(q)}%`;
+    filters.push(
+      Prisma.sql`AND (t.tmdb_name COLLATE Latin1_General_100_CI_AI LIKE ${pattern} ESCAPE ${LIKE_ESCAPE_CHAR}
+                   OR t.normalised_text COLLATE Latin1_General_100_CI_AI LIKE ${pattern} ESCAPE ${LIKE_ESCAPE_CHAR})`,
+    );
+  }
+  if (cursor) {
+    filters.push(
+      Prisma.sql`AND (l.removed_at < ${cursor.removedAt}
+                   OR (l.removed_at = ${cursor.removedAt} AND l.listing_id > ${cursor.listingId}))`,
+    );
+  }
+
+  return db(tx).$queryRaw<RemovedViewRow[]>`
+    SELECT TOP (${limit})
+      l.listing_id, l.title_id, l.service, l.removed_at, l.date_added,
+      l.removed_by_batch_id, l.removed_by_group_id,
+      t.work_identity, t.match_state, t.tmdb_name, t.tmdb_media_type,
+      t.tmdb_release_year, t.tmdb_poster_path, t.raw_extracted_text
+    FROM service_listing l
+    JOIN title t ON t.owner_id = l.owner_id AND t.id = l.title_id
+    WHERE l.owner_id = ${ownerId}
+      AND l.state = 'removed'
+      ${filters.length > 0 ? Prisma.join(filters, ' ') : Prisma.empty}
+    ORDER BY l.removed_at DESC, l.listing_id ASC`;
+}
+
+/** Every removed listing belonging to the given works, oldest removal first. */
+export interface WorkRemovalRow {
+  work_identity: string;
+  listing_id: string;
+  removed_at: Date;
+}
+
+/**
+ * The removal history of the works on one page of the removed view (US-024
+ * AC-6, `specs/data-model.md` §11 rule 4).
+ *
+ * ⚠ THE ORDINAL IS A PROPERTY OF THE WORK'S HISTORY, NOT OF THE CURRENT
+ * FILTER. This query is deliberately NOT given the caller's `q` or `service`
+ * filter. If it were, filtering to Max would renumber a work removed twice from
+ * Netflix and once from Max as "removal 1 of 1" — the annotation exists to make
+ * repetition read as history (§11 rule 4), and history that renumbers itself
+ * when you narrow the view is worse than no annotation at all. `T-REM-022`
+ * filters by service and asserts the ordinals are unchanged.
+ */
+export async function countRemovalsForWorks(
+  ownerId: OwnerId,
+  workIdentities: string[],
+  tx?: Db,
+): Promise<WorkRemovalRow[]> {
+  if (workIdentities.length === 0) return [];
+  return db(tx).$queryRaw<WorkRemovalRow[]>`
+    SELECT t.work_identity, l.listing_id, l.removed_at
+    FROM service_listing l
+    JOIN title t ON t.owner_id = l.owner_id AND t.id = l.title_id
+    WHERE l.owner_id = ${ownerId}
+      AND l.state = 'removed'
+      AND t.work_identity IN (${Prisma.join(workIdentities)})
+    ORDER BY l.removed_at ASC, l.listing_id ASC`;
+}
+
+/** The work identities, among those given, that currently have an ACTIVE suppression. */
+export async function findActiveSuppressedWorks(
+  ownerId: OwnerId,
+  workIdentities: string[],
+  tx?: Db,
+): Promise<Set<string>> {
+  if (workIdentities.length === 0) return new Set();
+  const rows = await db(tx).suppression.findMany({
+    where: { ownerId, active: true, workIdentity: { in: workIdentities } },
+    select: { workIdentity: true },
+  });
+  return new Set(rows.map((r) => r.workIdentity));
+}
+
 /**
  * Soft-delete a listing.
  *
