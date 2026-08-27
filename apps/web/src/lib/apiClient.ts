@@ -226,7 +226,15 @@ export interface SuppressionItem {
   suppressionId: string;
   workIdentity: string;
   suppressedAt: string;
-  identityStability: string;
+  /**
+   * ⚠ The CLOSED pair the API actually sends (`specs/api.md` §6.7), not a
+   * free string. It was `string` until TASK-104, and the cost was silent: the
+   * component tests fixtured `'matched'` — a value no server can produce — so
+   * "a matched identity shows no caveat" passed because ANY value other than
+   * `'text-derived'` hides it. The assertion proved nothing about the
+   * contract, and the real negative case (`'stable'`) was never exercised.
+   */
+  identityStability: 'stable' | 'text-derived';
   displaySnapshot: {
     name: string;
     releaseYear: number | null;
