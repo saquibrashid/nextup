@@ -27,7 +27,7 @@ function makeItem(overrides?: Partial<SuppressionItem>): SuppressionItem {
     suppressionId: 'sup-001',
     workIdentity: 'wi-001',
     suppressedAt: '2024-01-01T00:00:00Z',
-    identityStability: 'matched',
+    identityStability: 'stable',
     displaySnapshot: {
       name: 'The Test Movie',
       releaseYear: 2023,
@@ -107,9 +107,14 @@ describe('T-UI-010 — SuppressedPage', () => {
     expect(screen.getByTestId('suppressed-caveat')).toHaveTextContent(UNMATCHED_SUPPRESSION_CAVEAT);
   });
 
-  // T-UI-010u: matched identity does NOT show the caveat
-  it('T-UI-010u: matched identity does NOT show caveat', () => {
-    render(<SuppressedPage items={[makeItem({ identityStability: 'matched' })]} />);
+  // T-UI-010u: a STABLE identity does NOT show the caveat.
+  //
+  // ⚠ Corrected in place (TASK-104). This read `'matched'`, which is not one
+  // of the two values the API sends, so it passed because anything other than
+  // `'text-derived'` hides the caveat — it asserted the fallback, never the
+  // contract. `'stable'` is the real negative case.
+  it('T-UI-010u: a stable identity does NOT show caveat', () => {
+    render(<SuppressedPage items={[makeItem({ identityStability: 'stable' })]} />);
     expect(screen.queryByTestId('suppressed-caveat')).not.toBeInTheDocument();
   });
 
@@ -165,5 +170,75 @@ describe('T-UI-010 — SuppressedPage', () => {
     render(<SuppressedPage items={[]} />);
     const list = screen.getByTestId('suppressed-list');
     expect(list.children).toHaveLength(0);
+  });
+});
+
+/**
+ * TASK-104 — the COMPONENT half of `T-SUP-006` (US-028 AC-6′, OQ-015 closed).
+ *
+ * An unmatched work is suppressible, and because its identity is derived from
+ * the text an OCR pass read rather than from a TMDB id, the suppressed view
+ * has to say so. The caveat is not decoration: a future screenshot that reads
+ * the same title slightly differently produces a DIFFERENT identity, and the
+ * suppression the owner set will simply not apply to it. Without the caveat
+ * that reads as the feature being broken; with it, it reads as a known limit
+ * with a remedy (`T-FIX-005`, fix-match migration).
+ */
+describe('T-SUP-006 · US-028 AC-6′ · the suppressed view carries the stability caveat', () => {
+  it('T-SUP-006b: a text-derived row renders the caveat VERBATIM from `ui.md` §9', () => {
+    render(<SuppressedPage items={[makeItem({ identityStability: 'text-derived' })]} />);
+    // Compared to the exported constant AND to its literal text, because a
+    // component that rendered some other string would still satisfy a
+    // comparison against whatever constant it happened to import.
+    expect(screen.getByTestId('suppressed-caveat')).toHaveTextContent(UNMATCHED_SUPPRESSION_CAVEAT);
+    expect(UNMATCHED_SUPPRESSION_CAVEAT).toContain("we're matching it on the text we read");
+  });
+
+  it('T-SUP-006c: the caveat is keyed on the STABILITY, not on a missing poster or year', () => {
+    // The rows most likely to be unmatched are also the rows most likely to
+    // have no poster and no year, so a caveat that keyed on either would look
+    // correct on every realistic fixture and be wrong in principle — and it
+    // would then appear on matched rows whose metadata simply had not loaded.
+    render(
+      <SuppressedPage
+        items={[
+          makeItem({
+            identityStability: 'stable',
+            displaySnapshot: {
+              name: 'Sparse But Matched',
+              releaseYear: null,
+              mediaType: null,
+              posterPath: null,
+            },
+          }),
+        ]}
+      />,
+    );
+    expect(screen.queryByTestId('suppressed-caveat')).not.toBeInTheDocument();
+  });
+
+  it('T-SUP-006d: the caveat attaches per ROW, not to the page', () => {
+    // Mixed lists are the normal case, and a page-level banner would tell the
+    // owner their matched suppressions are unreliable when they are not.
+    render(
+      <SuppressedPage
+        items={[
+          makeItem({ suppressionId: 'sup-a', identityStability: 'stable' }),
+          makeItem({ suppressionId: 'sup-b', identityStability: 'text-derived' }),
+        ]}
+      />,
+    );
+    expect(screen.getAllByTestId('suppressed-row')).toHaveLength(2);
+    expect(screen.getAllByTestId('suppressed-caveat')).toHaveLength(1);
+  });
+
+  it('T-SUP-006e: an unmatched row is still fully actionable — un-suppression is offered', () => {
+    // OQ-015 closed the question by making unmatched works suppressible. A
+    // caveat that came with a disabled control would re-open it in practice:
+    // the owner could suppress but never undo.
+    render(<SuppressedPage items={[makeItem({ identityStability: 'text-derived' })]} />);
+    const button = screen.getByText(/stop ignoring/i);
+    expect(button).toBeInTheDocument();
+    expect(button).not.toBeDisabled();
   });
 });

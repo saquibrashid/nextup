@@ -159,6 +159,20 @@ const unsuppress = (suppressionId: string): Promise<Response> =>
     body: '{}',
   });
 
+interface SuppressionListItem {
+  suppressionId: string;
+  workIdentity: string;
+  identityStability: 'stable' | 'text-derived';
+}
+
+const listSuppressions = async (): Promise<SuppressionListItem[]> => {
+  const res = await fetch(`${origin}/api/suppressions`, {
+    headers: { [CLIENT_PRINCIPAL_HEADER]: principalHeader },
+  });
+  expect(res.status).toBe(200);
+  return ((await res.json()) as { items: SuppressionListItem[] }).items;
+};
+
 /* ── fixtures ─────────────────────────────────────────────────────────── */
 
 let batchSeq = 0;
@@ -694,5 +708,39 @@ describe('T-SUP-016 · US-028 AC-5 · suppressing while an open batch is in revi
     // section was shown and had nothing in it; the owner was not kept in the
     // dark about a whole category of change.
     expect(after.sections.removals.omitted ?? false).toBe(false);
+  });
+});
+
+describe('T-SUP-006 · US-028 AC-6′ · unmatched works are suppressible and flagged as such', () => {
+  it('T-SUP-006f · an unmatched suppression is reported text-derived', async () => {
+    // The stability is DERIVED from the stored identity on every read, not
+    // frozen onto the suppression row at write time. That matters because
+    // fix-match (`T-FIX-005`) can migrate a suppression from a text-derived
+    // identity to a TMDB one, and a stored copy would go on telling the owner
+    // their now-stable suppression is unreliable.
+    const { titleId } = await makeActiveTitle(UNMATCHED, 'netflix', 'Somethign Unreadble');
+    const suppressionId = await suppressWork(titleId);
+
+    const items = await listSuppressions();
+    expect(items).toHaveLength(1);
+    expect(items[0]?.suppressionId).toBe(suppressionId);
+    expect(items[0]?.workIdentity).toBe(UNMATCHED);
+    expect(items[0]?.identityStability).toBe('text-derived');
+  });
+
+  it('T-SUP-006g · a matched suppression is reported stable, in the same list', async () => {
+    // Both in one list, because the failure worth ruling out is a flag that is
+    // constant — always `text-derived`, or always `stable` — which is
+    // indistinguishable from a correct one until the list is mixed.
+    const unmatched = await makeActiveTitle(UNMATCHED, 'netflix', 'Somethign Unreadble');
+    const matched = await makeActiveTitle(DUNE, 'netflix', 'Dune');
+    await suppressWork(unmatched.titleId);
+    await suppressWork(matched.titleId);
+
+    const byIdentity = new Map(
+      (await listSuppressions()).map((item) => [item.workIdentity, item.identityStability]),
+    );
+    expect(byIdentity.get(UNMATCHED)).toBe('text-derived');
+    expect(byIdentity.get(DUNE)).toBe('stable');
   });
 });
