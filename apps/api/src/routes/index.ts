@@ -32,6 +32,7 @@ import { registerBatchImageRoutes } from './batchImages.js';
 import { registerBatchRemovalRoutes } from './batchRemovals.js';
 import { registerBatchReviewRoutes } from './batchReview.js';
 import { registerBatchUndoRoutes } from './batchUndo.js';
+import { registerFixMatchRoutes } from './fixMatch.js';
 import { registerImageRoutes } from './images.js';
 import { registerImdbRoutes } from './imdb.js';
 import { registerMeRoutes } from './me.js';
@@ -118,6 +119,13 @@ export function createApiRouter(): Router {
   // §6.27 — the ONE route that serves image bytes. No SAS, no blob URL.
   registerImageRoutes(apiRouter);
   registerTitleRoutes(apiRouter);
+  // §6.5 (US-030) — the owner corrects a wrong match. Registered after the
+  // title routes it acts on, and given the same per-request TMDB client for
+  // the same reason as `registerTmdbRoutes` below.
+  registerFixMatchRoutes(
+    apiRouter,
+    () => new TmdbClient({ apiKey: process.env['TMDB_API_KEY'] ?? '' }),
+  );
   registerSuppressionRoutes(apiRouter);
   registerServiceStateRoutes(apiRouter);
   // TASK-045 (`specs/api.md` §6.29). The client is built PER REQUEST on

@@ -612,6 +612,33 @@ export async function findTitleByWorkIdentity(ownerId: OwnerId, workIdentity: st
 }
 
 /**
+ * The ACTIVE title holding a work identity, if any (US-030 AC-4, TASK-109).
+ *
+ * ⚠ Deliberately NOT `findTitleByWorkIdentity` with a state check bolted on
+ * afterwards. That read is `findFirst` ordered by `createdAt desc` across
+ * EVERY state, so a work removed yesterday and re-added last month comes back
+ * as the removed row — and a caller filtering the result would conclude no
+ * active title exists while `title_one_active_per_work` is about to reject the
+ * write. The duplicate warning fix-match shows the owner has to agree with the
+ * index that enforces it, so the state filter belongs in the query.
+ *
+ * `createdAt asc` because at most one active row can hold an identity for a
+ * given `duplicateAckSeq`; where several exist they are acknowledged
+ * duplicates, and the FIRST is the one the owner has lived with longest and so
+ * the one worth naming in the warning.
+ */
+export async function findActiveTitleByWorkIdentity(
+  ownerId: OwnerId,
+  workIdentity: string,
+  tx?: Db,
+) {
+  return db(tx).title.findFirst({
+    where: { ownerId, workIdentity, state: 'active' },
+    orderBy: [{ createdAt: 'asc' }],
+  });
+}
+
+/**
  * Persist ONE work's IMDb rating (REQ-090, ADR-0011).
  *
  * ⚠ **THE COLUMN SET IS CLOSED, AND THAT IS WHAT MAKES THE LAZY REFRESH
@@ -1153,6 +1180,74 @@ export async function reactivateSuppression(
     where: { ownerId, workIdentity, active: false },
     data: { active: true, suppressedAt, unsuppressedAt: null },
   });
+}
+
+/**
+ * SD-06 — move an ACTIVE suppression from one work identity to another
+ * (`specs/data-model.md` §6.3 step 6, TASK-110, `T-FIX-005`).
+ *
+ * ⚠ **Silently dropping the suppression here re-opens the REQ-071 hole.** A
+ * fix-match replaces the identity a suppression is keyed on. Leave the old
+ * suppression where it is and it now guards an identity nothing holds, while
+ * the work the owner rejected becomes visible again on the next render — with
+ * nothing anywhere to say why. So the decision moves with the work.
+ *
+ * The old row is DEACTIVATED, never deleted (REQ-028): the record that the
+ * owner made the decision, and when, survives the move. `migratedFrom` on the
+ * new row is the breadcrumb back to it — the title table carries no
+ * `previousWorkIdentity` column, so this is the only place the link is kept.
+ *
+ * Reactivate-then-create, in that order, because the suppression id is
+ * `supp:<workIdentity>` and therefore deterministic: at most ONE row can ever
+ * exist per identity, and a target the owner suppressed and later lifted
+ * already has one. A bare `create` would collide on the primary key and fail
+ * the whole fix-match for a case that is entirely normal.
+ *
+ * The caller has already refused the fix-match with `TARGET_WORK_SUPPRESSED`
+ * when an ACTIVE suppression holds the target, so this can never overwrite a
+ * live decision — it only ever re-arms a lifted one or writes a fresh row.
+ */
+export async function migrateSuppression(
+  ownerId: OwnerId,
+  params: {
+    id: string;
+    from: string;
+    to: string;
+    at: Date;
+    snapshot: {
+      displayName: string;
+      displayReleaseYear: number | null;
+      displayMediaType: string | null;
+      displayPosterPath: string | null;
+    };
+  },
+  tx?: Db,
+): Promise<void> {
+  await deactivateSuppression(ownerId, params.from, params.at, tx);
+
+  const { count } = await db(tx).suppression.updateMany({
+    where: { ownerId, workIdentity: params.to },
+    data: {
+      active: true,
+      suppressedAt: params.at,
+      unsuppressedAt: null,
+      migratedFrom: params.from,
+    },
+  });
+  if (count > 0) return;
+
+  await createSuppression(
+    ownerId,
+    {
+      id: params.id,
+      workIdentity: params.to,
+      active: true,
+      suppressedAt: params.at,
+      migratedFrom: params.from,
+      ...params.snapshot,
+    },
+    tx,
+  );
 }
 
 /* ------------------------------------------------------------------ *
