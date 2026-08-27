@@ -1601,3 +1601,71 @@ export async function createRemovalGroup(
 export async function findRemovalGroup(ownerId: OwnerId, id: string, tx?: Db) {
   return db(tx).removalGroup.findFirst({ where: { ownerId, id } });
 }
+
+/**
+ * Every listing this removal group removed, with the identity its undo needs.
+ *
+ * ⚠ NOT filtered to `state: 'removed'`. US-017's undo has to be able to see a
+ * listing that has already come back — through a per-listing restore (§6.10),
+ * or through a reappearance the owner accepted — and DECIDE about it. Filtering
+ * it out here would make it invisible to the guarded write below, which would
+ * then find nothing to do and report a clean undo of a group it had silently
+ * skipped part of. The group's membership is history and does not change.
+ */
+export async function listListingsInRemovalGroup(ownerId: OwnerId, groupId: string, tx?: Db) {
+  return db(tx).serviceListing.findMany({
+    where: { ownerId, removedByGroupId: groupId },
+    select: {
+      listingId: true,
+      titleId: true,
+      service: true,
+      state: true,
+      title: { select: { workIdentity: true, tmdbName: true, rawExtractedText: true } },
+    },
+    orderBy: { listingId: 'asc' },
+  });
+}
+
+/**
+ * Return one listing to `active` (US-017 AC-2, US-025 AC-1).
+ *
+ * ⚠ GUARDED ON `state: 'removed'`, and the count is the caller's signal. An
+ * unguarded update would silently "restore" a listing that was already active
+ * and report success, which is how a half-applied group reads as a whole one.
+ *
+ * ⚠ `dateAdded` IS NOT TOUCHED, and it must never be. It is write-once
+ * (REQ-030) and it is the value the whole default sort is built from: a
+ * restore that stamped today's date would move the title to the top of the
+ * owner's list, which is a silent edit of data that came off a screenshot they
+ * may no longer have (US-017 AC-2, US-025 AC-2).
+ *
+ * `removedByBatchId` and `removedByGroupId` are cleared with the state. Leaving
+ * them behind would keep the listing in a group whose undo has already run,
+ * so a later undo of the same group would try to restore it a second time.
+ */
+export async function restoreServiceListing(ownerId: OwnerId, listingId: string, tx?: Db) {
+  return db(tx).serviceListing.updateMany({
+    where: { ownerId, listingId, state: 'removed' },
+    data: { state: 'active', removedAt: null, removedByBatchId: null, removedByGroupId: null },
+  });
+}
+
+/**
+ * Mark a removal group reversed (US-017 AC-5).
+ *
+ * ⚠ GUARDED ON `undoneAt: null`, so a concurrent second undo updates zero rows
+ * rather than overwriting the first one's timestamp. The read-then-check in the
+ * handler answers the ordinary case; this is what makes it true under a double
+ * submit, where both requests read `null` before either wrote.
+ */
+export async function markRemovalGroupUndone(
+  ownerId: OwnerId,
+  groupId: string,
+  undoneAt: Date,
+  tx?: Db,
+) {
+  return db(tx).removalGroup.updateMany({
+    where: { ownerId, id: groupId, undoneAt: null },
+    data: { undoneAt },
+  });
+}
