@@ -9,6 +9,14 @@
 // functions return. A second implementation cannot be kept in step, and when
 // it drifts the symptom is not an error — it is a row silently sorting into
 // the wrong place, or a title appearing active when every listing is gone.
+//
+// ⚠ The parameters are `Pick`s, not whole `ServiceListing`s, and that is a
+// statement about the inputs rather than a convenience. A caller reading rows
+// back out of the store to recompute these values would otherwise have to
+// fabricate `removedAt`, `removedByBatchId` and the rest to satisfy the type —
+// and inventing field values to get past a compiler is exactly how a wrong
+// value ends up written. The `Pick` names the columns the derivation actually
+// depends on, so a caller knows precisely which ones it must really read.
 
 import type { TitleState } from './enums.js';
 import type { ServiceListing } from './types.js';
@@ -21,7 +29,7 @@ import type { ServiceListing } from './types.js';
  * would report `removed` — the safer of the two wrong answers, since it hides
  * a row rather than resurrecting one, but it is still wrong, so it throws.
  */
-export function deriveTitleState(listings: readonly ServiceListing[]): TitleState {
+export function deriveTitleState(listings: readonly Pick<ServiceListing, 'state'>[]): TitleState {
   if (listings.length === 0) {
     throw new RangeError('a title must have at least one listing (invariant I-3)');
   }
@@ -43,7 +51,9 @@ export function deriveTitleState(listings: readonly ServiceListing[]): TitleStat
  * Dates are `YYYY-MM-DD`, so a lexicographic comparison IS a chronological one;
  * no Date parsing is involved and no timezone can shift a day.
  */
-export function deriveSortDateAdded(listings: readonly ServiceListing[]): string | null {
+export function deriveSortDateAdded(
+  listings: readonly Pick<ServiceListing, 'state' | 'dateAdded'>[],
+): string | null {
   let earliest: string | null = null;
   for (const listing of listings) {
     if (listing.state === 'removed') continue;

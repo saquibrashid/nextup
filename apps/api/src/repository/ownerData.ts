@@ -629,6 +629,28 @@ export async function listActiveListingsForTitle(ownerId: OwnerId, titleId: stri
 }
 
 /**
+ * EVERY listing on one title, active or removed.
+ *
+ * ⚠ This is NOT a relaxed `listActiveListingsForTitle`, and the two must not be
+ * merged. That one answers "what is this title still on?", which is a product
+ * question and where `state: 'active'` is load-bearing. This one exists solely
+ * to feed `deriveTitleState`/`deriveSortDateAdded`, which are DEFINED over the
+ * whole set — a title is `removed` only when EVERY listing is (invariant I-3),
+ * so a caller handed only the active ones would see an empty array and get a
+ * `RangeError` instead of the `removed` state it should have computed.
+ *
+ * Only the columns the derivation reads are selected, so it cannot accidentally
+ * become a general-purpose listing reader.
+ */
+export async function listListingsForTitle(ownerId: OwnerId, titleId: string, tx?: Db) {
+  return db(tx).serviceListing.findMany({
+    where: { ownerId, titleId },
+    select: { listingId: true, service: true, state: true, dateAdded: true },
+    orderBy: { listingId: 'asc' },
+  });
+}
+
+/**
  * Every ACTIVE listing on ONE service, with just enough of its title to render
  * a removal proposal (`specs/api.md` §6.17) and to key classification
  * (`packages/domain/src/classify.ts`).
