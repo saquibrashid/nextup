@@ -50,6 +50,7 @@ import {
   listActiveSuppressions,
   listCandidatesForReview,
   listImagesForBatch,
+  listRemovalDecisions,
 } from '../repository/ownerData.js';
 
 /** `YYYY-MM-DD` in UTC. The listing's `dateAdded` is a DATE column already. */
@@ -167,6 +168,52 @@ export async function loadReviewCandidates(
   return { candidates, suppressed, activeListings, rows };
 }
 
+/**
+ * The removal set a batch currently proposes, derived from an already-loaded
+ * review read.
+ *
+ * ⚠ Exported and SHARED with `PATCH …/removals` (TASK-085) on purpose, for the
+ * same reason `loadReviewCandidates` is shared with `confirm-all`: the two
+ * endpoints must agree about which listings are on the table. A second,
+ * simpler implementation there would drift, and the way it drifts is that a
+ * tick lands on a listing the owner was never shown.
+ */
+export function proposedRemovalsFrom(
+  service: Service,
+  loaded: Pick<
+    Awaited<ReturnType<typeof loadReviewCandidates>>,
+    'candidates' | 'suppressed' | 'activeListings'
+  >,
+): ReturnType<typeof computeRemovals> {
+  // A listing "disappeared" when no SURVIVING candidate resolved to its work.
+  // ⚠ SD-02 collapse losers are excluded from the extracted set deliberately —
+  // their identity lives on in the survivor, so counting them changes nothing,
+  // but reading `resolvedWorkIdentity` off a discarded row is the shape of a
+  // bug where a rejected candidate keeps a title alive.
+  const extracted = new Set(
+    loaded.candidates
+      .filter((c) => c.collapsedIntoCandidateId === null && c.resolvedWorkIdentity !== null)
+      .map((c) => c.resolvedWorkIdentity as string),
+  );
+  return computeRemovals({
+    service,
+    activeListings: loaded.activeListings.map((listing) => ({
+      listingId: listing.listingId,
+      titleId: listing.titleId,
+      workIdentity: listing.title.workIdentity,
+      state: listing.state,
+      service: listing.service as Service,
+      tmdbName: listing.title.tmdbName,
+      rawExtractedText: listing.title.rawExtractedText,
+      releaseYear: listing.title.tmdbReleaseYear,
+      posterPath: listing.title.tmdbPosterPath,
+      dateAdded: toIsoDate(listing.dateAdded),
+    })),
+    extractedWorkIdentities: extracted,
+    suppressed: loaded.suppressed,
+  });
+}
+
 export function registerBatchReviewRoutes(router: Router): void {
   router.get('/batches/:batchId/review', async (req, res) => {
     const ownerId = requireOwnerId(req);
@@ -187,34 +234,13 @@ export function registerBatchReviewRoutes(router: Router): void {
       loadReviewCandidates(ownerId, batchId, service),
       listImagesForBatch(ownerId, batchId),
     ]);
-    // Step 6. A listing "disappeared" when no SURVIVING candidate resolved to
-    // its work. ⚠ SD-02 collapse losers are excluded from the extracted set
-    // deliberately — their identity lives on in the survivor, so counting them
-    // changes nothing, but reading `resolvedWorkIdentity` off a discarded row
-    // is the shape of a bug where a rejected candidate keeps a title alive.
-    const extracted = new Set(
-      candidates
-        .filter((c) => c.collapsedIntoCandidateId === null && c.resolvedWorkIdentity !== null)
-        .map((c) => c.resolvedWorkIdentity as string),
-    );
-    const disappearedListings = computeRemovals({
-      service,
-      activeListings: activeListings.map((listing) => ({
-        listingId: listing.listingId,
-        titleId: listing.titleId,
-        workIdentity: listing.title.workIdentity,
-        state: listing.state,
-        service: listing.service as Service,
-        tmdbName: listing.title.tmdbName,
-        rawExtractedText: listing.title.rawExtractedText,
-        releaseYear: listing.title.tmdbReleaseYear,
-        posterPath: listing.title.tmdbPosterPath,
-        dateAdded: toIsoDate(listing.dateAdded),
-      })),
-      extractedWorkIdentities: extracted,
+    const decisions = await listRemovalDecisions(ownerId, batchId);
+    const untickedListingIds = new Set(decisions.filter((d) => !d.ticked).map((d) => d.listingId));
+    const disappearedListings = proposedRemovalsFrom(service, {
+      candidates,
       suppressed,
+      activeListings,
     });
-
     // ⚠ `candidateCount` is the DATUM, and `null` (not extracted yet) and `0`
     // (extracted, found nothing) are DIFFERENT and both meaningful — US-006
     // AC-3. Deriving this from "no candidate names this image" instead would
@@ -233,6 +259,7 @@ export function registerBatchReviewRoutes(router: Router): void {
       crossCheck: (batch.crossCheck ?? 'ok') as CrossCheckOutcome,
       candidates,
       disappearedListings,
+      untickedListingIds,
       imagesWithNoText,
     });
 

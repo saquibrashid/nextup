@@ -126,6 +126,16 @@ export interface BuildReviewInput {
    * owner is allowed to see it.
    */
   disappearedListings: readonly Omit<ReviewRemovalItem, 'ticked'>[];
+  /**
+   * Listing ids the owner has explicitly UNTICKED in this batch (TASK-085,
+   * REQ-021).
+   *
+   * ⚠ It is a set of exceptions, never a set of ticks: REQ-055 says every
+   * proposal arrives ticked, so the default has to be expressible without any
+   * stored row. An omitted or empty set therefore means "everything is
+   * ticked", which is exactly what a batch nobody has touched should mean.
+   */
+  untickedListingIds?: ReadonlySet<string>;
   imagesWithNoText: readonly ReviewImageWithNoText[];
 }
 
@@ -358,7 +368,15 @@ export function buildReviewResponse(input: BuildReviewInput): ReviewResponse {
         withheld: fullUpdate && withheldReason !== null,
         withheldReason,
         items: showRemovals
-          ? input.disappearedListings.map((listing) => ({ ...listing, ticked: true }))
+          ? input.disappearedListings.map((listing) => ({
+              ...listing,
+              // REQ-055 — ticked unless the owner said otherwise. The default
+              // lives HERE, in the one place that builds the item, so a
+              // missing decisions read degrades to "everything ticked", which
+              // is the state the owner already saw, rather than to a silently
+              // empty removal group.
+              ticked: input.untickedListingIds?.has(listing.listingId) !== true,
+            }))
           : [],
       },
     },

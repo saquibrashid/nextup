@@ -43,5 +43,7 @@ export * from './review.js';
 // TASK-083 — full-update removal computation (US-014). Pure: it decides WHAT
 // disappeared; `review.ts` decides whether the owner may see it.
 export * from './removals.js';
+// TASK-085 — the tick/untick body grammar for `PATCH …/removals` (§6.21).
+export * from './removalPatch.js';
 export * from './schemas.js';
 export * from './types.js';
