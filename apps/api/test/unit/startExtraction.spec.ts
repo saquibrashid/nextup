@@ -191,16 +191,54 @@ describe('startExtraction', () => {
     expect(written['degradedExtraction']).toBe(true);
   });
 
-  it('T-EXT-010j records the stage-1 slice without inventing stage 2-5 zeros', async () => {
+  it('T-EXT-010j records the stage-1 slice without inventing stage 3-5 zeros', async () => {
     await startExtraction(OWNER, BATCH, { blobStore, extractor: extractorReturning() });
 
     const stats = lastStats();
     expect(stats['stage1']).toMatchObject({ imagesProcessed: 1, candidatesRaw: 1 });
     expect(stats['progress']).toEqual({ imagesDone: 1, imagesTotal: 1 });
-    // A zero is a measurement. Stages 2-5 never ran, so writing theirs would
-    // record five false ones into the only evidence for RSK-021.
+    // A zero is a measurement. Stages 3-5 never ran, so writing theirs would
+    // record false ones into the only evidence for RSK-021.
     expect(Object.keys(stats)).not.toContain('matched');
-    expect(Object.keys(stats['stage1'] as object)).not.toContain('candidatesAfterCleanup');
+    const stage1Keys = Object.keys(stats['stage1'] as object);
+    expect(stage1Keys).not.toContain('candidatesCollapsed');
+    expect(stage1Keys).not.toContain('suppressedGated');
+    // ⚠ `candidatesAfterCleanup` IS written, and this case used to assert it
+    // was not. Stage 2 (`cleanup`) genuinely runs — inside `recordItems`, which
+    // is why it looked like it had not — so the count is a real measurement,
+    // and `specs/ai.md` §8.1 reads it to decide `lowYield`. Suppressing it to
+    // preserve the old "stages 2-5 never ran" wording would have left the
+    // low-yield decision with nothing to decide from.
+    expect(stats['stage1']).toMatchObject({ candidatesAfterCleanup: 1 });
+  });
+
+  it('T-AI-022a persists lowYield as state when the readers produced nothing', async () => {
+    // ⚠ THE DEFECT TASK-084 EXISTS FOR. `lowYield` was modelled, persisted,
+    // read at review and asserted by T-AI-021 a–m — and no code path anywhere
+    // ever set it. This is the case that would have caught that: a batch whose
+    // screenshots yielded no titles at all must reach review flagged, because
+    // in full-update the flag is the only thing standing between a blank read
+    // and a proposal to remove the owner's entire list.
+    await startExtraction(OWNER, BATCH, {
+      blobStore,
+      extractor: extractorReturning({ items: [] }),
+    });
+
+    expect(lastStatus()).toBe('in-review');
+    const written = mockRecord.mock.calls.at(-1)?.[2] as Record<string, unknown>;
+    expect(written['lowYield']).toBe(true);
+  });
+
+  it('T-AI-022b writes lowYield FALSE on a healthy read, never leaving it stale', async () => {
+    // ⚠ Written in both directions on purpose. A re-extraction (US-034) of a
+    // batch that was low yield must clear the flag when the new read is good;
+    // an implementation that only ever set it to `true` would leave the owner
+    // permanently unable to remove anything from that batch, with no way to
+    // tell why.
+    await startExtraction(OWNER, BATCH, { blobStore, extractor: extractorReturning() });
+
+    const written = mockRecord.mock.calls.at(-1)?.[2] as Record<string, unknown>;
+    expect(written['lowYield']).toBe(false);
   });
 
   it('T-EXT-010k fails loudly with EXTRACTOR_UNAVAILABLE when no reader is configured', async () => {
