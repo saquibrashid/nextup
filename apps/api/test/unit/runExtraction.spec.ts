@@ -91,7 +91,9 @@ function harness(overrides: Partial<RunExtractionPorts> = {}): Harness {
     loadImageBytes: () => Promise.resolve(new Uint8Array([1, 2, 3])),
     recordItems: (img, items) => {
       recorded.push({ imageId: img.imageId, count: items.length });
-      return Promise.resolve();
+      // The stub stands in for stage 2, which never drops a row — so the
+      // post-cleanup count is the item count unless a case overrides it.
+      return Promise.resolve(items.length);
     },
     reportProgress: (p) => {
       progressLog.push({ ...p });
@@ -620,5 +622,90 @@ describe('T-BATCH-007 a memory failure fails ONE image, never the batch', () => 
     expect(outcome.status).toBe('extraction-failed');
     if (outcome.status !== 'extraction-failed') throw new Error('unreachable');
     expect(outcome.errorCode).toBe('EXTRACTOR_ERROR');
+  });
+});
+
+describe('T-AI-021 the runner raises lowYield from what it actually read', () => {
+  it('T-AI-021v · a healthy batch reports lowYield false and a post-cleanup count', async () => {
+    const outcome = await runExtraction({
+      batchId: 'batch-1',
+      images: [image(1), image(2)],
+      extractor: scripted([result({ items: [item('Dune'), item('Arrival')] })]),
+      ports: harness().ports,
+    });
+
+    expect(outcome.status).toBe('in-review');
+    if (outcome.status !== 'in-review') throw new Error('unreachable');
+    expect(outcome.lowYield).toBe(false);
+    expect(outcome.stats.candidatesAfterCleanup).toBe(4);
+  });
+
+  it('T-AI-021w · a batch that read nothing reports lowYield true', async () => {
+    // The blank-screenshot case, at the runner boundary. Until TASK-084 this
+    // batch reached review with lowYield false and, in full-update, proposed
+    // removing every title the owner had.
+    const outcome = await runExtraction({
+      batchId: 'batch-1',
+      images: [image(1), image(2)],
+      extractor: scripted([result({ items: [] })]),
+      ports: harness().ports,
+    });
+
+    expect(outcome.status).toBe('in-review');
+    if (outcome.status !== 'in-review') throw new Error('unreachable');
+    expect(outcome.lowYield).toBe(true);
+    expect(outcome.stats.candidatesAfterCleanup).toBe(0);
+  });
+
+  it('T-AI-021x · half the images blank is low yield even though the rest read fine', async () => {
+    const outcome = await runExtraction({
+      batchId: 'batch-1',
+      images: [image(1), image(2)],
+      extractor: scripted([result({ items: [] }), result({ items: [item('Dune')] })]),
+      ports: harness().ports,
+    });
+
+    expect(outcome.status).toBe('in-review');
+    if (outcome.status !== 'in-review') throw new Error('unreachable');
+    expect(outcome.stats.candidatesAfterCleanup).toBe(1);
+    expect(outcome.lowYield).toBe(true);
+  });
+
+  it('T-AI-021y · the count comes from recordItems, NOT from the raw item count', async () => {
+    // Stage 2 lives behind the port and MERGES fragments of one caption, so
+    // the runner cannot substitute `items.length`. A three-fragment read of a
+    // single title is a one-candidate image; counting it as three would report
+    // a healthy read of a screenshot that yielded one title.
+    const h = harness({
+      recordItems: () => Promise.resolve(1),
+    });
+    const outcome = await runExtraction({
+      batchId: 'batch-1',
+      images: [image(1)],
+      extractor: scripted([result({ items: [item('Du'), item('ne'), item('Part Two')] })]),
+      ports: h.ports,
+    });
+
+    expect(outcome.status).toBe('in-review');
+    if (outcome.status !== 'in-review') throw new Error('unreachable');
+    expect(outcome.stats.candidatesRaw).toBe(3);
+    expect(outcome.stats.candidatesAfterCleanup).toBe(1);
+  });
+
+  it('T-AI-021z · lowYield is independent of degradedExtraction', async () => {
+    // Two separate flags with two separate causes. A fully corroborated read
+    // of blank screenshots is low yield and NOT degraded; conflating them
+    // would make a clean reader outage look like a thin read, and vice versa.
+    const outcome = await runExtraction({
+      batchId: 'batch-1',
+      images: [image(1)],
+      extractor: scripted([result({ items: [], crossCheck: 'ok' })]),
+      ports: harness().ports,
+    });
+
+    expect(outcome.status).toBe('in-review');
+    if (outcome.status !== 'in-review') throw new Error('unreachable');
+    expect(outcome.lowYield).toBe(true);
+    expect(outcome.degradedExtraction).toBe(false);
   });
 });

@@ -53,8 +53,14 @@ import type {
 } from './enums.js';
 import type { IsoDate } from './types.js';
 
-/** `specs/ai.md` §8.1 — half the images yielding nothing is a low-yield read. */
-export const ZERO_YIELD_IMAGE_RATIO = 0.5;
+/**
+ * ⚠ `ZERO_YIELD_IMAGE_RATIO` USED TO BE DECLARED HERE AND WAS NEVER READ.
+ * It is now defined once, next to the only thing that applies it, in
+ * `extraction/lowYield.ts`. A threshold living beside the code that *consumes*
+ * the flag rather than the code that *raises* it is how this project ended up
+ * with a fully tested withholding path and nothing anywhere setting
+ * `lowYield`.
+ */
 
 // ── Inputs ─────────────────────────────────────────────────────────────────
 

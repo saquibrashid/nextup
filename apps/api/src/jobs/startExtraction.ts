@@ -61,13 +61,16 @@ export interface StartExtractionDeps {
  * What goes into `uploadBatch.extractionStats`.
  *
  * ⚠ NOT `extractionStatsSchema` from the domain. That schema is `.strict()`
- * and requires `candidatesAfterCleanup`, `candidatesCollapsed`, `matched`,
- * `unmatched` and `suppressedGated` — stages 2-5, which have not run
- * (TASK-057/060). Writing zeros for them to satisfy the schema would record
- * five measurements that were never taken, into the one field
- * `docs/architecture.md` calls the only evidence for RSK-021. The stage-1
- * slice is nested under its own key instead, so stages 2-5 can add theirs
- * without any value here ever having been a lie.
+ * and requires `candidatesCollapsed`, `matched`, `unmatched` and
+ * `suppressedGated` — stages 3-5, which have not run (TASK-060). Writing zeros
+ * for them to satisfy the schema would record measurements that were never
+ * taken, into the one field `docs/architecture.md` calls the only evidence for
+ * RSK-021. The stage-1 slice is nested under its own key instead, so stages
+ * 3-5 can add theirs without any value here ever having been a lie.
+ *
+ * ⚠ `candidatesAfterCleanup` IS in that slice and IS honest: stage 2
+ * (`cleanup`) runs inside `recordItems` below, so the count is measured rather
+ * than assumed. `specs/ai.md` §8.1 reads it to decide `lowYield`.
  */
 interface PersistedExtractionStats {
   stage1: RunExtractionResult['stats'];
@@ -144,6 +147,11 @@ export function extractionPorts(
           sourceImages: { create: [{ ownerId, imageId: image.imageId, ordinal }] },
         });
       }
+      // ⚠ The count the runner needs for `specs/ai.md` §8.1. Returned from
+      // HERE, after `cleanup`, rather than counted from `items` upstream: stage
+      // 2 merges fragments, so the two numbers differ on exactly the messy
+      // reads the low-yield check exists to catch.
+      return cleaned.length;
     },
 
     async reportProgress(progress) {
@@ -242,12 +250,15 @@ export async function startExtraction(
         // `computeRemovals: false` downstream, so they must survive the round
         // trip to the review request and must never be recomputed on read.
         degradedExtraction: result.degradedExtraction,
+        lowYield: result.lowYield,
         crossCheck: result.crossCheck,
       });
       log('extraction.completed', {
         batchId,
         candidatesRaw: result.stats.candidatesRaw,
+        candidatesAfterCleanup: result.stats.candidatesAfterCleanup,
         degraded: result.degradedExtraction,
+        lowYield: result.lowYield,
         crossCheck: result.crossCheck,
         imageFailures: result.imageFailures.length,
       });
@@ -304,6 +315,7 @@ function emptyStats(): RunExtractionResult['stats'] {
     imagesProcessed: 0,
     imagesWithZeroCandidates: 0,
     candidatesRaw: 0,
+    candidatesAfterCleanup: 0,
     estimatedCostUsd: 0,
   };
 }

@@ -34,6 +34,7 @@
 
 import {
   isExtractorError,
+  isLowYield,
   type CrossCheckOutcome,
   type ExtractedTextItem,
   type ExtractionErrorCode,
@@ -129,6 +130,16 @@ export interface ExtractionStats {
   imagesProcessed: number;
   imagesWithZeroCandidates: number;
   candidatesRaw: number;
+  /**
+   * Candidates surviving stage 2 (`cleanup`), reported by `recordItems`.
+   *
+   * ⚠ NOT DERIVABLE FROM `candidatesRaw`. Stage 2 merges `ocr-only` fragments
+   * of one caption, so the two differ whenever a caption arrived in pieces —
+   * and this is the arm `specs/ai.md` §8.1 reads, so guessing it from the raw
+   * count would make the low-yield decision wrong on exactly the batches whose
+   * reads were poorest.
+   */
+  candidatesAfterCleanup: number;
   /** REPORTING ONLY — never a branch (NFR-012a). */
   estimatedCostUsd: number;
 }
@@ -148,8 +159,15 @@ export interface RunExtractionPorts {
    * re-extraction ran (US-034 AC-5).
    */
   loadImageBytes(image: ExtractionImageRef): Promise<Uint8Array>;
-  /** Stage-2 seam (TASK-057). Called once per image, in order. */
-  recordItems(image: ExtractionImageRef, items: readonly ExtractedTextItem[]): Promise<void>;
+  /**
+   * Stage-2 seam (TASK-057). Called once per image, in order.
+   *
+   * Returns the number of candidates that survived `cleanup` for this image.
+   * ⚠ The COUNT, not `void`: stage 2 lives behind this port, so the runner
+   * cannot see the post-cleanup total any other way, and `specs/ai.md` §8.1
+   * decides low yield from it.
+   */
+  recordItems(image: ExtractionImageRef, items: readonly ExtractedTextItem[]): Promise<number>;
   /** Persist `progress` so `GET /api/batches/:batchId` can report it. */
   reportProgress(progress: ExtractionProgress): Promise<void> | void;
   now(): number;
@@ -175,6 +193,14 @@ export interface ExtractionSucceeded {
   readonly stats: ExtractionStats;
   /** `true` when any image fell back to OCR-only (`specs/ai.md` §2.2a). */
   readonly degradedExtraction: boolean;
+  /**
+   * `specs/ai.md` §8.1. Carried as STATE alongside `degradedExtraction`, and
+   * for the same reason: it forces `computeRemovals: false` at review, so
+   * recomputing it on read would let a later change to the stats shape quietly
+   * unwithhold a batch the owner was already told nothing would be removed
+   * from.
+   */
+  readonly lowYield: boolean;
   readonly crossCheck: CrossCheckOutcome;
   readonly imageFailures: readonly ExtractionImageFailure[];
   readonly progress: ExtractionProgress;
@@ -293,6 +319,7 @@ export async function runExtraction(input: RunExtractionInput): Promise<RunExtra
     imagesProcessed: 0,
     imagesWithZeroCandidates: 0,
     candidatesRaw: 0,
+    candidatesAfterCleanup: 0,
     estimatedCostUsd: 0,
   };
   const imageFailures: ExtractionImageFailure[] = [];
@@ -390,7 +417,7 @@ export async function runExtraction(input: RunExtractionInput): Promise<RunExtra
     if (result.items.length === 0) stats.imagesWithZeroCandidates += 1;
     stats.estimatedCostUsd += costOf(result);
 
-    await ports.recordItems(image, result.items);
+    stats.candidatesAfterCleanup += await ports.recordItems(image, result.items);
 
     imagesDone += 1;
     await ports.reportProgress(progress());
@@ -413,6 +440,10 @@ export async function runExtraction(input: RunExtractionInput): Promise<RunExtra
     // Carried as STATE, never recomputed on read: it forces
     // `computeRemovals: false` at review (`T-AI-036`).
     degradedExtraction: crossCheck === 'llm-unavailable',
+    // §8.1 — the read was too thin to reason about removals from. Independent
+    // of `degradedExtraction`: a fully corroborated read of five blank
+    // screenshots is not degraded and is still low yield.
+    lowYield: isLowYield(stats),
     crossCheck,
     imageFailures,
     progress: progress(),

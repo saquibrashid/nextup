@@ -394,6 +394,62 @@ describe('T-REV-005 — closing without confirmRemovals', () => {
   });
 });
 
+/* ── the low-yield read (T-AI-022) ────────────────────────────────────── */
+
+describe('T-AI-022 — a low-yield full-update removes nothing and logs nothing', () => {
+  it('T-AI-022c a zero-candidate full-update produces an EMPTY provenance.removed', async () => {
+    // `specs/ai.md` §8.2. Three titles are listed and the batch read nothing
+    // at all — the exact shape of a blank or unreadable capture. Reconciliation
+    // must not run over the removal half, so no listing is removed and NO
+    // `listing_removed` provenance row is written: an empty removal log is the
+    // evidence the owner was never asked, and a row here would later be undone
+    // as though a removal had happened.
+    await makeActiveTitle(DUNE, 'netflix', 'Dune');
+    await makeActiveTitle(ANDOR, 'netflix', 'Andor');
+    await makeActiveTitle(HEAT, 'netflix', 'Heat');
+    const batchId = await makeBatch({ lowYield: true });
+
+    const res = await close(batchId);
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as CloseBody;
+    expect(body.summary.listingsRemoved).toBe(0);
+    expect(body.summary.removalGroupId).toBeNull();
+    expect(
+      await testPrisma().batchChange.count({ where: { ownerId, kind: 'listing_removed' } }),
+    ).toBe(0);
+    expect(await testPrisma().serviceListing.count({ where: { ownerId, state: 'active' } })).toBe(
+      3,
+    );
+  });
+
+  it('T-AI-022d closes WITHOUT confirmRemovals — the owner was shown nothing to confirm', async () => {
+    // ⚠ The discriminating half. Requiring confirmation for a section that was
+    // never rendered makes a low-yield batch permanently unclosable, so the
+    // owner cannot even keep the additions it did read.
+    await makeActiveTitle(ANDOR, 'netflix', 'Andor');
+    const batchId = await makeBatch({ lowYield: true });
+
+    expect((await close(batchId)).status).toBe(200);
+    expect(await testPrisma().removalGroup.count({ where: { ownerId } })).toBe(0);
+  });
+
+  it('T-AI-022e withholds on low yield even when the cross-check was clean', async () => {
+    // lowYield and degradedExtraction are independent causes (specs/ai.md
+    // §8.1 vs §2.2a). This batch is corroborated and still must withhold, so
+    // the withholding cannot be an accidental side effect of a degraded read.
+    await makeActiveTitle(HEAT, 'netflix', 'Heat');
+    const batchId = await makeBatch({
+      lowYield: true,
+      degradedExtraction: false,
+      crossCheck: 'ok',
+    });
+
+    expect((await close(batchId)).status).toBe(200);
+    expect(await testPrisma().serviceListing.count({ where: { state: 'removed' } })).toBe(0);
+  });
+});
+
 /* ── the zero-member group (T-REV-007) ────────────────────────────────── */
 
 describe('T-REV-007 — unticking every proposed removal', () => {
