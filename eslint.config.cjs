@@ -139,6 +139,72 @@ module.exports = [
     },
   },
 
+  {
+    // ⚠ RULE A, STRUCTURALLY ENFORCED (`specs/ai.md` §4.4, RSK-022, NFR-016).
+    // TMDB's terms restrict use "in connection with … an AI based
+    // Application", so matching is deterministic (jaro-winkler, no ML) and no
+    // TMDB content ever reaches an AI service. This rule makes the first half
+    // of that a compile-time property rather than a convention: the matcher
+    // and the TMDB client cannot so much as IMPORT an inference SDK.
+    //
+    // PATH NOTE. `specs/ai.md` §4.4 writes the matcher's home as
+    // `apps/api/src/matching/`. It is `packages/domain/src/matching/` — the
+    // matcher is pure and belongs in the shared domain (ADR-0004), and the
+    // backlog put it there. The rule follows the code.
+    //
+    // ⚠ THE MATCHER'S `../extraction/jaroWinkler.js` IMPORT IS NOT A
+    // VIOLATION AND MUST KEEP WORKING. `packages/domain/src/extraction/` is
+    // pure string arithmetic — normalisation, edit distance, cross-check
+    // arbitration — and shares only a NAME with `apps/api/src/extraction/`,
+    // which is where the SDK calls live. A blanket `**/extraction/**` ban
+    // reads as the stricter, safer rule and is simply wrong: it breaks the
+    // deterministic matcher this rule exists to protect, which is the fastest
+    // route to somebody switching the whole rule off.
+    files: ['packages/domain/src/matching/**/*.{ts,tsx}', 'apps/api/src/clients/tmdbClient.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: [
+                'openai',
+                'openai/*',
+                '@azure/openai',
+                '@azure/openai/*',
+                '@azure/ai-*',
+                '@azure-rest/ai-*',
+                '@azure/cognitiveservices-*',
+                '@anthropic-ai/*',
+                '@google/generative-ai',
+                'langchain',
+                'langchain/*',
+                '@langchain/*',
+                'ollama',
+                'replicate',
+                '@huggingface/*',
+              ],
+              message:
+                'Rule A (specs/ai.md §4.4, RSK-022): matching is deterministic and no TMDB ' +
+                'content may reach an AI service. An inference SDK must not be importable ' +
+                'from the matching path or the TMDB client.',
+            },
+            {
+              // The other direction: the AI-calling extraction layer in the
+              // API app. Unreachable from `packages/domain` today because a
+              // package cannot import an app, but the TMDB client sits in the
+              // same app and can.
+              group: ['**/api/src/extraction/*', '../extraction/llmVisionExtractor*'],
+              message:
+                'Rule A (specs/ai.md §4.4): the TMDB path must not reach the extraction ' +
+                'layer, which is where the inference SDKs are called.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // Must stay LAST: it switches off the stylistic rules that would otherwise
   // fight Prettier. Anything appended after this would resurrect them.
   prettier,
