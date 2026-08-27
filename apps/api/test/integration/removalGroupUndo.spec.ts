@@ -385,10 +385,7 @@ describe('POST /api/removal-groups/:groupId/undo', () => {
     // Models a per-listing restore (§6.10) landing between the read and the
     // write. A half-reversed group cannot be reversed again as a group, and
     // the owner has no way to see which half landed.
-    const { groupId } = await seedGroup([
-      { name: 'Dune' },
-      { name: 'Heat', alreadyActive: true },
-    ]);
+    const { groupId } = await seedGroup([{ name: 'Dune' }, { name: 'Heat', alreadyActive: true }]);
 
     const res = await undo(groupId);
 
