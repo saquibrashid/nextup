@@ -1,5 +1,5 @@
 // The "Paste screenshot" BUTTON - primitive 2 of two (`specs/ui.md` §3.2b,
-// `specs/ux-states.md` §4.0a/§4.16, TASK-160, `A45`).
+// `specs/ux-states.md` §4.0a/§4.13-§4.16, TASK-160/161, `A45`).
 //
 // ⚠ A BUTTON, NOT A GESTURE, and it is the ONLY paste path on iOS. A
 // `document`-level `paste` listener never fires there without a hardware
@@ -15,6 +15,12 @@
 // immediately, on a device, with no way to reproduce it here. That is why
 // `T-PASTE-002` asserts the ORDER and not merely the call.
 //
+// ⚠ REJECTION IS THE EXPECTED CASE, NOT THE ERROR CASE (TASK-161). On iOS
+// any stray tap, tab switch or backgrounding silently rejects the promise.
+// Every settled promise maps to exactly ONE of four distinct copy constants
+// within the same tick. No pending/spinner outlives the promise. No auto-retry
+// is ever added: a read() outside a fresh user gesture rejects by design.
+//
 // ⚠ ADD, NOT SWAP. This renders ALONGSIDE "Choose files", never instead of it
 // (product invariant 16). It is also the one affordance that can be entirely
 // absent - see `isPasteSupported` - which is exactly why it must never be the
@@ -24,9 +30,16 @@
 // invocation and never remembers the answer, so there is no state to store and
 // a control offering to store it would simply lie.
 
-import { type JSX } from 'react';
+import { useState, type JSX } from 'react';
 
-import { PASTE_BUTTON_LABEL, PASTE_IOS_HINT } from '../copy';
+import {
+  PASTE_ABANDONED_BODY,
+  PASTE_BUTTON_LABEL,
+  PASTE_DENIED_BODY,
+  PASTE_EMPTY_BODY,
+  PASTE_IOS_HINT,
+  PASTE_NOT_IMAGE_BODY,
+} from '../copy';
 import { useHeldImages } from '../lib/useHeldImages';
 import { isPasteSupported } from './ImageDropzone';
 
@@ -84,10 +97,22 @@ export function PasteButton({
   touch,
 }: PasteButtonProps): JSX.Element | null {
   const { deliver, heldCount } = useHeldImages(batchReady, onImagesPasted);
+  const [rejection, setRejection] = useState<PasteFailure | null>(null);
 
   // Read at render, not in an effect: the button must be absent from the very
   // first paint, never rendered and then withdrawn.
   if (!isPasteSupported()) return null;
+
+  const rejectionMessage: string | null =
+    rejection === 'denied'
+      ? PASTE_DENIED_BODY
+      : rejection === 'empty'
+        ? PASTE_EMPTY_BODY
+        : rejection === 'not-image'
+          ? PASTE_NOT_IMAGE_BODY
+          : rejection === 'abandoned'
+            ? PASTE_ABANDONED_BODY
+            : null;
 
   function onClick(): void {
     // ⚠ FIRST STATEMENT. Nothing may precede this call - see the header note.
@@ -95,22 +120,27 @@ export function PasteButton({
       .read()
       .then(async (items) => {
         if (items.length === 0) {
+          setRejection('empty');
           onPasteFailed?.('empty');
           return;
         }
         const item = items.find((candidate) => candidate.types.includes(IMAGE_PNG));
         if (item === undefined) {
+          setRejection('not-image');
           onPasteFailed?.('not-image');
           return;
         }
         const blob = await item.getType(IMAGE_PNG);
+        setRejection(null);
         // The name is a placeholder: the server ignores it and synthesises the
         // real one (`api.md` §6.12, TASK-158), because a client-supplied name
         // must never reach a blob path.
         deliver([new File([blob], 'image.png', { type: IMAGE_PNG })]);
       })
       .catch((error: unknown) => {
-        onPasteFailed?.(classifyRejection(error));
+        const failure = classifyRejection(error);
+        setRejection(failure);
+        onPasteFailed?.(failure);
       });
   }
 
@@ -125,6 +155,11 @@ export function PasteButton({
         preview thumbnail.
       */}
       {touch === true && <p data-testid="paste-hint">{PASTE_IOS_HINT}</p>}
+      {rejectionMessage !== null && (
+        <p role="alert" data-testid="paste-rejection">
+          {rejectionMessage}
+        </p>
+      )}
       {heldCount > 0 && (
         <p role="status" data-testid="paste-held">
           {PASTE_HELD_BODY}

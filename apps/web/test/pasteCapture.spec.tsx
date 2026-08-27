@@ -12,7 +12,17 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { CHOOSE_FILES_LABEL, PASTE_IOS_HINT } from '../src/copy';
+import {
+  CHOOSE_FILES_LABEL,
+  DROPZONE_ACTIVE_LABEL,
+  DROPZONE_IDLE_LABEL,
+  FOLDER_REJECTION,
+  PASTE_ABANDONED_BODY,
+  PASTE_DENIED_BODY,
+  PASTE_EMPTY_BODY,
+  PASTE_IOS_HINT,
+  PASTE_NOT_IMAGE_BODY,
+} from '../src/copy';
 import { ImageDropzone } from '../src/components/ImageDropzone';
 import { PASTE_HELD_BODY, PasteButton, classifyRejection } from '../src/components/PasteButton';
 import {
@@ -400,5 +410,261 @@ describe('T-PASTE-009 - no clipboard API means no button, and no lost capability
     });
 
     expect(onFilesAccepted).toHaveBeenCalledWith([png], 'paste');
+  });
+});
+
+/**
+ * T-PASTE-008 — PasteButton renders the right copy for all four rejection paths.
+ *
+ * ⚠ REJECTION IS THE EXPECTED CASE (TASK-161). Every settlement of
+ * `clipboard.read()` maps to exactly one of four states within the same tick.
+ * After every one of the four, the button is re-enabled (no spinner outlives
+ * the promise, no auto-retry ever).
+ */
+describe('T-PASTE-008 - PasteButton rejection messages (TASK-161)', () => {
+  it('T-PASTE-008a NotAllowedError renders PASTE_DENIED_BODY', async () => {
+    const err = new Error('no');
+    err.name = 'NotAllowedError';
+    withClipboard(() => Promise.reject(err));
+    render(<PasteButton batchReady onImagesPasted={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /paste screenshot/i }));
+
+    const alert = await screen.findByTestId('paste-rejection');
+    expect(alert).toHaveTextContent(PASTE_DENIED_BODY);
+    expect(alert).toHaveAttribute('role', 'alert');
+    // Button re-enabled after rejection.
+    expect(screen.getByRole('button', { name: /paste screenshot/i })).not.toBeDisabled();
+  });
+
+  it('T-PASTE-008b zero items renders PASTE_EMPTY_BODY', async () => {
+    withClipboard(() => Promise.resolve([]));
+    render(<PasteButton batchReady onImagesPasted={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /paste screenshot/i }));
+
+    const alert = await screen.findByTestId('paste-rejection');
+    expect(alert).toHaveTextContent(PASTE_EMPTY_BODY);
+    expect(alert).toHaveAttribute('role', 'alert');
+    expect(screen.getByRole('button', { name: /paste screenshot/i })).not.toBeDisabled();
+  });
+
+  it('T-PASTE-008c items with no image/* renders PASTE_NOT_IMAGE_BODY', async () => {
+    withClipboard(() => Promise.resolve([textItem()]));
+    render(<PasteButton batchReady onImagesPasted={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /paste screenshot/i }));
+
+    const alert = await screen.findByTestId('paste-rejection');
+    expect(alert).toHaveTextContent(PASTE_NOT_IMAGE_BODY);
+    expect(alert).toHaveAttribute('role', 'alert');
+    expect(screen.getByRole('button', { name: /paste screenshot/i })).not.toBeDisabled();
+  });
+
+  it('T-PASTE-008d bare DOMException renders PASTE_ABANDONED_BODY', async () => {
+    withClipboard(() => Promise.reject(new Error('some other error')));
+    render(<PasteButton batchReady onImagesPasted={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /paste screenshot/i }));
+
+    const alert = await screen.findByTestId('paste-rejection');
+    expect(alert).toHaveTextContent(PASTE_ABANDONED_BODY);
+    expect(alert).toHaveAttribute('role', 'alert');
+    expect(screen.getByRole('button', { name: /paste screenshot/i })).not.toBeDisabled();
+  });
+
+  it('T-PASTE-008e no spinner / pending element outlives the promise', async () => {
+    // Verify no disabled state or loading indicator is present after rejection.
+    const err = new Error('no');
+    err.name = 'NotAllowedError';
+    withClipboard(() => Promise.reject(err));
+    render(<PasteButton batchReady onImagesPasted={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /paste screenshot/i }));
+
+    await screen.findByTestId('paste-rejection');
+    // No disabled buttons — the button is immediately re-offered.
+    const buttons = screen.getAllByRole('button');
+    for (const btn of buttons) {
+      expect(btn).not.toBeDisabled();
+    }
+  });
+
+  it('T-PASTE-008f no rejection shown on successful paste', async () => {
+    withClipboard(() => Promise.resolve([pngItem()]));
+    render(<PasteButton batchReady onImagesPasted={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /paste screenshot/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('paste-rejection')).not.toBeInTheDocument();
+    });
+  });
+
+  it('T-PASTE-008g second click after rejection clears the rejection message', async () => {
+    let callCount = 0;
+    withClipboard(() => {
+      callCount++;
+      if (callCount === 1) return Promise.resolve([]);
+      return Promise.resolve([pngItem()]);
+    });
+    render(<PasteButton batchReady onImagesPasted={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /paste screenshot/i }));
+    await screen.findByTestId('paste-rejection');
+
+    // Second click with success clears the rejection.
+    fireEvent.click(screen.getByRole('button', { name: /paste screenshot/i }));
+    await waitFor(() => {
+      expect(screen.queryByTestId('paste-rejection')).not.toBeInTheDocument();
+    });
+  });
+});
+
+/**
+ * T-PASTE-004 — Drag-and-drop: the attach area is the drop target (TASK-162).
+ *
+ * ⚠ NOT A MOBILE PATH and not pretended to be — silently inert on touch is
+ * correct. `T-UI-014` covers the all-three-affordances assertion.
+ */
+describe('T-PASTE-004 - drag-and-drop (TASK-162)', () => {
+  it('T-PASTE-004a accepts two PNG files dropped on the target', async () => {
+    const onFilesAccepted = vi.fn();
+    render(<ImageDropzone onFilesAccepted={onFilesAccepted} />);
+    const png1 = imageFile('a.png');
+    const png2 = imageFile('b.png');
+    const mockItem = (file: File) => ({
+      webkitGetAsEntry: () => ({ isDirectory: false, name: file.name }),
+      getAsFile: () => file,
+    });
+    fireEvent.drop(screen.getByTestId('drop-target'), {
+      dataTransfer: { items: [mockItem(png1), mockItem(png2)], files: [png1, png2] },
+    });
+    expect(onFilesAccepted).toHaveBeenCalledWith([png1, png2], 'drop');
+  });
+
+  it('T-PASTE-004b dragover shows DROPZONE_ACTIVE_LABEL', () => {
+    render(<ImageDropzone />);
+    fireEvent.dragOver(screen.getByTestId('drop-target'));
+    expect(screen.getByTestId('dropzone-label')).toHaveTextContent(DROPZONE_ACTIVE_LABEL);
+  });
+
+  it('T-PASTE-004c dragleave restores DROPZONE_IDLE_LABEL', () => {
+    render(<ImageDropzone />);
+    fireEvent.dragOver(screen.getByTestId('drop-target'));
+    fireEvent.dragLeave(screen.getByTestId('drop-target'));
+    expect(screen.getByTestId('dropzone-label')).toHaveTextContent(DROPZONE_IDLE_LABEL);
+  });
+
+  it('T-PASTE-004d non-image file is refused by name (UNSUPPORTED_FORMAT_REJECTION)', async () => {
+    render(<ImageDropzone />);
+    const pdf = new File(['x'], 'notes.pdf', { type: 'application/pdf' });
+    const mockItem = {
+      webkitGetAsEntry: () => ({ isDirectory: false, name: 'notes.pdf' }),
+      getAsFile: () => pdf,
+    };
+    fireEvent.drop(screen.getByTestId('drop-target'), {
+      dataTransfer: { items: [mockItem], files: [pdf] },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('rejected-name')).toHaveTextContent('notes.pdf');
+    });
+  });
+
+  it('T-PASTE-004e folder is refused by name (FOLDER_REJECTION)', async () => {
+    render(<ImageDropzone />);
+    const folderItem = {
+      webkitGetAsEntry: () => ({ isDirectory: true, name: 'my-screenshots' }),
+      getAsFile: () => null,
+    };
+    fireEvent.drop(screen.getByTestId('drop-target'), {
+      dataTransfer: { items: [folderItem], files: [] },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('rejected-name')).toHaveTextContent('my-screenshots');
+    });
+    expect(screen.getByTestId('rejected-reason')).toHaveTextContent(FOLDER_REJECTION);
+  });
+
+  it('T-PASTE-004f folder in mixed drop rejects folder and accepts files', async () => {
+    const onFilesAccepted = vi.fn();
+    render(<ImageDropzone onFilesAccepted={onFilesAccepted} />);
+    const png = imageFile('photo.png');
+    const fileItem = {
+      webkitGetAsEntry: () => ({ isDirectory: false, name: 'photo.png' }),
+      getAsFile: () => png,
+    };
+    const folderItem = {
+      webkitGetAsEntry: () => ({ isDirectory: true, name: 'Screenshots' }),
+      getAsFile: () => null,
+    };
+    fireEvent.drop(screen.getByTestId('drop-target'), {
+      dataTransfer: { items: [fileItem, folderItem], files: [png] },
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('rejected-name')).toHaveTextContent('Screenshots');
+    });
+    // The file in the same drop is accepted despite the folder rejection.
+    expect(onFilesAccepted).toHaveBeenCalledWith([png], 'drop');
+  });
+
+  it('T-PASTE-004g drop without items API falls back to dataTransfer.files', async () => {
+    const onFilesAccepted = vi.fn();
+    render(<ImageDropzone onFilesAccepted={onFilesAccepted} />);
+    const png = imageFile('fallback.png');
+    // No items property — exercises the legacy fallback path.
+    fireEvent.drop(screen.getByTestId('drop-target'), {
+      dataTransfer: { files: [png] },
+    });
+    expect(onFilesAccepted).toHaveBeenCalledWith([png], 'drop');
+  });
+});
+
+/**
+ * T-UI-014 — All three ingest affordances are present, visible, and accessible
+ * (TASK-162 / product invariant 16).
+ *
+ * ⚠ PASTE WAS ADDED, NOT SWAPPED IN. File selection is a first-class path —
+ * the iOS Photos path and the laptop screenshot path both need it. `T-PASTE-010`
+ * is a separate e2e guard for the file-selection-not-displaced invariant.
+ */
+describe('T-UI-014 - all three affordances present (TASK-162)', () => {
+  it('T-UI-014a all three affordances are rendered together', () => {
+    withClipboard(() => Promise.resolve([]));
+    render(<ImageDropzone batchReady />);
+    // 1. Paste button (primitive 2, iOS)
+    expect(screen.getByTestId('paste-button')).toBeInTheDocument();
+    // 2. File input (primitive 3, always present)
+    expect(screen.getByTestId('file-input')).toBeInTheDocument();
+    // 3. Drop target (primitive 1, TASK-162)
+    expect(screen.getByTestId('drop-target')).toBeInTheDocument();
+  });
+
+  it('T-UI-014b DROPZONE_IDLE_LABEL is shown when not dragging', () => {
+    render(<ImageDropzone />);
+    expect(screen.getByTestId('dropzone-label')).toHaveTextContent(DROPZONE_IDLE_LABEL);
+  });
+
+  it('T-UI-014c the paste button and file label have the tap-target class', () => {
+    withClipboard(() => Promise.resolve([]));
+    render(<ImageDropzone batchReady />);
+    expect(screen.getByTestId('paste-button')).toHaveClass('tap-target');
+    expect(screen.getByText(CHOOSE_FILES_LABEL)).toHaveClass('tap-target');
+  });
+
+  it('T-UI-014d dropzone-totals has aria-live polite for screen-reader announcements', async () => {
+    withClipboard(() => Promise.resolve([]));
+    const onFilesAccepted = vi.fn();
+    render(<ImageDropzone batchReady onFilesAccepted={onFilesAccepted} />);
+    const png = imageFile('screenshot.png');
+    await userEvent.setup().upload(screen.getByTestId('file-input'), png);
+    const totals = screen.getByTestId('dropzone-totals');
+    expect(totals).toHaveAttribute('aria-live', 'polite');
+  });
+
+  it('T-UI-014e iOS hint is accessible when touch=true', () => {
+    withClipboard(() => Promise.resolve([]));
+    render(<ImageDropzone batchReady touch />);
+    expect(screen.getByTestId('paste-hint')).toHaveTextContent(PASTE_IOS_HINT);
   });
 });
