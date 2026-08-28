@@ -253,6 +253,8 @@ export function ImageDropzone({
         className="dropzone__target"
         data-testid="drop-target"
         data-dragging={dragging ? 'true' : undefined}
+        aria-label={dragging ? DROPZONE_ACTIVE_LABEL : DROPZONE_IDLE_LABEL}
+        tabIndex={0}
         onDragOver={(event) => {
           event.preventDefault();
           setDragging(true);

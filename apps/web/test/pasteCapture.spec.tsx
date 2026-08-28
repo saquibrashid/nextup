@@ -22,6 +22,7 @@ import {
   PASTE_EMPTY_BODY,
   PASTE_IOS_HINT,
   PASTE_NOT_IMAGE_BODY,
+  UNSUPPORTED_FORMAT_REJECTION,
 } from '../src/copy';
 import { ImageDropzone } from '../src/components/ImageDropzone';
 import { PASTE_HELD_BODY, PasteButton, classifyRejection } from '../src/components/PasteButton';
@@ -566,6 +567,8 @@ describe('T-PASTE-004 - drag-and-drop (TASK-162)', () => {
     render(<ImageDropzone />);
     fireEvent.dragOver(screen.getByTestId('drop-target'));
     expect(screen.getByTestId('dropzone-label')).toHaveTextContent(DROPZONE_ACTIVE_LABEL);
+    expect(screen.getByTestId('drop-target')).toHaveAttribute('data-dragging', 'true');
+    expect(screen.getByTestId('drop-target')).toHaveAccessibleName(DROPZONE_ACTIVE_LABEL);
   });
 
   it('T-PASTE-004c dragleave restores DROPZONE_IDLE_LABEL', () => {
@@ -573,6 +576,8 @@ describe('T-PASTE-004 - drag-and-drop (TASK-162)', () => {
     fireEvent.dragOver(screen.getByTestId('drop-target'));
     fireEvent.dragLeave(screen.getByTestId('drop-target'));
     expect(screen.getByTestId('dropzone-label')).toHaveTextContent(DROPZONE_IDLE_LABEL);
+    expect(screen.getByTestId('drop-target')).not.toHaveAttribute('data-dragging');
+    expect(screen.getByTestId('drop-target')).toHaveAccessibleName(DROPZONE_IDLE_LABEL);
   });
 
   it('T-PASTE-004d non-image file is refused by name (UNSUPPORTED_FORMAT_REJECTION)', async () => {
@@ -588,6 +593,7 @@ describe('T-PASTE-004 - drag-and-drop (TASK-162)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('rejected-name')).toHaveTextContent('notes.pdf');
     });
+    expect(screen.getByTestId('rejected-reason')).toHaveTextContent(UNSUPPORTED_FORMAT_REJECTION);
   });
 
   it('T-PASTE-004e folder is refused by name (FOLDER_REJECTION)', async () => {
@@ -661,14 +667,28 @@ describe('T-UI-014 - all three affordances present (TASK-162)', () => {
 
   it('T-UI-014b DROPZONE_IDLE_LABEL is shown when not dragging', () => {
     render(<ImageDropzone />);
-    expect(screen.getByTestId('dropzone-label')).toHaveTextContent(DROPZONE_IDLE_LABEL);
+    const label = screen.getByTestId('dropzone-label');
+    expect(label).toHaveTextContent(DROPZONE_IDLE_LABEL);
+    expect(label).toHaveTextContent(/paste a screenshot/i);
+    expect(label).toHaveTextContent(/choose files/i);
+    expect(label).toHaveTextContent(/drag them here/i);
+    expect(label).toHaveTextContent(/PNG, JPEG or HEIC/);
+    expect(label).toHaveTextContent(/10 MB each, 40 per batch/);
   });
 
-  it('T-UI-014c the paste button and file label have the tap-target class', () => {
+  it('T-UI-014c the paste button, file picker and drop target are keyboard-reachable', () => {
     withClipboard(() => Promise.resolve([]));
     render(<ImageDropzone batchReady />);
-    expect(screen.getByTestId('paste-button')).toHaveClass('tap-target');
+    const pasteButton = screen.getByTestId('paste-button');
+    const fileInput = screen.getByLabelText(CHOOSE_FILES_LABEL);
+    const dropTarget = screen.getByTestId('drop-target');
+
+    expect(pasteButton).toHaveClass('tap-target');
+    expect(pasteButton).not.toHaveAttribute('tabindex', '-1');
+    expect(fileInput).toBe(screen.getByTestId('file-input'));
     expect(screen.getByText(CHOOSE_FILES_LABEL)).toHaveClass('tap-target');
+    expect(dropTarget).toHaveAttribute('tabindex', '0');
+    expect(dropTarget).toHaveAccessibleName(DROPZONE_IDLE_LABEL);
   });
 
   it('T-UI-014d dropzone-totals has aria-live polite for screen-reader announcements', async () => {
