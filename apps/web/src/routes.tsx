@@ -24,7 +24,7 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { RatingLookupPage } from './pages/RatingLookupPage';
 import { RemovedPage } from './pages/RemovedPage';
 import { ReviewPage } from './pages/ReviewPage';
-import { SuppressedPage } from './pages/SuppressedPage';
+import { SuppressedRoute } from './containers/SuppressedRoute';
 import { UploadPage } from './pages/UploadPage';
 
 export interface RouteDefinition {
@@ -78,7 +78,7 @@ export const ROUTES: readonly RouteDefinition[] = [
   },
   {
     path: '/not-interested',
-    Component: SuppressedPage,
+    Component: SuppressedRoute,
     examplePath: '/not-interested',
     navLabel: 'Not interested',
   },
