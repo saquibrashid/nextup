@@ -29,6 +29,7 @@ import {
   buildReviewResponse,
   classifyWorkIdentity,
   computeRemovals,
+  reconcile,
   type BatchMode,
   type CandidateBasis,
   type CandidateProvider,
@@ -195,18 +196,14 @@ export function proposedRemovalsFrom(
     'candidates' | 'suppressed' | 'activeListings'
   >,
 ): ReturnType<typeof computeRemovals> {
-  // A listing "disappeared" when no SURVIVING candidate resolved to its work.
-  // ⚠ SD-02 collapse losers are excluded from the extracted set deliberately —
-  // their identity lives on in the survivor, so counting them changes nothing,
-  // but reading `resolvedWorkIdentity` off a discarded row is the shape of a
-  // bug where a rejected candidate keeps a title alive.
-  const extracted = new Set(
-    loaded.candidates
-      .filter((c) => c.collapsedIntoCandidateId === null && c.resolvedWorkIdentity !== null)
-      .map((c) => c.resolvedWorkIdentity as string),
-  );
-  return computeRemovals({
+  // ⚠ ONE call, over the batch's WHOLE candidate set (US-005 AC-2, REQ-006).
+  // `listCandidatesForReview` is batch-scoped, so `loaded.candidates` is
+  // already the union across every image; `reconcile` is what makes that a
+  // named property instead of an accident of where a loop was closed. There is
+  // no per-image variant to reach for, deliberately — see `reconcile.ts`.
+  return reconcile({
     service,
+    candidates: loaded.candidates,
     activeListings: loaded.activeListings.map((listing) => ({
       listingId: listing.listingId,
       titleId: listing.titleId,
@@ -219,9 +216,8 @@ export function proposedRemovalsFrom(
       posterPath: listing.title.tmdbPosterPath,
       dateAdded: toIsoDate(listing.dateAdded),
     })),
-    extractedWorkIdentities: extracted,
     suppressed: loaded.suppressed,
-  });
+  }).removals;
 }
 
 export function registerBatchReviewRoutes(router: Router): void {

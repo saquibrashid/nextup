@@ -43,6 +43,11 @@ export * from './review.js';
 // TASK-083 — full-update removal computation (US-014). Pure: it decides WHAT
 // disappeared; `review.ts` decides whether the owner may see it.
 export * from './removals.js';
+// TASK-073 — batch reconciliation, run ONCE over the union of every image in
+// the batch (US-005 AC-2, REQ-006). There is deliberately no per-image entry
+// point: reconciling per image proposes removing everything not photographed
+// on that one screenshot.
+export * from './reconcile.js';
 // TASK-085 — the tick/untick body grammar for `PATCH …/removals` (§6.21).
 export * from './removalPatch.js';
 export * from './schemas.js';
