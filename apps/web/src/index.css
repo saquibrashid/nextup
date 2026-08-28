@@ -911,6 +911,48 @@ button {
   justify-content: space-between;
 }
 
+/* §6.8 — the unmatched card's three actions (TASK-068). */
+.unmatched-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.unmatched-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.unmatched-actions__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.unmatched-actions__results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.unmatched-actions__result {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+}
+
+.unmatched-actions__outcome {
+  color: var(--color-text-muted);
+  margin-top: var(--space-2);
+}
+
 /* §9.3 — the batch-history cards (TASK-076). */
 .batch-history {
   display: flex;

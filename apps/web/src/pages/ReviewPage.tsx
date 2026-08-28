@@ -47,6 +47,7 @@ import { CandidateCard } from '../components/CandidateCard';
 import { CandidateList } from '../components/CandidateList';
 import { ManualEntryPanel } from '../components/ManualEntryPanel';
 import { RemovalConfirmDialog } from '../components/RemovalConfirmDialog';
+import { UnmatchedActions } from '../components/UnmatchedActions';
 import {
   effectiveDisposition,
   readLocalDispositions,
@@ -96,6 +97,20 @@ export interface ReviewPageProps {
   /** TASK-067 — §6.20. Rejects with the server's refusal code on the two 409s. */
   readonly onManualEntry?: (result: TmdbSearchResult) => Promise<void>;
   /**
+   * TASK-068 — the §6.8 unmatched actions, all three §6.18 patches.
+   *
+   * ⚠ The actions render ONLY when all three, plus `onSearchTmdb`, are
+   * supplied. A card offering "keep" with no "discard", or a "find a match"
+   * with no search behind it, is a control that does nothing — and on this
+   * screen a control that does nothing is indistinguishable from a decision
+   * the owner believes they have made.
+   */
+  readonly onKeepUnmatched?: (candidateId: string) => Promise<void>;
+  /** TASK-068 — §6.18 `{ disposition: 'discarded' }`. */
+  readonly onDiscardUnmatched?: (candidateId: string) => Promise<void>;
+  /** TASK-068 — §6.18 `{ disposition: 'corrected', tmdbId, mediaType }`. */
+  readonly onMatchUnmatched?: (candidateId: string, result: TmdbSearchResult) => Promise<void>;
+  /**
    * SD-11e. Injectable so the persistence rule is testable, and OPTIONAL so a
    * environment without one (SSR, a locked-down browser) renders normally
    * instead of throwing — see `lib/reviewDispositions.ts`.
@@ -132,12 +147,15 @@ function CandidateSection({
   testId,
   confirmAll,
   pendingCount,
+  renderCard,
 }: {
   readonly section: SectionView;
   readonly testId: string;
   /** Omitted ⇒ the section carries no bulk control at all (see above). */
   readonly confirmAll?: () => void;
   readonly pendingCount?: number;
+  /** Overrides the card rendering — the §6.8 unmatched treatment uses it. */
+  readonly renderCard?: (candidate: ReviewCandidate) => JSX.Element;
 }): JSX.Element | null {
   // ⚠ ABSENT, not hidden (REQ-022, `T-REM-011`).
   if (section.omitted === true) return null;
@@ -177,7 +195,13 @@ function CandidateSection({
           <CandidateList
             items={section.items}
             keyFor={(candidate) => candidate.candidateId}
-            renderItem={(candidate) => <CandidateCard candidate={candidate} />}
+            renderItem={(candidate) =>
+              renderCard === undefined ? (
+                <CandidateCard candidate={candidate} />
+              ) : (
+                renderCard(candidate)
+              )
+            }
           />
         )}
       </details>
@@ -208,6 +232,9 @@ export function ReviewPage({
   onConfirmAll,
   onSearchTmdb,
   onManualEntry,
+  onKeepUnmatched,
+  onDiscardUnmatched,
+  onMatchUnmatched,
   storage = typeof sessionStorage === 'undefined' ? undefined : sessionStorage,
 }: ReviewPageProps): JSX.Element {
   // ⚠ Declared before the early returns: hooks must run unconditionally, and
@@ -272,6 +299,19 @@ export function ReviewPage({
         effectiveDisposition(candidate.disposition, local[candidate.candidateId]) === 'pending',
     ).length;
 
+  // ⚠ ALL FOUR OR NONE. See `onKeepUnmatched` above: a partly-wired card is a
+  // control that silently does nothing, which on the review screen reads as a
+  // decision the owner has made.
+  const onKeepU = onKeepUnmatched;
+  const onDiscardU = onDiscardUnmatched;
+  const onMatchU = onMatchUnmatched;
+  const onSearchU = onSearchTmdb;
+  const unmatchedWired =
+    onKeepU !== undefined &&
+    onDiscardU !== undefined &&
+    onMatchU !== undefined &&
+    onSearchU !== undefined;
+
   const confirmAll = (key: ConfirmableSection): void => {
     const next: Record<string, 'confirmed' | 'discarded'> = { ...local };
     for (const candidate of sections[key].items) {
@@ -322,6 +362,27 @@ export function ReviewPage({
           confirmAll('unmatched');
         }}
         pendingCount={pendingIn(sections.unmatched.items)}
+        renderCard={(candidate) => (
+          <CandidateCard
+            candidate={candidate}
+            unidentified
+            actions={
+              unmatchedWired ? (
+                <UnmatchedActions
+                  candidateId={candidate.candidateId}
+                  disposition={effectiveDisposition(
+                    candidate.disposition,
+                    local[candidate.candidateId],
+                  )}
+                  onDiscard={onDiscardU}
+                  onKeep={onKeepU}
+                  onMatch={onMatchU}
+                  onSearch={onSearchU}
+                />
+              ) : null
+            }
+          />
+        )}
         section={sections.unmatched}
         testId="review-unmatched"
       />

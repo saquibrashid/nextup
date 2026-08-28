@@ -857,10 +857,10 @@ ends up unmapped.
 ### US-008 — Unmatched candidates are surfaced, never silently discarded
 | AC | L | Test | Assertion |
 |---|---|---|---|
-| AC-1 | I/C | `T-UX-063` | Unmatched candidates render in their own section with raw text |
-| AC-2 | I | `T-UNM-010` | All three actions available: search-and-match, keep as unidentified, discard |
+| AC-1 | I/C | `T-UX-063` | Unmatched candidates render in their own section with raw text. The **I** half is `apps/api/test/integration/batchReview.spec.ts` and the routing rule is proven purely in `packages/domain/test/review.spec.ts`; the **C** half (`T-UX-063e`-`h`, `apps/web/test/unmatchedActions.spec.tsx`, TASK-068) proves the section the owner actually sees renders the raw text and the "Unidentified" chip, and that the chip is **passed in** rather than derived from a null `match` — `probablyNotTitles` and `unreadableTiles` carry a null match too, so a derived chip would claim TMDB had been asked about rows it was never asked about |
+| AC-2 | I/C | `T-UNM-010` | All three actions available: search-and-match, keep as unidentified, discard. `T-UNM-010c`-`i` in `apps/web/test/unmatchedActions.spec.tsx` (TASK-068) assert them against the **mounted** `ReviewPage`, never the component alone: `FixMatchDialog` is the standing example of a fully-built, fully-tested component that no screen has ever rendered. Also asserts a refused patch leaves the card undecided and says so, and that the actions are absent when the page is only half-wired |
 | AC-3 | I | `T-UNM-011` | An unmatched candidate in full-update does not cause any removal proposal |
-| AC-4 | I | `T-UNM-012` | Closing with unresolved unmatched keeps them as unmatched Titles; `unresolvedKept` counted |
+| AC-4 | I | `T-UNM-012` | Closing with unresolved unmatched keeps them as unmatched Titles; `unresolvedKept` counted. `apps/api/test/integration/batchUnmatchedClose.spec.ts` (`T-UNM-012a`-`f`, TASK-068): a kept row becomes a title **and** a listing (a title with no listing is not on the list at all), carries the raw text as its name, is counted under `unresolvedKept` **and** `titlesCreated`, is kept when its identity is `null` as well as `unmatched:`-prefixed, is **not** written when the owner discarded it, and blocks the close with `PENDING_ADDITIONS` when undecided |
 
 ### US-009 — Classify each matched candidate as new or already present
 | AC | L | Test | Assertion |

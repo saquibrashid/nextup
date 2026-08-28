@@ -16,7 +16,7 @@
 import { useCallback, useState, type JSX } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { apiClient, type ApiClient } from '../lib/apiClient';
+import { apiClient, type ApiClient, type CandidatePatchBody } from '../lib/apiClient';
 import { useResource } from '../lib/useResource';
 import { RefusalPage } from '../pages/RefusalPage';
 import { ReviewPage, type ConfirmableSection } from '../pages/ReviewPage';
@@ -93,6 +93,47 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
     [batchId, client],
   );
 
+  /**
+   * TASK-068 — the three §6.8 actions, each one §6.18 patch.
+   *
+   * ⚠ **THE REVIEW IS RE-READ, AND THE REJECTION IS RE-THROWN.** A keep or a
+   * discard changes what the close will write, and `UnmatchedActions` reports
+   * a refusal on the card rather than pretending the decision stuck — a
+   * swallowed rejection here would leave the card saying "kept" over a row the
+   * server still holds `pending`, and the close would then 409 on
+   * `PENDING_ADDITIONS` naming a candidate the owner believes they dealt with.
+   *
+   * ⚠ A CORRECTION SENDS THE TMDB **id**, never the name (SD-05) — the server
+   * re-resolves the identity from TMDB's own record.
+   */
+  const patch = useCallback(
+    async (candidateId: string, body: CandidatePatchBody): Promise<void> => {
+      await client.patchCandidate(batchId, candidateId, body);
+      setGeneration((n) => n + 1);
+    },
+    [batchId, client],
+  );
+
+  const keepUnmatched = useCallback(
+    (candidateId: string) => patch(candidateId, { disposition: 'confirmed' }),
+    [patch],
+  );
+
+  const discardUnmatched = useCallback(
+    (candidateId: string) => patch(candidateId, { disposition: 'discarded' }),
+    [patch],
+  );
+
+  const matchUnmatched = useCallback(
+    (candidateId: string, result: { tmdbId: number; mediaType: string }) =>
+      patch(candidateId, {
+        disposition: 'corrected',
+        tmdbId: result.tmdbId,
+        mediaType: result.mediaType,
+      }),
+    [patch],
+  );
+
   if (review.resource.kind === 'refused') return <RefusalPage reason="not-allowed" />;
 
   return (
@@ -106,6 +147,9 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
       onConfirmAll={confirmAll}
       onSearchTmdb={searchTmdb}
       onManualEntry={manualEntry}
+      onKeepUnmatched={keepUnmatched}
+      onDiscardUnmatched={discardUnmatched}
+      onMatchUnmatched={matchUnmatched}
     />
   );
 }

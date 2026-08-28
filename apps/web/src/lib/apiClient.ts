@@ -469,6 +469,30 @@ export interface ManualEntryResult {
   disposition: string;
 }
 
+/**
+ * §6.18 — the candidate as it stands after a patch.
+ *
+ * ⚠ `resolvedWorkIdentity` COMES BACK because a correction re-resolves it
+ * immediately (US-007 AC-3): the review pass must show the corrected match
+ * before close, and the only alternative is for the client to guess the
+ * identity grammar, which would be a second implementation of `workIdentity`.
+ */
+export interface PatchedCandidate {
+  candidateId: string;
+  rawText: string;
+  inferredTitle: string | null;
+  verdict: string;
+  resolvedWorkIdentity: string | null;
+  correctedToTmdbId: number | null;
+  disposition: string;
+}
+
+/** The §6.18 body forms, exactly as the spec enumerates them. */
+export type CandidatePatchBody =
+  | { disposition: 'confirmed' | 'discarded' | 'pending' }
+  | { disposition: 'corrected'; tmdbId: number; mediaType: string; confirmDuplicate?: boolean }
+  | { reclassifyAsTitle: true };
+
 export interface ImdbLookupResponse {
   name: string;
   releaseYear: number | null;
@@ -554,6 +578,22 @@ export function createApiClient(deps: ApiClientDeps = {}) {
       request<ConfirmAllResult>(
         `/api/batches/${encodeURIComponent(batchId)}/candidates/confirm-all`,
         { method: 'POST', body: { section } },
+        deps,
+      ),
+
+    /**
+     * §6.18 — one candidate's disposition, or a correction.
+     *
+     * ⚠ ONE CANDIDATE PER CALL, and that is not an oversight: §6.19 exists for
+     * the bulk case. The §6.8 unmatched actions each concern exactly the card
+     * the owner is looking at, and a batched variant would have to decide what
+     * to do when the third of five is refused — which is precisely the
+     * half-applied state REQ-014 forbids.
+     */
+    patchCandidate: (batchId: string, candidateId: string, body: CandidatePatchBody) =>
+      request<PatchedCandidate>(
+        `/api/batches/${encodeURIComponent(batchId)}/candidates/${encodeURIComponent(candidateId)}`,
+        { method: 'PATCH', body },
         deps,
       ),
 
