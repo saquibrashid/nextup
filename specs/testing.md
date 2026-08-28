@@ -3467,6 +3467,47 @@ unexpected token` **with no file or line**, at import, reported against the
 *spec* file. The gate was correct; only the first line was wrong. It is
 removed, and no other `tools/*.mjs` gate carries one.
 
+### 31.6 TASK-010 item (h) — metric existence, answered against live infra
+
+The last open item of TASK-010 could not be answered from documentation: it
+asks which OOM-relevant metrics **actually exist** on a deployed container
+app, and `A43-M5` hangs on the answer. Resolved 2026-08-28 with
+`az monitor metrics list-definitions` against the deployed
+`ca-nextup-staging` (read-only; no resource was created or changed).
+
+**The result confirms `A43-M5`'s premise, and it is a negative one.** The
+environment publishes 31 metrics. The two the runbook needs both exist:
+
+| Metric | Unit | Primary agg | Supported | Dimensions |
+|---|---|---|---|---|
+| `RestartCount` | Count | **Maximum** | Maximum, Total, Average, Minimum | `revisionName`, `podName` |
+| `WorkingSetBytes` | Bytes | **Average** | Average, Total, Maximum, Minimum | `revisionName`, `podName` |
+
+⚠ **There is no OOM-distinct metric of any kind.** Nothing in the 31 is named
+for the kernel OOM killer, and `RestartCount` counts *every* restart
+identically — an OOM kill, an unhandled crash, a failed probe, a deployment
+and a scale event all increment the same counter. So a rule on
+`RestartCount` alone cannot answer the one question `A43` makes the up-size
+trigger: *did it OOM?* It reports "something restarted", which during a
+deploy is the normal case. **This is exactly why TASK-157's
+`image.decode.begin/end` sentinel is the primary signal and the metric is
+only corroboration** — not a redundant belt-and-braces, but the only source
+that distinguishes the two.
+
+⚠ `RestartCount`'s primary aggregation is **`Maximum`, not `Total`**. It is a
+running counter per pod, not a per-interval delta, so a rule written as
+`Total` over a window sums a monotonically rising series and fires on a
+perfectly healthy app. The `podName` dimension is what makes it usable: a
+replaced pod restarts the count at zero, so an increase within one `podName`
+is the real event.
+
+Two further facts recorded because TASK-157 depends on them: the environment
+`cae-nextup` sends app logs to **`log-analytics`**, so the sentinel is
+queryable by KQL and a log-search alert is possible — and §31.4(c) already
+prices that at **$1.50/month**, fifteen times a metric rule. The cheap half of
+the design (a metric rule on `RestartCount` scoped by `podName`) is therefore
+the corroboration, and the sentinel log is what it corroborates.
+
 ## 32. The deployment pipeline (TASK-007)
 
 `.github/workflows/deploy.yml`, asserted by `T-CI-009a`--`r` in

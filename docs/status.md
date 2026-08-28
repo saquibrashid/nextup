@@ -12,8 +12,8 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 | Status | Count |
 |---|---|
 | ⬜ todo | 38 |
-| 🚧 doing | 7 |
-| ✅ done | 130 |
+| 🚧 doing | 6 |
+| ✅ done | 131 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **178** |
@@ -24,7 +24,6 @@ Not done, and every task they depend on is done.
 
 | Task | Size | Section |
 |---|---|---|
-| `TASK-010` | S | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks |
 | `TASK-026` | S | Epic G — Attribution & compliance |
 | `TASK-028` | S | Epic A — Access & identity |
 | `TASK-045` | S | Epic D — Matching & identity |
@@ -46,6 +45,7 @@ Not done, and every task they depend on is done.
 | `TASK-129` | S | Epic E — Review & apply |
 | `TASK-131` | S | Epic K — Platform, safety, and the shell |
 | `TASK-155` | S | Epic B — Capture & import |
+| `TASK-157` | M | Epic K — Platform, safety, and the shell |
 | `TASK-161` | S | Epic B — Capture & import |
 | `TASK-162` | S | Epic B — Capture & import |
 | `TASK-166` | S | Epic F — The list itself (the value loop) |
@@ -60,7 +60,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-20 tasks cannot start yet.
+19 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -80,10 +80,9 @@ Not done, and every task they depend on is done.
 | `TASK-125` | `TASK-123` |
 | `TASK-127` | `TASK-126` |
 | `TASK-130` | `TASK-124`, `TASK-108` |
-| `TASK-157` | `TASK-010` |
 | `TASK-163` | `TASK-162` |
 | `TASK-164` | `TASK-080`, `TASK-162` |
-| `TASK-168` | `TASK-079`, `TASK-010` |
+| `TASK-168` | `TASK-079` |
 
 ## Done
 
@@ -98,6 +97,7 @@ Not done, and every task they depend on is done.
 | `TASK-007` | `T-CI-009a`–`l` (`.github/workflows/deploy.yml`, `tests/infra/deployWorkflow.spec.ts`) and `T-SMOKE-001`–`003` (`tests/smoke/smoke.spec.ts`, `playwright.smoke.config.ts`). Build → secret-scan → ghcr.io push with `GITHUB_TOKEN` (no PAT) → staging → `prisma migrate deploy` → staging smoke → prod → hold at 0% traffic → prod smoke → shift to 100%. Azure auth is OIDC federated (app `nextup-github-deploy`, Owner scoped to `nextup-rg` only); Easy Auth app `nextup` registered. **Proven end to end on 2026-08-18**: staging and production both deployed, migrations applied, `T-SMOKE-001`--`004` green against both live FQDNs, and the blue/green gate observed engaging (traffic held on the prior revision, the new one smoked on its own private FQDN, shifted, prior revision deactivated). Four defects were found only by running it: the OIDC subject is emitted in immutable numeric form; Azure SQL refuses `eastus2` for this subscription (hence `sqlLocation`); `targetPort` disagreed with the Dockerfile `PORT`; and the 0%-traffic hold was a no-op in three independent ways (`T-INFRA-011`, `T-CI-009o`--`r`). See `specs/testing.md` §32. | `T-MIG-001` |
 | `TASK-008` | `T-INFRA-005` + `T-INV-013`, both mutation-proven against half-applied up-sizes | `T-INFRA-005`, `T-INV-013` |
 | `TASK-009` | `6d47f55` | _no test id declared_ |
+| `TASK-010` | Pricing verification **complete** against the live Retail Prices API for `eastus2`, dated 2026-08-17: dated addenda on ADR-0001/0003/0005, `architecture.md` §Cost summary and `runbooks/scale-up-memory.md` corrected in place. Verified total **$11.77/mo** vs published $11-13, so `OQ-026` does not fire. `gpt-4.1` (2025-04-14) and SQL `Basic` confirmed available in `eastus2`. **↳ Two corrections from the provisioning pass (2026-08-18), verified against this subscription with `az cognitiveservices model list` / `usage list` / `account list`:** (1) `gpt-4.1` has **no regional `Standard` quota here at all** — only `GlobalStandard` (key `OpenAI.GlobalStandard.gpt4.1`, limit 1000, used 0), so `infra/ai.bicep` pins `GlobalStandard`. ⚠ the quota key spells the model **`gpt4.1` with no hyphen**, so grepping the quota list for `gpt-4.1` returns nothing and reads exactly like "the model is unavailable". (2) Vision `F0` is available as a SKU in `eastus2` but is **one-per-subscription-per-kind**, and this subscription already holds `vision-f4n7ptoeq44pk` (F0, `rg-coffee-dev`, unrelated project) — so an F0 deployment **will be rejected** until that account is removed or nextup takes `S1`. ~~Vision `F0` confirmed available~~ — available ≠ deployable. ~~**Remaining: item (h)**~~ **↳ Item (h) CLOSED (2026-08-28), read-only against the deployed `ca-nextup-staging`** — `az monitor metrics list-definitions` returns 31 metrics; `RestartCount` (unit Count, primary **Maximum**, dims `revisionName`/`podName`) and `WorkingSetBytes` (Bytes, Average, same dims) both exist, and **no OOM-distinct metric exists at all**. `RestartCount` counts an OOM kill, a crash, a failed probe, a deploy and a scale event identically, so it cannot answer `A43`'s up-size trigger on its own — **which is the finding that makes TASK-157's `image.decode.begin/end` sentinel the primary signal rather than a belt-and-braces duplicate.** ⚠ Its primary aggregation is `Maximum`, not `Total`: it is a running per-pod counter, so a `Total`-over-window rule sums a rising series and fires on a healthy app; the `podName` dimension is what makes an increase meaningful. `cae-nextup` ships app logs to `log-analytics`, so the sentinel is KQL-queryable — at the $1.50/mo log-search price §31.4(c) already established. Written up as `specs/testing.md` §31.6. ~~metric existence (`RestartCount` / `WorkingSetBytes` / any OOM-distinct signal) needs `az monitor metrics list-definitions` against a **deployed** container app, so it is owed the moment staging exists and is a TASK-157 input.~~ See `specs/testing.md` §31. **↳ HELD by owner decision (2026-08-18): no Azure AI resource is to be DEPLOYED until `TASK-168`'s bake-off reports.** The infrastructure is written and gated (`838af3b`, `T-INFRA-001a…g` green) but deliberately unapplied — `nextup-rg` holds zero Cognitive Services accounts, and the auto-triggered `deploy` run on that push was cancelled at the build stage. ⚠ **CIRCULARITY, unresolved:** `specs/ai.md` §9.7 requires live calls to `gpt-4.1` **and** `gpt-5.4-mini` to produce the bake-off's recordings and scores, so the bake-off cannot report while the Azure OpenAI account is unprovisioned. The **Vision** half can wait — it is the F0 conflict that prompted the hold — but the **AOAI** half is the bake-off's own prerequisite. Resolving it AOAI-only would need a `deployVision` switch in `ai.bicep` that does not yet exist. | _no test id declared_ |
 | `TASK-012` | `9ae0a0f` | _no test id declared_ |
 | `TASK-013` | `692305b` | `T-DM-004` |
 | `TASK-014` | `692305b` | `T-INV-008` |
