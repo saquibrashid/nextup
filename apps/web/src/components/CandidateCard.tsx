@@ -72,7 +72,11 @@ export function CandidateCard({ candidate, thumbnailUrl = null }: CandidateCardP
   const displayName = match?.name ?? candidate.inferredTitle;
 
   return (
-    <li className="candidate-card" data-testid={`candidate-${candidate.candidateId}`}>
+    // ⚠ A `<div>`, NOT the `<li>`: `CandidateList` owns the row element,
+    // because the windowed branch (SD-11c) must position and measure it. The
+    // list semantics are unchanged — this card is still the only child of an
+    // `<li>` inside the section's `<ul>`.
+    <div className="candidate-card" data-testid={`candidate-${candidate.candidateId}`}>
       {needsThumbnail && thumbnailUrl !== null ? (
         <img
           className="candidate-card__thumb"
@@ -131,6 +135,6 @@ export function CandidateCard({ candidate, thumbnailUrl = null }: CandidateCardP
           </span>
         ))}
       </div>
-    </li>
+    </div>
   );
 }

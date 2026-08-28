@@ -589,6 +589,32 @@ button {
   padding: 0;
 }
 
+/*
+ * SD-11c. The windowed branch scrolls inside its own viewport so the
+ * virtualiser has an element to measure; below the threshold this element is
+ * not rendered at all and the section scrolls with the page as before.
+ */
+.review-section__viewport {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.review-section__row {
+  list-style: none;
+}
+
+/*
+ * SD-11a. Sits at the top of an expanded section, not in the sticky bar: the
+ * bar carries the ONE action that ends the review, and a bulk confirm next to
+ * it would be one mis-tap away from closing the batch.
+ */
+.review-section__confirm-all {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  margin: var(--space-2) 0 0;
+}
+
 .review-empty {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
