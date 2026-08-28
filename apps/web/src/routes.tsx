@@ -17,7 +17,7 @@
 import type { ComponentType } from 'react';
 
 import { AboutPage } from './pages/AboutPage';
-import { BatchHistoryPage } from './pages/BatchHistoryPage';
+import { BatchHistoryRoute } from './containers/BatchHistoryRoute';
 import { BatchStatusRoute } from './containers/BatchStatusRoute';
 import { ListRoute } from './containers/ListRoute';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -54,7 +54,7 @@ export const ROUTES: readonly RouteDefinition[] = [
   },
   {
     path: '/batches',
-    Component: BatchHistoryPage,
+    Component: BatchHistoryRoute,
     examplePath: '/batches',
     navLabel: 'Batches',
   },

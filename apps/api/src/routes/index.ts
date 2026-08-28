@@ -27,6 +27,7 @@ import type { PrincipalReader } from '../auth/principal.js';
 import { AppError } from '../errors/AppError.js';
 import { registerBatchCandidateRoutes } from './batchCandidates.js';
 import { registerBatchCloseRoutes } from './batchClose.js';
+import { registerBatchDetailRoutes } from './batchDetail.js';
 import { registerBatchRoutes } from './batches.js';
 import { registerBatchImageRoutes } from './batchImages.js';
 import { registerBatchRemovalRoutes } from './batchRemovals.js';
@@ -99,6 +100,7 @@ export function createApiRouter(): Router {
   const apiRouter = Router();
   registerMeRoutes(apiRouter);
   registerBatchRoutes(apiRouter);
+  registerBatchDetailRoutes(apiRouter);
   // §6.17 — the review pass. Its own file: the batch lifecycle routes and the
   // review assembly share nothing but the batch id, and `batches.ts` is a
   // contended file that several lanes need to keep small.

@@ -1604,6 +1604,73 @@ export async function listBatchChanges(ownerId: OwnerId, batchId: string, tx?: D
   });
 }
 
+/**
+ * Change counts for MANY batches at once (TASK-076, `ux-states.md` §9.3).
+ *
+ * ⚠ ONE `groupBy` FOR THE WHOLE PAGE, NOT ONE QUERY PER CARD. The history page
+ * shows a count triple on every card, and the obvious implementation —
+ * {@link listBatchChanges} inside the render loop — is 50 round trips per page
+ * view on a 5-DTU Basic database. It is also invisible in a test, because a
+ * seeded fixture of three batches makes three queries look fine.
+ *
+ * Returns rows, not a folded shape: the caller folds `title_created` into
+ * `listing_added` via `toBatchProvenance`, and this query deliberately does
+ * NOT try to reproduce that rule in SQL. Counting kinds in two places is how
+ * the card total and the detail list come to disagree.
+ */
+export async function countBatchChangeKinds(
+  ownerId: OwnerId,
+  batchIds: readonly string[],
+  tx?: Db,
+) {
+  if (batchIds.length === 0) return [];
+  return db(tx).batchChange.groupBy({
+    by: ['batchId', 'kind'],
+    where: { ownerId, batchId: { in: [...batchIds] } },
+    _count: { _all: true },
+  });
+}
+
+/**
+ * The owner's batch history across EVERY service, newest first (`T-BATCH-016`).
+ *
+ * ⚠ NOT {@link listUploadBatches} with the service argument dropped. That one
+ * answers "this service's batches" for reconciliation; this one answers "what
+ * have I ever uploaded", and the two orderings differ: this is ordered by
+ * `createdAt` across services, so interleaving a Netflix and a Max capture
+ * reads as one chronological history rather than two.
+ */
+export async function listBatchHistory(ownerId: OwnerId, take = 50, tx?: Db) {
+  return db(tx).uploadBatch.findMany({
+    where: { ownerId },
+    orderBy: { createdAt: 'desc' },
+    take,
+  });
+}
+
+/**
+ * Display fields for the titles a batch's provenance names (`ux-states.md`
+ * §9.4 — "each entry linking to the title").
+ *
+ * ⚠ Owner-scoped even though every id came from the owner's own provenance
+ * rows. The ids are read from one table and used against another, and an
+ * unscoped `in` here would be a cross-owner read the moment any future writer
+ * gets a `batch_change` row's `title_id` wrong.
+ */
+export async function listTitleNames(ownerId: OwnerId, titleIds: readonly string[], tx?: Db) {
+  if (titleIds.length === 0) return [];
+  return db(tx).title.findMany({
+    where: { ownerId, id: { in: [...titleIds] } },
+    select: {
+      id: true,
+      tmdbName: true,
+      rawExtractedText: true,
+      tmdbReleaseYear: true,
+      state: true,
+    },
+  });
+}
+
 export async function createRemovalGroup(
   ownerId: OwnerId,
   data: Omit<Prisma.RemovalGroupUncheckedCreateInput, 'ownerId'>,

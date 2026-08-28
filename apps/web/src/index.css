@@ -877,6 +877,22 @@ button {
 
 /* --------------------------- §5 `/batches/:batchId` extraction status ---- */
 
+/* §9.3 — the batch-history cards (TASK-076). */
+.batch-history {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  margin: var(--space-3) 0;
+  padding: 0;
+}
+
+.batch-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+}
+
 .batch-status__progress {
   font-weight: 600;
   margin: var(--space-2) 0;

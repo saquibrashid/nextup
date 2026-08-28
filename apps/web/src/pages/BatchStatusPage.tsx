@@ -31,10 +31,16 @@
  */
 
 import type { JSX } from 'react';
+import { Link } from 'react-router-dom';
 
 import { DEGRADED_EXTRACTION_BANNER } from '@nextup/domain';
 
 import {
+  BATCH_CHANGED_NOTHING,
+  BATCH_PROVENANCE_CREATED,
+  BATCH_PROVENANCE_MODIFIED,
+  BATCH_PROVENANCE_REMOVED,
+  BATCH_PROVENANCE_TITLE,
   STATUS_CONTINUE_LABEL,
   STATUS_DISCARD_BATCH_LABEL,
   STATUS_DISCARD_LABEL,
@@ -49,7 +55,7 @@ import {
   STATUS_TITLE,
   STATUS_ZERO_YIELD,
 } from '../copy';
-import type { BatchImage, BatchStatus } from '../lib/apiClient';
+import type { BatchImage, BatchStatus, BatchTitleRef } from '../lib/apiClient';
 
 export interface BatchStatusPageProps {
   readonly batch?: BatchStatus | null;
@@ -191,6 +197,96 @@ function ExtractionError({
   );
 }
 
+/**
+ * §9.4/§9.5 — does this batch have an account of what it changed?
+ *
+ * ⚠ **ONLY A CLOSED BATCH DOES**, and the guard is the whole point. Provenance
+ * rows are written when a batch reaches `applied` (`data-model.md` §3.10), so
+ * an *extracting* batch has three legitimately empty arrays — and rendering
+ * §9.5's "This upload didn't change anything." over one would tell the owner
+ * an outcome about work that has not happened yet.
+ */
+export function showsProvenance(batch: BatchStatus): boolean {
+  return batch.status === 'applied' || batch.status === 'undone';
+}
+
+function TitleLink({ titleId, titles }: { titleId: string; titles: BatchTitleRef[] }): JSX.Element {
+  const title = titles.find((candidate) => candidate.titleId === titleId);
+  // ⚠ **THE TARGET IS AN ANCHOR IN THE LIST, NOT `/titles/:titleId`.** v1 has
+  // no title-detail route (`routes.tsx` mounts ten, none of them one), so a
+  // link to `/titles/...` would render the 404 page — a broken link that looks
+  // exactly like a working one. `TitleRow` carries the matching `id`.
+  //
+  // ⚠ A ULID is not a name. A missing lookup falls back to the id rather than
+  // rendering nothing, because §9.4 forbids summarising an entry away — an
+  // entry the owner cannot identify is still better than an entry they cannot
+  // see.
+  return (
+    <Link to={`/#title-${titleId}`} data-testid="provenance-title-link">
+      {title === undefined ? titleId : title.name}
+      {title?.year != null && <span data-testid="provenance-title-year">{` (${title.year})`}</span>}
+      {title !== undefined && title.state !== 'active' && (
+        <span data-testid="provenance-title-state">{title.state}</span>
+      )}
+    </Link>
+  );
+}
+
+/**
+ * §9.4 — the three provenance panels.
+ *
+ * ⚠ **NOTHING IS SUMMARISED AWAY, EVER** (US-031 AC-2/AC-3/AC-4, US-033 AC-5).
+ * This view is the owner's only account of what an import did to their list;
+ * an "and 12 others" here is the product declining to answer the question it
+ * exists to answer.
+ */
+function ProvenancePanels({ batch }: { batch: BatchStatus }): JSX.Element {
+  const { provenance, titles } = batch;
+
+  if (batch.changedNothing) {
+    return (
+      <section data-testid="batch-provenance">
+        <h2>{BATCH_PROVENANCE_TITLE}</h2>
+        <p data-testid="batch-changed-nothing">{BATCH_CHANGED_NOTHING}</p>
+      </section>
+    );
+  }
+
+  return (
+    <section data-testid="batch-provenance">
+      <h2>{BATCH_PROVENANCE_TITLE}</h2>
+
+      <h3>{`${BATCH_PROVENANCE_CREATED} (${provenance.created.length})`}</h3>
+      <ul data-testid="provenance-created">
+        {provenance.created.map((entry) => (
+          <li key={`${entry.titleId}:${entry.listingId ?? ''}`} data-testid="provenance-entry">
+            <TitleLink titleId={entry.titleId} titles={titles} />
+          </li>
+        ))}
+      </ul>
+
+      <h3>{`${BATCH_PROVENANCE_MODIFIED} (${provenance.modified.length})`}</h3>
+      <ul data-testid="provenance-modified">
+        {provenance.modified.map((entry, index) => (
+          <li key={`${entry.titleId}:${entry.attr}:${index}`} data-testid="provenance-entry">
+            <TitleLink titleId={entry.titleId} titles={titles} />
+            <span data-testid="provenance-attr">{entry.attr}</span>
+          </li>
+        ))}
+      </ul>
+
+      <h3>{`${BATCH_PROVENANCE_REMOVED} (${provenance.removed.length})`}</h3>
+      <ul data-testid="provenance-removed">
+        {provenance.removed.map((entry) => (
+          <li key={entry.listingId} data-testid="provenance-entry">
+            <TitleLink titleId={entry.titleId} titles={titles} />
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function BatchStatusPage({
   batch = null,
   loadFailed = false,
@@ -290,6 +386,8 @@ export function BatchStatusPage({
               </button>
             )}
           </div>
+
+          {showsProvenance(batch) && <ProvenancePanels batch={batch} />}
         </>
       )}
     </>

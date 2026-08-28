@@ -67,6 +67,9 @@ function batch(overrides: Partial<BatchStatus> = {}): BatchStatus {
     extractionError: null,
     lowYield: false,
     progress: { imagesDone: 4, imagesTotal: 7 },
+    provenance: { created: [], modified: [], removed: [] },
+    changedNothing: true,
+    titles: [],
     ...overrides,
   };
 }

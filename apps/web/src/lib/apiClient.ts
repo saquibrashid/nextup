@@ -13,7 +13,7 @@
  * they would be subtly different on at least one of them (REQ-097).
  */
 
-import type { ErrorCode, ReviewResponse } from '@nextup/domain';
+import type { BatchProvenance, ErrorCode, ReviewResponse } from '@nextup/domain';
 
 import type { TitleListItem as WireTitleListItem } from '../components/TitleRow';
 import type { ServiceFreshness as WireServiceFreshness } from '../components/FreshnessStrip';
@@ -354,6 +354,56 @@ export interface BatchStatus {
   progress?: { imagesDone: number; imagesTotal: number };
   degradedExtraction?: boolean;
   crossCheck?: 'ok' | 'llm-unavailable' | 'ocr-unavailable';
+  /** What this batch did to the list (`ux-states.md` §9.4). */
+  provenance: BatchProvenance;
+  /**
+   * ⚠ **SENT BY THE SERVER, NOT DERIVED HERE** (`ux-states.md` §9.5). The rule
+   * is "all three arrays empty", and a second copy of it in the SPA is a
+   * second place it can be got wrong — a batch that only *modified* something
+   * would then be told it changed nothing.
+   */
+  changedNothing: boolean;
+  /**
+   * Names for every title the provenance arrays reference.
+   *
+   * ⚠ A LOOKUP ARRAY, not a field on each entry: §9.4 requires every entry to
+   * link to its title, a ULID is not a name, and a title both created and
+   * modified by one batch must not be carried twice.
+   */
+  titles: BatchTitleRef[];
+}
+
+/** One title named by a batch's provenance (`specs/api.md` §6.15 `titles[]`). */
+export interface BatchTitleRef {
+  titleId: string;
+  name: string;
+  year: number | null;
+  /** The title's CURRENT state, so one since removed reads as such (US-033 AC-6). */
+  state: string;
+}
+
+/**
+ * One card in `/batches` (`specs/api.md` §6.15a).
+ *
+ * ⚠ `counts.created` counts **creations, not `batch_change` rows**. A new
+ * title writes both a `title_created` and a `listing_added` row and §3.7 folds
+ * them into one entry, so a card that summed both kinds would claim twice what
+ * the detail page then lists — and both numbers would look plausible.
+ */
+export interface BatchHistoryItem {
+  batchId: string;
+  service: 'netflix' | 'max';
+  mode: string;
+  status: string;
+  createdAt: string;
+  submittedAt: string | null;
+  completedAt: string | null;
+  undoneAt: string | null;
+  counts: { created: number; modified: number; removed: number };
+}
+
+export interface BatchHistoryResponse {
+  batches: BatchHistoryItem[];
 }
 
 /**
@@ -447,17 +497,21 @@ export function createApiClient(deps: ApiClientDeps = {}) {
     createBatch: (service: string, mode: string) =>
       request<CreatedBatch>('/api/batches', { method: 'POST', body: { service, mode } }, deps),
 
+    /** §6.15a — the batch history `/batches` renders. */
+    listBatches: (signal?: AbortSignal) =>
+      request<BatchHistoryResponse>('/api/batches', { signal }, deps),
+
     /**
      * §6.15 — the batch the status page polls.
      *
-     * ⚠ **THIS ENDPOINT DOES NOT EXIST IN THE API YET**, and that is a
-     * reported spec/backlog gap rather than an oversight here: §6.15 is
-     * written, `BatchStatusPage` renders it and `T-UX-007`/`T-UX-008` assert
-     * the render, but no route serves it and no backlog row owns it. The
-     * method is declared so the poll is written once, correctly, against the
-     * documented shape; until the route lands the status screen shows its
-     * load-failure state, which is the honest rendering of "the server did
-     * not answer" and not a fabricated status.
+     * ⚠ **THIS ENDPOINT WAS MISSING FROM THE API FOR THE WHOLE OF TASK-059'S
+     * LIFE, AND EVERY POLL ANSWERED 404.** §6.15 was written,
+     * `BatchStatusPage` rendered it and `T-UX-007`/`T-UX-008` asserted the
+     * render, but no route served it and no backlog row owned it — so US-006
+     * AC-1 could not complete and the status screen sat in its load-failure
+     * state forever. TASK-076 built the route; `T-API-010` now compares this
+     * file's own paths against the live router on every CI run, so the next
+     * one fails the build instead of shipping.
      */
     getBatch: (batchId: string, signal?: AbortSignal) =>
       request<BatchStatus>(`/api/batches/${encodeURIComponent(batchId)}`, { signal }, deps),

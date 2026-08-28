@@ -76,7 +76,15 @@ export function TitleRow({ item, onOpenMenu, onFixMatch }: TitleRowProps): JSX.E
   const unmatched = item.matchState === 'unmatched';
 
   return (
-    <li className="title-row" data-testid={`title-row-${item.titleId}`}>
+    // ⚠ `id` IS A LINK TARGET, not decoration (TASK-076). v1 has no
+    // title-detail route, so `ux-states.md` §9.4's "each entry linking to the
+    // title" resolves to `/#title-<titleId>` — this anchor. Removing it turns
+    // every provenance link into a no-op that still looks like a link.
+    <li
+      className="title-row"
+      id={`title-${item.titleId}`}
+      data-testid={`title-row-${item.titleId}`}
+    >
       {item.posterPath === null ? (
         // A neutral tile, never a broken <img>. §2.2: a missing poster is an
         // ordinary state (TMDB has no art for plenty of works), not an error.

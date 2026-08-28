@@ -641,3 +641,40 @@ export const STATUS_TITLE = 'Reading your screenshots';
  * they confirm anything.
  */
 export const REVIEW_NO_TEXT_IN = 'No text was found in {file}.';
+
+// --- `/batches` — batch history (`specs/ux-states.md` §9, TASK-076) ---
+
+export const BATCHES_TITLE = 'Batch history';
+
+/** §9.1. A load in flight must not read as "you have never uploaded anything". */
+export const BATCHES_LOADING = 'Loading your uploads\u2026';
+
+/** §9.2, verbatim. */
+export const BATCHES_EMPTY = 'You haven\u2019t uploaded anything yet.';
+export const BATCHES_EMPTY_ACTION_LABEL = 'Upload screenshots';
+
+export const BATCHES_LOAD_ERROR = 'Couldn\u2019t load your uploads. Nothing has changed.';
+
+/**
+ * §9.3 — the count triple on a card. `{created}`/`{modified}`/`{removed}`.
+ *
+ * ⚠ These are CREATIONS, not `batch_change` rows (`data-model.md` §3.7). The
+ * server folds a `title_created` into its `listing_added` sibling; a card that
+ * added the two kinds would show double what the detail page lists.
+ */
+export const BATCHES_COUNTS =
+  'Created {created} \u00b7 Modified {modified} \u00b7 Removed {removed}';
+
+/** §9.4 — the detail view's provenance panels. */
+export const BATCH_PROVENANCE_TITLE = 'What this upload changed';
+export const BATCH_PROVENANCE_CREATED = 'Added';
+export const BATCH_PROVENANCE_MODIFIED = 'Changed';
+export const BATCH_PROVENANCE_REMOVED = 'Removed';
+
+/**
+ * §9.5, verbatim — stated OUTRIGHT, never implied by three empty panels.
+ *
+ * Empty panels are indistinguishable from a failed load, and this sentence is
+ * the difference between "we found nothing to do" and "we didn\u2019t look".
+ */
+export const BATCH_CHANGED_NOTHING = 'This upload didn\u2019t change anything.';
