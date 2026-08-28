@@ -289,6 +289,20 @@ export interface RemovedResponse {
   nextCursor: string | null;
 }
 
+/**
+ * `POST /api/listings/:listingId/restore` (`specs/api.md` §6.10, US-025).
+ *
+ * 200 means the listing is back to `active`.
+ */
+export interface RestoreResponse {
+  listingId: string;
+  titleId: string;
+  state: string;
+  dateAdded: string;
+  titleState: string;
+  sortDateAdded: string | null;
+}
+
 export interface MeResponse {
   ownerId: string;
   displayName: string | null;
@@ -529,6 +543,14 @@ export function createApiClient(deps: ApiClientDeps = {}) {
       request<unknown>(
         `/api/removal-groups/${encodeURIComponent(groupId)}/undo`,
         { method: 'POST', body: {} },
+        deps,
+      ),
+
+    /** §6.10 — restore one removed listing back to active. */
+    restoreListing: (listingId: string, opts: { confirmDuplicate?: boolean } = {}) =>
+      request<RestoreResponse>(
+        `/api/listings/${encodeURIComponent(listingId)}/restore`,
+        { method: 'POST', body: { confirmDuplicate: opts.confirmDuplicate ?? false } },
         deps,
       ),
 

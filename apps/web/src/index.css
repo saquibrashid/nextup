@@ -503,6 +503,10 @@ button {
   padding: 0 var(--space-1);
 }
 
+.removed-row__restoring {
+  color: var(--color-text-muted);
+}
+
 .removed-empty__title {
   font-weight: 600;
 }

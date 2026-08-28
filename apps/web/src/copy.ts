@@ -528,6 +528,54 @@ export const REMOVED_CLEAR_SEARCH_LABEL = 'Clear search';
 export const REMOVED_LOAD_ERROR = 'Couldn\u2019t load your removal history. Nothing has changed.';
 export const REMOVED_LOADING = 'Loading your removal history\u2026';
 
+/* ---------------------------------------- §7.6–7.10 restore (TASK-099) --- */
+
+/** §7.5 — the restore control label on each removed row. */
+export const RESTORE_LABEL = 'Restore';
+
+/** §7.6 — the submitting state while the restore request is in flight. */
+export const RESTORE_SUBMITTING_LABEL = 'Restoring\u2026';
+
+/**
+ * §7.7 — success. `{name}` is the title name, `{service}` is the service
+ * label, and `{date}` is the ORIGINAL date-added formatted as `4 Jan 2026`.
+ *
+ * ⚠ Naming the original date is what makes US-025 AC-2 visible — it is not
+ * decoration. The date proves the listing was restored WITH its original
+ * date, the single most important property of a restore.
+ */
+export const RESTORE_SUCCESS =
+  '\u2018{name}\u2019 is back on your {service} list, with its original date ({date}).';
+
+/**
+ * §7.8 / §3.5 — 409 `DUPLICATE_WORK_IDENTITY`. The owner already has this
+ * work active. Offer to keep both.
+ */
+export const RESTORE_DUPLICATE_BODY =
+  'You already have \u2018{name}\u2019 on your list. Do you want two rows for it?';
+export const RESTORE_DUPLICATE_KEEP_BOTH = 'Yes, keep both';
+export const RESTORE_DUPLICATE_CANCEL = 'Cancel';
+
+/**
+ * §7.9 / §3.6 — 409 `WORK_SUPPRESSED`. The work is on the Not interested
+ * list. The owner must un-suppress before restoring.
+ *
+ * ⚠ THE WORDING IS FROM THE SPEC, NOT FROM THE REFERENCE IMPLEMENTATION.
+ * The reference file says "is marked as not interested. Remove that first,
+ * then restore." — the spec says "You marked '{name}' as not interested.
+ * Stop ignoring it first?"
+ */
+export const RESTORE_SUPPRESSED_BODY =
+  'You marked \u2018{name}\u2019 as not interested. Stop ignoring it first?';
+export const RESTORE_SUPPRESSED_ACTION = 'Stop ignoring and continue';
+export const RESTORE_SUPPRESSED_CANCEL = 'Cancel';
+
+/**
+ * §7.10 — 409 `LISTING_NOT_REMOVED`. The listing is already back on the list.
+ */
+export const RESTORE_ALREADY_ACTIVE = '\u2018{name}\u2019 is already back on your list.';
+export const RESTORE_ALREADY_ACTIVE_REFRESH = 'Refresh';
+
 /* ------------------------- §5 `/batches/:batchId` extraction status ------ */
 
 /**

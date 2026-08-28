@@ -29,14 +29,22 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { RemovedPage, removalOrdinalLabel } from '../src/pages/RemovedPage';
-import type { RemovedItem } from '../src/lib/apiClient';
+import { RemovedPage, removalOrdinalLabel, formatDateShort } from '../src/pages/RemovedPage';
+import type { RemovedItem, RestoreResponse } from '../src/lib/apiClient';
+import { ApiError } from '../src/lib/apiClient';
 import {
   REMOVED_CLEAR_SEARCH_LABEL,
   REMOVED_EMPTY_BODY,
   REMOVED_EMPTY_TITLE,
   REMOVED_LOAD_ERROR,
   REMOVED_VIEW_SUBTITLE,
+  RESTORE_ALREADY_ACTIVE,
+  RESTORE_DUPLICATE_BODY,
+  RESTORE_DUPLICATE_KEEP_BOTH,
+  RESTORE_LABEL,
+  RESTORE_SUBMITTING_LABEL,
+  RESTORE_SUPPRESSED_ACTION,
+  RESTORE_SUPPRESSED_BODY,
   RETRY_LABEL,
 } from '../src/copy';
 
@@ -285,5 +293,279 @@ describe('a failed load is an error, not an empty log — T-UX-072', () => {
 
     expect(screen.getByRole('status')).toBeInTheDocument();
     expect(screen.queryByTestId('removed-empty')).toBeNull();
+  });
+});
+
+// ── TASK-099: Restore controls (§7.5–7.10) ───────────────────────────────
+
+function restoreResponse(overrides: Partial<RestoreResponse> = {}): RestoreResponse {
+  return {
+    listingId: 'lst_1',
+    titleId: 'ttl_1',
+    state: 'active',
+    dateAdded: '2026-01-04',
+    titleState: 'active',
+    sortDateAdded: '2026-01-04',
+    ...overrides,
+  };
+}
+
+function apiError(code: string, message: string, details: Record<string, unknown> = {}): ApiError {
+  return new ApiError(code, 409, message, details);
+}
+
+describe('the restore control — T-RES-016 / T-UI-009', () => {
+  it('T-RES-016a: every row has a restore button', () => {
+    render(
+      <RemovedPage
+        items={[removed(), removed({ listingId: 'lst_2' })]}
+        onRestore={() => Promise.resolve(restoreResponse())}
+        onUnsuppress={() => Promise.resolve()}
+      />,
+    );
+
+    const buttons = screen.getAllByTestId('restore-button');
+    expect(buttons).toHaveLength(2);
+    expect(buttons[0]).toHaveTextContent(RESTORE_LABEL);
+  });
+});
+
+describe('submitting state — T-UX-074', () => {
+  it('T-UX-074a: clicking Restore dims the row with a spinner', async () => {
+    // The onRestore never resolves, so we stay in submitting state.
+    const onRestore = vi.fn(
+      () =>
+        new Promise<RestoreResponse>(() => {
+          /* never resolves */
+        }),
+    );
+    render(
+      <RemovedPage
+        items={[removed()]}
+        onRestore={onRestore}
+        onUnsuppress={() => Promise.resolve()}
+      />,
+    );
+
+    await userEvent.click(screen.getByTestId('restore-button'));
+
+    expect(screen.getByTestId('restore-submitting')).toHaveTextContent(RESTORE_SUBMITTING_LABEL);
+    expect(screen.getByTestId('restore-submitting')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByTestId('restore-button')).toBeNull();
+  });
+});
+
+describe('success state — T-UX-075', () => {
+  it('T-UX-075a: announces the original date on success', async () => {
+    const onRestore = vi.fn(() => Promise.resolve(restoreResponse({ dateAdded: '2026-01-04' })));
+    render(
+      <RemovedPage
+        items={[removed({ name: 'The Matrix', service: 'netflix', dateAdded: '2026-01-04' })]}
+        onRestore={onRestore}
+        onUnsuppress={() => Promise.resolve()}
+      />,
+    );
+
+    await userEvent.click(screen.getByTestId('restore-button'));
+
+    const status = await screen.findByTestId('restore-success-announcement');
+    expect(status).toHaveAttribute('role', 'status');
+    // ⚠ The original date must be named — US-025 AC-2.
+    expect(status.textContent).toContain('4 Jan 2026');
+    expect(status.textContent).toContain('The Matrix');
+    expect(status.textContent).toContain('Netflix');
+  });
+
+  it('T-UX-075b: the row is dismissed after success', async () => {
+    const onRestore = vi.fn(() => Promise.resolve(restoreResponse()));
+    render(
+      <RemovedPage
+        items={[removed()]}
+        onRestore={onRestore}
+        onUnsuppress={() => Promise.resolve()}
+      />,
+    );
+
+    expect(screen.getAllByTestId('removed-row')).toHaveLength(1);
+    await userEvent.click(screen.getByTestId('restore-button'));
+
+    expect(screen.queryByTestId('removed-row')).toBeNull();
+  });
+
+  it('T-UX-075c: formatDateShort converts YYYY-MM-DD to D Mon YYYY', () => {
+    expect(formatDateShort('2026-01-04')).toBe('4 Jan 2026');
+    expect(formatDateShort('2026-12-25')).toBe('25 Dec 2026');
+  });
+});
+
+describe('409 DUPLICATE_WORK_IDENTITY dialog — T-UX-034', () => {
+  it('T-UX-034a: shows the keep-both dialog on DUPLICATE_WORK_IDENTITY', async () => {
+    const onRestore = vi
+      .fn()
+      .mockRejectedValueOnce(apiError('DUPLICATE_WORK_IDENTITY', 'Duplicate'))
+      .mockResolvedValueOnce(restoreResponse());
+
+    render(
+      <RemovedPage
+        items={[removed({ name: 'The Matrix' })]}
+        onRestore={onRestore}
+        onUnsuppress={() => Promise.resolve()}
+      />,
+    );
+
+    await userEvent.click(screen.getByTestId('restore-button'));
+
+    const dialog = await screen.findByTestId('restore-duplicate-dialog');
+    expect(dialog.textContent).toContain(RESTORE_DUPLICATE_BODY.replace('{name}', 'The Matrix'));
+    expect(screen.getByTestId('restore-keep-both')).toHaveTextContent(RESTORE_DUPLICATE_KEEP_BOTH);
+  });
+
+  it('T-UX-034b: Keep both retries with confirmDuplicate: true', async () => {
+    const onRestore = vi
+      .fn()
+      .mockRejectedValueOnce(apiError('DUPLICATE_WORK_IDENTITY', 'Duplicate'))
+      .mockResolvedValueOnce(restoreResponse());
+
+    render(
+      <RemovedPage
+        items={[removed()]}
+        onRestore={onRestore}
+        onUnsuppress={() => Promise.resolve()}
+      />,
+    );
+
+    await userEvent.click(screen.getByTestId('restore-button'));
+    await screen.findByTestId('restore-duplicate-dialog');
+
+    await userEvent.click(screen.getByTestId('restore-keep-both'));
+
+    // The second call must have confirmDuplicate: true
+    expect(onRestore).toHaveBeenCalledTimes(2);
+    expect(onRestore.mock.calls[1]).toEqual(['lst_1', { confirmDuplicate: true }]);
+  });
+
+  it('T-UX-034c: Cancel returns to idle', async () => {
+    const onRestore = vi.fn().mockRejectedValue(apiError('DUPLICATE_WORK_IDENTITY', 'Duplicate'));
+
+    render(
+      <RemovedPage
+        items={[removed()]}
+        onRestore={onRestore}
+        onUnsuppress={() => Promise.resolve()}
+      />,
+    );
+
+    await userEvent.click(screen.getByTestId('restore-button'));
+    await screen.findByTestId('restore-duplicate-dialog');
+
+    await userEvent.click(screen.getByTestId('restore-duplicate-cancel'));
+
+    expect(screen.getByTestId('restore-button')).toBeInTheDocument();
+    expect(screen.queryByTestId('restore-duplicate-dialog')).toBeNull();
+  });
+});
+
+describe('409 WORK_SUPPRESSED dialog — T-UX-035', () => {
+  it('T-UX-035a: shows the unsuppress dialog on WORK_SUPPRESSED', async () => {
+    const onRestore = vi.fn().mockRejectedValue(
+      apiError('WORK_SUPPRESSED', 'Suppressed', {
+        unsuppressHref: '/api/suppressions/sup_99/unsuppress',
+      }),
+    );
+
+    render(
+      <RemovedPage
+        items={[removed({ name: 'The Matrix' })]}
+        onRestore={onRestore}
+        onUnsuppress={() => Promise.resolve()}
+      />,
+    );
+
+    await userEvent.click(screen.getByTestId('restore-button'));
+
+    const dialog = await screen.findByTestId('restore-suppressed-dialog');
+    expect(dialog.textContent).toContain(RESTORE_SUPPRESSED_BODY.replace('{name}', 'The Matrix'));
+    expect(screen.getByTestId('restore-unsuppress-action')).toHaveTextContent(
+      RESTORE_SUPPRESSED_ACTION,
+    );
+  });
+
+  it('T-UX-035b: Stop ignoring calls unsuppress THEN retries restore', async () => {
+    const callOrder: string[] = [];
+    const onUnsuppress = vi.fn(() => {
+      callOrder.push('unsuppress');
+      return Promise.resolve();
+    });
+    const onRestore = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        callOrder.push('restore-1');
+        return Promise.reject(
+          apiError('WORK_SUPPRESSED', 'Suppressed', {
+            unsuppressHref: '/api/suppressions/sup_99/unsuppress',
+          }),
+        );
+      })
+      .mockImplementationOnce(() => {
+        callOrder.push('restore-2');
+        return Promise.resolve(restoreResponse());
+      });
+
+    render(<RemovedPage items={[removed()]} onRestore={onRestore} onUnsuppress={onUnsuppress} />);
+
+    await userEvent.click(screen.getByTestId('restore-button'));
+    await screen.findByTestId('restore-suppressed-dialog');
+
+    await userEvent.click(screen.getByTestId('restore-unsuppress-action'));
+
+    // Wait for the success announcement — proof that the whole flow completed.
+    await screen.findByTestId('restore-success-announcement');
+
+    expect(onUnsuppress).toHaveBeenCalledWith('sup_99');
+    expect(callOrder).toEqual(['restore-1', 'unsuppress', 'restore-2']);
+  });
+
+  it('T-UX-035c: Cancel returns to idle', async () => {
+    const onRestore = vi.fn().mockRejectedValue(
+      apiError('WORK_SUPPRESSED', 'Suppressed', {
+        unsuppressHref: '/api/suppressions/sup_99/unsuppress',
+      }),
+    );
+
+    render(
+      <RemovedPage
+        items={[removed()]}
+        onRestore={onRestore}
+        onUnsuppress={() => Promise.resolve()}
+      />,
+    );
+
+    await userEvent.click(screen.getByTestId('restore-button'));
+    await screen.findByTestId('restore-suppressed-dialog');
+
+    await userEvent.click(screen.getByTestId('restore-suppressed-cancel'));
+
+    expect(screen.getByTestId('restore-button')).toBeInTheDocument();
+    expect(screen.queryByTestId('restore-suppressed-dialog')).toBeNull();
+  });
+});
+
+describe('409 LISTING_NOT_REMOVED — T-UX-076', () => {
+  it('T-UX-076a: shows already-active message and refresh', async () => {
+    const onRestore = vi.fn().mockRejectedValue(apiError('LISTING_NOT_REMOVED', 'Already active'));
+
+    render(
+      <RemovedPage
+        items={[removed({ name: 'The Matrix' })]}
+        onRestore={onRestore}
+        onUnsuppress={() => Promise.resolve()}
+      />,
+    );
+
+    await userEvent.click(screen.getByTestId('restore-button'));
+
+    const el = await screen.findByTestId('restore-already-active');
+    expect(el.textContent).toContain(RESTORE_ALREADY_ACTIVE.replace('{name}', 'The Matrix'));
+    expect(screen.getByTestId('restore-refresh')).toBeInTheDocument();
   });
 });
