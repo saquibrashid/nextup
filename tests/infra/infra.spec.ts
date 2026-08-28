@@ -7,6 +7,8 @@ import {
   allResources,
   budgetPolicyViolations,
   ingressPolicyViolations,
+  lifecyclePolicyViolations,
+  IMAGE_RETENTION_DAYS,
   portViolations,
   rbacPolicyViolations,
   readCommittedArm,
@@ -149,6 +151,131 @@ describe('T-INFRA-002 storage retention trap', () => {
       )[0].properties.publicAccess = 'Blob';
     });
     expect(storagePolicyViolations(bad).join('\n')).toMatch(/publicAccess None/);
+  });
+});
+
+describe('T-INFRA-004 the 30-day blob-lifecycle purge (US-035, NFR-019)', () => {
+  // ⚠ THIS RULE IS THE ONLY THING IN THE ENTIRE SYSTEM THAT DELETES A
+  // SCREENSHOT. No application code participates (US-035 AC-3): the API stops
+  // SERVING at `retainUntil`, which `T-IMG-004` asserts, but the bytes go away
+  // because of this and nothing else. That makes both failure directions
+  // invisible everywhere else — a missing or misfiltered rule retains the
+  // owner's screenshots forever while every 410 test still passes, and a
+  // smaller day count destroys uploads the owner may not have reviewed yet.
+  //
+  // Pairs with `T-INFRA-002`, which asserts soft delete, versioning and PITR
+  // are OFF: a perfectly correct rule PLUS soft delete still retains the bytes
+  // past 30 days, so neither half is sufficient alone.
+
+  function lifecycleRule(t) {
+    return resourceOfType(t, 'Microsoft.Storage/storageAccounts/managementPolicies').properties
+      .policy.rules[0];
+  }
+
+  it('T-INFRA-004a: the committed template has no lifecycle violation', () => {
+    const violations = lifecyclePolicyViolations(template);
+    expect(violations, violations.join('\n')).toEqual([]);
+  });
+
+  it('T-INFRA-004b: exactly one enabled rule deletes block blobs at 30 days', () => {
+    const rule = lifecycleRule(template);
+    expect(rule.enabled).toBe(true);
+    expect(rule.type).toBe('Lifecycle');
+    expect(rule.definition.filters.blobTypes).toContain('blockBlob');
+    expect(rule.definition.actions.baseBlob.delete.daysAfterModificationGreaterThan).toBe(
+      IMAGE_RETENTION_DAYS,
+    );
+    // Asserted positively rather than "is a number": a defaulted or absent day
+    // count reads as a passing rule and purges nothing.
+    expect(IMAGE_RETENTION_DAYS).toBe(30);
+  });
+
+  it('T-INFRA-004c: the rule covers BOTH screenshot containers and nothing else', () => {
+    // Both are declared unconditionally, so a rule that named only
+    // `screenshots/` would retain every staging capture forever — and staging
+    // holds the owner's real screenshots during any trial of a change.
+    const prefixes = lifecycleRule(template).definition.filters.prefixMatch;
+    expect([...prefixes].sort()).toEqual(['screenshots-staging/', 'screenshots/']);
+  });
+
+  it('T-INFRA-004d: catches the rule being disabled', () => {
+    const bad = mutate((t) => {
+      lifecycleRule(t).enabled = false;
+    });
+    expect(lifecyclePolicyViolations(bad).join('\n')).toMatch(/must be enabled/);
+  });
+
+  it('T-INFRA-004e: catches the rule being removed entirely', () => {
+    // ⚠ Removed by walking NESTED module templates, not by filtering
+    // `t.resources`. Storage is deployed through a module, so the top-level
+    // filter removes nothing and the mutant survives reporting no violations —
+    // which is exactly how this assertion first passed vacuously.
+    const bad = mutate((t) => {
+      const visit = (tpl) => {
+        if (Array.isArray(tpl?.resources)) {
+          tpl.resources = tpl.resources.filter(
+            (r) => r.type !== 'Microsoft.Storage/storageAccounts/managementPolicies',
+          );
+          for (const r of tpl.resources) if (r?.properties?.template) visit(r.properties.template);
+        }
+      };
+      visit(t);
+    });
+    expect(lifecyclePolicyViolations(bad).join('\n')).toMatch(/exactly one managementPolicies/);
+  });
+
+  it('T-INFRA-004f: catches the retention window being changed in EITHER direction', () => {
+    // Both directions matter and they fail differently. 365 quietly breaks the
+    // privacy commitment; 7 destroys screenshots the owner has not reviewed,
+    // and REQ-028 makes that unrecoverable.
+    for (const days of [7, 365]) {
+      const bad = mutate((t) => {
+        lifecycleRule(t).definition.actions.baseBlob.delete.daysAfterModificationGreaterThan = days;
+      });
+      expect(lifecyclePolicyViolations(bad).join('\n')).toMatch(/daysAfterModificationGreaterThan/);
+    }
+  });
+
+  it('T-INFRA-004g: catches a container being dropped from prefixMatch', () => {
+    const bad = mutate((t) => {
+      lifecycleRule(t).definition.filters.prefixMatch = ['screenshots/'];
+    });
+    expect(lifecyclePolicyViolations(bad).join('\n')).toMatch(/screenshots-staging\//);
+  });
+
+  it('T-INFRA-004h: catches delete being swapped for a TIERING action', () => {
+    // The mutation that would pass review: it costs less, the rule stays
+    // "enabled", and the screenshots are retained indefinitely in cool
+    // storage. NFR-019 is a privacy commitment, not a storage-cost decision.
+    const bad = mutate((t) => {
+      lifecycleRule(t).definition.actions.baseBlob = {
+        tierToCool: { daysAfterModificationGreaterThan: 30 },
+      };
+    });
+    const violations = lifecyclePolicyViolations(bad).join('\n');
+    expect(violations).toMatch(/tierToCool/);
+    expect(violations).toMatch(/retains the bytes/);
+  });
+
+  it('T-INFRA-004i: catches a second rule being added', () => {
+    const bad = mutate((t) => {
+      const rules = resourceOfType(t, 'Microsoft.Storage/storageAccounts/managementPolicies')
+        .properties.policy.rules;
+      rules.push(structuredClone(rules[0]));
+    });
+    expect(lifecyclePolicyViolations(bad).join('\n')).toMatch(/exactly one rule/);
+  });
+
+  it('T-INFRA-004j: catches the filter being widened past the screenshot containers', () => {
+    // An empty or absent prefixMatch matches EVERY blob in the account.
+    const bad = mutate((t) => {
+      lifecycleRule(t).definition.filters.prefixMatch = [
+        'screenshots/',
+        'screenshots-staging/',
+        '',
+      ];
+    });
+    expect(lifecyclePolicyViolations(bad).join('\n')).toMatch(/only the screenshot containers/);
   });
 });
 

@@ -187,6 +187,119 @@ export function storagePolicyViolations(template) {
   return violations;
 }
 
+/** IMAGE_RETENTION_DAYS (NFR-019). Deliberately a literal here too. */
+export const IMAGE_RETENTION_DAYS = 30;
+
+/** The containers the purge rule must cover, and the only ones it may name. */
+export const SCREENSHOT_PREFIXES = ['screenshots/', 'screenshots-staging/'];
+
+/**
+ * T-INFRA-004 — the 30-day blob-lifecycle purge exists and is correctly shaped.
+ *
+ * ⚠ THIS IS THE ONLY THING THAT ACTUALLY DELETES A SCREENSHOT. No application
+ * code participates in retention (US-035 AC-3): the API stops SERVING at
+ * `retainUntil`, but the bytes go away because of this rule and nothing else.
+ * So the failure mode is silent in both directions and neither shows up
+ * anywhere else in the system:
+ *
+ *  - a rule that is missing, disabled, or filtered to a prefix that matches no
+ *    blob retains the owner's screenshots FOREVER while every 410 test still
+ *    passes, because the application boundary is asserted separately;
+ *  - a rule with a smaller `daysAfterModificationGreaterThan` deletes them
+ *    EARLY, which destroys the only copy of an upload the owner may not have
+ *    reviewed yet — REQ-028 makes that unrecoverable.
+ *
+ * Both are invisible until someone reads the storage account by hand, which is
+ * why this is asserted against the compiled ARM in CI rather than trusted.
+ *
+ * ⚠ THE ACTION MUST BE DELETE AND NOTHING ELSE. `tierToCool`/`tierToArchive`
+ * look like cost hygiene and are the exact mutation that would sail through
+ * review: they cost less, they leave the rule "enabled", and they retain the
+ * bytes indefinitely in a cheaper tier. NFR-019 is a privacy commitment, not a
+ * storage-cost decision.
+ *
+ * ⚠ AND IT MUST BE THE ONLY RULE. `managementPolicies` is an account-level
+ * singleton named `default`; a second rule cannot be reasoned about locally,
+ * and one whose filters overlap can silently re-tier or preserve what this one
+ * deletes.
+ */
+export function lifecyclePolicyViolations(template) {
+  const violations = [];
+  const policies = resourcesOfType(
+    template,
+    'Microsoft.Storage/storageAccounts/managementPolicies',
+  );
+
+  if (policies.length !== 1) {
+    violations.push(
+      `lifecycle: expected exactly one managementPolicies resource, found ${String(policies.length)} (screenshots are never purged without it)`,
+    );
+    return violations;
+  }
+
+  const rules = policies[0].properties?.policy?.rules ?? [];
+  if (rules.length !== 1) {
+    violations.push(
+      `lifecycle: expected exactly one rule, found ${String(rules.length)} (a second rule can re-tier or preserve what this one deletes)`,
+    );
+    return violations;
+  }
+
+  const rule = rules[0];
+  if (rule.enabled !== true) {
+    violations.push('lifecycle: the purge rule must be enabled (retains screenshots forever)');
+  }
+  if (rule.type !== 'Lifecycle') {
+    violations.push('lifecycle: the purge rule type must be Lifecycle');
+  }
+
+  const filters = rule.definition?.filters ?? {};
+  if (!(filters.blobTypes ?? []).includes('blockBlob')) {
+    violations.push(
+      'lifecycle: filters.blobTypes must include blockBlob (screenshots are block blobs)',
+    );
+  }
+  const prefixes = filters.prefixMatch ?? [];
+  for (const required of SCREENSHOT_PREFIXES) {
+    if (!prefixes.includes(required)) {
+      violations.push(
+        `lifecycle: filters.prefixMatch must cover ${required} (an uncovered container is never purged)`,
+      );
+    }
+  }
+  for (const prefix of prefixes) {
+    if (!SCREENSHOT_PREFIXES.includes(prefix)) {
+      violations.push(
+        `lifecycle: filters.prefixMatch must name only the screenshot containers, found ${String(prefix)}`,
+      );
+    }
+  }
+
+  const baseBlob = rule.definition?.actions?.baseBlob ?? {};
+  const actionNames = Object.keys(rule.definition?.actions ?? {});
+  for (const name of actionNames) {
+    if (name !== 'baseBlob') {
+      violations.push(`lifecycle: the only permitted action group is baseBlob, found ${name}`);
+    }
+  }
+  for (const name of Object.keys(baseBlob)) {
+    if (name !== 'delete') {
+      violations.push(
+        `lifecycle: baseBlob.${name} retains the bytes rather than deleting them — delete is the only permitted action`,
+      );
+    }
+  }
+
+  const days = baseBlob.delete?.daysAfterModificationGreaterThan;
+  if (days !== IMAGE_RETENTION_DAYS) {
+    violations.push(
+      `lifecycle: baseBlob.delete.daysAfterModificationGreaterThan must be ${String(IMAGE_RETENTION_DAYS)} (IMAGE_RETENTION_DAYS, NFR-019), found ${String(days)}`,
+    );
+  }
+
+  return violations;
+}
+
 /**
  * T-INFRA-003 — ingress must refuse plaintext.
  *
