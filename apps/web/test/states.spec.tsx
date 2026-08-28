@@ -15,22 +15,30 @@
  * silent: a refusal screen that still rendered the nav, or a stale list behind
  * a banner, would look fine to everyone except the person whose data leaked.
  *
- * ⚠ FINDING — A LIVE CONTRADICTION BETWEEN TWO SPECS, still reported and still
- * unresolved: `specs/ux-states.md` §2.11 assigns **`T-UX-020`** to the 403
- * refusal state, but `specs/testing.md` §12.2 DEFINES `T-UX-020` as an **e2e**
- * test that "each primary surface renders a distinct offline state". Those are
- * two different tests under one id, and `testing.md` is the file NFR-003 makes
- * authoritative. Squatting on `T-UX-020` would be the more damaging choice:
- * the id would resolve, CI would stay green, and the suite would appear to
- * carry offline-state coverage that exists nowhere.
+ * ⚠ FINDING — THE ID FOR THIS STATE IS INCONSISTENT ACROSS THE TWO SPECS,
+ * reported not resolved. `specs/ux-states.md` §2.11 assigns the 403 refusal
+ * `T-UX-020`, and `specs/testing.md`'s own TASK-024 correction note agrees
+ * that the dense allocation in `ux-states.md` "is the original and wins" —
+ * but the row `testing.md` actually DEFINES for this state is `T-UX-025`, and
+ * `T-UX-020` has no definition row anywhere (it was struck through at
+ * `testing.md` L1600 when the offline pair was renumbered to
+ * `T-UX-023`/`T-UX-024`). So citing `T-UX-020` fails `T-META-005a` on the
+ * spot. These cases use `T-UX-025`: it is the id `testing.md` defines, and
+ * NFR-003 makes `testing.md` authoritative for the AC-to-test mapping.
+ * `ux-states.md` §2.11 should be re-pointed to it.
  *
- * The gap this file previously recorded — "the 403 refusal has no
- * COMPONENT-level id at all" — is now CLOSED. `specs/testing.md` L1583
- * defines **`T-UX-025`**, and it was a phantom: defined, mapped, and carried
- * by no test, so `check:test-ids` resolved it while nothing ran. The four
- * 403 cases below (previously filed under `T-UX-019f…i`, borrowing an
- * IdP-failure id) now carry it. `T-UX-019a…e` keep the 401/IdP cases that
- * `T-UX-019` actually names.
+ * ⚠ AN EARLIER VERSION OF THIS NOTE WAS WRONG and is corrected here rather
+ * than left to be inherited: it claimed `T-UX-020` was live in `testing.md`
+ * §12.2 as an offline-state e2e test, and therefore that two different live
+ * tests shared one id. It is not live — it is retired. The lesson survives
+ * the correction: an id that resolves is not an id that runs.
+ *
+ * The gap this file used to record — "the 403 refusal has no COMPONENT-level
+ * id at all" — is now CLOSED. `T-UX-025` (`specs/testing.md` L1583) was a
+ * phantom: defined, mapped, and carried by no test, so `check:test-ids`
+ * resolved it while nothing ran. The four 403 cases below (previously filed
+ * under `T-UX-019f…i`, borrowing an IdP-failure id) now carry it.
+ * `T-UX-019a…e` keep the 401/IdP cases that `T-UX-019` actually names.
  *
  * ⚠ AND A CORRECTION TO THIS FILE'S OWN CLAIM. The header used to present
  * these cases as the assertion of "no partial app UI". They are not, and
