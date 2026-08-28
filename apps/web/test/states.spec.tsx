@@ -15,38 +15,52 @@
  * silent: a refusal screen that still rendered the nav, or a stale list behind
  * a banner, would look fine to everyone except the person whose data leaked.
  *
- * ⚠ FINDING — A LIVE CONTRADICTION BETWEEN TWO SPECS, reported not resolved:
- * `specs/ux-states.md` §2.11 assigns **`T-UX-020`** to the 403 refusal state,
- * but `specs/testing.md` §12.2 (added by the phantom-id reconciliation) now
- * DEFINES `T-UX-020` as an **e2e** test that "each primary surface renders a
- * distinct offline state". Those are two different tests under one id, and
- * `testing.md` is the file NFR-003 makes authoritative.
+ * ⚠ FINDING — A LIVE CONTRADICTION BETWEEN TWO SPECS, still reported and still
+ * unresolved: `specs/ux-states.md` §2.11 assigns **`T-UX-020`** to the 403
+ * refusal state, but `specs/testing.md` §12.2 DEFINES `T-UX-020` as an **e2e**
+ * test that "each primary surface renders a distinct offline state". Those are
+ * two different tests under one id, and `testing.md` is the file NFR-003 makes
+ * authoritative. Squatting on `T-UX-020` would be the more damaging choice:
+ * the id would resolve, CI would stay green, and the suite would appear to
+ * carry offline-state coverage that exists nowhere.
  *
- * So the 403-refusal cases below are filed under **`T-UX-019f…i`**, not under
- * `T-UX-020`. Squatting on `T-UX-020` would have been the more damaging
- * choice: the id would resolve, CI would stay green, and the suite would
- * appear to carry offline-state coverage that does not exist anywhere -
- * precisely the phantom-id failure that reconciliation was run to remove.
- * `T-UX-019` is TASK-028's own named test and its definition
- * ("...; no partial app UI") is the property these cases assert.
+ * The gap this file previously recorded — "the 403 refusal has no
+ * COMPONENT-level id at all" — is now CLOSED. `specs/testing.md` L1583
+ * defines **`T-UX-025`**, and it was a phantom: defined, mapped, and carried
+ * by no test, so `check:test-ids` resolved it while nothing ran. The four
+ * 403 cases below (previously filed under `T-UX-019f…i`, borrowing an
+ * IdP-failure id) now carry it. `T-UX-019a…e` keep the 401/IdP cases that
+ * `T-UX-019` actually names.
  *
- * The real gap: **the 403 refusal has no COMPONENT-level id at all.** US-001
- * AC-4 maps only to `T-SEC-010` (unit, middleware), `T-SEC-017` (integration)
- * and `T-SEC-018` (e2e). `specs/testing.md` needs a `T-UX-0xx` row for it.
+ * ⚠ AND A CORRECTION TO THIS FILE'S OWN CLAIM. The header used to present
+ * these cases as the assertion of "no partial app UI". They are not, and
+ * TASK-028 proved it in a browser: `RefusalPage` is rendered here IN
+ * ISOLATION, so `expectNoAppUi()` below asserts only that the component emits
+ * no nav of its own — which was true while the assembled application wrapped
+ * that same component in `AppShell` and served a refused account the entire
+ * product navigation. These cases passed throughout. `T-SEC-018c` is what
+ * caught it. A component test cannot make a statement about composition; the
+ * `OwnerGate` cases at the end of this file are the closest a unit test gets,
+ * and they assert the gate's own choice, not the shell's.
  */
 
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
 import {
+  GATE_FAILED_TITLE,
   IDP_FAILURE_BODY,
   IDP_FAILURE_TITLE,
   REFUSAL_NOT_ALLOWED_BODY,
   REFUSAL_NOT_ALLOWED_TITLE,
+  RETRY_LABEL,
   SESSION_ENDED_TITLE,
   SIGN_IN_AGAIN_LABEL,
   SIGN_OUT_LABEL,
 } from '../src/copy';
+import { OwnerGate } from '../src/containers/OwnerGate';
+import { RefusedError, type ApiClient } from '../src/lib/apiClient';
 import { RefusalPage, SIGN_IN_URL, SIGN_OUT_URL } from '../src/pages/RefusalPage';
 
 /**
@@ -118,7 +132,7 @@ describe('Refusal and sign-in states', () => {
     }
   });
 
-  it('T-UX-019f · US-001 AC-4 · a non-allow-listed account gets the refusal, its email and Sign out', () => {
+  it('T-UX-025a · US-001 AC-4 · a non-allow-listed account gets the refusal, its email and Sign out', () => {
     render(<RefusalPage reason="not-allowed" signedInEmail="someone@example.com" />);
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(REFUSAL_NOT_ALLOWED_TITLE);
@@ -134,12 +148,12 @@ describe('Refusal and sign-in states', () => {
     );
   });
 
-  it('T-UX-019g · US-001 AC-4 · the refusal renders no list data, no nav and no partial UI', () => {
+  it('T-UX-025b · US-001 AC-4 · the refusal renders no list data, no nav and no partial UI', () => {
     render(<RefusalPage reason="not-allowed" signedInEmail="someone@example.com" />);
     expectNoAppUi();
   });
 
-  it('T-UX-019h · NFR-015 · the refusal offers sign-out only - no sign-in loop, no way to request access', () => {
+  it('T-UX-025c · NFR-015 · the refusal offers sign-out only - no sign-in loop, no way to request access', () => {
     // Offering "Sign in again" to a refused account produces a loop that reads
     // as a bug; offering a request-access path would be a self-service
     // registration path, which NFR-015 says does not exist.
@@ -151,7 +165,7 @@ describe('Refusal and sign-in states', () => {
     expect(screen.queryByRole('link', { name: SIGN_IN_AGAIN_LABEL })).toBeNull();
   });
 
-  it('T-UX-019i · specs/security.md §2.2 · the refusal renders without an email at all', () => {
+  it('T-UX-025d · specs/security.md §2.2 · the refusal renders without an email at all', () => {
     // The email is display-only and may be absent - a malformed or missing
     // principal still has to produce a refusal, not a crashed render. Falling
     // back to a blank "Signed in as" line would be worse than omitting it.
@@ -160,5 +174,67 @@ describe('Refusal and sign-in states', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(REFUSAL_NOT_ALLOWED_TITLE);
     expect(screen.queryByTestId('refusal-email')).toBeNull();
     expect(screen.getByRole('link', { name: SIGN_OUT_LABEL })).toBeInTheDocument();
+  });
+});
+
+/**
+ * `OwnerGate` (TASK-028) — the gate itself, asserted at the component level.
+ *
+ * ⚠ THESE EXIST BECAUSE THE CASES ABOVE CANNOT COVER COMPOSITION. Rendering
+ * `RefusalPage` alone proves the component is clean; it says nothing about
+ * what the application renders around it. `T-SEC-018` is the real proof, in a
+ * browser, against the built bundle — these are the fast, precise statement of
+ * which branch the gate takes for each answer from `GET /api/me`, so a
+ * regression names a branch instead of just failing an e2e screenshot.
+ */
+describe('OwnerGate', () => {
+  function gateWith(getMe: () => Promise<unknown>) {
+    return { getMe } as unknown as ApiClient;
+  }
+
+  it('T-UX-025e · US-001 AC-4 · a refused identity renders the refusal and never mounts the app', async () => {
+    render(<OwnerGate client={gateWith(() => Promise.reject(new RefusedError('Not allowed.')))} />);
+
+    expect(await screen.findByText(REFUSAL_NOT_ALLOWED_TITLE)).toBeVisible();
+    // The property the container-level refusal could not deliver: the shell is
+    // never constructed at all, so there is no nav to leak.
+    expectNoAppUi();
+    expect(document.querySelector('.app-shell')).toBeNull();
+  });
+
+  it('T-UX-025f · US-001 AC-4 · the app is not mounted while the identity check is still in flight', () => {
+    // ⚠ THE HALF OF THE LEAK A POST-REFUSAL FIX CANNOT REACH. Before the gate,
+    // every screen rendered its loading state INSIDE the shell — so a refused
+    // account was shown the full navigation for the length of a round trip,
+    // and only then told it had no account. A gate that renders the product
+    // optimistically while it waits reintroduces exactly that window.
+    render(<OwnerGate client={gateWith(() => new Promise(() => {}))} />);
+
+    expectNoAppUi();
+    expect(document.querySelector('.app-shell')).toBeNull();
+  });
+
+  it('T-UX-025g · specs/ux-states.md §2.11 · a failed identity check is retryable and is NOT reported as a refusal', async () => {
+    // A refusal is final (NFR-015); a network fault is not. Collapsing the two
+    // would either tell the owner they have been denied access over a dropped
+    // packet, or - far worse in the other direction - render the product
+    // because the check merely failed to complete.
+    let attempts = 0;
+    render(
+      <OwnerGate
+        client={gateWith(() => {
+          attempts += 1;
+          return Promise.reject(new Error('network down'));
+        })}
+      />,
+    );
+
+    expect(await screen.findByText(GATE_FAILED_TITLE)).toBeVisible();
+    expect(screen.queryByText(REFUSAL_NOT_ALLOWED_TITLE)).toBeNull();
+    expect(screen.getByRole('button', { name: RETRY_LABEL })).toBeVisible();
+
+    const before = attempts;
+    await userEvent.click(screen.getByRole('button', { name: RETRY_LABEL }));
+    expect(attempts).toBeGreaterThan(before);
   });
 });

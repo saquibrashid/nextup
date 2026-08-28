@@ -96,6 +96,17 @@ async function stubApi(page: Page): Promise<void> {
  * nothing is laid out at all.
  */
 async function expectStyledAndRendered(page: Page): Promise<void> {
+  /*
+   * ⚠ WAIT FOR THE SHELL, NOT MERELY FOR A `<main>`. `OwnerGate` (TASK-028)
+   * settles `GET /api/me` before the router mounts, and its "checking your
+   * access" state is itself a `<main>` — so `getByRole('main')` alone goes
+   * green while the product has not rendered at all. The per-route checks
+   * below use non-retrying `isVisible()`, so they would then read a footer
+   * that is a round trip away from existing and report every route as having
+   * dropped the disclaimer. Waiting for `.app-shell` — which the gate
+   * deliberately never renders — is what makes those reads meaningful.
+   */
+  await expect(page.locator('.app-shell')).toBeVisible();
   await expect(page.getByRole('main')).toBeVisible();
   const token = await page.evaluate(() =>
     getComputedStyle(document.documentElement).getPropertyValue('--color-bg').trim(),
@@ -155,7 +166,21 @@ test.describe('T-ATTR-002 — the disclaimer is visible on every route, without 
     // component renders synchronously from a constant rather than from
     // `GET /api/me`, and this is the test that stops that being "simplified"
     // into a fetch-gated render later.
+    //
+    // ⚠ `/api/me` SUCCEEDS AND EVERYTHING ELSE FAILS — the failure this test
+    // means. Failing `/api/me` too would exercise `OwnerGate`'s failure screen
+    // instead (TASK-028), which carries no attribution ON PURPOSE: it renders
+    // before the router, shows no title, no poster and no TMDB-derived field
+    // of any kind, and TMDB's requirement attaches to the display of their
+    // content. Asserting a disclaimer there would also put TMDB's mark in
+    // front of a stranger the product is in the middle of refusing. The
+    // obligation covered here is the product's own error states, which is
+    // where TMDB data would otherwise have been.
     await page.route('**/api/**', async (route) => {
+      if (route.request().url().includes('/api/me')) {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+        return;
+      }
       await route.fulfill({ status: 500, contentType: 'application/json', body: '{}' });
     });
     await page.goto('/');

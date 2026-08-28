@@ -9,7 +9,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 
-import { App } from './App';
+import { OwnerGate } from './containers/OwnerGate';
 
 // ⚠ `T-CSS-002` ASSERTS THIS LINE EXISTS. A stylesheet that is never imported
 // is indistinguishable from no stylesheet at build time — Vite emits no
@@ -22,7 +22,7 @@ if (root) {
   createRoot(root).render(
     <StrictMode>
       <BrowserRouter>
-        <App />
+        <OwnerGate />
       </BrowserRouter>
     </StrictMode>,
   );
