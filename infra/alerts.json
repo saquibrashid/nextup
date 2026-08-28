@@ -1,0 +1,219 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "description": "nextup memory observability — one log-search rule, two metric backstops, zero automation."
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Deployment region for the log-search rule. Metric alerts are always global."
+      }
+    },
+    "environmentName": {
+      "type": "string",
+      "defaultValue": "prod",
+      "allowedValues": ["prod", "staging"],
+      "metadata": {
+        "description": "Names the rules. Prod is the default because the A43 trigger is a production decision."
+      }
+    },
+    "containerAppName": {
+      "type": "string",
+      "metadata": {
+        "description": "The container app these rules watch."
+      }
+    },
+    "logAnalyticsWorkspaceId": {
+      "type": "string",
+      "metadata": {
+        "description": "Resource id of the Log Analytics workspace the container app ships stdout to."
+      }
+    },
+    "ownerEmail": {
+      "type": "string",
+      "metadata": {
+        "description": "Where every notification is emailed. No default: an alert nobody is told about is not a control."
+      }
+    },
+    "memoryPressureBytes": {
+      "type": "int",
+      "defaultValue": 419430400,
+      "minValue": 1,
+      "metadata": {
+        "description": "Average working-set bytes that counts as memory pressure.\n\n400 MiB of the 512 MiB the container has. ⚠ RAISE THIS TO 800 MiB IF THE\nUP-SIZE IS TAKEN — `docs/runbooks/scale-up-memory.md` owns that step. Left at\n400 MiB after up-sizing to 1.0 GiB, this rule fires on ordinary operation and\ntrains the owner to ignore it, which is worse than not having it.\n"
+      }
+    }
+  },
+  "variables": {
+    "decodeBeginEvent": "image.decode.begin",
+    "decodeEndEvent": "image.decode.end",
+    "heapOomText": "JavaScript heap out of memory",
+    "decodeAbandonedQueryTemplate": "ContainerAppConsoleLogs_CL\n| where TimeGenerated > ago(15m)\n| where ContainerAppName_s == '__APP__'\n| extend Payload = parse_json(Log_s)\n| extend Event = tostring(Payload.event), ImageId = tostring(Payload.imageId)\n| where Event in ('__BEGIN__', '__END__') and isnotempty(ImageId)\n| summarize BeganAt = minif(TimeGenerated, Event == '__BEGIN__'), Ended = countif(Event == '__END__') by ImageId\n| where Ended == 0 and isnotnull(BeganAt) and BeganAt < ago(5m)\n| project ImageId, BeganAt\n| union (\n    ContainerAppConsoleLogs_CL\n    | where TimeGenerated > ago(15m)\n    | where ContainerAppName_s == '__APP__'\n    | where Log_s has '__HEAP__'\n    | project ImageId = 'javascript-heap-oom', BeganAt = TimeGenerated\n  )\n",
+    "decodeAbandonedQuery": "[replace(replace(replace(replace(replace(variables('decodeAbandonedQueryTemplate'), '\r\n', '\n'), '__APP__', parameters('containerAppName')), '__BEGIN__', variables('decodeBeginEvent')), '__END__', variables('decodeEndEvent')), '__HEAP__', variables('heapOomText'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Insights/actionGroups",
+      "apiVersion": "2023-01-01",
+      "name": "[format('ag-nextup-{0}-owner', parameters('environmentName'))]",
+      "location": "global",
+      "properties": {
+        "groupShortName": "nextupOwner",
+        "enabled": true,
+        "emailReceivers": [
+          {
+            "name": "owner",
+            "emailAddress": "[parameters('ownerEmail')]",
+            "useCommonAlertSchema": true
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Insights/scheduledQueryRules",
+      "apiVersion": "2023-03-15-preview",
+      "name": "[format('nextup-{0}-decode-abandoned', parameters('environmentName'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "displayName": "nextup — image decode abandoned (probable OOM)",
+        "description": "An image decode started and never finished, or the V8 heap died. This is the up-size trigger from docs/runbooks/scale-up-memory.md. Do not automate a response; read the runbook and decide.",
+        "severity": 1,
+        "enabled": true,
+        "evaluationFrequency": "PT5M",
+        "windowSize": "PT15M",
+        "scopes": ["[parameters('logAnalyticsWorkspaceId')]"],
+        "criteria": {
+          "allOf": [
+            {
+              "query": "[variables('decodeAbandonedQuery')]",
+              "timeAggregation": "Count",
+              "operator": "GreaterThan",
+              "threshold": 0,
+              "failingPeriods": {
+                "numberOfEvaluationPeriods": 1,
+                "minFailingPeriodsToAlert": 1
+              }
+            }
+          ]
+        },
+        "autoMitigate": false,
+        "actions": {
+          "actionGroups": [
+            "[resourceId('Microsoft.Insights/actionGroups', format('ag-nextup-{0}-owner', parameters('environmentName')))]"
+          ]
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/actionGroups', format('ag-nextup-{0}-owner', parameters('environmentName')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Insights/metricAlerts",
+      "apiVersion": "2018-03-01",
+      "name": "[format('nextup-{0}-replica-restart', parameters('environmentName'))]",
+      "location": "global",
+      "properties": {
+        "description": "A replica restarted. A kernel OOM kill looks exactly like this, and so does a deploy. Correlate with the decode sentinel before acting; remedy in docs/runbooks/scale-up-memory.md.",
+        "severity": 2,
+        "enabled": true,
+        "scopes": ["[resourceId('Microsoft.App/containerApps', parameters('containerAppName'))]"],
+        "evaluationFrequency": "PT5M",
+        "windowSize": "PT5M",
+        "targetResourceType": "Microsoft.App/containerApps",
+        "targetResourceRegion": "[parameters('location')]",
+        "criteria": {
+          "odata.type": "Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria",
+          "allOf": [
+            {
+              "name": "restarts",
+              "metricNamespace": "Microsoft.App/containerApps",
+              "metricName": "RestartCount",
+              "operator": "GreaterThan",
+              "threshold": 0,
+              "timeAggregation": "Maximum",
+              "criterionType": "StaticThresholdCriterion",
+              "dimensions": [
+                {
+                  "name": "podName",
+                  "operator": "Include",
+                  "values": ["*"]
+                }
+              ]
+            }
+          ]
+        },
+        "autoMitigate": true,
+        "actions": [
+          {
+            "actionGroupId": "[resourceId('Microsoft.Insights/actionGroups', format('ag-nextup-{0}-owner', parameters('environmentName')))]"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/actionGroups', format('ag-nextup-{0}-owner', parameters('environmentName')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Insights/metricAlerts",
+      "apiVersion": "2018-03-01",
+      "name": "[format('nextup-{0}-memory-pressure', parameters('environmentName'))]",
+      "location": "global",
+      "properties": {
+        "description": "Working set is close to the container limit. Nothing has failed yet. If this recurs, up-size per docs/runbooks/scale-up-memory.md — and move NEXTUP_MAX_DECODE_PIXELS with it.",
+        "severity": 3,
+        "enabled": true,
+        "scopes": ["[resourceId('Microsoft.App/containerApps', parameters('containerAppName'))]"],
+        "evaluationFrequency": "PT5M",
+        "windowSize": "PT5M",
+        "targetResourceType": "Microsoft.App/containerApps",
+        "targetResourceRegion": "[parameters('location')]",
+        "criteria": {
+          "odata.type": "Microsoft.Azure.Monitor.SingleResourceMultipleMetricCriteria",
+          "allOf": [
+            {
+              "name": "workingSet",
+              "metricNamespace": "Microsoft.App/containerApps",
+              "metricName": "WorkingSetBytes",
+              "operator": "GreaterThan",
+              "threshold": "[parameters('memoryPressureBytes')]",
+              "timeAggregation": "Average",
+              "criterionType": "StaticThresholdCriterion"
+            }
+          ]
+        },
+        "autoMitigate": true,
+        "actions": [
+          {
+            "actionGroupId": "[resourceId('Microsoft.Insights/actionGroups', format('ag-nextup-{0}-owner', parameters('environmentName')))]"
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/actionGroups', format('ag-nextup-{0}-owner', parameters('environmentName')))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "alertRuleIds": {
+      "type": "array",
+      "metadata": {
+        "description": "The three rule ids, so a deployment can be verified without a portal visit."
+      },
+      "value": [
+        "[resourceId('Microsoft.Insights/scheduledQueryRules', format('nextup-{0}-decode-abandoned', parameters('environmentName')))]",
+        "[resourceId('Microsoft.Insights/metricAlerts', format('nextup-{0}-replica-restart', parameters('environmentName')))]",
+        "[resourceId('Microsoft.Insights/metricAlerts', format('nextup-{0}-memory-pressure', parameters('environmentName')))]"
+      ]
+    },
+    "runbookPath": {
+      "type": "string",
+      "metadata": {
+        "description": "The runbook every notification points at. Asserted by T-INFRA-012."
+      },
+      "value": "docs/runbooks/scale-up-memory.md"
+    }
+  }
+}

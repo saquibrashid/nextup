@@ -17,6 +17,7 @@ export * from './extraction/index.js';
 export * from './freshness.js';
 export * from './identity.js';
 export * from './ids.js';
+export * from './logEvents.js';
 // TASK-060 — deterministic TMDB match scoring (`specs/ai.md` §4). Its own
 // barrel, following the `extraction/` precedent.
 export * from './matching/index.js';

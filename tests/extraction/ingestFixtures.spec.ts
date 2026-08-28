@@ -99,6 +99,8 @@ function contextFor(
     receivedAt: AT,
     store,
     stages,
+    correlationId: 'corr-ingest-fixtures',
+    logSink: () => {},
   };
 }
 

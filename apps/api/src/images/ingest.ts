@@ -36,16 +36,22 @@
  */
 
 import {
+  IMAGE_DECODE_BEGIN,
+  IMAGE_DECODE_END,
   MAX_IMAGE_BYTES,
   resolveFileName,
   ulid,
+  type DecodeOutcome,
+  type ImageDecodeBeginEvent,
+  type ImageDecodeEndEvent,
   type ImageFormat,
   type IngestSource,
   type UploadFormat,
 } from '@nextup/domain';
 
-import { IMAGE_RETENTION_DAYS } from '../config.js';
+import { IMAGE_RETENTION_DAYS, maxDecodePixels } from '../config.js';
 import { AppError } from '../errors/AppError.js';
+import { logLine, logTimestamp, type LogSink } from '../log.js';
 import { inspectDecodable } from './decodeGuard.js';
 import { isAcceptedUploadFormat, sniffUploadFormat } from './sniffFormat.js';
 import { blobPathFor, type ImageBlobStore } from '../storage/blobStore.js';
@@ -124,6 +130,19 @@ export interface IngestContext {
   readonly store: ImageBlobStore;
   readonly stages: IngestStages;
   readonly env?: NodeJS.ProcessEnv;
+  /**
+   * The request's correlation id, repeated on both sentinel lines so a decode
+   * that died can be read against the request that caused it (`api.md` §9.1).
+   * The `ownerIdHash` is deliberately NOT repeated here — it is already on the
+   * request line that shares this id.
+   */
+  readonly correlationId: string;
+  /** Swapped only by a test that needs to read the sentinel lines. */
+  readonly logSink?: LogSink;
+  /** Injected so `durationMs` is deterministic under test. */
+  readonly monotonicNow?: () => number;
+  /** Injected so `peakRssBytes` is deterministic under test. */
+  readonly rss?: () => number;
 }
 
 export interface IngestOutcome {
@@ -225,42 +244,113 @@ async function ingestOne(
   let bytes = file.bytes;
   let width = verdict.width;
   let height = verdict.height;
-  if (needsTranscode) {
-    // ⚠ A TRANSCODE FAILURE FAILS ONE IMAGE, NOT THE BATCH (REQ-080/081,
-    // invariant 15). The stage throws `AppError` — a decision we made about
-    // THIS file (`IMAGE_DECODE_FAILED`, `IMAGE_DECODE_OOM`) — and that becomes
-    // a `rejected[]` entry so the rest of the batch still processes and the
-    // file stays retryable. ⚠ Anything that is NOT an `AppError` propagates:
-    // an Azure outage or a programming error is not a verdict about one image
-    // and must not be reported to the owner as "that screenshot was bad".
-    try {
-      const transcoded = await context.stages.transcode(bytes, uploadedFormat);
-      bytes = transcoded.bytes;
-      // The row records the STORED raster. See `IngestStages.transcode`.
-      width = transcoded.width ?? width;
-      height = transcoded.height ?? height;
-    } catch (error) {
-      if (!(error instanceof AppError)) {
-        throw error;
-      }
-      return {
-        rejected: {
+
+  // ⚠ `imageId` IS MINTED HERE, BEFORE THE DECODE, NOT AFTER IT. An
+  // abandoned decode (path P2, the kernel OOM kill) never reaches the code
+  // below, so an id minted after the decode could never name the image that
+  // died — which is the whole point of the sentinel (`api.md` §9.1).
+  const imageId = ulid();
+  const sink = context.logSink;
+  const now = context.monotonicNow ?? (() => performance.now());
+  const readRss = context.rss ?? (() => process.memoryUsage().rss);
+
+  // ⚠ `begin` IS EMITTED AFTER THE PIXEL GUARD AND BEFORE ANY ALLOCATION.
+  // Emitting it before the guard would log a `begin` for an image that was
+  // never decoded, and every rejected oversize image would then look to the
+  // alert like an abandoned decode.
+  const beginEvent: ImageDecodeBeginEvent = {
+    event: IMAGE_DECODE_BEGIN,
+    ts: logTimestamp(),
+    level: 'info',
+    correlationId: context.correlationId,
+    batchId: context.batchId,
+    imageId,
+    fileName,
+    ingestSource: context.ingestSource,
+    uploadedFormat,
+    width: verdict.width,
+    height: verdict.height,
+    megapixels: verdict.megapixels,
+    declaredBytes: file.bytes.byteLength,
+    maxDecodePixels: maxDecodePixels(context.env),
+  };
+  logLine(beginEvent, sink);
+
+  const startedAt = now();
+  let outcome: DecodeOutcome = 'ok';
+  let errorName: string | undefined;
+  let transcodeRejection: RejectedImage | undefined;
+
+  try {
+    if (needsTranscode) {
+      // ⚠ A TRANSCODE FAILURE FAILS ONE IMAGE, NOT THE BATCH (REQ-080/081,
+      // invariant 15). The stage throws `AppError` — a decision we made about
+      // THIS file (`IMAGE_DECODE_FAILED`, `IMAGE_DECODE_OOM`) — and that
+      // becomes a `rejected[]` entry so the rest of the batch still processes
+      // and the file stays retryable. ⚠ Anything that is NOT an `AppError`
+      // propagates: an Azure outage or a programming error is not a verdict
+      // about one image and must not be reported to the owner as "that
+      // screenshot was bad".
+      try {
+        const transcoded = await context.stages.transcode(bytes, uploadedFormat);
+        bytes = transcoded.bytes;
+        // The row records the STORED raster. See `IngestStages.transcode`.
+        width = transcoded.width ?? width;
+        height = transcoded.height ?? height;
+      } catch (error) {
+        if (!(error instanceof AppError)) {
+          throw error;
+        }
+        outcome = error.code === 'IMAGE_DECODE_OOM' ? 'oom' : 'failed';
+        errorName = error.name;
+        transcodeRejection = {
           fileName,
           code: error.code,
           message: error.message,
           details: error.details,
-        },
-      };
+        };
+      }
     }
+
+    // 6. THE METADATA STRIP — OUTSIDE the transcode condition, for every image
+    //    from every source (REQ-078). ⚠ WebKit strips EXIF on clipboard READ
+    //    but NOT on file upload, so this is the only control that covers the
+    //    upload path, which is exactly where a GPS-bearing HEIC arrives.
+    if (transcodeRejection === undefined) {
+      bytes = await context.stages.stripMetadata(bytes, format);
+    }
+  } catch (error) {
+    // A non-`AppError` escape still gets an `end` line — an unpaired `begin`
+    // must mean "the process died", nothing else.
+    outcome = 'failed';
+    errorName = error instanceof Error ? error.name : 'Error';
+    throw error;
+  } finally {
+    // ⚠ THE `end` LINE IS EMITTED FROM A `finally`, DELIBERATELY. It must
+    // cover success, `IMAGE_DECODE_FAILED` and the CATCHABLE WASM OOM (path
+    // P1) alike, because the alert's signal is a `begin` with NO `end` — that
+    // and only that means the replica was killed mid-decode (path P2). Move
+    // this into the success path and every ordinary failure becomes a false
+    // OOM alarm.
+    const endEvent: ImageDecodeEndEvent = {
+      event: IMAGE_DECODE_END,
+      ts: logTimestamp(),
+      level: outcome === 'ok' ? 'info' : 'error',
+      correlationId: context.correlationId,
+      batchId: context.batchId,
+      imageId,
+      outcome,
+      durationMs: Math.round(now() - startedAt),
+      peakRssBytes: readRss(),
+      ...(errorName === undefined ? {} : { errorName }),
+    };
+    logLine(endEvent, sink);
   }
 
-  // 6. THE METADATA STRIP — OUTSIDE the transcode condition, for every image
-  //    from every source (REQ-078). ⚠ WebKit strips EXIF on clipboard READ but
-  //    NOT on file upload, so this is the only control that covers the upload
-  //    path, which is exactly where a GPS-bearing HEIC arrives.
-  bytes = await context.stages.stripMetadata(bytes, format);
+  if (transcodeRejection !== undefined) {
+    return { rejected: transcodeRejection };
+  }
 
-  const imageId = ulid();
   const blobPath = blobPathFor(context.ownerId, context.batchId, imageId, format);
   await context.store.put(blobPath, bytes, format);
 

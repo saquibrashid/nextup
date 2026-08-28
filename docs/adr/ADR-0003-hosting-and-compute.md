@@ -744,7 +744,12 @@ number on a bill.
   lever; it is **not** taken, because a 15-minute detection delay on an OOM is
   most of a batch (`A43-M5` exists to make the OOM *observed*).
 
-### Still owed — item (h), and it is not a pricing question
+### ~~Still owed~~ — item (h): DISCHARGED 2026-08-11, see the addendum below
+
+⚠ The paragraph below is **superseded**. Item (h) was verified against deployed
+staging and the answer is in "Addendum — 2026-08-11" at the end of this file:
+there is **no OOM-distinct metric**, so the architecture's claim is now
+**VERIFIED TRUE**, not unverified.
 
 Whether **`RestartCount`** and **`WorkingSetBytes`** exist as alertable metrics
 for `Microsoft.App/containerApps`, and whether **any OOM-distinct signal**
@@ -761,3 +766,43 @@ so the `OQ-026` escalation rule (verified total exceeding the published
 estimate by more than 50 %) does **not** fire. ⚠ But the total is right partly
 by **cancellation**: compute came in under and absorbed the alerting and
 up-size overages. Two line items were individually wrong.
+
+---
+
+## Addendum — 2026-08-11: item (h) closed, and there is no OOM metric (TASK-157)
+
+Item (h) above ("still owed") is now **discharged**, read-only, against the
+deployed staging container app. The full method and raw output are
+`specs/testing.md` §31.6; this is the decision-relevant summary.
+
+**Finding 1 — Azure Container Apps publishes 31 metrics and NONE of them is
+OOM-distinct.** The architecture's claim, recorded above as UNVERIFIED, is
+now **VERIFIED TRUE**. There is no `OomKilled`, no exit-reason dimension, and
+no container-level termination cause anywhere in the metric definitions for
+`Microsoft.App/containerApps`. An OOM is therefore **not observable from
+metrics at all** — which is exactly the condition the owner's "start at 0.5 GiB
+and up-size reactively" decision (`A43`/`OQ-028`) depends on being false.
+
+**Consequence:** the `image.decode.begin`/`image.decode.end` sentinel in
+`specs/api.md` §9.1 is the **primary** signal, not a convenience. A `begin`
+with no `end` is the only record in the system that names *which image* was
+being decoded when the replica died. ⚠ This is why deleting those two log lines
+as "telemetry" would remove the up-size trigger entirely; `specs/testing.md`
+§AC-6 records why `NFR-005` and the sentinel do not actually collide.
+
+**Finding 2 — `RestartCount` is a running per-pod counter whose primary
+aggregation is `Maximum`, not `Total`.** ⚠ This **corrects the TASK-157
+backlog row**, which specified a `Total`-over-window rule. Summing a
+monotonically rising series over a window produces a positive number forever on
+a perfectly healthy app, so a `Total > 0` rule would fire continuously from
+the first restart and then be muted by the owner — the classic way an alert is
+made useless without anyone deciding to disable it. The shipped rule is
+`Maximum > 0` split by `podName`.
+
+**Finding 3 — `RestartCount` cannot distinguish an OOM kill from a
+deployment.** Every deploy increments it identically. It is therefore a
+**backstop**, correlated by hand against Finding 1's sentinel, and its alert
+description says so in the text the owner receives.
+
+**Nothing in this addendum changes the cost model.** The three rules are within
+the alerting line item already priced above.
