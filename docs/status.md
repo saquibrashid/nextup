@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 24 |
+| ⬜ todo | 23 |
 | 🚧 doing | 4 |
-| ✅ done | 147 |
+| ✅ done | 148 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **178** |
@@ -35,7 +35,6 @@ Not done, and every task they depend on is done.
 | `TASK-155` | S | Epic B — Capture & import |
 | `TASK-161` | S | Epic B — Capture & import |
 | `TASK-162` | S | Epic B — Capture & import |
-| `TASK-166` | S | Epic F — The list itself (the value loop) |
 
 ## Waiting on the owner
 
@@ -206,6 +205,7 @@ Not done, and every task they depend on is done.
 | `TASK-158` | `packages/domain/src/pastedFileName.ts` + `T-PASTE-005a`-`s` (19 unit cases). `INGEST_SOURCES`/`IngestSource` already existed from TASK-012, so this task is the synthesiser alone. The INTEGRATION half of `T-PASTE-005` (round-trip of `ingestSource`, server-assigned `seqInBatch`, `blobPath` free of any client name) belongs to TASK-050 — see `specs/testing.md` §27.2. | `T-PASTE-005` |
 | `TASK-159` | `components/PasteCapture.tsx` (renders `null`, mounted by `ImageDropzone` so the listener lives exactly as long as the attach area) — `T-PASTE-001` (a–l). Handler order is normative and asserted step by step: editable target → return with no `preventDefault()`; zero images → return with no `preventDefault()`; otherwise `preventDefault()` and deliver **every** image. `navigator.clipboard.read` is asserted **never** called on this path, and no `contenteditable` node is added to the DOM. Four mutations caught: guard removed (`T-PASTE-001b`), `removeEventListener` deleted (`T-PASTE-001d`), zero-image guard neutered (`T-PASTE-001c/g/h`), clipboard truncated to one image (`T-PASTE-001e/f`). | `T-PASTE-001` |
 | `TASK-160` | `components/PasteButton.tsx` + `lib/useHeldImages.ts` — `T-PASTE-002` (a–j), `T-PASTE-009` (a–c). `navigator.clipboard.read()` is the **first statement** of the click handler, asserted by a mutation that merely wraps it in `setTimeout`. The §4.0a pre-batch hold was extracted to `useHeldImages` and wired to **both** primitives — a hold behind the button alone would leave Ctrl/Cmd+V silently lossy on the platform where paste is used most. Feature detection returns `null` (not disabled), which is every `http://` origin. Four further mutations caught: `read()` deferred (`T-PASTE-002a`), feature detect short-circuited (`T-PASTE-009a/b`), held images dropped (`T-PASTE-002c/d/e`), empty clipboard conflated with no-image (`T-PASTE-002g`). The four `PASTE_*` rejection messages are **TASK-161** and are deliberately not rendered here; `onPasteFailed` + `classifyRejection()` are the seam. New copy constant `PASTE_HELD_BODY` quoted from `ux-states.md` §4.0a, which `ui.md` §9 has no row for. | `T-PASTE-002`, `T-PASTE-009` |
+| `TASK-166` | Shipped in `9b9e988` (lane B) and **completed here**: `components/SortControl.tsx` is mounted in `ListPage` and `ListRoute` forwards `params.toString()` verbatim to `GET /api/titles`, so the URL is what the server sorts by — and the session-persisted direction was **never written into it**. With `asc` remembered and no `dir` in the address bar, the button read "Oldest first" while the API, seeing no `dir`, returned its `desc` default: a newest-first list under an oldest-first label, silently, with no error anywhere. ⚠ That is exactly the US-020 AC-6 path the persistence exists for ("survives navigating away and back"), so the half that appeared to work was the wrong half, and `T-UI-024j` passed against it because it only asserts `readSortDir`'s return value. Fixed with a `replace: true` reconciliation (a correction of the address the owner already arrived at, not a navigation they performed — pushing would make Back need two presses) and covered by new cases **`T-UI-024o`–`q`**: the direction reaches the query string, the other filters survive it, and the `desc` default is deliberately not written since an absent `dir` already means `desc` (`api.md` §6.2). Both mutants killed. This control is `must` per `A47`: it is the sole escape hatch for the knowingly-accepted newest-first-vs-SUC-003 trade-off. | `T-UI-024` |
 | `TASK-167` | this commit — the ledger, the gate and `docs/status.md` | `T-STATUS-001` |
 | `TASK-169` | `fc85ae4` — OMDb client | `T-OMDB-001`, `T-OMDB-007` |
 | `TASK-170` | `fc85ae4` — `external_ids` read first; `T-IMDB-009` (renamed from the already-taken `T-TMDB-011`) | `T-IMDB-009` |
