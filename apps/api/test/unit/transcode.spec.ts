@@ -323,6 +323,8 @@ describe('DEFAULT_STAGES.transcode', () => {
       receivedAt: AT,
       store: makeStore(),
       stages,
+      correlationId: 'corr-transcode-spec',
+      logSink: () => {},
     };
   }
 

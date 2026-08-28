@@ -89,6 +89,8 @@ async function upload(
       receivedAt: AT,
       store,
       stages,
+      correlationId: 'corr-ingest-real-device',
+      logSink: () => {},
     },
   );
   expect(outcome.rejected).toEqual([]);

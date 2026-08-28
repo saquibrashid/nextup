@@ -22,6 +22,7 @@
  */
 
 import { type Request, type Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import multer from 'multer';
 import {
   INGEST_SOURCES,
@@ -202,6 +203,11 @@ export function registerBatchImageRoutes(
       receivedAt,
       store,
       stages,
+      // The decode sentinel repeats this on both of its lines (`api.md` §9.1)
+      // so an abandoned decode can be read against the request that caused it.
+      // ⚠ Not the owner id and not a hash of it: identity belongs on the
+      // request line, and §9.1 rule 5 forbids repeating it here.
+      correlationId: randomUUID(),
     });
 
     for (const image of accepted) {

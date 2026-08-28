@@ -30,6 +30,8 @@ export const BICEP_FILE = join(ROOT, 'infra', 'main.bicep');
 export const ARM_FILE = join(ROOT, 'infra', 'main.json');
 export const BUDGET_BICEP_FILE = join(ROOT, 'infra', 'budget.bicep');
 export const BUDGET_ARM_FILE = join(ROOT, 'infra', 'budget.json');
+export const ALERTS_BICEP_FILE = join(ROOT, 'infra', 'alerts.bicep');
+export const ALERTS_ARM_FILE = join(ROOT, 'infra', 'alerts.json');
 
 /**
  * Every Bicep template with a committed ARM artifact.
@@ -39,10 +41,17 @@ export const BUDGET_ARM_FILE = join(ROOT, 'infra', 'budget.json');
  * It therefore needs its own compile + drift pair; folding it into the single
  * `main` pair above would leave it ungated, which is how an untested template
  * ends up deployed by hand.
+ *
+ * The alerts template is separate for a different reason (TASK-157): it takes
+ * the owner's EMAIL ADDRESS, which is not in the repo and must not become a
+ * required parameter on the path of every application deploy. Same gate, same
+ * drift pair — an ungated alert template is worse than none, because it looks
+ * like coverage.
  */
 export const TEMPLATES = [
   { name: 'main', bicep: BICEP_FILE, arm: ARM_FILE },
   { name: 'budget', bicep: BUDGET_BICEP_FILE, arm: BUDGET_ARM_FILE },
+  { name: 'alerts', bicep: ALERTS_BICEP_FILE, arm: ALERTS_ARM_FILE },
 ];
 
 /**
@@ -843,6 +852,141 @@ export function budgetPolicyViolations(template) {
     if (PROHIBITED_TYPES.includes(resource.type)) {
       violations.push(`budget: prohibited automation resource ${resource.type}`);
     }
+  }
+
+  return violations;
+}
+
+/**
+ * T-INFRA-012 — the memory alerts exist, they only ever SEND EMAIL, and the
+ * decode query still matches the log lines the app actually writes.
+ *
+ * TASK-157 (`A43-M5`). Three independent failure modes, all of which DEPLOY
+ * SUCCESSFULLY and none of which any other check would notice:
+ *
+ *   - a missing rule. The owner chose 0.5 GiB on the explicit basis that an
+ *     OOM would be observed; a rule that was never added turns the reactive
+ *     up-size strategy into no strategy at all.
+ *   - an ACTIONABLE receiver. An action group can invoke an automation
+ *     runbook, a webhook, a logic app or a function. Any of those makes an
+ *     alert an actuator, and REQ-028 says nothing acts on the owner's behalf.
+ *   - a RENAMED EVENT. This is the quiet one. Change
+ *     `image.decode.begin` in `packages/domain/src/logEvents.ts`, leave the
+ *     KQL alone, and everything keeps working: the app logs, the rule runs,
+ *     the deployment is clean — and the query simply never matches again.
+ *     Nothing tells anybody. So the literals are compared here.
+ */
+export const ALERT_RULE_NAMES = [
+  'nextup-prod-decode-abandoned',
+  'nextup-prod-replica-restart',
+  'nextup-prod-memory-pressure',
+];
+
+/**
+ * Receiver collections an action group may carry that DO something.
+ *
+ * `emailReceivers` and `smsReceivers` notify a human. Everything below invokes
+ * code. The list is explicit rather than "anything that is not email" so that
+ * a new Azure receiver type shows up as an unknown key rather than being
+ * silently permitted — see the unknown-key sweep in `alertPolicyViolations`.
+ */
+export const ACTIONABLE_RECEIVER_KEYS = [
+  'automationRunbookReceivers',
+  'webhookReceivers',
+  'azureFunctionReceivers',
+  'logicAppReceivers',
+  'armRoleReceivers',
+  'itsmReceivers',
+  'eventHubReceivers',
+  'azureAppPushReceivers',
+  'voiceReceivers',
+];
+
+const NOTIFY_ONLY_RECEIVER_KEYS = ['emailReceivers', 'smsReceivers'];
+
+export const ALERT_RUNBOOK_PATH = 'docs/runbooks/scale-up-memory.md';
+
+export function alertPolicyViolations(template, eventNames = []) {
+  const violations = [];
+  const resources = allResources(template);
+
+  const named = new Set(
+    resources
+      .filter((resource) => typeof resource.name === 'string')
+      .map((resource) => resource.name),
+  );
+  for (const expected of ALERT_RULE_NAMES) {
+    // The template names rules `nextup-${environmentName}-...`, so the
+    // compiled ARM carries the expression rather than the literal. Match on
+    // the SUFFIX, which is the part that is fixed.
+    const suffix = expected.replace('nextup-prod-', '');
+    const found = [...named].some((name) => name.includes(suffix));
+    if (!found) {
+      violations.push(`alerts: no rule matching "${suffix}" (TASK-157 — the A43 trigger)`);
+    }
+  }
+
+  const queryRules = resourcesOfType(template, 'Microsoft.Insights/scheduledQueryRules');
+  if (queryRules.length !== 1) {
+    violations.push(`alerts: expected exactly 1 log-search rule, found ${queryRules.length}`);
+  }
+  const metricRules = resourcesOfType(template, 'Microsoft.Insights/metricAlerts');
+  if (metricRules.length !== 2) {
+    violations.push(`alerts: expected exactly 2 metric rules, found ${metricRules.length}`);
+  }
+
+  for (const group of resourcesOfType(template, 'Microsoft.Insights/actionGroups')) {
+    const props = group.properties ?? {};
+    for (const key of Object.keys(props)) {
+      if (!key.endsWith('Receivers')) continue;
+      const receivers = props[key];
+      if (!Array.isArray(receivers) || receivers.length === 0) continue;
+      if (ACTIONABLE_RECEIVER_KEYS.includes(key)) {
+        violations.push(
+          `alerts: action group declares "${key}" — an alert must NOTIFY, never act (REQ-028)`,
+        );
+        continue;
+      }
+      if (!NOTIFY_ONLY_RECEIVER_KEYS.includes(key)) {
+        violations.push(
+          `alerts: action group declares unknown receiver "${key}" — classify it before allowing it`,
+        );
+      }
+    }
+  }
+
+  for (const resource of resources) {
+    if (PROHIBITED_TYPES.includes(resource.type)) {
+      violations.push(`alerts: prohibited automation resource ${resource.type}`);
+    }
+  }
+
+  // Every notification must name the runbook. An alert that says "memory is
+  // high" without saying what to do about it is a nag, and `A43-M4` exists
+  // precisely so the owner is not left to work it out during an incident.
+  for (const resource of [...queryRules, ...metricRules]) {
+    const description = resource.properties?.description ?? '';
+    if (!String(description).includes(ALERT_RUNBOOK_PATH)) {
+      violations.push(`alerts: "${resource.name}" does not point at ${ALERT_RUNBOOK_PATH}`);
+    }
+  }
+
+  // The literals. Compared against the constants the APPLICATION exports, so
+  // the two can never drift apart unnoticed.
+  const serialised = JSON.stringify(template);
+  for (const eventName of eventNames) {
+    if (!serialised.includes(eventName)) {
+      violations.push(
+        `alerts: the decode query does not mention "${eventName}" — renaming the event ` +
+          'silently disables nextup-prod-decode-abandoned',
+      );
+    }
+  }
+  // A `${...}` surviving into the compiled query means a multi-line Bicep
+  // string was used with interpolation, which is verbatim: the rule deploys
+  // and matches nothing.
+  if (/\$\{[A-Za-z]/.test(serialised)) {
+    violations.push('alerts: an uninterpolated ${...} survived into the compiled template');
   }
 
   return violations;

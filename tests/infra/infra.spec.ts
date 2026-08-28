@@ -3,8 +3,13 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import { IMAGE_DECODE_BEGIN, IMAGE_DECODE_END } from '@nextup/domain';
+
 import {
   allResources,
+  alertPolicyViolations,
+  ALERTS_ARM_FILE,
+  ALERT_RUNBOOK_PATH,
   budgetPolicyViolations,
   ingressPolicyViolations,
   lifecyclePolicyViolations,
@@ -664,5 +669,146 @@ describe('T-INFRA-011 the container app can actually hold traffic', () => {
     const bootstrap = /empty\(holdRevisionName\)\s*\?([\s\S]*?):\s*\[/.exec(aca)?.[1] ?? '';
     expect(bootstrap).toMatch(/latestRevision: true/);
     expect(bootstrap).toMatch(/weight: 100/);
+  });
+});
+
+// ── T-INFRA-012 (TASK-157, `A43-M5`) ────────────────────────────────────────
+//
+// The owner chose 0.25 vCPU / 0.5 GiB on the EXPLICIT basis that an OOM would
+// be observed and answered by up-sizing (`A43` / `OQ-028`). These rules are
+// what make that trigger real, so their absence is not missing hardening — it
+// silently converts a reactive strategy into no strategy.
+//
+// Every failure below DEPLOYS SUCCESSFULLY. That is why they are asserted
+// against the compiled ARM and why each one is also fed a mutated template:
+// a gate that cannot fail is decoration.
+describe('T-INFRA-012 the memory-observability alerts (TASK-157)', () => {
+  const alerts = readCommittedArm(ALERTS_ARM_FILE);
+
+  /** Deep clone so a mutation cannot leak into another case. */
+  function mutateAlerts(fn) {
+    const clone = structuredClone(alerts);
+    fn(clone);
+    return clone;
+  }
+
+  function actionGroup(t) {
+    return resourceOfType(t, 'Microsoft.Insights/actionGroups');
+  }
+
+  it('T-INFRA-012a: the committed alert template is clean', () => {
+    expect(alertPolicyViolations(alerts, [IMAGE_DECODE_BEGIN, IMAGE_DECODE_END])).toEqual([]);
+  });
+
+  it('T-INFRA-012b: the decode-abandoned log-search rule exists and is the primary signal', () => {
+    const rules = resourcesOfType(alerts, 'Microsoft.Insights/scheduledQueryRules');
+    expect(rules).toHaveLength(1);
+    // ⚠ Azure Container Apps publishes NO OOM-distinct metric at all
+    // (`specs/testing.md` §31.6, verified read-only against the deployed
+    // staging app). The sentinel is therefore the only signal that names WHICH
+    // image died, which is why this rule is severity 1 and the metric rules
+    // are not.
+    expect(rules[0].properties.severity).toBe(1);
+    expect(rules[0].properties.enabled).toBe(true);
+    // A rule that mitigates itself closes the incident the owner has not read.
+    expect(rules[0].properties.autoMitigate).toBe(false);
+  });
+
+  it('T-INFRA-012c: both metric backstops exist, and neither alone would suffice', () => {
+    const metrics = resourcesOfType(alerts, 'Microsoft.Insights/metricAlerts');
+    expect(metrics).toHaveLength(2);
+    const names = metrics.map((rule) => rule.properties.criteria.allOf[0].metricName).sort();
+    // `RestartCount` sees the KERNEL kill (P2) and never the catchable WASM
+    // RangeError (P1) — the likelier of the two, which leaves the container
+    // running. `WorkingSetBytes` is the only one that can fire BEFORE either.
+    expect(names).toEqual(['RestartCount', 'WorkingSetBytes']);
+
+    const restart = metrics.find(
+      (rule) => rule.properties.criteria.allOf[0].metricName === 'RestartCount',
+    );
+    // ⚠ `Maximum`, NOT `Total`, and that is a deliberate correction to the
+    // TASK-157 backlog row. §31.6 found `RestartCount` is a RUNNING PER-POD
+    // COUNTER whose primary aggregation is Maximum; a Total-over-window rule
+    // sums a rising series and fires on a healthy app, forever.
+    expect(restart.properties.criteria.allOf[0].timeAggregation).toBe('Maximum');
+  });
+
+  it('T-INFRA-012d: an actionable receiver is refused', () => {
+    // THE DANGEROUS ONE. An action group can invoke an automation runbook, so
+    // wiring one here turns "memory is high" into "stop the container app". It
+    // deploys cleanly, it looks responsible, and it would be added by someone
+    // being helpful. REQ-028 says nothing acts on the owner's behalf.
+    const mutated = mutateAlerts((t) => {
+      actionGroup(t).properties.automationRunbookReceivers = [
+        { name: 'restart', runbookName: 'RestartApp', isGlobalRunbook: false },
+      ];
+    });
+    expect(alertPolicyViolations(mutated, []).join('\n')).toMatch(/automationRunbookReceivers/);
+  });
+
+  it('T-INFRA-012e: an UNKNOWN receiver collection is refused, not tolerated', () => {
+    // The allow-list is explicit rather than "anything that is not email", so
+    // a receiver type Azure adds later shows up as unclassified instead of
+    // arriving as a permitted default.
+    const mutated = mutateAlerts((t) => {
+      actionGroup(t).properties.futureThingReceivers = [{ name: 'x' }];
+    });
+    expect(alertPolicyViolations(mutated, []).join('\n')).toMatch(/unknown receiver/);
+  });
+
+  it('T-INFRA-012f: every notification names the runbook', () => {
+    for (const rule of [
+      ...resourcesOfType(alerts, 'Microsoft.Insights/scheduledQueryRules'),
+      ...resourcesOfType(alerts, 'Microsoft.Insights/metricAlerts'),
+    ]) {
+      // ⚠ A LITERAL, not an ARM `format()` over a variable. Interpolating a
+      // Bicep variable compiles the path out of the artifact, and then this
+      // assertion can no longer prove that the email the OWNER receives names
+      // the remedy — which is the only thing it is here to prove.
+      expect(rule.properties.description).toContain(ALERT_RUNBOOK_PATH);
+    }
+
+    const mutated = mutateAlerts((t) => {
+      resourcesOfType(t, 'Microsoft.Insights/metricAlerts')[0].properties.description =
+        'Memory is high.';
+    });
+    expect(alertPolicyViolations(mutated, []).join('\n')).toMatch(/does not point at/);
+  });
+
+  it('T-INFRA-012g: renaming a decode event breaks the gate, not just the alert', () => {
+    // ⚠ THE QUIET FAILURE. Rename the constant in the domain, leave the KQL
+    // alone: the app still logs, the rule still runs, the deployment is still
+    // clean, and the query simply never matches again. Nothing else in the
+    // suite would notice, which is the entire reason the literals are compared
+    // against the constants the APPLICATION exports.
+    expect(JSON.stringify(alerts)).toContain(IMAGE_DECODE_BEGIN);
+    expect(JSON.stringify(alerts)).toContain(IMAGE_DECODE_END);
+    expect(alertPolicyViolations(alerts, ['image.decode.started']).join('\n')).toMatch(
+      /silently disables/,
+    );
+  });
+
+  it('T-INFRA-012h: an uninterpolated ${...} cannot survive into the query', () => {
+    // A Bicep multi-line string is VERBATIM: `'''...${x}...'''` keeps the
+    // braces, compiles clean, validates clean, deploys clean — and watches
+    // nothing. This shipped once during TASK-157 and produced no signal at all
+    // beyond three unused-variable warnings.
+    expect(JSON.stringify(alerts)).not.toMatch(/\$\{[A-Za-z]/);
+
+    const mutated = mutateAlerts((t) => {
+      t.variables.decodeAbandonedQueryTemplate = "| where App == '${containerAppName}'";
+    });
+    expect(alertPolicyViolations(mutated, []).join('\n')).toMatch(/uninterpolated/);
+  });
+
+  it('T-INFRA-012i: a missing rule is caught, and no automation resource is present', () => {
+    expect(ttlViolations(alerts)).toEqual([]);
+
+    const mutated = mutateAlerts((t) => {
+      t.resources = t.resources.filter(
+        (resource) => resource.type !== 'Microsoft.Insights/scheduledQueryRules',
+      );
+    });
+    expect(alertPolicyViolations(mutated, []).join('\n')).toMatch(/decode-abandoned/);
   });
 });

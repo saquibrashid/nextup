@@ -100,6 +100,11 @@ function context(overrides: Partial<Parameters<typeof ingestFiles>[1]> = {}) {
     receivedAt: AT,
     store: makeStore(),
     stages: makeStages(),
+    // The decode sentinel (`api.md` §9.1) is emitted for every image that
+    // passes the guard. Silenced here so this suite's output stays readable;
+    // the sentinel's own contract is asserted by `T-IMG-021`.
+    correlationId: 'corr-ingest-spec',
+    logSink: () => {},
     ...overrides,
   };
 }
