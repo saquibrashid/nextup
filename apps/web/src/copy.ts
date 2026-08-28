@@ -486,3 +486,58 @@ export const REMOVED_CLEAR_SEARCH_LABEL = 'Clear search';
  */
 export const REMOVED_LOAD_ERROR = 'Couldn\u2019t load your removal history. Nothing has changed.';
 export const REMOVED_LOADING = 'Loading your removal history\u2026';
+
+/* ------------------------- §5 `/batches/:batchId` extraction status ------ */
+
+/**
+ * ⚠ QUOTED VERBATIM from `ux-states.md` §5.1/§5.2. `{done}` and `{total}` are
+ * substituted; the strings are not reassembled from fragments, because the
+ * two states differ in tense and in punctuation ("Queued — 0 of 7 screenshots
+ * read." vs "Reading 4 of 7…") and a shared template would flatten both.
+ *
+ * ⚠ This screen is visible for MINUTES, not milliseconds (`ADR-0001` — LLM
+ * vision latency). It is a primary surface with real content, not a spinner;
+ * `T-UX-007` exists because treating it as a spinner is the likely mistake.
+ */
+export const STATUS_QUEUED = 'Queued \u2014 {done} of {total} screenshots read.';
+export const STATUS_RUNNING = 'Reading {done} of {total}\u2026';
+
+/**
+ * §5.3 — some images yielded nothing. US-006 AC-3 requires the image to be
+ * **named and thumbnailed**, not merely counted: "1 of 7 found no text" is
+ * unactionable, whereas naming the file tells the owner which screenshot to
+ * retake.
+ */
+export const STATUS_ZERO_YIELD = 'No text was found in {count} of {total} screenshots';
+
+/**
+ * §5.5 — `EXTRACTOR_ERROR`. ⚠ The reassurance is half the message: the owner's
+ * fear at an extraction failure is that their list was damaged, and both
+ * clauses ("Nothing has changed", "your screenshots are safe") answer it.
+ */
+export const STATUS_ERROR_EXTRACTOR =
+  'Couldn\u2019t read your screenshots. Nothing has changed and your screenshots are safe.';
+
+/** §5.6 — `EXTRACTOR_UNAVAILABLE`. Transient: retry is the ONLY action. */
+export const STATUS_ERROR_UNAVAILABLE =
+  'The text-reading service is busy. Nothing has changed. Try again in a few minutes.';
+
+/**
+ * §5.7 — `IMAGES_PURGED`. ⚠ Retry is NOT offered, and that omission is the
+ * point: the images are gone under NFR-019's 30-day lifecycle purge, so a
+ * "Try again" here would fail forever. The only move is new screenshots.
+ */
+export const STATUS_ERROR_PURGED =
+  'These screenshots were deleted 30 days after upload, so they can\u2019t be read again.';
+export const STATUS_PURGED_ACTION_LABEL = 'Upload new screenshots';
+
+/** §5.8 — offline. Polling PAUSES; no error is invented from a lost network. */
+export const STATUS_OFFLINE = 'You\u2019re offline. This will keep updating when you reconnect.';
+
+export const STATUS_DISCARD_LABEL = 'Discard';
+export const STATUS_DISCARD_BATCH_LABEL = 'Discard batch';
+export const STATUS_RETRY_LABEL = 'Try again';
+export const STATUS_CONTINUE_LABEL = 'Continue to review';
+
+/** Not in §5 — a heading is required and §5 specifies none. Invented here. */
+export const STATUS_TITLE = 'Reading your screenshots';

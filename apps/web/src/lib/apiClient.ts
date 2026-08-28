@@ -295,6 +295,52 @@ export interface MeResponse {
   attribution: unknown;
 }
 
+/**
+ * One screenshot inside a batch (`specs/api.md` §6.15 `images[]`).
+ *
+ * ⚠ `href` is an **API path**, never a blob URL (NFR-020) — the container is
+ * private and a direct storage URL would either 403 or, worse, leak a SAS.
+ */
+export interface BatchImage {
+  imageId: string;
+  fileName: string;
+  ingestSource: string;
+  available: boolean;
+  retainUntil: string | null;
+  candidateCount: number | null;
+  href: string;
+}
+
+/**
+ * `GET /api/batches/:batchId` (`specs/api.md` §6.15).
+ *
+ * ⚠ **`degradedExtraction` and `crossCheck` are NOT in the §6.15 shape as
+ * written, and that is a spec gap, not an oversight here.** `ux-states.md`
+ * §5.9/§5.10 require this page to render the degraded banner, and `T-UX-008`
+ * asserts it, but the documented response carries nothing the client could
+ * decide that from — the review response (§6.17) has both fields, this one
+ * does not. They are declared optional so the page is correct the moment the
+ * server sends them and merely silent until then; §6.15 needs the two fields
+ * added. See TASK-059's ledger row.
+ */
+export interface BatchStatus {
+  batchId: string;
+  service: 'netflix' | 'max';
+  mode: string;
+  status: string;
+  derivedFromBatchId: string | null;
+  createdAt: string;
+  submittedAt: string | null;
+  completedAt: string | null;
+  images: BatchImage[];
+  extractionError: string | null;
+  lowYield: boolean;
+  /** Present only while `status` is `submitted` or `extracting` (US-006 AC-1). */
+  progress?: { imagesDone: number; imagesTotal: number };
+  degradedExtraction?: boolean;
+  crossCheck?: 'ok' | 'llm-unavailable' | 'ocr-unavailable';
+}
+
 export interface CreatedBatch {
   batchId: string;
   service: string;
