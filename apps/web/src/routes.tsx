@@ -18,14 +18,14 @@ import type { ComponentType } from 'react';
 
 import { AboutPage } from './pages/AboutPage';
 import { BatchHistoryPage } from './pages/BatchHistoryPage';
-import { BatchStatusPage } from './pages/BatchStatusPage';
+import { BatchStatusRoute } from './containers/BatchStatusRoute';
 import { ListRoute } from './containers/ListRoute';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { RatingLookupPage } from './pages/RatingLookupPage';
 import { RemovedPage } from './pages/RemovedPage';
-import { ReviewPage } from './pages/ReviewPage';
+import { ReviewRoute } from './containers/ReviewRoute';
 import { SuppressedRoute } from './containers/SuppressedRoute';
-import { UploadPage } from './pages/UploadPage';
+import { UploadRoute } from './containers/UploadRoute';
 
 export interface RouteDefinition {
   /** The `react-router` path pattern. `*` is the catch-all. */
@@ -48,7 +48,7 @@ export const ROUTES: readonly RouteDefinition[] = [
   { path: '/', Component: ListRoute, examplePath: '/', navLabel: 'List' },
   {
     path: '/upload',
-    Component: UploadPage,
+    Component: UploadRoute,
     examplePath: '/upload',
     navLabel: 'Upload',
   },
@@ -60,13 +60,13 @@ export const ROUTES: readonly RouteDefinition[] = [
   },
   {
     path: '/batches/:batchId',
-    Component: BatchStatusPage,
+    Component: BatchStatusRoute,
     examplePath: `/batches/${EXAMPLE_BATCH_ID}`,
     navLabel: null,
   },
   {
     path: '/batches/:batchId/review',
-    Component: ReviewPage,
+    Component: ReviewRoute,
     examplePath: `/batches/${EXAMPLE_BATCH_ID}/review`,
     navLabel: null,
   },

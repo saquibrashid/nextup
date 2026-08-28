@@ -13,10 +13,11 @@
  * they would be subtly different on at least one of them (REQ-097).
  */
 
-import type { ErrorCode } from '@nextup/domain';
+import type { ErrorCode, ReviewResponse } from '@nextup/domain';
 
 import type { TitleListItem as WireTitleListItem } from '../components/TitleRow';
 import type { ServiceFreshness as WireServiceFreshness } from '../components/FreshnessStrip';
+import type { ServerRejection as WireServerRejection } from '../components/RejectionList';
 
 /** The wire shape of a failure (`apps/api/src/middleware/errorEnvelope.ts`). */
 export interface ErrorEnvelope {
@@ -341,12 +342,47 @@ export interface BatchStatus {
   crossCheck?: 'ok' | 'llm-unavailable' | 'ocr-unavailable';
 }
 
+/**
+ * `POST /api/batches/:batchId/images` (`specs/api.md` §6.12).
+ *
+ * ⚠ **`rejected[]` ARRIVES BY TWO DIFFERENT ROUTES AND BOTH MUST BE READ.**
+ * Partial acceptance is a **201** carrying `rejected[]` in the body; a request
+ * where *nothing* was accepted takes the first rejection's own **status** and
+ * carries the same array in the error envelope's `details.rejected`. A client
+ * that reads only the success body shows an empty rejection list on the one
+ * case where every file failed — the case the owner most needs explained.
+ */
+export interface AddImagesResult {
+  accepted: { imageId: string; fileName: string }[];
+  /**
+   * ⚠ The component's own type, imported rather than restated. A structurally
+   * similar copy here would drift the first time a field is added, with both
+   * copies compiling perfectly — the exact failure `TitleListItem` above is
+   * imported to avoid.
+   */
+  rejected: WireServerRejection[];
+  batchTotals: { imageCount: number; uploadedByteSize: number; storedByteSize: number };
+}
+
 export interface CreatedBatch {
   batchId: string;
   service: string;
   mode: string;
   status: string;
   createdAt: string;
+}
+
+/**
+ * `POST /api/batches/:batchId/candidates/confirm-all` (`specs/api.md` §6.20).
+ *
+ * ⚠ `skipped` is not decoration. A press that reports `confirmed: 0` on a
+ * section the owner has already worked through reads as a failure; the pair
+ * is what distinguishes "nothing to do" from "nothing happened".
+ */
+export interface ConfirmAllResult {
+  section: string;
+  confirmed: number;
+  skipped: number;
 }
 
 export interface ImdbLookupResponse {
@@ -397,8 +433,59 @@ export function createApiClient(deps: ApiClientDeps = {}) {
     createBatch: (service: string, mode: string) =>
       request<CreatedBatch>('/api/batches', { method: 'POST', body: { service, mode } }, deps),
 
-    addBatchImages: (batchId: string, formData: FormData) =>
+    /**
+     * §6.15 — the batch the status page polls.
+     *
+     * ⚠ **THIS ENDPOINT DOES NOT EXIST IN THE API YET**, and that is a
+     * reported spec/backlog gap rather than an oversight here: §6.15 is
+     * written, `BatchStatusPage` renders it and `T-UX-007`/`T-UX-008` assert
+     * the render, but no route serves it and no backlog row owns it. The
+     * method is declared so the poll is written once, correctly, against the
+     * documented shape; until the route lands the status screen shows its
+     * load-failure state, which is the honest rendering of "the server did
+     * not answer" and not a fabricated status.
+     */
+    getBatch: (batchId: string, signal?: AbortSignal) =>
+      request<BatchStatus>(`/api/batches/${encodeURIComponent(batchId)}`, { signal }, deps),
+
+    /** §6.17 — the review pass. */
+    getReview: (batchId: string, signal?: AbortSignal) =>
+      request<ReviewResponse>(
+        `/api/batches/${encodeURIComponent(batchId)}/review`,
+        { signal },
+        deps,
+      ),
+
+    /**
+     * §6.20 — bulk confirm. The section is sent verbatim; the client does not
+     * enumerate candidate ids, because a per-row loop would be N requests
+     * against a single 0.25 vCPU replica and would half-apply on the first
+     * failure.
+     */
+    confirmAllCandidates: (batchId: string, section: string) =>
+      request<ConfirmAllResult>(
+        `/api/batches/${encodeURIComponent(batchId)}/candidates/confirm-all`,
+        { method: 'POST', body: { section } },
+        deps,
+      ),
+
+    /**
+     * §6.21 — applies the batch.
+     *
+     * ⚠ `confirmRemovals` is carried through unchanged and is `true` only when
+     * the owner has been through the removal dialog. The server reads it
+     * strictly, so a client that always sent `true` would turn REQ-020's group
+     * confirmation into a formality.
+     */
+    closeBatch: (batchId: string, confirmRemovals: boolean) =>
       request<unknown>(
+        `/api/batches/${encodeURIComponent(batchId)}/close`,
+        { method: 'POST', body: { confirmRemovals } },
+        deps,
+      ),
+
+    addBatchImages: (batchId: string, formData: FormData) =>
+      request<AddImagesResult>(
         `/api/batches/${encodeURIComponent(batchId)}/images`,
         { method: 'POST', formData },
         deps,

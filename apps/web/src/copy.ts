@@ -299,6 +299,40 @@ export const SERVICE_STEP_LEGEND = 'Which service did these screenshots come fro
 export const MODE_STEP_LEGEND = 'Is this a complete capture of that list?';
 
 /**
+ * §3.3 - step 3.
+ *
+ * ⚠ THE DISABLED BUTTON ALWAYS STATES ITS REASON. §3.3 requires "disabled at
+ * zero images with the reason shown as text (never a silent disabled button)":
+ * a control that is simply grey is indistinguishable from a broken one, and
+ * this is the last screen before the owner's screenshots leave the device.
+ *
+ * ⚠ `SUBMIT_LABEL` is the exact wording §3.3 fixes. The two reasons and the
+ * in-flight warning are NOT fixed by §9, so they are declared here as the
+ * single source rather than typed into the markup - the same rule the mode
+ * consequences follow.
+ */
+export const SUBMIT_LABEL = 'Extract titles';
+export const SUBMIT_NEEDS_SELECTION = 'Choose a service and a mode first.';
+export const SUBMIT_NEEDS_IMAGES = 'Attach at least one screenshot first.';
+export const SUBMIT_IN_FLIGHT = "Don't close this tab.";
+
+/**
+ * §3.3 batch immutability (US-003 AC-6) - shown once the batch is submitted.
+ */
+export const BATCH_LOCKED_NOTE = 'Locked for this batch. Discard and start again to change them.';
+
+/**
+ * §4.10 - `OPEN_BATCH_EXISTS`.
+ *
+ * ⚠ THE TITLE IS THE ONE STRING HERE THAT IS *NOT* RENDERED. §12.8 requires
+ * the server's `message` verbatim, and the server already sends a complete
+ * sentence naming the remedy. These are the two ACTIONS §4.10 requires beside
+ * it, which the envelope cannot carry because they are navigation, not text.
+ */
+export const OPEN_BATCH_GO_LABEL = 'Go to it';
+export const OPEN_BATCH_DISCARD_LABEL = 'Discard it and start again';
+
+/**
  * ⚠ FINDING - INVENTED COPY, needs owner review. `specs/ui.md` §9 defines
  * `MODE_FULL_UPDATE_CONSEQUENCE` with a `{Service}` placeholder "substituted
  * with the batch's service name", but US-003 AC-1 forbids a default service,
