@@ -47,6 +47,7 @@ import {
   REVIEW_APPLY_LABEL,
   REVIEW_DISCARD_LABEL,
   REVIEW_LOADING,
+  REVIEW_NO_TEXT_IN,
   REVIEW_LOAD_FAILED,
   REVIEW_NO_ADDITIONS_BODY,
   REVIEW_NO_ADDITIONS_TITLE,
@@ -244,9 +245,22 @@ export function ReviewPage({
       {review.imagesWithNoText.length > 0 && (
         <section className="review-section" data-testid="images-with-no-text">
           <ul className="review-section__list">
+            {/* ⚠ `T-AI-020`, US-006 AC-3, `specs/ai.md` §8.2: "the image
+                thumbnail is shown. NEVER A SILENT SKIP." Both halves matter —
+                a bare file name will not pick one screenshot out of twenty
+                near-identical ones in a camera roll, and picking the right one
+                to retake is the entire action this section exists to enable. */}
             {review.imagesWithNoText.map((image) => (
-              <li className="review-empty__body" key={image.imageId}>
-                {image.fileName}
+              <li className="review-no-text" key={image.imageId}>
+                <img
+                  className="review-no-text__thumb"
+                  src={image.href}
+                  alt=""
+                  data-testid="no-text-thumb"
+                />
+                <span className="review-empty__body" data-testid="no-text-name">
+                  {REVIEW_NO_TEXT_IN.replace('{file}', image.fileName)}
+                </span>
               </li>
             ))}
           </ul>

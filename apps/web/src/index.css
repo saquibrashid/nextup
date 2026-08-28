@@ -911,3 +911,17 @@ button {
   gap: var(--space-2);
   margin-top: var(--space-3);
 }
+
+.review-no-text {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+}
+
+.review-no-text__thumb {
+  border-radius: var(--radius);
+  flex: 0 0 auto;
+  height: 3rem;
+  object-fit: cover;
+  width: 3rem;
+}

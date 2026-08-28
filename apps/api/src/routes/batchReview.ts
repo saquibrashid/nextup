@@ -254,7 +254,14 @@ export function registerBatchReviewRoutes(router: Router): void {
     // absorbed by an SD-02 survivor on another image. `T-AI-020`.
     const imagesWithNoText = images
       .filter((image) => image.candidateCount === 0)
-      .map((image) => ({ imageId: image.id, fileName: image.fileName }));
+      .map((image) => ({
+        imageId: image.id,
+        fileName: image.fileName,
+        // ⚠ The API path, never a blob URL (NFR-020). US-006 AC-3 wants the
+        // image THUMBNAILED as well as named, and this is what makes that
+        // possible from the review pass.
+        href: `/api/images/${encodeURIComponent(image.id)}`,
+      }));
 
     const response = buildReviewResponse({
       batchId: batch.id,

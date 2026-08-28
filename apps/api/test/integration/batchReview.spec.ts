@@ -75,7 +75,7 @@ interface ReviewBody {
     unreadableTiles: ReviewSection;
     removals: ReviewSection;
   };
-  imagesWithNoText: { imageId: string; fileName: string }[];
+  imagesWithNoText: { imageId: string; fileName: string; href: string }[];
 }
 
 interface ErrorBody {
@@ -372,7 +372,12 @@ describe('T-AI-004 every candidate is reachable; nothing is dropped', () => {
     });
 
     const body = (await (await getReview(batchId)).json()) as ReviewBody;
-    expect(body.imagesWithNoText).toEqual([{ imageId: 'img-empty', fileName: 'IMG_0428.PNG' }]);
+    // ⚠ NAMED AND THUMBNAILED (US-006 AC-3, `T-AI-020`). The `href` is the
+    // thumbnail half; it is an API path, never a blob or SAS URL out of the
+    // private container (NFR-020).
+    expect(body.imagesWithNoText).toEqual([
+      { imageId: 'img-empty', fileName: 'IMG_0428.PNG', href: '/api/images/img-empty' },
+    ]);
   });
 
   it('T-AI-004af: an image not yet extracted (candidateCount null) is NOT reported as empty', async () => {
