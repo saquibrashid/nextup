@@ -644,7 +644,7 @@ export const REVIEW_NO_TEXT_IN = 'No text was found in {file}.';
 
 // --- `/batches` — batch history (`specs/ux-states.md` §9, TASK-076) ---
 
-export const BATCHES_TITLE = 'Uploads';
+export const BATCHES_TITLE = 'Batch history';
 
 /** §9.1. A load in flight must not read as "you have never uploaded anything". */
 export const BATCHES_LOADING = 'Loading your uploads\u2026';
