@@ -248,6 +248,46 @@ export interface SuppressionsResponse {
   items: SuppressionItem[];
 }
 
+/**
+ * One row of `GET /api/removed` (`specs/api.md` §6.9) — one **removal**, never
+ * one work.
+ *
+ * ⚠ `removalOrdinal` / `removalTotalForWork` are why this cannot collapse to a
+ * per-work shape. Product invariant 7: a reappearing title becomes a brand-new
+ * row, so one work legitimately owns several removals over time and the log
+ * must show all of them (`T-REM-006`, US-024 AC-6).
+ *
+ * ⚠ `name` is already resolved server-side (`tmdb_name ?? raw_extracted_text`),
+ * so an UNMATCHED removal still has something to display. The client must not
+ * re-derive it — there is no raw text in this DTO to fall back to.
+ */
+export interface RemovedItem {
+  listingId: string;
+  titleId: string;
+  workIdentity: string;
+  matchState: string;
+  name: string;
+  mediaType: string | null;
+  releaseYear: number | null;
+  posterPath: string | null;
+  service: 'netflix' | 'max';
+  /** `YYYY-MM-DD` — the ORIGINAL date added, preserved through removal. */
+  dateAdded: string;
+  /** A timestamp, not a date: two removals on one day stay distinguishable. */
+  removedAt: string;
+  removedByBatchId: string | null;
+  removedByGroupId: string | null;
+  removalOrdinal: number;
+  removalTotalForWork: number;
+  restorable: boolean;
+  suppressed: boolean;
+}
+
+export interface RemovedResponse {
+  items: RemovedItem[];
+  nextCursor: string | null;
+}
+
 export interface MeResponse {
   ownerId: string;
   displayName: string | null;

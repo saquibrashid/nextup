@@ -98,22 +98,46 @@ export const DATE_ADDED_LABEL_MARKER = 'to nextup';
  * §row). `T-LIST-018` asserts every rendered label contains "to nextup".
  */
 export function dateAddedLabel(dateAdded: IsoDate): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateAdded);
+  return `Added ${DATE_ADDED_LABEL_MARKER} ${formatIsoDay(dateAdded, 'dateAddedLabel')}`;
+}
+
+/**
+ * `'2026-01-04'` → `'4 Jan 2026'`.
+ *
+ * ⚠ Extracted so that every human-readable date in the product has ONE
+ * implementation. The removal log (US-024 AC-1) shows a date-added AND a
+ * date-removed side by side; two formatters would eventually disagree about
+ * padding or month casing, and the owner would read the mismatch as two
+ * different kinds of date rather than one formatting bug.
+ */
+function formatIsoDay(iso: IsoDate, caller: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   if (match === null) {
     // Refuse rather than render a partial sentence. A malformed date reaching
     // here means a write path stored something the `date` column cannot hold,
     // and "Added to nextup Invalid Date" is worse than a loud failure.
-    throw new RangeError(
-      `dateAddedLabel expects YYYY-MM-DD, received ${JSON.stringify(dateAdded)}`,
-    );
+    throw new RangeError(`${caller} expects YYYY-MM-DD, received ${JSON.stringify(iso)}`);
   }
 
   const [, year, month, day] = match as unknown as [string, string, string, string];
   const monthName = MONTH_ABBREVIATIONS[Number(month) - 1];
   if (monthName === undefined) {
-    throw new RangeError(`dateAddedLabel received an impossible month: ${dateAdded}`);
+    throw new RangeError(`${caller} received an impossible month: ${iso}`);
   }
 
   // The day is un-padded ("2 Apr", not "02 Apr") to match `specs/api.md` §6.2.
-  return `Added ${DATE_ADDED_LABEL_MARKER} ${Number(day)} ${monthName} ${year}`;
+  return `${Number(day)} ${monthName} ${year}`;
+}
+
+/**
+ * The removal log's date-removed label (US-024 AC-1, `ux-states.md` §7.5).
+ *
+ * ⚠ It carries NO "to nextup" marker, and that asymmetry is deliberate.
+ * `DATE_ADDED_LABEL_MARKER` exists because the date a title was *added* is
+ * unknowable for the streaming service and would otherwise read as theirs
+ * (`T-LIST-018`). The date it was *removed* is unambiguously an event in
+ * nextup — the owner confirmed it here — so the disclaimer would be noise.
+ */
+export function removedOnLabel(removedOn: IsoDate): string {
+  return `Removed ${formatIsoDay(removedOn, 'removedOnLabel')}`;
 }
