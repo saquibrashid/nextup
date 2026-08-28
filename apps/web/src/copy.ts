@@ -460,3 +460,29 @@ export const REMOVAL_CONFIRM_NONE = 'No removals selected. Nothing will be remov
 
 export const REMOVAL_CONFIRM_LABEL = 'Confirm';
 export const REMOVAL_CANCEL_LABEL = 'Cancel';
+
+/* ------------------------------------------- §7 removal history (log) --- */
+
+/**
+ * ux-states.md §7.2 - nothing has EVER been removed.
+ *
+ * WARNING: This is not interchangeable with REMOVED_NO_MATCHES (§7.3). "You
+ * have no removal history" and "your search matched none of your removal
+ * history" are different facts, and collapsing them tells an owner who
+ * mistyped a search that the log they are relying on is empty - which is the
+ * one thing REQ-028 promises can never happen.
+ */
+export const REMOVED_EMPTY_TITLE = 'Nothing has been removed yet.';
+export const REMOVED_EMPTY_BODY = 'When a title leaves your list, it\u2019s kept here forever.';
+
+/** ux-states.md §7.3. `{q}` is substituted with the owner's search text. */
+export const REMOVED_NO_MATCHES = 'No removals match \u201c{q}\u201d.';
+export const REMOVED_CLEAR_SEARCH_LABEL = 'Clear search';
+
+/**
+ * US-024 AC-8. A load failure must render an ERROR, never an empty view: an
+ * empty removal log reads as "nothing was ever removed", which would be a lie
+ * told by a network error.
+ */
+export const REMOVED_LOAD_ERROR = 'Couldn\u2019t load your removal history. Nothing has changed.';
+export const REMOVED_LOADING = 'Loading your removal history\u2026';
