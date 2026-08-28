@@ -161,7 +161,11 @@ export function ReviewPage({
   const { sections } = review;
   const service = SERVICE_LABELS[review.service] ?? review.service;
   const mode = MODE_LABELS[review.mode] ?? review.mode;
-  const removalCount = sections.removals.omitted ? 0 : sections.removals.count;
+  // ⚠ THE COUNT IS THE SERVER'S. `buildReviewResponse` already reports
+  // `count: 0` whenever removals are omitted or withheld, so a client-side
+  // `omitted ? 0 : count` guard here is not a safeguard - it is a second
+  // implementation of the same rule that no test can distinguish from the
+  // first, and it would go on agreeing after the server's rule changed.
   const showRemovals = !sections.removals.omitted && !sections.removals.withheld;
 
   return (
@@ -234,7 +238,7 @@ export function ReviewPage({
           counts stay reachable through a 200-candidate pass on a phone. */}
       <div className="review-action-bar" data-testid="review-action-bar">
         <p className="review-action-bar__counts" data-testid="review-counts">
-          {`${sections.additions.count} to add · ${removalCount} to remove`}
+          {`${sections.additions.count} to add · ${sections.removals.count} to remove`}
         </p>
         <button
           type="button"
