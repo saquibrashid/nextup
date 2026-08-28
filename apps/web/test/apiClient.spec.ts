@@ -94,6 +94,7 @@ describe('T-DATA-003 — every method sends credentials', () => {
       suppressTitle: () => client.suppressTitle('ttl_1'),
       unsuppress: () => client.unsuppress('sup_1'),
       createBatch: () => client.createBatch('netflix', 'append'),
+      listBatches: () => client.listBatches(),
       getBatch: () => client.getBatch('bat_1'),
       getReview: () => client.getReview('bat_1'),
       confirmAllCandidates: () => client.confirmAllCandidates('bat_1', 'additions'),
