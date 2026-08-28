@@ -615,7 +615,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-163` | `todo` | — |
 | `TASK-164` | `todo` | — |
 | `TASK-165` | `owner` | Needs a real iOS device to verify the clipboard paste path |
-| `TASK-166` | `todo` | — |
+| `TASK-166` | `done` | Shipped in `9b9e988` (lane B) and **completed here**: `components/SortControl.tsx` is mounted in `ListPage` and `ListRoute` forwards `params.toString()` verbatim to `GET /api/titles`, so the URL is what the server sorts by — and the session-persisted direction was **never written into it**. With `asc` remembered and no `dir` in the address bar, the button read "Oldest first" while the API, seeing no `dir`, returned its `desc` default: a newest-first list under an oldest-first label, silently, with no error anywhere. ⚠ That is exactly the US-020 AC-6 path the persistence exists for ("survives navigating away and back"), so the half that appeared to work was the wrong half, and `T-UI-024j` passed against it because it only asserts `readSortDir`'s return value. Fixed with a `replace: true` reconciliation (a correction of the address the owner already arrived at, not a navigation they performed — pushing would make Back need two presses) and covered by new cases **`T-UI-024o`–`q`**: the direction reaches the query string, the other filters survive it, and the `desc` default is deliberately not written since an absent `dir` already means `desc` (`api.md` §6.2). Both mutants killed. This control is `must` per `A47`: it is the sole escape hatch for the knowingly-accepted newest-first-vs-SUC-003 trade-off. |
 | `TASK-167` | `done` | this commit — the ledger, the gate and `docs/status.md` |
 | `TASK-168` | `todo` | — |
 | `TASK-169` | `done` | `fc85ae4` — OMDb client |
