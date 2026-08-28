@@ -742,6 +742,20 @@ export async function findServiceListing(ownerId: OwnerId, listingId: string, tx
   return db(tx).serviceListing.findFirst({ where: { ownerId, listingId } });
 }
 
+/**
+ * Fetch a listing plus its title's `workIdentity` in one read.
+ *
+ * Used by `POST /api/listings/:listingId/restore` which needs to check
+ * suppression (keyed on workIdentity) and the duplicate-title guard without
+ * a separate title lookup.
+ */
+export async function findServiceListingWithWork(ownerId: OwnerId, listingId: string, tx?: Db) {
+  return db(tx).serviceListing.findFirst({
+    where: { ownerId, listingId },
+    include: { title: { select: { workIdentity: true } } },
+  });
+}
+
 export async function listActiveListingsForTitle(ownerId: OwnerId, titleId: string, tx?: Db) {
   return db(tx).serviceListing.findMany({
     where: { ownerId, titleId, state: 'active' },
@@ -1647,6 +1661,42 @@ export async function restoreServiceListing(ownerId: OwnerId, listingId: string,
   return db(tx).serviceListing.updateMany({
     where: { ownerId, listingId, state: 'removed' },
     data: { state: 'active', removedAt: null, removedByBatchId: null, removedByGroupId: null },
+  });
+}
+
+/**
+ * Restore a removed listing and re-home it under an existing active title
+ * (`specs/api.md` §6.10, `confirmDuplicate` path, TASK-098).
+ *
+ * Used ONLY when the owner has confirmed awareness of a duplicate work
+ * identity — i.e. when a newer active title already holds the same
+ * `workIdentity` and `confirmDuplicate === true`. Moving the listing to the
+ * existing title is the only way to avoid violating
+ * `title_one_active_per_work`, which prevents two active titles sharing an
+ * identity. The original title stays `removed` (because, after this move, all
+ * its remaining listings are still removed); the target title is re-derived by
+ * the route handler.
+ *
+ * ⚠ `listing_one_per_service` may still fire if the target title already has
+ * an active listing for the same service — that is a correct rejection and
+ * the caller gets a DB-mapped AppError. The route does not pre-check this
+ * because the constraint does the work.
+ */
+export async function restoreListingToExistingTitle(
+  ownerId: OwnerId,
+  listingId: string,
+  targetTitleId: string,
+  tx?: Db,
+) {
+  return db(tx).serviceListing.updateMany({
+    where: { ownerId, listingId, state: 'removed' },
+    data: {
+      state: 'active',
+      removedAt: null,
+      removedByBatchId: null,
+      removedByGroupId: null,
+      titleId: targetTitleId,
+    },
   });
 }
 

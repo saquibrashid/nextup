@@ -104,6 +104,7 @@ describe('T-DATA-003 — every method sends credentials', () => {
       discardBatch: () => client.discardBatch('bat_1'),
       undoBatch: () => client.undoBatch('bat_1'),
       undoRemovalGroup: () => client.undoRemovalGroup('grp_1'),
+      restoreListing: () => client.restoreListing('lst_1'),
       lookupImdb: () => client.lookupImdb('The Matrix'),
     };
 
