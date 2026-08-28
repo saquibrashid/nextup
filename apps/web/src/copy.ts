@@ -541,3 +541,14 @@ export const STATUS_CONTINUE_LABEL = 'Continue to review';
 
 /** Not in §5 — a heading is required and §5 specifies none. Invented here. */
 export const STATUS_TITLE = 'Reading your screenshots';
+
+/**
+ * `specs/ai.md` §8.2, verbatim — the review pass NAMES every image that
+ * yielded nothing. `{file}` is the file name.
+ *
+ * ⚠ "Never a silent skip." An image the extractor read and found nothing in
+ * is not an absence of news: in full-update mode its titles are missing from
+ * the read, and the owner needs to know which screenshot to retake before
+ * they confirm anything.
+ */
+export const REVIEW_NO_TEXT_IN = 'No text was found in {file}.';

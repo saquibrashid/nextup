@@ -114,9 +114,23 @@ export interface ReviewRemovalItem {
   ticked: boolean;
 }
 
+/**
+ * An image the extractor read and found nothing in (`specs/ai.md` §8.2,
+ * US-006 AC-3, `T-AI-020`).
+ *
+ * ⚠ **NAMED *AND* THUMBNAILED — both, and `href` is why.** A file name alone
+ * does not identify one screenshot among twenty near-identical ones in a
+ * camera roll, which is the whole action this surfacing exists to enable:
+ * retake *that* screenshot. §8.2 says "the image thumbnail is shown. Never a
+ * silent skip."
+ *
+ * ⚠ `href` is an **API path** (`/api/images/:id`), never a blob URL (NFR-020).
+ * The container is private, so a storage URL would either 403 or leak a SAS.
+ */
 export interface ReviewImageWithNoText {
   imageId: string;
   fileName: string;
+  href: string;
 }
 
 export interface BuildReviewInput {

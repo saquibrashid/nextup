@@ -305,7 +305,28 @@ describe('T-REV-010 · GET /review without a store', () => {
     expect(body.sections['probablyNotTitles']?.items.map((i) => i.candidateId)).toEqual([
       'c-chrome',
     ]);
-    expect(body.imagesWithNoText).toEqual([{ imageId: 'img-2' }]);
+    expect(body.imagesWithNoText).toEqual([{ imageId: 'img-2', href: '/api/images/img-2' }]);
+  });
+
+  it('T-AI-020j: a zero-yield image carries an API href so it can be THUMBNAILED', async () => {
+    // ⚠ US-006 AC-3 / `specs/ai.md` §8.2 require the image to be named AND
+    // thumbnailed. Naming it was implemented first; without an `href` the
+    // client has no way to render the picture, so the requirement was only
+    // half met and looked complete.
+    makeCandidate({ id: 'c-new' });
+    store.images = [
+      { id: 'img-1', candidateCount: 3, fileName: 'ok.png' },
+      { id: 'img-blank', candidateCount: 0, fileName: 'screenshot-3.png' },
+    ];
+
+    const body = (await (await getReview('batch-1')).json()) as {
+      imagesWithNoText: { imageId: string; fileName: string; href: string }[];
+    };
+    expect(body.imagesWithNoText).toEqual([
+      { imageId: 'img-blank', fileName: 'screenshot-3.png', href: '/api/images/img-blank' },
+    ]);
+    // NFR-020: an API path, never a blob/SAS URL out of private storage.
+    expect(body.imagesWithNoText[0]?.href.startsWith('/api/images/')).toBe(true);
   });
 
   it('T-REV-010r: a suppressed work never reaches the owner', async () => {
