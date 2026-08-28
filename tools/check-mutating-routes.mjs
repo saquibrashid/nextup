@@ -203,7 +203,7 @@ export const MUTATING_ROUTE_REGISTRY = [
     method: 'POST',
     path: '/api/batches/:batchId/re-extract',
     changesListState: false,
-    why: 're-runs extraction over an existing batch (US-034)',
+    why: 'derives a NEW batch that re-reads the retained screenshots; nothing enters the list until review (US-034)',
   },
 ];
 

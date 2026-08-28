@@ -33,6 +33,7 @@ import {
 import { AppError } from '../errors/AppError.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import { discardBatch, submitBatch } from '../services/batchLifecycle.js';
+import { reextractBatch } from '../services/batchReextract.js';
 import { beginExtraction } from '../jobs/startExtraction.js';
 import { createUploadBatch, findOpenUploadBatch } from '../repository/ownerData.js';
 
@@ -123,6 +124,18 @@ export function registerBatchRoutes(router: Router): void {
     // awaits nor rejects; it only records the promise so a test can await
     // the settled state instead of racing it.
     beginExtraction(ownerId, batchId);
+  });
+
+  // §6.24. **202, not 201**: like submit, extraction runs asynchronously and
+  // the client polls the DERIVED batch id. See `services/batchReextract.ts`
+  // for why this creates a new batch rather than re-running the old one.
+  router.post('/batches/:batchId/re-extract', async (req, res) => {
+    const ownerId = requireOwnerId(req);
+    const result = await reextractBatch(ownerId, req.params.batchId ?? '');
+    res.status(202).json(result);
+
+    // Fire-and-forget after the response, for the same reason as submit above.
+    beginExtraction(ownerId, result.batchId);
   });
 
   // §6.23. 200 with `listStateChanged: false` — the SPA states plainly that
