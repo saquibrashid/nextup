@@ -350,9 +350,9 @@ describe('US-026 — a reappearing work becomes a brand-new title', () => {
     const batchId = await seedReappearanceBatch();
     expect((await close(batchId)).status).toBe(200);
 
-    const removed = (await (
-      await fetch(`${origin}/api/removed`, { headers: authed })
-    ).json()) as { items: RemovedItem[] };
+    const removed = (await (await fetch(`${origin}/api/removed`, { headers: authed })).json()) as {
+      items: RemovedItem[];
+    };
 
     // Exactly one removal in the log — the reappearance did not add a second
     // removal, and did not clear the first.
@@ -361,9 +361,9 @@ describe('US-026 — a reappearing work becomes a brand-new title', () => {
     expect(removed.items[0]?.titleId).toBe(old.titleId);
     expect(removed.items[0]?.dateAdded).toBe(LONG_AGO);
 
-    const list = (await (
-      await fetch(`${origin}/api/titles`, { headers: authed })
-    ).json()) as { items: Item[] };
+    const list = (await (await fetch(`${origin}/api/titles`, { headers: authed })).json()) as {
+      items: Item[];
+    };
 
     // ⚠ ONE ROW PER TITLE, and it is the NEW one. Both halves matter: the
     // combined list showing the removed row would be a resurrection bug, and
