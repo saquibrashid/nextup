@@ -660,6 +660,46 @@ button {
   }
 }
 
+/* ------------------------------------------------- batch applied notice -- */
+
+/*
+ * §6.13's success notice. It sits at the top of `/` and is the only place the
+ * undo is offered immediately after a close, so it is deliberately a bordered
+ * surface rather than inline text: the owner has just arrived from another
+ * screen and has to see it without looking for it.
+ */
+.applied-notice {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.applied-notice-body {
+  margin: 0;
+}
+
+.applied-notice-error {
+  margin: 0;
+}
+
+.applied-notice-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.applied-notice-undo {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.applied-notice-link {
+  text-decoration: underline;
+}
+
 /* ------------------------------------------------------ reduced motion -- */
 
 /*

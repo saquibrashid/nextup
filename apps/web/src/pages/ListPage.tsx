@@ -15,6 +15,7 @@ import type { JSX } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { FilterBar, parseFilters, applyFilters, NO_FILTERS } from '../components/FilterBar';
+import { BatchAppliedNotice, type AppliedBatch } from '../components/BatchAppliedNotice';
 import { FreshnessStrip, type ServiceFreshness } from '../components/FreshnessStrip';
 import { ListEmptyState, ListLoadError } from '../components/ListEmptyState';
 import { SortControl } from '../components/SortControl';
@@ -43,6 +44,24 @@ export interface ListPageProps {
    */
   readonly loading?: boolean;
   readonly onRetry?: () => void;
+  /**
+   * The batch that was just applied, when the owner arrived here from a close
+   * (`ux-states.md` §6.13). Absent on every ordinary visit.
+   */
+  readonly applied?: AppliedBatch;
+  readonly onUndoRemovalGroup?: (groupId: string) => Promise<unknown>;
+  readonly onUndoBatch?: (batchId: string) => Promise<unknown>;
+}
+
+/**
+ * ⚠ Rejects rather than resolving. A missing handler means the container did
+ * not wire the undo, and a resolving stub would render "those titles are back"
+ * over a list where nothing was reversed — the one lie this notice must never
+ * tell. The rejection puts the owner in the failed state, which correctly says
+ * the changes are still applied.
+ */
+function rejectMissingHandler(): Promise<never> {
+  return Promise.reject(new Error('undo handler not wired'));
 }
 
 export function ListPage({
@@ -55,6 +74,9 @@ export function ListPage({
   loadFailed = false,
   loading = false,
   onRetry,
+  applied,
+  onUndoRemovalGroup,
+  onUndoBatch,
 }: ListPageProps): JSX.Element {
   const [params, setParams] = useSearchParams();
   const filters = parseFilters(params);
@@ -64,6 +86,19 @@ export function ListPage({
   return (
     <>
       <h1>Your list</h1>
+      {/*
+        ⚠ OUTSIDE the loading/failure branches below. The notice reports a
+        write that has already happened; hiding it because `GET /api/titles`
+        failed would take away the undo at exactly the moment the owner cannot
+        see what the batch did.
+      */}
+      {applied !== undefined && (
+        <BatchAppliedNotice
+          applied={applied}
+          undoRemovalGroup={onUndoRemovalGroup ?? rejectMissingHandler}
+          undoBatch={onUndoBatch ?? rejectMissingHandler}
+        />
+      )}
       {/*
         The strip is informational and NEVER blocks the list (§2.1), so it is a
         sibling of the list rather than a gate in front of it: whatever it is
