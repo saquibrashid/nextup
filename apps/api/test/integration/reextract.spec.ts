@@ -245,7 +245,9 @@ describe('US-034 — re-extract a batch within the retention window', () => {
     expect(body.service).toBe('max');
     expect(body.mode).toBe('full-update');
 
-    const derived = await testPrisma().uploadBatch.findFirstOrThrow({ where: { id: body.batchId } });
+    const derived = await testPrisma().uploadBatch.findFirstOrThrow({
+      where: { id: body.batchId },
+    });
     expect(derived.derivedFromBatchId).toBe(source);
     expect(derived.service).toBe('max');
     expect(derived.mode).toBe('full-update');
@@ -413,7 +415,9 @@ describe('US-034 — re-extract a batch within the retention window', () => {
     // A second copy of the suppression check on this path would be worse than
     // no check: REQ-071 keys suppression on WORK IDENTITY rather than row id,
     // and a duplicated implementation is a second place to get that wrong.
-    const derived = await testPrisma().uploadBatch.findFirstOrThrow({ where: { id: body.batchId } });
+    const derived = await testPrisma().uploadBatch.findFirstOrThrow({
+      where: { id: body.batchId },
+    });
     expect(derived.status).not.toBe('applied');
     expect(derived.completedAt).toBeNull();
     expect(await testPrisma().serviceListing.count({ where: { ownerId } })).toBe(0);
