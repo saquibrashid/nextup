@@ -101,6 +101,8 @@ describe('T-DATA-003 — every method sends credentials', () => {
       undoBatch: () => client.undoBatch('bat_1'),
       undoRemovalGroup: () => client.undoRemovalGroup('grp_1'),
       lookupImdb: () => client.lookupImdb('The Matrix'),
+      getRemoved: () => client.getRemoved(),
+      restoreListing: () => client.restoreListing('list_1'),
     };
 
     // The client's surface and the list above must not drift apart.

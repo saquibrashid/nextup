@@ -437,6 +437,30 @@ button {
   min-width: 0;
 }
 
+/* --------------------------------------------------------- removed view -- */
+
+/*
+ * TASK-096 (`specs/ui.md` §7). Mirrors the title-row layout so the removal
+ * log feels consistent with the main list. Each row is one removal event —
+ * ordinals separate repeated removals of the same work.
+ */
+.removed-row {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.removed-row__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
 /* ---------------------------------------------------------- attribution -- */
 
 /*

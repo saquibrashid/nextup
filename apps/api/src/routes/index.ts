@@ -32,6 +32,7 @@ import { registerBatchImageRoutes } from './batchImages.js';
 import { registerBatchRemovalRoutes } from './batchRemovals.js';
 import { registerBatchReviewRoutes } from './batchReview.js';
 import { registerBatchUndoRoutes } from './batchUndo.js';
+import { registerListingRoutes } from './listings.js';
 import { registerFixMatchRoutes } from './fixMatch.js';
 import { registerImageRoutes } from './images.js';
 import { registerImdbRoutes } from './imdb.js';
@@ -130,6 +131,9 @@ export function createApiRouter(): Router {
   // is the same read surface seen from the other side, and it shares the
   // list's date and name projections (`toIsoDate`, the raw-text name fallback).
   registerRemovedRoutes(apiRouter);
+  // §6.10 (US-025) — explicit restore from the removed view. Registered next
+  // to the removed view route it complements.
+  registerListingRoutes(apiRouter);
   // §6.5 (US-030) — the owner corrects a wrong match. Registered after the
   // title routes it acts on, and given the same per-request TMDB client for
   // the same reason as `registerTmdbRoutes` below.

@@ -248,6 +248,53 @@ export interface SuppressionsResponse {
   items: SuppressionItem[];
 }
 
+/**
+ * One removed listing from `GET /api/removed` (§6.9, US-024).
+ *
+ * ⚠ The removed view is a LOG, not a recycle bin (product invariant 7). A work
+ * removed three times yields three rows; `removalOrdinal`/`removalTotalForWork`
+ * make the repetition readable as history rather than duplicate rows.
+ */
+export interface RemovedItem {
+  listingId: string;
+  titleId: string;
+  workIdentity: string;
+  matchState: string;
+  name: string;
+  mediaType: string | null;
+  releaseYear: number | null;
+  posterPath: string | null;
+  service: string;
+  dateAdded: string;
+  removedAt: string;
+  removedByBatchId: string | null;
+  removedByGroupId: string | null;
+  removalOrdinal: number;
+  removalTotalForWork: number;
+  /** Whether the work is actively suppressed (`restorable = !suppressed`). */
+  suppressed: boolean;
+  restorable: boolean;
+}
+
+export interface RemovedListResponse {
+  items: RemovedItem[];
+  nextCursor: string | null;
+  limit: number;
+}
+
+/**
+ * Response body from `POST /api/listings/:listingId/restore` (§6.10, US-025).
+ * 200 means the listing is back to `active`.
+ */
+export interface RestoreResponse {
+  listingId: string;
+  titleId: string;
+  state: string;
+  dateAdded: string;
+  titleState: string;
+  sortDateAdded: string | null;
+}
+
 export interface MeResponse {
   ownerId: string;
   displayName: string | null;
@@ -293,6 +340,32 @@ export function createApiClient(deps: ApiClientDeps = {}) {
 
     getSuppressions: (signal?: AbortSignal) =>
       request<SuppressionsResponse>('/api/suppressions', { signal }, deps),
+
+    /** §6.9 — the owner's full removal history, newest-first, with keyset paging. */
+    getRemoved: (
+      params: { cursor?: string; q?: string; service?: string; limit?: number } = {},
+      signal?: AbortSignal,
+    ) => {
+      const qs = new URLSearchParams();
+      if (params.cursor !== undefined) qs.set('cursor', params.cursor);
+      if (params.q !== undefined) qs.set('q', params.q);
+      if (params.service !== undefined) qs.set('service', params.service);
+      if (params.limit !== undefined) qs.set('limit', String(params.limit));
+      const query = qs.toString();
+      return request<RemovedListResponse>(
+        `/api/removed${query ? `?${query}` : ''}`,
+        { signal },
+        deps,
+      );
+    },
+
+    /** §6.10 — restore one removed listing back to active. */
+    restoreListing: (listingId: string, opts: { confirmDuplicate?: boolean } = {}) =>
+      request<RestoreResponse>(
+        `/api/listings/${encodeURIComponent(listingId)}/restore`,
+        { method: 'POST', body: { confirmDuplicate: opts.confirmDuplicate ?? false } },
+        deps,
+      ),
 
     suppressTitle: (titleId: string, reason?: string) =>
       request<{ suppressionId: string; workIdentity: string; alreadySuppressed: boolean }>(
