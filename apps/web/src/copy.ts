@@ -388,3 +388,54 @@ export const IMDB_LOOKUP_SUBMIT_LABEL = 'Look it up';
 export const IMDB_LOOKUP_NOT_FOUND = "Couldn't find that title.";
 export const IMDB_LOOKUP_FAILED = "Couldn't run that lookup. Nothing has changed.";
 export const IMDB_LOOKUP_IN_LIST = 'Already on your list.';
+
+/*
+ * ── The review pass (`specs/ui.md` §5.3/§5.3a, TASK-069) ──────────────────
+ *
+ * ⚠ THE SIX CHIP LABELS ARE QUOTED FROM `specs/ui.md` §5.3/§5.3a, NOT
+ * PARAPHRASED. Two of them - `CANDIDATE_INFERRED_CHIP` and
+ * `CANDIDATE_UNREADABLE_CHIP` - are the review-side half of the RSK-028
+ * (fabrication) mitigation, and a softer rewording is a real reduction in the
+ * safeguard rather than a copy edit.
+ */
+
+export const CANDIDATE_LOW_CONFIDENCE_CHIP = 'Low confidence';
+export const CANDIDATE_UNCERTAIN_CHIP = 'Uncertain match';
+export const CANDIDATE_AMBIGUOUS_CHIP = 'Could be more than one work';
+export const CANDIDATE_INFERRED_CHIP = 'Read from the artwork \u2014 check this';
+export const CANDIDATE_UNREADABLE_CHIP = "Couldn't read this one";
+export const CANDIDATE_OCR_ONLY_CHIP = 'The text reader saw this, the tile reader did not';
+
+/**
+ * ⚠ A NAMED STATE, NOT A BLANK LINE. An unreadable tile has no proposed title
+ * by definition (§5.3a), and rendering nothing there is indistinguishable from
+ * a card that failed to load - so the owner is told which it is.
+ */
+export const CANDIDATE_UNREADABLE_NO_TITLE = 'No title read from this tile';
+
+/**
+ * `T-UX-061`. ⚠ **NOT A BLANK PANEL.** Zero additions in a batch the owner
+ * just uploaded is the moment they most need to be told that nextup read the
+ * screenshots and found nothing new - an empty area reads as a failed render,
+ * and the owner's next move is to upload the same screenshots again.
+ */
+export const REVIEW_NO_ADDITIONS_TITLE = 'Nothing new in these screenshots';
+export const REVIEW_NO_ADDITIONS_BODY =
+  'Everything nextup could read is already on your list. Nothing has been added.';
+
+/** §5.1 - the sticky action bar's running counts. */
+export const REVIEW_APPLY_LABEL = 'Apply changes';
+export const REVIEW_DISCARD_LABEL = 'Discard batch';
+
+export const REVIEW_TITLE = 'Review this batch';
+export const REVIEW_LOADING = 'Reading this batch…';
+export const REVIEW_LOAD_FAILED = "Couldn't load this review. Nothing has changed.";
+export const REVIEW_RETRY_LABEL = 'Try again';
+
+/**
+ * ⚠ A SECTION THAT APPLIES BUT IS EMPTY SAYS SO. `count: 0` means "we looked
+ * and there was nothing"; `omitted` means "this question does not apply to
+ * this mode" and renders no section at all. An empty `<details>` body would
+ * make the two indistinguishable to the owner.
+ */
+export const REVIEW_SECTION_EMPTY = 'Nothing in this group.';
