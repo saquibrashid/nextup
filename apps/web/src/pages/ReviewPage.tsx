@@ -38,10 +38,11 @@
 // identifies each route by its unique level-1 heading, so a state without one
 // reads as a route that fell through to the catch-all.
 
-import type { JSX } from 'react';
+import { useState, type JSX } from 'react';
 import type { ReviewCandidate, ReviewResponse, ReviewSection } from '@nextup/domain';
 
 import { CandidateCard } from '../components/CandidateCard';
+import { RemovalConfirmDialog } from '../components/RemovalConfirmDialog';
 import {
   REVIEW_APPLY_LABEL,
   REVIEW_DISCARD_LABEL,
@@ -59,7 +60,14 @@ export interface ReviewPageProps {
   readonly loading?: boolean;
   readonly loadFailed?: boolean;
   readonly onRetry?: () => void;
-  readonly onApply?: () => void;
+  /**
+   * ⚠ Takes `confirmRemovals`, which the container sends verbatim to
+   * `POST /api/batches/:id/close`. It is `true` **only** when the owner has
+   * been through the §6.10 dialog: a page that always sent `true` would make
+   * REQ-020's group confirmation a formality, and one that always sent `false`
+   * would 409 every full-update close.
+   */
+  readonly onApply?: (confirmRemovals: boolean) => void;
   readonly onDiscard?: () => void;
 }
 
@@ -131,6 +139,10 @@ export function ReviewPage({
   onApply,
   onDiscard,
 }: ReviewPageProps): JSX.Element {
+  // ⚠ Declared before the early returns: hooks must run unconditionally, and
+  // the loading and failure branches below both return.
+  const [confirming, setConfirming] = useState(false);
+
   if (loadFailed) {
     return (
       <>
@@ -167,6 +179,13 @@ export function ReviewPage({
   // implementation of the same rule that no test can distinguish from the
   // first, and it would go on agreeing after the server's rule changed.
   const showRemovals = !sections.removals.omitted && !sections.removals.withheld;
+  // ⚠ PROPOSALS, NOT TICKS — the same rule TASK-086 put on the server's gate.
+  // ⚠ And NOT `showRemovals && …`: a section that was omitted or withheld
+  // already arrives with `count: 0` (see the note above), so the conjunct was
+  // a second copy of the server's rule that no test could distinguish — it
+  // survived mutation, which is the proof. `T-UI-008j` covers the withheld
+  // case through the count alone.
+  const needsConfirmation = sections.removals.count > 0;
 
   return (
     <>
@@ -252,11 +271,37 @@ export function ReviewPage({
           type="button"
           className="tap-target"
           data-testid="apply-changes-button"
-          onClick={onApply}
+          onClick={() => {
+            // ⚠ The dialog is not a formality that can be skipped: without
+            // removals there is nothing to confirm and the close goes straight
+            // through, but with them the owner must see the names first.
+            if (needsConfirmation) {
+              setConfirming(true);
+              return;
+            }
+            onApply?.(false);
+          }}
         >
           {REVIEW_APPLY_LABEL}
         </button>
       </div>
+
+      {confirming && (
+        <RemovalConfirmDialog
+          service={review.service}
+          items={sections.removals.items}
+          onCancel={() => {
+            // ⚠ Cancel returns to the review with everything intact. It must
+            // never fall through to `onApply` — a cancelled confirmation that
+            // still closed the batch is the worst outcome this screen has.
+            setConfirming(false);
+          }}
+          onConfirm={() => {
+            setConfirming(false);
+            onApply?.(true);
+          }}
+        />
+      )}
     </>
   );
 }
