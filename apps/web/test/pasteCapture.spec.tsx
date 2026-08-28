@@ -462,7 +462,7 @@ describe('T-PASTE-008 - PasteButton rejection messages (TASK-161)', () => {
   });
 
   it('T-PASTE-008d bare DOMException renders PASTE_ABANDONED_BODY', async () => {
-    withClipboard(() => Promise.reject(new Error('some other error')));
+    withClipboard(() => Promise.reject(new DOMException('cancelled')));
     render(<PasteButton batchReady onImagesPasted={vi.fn()} />);
 
     fireEvent.click(screen.getByRole('button', { name: /paste screenshot/i }));
@@ -488,6 +488,8 @@ describe('T-PASTE-008 - PasteButton rejection messages (TASK-161)', () => {
     for (const btn of buttons) {
       expect(btn).not.toBeDisabled();
     }
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/pasting|loading|still working/i);
   });
 
   it('T-PASTE-008f no rejection shown on successful paste', async () => {
@@ -518,6 +520,23 @@ describe('T-PASTE-008 - PasteButton rejection messages (TASK-161)', () => {
     await waitFor(() => {
       expect(screen.queryByTestId('paste-rejection')).not.toBeInTheDocument();
     });
+  });
+
+  it('T-PASTE-008h a rejection never retries automatically and keeps the existing batch untouched', async () => {
+    const read = vi.fn(() => Promise.resolve([]));
+    withClipboard(read);
+    const onFilesAccepted = vi.fn();
+    render(<ImageDropzone batchReady onFilesAccepted={onFilesAccepted} />);
+    const uploaded = imageFile('already-attached.png');
+
+    fireEvent.change(screen.getByTestId('file-input'), { target: { files: [uploaded] } });
+    fireEvent.click(screen.getByRole('button', { name: /paste screenshot/i }));
+
+    await screen.findByTestId('paste-rejection');
+    expect(read).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('accepted-name')).toHaveTextContent('already-attached.png');
+    expect(onFilesAccepted).toHaveBeenCalledTimes(1);
+    expect(onFilesAccepted).toHaveBeenCalledWith([uploaded], 'upload');
   });
 });
 
