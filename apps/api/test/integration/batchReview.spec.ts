@@ -464,6 +464,111 @@ describe('T-REV-006 full-update shows ALL extracted titles — the safety proper
   });
 });
 
+/* ── discrepancy visibility (T-REV-017) ───────────────────────────────── */
+
+describe('T-REV-017 · US-005 AC-4 — the discrepancy is SHOWN, never reconciled silently', () => {
+  // ⚠ THE POINT OF THIS SUITE IS THE ABSENCE OF A MERGE. A reconciliation that
+  // quietly took the union of "what the screenshots said" and "what is on the
+  // list" would produce a correct-looking list and destroy the owner's only
+  // means of telling a genuine removal from a failed OCR read. Every case here
+  // asserts that the two directions of disagreement land in DIFFERENT, VISIBLE
+  // sections with honest counts — product invariant 2.
+
+  it('T-REV-017a: a known title missed by extraction is proposed for removal AND the rest still show', async () => {
+    // The canonical AC-4 scenario: two titles on the list, extraction reads
+    // only one of them.
+    const batchId = await makeBatch({ mode: 'full-update' });
+    await makeActiveListing(DUNE, 'netflix', 'Dune');
+    await makeActiveListing(HEAT, 'netflix', 'Heat');
+    await makeCandidate(batchId, { workIdentity: DUNE, rawText: 'Dune' });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+
+    // The half that WAS read is visible and named...
+    expect(body.sections.alreadyOnYourList.count).toBe(1);
+    expect(body.sections.alreadyOnYourList.items[0]?.rawText).toBe('Dune');
+    // ...and the half that was NOT read is on the table as a removal, named.
+    expect(body.sections.removals.count).toBe(1);
+    expect(body.sections.removals.items[0]?.name).toBe('Heat');
+    // ⚠ Both must be non-empty in the SAME response. A review that showed only
+    // the removal would present a failed extraction as a decided fact.
+    expect(body.sections.alreadyOnYourList.omitted).toBe(false);
+    expect(body.sections.removals.omitted).toBe(false);
+  });
+
+  it('T-REV-017b: an extracted title that is NOT on the list is an addition, never folded into the known section', async () => {
+    // The other direction of the same discrepancy.
+    const batchId = await makeBatch({ mode: 'full-update' });
+    await makeActiveListing(HEAT, 'netflix', 'Heat');
+    await makeCandidate(batchId, { workIdentity: DUNE, rawText: 'Dune' });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+
+    expect(body.sections.additions.count).toBe(1);
+    expect(body.sections.additions.items[0]?.rawText).toBe('Dune');
+    // Silently treating a new title as already-known is the failure that makes
+    // an addition vanish without ever being offered.
+    expect(body.sections.alreadyOnYourList.count).toBe(0);
+  });
+
+  it('T-REV-017c: both directions at once are reported separately, each with its own count', async () => {
+    const batchId = await makeBatch({ mode: 'full-update' });
+    await makeActiveListing(HEAT, 'netflix', 'Heat'); // on the list, not read
+    await makeActiveListing(ANDOR, 'netflix', 'Andor'); // on the list, read
+    await makeCandidate(batchId, { workIdentity: ANDOR, rawText: 'Andor' });
+    await makeCandidate(batchId, { workIdentity: DUNE, rawText: 'Dune' }); // read, not on the list
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+
+    expect(body.sections.additions.count).toBe(1);
+    expect(body.sections.additions.items[0]?.rawText).toBe('Dune');
+    expect(body.sections.alreadyOnYourList.count).toBe(1);
+    expect(body.sections.alreadyOnYourList.items[0]?.rawText).toBe('Andor');
+    expect(body.sections.removals.count).toBe(1);
+    expect(body.sections.removals.items[0]?.name).toBe('Heat');
+  });
+
+  it('T-REV-017d: no candidate appears in two sections — the sections partition, they do not overlap', async () => {
+    // ⚠ A "reconciliation" that emitted a row into both `additions` and
+    // `alreadyOnYourList` would let one confirmation both add and skip the same
+    // title, and the counts would still look plausible.
+    const batchId = await makeBatch({ mode: 'full-update' });
+    await makeActiveListing(ANDOR, 'netflix', 'Andor');
+    await makeCandidate(batchId, { workIdentity: ANDOR, rawText: 'Andor' });
+    await makeCandidate(batchId, { workIdentity: DUNE, rawText: 'Dune' });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+
+    const ids = [
+      ...body.sections.additions.items,
+      ...body.sections.alreadyOnYourList.items,
+      ...body.sections.probablyNotTitles.items,
+      ...body.sections.unmatched.items,
+      ...body.sections.unreadableTiles.items,
+    ].map((candidate) => candidate.candidateId);
+
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  it('T-REV-017e: when there is NO discrepancy the sections are shown and empty, not omitted', async () => {
+    // ⚠ `count: 0` with `omitted: false` says "we looked, and there is nothing".
+    // `omitted: true` says "this question does not apply". Collapsing the two
+    // is how a full-update comes to look like an append-only one.
+    const batchId = await makeBatch({ mode: 'full-update' });
+    await makeActiveListing(ANDOR, 'netflix', 'Andor');
+    await makeCandidate(batchId, { workIdentity: ANDOR, rawText: 'Andor' });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+
+    expect(body.sections.additions.count).toBe(0);
+    expect(body.sections.removals.count).toBe(0);
+    expect(body.sections.removals.omitted).toBe(false);
+    expect(body.sections.alreadyOnYourList.omitted).toBe(false);
+    expect(body.sections.alreadyOnYourList.count).toBe(1);
+  });
+});
+
 describe('T-SUP-002 suppression is gated BEFORE classification and never appears', () => {
   it('T-SUP-002a: a suppressed work is absent from every candidate section', async () => {
     const batchId = await makeBatch();
