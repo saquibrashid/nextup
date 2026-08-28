@@ -260,6 +260,13 @@ export const RUNTIME_DEPENDENCY_ALLOWLIST = new Set([
   'react',
   'react-dom',
   'react-router-dom',
+  // SD-11c (`specs/ui.md` §5.4) names this package by name for the review
+  // list, which must stay responsive at 500 candidates on 0.25 vCPU
+  // (US-013 AC-5, `T-PERF-002`). MIT, no transitive runtime dependencies, and
+  // headless — it computes a window and renders nothing itself. Absent from
+  // specs/security.md §8's prose list, which enumerated the API's dependencies
+  // and the SPA's framework three; that row is corrected alongside this entry.
+  '@tanstack/react-virtual',
   // Audited SHA-256 for the canonical id derivation in packages/domain.
   // Deliberately NOT node:crypto: the domain package is isomorphic and these
   // ids are computed in the browser as well as the API.

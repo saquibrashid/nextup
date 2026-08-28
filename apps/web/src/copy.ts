@@ -428,6 +428,13 @@ export const REVIEW_APPLY_LABEL = 'Apply changes';
 export const REVIEW_DISCARD_LABEL = 'Discard batch';
 
 export const REVIEW_TITLE = 'Review this batch';
+
+/**
+ * SD-11a, quoted from the `specs/ui.md` §5.2 wireframe (`[Confirm all 9]`).
+ * `{n}` is the number of STILL-PENDING candidates in the section, not the
+ * section's total — see `CandidateSection` for why that distinction matters.
+ */
+export const REVIEW_CONFIRM_ALL = 'Confirm all {n}';
 export const REVIEW_LOADING = 'Reading this batch…';
 export const REVIEW_LOAD_FAILED = "Couldn't load this review. Nothing has changed.";
 export const REVIEW_RETRY_LABEL = 'Try again';
