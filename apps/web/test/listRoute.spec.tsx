@@ -276,11 +276,14 @@ describe('useResource — abort handling', () => {
 });
 
 describe('T-DATA-009 — polling stops', () => {
-  it('T-DATA-009a: no module in apps/web/src starts a repeating timer', async () => {
+  it('T-DATA-009a: only the batch-status container starts a repeating timer', async () => {
     // REQ-103 permits polling of a RUNNING batch only, from an open screen.
-    // That screen does not exist yet (Epic E), so the correct assertion today
-    // is that nothing polls at all — which is also what keeps a forgotten tab
-    // from hammering a single-replica container indefinitely.
+    // ⚠ THE ASSERTION IS A ONE-MODULE ALLOW-LIST, NOT A BAN. It used to be a
+    // ban, because the screen that polls did not exist; a ban would now be
+    // satisfied only by deleting the poll, and relaxing it to "some module may
+    // poll" would let a second timer appear anywhere. The behavioural half —
+    // that this one timer stops at a settled status, on unmount and while the
+    // tab is hidden — is `T-DATA-009b`…`f` in `mutatingFlows.spec.tsx`.
     const { readFileSync, readdirSync, existsSync } = await import('node:fs');
     const { join } = await import('node:path');
     const root = existsSync(join(process.cwd(), 'apps', 'web', 'src'))
@@ -294,10 +297,10 @@ describe('T-DATA-009 — polling stops', () => {
         return /\.tsx?$/.test(entry.name) ? [full] : [];
       });
 
-    const offenders = walk(root).filter((file) =>
-      /setInterval\s*\(/.test(readFileSync(file, 'utf8')),
-    );
-    expect(offenders).toEqual([]);
+    const offenders = walk(root)
+      .filter((file) => /setInterval\s*\(/.test(readFileSync(file, 'utf8')))
+      .map((file) => file.split(/[\\/]/).slice(-2).join('/'));
+    expect(offenders).toEqual(['containers/BatchStatusRoute.tsx']);
   });
 });
 

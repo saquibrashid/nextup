@@ -951,3 +951,42 @@ button {
   object-fit: cover;
   width: 3rem;
 }
+
+/*
+ * TASK-178 — step 3 of `/upload` and the §4.10 conflict (`specs/ui.md` §3.3).
+ *
+ * The reason text is a peer of the button, never a title attribute and never a
+ * tooltip: §3.3 forbids a silently disabled control, and a reason that only
+ * appears on hover does not exist on a touch device at all.
+ */
+.upload-submit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.upload-submit__reason {
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.upload-submit__button {
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius);
+  color: var(--color-surface);
+}
+
+.upload-submit__failure {
+  color: var(--color-danger);
+  margin: 0;
+}
+
+.upload-conflict {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+}
