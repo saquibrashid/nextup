@@ -340,6 +340,26 @@ export function createApiClient(deps: ApiClientDeps = {}) {
       ),
 
     /**
+     * §6.25 — reverses a creates-only batch. 409 `BATCH_NOT_CREATES_ONLY` for
+     * anything else, which is why `undoOffer` in `BatchAppliedNotice` never
+     * points here for a batch that removed something.
+     */
+    undoBatch: (batchId: string) =>
+      request<unknown>(
+        `/api/batches/${encodeURIComponent(batchId)}/undo`,
+        { method: 'POST', body: {} },
+        deps,
+      ),
+
+    /** §6.26 — puts a confirmed removal group's listings back. */
+    undoRemovalGroup: (groupId: string) =>
+      request<unknown>(
+        `/api/removal-groups/${encodeURIComponent(groupId)}/undo`,
+        { method: 'POST', body: {} },
+        deps,
+      ),
+
+    /**
      * ⚠ **404 is a RESULT, not a failure**, and that distinction lives here so
      * it has exactly one implementation. It means "TMDB knows of no such
      * title"; reported as an error it would tell the owner nextup broke when

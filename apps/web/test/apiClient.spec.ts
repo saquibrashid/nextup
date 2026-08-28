@@ -98,6 +98,8 @@ describe('T-DATA-003 — every method sends credentials', () => {
       removeBatchImage: () => client.removeBatchImage('bat_1', 'img_1'),
       submitBatch: () => client.submitBatch('bat_1'),
       discardBatch: () => client.discardBatch('bat_1'),
+      undoBatch: () => client.undoBatch('bat_1'),
+      undoRemovalGroup: () => client.undoRemovalGroup('grp_1'),
       lookupImdb: () => client.lookupImdb('The Matrix'),
     };
 
