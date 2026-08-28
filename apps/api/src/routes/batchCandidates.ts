@@ -20,28 +20,35 @@
 
 import {
   isConfirmable,
+  normaliseTitleText,
   parseCandidatePatch,
   parseConfirmAllSection,
+  parseManualEntry,
   sectionForCandidate,
+  ulid,
   workIdentityForTmdb,
   type CandidatePatch,
+  type ManualEntry,
   type ReviewCandidate,
   type Service,
 } from '@nextup/domain';
 import { type Router } from 'express';
 
-import { TmdbClient, TmdbUnavailableError } from '../clients/tmdbClient.js';
+import { TmdbClient, TmdbUnavailableError, TmdbWorkNotFoundError } from '../clients/tmdbClient.js';
 import { AppError } from '../errors/AppError.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import {
   confirmPendingCandidates,
+  createExtractionCandidate,
   findExtractionCandidate,
   findUploadBatch,
   listActiveListingsForService,
   listActiveSuppressions,
+  listCandidatesForBatch,
   updateCandidateDisposition,
 } from '../repository/ownerData.js';
 import { loadReviewCandidates } from './batchReview.js';
+import { TMDB_UNAVAILABLE_MESSAGE } from './tmdb.js';
 
 /** Loads the batch and refuses anything that is not open for review. */
 async function requireReviewableBatch(
@@ -289,6 +296,136 @@ export function registerBatchCandidateRoutes(
       // "confirmed: 0" on a section the owner has already worked through is
       // distinguishable from "confirmed: 0" on an empty one.
       skipped: inSection.length - count,
+    });
+  });
+
+  /**
+   * §6.20 — the manual-entry escape hatch (US-006 AC-5): a work the extraction
+   * missed entirely, added as part of THIS batch so it goes through the same
+   * review and the same close.
+   *
+   * ⚠ **The suppression gate is on WORK IDENTITY, not on any row** (REQ-071,
+   * invariant 1). A suppressed work re-entering by hand is the same back door
+   * `applyCorrection` closes, one screen further along.
+   *
+   * ⚠ **TMDB is consulted and its failure modes are NOT collapsed.** An
+   * unknown id is refused (404) rather than written: an entry whose identity
+   * names a work TMDB does not have has no name, no poster and no metadata at
+   * close, and would sit on the list as a permanent blank. An outage is a 502
+   * and the entry is simply not made — unlike a *correction*, where the owner
+   * has already lost something and refusing would strand them, nothing is lost
+   * by asking them to add the title again in a minute.
+   */
+  router.post('/batches/:batchId/manual-entry', async (req, res) => {
+    const ownerId = requireOwnerId(req);
+    const batchId = req.params.batchId ?? '';
+
+    // Ownership before the body, for the reason given on the PATCH above.
+    const batch = await requireReviewableBatch(ownerId, batchId);
+
+    const entry = unwrap<ManualEntry>(parseManualEntry(req.body));
+    const workIdentity = workIdentityForTmdb(entry.mediaType, entry.tmdbId);
+
+    const suppressions = await listActiveSuppressions(ownerId);
+    if (suppressions.some((s) => s.workIdentity === workIdentity)) {
+      throw new AppError(
+        'WORK_SUPPRESSED',
+        409,
+        "You marked that title as not interested. Un-suppress it first if you'd like it back.",
+        { workIdentity },
+      );
+    }
+
+    // ⚠ `discarded` candidates are deliberately EXCLUDED from this gate. The
+    // owner discarding a mis-read row and then adding the right work by hand
+    // is the ordinary path through the artwork-only tile; treating the
+    // discarded row as "already in this batch" would refuse the only
+    // affordance that fixes it, with a message saying the title is already
+    // there when the review pass shows it struck out.
+    const existing = await listCandidatesForBatch(ownerId, batch.id);
+    const clash = existing.find(
+      (row) => row.resolvedWorkIdentity === workIdentity && row.reviewDisposition !== 'discarded',
+    );
+    if (clash !== undefined) {
+      throw new AppError('ALREADY_IN_BATCH', 409, 'That title is already in this batch.', {
+        workIdentity,
+        candidateId: clash.id,
+      });
+    }
+
+    let detail;
+    try {
+      detail = await getTmdbClient().getWork(entry.mediaType, entry.tmdbId);
+    } catch (error) {
+      if (error instanceof TmdbWorkNotFoundError) {
+        throw new AppError('TMDB_WORK_NOT_FOUND', 404, 'TMDB has no such work.', {
+          tmdbId: entry.tmdbId,
+          mediaType: entry.mediaType,
+        });
+      }
+      // The upstream text never reaches the owner: a fetch failure message can
+      // carry the request URL, and the TMDB URL carries the API key.
+      if (error instanceof TmdbUnavailableError) {
+        throw new AppError('TMDB_UNAVAILABLE', 502, TMDB_UNAVAILABLE_MESSAGE);
+      }
+      throw error;
+    }
+
+    const candidateId = ulid();
+    await createExtractionCandidate(ownerId, {
+      id: candidateId,
+      batchId: batch.id,
+      // ⚠ `rawText` is "what the row came from", and for a manual entry that
+      // is the owner's own choice, not anything a reader saw. The TMDB name is
+      // recorded verbatim so the review card has something to show; nothing
+      // here enters identity (SD-05), which is `tmdb:<type>:<id>` alone.
+      rawText: detail.name,
+      inferredTitle: detail.name,
+      // ⚠ No screenshot was read, and the stored vocabulary has no value that
+      // says so — `provider` is CHECK-constrained to `llm`/`ocr-only` and
+      // `box_source` to `ocr`/`llm` (`prisma/migrations`), neither of which is
+      // true here. `basis: 'unknown'` and `ocrSupport: 'not-checked'` are the
+      // honest members of their sets; `provider: 'llm'` is chosen because it
+      // is the value with no observable claim attached (`CandidateCard` shows
+      // an "OCR only" chip for the other one, which would be a visible lie),
+      // and `boundingBoxes: null` + `ocrConfidence: null` leave no evidence a
+      // reader never produced. Recorded as a data-model finding on TASK-067.
+      basis: 'unknown',
+      ocrSupport: 'not-checked',
+      provider: 'llm',
+      boxSource: 'llm',
+      normalisedText: normaliseTitleText(detail.name),
+      ...(detail.releaseYear === null ? {} : { extractedYear: detail.releaseYear }),
+      cleanupVerdict: 'title-candidate',
+      resolvedWorkIdentity: workIdentity,
+      correctedToTmdbId: entry.tmdbId,
+      // The owner picked this work by hand out of a TMDB search; there is
+      // nothing left for them to decide about it, so §6.20 fixes the
+      // disposition at `confirmed`. This is NOT accept-by-inaction (REQ-014):
+      // the act of adding IS the explicit action.
+      reviewDisposition: 'confirmed',
+      // Recomputed from the identity on the next review read — a value written
+      // here would go stale the moment another entry in the batch resolves to
+      // the same work.
+      classification: null,
+      matchCandidates: JSON.stringify([
+        {
+          tmdbId: detail.tmdbId,
+          mediaType: detail.mediaType,
+          name: detail.name,
+          releaseYear: detail.releaseYear,
+          posterPath: detail.posterPath,
+          // 1 — and this is the ONE place a certainty of 1 is truthful: the
+          // owner named the work. Nothing was matched.
+          score: 1,
+        },
+      ]),
+    });
+
+    res.status(201).json({
+      candidateId,
+      resolvedWorkIdentity: workIdentity,
+      disposition: 'confirmed',
     });
   });
 }

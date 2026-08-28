@@ -678,3 +678,25 @@ export const BATCH_PROVENANCE_REMOVED = 'Removed';
  * the difference between "we found nothing to do" and "we didn\u2019t look".
  */
 export const BATCH_CHANGED_NOTHING = 'This upload didn\u2019t change anything.';
+
+/* ── TASK-067 · manual entry (`specs/api.md` §6.20, US-006 AC-5) ───────────
+ *
+ * ⚠ The heading says what this is FOR. An artwork-only tile carries no
+ * readable text, so the owner has nothing to confirm and nothing to correct —
+ * the panel has to say that adding it by hand is the path, or it reads as a
+ * search box with no reason to exist.
+ */
+export const MANUAL_ENTRY_TITLE = 'Add a title the reader missed';
+export const MANUAL_ENTRY_HINT =
+  'Some tiles are artwork only, with no text to read. Search for the title and add it to this batch.';
+export const MANUAL_ENTRY_SEARCH_LABEL = 'Search TMDB';
+export const MANUAL_ENTRY_SEARCH_BUTTON = 'Search';
+export const MANUAL_ENTRY_ADD_LABEL = 'Add {name}';
+export const MANUAL_ENTRY_SEARCHING = 'Searching…';
+export const MANUAL_ENTRY_NO_RESULTS = 'TMDB has nothing under that name.';
+export const MANUAL_ENTRY_SEARCH_FAILED = "Couldn't reach TMDB. Try again in a moment.";
+export const MANUAL_ENTRY_ADDED = 'Added {name} to this batch.';
+export const MANUAL_ENTRY_SUPPRESSED =
+  "You marked that title as not interested. Un-suppress it first if you'd like it back.";
+export const MANUAL_ENTRY_ALREADY_IN_BATCH = 'That title is already in this batch.';
+export const MANUAL_ENTRY_ADD_FAILED = "Couldn't add that title. Nothing has changed.";

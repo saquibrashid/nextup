@@ -449,6 +449,26 @@ export interface ConfirmAllResult {
   skipped: number;
 }
 
+/** One §6.29 search hit. The panel renders these and sends back only the id. */
+export interface TmdbSearchResult {
+  tmdbId: number;
+  mediaType: string;
+  name: string;
+  releaseYear: number | null;
+  posterPath: string | null;
+}
+
+export interface TmdbSearchResults {
+  items: TmdbSearchResult[];
+}
+
+/** §6.20 — what the server wrote for a manual entry. */
+export interface ManualEntryResult {
+  candidateId: string;
+  resolvedWorkIdentity: string;
+  disposition: string;
+}
+
 export interface ImdbLookupResponse {
   name: string;
   releaseYear: number | null;
@@ -525,7 +545,7 @@ export function createApiClient(deps: ApiClientDeps = {}) {
       ),
 
     /**
-     * §6.20 — bulk confirm. The section is sent verbatim; the client does not
+     * §6.19 — bulk confirm. The section is sent verbatim; the client does not
      * enumerate candidate ids, because a per-row loop would be N requests
      * against a single 0.25 vCPU replica and would half-apply on the first
      * failure.
@@ -534,6 +554,33 @@ export function createApiClient(deps: ApiClientDeps = {}) {
       request<ConfirmAllResult>(
         `/api/batches/${encodeURIComponent(batchId)}/candidates/confirm-all`,
         { method: 'POST', body: { section } },
+        deps,
+      ),
+
+    /**
+     * §6.29 — TMDB search. The ONLY search the manual-entry panel has: there
+     * is no local catalogue and US-007 AC-6 forbids building one.
+     */
+    searchTmdb: (query: string, signal?: AbortSignal) =>
+      request<TmdbSearchResults>(
+        `/api/tmdb/search?q=${encodeURIComponent(query)}`,
+        { signal },
+        deps,
+      ),
+
+    /**
+     * §6.20 — manual entry (US-006 AC-5): a work the reader never saw, added
+     * to this batch by hand.
+     *
+     * ⚠ Sends the TMDB **id**, never the name. The name shown in the panel
+     * came from TMDB and goes back to TMDB's own record at the server; sending
+     * it would make the client's rendering of a work part of that work's
+     * identity, which SD-05 forbids.
+     */
+    addManualEntry: (batchId: string, tmdbId: number, mediaType: string) =>
+      request<ManualEntryResult>(
+        `/api/batches/${encodeURIComponent(batchId)}/manual-entry`,
+        { method: 'POST', body: { tmdbId, mediaType } },
         deps,
       ),
 

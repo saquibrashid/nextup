@@ -164,6 +164,57 @@ function parseCorrection(record: Record<string, unknown>): ParseResult<Candidate
   };
 }
 
+/** One §6.20 manual entry: a work the extraction missed entirely. */
+export interface ManualEntry {
+  tmdbId: number;
+  mediaType: MediaType;
+}
+
+/**
+ * Parses one §6.20 body (`{ "tmdbId": 66732, "mediaType": "tv" }`).
+ *
+ * ⚠ **A manual entry carries NO disposition field and none is accepted.** The
+ * owner picked this work out of a TMDB search themselves, so §6.20 fixes the
+ * stored disposition at `confirmed`; letting a client send its own would allow
+ * `{ tmdbId, disposition: 'discarded' }`, which writes a row nobody can act on
+ * and which the review pass then reports as a decision the owner made.
+ *
+ * ⚠ **`name` is REFUSED, not ignored.** A caller-supplied display name would
+ * be the one piece of a manual entry that did not come from TMDB, and SD-05
+ * keeps text out of identity: the name is read from the work itself at the
+ * route, so what the owner sees back is what TMDB actually holds for the id
+ * they picked, not what their client believed it was.
+ */
+export function parseManualEntry(body: unknown): ParseResult<ManualEntry> {
+  const record = asRecord(body);
+  if (record === null) {
+    return reject('That request body could not be read as an object.');
+  }
+
+  const tmdbId = record['tmdbId'];
+  const mediaType = record['mediaType'];
+
+  if (typeof tmdbId !== 'number' || !Number.isInteger(tmdbId) || tmdbId <= 0) {
+    return reject('"tmdbId" must be a positive integer.', { field: 'tmdbId' });
+  }
+  if (typeof mediaType !== 'string' || !(MEDIA_TYPES as readonly string[]).includes(mediaType)) {
+    return reject('"mediaType" is not one of the permitted values.', {
+      field: 'mediaType',
+      permitted: [...MEDIA_TYPES],
+    });
+  }
+  if ('disposition' in record) {
+    return reject('A manual entry is confirmed by definition; do not send "disposition".', {
+      field: 'disposition',
+    });
+  }
+  if ('name' in record) {
+    return reject('"name" is read from TMDB, not supplied.', { field: 'name' });
+  }
+
+  return { ok: true, value: { tmdbId, mediaType: mediaType as MediaType } };
+}
+
 /** Parses one §6.19 body. */
 export function parseConfirmAllSection(body: unknown): ParseResult<ConfirmableSection> {
   const record = asRecord(body);
