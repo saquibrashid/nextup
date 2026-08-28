@@ -98,6 +98,7 @@ describe('T-DATA-003 — every method sends credentials', () => {
       getBatch: () => client.getBatch('bat_1'),
       getReview: () => client.getReview('bat_1'),
       confirmAllCandidates: () => client.confirmAllCandidates('bat_1', 'additions'),
+      patchCandidate: () => client.patchCandidate('bat_1', 'cand_1', { disposition: 'confirmed' }),
       searchTmdb: () => client.searchTmdb('dune'),
       addManualEntry: () => client.addManualEntry('bat_1', 438631, 'movie'),
       closeBatch: () => client.closeBatch('bat_1', false),

@@ -700,3 +700,41 @@ export const MANUAL_ENTRY_SUPPRESSED =
   "You marked that title as not interested. Un-suppress it first if you'd like it back.";
 export const MANUAL_ENTRY_ALREADY_IN_BATCH = 'That title is already in this batch.';
 export const MANUAL_ENTRY_ADD_FAILED = "Couldn't add that title. Nothing has changed.";
+
+/**
+ * TASK-068 — the §6.8 unmatched card (`specs/ux-states.md` §6.8, US-008).
+ *
+ * ⚠ **"KEEP AS UNIDENTIFIED" IS A REAL, SUPPORTED OUTCOME, NOT A FAILURE**,
+ * and the copy has to say so. US-008 exists because a title TMDB cannot name
+ * is still a title the owner saw on their list; wording that framed keeping it
+ * as settling for second best would push the owner towards discarding the one
+ * row the product most wants preserved.
+ *
+ * ⚠ THE DISCARD WORDING NAMES WHAT IS LOST. "Discard" alone reads like
+ * dismissing a notification; this row is the only record that the tile was
+ * ever read, and after close there is nothing to come back to.
+ */
+export const UNMATCHED_CHIP = 'Unidentified';
+/**
+ * The same word, exported under the `CANDIDATE_*` name the card's chip list
+ * uses. ⚠ ONE STRING, aliased — two constants would drift, and the chip and
+ * the section that explains it must say the same word or the explanation
+ * stops attaching to anything the owner can see.
+ */
+export const CANDIDATE_UNIDENTIFIED_CHIP = UNMATCHED_CHIP;
+export const UNMATCHED_HINT =
+  "TMDB couldn't name this one. Keeping it is fine — it goes on your list under the text we read.";
+export const UNMATCHED_KEEP_LABEL = 'Keep as unidentified';
+export const UNMATCHED_FIND_LABEL = 'Find a match';
+export const UNMATCHED_DISCARD_LABEL = 'Not a title — discard';
+export const UNMATCHED_KEPT = 'Keeping this as an unidentified title.';
+export const UNMATCHED_DISCARDED = "Discarded. It won't be added to your list.";
+export const UNMATCHED_MATCHED = 'Matched to {name}.';
+export const UNMATCHED_MATCHED_UNNAMED = 'Matched to the title you chose.';
+export const UNMATCHED_SEARCHING = 'Searching…';
+export const UNMATCHED_NO_RESULTS = 'TMDB has nothing under that name.';
+export const UNMATCHED_SEARCH_FAILED = "Couldn't reach TMDB. Try again in a moment.";
+export const UNMATCHED_SEARCH_LABEL = 'Search TMDB for this title';
+export const UNMATCHED_MATCH_LABEL = 'Use {name}';
+export const UNMATCHED_ACTION_FAILED = "Couldn't save that. Nothing has changed.";
+export const UNMATCHED_CANCEL_LABEL = 'Cancel';

@@ -31,6 +31,7 @@ import {
   CANDIDATE_LOW_CONFIDENCE_CHIP,
   CANDIDATE_OCR_ONLY_CHIP,
   CANDIDATE_UNCERTAIN_CHIP,
+  CANDIDATE_UNIDENTIFIED_CHIP,
   CANDIDATE_UNREADABLE_CHIP,
   CANDIDATE_UNREADABLE_NO_TITLE,
 } from '../copy';
@@ -46,14 +47,25 @@ export interface CandidateCardProps {
    * verdicts have nothing to verify against.
    */
   readonly thumbnailUrl?: string | null;
+  /**
+   * ⚠ PASSED IN, NEVER DERIVED. `match === null` is also true of
+   * `probablyNotTitles` and `unreadableTiles`, so deriving the chip here would
+   * claim TMDB had been asked about rows it was never asked about. Section
+   * membership is `sectionForCandidate`, server-side; only the caller knows
+   * which section this card is being rendered in (`T-UX-063h`).
+   */
+  readonly unidentified?: boolean;
+  /** The §6.8 per-card action strip, when the section has one. */
+  readonly actions?: JSX.Element | null;
 }
 
 /**
  * The chips §5.3/§5.3a require. Order is fixed so a card never reshuffles its
  * own warnings between renders.
  */
-function chipsFor(candidate: ReviewCandidate): readonly string[] {
+function chipsFor(candidate: ReviewCandidate, unidentified: boolean): readonly string[] {
   const chips: string[] = [];
+  if (unidentified) chips.push(CANDIDATE_UNIDENTIFIED_CHIP);
   if (candidate.verdict === 'low-confidence') chips.push(CANDIDATE_LOW_CONFIDENCE_CHIP);
   if (candidate.verdict === 'inferred-unverified') chips.push(CANDIDATE_INFERRED_CHIP);
   if (candidate.verdict === 'unreadable-tile') chips.push(CANDIDATE_UNREADABLE_CHIP);
@@ -63,7 +75,12 @@ function chipsFor(candidate: ReviewCandidate): readonly string[] {
   return chips;
 }
 
-export function CandidateCard({ candidate, thumbnailUrl = null }: CandidateCardProps): JSX.Element {
+export function CandidateCard({
+  candidate,
+  thumbnailUrl = null,
+  unidentified = false,
+  actions = null,
+}: CandidateCardProps): JSX.Element {
   const { match } = candidate;
   const unreadable = candidate.verdict === 'unreadable-tile';
   // §5.3a: the tile must be rendered for both fabrication-adjacent verdicts,
@@ -129,11 +146,13 @@ export function CandidateCard({ candidate, thumbnailUrl = null }: CandidateCardP
           </p>
         )}
 
-        {chipsFor(candidate).map((chip) => (
+        {chipsFor(candidate, unidentified).map((chip) => (
           <span className="candidate-card__chip" data-testid="candidate-chip" key={chip}>
             {chip}
           </span>
         ))}
+
+        {actions}
       </div>
     </div>
   );
