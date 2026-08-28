@@ -439,3 +439,24 @@ export const REVIEW_RETRY_LABEL = 'Try again';
  * make the two indistinguishable to the owner.
  */
 export const REVIEW_SECTION_EMPTY = 'Nothing in this group.';
+
+/* ------------------------------------ §6.10/§6.11 removal confirmation -- */
+
+/**
+ * ⚠ QUOTED FROM `ux-states.md` §6.10, not paraphrased. This is the last thing
+ * the owner reads before listings leave their list, and the promise it makes —
+ * that nothing is destroyed — is REQ-028's soft-delete guarantee stated to the
+ * person relying on it.
+ */
+export const REMOVAL_CONFIRM_REASSURANCE =
+  'They\u2019ll be kept in Removal history and you can restore them any time.';
+
+/**
+ * ⚠ §6.11, and it is a CONFIRMABLE state, not an error. Unticking every
+ * removal is a supported outcome (US-015 AC-5): the owner made a decision,
+ * the close proceeds, and a zero-member group is recorded.
+ */
+export const REMOVAL_CONFIRM_NONE = 'No removals selected. Nothing will be removed.';
+
+export const REMOVAL_CONFIRM_LABEL = 'Confirm';
+export const REMOVAL_CANCEL_LABEL = 'Cancel';
