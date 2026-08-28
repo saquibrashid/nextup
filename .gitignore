@@ -50,6 +50,16 @@ dist-dev/
 # it is redirected to, and this repository is public.
 .az-*
 
+# Owner-data exports (`scripts/export-owner-data.ts`, TASK-131). THIS REPOSITORY
+# IS PUBLIC and the artefact is a complete copy of everything the owner has
+# ever saved — every title, every listing, every batch. `docs/restore.md` tells
+# the owner to write it OUTSIDE the working tree for exactly that reason; these
+# patterns are the belt-and-braces for the run that ignores the instruction and
+# uses `--out .` out of habit.
+*.owner-export.json
+owner-export-*.json
+/exports/
+
 # Coordination briefs handed to parallel lane agents. Working artefacts of a
 # build session, not part of the product: they name branch strategy, path
 # allow-lists and hard stops, all of which go stale the moment the lanes
