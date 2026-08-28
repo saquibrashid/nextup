@@ -1073,16 +1073,79 @@ history (data-model I-7 exempts pre-submit draft images).
                 "ingestSource": "upload",
                 "available": true, "retainUntil": "2026-09-09T20:03:00.000Z",
                 "candidateCount": 14, "href": "/api/images/01J8ZG..." } ],
-  "extractionStats": { "imagesProcessed": 7, "imagesWithZeroCandidates": 1,
-                       "candidatesRaw": 96, "candidatesAfterCleanup": 71,
-                       "candidatesCollapsed": 6, "matched": 63, "unmatched": 2,
-                       "suppressedGated": 1, "estimatedCostUsd": 0.0312 },
   "extractionError": null,
   "lowYield": false,
-  "progress": { "imagesDone": 7, "imagesTotal": 7 } }
+  "degradedExtraction": false,
+  "crossCheck": "ok",
+  "progress": { "imagesDone": 7, "imagesTotal": 7 },
+  "provenance": { "created": [], "modified": [], "removed": [] },
+  "changedNothing": true,
+  "titles": [ { "titleId": "01J8ZH...", "name": "Arrival", "year": 2016,
+                "state": "active" } ] }
 ```
 `progress` is present while `status` is `submitted` or `extracting`
 (US-006 AC-1). `href` is an **API path**, never a blob URL (NFR-020).
+
+**`available` is DERIVED from `retainUntil`, never stored** (ADR-0006): the
+30-day purge is a storage lifecycle rule that writes nothing back to the row,
+so this field and `GET /api/images/:imageId`'s 410 must come from one
+predicate. `extractionError` is the error **code**, not the message — the SPA
+owns the wording for every code (`ux-states.md` §5.5–§5.7).
+
+**`degradedExtraction` and `crossCheck` are REQUIRED, not optional.**
+`ux-states.md` §5.9/§5.10 make this page render the degraded banner and
+`T-UX-008` asserts it; without these two fields the client has nothing to
+decide it from. They are **safety state** and are read back as stored — never
+recomputed (`data-model.md` §3.2).
+
+**`provenance`, `changedNothing` and `titles` serve `ux-states.md` §9.4/§9.5.**
+`provenance` is the `data-model.md` §3.7 three-array shape. `changedNothing` is
+sent rather than derived in the SPA because §9.5 is a *sentence* — *"This
+upload didn't change anything"* — and a batch that only **modified** something
+must not be told it changed nothing; putting that rule in two places is how the
+two come to disagree. `titles` is a lookup keyed by the ids the three arrays
+name, because §9.4 requires each entry to link to the title and a ULID is not a
+name; it is one array rather than a field on each entry so a title that was both
+created and modified is not carried twice.
+
+⚠ **`extractionStats` IS NOT IN THIS RESPONSE.** As stored it is
+`{ stage1, progress, imageFailures? }`, not the flat shape once documented
+here: stages 3–5 do not run yet (TASK-060), and `jobs/startExtraction.ts`
+deliberately refuses to write zeros for measurements that were never taken —
+`docs/architecture.md` calls that column the only evidence for RSK-021.
+Publishing a flat object with invented zeros would make the API the place the
+lie enters. It is added when the stages that populate it land.
+
+~~**200** `{ ..., "extractionStats": { "imagesProcessed": 7,
+"imagesWithZeroCandidates": 1, "candidatesRaw": 96, "candidatesAfterCleanup":
+71, "candidatesCollapsed": 6, "matched": 63, "unmatched": 2, "suppressedGated":
+1, "estimatedCostUsd": 0.0312 } }`~~ — superseded (TASK-076). The flat shape
+above was never written by any code path; `candidatesCollapsed`, `matched`,
+`unmatched` and `suppressedGated` are stage 3–5 measurements that do not exist
+yet.
+
+### 6.15a `GET /api/batches` (US-031, `ux-states.md` §9)
+
+The owner's batch history across **every** service, newest first, capped at 50.
+
+**200**
+```jsonc
+{ "batches": [ { "batchId": "01J8ZF...", "service": "netflix",
+                 "mode": "full-update", "status": "applied",
+                 "createdAt": "...", "submittedAt": "...",
+                 "completedAt": "...", "undoneAt": null,
+                 "counts": { "created": 6, "modified": 0, "removed": 3 } } ] }
+```
+
+`counts` is what §9.3's card renders. **`created` counts CREATIONS, not
+`batch_change` rows**: a `title_created` row and its `listing_added` sibling
+are one creation in `data-model.md` §3.7, so summing the two kinds would double
+every new title on the card while the detail page listed half as many.
+
+Not paginated in v1, deliberately: a single owner uploading a handful of
+captures a month will not reach 50, and a cursor nobody exercises is a cursor
+nobody has debugged. The cap makes an unexpected volume a truncated page rather
+than an unbounded read on a 5-DTU database.
 
 ### 6.16 `POST /api/batches/:batchId/retry-extraction` (US-006)
 
