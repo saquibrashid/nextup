@@ -738,3 +738,31 @@ export const UNMATCHED_SEARCH_LABEL = 'Search TMDB for this title';
 export const UNMATCHED_MATCH_LABEL = 'Use {name}';
 export const UNMATCHED_ACTION_FAILED = "Couldn't save that. Nothing has changed.";
 export const UNMATCHED_CANCEL_LABEL = 'Cancel';
+
+/**
+ * TASK-028 — the owner gate (`apps/web/src/containers/OwnerGate.tsx`).
+ *
+ * ⚠ Deliberately NOT reusing `LIST_LOAD_FAILED_BODY` or `SESSION_ENDED_TITLE`.
+ * "Couldn't load your list" is wrong here — nothing about the list is known
+ * yet, and the list is not what failed. "Your session ended" is worse: it is a
+ * confident claim about the owner's session that a network error does not
+ * support, and it would send them to sign in again over a problem signing in
+ * has no effect on. `ux-states.md` §2.10 reserves that sentence for a real
+ * 401.
+ *
+ * No spec defines this wording — like `IDP_FAILURE_TITLE`/`_BODY`, it is
+ * invented and pending owner review.
+ */
+export const GATE_CHECKING = 'Checking your access…';
+
+/** The identity check itself failed — distinct from being refused. */
+export const GATE_FAILED_TITLE = "Couldn't check your access.";
+
+/**
+ * ⚠ States that nothing was shown, and that nothing was lost. A gate failure
+ * looks identical to a refusal from the outside, and the owner must be able to
+ * tell "nextup will not show you this" (final, NFR-015) from "nextup could not
+ * ask" (transient, retryable).
+ */
+export const GATE_FAILED_BODY =
+  'Something went wrong before your list could load. Nothing has changed — try again.';
