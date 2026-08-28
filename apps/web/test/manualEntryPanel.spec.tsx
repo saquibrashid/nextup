@@ -17,6 +17,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { buildReviewResponse } from '@nextup/domain';
 
 import { ManualEntryPanel, resultLabel } from '../src/components/ManualEntryPanel';
 import {
@@ -28,6 +29,7 @@ import {
   MANUAL_ENTRY_TITLE,
 } from '../src/copy';
 import type { TmdbSearchResult } from '../src/lib/apiClient';
+import { ReviewPage } from '../src/pages/ReviewPage';
 
 afterEach(cleanup);
 
@@ -184,5 +186,35 @@ describe('T-UI-028 · the manual-entry panel', () => {
   it('T-UI-028j: a hit with no year renders its bare name', () => {
     expect(resultLabel({ ...DUNE, releaseYear: null })).toBe('Dune');
     expect(resultLabel(DUNE)).toBe('Dune (2021)');
+  });
+});
+
+describe('T-UI-028 · the panel is MOUNTED on the review screen', () => {
+  // ⚠ A component nobody renders is the TASK-076 defect in miniature: every
+  // case above passes against a component the owner never sees. These two
+  // assert the mount, and the negative one asserts the half-wired case — a
+  // search box with no add is worse than no panel at all.
+  function review() {
+    return buildReviewResponse({
+      batchId: '01J0000000000000000000BTCH',
+      service: 'netflix',
+      mode: 'append-only',
+      lowYield: false,
+      degradedExtraction: false,
+      crossCheck: 'agreed',
+      candidates: [],
+      disappearedListings: [],
+      imagesWithNoText: [],
+    });
+  }
+
+  it('T-UI-028k: ReviewPage renders the panel when both halves are wired', () => {
+    render(<ReviewPage onManualEntry={vi.fn()} onSearchTmdb={vi.fn()} review={review()} />);
+    expect(screen.getByRole('heading', { name: MANUAL_ENTRY_TITLE })).toBeInTheDocument();
+  });
+
+  it('T-UI-028l: and does NOT render it when only one half is wired', () => {
+    render(<ReviewPage onSearchTmdb={vi.fn()} review={review()} />);
+    expect(screen.queryByRole('heading', { name: MANUAL_ENTRY_TITLE })).not.toBeInTheDocument();
   });
 });
