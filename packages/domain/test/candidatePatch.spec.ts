@@ -10,6 +10,7 @@ import {
   isConfirmable,
   parseCandidatePatch,
   parseConfirmAllSection,
+  parseManualEntry,
   SETTABLE_DISPOSITIONS,
 } from '../src/candidatePatch.js';
 
@@ -187,6 +188,54 @@ describe('T-REV-011 · isConfirmable', () => {
     expect(isConfirmable('pending')).toBe(true);
     for (const disposition of ['confirmed', 'corrected', 'discarded']) {
       expect(isConfirmable(disposition), disposition).toBe(false);
+    }
+  });
+});
+
+describe('T-REV-018 · parseManualEntry · the §6.20 body', () => {
+  it('T-REV-018a: accepts a well-formed manual entry for either media type', () => {
+    for (const mediaType of ['movie', 'tv'] as const) {
+      expect(parseManualEntry({ tmdbId: 66732, mediaType }), mediaType).toEqual({
+        ok: true,
+        value: { tmdbId: 66732, mediaType },
+      });
+    }
+  });
+
+  it('T-REV-018b: refuses a tmdbId that is not a positive integer', () => {
+    for (const tmdbId of [0, -1, 1.5, '66732', null, undefined]) {
+      const result = parseManualEntry({ tmdbId, mediaType: 'tv' });
+      expect(result.ok, String(tmdbId)).toBe(false);
+    }
+  });
+
+  it('T-REV-018c: refuses a mediaType outside the permitted set', () => {
+    // `person` is the one that matters: TMDB's multi-search returns people,
+    // and a client that passed one straight through would add a human being
+    // to the owner's watchlist as though it were a work.
+    const result = parseManualEntry({ tmdbId: 66732, mediaType: 'person' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.details['field']).toBe('mediaType');
+  });
+
+  it('T-REV-018d: refuses a client-supplied disposition rather than honouring it', () => {
+    // A manual entry is confirmed by definition (§6.20). Accepting
+    // `discarded` here would write a row the owner cannot act on and then
+    // report it back to them as a decision they made.
+    const result = parseManualEntry({ tmdbId: 66732, mediaType: 'tv', disposition: 'discarded' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.details['field']).toBe('disposition');
+  });
+
+  it('T-REV-018e: refuses a client-supplied name (SD-05 — the name is read from TMDB)', () => {
+    const result = parseManualEntry({ tmdbId: 66732, mediaType: 'tv', name: 'Not This' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.details['field']).toBe('name');
+  });
+
+  it('T-REV-018f: refuses a body that is not an object', () => {
+    for (const body of [null, [], 'tv', 7]) {
+      expect(parseManualEntry(body).ok, JSON.stringify(body)).toBe(false);
     }
   });
 });

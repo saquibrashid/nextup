@@ -70,6 +70,29 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
     void client.discardBatch(batchId).then(() => navigate('/'));
   }, [batchId, client, navigate]);
 
+  const searchTmdb = useCallback(
+    async (query: string) => (await client.searchTmdb(query)).items,
+    [client],
+  );
+
+  /**
+   * TASK-067 — §6.20. Re-reads the review afterwards, for the same reason
+   * `confirmAll` does: the entry becomes a candidate the owner must be able to
+   * SEE in the additions section, and a screen that reported "added" without
+   * showing the row is indistinguishable from one that added nothing.
+   *
+   * ⚠ The rejection is RE-THROWN. `ManualEntryPanel` turns the two deliberate
+   * 409s into their own messages; swallowing the error here would show the
+   * owner a success notice for a title the batch does not contain.
+   */
+  const manualEntry = useCallback(
+    async (result: { tmdbId: number; mediaType: string }): Promise<void> => {
+      await client.addManualEntry(batchId, result.tmdbId, result.mediaType);
+      setGeneration((n) => n + 1);
+    },
+    [batchId, client],
+  );
+
   if (review.resource.kind === 'refused') return <RefusalPage reason="not-allowed" />;
 
   return (
@@ -81,6 +104,8 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
       onApply={apply}
       onDiscard={discard}
       onConfirmAll={confirmAll}
+      onSearchTmdb={searchTmdb}
+      onManualEntry={manualEntry}
     />
   );
 }

@@ -877,6 +877,40 @@ button {
 
 /* --------------------------- §5 `/batches/:batchId` extraction status ---- */
 
+/* §6.20 / US-006 AC-5 — the manual-entry panel (TASK-067). */
+.manual-entry {
+  border-top: 1px solid var(--color-border);
+  margin: var(--space-4) 0;
+  padding-top: var(--space-3);
+}
+
+.manual-entry__hint {
+  color: var(--color-text-muted);
+}
+
+.manual-entry__form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.manual-entry__results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  margin: var(--space-3) 0;
+  padding: 0;
+}
+
+.manual-entry__result {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+}
+
 /* §9.3 — the batch-history cards (TASK-076). */
 .batch-history {
   display: flex;

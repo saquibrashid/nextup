@@ -1278,14 +1278,38 @@ Sets every `pending` item in that section to `confirmed`. **200**
 This is the OQ-011 bulk affordance (`specs/ux-states.md` §4.4). It is an
 explicit action, so REQ-014's no-accept-by-inaction rule is intact.
 
-### 6.20 `POST /api/batches/:batchId/manual-entry` (US-009)
+### 6.20 `POST /api/batches/:batchId/manual-entry` (US-006 AC-5)
 
-Body: `{ "tmdbId": 66732, "mediaType": "tv" }`
+Body: `{ "tmdbId": 66732, "mediaType": "tv" }` — and **nothing else**. A
+`disposition` is refused (a manual entry is `confirmed` by definition) and so
+is a `name` (it is read from TMDB, never supplied — SD-05).
 Adds a title the extraction missed, as part of this batch, subject to the same
 review and the same suppression gate.
-**201** `{ "candidateId": "cand:...:manual:1", "resolvedWorkIdentity": "tmdb:tv:66732", "disposition": "confirmed" }`
-**409 `WORK_SUPPRESSED`** if actively suppressed.
+**201** `{ "candidateId": "01J8ZM…", "resolvedWorkIdentity": "tmdb:tv:66732", "disposition": "confirmed" }`
+**409 `BATCH_NOT_IN_REVIEW`** if the batch is not open for review.
+**409 `WORK_SUPPRESSED`** if actively suppressed — the gate is on **work
+identity** (REQ-071), because manual entry is the most direct back door there
+is: the owner types the name of the thing they told the product to stop showing
+them.
 **409 `ALREADY_IN_BATCH`** if the work is already a candidate in this batch.
+A **`discarded`** candidate for the same work does **not** block the entry:
+discarding a mis-read row and adding the right work by hand is the ordinary
+path through an artwork-only tile, and refusing it would close the only
+affordance that fixes one.
+**404 `TMDB_WORK_NOT_FOUND`** / **502 `TMDB_UNAVAILABLE`** — the id is checked
+against TMDB and nothing is written on either. An entry whose identity names a
+work TMDB does not hold has no name, no poster and no metadata at close, and
+would sit on the list permanently blank.
+
+~~### 6.20 `POST /api/batches/:batchId/manual-entry` (US-009)~~
+~~Body: `{ "tmdbId": 66732, "mediaType": "tv" }`. **201**
+`{ "candidateId": "cand:...:manual:1", … }`. **409 `WORK_SUPPRESSED`**,
+**409 `ALREADY_IN_BATCH`**.~~
+⚠ Superseded at TASK-067. Two corrections: **US-009 is candidate
+classification**, not manual entry — the anchor is **US-006 AC-5** — and the
+`cand:…:manual:1` candidate id was illustrative only; candidate ids are ULIDs
+everywhere else in the store and a second id grammar would have to be parsed to
+be believed.
 
 ### 6.21 `PATCH /api/batches/:batchId/removals` (US-015)
 

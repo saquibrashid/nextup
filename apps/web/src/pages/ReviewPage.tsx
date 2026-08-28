@@ -41,8 +41,11 @@
 import { useState, type JSX } from 'react';
 import type { ReviewCandidate, ReviewResponse, ReviewSection } from '@nextup/domain';
 
+import type { TmdbSearchResult } from '../lib/apiClient';
+
 import { CandidateCard } from '../components/CandidateCard';
 import { CandidateList } from '../components/CandidateList';
+import { ManualEntryPanel } from '../components/ManualEntryPanel';
 import { RemovalConfirmDialog } from '../components/RemovalConfirmDialog';
 import {
   effectiveDisposition,
@@ -84,6 +87,14 @@ export interface ReviewPageProps {
    * `POST /api/batches/:id/candidates/confirm-all`.
    */
   readonly onConfirmAll?: (section: ConfirmableSection) => void;
+  /**
+   * TASK-067 — the §6.29 search behind the manual-entry panel. Optional, and
+   * the panel renders ONLY when both halves are supplied: a search box with no
+   * add, or an add with no search, is worse than no panel at all.
+   */
+  readonly onSearchTmdb?: (query: string) => Promise<TmdbSearchResult[]>;
+  /** TASK-067 — §6.20. Rejects with the server's refusal code on the two 409s. */
+  readonly onManualEntry?: (result: TmdbSearchResult) => Promise<void>;
   /**
    * SD-11e. Injectable so the persistence rule is testable, and OPTIONAL so a
    * environment without one (SSR, a locked-down browser) renders normally
@@ -195,6 +206,8 @@ export function ReviewPage({
   onApply,
   onDiscard,
   onConfirmAll,
+  onSearchTmdb,
+  onManualEntry,
   storage = typeof sessionStorage === 'undefined' ? undefined : sessionStorage,
 }: ReviewPageProps): JSX.Element {
   // ⚠ Declared before the early returns: hooks must run unconditionally, and
@@ -365,6 +378,10 @@ export function ReviewPage({
             ))}
           </ul>
         </section>
+      )}
+
+      {onSearchTmdb !== undefined && onManualEntry !== undefined && (
+        <ManualEntryPanel onAdd={onManualEntry} onSearch={onSearchTmdb} />
       )}
 
       {/* ⚠ SD-11d / `T-UX-011`. Sticky, so the primary action and the running
