@@ -141,3 +141,27 @@ function formatIsoDay(iso: IsoDate, caller: string): string {
 export function removedOnLabel(removedOn: IsoDate): string {
   return `Removed ${formatIsoDay(removedOn, 'removedOnLabel')}`;
 }
+
+/* ------------------------------- degraded extraction banner (§5.9/§5.10) -- */
+
+/**
+ * The one degraded-read banner, shared by `/batches/:batchId` and `/review`.
+ *
+ * ⚠ **`ux-states.md` §5.9 requires "a persistent, non-dismissible banner on
+ * BOTH this page and the review page" — the SAME banner.** That is only true
+ * mechanically if there is one string, so this constant is it and both
+ * surfaces import it. Two hand-written copies drift on the first edit, and a
+ * drifted banner is how the owner ends up reading two different explanations
+ * for one event.
+ *
+ * ⚠ **Whenever this text renders, full-update removals were withheld**
+ * (product invariant 2, `specs/ai.md` §2.2). It is not decoration: it is the
+ * only on-screen explanation for why the removal section the owner expected
+ * is missing. `T-UX-008`, `T-AI-036`.
+ *
+ * Quoted verbatim from `ux-states.md` §5.9.
+ */
+export const DEGRADED_EXTRACTION_BANNER =
+  'One of the two readers was unavailable, so these results may be less ' +
+  'complete than usual. Nothing has been removed from your list \u2014 you ' +
+  'can still add titles, and you can re-read these screenshots later.';

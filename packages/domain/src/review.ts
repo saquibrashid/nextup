@@ -52,6 +52,7 @@ import type {
   Service,
 } from './enums.js';
 import type { IsoDate } from './types.js';
+import { DEGRADED_EXTRACTION_BANNER } from './copy.js';
 
 /**
  * ⚠ `ZERO_YIELD_IMAGE_RATIO` USED TO BE DECLARED HERE AND WAS NEVER READ.
@@ -280,11 +281,12 @@ export function reviewBanner(input: {
       'Check the list below before confirming.'
     );
   }
+  // ⚠ The SHARED constant, not a review-specific paraphrase. `ux-states.md`
+  // §5.9 requires the same banner here and on `/batches/:batchId`; this used
+  // to be a second, differently-worded string, which meant the owner read one
+  // explanation on the status page and another on review for one event.
   if (input.crossCheck === 'llm-unavailable') {
-    return (
-      'Only part of the reading pipeline was available for these screenshots, ' +
-      'so this read is incomplete. Check the list below before confirming.'
-    );
+    return DEGRADED_EXTRACTION_BANNER;
   }
   return null;
 }

@@ -13,6 +13,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { CLEANUP_VERDICTS } from '../src/enums.js';
+import { DEGRADED_EXTRACTION_BANNER } from '../src/copy.js';
 import {
   assertEveryCandidateRouted,
   buildReviewResponse,
@@ -391,7 +392,10 @@ describe('T-AI-021 — banner copy', () => {
     const res = buildReviewResponse(
       input({ crossCheck: 'llm-unavailable', degradedExtraction: true }),
     );
-    expect(res.banner).toContain('incomplete');
+    // ⚠ Asserted against the SHARED constant, not a substring. `ux-states.md`
+    // §5.9 requires the same banner here and on `/batches/:batchId`, so the
+    // thing under test is the identity, not the presence of some wording.
+    expect(res.banner).toBe(DEGRADED_EXTRACTION_BANNER);
   });
 });
 
