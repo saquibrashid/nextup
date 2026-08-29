@@ -103,6 +103,15 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
       loading={titles.resource.kind === 'loading'}
       loadFailed={titles.resource.kind === 'failed'}
       onRetry={titles.reload}
+      /*
+        ⚠ THE FOUR ROW-ACTION CALLS. Without these the `⋮` renders and does
+        nothing — the defect this wiring exists to close. They are passed as a
+        set because `ListPage` refuses to render a partly-wired menu.
+      */
+      onSuppress={(titleId) => client.suppressTitle(titleId)}
+      onUnsuppress={(suppressionId) => client.unsuppress(suppressionId)}
+      onSearchTmdb={(query) => client.searchTmdb(query)}
+      onFixMatch={(titleId, body) => client.fixMatch(titleId, body)}
     />
   );
 }
