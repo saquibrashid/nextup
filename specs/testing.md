@@ -3823,18 +3823,20 @@ spec. Each container gets a contiguous block:
 
 | Id | Screen | Spec file |
 |---|---|---|
-| `T-DATA-002a`–`u` | list, upload, review, batches, suppressed | as cited in the backlog |
-| `T-DATA-002v`–`ac` | **removed** (`RemovedRoute`) | `apps/web/test/removedRoute.spec.tsx` |
+| `T-DATA-002a` … `T-DATA-002u` | list, upload, review, batches, suppressed | as cited in the backlog |
+| `T-DATA-002v` `T-DATA-002w` `T-DATA-002x` `T-DATA-002y` `T-DATA-002z` `T-DATA-002aa` `T-DATA-002ab` `T-DATA-002ac` | **removed** (`RemovedRoute`) | `apps/web/test/removedRoute.spec.tsx` |
 
-The removed block asserts, in order: a read is issued on mount (`v`); a
-**failed** read renders the failure state and **never** an empty log (`w`);
-retry re-reads (`x`); a 403 renders the refusal screen (`y`); restore reaches
-the API from a row (`z`); unsuppress reaches the API (`aa`); the `q` URL param
-is passed through to the read (`ab`); and the **route table mounts the
-container, not the bare page** (`ac`).
+The removed block asserts, in order: `T-DATA-002v` — a read is issued on
+mount; `T-DATA-002w` — a **failed** read renders the failure state and
+**never** an empty log; `T-DATA-002x` — retry re-reads; `T-DATA-002y` — a 403
+renders the refusal screen; `T-DATA-002z` — restore reaches the API from a
+row; `T-DATA-002aa` — unsuppress reaches the API; `T-DATA-002ab` — the `q` URL
+param is passed through to the read; and `T-DATA-002ac` — the **route table
+mounts the container, not the bare page**.
 
-`ac` is not redundant with the other seven. A container can be correct in
-every respect and still be reachable by nobody — that is exactly what shipped
+`T-DATA-002ac` is not redundant with the other seven. A container can be
+correct in every respect and still be reachable by nobody — that is exactly
+what shipped
 for `/removed`, and `ac` is the only case in the block that fails on it. See
 `T-INFRA-013` (§14), the gate that now catches this class mechanically —
 `T-INFRA-013b` is what surfaced `/removed` in the first place.
