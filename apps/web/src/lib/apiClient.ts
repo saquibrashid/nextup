@@ -721,6 +721,18 @@ export function createApiClient(deps: ApiClientDeps = {}) {
         deps,
       ),
 
+    /**
+     * §6.9 — the removed view, the historical LOG of removals.
+     *
+     * ⚠ `query` is the already-encoded search string, matching `getTitles`.
+     * ⚠ **A FAILED READ HERE MUST NEVER DEGRADE TO AN EMPTY LIST.** An empty
+     * removed view reads as *"nothing has ever been removed"*, which is the
+     * one sentence this screen must never say falsely — the removed view is
+     * how the owner sees that nothing was lost (product invariant 7, REQ-028).
+     */
+    getRemoved: (query: string, signal?: AbortSignal) =>
+      request<RemovedResponse>(`/api/removed${query ? `?${query}` : ''}`, { signal }, deps),
+
     /** §6.10 — restore one removed listing back to active. */
     restoreListing: (listingId: string, opts: { confirmDuplicate?: boolean } = {}) =>
       request<RestoreResponse>(
