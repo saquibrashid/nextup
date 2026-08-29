@@ -137,6 +137,36 @@ export function isPasteSupported(): boolean {
   return typeof navigator.clipboard?.read === 'function';
 }
 
+/**
+ * Whether this is a touch device, and therefore whether the iOS paste hint
+ * must be shown (product invariant 16, `ux-states.md` §4.0a).
+ *
+ * ⚠ **THIS FUNCTION DID NOT EXIST, AND ITS ABSENCE MADE THE HINT DEAD CODE.**
+ * `PasteButton` renders the hint on `touch === true` and nothing in the SPA
+ * ever passed `touch` — so the hint rendered **only in tests**, while both
+ * this file and `PasteButton` carried a comment promising it was "otherwise
+ * inferred from the viewport". No inference had ever been written. Found at a
+ * 320 px viewport by the a11y suite; see the struck-through comments below.
+ *
+ * ⚠ **`pointer: coarse`, NOT a width breakpoint.** The hint is instructions
+ * for a *touch* interaction — take a screenshot, tap Copy, tap here — and a
+ * narrow desktop window is not an iPhone. Keying it on width would show the
+ * wrong instructions to a desktop owner who resized their browser, and hide
+ * them on a tablet in landscape.
+ *
+ * ⚠ Probed defensively: `matchMedia` is absent in jsdom unless a test stubs
+ * it, and a throw here would take down the whole upload screen — the one
+ * screen the product cannot work without.
+ */
+export function isTouchDevice(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
+  try {
+    return window.matchMedia('(pointer: coarse)').matches;
+  } catch {
+    return false;
+  }
+}
+
 export interface ImageDropzoneProps {
   /** Every affordance funnels here - the single submit path (`api.md` §5.3.1). */
   readonly onFilesAccepted?: (files: readonly File[], source: IngestSource) => void;
@@ -149,7 +179,12 @@ export interface ImageDropzoneProps {
    * (`api.md` §6.12), rendered verbatim in the same list as client refusals.
    */
   readonly serverRejected?: readonly ServerRejection[];
-  /** Forces the touch hint on in tests; otherwise inferred from the viewport. */
+  /**
+   * Overrides the touch probe; `undefined` in the SPA — see `PasteButton`.
+   *
+   * ~~Superseded: "Forces the touch hint on in tests; otherwise inferred from
+   * the viewport."~~
+   */
   readonly touch?: boolean;
 }
 

@@ -41,7 +41,7 @@ import {
   PASTE_NOT_IMAGE_BODY,
 } from '../copy';
 import { useHeldImages } from '../lib/useHeldImages';
-import { isPasteSupported } from './ImageDropzone';
+import { isPasteSupported, isTouchDevice } from './ImageDropzone';
 
 /** Why a `clipboard.read()` did not produce an image. Mapped to copy by TASK-161. */
 export type PasteFailure = 'denied' | 'empty' | 'not-image' | 'abandoned';
@@ -59,7 +59,14 @@ export interface PasteButtonProps {
   readonly onImagesPasted: (files: readonly File[]) => void;
   /** TASK-161 maps this to the four §4.13–§4.15 messages. */
   readonly onPasteFailed?: (failure: PasteFailure) => void;
-  /** Forces the touch hint on in tests; otherwise inferred from the viewport. */
+  /**
+   * Overrides the touch probe. Supplied by tests; **`undefined` in the SPA**,
+   * where `isTouchDevice()` decides.
+   *
+   * ~~Superseded: "Forces the touch hint on in tests; otherwise inferred from
+   * the viewport."~~ — the second half was false. Nothing inferred anything,
+   * and nothing passed this prop, so the hint rendered only under test.
+   */
   readonly touch?: boolean;
 }
 
@@ -102,6 +109,10 @@ export function PasteButton({
   // Read at render, not in an effect: the button must be absent from the very
   // first paint, never rendered and then withdrawn.
   if (!isPasteSupported()) return null;
+
+  // ⚠ `??`, not `||`: `touch={false}` is a test asserting the hint is ABSENT
+  // on a pointer device, and `||` would silently re-probe and defeat it.
+  const showHint = touch ?? isTouchDevice();
 
   const rejectionMessage: string | null =
     rejection === 'denied'
@@ -154,7 +165,7 @@ export function PasteButton({
         the button looks broken to someone who never tapped "Copy" on the
         preview thumbnail.
       */}
-      {touch === true && <p data-testid="paste-hint">{PASTE_IOS_HINT}</p>}
+      {showHint && <p data-testid="paste-hint">{PASTE_IOS_HINT}</p>}
       {rejectionMessage !== null && (
         <p role="alert" data-testid="paste-rejection">
           {rejectionMessage}
