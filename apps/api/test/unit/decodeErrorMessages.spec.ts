@@ -17,6 +17,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  decodeErrorMessageFor,
   imageDecodeFailedMessage,
   imageDecodeOomMessage,
   imageTooLargeToDecodeMessage,
@@ -231,5 +232,118 @@ describe('T-IMG-020 the diagnostic decode messages are the specified text', () =
       expect(corrupt).not.toBe(memoryText);
     }
     expect(corrupt.toLowerCase()).not.toContain('memory');
+  });
+
+  // `decodeErrorMessageFor` is the dispatcher `ingest.ts` calls with whatever
+  // an `AppError` happened to carry. Its defensive branches decide whether the
+  // owner sees a diagnostic or the original message, so they are asserted
+  // directly rather than only through the two paths `ingestFiles` reaches.
+
+  it('T-IMG-020j: a code this module does not own keeps the ORIGINAL message', () => {
+    // Returning a decode diagnostic for, say, UNSUPPORTED_IMAGE_TYPE would
+    // tell the owner to buy memory for a file that was refused on format.
+    for (const code of ['UNSUPPORTED_IMAGE_TYPE', 'IMAGE_TOO_LARGE', 'VALIDATION_FAILED', '']) {
+      expect(decodeErrorMessageFor(code, 'a.heic', { width: 8064, height: 5952 })).toBeUndefined();
+    }
+  });
+
+  it('T-IMG-020k: the OOM and corrupt codes dispatch to their own builders', () => {
+    expect(decodeErrorMessageFor('IMAGE_DECODE_OOM', 'a.heic', undefined)).toBe(
+      imageDecodeOomMessage('a.heic'),
+    );
+    expect(decodeErrorMessageFor('IMAGE_DECODE_FAILED', 'a.heic', undefined)).toBe(
+      imageDecodeFailedMessage('a.heic'),
+    );
+  });
+
+  it('T-IMG-020l: the corrupt-file dispatch ignores any details it is handed', () => {
+    // Dimensions must not pull the corrupt-file message towards the memory
+    // wording just because the caller happened to know them.
+    const withDetails = decodeErrorMessageFor('IMAGE_DECODE_FAILED', 'a.heic', {
+      width: 8064,
+      height: 5952,
+      megapixels: 48,
+    });
+    expect(withDetails).toBe(imageDecodeFailedMessage('a.heic'));
+    expect(withDetails?.toLowerCase()).not.toContain('memory');
+    expect(withDetails).not.toContain(MEMORY_RUNBOOK_PATH);
+    expect(withDetails).not.toContain(UPSIZE_REMEDY);
+  });
+
+  it('T-IMG-020m: a guard refusal with NO measurements keeps the original message', () => {
+    // The alternative — interpolating `undefined` — renders "is NaN MP
+    // (undefined × undefined)", which is worse than the generic message it
+    // would have replaced.
+    expect(decodeErrorMessageFor('IMAGE_TOO_LARGE_TO_DECODE', 'a.heic', undefined)).toBeUndefined();
+    expect(decodeErrorMessageFor('IMAGE_TOO_LARGE_TO_DECODE', 'a.heic', {})).toBeUndefined();
+  });
+
+  it('T-IMG-020n: PARTIAL or non-numeric measurements keep the original message', () => {
+    const partial: readonly Readonly<Record<string, unknown>>[] = [
+      { width: 8064, height: 5952 },
+      { width: 8064, megapixels: 48 },
+      { height: 5952, megapixels: 48 },
+      { width: '8064', height: 5952, megapixels: 48 },
+      { width: Number.NaN, height: 5952, megapixels: 48 },
+      { width: 8064, height: Number.POSITIVE_INFINITY, megapixels: 48 },
+      { width: 8064, height: 5952, megapixels: null },
+    ];
+    for (const details of partial) {
+      expect(decodeErrorMessageFor('IMAGE_TOO_LARGE_TO_DECODE', 'a.heic', details)).toBeUndefined();
+    }
+  });
+
+  it('T-IMG-020o: a guard refusal without a stated limit falls back to the LIVE budget', () => {
+    // `maxMegapixels` is absent whenever the guard fired somewhere that did not
+    // bother to restate the ceiling. The fallback must still be the configured
+    // one, never a literal, or the message misstates the limit after a resize.
+    const message = decodeErrorMessageFor(
+      'IMAGE_TOO_LARGE_TO_DECODE',
+      'a.heic',
+      { width: 8064, height: 5952, megapixels: 48 },
+      { NEXTUP_MAX_DECODE_PIXELS: '50000000' },
+    );
+    expect(message).toContain('48.0 MP');
+    expect(message).toContain('50.0 MP');
+    expect(message).toContain('in a 1.0 GiB container');
+  });
+
+  it('T-IMG-020p: a stated limit in details WINS over the configured budget', () => {
+    const message = decodeErrorMessageFor(
+      'IMAGE_TOO_LARGE_TO_DECODE',
+      'a.heic',
+      { width: 8064, height: 5952, megapixels: 48, maxMegapixels: 25 },
+      { NEXTUP_MAX_DECODE_PIXELS: '50000000' },
+    );
+    expect(message).toContain('25.0 MP');
+    expect(message).not.toContain('50.0 MP');
+  });
+
+  it('T-IMG-020q: every builder reads the AMBIENT environment when given none', () => {
+    // The default `env = process.env` parameter is the production call shape:
+    // `ingest.ts` passes an env, but the builders are exported and a caller
+    // that omits it must still get live values rather than a compiled-in tier.
+    vi.stubEnv('NEXTUP_MAX_DECODE_PIXELS', '50000000');
+    try {
+      expect(imageDecodeOomMessage('a.heic')).toContain('1.0 GiB');
+      expect(
+        imageTooLargeToDecodeMessage({
+          fileName: 'a.heic',
+          megapixels: 60,
+          width: 10000,
+          height: 6000,
+          maxMegapixels: 50,
+        }),
+      ).toContain('in a 1.0 GiB container');
+      expect(
+        decodeErrorMessageFor('IMAGE_TOO_LARGE_TO_DECODE', 'a.heic', {
+          width: 10000,
+          height: 6000,
+          megapixels: 60,
+        }),
+      ).toContain('50.0 MP');
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
