@@ -53,6 +53,7 @@ import { IMAGE_RETENTION_DAYS, maxDecodePixels } from '../config.js';
 import { AppError } from '../errors/AppError.js';
 import { logLine, logTimestamp, type LogSink } from '../log.js';
 import { inspectDecodable } from './decodeGuard.js';
+import { decodeErrorMessageFor, imageTooLargeToDecodeMessage } from './decodeErrorMessages.js';
 import { isAcceptedUploadFormat, sniffUploadFormat } from './sniffFormat.js';
 import { blobPathFor, type ImageBlobStore } from '../storage/blobStore.js';
 
@@ -223,7 +224,7 @@ async function ingestOne(
       rejected: {
         fileName,
         code: verdict.code,
-        message: guardMessage(fileName, verdict),
+        message: guardMessage(fileName, verdict, context.env),
         details: {
           ...(verdict.width === undefined ? {} : { width: verdict.width }),
           ...(verdict.height === undefined ? {} : { height: verdict.height }),
@@ -306,7 +307,15 @@ async function ingestOne(
         transcodeRejection = {
           fileName,
           code: error.code,
-          message: error.message,
+          // ⚠ RE-COMPOSED HERE, WHERE THE FILE NAME IS KNOWN. The transcode
+          // stage is handed bytes, not a name, so its own message cannot name
+          // the file — and `ui.md` §3.2a item 1 requires the name, because a
+          // batch may hold 40 images and "an image was too large" is not
+          // actionable. Falls back to the stage's message for any code this
+          // module does not own, rather than inventing one.
+          message:
+            decodeErrorMessageFor(error.code, fileName, error.details, context.env) ??
+            error.message,
           details: error.details,
         };
       }
@@ -384,19 +393,21 @@ async function ingestOne(
 function guardMessage(
   fileName: string,
   verdict: Extract<ReturnType<typeof inspectDecodable>, { ok: false }>,
+  env: NodeJS.ProcessEnv = process.env,
 ): string {
-  // Final wording is TASK-155's (`api.md` §5.2.4). The two constraints that are
-  // already load-bearing and asserted by `T-IMG-020` are honoured here: a
-  // MEMORY refusal names memory and cites the runbook; the unsupported-format
-  // refusal mentions NEITHER, because more memory never fixes a corrupt file.
+  // The two constraints asserted by `T-IMG-020`: a MEMORY refusal names memory
+  // and cites the runbook; the unsupported-format refusal mentions NEITHER,
+  // because more memory never fixes a corrupt file.
   if (verdict.code === 'IMAGE_TOO_LARGE_TO_DECODE') {
-    return (
-      `${fileName} is ${(verdict.megapixels ?? 0).toFixed(1)} MP (${String(verdict.width)} × ${String(verdict.height)}). ` +
-      `nextup refuses anything above ${verdict.maxMegapixels.toFixed(1)} MP before allocating memory, ` +
-      'because decoding it would exhaust container memory and kill the import. ' +
-      'This is a memory limit, not a problem with your image. ' +
-      'Remedy: up-size compute — see docs/runbooks/scale-up-memory.md. ' +
-      'No other image in this batch was affected; re-attach this file after up-sizing.'
+    return imageTooLargeToDecodeMessage(
+      {
+        fileName,
+        megapixels: verdict.megapixels ?? 0,
+        width: verdict.width ?? 0,
+        height: verdict.height ?? 0,
+        maxMegapixels: verdict.maxMegapixels,
+      },
+      env,
     );
   }
   if (verdict.code === 'IMAGE_DIMENSIONS_UNSUPPORTED') {

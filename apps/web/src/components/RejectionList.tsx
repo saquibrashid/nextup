@@ -22,7 +22,7 @@
 
 import type { JSX } from 'react';
 
-import { DECODE_REMEDY_LINK_LABEL, MEMORY_REMEDY_PATH } from '../copy';
+import { DECODE_BATCH_UNAFFECTED, DECODE_REMEDY_LINK_LABEL, MEMORY_REMEDY_PATH } from '../copy';
 
 /** A per-file refusal the client itself decided (`ImageDropzone.reviewFiles`). */
 export interface RejectedFile {
@@ -50,6 +50,14 @@ export interface RejectionEntry {
   readonly code?: string;
   /** `ux-states.md` §4.6a — only the memory case offers the remedy. */
   readonly remedy?: string;
+  /**
+   * `ui.md` §3.2a item 3 — *"8064 × 5952 · 48.0 MP · limit 25.0 MP"*, for
+   * `IMAGE_TOO_LARGE_TO_DECODE` only. Absent when the server did not send the
+   * numbers, rather than rendered with zeroes.
+   */
+  readonly facts?: string;
+  /** `ui.md` §3.2a item 5 — the reassurance line, on every server refusal. */
+  readonly reassurance?: string;
 }
 
 /**
@@ -67,6 +75,44 @@ const MEMORY_CODES: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * `ui.md` §3.2a item 3 — the dimension facts, as secondary text, for
+ * `IMAGE_TOO_LARGE_TO_DECODE` only.
+ *
+ * ⚠ THIS IS THE ONE THING THE CLIENT FORMATS, AND IT FORMATS ONLY NUMBERS THE
+ * SERVER SENT. It does not re-derive the limit from a client constant — that
+ * is the mistake the header note forbids — it renders `details.maxMegapixels`,
+ * which the server computed from the LIVE `NEXTUP_MAX_DECODE_PIXELS`.
+ *
+ * ⚠ MEGApixels, to one decimal place. `details.megapixels` and
+ * `details.maxMegapixels` are MEGApixels; the raw pixel budget rendered here
+ * would read "limit 25000000.0 MP" (`specs/testing.md` §28.3(a)).
+ *
+ * Returns `undefined` rather than a partially-filled string when any number is
+ * missing: half a fact is worse than none in a diagnostic.
+ */
+function dimensionFacts(
+  details: Readonly<Record<string, unknown>> | undefined,
+): string | undefined {
+  const width = numeric(details?.['width']);
+  const height = numeric(details?.['height']);
+  const megapixels = numeric(details?.['megapixels']);
+  const maxMegapixels = numeric(details?.['maxMegapixels']);
+  if (
+    width === undefined ||
+    height === undefined ||
+    megapixels === undefined ||
+    maxMegapixels === undefined
+  ) {
+    return undefined;
+  }
+  return `${width} × ${height} · ${megapixels.toFixed(1)} MP · limit ${maxMegapixels.toFixed(1)} MP`;
+}
+
+function numeric(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+/**
  * Fold client and server refusals into one ordered list.
  *
  * Client entries come first because they were decided first, and because a
@@ -78,13 +124,26 @@ export function mergeRejections(
   server: readonly ServerRejection[],
 ): readonly RejectionEntry[] {
   const fromClient = client.map((file) => ({ name: file.name, reason: file.reason }));
-  const fromServer = server.map((rejection) => ({
-    // Verbatim on both fields. See the header note.
-    name: rejection.fileName,
-    reason: rejection.message,
-    code: rejection.code,
-    ...(MEMORY_CODES.has(rejection.code) ? { remedy: MEMORY_REMEDY_PATH } : {}),
-  }));
+  const fromServer = server.map((rejection) => {
+    const facts =
+      rejection.code === 'IMAGE_TOO_LARGE_TO_DECODE'
+        ? dimensionFacts(rejection.details)
+        : undefined;
+    return {
+      // Verbatim on both fields. See the header note.
+      name: rejection.fileName,
+      reason: rejection.message,
+      code: rejection.code,
+      ...(MEMORY_CODES.has(rejection.code) ? { remedy: MEMORY_REMEDY_PATH } : {}),
+      ...(facts === undefined ? {} : { facts }),
+      // ⚠ ALWAYS, on every SERVER refusal (`ui.md` §3.2a item 5). It is true
+      // by construction (`api.md` §5.2.1 — a per-file refusal never fails the
+      // request) and it is the half of the diagnostic that makes the failure
+      // non-frightening. It is NOT attached to client-side refusals: those
+      // files were never sent, so there is no batch state to reassure about.
+      reassurance: DECODE_BATCH_UNAFFECTED,
+    };
+  });
   return [...fromClient, ...fromServer];
 }
 
@@ -103,10 +162,21 @@ export function RejectionList({ entries }: RejectionListProps): JSX.Element | nu
         <li key={`${entry.name}:${entry.code ?? 'client'}`} data-testid="rejected-file">
           <span data-testid="rejected-name">{entry.name}</span>
           <span data-testid="rejected-reason">{entry.reason}</span>
+          {entry.facts !== undefined && <span data-testid="rejected-facts">{entry.facts}</span>}
           {entry.remedy !== undefined && (
-            <a data-testid="rejected-remedy" href={`/${entry.remedy}`}>
-              {DECODE_REMEDY_LINK_LABEL}
-            </a>
+            // ⚠ THE PATH IS RENDERED AS LITERAL TEXT AS WELL AS A LINK
+            // (`ui.md` §3.2a item 4), so it survives being read in a
+            // screenshot or pasted into a copied error report — which is
+            // exactly how this failure will actually be reported.
+            <span data-testid="rejected-remedy-block">
+              <a data-testid="rejected-remedy" href={`/${entry.remedy}`}>
+                {DECODE_REMEDY_LINK_LABEL}
+              </a>
+              <span data-testid="rejected-remedy-path">{entry.remedy}</span>
+            </span>
+          )}
+          {entry.reassurance !== undefined && (
+            <span data-testid="rejected-reassurance">{entry.reassurance}</span>
           )}
         </li>
       ))}

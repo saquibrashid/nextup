@@ -115,3 +115,60 @@ export function maxDecodePixels(env: NodeJS.ProcessEnv = process.env): number {
   if (!Number.isInteger(parsed) || parsed <= 0) return DEFAULT_MAX_DECODE_PIXELS;
   return parsed;
 }
+
+/**
+ * The two permitted compute sizings (REQ-079, invariant 14). Mirrors
+ * `tools/check-infra.mjs`'s `PERMITTED_PAIRS` and `infra/aca.bicep`'s comment
+ * block; `T-INFRA-005` fails CI on any deployment that is not one of these.
+ *
+ * ⚠ THE MEMORY FIGURE IS DERIVED FROM THE PIXEL BUDGET, NOT CONFIGURED
+ * SEPARATELY, and that is the whole point. REQ-079 says memory and the decode
+ * guard are ONE setting in two places. A separate `NEXTUP_CONTAINER_MEMORY`
+ * env var would be a third place, and the first time someone up-sized the
+ * container without updating it the diagnostic message would confidently tell
+ * the owner they are on 0.5 GiB while running on 1.0 GiB — a wrong diagnosis
+ * printed with total authority, which is worse than no diagnosis at all and is
+ * exactly the `RSK-016` failure mode `A43-M3` exists to close.
+ */
+export const COMPUTE_TIERS = [
+  { cpu: '0.25', memoryGiB: 0.5, maxDecodePixels: 25_000_000 },
+  { cpu: '0.5', memoryGiB: 1.0, maxDecodePixels: 50_000_000 },
+] as const;
+
+/**
+ * The container memory, in GiB, implied by the live pixel budget.
+ *
+ * An unrecognised budget (only reachable from a test that sets an arbitrary
+ * `NEXTUP_MAX_DECODE_PIXELS`, since CI rejects any other deployed pair) falls
+ * back to the largest tier at or below it, and to the smallest tier otherwise.
+ * Never throws: a diagnostic message must not be the thing that fails.
+ */
+export function containerMemoryGiB(env: NodeJS.ProcessEnv = process.env): number {
+  const pixels = maxDecodePixels(env);
+  let memoryGiB: number = COMPUTE_TIERS[0].memoryGiB;
+  for (const tier of COMPUTE_TIERS) {
+    if (tier.maxDecodePixels <= pixels) memoryGiB = tier.memoryGiB;
+  }
+  return memoryGiB;
+}
+
+/**
+ * The remedy offered by the memory messages (`api.md` §5.2.4, ADR-0008 R2.3),
+ * verbatim. Always the LARGER tier: the small tier is the only one an owner
+ * can be refused on in practice, and there is deliberately no third size to
+ * escalate to (`docs/runbooks/scale-up-memory.md`).
+ */
+export const UPSIZE_REMEDY = '0.5 vCPU / 1.0 GiB (+~$4/month)';
+
+/**
+ * The runbook path cited by both memory messages.
+ *
+ * ⚠ SPEC CONFLICT, RESOLVED IN FAVOUR OF THE WORK ORDER AND REPORTED, NOT
+ * EDITED. `api.md` §5.2.4 and ADR-0008 R2.3 write the shorthand
+ * `runbooks/scale-up-memory.md`; the TASK-155 backlog row requires the message
+ * to cite `docs/runbooks/scale-up-memory.md`. The backlog is the work order,
+ * and the repo-rooted path is the one that actually resolves, so the longer
+ * form wins — it contains the shorter as a substring, so `T-IMG-020`'s
+ * assertion holds either way.
+ */
+export const MEMORY_RUNBOOK_PATH = 'docs/runbooks/scale-up-memory.md';

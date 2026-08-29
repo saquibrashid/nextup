@@ -588,6 +588,45 @@ describe('T-UX-048 — the 409 offers both ways out', () => {
   });
 });
 
+describe('T-UI-013 — a decode rejection never takes the batch down', () => {
+  it('T-UI-013j: the accepted list and the ENABLED "Extract titles" button both survive', async () => {
+    // ⚠ US-004 AC-11's second half, and the reason it is asserted at the ROUTE
+    // and not on the card: the diagnostic is only half the containment. The
+    // other half is that the owner can still ship the images that worked. A
+    // client that clears the grid, closes the batch or disables submit on a
+    // per-file refusal turns one bad screenshot into a lost upload — and the
+    // card-level tests in `decodeDiagnostic.spec.tsx` would all still pass.
+    const { client } = stubClient({
+      addBatchImages: () =>
+        Promise.resolve(
+          attachResult(1, [
+            {
+              fileName: 'beach-list-03.heic',
+              code: 'IMAGE_TOO_LARGE_TO_DECODE',
+              message: 'beach-list-03.heic is 48.0 MP (8064 × 5952). … memory limit …',
+              details: { width: 8064, height: 5952, megapixels: 48, maxMegapixels: 25 },
+            },
+          ]),
+        ),
+    });
+    renderAt('/upload', <UploadRoute client={client} />, '/upload');
+
+    chooseServiceAndMode();
+    dropFiles([png('a.png'), png('beach-list-03.heic')]);
+
+    expect(await screen.findByTestId('rejected-name')).toHaveTextContent('beach-list-03.heic');
+    // The refusal is per-file: the good image is still attached…
+    expect(screen.getAllByTestId('accepted-file').length).toBeGreaterThan(0);
+    // …and the batch is still submittable (`ui.md` §3.2a, "The batch remains
+    // usable"). `api.md` §5.2.5: the remedy is a re-attach later, not a
+    // re-start now.
+    await waitFor(() => {
+      expect(screen.getByTestId('submit-button')).toBeEnabled();
+    });
+    expect(screen.queryByTestId('submit-reason')).not.toBeInTheDocument();
+  });
+});
+
 describe('T-UX-043 — every file rejected', () => {
   it('T-UX-043a: rejections are read from the error envelope, not just the 201', () => {
     const error = new ApiError('IMAGE_DECODE_FAILED', 422, 'That file could not be read.', {
