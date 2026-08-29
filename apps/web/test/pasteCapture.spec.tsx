@@ -57,6 +57,24 @@ function withClipboard(read: () => Promise<readonly ClipboardItem[]>): void {
 }
 
 /**
+ * Stubs the pointer-capability probe `isTouchDevice()` reads.
+ *
+ * ⚠ Needed because jsdom has no `matchMedia` at all, which is precisely how
+ * the hint defect hid: every existing hint case passed `touch` explicitly, so
+ * nothing ever exercised the inference — and there was no inference to
+ * exercise. A stub that answered every query `true` would be no better, so
+ * this one asserts the query it was asked.
+ */
+function withPointer(kind: 'coarse' | 'fine'): void {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query.includes('coarse') === (kind === 'coarse'),
+    media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }));
+}
+
+/**
  * A `paste` event carrying a real `DataTransfer`-shaped payload.
  *
  * jsdom's `ClipboardEvent` does not accept `clipboardData` through its
@@ -356,10 +374,59 @@ describe('T-PASTE-002 - the iOS button reads the clipboard inside the click hand
     expect(classifyRejection(undefined)).toBe('abandoned');
   });
 
-  it('T-PASTE-002i shows the iOS hint on a touch viewport, because screenshots go to Photos', () => {
+  it('T-PASTE-002i shows the iOS hint when the prop forces it on', () => {
     withClipboard(() => Promise.resolve([]));
     render(<PasteButton batchReady onImagesPasted={vi.fn()} touch />);
 
+    expect(screen.getByTestId('paste-hint').textContent).toBe(PASTE_IOS_HINT);
+  });
+
+  /**
+   * ⚠ `T-PASTE-002k`–`m` EXIST BECAUSE EVERY CASE ABOVE PASSES `touch`
+   * EXPLICITLY. `PasteButton` rendered the hint on `touch === true` and
+   * NOTHING in `apps/web/src` ever passed it, so the hint was dead code in
+   * production while both prop comments claimed it was "otherwise inferred
+   * from the viewport" — an inference that had never been written. `T-PASTE-002i`
+   * was even *named* for the touch viewport it did not exercise. Found at a
+   * 320 px viewport by the a11y suite (product invariant 16: the iOS path
+   * needs the visible button AND the instructions that make it usable).
+   */
+  it('T-PASTE-002k infers the hint from a coarse pointer, with no prop at all', () => {
+    withClipboard(() => Promise.resolve([]));
+    withPointer('coarse');
+    render(<PasteButton batchReady onImagesPasted={vi.fn()} />);
+
+    expect(screen.getByTestId('paste-hint').textContent).toBe(PASTE_IOS_HINT);
+  });
+
+  it('T-PASTE-002l shows no hint on a fine pointer — a narrow window is not a phone', () => {
+    withClipboard(() => Promise.resolve([]));
+    withPointer('fine');
+    render(<PasteButton batchReady onImagesPasted={vi.fn()} />);
+
+    // The hint is instructions for a TOUCH interaction. Keying it on width
+    // would show them to a desktop owner who resized their browser.
+    expect(screen.queryByTestId('paste-hint')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /paste screenshot/i })).toBeInTheDocument();
+  });
+
+  it('T-PASTE-002m lets `touch={false}` override a coarse pointer', () => {
+    withClipboard(() => Promise.resolve([]));
+    withPointer('coarse');
+    render(<PasteButton batchReady onImagesPasted={vi.fn()} touch={false} />);
+
+    // `??` and not `||`: with `||` an explicit `false` would silently re-probe.
+    expect(screen.queryByTestId('paste-hint')).not.toBeInTheDocument();
+  });
+
+  it('T-PASTE-002n reaches the hint through ImageDropzone, which passes no `touch`', () => {
+    withClipboard(() => Promise.resolve([]));
+    withPointer('coarse');
+    render(<ImageDropzone batchReady />);
+
+    // The SPA renders the dropzone exactly like this — `UploadRoute` supplies
+    // no `touch`. A fix that only worked when PasteButton was mounted directly
+    // would leave the real screen unchanged.
     expect(screen.getByTestId('paste-hint').textContent).toBe(PASTE_IOS_HINT);
   });
 
