@@ -35,24 +35,38 @@
  *      is green now, so shipping it with an empty baseline is a statement that
  *      an unmounted screen is never acceptable.
  *
- * ⚠ **BOTH MATCHERS ARE DELIBERATELY LOOSE.** A method referenced anywhere
- * under `src` — called, aliased, or passed as a prop reference — counts as
- * reached, and a module imported by any other `src` module counts as mounted.
- * The gate must not produce a single false positive: a reachability gate that
- * cries wolf gets a baseline entry added to silence it, and then it protects
- * nothing. It is a smoke alarm, not a proof of liveness.
+ * ⚠ **MATCHER A REQUIRES A CALL FORM (`.method(`); MATCHER B IS STILL LOOSE.**
+ * A module imported by any other `src` module counts as mounted, because a
+ * false positive there is worse than a miss: a reachability gate that cries
+ * wolf gets a baseline entry added to silence it, and then it protects
+ * nothing. But matcher A's looseness cost a shipped dead feature (below), so
+ * it now demands an actual invocation. Both properties are still smoke
+ * alarms, not proofs of liveness — a called method may still be called from
+ * a screen the owner cannot reach.
+ *
+ * ~~Superseded: "**BOTH MATCHERS ARE DELIBERATELY LOOSE.** A method
+ * referenced anywhere under `src` — called, aliased, or passed as a prop
+ * reference — counts as reached."~~ — the exact hole that let the
+ * undo-at-close defect ship.
  *
  * ⚠ **AND THE LOOSENESS COST US ONE, EXACTLY AS DESCRIBED ABOVE.** The note
  * below was accurate and its consequence was a shipped dead feature:
  * `undoBatch` and `undoRemovalGroup` were mentioned only in the PROP
- * DECLARATIONS of `ListPage` and `BatchAppliedNotice`, which satisfied this
- * matcher while nothing ever called them — `ReviewRoute` threw the close
+ * DECLARATIONS of `ListPage` and `BatchAppliedNotice`, which satisfied the
+ * old matcher while nothing ever called them — `ReviewRoute` threw the close
  * result away and `ListRoute` passed neither handler. `T-DATA-011`
  * (`apps/web/test/appliedUndoWiring.spec.tsx`) is the assertion that can see
- * that, because it drives the real containers end to end. **The generalisable
- * lesson: this gate proves a NAME IS MENTIONED, never that a CHAIN IS
- * CONNECTED. Do not read a green run here as evidence a feature is live.**
- * Both methods are now genuinely called from `ListRoute`.
+ * that, because it drives the real containers end to end.
+ *
+ * **Matcher A has since been tightened to `\.method\s*\(`, and the
+ * tightening was verified against the real defect: with `ListRoute`'s
+ * `client.undoBatch(batchId)` replaced by a no-op, the old matcher stayed
+ * GREEN and the new one reports `['undoBatch']`.** `T-INFRA-013e` guards the
+ * distinction directly so it cannot quietly loosen again.
+ *
+ * ⚠ **The generalisable lesson survives the fix: a static gate proves a
+ * CALL EXISTS IN A FILE, never that a CHAIN IS CONNECTED at runtime. Do not
+ * read a green run here as evidence a feature is live.**
  *
  * ~~Superseded: "`undoBatch` and `undoRemovalGroup` are reached ONLY as prop
  * references today and the loose matcher is what keeps them honestly out of
@@ -90,6 +104,28 @@ const CLIENT = path.join(SRC, 'lib', 'apiClient.ts');
  */
 const BASELINE_UNREACHED = new Set(['getTitle', 'removeBatchImage']);
 
+/**
+ * A CALL, not a mention.
+ *
+ * ⚠ This gate previously matched a bare `\bmethod\b` anywhere under
+ * `apps/web/src`, which meant a PROP DECLARATION counted as a call. That is
+ * exactly how `undoBatch`/`undoRemovalGroup` passed `T-INFRA-013b` while
+ * `BatchAppliedNotice` — the undo offered at the moment of the close, a
+ * `must`-level AC — had never rendered once: both names appeared in
+ * `ListPage.tsx` and `BatchAppliedNotice.tsx` as prop types, and nothing
+ * ever invoked them. The old matcher proved a name was MENTIONED; it never
+ * proved a chain was CONNECTED.
+ *
+ * Every client call in this SPA goes through an instance, so `.method(` is
+ * the real form. A destructured `const { getList } = client` would evade
+ * this — deliberately: the gate ratchets against the call style the codebase
+ * actually uses, and adopting a new one should be a conscious edit here
+ * rather than a silent hole.
+ */
+function callForm(method: string): RegExp {
+  return new RegExp(`\\.${method}\\s*\\(`);
+}
+
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -123,9 +159,9 @@ describe('T-INFRA-013 nothing finished is left unreachable', () => {
     expect(methods).toContain('fixMatch');
   });
 
-  it('T-INFRA-013b: every client method is reached from somewhere in the SPA', () => {
+  it('T-INFRA-013b: every client method is CALLED from somewhere in the SPA', () => {
     const unreached = clientMethods().filter((method) => {
-      const reference = new RegExp(`\\b${method}\\b`);
+      const reference = callForm(method);
       for (const [file, text] of TEXT) {
         if (file === CLIENT) continue;
         if (reference.test(text)) return false;
@@ -142,7 +178,7 @@ describe('T-INFRA-013 nothing finished is left unreachable', () => {
     const methods = new Set(clientMethods());
     const stale = [...BASELINE_UNREACHED].filter((method) => {
       if (!methods.has(method)) return true;
-      const reference = new RegExp(`\\b${method}\\b`);
+      const reference = callForm(method);
       for (const [file, text] of TEXT) {
         if (file === CLIENT) continue;
         if (reference.test(text)) return true;
@@ -170,5 +206,32 @@ describe('T-INFRA-013 nothing finished is left unreachable', () => {
     });
 
     expect(unmounted.map((f) => path.relative(ROOT, f))).toEqual([]);
+  });
+
+  it('T-INFRA-013e: a prop declaration is NOT a call — the matcher itself is guarded', () => {
+    // ⚠ THE GATE'S OWN REGRESSION TEST. T-INFRA-013b was green for the whole
+    // life of the undo-at-close defect because its matcher was a bare
+    // `\bundoBatch\b`, and `BatchAppliedNotice.tsx` DECLARES a prop by that
+    // name. Loosening `callForm` back to a mention would silently restore
+    // that blind spot with every other assertion in this file still passing,
+    // so the distinction is asserted directly rather than left to review.
+    const declarations = [
+      '  readonly undoBatch?: (batchId: string) => Promise<void>;',
+      '  undoBatch,',
+      'onUndoBatch={handler}',
+      'type X = { undoBatch: Fn };',
+    ];
+    for (const line of declarations) {
+      expect(callForm('undoBatch').test(line)).toBe(false);
+    }
+
+    const calls = [
+      'void client.undoBatch(batchId)',
+      'await api.undoBatch (id)',
+      'return this.undoBatch(\n  batchId,\n)',
+    ];
+    for (const line of calls) {
+      expect(callForm('undoBatch').test(line)).toBe(true);
+    }
   });
 });
