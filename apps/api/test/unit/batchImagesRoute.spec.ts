@@ -21,7 +21,7 @@
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 
-import { MAX_BATCH_UPLOAD_BYTES, MAX_IMAGES_PER_BATCH } from '@nextup/domain';
+import { MAX_BATCH_UPLOAD_BYTES, MAX_IMAGE_BYTES, MAX_IMAGES_PER_BATCH } from '@nextup/domain';
 import type { Express } from 'express';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -259,6 +259,52 @@ describe('T-IMG-010 whole-request ceilings refuse the request, not a file', () =
     expect(body.error.details['max']).toBe(MAX_BATCH_UPLOAD_BYTES);
     expect(body.error.details['current']).toBe(MAX_BATCH_UPLOAD_BYTES);
     expect(body.error.details['current']).not.toBe(MAX_BATCH_UPLOAD_BYTES * 3);
+  });
+
+  /**
+   * ⚠ THESE TWO CASES EXIST BECAUSE THE ROUTE RETURNED 500 FOR AN OVERSIZED
+   * IMAGE. Multer's own `limits` abort the multipart stream and raise a
+   * `MulterError`, which nothing mapped — so the envelope's catch-all turned a
+   * ceiling the product deliberately enforces into `INTERNAL_ERROR`, telling
+   * the owner that nextup had broken when in fact their file was too big. The
+   * distinction is not cosmetic: `IMAGE_TOO_LARGE` is actionable and
+   * `INTERNAL_ERROR` is not, and this is the one screen where the owner is
+   * adding data and most needs to be told what to do next.
+   *
+   * Found by the TASK-163 ingest-parity suite (`T-PASTE-007`), which requires
+   * an 11 MB paste to be 413 `IMAGE_TOO_LARGE`.
+   *
+   * ⚠ The bytes here must exceed `MAX_IMAGE_BYTES` by more than one byte:
+   * multer's `fileSize` is set to `MAX_IMAGE_BYTES + 1` so that a file AT the
+   * limit still reaches the pipeline, which judges it per-file. A fixture of
+   * exactly `MAX_IMAGE_BYTES + 1` would take the pipeline path and pass this
+   * assertion for the wrong reason.
+   */
+  it('T-IMG-010k: an image past multer’s backstop is 413 IMAGE_TOO_LARGE, never 500', async () => {
+    const oversized = pngBytes(1179, 2556, MAX_IMAGE_BYTES);
+
+    const res = await postImages([{ name: 'huge.png', bytes: oversized }]);
+
+    expect(res.status).toBe(413);
+    const body = (await res.json()) as ErrorBody;
+    expect(body.error.code).toBe('IMAGE_TOO_LARGE');
+    expect(body.error.code).not.toBe('INTERNAL_ERROR');
+    // The owner is told the actual ceiling, not just that something was wrong.
+    expect(body.error.details['maxByteSize']).toBe(MAX_IMAGE_BYTES);
+    expect(createUploadedImage).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+  });
+
+  it('T-IMG-010l: the oversize refusal is identical for a pasted image (invariant 17)', async () => {
+    const oversized = pngBytes(1179, 2556, MAX_IMAGE_BYTES);
+
+    const res = await postImages([{ name: 'pasted.png', bytes: oversized }], 'paste');
+
+    // Ceilings are not conditioned on the client-declared ingest source. A
+    // route that mapped this error only on the upload path would leave paste
+    // returning 500 while every upload-path test stayed green.
+    expect(res.status).toBe(413);
+    expect(((await res.json()) as ErrorBody).error.code).toBe('IMAGE_TOO_LARGE');
   });
 });
 

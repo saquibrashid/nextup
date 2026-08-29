@@ -21,7 +21,7 @@
  * and never changes `batchTotals` for the others (REQ-080/081, `T-IMG-018`).
  */
 
-import { type Request, type Router } from 'express';
+import { type Request, type RequestHandler, type Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import multer from 'multer';
 import {
@@ -46,21 +46,93 @@ import { ingestFiles, type IncomingFile, type IngestStages } from '../images/ing
 import { stripAllMetadata, transcodeHeicToPng } from '../images/transcode.js';
 import { azureImageBlobStore, type ImageBlobStore } from '../storage/blobStore.js';
 
+const BYTES_PER_MIB = 1024 * 1024;
+
 /**
  * In-memory multipart, because every downstream stage — the sniff, the header
  * read, the guard, the transcode — wants bytes, and a temp file would only add
  * a cleanup path that can leak screenshots onto the container's disk.
  *
- * `limits.fileSize` is set one byte ABOVE `MAX_IMAGE_BYTES` deliberately: the
- * spec's answer to an oversized image is a per-file `rejected[]` entry
- * (`IMAGE_TOO_LARGE`), not a failed request, so multer must let the file
- * through for the pipeline to judge it. The limit here is only a backstop
- * against an unbounded stream.
+ * `limits.fileSize` is set one byte ABOVE `MAX_IMAGE_BYTES` so that a file of
+ * exactly the limit reaches the pipeline and is judged there. It is a backstop
+ * against an unbounded stream at 0.5 GiB of RAM, and it must stay one: raising
+ * it so the pipeline can judge every oversized file would let ten 60 MiB
+ * uploads into memory at once.
+ *
+ * ~~"…so the spec's answer to an oversized image is a per-file `rejected[]`
+ * entry (`IMAGE_TOO_LARGE`), not a failed request, so multer must let the file
+ * through for the pipeline to judge it."~~ ⚠ **THAT COMMENT DESCRIBED A
+ * BEHAVIOUR THE CODE DID NOT HAVE.** The window it describes is exactly ONE
+ * byte wide: at `MAX_IMAGE_BYTES + 1` multer aborts the stream, so anything
+ * genuinely oversized — an 11 MB paste, say — never reached the pipeline at
+ * all. The `MulterError` was then unmapped and surfaced as **500
+ * `INTERNAL_ERROR`** where `specs/api.md` §5.3.1 and `T-PASTE-007` both
+ * require **413 `IMAGE_TOO_LARGE`**. Found by the TASK-163 ingest-parity
+ * suite. `mapMulterError` below is the fix.
  */
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_IMAGE_BYTES + 1, files: MAX_FILES_PER_REQUEST + 1 },
 });
+
+/**
+ * Multer's own limit breaches, translated into the closed error enum.
+ *
+ * ⚠ **A CEILING THAT IS ENFORCED BUT NOT NAMED IS A 500.** Every value in
+ * `limits` above can abort the request, and Express hands the resulting
+ * `MulterError` to the envelope middleware, which has no reason to treat an
+ * unrecognised error as anything but `INTERNAL_ERROR`. The owner is then told
+ * that nextup broke, when in fact they attached a file that is too big — a
+ * message that is both false and unactionable, and one that `RSK`-wise reads
+ * as data loss on the one screen where the owner is adding data.
+ *
+ * ⚠ **THE `413` IS WHOLE-REQUEST, AND THAT IS A KNOWN NARROWING OF PARTIAL
+ * ACCEPTANCE (US-004 AC-6), REPORTED NOT HIDDEN.** Multer aborts the stream on
+ * the offending part, so the valid files alongside an oversized one cannot be
+ * recovered and the request fails as a whole rather than returning `201` with
+ * a `rejected[]` entry. Fixing that properly means buffering past the ceiling,
+ * which is precisely what the 0.5 GiB budget (product invariant 14) forbids.
+ * The pipeline's per-file `IMAGE_TOO_LARGE` in `images/ingest.ts` still covers
+ * every file that fits under the backstop.
+ */
+export function mapMulterError(err: unknown): unknown {
+  if (!(err instanceof multer.MulterError)) {
+    return err;
+  }
+  switch (err.code) {
+    case 'LIMIT_FILE_SIZE':
+      return new AppError(
+        'IMAGE_TOO_LARGE',
+        413,
+        `That image is larger than the ${MAX_IMAGE_BYTES / BYTES_PER_MIB} MiB limit for a single image.`,
+        { maxByteSize: MAX_IMAGE_BYTES },
+      );
+    case 'LIMIT_FILE_COUNT':
+      return new AppError(
+        'TOO_MANY_FILES_IN_REQUEST',
+        400,
+        `Attach at most ${MAX_FILES_PER_REQUEST} files per request.`,
+        { max: MAX_FILES_PER_REQUEST },
+      );
+    case 'LIMIT_UNEXPECTED_FILE':
+      return new AppError('VALIDATION_FAILED', 400, 'Attach images under the "files" field.', {
+        field: 'files',
+      });
+    default:
+      return err;
+  }
+}
+
+/**
+ * `upload.array('files')` with its errors translated. Multer is invoked
+ * explicitly rather than mounted directly so the `MulterError` can be mapped
+ * before Express ever sees it.
+ */
+export const acceptUploads: RequestHandler = (req, res, next) => {
+  upload.array('files')(req, res, (err: unknown) => {
+    next(err === undefined || err === null ? undefined : mapMulterError(err));
+  });
+};
 
 /**
  * The pipeline's two byte-level stages, wired.
@@ -117,7 +189,7 @@ export function registerBatchImageRoutes(
   store: ImageBlobStore = azureImageBlobStore,
   stages: IngestStages = DEFAULT_STAGES,
 ): void {
-  router.post('/batches/:batchId/images', upload.array('files'), async (req, res) => {
+  router.post('/batches/:batchId/images', acceptUploads, async (req, res) => {
     const ownerId = requireOwnerId(req);
     const batchId = firstParam(req.params.batchId);
 
