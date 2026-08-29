@@ -16,13 +16,41 @@
 import { useCallback, useState, type JSX } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { apiClient, type ApiClient, type CandidatePatchBody } from '../lib/apiClient';
+import {
+  apiClient,
+  type ApiClient,
+  type CandidatePatchBody,
+  type CloseBatchResult,
+} from '../lib/apiClient';
+import { type AppliedBatch } from '../components/BatchAppliedNotice';
 import { useResource } from '../lib/useResource';
 import { RefusalPage } from '../pages/RefusalPage';
 import { ReviewPage, type ConfirmableSection } from '../pages/ReviewPage';
 
 export interface ReviewRouteProps {
   readonly client?: ApiClient;
+}
+
+/**
+ * The §6.22 close response, narrowed to what the notice needs.
+ *
+ * ⚠ **`service` MOVES.** The wire nests it under `serviceState`, the notice
+ * reads it flat, and nothing in between would have caught the difference: a
+ * mis-mapped `service` renders `undefined` inside the summary sentence rather
+ * than throwing. Mapping here keeps the wire shape at the one boundary that
+ * knows it, and leaves `ListRoute` free to distrust whatever history hands it.
+ */
+export function toAppliedBatch(result: CloseBatchResult): AppliedBatch {
+  return {
+    batchId: result.batchId,
+    service: result.serviceState.service,
+    summary: {
+      listingsCreated: result.summary.listingsCreated,
+      listingsRemoved: result.summary.listingsRemoved,
+      removalGroupId: result.summary.removalGroupId,
+    },
+    undoable: result.undoable,
+  };
 }
 
 export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.Element {
@@ -61,7 +89,29 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
     (confirmRemovals: boolean): void => {
       // `confirmRemovals` is carried through EXACTLY as the page computed it:
       // it is `true` only once the owner has been through the §6.10 dialog.
-      void client.closeBatch(batchId, confirmRemovals).then(() => navigate('/'));
+      //
+      // ⚠ **THE CLOSE RESULT IS CARRIED TO THE LIST, NOT DISCARDED.** US-017
+      // AC-1 requires the undo to be offered *immediately* after confirmation,
+      // and `BatchAppliedNotice` on `/` is where §6.13 puts it. This route
+      // previously ran `.then(() => navigate('/'))`, dropping the only copy of
+      // the summary that exists — `removalGroupId` and `undoable` are not
+      // derivable from `GET /api/titles`, so the notice could never render and
+      // the owner who mis-ticked a removal had no offered way back.
+      //
+      // History state, not a store: it belongs to THIS navigation. A module
+      // variable would re-show the notice on the next visit to `/`, and the
+      // back button would take the owner to a screen still claiming a batch
+      // had just been applied.
+      void client.closeBatch(batchId, confirmRemovals).then(
+        (result) => {
+          navigate('/', { state: { applied: toAppliedBatch(result) } });
+        },
+        () => {
+          // A failed close must NOT navigate: the batch is still in review and
+          // the list has not changed. Sending the owner to `/` would show them
+          // an unchanged list as though the close had succeeded.
+        },
+      );
     },
     [batchId, client, navigate],
   );

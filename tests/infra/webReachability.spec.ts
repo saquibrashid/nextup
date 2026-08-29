@@ -40,9 +40,24 @@
  * reached, and a module imported by any other `src` module counts as mounted.
  * The gate must not produce a single false positive: a reachability gate that
  * cries wolf gets a baseline entry added to silence it, and then it protects
- * nothing. It is a smoke alarm, not a proof of liveness. `undoBatch` and
- * `undoRemovalGroup` are reached ONLY as prop references today and the loose
- * matcher is what keeps them honestly out of the baseline.
+ * nothing. It is a smoke alarm, not a proof of liveness.
+ *
+ * ⚠ **AND THE LOOSENESS COST US ONE, EXACTLY AS DESCRIBED ABOVE.** The note
+ * below was accurate and its consequence was a shipped dead feature:
+ * `undoBatch` and `undoRemovalGroup` were mentioned only in the PROP
+ * DECLARATIONS of `ListPage` and `BatchAppliedNotice`, which satisfied this
+ * matcher while nothing ever called them — `ReviewRoute` threw the close
+ * result away and `ListRoute` passed neither handler. `T-DATA-011`
+ * (`apps/web/test/appliedUndoWiring.spec.tsx`) is the assertion that can see
+ * that, because it drives the real containers end to end. **The generalisable
+ * lesson: this gate proves a NAME IS MENTIONED, never that a CHAIN IS
+ * CONNECTED. Do not read a green run here as evidence a feature is live.**
+ * Both methods are now genuinely called from `ListRoute`.
+ *
+ * ~~Superseded: "`undoBatch` and `undoRemovalGroup` are reached ONLY as prop
+ * references today and the loose matcher is what keeps them honestly out of
+ * the baseline."~~ — true when written, and the defect it describes has since
+ * been found and fixed.
  */
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';

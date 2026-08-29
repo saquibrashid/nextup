@@ -13,7 +13,7 @@
  * they would be subtly different on at least one of them (REQ-097).
  */
 
-import type { BatchProvenance, ErrorCode, ReviewResponse } from '@nextup/domain';
+import type { BatchProvenance, ErrorCode, ReviewResponse, Service } from '@nextup/domain';
 
 import type { TitleListItem as WireTitleListItem } from '../components/TitleRow';
 import type { ServiceFreshness as WireServiceFreshness } from '../components/FreshnessStrip';
@@ -216,6 +216,34 @@ export interface TitleListResponse {
 
 export interface ServiceStateResponse {
   services: WireServiceFreshness[];
+}
+
+/**
+ * The §6.22 close response.
+ *
+ * ⚠ **THIS TYPE IS THE UNDO AFFORDANCE.** `closeBatch` was declared
+ * `request<unknown>` and its result was thrown away by `ReviewRoute`, so the
+ * only moment US-017 AC-1 requires the undo to be offered — *immediately*
+ * after confirmation — had no data behind it and `BatchAppliedNotice` never
+ * rendered. The component, its twenty `T-UX-065` assertions and both client
+ * undo calls were all complete; nothing carried the summary from the close to
+ * the list.
+ *
+ * `removalGroupId` and `undoable` are the two fields `undoOffer` discriminates
+ * on, and they are the reason this cannot be reconstructed on the list from
+ * `GET /api/titles`: which group a close created is knowable only from the
+ * close itself.
+ */
+export interface CloseBatchResult {
+  readonly batchId: string;
+  readonly status: string;
+  readonly summary: {
+    readonly listingsCreated: number;
+    readonly listingsRemoved: number;
+    readonly removalGroupId: string | null;
+  };
+  readonly serviceState: { readonly service: Service };
+  readonly undoable: boolean;
 }
 
 /**
@@ -667,7 +695,7 @@ export function createApiClient(deps: ApiClientDeps = {}) {
      * confirmation into a formality.
      */
     closeBatch: (batchId: string, confirmRemovals: boolean) =>
-      request<unknown>(
+      request<CloseBatchResult>(
         `/api/batches/${encodeURIComponent(batchId)}/close`,
         { method: 'POST', body: { confirmRemovals } },
         deps,
