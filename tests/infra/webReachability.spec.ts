@@ -66,10 +66,14 @@ const CLIENT = path.join(SRC, 'lib', 'apiClient.ts');
  *   fetches a single title yet.
  * - `removeBatchImage` — `DELETE /api/batches/:batchId/images/:imageId`. The
  *   upload screen's per-image remove control is not built.
- * - `restoreListing` — `POST /api/listings/:listingId/restore`. The restore UI
- *   is TASK-099 and the removed view it hangs off is unbuilt.
+ *
+ * ~~`restoreListing` — the restore UI is TASK-099 and the removed view it
+ * hangs off is unbuilt.~~ **DISCHARGED.** The gate was right and the diagnosis
+ * was wrong: TASK-099's restore control WAS built, and `RemovedPage` was
+ * mounted bare by `routes.tsx`, so nothing could reach it. `RemovedRoute` now
+ * wires it (`T-DATA-002z`).
  */
-const BASELINE_UNREACHED = new Set(['getTitle', 'removeBatchImage', 'restoreListing']);
+const BASELINE_UNREACHED = new Set(['getTitle', 'removeBatchImage']);
 
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];

@@ -91,6 +91,7 @@ describe('T-DATA-003 — every method sends credentials', () => {
       getTitle: () => client.getTitle('ttl_1'),
       getServiceState: () => client.getServiceState(),
       getSuppressions: () => client.getSuppressions(),
+      getRemoved: () => client.getRemoved(''),
       suppressTitle: () => client.suppressTitle('ttl_1'),
       unsuppress: () => client.unsuppress('sup_1'),
       createBatch: () => client.createBatch('netflix', 'append'),

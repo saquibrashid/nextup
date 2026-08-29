@@ -22,7 +22,7 @@ import { BatchStatusRoute } from './containers/BatchStatusRoute';
 import { ListRoute } from './containers/ListRoute';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { RatingLookupPage } from './pages/RatingLookupPage';
-import { RemovedPage } from './pages/RemovedPage';
+import { RemovedRoute } from './containers/RemovedRoute';
 import { ReviewRoute } from './containers/ReviewRoute';
 import { SuppressedRoute } from './containers/SuppressedRoute';
 import { UploadRoute } from './containers/UploadRoute';
@@ -72,7 +72,7 @@ export const ROUTES: readonly RouteDefinition[] = [
   },
   {
     path: '/removed',
-    Component: RemovedPage,
+    Component: RemovedRoute,
     examplePath: '/removed',
     navLabel: 'Removal history',
   },
