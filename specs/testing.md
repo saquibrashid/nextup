@@ -3842,6 +3842,33 @@ for `/removed`, and `ac` is the only case in the block that fails on it. See
 `T-INFRA-013` (§14), the gate that now catches this class mechanically —
 `T-INFRA-013b` is what surfaced `/removed` in the first place.
 
+### 36.2b `T-DATA-011` — the undo offered at the close
+
+| Id | Asserts | AC |
+|---|---|---|
+| `T-DATA-011a` `T-DATA-011b` `T-DATA-011c` `T-DATA-011d` `T-DATA-011e` `T-DATA-011f` `T-DATA-011g` | The close→list→undo chain, end to end (`apps/web/test/appliedUndoWiring.spec.tsx`) | US-017 AC-1, `ux-states.md` §6.13, `api.md` §6.22/§6.25/§6.26 |
+
+In order: `T-DATA-011a` — applying a batch lands on the list **with the notice
+rendered and its sentence naming the right service and counts**;
+`T-DATA-011b` — an ordinary visit shows no notice; `T-DATA-011c` — a **failed**
+close does not navigate, because an unchanged list reads as a close that
+succeeded and changed nothing; `T-DATA-011d` — the removals undo calls
+`undoRemovalGroup` with the group id **and never the batch undo**;
+`T-DATA-011e` — a creates-only batch calls `undoBatch` with the batch id;
+`T-DATA-011f` — history state from an older build renders no notice and does
+not throw; `T-DATA-011g` — the state guard checks **every** field, not merely
+the presence of `applied`.
+
+⚠ **This block exists because `T-INFRA-013b` structurally cannot see this
+defect class.** `BatchAppliedNotice` was complete with twenty `T-UX-065`
+assertions, both client undo methods existed and were tested, and both server
+undo endpoints existed and were tested — and the notice had never once
+rendered, because `ReviewRoute` discarded the close result and `ListRoute`
+passed neither `applied` nor either handler. The reachability matcher counted
+the two methods as reached because their **prop declarations** mention them.
+A reachability gate proves a name is mentioned; only a test that drives the
+real containers together proves a chain is connected.
+
 ### 36.3 What is deliberately not asserted here
 
 **Cache coherence and revalidation.** There is no cache to be coherent (D-1),

@@ -13,8 +13,9 @@
  */
 
 import type { JSX } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 
+import { type AppliedBatch } from '../components/BatchAppliedNotice';
 import { isFiltered, parseFilters } from '../components/FilterBar';
 import { apiClient, type ApiClient, type TitleListItem } from '../lib/apiClient';
 import { useResource } from '../lib/useResource';
@@ -31,10 +32,50 @@ export function collectGenres(items: readonly TitleListItem[]): string[] {
   return [...new Set(items.flatMap((item) => item.genres))].sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * The `location.state` left by `ReviewRoute` after a close, narrowed to an
+ * `AppliedBatch` or to `undefined`.
+ *
+ * ⚠ **VALIDATED, NEVER CAST.** History state is not trusted input: it survives
+ * a reload, it is restored by the back button, and a browser session restored
+ * across a deploy can hand this route a shape from an older build. A cast
+ * would put `undefined.listingsRemoved` into the notice's copy and blank the
+ * list with a render error — on the one screen whose whole job is to prove
+ * nothing was lost.
+ *
+ * ⚠ Returns `undefined` rather than a default notice. There is no safe
+ * fallback: a notice with invented counts, or one offering an undo whose
+ * `removalGroupId` we do not have, is worse than no notice at all.
+ */
+export function parseAppliedState(state: unknown): AppliedBatch | undefined {
+  if (typeof state !== 'object' || state === null) return undefined;
+  const applied = (state as { applied?: unknown }).applied;
+  if (typeof applied !== 'object' || applied === null) return undefined;
+
+  const { batchId, service, summary, undoable } = applied as Record<string, unknown>;
+  if (typeof batchId !== 'string' || batchId === '') return undefined;
+  if (service !== 'netflix' && service !== 'max') return undefined;
+  if (typeof undoable !== 'boolean') return undefined;
+  if (typeof summary !== 'object' || summary === null) return undefined;
+
+  const { listingsCreated, listingsRemoved, removalGroupId } = summary as Record<string, unknown>;
+  if (typeof listingsCreated !== 'number' || typeof listingsRemoved !== 'number') return undefined;
+  if (removalGroupId !== null && typeof removalGroupId !== 'string') return undefined;
+
+  return {
+    batchId,
+    service,
+    summary: { listingsCreated, listingsRemoved, removalGroupId },
+    undoable,
+  };
+}
+
 export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Element {
   const [params] = useSearchParams();
+  const location = useLocation();
   const query = params.toString();
   const filtered = isFiltered(parseFilters(params));
+  const applied = parseAppliedState(location.state);
 
   const titles = useResource((signal) => client.getTitles(query, signal), `titles:${query}`);
 
@@ -77,12 +118,19 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
     all.resource.kind === 'ok' && all.resource.value !== null ? all.resource.value.items : items;
 
   /**
-   * ⚠ KNOWN GAP, DELIBERATELY NOT PAPERED OVER: `removedCount` is not passed,
-   * because `GET /api/removed` (§6.9) does not exist yet — it belongs to Epic
-   * H. Its default of 0 is wrong in exactly one case: an empty list where
-   * titles were removed and none suppressed, which then reads "Nothing here
-   * yet" instead of "Nothing on your list right now". Inventing a number would
-   * hide that; leaving it defaulted keeps it findable and grep-able.
+   * ⚠ KNOWN GAP, DELIBERATELY NOT PAPERED OVER: `removedCount` is not passed.
+   * `GET /api/removed` (§6.9) and `client.getRemoved` now both exist, so the
+   * blocker is no longer availability but cost: reading it would add a fourth
+   * request to every list load on a single 0.25 vCPU replica to answer a
+   * question that only matters when the unfiltered list came back empty. Its
+   * default of 0 is wrong in exactly one case: an empty list where titles were
+   * removed and none suppressed, which then reads "Nothing here yet" instead
+   * of "Nothing on your list right now" (US-019 AC-5). Inventing a number
+   * would hide that; leaving it defaulted keeps it findable and grep-able.
+   *
+   * ~~Superseded: "because `GET /api/removed` (§6.9) does not exist yet — it
+   * belongs to Epic H."~~ The endpoint shipped with TASK-099; the comment
+   * outlived the fact it asserted.
    *
    * ⚠ `total` is capped at one page until the API returns a count, because
    * §6.2 answers with `items`/`nextCursor`/`limit` and no total. It is only
@@ -103,6 +151,19 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
       loading={titles.resource.kind === 'loading'}
       loadFailed={titles.resource.kind === 'failed'}
       onRetry={titles.reload}
+      /*
+        ⚠ THE UNDO CHAIN (US-017 AC-1, §6.13). `applied` is present only on the
+        navigation `ReviewRoute` makes after a successful close; on every
+        ordinary visit it is `undefined` and the notice does not render.
+
+        ⚠ The two handlers are passed UNCONDITIONALLY, even when `applied` is
+        absent. `ListPage` substitutes `rejectMissingHandler` for a missing
+        one, so a notice wired to `applied` alone would render an Undo button
+        whose only possible outcome is the failure message.
+      */
+      {...(applied !== undefined ? { applied } : {})}
+      onUndoRemovalGroup={(groupId) => client.undoRemovalGroup(groupId)}
+      onUndoBatch={(batchId) => client.undoBatch(batchId)}
       /*
         ⚠ THE FOUR ROW-ACTION CALLS. Without these the `⋮` renders and does
         nothing — the defect this wiring exists to close. They are passed as a
