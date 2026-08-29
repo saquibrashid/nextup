@@ -18,6 +18,7 @@ import type { BatchProvenance, ErrorCode, ReviewResponse } from '@nextup/domain'
 import type { TitleListItem as WireTitleListItem } from '../components/TitleRow';
 import type { ServiceFreshness as WireServiceFreshness } from '../components/FreshnessStrip';
 import type { ServerRejection as WireServerRejection } from '../components/RejectionList';
+import type { FixMatchRequest, FixMatchResponse } from '../components/FixMatchDialog';
 
 /** The wire shape of a failure (`apps/api/src/middleware/errorEnvelope.ts`). */
 export interface ErrorEnvelope {
@@ -449,10 +450,19 @@ export interface ConfirmAllResult {
   skipped: number;
 }
 
-/** One §6.29 search hit. The panel renders these and sends back only the id. */
+/**
+ * One §6.29 search hit. The panel renders these and sends back only the id.
+ *
+ * ⚠ `mediaType` IS NARROWED TO THE CONTRACT, not typed `string`. §6.29 emits
+ * only `movie` or `tv` — `tmdbClient.ts` drops any row whose `media_type` is
+ * neither (TMDB's search also returns `person`) — so `string` here was wider
+ * than anything the server can send, and the extra width had a cost: it made
+ * this type structurally incompatible with `FixMatchDialog`'s, which is one
+ * reason the dialog could not simply be handed the client's search method.
+ */
 export interface TmdbSearchResult {
   tmdbId: number;
-  mediaType: string;
+  mediaType: 'movie' | 'tv';
   name: string;
   releaseYear: number | null;
   posterPath: string | null;
@@ -605,6 +615,30 @@ export function createApiClient(deps: ApiClientDeps = {}) {
       request<TmdbSearchResults>(
         `/api/tmdb/search?q=${encodeURIComponent(query)}`,
         { signal },
+        deps,
+      ),
+
+    /**
+     * §6.5 — the owner re-points a row at the correct work (US-030).
+     *
+     * ⚠ THIS METHOD IS THE LINK THAT WAS MISSING, AND ITS ABSENCE WAS
+     * INVISIBLE TO EVERY GATE. The route (TASK-109) and `FixMatchDialog`
+     * (TASK-111) were both built and both tested, but nothing joined them, so
+     * US-030 AC-1 — "the owner chooses fix match ... from the row" — had no
+     * reachable implementation at all. `T-API-010` compares the client's paths
+     * against the live router in one direction only (client → server), by
+     * design, so a route the client never calls is asserted by nobody.
+     *
+     * ⚠ `confirmDuplicate` IS ALWAYS SENT EXPLICITLY, never omitted. §6.5
+     * refuses with `DUPLICATE_WORK_IDENTITY` unless it is exactly `true`, and
+     * the dialog's "Yes, keep both" step is the only thing allowed to set it —
+     * defaulting it here would turn the warning US-030 AC-4 requires into a
+     * silent second row.
+     */
+    fixMatch: (titleId: string, body: FixMatchRequest) =>
+      request<FixMatchResponse>(
+        `/api/titles/${encodeURIComponent(titleId)}/fix-match`,
+        { method: 'POST', body: { ...body } },
         deps,
       ),
 

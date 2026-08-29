@@ -12,13 +12,22 @@
 // by `listEmptyKind()` from the facts, never by this page picking a message.
 
 import type { JSX } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import { FilterBar, parseFilters, applyFilters, NO_FILTERS } from '../components/FilterBar';
 import { BatchAppliedNotice, type AppliedBatch } from '../components/BatchAppliedNotice';
 import { FreshnessStrip, type ServiceFreshness } from '../components/FreshnessStrip';
 import { ListEmptyState, ListLoadError } from '../components/ListEmptyState';
+import { RowMenu } from '../components/RowMenu';
 import { SortControl } from '../components/SortControl';
+import { SuppressDialog, type RowState } from '../components/SuppressDialog';
+import {
+  FixMatchDialog,
+  type FixMatchRequest,
+  type FixMatchResponse,
+  type TmdbSearchResponse,
+} from '../components/FixMatchDialog';
 import { TitleList } from '../components/TitleList';
 import type { TitleListItem } from '../components/TitleRow';
 import { LIST_LOADING_BODY } from '../copy';
@@ -51,7 +60,32 @@ export interface ListPageProps {
   readonly applied?: AppliedBatch;
   readonly onUndoRemovalGroup?: (groupId: string) => Promise<unknown>;
   readonly onUndoBatch?: (batchId: string) => Promise<unknown>;
+  /**
+   * The four row-action calls (`ui.md` §2.3).
+   *
+   * ⚠ ALL FOUR OR NONE, exactly as `ReviewPage` treats the unmatched actions.
+   * A menu offering "Fix match" over a missing `fixMatch` would open a dialog
+   * whose search works and whose confirm cannot, which is worse than a row
+   * with no menu at all: the owner picks the right work, presses confirm and
+   * is told nothing.
+   */
+  readonly onSuppress?: (titleId: string) => Promise<SuppressedResult>;
+  readonly onUnsuppress?: (suppressionId: string) => Promise<unknown>;
+  readonly onSearchTmdb?: (query: string) => Promise<TmdbSearchResponse>;
+  readonly onFixMatch?: (titleId: string, body: FixMatchRequest) => Promise<FixMatchResponse>;
 }
+
+/** `POST /api/titles/:titleId/suppress` — `specs/api.md` §6.6. */
+interface SuppressedResult {
+  suppressionId: string;
+  workIdentity: string;
+  alreadySuppressed: boolean;
+}
+
+/** Which dialog the row menu opened, and over which row. */
+type OpenDialog =
+  | { readonly kind: 'suppress'; readonly item: TitleListItem }
+  | { readonly kind: 'fix-match'; readonly item: TitleListItem };
 
 /**
  * ⚠ Rejects rather than resolving. A missing handler means the container did
@@ -77,11 +111,43 @@ export function ListPage({
   applied,
   onUndoRemovalGroup,
   onUndoBatch,
+  onSuppress,
+  onUnsuppress,
+  onSearchTmdb,
+  onFixMatch,
 }: ListPageProps): JSX.Element {
   const [params, setParams] = useSearchParams();
   const filters = parseFilters(params);
-  const shown = items.length;
+  const [menuFor, setMenuFor] = useState<TitleListItem | null>(null);
+  const [dialog, setDialog] = useState<OpenDialog | null>(null);
+  /**
+   * ⚠ ROWS ARE HIDDEN ON `suppressed`, NEVER ON `pending`. `SuppressDialog`
+   * reports `pending` while the POST is in flight and `suppressed` only once
+   * the server has persisted it (`T-UX-085a`); hiding on `pending` would be
+   * the optimistic-then-reconcile behaviour TASK-102 specifically rejected,
+   * and a failed request would leave a row hidden that is still on the list.
+   */
+  const [rowStates, setRowStates] = useState<Readonly<Record<string, RowState>>>({});
+
+  // ⚠ ALL FOUR OR NONE — see `onSuppress` above.
+  const suppressFn = onSuppress;
+  const unsuppressFn = onUnsuppress;
+  const searchFn = onSearchTmdb;
+  const fixMatchFn = onFixMatch;
+  const rowActionsWired =
+    suppressFn !== undefined &&
+    unsuppressFn !== undefined &&
+    searchFn !== undefined &&
+    fixMatchFn !== undefined;
+
+  const visible = items.filter((item) => rowStates[item.titleId] !== 'suppressed');
+  const shown = visible.length;
   const unfilteredTotal = total ?? shown;
+
+  const closeAll = (): void => {
+    setMenuFor(null);
+    setDialog(null);
+  };
 
   return (
     <>
@@ -122,7 +188,64 @@ export function ListPage({
         <>
           <FilterBar genres={genres} shown={shown} total={unfilteredTotal} />
           <SortControl />
-          <TitleList items={items} />
+          <TitleList
+            items={visible}
+            {...(rowActionsWired
+              ? {
+                  onOpenMenu: (item: TitleListItem) => {
+                    setMenuFor(item);
+                  },
+                  // The unmatched row's "Find a match" goes STRAIGHT to the
+                  // dialog (§2.2): there is no identity to suppress yet, so a
+                  // two-item menu would offer one item.
+                  onFixMatch: (item: TitleListItem) => {
+                    setDialog({ kind: 'fix-match', item });
+                  },
+                }
+              : {})}
+          />
+          {menuFor !== null && (
+            <RowMenu
+              item={menuFor}
+              onDismiss={closeAll}
+              onChoose={(choice) => {
+                const item = menuFor;
+                setMenuFor(null);
+                setDialog(
+                  choice === 'suppress' ? { kind: 'suppress', item } : { kind: 'fix-match', item },
+                );
+              }}
+            />
+          )}
+          {dialog !== null && suppressFn !== undefined && unsuppressFn !== undefined && (
+            <>
+              {dialog.kind === 'suppress' && (
+                <SuppressDialog
+                  titleId={dialog.item.titleId}
+                  name={dialog.item.name}
+                  suppress={suppressFn}
+                  unsuppress={unsuppressFn}
+                  onRowState={(state) => {
+                    setRowStates((prev) => ({ ...prev, [dialog.item.titleId]: state }));
+                  }}
+                  onClose={closeAll}
+                />
+              )}
+            </>
+          )}
+          {dialog !== null &&
+            dialog.kind === 'fix-match' &&
+            searchFn !== undefined &&
+            fixMatchFn !== undefined && (
+              <FixMatchDialog
+                titleId={dialog.item.titleId}
+                name={dialog.item.name}
+                badges={dialog.item.badges}
+                searchTmdb={searchFn}
+                fixMatch={fixMatchFn}
+                onClose={closeAll}
+              />
+            )}
           <ListEmptyState
             facts={{ shown, total: unfilteredTotal, filters, removedCount, suppressedCount }}
             onClearFilters={() => {

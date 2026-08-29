@@ -183,11 +183,22 @@ describe('T-UI-010 - the row shows poster, name, type, year, date-added label an
     expect(onOpenMenu).toHaveBeenCalledWith(DUNE);
   });
 
-  it('T-UI-010k renders without action handlers wired, as the read-only list does', async () => {
+  it('T-UI-010k renders without action handlers wired, offering no DEAD affordance', async () => {
+    // ⚠ CORRECTED. This case previously clicked the `⋮` on an unwired
+    // `ListPage` and asserted the row survived, under the heading "as the
+    // read-only list does". That passed, and it locked in a real defect:
+    // `specs/ui.md` §2.2 describes no read-only list, `ListPage` was the only
+    // consumer, and it wired nothing — so the menu the spec requires shipped
+    // as a button that did nothing on every click, for every row, while this
+    // test reported the behaviour as intended.
+    //
+    // The row must still render safely without handlers (that much was always
+    // right); what it must NOT do is draw an affordance it cannot honour.
     render(<ListPage items={[DUNE]} />);
 
-    await userEvent.click(screen.getByTestId('row-menu'));
     expect(screen.getByTestId('title-name')).toHaveTextContent('Dune');
+    expect(screen.queryByTestId('row-menu')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Find a match' })).toBeNull();
   });
 });
 

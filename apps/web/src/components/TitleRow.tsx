@@ -179,28 +179,42 @@ export function TitleRow({ item, onOpenMenu, onFixMatch }: TitleRowProps): JSX.E
       </div>
 
       <div className="title-row__actions">
-        {unmatched ? (
-          <button
-            type="button"
-            className="title-row__action tap-target"
-            onClick={() => onFixMatch?.(item)}
-          >
-            Find a match
-          </button>
-        ) : (
-          <button
-            type="button"
-            // `tap-target` carries the §2.2 44x44 px minimum, shared with the
-            // nav so the floor is defined in one place.
-            className="title-row__menu tap-target"
-            aria-haspopup="menu"
-            aria-label={`Actions for ${item.name}`}
-            data-testid="row-menu"
-            onClick={() => onOpenMenu?.(item)}
-          >
-            ⋮
-          </button>
-        )}
+        {/*
+          ⚠ THE AFFORDANCE IS CONDITIONAL ON A HANDLER, AND THAT IS THE POINT.
+          Rendering the `⋮` unconditionally is what let the row menu ship
+          inert for the whole of Epics I and J: `ListPage` passed no callbacks,
+          every click optional-chained to `undefined`, and a present, focusable,
+          correctly-labelled button satisfied every a11y and tap-target sweep
+          while doing nothing. A button that cannot act must not be drawn.
+        */}
+        {unmatched
+          ? onFixMatch !== undefined && (
+              <button
+                type="button"
+                className="title-row__action tap-target"
+                onClick={() => {
+                  onFixMatch(item);
+                }}
+              >
+                Find a match
+              </button>
+            )
+          : onOpenMenu !== undefined && (
+              <button
+                type="button"
+                // `tap-target` carries the §2.2 44x44 px minimum, shared with the
+                // nav so the floor is defined in one place.
+                className="title-row__menu tap-target"
+                aria-haspopup="menu"
+                aria-label={`Actions for ${item.name}`}
+                data-testid="row-menu"
+                onClick={() => {
+                  onOpenMenu(item);
+                }}
+              >
+                ⋮
+              </button>
+            )}
       </div>
     </li>
   );
