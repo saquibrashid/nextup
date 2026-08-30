@@ -56,6 +56,7 @@ import {
 } from '../lib/reviewDispositions';
 import {
   REVIEW_APPLY_LABEL,
+  REVIEW_APPLYING,
   REVIEW_APPLY_FAILED,
   REVIEW_CONFIRM_ALL,
   REVIEW_DISCARD_LABEL,
@@ -83,6 +84,18 @@ export interface ReviewPageProps {
    * bar. The container clears it the instant a new attempt starts.
    */
   readonly applyFailed?: boolean;
+  /**
+   * `specs/ux-states.md` §6.12 (`T-UX-064`) — the close is in flight.
+   *
+   * ⚠ THE ONE CONTROL ON THIS SCREEN THAT MUST NOT FIRE TWICE. `closeBatch` is
+   * the batch's single irreversible transition; a second one lands on a batch
+   * that is no longer `in-review` and is refused 409 `BATCH_NOT_IN_REVIEW`, so
+   * a double-tap yields a success immediately followed by a spurious error the
+   * owner has no way to interpret. Disabling covers **both** buttons: a
+   * discard issued while a close is in flight is a genuine race over which
+   * terminal state the batch ends in, not merely a wasted request.
+   */
+  readonly applying?: boolean;
   /**
    * `specs/ux-states.md` §6.14 (`T-UX-066`) — the candidate ids the server
    * named in a 409 `PENDING_ADDITIONS` when the owner tried to close. Non-null
@@ -276,6 +289,7 @@ export function ReviewPage({
   loading = false,
   loadFailed = false,
   applyFailed = false,
+  applying = false,
   pendingAdditionIds = null,
   reconfirmSignal = 0,
   onRetry,
@@ -293,6 +307,18 @@ export function ReviewPage({
   // the loading and failure branches below both return.
   const [confirmAllOverride, setConfirmAllOverride] = useState<LocalDispositionMap | null>(null);
   const [confirming, setConfirming] = useState(false);
+  /*
+   * ⚠ WHY THE DIALOG IS NOT CLOSED BY AN EFFECT WHEN THE CLOSE FINISHES.
+   * §6.12 disables every control while the close is in flight, and the
+   * dialog's own Confirm is one of them — so it has to stay mounted for the
+   * duration rather than unmounting the instant it is pressed. Closing it
+   * again from a `useEffect` on `applying` would race the §6.15 effect below:
+   * a 409 `REMOVALS_NOT_CONFIRMED` clears `applying` and bumps the nonce in
+   * the SAME render, and the later-declared effect would win and shut the
+   * dialog the refusal exists to re-open. Deriving the open state from
+   * `applying` instead needs no effect and cannot be ordered wrongly.
+   */
+  const [confirmedFlight, setConfirmedFlight] = useState(false);
 
   // §6.14. When the server refuses the close with 409 `PENDING_ADDITIONS`, move
   // focus (and scroll) to the first pending card the owner still has to decide.
@@ -318,7 +344,10 @@ export function ReviewPage({
   // before the close is retried. `reconfirmSignal` starts at 0 and only the
   // container increments it, so this never fires on first render.
   useEffect(() => {
-    if (reconfirmSignal > 0) setConfirming(true);
+    if (reconfirmSignal > 0) {
+      setConfirmedFlight(false);
+      setConfirming(true);
+    }
   }, [reconfirmSignal]);
 
   if (loadFailed) {
@@ -556,6 +585,7 @@ export function ReviewPage({
           type="button"
           className="tap-target"
           data-testid="discard-batch-button"
+          disabled={applying}
           onClick={onDiscard}
         >
           {REVIEW_DISCARD_LABEL}
@@ -564,6 +594,7 @@ export function ReviewPage({
           type="button"
           className="tap-target"
           data-testid="apply-changes-button"
+          disabled={applying}
           onClick={() => {
             // ⚠ The dialog is not a formality that can be skipped: without
             // removals there is nothing to confirm and the close goes straight
@@ -575,22 +606,28 @@ export function ReviewPage({
             onApply?.(false);
           }}
         >
-          {REVIEW_APPLY_LABEL}
+          {applying ? REVIEW_APPLYING : REVIEW_APPLY_LABEL}
         </button>
       </div>
 
-      {confirming && (
+      {(confirming || (applying && confirmedFlight)) && (
         <RemovalConfirmDialog
           service={review.service}
           items={sections.removals.items}
+          submitting={applying}
           onCancel={() => {
             // ⚠ Cancel returns to the review with everything intact. It must
             // never fall through to `onApply` — a cancelled confirmation that
             // still closed the batch is the worst outcome this screen has.
+            setConfirmedFlight(false);
             setConfirming(false);
           }}
           onConfirm={() => {
+            // Handed to the derived open state above, so the dialog survives
+            // the close it just issued and shows §6.12's disabled controls
+            // instead of vanishing under the owner's finger.
             setConfirming(false);
+            setConfirmedFlight(true);
             onApply?.(true);
           }}
         />

@@ -461,6 +461,16 @@ export const REVIEW_NO_ADDITIONS_BODY =
 export const REVIEW_APPLY_LABEL = 'Apply changes';
 export const REVIEW_DISCARD_LABEL = 'Discard batch';
 
+/**
+ * `specs/ux-states.md` §6.12 (`T-UX-064`) — the close is in flight.
+ *
+ * ⚠ THIS REPLACES THE APPLY LABEL RATHER THAN SITTING BESIDE IT. A disabled
+ * button still reading "Apply changes" is indistinguishable from a button that
+ * has stopped working, and the close is the one action on this screen that
+ * both takes a visible moment and must not be issued twice.
+ */
+export const REVIEW_APPLYING = 'Applying…';
+
 export const REVIEW_TITLE = 'Review this batch';
 
 /**

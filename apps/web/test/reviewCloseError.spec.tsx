@@ -16,12 +16,15 @@
  * anyone "simplifies" this into the load-failure state, which swaps the review
  * body out for an error.
  *
- * Retry design: the existing **Apply changes** control is the "Try again". It
- * is never disabled here (no §6.12 disabled state exists on this button), so it
- * is unambiguously re-pressable, and re-pressing it re-runs the EXACT same flow
- * — re-opening the §6.10 removal dialog whenever there are removals — so
- * `confirmRemovals` can never be silently re-applied without the owner. A
- * distinct control remembering `confirmRemovals` would risk exactly that.
+ * Retry design: the existing **Apply changes** control is the "Try again". The
+ * §6.12 in-flight state (`T-UX-064`) disables it only WHILE a close is in
+ * flight and clears the flag on every failure arm, so by the time this
+ * message is on screen the button is re-pressable again — `T-UX-064d` is the
+ * case that fails if that guard ever latches on. Re-pressing it re-runs the
+ * EXACT same flow — re-opening the §6.10 removal dialog whenever there are
+ * removals — so `confirmRemovals` can never be silently re-applied without the
+ * owner. A distinct control remembering `confirmRemovals` would risk exactly
+ * that.
  */
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
