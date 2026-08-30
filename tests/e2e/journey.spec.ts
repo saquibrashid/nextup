@@ -1081,25 +1081,21 @@ test('T-E2E-001: a first full update, a reconcile with removals, a suppression, 
     removedArrival2.getByTestId('removed-date-added'),
     'the logged removal keeps its original date after the reappearance',
   ).toHaveText(LABEL_B1);
-  // ⚠ FINDING (Part 3), reported not worked around — a spec-vs-implementation
-  // conflict on the ordinal chip for a SINGLE removal:
-  //   • `specs/testing.md` §5 step 7 (authoritative AC→test mapping, NFR-003)
-  //     explicitly requires /removed to show "Removal 1 of 1" here;
-  //   • `specs/ui.md` (§ "/removed") lists the ordinal chip as a per-row
-  //     element and its example is "Removal 2 of 3" — silent on the singleton,
-  //     if anything implying every row carries one;
-  //   • `specs/ux-states.md` §7.5 says only "with ordinal chips" — silent on
-  //     the singleton;
-  //   • `RemovedPage.removalOrdinalLabel` returns null when
-  //     `removalTotalForWork <= 1` (citing "§7.5", which does not state it), so
-  //     NO ordinal renders for a work removed exactly once.
-  // The design specs do not specify the singleton suppression, so it is not
-  // "specified behaviour" this test can simply ratify; making the ordinal
-  // render for a singleton is a `RemovedPage` change this lane must not make,
-  // and forcing a second removal purely to light up the chip would bend the
-  // owner's actual path (the parent chose the finding over that coverage). The
-  // assertion therefore pins the SHIPPED behaviour (no chip for a singleton) so
-  // a regression is still caught, and the conflict is recorded on TASK-108 for
-  // the owner to reconcile.
-  await expect(removedArrival2.getByTestId('removed-ordinal')).toHaveCount(0);
+  // ⚠ RESOLVED (was "FINDING (Part 3)"): the ordinal chip on a SINGLE removal.
+  // This assertion used to pin the shipped behaviour — no chip at a total of
+  // one — and escalate the spec-vs-implementation conflict rather than work
+  // around it. That was the right call by the lane that found it, and the
+  // conflict has since been reconciled IN FAVOUR OF THE SPEC:
+  //   • `specs/testing.md` §5 step 7 (the authoritative AC→test mapping,
+  //     NFR-003) requires /removed to show "Removal 1 of 1" by name;
+  //   • `specs/ui.md` "/removed" lists the ordinal chip as a per-ROW element;
+  //   • `specs/ux-states.md` §7.5 — "One row per removed listing, with ordinal
+  //     chips".
+  // Nothing anywhere licensed the null, and `removalOrdinalLabel` cited a §7.5
+  // sentence that does not exist. `RemovedPage` now renders the chip whenever
+  // the total is at least one, so this step asserts what §5 actually asks for.
+  await expect(
+    removedArrival2.getByTestId('removed-ordinal'),
+    'a single removal still carries its ordinal — /removed is a log, not a recycle bin (L1/A33)',
+  ).toHaveText('Removal 1 of 1');
 });
