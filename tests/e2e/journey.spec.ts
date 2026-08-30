@@ -1,97 +1,324 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import {
+  REVIEW_LABELS,
   SERVICE_LABELS,
   dateAddedLabel,
   modeExplanation,
   removalsLabel,
+  serviceFreshnessLabel,
+  type BatchMode,
   type ReviewCandidate,
+  type ReviewRemovalItem,
   type ReviewResponse,
+  type Service,
 } from '@nextup/domain';
 
-import { REVIEW_APPLY_LABEL, SUBMIT_LABEL } from '../../apps/web/src/copy';
+import { REMOVAL_CONFIRM_LABEL, REVIEW_APPLY_LABEL, SUBMIT_LABEL } from '../../apps/web/src/copy';
 
-const BATCH_ID = 'bat_e2e_001_steps_1_4';
+/**
+ * `T-E2E-001` — the single most valuable test in the suite (`specs/testing.md`
+ * §5, L545). It is not a smoke test; it is the product's specification
+ * executed end to end against the real SPA, with the API replaced by a
+ * STATEFUL in-memory backend that reconciles exactly as the server contract
+ * (`specs/api.md` §6, `packages/domain` reconcile/review/removals) requires.
+ *
+ * The journey drives steps 1–7 of §5:
+ *   1–4  Upload, extract, match, review and apply a first Netflix full update.
+ *   5    A second full update that REMOVES a title and ADDS another —
+ *        transactional, scoped to one service, removals shown ticked, the
+ *        removed title logged with its ORIGINAL date preserved.
+ *   6    Suppress ("not interested") a remaining title — it leaves the list
+ *        and appears under /not-interested, keyed on WORK IDENTITY.
+ *   7    A third, APPEND-ONLY batch in which the removed title REAPPEARS as a
+ *        brand-new active row dated today (the removed-log row is untouched),
+ *        while the suppressed title is silently kept off — proving suppression
+ *        survives a reappearance because it is keyed on identity, not row id.
+ *
+ * ⚠ The stub is the backend, not a canned reply. Every review/close/list read
+ * is computed from mutable state, so an assertion that would pass under a
+ * row-id-keyed suppression, or a non-transactional close, genuinely fails.
+ */
+
+// ── The works catalogue ─────────────────────────────────────────────────────
+
+interface WorkDef {
+  readonly id: string;
+  readonly tmdbId: number;
+  readonly name: string;
+  readonly year: number;
+  readonly mediaType: 'movie' | 'tv';
+}
+
+const WORKS: Record<string, WorkDef> = {
+  dune: { id: 'dune', tmdbId: 438631, name: 'Dune', year: 2021, mediaType: 'movie' },
+  arrival: { id: 'arrival', tmdbId: 329865, name: 'Arrival', year: 2016, mediaType: 'movie' },
+  arcane: { id: 'arcane', tmdbId: 94605, name: 'Arcane', year: 2021, mediaType: 'tv' },
+  sinners: { id: 'sinners', tmdbId: 1233413, name: 'Sinners', year: 2025, mediaType: 'movie' },
+};
+
+function work(id: string): WorkDef {
+  const w = WORKS[id];
+  if (w === undefined) throw new Error(`Unknown work fixture: ${id}`);
+  return w;
+}
+
+/** `workIdentity` is what suppression is keyed on (REQ-071), never the row id. */
+function workIdentity(id: string): string {
+  const w = work(id);
+  return `tmdb:${w.mediaType}:${String(w.tmdbId)}`;
+}
+
+function titleId(id: string): string {
+  return `ttl_${id}`;
+}
+
+// ── The calendar ────────────────────────────────────────────────────────────
+//
+// Distinct per-batch "date added" values so the removed-log's promise — that a
+// removed listing keeps its ORIGINAL date (`RemovedItem.dateAdded`), while a
+// reappearance is a brand-new row dated TODAY — is directly observable on
+// screen. The freshness strip is a separate fact ("you last uploaded today")
+// and is computed independently below.
+
+const DATE_B1 = '2026-08-27';
+const DATE_B2 = '2026-08-28';
 const TODAY = '2026-08-29';
-const NOW = `${TODAY}T16:00:00.000Z`;
-const DATE_LABEL = dateAddedLabel(TODAY);
+const LABEL_B1 = dateAddedLabel(DATE_B1);
+const LABEL_B2 = dateAddedLabel(DATE_B2);
+const LABEL_TODAY = dateAddedLabel(TODAY);
 
-const WORKS = [
-  { id: 'dune', tmdbId: 438631, name: 'Dune', year: 2021, mediaType: 'movie' as const },
+function iso(date: string): string {
+  return `${date}T16:00:00.000Z`;
+}
+
+/** Mirrors `BatchAppliedNotice.UNDO_REMOVALS_LABEL` — kept literal so the test imports only plain copy, never a React component module. */
+const UNDO_REMOVALS_LABEL = 'Undo the removals';
+
+// ── The script: three batches, in creation order ────────────────────────────
+
+interface BatchPlan {
+  readonly service: Service;
+  readonly mode: BatchMode;
+  readonly date: string;
+  readonly candidates: readonly string[];
+}
+
+const BATCH_PLANS: readonly BatchPlan[] = [
+  // Batch 1 — the first Netflix full update (steps 1–4).
   {
-    id: 'arrival',
-    tmdbId: 329865,
-    name: 'Arrival',
-    year: 2016,
-    mediaType: 'movie' as const,
+    service: 'netflix',
+    mode: 'full-update',
+    date: DATE_B1,
+    candidates: ['dune', 'arrival', 'arcane'],
   },
+  // Batch 2 — a full update that drops Arrival and adds Sinners (step 5).
   {
-    id: 'arcane',
-    tmdbId: 94605,
-    name: 'Arcane',
-    year: 2021,
-    mediaType: 'tv' as const,
+    service: 'netflix',
+    mode: 'full-update',
+    date: DATE_B2,
+    candidates: ['dune', 'arcane', 'sinners'],
   },
+  // Batch 3 — an append-only batch in which Arrival reappears and the
+  // suppressed Dune is silently kept off (step 7).
+  { service: 'netflix', mode: 'append-only', date: TODAY, candidates: ['arrival', 'dune'] },
 ] as const;
 
-function candidate(index: number, disposition: ReviewCandidate['disposition']): ReviewCandidate {
-  const work = WORKS[index];
-  if (work === undefined) throw new Error(`Missing work fixture at ${String(index)}`);
+// ── The mutable backend ─────────────────────────────────────────────────────
+
+interface Listing {
+  listingId: string;
+  workId: string;
+  service: Service;
+  dateAdded: string;
+  state: 'active' | 'removed';
+  removedAt: string | null;
+  removedByBatchId: string | null;
+  removedByGroupId: string | null;
+}
+
+interface BatchRuntime {
+  batchId: string;
+  plan: BatchPlan;
+  statusReads: number;
+  submitted: boolean;
+  confirmedAdditions: boolean;
+  closed: boolean;
+}
+
+interface Suppression {
+  suppressionId: string;
+  workId: string;
+  suppressedAt: string;
+}
+
+interface Backend {
+  listings: Listing[];
+  suppressions: Map<string, Suppression>;
+  batches: Map<string, BatchRuntime>;
+  createdBatchCount: number;
+  listingSeq: number;
+  groupSeq: number;
+  lastCompletedAt: Partial<Record<Service, string>>;
+  lastCompletedBatchId: Partial<Record<Service, string>>;
+  createdBodies: unknown[];
+  confirmAllBodies: unknown[];
+  closeBodies: unknown[];
+}
+
+function makeBackend(): Backend {
   return {
-    candidateId: `cnd_${work.id}`,
-    rawText: work.name,
-    inferredTitle: work.name,
+    listings: [],
+    suppressions: new Map(),
+    batches: new Map(),
+    createdBatchCount: 0,
+    listingSeq: 0,
+    groupSeq: 0,
+    lastCompletedAt: {},
+    lastCompletedBatchId: {},
+    createdBodies: [],
+    confirmAllBodies: [],
+    closeBodies: [],
+  };
+}
+
+function activeListings(be: Backend, service: Service): Listing[] {
+  return be.listings.filter((l) => l.state === 'active' && l.service === service);
+}
+
+function isSuppressed(be: Backend, workId: string): boolean {
+  return be.suppressions.has(workId);
+}
+
+function batchRuntime(be: Backend, batchId: string): BatchRuntime | undefined {
+  return be.batches.get(batchId);
+}
+
+// ── Response builders ───────────────────────────────────────────────────────
+
+function candidate(
+  batch: BatchRuntime,
+  workId: string,
+  classification: ReviewCandidate['classification'],
+  disposition: ReviewCandidate['disposition'],
+): ReviewCandidate {
+  const w = work(workId);
+  return {
+    candidateId: `cnd_${batch.batchId}_${workId}`,
+    rawText: w.name,
+    inferredTitle: w.name,
     basis: 'both',
     ocrSupport: 'exact',
     provider: 'llm',
     verdict: 'title-candidate',
     ocrConfidence: 0.98,
-    resolvedWorkIdentity: `tmdb:${work.mediaType}:${String(work.tmdbId)}`,
+    resolvedWorkIdentity: workIdentity(workId),
     match: {
-      tmdbId: work.tmdbId,
-      mediaType: work.mediaType,
-      name: work.name,
-      releaseYear: work.year,
+      tmdbId: w.tmdbId,
+      mediaType: w.mediaType,
+      name: w.name,
+      releaseYear: w.year,
       posterPath: null,
       score: 0.99,
       uncertain: false,
       ambiguous: false,
     },
     alternatives: [],
-    sourceImageIds: [`img_${String(index + 1)}`],
+    sourceImageIds: ['img_1'],
     disposition,
     collapsedIntoCandidateId: null,
-    classification: 'new',
+    classification,
   };
 }
 
-function emptyCandidateSection(label: string, collapsedByDefault = true) {
-  return { label, count: 0, items: [], collapsedByDefault, omitted: false };
+function removalItem(listing: Listing): ReviewRemovalItem {
+  const w = work(listing.workId);
+  return {
+    listingId: listing.listingId,
+    titleId: titleId(listing.workId),
+    name: w.name,
+    releaseYear: w.year,
+    posterPath: null,
+    service: listing.service,
+    dateAdded: listing.dateAdded,
+    ticked: true,
+  };
 }
 
-function reviewResponse(confirmed: boolean): ReviewResponse {
+interface Reconciled {
+  additionIds: string[];
+  alreadyIds: string[];
+  removalListings: Listing[];
+  appendOnly: boolean;
+}
+
+function reconcile(be: Backend, batch: BatchRuntime): Reconciled {
+  const { plan } = batch;
+  const appendOnly = plan.mode === 'append-only';
+  const active = activeListings(be, plan.service);
+  const activeIds = new Set(active.map((l) => l.workId));
+  const candSet = new Set(plan.candidates);
+  // ⚠ A suppressed candidate is dropped ENTIRELY — never an addition, never a
+  // removal (REQ-071). This is the front-half of the suppression invariant.
+  const visible = plan.candidates.filter((c) => !isSuppressed(be, c));
+  const additionIds = visible.filter((c) => !activeIds.has(c));
+  const alreadyIds = visible.filter((c) => activeIds.has(c));
+  const removalListings = appendOnly
+    ? []
+    : active.filter((l) => !candSet.has(l.workId) && !isSuppressed(be, l.workId));
+  return { additionIds, alreadyIds, removalListings, appendOnly };
+}
+
+function reviewResponse(be: Backend, batch: BatchRuntime): ReviewResponse {
+  const { plan } = batch;
+  const { additionIds, alreadyIds, removalListings, appendOnly } = reconcile(be, batch);
+  const showRemovals = !appendOnly && removalListings.length > 0;
+
   return {
-    batchId: BATCH_ID,
-    service: 'netflix',
-    mode: 'full-update',
+    batchId: batch.batchId,
+    service: plan.service,
+    mode: plan.mode,
     lowYield: false,
     degradedExtraction: false,
     crossCheck: 'ok',
     banner: null,
     sections: {
       additions: {
-        label: 'New to your list',
-        count: WORKS.length,
-        items: WORKS.map((_, index) => candidate(index, confirmed ? 'confirmed' : 'pending')),
+        label: REVIEW_LABELS.additions,
+        count: additionIds.length,
+        items: additionIds.map((id) =>
+          candidate(batch, id, 'new', batch.confirmedAdditions ? 'confirmed' : 'pending'),
+        ),
       },
-      alreadyOnYourList: emptyCandidateSection('Already on your list'),
-      probablyNotTitles: emptyCandidateSection('Probably not titles'),
-      unmatched: { label: "Couldn't identify these", count: 0, items: [] },
-      unreadableTiles: { label: "Couldn't read these", count: 0, items: [] },
-      removals: {
-        label: removalsLabel('netflix'),
+      alreadyOnYourList: {
+        label: REVIEW_LABELS.alreadyOnYourList,
+        count: appendOnly ? 0 : alreadyIds.length,
+        items: appendOnly
+          ? []
+          : alreadyIds.map((id) =>
+              candidate(batch, id, 'already-present-for-this-service', 'confirmed'),
+            ),
+        collapsedByDefault: true,
+        omitted: appendOnly,
+      },
+      probablyNotTitles: {
+        label: REVIEW_LABELS.probablyNotTitles,
         count: 0,
         items: [],
-        omitted: true,
+        collapsedByDefault: true,
+        omitted: false,
+      },
+      unmatched: { label: REVIEW_LABELS.unmatched, count: 0, items: [] },
+      unreadableTiles: { label: REVIEW_LABELS.unreadableTiles, count: 0, items: [] },
+      // ⚠ The removals section is ABSENT (omitted) for an append-only batch and
+      // for a full update with nothing to remove — REQ-022 / `T-REM-011`. This
+      // deliberately diverges from `buildReviewResponse`, which keeps a
+      // count-0 full-update removals section present (omitted:false). See the
+      // FINDING recorded on TASK-094 in `docs/backlog.md`.
+      removals: {
+        label: removalsLabel(plan.service),
+        count: showRemovals ? removalListings.length : 0,
+        items: showRemovals ? removalListings.map(removalItem) : [],
+        omitted: !showRemovals,
         withheld: false,
         withheldReason: null,
       },
@@ -100,34 +327,234 @@ function reviewResponse(confirmed: boolean): ReviewResponse {
   };
 }
 
-function listItems() {
-  return WORKS.map((work) => ({
-    titleId: `ttl_${work.id}`,
-    workIdentity: `tmdb:${work.mediaType}:${String(work.tmdbId)}`,
-    matchState: 'matched',
-    name: work.name,
-    mediaType: work.mediaType,
-    releaseYear: work.year,
-    genres: [],
-    runtimeMinutes: null,
-    posterPath: null,
-    badges: [{ service: 'netflix', listingId: `lst_${work.id}_netflix`, dateAdded: TODAY }],
-    sortDateAdded: TODAY,
-    dateAddedLabel: DATE_LABEL,
-    imdbRating: null,
-  }));
+function titlesResponse(be: Backend) {
+  const active = be.listings.filter((l) => l.state === 'active' && !isSuppressed(be, l.workId));
+  const byWork = new Map<string, Listing[]>();
+  for (const l of active) {
+    const list = byWork.get(l.workId) ?? [];
+    list.push(l);
+    byWork.set(l.workId, list);
+  }
+  const items = [...byWork.entries()]
+    .map(([workId, listings]) => {
+      const w = work(workId);
+      const sortDateAdded = listings.map((l) => l.dateAdded).reduce((a, b) => (a < b ? a : b));
+      return {
+        titleId: titleId(workId),
+        workIdentity: workIdentity(workId),
+        matchState: 'matched',
+        name: w.name,
+        mediaType: w.mediaType,
+        releaseYear: w.year,
+        genres: [] as string[],
+        runtimeMinutes: null,
+        posterPath: null,
+        badges: listings.map((l) => ({
+          service: l.service,
+          listingId: l.listingId,
+          dateAdded: l.dateAdded,
+        })),
+        sortDateAdded,
+        dateAddedLabel: dateAddedLabel(sortDateAdded),
+        imdbRating: null,
+      };
+    })
+    // Newest-first, the product default (REQ-038).
+    .sort((a, b) => (a.sortDateAdded < b.sortDateAdded ? 1 : -1));
+  return { items, nextCursor: null, limit: 50 };
 }
 
-interface JourneyState {
-  batchCreatedWith: unknown;
-  uploadedImageCalls: number;
-  submitted: boolean;
-  batchStatusReads: number;
-  candidatesConfirmed: boolean;
-  confirmAllBody: unknown;
-  closed: boolean;
-  closeBody: unknown;
+function removedResponse(be: Backend) {
+  const removed = be.listings.filter((l) => l.state === 'removed');
+  const byWork = new Map<string, Listing[]>();
+  for (const l of removed) {
+    const list = byWork.get(l.workId) ?? [];
+    list.push(l);
+    byWork.set(l.workId, list);
+  }
+  const items = removed.map((l) => {
+    const peers = (byWork.get(l.workId) ?? [])
+      .slice()
+      .sort((a, b) => (a.removedAt ?? '').localeCompare(b.removedAt ?? ''));
+    const ordinal = peers.findIndex((p) => p.listingId === l.listingId) + 1;
+    const w = work(l.workId);
+    return {
+      listingId: l.listingId,
+      titleId: titleId(l.workId),
+      workIdentity: workIdentity(l.workId),
+      matchState: 'matched',
+      name: w.name,
+      mediaType: w.mediaType,
+      releaseYear: w.year,
+      posterPath: null,
+      service: l.service,
+      dateAdded: l.dateAdded,
+      removedAt: l.removedAt ?? iso(TODAY),
+      removedByBatchId: l.removedByBatchId,
+      removedByGroupId: l.removedByGroupId,
+      removalOrdinal: ordinal,
+      removalTotalForWork: peers.length,
+      restorable: true,
+      suppressed: isSuppressed(be, l.workId),
+    };
+  });
+  return { items, nextCursor: null };
 }
+
+function suppressionsResponse(be: Backend) {
+  const items = [...be.suppressions.values()].map((s) => {
+    const w = work(s.workId);
+    return {
+      suppressionId: s.suppressionId,
+      workIdentity: workIdentity(s.workId),
+      suppressedAt: s.suppressedAt,
+      identityStability: 'stable' as const,
+      displaySnapshot: {
+        name: w.name,
+        releaseYear: w.year,
+        mediaType: w.mediaType,
+        posterPath: null,
+      },
+      unsuppressHref: `/api/suppressions/${s.suppressionId}/unsuppress`,
+    };
+  });
+  return { items };
+}
+
+function serviceStateResponse(be: Backend) {
+  const services = (['netflix', 'max'] as Service[]).map((svc) => {
+    const completedAt = be.lastCompletedAt[svc] ?? null;
+    const ageDays = completedAt !== null ? 0 : null;
+    return {
+      service: svc,
+      lastCompletedBatchAt: completedAt,
+      lastCompletedBatchId: be.lastCompletedBatchId[svc] ?? null,
+      ageDays,
+      label: serviceFreshnessLabel(svc, ageDays),
+    };
+  });
+  return { services };
+}
+
+function batchStatusResponse(batch: BatchRuntime) {
+  const inReview = batch.submitted && batch.statusReads >= 2;
+  return {
+    batchId: batch.batchId,
+    service: batch.plan.service,
+    mode: batch.plan.mode,
+    status: inReview ? 'in-review' : 'extracting',
+    derivedFromBatchId: null,
+    createdAt: iso(TODAY),
+    submittedAt: iso(TODAY),
+    completedAt: null,
+    images: [1, 2, 3].map((n) => ({
+      imageId: `img_${String(n)}`,
+      fileName: `${batch.plan.service}-golden-${String(n)}.png`,
+      ingestSource: 'upload',
+      available: true,
+      retainUntil: '2026-09-28T16:00:00.000Z',
+      candidateCount: inReview ? 1 : null,
+      href: `/api/images/img_${String(n)}`,
+    })),
+    extractionError: null,
+    lowYield: false,
+    progress: inReview ? undefined : { imagesDone: 1, imagesTotal: 3 },
+    degradedExtraction: false,
+    crossCheck: 'ok',
+    provenance: { created: [], modified: [], removed: [] },
+    changedNothing: true,
+    titles: [],
+  };
+}
+
+interface CloseOutcome {
+  status: number;
+  body: unknown;
+}
+
+function closeBatch(be: Backend, batch: BatchRuntime, confirmRemovals: boolean): CloseOutcome {
+  const { plan } = batch;
+  const { additionIds, removalListings } = reconcile(be, batch);
+  const showRemovals = removalListings.length > 0;
+
+  // ⚠ A close that would create additions the owner has not confirmed is
+  // refused whole (`specs/api.md` §6.14): nothing is applied.
+  if (!batch.confirmedAdditions && additionIds.length > 0) {
+    return {
+      status: 409,
+      body: {
+        error: {
+          code: 'PENDING_ADDITIONS',
+          message: 'Some additions still need a decision.',
+          details: {
+            pendingCandidateIds: additionIds.map((id) => `cnd_${batch.batchId}_${id}`),
+          },
+        },
+      },
+    };
+  }
+
+  // ⚠ Removals must be confirmed as ONE group before they apply (§6.15).
+  if (showRemovals && confirmRemovals !== true) {
+    return {
+      status: 409,
+      body: {
+        error: {
+          code: 'REMOVALS_NOT_CONFIRMED',
+          message: 'Confirm the removals before applying.',
+          details: {},
+        },
+      },
+    };
+  }
+
+  // ⚠ Transactional and scoped to exactly ONE service: this batch's service.
+  let removalGroupId: string | null = null;
+  if (removalListings.length > 0) {
+    be.groupSeq += 1;
+    removalGroupId = `grp_e2e_${String(be.groupSeq)}`;
+    for (const l of removalListings) {
+      // Soft delete forever — the row stays, it is only marked removed.
+      l.state = 'removed';
+      l.removedAt = iso(TODAY);
+      l.removedByBatchId = batch.batchId;
+      l.removedByGroupId = removalGroupId;
+    }
+  }
+  for (const id of additionIds) {
+    be.listingSeq += 1;
+    be.listings.push({
+      listingId: `lst_e2e_${String(be.listingSeq)}`,
+      workId: id,
+      service: plan.service,
+      dateAdded: plan.date,
+      state: 'active',
+      removedAt: null,
+      removedByBatchId: null,
+      removedByGroupId: null,
+    });
+  }
+  batch.closed = true;
+  be.lastCompletedAt[plan.service] = iso(TODAY);
+  be.lastCompletedBatchId[plan.service] = batch.batchId;
+
+  return {
+    status: 200,
+    body: {
+      batchId: batch.batchId,
+      status: 'closed',
+      summary: {
+        listingsCreated: additionIds.length,
+        listingsRemoved: removalListings.length,
+        removalGroupId,
+      },
+      serviceState: { service: plan.service },
+      undoable: removalListings.length === 0,
+    },
+  };
+}
+
+// ── The router ──────────────────────────────────────────────────────────────
 
 function ok(body: unknown) {
   return { status: 200, contentType: 'application/json', body: JSON.stringify(body) };
@@ -137,7 +564,9 @@ async function fulfillJson(route: Route, status: number, body: unknown): Promise
   await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 }
 
-async function stubJourneyApi(page: Page, state: JourneyState): Promise<void> {
+const BATCH_PATH = /^\/api\/batches\/([^/]+)(\/[^?]*)?$/;
+
+async function stubBackend(page: Page, be: Backend): Promise<void> {
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const url = new URL(request.url());
@@ -146,138 +575,155 @@ async function stubJourneyApi(page: Page, state: JourneyState): Promise<void> {
 
     if (method === 'GET' && path === '/api/me') {
       await route.fulfill(
-        ok({ ownerId: 'owner-e2e', displayName: 'Owner', signOutUrl: '/.auth/logout' }),
+        ok({
+          ownerId: 'owner-e2e',
+          displayName: 'Owner',
+          signOutUrl: '/.auth/logout',
+          attribution: null,
+        }),
       );
       return;
     }
 
     if (method === 'GET' && path === '/api/titles') {
-      await route.fulfill(
-        ok({ items: state.closed ? listItems() : [], nextCursor: null, limit: 50 }),
-      );
+      await route.fulfill(ok(titlesResponse(be)));
       return;
     }
 
     if (method === 'GET' && path === '/api/suppressions') {
-      await route.fulfill(ok({ items: [] }));
+      await route.fulfill(ok(suppressionsResponse(be)));
       return;
     }
 
     if (method === 'GET' && path === '/api/service-state') {
-      await route.fulfill(
-        ok({
-          services: [
-            {
-              service: 'netflix',
-              lastCompletedBatchAt: state.closed ? NOW : null,
-              lastCompletedBatchId: state.closed ? BATCH_ID : null,
-              ageDays: state.closed ? 0 : null,
-              label: state.closed ? 'Netflix updated today' : 'Netflix has never been updated',
-            },
-            {
-              service: 'max',
-              lastCompletedBatchAt: null,
-              lastCompletedBatchId: null,
-              ageDays: null,
-              label: 'Max has never been updated',
-            },
-          ],
-        }),
-      );
+      await route.fulfill(ok(serviceStateResponse(be)));
+      return;
+    }
+
+    if (method === 'GET' && path === '/api/removed') {
+      await route.fulfill(ok(removedResponse(be)));
       return;
     }
 
     if (method === 'POST' && path === '/api/batches') {
-      state.batchCreatedWith = request.postDataJSON();
+      be.createdBatchCount += 1;
+      const plan = BATCH_PLANS[be.createdBatchCount - 1];
+      if (plan === undefined) throw new Error(`No batch plan #${String(be.createdBatchCount)}`);
+      const batchId = `bat_e2e_${String(be.createdBatchCount)}`;
+      be.batches.set(batchId, {
+        batchId,
+        plan,
+        statusReads: 0,
+        submitted: false,
+        confirmedAdditions: false,
+        closed: false,
+      });
+      be.createdBodies.push(request.postDataJSON());
       await fulfillJson(route, 201, {
-        batchId: BATCH_ID,
-        service: 'netflix',
-        mode: 'full-update',
+        batchId,
+        service: plan.service,
+        mode: plan.mode,
         status: 'open',
-        createdAt: NOW,
+        createdAt: iso(TODAY),
       });
       return;
     }
 
-    if (method === 'POST' && path === `/api/batches/${BATCH_ID}/images`) {
-      state.uploadedImageCalls += 1;
-      await fulfillJson(route, 201, {
-        accepted: [1, 2, 3].map((n) => ({
-          imageId: `img_${String(n)}`,
-          fileName: `netflix-golden-${String(n)}.png`,
-        })),
-        rejected: [],
-        batchTotals: { imageCount: 3, uploadedByteSize: 300, storedByteSize: 300 },
+    // POST /api/titles/:titleId/suppress
+    const suppressMatch = /^\/api\/titles\/([^/]+)\/suppress$/.exec(path);
+    if (method === 'POST' && suppressMatch) {
+      const rawTitleId = decodeURIComponent(suppressMatch[1] ?? '');
+      const workId = rawTitleId.replace(/^ttl_/, '');
+      const identity = workIdentity(workId);
+      const already = be.suppressions.has(workId);
+      if (!already) {
+        be.suppressions.set(workId, {
+          suppressionId: `supp:${identity}`,
+          workId,
+          suppressedAt: iso(TODAY),
+        });
+      }
+      await fulfillJson(route, 200, {
+        suppressionId: `supp:${identity}`,
+        workIdentity: identity,
+        alreadySuppressed: already,
       });
       return;
     }
 
-    if (method === 'POST' && path === `/api/batches/${BATCH_ID}/submit`) {
-      state.submitted = true;
-      await route.fulfill({ status: 204, body: '' });
+    // POST /api/suppressions/:id/unsuppress
+    const unsuppressMatch = /^\/api\/suppressions\/([^/]+)\/unsuppress$/.exec(path);
+    if (method === 'POST' && unsuppressMatch) {
+      const suppressionId = decodeURIComponent(unsuppressMatch[1] ?? '');
+      for (const [workId, s] of be.suppressions) {
+        if (s.suppressionId === suppressionId) be.suppressions.delete(workId);
+      }
+      await fulfillJson(route, 200, {
+        suppressionId,
+        active: false,
+        restoredAnything: false,
+      });
       return;
     }
 
-    if (method === 'GET' && path === `/api/batches/${BATCH_ID}`) {
-      state.batchStatusReads += 1;
-      const inReview = state.submitted && state.batchStatusReads >= 2;
-      await route.fulfill(
-        ok({
-          batchId: BATCH_ID,
-          service: 'netflix',
-          mode: 'full-update',
-          status: inReview ? 'in-review' : 'extracting',
-          derivedFromBatchId: null,
-          createdAt: NOW,
-          submittedAt: NOW,
-          completedAt: null,
-          images: [1, 2, 3].map((n) => ({
+    const batchMatch = BATCH_PATH.exec(path);
+    if (batchMatch) {
+      const batchId = decodeURIComponent(batchMatch[1] ?? '');
+      const suffix = batchMatch[2] ?? '';
+      const batch = batchRuntime(be, batchId);
+      if (batch === undefined) {
+        await fulfillJson(route, 404, {
+          error: { code: 'NOT_FOUND', message: `${batchId} unknown`, details: {} },
+        });
+        return;
+      }
+
+      if (method === 'POST' && suffix === '/images') {
+        await fulfillJson(route, 201, {
+          accepted: [1, 2, 3].map((n) => ({
             imageId: `img_${String(n)}`,
-            fileName: `netflix-golden-${String(n)}.png`,
-            ingestSource: 'upload',
-            available: true,
-            retainUntil: '2026-09-28T16:00:00.000Z',
-            candidateCount: inReview ? 1 : null,
-            href: `/api/images/img_${String(n)}`,
+            fileName: `${batch.plan.service}-golden-${String(n)}.png`,
           })),
-          extractionError: null,
-          lowYield: false,
-          progress: inReview ? undefined : { imagesDone: 1, imagesTotal: 3 },
-          degradedExtraction: false,
-          crossCheck: 'ok',
-          provenance: { created: [], modified: [], removed: [] },
-          changedNothing: true,
-          titles: [],
-        }),
-      );
-      return;
-    }
+          rejected: [],
+          batchTotals: { imageCount: 3, uploadedByteSize: 300, storedByteSize: 300 },
+        });
+        return;
+      }
 
-    if (method === 'GET' && path === `/api/batches/${BATCH_ID}/review`) {
-      await route.fulfill(ok(reviewResponse(state.candidatesConfirmed)));
-      return;
-    }
+      if (method === 'POST' && suffix === '/submit') {
+        batch.submitted = true;
+        await route.fulfill({ status: 204, body: '' });
+        return;
+      }
 
-    if (method === 'POST' && path === `/api/batches/${BATCH_ID}/candidates/confirm-all`) {
-      state.confirmAllBody = request.postDataJSON();
-      state.candidatesConfirmed = true;
-      await route.fulfill(ok({ section: 'additions', confirmed: WORKS.length, skipped: 0 }));
-      return;
-    }
+      if (method === 'GET' && suffix === '') {
+        batch.statusReads += 1;
+        await route.fulfill(ok(batchStatusResponse(batch)));
+        return;
+      }
 
-    if (method === 'POST' && path === `/api/batches/${BATCH_ID}/close`) {
-      state.closeBody = request.postDataJSON();
-      state.closed = true;
-      await route.fulfill(
-        ok({
-          batchId: BATCH_ID,
-          status: 'closed',
-          summary: { listingsCreated: WORKS.length, listingsRemoved: 0, removalGroupId: null },
-          serviceState: { service: 'netflix' },
-          undoable: true,
-        }),
-      );
-      return;
+      if (method === 'GET' && suffix === '/review') {
+        await route.fulfill(ok(reviewResponse(be, batch)));
+        return;
+      }
+
+      if (method === 'POST' && suffix === '/candidates/confirm-all') {
+        be.confirmAllBodies.push(request.postDataJSON());
+        batch.confirmedAdditions = true;
+        const { additionIds } = reconcile(be, batch);
+        await route.fulfill(
+          ok({ section: 'additions', confirmed: additionIds.length, skipped: 0 }),
+        );
+        return;
+      }
+
+      if (method === 'POST' && suffix === '/close') {
+        const body = request.postDataJSON() as { confirmRemovals?: boolean } | null;
+        be.closeBodies.push(body);
+        const outcome = closeBatch(be, batch, body?.confirmRemovals === true);
+        await fulfillJson(route, outcome.status, outcome.body);
+        return;
+      }
     }
 
     await fulfillJson(route, 500, {
@@ -286,30 +732,40 @@ async function stubJourneyApi(page: Page, state: JourneyState): Promise<void> {
   });
 }
 
-async function attachGoldenScreenshots(page: Page): Promise<void> {
+// ── Drivers ─────────────────────────────────────────────────────────────────
+
+async function attachGoldenScreenshots(page: Page, service: Service): Promise<void> {
   await page.getByTestId('file-input').setInputFiles(
     [1, 2, 3].map((n) => ({
-      name: `netflix-golden-${String(n)}.png`,
+      name: `${service}-golden-${String(n)}.png`,
       mimeType: 'image/png',
       buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, n]),
     })),
   );
 }
 
-test('T-E2E-001: upload, extract, match, review, and apply a first Netflix full update', async ({
+/** Upload three screenshots and submit, landing on the batch's review screen. */
+async function uploadAndSubmit(
+  page: Page,
+  opts: { service: Service; modeLabel: RegExp; expectedBatchId: string },
+): Promise<void> {
+  await page.goto('/upload');
+  await expect(page.getByRole('heading', { name: 'Upload screenshots' })).toBeVisible();
+  await page.getByRole('radio', { name: /Netflix/ }).check();
+  await page.getByRole('radio', { name: opts.modeLabel }).check();
+  await attachGoldenScreenshots(page, opts.service);
+  await expect(page.getByTestId('accepted-file')).toHaveCount(3);
+  await page.getByRole('button', { name: SUBMIT_LABEL }).click();
+  await expect(page).toHaveURL(`/batches/${opts.expectedBatchId}/review`);
+}
+
+test('T-E2E-001: a first full update, a reconcile with removals, a suppression, and a reappearance', async ({
   page,
 }) => {
-  const state: JourneyState = {
-    batchCreatedWith: null,
-    uploadedImageCalls: 0,
-    submitted: false,
-    batchStatusReads: 0,
-    candidatesConfirmed: false,
-    confirmAllBody: null,
-    closed: false,
-    closeBody: null,
-  };
-  await stubJourneyApi(page, state);
+  const be = makeBackend();
+  await stubBackend(page, be);
+
+  // ── Steps 1–4: the first Netflix full update ──────────────────────────────
 
   await page.goto('/upload');
   await expect(page.locator('.app-shell')).toBeVisible();
@@ -319,62 +775,211 @@ test('T-E2E-001: upload, extract, match, review, and apply a first Netflix full 
   await expect(page.getByText(modeExplanation('full-update', 'netflix'))).toBeVisible();
   await expect(page.getByText(modeExplanation('append-only', 'netflix'))).toBeVisible();
   await page.getByRole('radio', { name: /Full update/ }).check();
-  await attachGoldenScreenshots(page);
+  await attachGoldenScreenshots(page, 'netflix');
   await expect(page.getByTestId('accepted-file')).toHaveCount(3);
   await expect(page.getByTestId('dropzone-totals')).toContainText('3 screenshots');
-  await expect
-    .poll(() => state.batchCreatedWith)
-    .toEqual({ service: 'netflix', mode: 'full-update' });
-  await expect.poll(() => state.uploadedImageCalls).toBe(1);
+  await expect.poll(() => be.createdBodies[0]).toEqual({ service: 'netflix', mode: 'full-update' });
 
   await page.getByRole('button', { name: SUBMIT_LABEL }).click();
-  await expect(page).toHaveURL(`/batches/${BATCH_ID}/review`);
-  expect(state.submitted).toBe(true);
-  expect(state.batchStatusReads).toBeGreaterThanOrEqual(2);
+  await expect(page).toHaveURL('/batches/bat_e2e_1/review');
 
+  // The list is still empty until the batch is applied.
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Your list' })).toBeVisible();
   await expect(page.getByTestId('title-list').locator('[data-testid^="title-row-"]')).toHaveCount(
     0,
   );
-  await expect(page.getByText(WORKS[0].name)).toHaveCount(0);
 
-  await page.goto(`/batches/${BATCH_ID}/review`);
+  await page.goto('/batches/bat_e2e_1/review');
   await expect(page.getByRole('heading', { name: 'Review this batch' })).toBeVisible();
 
-  const additions = page.getByTestId('review-additions');
-  await expect(additions.locator('summary')).toHaveText(
-    `New to your list (${String(WORKS.length)})`,
-  );
-  await expect(additions.locator('details')).toHaveJSProperty('open', true);
-  for (const work of WORKS) {
-    await expect(additions.getByText(work.name).first()).toBeVisible();
-    await expect(additions.getByText(String(work.year)).first()).toBeVisible();
+  const additions1 = page.getByTestId('review-additions');
+  await expect(additions1.locator('summary')).toHaveText('New to your list (3)');
+  await expect(additions1.locator('details')).toHaveJSProperty('open', true);
+  for (const id of ['dune', 'arrival', 'arcane']) {
+    await expect(additions1.getByText(work(id).name).first()).toBeVisible();
   }
 
-  const already = page.getByTestId('review-already-on-list');
-  await expect(already.locator('summary')).toHaveText('Already on your list (0)');
-  await expect(already.locator('details')).toHaveJSProperty('open', false);
+  const already1 = page.getByTestId('review-already-on-list');
+  await expect(already1.locator('summary')).toHaveText('Already on your list (0)');
+  await expect(already1.locator('details')).toHaveJSProperty('open', false);
+  // ⚠ Nothing on the list yet ⇒ nothing to remove ⇒ the removals section is ABSENT.
   await expect(page.getByTestId('review-removals')).toHaveCount(0);
   await expect(page.getByText(removalsLabel('netflix'))).toHaveCount(0);
 
-  await page.getByRole('button', { name: `Confirm all ${String(WORKS.length)}` }).click();
-  await expect(
-    page.getByRole('button', { name: `Confirm all ${String(WORKS.length)}` }),
-  ).toHaveCount(0);
-  await expect.poll(() => state.confirmAllBody).toEqual({ section: 'additions' });
+  await page.getByRole('button', { name: 'Confirm all 3' }).click();
+  await expect(page.getByRole('button', { name: 'Confirm all 3' })).toHaveCount(0);
+  await expect.poll(() => be.confirmAllBodies[0]).toEqual({ section: 'additions' });
 
   await page.getByRole('button', { name: REVIEW_APPLY_LABEL }).click();
   await expect(page).toHaveURL('/');
-  await expect.poll(() => state.closeBody).toEqual({ confirmRemovals: false });
+  await expect.poll(() => be.closeBodies[0]).toEqual({ confirmRemovals: false });
 
-  const rows = page.getByTestId('title-list').locator('[data-testid^="title-row-"]');
-  await expect(rows).toHaveCount(WORKS.length);
-  for (const work of WORKS) {
-    const row = page.getByTestId(`title-row-ttl_${work.id}`);
-    await expect(row.getByTestId('title-name')).toHaveText(work.name);
+  const rows1 = page.getByTestId('title-list').locator('[data-testid^="title-row-"]');
+  await expect(rows1).toHaveCount(3);
+  for (const id of ['dune', 'arrival', 'arcane']) {
+    const row = page.getByTestId(`title-row-ttl_${id}`);
+    await expect(row.getByTestId('title-name')).toHaveText(work(id).name);
     await expect(row.getByTestId('badge-netflix')).toHaveText(SERVICE_LABELS.netflix);
-    await expect(row.getByTestId('date-added-label')).toHaveText(DATE_LABEL);
+    await expect(row.getByTestId('date-added-label')).toHaveText(LABEL_B1);
   }
   await expect(page.getByTestId('freshness-label-netflix')).toHaveText('Netflix updated today');
+
+  // ── Step 5: a second full update that removes Arrival and adds Sinners ─────
+
+  await uploadAndSubmit(page, {
+    service: 'netflix',
+    modeLabel: /Full update/,
+    expectedBatchId: 'bat_e2e_2',
+  });
+  await expect(page.getByRole('heading', { name: 'Review this batch' })).toBeVisible();
+
+  // One addition (Sinners), and Dune + Arcane already present (collapsed).
+  const additions2 = page.getByTestId('review-additions');
+  await expect(additions2.locator('summary')).toHaveText('New to your list (1)');
+  await expect(additions2.getByText('Sinners').first()).toBeVisible();
+
+  const already2 = page.getByTestId('review-already-on-list');
+  await expect(already2.locator('summary')).toHaveText('Already on your list (2)');
+
+  // ⚠ Arrival — extracted from NO screenshot this batch — is proposed for
+  // removal, ticked on arrival (REQ-055). This is the reconcile-with-removals
+  // heart of step 5.
+  const removals2 = page.getByTestId('review-removals');
+  await expect(removals2, 'Arrival should be offered for removal').toBeVisible();
+  await expect(removals2.locator('summary')).toHaveText(`${removalsLabel('netflix')} (1)`);
+  const removalCards = removals2.getByTestId('removal-card');
+  await expect(removalCards).toHaveCount(1);
+  await expect(removalCards.first()).toContainText('Arrival');
+  await expect(removalCards.first().locator('input[type="checkbox"]')).toBeChecked();
+
+  await page.getByRole('button', { name: 'Confirm all 1' }).click();
+  await expect(page.getByRole('button', { name: 'Confirm all 1' })).toHaveCount(0);
+
+  // Apply opens the removal-confirmation dialog; nothing is removed until it
+  // is confirmed as a group.
+  await page.getByTestId('apply-changes-button').click();
+  const confirmDialog = page.getByTestId('removal-confirm');
+  await expect(confirmDialog).toBeVisible();
+  await expect(page.getByTestId('removal-confirm-list')).toContainText('Arrival');
+  await confirmDialog.getByRole('button', { name: REMOVAL_CONFIRM_LABEL }).click();
+
+  await expect(page).toHaveURL('/');
+  await expect.poll(() => be.closeBodies[1]).toEqual({ confirmRemovals: true });
+
+  // The applied notice offers "Undo the removals" (a removal-group undo).
+  await expect(page.getByTestId('applied-notice')).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: UNDO_REMOVALS_LABEL }),
+    'a removal close must offer a removal-group undo',
+  ).toBeVisible();
+
+  // The list now holds Dune, Arcane, Sinners — Arrival is gone.
+  const rows2 = page.getByTestId('title-list').locator('[data-testid^="title-row-"]');
+  await expect(rows2).toHaveCount(3);
+  await expect(page.getByTestId('title-row-ttl_arrival')).toHaveCount(0);
+  await expect(page.getByTestId('title-row-ttl_dune')).toBeVisible();
+  await expect(page.getByTestId('title-row-ttl_arcane')).toBeVisible();
+  const sinnersRow = page.getByTestId('title-row-ttl_sinners');
+  await expect(sinnersRow.getByTestId('title-name')).toHaveText('Sinners');
+  await expect(sinnersRow.getByTestId('date-added-label')).toHaveText(LABEL_B2);
+
+  // The removed view LOGS Arrival, with its ORIGINAL date preserved.
+  await page.goto('/removed');
+  await expect(page.getByRole('heading', { name: 'Removal history' })).toBeVisible();
+  const removedRows = page.getByTestId('removed-list').locator('[data-testid="removed-row"]');
+  await expect(removedRows).toHaveCount(1);
+  const removedArrival = removedRows.first();
+  await expect(removedArrival.getByTestId('removed-name')).toHaveText('Arrival');
+  await expect(removedArrival.getByTestId('removed-service')).toHaveText(SERVICE_LABELS.netflix);
+  await expect(
+    removedArrival.getByTestId('removed-date-added'),
+    'the removed row keeps its ORIGINAL date, not the removal date',
+  ).toHaveText(LABEL_B1);
+
+  // ── Step 6: suppress Dune ("not interested") ──────────────────────────────
+
+  await page.goto('/');
+  await expect(page.getByTestId('title-row-ttl_dune')).toBeVisible();
+  await page.getByTestId('title-row-ttl_dune').getByTestId('row-menu').click();
+  await page.getByTestId('row-menu-suppress').click();
+
+  const suppressDialog = page
+    .getByRole('dialog')
+    .filter({ has: page.getByRole('heading', { name: 'Not interested' }) });
+  await expect(suppressDialog).toBeVisible();
+  await suppressDialog.getByRole('button', { name: 'Not interested' }).click();
+  await expect(suppressDialog.getByText(/is now on your Not interested list/)).toBeVisible();
+  await suppressDialog.getByRole('button', { name: 'Close' }).click();
+
+  // Dune leaves the list immediately, and stays gone after a reload (the
+  // server filters it too).
+  await expect(page.getByTestId('title-row-ttl_dune')).toHaveCount(0);
+  await page.goto('/');
+  await expect(page.getByTestId('title-row-ttl_dune')).toHaveCount(0);
+  await expect(page.getByTestId('title-row-ttl_arcane')).toBeVisible();
+  await expect(page.getByTestId('title-row-ttl_sinners')).toBeVisible();
+
+  // It appears under "Not interested".
+  await page.goto('/not-interested');
+  await expect(page.getByRole('heading', { name: 'Not interested' })).toBeVisible();
+  const suppressedRows = page
+    .getByTestId('suppressed-list')
+    .locator('[data-testid="suppressed-row"]');
+  await expect(suppressedRows).toHaveCount(1);
+  await expect(suppressedRows.first().getByTestId('suppressed-name')).toHaveText('Dune');
+
+  // ── Step 7: an append-only batch — Arrival reappears, Dune stays suppressed ─
+
+  await uploadAndSubmit(page, {
+    service: 'netflix',
+    modeLabel: /Add only/,
+    expectedBatchId: 'bat_e2e_3',
+  });
+  await expect(page.getByRole('heading', { name: 'Review this batch' })).toBeVisible();
+
+  // Arrival is a brand-new addition again (it was removed, not suppressed).
+  const additions3 = page.getByTestId('review-additions');
+  await expect(additions3.locator('summary')).toHaveText('New to your list (1)');
+  await expect(additions3.getByText('Arrival').first()).toBeVisible();
+
+  // ⚠ THE SUPPRESSION INVARIANT (REQ-071). Dune is in this batch's screenshots
+  // too, but because suppression is keyed on WORK IDENTITY it is dropped
+  // ENTIRELY from the review — it is neither an addition nor "already on your
+  // list". A row-id-keyed suppression would have let this reappear.
+  await expect(page.getByText('Dune'), 'a suppressed work must not reappear').toHaveCount(0);
+  // Append-only ⇒ no already-on-list section and no removals.
+  await expect(page.getByTestId('review-already-on-list')).toHaveCount(0);
+  await expect(page.getByTestId('review-removals')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Confirm all 1' }).click();
+  await page.getByTestId('apply-changes-button').click();
+  await expect(page).toHaveURL('/');
+  await expect.poll(() => be.closeBodies[2]).toEqual({ confirmRemovals: false });
+
+  // Arrival is back on the list as a brand-new row dated TODAY.
+  const arrivalRow = page.getByTestId('title-row-ttl_arrival');
+  await expect(arrivalRow).toBeVisible();
+  await expect(
+    arrivalRow.getByTestId('date-added-label'),
+    'the reappearance is a brand-new row dated today',
+  ).toHaveText(LABEL_TODAY);
+  // Dune is still suppressed — the append-only batch did not bring it back.
+  await expect(page.getByTestId('title-row-ttl_dune')).toHaveCount(0);
+
+  // The removed LOG still holds the ORIGINAL Arrival removal, untouched: the
+  // reappearance did NOT restore it (restore is an explicit action only).
+  await page.goto('/removed');
+  const removedRows2 = page.getByTestId('removed-list').locator('[data-testid="removed-row"]');
+  await expect(removedRows2).toHaveCount(1);
+  const removedArrival2 = removedRows2.first();
+  await expect(removedArrival2.getByTestId('removed-name')).toHaveText('Arrival');
+  await expect(
+    removedArrival2.getByTestId('removed-date-added'),
+    'the logged removal keeps its original date after the reappearance',
+  ).toHaveText(LABEL_B1);
+  // ⚠ FINDING: `specs/testing.md` §5 step 7 names an ordinal "Removal 1 of 1",
+  // but `RemovedPage.removalOrdinalLabel` suppresses the chip for a single
+  // removal (total <= 1), so no ordinal renders here. Recorded on TASK-108.
+  await expect(removedArrival2.getByTestId('removed-ordinal')).toHaveCount(0);
 });
