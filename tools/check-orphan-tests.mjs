@@ -103,16 +103,29 @@ export const BASELINE_ORPHANS = new Set([
   'T-SUP-015',
   'T-SUP-022',
   'T-SUP-023',
-  'T-UNDO-011',
-  'T-UNDO-012',
-  // ⚠ THE NINE BELOW ARE NOT NEW GAPS. They were always unimplemented; they
+  // ⚠ `T-UNDO-011`, `T-UNDO-012`, `T-UX-053`, `T-UX-054` and `T-UX-062` were
+  // REMOVED from this baseline — the gate reported all five as owned, and each
+  // is now implemented in TITLE position, which is this file's own strict
+  // definition of "a test bearing this id runs":
+  //   `T-UNDO-011`/`T-UNDO-012` → `apps/api/test/integration/batchUndo.spec.ts`
+  //   `T-UX-053`/`T-UX-054`     → `apps/web/test/batchStatusPage.spec.tsx`
+  //   `T-UX-062`                → `apps/web/test/reviewPage.spec.tsx` (a–e)
+  // That is the baseline working as a ratchet: the gap was recorded, the work
+  // was done, and the record shrinks to match.
+  //
+  // ⚠ THE SIX BELOW ARE NOT NEW GAPS. They were always unimplemented; they
   // became VISIBLE when `implementedTestIds` was sharpened from "the id
   // appears anywhere in a spec file" to "the id is in a test title". Under the
   // old predicate an id recorded in another gate's known-gap baseline counted
   // as its own implementation, so the act of writing down that a test was
-  // missing is what hid it. `T-AUTH-003`, `T-UX-053`, `T-UX-054` and
-  // `T-UX-062` appear in exactly one place in the entire suite — as literals
-  // in `uxStateCoverage.spec.ts`'s `KNOWN_UNCOVERED`.
+  // missing is what hid it.
+  //
+  // ~~"`T-AUTH-003`, `T-UX-053`, `T-UX-054` and `T-UX-062` appear in exactly
+  // one place in the entire suite — as literals in `uxStateCoverage.spec.ts`'s
+  // `KNOWN_UNCOVERED`."~~ — superseded and corrected in place, because it is a
+  // factual claim a reader would otherwise act on. Real tests have since been
+  // written for the three `T-UX-*` ids, and none of them appears in
+  // `uxStateCoverage.spec.ts` any more.
   //
   // A sharpened detector is the ONLY legitimate reason this list may grow, and
   // this comment is the required justification. Do not append to it for any
@@ -124,9 +137,6 @@ export const BASELINE_ORPHANS = new Set([
   'T-AUTH-001',
   'T-AUTH-002',
   'T-AUTH-003',
-  'T-UX-053',
-  'T-UX-054',
-  'T-UX-062',
   'T-UX-069',
   'T-UX-099',
   // ⚠ `T-UX-099` IS baselined here, and the note that used to sit on this line
