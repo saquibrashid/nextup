@@ -33,6 +33,7 @@
 import { useState, type JSX } from 'react';
 
 import {
+  OFFLINE_DISABLED_REASON,
   PASTE_ABANDONED_BODY,
   PASTE_BUTTON_LABEL,
   PASTE_DENIED_BODY,
@@ -56,6 +57,11 @@ export interface PasteButtonProps {
    * not create or submit one.
    */
   readonly batchReady: boolean;
+  /**
+   * §4.11 / `A45` — disables the button and shows the reason as visible text.
+   * A paste is a `POST`, so it cannot work offline any more than submit can.
+   */
+  readonly offline?: boolean;
   readonly onImagesPasted: (files: readonly File[]) => void;
   /** TASK-161 maps this to the four §4.13–§4.15 messages. */
   readonly onPasteFailed?: (failure: PasteFailure) => void;
@@ -99,6 +105,7 @@ export function classifyRejection(error: unknown): PasteFailure {
 
 export function PasteButton({
   batchReady,
+  offline = false,
   onImagesPasted,
   onPasteFailed,
   touch,
@@ -157,9 +164,27 @@ export function PasteButton({
 
   return (
     <div className="dropzone__paste" data-testid="paste-slot">
-      <button type="button" className="tap-target" data-testid="paste-button" onClick={onClick}>
+      <button
+        type="button"
+        className="tap-target"
+        data-testid="paste-button"
+        disabled={offline}
+        onClick={onClick}
+      >
         {PASTE_BUTTON_LABEL}
       </button>
+      {/*
+        ⚠ §4.11 / `A45` — A PASTE NEEDS A `POST`, so the button is disabled
+        offline exactly as submit is, and carries the reason as VISIBLE text.
+        Leaving it enabled would let the owner paste screenshot after
+        screenshot into a batch that cannot receive any of them; they would
+        only discover it at submit, with the work already done.
+      */}
+      {offline && (
+        <span className="offline-reason" data-testid="paste-offline-reason">
+          {OFFLINE_DISABLED_REASON}
+        </span>
+      )}
       {/*
         iOS screenshots go to Photos, not the clipboard. Without this sentence
         the button looks broken to someone who never tapped "Copy" on the

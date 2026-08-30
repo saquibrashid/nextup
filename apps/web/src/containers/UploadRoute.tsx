@@ -45,10 +45,14 @@ import {
   SUBMIT_NEEDS_IMAGES,
   SUBMIT_NEEDS_SELECTION,
 } from '../copy';
+import { OFFLINE_DISABLED_REASON } from '../copy';
+import { useOnline } from '../lib/useOnline';
 
 export interface UploadRouteProps {
   /** Injected so the suite can drive every state without a server. */
   readonly client?: ApiClient;
+  /** Injected so §4.11 is drivable without a real network. Reads TRUE when online. */
+  readonly connectivity?: () => boolean;
 }
 
 /** The 409 the owner can act on, kept apart from ordinary failures (§4.10). */
@@ -68,7 +72,16 @@ interface OpenBatchConflict {
 export function submitBlockedReason(
   selection: BatchDraftSelection,
   imageCount: number,
+  offline = false,
 ): string | null {
+  /*
+   * ⚠ OFFLINE IS CHECKED FIRST AND IS NOT MERELY ANOTHER REASON IN THE LIST.
+   * §4.11 disables submit while offline because the submit is a `POST`. The
+   * order matters: with a service chosen and images attached, the other two
+   * reasons are `null` and the button would otherwise be enabled, sending the
+   * owner's screenshots into a connection that cannot carry them.
+   */
+  if (offline) return OFFLINE_DISABLED_REASON;
   if (selection.service === null || selection.mode === null) return SUBMIT_NEEDS_SELECTION;
   if (imageCount === 0) return SUBMIT_NEEDS_IMAGES;
   return null;
@@ -88,8 +101,12 @@ export function rejectionsFromError(error: unknown): readonly ServerRejection[] 
   return Array.isArray(rejected) ? (rejected as ServerRejection[]) : [];
 }
 
-export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.Element {
+export function UploadRoute({
+  client = apiClient,
+  connectivity,
+}: UploadRouteProps = {}): JSX.Element {
   const navigate = useNavigate();
+  const online = useOnline({ connectivity });
 
   const [selection, setSelection] = useState<BatchDraftSelection>({ service: null, mode: null });
   const [batchId, setBatchId] = useState<string | null>(null);
@@ -211,7 +228,7 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
 
   if (refused) return <RefusalPage reason="not-allowed" />;
 
-  const blocked = submitBlockedReason(selection, imageCount);
+  const blocked = submitBlockedReason(selection, imageCount, !online);
   const ready = selection.service !== null && selection.mode !== null;
 
   return (
@@ -247,7 +264,12 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
         </section>
       )}
 
-      <ImageDropzone batchReady={ready} onFilesAccepted={attach} serverRejected={serverRejected} />
+      <ImageDropzone
+        batchReady={ready}
+        offline={!online}
+        onFilesAccepted={attach}
+        serverRejected={serverRejected}
+      />
 
       <section className="upload-submit" data-testid="submit-step">
         {/*

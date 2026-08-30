@@ -943,3 +943,34 @@ export const GATE_FAILED_TITLE = "Couldn't check your access.";
  */
 export const GATE_FAILED_BODY =
   'Something went wrong before your list could load. Nothing has changed — try again.';
+
+/*
+ * ⚠ THE GLOBAL OFFLINE COPY (§11 / `T-UX-023`). Every surface owes an offline
+ * state, and before TASK-125 only batch status had one, so the other six
+ * showed whatever the failed `fetch` produced — usually the generic
+ * load-failure error, which tells the owner nextup is broken when in fact
+ * their network is.
+ *
+ * ⚠ `STATUS_OFFLINE` ABOVE IS NOT A DUPLICATE OF THIS AND MUST NOT BE MERGED
+ * INTO IT. §5.8 is a promise about a batch that is still extracting on the
+ * server ("this will keep updating"), which is only true while something is
+ * running. Reusing that sentence on the list or the removed view would promise
+ * a refresh that nothing is going to deliver.
+ */
+export const OFFLINE_BANNER = 'You\u2019re offline. nextup needs a connection.';
+
+/** The reason a disabled mutating control carries, as VISIBLE text (§11). */
+export const OFFLINE_DISABLED_REASON = 'You\u2019re offline.';
+
+/** §2.12 — cached rows stay on screen, and are marked as what they are. */
+export const OFFLINE_SHOWING_CACHED = 'Showing what was loaded earlier.';
+
+/**
+ * §2.12 — offline before anything was cached.
+ *
+ * ⚠ NOT the empty state and NOT the load-failure state. Both would be lies:
+ * the first tells an owner with a full library they have never uploaded
+ * anything, the second blames nextup for the owner's network.
+ */
+export const OFFLINE_NOTHING_LOADED =
+  'Your list hasn\u2019t loaded yet. It will appear when you\u2019re back online.';

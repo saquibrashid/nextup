@@ -21,14 +21,23 @@
 import type { JSX } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 
+import { OfflineBanner } from './OfflineBanner';
 import { TmdbAttribution } from './TmdbAttribution';
+import { useOnline } from '../lib/useOnline';
 import { ROUTES } from '../routes';
 
 const NAV_ITEMS = ROUTES.filter(
   (route): route is typeof route & { navLabel: string } => route.navLabel !== null,
 );
 
-export function AppShell(): JSX.Element {
+export interface AppShellProps {
+  /** Injected so the global offline state is drivable without a real network. */
+  readonly connectivity?: () => boolean;
+}
+
+export function AppShell({ connectivity }: AppShellProps = {}): JSX.Element {
+  const online = useOnline({ connectivity });
+
   return (
     <div className="app-shell">
       <header>
@@ -47,6 +56,8 @@ export function AppShell(): JSX.Element {
           </ul>
         </nav>
       </header>
+
+      <OfflineBanner offline={!online} />
 
       <main>
         <Outlet />
