@@ -331,8 +331,16 @@ captioning model for no product benefit (NFR-015).
 
 ### 2.1c The cross-check merge — deterministic, and the heart of this design
 
-`apps/api/src/extraction/crossCheck.ts`. **Pure function. No I/O. No
-inference.** Same inputs → byte-identical output, always (`T-AI-034`).
+`packages/domain/src/extraction/crossCheck.ts`. **Pure function. No I/O.
+No inference.** Same inputs → byte-identical output, always
+(`T-AI-034`). ⚠ **Domain, not `apps/api`** — the function is pure, and
+both the hybrid extractor and the `StubExtractor` must run **this**
+merge rather than a copy (`specs/testing.md` §3.1), which is only
+possible from the shared package.
+
+~~Superseded: "`apps/api/src/extraction/crossCheck.ts`."~~ — never true
+of the shipped code; corrected here because this line is an instruction
+about where the code goes.
 
 ```ts
 export function crossCheck(
@@ -354,10 +362,30 @@ coincidental match elsewhere on screen does not count):
 | otherwise, or no overlapping line | `'none'` |
 
 **Step 2 — orphan recovery (this is `REQ-012` applied to the model
-itself).** Every OCR line that (i) was not consumed in step 1 by any
-tile, and (ii) survives the §3.2 length/chrome/digit gates, is emitted
-as an **additional** `ExtractedTextItem` with `provider: 'ocr-only'`,
-`basis: 'text'`, `ocrSupport: 'exact'`, `inferredTitle: null`.
+itself).** Every OCR line that was not consumed in step 1 by any tile is
+emitted as an **additional** `ExtractedTextItem` with
+`provider: 'ocr-only'`, `basis: 'text'`, `ocrSupport: 'exact'`,
+`inferredTitle: null`. **No gate is applied here, and none may be
+added.**
+
+> ⚠ **§3.2 IS A CLASSIFIER, NOT A FILTER, AND IT RUNS LATER.** It
+> assigns `chrome-suspected` and states in its own terms that verdicts
+> are *"flags on a visible candidate, not exclusions"*; §3.3 shows
+> `chrome-suspected` items **surfaced** in the collapsed "Probably not
+> titles (N)" group, not dropped. So there is nothing here for a line to
+> "survive". Filtering orphans at this step would discard, before any
+> human ever saw them, exactly the titles the vision model missed and
+> the deterministic reader caught — the one class `REQ-012` exists to
+> protect — and would make the **"Omission recovery — 1.0,
+> non-negotiable"** metric (§9, `T-AI-039`) unsatisfiable by
+> construction. An orphan that trips a §3.2 rule is **classified and
+> shown**, exactly like a tile that trips the same rule.
+>
+> ~~Superseded: "Every OCR line that (i) was not consumed in step 1 by
+> any tile, and (ii) **survives the §3.2 length/chrome/digit gates**, is
+> emitted…"~~ — a real spec defect, reported by the implementer of
+> TASK-056c rather than silently conformed to. `crossCheck.ts` was
+> written the safe way and carries the same note in its header.
 
 > **This is the guarantee Revision 1 could not offer: the vision model
 > cannot silently omit a title that a second, independent, deterministic
@@ -417,9 +445,13 @@ produces `provenance.removed.length === 0`.
 
 ### 2.3 The interface
 
-`apps/api/src/extraction/TitleExtractor.ts` — **the interface itself is
-unchanged** (US-006 AC-1). `ExtractedTextItem` gains four fields; every
-call site above stage 1 is untouched.
+`packages/domain/src/extraction/TitleExtractor.ts` — **the interface
+itself is unchanged** (US-006 AC-1). `ExtractedTextItem` gains four
+fields; every call site above stage 1 is untouched.
+~~Superseded: "`apps/api/src/extraction/TitleExtractor.ts`."~~ — see the
+note at §2.1c: the pure half of extraction lives in `packages/domain`,
+because `apps/api`'s `stubExtractor` and `hybridExtractor` must both
+implement **one** interface, not two copies of it.
 
 ```ts
 export interface ExtractedTextItem {
@@ -499,7 +531,9 @@ configuration value** (ADR-0001 R2.9).
 
 ## 3. Stage 2 — deterministic clean-up
 
-`apps/api/src/extraction/cleanup.ts`. Pure functions, no I/O, no inference.
+`packages/domain/src/extraction/cleanup.ts`. Pure functions, no I/O, no
+inference — hence `packages/domain`, per §2.1c.
+~~Superseded: "`apps/api/src/extraction/cleanup.ts`."~~
 
 ### 3.1 The governing rule (REQ-012, ADR-0001)
 
@@ -531,7 +565,7 @@ favour of `inferredTitle`.**
 |---|---|---|
 | 1 | **Reading-order grouping** | **Applies only to `provider: 'ocr-only'` items.** Sort by `(round(y*40), x)`. Merge two items into one candidate when their vertical centres differ by < 40 % of the taller box's height **and** their horizontal gap is < 3 % of image width. ⚠ These three constants are **uncalibrated** and are now a *secondary* path only — the primary reader groups tiles natively (ADR-0001 R2.3a). `provider: 'llm'` items are already one-per-tile and are **never** merged. |
 | 2 | **Length gate** | `matchText.length < 2` or `> 200` → `chrome-suspected`. |
-| 3 | **Chrome vocabulary** | Case-insensitive exact match against `CHROME_TERMS` (`apps/api/src/extraction/chromeTerms.ts`): `my list`, `continue watching`, `watchlist`, `saved`, `downloads`, `search`, `home`, `browse`, `settings`, `profile`, `new & popular`, `coming soon`, `top 10`, `trending now`, `for you`, `series`, `movies`, `sign out`, `remove from my list`, `play`, `more info`, `resume`, `episodes`, `hbo max`, `max`, `netflix`. → `chrome-suspected`. **Substring matches do not count** — "Play" as a whole line is chrome; *The Play* is a title. **Applies only to `provider: 'ocr-only'` items** — the primary reader is instructed not to report chrome as a tile, and applying a fixed vocabulary to its output would suppress a genuine title named after a UI word. |
+| 3 | **Chrome vocabulary** | Case-insensitive exact match against `CHROME_TERMS` (`packages/domain/src/extraction/chromeTerms.ts`, a pure module — ~~`apps/api/src/extraction/chromeTerms.ts`~~): `my list`, `continue watching`, `watchlist`, `saved`, `downloads`, `search`, `home`, `browse`, `settings`, `profile`, `new & popular`, `coming soon`, `top 10`, `trending now`, `for you`, `series`, `movies`, `sign out`, `remove from my list`, `play`, `more info`, `resume`, `episodes`, `hbo max`, `max`, `netflix`. → `chrome-suspected`. **Substring matches do not count** — "Play" as a whole line is chrome; *The Play* is a title. **Applies only to `provider: 'ocr-only'` items** — the primary reader is instructed not to report chrome as a tile, and applying a fixed vocabulary to its output would suppress a genuine title named after a UI word. |
 | 4 | **Digit/symbol ratio** | > 60 % of characters are digits or punctuation → `chrome-suspected` (progress bars, durations, "1h 52m", "S2:E4"). `ocr-only` items only. |
 | 5 | **Year extraction** | A trailing or parenthesised 4-digit token in `1880..currentYear+5` is lifted into `extractedYear` and **removed from the text used for matching**. It is **not** part of identity (data-model SD-05). |
 | 6 | **Normalisation** | `normalisedText = normaliseTitleText(matchText)` — the single shared function (data-model §2.2). No second implementation. |

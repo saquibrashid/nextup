@@ -302,10 +302,17 @@ paste whose blob claims `image/png` but whose bytes are a PDF is **415
 ### 5.0 The pre-decode pixel guard — MANDATORY *(new, R5; `A43-M1`, ADR-0008 R2.1)*
 
 **Rule, stated as the implementer must execute it:** for **every** accepted
-file, in `apps/api/src/images/pixelGuard.ts`, **read the pixel dimensions out
+file, in `apps/api/src/images/decodeGuard.ts` (whose pixel arithmetic is the
+pure `packages/domain/src/pixelGuard.ts`), **read the pixel dimensions out
 of the container header and decide accept/reject BEFORE calling any decoder
 and before allocating any decode buffer.** The order in
 `apps/api/src/images/ingest.ts` is fixed and is part of the contract:
+
+~~Superseded: "in `apps/api/src/images/pixelGuard.ts`"~~ — that file has
+never existed. `specs/testing.md` flagged the divergence while TASK-145 was
+still unbuilt and said it should be settled *before* it was built; it was
+then built as `decodeGuard.ts` + a pure `pixelGuard.ts`, and the spec did
+not follow. `T-INFRA-014` now fails on this class.
 
 ```
 magic-byte sniff (§5)                     ← no allocation
@@ -354,7 +361,7 @@ the more actionable message (up-sizing would not help it).
 | | |
 |---|---|
 | Env var | **`NEXTUP_MAX_DECODE_PIXELS`** |
-| Type | positive integer, parsed by `packages/domain/src/config.ts` with `z.coerce.number().int().positive()` |
+| Type | positive integer, parsed by `apps/api/src/config.ts` (~~`packages/domain/src/config.ts`~~ — it must sit beside `IMAGE_RETENTION_DAYS`, per invariant 8 and `T-INV-008`) with `z.coerce.number().int().positive()` |
 | **Default when unset** | **`25000000`** — the 0.25 vCPU / 0.5 GiB value. `T-IMG-022`. |
 | Value at 0.5 vCPU / 1.0 GiB | **`50000000`** — set **in the same command** that up-sizes memory (`runbooks/scale-up-memory.md` §2) |
 | Binding rule | **The guard value moves with container memory, always.** A raised guard on a small container is strictly worse than no up-size at all. `T-INFRA-005` pins the **pair** `0.25 vCPU / 0.5 GiB` **and** `NEXTUP_MAX_DECODE_PIXELS=25000000` so they can never drift apart. |
