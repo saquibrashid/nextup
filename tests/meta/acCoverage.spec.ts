@@ -225,8 +225,9 @@ const KNOWN_UNMAPPED: readonly string[] = [
  * runs". An AC whose only named test does not exist has no definition of done.
  *
  * ⚠ Shrink-only, like `KNOWN_UNMAPPED`. `T-META-001e` fails in both
- * directions, so landing any one of these forces its line out.
- *
+ * directions, so landing any one of these forces its line out. It has already
+ * happened twice: lane V's a11y work removed three, and building
+ * `T-META-002` removed its own line.
  */
 const KNOWN_PHANTOM_CITATIONS: readonly string[] = [
   'T-AI-014',
@@ -234,7 +235,6 @@ const KNOWN_PHANTOM_CITATIONS: readonly string[] = [
   'T-AI-041',
   'T-AUTH-001',
   'T-AUTH-002',
-  'T-META-002',
   'T-TMDB-011',
   'T-UNDO-004',
   'T-UNDO-006',
