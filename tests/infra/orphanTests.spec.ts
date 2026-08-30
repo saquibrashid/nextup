@@ -138,7 +138,11 @@ describe('T-META-006 — every defined test id is owned', () => {
     // properties whose expected set is read back from the store or the schema
     // rather than written out by hand, so they keep working as the schema
     // grows. Two of them closed gaps nothing else caught.
-    expect(BASELINE_ORPHANS.size).toBe(11);
+    // 11 → 9: `T-ATTR-005` (US-011 AC-4) and `T-UX-099` (US-015 AC-6), both
+    // web, both mutation-verified, and both were the sole guard of what they
+    // assert. `T-UX-099` also carried a false comment in the baseline claiming
+    // it was not baselined — corrected in the same change.
+    expect(BASELINE_ORPHANS.size).toBe(9);
   });
 
   it('T-META-006f: a citation that is struck through does not count as ownership', () => {

@@ -17,7 +17,7 @@
  * TASK-024 lands, wiring it up cannot change what is displayed.
  */
 
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
@@ -139,6 +139,41 @@ describe('TMDB attribution', () => {
     expect(logo).toHaveAttribute('src', TMDB_LOGO_PATH);
     // specs/ui.md §10.2: posters are decorative (alt=""), the TMDB logo is not.
     expect(logo).toHaveAttribute('alt', 'TMDB');
+  });
+
+  it('T-ATTR-005a · US-011 AC-4 · a FAILING logo asset does not take the disclaimer with it', () => {
+    // ⚠ THE LICENSING OBLIGATION IS THE SENTENCE, NOT THE LOGO. A missing or
+    // 404ing logo is the likeliest single failure on this path — it is the one
+    // part of the attribution that depends on a separate network request and a
+    // correct build output — and it must degrade to "no logo" and never to "no
+    // disclaimer". A component that rendered the pair conditionally, or that
+    // swapped the whole block for a fallback on error, would look tidy and
+    // would silently drop a compliance statement whose absence is invisible
+    // from inside the product.
+    render(<TmdbAttribution logoPath="/assets/does-not-exist.svg" />);
+
+    const logo = screen.getByRole('img', { name: TMDB_LOGO_ALT });
+    // jsdom never fetches, so the failure is dispatched explicitly. This is
+    // exactly the event a real 404 would deliver.
+    fireEvent.error(logo);
+
+    expect(screen.getByText(REQUIRED_WORDING)).toBeVisible();
+    expect(screen.getByTestId('omdb-disclaimer')).toBeVisible();
+    // And no error handler removed or replaced the block itself.
+    expect(screen.getByTestId('tmdb-attribution')).toBeInTheDocument();
+  });
+
+  it('T-ATTR-005b · US-011 AC-4 · the disclaimer is a SIBLING of the logo, not inside it', () => {
+    // The structural reason `005a` holds, asserted directly so it cannot be
+    // reintroduced by a refactor that wraps the sentence in the image's
+    // container and hides that container on error. An `<img>` cannot contain
+    // text, so a build that tried would drop the sentence outright.
+    render(<TmdbAttribution />);
+
+    const logo = screen.getByRole('img', { name: TMDB_LOGO_ALT });
+    const disclaimer = screen.getByText(REQUIRED_WORDING);
+    expect(logo.contains(disclaimer)).toBe(false);
+    expect(disclaimer.contains(logo)).toBe(false);
   });
 
   it('T-ATTR-001g · US-011 AC-3/AC-5 · the disclaimer is in the footer of every route', () => {
