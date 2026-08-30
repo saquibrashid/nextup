@@ -270,6 +270,17 @@ async function expectStyledAndRendered(page: Page): Promise<void> {
 
 async function expectNoHorizontalOverflow(page: Page, context = page.url()): Promise<void> {
   const result = await page.evaluate(() => {
+    const scrollbarProbe = document.createElement('div');
+    scrollbarProbe.style.position = 'absolute';
+    scrollbarProbe.style.left = '-9999px';
+    scrollbarProbe.style.top = '0';
+    scrollbarProbe.style.width = '100px';
+    scrollbarProbe.style.height = '100px';
+    scrollbarProbe.style.overflow = 'scroll';
+    document.body.append(scrollbarProbe);
+    const scrollbarWidth = scrollbarProbe.offsetWidth - scrollbarProbe.clientWidth;
+    scrollbarProbe.remove();
+
     const clientWidth = document.documentElement.clientWidth;
     const scrollWidth = document.documentElement.scrollWidth;
     const offenders = [...document.body.querySelectorAll('*')]
@@ -291,9 +302,15 @@ async function expectNoHorizontalOverflow(page: Page, context = page.url()): Pro
       .slice(0, 5);
 
     return {
+      bodyClientWidth: document.body.clientWidth,
+      bodyScrollWidth: document.body.scrollWidth,
       clientWidth,
+      offsetWidth: document.documentElement.offsetWidth,
+      outerWidth: window.outerWidth,
+      scrollbarWidth,
       scrollWidth,
       overflow: scrollWidth - clientWidth,
+      innerWidth: window.innerWidth,
       offenders,
     };
   });
@@ -341,6 +358,7 @@ test.describe('T-A11Y-001 — the 320 px floor', () => {
     await page.setViewportSize(NARROW);
 
     for (const route of ROUTES) {
+      console.log(`T-A11Y-001c measuring ${route}`);
       await page.goto(route);
       await expectStyledAndRendered(page);
       await expectNoHorizontalOverflow(page, route);
