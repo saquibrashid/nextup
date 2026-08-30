@@ -33,6 +33,7 @@ import {
   parseUndoResult,
   type UndoSuccess,
 } from '../lib/undoResult';
+import { useOnline } from '../lib/useOnline';
 import { useResource } from '../lib/useResource';
 import { BatchHistoryPage } from '../pages/BatchHistoryPage';
 import { RefusalPage } from '../pages/RefusalPage';
@@ -43,6 +44,7 @@ import {
   BATCHES_UNDO_FAILED,
   BATCHES_UNDO_FAILED_RETRY_LABEL,
   BATCHES_UNDONE_HOME_LABEL,
+  OFFLINE_DISABLED_REASON,
 } from '../copy';
 
 export interface BatchHistoryRouteProps {
@@ -64,6 +66,9 @@ export function BatchHistoryRoute({
 }: BatchHistoryRouteProps = {}): JSX.Element {
   const batches = useResource((signal) => client.listBatches(signal), 'batches');
   const [undo, setUndo] = useState<UndoState>({ kind: 'idle' });
+  // §9.11 — offline. Reading the history stays available; the undo POST does
+  // not. The global banner is AppShell's; here we only disable the mutations.
+  const offline = !useOnline();
 
   if (batches.resource.kind === 'refused') return <RefusalPage reason="not-allowed" />;
 
@@ -141,10 +146,16 @@ export function BatchHistoryRoute({
             type="button"
             className="tap-target"
             data-testid="undo-failed-retry"
+            disabled={offline}
             onClick={() => onUndo(undo.batchId)}
           >
             {BATCHES_UNDO_FAILED_RETRY_LABEL}
           </button>
+          {offline && (
+            <span className="offline-reason" data-testid="undo-failed-offline-reason">
+              {OFFLINE_DISABLED_REASON}
+            </span>
+          )}
         </div>
       )}
       <BatchHistoryPage
@@ -154,6 +165,7 @@ export function BatchHistoryRoute({
         onRetry={batches.reload}
         onUndo={onUndo}
         undoingBatchId={undo.kind === 'submitting' ? undo.batchId : null}
+        offline={offline}
       />
     </>
   );

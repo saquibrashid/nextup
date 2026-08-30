@@ -30,6 +30,7 @@ import {
   BATCHES_TITLE,
   BATCHES_UNDO_LABEL,
   BATCHES_UNDO_SUBMITTING,
+  OFFLINE_DISABLED_REASON,
   RETRY_LABEL,
 } from '../copy';
 import type { BatchHistoryItem } from '../lib/apiClient';
@@ -51,6 +52,13 @@ export interface BatchHistoryPageProps {
    * actionable. `null`/absent when no undo is in flight.
    */
   readonly undoingBatchId?: string | null;
+  /**
+   * §9.11 — offline. Undo is an irreversible `POST`; offline it can only fail,
+   * so every *Undo this batch* button is disabled with the reason as visible
+   * text. Reading the history stays available — this blocks the mutation, not
+   * the browse. The global banner is `AppShell`'s job, not this page's.
+   */
+  readonly offline?: boolean;
 }
 
 /**
@@ -97,10 +105,12 @@ function BatchCard({
   item,
   onUndo,
   undoing = false,
+  offline = false,
 }: {
   item: BatchHistoryItem;
   onUndo?: (batchId: string) => void;
   undoing?: boolean;
+  offline?: boolean;
 }): JSX.Element {
   return (
     <li className="batch-card" data-testid="batch-card">
@@ -114,16 +124,23 @@ function BatchCard({
         <span data-testid="batch-card-counts">{countsLine(item.counts)}</span>
       </Link>
       {onUndo !== undefined && canOfferUndo(item) && (
-        <button
-          type="button"
-          className="batch-card__undo tap-target"
-          data-testid="batch-card-undo"
-          disabled={undoing}
-          aria-busy={undoing}
-          onClick={() => onUndo(item.batchId)}
-        >
-          {undoing ? BATCHES_UNDO_SUBMITTING : BATCHES_UNDO_LABEL}
-        </button>
+        <>
+          <button
+            type="button"
+            className="batch-card__undo tap-target"
+            data-testid="batch-card-undo"
+            disabled={undoing || offline}
+            aria-busy={undoing}
+            onClick={() => onUndo(item.batchId)}
+          >
+            {undoing ? BATCHES_UNDO_SUBMITTING : BATCHES_UNDO_LABEL}
+          </button>
+          {offline && (
+            <span className="offline-reason" data-testid="batch-card-offline-reason">
+              {OFFLINE_DISABLED_REASON}
+            </span>
+          )}
+        </>
       )}
     </li>
   );
@@ -136,6 +153,7 @@ export function BatchHistoryPage({
   onRetry,
   onUndo,
   undoingBatchId = null,
+  offline = false,
 }: BatchHistoryPageProps): JSX.Element {
   return (
     <>
@@ -168,6 +186,7 @@ export function BatchHistoryPage({
               key={item.batchId}
               item={item}
               undoing={item.batchId === undoingBatchId}
+              offline={offline}
               {...(onUndo ? { onUndo } : {})}
             />
           ))}
