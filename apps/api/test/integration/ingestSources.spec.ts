@@ -30,7 +30,12 @@
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
-import { MAX_FILES_PER_REQUEST } from '@nextup/domain';
+import {
+  IMAGE_DECODE_BEGIN,
+  MAX_FILES_PER_REQUEST,
+  MAX_IMAGE_BYTES,
+  MAX_IMAGES_PER_BATCH,
+} from '@nextup/domain';
 import type { Express } from 'express';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -39,6 +44,10 @@ import { CLIENT_PRINCIPAL_HEADER } from '../../src/auth/principal.js';
 import { resetAllowListWarning } from '../../src/middleware/allowList.js';
 import { azureImageBlobStore, resetBlobStoreForTests } from '../../src/storage/blobStore.js';
 import { closeTestPrisma, resetDatabase, testPrisma } from './harness.js';
+import {
+  INGEST_FIXTURES,
+  loadIngestFixture,
+} from '../../../../tests/fixtures/golden/ingest/index.js';
 
 const OID = 'http://schemas.microsoft.com/identity/claims/objectidentifier';
 const SUBJECT = 'oid-owner-ingest';
@@ -188,6 +197,46 @@ async function openBatch(service = 'netflix', mode = 'append-only'): Promise<str
   return ((await res.json()) as { batchId: string }).batchId;
 }
 
+async function reextract(batchId: string): Promise<Response> {
+  return fetch(`${origin}/api/batches/${batchId}/re-extract`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      [CLIENT_PRINCIPAL_HEADER]: principalHeader(),
+    },
+    body: JSON.stringify({}),
+  });
+}
+
+function isCreateBatchCall(call: Parameters<typeof fetch>): boolean {
+  const [input, init] = call;
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  return new URL(url).pathname === '/api/batches' && init?.method === 'POST';
+}
+
+async function captureStdoutWhile<T>(
+  action: () => Promise<T>,
+): Promise<{ value: T; events: Record<string, unknown>[] }> {
+  const chunks: string[] = [];
+  const spy = vi.spyOn(process.stdout, 'write').mockImplementation(((
+    chunk: string | Uint8Array,
+  ) => {
+    chunks.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString('utf8'));
+    return true;
+  }) as typeof process.stdout.write);
+
+  try {
+    const value = await action();
+    const events = chunks
+      .flatMap((chunk) => chunk.split(/\r?\n/))
+      .filter((line) => line.trim().length > 0)
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    return { value, events };
+  } finally {
+    spy.mockRestore();
+  }
+}
+
 beforeEach(async () => {
   resetAllowListWarning();
   resetBlobStoreForTests();
@@ -225,6 +274,7 @@ afterAll(async () => {
 
 describe('T-PASTE-003 successive pastes append to the ONE open batch', () => {
   it('T-PASTE-003a: three pastes produce one batch, three images, ordinals 01/02/03', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const batchId = await openBatch();
 
     const names: string[] = [];
@@ -245,6 +295,7 @@ describe('T-PASTE-003 successive pastes append to the ONE open batch', () => {
     expect(new Set(names).size).toBe(3);
 
     // ONE batch, not three. A paste never creates or submits a batch (`A45`).
+    expect(fetchSpy.mock.calls.filter((call) => isCreateBatchCall(call)).length).toBe(1);
     expect(await testPrisma().uploadBatch.count({ where: { ownerId } })).toBe(1);
     expect(await testPrisma().uploadedImage.count({ where: { ownerId, batchId } })).toBe(3);
   });
@@ -252,9 +303,9 @@ describe('T-PASTE-003 successive pastes append to the ONE open batch', () => {
   it('T-PASTE-003b: paste, drop and upload all land in the SAME batch and are counted together', async () => {
     const batchId = await openBatch();
 
+    await postImages(batchId, [{ name: 'chosen.png', bytes: pngBytes() }], 'upload');
     await postImages(batchId, [{ name: PASTED_NAME, bytes: pngBytes() }], 'paste');
-    await postImages(batchId, [{ name: 'dragged.png', bytes: pngBytes() }], 'drop');
-    const last = await postImages(batchId, [{ name: 'chosen.png', bytes: pngBytes() }], 'upload');
+    const last = await postImages(batchId, [{ name: 'dragged.png', bytes: pngBytes() }], 'drop');
 
     const body = (await last.json()) as ImagesBody;
     // The totals are across ALL sources — a per-source tally would let a batch
@@ -325,16 +376,48 @@ describe('T-PASTE-005 naming and ingestSource are server facts, not client claim
 });
 
 describe('T-PASTE-006 the declared content type is never trusted', () => {
+  it('T-PASTE-006a: a paste whose bytes are a PDF is refused exactly like an upload', async () => {
+    expect(INGEST_FIXTURES.lyingBlob.declaredContentType).toBe('image/png');
+    const batchId = await openBatch();
+
+    for (const source of ['paste', 'upload'] as const) {
+      const res = await postImages(
+        batchId,
+        [
+          {
+            name: 'invoice.png',
+            bytes: loadIngestFixture('lyingBlob'),
+            declaredType: INGEST_FIXTURES.lyingBlob.declaredContentType,
+          },
+        ],
+        source,
+      );
+
+      expect(res.status).toBe(415);
+      expect(((await res.json()) as ErrorBody).error.code).toBe('UNSUPPORTED_IMAGE_FORMAT');
+      expect(await testPrisma().uploadedImage.count({ where: { ownerId, batchId } })).toBe(0);
+    }
+  });
+
   it('T-PASTE-006b: a PNG declared as application/octet-stream is accepted by magic bytes', async () => {
     const batchId = await openBatch();
     const res = await postImages(
       batchId,
-      [{ name: 'x.png', bytes: pngBytes(), declaredType: 'application/octet-stream' }],
+      [
+        {
+          name: PASTED_NAME,
+          bytes: loadIngestFixture('clipboardBlob'),
+          declaredType: 'application/octet-stream',
+        },
+      ],
       'paste',
     );
 
     expect(res.status).toBe(201);
-    expect(((await res.json()) as ImagesBody).accepted[0]?.uploadedFormat).toBe('png');
+    const body = (await res.json()) as ImagesBody;
+    expect(body.accepted[0]?.uploadedFormat).toBe('png');
+    expect(body.accepted[0]?.width).toBe(1170);
+    expect(body.accepted[0]?.height).toBe(2532);
   });
 
   it('T-PASTE-006c: a NON-image declared as image/png is refused', async () => {
@@ -359,7 +442,93 @@ describe('T-PASTE-006 the declared content type is never trusted', () => {
 });
 
 describe('T-PASTE-007 every ceiling applies identically to pasted images', () => {
-  it('T-PASTE-007b: the per-request file ceiling refuses a paste exactly as it refuses an upload', async () => {
+  it('T-PASTE-007a: a pasted 48 MP PNG is refused before any decode begins', async () => {
+    const batchId = await openBatch();
+    const captured = await captureStdoutWhile(() =>
+      postImages(
+        batchId,
+        [{ name: PASTED_NAME, bytes: pngBytes(8064, 5952), declaredType: 'image/png' }],
+        'paste',
+      ),
+    );
+
+    expect(captured.value.status).toBe(413);
+    expect(((await captured.value.json()) as ErrorBody).error.code).toBe(
+      'IMAGE_TOO_LARGE_TO_DECODE',
+    );
+    expect(captured.events.some((event) => event['event'] === IMAGE_DECODE_BEGIN)).toBe(false);
+    expect(await testPrisma().uploadedImage.count({ where: { ownerId, batchId } })).toBe(0);
+  });
+
+  it('T-PASTE-007: an 11 MiB paste is refused by the ingest byte ceiling, not multer', async () => {
+    // This uses a real multipart body so the route-level multer mapper stays
+    // covered on the same integration path the paste affordance exercises.
+    const batchId = await openBatch();
+    const tooLarge = await postImages(
+      batchId,
+      [
+        {
+          name: PASTED_NAME,
+          bytes: pngBytes(1179, 2556, MAX_IMAGE_BYTES),
+          declaredType: 'image/png',
+        },
+      ],
+      'paste',
+    );
+
+    expect(tooLarge.status).toBe(413);
+    expect(((await tooLarge.json()) as ErrorBody).error.code).toBe('IMAGE_TOO_LARGE');
+    expect(await testPrisma().uploadedImage.count({ where: { ownerId, batchId } })).toBe(0);
+  });
+
+  it('T-PASTE-007b: the 41st image is refused whether it arrives by paste or upload', async () => {
+    for (const [index, source] of (['paste', 'upload'] as const).entries()) {
+      if (index > 0) {
+        await resetDatabase();
+      }
+      const batchId = await openBatch();
+
+      for (let start = 0; start < MAX_IMAGES_PER_BATCH; start += MAX_FILES_PER_REQUEST) {
+        const chunk = Array.from({ length: MAX_FILES_PER_REQUEST }, (_, offset) => ({
+          name: `seed-${String(start + offset + 1).padStart(2, '0')}.png`,
+          bytes: pngBytes(),
+        }));
+        const fill = await postImages(batchId, chunk, 'upload');
+        expect(fill.status).toBe(201);
+      }
+
+      expect(await testPrisma().uploadedImage.count({ where: { ownerId, batchId } })).toBe(
+        MAX_IMAGES_PER_BATCH,
+      );
+
+      const res = await postImages(batchId, [{ name: PASTED_NAME, bytes: pngBytes() }], source);
+      expect(res.status).toBe(400);
+      const body = (await res.json()) as ErrorBody;
+      expect(body.error.code).toBe('TOO_MANY_IMAGES');
+      expect(body.error.details).toMatchObject({
+        current: MAX_IMAGES_PER_BATCH,
+        incoming: 1,
+      });
+    }
+  });
+
+  it('T-PASTE-007c: image.decode.begin carries the source that reached the shared route', async () => {
+    const batchId = await openBatch();
+    const captured = await captureStdoutWhile(() =>
+      postImages(batchId, [{ name: PASTED_NAME, bytes: pngBytes() }], 'paste'),
+    );
+    expect(captured.value.status).toBe(201);
+
+    const begin = captured.events.find((event) => event['event'] === IMAGE_DECODE_BEGIN);
+    expect(begin).toMatchObject({
+      event: IMAGE_DECODE_BEGIN,
+      ingestSource: 'paste',
+      uploadedFormat: 'png',
+      fileName: expect.stringMatching(/^pasted-\d{8}-\d{6}-01\.png$/) as unknown,
+    });
+  });
+
+  it('T-PASTE-007d: the per-request file ceiling refuses a paste exactly as it refuses an upload', async () => {
     const batchId = await openBatch();
     const many = Array.from({ length: MAX_FILES_PER_REQUEST + 1 }, (_, i) => ({
       name: `f${String(i)}.png`,
@@ -373,13 +542,27 @@ describe('T-PASTE-007 every ceiling applies identically to pasted images', () =>
     }
     // Refusing the REQUEST means nothing landed — not a partial accept.
     expect(await testPrisma().uploadedImage.count({ where: { ownerId, batchId } })).toBe(0);
+
+    for (const source of ['paste', 'upload'] as const) {
+      const beyondMulterBackstop = Array.from({ length: MAX_FILES_PER_REQUEST + 2 }, (_, i) => ({
+        name: `backstop-${String(i)}.png`,
+        bytes: pngBytes(),
+      }));
+
+      const res = await postImages(batchId, beyondMulterBackstop, source);
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as ErrorBody).error.code).toBe('TOO_MANY_FILES_IN_REQUEST');
+      expect(await testPrisma().uploadedImage.count({ where: { ownerId, batchId } })).toBe(0);
+    }
   });
 
-  it('T-PASTE-007c: an empty request is refused for every source', async () => {
+  it('T-PASTE-007e: an empty request is refused for every source', async () => {
     const batchId = await openBatch();
-    const res = await postImages(batchId, [], 'paste');
-    expect(res.status).toBe(400);
-    expect(((await res.json()) as ErrorBody).error.code).toBe('VALIDATION_FAILED');
+    for (const source of ['paste', 'upload', 'drop'] as const) {
+      const res = await postImages(batchId, [], source);
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as ErrorBody).error.code).toBe('VALIDATION_FAILED');
+    }
   });
 });
 
@@ -505,17 +688,39 @@ describe('T-SEC-003 no blob path, URL or SAS in any response', () => {
 });
 
 describe('T-RET-014 retention is stamped at ingest', () => {
-  it('T-RET-014a: retainUntil is 30 days after receipt, from the image retention constant alone', async () => {
+  it('T-RET-014a: pasted-image retention is stamped once and purged like uploads', async () => {
     const batchId = await openBatch();
     const before = Date.now();
     await postImages(batchId, [{ name: 'x.png', bytes: pngBytes() }], 'paste');
 
-    const row = await testPrisma().uploadedImage.findFirst({ where: { ownerId, batchId } });
-    const days = ((row?.retainUntil?.getTime() ?? 0) - before) / (24 * 60 * 60 * 1000);
+    const row = await testPrisma().uploadedImage.findFirstOrThrow({ where: { ownerId, batchId } });
+    const firstRetainUntil = row.retainUntil;
+    const days = (firstRetainUntil.getTime() - before) / (24 * 60 * 60 * 1000);
     // ⚠ 30, and it must never be confused with `TMDB_METADATA_MAX_AGE_DAYS`
     // (183). The two 30-ish constants are separate on purpose (`T-INV-008`).
     expect(days).toBeGreaterThan(29.9);
     expect(days).toBeLessThan(30.1);
+
+    await postImages(batchId, [{ name: 'y.png', bytes: pngBytes() }], 'upload');
+    const afterSecondAttach = await testPrisma().uploadedImage.findFirstOrThrow({
+      where: { ownerId, id: row.id },
+    });
+    expect(afterSecondAttach.retainUntil.toISOString()).toBe(firstRetainUntil.toISOString());
+
+    await testPrisma().uploadBatch.update({
+      where: { id: batchId },
+      data: { status: 'applied' },
+    });
+    await testPrisma().uploadedImage.update({
+      where: { id: row.id },
+      data: { retainUntil: new Date('2020-01-01T00:00:00.000Z') },
+    });
+
+    const res = await reextract(batchId);
+    expect(res.status).toBe(410);
+    const body = (await res.json()) as ErrorBody;
+    expect(body.error.code).toBe('IMAGES_PURGED');
+    expect(body.error.message).toContain('30 days');
   });
 });
 
