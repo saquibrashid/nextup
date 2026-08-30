@@ -650,6 +650,82 @@ describe('T-IMG-012 uploadedFormat is recorded as received', () => {
   });
 });
 
+describe('T-IMG-011 · US-011 AC-2 · both stores agree: a row per blob, a blob per row', () => {
+  it('T-IMG-011a: every accepted image has a batch-bound row AND readable bytes at its path', async () => {
+    // ⚠ THE PROPERTY IS THE AGREEMENT, IN BOTH DIRECTIONS. Two stores are
+    // written on the ingest path — Azure Blob and `uploadedImage` — and each
+    // is separately asserted elsewhere (`T-SEC-003` reads the row,
+    // `T-SEC-032g` reads the blob). Neither notices the failure that actually
+    // matters: a row whose blob was never written, or a blob with no row.
+    // The first is a batch that re-extracts to nothing months later; the
+    // second is bytes retained past the 30-day purge with nothing pointing at
+    // them, because the purge walks rows.
+    const batchId = await openBatch();
+    const res = await postImages(
+      batchId,
+      [
+        { name: 'one.png', bytes: pngBytes(1179, 2556, 40) },
+        { name: 'two.jpg', bytes: jpegBytes() },
+        { name: 'three.png', bytes: pngBytes() },
+      ],
+      'upload',
+    );
+    expect(res.status).toBe(201);
+    const accepted = ((await res.json()) as ImagesBody).accepted;
+    expect(accepted).toHaveLength(3);
+
+    const rows = await testPrisma().uploadedImage.findMany({ where: { ownerId, batchId } });
+
+    // Direction 1 — every accepted image is a row BOUND TO THIS BATCH. The
+    // batch binding is the load-bearing half: an image row that exists but
+    // hangs off no batch is unreachable from every read path in the product.
+    expect(rows.map((r) => r.id).sort()).toEqual(accepted.map((a) => a.imageId).sort());
+    for (const row of rows) {
+      expect(row.batchId).toBe(batchId);
+    }
+
+    // Direction 2 — every row's blobPath resolves to bytes, and the bytes are
+    // the ones the row claims. A stored length of zero is the shape a failed
+    // upload takes when its error was swallowed.
+    for (const row of rows) {
+      const stored = await azureImageBlobStore.get(row.blobPath);
+      expect(stored, `no blob at ${row.blobPath}`).not.toBeNull();
+      expect(stored?.byteLength).toBe(Number(row.byteSize));
+      expect(stored?.byteLength).toBeGreaterThan(0);
+    }
+
+    // Distinct paths, so the agreement above is not one blob counted 3 times.
+    expect(new Set(rows.map((r) => r.blobPath)).size).toBe(3);
+  });
+
+  it('T-IMG-011b: a REJECTED image writes neither a row nor a blob', async () => {
+    // The converse, and the reason this is not just a happy-path check: a
+    // partially-accepted request (`T-IMG-002d`) must not leave a half-written
+    // pair behind for the file it refused.
+    const batchId = await openBatch();
+    const res = await postImages(
+      batchId,
+      [
+        { name: 'good.png', bytes: pngBytes() },
+        {
+          name: 'bad.pdf',
+          bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]),
+        },
+      ],
+      'upload',
+    );
+    expect(res.status).toBe(201);
+    const body = (await res.json()) as ImagesBody;
+    expect(body.accepted).toHaveLength(1);
+    expect(body.rejected).toHaveLength(1);
+
+    const rows = await testPrisma().uploadedImage.findMany({ where: { ownerId, batchId } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.fileName).toBe('good.png');
+    expect(await azureImageBlobStore.get(rows[0]?.blobPath ?? '')).not.toBeNull();
+  });
+});
+
 describe('T-SEC-003 no blob path, URL or SAS in any response', () => {
   it('T-SEC-003a: blobPath appears nowhere in the response body', async () => {
     const batchId = await openBatch();
