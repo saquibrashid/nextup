@@ -461,10 +461,8 @@ describe('T-PASTE-007 every ceiling applies identically to pasted images', () =>
   });
 
   it('T-PASTE-007: an 11 MiB paste is refused by the ingest byte ceiling, not multer', async () => {
-    // KNOWN RED until the critical-path route fix lands:
-    // `multer` currently aborts this before the shared ingest pipeline sees
-    // the bytes, surfacing as 500 `INTERNAL_ERROR` instead of this required
-    // 413 `IMAGE_TOO_LARGE`. Keep this assertion red; do not weaken or skip it.
+    // This uses a real multipart body so the route-level multer mapper stays
+    // covered on the same integration path the paste affordance exercises.
     const batchId = await openBatch();
     const tooLarge = await postImages(
       batchId,
