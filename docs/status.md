@@ -216,6 +216,6 @@ Not done, and every task they depend on is done.
 | `TASK-175` | this branch — `lib/apiClient.ts`; `T-DATA-001` caught the one real offender (the `/rating` page's own `fetch`, written before the client existed and unaware of the 401 rule) | `T-DATA-001`, `T-DATA-003`, `T-DATA-004`, `T-DATA-005`, `T-DATA-006`, `T-DATA-010` |
 | `TASK-176` | `T-DATA-007` | `T-DATA-007` |
 | `TASK-177` | `T-DATA-002` | `T-DATA-002` |
-| `TASK-178` | `T-DATA-008`, `T-DATA-009`, `T-UX-043`, `T-UX-045`, `T-UX-046`, `T-UX-047`, `T-UX-048`, `T-UX-067` | `T-DATA-008`, `T-DATA-008f`, `T-DATA-009`, `T-DATA-009a`, `T-DATA-009f`, `T-UX-043`, `T-UX-045`, `T-UX-046`, `T-UX-047`, `T-UX-048`, `T-UX-067` |
+| `TASK-178` | `T-DATA-008`, `T-DATA-009`, `T-UX-043`, `T-UX-045`, `T-UX-046`, `T-UX-047`, `T-UX-048`, `T-UX-067`, `T-UX-066` | `T-DATA-008`, `T-DATA-008f`, `T-DATA-009`, `T-DATA-009a`, `T-DATA-009f`, `T-REV-005`, `T-UX-043`, `T-UX-045`, `T-UX-046`, `T-UX-047`, `T-UX-048`, `T-UX-066`, `T-UX-067` |
 | `TASK-179` | `T-CSS-002`, `T-CSS-003`, `T-CSS-004` | `T-CSS-002`, `T-CSS-003`, `T-CSS-004` |
 | `TASK-180` | `T-CSS-001`, `T-CSS-005` | `T-CSS-001`, `T-CSS-005` |

@@ -55,6 +55,19 @@ export function toAppliedBatch(result: CloseBatchResult): AppliedBatch {
   };
 }
 
+/**
+ * The `details.pendingCandidateIds` a 409 `PENDING_ADDITIONS` carries
+ * (`specs/api.md` §7.9), narrowed defensively: `ApiError.details` is
+ * `Record<string, unknown>`, and a malformed body must degrade to "the count
+ * is unknown" rather than throw INSIDE the rejection handler — a throw there
+ * would be swallowed by the promise and the owner would get no feedback at
+ * all, the very defect §6.14 exists to remove.
+ */
+export function pendingCandidateIdsFrom(details: Record<string, unknown>): readonly string[] {
+  const ids = details['pendingCandidateIds'];
+  return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : [];
+}
+
 export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.Element {
   const params = useParams();
   const navigate = useNavigate();
@@ -68,6 +81,17 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
   // a 5xx or a network error; cleared the instant a new attempt starts, so a
   // subsequent success never leaves a stale error on screen during navigation.
   const [applyFailed, setApplyFailed] = useState(false);
+
+  // `specs/ux-states.md` §6.14. The candidate ids the server named in a 409
+  // `PENDING_ADDITIONS`, or `null` when the last close did not refuse that way.
+  // A FRESH array on every refusal, so `ReviewPage`'s focus effect re-fires
+  // even when the owner presses Apply again without deciding anything.
+  const [pendingAdditionIds, setPendingAdditionIds] = useState<readonly string[] | null>(null);
+
+  // `specs/ux-states.md` §6.15. Bumped on every 409 `REMOVALS_NOT_CONFIRMED`
+  // to re-open the §6.10 removal dialog. Monotonic so a second identical
+  // refusal still re-opens it (a boolean would latch after the first).
+  const [reconfirmSignal, setReconfirmSignal] = useState(0);
 
   const review = useResource(
     (signal) => client.getReview(batchId, signal),
@@ -110,9 +134,13 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
       // back button would take the owner to a screen still claiming a batch
       // had just been applied.
       //
-      // Clear any prior §6.16 error the moment a fresh attempt starts, or a
-      // subsequent success leaves a stale "couldn't apply" alert on screen.
+      // Clear any prior §6.16 / §6.14 error the moment a fresh attempt starts,
+      // or a subsequent success leaves a stale "couldn't apply" / "titles still
+      // need a decision" alert on screen. The §6.15 nonce is monotonic and is
+      // not reset here — bumping it is what re-opens the dialog, and it never
+      // renders anything by itself.
       setApplyFailed(false);
+      setPendingAdditionIds(null);
       void client.closeBatch(batchId, confirmRemovals).then(
         (result) => {
           navigate('/', { state: { applied: toAppliedBatch(result) } });
@@ -122,20 +150,30 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
           // the list has not changed. Sending the owner to `/` would show them
           // an unchanged list as though the close had succeeded.
           //
-          // ⚠ But an empty handler leaves the owner with NO feedback on the
-          // irreversible full-update path — indistinguishable from a dead
-          // button, whose likeliest reaction is to press it again. §6.16
-          // surfaces the failure while keeping the review intact (SD-11e).
+          // ⚠ Each close-error state is DISTINCT and routed on its own code —
+          // §6.16's "nothing was changed, try again" wording is wrong for the
+          // others, so an empty or catch-all handler is a defect, not caution:
           //
-          // ⚠ Scoped to the 5xx / network case ON PURPOSE. 409
-          // `PENDING_ADDITIONS` (§6.14), 409 `REMOVALS_NOT_CONFIRMED` (§6.15)
-          // and 401 (§6.18, already redirecting inside `request`) are DISTINCT
-          // specified states with their own ids and their own affordances —
-          // §6.16's "nothing was changed, try again" wording is wrong for
-          // them. They are currently unhandled here (see the PR finding); this
-          // handler must not swallow that distinction by claiming them as
-          // §6.16.
-          if (error instanceof ApiError && error.status < 500) return;
+          //   - 409 `PENDING_ADDITIONS` (§6.14) → name the still-pending
+          //     candidates and send the owner to the first card to decide it.
+          //   - 409 `REMOVALS_NOT_CONFIRMED` (§6.15) → re-open the §6.10 removal
+          //     dialog so the owner confirms the group, then retries with
+          //     `confirmRemovals: true`. Reachable when the client's and the
+          //     server's view of "are there removals" diverged.
+          //   - 401 (§6.18) is already redirecting inside `request`; every
+          //     other 4xx (a refusal) is not a "try again" case either.
+          //   - Only a 5xx or a network failure is §6.16.
+          if (error instanceof ApiError) {
+            if (error.code === 'PENDING_ADDITIONS') {
+              setPendingAdditionIds(pendingCandidateIdsFrom(error.details));
+              return;
+            }
+            if (error.code === 'REMOVALS_NOT_CONFIRMED') {
+              setReconfirmSignal((n) => n + 1);
+              return;
+            }
+            if (error.status < 500) return;
+          }
           if (error instanceof RefusedError) return;
           setApplyFailed(true);
         },
@@ -220,6 +258,8 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
       loading={review.resource.kind === 'loading'}
       loadFailed={review.resource.kind === 'failed'}
       applyFailed={applyFailed}
+      pendingAdditionIds={pendingAdditionIds}
+      reconfirmSignal={reconfirmSignal}
       onRetry={review.reload}
       onApply={apply}
       onDiscard={discard}

@@ -252,8 +252,8 @@ describe('T-UX-067 — §6.16 5xx on close', () => {
     // §6.14/§6.15 own the 409s with their own affordances; §6.16's "nothing
     // was changed, try again" wording is wrong for them. This pins the 5xx
     // scoping so a widened guard cannot silently reclaim a 409 as §6.16. (The
-    // 409s themselves are currently unhandled here — reported as a finding,
-    // not fixed in this lane.)
+    // 409s are now handled — see reviewCloseErrorSiblings.spec.tsx; this case
+    // only guards that §6.16 is NOT what fires for them.)
     const { client } = stubClient({
       closeBatch: () => Promise.reject(new ApiError('PENDING_ADDITIONS', 409, 'decide first', {})),
     });
