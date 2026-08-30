@@ -164,3 +164,68 @@ cover all three `prisma`-group members plus `@types/mssql`. ⚠ The adapter was
 originally **missing** from that list, which is the only reason a v7 adapter PR
 could be raised while the other two were held: an ignore that covers two of a
 group's three members holds nothing.
+
+## 6. `package-lock.json` carries `sha1-` integrity — investigated, nothing to do
+
+Most of the lockfile's `integrity` hashes are **`sha1-`**, not `sha512-`. This
+was investigated and is **expected, not a defect**: there is no action for a
+maintainer to take, and — importantly — **no action a maintainer _can_ take
+from this machine.** Read this before "fixing" it.
+
+**Why it looks the way it does.** The public npm registry is blocked by
+Microsoft IT; npm is globally pointed at `https://packagefeedproxy.microsoft.io/npm/`,
+whose tarballs resolve to `ms-feed-*.pkgs.visualstudio.com`. That Azure DevOps
+Artifacts feed publishes only the **legacy `dist.shasum` (sha1)** for a
+package — it returns **no `dist.integrity` (sha512)** — so npm records the sha1
+it is given. The correlation is exact:
+
+- **`sha1-` ⟺ the `ms-feed-*` proxy** — the whole population, ~525 entries, and
+  it is **not** dev-only: it covers the entire production tree, including
+  `@prisma/client`, `@prisma/adapter-mssql`, `mssql`, `express`, `sharp`, the
+  `@azure/*` SDKs and `openai`.
+- **`sha512-` ⟺ `registry.npmjs.org`** — the ~32 entries **dependabot** has
+  touched. Dependabot runs on GitHub, reads the public registry, and writes the
+  stronger hash plus a `registry.npmjs.org` URL; on this machine npm's
+  `replace-registry-host` rewrites that host to the proxy for the actual
+  download and verifies the identical tarball against the sha512.
+
+**Does npm still verify a `sha1-` hash?** Yes — measured, not assumed, against
+npm 11's own verifier (`ssri` 12): good data verifies as `sha1`, a single
+flipped byte is **rejected**, and the install-path stream verifier passes sha1.
+npm neither warns nor rejects it (it simply ranks sha512 higher when both are
+present). `npm ci` and `npm install` share this path; integrity behaviour is
+identical.
+
+**Is the exposure real?** Low / theoretical here. sha1's broken property is
+**collision** resistance, not **second-preimage** resistance — and the lockfile
+pins the sha1 of the already-published legitimate tarball, so swapping in
+malware needs a *second-preimage* (no practical attack on sha1) rather than a
+collision. A collision only helps an attacker who controls the **original**
+artifact **and** can serve the colliding variant through the feed — i.e. a
+malicious publisher **plus** a compromise of the TLS-protected internal
+Microsoft proxy. The control that is genuinely absent is registry
+signature/provenance verification, and that is a proxy limitation independent of
+the hash: `npm audit signatures` **cannot run here** — it fails with *"Fetching
+verification keys using TUF failed … no dependencies … installed from a
+supported registry."*
+
+⚠ **Do not try to "upgrade" the hashes by regenerating the lockfile.** The only
+source of sha512 is `registry.npmjs.org`, which is **IT-blocked**; do not add an
+`.npmrc`/registry override to reach it. Worse, a wholesale
+`rm package-lock.json && npm install` against the proxy would **downgrade the
+~32 `sha512-` entries back to `sha1-`** — the opposite of the goal.
+
+**The supported remediation is dependabot itself.** Each bump arrives
+sha512/`registry.npmjs.org`, so the sha1 population shrinks on its own over
+time; no manual step exists or is wanted.
+
+**No CI gate.** A check that failed on any `sha1-` would fail today on ~525
+entries with no available remedy — a broken gate, not a safety net. A ratchet
+(fail if `sha1-` count rises / `sha512-` count falls) would at most catch an
+accidental full-lockfile regeneration, but the count is not monotonic — a
+legitimate bump can drop a transitive `sha512-` dependency — so it would raise
+false positives, and the regeneration it guards against already shows up as an
+enormous lockfile diff in review. The review expectation is the mitigation: a
+dependency PR should **add or keep `sha512-`/`registry.npmjs.org`** entries;
+one that **adds `sha1-`** entries or repoints `resolved` at `ms-feed-*`
+(especially a full regen) is the red flag to inspect by hand.
