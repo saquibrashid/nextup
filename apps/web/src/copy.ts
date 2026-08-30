@@ -683,6 +683,9 @@ export const BATCHES_EMPTY_ACTION_LABEL = 'Upload screenshots';
 
 export const BATCHES_LOAD_ERROR = 'Couldn\u2019t load your uploads. Nothing has changed.';
 
+/** §9.3 — the per-card "attempt to undo this batch" control. */
+export const BATCHES_UNDO_LABEL = 'Undo this batch';
+
 /**
  * §9.3 — the count triple on a card. `{created}`/`{modified}`/`{removed}`.
  *
@@ -706,6 +709,74 @@ export const BATCH_PROVENANCE_REMOVED = 'Removed';
  * the difference between "we found nothing to do" and "we didn\u2019t look".
  */
 export const BATCH_CHANGED_NOTHING = 'This upload didn\u2019t change anything.';
+
+/* ── TASK-116 · the §9.8/§9.9 undo-refusal panel (`specs/ux-states.md` §9.8,
+ * §9.9, US-033, `T-UX-097`) ────────────────────────────────────────────────
+ *
+ * ⚠ THE FRAMING IS THE FEATURE (US-033 AC-4). §9.8 is a full-screen panel, not
+ * a toast, precisely because its whole job is to say "your undo was refused,
+ * and here is what to do instead" in a place the owner cannot miss. These
+ * constants exist so that framing lives in ONE register and cannot drift into
+ * an inline string that says something subtly different — the structural proxy
+ * `specs/testing.md` §9 names for AC-4.
+ *
+ * ⚠ NOTHING IS SUMMARISED AWAY (US-033 AC-5). `UNDO_REFUSAL_SHOW_ALL_LABEL`
+ * reveals the rest of a group the panel paginates at 50 CLIENT-SIDE; the API
+ * never truncates (`truncated: false`), so "Show all" must always reach every
+ * entry without a network call.
+ */
+
+/**
+ * §9.8 body, verbatim — the framing sentence the panel leads with when the
+ * refusal reason is `modified-or-removed` (or `later-owner-edits`).
+ */
+export const UNDO_REFUSAL_BODY =
+  'This upload can\u2019t be undone in one step, because it changed things as well as adding them. ' +
+  'Here\u2019s everything it touched, and how to fix each one.';
+
+/**
+ * ⚠ FINDING — invented copy, pending owner review. §9.8 fixes the body
+ * (`UNDO_REFUSAL_BODY`) but gives the panel no separate heading; this is a
+ * short `h1` phrased on the body's leading clause so the panel has a landmark.
+ */
+export const UNDO_REFUSAL_TITLE = 'This upload can\u2019t be undone in one step';
+
+/** §9.9 body, verbatim — the `provenance-unavailable` refusal. */
+export const UNDO_REFUSAL_PROVENANCE_UNAVAILABLE_BODY =
+  'We can\u2019t tell what this upload changed, so it can\u2019t be undone safely. ' +
+  'Nothing has been changed.';
+
+/**
+ * ⚠ FINDING — invented copy, pending owner review. §9.9 supplies the body but
+ * no heading; phrased on the body's leading clause, matching the §9.8 pair.
+ */
+export const UNDO_REFUSAL_PROVENANCE_UNAVAILABLE_TITLE =
+  'We can\u2019t tell what this upload changed';
+
+/** §9.8 — the three group headings, verbatim. The count is appended by the panel. */
+export const UNDO_REFUSAL_GROUP_ADDED = 'Added';
+export const UNDO_REFUSAL_GROUP_CHANGED = 'Changed';
+export const UNDO_REFUSAL_GROUP_REMOVED = 'Removed';
+
+/** §9.8 — the per-item action labels, verbatim. */
+export const UNDO_REFUSAL_ACTION_NOT_INTERESTED = 'Not interested';
+export const UNDO_REFUSAL_ACTION_FIX_MATCH = 'Fix match';
+export const UNDO_REFUSAL_ACTION_RESTORE = 'Restore';
+
+/** §9.8 — the client-side "reveal the rest of this group" control (US-033 AC-5). */
+export const UNDO_REFUSAL_SHOW_ALL_LABEL = 'Show all';
+
+/**
+ * ⚠ FINDING — invented copy, pending owner review. §9.8 requires a state chip
+ * on a title since removed or suppressed (US-033 AC-6) but supplies no wording.
+ * These name the current state so the owner reads "this remedy will act on a
+ * title that has since moved" rather than being silently surprised.
+ */
+export const UNDO_REFUSAL_CHIP_REMOVED = 'Since removed';
+export const UNDO_REFUSAL_CHIP_SUPPRESSED = 'On your Not interested list';
+
+/** The close control that returns the owner to their batch history. */
+export const UNDO_REFUSAL_CLOSE_LABEL = 'Back to batches';
 
 /* ── TASK-067 · manual entry (`specs/api.md` §6.20, US-006 AC-5) ───────────
  *

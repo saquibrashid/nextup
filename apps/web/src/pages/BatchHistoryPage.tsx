@@ -28,6 +28,7 @@ import {
   BATCHES_LOADING,
   BATCHES_LOAD_ERROR,
   BATCHES_TITLE,
+  BATCHES_UNDO_LABEL,
   RETRY_LABEL,
 } from '../copy';
 import type { BatchHistoryItem } from '../lib/apiClient';
@@ -37,6 +38,22 @@ export interface BatchHistoryPageProps {
   readonly loading?: boolean;
   readonly loadFailed?: boolean;
   readonly onRetry?: () => void;
+  /**
+   * §9.3 — attempt to undo a batch. The server decides whether it can: a
+   * creates-only batch is reversed, anything else answers 409 and the container
+   * routes that refusal into the §9.8 panel. Absent when undo is not wired.
+   */
+  readonly onUndo?: (batchId: string) => void;
+}
+
+/**
+ * §9.3 — a batch the owner may attempt to undo. An `applied` batch not already
+ * undone is offerable; the server has the final say and refuses the rest into
+ * the §9.8 panel, so this is deliberately the coarse gate rather than a client
+ * re-derivation of `undoable` the history DTO does not carry.
+ */
+export function canOfferUndo(item: BatchHistoryItem): boolean {
+  return item.status === 'applied' && item.undoneAt === null;
 }
 
 const SERVICE_LABELS: Record<string, string> = { netflix: 'Netflix', max: 'Max' };
@@ -69,7 +86,13 @@ export function batchDate(item: BatchHistoryItem): string {
   });
 }
 
-function BatchCard({ item }: { item: BatchHistoryItem }): JSX.Element {
+function BatchCard({
+  item,
+  onUndo,
+}: {
+  item: BatchHistoryItem;
+  onUndo?: (batchId: string) => void;
+}): JSX.Element {
   return (
     <li className="batch-card" data-testid="batch-card">
       <Link to={`/batches/${item.batchId}`} data-testid="batch-card-link">
@@ -81,6 +104,16 @@ function BatchCard({ item }: { item: BatchHistoryItem }): JSX.Element {
         </span>
         <span data-testid="batch-card-counts">{countsLine(item.counts)}</span>
       </Link>
+      {onUndo !== undefined && canOfferUndo(item) && (
+        <button
+          type="button"
+          className="batch-card__undo tap-target"
+          data-testid="batch-card-undo"
+          onClick={() => onUndo(item.batchId)}
+        >
+          {BATCHES_UNDO_LABEL}
+        </button>
+      )}
     </li>
   );
 }
@@ -90,6 +123,7 @@ export function BatchHistoryPage({
   loading = false,
   loadFailed = false,
   onRetry,
+  onUndo,
 }: BatchHistoryPageProps): JSX.Element {
   return (
     <>
@@ -118,7 +152,7 @@ export function BatchHistoryPage({
       ) : (
         <ul className="batch-history" data-testid="batches-list">
           {items.map((item) => (
-            <BatchCard key={item.batchId} item={item} />
+            <BatchCard key={item.batchId} item={item} {...(onUndo ? { onUndo } : {})} />
           ))}
         </ul>
       )}

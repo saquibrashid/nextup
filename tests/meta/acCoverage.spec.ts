@@ -246,7 +246,6 @@ const KNOWN_PHANTOM_CITATIONS: readonly string[] = [
   // only thing making it look cited was its own string literal on this line,
   // read by a gate that matched bare occurrence.
   'T-UNDO-004',
-  'T-UX-097',
 ];
 
 /**
