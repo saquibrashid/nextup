@@ -51,8 +51,6 @@ import { useOnline } from '../lib/useOnline';
 export interface UploadRouteProps {
   /** Injected so the suite can drive every state without a server. */
   readonly client?: ApiClient;
-  /** Injected so §4.11 is drivable without a real network. Reads TRUE when online. */
-  readonly connectivity?: () => boolean;
 }
 
 /** The 409 the owner can act on, kept apart from ordinary failures (§4.10). */
@@ -101,12 +99,9 @@ export function rejectionsFromError(error: unknown): readonly ServerRejection[] 
   return Array.isArray(rejected) ? (rejected as ServerRejection[]) : [];
 }
 
-export function UploadRoute({
-  client = apiClient,
-  connectivity,
-}: UploadRouteProps = {}): JSX.Element {
+export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.Element {
   const navigate = useNavigate();
-  const online = useOnline({ connectivity });
+  const online = useOnline();
 
   const [selection, setSelection] = useState<BatchDraftSelection>({ service: null, mode: null });
   const [batchId, setBatchId] = useState<string | null>(null);

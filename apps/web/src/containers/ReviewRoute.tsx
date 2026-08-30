@@ -32,8 +32,6 @@ import { ReviewPage, type ConfirmableSection } from '../pages/ReviewPage';
 
 export interface ReviewRouteProps {
   readonly client?: ApiClient;
-  /** Injected so §6.17 is drivable without a real network. Reads TRUE when online. */
-  readonly connectivity?: () => boolean;
 }
 
 /**
@@ -71,10 +69,7 @@ export function pendingCandidateIdsFrom(details: Record<string, unknown>): reado
   return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : [];
 }
 
-export function ReviewRoute({
-  client = apiClient,
-  connectivity,
-}: ReviewRouteProps = {}): JSX.Element {
+export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.Element {
   const params = useParams();
   const navigate = useNavigate();
   const batchId = params['batchId'] ?? '';
@@ -85,7 +80,7 @@ export function ReviewRoute({
    * every disposition they had made while offline, which is exactly the
    * data-loss `T-UX-024` pairs with `T-UX-023` to prevent.
    */
-  const online = useOnline({ connectivity });
+  const online = useOnline();
 
   // Bumped to force a re-read after a bulk confirm. `useResource` keys on a
   // string, so the counter IS the declared identity of "the review, again".

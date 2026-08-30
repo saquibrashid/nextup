@@ -30,13 +30,8 @@ const NAV_ITEMS = ROUTES.filter(
   (route): route is typeof route & { navLabel: string } => route.navLabel !== null,
 );
 
-export interface AppShellProps {
-  /** Injected so the global offline state is drivable without a real network. */
-  readonly connectivity?: () => boolean;
-}
-
-export function AppShell({ connectivity }: AppShellProps = {}): JSX.Element {
-  const online = useOnline({ connectivity });
+export function AppShell(): JSX.Element {
+  const online = useOnline();
 
   return (
     <div className="app-shell">

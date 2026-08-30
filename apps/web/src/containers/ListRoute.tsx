@@ -26,8 +26,6 @@ import { RefusalPage } from '../pages/RefusalPage';
 export interface ListRouteProps {
   /** Injected so the suite can drive every state without a server. */
   readonly client?: ApiClient;
-  /** Injected so §2.12 is drivable without a real network. Reads TRUE when online. */
-  readonly connectivity?: () => boolean;
 }
 
 /** The genre facet, derived from the rows rather than requested separately. */
@@ -73,7 +71,7 @@ export function parseAppliedState(state: unknown): AppliedBatch | undefined {
   };
 }
 
-export function ListRoute({ client = apiClient, connectivity }: ListRouteProps = {}): JSX.Element {
+export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Element {
   const [params] = useSearchParams();
   const location = useLocation();
   const query = params.toString();
@@ -89,7 +87,7 @@ export function ListRoute({ client = apiClient, connectivity }: ListRouteProps =
    * refetch loses nothing; that is why the review route deliberately does
    * NOT do the same.
    */
-  const online = useOnline({ connectivity, onReconnect: titles.reload });
+  const online = useOnline({ onReconnect: titles.reload });
 
   /**
    * The unfiltered rows behind "Showing X of Y" and the genre facet.

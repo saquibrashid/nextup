@@ -18,38 +18,38 @@
  * offline state that recovers by discarding a half-finished review is a
  * data-loss bug wearing an error message.
  *
- * ⚠ **`connectivity` READS TRUE WHEN ONLINE**, matching `navigator.onLine`
- * rather than inverting it. Every consumer is then named after the DOM
- * property it stands in for, and no call site has to remember a local
- * inversion.
+ * ⚠ **THERE IS NO `connectivity` INJECTION SEAM, AND THAT IS DELIBERATE.**
+ * The first draft had one, threaded through `AppShell` and three route
+ * containers as an optional prop — and **`T-INFRA-013f` caught it in CI, with
+ * no caller anywhere supplying it.** That gate's own history records three
+ * prior cases of the same shape, including `RefusalPage.signedInEmail`, where
+ * a green named test hand-supplied the prop in isolation while all nine real
+ * callers omitted it, so the criterion had never once held in the running
+ * product. `T-UX-023`/`T-UX-024` drive real routes through Playwright's
+ * `context.setOffline`, which exercises `navigator.onLine` itself, so the seam
+ * bought nothing and its only effect would have been to make a weaker test
+ * possible later. Read the DOM property; there is no way to fake it.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export interface UseOnlineOptions {
   /**
-   * Injected so the offline states are drivable without a real network.
-   *
-   * ⚠ `| undefined` is explicit because `exactOptionalPropertyTypes` is on and
-   * every caller forwards an optional prop straight through.
-   */
-  readonly connectivity?: (() => boolean) | undefined;
-  /**
    * Run when the connection comes back — a refetch or a retry.
    *
    * ⚠ Called on the `online` EVENT only, never on mount, so a surface that
    * loads normally does not immediately load a second time.
+   *
+   * ⚠ `| undefined` is explicit because `exactOptionalPropertyTypes` is on and
+   * callers forward an optional prop straight through.
    */
   readonly onReconnect?: (() => void) | undefined;
 }
 
-export function useOnline({ connectivity, onReconnect }: UseOnlineOptions = {}): boolean {
+export function useOnline({ onReconnect }: UseOnlineOptions = {}): boolean {
   const isOnline = useCallback(
-    (): boolean =>
-      connectivity === undefined
-        ? typeof navigator === 'undefined' || navigator.onLine !== false
-        : connectivity(),
-    [connectivity],
+    (): boolean => typeof navigator === 'undefined' || navigator.onLine !== false,
+    [],
   );
 
   const [online, setOnline] = useState(isOnline);
