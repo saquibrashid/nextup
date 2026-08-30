@@ -30,6 +30,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildReviewResponse,
   pendingAdditionIds,
+  DEGRADED_EXTRACTION_BANNER,
   type BuildReviewInput,
   type ReviewCandidate,
   type ReviewMatch,
@@ -386,6 +387,83 @@ describe('T-UX-062 · specs/ux-states.md §6.7 · the bar reports what is still 
     // The gate's own answer, not a literal — see the block note above.
     expect(expected).toBeGreaterThan(0);
     expect(screen.getByTestId('review-counts')).toHaveTextContent(`${expected} still to review`);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `T-UX-057` / `T-UX-058` — `specs/ux-states.md` §5.9 and §5.10 require the
+ * degraded-read banner **on both the status page and the review page**.
+ *
+ * ⚠ **ONLY THE STATUS-PAGE HALF EXISTED.** `T-UX-008` covers that surface
+ * thoroughly, and `T-UX-008h` is even titled *"the wording is IDENTICAL to the
+ * review page banner"* — but it renders `BatchStatusPage` and compares that
+ * page's own text to the shared constant. It never renders the review at all.
+ * A test that asserts parity with a surface it does not mount can only ever
+ * report on the surface it does mount.
+ *
+ * ⚠ **AND THE REVIEW HALF WAS HALF-BUILT.** `reviewBanner()` returned the
+ * constant for `llm-unavailable` and `null` for `ocr-unavailable`, while
+ * `isDegraded()` on the status page accepted both. One event therefore produced
+ * a banner on one screen and silence on the other — and silence on the review
+ * is the expensive one, because the review is where the owner CONFIRMS.
+ *
+ * These cases mount `ReviewPage` and compare against the same
+ * `DEGRADED_EXTRACTION_BANNER` the status-page suite imports, so the two
+ * surfaces cannot drift apart on the next copy edit.
+ */
+describe('T-UX-057 · T-UX-058 · §5.9/§5.10 · the degraded banner reaches the REVIEW page', () => {
+  it('T-UX-057a: §5.9 — the tile reader was down: the review carries the banner', () => {
+    render(
+      <ReviewPage review={review({ crossCheck: 'llm-unavailable', degradedExtraction: true })} />,
+    );
+
+    expect(screen.getByTestId('review-banner').textContent).toBe(DEGRADED_EXTRACTION_BANNER);
+  });
+
+  it('T-UX-057b: it is NOT dismissible — no control can remove it', () => {
+    // §5.9 says persistent and non-dismissible. On this screen especially: the
+    // banner qualifies the very list the owner is about to confirm.
+    render(
+      <ReviewPage review={review({ crossCheck: 'llm-unavailable', degradedExtraction: true })} />,
+    );
+
+    expect(within(screen.getByTestId('review-banner')).queryAllByRole('button')).toHaveLength(0);
+  });
+
+  it('T-UX-058a: §5.10 — the CROSS-CHECK reader was down: same banner, still shown', () => {
+    // ⚠ The case that was missing. It is the tempting one to treat as healthy,
+    // because removals are still permitted — but "we could not corroborate what
+    // we read" is precisely what the owner needs before confirming a removal.
+    render(<ReviewPage review={review({ crossCheck: 'ocr-unavailable' })} />);
+
+    expect(screen.getByTestId('review-banner').textContent).toBe(DEGRADED_EXTRACTION_BANNER);
+  });
+
+  it('T-UX-058b: §5.10 is the MILDER consequence — removals are still offered', () => {
+    // The banner must not be mistaken for withholding. If this ever fails
+    // alongside `T-UX-058a` passing, the fix went too far and turned an OCR
+    // outage into a full-update blocker (`T-AI-021e`).
+    render(
+      <ReviewPage
+        review={review({
+          crossCheck: 'ocr-unavailable',
+          disappearedListings: [
+            { listingId: 'lst_1', titleId: 'ttl_1', name: 'Arrival', year: 2016, posterPath: null },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByTestId('review-banner').textContent).toBe(DEGRADED_EXTRACTION_BANNER);
+    expect(screen.getByTestId('review-counts')).toHaveTextContent('1 to remove');
+  });
+
+  it('T-UX-058c: a healthy read carries NO banner on the review either', () => {
+    render(<ReviewPage review={review({ crossCheck: 'ok' })} />);
+
+    expect(screen.queryByTestId('review-banner')).not.toBeInTheDocument();
   });
 });
 

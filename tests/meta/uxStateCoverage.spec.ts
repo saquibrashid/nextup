@@ -101,8 +101,6 @@ const KNOWN_UNCOVERED: readonly string[] = [
   'T-UX-036',
   'T-UX-040',
   'T-UX-044',
-  'T-UX-057',
-  'T-UX-058',
   'T-UX-060',
   // ⚠ `T-UX-068` (§6.17, offline mid-review) IS LISTED DELIBERATELY AND MUST
   // NOT BE IMPLEMENTED TO CLEAR IT. It is `T-STATUS-001p`'s worked example of

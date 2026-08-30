@@ -344,6 +344,14 @@ describe('T-UX-008 — the degraded / cross-check-unavailable banner', () => {
     // ⚠ `ux-states.md` §5.9 demands the same banner on both surfaces. This
     // asserts the shared domain constant is what renders, so the two cannot
     // drift apart on the next copy edit.
+    //
+    // ⚠ **AND IT ONLY EVER SPOKE FOR THIS SURFACE.** It mounts
+    // `BatchStatusPage` and compares that page's own text to the constant — it
+    // never renders the review, so despite its title it could not have noticed
+    // that `reviewBanner()` returned `null` for `ocr-unavailable` and the
+    // review page showed nothing at all. The other half of the parity now
+    // lives in `apps/web/test/reviewPage.spec.tsx` under `T-UX-057`/`T-UX-058`,
+    // which mount the review and compare against this same constant.
     render(<BatchStatusPage batch={batch({ crossCheck: 'llm-unavailable' })} />);
     expect(screen.getByTestId('batch-status-degraded').textContent).toBe(
       DEGRADED_EXTRACTION_BANNER,
