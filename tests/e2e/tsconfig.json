@@ -6,11 +6,17 @@
   // instead of passing silently against a fiction (see the header of
   // `journey.spec.ts`, Part 2).
   //
-  // ⚠ This config is NOT yet part of `npm run typecheck` (root `tsc --build`
-  // references only domain/api/web/scripts, never `tests/**`). Wiring it in
-  // needs a `{ "path": "./tests/e2e" }` entry in the root `tsconfig.json` — a
-  // shared, cross-lane build-graph file this lane must not edit. Reported as a
-  // finding on TASK-094/TASK-108, not changed here.
+  // ⚠ This config IS part of `npm run typecheck` — the root script is
+  // `tsc --build && npm run typecheck:e2e`, so CI's `1 · lint` job runs it on
+  // every push. It is NOT in the root `tsconfig.json` `references` array and
+  // must not be added there: `tsc --build` requires a referenced project to be
+  // `composite`, and a composite project emits build info and declarations for
+  // a directory that produces no build output. Running it as a separate
+  // `--noEmit` invocation keeps the alarm outside the build graph, which is
+  // where it belongs.
+  //
+  // `T-INFRA-016` asserts the wiring, so deleting the `&&` fails CI rather than
+  // silently returning the e2e specs to being unchecked.
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,

@@ -117,10 +117,15 @@ import type {
  * ⚠ DRIFT ALARM (Part 2): the response builders below are annotated with the
  * SPA's own contract types (`@nextup/domain`, `apps/web/src/lib/apiClient`), so
  * a server-side shape change fails `tsc --noEmit -p tests/e2e/tsconfig.json`
- * instead of passing against a fiction. That tsconfig is NOT yet in
- * `npm run typecheck` (root `tsc --build` never references `tests/**`); wiring
- * it in is a one-line root-`tsconfig.json` change this lane must not make. See
- * the TASK-094/TASK-108 findings in `docs/backlog.md`.
+ * instead of passing against a fiction. That alarm runs in CI: `npm run
+ * typecheck` is `tsc --build && npm run typecheck:e2e`, and `T-INFRA-016`
+ * asserts the chaining so it cannot be quietly unwired.
+ *
+ * ⚠ The alarm is the ONLY thing that makes the type annotations below load
+ * bearing. Playwright's esbuild loader merely STRIPS types — it never checks
+ * them — so a Playwright run is green against a stub whose builders contradict
+ * their own declared types. If you find yourself removing a type annotation
+ * here "because the test still passes", that is why it still passes.
  */
 
 // ── The works catalogue ─────────────────────────────────────────────────────
