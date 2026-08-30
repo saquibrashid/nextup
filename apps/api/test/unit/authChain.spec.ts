@@ -66,13 +66,15 @@ const OID = 'http://schemas.microsoft.com/identity/claims/objectidentifier';
 const SUBJECT = 'oid-owner-1';
 const ISSUER = 'https://sts.windows.net/tenant/';
 
-const principalHeader = (subject: string): string =>
+const principalHeader = (subject: string, display: string | null = 'owner@example.com'): string =>
   Buffer.from(
     JSON.stringify({
       claims: [
         { typ: 'iss', val: ISSUER },
         { typ: OID, val: subject },
-        { typ: 'preferred_username', val: 'owner@example.com' },
+        // Omitted entirely when null: a principal whose token carries no
+        // display claim is a real case, not a hypothetical one.
+        ...(display === null ? [] : [{ typ: 'preferred_username', val: display }]),
       ],
     }),
     'utf8',
@@ -96,9 +98,15 @@ const stop = (): Promise<void> =>
     server.close(() => resolve());
   });
 
-const get = (path: string, subject?: string): Promise<Response> =>
+const get = (path: string, subject?: string, display?: string | null): Promise<Response> =>
   fetch(`${origin}${path}`, {
-    headers: subject === undefined ? {} : { [CLIENT_PRINCIPAL_HEADER]: principalHeader(subject) },
+    headers:
+      subject === undefined
+        ? {}
+        : {
+            [CLIENT_PRINCIPAL_HEADER]:
+              display === undefined ? principalHeader(subject) : principalHeader(subject, display),
+          },
   });
 
 beforeEach(async () => {
@@ -187,6 +195,61 @@ describe('T-SEC-010 the allow-list refuses a signed-in stranger', () => {
     const res = await get('/api/me', 'oid-someone-else');
     const body = (await res.json()) as Record<string, unknown>;
     expect(body).not.toHaveProperty('ownerId');
+  });
+
+  it('T-SEC-010c: the refusal names the account it refused (ux-states §2.11)', async () => {
+    /*
+     * ⚠ NOT COSMETIC. A personal MSA and a work account federate through the
+     * same `/common` issuer with different subject ids, so "this account is
+     * not permitted" with no account named is genuinely ambiguous to the one
+     * person entitled to use the app — it reads as a broken deployment.
+     *
+     * The value is decorated by the ENVELOPE, not by `allowList.ts`, which
+     * `T-SEC-015b` forbids from naming an address claim at all.
+     */
+    const res = await get('/api/me', 'oid-someone-else', 'stranger@example.com');
+    expect(res.status).toBe(403);
+
+    const body = (await res.json()) as { error: { details: Record<string, unknown> } };
+    expect(body.error.details['signedInAs']).toBe('stranger@example.com');
+  });
+
+  it('T-SEC-010d: a principal with no display claim is still refused, with no key to render', async () => {
+    // Absent, not empty. An empty string would render "Signed in as" followed
+    // by nothing, which looks like a bug in the refusal screen itself.
+    const res = await get('/api/me', 'oid-someone-else', null);
+    expect(res.status).toBe(403);
+
+    const body = (await res.json()) as { error: { details: Record<string, unknown> } };
+    expect(body.error.details).not.toHaveProperty('signedInAs');
+  });
+
+  it('T-SEC-010e: the name is not echoed onto refusals that established no identity', async () => {
+    // A 401 has no principal to report.
+    const res = await get('/api/me');
+    expect(res.status).toBe(401);
+
+    const body = (await res.json()) as { error: { details: Record<string, unknown> } };
+    expect(body.error.details).not.toHaveProperty('signedInAs');
+  });
+
+  it('T-SEC-010f: the name rides on NOT_ALLOWED only, never on an ordinary error', async () => {
+    /*
+     * ⚠ THIS CASE EXISTS BECAUSE MUTATION TESTING PROVED `T-SEC-010e` COULD
+     * NOT SEE THE RESTRICTION. Deleting the `NOT_ALLOWED` check from the
+     * envelope left every test green: a 401 carries no principal, so the
+     * `typeof` guard excluded it anyway and the 401 case was asserting a
+     * property that held for an unrelated reason.
+     *
+     * The condition is only observable for a caller who IS a valid principal
+     * and gets some other error — an allow-listed owner hitting a path that
+     * does not exist. Without this, the restriction is a comment.
+     */
+    const res = await get('/api/definitely-not-a-route', SUBJECT);
+    expect(res.status).not.toBe(403);
+
+    const body = (await res.json()) as { error: { details: Record<string, unknown> } };
+    expect(body.error.details).not.toHaveProperty('signedInAs');
   });
 });
 

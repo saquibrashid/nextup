@@ -48,12 +48,42 @@ export function redactMessage(message: string): string {
   return FORBIDDEN_IN_MESSAGE.some((re) => re.test(message)) ? INTERNAL_ERROR_MESSAGE : message;
 }
 
-export function buildEnvelope(error: AppError, correlationId: string): ErrorEnvelope {
+/**
+ * The details key carrying the refused account's display name (§2.11).
+ *
+ * ⚠ DISPLAY ONLY, and deliberately decorated HERE rather than where the
+ * refusal is decided. `allowList.ts` must not so much as name an address claim
+ * — `T-SEC-015b` bans the word outright in that file, because a reassignable
+ * identifier next to an authorisation decision is how the unsafe design gets
+ * written by accident. The envelope is the one place an error becomes a body,
+ * it decides nothing, and so it is the only safe place to add this.
+ */
+export const SIGNED_IN_AS_DETAIL = 'signedInAs';
+
+export function buildEnvelope(
+  error: AppError,
+  correlationId: string,
+  signedInAs?: string | null,
+): ErrorEnvelope {
   const details = { ...error.details };
   // A correlation id on a 5xx is what makes an opaque message diagnosable: the
   // owner reports the id, the full error is in the log line under that id.
   if (error.httpStatus >= 500) {
     details['correlationId'] = correlationId;
+  }
+  /*
+   * `specs/ux-states.md` §2.11 requires the refusal to show WHICH account was
+   * refused — the difference between "nextup is broken" and "I am signed in as
+   * the wrong account". That is not a nicety here: a personal MSA and a work
+   * account both resolve through the same `/common` issuer with different
+   * subject ids, so a refusal with no account named is genuinely ambiguous.
+   *
+   * ⚠ NOT_ALLOWED ONLY. A 401 has no established identity to report, and
+   * echoing a name onto every error would put it on responses the owner never
+   * sees, for no benefit.
+   */
+  if (error.code === 'NOT_ALLOWED' && typeof signedInAs === 'string' && signedInAs !== '') {
+    details[SIGNED_IN_AS_DETAIL] = signedInAs;
   }
   return {
     error: {
@@ -83,7 +113,7 @@ export function toAppError(thrown: unknown): AppError {
 
 export function errorEnvelope(
   thrown: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): void {
@@ -112,7 +142,7 @@ export function errorEnvelope(
     );
   }
 
-  res.status(error.httpStatus).json(buildEnvelope(error, correlationId));
+  res.status(error.httpStatus).json(buildEnvelope(error, correlationId, req.principal?.email));
 }
 
 /**

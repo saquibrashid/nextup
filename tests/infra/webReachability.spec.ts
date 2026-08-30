@@ -154,7 +154,7 @@ function callForm(method: string): RegExp {
  *   message into a container: that would render the rejection copy twice.
  *
  * Genuinely unwired, each a separately-tracked gap — NOT permission for a
- * fourth:
+ * third:
  * - `RemovalConfirmDialog.submitting` — the confirm/cancel buttons never
  *   disable while the removal is in flight. ⚠ INVESTIGATED, AND THE EXPOSURE
  *   IS SMALLER THAN IT LOOKS: `ReviewPage`'s `onConfirm` calls
@@ -169,9 +169,14 @@ function callForm(method: string): RegExp {
  * - `BatchStatusPage.offline` — the offline banner never renders, so a poll
  *   that has stopped because the device dropped off the network is
  *   indistinguishable from one that is merely slow.
- * - `RefusalPage.signedInEmail` — the refusal screen never says WHICH account
- *   was refused, which is precisely the information needed when a personal and
- *   a work identity both resolve through the same `/common` issuer.
+ *
+ * ⚠ `RefusalPage.signedInEmail` WAS HERE AND IS NOW WIRED — left recorded
+ * because of HOW it was missed. `ux-states.md` §2.11 requires the refusal to
+ * name the signed-in account, and `T-UX-025a` asserted exactly that while
+ * hand-supplying the prop to `RefusalPage` in isolation. All nine callers
+ * omitted it, so a criterion with a green named test had never once held in
+ * the running product. `OwnerGate` now supplies it from the 403 envelope, and
+ * `T-UX-025h` drives it through the gate rather than the component.
  */
 const BASELINE_UNSUPPLIED = new Set([
   'apps/web/src/components/ImageDropzone.tsx ImageDropzone.onPasteFailed',
@@ -182,7 +187,6 @@ const BASELINE_UNSUPPLIED = new Set([
   'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.logoPath',
   'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.omdbDisclaimer',
   'apps/web/src/pages/BatchStatusPage.tsx BatchStatusPage.offline',
-  'apps/web/src/pages/RefusalPage.tsx RefusalPage.signedInEmail',
   'apps/web/src/pages/ReviewPage.tsx ReviewPage.storage',
 ]);
 
