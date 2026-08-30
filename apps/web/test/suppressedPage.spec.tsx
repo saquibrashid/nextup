@@ -15,11 +15,18 @@
  * the title reads differently in a future screenshot.
  */
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { SuppressedPage } from '../src/pages/SuppressedPage';
 import type { SuppressionItem } from '../src/lib/apiClient';
-import { RETRY_LABEL, UNMATCHED_SUPPRESSION_CAVEAT, UNSUPPRESS_CONFIRM_BODY } from '../src/copy';
+import {
+  RETRY_LABEL,
+  SUPPRESSED_EMPTY_BODY,
+  SUPPRESSED_EMPTY_TITLE,
+  SUPPRESSED_LOADING,
+  UNMATCHED_SUPPRESSION_CAVEAT,
+  UNSUPPRESS_CONFIRM_BODY,
+} from '../src/copy';
 import { withName } from '../src/components/SuppressDialog';
 
 function makeItem(overrides?: Partial<SuppressionItem>): SuppressionItem {
@@ -165,11 +172,91 @@ describe('T-UI-010 — SuppressedPage', () => {
     expect(screen.getAllByTestId('suppressed-row')).toHaveLength(2);
   });
 
-  // T-UI-010z: empty list renders empty ul (no error, no loading)
-  it('T-UI-010z: empty items list renders empty list', () => {
+  // T-UI-010z: empty list renders the empty state (no error, no loading)
+  it('T-UI-010z: empty items list renders empty state', () => {
     render(<SuppressedPage items={[]} />);
-    const list = screen.getByTestId('suppressed-list');
-    expect(list.children).toHaveLength(0);
+    expect(screen.getByTestId('suppressed-empty')).toBeInTheDocument();
+    expect(screen.queryByTestId('suppressed-list')).not.toBeInTheDocument();
+  });
+});
+
+describe('suppressed-view UX states — §8', () => {
+  it('T-UX-080a: loading renders skeleton rows, not an empty list', () => {
+    render(<SuppressedPage loading />);
+
+    expect(screen.getByTestId('suppressed-loading')).toHaveAccessibleName(SUPPRESSED_LOADING);
+    expect(screen.getAllByTestId('suppressed-row-skeleton')).toHaveLength(3);
+    expect(screen.queryByTestId('suppressed-empty')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('suppressed-list')).not.toBeInTheDocument();
+  });
+
+  it('T-UX-081a: empty state explains that nothing is marked not interested', () => {
+    render(<SuppressedPage items={[]} />);
+
+    const empty = screen.getByTestId('suppressed-empty');
+    expect(empty).toHaveTextContent(SUPPRESSED_EMPTY_TITLE);
+    expect(empty).toHaveTextContent("You haven't marked anything as not interested.");
+    expect(empty).toHaveTextContent(SUPPRESSED_EMPTY_BODY);
+    expect(empty).toHaveTextContent('Use the ⋮ menu on any title.');
+    expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute('href', '/');
+  });
+
+  it('T-UX-082a: populated rows render from displaySnapshot', () => {
+    render(
+      <SuppressedPage
+        items={[
+          makeItem({
+            displaySnapshot: {
+              name: 'Snapshot Title',
+              releaseYear: 1984,
+              mediaType: 'movie',
+              posterPath: '/snapshot.jpg',
+            },
+          }),
+        ]}
+      />,
+    );
+
+    const row = screen.getByTestId('suppressed-row');
+    expect(within(row).getByTestId('suppressed-name')).toHaveTextContent('Snapshot Title');
+    expect(within(row).getByTestId('suppressed-year')).toHaveTextContent('1984');
+    expect(within(row).getByTestId('suppressed-poster')).toHaveAttribute(
+      'src',
+      expect.stringContaining('/snapshot.jpg'),
+    );
+  });
+
+  it('T-UX-083a: submitting dims only the affected row while unsuppress is in flight', async () => {
+    const onUnsuppress = vi.fn(
+      () =>
+        new Promise<unknown>(() => {
+          /* keep the row in the submitting state */
+        }),
+    );
+
+    render(<SuppressedPage items={[makeItem()]} onUnsuppress={onUnsuppress} />);
+    fireEvent.click(screen.getByTestId('stop-ignoring-button'));
+    fireEvent.click(screen.getByTestId('unsuppress-confirm-button'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('suppressed-row')).toHaveAttribute('aria-busy', 'true');
+    });
+    expect(screen.getByTestId('unsuppress-submitting')).toBeDisabled();
+    expect(screen.queryByTestId('stop-ignoring-button')).not.toBeInTheDocument();
+  });
+
+  it('T-UX-084a: success restates the un-suppression caveat as a status', async () => {
+    const onUnsuppress = vi.fn(() => Promise.resolve());
+
+    render(<SuppressedPage items={[makeItem()]} onUnsuppress={onUnsuppress} />);
+    fireEvent.click(screen.getByTestId('stop-ignoring-button'));
+    fireEvent.click(screen.getByTestId('unsuppress-confirm-button'));
+
+    const status = await screen.findByTestId('unsuppress-success-announcement');
+    expect(status).toHaveAttribute('role', 'status');
+    expect(status).toHaveTextContent(withName(UNSUPPRESS_CONFIRM_BODY, 'The Test Movie'));
+    expect(status).toHaveTextContent("This doesn't bring back anything that was removed");
+    expect(screen.queryByTestId('suppressed-row')).not.toBeInTheDocument();
   });
 });
 

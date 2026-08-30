@@ -58,6 +58,14 @@ export const UNSUPPRESS_CONFIRM_BODY =
 export const UNMATCHED_SUPPRESSION_CAVEAT =
   "We couldn't identify this title, so we're matching it on the text we read. If a future screenshot reads slightly differently, it may come back.";
 
+/** ux-states.md §8.1 — the `/not-interested` initial load. */
+export const SUPPRESSED_LOADING = 'Loading your Not interested list…';
+
+/** ux-states.md §8.2 — the owner has never suppressed anything. */
+export const SUPPRESSED_EMPTY_TITLE = "You haven't marked anything as not interested.";
+export const SUPPRESSED_EMPTY_BODY = 'Use the ⋮ menu on any title.';
+export const SUPPRESSED_EMPTY_BACK = 'Back';
+
 /** data-model SD-06 - the suppression followed the corrected identity. */
 export const FIXMATCH_SUPPRESSION_MIGRATED =
   'We also moved your "not interested" setting across to the corrected title, so it still won\'t come back.';

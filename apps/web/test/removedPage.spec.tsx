@@ -36,6 +36,7 @@ import {
   REMOVED_CLEAR_SEARCH_LABEL,
   REMOVED_EMPTY_BODY,
   REMOVED_EMPTY_TITLE,
+  REMOVED_LOADING,
   REMOVED_LOAD_ERROR,
   REMOVED_VIEW_SUBTITLE,
   RESTORE_ALREADY_ACTIVE,
@@ -258,6 +259,17 @@ describe('the two empty states are distinct — T-UX-071', () => {
 
     expect(screen.getByTestId('removed-empty')).toBeInTheDocument();
     expect(screen.queryByTestId('removed-no-matches')).toBeNull();
+  });
+});
+
+describe('loading state — T-UX-070', () => {
+  it('T-UX-070a: the removed view renders row skeletons while loading', () => {
+    render(<RemovedPage loading />);
+
+    expect(screen.getByTestId('removed-loading')).toHaveAccessibleName(REMOVED_LOADING);
+    expect(screen.getAllByTestId('removed-row-skeleton')).toHaveLength(3);
+    expect(screen.queryByTestId('removed-empty')).toBeNull();
+    expect(screen.queryByTestId('removed-row')).toBeNull();
   });
 });
 

@@ -394,9 +394,21 @@ export function RemovedPage({
           )}
         </div>
       ) : loading ? (
-        <p role="status" data-testid="removed-loading">
-          {REMOVED_LOADING}
-        </p>
+        <div role="status" data-testid="removed-loading" aria-label={REMOVED_LOADING}>
+          <ul
+            className="removed-list removed-list--loading"
+            data-testid="removed-loading-skeletons"
+          >
+            {[0, 1, 2].map((index) => (
+              <li
+                key={index}
+                className="removed-row removed-row--skeleton"
+                data-testid="removed-row-skeleton"
+                aria-hidden="true"
+              />
+            ))}
+          </ul>
+        </div>
       ) : visible.length === 0 && !searching && dismissed.size === 0 ? (
         <div data-testid="removed-empty">
           <p className="removed-empty__title">{REMOVED_EMPTY_TITLE}</p>
