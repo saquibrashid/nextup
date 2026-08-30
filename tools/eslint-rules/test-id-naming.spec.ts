@@ -42,7 +42,7 @@ describe('T-META-004 · test titles carry a unique T- id', () => {
       "it.only('T-REV-006 · full update shows all extracted titles', () => {});",
       "it.concurrent('T-IMG-017 · pre-decode pixel guard', () => {});",
       // Static template literal is fine — the id is still visible to CI.
-      'it(`T-PASTE-010 · upload path is not displaced`, () => {});',
+      'it(`T-UX-068 · the close conflict is explained`, () => {});',
       // A lowercase suffix distinguishes several cases for ONE acceptance
       // criterion (the specs use it too: T-AI-010b). Suffixed variants are
       // distinct ids, so they may sit in the same file.

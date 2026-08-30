@@ -148,7 +148,10 @@ async function stubApi(page: Page, state: UploadState): Promise<void> {
             lastUpdatedAt: null,
             lastCompletedBatchId: null,
             ageDays: null,
-            label: service === 'netflix' ? 'Netflix has never been updated' : 'Max has never been updated',
+            label:
+              service === 'netflix'
+                ? 'Netflix has never been updated'
+                : 'Max has never been updated',
           })),
         }),
       );
@@ -263,7 +266,9 @@ async function stubApi(page: Page, state: UploadState): Promise<void> {
     await route.fulfill({
       status: 500,
       contentType: 'application/json',
-      body: JSON.stringify({ error: { code: 'UNSTUBBED', message: `${method} ${path}`, details: {} } }),
+      body: JSON.stringify({
+        error: { code: 'UNSTUBBED', message: `${method} ${path}`, details: {} },
+      }),
     });
   });
 }
@@ -279,10 +284,11 @@ function freshState(): UploadState {
   };
 }
 
-/** A real HEIF `ftyp` box — brand `heic`, the iOS Photos shape (REQ-077). */const HEIC_BYTES = Buffer.from([
-  0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63, 0x00, 0x00, 0x00, 0x00,
-  0x68, 0x65, 0x69, 0x63, 0x6d, 0x69, 0x66, 0x31,
-]);
+/** A real HEIF `ftyp` box — brand `heic`, the iOS Photos shape (REQ-077). */ const HEIC_BYTES =
+  Buffer.from([
+    0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63, 0x00, 0x00, 0x00, 0x00,
+    0x68, 0x65, 0x69, 0x63, 0x6d, 0x69, 0x66, 0x31,
+  ]);
 
 test.describe('T-PASTE-010 — the add-not-swap regression guard', () => {
   test('T-PASTE-010a: the file input still exists on /upload and accepts multiple files', async ({
@@ -392,9 +398,11 @@ test.describe('T-PASTE-010 — the add-not-swap regression guard', () => {
 
     await page.getByRole('radio', { name: /Netflix/ }).check();
     await page.getByRole('radio', { name: /Full update/ }).check();
-    await page.getByTestId('file-input').setInputFiles([
-      { name: 'ios-photo.heic', mimeType: 'application/octet-stream', buffer: HEIC_BYTES },
-    ]);
+    await page
+      .getByTestId('file-input')
+      .setInputFiles([
+        { name: 'ios-photo.heic', mimeType: 'application/octet-stream', buffer: HEIC_BYTES },
+      ]);
     await expect(page.getByTestId('accepted-file')).toHaveCount(1);
     await expect.poll(() => state.batchCreatedWith).not.toBeNull();
 
