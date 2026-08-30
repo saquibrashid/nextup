@@ -172,6 +172,25 @@ interface SectionView extends ReviewSection<ReviewCandidate> {
  */
 export type ConfirmableSection = 'additions' | 'unmatched';
 
+/**
+ * The cropped-tile thumbnail source for a candidate (`specs/ui.md` §5.3a).
+ *
+ * ⚠ DERIVED FROM `sourceImageIds`, PASSED IN — never invented by the caller of
+ * `CandidateCard`. §5.3a requires the tile beside `inferred-unverified` and
+ * `unreadable-tile`, the review-side half of the RSK-028 (fabrication)
+ * mitigation. There is no crop endpoint; the only bytes served are the whole
+ * uploaded screenshot at `GET /api/images/:imageId` (`specs/api.md` §6.27),
+ * mirroring the `imagesWithNoText.href` shape the route already emits.
+ *
+ * ⚠ `noUncheckedIndexedAccess` makes `sourceImageIds[0]` `string | undefined`:
+ * a candidate with no source image yields `null`, so `CandidateCard` renders
+ * no broken `<img>` rather than an empty `src`.
+ */
+function thumbnailUrlFor(candidate: ReviewCandidate): string | null {
+  const imageId = candidate.sourceImageIds[0];
+  return imageId === undefined ? null : `/api/images/${encodeURIComponent(imageId)}`;
+}
+
 function CandidateSection({
   section,
   testId,
@@ -227,7 +246,7 @@ function CandidateSection({
             keyFor={(candidate) => candidate.candidateId}
             renderItem={(candidate) =>
               renderCard === undefined ? (
-                <CandidateCard candidate={candidate} />
+                <CandidateCard candidate={candidate} thumbnailUrl={thumbnailUrlFor(candidate)} />
               ) : (
                 renderCard(candidate)
               )
@@ -425,6 +444,7 @@ export function ReviewPage({
         renderCard={(candidate) => (
           <CandidateCard
             candidate={candidate}
+            thumbnailUrl={thumbnailUrlFor(candidate)}
             unidentified
             actions={
               unmatchedWired ? (
