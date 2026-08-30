@@ -210,6 +210,83 @@ describe('T-UI-020 - FixMatchDialog renders search input, results, and selection
   });
 });
 
+// ── T-UX-032 ─────────────────────────────────────────────────────────────────
+
+/**
+ * §3.3 — fix match, searching — `T-UX-032`.
+ *
+ * ⚠ OVERLAP, ESTABLISHED BEFORE WRITING: `T-UI-020` (a backlog-cited id, not
+ * renamed) already asserts results with name/year/type/poster (`c`/`d`) and
+ * that no-results names the query (`j`). `specs/ux-states.md` §3.3 stayed
+ * pinned uncovered because no test bore ITS id. These cases give it that id and
+ * — more importantly — close the two clauses `T-UI-020` did NOT genuinely
+ * prove: the 300 ms DEBOUNCE (`T-UI-020b` asserts a call with the final query,
+ * which an undebounced per-keystroke search also satisfies) and the transient
+ * *"Searching…"* state, plus the quote-back (§3.3's *"No results for '{q}'"*).
+ */
+describe('T-UX-032 - §3.3 fix-match searching: debounce, Searching…, results, no-results quote-back', () => {
+  it('T-UX-032a debounces: rapid typing fires ONE search for the final query, not one per key', async () => {
+    const { searchTmdb, user } = mount();
+
+    // userEvent types the four keys well within the 300 ms debounce window.
+    await user.type(screen.getByTestId('tmdb-search-input'), 'Dune');
+
+    await waitFor(() => expect(searchTmdb).toHaveBeenCalled(), { timeout: 1000 });
+    // Give any further (undebounced, per-keystroke) calls time to land.
+    await new Promise((resolve) => setTimeout(resolve, 350));
+
+    // ⚠ Killing assertion for "remove the debounce": an undebounced search
+    // fires per keystroke (D, Du, Dun, Dune) = 4 calls; a debounced one fires
+    // exactly once, for the final query.
+    expect(searchTmdb).toHaveBeenCalledTimes(1);
+    expect(searchTmdb).toHaveBeenCalledWith('Dune');
+  });
+
+  it('T-UX-032b shows "Searching…" while the request is in flight', async () => {
+    let settle: (r: TmdbSearchResponse) => void = () => undefined;
+    const { user } = mount({
+      searchTmdb: () =>
+        new Promise<TmdbSearchResponse>((resolve) => {
+          settle = resolve;
+        }),
+    });
+
+    await user.type(screen.getByTestId('tmdb-search-input'), 'Dune');
+
+    // The debounced search has fired but not resolved: §3.3's "Searching…".
+    expect(await screen.findByText('Searching…')).toBeTruthy();
+
+    settle(searchResponse());
+    await screen.findByTestId('tmdb-results');
+  });
+
+  it('T-UX-032c results carry poster, name, year and type', async () => {
+    const { user } = mount();
+
+    await user.type(screen.getByTestId('tmdb-search-input'), 'Dune');
+
+    await screen.findByTestId('tmdb-results');
+    expect(screen.getByTestId('result-name').textContent).toBe(SEARCH_RESULT.name);
+    expect(screen.getByTestId('result-year').textContent).toBe(String(SEARCH_RESULT.releaseYear));
+    expect(screen.getByTestId('result-type').textContent).toBe('Movie');
+    expect((screen.getByTestId('result-poster') as HTMLImageElement).src).toContain(
+      SEARCH_RESULT.posterPath,
+    );
+  });
+
+  it('T-UX-032d no-results QUOTES THE QUERY BACK, not a generic "No results"', async () => {
+    const { user } = mount({ searchTmdb: () => Promise.resolve({ items: [] }) });
+
+    await user.type(screen.getByTestId('tmdb-search-input'), 'zzq123');
+
+    const status = await screen.findByRole('status');
+    // ⚠ Killing assertion for "generic 'No results'": the owner must be able to
+    // see they typoed, so the query is quoted back verbatim.
+    expect(status.textContent).toContain('No results for');
+    expect(status.textContent).toContain('zzq123');
+  });
+});
+
 // ── T-UX-033 ─────────────────────────────────────────────────────────────────
 
 describe('T-UX-033 - TMDB unavailable (502) dialog reports it; nothing is changed', () => {

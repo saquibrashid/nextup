@@ -272,3 +272,50 @@ describe('T-UX-022 - undo is offered immediately, and rolls back if it fails', (
     expect(withName(SUPPRESS_CONFIRM_BODY, NAME)).toContain(NAME);
   });
 });
+
+/**
+ * §3.2 — suppress, already suppressed (idempotent 200) — `T-UX-031`.
+ *
+ * ⚠ REACHABILITY, ESTABLISHED BEFORE WRITING: the server DOES discriminate.
+ * `apps/api/src/routes/suppressions.ts` returns `alreadySuppressed: true` when
+ * the work is already actively suppressed (step 1) or a concurrent create
+ * loses the unique-violation race (step 3), and `false` on a genuine first
+ * create/re-arm — `specs/api.md` §6.6 documents both. `SuppressDialog.confirm`
+ * reads that flag and enters phase `already`, so the state IS reachable and the
+ * copy is NOT dead. It was, however, asserted only under `T-UX-022g` — a
+ * backlog-cited id — so `specs/ux-states.md` §3.2 stayed pinned uncovered under
+ * its own id. These cases give it that id; the overlap with `T-UX-022g` is
+ * deliberate and reported, since renaming a cited case would dangle its
+ * citation (`T-META-005a`).
+ */
+describe('T-UX-031 — §3.2 suppress, already suppressed (idempotent 200)', () => {
+  it('T-UX-031a reads as "already on your list", distinct from a first-time hide', async () => {
+    const { user } = mount({
+      suppress: () => Promise.resolve(result({ alreadySuppressed: true })),
+    });
+
+    await user.click(confirmButton());
+
+    const status = await screen.findByRole('status');
+    // ⚠ Killing assertion for "render the first-time confirmation on the
+    // idempotent path": §3.2 and §2.14 MUST be distinguishable, or the owner
+    // is told a fresh hide happened when nothing changed.
+    expect(status.textContent).toBe(withName(ALREADY_SUPPRESSED_BODY, NAME));
+    expect(status.textContent).not.toBe(withName(SUPPRESS_SUCCESS_BODY, NAME));
+    expect(status.textContent).toContain(NAME);
+  });
+
+  it('T-UX-031b offers Close only — nothing changed, so there is nothing to undo', async () => {
+    const { states, user } = mount({
+      suppress: () => Promise.resolve(result({ alreadySuppressed: true })),
+    });
+
+    await user.click(confirmButton());
+    await screen.findByRole('status');
+
+    // §3.2's action is Close; an Undo would imply a change that did not happen.
+    expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeTruthy();
+    expect(states.at(-1)).toBe('suppressed');
+  });
+});
