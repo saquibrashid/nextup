@@ -91,9 +91,27 @@ const SKIP_DIRS = new Set([
   'test-results',
 ]);
 
-/** Recursively collect files, skipping build output and vendored code. */
+/**
+ * Recursively collect files, skipping build output and vendored code.
+ *
+ * ⚠ **A PATH THAT VANISHES MID-WALK IS SKIPPED, NOT THROWN ON.** This checker
+ * is the one walker that MUST see `tests/infra/supplyChain.spec.ts`'s scratch
+ * directories — they are how that suite proves the gate catches a real
+ * violation — so it cannot skip `.tmp-*` the way `tools/check-status.mjs` does.
+ * It therefore has to tolerate the other half of the same race: Vitest runs
+ * spec files in parallel, and a sibling's scratch directory can be removed
+ * between this `readdir` and the recursive call into it. Left unhandled, that
+ * surfaced as `T-SEC-009d` reporting a planted `mixpanel` devDependency as NOT
+ * caught — a security gate reading green because the walk died early.
+ */
 async function walk(dir, out = []) {
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
+  let entries;
+  try {
+    entries = await readdir(dir, { withFileTypes: true });
+  } catch {
+    return out; // removed between the parent listing and this call
+  }
+  for (const entry of entries) {
     if (entry.isDirectory()) {
       if (SKIP_DIRS.has(entry.name)) continue;
       await walk(path.join(dir, entry.name), out);

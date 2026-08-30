@@ -46,9 +46,20 @@ export function findSpecFiles(root = ROOT) {
   const found = [];
   const walk = (dir) => {
     for (const entry of readdirSync(dir)) {
-      if (IGNORED_DIRS.has(entry)) continue;
+      // `.tmp-*` is `tests/infra/supplyChain.spec.ts`'s scratch directory,
+      // created inside the repository root and deleted again while Vitest is
+      // running sibling spec FILES in parallel. Any root walker that does not
+      // skip it eventually stats a path that has just been removed. See the
+      // long note on `SKIP_DIRS` in `tools/check-status.mjs`.
+      if (IGNORED_DIRS.has(entry) || entry.startsWith('.tmp-')) continue;
       const full = path.join(dir, entry);
-      if (statSync(full).isDirectory()) walk(full);
+      let stat;
+      try {
+        stat = statSync(full);
+      } catch {
+        continue; // vanished between the listing and the stat
+      }
+      if (stat.isDirectory()) walk(full);
       else if (SPEC_RE.test(entry)) found.push(path.relative(root, full).split(path.sep).join('/'));
     }
   };
