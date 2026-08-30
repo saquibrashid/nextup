@@ -1,56 +1,79 @@
 /**
- * TASK-076 — the batch-history container (`specs/ux-states.md` §9.1–§9.3), now
- * also the caller that produces and routes a §9.8 undo refusal (TASK-116).
+ * TASK-076 / TASK-116 / the §9.6–§9.10 undo outcomes — the batch-history
+ * container (`specs/ux-states.md` §9). Containers fetch, pages render; this is
+ * also the caller that ATTEMPTS the undo and routes each of its outcomes.
  *
- * ⚠ `/batches` WAS MOUNTED ON A STUB THAT RENDERED THE WORDS "Batch history"
- * AND NOTHING ELSE. Containers fetch, pages render — the same split every
- * other screen here uses, and the same one whose absence made
- * `/not-interested` render an empty list against a working API (see
- * `SuppressedRoute`).
+ * ⚠ **AN UNDO HAS FIVE OUTCOMES AND EVERY ONE IS OWNER-VISIBLE.** Before this
+ * container grew the state machine below, only the §8.4 enumeration was handled
+ * and every other outcome — success, "already undone", a network fault — was
+ * silently swallowed: the owner tapped *Undo this batch* and watched nothing
+ * happen. That is the dead-button failure §4.15 calls out ("MUST NEVER sit on a
+ * spinner"). The outcomes are, and must stay, distinct:
+ *   • §9.6 submitting — the card says *Undoing…*, guarded against a second tap;
+ *   • §9.7 success — *"Undone. N titles and M service entries were removed."*
+ *     with the counts from the response and a link to `/` (NOT an auto-nav);
+ *   • §9.8/§9.9 refusal — the full-screen `<UndoRefusalPanel>`;
+ *   • §9.10 already-undone — a settled fact, offering a refresh, never a retry;
+ *   • unclassified fault — surfaced and retryable, never merged with §9.10.
  *
- * ⚠ **THE UNDO IS ATTEMPTED HERE, AND ITS REFUSAL IS THE WHOLE POINT.** The
- * owner asks to undo a batch; a creates-only batch is reversed and the owner
- * returns to their list, but anything else answers 409 `BATCH_NOT_CREATES_
- * ONLY` with the §8.4 enumeration. That refusal is rendered as the full-screen
- * `<UndoRefusalPanel>` — replacing the history, never floating over it as a
- * toast (§9.8) — so every title the undo would have touched carries a working
- * remedy. A lifecycle 409 (`BATCH_ALREADY_UNDONE`) is not a refusal to
- * enumerate and is deliberately not routed here.
+ * ⚠ The mutation is in a HANDLER, never an effect: a second undo of the same
+ * batch under StrictMode's double invoke would be a spurious 409.
  */
 
 import { useState, type JSX } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import type { UndoRefusalDetails } from '@nextup/domain';
 
 import { apiClient, type ApiClient } from '../lib/apiClient';
 import { isUndoRefusal, parseUndoRefusalDetails } from '../lib/undoRefusal';
+import {
+  formatUndoneSummary,
+  isBatchAlreadyUndone,
+  parseUndoResult,
+  type UndoSuccess,
+} from '../lib/undoResult';
 import { useResource } from '../lib/useResource';
 import { BatchHistoryPage } from '../pages/BatchHistoryPage';
 import { RefusalPage } from '../pages/RefusalPage';
 import { UndoRefusalPanel } from '../components/UndoRefusalPanel';
+import {
+  BATCHES_ALREADY_UNDONE,
+  BATCHES_ALREADY_UNDONE_REFRESH_LABEL,
+  BATCHES_UNDO_FAILED,
+  BATCHES_UNDO_FAILED_RETRY_LABEL,
+  BATCHES_UNDONE_HOME_LABEL,
+} from '../copy';
 
 export interface BatchHistoryRouteProps {
   /** Injected so the suite can drive every state without a server. */
   readonly client?: ApiClient;
 }
 
+/** The undo state machine — exactly one outcome is live at a time. */
+type UndoState =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'submitting'; readonly batchId: string }
+  | { readonly kind: 'success'; readonly counts: UndoSuccess }
+  | { readonly kind: 'refused'; readonly details: UndoRefusalDetails }
+  | { readonly kind: 'already-undone' }
+  | { readonly kind: 'failed' };
+
 export function BatchHistoryRoute({
   client = apiClient,
 }: BatchHistoryRouteProps = {}): JSX.Element {
-  const navigate = useNavigate();
   const batches = useResource((signal) => client.listBatches(signal), 'batches');
-  const [refusal, setRefusal] = useState<UndoRefusalDetails | null>(null);
+  const [undo, setUndo] = useState<UndoState>({ kind: 'idle' });
 
   if (batches.resource.kind === 'refused') return <RefusalPage reason="not-allowed" />;
 
-  // ⚠ A full-screen replacement, not an overlay. §9.8 is a panel, not a toast:
-  // it is shown INSTEAD of the history, and its own actions are the way out.
-  if (refusal !== null) {
+  // §9.8/§9.9 — a full-screen replacement, not an overlay. The panel is shown
+  // INSTEAD of the history, and its own actions are the way out.
+  if (undo.kind === 'refused') {
     return (
       <UndoRefusalPanel
-        details={refusal}
-        onClose={() => setRefusal(null)}
+        details={undo.details}
+        onClose={() => setUndo({ kind: 'idle' })}
         suppress={(titleId) => client.suppressTitle(titleId)}
         unsuppress={(suppressionId) => client.unsuppress(suppressionId)}
         searchTmdb={(query) => client.searchTmdb(query)}
@@ -60,30 +83,71 @@ export function BatchHistoryRoute({
     );
   }
 
-  // The mutation is in a handler, never an effect: a second undo of the same
-  // batch under StrictMode's double invoke would be a spurious 409.
+  // §9.7 — the owner is TOLD what happened and chooses to continue. This
+  // replaces the old unconditional navigate('/'): the link is theirs to follow.
+  if (undo.kind === 'success') {
+    return (
+      <section role="status" data-testid="undo-success">
+        <h1>{formatUndoneSummary(undo.counts)}</h1>
+        <Link to="/" className="tap-target" data-testid="undo-success-home">
+          {BATCHES_UNDONE_HOME_LABEL}
+        </Link>
+      </section>
+    );
+  }
+
+  // The mutation is in a handler, never an effect (see the module note).
   const onUndo = (batchId: string): void => {
+    if (undo.kind === 'submitting') return; // guard: one undo in flight at a time
+    setUndo({ kind: 'submitting', batchId });
     client.undoBatch(batchId).then(
-      () => {
-        // The batch has been reversed; return the owner to their list.
-        void navigate('/');
-      },
+      (result) => setUndo({ kind: 'success', counts: parseUndoResult(result) }),
       (error: unknown) => {
-        // Only the enumerated refusal opens the panel. A lifecycle 409, an
-        // expired session (already redirected) or a network failure is not a
-        // §8.4 body and must not be forced into one.
-        if (isUndoRefusal(error)) setRefusal(parseUndoRefusalDetails(error.details));
+        // Each outcome is kept distinct — an enumerated refusal, a settled
+        // "already undone", and a retryable fault mean three different things.
+        if (isUndoRefusal(error)) {
+          setUndo({ kind: 'refused', details: parseUndoRefusalDetails(error.details) });
+        } else if (isBatchAlreadyUndone(error)) {
+          setUndo({ kind: 'already-undone' });
+        } else {
+          setUndo({ kind: 'failed' });
+        }
       },
     );
   };
 
   return (
-    <BatchHistoryPage
-      items={batches.resource.kind === 'ok' ? batches.resource.value.batches : []}
-      loading={batches.resource.kind === 'loading'}
-      loadFailed={batches.resource.kind === 'failed'}
-      onRetry={batches.reload}
-      onUndo={onUndo}
-    />
+    <>
+      {undo.kind === 'already-undone' && (
+        <div role="alert" data-testid="undo-already-undone">
+          <p>{BATCHES_ALREADY_UNDONE}</p>
+          <button
+            type="button"
+            className="tap-target"
+            data-testid="undo-already-undone-refresh"
+            onClick={() => {
+              setUndo({ kind: 'idle' });
+              batches.reload();
+            }}
+          >
+            {BATCHES_ALREADY_UNDONE_REFRESH_LABEL}
+          </button>
+        </div>
+      )}
+      {undo.kind === 'failed' && (
+        <div role="alert" data-testid="undo-failed">
+          <p>{BATCHES_UNDO_FAILED}</p>
+          <span data-testid="undo-failed-retry-hint">{BATCHES_UNDO_FAILED_RETRY_LABEL}</span>
+        </div>
+      )}
+      <BatchHistoryPage
+        items={batches.resource.kind === 'ok' ? batches.resource.value.batches : []}
+        loading={batches.resource.kind === 'loading'}
+        loadFailed={batches.resource.kind === 'failed'}
+        onRetry={batches.reload}
+        onUndo={onUndo}
+        undoingBatchId={undo.kind === 'submitting' ? undo.batchId : null}
+      />
+    </>
   );
 }

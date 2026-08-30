@@ -115,9 +115,6 @@ const KNOWN_UNCOVERED: readonly string[] = [
   'T-UX-082',
   'T-UX-083',
   'T-UX-084',
-  'T-UX-095',
-  'T-UX-096',
-  'T-UX-098',
 ];
 
 function collectSpecFiles(): string[] {

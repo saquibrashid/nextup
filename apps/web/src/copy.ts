@@ -720,6 +720,48 @@ export const BATCH_PROVENANCE_REMOVED = 'Removed';
  */
 export const BATCH_CHANGED_NOTHING = 'This upload didn\u2019t change anything.';
 
+/* ── §9.6/§9.7/§9.10 — the undo OUTCOMES (`specs/ux-states.md` §9.6, §9.7,
+ * §9.10, US-032) ────────────────────────────────────────────────────────────
+ *
+ * ⚠ THE COUNTS ARE THE SERVER'S (§9.7). `BATCHES_UNDONE` is a template whose
+ * `{titles}`/`{entries}` are filled from the undo response, not baked in, so
+ * "Undone. 6 titles and 9 service entries were removed." can never disagree
+ * with what actually left the list. The noun phrases pluralise honestly for a
+ * count of one.
+ *
+ * ⚠ §9.10 IS A SETTLED FACT, NOT A FAULT. "Already undone" offers a refresh,
+ * never a retry; a genuine fault (below) offers a retry and leaves the batch
+ * retryable. Reusing one message for both would tell the owner a falsehood.
+ */
+
+/** §9.6 — the in-flight label on the card whose undo is submitting. */
+export const BATCHES_UNDO_SUBMITTING = 'Undoing\u2026';
+
+/**
+ * §9.7 — the success sentence, verbatim shape. `{titles}` and `{entries}` are
+ * the pluralised phrases below so the numbers stay the server's own.
+ */
+export const BATCHES_UNDONE = 'Undone. {titles} and {entries} were removed.';
+export const BATCHES_UNDONE_TITLES_ONE = '1 title';
+export const BATCHES_UNDONE_TITLES_MANY = '{count} titles';
+export const BATCHES_UNDONE_ENTRIES_ONE = '1 service entry';
+export const BATCHES_UNDONE_ENTRIES_MANY = '{count} service entries';
+
+/** §9.7 — the link back to the combined list the owner may follow, or not. */
+export const BATCHES_UNDONE_HOME_LABEL = 'Go to your list';
+
+/** §9.10, verbatim — plus its refresh, which reloads the history. */
+export const BATCHES_ALREADY_UNDONE = 'This upload was already undone.';
+export const BATCHES_ALREADY_UNDONE_REFRESH_LABEL = 'Refresh';
+
+/**
+ * Not a §9-row, but mandatory: an unclassified undo failure must surface
+ * something and leave the batch retryable, kept distinct from §9.10's fact.
+ */
+export const BATCHES_UNDO_FAILED =
+  'Couldn\u2019t undo this upload. Nothing has changed \u2014 you can try again.';
+export const BATCHES_UNDO_FAILED_RETRY_LABEL = 'Try again';
+
 /* ── TASK-116 · the §9.8/§9.9 undo-refusal panel (`specs/ux-states.md` §9.8,
  * §9.9, US-033, `T-UX-097`) ────────────────────────────────────────────────
  *
