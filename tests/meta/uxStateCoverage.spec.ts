@@ -70,9 +70,21 @@ const ID_PATTERN = /T-[A-Z0-9]+-\d+/g;
  *
  * ⚠ Do NOT add to this list to make a build pass. A new uncovered state means a
  * UI state was specified and left unasserted; write the test instead.
+ *
+ * ⚠ THE LIST GREW ONCE, BY FIVE, AND ONLY BECAUSE THE DETECTOR GOT SHARPER.
+ * When `assertedIds` stopped counting bare occurrences and started requiring
+ * title position (see `TITLE_ID_PATTERN` above), five ids that had always been
+ * unasserted stopped being able to hide: `T-AI-017`, `T-AUTH-001`,
+ * `T-AUTH-002`, `T-UX-020` and `T-UX-068`. Coverage did not regress — the
+ * measurement stopped lying. This is the ONLY circumstance in which an entry
+ * may be added, it must be justified in the diff exactly like this, and the
+ * ratchet is shrink-only again from here.
  */
 const KNOWN_UNCOVERED: readonly string[] = [
   'T-A11Y-006',
+  'T-AI-017',
+  'T-AUTH-001',
+  'T-AUTH-002',
   'T-AUTH-003',
   'T-AUTH-004',
   'T-SEC-008',
@@ -85,6 +97,7 @@ const KNOWN_UNCOVERED: readonly string[] = [
   'T-UX-015',
   'T-UX-016',
   'T-UX-017',
+  'T-UX-020',
   'T-UX-021',
   'T-UX-031',
   'T-UX-032',
@@ -140,13 +153,34 @@ export function specStateIds(text: string): string[] {
   return [...new Set(text.match(ID_PATTERN) ?? [])].sort();
 }
 
+/**
+ * ⚠ AN ID IS "ASSERTED" ONLY WHEN IT NAMES A TEST — not when it merely appears
+ * in the file. This predicate was originally `text.match(ID_PATTERN)`, which
+ * counted ANY occurrence, including a mention in a comment or an id used as
+ * DATA. That is this repository's second defect disguise — a name matched
+ * instead of a call — reproduced inside the gate built to catch the sixth.
+ *
+ * It was not hypothetical. Under the loose predicate:
+ *
+ *   - `T-AUTH-001` counted as covered on the strength of a COMMENT in
+ *     `tests/infra/easyAuth.spec.ts` explaining that TASK-027's "Done when"
+ *     column names it. No test bears the id.
+ *   - `T-UX-068` counted as covered because `tests/infra/status.spec.ts` names
+ *     it as a PROBE — a deliberately unimplemented id, cited as data, to prove
+ *     that a mention is not a delivery. The loose predicate read that proof as
+ *     the very thing it disproves.
+ *
+ * `T-META-004` already requires every `it(...)` title to begin with a static
+ * `T-` id, so title position is a predicate this suite is entitled to rely on.
+ */
+const TITLE_ID_PATTERN = /\b(?:it|test|describe)(?:\.\w+)*\(\s*['"`]\s*(T-[A-Z0-9]+-\d+)/g;
+
 /** Every test id asserted anywhere in the collected suites. */
 function assertedIds(files: readonly string[]): Set<string> {
   const ids = new Set<string>();
   for (const file of files) {
-    for (const id of readFileSync(join(REPO_ROOT, file), 'utf8').match(ID_PATTERN) ?? []) {
-      ids.add(id);
-    }
+    const text = readFileSync(join(REPO_ROOT, file), 'utf8');
+    for (const [, id] of text.matchAll(TITLE_ID_PATTERN)) ids.add(id);
   }
   return ids;
 }
