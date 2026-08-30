@@ -291,26 +291,31 @@ async function expectNoHorizontalOverflow(page: Page, context = page.url()): Pro
           className:
             typeof node.getAttribute('class') === 'string' ? node.getAttribute('class') : '',
           testId: node.getAttribute('data-testid') ?? '',
-          text: (node.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 80),
+          text: (node.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 40),
           left: Math.round(rect.left * 10) / 10,
           right: Math.round(rect.right * 10) / 10,
           width: Math.round(rect.width * 10) / 10,
         };
       })
-      .filter((rect) => rect.width > 0 && (rect.left < 0 || rect.right > clientWidth))
-      .sort((a, b) => b.right - a.right)
-      .slice(0, 5);
+      .filter((rect) => rect.width > 0 && (rect.left < -0.5 || rect.right > clientWidth + 0.5))
+      .sort((a, b) => b.right - a.right);
 
     return {
       bodyClientWidth: document.body.clientWidth,
       bodyScrollWidth: document.body.scrollWidth,
       clientWidth,
+      currentUrl: window.location.href,
+      devicePixelRatio: window.devicePixelRatio,
       offsetWidth: document.documentElement.offsetWidth,
       outerWidth: window.outerWidth,
+      pasteButtonCount: document.querySelectorAll('[data-testid="paste-button"]').length,
+      pasteHintCount: document.querySelectorAll('[data-testid="paste-hint"]').length,
+      readyState: document.readyState,
       scrollbarWidth,
       scrollWidth,
       overflow: scrollWidth - clientWidth,
       innerWidth: window.innerWidth,
+      visualViewportWidth: window.visualViewport?.width ?? null,
       offenders,
     };
   });
