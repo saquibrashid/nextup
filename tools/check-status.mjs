@@ -239,6 +239,50 @@ export function parseLedger(markdown) {
  * rule — a delivered, passing test — as missing.
  */
 /**
+ * Directories no repository walker should descend into.
+ *
+ * ⚠ **`.tmp-*` IS IN HERE FOR A CONCURRENCY REASON, NOT A TIDINESS ONE.**
+ * `tests/infra/supplyChain.spec.ts` proves the dependency gate really catches a
+ * violation by writing one into a scratch directory **inside the repository
+ * root** — that is the only place `checkDependencies()` would ever walk — and
+ * deleting it immediately afterwards. Vitest runs spec FILES in parallel, so
+ * those directories appear and vanish underneath every other walker in the
+ * `infra` project while it is mid-traversal. That produced two different
+ * intermittent failures, both of which look like defects in innocent code:
+ *
+ *   - `T-STATUS-001p` crashing with `ENOENT: stat '.tmp-vendor-88Oost'`, and
+ *   - `T-SEC-009d` reporting that a planted `mixpanel` devDependency was NOT
+ *     caught — a **false green on a security gate**, which is the dangerous one.
+ *
+ * Skipping the prefix removes the race for every walker except the one whose
+ * subject the scratch directory is. `statOrNull` then covers what remains: a
+ * path can still disappear between `readdirSync` and `statSync`, and a walker
+ * that throws on that is asserting the filesystem held still, which it does not.
+ */
+const SKIP_DIRS = [
+  'node_modules',
+  '.git',
+  'dist',
+  'build',
+  'coverage',
+  'playwright-report',
+  'test-results',
+];
+
+function isSkippedDir(entry) {
+  return SKIP_DIRS.includes(entry) || entry.startsWith('.tmp-');
+}
+
+/** `statSync`, except that a path which vanished mid-walk reads as `null`. */
+function statOrNull(full) {
+  try {
+    return statSync(full);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Every test id MENTIONED anywhere in a spec file, including in comments and
  * inside string literals.
  *
@@ -252,21 +296,11 @@ export function mentionedTestIds(root = ROOT) {
   const ids = new Set();
   const walk = (dir) => {
     for (const entry of readdirSync(dir)) {
-      if (
-        [
-          'node_modules',
-          '.git',
-          'dist',
-          'build',
-          'coverage',
-          'playwright-report',
-          'test-results',
-        ].includes(entry)
-      ) {
-        continue;
-      }
+      if (isSkippedDir(entry)) continue;
       const full = path.join(dir, entry);
-      if (statSync(full).isDirectory()) walk(full);
+      const stat = statOrNull(full);
+      if (stat === null) continue;
+      if (stat.isDirectory()) walk(full);
       else if (/\.(spec|test)\.[cm]?[tj]sx?$/.test(entry)) {
         for (const m of readFileSync(full, 'utf8').matchAll(/T-[A-Z0-9]+-\d+[a-z]{0,2}/g))
           ids.add(m[0]);
@@ -281,21 +315,11 @@ export function collectDefinedTestIds(root = ROOT) {
   const files = [];
   const walk = (dir) => {
     for (const entry of readdirSync(dir)) {
-      if (
-        [
-          'node_modules',
-          '.git',
-          'dist',
-          'build',
-          'coverage',
-          'playwright-report',
-          'test-results',
-        ].includes(entry)
-      ) {
-        continue;
-      }
+      if (isSkippedDir(entry)) continue;
       const full = path.join(dir, entry);
-      if (statSync(full).isDirectory()) walk(full);
+      const stat = statOrNull(full);
+      if (stat === null) continue;
+      if (stat.isDirectory()) walk(full);
       else if (/\.(spec|test)\.[cm]?[tj]sx?$/.test(entry)) files.push(full);
     }
   };
