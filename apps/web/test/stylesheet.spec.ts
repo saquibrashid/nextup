@@ -261,3 +261,37 @@ describe('the 320 px floor is written mobile-first', () => {
     expect(cssWithoutComments).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
   });
 });
+
+// ── §5.3a — the crop wrapper actually clips ────────────────────────────────
+//
+// ⚠ WITHOUT THIS ASSERTION THE CROP IS UNTESTABLE FROM THE DOM. jsdom applies
+// no stylesheet, so a component test can prove the wrapper element and the
+// scaled `<img>` exist while `overflow: hidden` is absent and the "cropped
+// thumbnail" is in fact a hugely magnified screenshot spilling out of the
+// card. The rule is read from the FILE for the same reason the rest of this
+// suite is: it is the only place the clip is real.
+describe('T-AI-041 - the cropped tile thumbnail clips, and is legible', () => {
+  const rule =
+    cssWithoutComments.match(/\.candidate-card__thumb--cropped\s*\{([^}]*)\}/)?.[1] ?? '';
+
+  it('T-AI-041s: the crop wrapper hides its overflow - this is what makes it a crop', () => {
+    expect(rule).toMatch(/overflow:\s*hidden/);
+    // A clipped child can only be positioned against a positioned ancestor.
+    expect(rule).toMatch(/position:\s*relative/);
+  });
+
+  it('T-AI-041t: the crop is at least 96px on the short edge, per specs/ui.md 5.3a', () => {
+    const px = (prop: string) => Number(rule.match(new RegExp(`${prop}:\\s*(\\d+)px`))?.[1] ?? '0');
+    // Both edges, because `min-width` alone leaves the height free to collapse
+    // to whatever the row happens to be - and then the SHORT edge is not 96px.
+    expect(Math.min(px('width'), px('height'))).toBeGreaterThanOrEqual(96);
+  });
+
+  it('T-AI-041u: the image inside the crop is absolutely positioned and unconstrained', () => {
+    const inner =
+      cssWithoutComments.match(/\.candidate-card__thumb--cropped img\s*\{([^}]*)\}/)?.[1] ?? '';
+    expect(inner).toMatch(/position:\s*absolute/);
+    // A global `max-width: 100%` reset would silently defeat the magnification.
+    expect(inner).toMatch(/max-width:\s*none/);
+  });
+});

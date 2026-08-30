@@ -30,6 +30,7 @@ import {
   classifyWorkIdentity,
   computeRemovals,
   reconcile,
+  tileCropFor,
   type BatchMode,
   type CandidateBasis,
   type CandidateProvider,
@@ -81,6 +82,37 @@ function isMatchRef(value: unknown): value is ReviewMatchRef {
   if (typeof value !== 'object' || value === null) return false;
   const ref = value as Record<string, unknown>;
   return typeof ref['tmdbId'] === 'number' && typeof ref['name'] === 'string';
+}
+
+/**
+ * The persisted `bounding_boxes` column, as boxes.
+ *
+ * ⚠ Every field is checked, not cast. The column is `NVarChar(Max)` written by
+ * the extraction runner from provider output; a box with a string `x` would
+ * flow into an inline CSS transform and position the crop somewhere arbitrary,
+ * which renders as a confident thumbnail of the wrong part of the screenshot.
+ * A rejected box shows the whole image instead, which is honest.
+ */
+function parseBoundingBoxes(
+  raw: string | null,
+): { imageId: string; x: number; y: number; w: number; h: number }[] {
+  if (raw === null || raw === '') return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(isBoundingBox);
+  } catch {
+    return [];
+  }
+}
+
+function isBoundingBox(
+  value: unknown,
+): value is { imageId: string; x: number; y: number; w: number; h: number } {
+  if (typeof value !== 'object' || value === null) return false;
+  const box = value as Record<string, unknown>;
+  if (typeof box['imageId'] !== 'string') return false;
+  return (['x', 'y', 'w', 'h'] as const).every((key) => typeof box[key] === 'number');
 }
 
 /**
@@ -170,6 +202,15 @@ export async function loadReviewCandidates(
         match,
         alternatives,
         sourceImageIds: row.sourceImages.map((image) => image.imageId),
+        // §5.3a. The stored column is `NVarChar(Max)` JSON, so a malformed
+        // value degrades to "no crop" (the whole image) rather than taking the
+        // review page out: an unverifiable candidate the owner can still SEE
+        // is recoverable, a 500 on the review pass is not.
+        tileCrop: tileCropFor({
+          verdict: row.cleanupVerdict as CleanupVerdict,
+          boxSource: row.boxSource,
+          boundingBoxes: parseBoundingBoxes(row.boundingBoxes),
+        }),
         disposition: row.reviewDisposition as ReviewDisposition,
         collapsedIntoCandidateId: row.collapsedIntoCandidateId,
         classification: classifyWorkIdentity(row.resolvedWorkIdentity, service, index),

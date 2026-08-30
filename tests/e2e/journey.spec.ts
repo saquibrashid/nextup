@@ -300,6 +300,10 @@ function candidate(
     provider: 'llm',
     verdict: 'title-candidate',
     ocrConfidence: 0.98,
+    // §5.3a — `null` because this stub only ever builds `title-candidate`
+    // rows, which get no tile crop. A non-null value here would be the stub
+    // asserting a presentation the server would not have sent.
+    tileCrop: null,
     resolvedWorkIdentity: workIdentity(workId),
     match: {
       tmdbId: w.tmdbId,

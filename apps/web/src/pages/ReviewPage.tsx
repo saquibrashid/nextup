@@ -206,9 +206,16 @@ export type ConfirmableSection = 'additions' | 'unmatched';
  * ⚠ `noUncheckedIndexedAccess` makes `sourceImageIds[0]` `string | undefined`:
  * a candidate with no source image yields `null`, so `CandidateCard` renders
  * no broken `<img>` rather than an empty `src`.
+ *
+ * ⚠ **`tileCrop.imageId` WINS over `sourceImageIds[0]`.** The crop rectangle
+ * is only meaningful against the image it was measured on, and after an SD-02
+ * collapse a candidate's source images are not guaranteed to be in the order
+ * its boxes were recorded. Cropping image A's rectangle out of image B shows
+ * a confidently-wrong region of the wrong screenshot — evidence that looks
+ * like evidence and is not.
  */
 function thumbnailUrlFor(candidate: ReviewCandidate): string | null {
-  const imageId = candidate.sourceImageIds[0];
+  const imageId = candidate.tileCrop?.imageId ?? candidate.sourceImageIds[0];
   return imageId === undefined ? null : `/api/images/${encodeURIComponent(imageId)}`;
 }
 

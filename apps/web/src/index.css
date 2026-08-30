@@ -750,6 +750,36 @@ button {
   object-fit: cover;
 }
 
+/*
+ * §5.3a's cropped tile. The wrapper IS the crop: it is the visible rectangle,
+ * and the `<img>` inside is scaled up and offset by `CandidateCard` so that
+ * the tile's normalised region fills it.
+ *
+ * ⚠ `overflow: hidden` is load-bearing, not cosmetic. Without it the scaled
+ * image is simply a very large picture spilling out of the card, and the
+ * "cropped thumbnail" the fabrication mitigation depends on stops existing
+ * while every test that only looks for an `<img>` still passes.
+ *
+ * ⚠ Both edges are pinned at 96px because §5.3a specifies "at a size where the
+ * artwork is legible (>= 96 px on the SHORT edge)" — `min-width` alone leaves
+ * the height free to collapse to whatever the row happens to be.
+ */
+.candidate-card__thumb--cropped {
+  display: block;
+  flex: 0 0 auto;
+  height: 96px;
+  min-height: 96px;
+  min-width: 96px;
+  overflow: hidden;
+  position: relative;
+  width: 96px;
+}
+
+.candidate-card__thumb--cropped img {
+  position: absolute;
+  max-width: none;
+}
+
 .candidate-card__poster {
   border-radius: var(--radius);
   height: 4.5rem;

@@ -98,6 +98,13 @@ export function CandidateCard({
   // and it is the ONLY content an unreadable tile has.
   const needsThumbnail = unreadable || candidate.verdict === 'inferred-unverified';
   const displayName = match?.name ?? candidate.inferredTitle;
+  // ⚠ `?? null`, not `=== null`. `tileCrop` was added to the review payload
+  // after this component shipped, so a response from an older API — or from
+  // the previous revision during a Container Apps rolling deploy — carries no
+  // such key at all. Nullish-coalescing degrades that to the uncropped whole
+  // screenshot; strict `=== null` would instead take the crop branch and throw
+  // on `undefined.w`, blanking the entire review page.
+  const crop = candidate.tileCrop ?? null;
 
   return (
     // ⚠ A `<div>`, NOT the `<li>`: `CandidateList` owns the row element,
@@ -117,12 +124,41 @@ export function CandidateCard({
       data-testid={`candidate-${candidate.candidateId}`}
     >
       {needsThumbnail && thumbnailUrl !== null ? (
-        <img
-          className="candidate-card__thumb"
-          data-testid="candidate-thumb"
-          src={thumbnailUrl}
-          alt=""
-        />
+        crop === null ? (
+          <img
+            className="candidate-card__thumb"
+            data-testid="candidate-thumb"
+            src={thumbnailUrl}
+            alt=""
+          />
+        ) : (
+          // §5.3a's CROP. The whole image is fetched either way — the byte
+          // route serves whole screenshots and cropping server-side would put
+          // image processing on the request path of a 0.25 vCPU container —
+          // so the crop is presentational, done by scaling the image up inside
+          // a clipping box. `tileCrop` is normalised 0..1, so the arithmetic
+          // is resolution-independent and needs no natural dimensions.
+          //
+          // ⚠ `overflow: hidden` on the wrapper is what makes this a crop and
+          // not a very large picture. Removing it renders a hugely magnified
+          // screenshot that overflows the card.
+          <span
+            className="candidate-card__thumb candidate-card__thumb--cropped"
+            data-testid="candidate-thumb-crop"
+          >
+            <img
+              data-testid="candidate-thumb"
+              src={thumbnailUrl}
+              alt=""
+              style={{
+                width: `${(100 / crop.w).toFixed(4)}%`,
+                height: `${(100 / crop.h).toFixed(4)}%`,
+                left: `${(-(crop.x * 100) / crop.w).toFixed(4)}%`,
+                top: `${(-(crop.y * 100) / crop.h).toFixed(4)}%`,
+              }}
+            />
+          </span>
+        )
       ) : match?.posterPath !== undefined && match?.posterPath !== null ? (
         <img
           className="candidate-card__poster"

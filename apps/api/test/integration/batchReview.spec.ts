@@ -58,7 +58,13 @@ interface ReviewSection {
   withheld?: boolean;
   withheldReason?: string | null;
   collapsedByDefault?: boolean;
-  items: { candidateId?: string; rawText?: string; name?: string; ticked?: boolean }[];
+  items: {
+    candidateId?: string;
+    rawText?: string;
+    name?: string;
+    ticked?: boolean;
+    tileCrop?: { imageId: string; x: number; y: number; w: number; h: number } | null;
+  }[];
 }
 
 interface ReviewBody {
@@ -120,6 +126,8 @@ async function makeCandidate(
     verdict?: string;
     collapsedInto?: string | null;
     disposition?: string;
+    boxSource?: string;
+    boundingBoxes?: string | null;
   } = {},
 ): Promise<string> {
   const id = `cand-${++candidateSeq}`;
@@ -134,7 +142,8 @@ async function makeCandidate(
       ocrSupport: 'exact',
       provider: 'llm',
       normalisedText: (over.rawText ?? 'Dune').toLowerCase(),
-      boxSource: 'llm',
+      boxSource: over.boxSource ?? 'llm',
+      boundingBoxes: over.boundingBoxes ?? null,
       cleanupVerdict: over.verdict ?? 'title-candidate',
       resolvedWorkIdentity: over.workIdentity === undefined ? DUNE : over.workIdentity,
       reviewDisposition: over.disposition ?? (over.collapsedInto == null ? 'pending' : 'discarded'),
@@ -740,5 +749,87 @@ describe('T-REM-010 · US-014 · removals as the owner actually receives them', 
     const body = (await (await getReview(batchId)).json()) as ReviewBody;
     expect(body.sections.removals.items).toEqual([]);
     expect(body.sections.removals.count).toBe(0);
+  });
+});
+
+// ── T-AI-041 · specs/ui.md §5.3a · the crop reaches the wire ───────────────
+//
+// ⚠ WHY THIS IS AN INTEGRATION TEST AND NOT A UNIT ONE. `tileCropFor` is
+// covered exhaustively in `packages/domain/test/review.spec.ts`, and the
+// rendering is covered in `apps/web/test/candidateThumbnail.spec.tsx` - and
+// with BOTH of those green, replacing this route's call with a hard `null`
+// changed nothing anywhere. A perfect domain function that no route invokes
+// is a feature that does not exist, and this file is the only place that
+// difference is visible. It is the same dead-wiring defect `thumbnailUrl`
+// already shipped with once.
+describe('T-AI-041 · the review response carries the tile crop for the client to render', () => {
+  const boxes = (over: Record<string, unknown> = {}) =>
+    JSON.stringify([{ imageId: 'img_tile', x: 0.25, y: 0.5, w: 0.25, h: 0.25, ...over }]);
+
+  it('T-AI-041v: an inferred-unverified candidate is served WITH its crop', async () => {
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, {
+      verdict: 'inferred-unverified',
+      boxSource: 'llm',
+      boundingBoxes: boxes(),
+    });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    const crop = body.sections.additions.items[0]?.tileCrop;
+
+    expect(crop).toBeTruthy();
+    expect(crop?.imageId).toBe('img_tile');
+    // Padded by 8% of the tile's own size, so the artwork is not clipped.
+    expect(crop?.w).toBeGreaterThan(0.25);
+  });
+
+  it('T-AI-041w: an unreadable tile is served with its crop - the tile is all it has', async () => {
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, {
+      verdict: 'unreadable-tile',
+      rawText: '',
+      workIdentity: null,
+      boxSource: 'llm',
+      boundingBoxes: boxes(),
+    });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(body.sections.unreadableTiles.items[0]?.tileCrop).toBeTruthy();
+  });
+
+  it('T-AI-041x: an OCR box is served as NO crop - it is a caption strip, not artwork', async () => {
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, {
+      verdict: 'inferred-unverified',
+      boxSource: 'ocr',
+      boundingBoxes: boxes({ h: 0.02 }),
+    });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(body.sections.additions.items[0]?.tileCrop).toBeNull();
+  });
+
+  // ⚠ `boundingBoxes` is NVarChar(Max) JSON written by the extraction
+  // pipeline. A malformed value must degrade to "no crop" - a candidate the
+  // owner can still SEE is recoverable; a 500 on the review pass is not.
+  it('T-AI-041y: malformed stored boxes degrade to no crop, never a 500', async () => {
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, {
+      verdict: 'inferred-unverified',
+      boxSource: 'llm',
+      boundingBoxes: '{"not":"an array"}',
+    });
+
+    const res = await getReview(batchId);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as ReviewBody).sections.additions.items[0]?.tileCrop).toBeNull();
+  });
+
+  it('T-AI-041z: a plain title-candidate carries no crop', async () => {
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, { boxSource: 'llm', boundingBoxes: boxes() });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(body.sections.additions.items[0]?.tileCrop).toBeNull();
   });
 });
