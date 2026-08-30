@@ -170,6 +170,93 @@ const BASELINE_UNSUPPLIED = new Set([
 ]);
 
 /**
+ * Advance past a `//` or `/* *``/` comment starting at `i`, else return `i`.
+ *
+ * ⚠ A JSX TAG BODY CAN CONTAIN COMMENTS, AND THEY CONTAIN APOSTROPHES.
+ * `RemovedRoute.tsx` explains `query` in a `//` comment reading "rather than
+ * from an input's value". Treating that apostrophe as a string opener swallows
+ * every attribute after it, and the sweep then reports five correctly-wired
+ * props — `query`, `onRetry`, `onClearSearch`, `onRestore`, `onUnsuppress` —
+ * as dead. Comments must be consumed BEFORE quote state is considered.
+ */
+function skipComment(text: string, i: number): number {
+  if (text[i] !== '/') return i;
+  if (text[i + 1] === '/') {
+    const nl = text.indexOf('\n', i);
+    return nl === -1 ? text.length : nl;
+  }
+  if (text[i + 1] === '*') {
+    const end = text.indexOf('*/', i + 2);
+    return end === -1 ? text.length : end + 2;
+  }
+  return i;
+}
+
+/**
+ * Attribute names supplied at a JSX call site, plus whether a spread is present.
+ *
+ * ⚠ MATCHING `name\s*=` IS WRONG AND FAILS ON CORRECT CODE. A bare boolean
+ * attribute — `<CandidateCard candidate={c} unidentified />` — supplies the
+ * prop with no `=` at all. The first version of this sweep reported
+ * `CandidateCard.unidentified` as never supplied on exactly that basis, and it
+ * is supplied, at `ReviewPage.tsx` L428, for the unmatched section. A gate that
+ * fails on correct code gets a baseline entry added to silence it and then
+ * protects nothing.
+ *
+ * Attributes live at brace-depth 0 of the tag body, so the depth walk is what
+ * separates a real attribute from an identifier inside another prop's
+ * expression (`onPick={() => setUnidentified(x)}` supplies nothing).
+ */
+function suppliedAttributes(body: string): { names: Set<string>; spread: boolean } {
+  const names = new Set<string>();
+  let spread = false;
+  let depth = 0;
+  let quote: string | null = null;
+  let word = '';
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i] as string;
+    if (quote !== null) {
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      quote = ch;
+      continue;
+    }
+    if (ch === '/') {
+      const next = skipComment(body, i);
+      if (next !== i) {
+        if (depth === 0 && word !== '') {
+          names.add(word);
+          word = '';
+        }
+        i = next - 1;
+        continue;
+      }
+    }
+    if (ch === '{') {
+      if (depth === 0 && /^\s*\.\.\./.test(body.slice(i + 1))) spread = true;
+      depth++;
+      continue;
+    }
+    if (ch === '}') {
+      depth--;
+      continue;
+    }
+    if (depth === 0 && /[\w$]/.test(ch)) {
+      word += ch;
+      continue;
+    }
+    if (depth === 0 && word !== '') {
+      names.add(word);
+      word = '';
+    }
+  }
+  if (depth === 0 && word !== '') names.add(word);
+  return { names, spread };
+}
+
+/**
  * The body of a `<Name ...>` opening tag, honouring nesting and strings.
  *
  * ⚠ Ending at the first `>` is WRONG and inverts the result: an arrow-function
@@ -189,6 +276,7 @@ function openingTagBodies(text: string, name: string): string[] {
         continue;
       }
       if (ch === '"' || ch === "'" || ch === '`') quote = ch;
+      else if (ch === '/' && skipComment(text, i) !== i) i = skipComment(text, i) - 1;
       else if (ch === '{') depth++;
       else if (ch === '}') depth--;
       else if (ch === '>' && depth === 0) break;
@@ -226,7 +314,8 @@ function unsuppliedIn(iface: string, component: string, prop: string, callSite: 
   let mounted = false;
   for (const body of openingTagBodies(callSite, component)) {
     mounted = true;
-    if (new RegExp(`\\b${prop}\\s*=`).test(body) || /\{\s*\.\.\./.test(body)) return false;
+    const { names, spread } = suppliedAttributes(body);
+    if (names.has(prop) || spread) return false;
   }
   return mounted && optionalPropsOf(iface).includes(prop);
 }
@@ -252,9 +341,8 @@ function neverSuppliedProps(): string[] {
         for (const [, other] of TEXT) {
           for (const body of openingTagBodies(other, component)) {
             mounted = true;
-            if (new RegExp(`\\b${prop}\\s*=`).test(body) || /\{\s*\.\.\./.test(body)) {
-              supplied = true;
-            }
+            const { names, spread } = suppliedAttributes(body);
+            if (names.has(prop) || spread) supplied = true;
           }
         }
         if (mounted && !supplied) {
@@ -413,9 +501,34 @@ describe('T-INFRA-013 nothing finished is left unreachable', () => {
     // `onContinue={() => {...}}` contains one. Truncating there reported
     // `BatchStatusPage.onContinue` and `RemovedPage.onRestore` as unsupplied
     // when both are wired by their containers.
+    // Trap 5 — A COMMENT INSIDE THE TAG BODY, CONTAINING AN APOSTROPHE.
+    // `RemovedRoute.tsx` documents `query` with "rather than from an input's
+    // value". Read as a string opener, that apostrophe swallowed the next five
+    // attributes and the sweep condemned five correctly-wired props. Comments
+    // must be consumed before quote state.
+    const commented = "<Thing\n  a={1}\n  // an input's value\n  onRestore={x}\n/>";
+    const cBody = openingTagBodies(commented, 'Thing')[0] ?? '';
+    expect(suppliedAttributes(cBody).names.has('onRestore')).toBe(true);
+    expect(suppliedAttributes(cBody).names.has('value')).toBe(false);
+
     const arrow = "<Thing onContinue={() => { go(); }} onRestore={(a) => f(a)} />";
     expect(openingTagBodies(arrow, 'Thing')).toHaveLength(1);
-    expect(/\bonRestore\s*=/.test(openingTagBodies(arrow, 'Thing')[0] ?? '')).toBe(true);
+    expect(suppliedAttributes(openingTagBodies(arrow, 'Thing')[0] ?? '').names.has('onRestore')).toBe(
+      true,
+    );
+
+    // Trap 1b — A BARE BOOLEAN ATTRIBUTE SUPPLIES THE PROP, with no `=` at
+    // all. Matching `name\s*=` reported `CandidateCard.unidentified` as dead
+    // when `ReviewPage` supplies it bare for the unmatched section, i.e. the
+    // sweep would have FAILED CI ON CORRECT CODE — the failure mode that gets
+    // a gate silenced with a baseline entry and thereafter protects nothing.
+    // The depth walk is what distinguishes a real attribute from the same
+    // identifier inside another prop's expression.
+    const bare = suppliedAttributes(' candidate={c} unidentified ');
+    expect(bare.names.has('unidentified')).toBe(true);
+    expect(suppliedAttributes(' onPick={() => setUnidentified(x)} ').names.has('unidentified')).toBe(
+      false,
+    );
 
     // Trap 2 — a prop whose TYPE is a function signature spans lines and
     // carries its own optional parameters. A line-wise scan read `opts?:`
