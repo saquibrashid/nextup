@@ -51,6 +51,10 @@ function stubClient(overrides: Partial<ApiClient> = {}) {
     getTitles: record('getTitles', { items: [item()], nextCursor: null, limit: 50 }),
     getServiceState: record('getServiceState', { services: [] }),
     getSuppressions: record('getSuppressions', { items: [] }),
+    // ⚠ Present so that an UNCONDITIONAL read fails on the case that names the
+    // rule (`T-DATA-002k`) rather than exploding thirteen unrelated cases with
+    // "not a function". A missing stub kills a mutant loudly but anonymously.
+    getRemoved: record('getRemoved', { items: [], nextCursor: null, limit: 50 }),
     getMe: record('getMe', {}),
     getTitle: record('getTitle', item()),
     suppressTitle: record('suppressTitle', {}),
@@ -171,6 +175,55 @@ describe('T-DATA-002 — the list screen reads its data from the API', () => {
 
     // §2.1 — the strip is informational and never a gate in front of the rows.
     expect(await screen.findByText('The Matrix')).toBeInTheDocument();
+  });
+  it('T-DATA-002j: an empty list with removals reads "all gone", not "never uploaded"', async () => {
+    // ⚠ US-019 AC-5, and a real shipped defect: `removedCount` was never
+    // passed, so it defaulted to 0. With no suppressions, an owner who had
+    // removed titles was told "Nothing here yet" — which reads as data loss,
+    // the exact misreading this empty state exists to prevent. The count was
+    // available (`GET /api/removed` shipped with TASK-099); only the wiring
+    // was missing, and no test saw it because none rendered this state
+    // through the CONTAINER that owns the wiring.
+    const { client, calls } = stubClient({
+      getTitles: (async () => ({
+        items: [],
+        nextCursor: null,
+        limit: 50,
+      })) as unknown as ApiClient['getTitles'],
+      getRemoved: (async () => {
+        calls.push('getRemoved');
+        return { items: [{ listingId: 'lst_9' }], nextCursor: null, limit: 50 };
+      }) as unknown as ApiClient['getRemoved'],
+    });
+
+    renderRoute(client, '/');
+
+    expect(await screen.findByTestId('list-empty-all-gone')).toBeInTheDocument();
+    expect(screen.queryByTestId('list-empty-never-uploaded')).not.toBeInTheDocument();
+    // The number is rendered, not merely used as a boolean: a link labelled
+    // "Removal history (0)" next to a non-empty log is its own small lie.
+    expect(screen.getByTestId('link-removed')).toHaveTextContent('Removal history (1)');
+    expect(calls).toContain('getRemoved');
+  });
+
+  it('T-DATA-002k: a NON-empty list does not pay for the removed count', async () => {
+    // The cost objection that kept this unwired was real - a fourth request on
+    // every list load, on one 0.25 vCPU replica, to answer a question that
+    // only matters when the list is empty. It is answered by the condition,
+    // not by paying it, and this case is what holds that condition in place.
+    const { client, calls } = stubClient({
+      getRemoved: (async () => {
+        calls.push('getRemoved');
+        return { items: [], nextCursor: null, limit: 50 };
+      }) as unknown as ApiClient['getRemoved'],
+    });
+
+    renderRoute(client, '/');
+    await waitFor(() => {
+      expect(calls).toContain('getSuppressions');
+    });
+    expect(await screen.findByText('The Matrix')).toBeInTheDocument();
+    expect(calls).not.toContain('getRemoved');
   });
 });
 
