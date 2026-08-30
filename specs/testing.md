@@ -935,7 +935,7 @@ ends up unmapped.
 | AC-3 | I/C | **`T-UI-008`** | One group confirmation applies all ticked; no per-row remove control exists in the DOM |
 | AC-4 | I | **`T-REV-005`** | Closing without `confirmRemovals` → 409 `REMOVALS_NOT_CONFIRMED`; nothing written |
 | AC-5 | I | `T-REV-007` | Unticking all → zero-member group recorded; close succeeds; nothing removed |
-| AC-6 | C | `T-UX-064` | The removals count is visible without expanding the section |
+| AC-6 | C | `T-UX-099` | The removals count is visible without expanding the section |
 | AC-7 | I | `T-REM-015` | Injected mid-apply failure → group left unapplied in full; error states nothing changed |
 
 ### US-016 — Removal marks one service's listing removed and nothing else
