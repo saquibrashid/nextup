@@ -478,6 +478,76 @@ describe('T-REV-006 full-update shows ALL extracted titles — the safety proper
   });
 });
 
+/* ── exhaustiveness (T-REV-015) ───────────────────────────────────────── */
+
+describe('T-REV-015 · US-013 AC-1 · full-update review contains EVERY extracted title', () => {
+  it('T-REV-015a: every non-collapsed candidate in the batch is reachable in some section', async () => {
+    // ⚠ THE EXPECTED SET IS READ BACK FROM THE STORE, NOT WRITTEN OUT HERE.
+    // A test that lists the ids it expects is only ever as exhaustive as the
+    // person who wrote it: add a seventh classification later and the test
+    // still passes while the seventh kind of candidate silently vanishes from
+    // the owner's review. Asking the database "what candidates does this batch
+    // have?" and demanding the review account for all of them is the only form
+    // of this assertion that keeps working after the code changes.
+    //
+    // This is the machinery behind product invariant 2 — a full-update review
+    // shows ALL extracted titles, not just the new ones — which is why a
+    // failed extraction of a known title can never be misread as a removal.
+    const batchId = await makeBatch({ mode: 'full-update' });
+    await makeActiveListing(HEAT, 'netflix', 'Heat');
+
+    // One of every kind the classifier can produce.
+    await makeCandidate(batchId, { workIdentity: DUNE, rawText: 'Dune' });
+    await makeCandidate(batchId, { workIdentity: HEAT, rawText: 'Heat' });
+    await makeCandidate(batchId, {
+      workIdentity: 'unmatched:9f2b1c4d5e6f7a80',
+      rawText: 'Somethign Unreadble',
+    });
+    await makeCandidate(batchId, { workIdentity: null, rawText: 'Unidentifiable' });
+    await makeCandidate(batchId, { verdict: 'chrome-suspected', rawText: 'My List' });
+    await makeCandidate(batchId, {
+      verdict: 'unreadable-tile',
+      rawText: '',
+      workIdentity: null,
+    });
+
+    const stored = await testPrisma().extractionCandidate.findMany({
+      where: { ownerId, batchId, collapsedIntoCandidateId: null },
+      select: { id: true },
+    });
+    expect(stored.length).toBe(6);
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    const rendered = new Set(
+      Object.values(body.sections)
+        .flatMap((section) => section.items)
+        .map((item) => item.candidateId)
+        .filter((id): id is string => typeof id === 'string'),
+    );
+
+    for (const { id } of stored) {
+      expect(rendered.has(id), `candidate ${id} is missing from every review section`).toBe(true);
+    }
+  });
+
+  it('T-REV-015b: the KNOWN half is present in its own right, with a truthful count', async () => {
+    // `015a` proves nothing is dropped. It does not prove the known titles are
+    // shown AS known — a build that dumped every candidate into `additions`
+    // would satisfy it while asking the owner to re-add titles they already
+    // have. AC-1 says "new and known", so both halves are asserted.
+    const batchId = await makeBatch({ mode: 'full-update' });
+    await makeActiveListing(HEAT, 'netflix', 'Heat');
+    const known = await makeCandidate(batchId, { workIdentity: HEAT, rawText: 'Heat' });
+    const fresh = await makeCandidate(batchId, { workIdentity: DUNE, rawText: 'Dune' });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(body.sections.alreadyOnYourList.count).toBe(1);
+    expect(body.sections.alreadyOnYourList.items[0]?.candidateId).toBe(known);
+    expect(body.sections.additions.count).toBe(1);
+    expect(body.sections.additions.items[0]?.candidateId).toBe(fresh);
+  });
+});
+
 /* ── discrepancy visibility (T-REV-017) ───────────────────────────────── */
 
 describe('T-REV-017 · US-005 AC-4 — the discrepancy is SHOWN, never reconciled silently', () => {

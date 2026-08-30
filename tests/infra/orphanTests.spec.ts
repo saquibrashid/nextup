@@ -133,7 +133,12 @@ describe('T-META-006 — every defined test id is owned', () => {
     // a different TMDB entry escapes it — a documented limitation whose remedy
     // is `T-FIX-005`), `T-SUP-022` and `T-SUP-023` (US-029's un-suppress
     // semantics) are implemented and mutation-tested.
-    expect(BASELINE_ORPHANS.size).toBe(14);
+    // 14 → 11: `T-REV-015` (US-013 AC-1), `T-RET-010` (US-023 AC-1) and
+    // `T-IMG-011` (US-011 AC-2). All three are written as EXHAUSTIVENESS
+    // properties whose expected set is read back from the store or the schema
+    // rather than written out by hand, so they keep working as the schema
+    // grows. Two of them closed gaps nothing else caught.
+    expect(BASELINE_ORPHANS.size).toBe(11);
   });
 
   it('T-META-006f: a citation that is struck through does not count as ownership', () => {

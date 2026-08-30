@@ -91,9 +91,22 @@ export const BASELINE_ORPHANS = new Set([
   // the clearest cost: `specs/testing.md` §19.2 asserted the re-observation
   // path was "covered behaviourally by T-DATE-011" while T-DATE-011 did not
   // exist, so a written-down guarantee was owned by nothing at all.
-  'T-IMG-011',
+  // ⚠ `T-IMG-011` was REMOVED from this baseline — implemented in
+  // `apps/api/test/integration/ingestSources.spec.ts` as a both-directions
+  // agreement between the blob store and `uploadedImage`. Mutation-verified,
+  // and it closed a real gap: skipping the blob write for PNGs was caught by
+  // NO other test in that file.
   'T-INFRA-006',
   'T-INV-014',
+  // ⚠ `T-INV-016` STAYS, and NOT because it is hard. As specified it asserts a
+  // non-empty `title.duplicate_ack_seq` is written "in
+  // `createTitleAllowingDuplicate()` and nowhere else". That function does not
+  // exist anywhere in the codebase, and `duplicateAckSeq` is written in TWO
+  // real places — `routes/fixMatch.ts` (~L288) and `routes/listings.ts`
+  // (~L107), both deliberately, both documented in place. Implementing the
+  // rule literally would fail; rewriting the rule to match the code would be
+  // editing the spec to agree with the implementation. This is a FINDING for
+  // the owner, in the same class as `T-INV-014`.
   'T-INV-016',
   'T-MIG-002',
   // 'T-RES-011', 'T-RES-012', 'T-RES-015' removed (US-025 restore) —
@@ -102,8 +115,12 @@ export const BASELINE_ORPHANS = new Set([
   // `T-RES-015a` is the one with the most teeth: mutation-verified, a route
   // that restores the row and THEN discovers the suppression returns a byte-
   // identical 409 and passes `T-RES-013`.
-  'T-RET-010',
-  'T-REV-015',
+  // ⚠ `T-RET-010` and `T-REV-015` were REMOVED from this baseline —
+  // implemented in `batchCloseRemovals.spec.ts` (a whole-store row census
+  // across a removal close, table list read from the Prisma DMMF) and
+  // `batchReview.spec.ts` (every non-collapsed candidate is reachable in some
+  // section, expected set read back from the store). `T-RET-010a` was the ONLY
+  // test in its file to catch a hard delete of the batch's candidates.
   // ⚠ `T-SUP-015`, `T-SUP-022` and `T-SUP-023` were REMOVED from this baseline:
   // implemented in `suppressionLifecycle.spec.ts` (015a/b) and
   // `suppressions.spec.ts` (022, 023), each mutation-tested.

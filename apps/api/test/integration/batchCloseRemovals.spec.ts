@@ -22,6 +22,7 @@ import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import type { Express } from 'express';
+import { Prisma } from '@prisma/client';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../src/app.js';
@@ -606,6 +607,51 @@ describe('T-REM-016 / T-REM-018 — the removal transition', () => {
     expect((await listing(andor.listingId)).listingId).toBe(andor.listingId);
     expect((await listing(heat.listingId)).listingId).toBe(heat.listingId);
     expect(await testPrisma().title.count({ where: { ownerId } })).toBe(3);
+  });
+
+  it('T-RET-010a · US-023 AC-1 · a removal close loses NO ROW ANYWHERE — a whole-store census', async () => {
+    // ⚠ THE TABLE LIST IS READ OUT OF THE PRISMA DMMF, NOT WRITTEN HERE.
+    // REQ-028 is soft delete FOREVER, and its enforcement problem is that the
+    // hard delete which eventually appears will be in whichever table nobody
+    // thought to assert. A hand-written list of tables is only as good as the
+    // day it was written; asking the schema what tables exist means a table
+    // added next year is covered by this test the moment it is added.
+    //
+    // `T-REM-018b` proves the two REMOVED listings survive. This proves the
+    // close did not quietly take anything else with it — candidates, images,
+    // change log, batches, titles, suppressions. It is the difference between
+    // "the row I looked at is still there" and "nothing was deleted".
+    const { batchId, andor, heat } = await threeListedTwoProposed();
+
+    const models = Prisma.dmmf.datamodel.models.map((m) => m.name);
+    expect(models.length).toBeGreaterThan(5);
+    const census = async (): Promise<Record<string, number>> => {
+      const out: Record<string, number> = {};
+      for (const name of models) {
+        const key = name.charAt(0).toLowerCase() + name.slice(1);
+        const delegate = (
+          testPrisma() as unknown as Record<string, { count: () => Promise<number> }>
+        )[key];
+        out[name] = await delegate.count();
+      }
+      return out;
+    };
+
+    const before = await census();
+    expect((await close(batchId, { confirmRemovals: true })).status).toBe(200);
+    const after = await census();
+
+    for (const name of models) {
+      expect(after[name], `${name} lost rows across the close`).toBeGreaterThanOrEqual(
+        before[name] ?? 0,
+      );
+    }
+
+    // And the removed rows are READABLE, not merely counted — AC-1 says the
+    // document still exists AND is readable, which a tombstoned row that
+    // throws on read would not satisfy.
+    expect((await listing(andor.listingId)).state).toBe('removed');
+    expect((await listing(heat.listingId)).state).toBe('removed');
   });
 
   it('T-REM-016b records a listing_removed change carrying the group id', async () => {
