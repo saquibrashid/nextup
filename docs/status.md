@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 14 |
 | 🚧 doing | 4 |
-| ✅ done | 157 |
+| ✅ done | 158 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **178** |
+| **total** | **179** |
 
 ## Ready to start
 
@@ -219,3 +219,4 @@ Not done, and every task they depend on is done.
 | `TASK-178` | `T-DATA-008`, `T-DATA-009`, `T-UX-043`, `T-UX-045`, `T-UX-046`, `T-UX-047`, `T-UX-048`, `T-UX-067`, `T-UX-066` | `T-DATA-008`, `T-DATA-008f`, `T-DATA-009`, `T-DATA-009a`, `T-DATA-009f`, `T-REV-005`, `T-UX-043`, `T-UX-045`, `T-UX-046`, `T-UX-047`, `T-UX-048`, `T-UX-066`, `T-UX-067` |
 | `TASK-179` | `T-CSS-002`, `T-CSS-003`, `T-CSS-004` | `T-CSS-002`, `T-CSS-003`, `T-CSS-004` |
 | `TASK-180` | `T-CSS-001`, `T-CSS-005` | `T-CSS-001`, `T-CSS-005` |
+| `TASK-181` | `T-BOUND-001` (a–f). Found as a field defect three times over and each time written off as a bad test stub: a 200 of the wrong SHAPE throws mid-render, React unmounts the tree, and the owner gets a white page. ⚠ **Every existing sweep stayed green on it** — `role="main"` exists for the instant before the throw propagates — so `T-A11Y-001c` and `expectStyledAndRendered` could not have been strengthened into this. Three mutations, each killed by the intended case and no other: dropping `resetKey` killed `d` **alone** (the latch — React never clears boundary state, so the apology would render over a route that is fine); inverting the render guard killed `f` (the discriminator; `a`–`e` all pass against a boundary that apologises unconditionally, which would replace all ten routes); removing the wrapper from `AppShell` killed `a` + `c` + `d`. ⚠ The boundary wraps the `<Outlet />`, not the root: a root boundary takes the nav down with the crashed screen and strands the owner on the one page that does not work. | `T-A11Y-001c`, `T-BOUND-001` |

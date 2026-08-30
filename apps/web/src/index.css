@@ -1253,6 +1253,18 @@ button {
  * §11 reserves the danger colour for destructive confirmation. The accent
  * border is what makes it noticeable.
  */
+/*
+ * `ux-states.md` §1 — the render-crash boundary. Deliberately quiet: this is
+ * an apology for a defect, not an alarm, and the owner's next move is the nav
+ * above it, which must stay the most prominent thing on the page.
+ */
+.boundary {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  margin: var(--space-4) 0;
+  padding: var(--space-4);
+}
+
 .offline-banner {
   background: var(--color-surface);
   border: 1px solid var(--color-accent);

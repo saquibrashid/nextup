@@ -974,3 +974,33 @@ export const OFFLINE_SHOWING_CACHED = 'Showing what was loaded earlier.';
  */
 export const OFFLINE_NOTHING_LOADED =
   'Your list hasn\u2019t loaded yet. It will appear when you\u2019re back online.';
+
+// --- The render-crash boundary (`specs/ux-states.md` §1, TASK-181) ---
+
+/**
+ * ⚠ THESE EXIST BECAUSE A BLANK PAGE WAS SHIPPING, THREE TIMES OVER.
+ *
+ * §1's "never a silent failure" is written about NON-2XX RESPONSES, and every
+ * route honours it. The gap was a 200 whose SHAPE was wrong: a response
+ * missing a field a component indexes into throws during render, React
+ * unmounts the entire tree, and the owner is left on a white page with no
+ * message, no nav and nothing to retry — the most silent failure the product
+ * can produce, and the only one none of the §1 rules covered.
+ *
+ * It was observed on `/batches/:id`, on the review route and again during the
+ * all-routes a11y sweep, each time mistaken for a bad test stub and "fixed" in
+ * the stub. `T-A11Y-001c` and `expectStyledAndRendered` both stayed GREEN
+ * throughout, because `role="main"` exists for the instant before the throw
+ * propagates.
+ */
+export const BOUNDARY_TITLE = 'This screen couldn\u2019t be shown.';
+
+/**
+ * ⚠ NAMES WHAT WAS NOT CHANGED, per §1's ASM-029 rule. A crash mid-render is
+ * exactly the moment an owner has to guess whether their last action
+ * half-applied — and the guess is what the rule exists to prevent.
+ */
+export const BOUNDARY_BODY =
+  'Something went wrong while drawing this page. Nothing you have saved was changed.';
+
+export const BOUNDARY_RETRY_LABEL = 'Try again';
