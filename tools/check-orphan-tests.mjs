@@ -86,23 +86,27 @@ export const BASELINE_ORPHANS = new Set([
   'T-A11Y-014',
   'T-ATTR-005',
   // 'T-AUTH-003' removed — the gate reports it as owned.
-  'T-DATE-010',
-  'T-DATE-011',
-  'T-DATE-012',
-  'T-DATE-013',
+  // 'T-DATE-010'..'T-DATE-013' removed (US-021 dates) — implemented in
+  // `apps/api/test/integration/dateAdded.spec.ts`. They were the entries with
+  // the clearest cost: `specs/testing.md` §19.2 asserted the re-observation
+  // path was "covered behaviourally by T-DATE-011" while T-DATE-011 did not
+  // exist, so a written-down guarantee was owned by nothing at all.
   'T-IMG-011',
   'T-INFRA-006',
   'T-INV-014',
   'T-INV-016',
   'T-MIG-002',
-  'T-RES-011',
-  'T-RES-012',
-  'T-RES-015',
+  // 'T-RES-011', 'T-RES-012', 'T-RES-015' removed (US-025 restore) —
+  // implemented in `apps/api/test/integration/restoreListing.spec.ts`
+  // alongside the `T-RES-013`/`014` cases that were built around them.
+  // `T-RES-015a` is the one with the most teeth: mutation-verified, a route
+  // that restores the row and THEN discovers the suppression returns a byte-
+  // identical 409 and passes `T-RES-013`.
   'T-RET-010',
   'T-REV-015',
-  'T-SUP-015',
-  'T-SUP-022',
-  'T-SUP-023',
+  // ⚠ `T-SUP-015`, `T-SUP-022` and `T-SUP-023` were REMOVED from this baseline:
+  // implemented in `suppressionLifecycle.spec.ts` (015a/b) and
+  // `suppressions.spec.ts` (022, 023), each mutation-tested.
   // ⚠ `T-UNDO-011`, `T-UNDO-012`, `T-UX-053`, `T-UX-054` and `T-UX-062` were
   // REMOVED from this baseline — the gate reported all five as owned, and each
   // is now implemented in TITLE position, which is this file's own strict
