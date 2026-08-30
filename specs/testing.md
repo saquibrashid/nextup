@@ -2361,11 +2361,22 @@ see a value reaching an update through a spread of a variable —
 `softDeleteServiceListing` writes `data: { state: 'removed', ...removal }`, so a
 `dateAdded` added to that object's type would pass the scan.
 
-That residual path is covered behaviourally by **`T-DATE-011`** (seeing the same
-listing in a later batch does not change `dateAdded`). **Neither test replaces
+That residual path is covered behaviourally by **`T-DATE-011a`/`T-DATE-011b`**
+(`apps/api/test/integration/dateAdded.spec.ts` — re-seeing a listing already on
+the service writes nothing, and capturing a second service never moves either
+the first listing's date or the title's earliest-across-listings date).
+**Neither test replaces
 the other**; deleting either leaves a real hole, and the static half is the one
 that fails at the moment the offending line is written rather than at the moment
 a second capture happens to exercise it.
+
+⚠ **This sentence was false from the day it was written until 2026-08:** it
+named `T-DATE-011` as the behavioural cover while `T-DATE-011` existed nowhere
+but in the §9 mapping table — the write-once guarantee was documented, assigned
+and enforced by nothing. It is this project's signature defect (see §22), and it
+is why `check-orphan-tests.mjs` exists. If you find another sentence asserting
+that some *other* test covers a property, check that the test runs before you
+believe it.
 
 ⚠ The adjacent field **`dateAddedEdited`** (REQ-059, always `false` in v1 per
 `T-INV-007`) is legitimately assignable. A prefix match on `.dateAdded` fires on
@@ -2583,12 +2594,15 @@ of US-021's date-added criteria (`T-DATE-010`-`013`), all five undo criteria
 (`T-UNDO-008`-`012`), all five reappearance criteria (`T-REX-010`-`014`) and
 all five grouping criteria (`T-GRP-010`-`014`).
 
-⚠ **`T-DATE-011` is among them, and this document cited it as coverage.** §19.2
-states that the residual path the write-once static scan cannot see "is covered
-behaviourally by `T-DATE-011`". It is not: `T-DATE-011` does not exist. A spec
+⚠ **`T-DATE-011` was among them, and this document cited it as coverage.** §19.2
+stated that the residual path the write-once static scan cannot see "is covered
+behaviourally by `T-DATE-011`" — while `T-DATE-011` did not exist. A spec
 claiming coverage from a phantom is the same defect as a backlog row citing
 one, and it is why the mirror gate had to exist rather than being a tidiness
-exercise.
+exercise. **Resolved (2026-08):** `T-DATE-010`–`T-DATE-013` are now implemented
+in `apps/api/test/integration/dateAdded.spec.ts`, all four were struck from
+`BASELINE_ORPHANS` (24 → 20) and §19.2 now names tests that run. The *class*
+stands as written: this was the fifth instance found.
 
 The residual set is listed in `BASELINE_ORPHANS` so the gate can fail on
 anything **new** without blocking on an N-way assignment that would have to

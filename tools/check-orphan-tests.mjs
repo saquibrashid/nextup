@@ -86,10 +86,11 @@ export const BASELINE_ORPHANS = new Set([
   'T-A11Y-014',
   'T-ATTR-005',
   // 'T-AUTH-003' removed — the gate reports it as owned.
-  'T-DATE-010',
-  'T-DATE-011',
-  'T-DATE-012',
-  'T-DATE-013',
+  // 'T-DATE-010'..'T-DATE-013' removed (US-021 dates) — implemented in
+  // `apps/api/test/integration/dateAdded.spec.ts`. They were the entries with
+  // the clearest cost: `specs/testing.md` §19.2 asserted the re-observation
+  // path was "covered behaviourally by T-DATE-011" while T-DATE-011 did not
+  // exist, so a written-down guarantee was owned by nothing at all.
   'T-IMG-011',
   'T-INFRA-006',
   'T-INV-014',

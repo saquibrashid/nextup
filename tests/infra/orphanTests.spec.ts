@@ -123,7 +123,12 @@ describe('T-META-006 — every defined test id is owned', () => {
     // the baseline. This is the direction the comment above calls "always
     // welcome", and the exact match is what forced this constant to be updated
     // in the same change rather than drifting.
-    expect(BASELINE_ORPHANS.size).toBe(24);
+    // 24 → 20: `T-DATE-010`–`T-DATE-013` (US-021's dates) are implemented in
+    // `apps/api/test/integration/dateAdded.spec.ts`. Same direction, same
+    // discipline — and the pay-down found a live instance of this project's
+    // signature defect: §19.2 of `specs/testing.md` named `T-DATE-011` as the
+    // behavioural cover for the write-once path while no such test existed.
+    expect(BASELINE_ORPHANS.size).toBe(20);
   });
 
   it('T-META-006f: a citation that is struck through does not count as ownership', () => {
