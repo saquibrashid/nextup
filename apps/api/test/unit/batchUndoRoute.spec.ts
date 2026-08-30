@@ -64,6 +64,24 @@ const store: {
   transactions: number;
   /** Makes the conditional status claim report zero rows — the injected race. */
   claimFails: boolean;
+  /** Current title rows the §8.4 refusal enumeration reads (TASK-114). */
+  titleDisplays: Record<
+    string,
+    {
+      workIdentity: string;
+      state: string;
+      tmdbName: string | null;
+      rawExtractedText: string | null;
+      tmdbReleaseYear: number | null;
+      tmdbPosterPath: string | null;
+    }
+  >;
+  /** Current listing state by listingId, for `removed` entries' `currentState`. */
+  listingStates: Record<string, string>;
+  /** Active suppressions, keyed on WORK identity (REQ-071). */
+  suppressions: { workIdentity: string }[];
+  /** Titles + listings this batch created — the provenance-unavailable signal. */
+  createdEffects: number;
 } = {
   batch: null,
   previous: null,
@@ -77,6 +95,10 @@ const store: {
   serviceState: [],
   transactions: 0,
   claimFails: false,
+  titleDisplays: {},
+  listingStates: {},
+  suppressions: [],
+  createdEffects: 0,
 };
 
 vi.mock('../../src/repository/undoDiscard.js', () => ({
@@ -146,6 +168,26 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
       store.serviceState.push({ service, data });
       return Promise.resolve(undefined) as Promise<never>;
     },
+    // TASK-114 · the four reads the §8.4 refusal enumeration makes. With
+    // `...actual` these would hit Prisma against no database and throw, which
+    // is exactly the 500 the route was returning on every refusal path.
+    listTitleDisplaysByIds: (_ownerId: string, titleIds: readonly string[]) =>
+      Promise.resolve(
+        [...titleIds].flatMap((id) => {
+          const display = store.titleDisplays[id];
+          return display === undefined ? [] : [{ id, ...display }];
+        }),
+      ) as Promise<never>,
+    listServiceListingStatesByIds: (_ownerId: string, listingIds: readonly string[]) =>
+      Promise.resolve(
+        [...listingIds].flatMap((listingId) => {
+          const state = store.listingStates[listingId];
+          return state === undefined ? [] : [{ listingId, state }];
+        }),
+      ) as Promise<never>,
+    listActiveSuppressions: () =>
+      Promise.resolve(store.suppressions.map((row) => ({ ...row }))) as Promise<never>,
+    countBatchCreatedEffects: () => Promise.resolve(store.createdEffects),
   };
 });
 
@@ -227,6 +269,10 @@ beforeEach(async () => {
   store.serviceState = [];
   store.transactions = 0;
   store.claimFails = false;
+  store.titleDisplays = {};
+  store.listingStates = {};
+  store.suppressions = [];
+  store.createdEffects = 0;
 
   const { createApp } = await import('../../src/app.js');
   app = createApp();
@@ -467,5 +513,180 @@ describe('T-UNDO-002/003/008 · POST /undo without a store', () => {
     const res = await undo('batch-1');
     expect(res.status).toBe(409);
     expect(((await res.json()) as ErrorBody).error.code).toBe('BATCH_NOT_CREATES_ONLY');
+  });
+
+  it('T-UNDO-006a: the refusal enumerates created + modified + removed in ONE untruncated payload', async () => {
+    // Unit-level counterpart to the integration T-UNDO-006, driving the §8.4
+    // enumeration builder with no database. A mixed batch — a created title, a
+    // modified title, a removed listing — must return all three groups, each
+    // entry carrying its remedy + remedyHref, with truncated:false.
+    created('t-1', 'l-1');
+    store.changes.push({
+      kind: 'attr_modified',
+      titleId: 't-9',
+      listingId: null,
+      attr: 'tmdbName',
+      prevValue: '"Heat"',
+      nextValue: '"Dune"',
+    });
+    store.changes.push({
+      kind: 'listing_removed',
+      titleId: 't-2',
+      listingId: 'l-2',
+      attr: null,
+      prevValue: null,
+      nextValue: '"group-1"',
+    });
+    store.titleDisplays = {
+      't-1': {
+        workIdentity: 'w-1',
+        state: 'active',
+        tmdbName: 'The Matrix',
+        rawExtractedText: 'matrix',
+        tmdbReleaseYear: 1999,
+        tmdbPosterPath: '/matrix.jpg',
+      },
+      't-9': {
+        workIdentity: 'w-9',
+        state: 'active',
+        tmdbName: 'Dune',
+        rawExtractedText: 'dune',
+        tmdbReleaseYear: 2021,
+        tmdbPosterPath: null,
+      },
+      't-2': {
+        workIdentity: 'w-2',
+        state: 'active',
+        tmdbName: 'Heat',
+        rawExtractedText: 'heat',
+        tmdbReleaseYear: 1995,
+        tmdbPosterPath: '/heat.jpg',
+      },
+    };
+    store.listingStates = { 'l-2': 'removed' };
+
+    const res = await undo('batch-1');
+    expect(res.status).toBe(409);
+    const details = ((await res.json()) as ErrorBody).error.details as {
+      reason: string;
+      truncated: boolean;
+      created: Record<string, unknown>[];
+      modified: Record<string, unknown>[];
+      removed: Record<string, unknown>[];
+    };
+
+    expect(details.reason).toBe('modified-or-removed');
+    expect(details.truncated).toBe(false);
+
+    expect(details.created).toHaveLength(1);
+    expect(details.created[0]).toMatchObject({
+      titleId: 't-1',
+      name: 'The Matrix',
+      releaseYear: 1999,
+      posterPath: '/matrix.jpg',
+      currentState: 'active',
+      remedy: 'not-interested',
+      remedyHref: '/api/titles/t-1/suppress',
+    });
+
+    expect(details.modified).toHaveLength(1);
+    expect(details.modified[0]).toMatchObject({
+      titleId: 't-9',
+      name: 'Dune',
+      attr: 'tmdbName',
+      before: 'Heat',
+      currentState: 'active',
+      remedy: 'fix-match',
+      remedyHref: '/api/titles/t-9/fix-match',
+    });
+
+    expect(details.removed).toHaveLength(1);
+    expect(details.removed[0]).toMatchObject({
+      titleId: 't-2',
+      listingId: 'l-2',
+      name: 'Heat',
+      currentState: 'removed',
+      remedy: 'restore',
+      remedyHref: '/api/listings/l-2/restore',
+    });
+
+    // Read-only refusal (REQ-075): nothing written.
+    expect(store.transactions).toBe(0);
+  });
+
+  it('T-UNDO-012a: a since-removed title and a since-suppressed work are ANNOTATED, not dropped', async () => {
+    // US-033 AC-6: a title the batch touched that has since been removed or
+    // suppressed still appears, annotated via currentState. Filtering them out
+    // is the tempting bug — it loses exactly the entries the owner most needs.
+    created('t-1', 'l-1');
+    store.changes.push({
+      kind: 'listing_removed',
+      titleId: 't-2',
+      listingId: 'l-2',
+      attr: null,
+      prevValue: null,
+      nextValue: '"group-1"',
+    });
+    store.titleDisplays = {
+      't-1': {
+        workIdentity: 'w-1',
+        state: 'removed',
+        tmdbName: 'Gone Title',
+        rawExtractedText: 'gone',
+        tmdbReleaseYear: null,
+        tmdbPosterPath: null,
+      },
+      't-2': {
+        workIdentity: 'w-2',
+        state: 'active',
+        tmdbName: 'Suppressed Title',
+        rawExtractedText: null,
+        tmdbReleaseYear: null,
+        tmdbPosterPath: null,
+      },
+    };
+    // The listing itself is still active; suppression of its WORK must win.
+    store.listingStates = { 'l-2': 'active' };
+    store.suppressions = [{ workIdentity: 'w-2' }];
+
+    const res = await undo('batch-1');
+    expect(res.status).toBe(409);
+    const details = ((await res.json()) as ErrorBody).error.details as {
+      created: Record<string, unknown>[];
+      removed: Record<string, unknown>[];
+    };
+
+    expect(details.created[0]).toMatchObject({ titleId: 't-1', currentState: 'removed' });
+    expect(details.removed[0]).toMatchObject({ titleId: 't-2', currentState: 'suppressed' });
+  });
+
+  it('T-UNDO-007a: created effects with NO provenance refuse as provenance-unavailable, writing nothing', async () => {
+    // US-033 AC-7: no batch_change rows, but the batch demonstrably created
+    // rows — provenance was lost. The refusal must be the structured §8.4 body,
+    // not a silent no-op that destroys rows it has no record of.
+    store.changes = [];
+    store.createdEffects = 3;
+
+    const res = await undo('batch-1');
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as ErrorBody;
+    expect(body.error.code).toBe('BATCH_NOT_CREATES_ONLY');
+    const details = body.error.details as {
+      reason: string;
+      created: unknown[];
+      modified: unknown[];
+      removed: unknown[];
+      truncated: boolean;
+    };
+    expect(details.reason).toBe('provenance-unavailable');
+    expect(details.created).toEqual([]);
+    expect(details.modified).toEqual([]);
+    expect(details.removed).toEqual([]);
+    expect(details.truncated).toBe(false);
+
+    // Read-only: no transaction, nothing discarded.
+    expect(store.transactions).toBe(0);
+    expect(store.discardedTitles).toEqual([]);
+    expect(store.discardedListings).toEqual([]);
   });
 });

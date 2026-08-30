@@ -1671,6 +1671,77 @@ export async function listTitleNames(ownerId: OwnerId, titleIds: readonly string
   });
 }
 
+/**
+ * Full display fields for the §8.4 undo-refusal enumeration (REQ-075, US-033).
+ *
+ * ⚠ Richer than {@link listTitleNames}: the refusal panel needs `posterPath`
+ * for the tile, and `workIdentity` to decide `currentState: 'suppressed'` —
+ * suppression is keyed on the WORK, never on a row id (REQ-071). One batched
+ * read, not one per enumerated title: a mixed-changeset batch can name several
+ * hundred titles and the refusal is a single response.
+ */
+export async function listTitleDisplaysByIds(
+  ownerId: OwnerId,
+  titleIds: readonly string[],
+  tx?: Db,
+) {
+  if (titleIds.length === 0) return [];
+  return db(tx).title.findMany({
+    where: { ownerId, id: { in: [...titleIds] } },
+    select: {
+      id: true,
+      workIdentity: true,
+      state: true,
+      tmdbName: true,
+      rawExtractedText: true,
+      tmdbReleaseYear: true,
+      tmdbPosterPath: true,
+    },
+  });
+}
+
+/**
+ * Current `state` of the listings a refusal's `removed` entries name, so the
+ * enumeration can annotate whether the removed listing is still restorable.
+ * Owner-scoped for the same reason {@link listTitleDisplaysByIds} is.
+ */
+export async function listServiceListingStatesByIds(
+  ownerId: OwnerId,
+  listingIds: readonly string[],
+  tx?: Db,
+) {
+  if (listingIds.length === 0) return [];
+  return db(tx).serviceListing.findMany({
+    where: { ownerId, listingId: { in: [...listingIds] } },
+    select: { listingId: true, state: true },
+  });
+}
+
+/**
+ * How many list rows this batch brought into existence (titles + listings it
+ * created).
+ *
+ * ⚠ EXISTS ONLY to distinguish two look-alike states on the undo path: a batch
+ * that legitimately created nothing (`provenance` empty → undo is a no-op,
+ * US-032 AC-5) versus a batch whose provenance was LOST (`provenance` empty but
+ * effects present → §8.4 `reason: 'provenance-unavailable'`, US-033 AC-7). Both
+ * present as zero `batch_change` rows; only the downstream effects tell them
+ * apart. US-031 AC-6 makes the second unreachable in normal operation, which is
+ * why this is a count, not a listing.
+ */
+export async function countBatchCreatedEffects(
+  ownerId: OwnerId,
+  batchId: string,
+  tx?: Db,
+): Promise<number> {
+  const client = db(tx);
+  const [titles, listings] = await Promise.all([
+    client.title.count({ where: { ownerId, createdByBatchId: batchId } }),
+    client.serviceListing.count({ where: { ownerId, createdByBatchId: batchId } }),
+  ]);
+  return titles + listings;
+}
+
 export async function createRemovalGroup(
   ownerId: OwnerId,
   data: Omit<Prisma.RemovalGroupUncheckedCreateInput, 'ownerId'>,

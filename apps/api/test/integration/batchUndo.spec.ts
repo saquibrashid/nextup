@@ -540,3 +540,487 @@ describe('T-UNDO-003 · US-032 AC-3 · status becomes undone; a second undo is r
     expect(row?.status).toBe('applied');
   });
 });
+
+/* ── §8.4 refusal enumeration (TASK-114, REQ-075, US-033) ─────────────────── */
+
+interface RefusalCreated {
+  titleId: string;
+  name: string;
+  releaseYear: number | null;
+  posterPath: string | null;
+  currentState: string;
+  remedy: string;
+  remedyHref: string;
+}
+interface RefusalModified extends RefusalCreated {
+  attr: string;
+  before: unknown;
+}
+interface RefusalRemoved extends RefusalCreated {
+  listingId: string;
+}
+interface RefusalDetails {
+  batchId: string;
+  reason: string;
+  created: RefusalCreated[];
+  modified: RefusalModified[];
+  removed: RefusalRemoved[];
+  truncated: boolean;
+}
+
+/** An APPLIED batch — undo reaches the provenance check only for these. */
+async function makeAppliedBatch(service = 'netflix', mode = 'full-update'): Promise<string> {
+  const batchId = `batch-refuse-${++batchSeq}`;
+  await testPrisma().uploadBatch.create({
+    data: {
+      id: batchId,
+      ownerId,
+      service,
+      mode,
+      status: 'applied',
+      completedAt: new Date('2026-06-01T10:00:00.000Z'),
+      lowYield: false,
+      degradedExtraction: false,
+      crossCheck: 'ok',
+    },
+  });
+  return batchId;
+}
+
+let refuseTitleSeq = 0;
+
+/** A matched title in whatever `state` the case needs. Returns its id. */
+async function seedTitle(opts: {
+  name: string;
+  releaseYear?: number | null;
+  posterPath?: string | null;
+  state?: 'active' | 'removed';
+}): Promise<{ titleId: string; workIdentity: string }> {
+  refuseTitleSeq += 1;
+  const titleId = `rtitle-${refuseTitleSeq}`;
+  const workIdentity = `tmdb:movie:9${refuseTitleSeq}`;
+  await testPrisma().title.create({
+    data: {
+      id: titleId,
+      ownerId,
+      workIdentity,
+      state: opts.state ?? 'active',
+      matchState: 'matched',
+      rawExtractedText: null,
+      normalisedText: opts.name.toLowerCase(),
+      tmdbId: 900000 + refuseTitleSeq,
+      tmdbMediaType: 'movie',
+      tmdbName: opts.name,
+      tmdbReleaseYear: opts.releaseYear ?? null,
+      tmdbPosterPath: opts.posterPath ?? null,
+      sortDateAdded: new Date('2026-02-02'),
+    },
+  });
+  return { titleId, workIdentity };
+}
+
+let refuseListingSeq = 0;
+
+/** A REMOVED listing under `titleId`. Returns its id. */
+async function seedRemovedListing(titleId: string, batchId: string): Promise<string> {
+  refuseListingSeq += 1;
+  const listingId = `rlisting-${refuseListingSeq}`;
+  await testPrisma().serviceListing.create({
+    data: {
+      listingId,
+      ownerId,
+      titleId,
+      service: 'netflix',
+      state: 'removed',
+      dateAdded: new Date('2026-02-02'),
+      removedAt: new Date('2026-06-01T10:00:00.000Z'),
+      removedByBatchId: batchId,
+      createdByBatchId: batchId,
+    },
+  });
+  return listingId;
+}
+
+type ChangeSeed = {
+  batchId: string;
+  kind: 'title_created' | 'listing_added' | 'listing_removed' | 'attr_modified';
+  titleId: string;
+  listingId?: string;
+  attr?: string;
+  prevValue?: string;
+  nextValue?: string;
+};
+
+async function seedChange(seed: ChangeSeed): Promise<void> {
+  await testPrisma().batchChange.create({
+    data: {
+      ownerId,
+      batchId: seed.batchId,
+      kind: seed.kind,
+      titleId: seed.titleId,
+      listingId: seed.listingId ?? null,
+      attr: seed.attr ?? null,
+      prevValue: seed.prevValue ?? null,
+      nextValue: seed.nextValue ?? null,
+    },
+  });
+}
+
+async function suppressWork(workIdentity: string, name: string): Promise<void> {
+  await testPrisma().suppression.create({
+    data: {
+      id: `rsupp-${++refuseTitleSeq}`,
+      ownerId,
+      workIdentity,
+      active: true,
+      displayName: name,
+    },
+  });
+}
+
+/* ── T-UNDO-006 ───────────────────────────────────────────────────────── */
+
+describe('T-UNDO-006 · US-033 AC-2/AC-5 · the enumeration is COMPLETE and never truncated', () => {
+  it('T-UNDO-006 · a 400-title mixed batch enumerates every id in one response, truncated:false', async () => {
+    // ⚠ 400 is not decoration — §8.4 and US-033 AC-2/AC-5 name this fixture
+    // because truncation logic only engages at scale. A 5-title batch cannot
+    // catch a `LIMIT`, a page size, or a "first N" slice; this asserts the
+    // COUNT and the FULL id set, not a spot check.
+    const batchId = await makeAppliedBatch();
+
+    const createdIds: string[] = [];
+    const modifiedIds: string[] = [];
+    const removedIds: string[] = [];
+
+    // 134 created + 133 modified + 133 removed = 400 distinct titles. Bulk
+    // inserts keep this at-scale fixture cheap enough for CI.
+    const titles: {
+      id: string;
+      ownerId: string;
+      workIdentity: string;
+      state: string;
+      matchState: string;
+      normalisedText: string;
+      tmdbId: number;
+      tmdbMediaType: string;
+      tmdbName: string;
+      tmdbReleaseYear: number;
+      sortDateAdded: Date;
+    }[] = [];
+    const listings: {
+      listingId: string;
+      ownerId: string;
+      titleId: string;
+      service: string;
+      state: string;
+      dateAdded: Date;
+      removedAt: Date;
+      removedByBatchId: string;
+      createdByBatchId: string;
+    }[] = [];
+    const changes: {
+      ownerId: string;
+      batchId: string;
+      kind: string;
+      titleId: string;
+      listingId: string | null;
+      attr: string | null;
+      prevValue: string | null;
+      nextValue: string | null;
+    }[] = [];
+
+    const mkTitle = (seq: number, name: string): string => {
+      const id = `bulk-title-${seq}`;
+      titles.push({
+        id,
+        ownerId,
+        workIdentity: `tmdb:movie:8${seq}`,
+        state: 'active',
+        matchState: 'matched',
+        normalisedText: name.toLowerCase(),
+        tmdbId: 800000 + seq,
+        tmdbMediaType: 'movie',
+        tmdbName: name,
+        tmdbReleaseYear: 2000 + (seq % 25),
+        sortDateAdded: new Date('2026-02-02'),
+      });
+      return id;
+    };
+
+    let seq = 0;
+    for (let i = 0; i < 134; i += 1) {
+      const titleId = mkTitle((seq += 1), `Created ${String(i)}`);
+      changes.push({
+        ownerId,
+        batchId,
+        kind: 'title_created',
+        titleId,
+        listingId: null,
+        attr: null,
+        prevValue: null,
+        nextValue: null,
+      });
+      createdIds.push(titleId);
+    }
+    for (let i = 0; i < 133; i += 1) {
+      const titleId = mkTitle((seq += 1), `Modified ${String(i)}`);
+      changes.push({
+        ownerId,
+        batchId,
+        kind: 'attr_modified',
+        titleId,
+        listingId: null,
+        attr: 'workIdentity',
+        prevValue: JSON.stringify('tmdb:tv:1'),
+        nextValue: JSON.stringify('tmdb:movie:2'),
+      });
+      modifiedIds.push(titleId);
+    }
+    for (let i = 0; i < 133; i += 1) {
+      const titleId = mkTitle((seq += 1), `Removed ${String(i)}`);
+      const listingId = `bulk-listing-${seq}`;
+      listings.push({
+        listingId,
+        ownerId,
+        titleId,
+        service: 'netflix',
+        state: 'removed',
+        dateAdded: new Date('2026-02-02'),
+        removedAt: new Date('2026-06-01T10:00:00.000Z'),
+        removedByBatchId: batchId,
+        createdByBatchId: batchId,
+      });
+      changes.push({
+        ownerId,
+        batchId,
+        kind: 'listing_removed',
+        titleId,
+        listingId,
+        attr: null,
+        prevValue: null,
+        nextValue: JSON.stringify(`grp-${String(i)}`),
+      });
+      removedIds.push(titleId);
+    }
+
+    await testPrisma().title.createMany({ data: titles });
+    await testPrisma().serviceListing.createMany({ data: listings });
+    await testPrisma().batchChange.createMany({ data: changes });
+
+    const res = await undo(batchId);
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as ErrorBody;
+    expect(body.error.code).toBe('BATCH_NOT_CREATES_ONLY');
+    const details = body.error.details as unknown as RefusalDetails;
+
+    expect(details.reason).toBe('modified-or-removed');
+    expect(details.truncated).toBe(false);
+
+    // Group sizes are exact — nothing summarised away.
+    expect(details.created).toHaveLength(134);
+    expect(details.modified).toHaveLength(133);
+    expect(details.removed).toHaveLength(133);
+
+    // Every id the batch touched is present, across all three groups, in ONE
+    // response. This is the property a `LIMIT` or a paging cap would break.
+    const seen = new Set<string>([
+      ...details.created.map((entry) => entry.titleId),
+      ...details.modified.map((entry) => entry.titleId),
+      ...details.removed.map((entry) => entry.titleId),
+    ]);
+    expect(seen.size).toBe(400);
+    for (const id of [...createdIds, ...modifiedIds, ...removedIds]) {
+      expect(seen.has(id)).toBe(true);
+    }
+  });
+});
+
+/* ── T-UNDO-011 ───────────────────────────────────────────────────────── */
+
+describe('T-UNDO-011 · US-033 AC-3 · each entry carries a working remedy href of the correct kind', () => {
+  it('T-UNDO-011 · created→suppress, modified→fix-match, removed→restore, with hrefs and fields', async () => {
+    const batchId = await makeAppliedBatch();
+
+    const created = await seedTitle({ name: 'Dune', releaseYear: 2021, posterPath: '/d.jpg' });
+    await seedChange({ batchId, kind: 'title_created', titleId: created.titleId });
+
+    const modified = await seedTitle({ name: 'Andor', releaseYear: 2022, posterPath: '/a.jpg' });
+    await seedChange({
+      batchId,
+      kind: 'attr_modified',
+      titleId: modified.titleId,
+      attr: 'workIdentity',
+      prevValue: JSON.stringify('tmdb:tv:1'),
+      nextValue: JSON.stringify('tmdb:tv:83867'),
+    });
+
+    const removed = await seedTitle({ name: 'Heat', releaseYear: 1995, posterPath: '/h.jpg' });
+    const listingId = await seedRemovedListing(removed.titleId, batchId);
+    await seedChange({
+      batchId,
+      kind: 'listing_removed',
+      titleId: removed.titleId,
+      listingId,
+      nextValue: JSON.stringify('grp-1'),
+    });
+
+    const res = await undo(batchId);
+    expect(res.status).toBe(409);
+    const details = ((await res.json()) as ErrorBody).error.details as unknown as RefusalDetails;
+
+    expect(details.created[0]).toMatchObject({
+      titleId: created.titleId,
+      name: 'Dune',
+      releaseYear: 2021,
+      posterPath: '/d.jpg',
+      remedy: 'not-interested',
+      remedyHref: `/api/titles/${created.titleId}/suppress`,
+    });
+    expect(details.modified[0]).toMatchObject({
+      titleId: modified.titleId,
+      name: 'Andor',
+      attr: 'workIdentity',
+      before: 'tmdb:tv:1',
+      remedy: 'fix-match',
+      remedyHref: `/api/titles/${modified.titleId}/fix-match`,
+    });
+    expect(details.removed[0]).toMatchObject({
+      titleId: removed.titleId,
+      listingId,
+      name: 'Heat',
+      releaseYear: 1995,
+      remedy: 'restore',
+      remedyHref: `/api/listings/${listingId}/restore`,
+    });
+  });
+});
+
+/* ── T-UNDO-012 (US-033 AC-6) ─────────────────────────────────────────── */
+
+describe('T-UNDO-012 · US-033 AC-6 · a since-removed or since-suppressed title STILL appears, annotated', () => {
+  it('T-UNDO-012 · currentState reflects removed/suppressed; the entries are not filtered out', async () => {
+    const batchId = await makeAppliedBatch();
+
+    // A created title still active.
+    const active = await seedTitle({ name: 'Still Here', state: 'active' });
+    await seedChange({ batchId, kind: 'title_created', titleId: active.titleId });
+
+    // A created title the owner has since REMOVED.
+    const removedSince = await seedTitle({ name: 'Gone Since', state: 'removed' });
+    await seedChange({ batchId, kind: 'title_created', titleId: removedSince.titleId });
+
+    // A modified title whose WORK the owner has since SUPPRESSED.
+    const suppressedSince = await seedTitle({ name: 'Not Interested Now', state: 'active' });
+    await seedChange({
+      batchId,
+      kind: 'attr_modified',
+      titleId: suppressedSince.titleId,
+      attr: 'workIdentity',
+      prevValue: JSON.stringify('tmdb:tv:1'),
+      nextValue: JSON.stringify(suppressedSince.workIdentity),
+    });
+    await suppressWork(suppressedSince.workIdentity, 'Not Interested Now');
+
+    const res = await undo(batchId);
+    expect(res.status).toBe(409);
+    const details = ((await res.json()) as ErrorBody).error.details as unknown as RefusalDetails;
+
+    const byId = new Map<string, string>([
+      ...details.created.map((e) => [e.titleId, e.currentState] as const),
+      ...details.modified.map((e) => [e.titleId, e.currentState] as const),
+      ...details.removed.map((e) => [e.titleId, e.currentState] as const),
+    ]);
+
+    // The tempting bug is to DROP the removed/suppressed ones. All three appear.
+    expect(byId.has(active.titleId)).toBe(true);
+    expect(byId.has(removedSince.titleId)).toBe(true);
+    expect(byId.has(suppressedSince.titleId)).toBe(true);
+
+    expect(byId.get(active.titleId)).toBe('active');
+    expect(byId.get(removedSince.titleId)).toBe('removed');
+    expect(byId.get(suppressedSince.titleId)).toBe('suppressed');
+  });
+});
+
+/* ── T-UNDO-007 (US-033 AC-7) ─────────────────────────────────────────── */
+
+describe('T-UNDO-007 · US-033 AC-7 · missing provenance → reason:provenance-unavailable, still refused', () => {
+  it('T-UNDO-007 · a batch with created effects but NO provenance rows is refused, not no-op undone', async () => {
+    // Hand-crafted: US-031 AC-6 makes this unreachable in normal operation. The
+    // batch created a title and a listing but carries ZERO batch_change rows —
+    // its provenance was lost. Undo must REFUSE (it cannot correctly reverse
+    // what it has no record of), never silently no-op into destroying rows.
+    const batchId = await makeAppliedBatch('netflix', 'append-only');
+    const { titleId } = await seedTitle({ name: 'Orphaned Creation', state: 'active' });
+    await testPrisma().serviceListing.create({
+      data: {
+        listingId: `orphan-listing-${batchId}`,
+        ownerId,
+        titleId,
+        service: 'netflix',
+        state: 'active',
+        dateAdded: new Date('2026-02-02'),
+        createdByBatchId: batchId,
+      },
+    });
+    await testPrisma().title.update({
+      where: { id: titleId },
+      data: { createdByBatchId: batchId },
+    });
+
+    // Sanity: there really is no provenance for this batch.
+    expect(await testPrisma().batchChange.count({ where: { ownerId, batchId } })).toBe(0);
+
+    const before = await snapshotList();
+    const res = await undo(batchId);
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as ErrorBody;
+    expect(body.error.code).toBe('BATCH_NOT_CREATES_ONLY');
+    const details = body.error.details as unknown as RefusalDetails;
+
+    expect(details.reason).toBe('provenance-unavailable');
+    expect(details.batchId).toBe(batchId);
+    // Actionable structure, not a bare 409: the §8.4 arrays are present.
+    expect(details.truncated).toBe(false);
+    expect(Array.isArray(details.created)).toBe(true);
+    expect(Array.isArray(details.modified)).toBe(true);
+    expect(Array.isArray(details.removed)).toBe(true);
+
+    // §8.4: nothing is written on a refusal, and the batch stays applied.
+    expect(await snapshotList()).toEqual(before);
+    const row = await testPrisma().uploadBatch.findFirst({ where: { id: batchId } });
+    expect(row?.status).toBe('applied');
+  });
+});
+
+/* ── T-UNDO-005 (read-only refusal) ───────────────────────────────────── */
+
+describe('T-UNDO-005 · US-033 · a refusal writes NOTHING (the enumeration is read-only)', () => {
+  it('T-UNDO-005 · the owner partition is byte-for-byte identical before and after a mixed refusal', async () => {
+    const batchId = await makeAppliedBatch();
+    const created = await seedTitle({ name: 'Created', releaseYear: 2019 });
+    await seedChange({ batchId, kind: 'title_created', titleId: created.titleId });
+    const removed = await seedTitle({ name: 'Removed', releaseYear: 2018 });
+    const listingId = await seedRemovedListing(removed.titleId, batchId);
+    await seedChange({
+      batchId,
+      kind: 'listing_removed',
+      titleId: removed.titleId,
+      listingId,
+      nextValue: JSON.stringify('grp-1'),
+    });
+
+    const before = await snapshotList();
+    const changesBefore = await testPrisma().batchChange.count({ where: { ownerId, batchId } });
+
+    const res = await undo(batchId);
+    expect(res.status).toBe(409);
+
+    expect(await snapshotList()).toEqual(before);
+    expect(await testPrisma().batchChange.count({ where: { ownerId, batchId } })).toBe(
+      changesBefore,
+    );
+    const row = await testPrisma().uploadBatch.findFirst({ where: { id: batchId } });
+    expect(row?.status).toBe('applied');
+  });
+});
