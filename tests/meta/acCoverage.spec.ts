@@ -230,11 +230,23 @@ const KNOWN_UNMAPPED: readonly string[] = [
  * `T-META-002` removed its own line.
  */
 const KNOWN_PHANTOM_CITATIONS: readonly string[] = [
-  'T-AI-014',
+  // ⚠ THIS LIST AND `BASELINE_ORPHANS` ARE COUPLED, AND THE COUPLING IS EASY TO
+  // MISREAD AS A LIST SHRINKING ON ITS OWN. `T-META-001e` subtracts
+  // `BASELINE_ORPHANS` before comparing, because an id that no task cites AND
+  // no test implements is already tracked, by name, over there. So moving an id
+  // INTO the orphan baseline removes it from here. That is not a gap closing —
+  // it is the same gap changing which gate reports it, and it is only safe
+  // because both lists are pinned EXACTLY (`T-META-006e` and this assertion),
+  // so neither can absorb an entry quietly.
+  //
+  // Four ids left this list that way when `implementedTestIds` was sharpened to
+  // title position: `T-AI-014`, `T-AUTH-001`, `T-AUTH-002` and `T-UX-099`. The
+  // note that used to sit on `T-UX-099` here — claiming a task cites it, so it
+  // could never be an orphan — was WRONG, and wrong in the house pattern: the
+  // only thing making it look cited was its own string literal on this line,
+  // read by a gate that matched bare occurrence.
   'T-AI-017',
   'T-AI-041',
-  'T-AUTH-001',
-  'T-AUTH-002',
   'T-TMDB-011',
   'T-UNDO-004',
   'T-UNDO-006',

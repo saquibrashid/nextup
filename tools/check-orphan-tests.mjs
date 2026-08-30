@@ -62,7 +62,13 @@ import { baseId, citedTestIds, definedTestIds } from './check-test-ids.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const TEST_ID_RE = /T-[A-Z0-9]+-\d+[a-z]{0,2}/g;
+/**
+ * A test id in `it`/`test`/`describe` TITLE position — the one place a test id
+ * means "a test bearing this id runs". See `implementedTestIds` for why bare
+ * occurrence was wrong.
+ */
+const TITLE_TEST_ID_RE =
+  /\b(?:it|test|describe)(?:\.\w+)*\(\s*['"`]\s*(T-[A-Z0-9]+-\d+[a-z]{0,2})/g;
 
 /** Directories that never hold a first-party suite. */
 const SKIP_DIRS = new Set(['node_modules', '.git', 'dist', 'dist-dev', 'coverage', '.turbo']);
@@ -79,7 +85,7 @@ const SPEC_FILE_RE = /\.(spec|test)\.[cm]?[jt]sx?$/;
 export const BASELINE_ORPHANS = new Set([
   'T-A11Y-014',
   'T-ATTR-005',
-  'T-AUTH-003',
+  // 'T-AUTH-003' removed — the gate reports it as owned.
   'T-DATE-010',
   'T-DATE-011',
   'T-DATE-012',
@@ -99,14 +105,69 @@ export const BASELINE_ORPHANS = new Set([
   'T-SUP-023',
   'T-UNDO-011',
   'T-UNDO-012',
+  // ⚠ THE NINE BELOW ARE NOT NEW GAPS. They were always unimplemented; they
+  // became VISIBLE when `implementedTestIds` was sharpened from "the id
+  // appears anywhere in a spec file" to "the id is in a test title". Under the
+  // old predicate an id recorded in another gate's known-gap baseline counted
+  // as its own implementation, so the act of writing down that a test was
+  // missing is what hid it. `T-AUTH-003`, `T-UX-053`, `T-UX-054` and
+  // `T-UX-062` appear in exactly one place in the entire suite — as literals
+  // in `uxStateCoverage.spec.ts`'s `KNOWN_UNCOVERED`.
+  //
+  // A sharpened detector is the ONLY legitimate reason this list may grow, and
+  // this comment is the required justification. Do not append to it for any
+  // other reason: `T-META-006e` pins the size exactly and the correct fix for
+  // a new orphan is to cite the id in `docs/backlog.md`.
+  //
+  // `T-AUTH-001/002/003` are level `E` — a real browser against a real IdP —
+  // and are deferred by §10, not merely unwritten.
+  'T-AI-014',
+  'T-AUTH-001',
+  'T-AUTH-002',
+  'T-AUTH-003',
   'T-UX-053',
   'T-UX-054',
   'T-UX-062',
-  'T-UX-064',
+  'T-UX-069',
   'T-UX-099',
+  // ⚠ `T-UX-099` IS baselined here, and the note that used to sit on this line
+  // claiming the opposite was itself an instance of the bug. It read: ~~"not
+  // baselined here: it is cited by a task, so it was never an orphan in this
+  // gate's sense"~~. It is cited by no task. The only thing that kept it out of
+  // this report was its own string literal in `acCoverage.spec.ts`'s
+  // `KNOWN_PHANTOM_CITATIONS`, which the old bare-occurrence predicate read as
+  // an implementation.
+  //
+  // The distinction the note was reaching for is real and still worth keeping:
+  // "owned" here means an id a task cites, which is strictly weaker than "a
+  // test bearing this id runs". Filing a gap in the list that cannot see it
+  // hides it. What is NOT true is that either list can be reasoned about from
+  // the comments alone — check which gate actually reports the id.
 ]);
 
-/** Every base id named by any `*.spec.*` / `*.test.*` file under `root`. */
+/**
+ * Every base id named by any `*.spec.*` / `*.test.*` file under `root`, counted
+ * only where the id appears in an `it`/`test`/`describe` TITLE.
+ *
+ * ⚠ THIS USED TO MATCH ANY OCCURRENCE, AND THAT MADE IT REPORT THE OPPOSITE OF
+ * THE TRUTH. Several gates keep their known-gap baselines as arrays of id
+ * string literals inside a `.spec.ts` file — `uxStateCoverage.spec.ts`'s
+ * `KNOWN_UNCOVERED` is one. Under a bare-occurrence scan, an id sitting in
+ * such a list was read as its own implementation, so **the very act of
+ * recording that an id has no test made it look implemented.**
+ *
+ * That was not hypothetical. `T-AUTH-003`, `T-UX-053`, `T-UX-054` and
+ * `T-UX-062` appear in exactly one place in the whole suite — as literals in
+ * `KNOWN_UNCOVERED` — and this function reported all four as implemented, so
+ * `resolvedBaselineIds` advised removing them from `BASELINE_ORPHANS` as
+ * "now owned". Acting on that advice is what surfaced them.
+ *
+ * The predicate is title position, which an array literal never reaches. It is
+ * safe because `T-META-004` requires every `it()` title to begin with a static
+ * `T-` id, and it is the same predicate `T-META-001`, `T-META-002` and
+ * `T-META-007` use — `acCoverage.spec.ts` previously had to avoid this helper
+ * for precisely this reason, and no longer does.
+ */
 export function implementedTestIds(root = ROOT) {
   const found = new Set();
   const walk = (dir) => {
@@ -129,7 +190,7 @@ export function implementedTestIds(root = ROOT) {
         } catch {
           continue;
         }
-        for (const id of text.match(TEST_ID_RE) ?? []) found.add(baseId(id));
+        for (const [, id] of text.matchAll(TITLE_TEST_ID_RE)) found.add(baseId(id));
       }
     }
   };
@@ -171,7 +232,10 @@ function main() {
         `${String(BASELINE_ORPHANS.size)} remain in the baseline` +
         (resolved.length > 0
           ? `, of which ${String(resolved.length)} are now owned and can be removed from it: ` +
-            resolved.join(', ')
+            resolved.join(', ') +
+            `\n⚠ "Owned" here is satisfied by a BACKLOG CITATION alone, which does not mean a ` +
+            `test bearing the id runs. Removing such an id from the baseline may surface it in ` +
+            `T-META-001e as a phantom citation — that is the gate working, not a regression.`
           : '.'),
     );
     return;
