@@ -471,6 +471,32 @@ export const REVIEW_DISCARD_LABEL = 'Discard batch';
  */
 export const REVIEW_APPLYING = 'Applying…';
 
+/**
+ * `specs/ux-states.md` §6.7 (`T-UX-062`) — the sticky bar's running counts,
+ * quoted from the spec: *"9 to add · 3 to remove · 2 still to review"*.
+ *
+ * ⚠ **THE THIRD CLAUSE IS THE ONE THAT MATTERS AND IT WAS MISSING.** The first
+ * two say what a close would write; only this one says whether the close will
+ * be ACCEPTED. `closeBatch` refuses the whole batch with 409
+ * `PENDING_ADDITIONS` while any decidable candidate is still `pending`
+ * (`packages/domain/src/close.ts`), so a bar reading "9 to add · 3 to remove"
+ * over two undecided cards promises an apply that cannot happen — the owner
+ * learns otherwise only by pressing the button and being refused.
+ *
+ * ⚠ **IT COUNTS THE SAME ROWS THE SERVER'S GATE COUNTS** — additions AND
+ * unmatched, `CLOSE_DECIDABLE_SECTIONS`. Counting additions alone would read
+ * "0 still to review" on a batch the close is about to refuse, which is worse
+ * than saying nothing.
+ *
+ * ⚠ **OMITTED AT ZERO, NOT RENDERED AS "0 still to review".** §6.7 is the
+ * PARTIAL-review state; with every card decided there is nothing outstanding
+ * to report and the bar returns to the §6.5/§6.6 two-clause reading.
+ */
+export function reviewCounts(toAdd: number, toRemove: number, stillToReview: number): string {
+  const head = `${toAdd} to add · ${toRemove} to remove`;
+  return stillToReview > 0 ? `${head} · ${stillToReview} still to review` : head;
+}
+
 export const REVIEW_TITLE = 'Review this batch';
 
 /**

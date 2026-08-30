@@ -104,8 +104,13 @@ const KNOWN_UNCOVERED: readonly string[] = [
   'T-UX-057',
   'T-UX-058',
   'T-UX-060',
-  'T-UX-062',
-  // only because the state was still unasserted when this gate landed; the
+  // ⚠ `T-UX-068` (§6.17, offline mid-review) IS LISTED DELIBERATELY AND MUST
+  // NOT BE IMPLEMENTED TO CLEAR IT. It is `T-STATUS-001p`'s worked example of
+  // a live probe, and a test asserting it here would make that example false.
+  // (This note was truncated to a single dangling clause — "only because the
+  // state was still unasserted when this gate landed; the" — from the commit
+  // that created this file, and read as if it applied to whichever id happened
+  // to sit under it. Restored in full.)
   'T-UX-068',
   'T-UX-069',
   'T-UX-070',
