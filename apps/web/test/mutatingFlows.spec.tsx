@@ -32,6 +32,7 @@ import { ApiError, type ApiClient } from '../src/lib/apiClient';
 import {
   OPEN_BATCH_DISCARD_LABEL,
   OPEN_BATCH_GO_LABEL,
+  STATUS_OFFLINE,
   SUBMIT_IN_FLIGHT,
   SUBMIT_NEEDS_IMAGES,
   SUBMIT_NEEDS_SELECTION,
@@ -417,6 +418,171 @@ describe('T-DATA-009 — polling stops three ways', () => {
     for (const settled of ['draft', 'in-review', 'extraction-failed', 'applied', 'discarded']) {
       expect(isRunning(settled)).toBe(false);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T-UX-056 — ux-states.md §5.8, offline while polling
+// ---------------------------------------------------------------------------
+
+/**
+ * §5.8: *"Banner; polling pauses and resumes on reconnect; **no error is
+ * invented**."*
+ *
+ * ⚠ THE PAGE HALF OF THIS WAS BUILT AND THE PRODUCT HALF WAS NOT.
+ * `BatchStatusPage` has rendered the banner from an `offline` prop, correctly
+ * placed above the error branch, since it was written — and no container ever
+ * passed it, so the banner had never appeared and the poll had never paused.
+ * The prop sat in `BASELINE_UNSUPPLIED` as a tracked gap.
+ *
+ * These cases therefore drive `BatchStatusRoute`, never the page: rendering
+ * `<BatchStatusPage offline />` would prove only that the component can render
+ * a flag it is handed, which is the assertion that was already passing while
+ * the feature did not exist.
+ */
+describe('T-UX-056 — offline while polling', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+  });
+
+  const goOffline = (): void => {
+    act(() => {
+      window.dispatchEvent(new Event('offline'));
+    });
+  };
+  const goOnline = (): void => {
+    act(() => {
+      window.dispatchEvent(new Event('online'));
+    });
+  };
+
+  it('T-UX-056a: losing the connection shows the banner', async () => {
+    const { client } = stubClient();
+    renderAt(
+      '/batches/bat_1',
+      <BatchStatusRoute client={client} visibility={() => false} />,
+      '/batches/:batchId',
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('batch-status-offline')).toBeNull();
+    });
+
+    goOffline();
+    expect(await screen.findByTestId('batch-status-offline')).toHaveTextContent(STATUS_OFFLINE);
+  });
+
+  it('T-UX-056b: the poll pauses while offline', async () => {
+    const { client, calls } = stubClient();
+    renderAt(
+      '/batches/bat_1',
+      <BatchStatusRoute client={client} visibility={() => false} />,
+      '/batches/:batchId',
+    );
+
+    await waitFor(() => {
+      expect(calls).toContain('getBatch');
+    });
+    goOffline();
+    const afterOffline = calls.filter((call) => call === 'getBatch').length;
+
+    await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS * 5);
+    // Five ticks into a dead network is five rejected requests and five
+    // chances to invent an error, for no information.
+    expect(calls.filter((call) => call === 'getBatch')).toHaveLength(afterOffline);
+  });
+
+  it('T-UX-056c: reconnecting reads immediately, without waiting for a tick', async () => {
+    const { client, calls } = stubClient();
+    renderAt(
+      '/batches/bat_1',
+      <BatchStatusRoute client={client} visibility={() => false} />,
+      '/batches/:batchId',
+    );
+
+    await waitFor(() => {
+      expect(calls).toContain('getBatch');
+    });
+    goOffline();
+    const afterOffline = calls.filter((call) => call === 'getBatch').length;
+
+    goOnline();
+    // ⚠ NO TIMER ADVANCE. Waiting for the next tick would leave a visibly
+    // reconnected owner staring at a stale status, which reads as the page
+    // having given up.
+    await waitFor(() => {
+      expect(calls.filter((call) => call === 'getBatch').length).toBeGreaterThan(afterOffline);
+    });
+    await waitFor(() => {
+      expect(screen.queryByTestId('batch-status-offline')).toBeNull();
+    });
+  });
+
+  it('T-UX-056d: a request already in flight when the connection drops invents no error', async () => {
+    /*
+     * ⚠ THE CASE THE PAUSE CANNOT COVER, AND THE ONE §5.8 NAMES. The poll can
+     * refuse to START a request once it knows it is offline; it cannot recall
+     * the one that left a moment earlier. That request rejects AFTER the
+     * offline state is known, and treating it as a load failure puts the
+     * "we couldn't load this" screen in front of a batch that is extracting
+     * perfectly well on the server.
+     */
+    let rejectInFlight: ((error: unknown) => void) | undefined;
+    let call = 0;
+    const { client } = stubClient({
+      getBatch: () => {
+        call += 1;
+        if (call === 1) return Promise.resolve(batch('extracting'));
+        return new Promise((_resolve, reject) => {
+          rejectInFlight = reject;
+        });
+      },
+    });
+    renderAt(
+      '/batches/bat_1',
+      <BatchStatusRoute client={client} visibility={() => false} />,
+      '/batches/:batchId',
+    );
+
+    await screen.findByTestId('batch-status-images');
+
+    // Tick once while still online, so a second request is genuinely in flight.
+    await vi.advanceTimersByTimeAsync(POLL_INTERVAL_MS);
+    await waitFor(() => {
+      expect(rejectInFlight).toBeDefined();
+    });
+
+    goOffline();
+    await act(async () => {
+      rejectInFlight?.(new Error('network down'));
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByTestId('batch-status-load-error')).toBeNull();
+    // The last known state stays on screen under the banner, per §5.8.
+    expect(screen.getByTestId('batch-status-offline')).toBeVisible();
+    expect(screen.getByTestId('batch-status-images')).toBeVisible();
+  });
+
+  it('T-UX-056e: an ONLINE failure is still reported', async () => {
+    // The negative control. A guard that suppressed every load failure would
+    // pass every case above while hiding a real outage forever.
+    const { client } = stubClient({
+      getBatch: () => Promise.reject(new Error('network down')),
+    });
+    renderAt(
+      '/batches/bat_1',
+      <BatchStatusRoute client={client} visibility={() => false} />,
+      '/batches/:batchId',
+    );
+
+    expect(await screen.findByTestId('batch-status-load-error')).toBeVisible();
   });
 });
 
