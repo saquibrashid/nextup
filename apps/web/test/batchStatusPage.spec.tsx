@@ -11,6 +11,26 @@
  * shows, full-update removals were withheld (product invariant 2), so a
  * silently-absent banner leaves the owner with no explanation for a missing
  * removal section — a failure that looks like nothing at all.
+ *
+ * ⚠ FIVE CASES CARRY A SECOND ID, AND NOTHING NEW WAS ASSERTED TO EARN IT.
+ * `ux-states.md` gives each STATE its own id, and five of those states —
+ * §5.1 `T-UX-050`, §5.2 `T-UX-051`, §5.5 `T-UX-053`, §5.6 `T-UX-054`,
+ * §5.7 `T-UX-055` — were listed as uncovered while the assertions for them had
+ * existed here all along under the TASK id `T-UX-007`. The criterion and its
+ * test both existed and had simply never been joined, so `T-META-007` reported
+ * five states as unmeasured that were in fact measured, and the number nobody
+ * could trust was the one meant to be shrinking. The state id is written
+ * FIRST because `T-META-007`'s detector reads only the id in title position;
+ * the `T-UX-007x` letter stays in the sentence, and `check-orphan-tests`
+ * still sees `T-UX-007` from the `describe`.
+ *
+ * ⚠ Do NOT copy this as a way to clear the list. It is honest ONLY because
+ * each case already asserted the exact spec row — the same copy, the same
+ * controls. Adding a spec id to a test that does not drive that state is the
+ * house defect in its purest form. §5.4 (`T-UX-052`) is the counter-example
+ * from the same sweep: it had no assertion anywhere and had to be written, in
+ * `mutatingFlows.spec.tsx`, because it is a ROUTE behaviour this file cannot
+ * reach.
  */
 
 import { cleanup, render, screen, within } from '@testing-library/react';
@@ -75,14 +95,14 @@ function batch(overrides: Partial<BatchStatus> = {}): BatchStatus {
 }
 
 describe('T-UX-007 — per-image progress without navigating away', () => {
-  it('T-UX-007a: a submitted batch reads as QUEUED, with both counts', () => {
+  it('T-UX-050 · T-UX-007a: a submitted batch reads as QUEUED, with both counts', () => {
     render(<BatchStatusPage batch={batch({ status: 'submitted' })} />);
     expect(screen.getByTestId('batch-status-headline')).toHaveTextContent(
       'Queued — 4 of 7 screenshots read.',
     );
   });
 
-  it('T-UX-007b: an extracting batch reads as RUNNING, not queued', () => {
+  it('T-UX-051 · T-UX-007b: an extracting batch reads as RUNNING, not queued', () => {
     render(<BatchStatusPage batch={batch()} />);
     expect(screen.getByTestId('batch-status-headline')).toHaveTextContent('Reading 4 of 7…');
   });
@@ -187,7 +207,7 @@ describe('T-UX-007 — per-image progress without navigating away', () => {
     expect(screen.queryByRole('button', { name: STATUS_DISCARD_LABEL })).not.toBeInTheDocument();
   });
 
-  it('T-UX-007n: §5.5 EXTRACTOR_ERROR reassures AND offers both actions', async () => {
+  it('T-UX-053 · T-UX-007n: §5.5 EXTRACTOR_ERROR reassures AND offers both actions', async () => {
     const onRetry = vi.fn();
     const onDiscard = vi.fn();
     render(
@@ -207,7 +227,7 @@ describe('T-UX-007 — per-image progress without navigating away', () => {
     expect(onDiscard).toHaveBeenCalledOnce();
   });
 
-  it('T-UX-007o: §5.6 EXTRACTOR_UNAVAILABLE is transient — retry only, no discard', () => {
+  it('T-UX-054 · T-UX-007o: §5.6 EXTRACTOR_UNAVAILABLE is transient — retry only, no discard', () => {
     render(
       <BatchStatusPage
         batch={batch({ extractionError: 'EXTRACTOR_UNAVAILABLE' })}
@@ -225,7 +245,7 @@ describe('T-UX-007 — per-image progress without navigating away', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('T-UX-007p: §5.7 IMAGES_PURGED offers new screenshots and NEVER a retry', async () => {
+  it('T-UX-055 · T-UX-007p: §5.7 IMAGES_PURGED offers new screenshots and NEVER a retry', async () => {
     const onUploadNew = vi.fn();
     render(
       <BatchStatusPage

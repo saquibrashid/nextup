@@ -17,7 +17,7 @@
 
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { StrictMode } from 'react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildReviewResponse } from '@nextup/domain';
 
@@ -188,6 +188,18 @@ function stubClient(overrides: Record<string, unknown> = {}) {
   return { client, calls };
 }
 
+/**
+ * The review destination, naming the batch it was reached for.
+ *
+ * ⚠ It keeps the literal text "review screen" other cases already match on,
+ * and adds the id, so §5.4 can assert WHICH review it landed on rather than
+ * merely that some navigation happened.
+ */
+function ReviewProbe(): JSX.Element {
+  const { batchId } = useParams();
+  return <p data-testid="review-screen">review screen: {batchId ?? 'none'}</p>;
+}
+
 /** Renders a route at a real URL so `useParams` sees a batch id. */
 function renderAt(url: string, element: JSX.Element, pattern: string, strict = false) {
   const tree = (
@@ -195,7 +207,7 @@ function renderAt(url: string, element: JSX.Element, pattern: string, strict = f
       <Routes>
         <Route path={pattern} element={element} />
         <Route path="/batches/:batchId" element={<p>status screen</p>} />
-        <Route path="/batches/:batchId/review" element={<p>review screen</p>} />
+        <Route path="/batches/:batchId/review" element={<ReviewProbe />} />
         <Route path="/" element={<p>list screen</p>} />
       </Routes>
     </MemoryRouter>
@@ -583,6 +595,50 @@ describe('T-UX-056 — offline while polling', () => {
     );
 
     expect(await screen.findByTestId('batch-status-load-error')).toBeVisible();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T-UX-052 — ux-states.md §5.4, the batch finishes reading
+// ---------------------------------------------------------------------------
+
+/**
+ * §5.4: *"Auto-navigates to the review page."*
+ *
+ * ⚠ THIS IS A ROUTE BEHAVIOUR AND HAD NO ASSERTION ANYWHERE.
+ * `batchStatusPage.spec.tsx` covers every other §5 row, and it cannot reach
+ * this one: the page renders no navigation, the container does. So the single
+ * transition the owner cannot perform for themselves — the batch has finished
+ * reading and there is now something to review — was shipped unmeasured. A
+ * silent failure here strands the owner on a progress screen that has stopped
+ * progressing, with no control offering the review.
+ */
+describe('T-UX-052 — §5.4 a finished batch goes to the review', () => {
+  it('T-UX-052a: an in-review batch navigates to that batch\u2019s review', async () => {
+    const { client } = stubClient({ getBatch: () => Promise.resolve(batch('in-review')) });
+    renderAt(
+      '/batches/bat_1',
+      <BatchStatusRoute client={client} visibility={() => false} />,
+      '/batches/:batchId',
+    );
+
+    // ⚠ The batch id is part of the assertion, not decoration: navigating to
+    // some other batch's review is a worse failure than not navigating.
+    expect(await screen.findByTestId('review-screen')).toHaveTextContent('bat_1');
+  });
+
+  it('T-UX-052b: a still-running batch does NOT navigate', async () => {
+    const { client } = stubClient();
+    renderAt(
+      '/batches/bat_1',
+      <BatchStatusRoute client={client} visibility={() => false} />,
+      '/batches/:batchId',
+    );
+
+    await screen.findByTestId('batch-status-images');
+    // The inverse failure, and the one a naive `useEffect` produces: yanking
+    // the owner off a progress screen they are still watching.
+    expect(screen.queryByTestId('review-screen')).toBeNull();
   });
 });
 
