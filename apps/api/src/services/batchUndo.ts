@@ -28,6 +28,13 @@ import {
   toBatchProvenance,
 } from '@nextup/domain';
 import type { BatchProvenance } from '@nextup/domain';
+import type {
+  UndoRefusalCreatedEntry,
+  UndoRefusalCurrentState,
+  UndoRefusalDetails,
+  UndoRefusalModifiedEntry,
+  UndoRefusalRemovedEntry,
+} from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
 import {
@@ -266,63 +273,20 @@ async function rederiveSurvivors(
 /* ── §8.4 refusal enumeration (TASK-114, REQ-075, US-033) ─────────────────── */
 
 /**
- * Where a work stands NOW, relative to the owner's list, so the refusal panel
- * can say what its remedy will do. NOT a `TitleState`: `'suppressed'` is the
- * existence of a `Suppression` row against the WORK (REQ-071), evaluated here
- * for display only and never written back onto the title.
+ * ⚠ THE §8.4 REFUSAL TYPES NOW LIVE IN `@nextup/domain`, NOT HERE. They are
+ * re-exported so existing importers of this module keep working, but the
+ * declaration is shared because `apps/web`'s refusal panel renders the same
+ * contract and must fail to compile when this shape changes.
  */
-export type UndoRefusalCurrentState = 'active' | 'removed' | 'suppressed';
-
-export interface UndoRefusalCreatedEntry {
-  titleId: string;
-  name: string;
-  releaseYear: number | null;
-  posterPath: string | null;
-  currentState: UndoRefusalCurrentState;
-  remedy: 'not-interested';
-  remedyHref: string;
-}
-
-export interface UndoRefusalModifiedEntry {
-  titleId: string;
-  name: string;
-  releaseYear: number | null;
-  posterPath: string | null;
-  attr: string;
-  before: unknown;
-  currentState: UndoRefusalCurrentState;
-  remedy: 'fix-match';
-  remedyHref: string;
-}
-
-export interface UndoRefusalRemovedEntry {
-  titleId: string;
-  listingId: string;
-  name: string;
-  releaseYear: number | null;
-  posterPath: string | null;
-  currentState: UndoRefusalCurrentState;
-  remedy: 'restore';
-  remedyHref: string;
-}
-
-export interface UndoRefusalDetails {
-  batchId: string;
-  reason: 'modified-or-removed' | 'later-owner-edits' | 'provenance-unavailable';
-  created: UndoRefusalCreatedEntry[];
-  modified: UndoRefusalModifiedEntry[];
-  removed: UndoRefusalRemovedEntry[];
-  /**
-   * ⚠ ALWAYS `false`, typed as the literal so a summarising change fails to
-   * compile. The enumeration is NEVER capped, paged or sliced (US-033 AC-5,
-   * `specs/testing.md` §6 row 10): a truncated refusal shows the owner a
-   * partial list of what undo would touch and the difference is invisible. The
-   * UI paginates client-side.
-   */
-  truncated: false;
-  /** Carried on `AppError.details` (a `Record<string, unknown>`). */
-  [key: string]: unknown;
-}
+export type {
+  UndoRefusalCreatedEntry,
+  UndoRefusalCurrentState,
+  UndoRefusalDetails,
+  UndoRefusalEntry,
+  UndoRefusalModifiedEntry,
+  UndoRefusalReason,
+  UndoRefusalRemovedEntry,
+} from '@nextup/domain';
 
 interface TitleDisplay {
   workIdentity: string;

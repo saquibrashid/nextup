@@ -38,6 +38,9 @@ export * from './close.js';
 // TASK-074 — provenance (REQ-068, US-031): how stored `batch_change` rows
 // fold back into the §3.7 three-array shape a batch undo reads.
 export * from './provenance.js';
+// TASK-116 — the §8.4 undo-refusal contract, shared so the SPA's refusal panel
+// renders the SAME shape the API produces rather than a hand-copied twin.
+export * from './undoRefusal.js';
 // TASK-065 — the pure half of the review response (`specs/api.md` §6.17):
 // section routing, the mode contract and removal withholding.
 export * from './review.js';
