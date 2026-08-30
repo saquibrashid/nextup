@@ -226,7 +226,7 @@ image is "no longer available for re-extraction", never a 500.
 - `Context/requirements.md` — NFR-011, NFR-019, NFR-020, REQ-007,
   REQ-041, REQ-074; §1.8
 - `Context/open-questions.md` — OQ-009 (closed at A35)
-- `artifacts/PRD.md` §7.5, US-004, US-034, US-035
+- `docs/PRD.md` §7.5, US-004, US-034, US-035
 - ADR-0001 (extraction), ADR-0003 (hosting), ADR-0005 (datastore),
   **ADR-0008 (HEIC transcode — the stored blob is a derived PNG; EXIF/GPS
   stripped on ingest)**

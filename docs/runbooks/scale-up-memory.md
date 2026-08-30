@@ -520,8 +520,8 @@ Do **not** keep climbing the SKU ladder blindly. In order:
   in §4.
 
 > ~~*Superseded 2026-08-18 (TASK-156): this section linked
-> `artifacts/architecture.md`, `artifacts/adr/ADR-0003-hosting-and-compute.md`
-> and `artifacts/adr/ADR-0008-heic-transcode-on-ingest.md`. `artifacts/` is
+> `docs/architecture.md`, `docs/adr/ADR-0003-hosting-and-compute.md`
+> and `docs/adr/ADR-0008-heic-transcode-on-ingest.md`. `docs/` is
 > the authoring tree and does not exist in the delivered repo; all three live
 > under `docs/`. It also closed with "`RSK-029` — every price on this page is
 > unverified, ±30 %", which `TASK-010` superseded on 2026-08-17: the +$5.92

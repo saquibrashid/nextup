@@ -32,7 +32,7 @@
 > an open question.**
 >
 > **The remedy values, for when the trigger fires** (procedure:
-> `artifacts/runbooks/scale-up-memory.md`, `A43-M4`):
+> `docs/runbooks/scale-up-memory.md`, `A43-M4`):
 >
 > | Parameter | **REMEDY VALUE (apply only on a real OOM)** |
 > |---|---|
@@ -78,7 +78,7 @@
 > | **A43-M1** | **Pre-decode dimension/pixel guard** | Reject `width × height > NEXTUP_MAX_DECODE_PIXELS`, or either dimension `> 16000` / `< 50`, **before allocating any decode buffer** — read from the HEIF `ispe` box / PNG IHDR / JPEG SOFn. **Retained at the owner's explicit instruction even though "mitigate and stay" was not the selected option: it is what makes the reactive option survivable.** The byte-size ceiling is *not* a substitute — HEIC compression ratio is variable and bytes do not predict raster size. Guard value **moves with container memory** (25 MP ⇄ 0.5 GiB, 50 MP ⇄ 1.0 GiB). Detail: ADR-0008 R2.1 |
 > | **A43-M2** | **One-image blast radius** | Guard rejection, decode failure or OOM fails **that image only**. No partial commit, no batch corruption — guaranteed structurally by the one-transaction close, not by an error handler. Reconciled with `REQ-074` in `architecture.md` §Key flows and ADR-0008 R2.2 |
 > | **A43-M3** | **Self-explaining error** | Names memory/decode as the cause and cites `runbooks/scale-up-memory.md`. **No blind debugging.** Exact text: ADR-0008 R2.3 |
-> | **A43-M4** | **The runbook** | `artifacts/runbooks/scale-up-memory.md` — exact `az` command, exact `infra/aca.bicep` change, confirmation, cost delta, rollback. One step, executable by someone who is not thinking clearly |
+> | **A43-M4** | **The runbook** | `docs/runbooks/scale-up-memory.md` — exact `az` command, exact `infra/aca.bicep` change, confirmation, cost delta, rollback. One step, executable by someone who is not thinking clearly |
 > | **A43-M5** | **OOM/restart alert** | So the trigger is **observed, not inferred**. ⚠ **Azure Container Apps does not surface OOM-kill as a distinct signal** (no `OOMKilled` metric, no termination-reason dimension) — the design uses replica-restart count, memory-working-set pressure, system/console logs, and an **application-emitted decode begin/end sentinel that names the failing image**. Full design, confidence and the verification owed: `architecture.md` §Observability → *Knowing that it OOMed* |
 >
 > **Retained from R3.2 and still required:** strictly serial image
@@ -180,7 +180,7 @@
 > at R4 is part of the pinned configuration, and the two values must
 > always move together. The up-size lever is no longer merely "available":
 > it is **pre-authorised and documented** in
-> `artifacts/runbooks/scale-up-memory.md`.
+> `docs/runbooks/scale-up-memory.md`.
 >
 > ~~`T-INFRA-005` (SKU pinning) is updated to assert `0.25 vCPU / 0.5 GiB`,
 > not `0.5 / 1.0`.~~ *(R3 text, superseded by the R4 line above — the
@@ -687,8 +687,8 @@ architecture implements both **without a scheduler**:
 
 - `Context/requirements.md` — NFR-012, NFR-002, NFR-003, NFR-004,
   NFR-005, NFR-014, NFR-019, NFR-020, REQ-041, REQ-076
-- `artifacts/PRD.md` §7.4 (closed enumeration), §12.2, US-036, US-039
-- `artifacts/BRD.md` — "$0–$5/month … everything except extraction"
+- `docs/PRD.md` §7.4 (closed enumeration), §12.2, US-036, US-039
+- `docs/BRD.md` — "$0–$5/month … everything except extraction"
 - ADR-0001 (extraction), ADR-0002 (identity), ADR-0005 (datastore),
   ADR-0006 (image storage)
 - **Pricing provenance:** Azure list prices from model knowledge; web

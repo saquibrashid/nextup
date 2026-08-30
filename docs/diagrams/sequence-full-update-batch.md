@@ -207,7 +207,7 @@ straight out of these three arrays.
   two-pass approach (normalised text pre-match, `workIdentity`
   post-match) is in ADR-0005.
 - Polling is shown as a single call; the real interval and the progress
-  states belong in `specs/ux.md`.
+  states belong in `specs/ux-states.md`.
 - `OQ-011` — how fast this review must be to stay tolerable — is open and
   is the product's largest abandonment risk (R-1). This diagram shows
   *what* happens, not how many taps it costs.

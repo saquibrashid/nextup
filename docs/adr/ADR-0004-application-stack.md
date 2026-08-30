@@ -269,7 +269,7 @@ by once. An ADR table is executed, not narrated.
 
 - `Context/requirements.md` — NFR-002, NFR-003, NFR-004, NFR-006,
   NFR-007, NFR-008, NFR-013; ASM-028, ASM-029
-- `artifacts/PRD.md` §3 P-2 ("the implementing agent" as a persona),
+- `docs/PRD.md` §3 P-2 ("the implementing agent" as a persona),
   US-037, US-039
 - ADR-0001 (extraction), ADR-0003 (hosting), ADR-0005 (datastore)
 

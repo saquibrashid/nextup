@@ -3,7 +3,7 @@ createdAt: 2026-08-10T20:12:02-04:00
 createdBy: spec-writer
 phase: 8
 status: complete
-sourceOfTruth: artifacts/PRD.md, artifacts/architecture.md, artifacts/adr/ADR-0005, ADR-0006, ADR-0007, artifacts/diagrams/data-model-erd.md
+sourceOfTruth: docs/PRD.md, docs/architecture.md, docs/adr/ADR-0005, ADR-0006, ADR-0007, docs/diagrams/data-model-erd.md
 ---
 
 # specs/data-model.md — nextup
@@ -92,7 +92,7 @@ sourceOfTruth: artifacts/PRD.md, artifacts/architecture.md, artifacts/adr/ADR-00
 > the wrong thing. That is `RSK-030`; these banners are its mitigation, and
 > `TASK-143` is the sweep that confirms them.
 
-> **Entity names in this document match `artifacts/diagrams/data-model-erd.md`
+> **Entity names in this document match `docs/diagrams/data-model-erd.md`
 > exactly.** A mismatch is a blocking review finding (architecture §Handover 1).
 
 **Serves:** US-002, US-004, US-005, US-007, US-008, US-009, US-010, US-016,
@@ -1295,7 +1295,7 @@ recommended for early promotion (architecture §Deliberately deferred); it is
 | OQ-023 | v1.1 only; untouched |
 | OQ-024 | Untouched — `specs/ai.md` §8 specifies behaviour under both answers without assuming either |
 | **OQ-025 (new)** | ~~No user-controlled backup or export exists.~~ **NARROWED (R3), RE-WIDENED (R4):** the store is **Azure SQL Database Basic**, whose point-in-time restore window is **7 days** — the Basic-tier maximum — not the 35 days the R3 PostgreSQL design gave (§16.1, §16.10). An accidental destructive change is recoverable by the owner's operator **only within 7 days of it happening**, so the window can close before a single-owner product is next opened. Still missing on top of that: a *user-controlled* export the owner can hold themselves; and PITR of any length does not survive subscription loss. Severity **medium → low-medium (R3) → medium (R4)** — the R3 narrowing was justified by a 35-day window that no longer exists. Owner: the owner, post-v1. ~~**NARROWED (R3):** the store is now PostgreSQL Flexible Server with **35-day point-in-time restore** included, so an accidental destructive change is recoverable by the owner's operator within 35 days. … Severity **medium → low-medium**.~~ |
-| **OQ-026 (A41)** | **CLOSED at `A40`: the owner selected Variant A (~$11–13/mo).** The closing mechanism was the per-component cost table in `artifacts/architecture.md` §Cost summary. This document's only cost-relevant content is that the store is now a paid **Azure SQL Basic** database (~$5/mo prod + ~$0.50/mo serverless staging) rather than PostgreSQL B1ms (~$15/mo) or a free tier. |
+| **OQ-026 (A41)** | **CLOSED at `A40`: the owner selected Variant A (~$11–13/mo).** The closing mechanism was the per-component cost table in `docs/architecture.md` §Cost summary. This document's only cost-relevant content is that the store is now a paid **Azure SQL Basic** database (~$5/mo prod + ~$0.50/mo serverless staging) rather than PostgreSQL B1ms (~$15/mo) or a free tier. |
 
 
 ---

@@ -195,7 +195,7 @@ application logic changes.
 
 - `Context/requirements.md` — NFR-015, NFR-016, NFR-017, NFR-008, NFR-001
 - `Context/open-questions.md` — OQ-019 (opened at A27), C4b/C5
-- `artifacts/PRD.md` §6 US-001, US-002; §7.7 permissions matrix
+- `docs/PRD.md` §6 US-001, US-002; §7.7 permissions matrix
 - ADR-0003 (hosting), ADR-0005 (datastore), ADR-0006 (image storage)
 
 ---

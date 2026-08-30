@@ -5,7 +5,7 @@ phase: 11
 checksRun: 22
 findings: { critical: 0, high: 1, medium: 4, low: 2, nit: 0 }
 verdict: fix-blockers-first
-scope: NON-INTERACTIVE audit of Context/* and artifacts/* at Revision 4 (A40 Variant A)
+scope: NON-INTERACTIVE audit of Context/* and docs/* at Revision 4 (A40 Variant A)
 sourceOfTruth: Context/session-state.json, Context/requirements.md, Context/mvp-definition.md §17–§18
 ---
 
@@ -59,7 +59,7 @@ verified and how.
   delegates that to a build-time gate (`T-META-001`, US-039 AC-1) rather than to
   a static document, which is the correct place for it but means it is unproven
   until CI runs once.
-- **Supersession hunt.** Ripgrep across `artifacts/**` for `Cosmos`,
+- **Supersession hunt.** Ripgrep across `docs/**` for `Cosmos`,
   `PostgreSQL/Postgres/pg_trgm/pg_cron/B1ms`, `ACR/Container Registry`,
   `near-zero/\$0/month/free tier only`, `\$30`, then read each hit in context to
   decide whether it reads as **history (fine)** or as **current (defect)**.

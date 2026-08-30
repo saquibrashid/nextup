@@ -85,7 +85,7 @@ still the primary gate.
 > which relaxed `NFR-012` from a near-zero-cost MUST to a SHOULD with quality
 > and reliability outranking raw cost. Estimated total ≈ **$30/month**; the
 > per-component table and two leaner variants are in
-> `artifacts/architecture.md` §Cost summary. Decisions: ADR-0003 Rev 2,
+> `docs/architecture.md` §Cost summary. Decisions: ADR-0003 Rev 2,
 > ADR-0005 Rev 2.
 
 ## Core features (v1 — 59 functional requirements)

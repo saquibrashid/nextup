@@ -3,7 +3,7 @@ createdAt: 2026-08-10T20:12:02-04:00
 createdBy: spec-writer
 phase: 8
 status: complete
-sourceOfTruth: artifacts/PRD.md §9, specs/ui.md, specs/api.md
+sourceOfTruth: docs/PRD.md §9, specs/ui.md, specs/api.md
 ---
 
 # specs/ux-states.md — nextup

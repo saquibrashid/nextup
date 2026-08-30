@@ -3,7 +3,7 @@ createdAt: 2026-08-10T20:12:02-04:00
 createdBy: spec-writer
 phase: 8
 status: complete
-sourceOfTruth: artifacts/PRD.md, artifacts/architecture.md, artifacts/adr/ADR-0002, ADR-0006
+sourceOfTruth: docs/PRD.md, docs/architecture.md, docs/adr/ADR-0002, ADR-0006
 ---
 
 # specs/api.md — nextup HTTP API
