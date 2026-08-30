@@ -299,7 +299,17 @@ export function reviewBanner(input: {
   // §5.9 requires the same banner here and on `/batches/:batchId`; this used
   // to be a second, differently-worded string, which meant the owner read one
   // explanation on the status page and another on review for one event.
-  if (input.crossCheck === 'llm-unavailable') {
+  //
+  // ⚠ **BOTH OUTCOMES RAISE IT, NOT JUST THE SEVERE ONE.** §5.10 (the
+  // cross-check reader down, `ocr-unavailable`) is explicitly "same banner
+  // wording, milder consequence": removals are still permitted, but the read
+  // went one-legged and the owner is entitled to know before they confirm.
+  // `ocr-unavailable` returned `null` here while `isDegraded()` on the status
+  // page accepted it, so ONE event produced a banner on one screen and silence
+  // on the other — the exact drift the shared constant above exists to stop,
+  // and the half `T-UX-008h`'s title ("identical to the review page banner")
+  // asserted about itself without ever rendering the review page.
+  if (input.crossCheck === 'llm-unavailable' || input.crossCheck === 'ocr-unavailable') {
     return DEGRADED_EXTRACTION_BANNER;
   }
   return null;
