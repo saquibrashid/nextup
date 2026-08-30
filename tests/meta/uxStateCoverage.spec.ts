@@ -111,13 +111,7 @@ const KNOWN_UNCOVERED: readonly string[] = [
   // to sit under it. Restored in full.)
   'T-UX-068',
   'T-UX-069',
-  'T-UX-070',
   'T-UX-073',
-  'T-UX-080',
-  'T-UX-081',
-  'T-UX-082',
-  'T-UX-083',
-  'T-UX-084',
 ];
 
 function collectSpecFiles(): string[] {

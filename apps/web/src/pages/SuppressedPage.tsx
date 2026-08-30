@@ -18,7 +18,15 @@
 
 import { useState, type JSX } from 'react';
 
-import { RETRY_LABEL, UNMATCHED_SUPPRESSION_CAVEAT, UNSUPPRESS_CONFIRM_BODY } from '../copy';
+import {
+  RETRY_LABEL,
+  SUPPRESSED_EMPTY_BACK,
+  SUPPRESSED_EMPTY_BODY,
+  SUPPRESSED_EMPTY_TITLE,
+  SUPPRESSED_LOADING,
+  UNMATCHED_SUPPRESSION_CAVEAT,
+  UNSUPPRESS_CONFIRM_BODY,
+} from '../copy';
 import { withName } from '../components/SuppressDialog';
 import type { SuppressionItem } from '../lib/apiClient';
 import { TMDB_IMAGE_BASE } from '../components/TitleRow';
@@ -45,7 +53,7 @@ function SuppressionRow({
 }: {
   item: SuppressionItem;
   onUnsuppress: (suppressionId: string) => Promise<unknown>;
-  onDone: () => void;
+  onDone: (msg: string) => void;
 }): JSX.Element {
   const [rowState, setRowState] = useState<RowState>({ phase: 'idle' });
   const { displaySnapshot, identityStability, suppressionId } = item;
@@ -56,7 +64,7 @@ function SuppressionRow({
     setRowState({ phase: 'submitting' });
     onUnsuppress(suppressionId).then(
       () => {
-        onDone();
+        onDone(withName(UNSUPPRESS_CONFIRM_BODY, name));
       },
       () => {
         setRowState({ phase: 'error' });
@@ -65,7 +73,11 @@ function SuppressionRow({
   }
 
   return (
-    <li className="suppressed-row" data-testid="suppressed-row">
+    <li
+      className="suppressed-row"
+      data-testid="suppressed-row"
+      aria-busy={rowState.phase === 'submitting' ? 'true' : undefined}
+    >
       {displaySnapshot.posterPath !== null ? (
         <img
           className="suppressed-row__poster"
@@ -120,7 +132,7 @@ function SuppressionRow({
         )}
 
         {rowState.phase === 'submitting' && (
-          <button type="button" className="tap-target" disabled>
+          <button type="button" className="tap-target" data-testid="unsuppress-submitting" disabled>
             Removing…
           </button>
         )}
@@ -153,6 +165,7 @@ export function SuppressedPage({
   onUnsuppress = () => Promise.resolve(),
 }: SuppressedPageProps): JSX.Element {
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
+  const [announcement, setAnnouncement] = useState<string | null>(null);
 
   const visible = items.filter((item) => !dismissed.has(item.suppressionId));
 
@@ -160,6 +173,12 @@ export function SuppressedPage({
     <>
       <h1>Not interested</h1>
       <p data-testid="suppressed-subtitle">{'These won\u2019t be added back by future uploads.'}</p>
+
+      {announcement !== null && (
+        <p role="status" data-testid="unsuppress-success-announcement">
+          {announcement}
+        </p>
+      )}
 
       {loadFailed ? (
         <div role="alert" data-testid="suppressed-load-error">
@@ -171,9 +190,29 @@ export function SuppressedPage({
           )}
         </div>
       ) : loading ? (
-        <p role="status" data-testid="suppressed-loading">
-          Loading your Not interested list…
-        </p>
+        <div role="status" data-testid="suppressed-loading" aria-label={SUPPRESSED_LOADING}>
+          <ul
+            className="suppressed-list suppressed-list--loading"
+            data-testid="suppressed-loading-skeletons"
+          >
+            {[0, 1, 2].map((index) => (
+              <li
+                key={index}
+                className="suppressed-row suppressed-row--skeleton"
+                data-testid="suppressed-row-skeleton"
+                aria-hidden="true"
+              />
+            ))}
+          </ul>
+        </div>
+      ) : visible.length === 0 && dismissed.size === 0 ? (
+        <div data-testid="suppressed-empty">
+          <p>{SUPPRESSED_EMPTY_TITLE}</p>
+          <p>{SUPPRESSED_EMPTY_BODY}</p>
+          <a className="tap-target" href="/">
+            {SUPPRESSED_EMPTY_BACK}
+          </a>
+        </div>
       ) : (
         <ul data-testid="suppressed-list">
           {visible.map((item) => (
@@ -181,8 +220,9 @@ export function SuppressedPage({
               key={item.suppressionId}
               item={item}
               onUnsuppress={onUnsuppress}
-              onDone={() => {
+              onDone={(msg) => {
                 setDismissed((prev) => new Set([...prev, item.suppressionId]));
+                setAnnouncement(msg);
               }}
             />
           ))}
