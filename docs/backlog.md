@@ -138,7 +138,7 @@ effortModel: agent-runs + owner-review-minutes (see §0.2)
 > up-size only if it OOMs."*** Compute **STAYS at 0.25 vCPU / 0.5 GiB**. The
 > up-size to **0.5 vCPU / 1.0 GiB (+~$4/month)** is now a **pre-authorised,
 > trigger-gated remedy** applied *reactively* only if a real OOM occurs —
-> `artifacts/runbooks/scale-up-memory.md`, ADR-0003 Rev 4, ADR-0008 Rev 2.
+> `docs/runbooks/scale-up-memory.md`, ADR-0003 Rev 4, ADR-0008 Rev 2.
 > **`RSK-016` is therefore an OWNER-ACCEPTED RESIDUAL RISK, and its five
 > containment mechanisms (`A43-M1`…`A43-M5`) are MANDATORY acceptance criteria,
 > not optional mitigations** — they are what makes a reactive strategy
@@ -262,7 +262,7 @@ Consequences that shaped every row in this backlog:
    Node + Express (`apps/api/src/**`), shared TypeScript domain
    (`packages/domain/src/**`), Bicep (`infra/**`), tests (`tests/**`).
 3. **Every acceptance criterion maps to a named test** from
-   `artifacts/specs/testing.md` §9. Test IDs are cited on every task. A task with
+   `specs/testing.md` §9. Test IDs are cited on every task. A task with
    no test ID is a task that cannot be verified by a machine, and there are only
    the deliberate exceptions listed in `testing.md` §10.
 4. **Sized for a single agent run.** An agent's error rate compounds with task
@@ -725,13 +725,13 @@ supplies real golden fixtures — not because M3 depends on the answer.
 
 ## 4. Epics → stories → tasks
 
-Epic and story IDs are from `artifacts/PRD.md`. **Every task traces to a user
-story ID.** Test IDs are from `artifacts/specs/testing.md` §9.
+Epic and story IDs are from `docs/PRD.md`. **Every task traces to a user
+story ID.** Test IDs are from `specs/testing.md` §9.
 
 > ### ⚠ Story→requirement traces are SYNCED FROM THE PRD — the PRD wins
 >
 > The `Traces to: US-0NN (…)` line under each story below is a **convenience
-> copy**. `artifacts/PRD.md` is the **single authoritative source** for
+> copy**. `docs/PRD.md` is the **single authoritative source** for
 > story→requirement traceability. If the two ever disagree, **the PRD is right
 > and this file is stale.**
 >
