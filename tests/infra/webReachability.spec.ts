@@ -153,19 +153,6 @@ function callForm(method: string): RegExp {
  *   nothing needs to today. Do not "fix" this by wiring a second, duplicate
  *   message into a container: that would render the rejection copy twice.
  *
- * Genuinely unwired, a separately-tracked gap — NOT permission for a second:
- * - `RemovalConfirmDialog.submitting` — the confirm/cancel buttons never
- *   disable while the removal is in flight. ⚠ INVESTIGATED, AND THE EXPOSURE
- *   IS SMALLER THAN IT LOOKS: `ReviewPage`'s `onConfirm` calls
- *   `setConfirming(false)` before `onApply`, so the dialog unmounts
- *   synchronously and cannot itself be double-submitted, and a second close is
- *   refused server-side with 409 `BATCH_NOT_IN_REVIEW` rather than applied
- *   twice. What remains is the **Apply changes** button on the no-removals
- *   path, which has no in-flight guard: a double-tap yields a success followed
- *   by a spurious error, a UX wart rather than data loss. Recorded here so the
- *   next reader does not re-derive it — and NOT fixed in the same breath,
- *   because `ReviewPage.tsx` is a live edit surface.
- *
  * ⚠ `BatchStatusPage.offline` WAS HERE AND IS NOW WIRED — and it was the same
  * defect as `RefusalPage.signedInEmail` below, one layer down. The banner and
  * its placement above the error branch were built correctly and no container
@@ -176,6 +163,16 @@ function callForm(method: string): RegExp {
  * `offline` state, pauses the tick, resumes with an immediate read, and
  * suppresses a failure that lands after the drop; `T-UX-056a`–`e` drive the
  * ROUTE, never the page.
+ *
+ * ⚠ `RemovalConfirmDialog.submitting` WAS HERE AND IS NOW WIRED, AND THE NOTE
+ * THAT SAT ON IT WAS WRONG IN THE WAY THAT MATTERS. It reasoned that the
+ * dialog "unmounts synchronously and cannot itself be double-submitted" — true,
+ * and precisely the defect: the dialog vanished under the owner's finger while
+ * a close was in flight against the review it left behind, and the **Apply
+ * changes** button underneath had no in-flight guard at all. `ux-states.md`
+ * §6.12 wants the opposite — the dialog stays, with every control disabled.
+ * `ReviewPage` now derives the dialog's open state from `applying`, so no
+ * effect can race §6.15's re-open, and `T-UX-064a`–`f` drive the ROUTE.
  *
  * ⚠ `RefusalPage.signedInEmail` WAS HERE AND IS NOW WIRED — left recorded
  * because of HOW it was missed. `ux-states.md` §2.11 requires the refusal to
@@ -189,7 +186,6 @@ const BASELINE_UNSUPPLIED = new Set([
   'apps/web/src/components/ImageDropzone.tsx ImageDropzone.onPasteFailed',
   'apps/web/src/components/ImageDropzone.tsx ImageDropzone.touch',
   'apps/web/src/components/PasteCapture.tsx PasteCapture.target',
-  'apps/web/src/components/RemovalConfirmDialog.tsx RemovalConfirmDialog.submitting',
   'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.disclaimer',
   'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.logoPath',
   'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.omdbDisclaimer',

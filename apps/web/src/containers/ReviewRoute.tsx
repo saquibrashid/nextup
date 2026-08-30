@@ -81,6 +81,8 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
   // a 5xx or a network error; cleared the instant a new attempt starts, so a
   // subsequent success never leaves a stale error on screen during navigation.
   const [applyFailed, setApplyFailed] = useState(false);
+  /** §6.12 — the close is in flight; the sticky bar's controls are disabled. */
+  const [applying, setApplying] = useState(false);
 
   // `specs/ux-states.md` §6.14. The candidate ids the server named in a 409
   // `PENDING_ADDITIONS`, or `null` when the last close did not refuse that way.
@@ -141,8 +143,13 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
       // renders anything by itself.
       setApplyFailed(false);
       setPendingAdditionIds(null);
+      setApplying(true);
       void client.closeBatch(batchId, confirmRemovals).then(
         (result) => {
+          // ⚠ `applying` is deliberately NOT cleared here. The navigation is
+          // the terminal state; clearing it first re-enables both buttons for
+          // the frame before the route changes, which is exactly the window a
+          // double-tap lands in.
           navigate('/', { state: { applied: toAppliedBatch(result) } });
         },
         (error: unknown) => {
@@ -163,6 +170,14 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
           //   - 401 (§6.18) is already redirecting inside `request`; every
           //     other 4xx (a refusal) is not a "try again" case either.
           //   - Only a 5xx or a network failure is §6.16.
+          //
+          // ⚠ CLEARED BEFORE THE BRANCHING, NOT INSIDE EACH ARM. Every one of
+          // these arms leaves the owner on the review with something to do,
+          // and three of them `return` early — a per-arm clear would be
+          // forgotten by exactly the arm that was added last, leaving the
+          // owner with a permanently dead **Apply changes** button and no way
+          // to retry the close.
+          setApplying(false);
           if (error instanceof ApiError) {
             if (error.code === 'PENDING_ADDITIONS') {
               setPendingAdditionIds(pendingCandidateIdsFrom(error.details));
@@ -258,6 +273,7 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
       loading={review.resource.kind === 'loading'}
       loadFailed={review.resource.kind === 'failed'}
       applyFailed={applyFailed}
+      applying={applying}
       pendingAdditionIds={pendingAdditionIds}
       reconfirmSignal={reconfirmSignal}
       onRetry={review.reload}
