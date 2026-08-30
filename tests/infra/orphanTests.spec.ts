@@ -148,7 +148,12 @@ describe('T-META-006 — every defined test id is owned', () => {
     // SHOULD stay: three `T-AUTH-*` deferred by §10, two findings that need an
     // owner decision (`T-INV-014`, `T-INV-016`), and `T-UX-069`, catalogued as
     // not implemented in v1. `T-A11Y-014` is the one open piece of real work.
-    expect(BASELINE_ORPHANS.size).toBe(7);
+    // 7 → 6: `T-A11Y-014` is implemented in `tests/e2e/a11y.spec.ts`. It was
+    // the LAST actionable entry — the six that remain are the six that SHOULD.
+    // Lowering this number further needs an owner decision on the two
+    // findings, not more tests, so a future implementer should not read a
+    // non-zero baseline as unfinished work.
+    expect(BASELINE_ORPHANS.size).toBe(6);
   });
 
   it('T-META-006f: a citation that is struck through does not count as ownership', () => {

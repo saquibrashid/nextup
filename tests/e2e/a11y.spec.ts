@@ -1,6 +1,6 @@
 /**
- * `T-A11Y-001`, `T-A11Y-002`, `T-A11Y-012`, `T-A11Y-013`, `T-A11Y-015`,
- * `T-CSS-005` — the browser-only accessibility
+ * `T-A11Y-001`, `T-A11Y-002`, `T-A11Y-012`, `T-A11Y-013`, `T-A11Y-014`,
+ * `T-A11Y-015`, `T-CSS-005` — the browser-only accessibility
  * floor (`specs/testing.md` §37, `specs/ui.md` §10.2, §13.3, NFR-006).
  *
  * ⚠ THIS FILE DID NOT EXIST, AND ITS ABSENCE WAS INVISIBLE. `tests/e2e/` held
@@ -523,6 +523,233 @@ test.describe('T-A11Y-013 — long removal history stays operable at 320 px', ()
     for (let i = 0; i < count; i += 1) {
       await expectTapTarget(restoreButtons.nth(i));
     }
+  });
+});
+
+/**
+ * `T-A11Y-014` (US-037 AC-4) — the US-033 refusal enumeration is readable and
+ * actionable at 320 px.
+ *
+ * ⚠ THIS IS THE ONE SCREEN IN THE PRODUCT THAT IS UNBOUNDED BY DESIGN. Every
+ * other list the owner sees is a page of results; the undo refusal enumerates
+ * **everything** a one-step undo would touch and is forbidden from truncating
+ * (`UndoRefusalDetails.truncated` is typed as the literal `false`, US-033 AC-5,
+ * `specs/testing.md` §6 row 10). A refusal panel that is *correct* and
+ * *unusable at 320 px* fails the owner in exactly the same way a truncated one
+ * would: the entries they need to act on are there, and they cannot reach them.
+ *
+ * ⚠ AND THE COMPONENT TEST CANNOT SEE THIS. `apps/web/test` renders
+ * `UndoRefusalPanel` in jsdom, which has no layout — every element is 0×0, so
+ * neither the overflow check nor the 44 px tap target means anything there.
+ * Width, wrapping and reachability are browser-only facts.
+ */
+const REFUSAL_BATCH = {
+  batches: [
+    {
+      batchId: '01J0000000000000000000UNDO',
+      service: 'netflix',
+      mode: 'full-update',
+      status: 'applied',
+      createdAt: '2026-02-11T00:00:00.000Z',
+      submittedAt: '2026-02-11T00:01:00.000Z',
+      completedAt: '2026-02-11T00:02:00.000Z',
+      undoneAt: null,
+      counts: { created: 62, modified: 3, removed: 2 },
+    },
+  ],
+};
+
+/**
+ * ⚠ 62 CREATED ENTRIES, NOT 3, AND THE NUMBER IS LOAD-BEARING. `PAGE_SIZE` is
+ * 50, so a fixture below it never renders the "Show all" control and the
+ * assertions about reaching the tail pass over a list that was never long
+ * enough to have one. Names are deliberately long, unbroken and mixed-case:
+ * a single unwrappable token is the usual cause of sideways scroll at 320 px.
+ */
+const REFUSAL_DETAILS = {
+  batchId: '01J0000000000000000000UNDO',
+  reason: 'modified-or-removed',
+  truncated: false,
+  created: Array.from({ length: 62 }, (_, i) => ({
+    titleId: `ttl_created_${i}`,
+    name: `Everything Everywhere All At Once In One Unbreakable Title Number ${i}`,
+    releaseYear: 2022,
+    posterPath: null,
+    currentState: i % 3 === 0 ? 'suppressed' : 'active',
+    remedy: 'not-interested',
+    remedyHref: `/not-interested?title=ttl_created_${i}`,
+  })),
+  modified: Array.from({ length: 3 }, (_, i) => ({
+    titleId: `ttl_modified_${i}`,
+    name: `A Rematched Work With A Very Long Name Indeed ${i}`,
+    releaseYear: 1999,
+    posterPath: null,
+    attr: 'workIdentity',
+    before: 'tmdb:movie:603',
+    currentState: 'active',
+    remedy: 'fix-match',
+    remedyHref: `/?fix=ttl_modified_${i}`,
+  })),
+  removed: Array.from({ length: 2 }, (_, i) => ({
+    titleId: `ttl_removed_${i}`,
+    listingId: `lst_removed_${i}`,
+    name: `Something Taken Off The List Since This Batch Ran ${i}`,
+    releaseYear: 2010,
+    posterPath: null,
+    currentState: 'removed',
+    remedy: 'restore',
+    remedyHref: `/removed?listing=lst_removed_${i}`,
+  })),
+};
+
+/** Serves the batch history, then refuses the undo with the §8.4 body. */
+async function stubUndoRefusal(page: Page): Promise<void> {
+  await page.route('**/api/**', async (route) => {
+    const url = route.request().url();
+    const method = route.request().method();
+
+    if (url.includes('/undo') && method === 'POST') {
+      await route.fulfill({
+        status: 409,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: {
+            // The exact code `isUndoRefusal` matches on. A plausible-but-wrong
+            // one renders the generic retry panel and every assertion below
+            // would then be measuring the wrong screen.
+            code: 'BATCH_NOT_CREATES_ONLY',
+            message: 'This upload cannot be undone in one step.',
+            details: REFUSAL_DETAILS,
+          },
+        }),
+      });
+      return;
+    }
+
+    const body = url.includes('/me')
+      ? ME
+      : url.endsWith('/api/batches') && method === 'GET'
+        ? REFUSAL_BATCH
+        : { items: [] };
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(body),
+    });
+  });
+}
+
+/** Drive the history screen into the refusal panel. */
+async function openRefusalPanel(page: Page): Promise<void> {
+  await stubUndoRefusal(page);
+  await page.setViewportSize(NARROW);
+  await page.goto('/batches');
+  await expectStyledAndRendered(page);
+
+  await page.getByTestId('batch-card-undo').click();
+  await expect(page.getByTestId('undo-refusal-panel')).toBeVisible();
+}
+
+test.describe('T-A11Y-014 — the undo-refusal enumeration at 320 px', () => {
+  test('T-A11Y-014a: the panel renders all three groups without sideways scroll', async ({
+    page,
+  }) => {
+    await openRefusalPanel(page);
+
+    // Assert the panel is genuinely populated BEFORE measuring overflow — an
+    // empty panel cannot overflow, which is the trivial pass this file's
+    // header warns about.
+    await expect(page.getByTestId('undo-refusal-group-added')).toBeVisible();
+    await expect(page.getByTestId('undo-refusal-group-changed')).toBeVisible();
+    await expect(page.getByTestId('undo-refusal-group-removed')).toBeVisible();
+    expect(await page.getByTestId('undo-refusal-entry').count()).toBeGreaterThan(50);
+
+    await expectNoHorizontalOverflow(page, 'undo refusal panel');
+  });
+
+  test('T-A11Y-014b: every rendered name is readable — wrapped, not clipped away', async ({
+    page,
+  }) => {
+    await openRefusalPanel(page);
+
+    // "Readable" is a layout claim, so measure layout: each name occupies real
+    // width, sits inside the viewport, and is not collapsed to a sliver by an
+    // overflow rule. A name rendered at 3 px wide is present in the DOM and
+    // invisible to the owner.
+    const names = page.getByTestId('undo-refusal-name');
+    const count = await names.count();
+    expect(count).toBeGreaterThan(50);
+
+    const boxes = await names.evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const rect = node.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, width: rect.width };
+      }),
+    );
+    const viewport = page.viewportSize()?.width ?? 0;
+    for (const box of boxes) {
+      expect(box.width).toBeGreaterThan(40);
+      expect(box.left).toBeGreaterThanOrEqual(-0.5);
+      expect(box.right).toBeLessThanOrEqual(viewport + 0.5);
+    }
+  });
+
+  test('T-A11Y-014c: the remedy for the FIRST entry is a real 44 px target', async ({ page }) => {
+    await openRefusalPanel(page);
+
+    // One remedy per group, so all three remedy kinds are covered rather than
+    // whichever happens to sort first.
+    for (const testId of [
+      'undo-refusal-not-interested',
+      'undo-refusal-fix-match',
+      'undo-refusal-restore',
+    ] as const) {
+      const button = page.getByTestId(testId).first();
+      await button.scrollIntoViewIfNeeded();
+      await expect(button).toBeVisible();
+      await expectTapTarget(button);
+    }
+  });
+
+  test('T-A11Y-014d: the tail of a >50 entry group is reachable, and nothing is summarised away', async ({
+    page,
+  }) => {
+    await openRefusalPanel(page);
+
+    // ⚠ THE POINT OF US-033 AC-5, ASSERTED AT THE VIEWPORT WHERE IT IS
+    // HARDEST. The API may not truncate; the panel pages CLIENT-SIDE at 50.
+    // If "Show all" were unreachable at 320 px the effect on the owner is
+    // identical to a truncated response — twelve of their titles simply do
+    // not exist as far as they can tell.
+    const showAll = page.getByTestId('undo-refusal-show-all-added');
+    await showAll.scrollIntoViewIfNeeded();
+    await expect(showAll).toBeVisible();
+    await expect(showAll).toHaveText(/62/);
+    await expectTapTarget(showAll);
+
+    await showAll.click();
+
+    const last = page
+      .getByTestId('undo-refusal-name')
+      .filter({ hasText: 'Unbreakable Title Number 61' });
+    await last.scrollIntoViewIfNeeded();
+    await expect(last).toBeVisible();
+
+    // The full count is now rendered — 62 + 3 + 2.
+    expect(await page.getByTestId('undo-refusal-entry').count()).toBe(67);
+    // …and expanding it did not push the layout sideways.
+    await expectNoHorizontalOverflow(page, 'undo refusal panel, expanded');
+  });
+
+  test('T-A11Y-014e: the way out stays reachable at 320 px', async ({ page }) => {
+    await openRefusalPanel(page);
+
+    // The panel REPLACES the history full-screen, so its own close control is
+    // the only exit. Unreachable, the owner is stranded on it.
+    const close = page.getByTestId('undo-refusal-close');
+    await close.scrollIntoViewIfNeeded();
+    await expect(close).toBeVisible();
+    await expectTapTarget(close);
   });
 });
 

@@ -83,7 +83,19 @@ const SPEC_FILE_RE = /\.(spec|test)\.[cm]?[jt]sx?$/;
  * with a written test id that no task will build — see `specs/testing.md` §22.
  */
 export const BASELINE_ORPHANS = new Set([
-  'T-A11Y-014',
+  // ⚠ `T-A11Y-014` was REMOVED from this baseline — implemented in
+  // `tests/e2e/a11y.spec.ts` as five browser cases at 320 px. It lives there
+  // rather than in `apps/web/test` because jsdom has no layout: every element
+  // is 0×0, so an overflow check and a 44 px tap-target check both pass
+  // vacuously. Mutation-verified three ways — silently truncating the
+  // enumeration (`014d` alone), an unwrappable name (`014a`/`b`/`d`), and the
+  // close control losing its tap target (`014e` alone).
+  //
+  // ⚠ AND `T-A11Y-001c` DOES NOT COVER IT, despite reading as if it does
+  // ("every route avoids horizontal scroll at 320 px"). The refusal panel is
+  // not a route — it is reached only by a 409 from `POST /batches/:id/undo` —
+  // so the one unbounded-by-design screen in the product was outside the
+  // sweep that appears to include everything.
   // ⚠ `T-ATTR-005` was REMOVED from this baseline — implemented in
   // `apps/web/test/attribution.spec.tsx`. Mutation-verified: hiding the
   // attribution block on the logo's `error` event was caught by nothing else.
