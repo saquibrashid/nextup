@@ -220,6 +220,47 @@ button {
   font-weight: 600;
 }
 
+/*
+ * ⚠ THE NATIVE FILE INPUT IS CLIPPED, NOT `display: none`, AND NOT UNSTYLED.
+ *
+ * It previously carried no rule at all, so WebKit rendered its raw widget at
+ * its intrinsic **347 px** beside the already-styled "Choose files" label.
+ * Two consequences, both real:
+ *
+ *   1. `ux-states.md` §4.3 enumerates exactly THREE affordances in the
+ *      dropzone. A second, unstyled file control was a fourth.
+ *   2. 347 px cannot fit a 320 px phone. `.dropzone__target` centres its
+ *      children, so the input overflowed symmetrically — `(347 - 320) / 2`
+ *      = 13.5 px past each edge at 320 px, and 33.5 px at 280 px. That is a
+ *      horizontal scrollbar on the PRIMARY capture screen, and it is exactly
+ *      the +14 / +34 px that `T-A11Y-001c`/`d` measured on mobile-safari.
+ *
+ * ⚠ `display: none` and `visibility: hidden` are BOTH wrong here: they remove
+ * the input from the tab order, and the `<label>` is not focusable, so
+ * keyboard-only file selection would disappear entirely. Invariant 16 requires
+ * file selection to remain a COMPLETE path — the iOS Photos route for raw HEIC
+ * has no other way in. Clipping keeps the input focusable and operable while
+ * the label is what is seen; the focus ring is put back on the label below.
+ */
+.dropzone__file-input {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+
+/*
+ * Focus must stay VISIBLE once the input itself is clipped. The label precedes
+ * the input, so a sibling combinator cannot reach backwards; `:has()` on the
+ * container can.
+ */
+.dropzone__target:has(.dropzone__file-input:focus-visible) .dropzone__choose {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 /* ----------------------------------------------------------- filter bar -- */
 
 .filter-bar {

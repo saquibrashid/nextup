@@ -327,6 +327,7 @@ export function ImageDropzone({
           id={inputId}
           type="file"
           multiple
+          className="dropzone__file-input"
           data-testid="file-input"
           accept={IMAGE_ACCEPT_ATTRIBUTE}
           onChange={(event) => {
