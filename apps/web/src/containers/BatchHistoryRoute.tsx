@@ -57,7 +57,7 @@ type UndoState =
   | { readonly kind: 'success'; readonly counts: UndoSuccess }
   | { readonly kind: 'refused'; readonly details: UndoRefusalDetails }
   | { readonly kind: 'already-undone' }
-  | { readonly kind: 'failed' };
+  | { readonly kind: 'failed'; readonly batchId: string };
 
 export function BatchHistoryRoute({
   client = apiClient,
@@ -110,7 +110,7 @@ export function BatchHistoryRoute({
         } else if (isBatchAlreadyUndone(error)) {
           setUndo({ kind: 'already-undone' });
         } else {
-          setUndo({ kind: 'failed' });
+          setUndo({ kind: 'failed', batchId });
         }
       },
     );
@@ -137,7 +137,14 @@ export function BatchHistoryRoute({
       {undo.kind === 'failed' && (
         <div role="alert" data-testid="undo-failed">
           <p>{BATCHES_UNDO_FAILED}</p>
-          <span data-testid="undo-failed-retry-hint">{BATCHES_UNDO_FAILED_RETRY_LABEL}</span>
+          <button
+            type="button"
+            className="tap-target"
+            data-testid="undo-failed-retry"
+            onClick={() => onUndo(undo.batchId)}
+          >
+            {BATCHES_UNDO_FAILED_RETRY_LABEL}
+          </button>
         </div>
       )}
       <BatchHistoryPage

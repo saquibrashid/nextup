@@ -20,6 +20,7 @@ import { formatUndoneSummary, isBatchAlreadyUndone, parseUndoResult } from '../s
 import {
   BATCHES_ALREADY_UNDONE,
   BATCHES_UNDO_FAILED,
+  BATCHES_UNDO_FAILED_RETRY_LABEL,
   BATCHES_UNDO_LABEL,
   BATCHES_UNDO_SUBMITTING,
 } from '../src/copy';
@@ -256,5 +257,81 @@ describe('T-UX-098 — §9.10 "This upload was already undone." + refresh, kept 
 
     await screen.findByTestId('undo-failed');
     expect(screen.queryByTestId('undo-already-undone')).not.toBeInTheDocument();
+  });
+});
+
+// ── The unclassified-failure RETRY is a working control — T-UX-098 ───────────
+
+describe('T-UX-098 — the failure banner offers a WORKING retry for the batch that failed', () => {
+  it('T-UX-098f: the retry affordance is a real button, not inert text', async () => {
+    const client = stubBatchClient({
+      undoBatch: vi.fn(async () => {
+        throw new ApiError('INTERNAL_ERROR', 500, 'Boom.', {});
+      }) as unknown as ApiClient['undoBatch'],
+    });
+    renderRoute(client);
+    await screen.findByTestId('batches-list');
+    fireEvent.click(within(screen.getAllByTestId('batch-card')[0]!).getByTestId('batch-card-undo'));
+
+    const failure = await screen.findByTestId('undo-failed');
+    // ⚠ Killing assertion for "render the retry as a <span> again": the retry
+    // MUST be an operable button, not a label the owner taps to no effect.
+    const retry = within(failure).getByRole('button', { name: BATCHES_UNDO_FAILED_RETRY_LABEL });
+    expect(retry.tagName).toBe('BUTTON');
+  });
+
+  it('T-UX-098g: retry re-issues undo with the SAME batch id that failed (2-batch history)', async () => {
+    // The failure comes from the SECOND card ('b'). A retry hard-coded to the
+    // first batch would call undo with 'a' and this assertion would fail.
+    let calls = 0;
+    const undoBatch = vi.fn(async (id: string) => {
+      calls += 1;
+      if (calls === 1) throw new ApiError('INTERNAL_ERROR', 500, 'Boom.', {});
+      return {
+        batchId: id,
+        reversed: { titlesDeleted: 2, listingsRemoved: 3 },
+        serviceState: { service: 'netflix', lastCompletedBatchAt: null },
+      };
+    });
+    const client = stubBatchClient({
+      undoBatch: undoBatch as unknown as ApiClient['undoBatch'],
+    });
+    renderRoute(client);
+    await screen.findByTestId('batches-list');
+    const secondCard = screen.getAllByTestId('batch-card')[1]!;
+    fireEvent.click(within(secondCard).getByTestId('batch-card-undo'));
+
+    const failure = await screen.findByTestId('undo-failed');
+    fireEvent.click(within(failure).getByRole('button', { name: BATCHES_UNDO_FAILED_RETRY_LABEL }));
+
+    await screen.findByTestId('undo-success');
+    expect(undoBatch).toHaveBeenCalledTimes(2);
+    expect(undoBatch.mock.calls[0]![0]).toBe('b');
+    expect(undoBatch.mock.calls[1]![0]).toBe('b');
+  });
+
+  it('T-UX-098h: a retry that succeeds lands in §9.7 with the server counts', async () => {
+    let calls = 0;
+    const client = stubBatchClient({
+      undoBatch: vi.fn(async (id: string) => {
+        calls += 1;
+        if (calls === 1) throw new ApiError('INTERNAL_ERROR', 500, 'Boom.', {});
+        return {
+          batchId: id,
+          reversed: { titlesDeleted: 5, listingsRemoved: 8 },
+          serviceState: { service: 'netflix', lastCompletedBatchAt: null },
+        };
+      }) as unknown as ApiClient['undoBatch'],
+    });
+    renderRoute(client);
+    await screen.findByTestId('batches-list');
+    fireEvent.click(within(screen.getAllByTestId('batch-card')[0]!).getByTestId('batch-card-undo'));
+
+    const failure = await screen.findByTestId('undo-failed');
+    fireEvent.click(within(failure).getByRole('button', { name: BATCHES_UNDO_FAILED_RETRY_LABEL }));
+
+    const success = await screen.findByTestId('undo-success');
+    expect(success).toHaveTextContent('Undone. 5 titles and 8 service entries were removed.');
+    expect(screen.queryByTestId('undo-failed')).not.toBeInTheDocument();
   });
 });
