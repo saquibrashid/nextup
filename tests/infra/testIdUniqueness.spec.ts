@@ -151,7 +151,6 @@ const BASELINE_COLLISIONS = new Set([
   'T-UI-022c',
   'T-UI-022d',
   'T-UI-022e',
-  'T-UX-003e',
 ]);
 
 const specFilesUnder = (dir: string): string[] => {
@@ -220,7 +219,7 @@ describe('T-META-008 — a suffixed test id names exactly one test', () => {
     // to learn the hard way when a `toBeLessThanOrEqual` high-water mark left
     // thirty-four free slots and was quietly used. Resolving a collision must
     // update this number in the same change.
-    expect(BASELINE_COLLISIONS.size).toBe(65);
+    expect(BASELINE_COLLISIONS.size).toBe(64);
   });
 
   it('T-META-008d: every baselined id is still a real collision', () => {
