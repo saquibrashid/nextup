@@ -14,8 +14,8 @@
     "@azure/identity": "^4.13.1",
     "@azure/storage-blob": "^12.33.0",
     "@nextup/domain": "*",
-    "@prisma/adapter-mssql": "6.19.3",
-    "@prisma/client": "^6.19.3",
+    "@prisma/adapter-mssql": "^7.9.1",
+    "@prisma/client": "^7.9.1",
     "express": "^5.2.1",
     "heic-convert": "^2.1.0",
     "multer": "^2.2.0",
@@ -25,8 +25,8 @@
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/heic-convert": "^2.1.1",
-    "@types/mssql": "9.1.7",
+    "@types/mssql": "^12.3.0",
     "@types/multer": "^2.2.0",
-    "prisma": "^6.19.3"
+    "prisma": "^7.9.1"
   }
 }
