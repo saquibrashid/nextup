@@ -1,7 +1,9 @@
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page, type Route } from '@playwright/test';
 import {
   REVIEW_LABELS,
   SERVICE_LABELS,
+  TMDB_DISCLAIMER,
   dateAddedLabel,
   modeExplanation,
   removalsLabel,
@@ -56,6 +58,40 @@ import type {
  *        brand-new active row dated today (the removed-log row is untouched),
  *        while the suppressed title is silently kept off — proving suppression
  *        survives a reappearance because it is keyed on identity, not row id.
+ *
+ * …and steps 8–10, the whole-product cross-cutting obligations, woven INTO the
+ * journey rather than run as a static route sweep:
+ *   8    ATTRIBUTION — the TMDB disclaimer and logo are visible at every route
+ *        the owner actually passes through, in the POPULATED states this file
+ *        puts them in (a list with rows, a mid-flow review, a removed log with
+ *        history). See "ALREADY COVERED ELSEWHERE" below — this is the
+ *        journey-shaped half of `T-ATTR-002`/`003`, not a re-run of it.
+ *   9    A11Y — zero serious/critical axe violations at the INTERACTION-GATED
+ *        journey states a static sweep cannot reach: the review screen, the
+ *        removal-confirm dialog open, the suppress dialog open, the populated
+ *        list. `serious`/`critical` ONLY (§5), never widened.
+ *   10   VIEWPORT — the ENTIRE journey re-runs at 320×640 and asserts no
+ *        horizontal scroll THROUGHOUT, including while each dialog and row menu
+ *        is open (the states where a control falls off-screen). This is a
+ *        SECOND `test()` calling the SAME body (`runOwnerJourney`) with a
+ *        narrow viewport — one implementation, two configurations, so the two
+ *        cannot drift (the same second-implementation hazard the stub itself
+ *        was bounded against).
+ *
+ * ⚠ ALREADY COVERED ELSEWHERE — steps 8–10 are cross-cutting, and dedicated
+ * suites already assert them on every route in its INITIAL state. This file
+ * deliberately does NOT duplicate them; it adds only what a static, empty-state
+ * route sweep structurally cannot see — the same routes in their JOURNEY
+ * states, and the flow DRIVEN at 320 px:
+ *   • Step 8 on all nine routes, no interaction, empty state — `T-ATTR-002b`
+ *     (disclaimer) and `T-ATTR-003a` (logo), enumerated from `ROUTES`
+ *     (`tests/e2e/attribution.spec.ts`); the 320 px attribution itself is
+ *     `T-ATTR-004`. US-011 AC-5, `specs/testing.md` §6 row 5.
+ *   • Step 9 on every route, empty state, 320 px — `T-A11Y-012c`
+ *     (`tests/e2e/a11y.spec.ts`); the contrast-rule guard is `T-A11Y-012b`.
+ *   • Step 10 "no horizontal scroll on every route" — `T-A11Y-001c`, and the
+ *     44 px touch floor with the row menu open is `T-A11Y-001e`. What is NOT
+ *     there, and is added here, is the whole VALUE LOOP executed at 320 px.
  *
  * ⚠ The stub is the backend, not a canned reply. Every review/close/list read
  * is computed from mutable state, so an assertion that would pass under a
@@ -862,17 +898,80 @@ async function uploadAndSubmit(
   await expect(page).toHaveURL(`/batches/${opts.expectedBatchId}/review`);
 }
 
-test('T-E2E-001: a first full update, a reconcile with removals, a suppression, and a reappearance', async ({
-  page,
-}) => {
+/**
+ * Steps 8–10 are woven into the ONE journey body below via these options so
+ * that the 320 px run (step 10) is the SAME code as the default run, never a
+ * copy. `axeJourneyStates` gates the step-9 scans (wide pass only — the narrow
+ * per-route axe sweep is `T-A11Y-012c`); `narrow` gates the step-10 overflow
+ * assertions (they are meaningless at a desktop width).
+ */
+interface JourneyOptions {
+  readonly axeJourneyStates: boolean;
+  readonly narrow: boolean;
+}
+
+const NARROW_VIEWPORT = { width: 320, height: 640 } as const;
+
+async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> {
   const be = makeBackend();
   await stubBackend(page, be);
+
+  // ── Step 10 — no horizontal scroll at 320 px, asserted at each waypoint ────
+  // A no-op off the narrow pass, so it can be sprinkled through the body freely.
+  const noOverflow = async (label: string): Promise<void> => {
+    if (!opts.narrow) return;
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    // 1 px of slack absorbs sub-pixel rounding; anything more is a real
+    // sideways scrollbar, which at 320 px means a control the owner cannot reach.
+    expect(overflow, `step 10 — horizontal overflow at 320px: ${label}`).toBeLessThanOrEqual(1);
+  };
+
+  // ── Step 8 — TMDB attribution present at the routes the owner traverses ────
+  // The journey-shaped claim: not "every route in its empty state" (that is
+  // `T-ATTR-002b`/`003a`), but the routes the owner PASSES THROUGH, in the
+  // POPULATED states this file drives them into.
+  const attribution = async (label: string): Promise<void> => {
+    // Visible TEXT, never an attribute — an `aria-label`-only implementation
+    // would satisfy a role locator but not `getByText` (US-011 AC-2).
+    await expect(
+      page.getByText(TMDB_DISCLAIMER, { exact: true }),
+      `step 8 — TMDB disclaimer on ${label}`,
+    ).toBeVisible();
+    const logo = page.locator('img.tmdb-attribution__logo');
+    await expect(logo, `step 8 — TMDB logo on ${label}`).toBeVisible();
+    // `naturalWidth` is the only thing that proves the asset LOADED — a 404'd
+    // `<img>` still has a box and still passes `toBeVisible` (see `T-ATTR-003`).
+    const natural = await logo.evaluate((node) => (node as HTMLImageElement).naturalWidth);
+    expect(natural, `step 8 — TMDB logo painted on ${label}`).toBeGreaterThan(0);
+  };
+
+  // ── Step 9 — no serious/critical axe violation at an interaction-gated state ─
+  const axeState = async (label: string): Promise<void> => {
+    if (!opts.axeJourneyStates) return;
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    // ⚠ `serious`/`critical` ONLY, as §5 specifies. Widening to `minor`/
+    // `moderate` earns an exclusion list within a week and then protects
+    // nothing. The failure names the rule ids so a red run is actionable.
+    const blocking = results.violations.filter(
+      (v) => v.impact === 'serious' || v.impact === 'critical',
+    );
+    expect(
+      blocking.map((v) => v.id),
+      `step 9 — serious/critical axe on ${label}`,
+    ).toEqual([]);
+  };
 
   // ── Steps 1–4: the first Netflix full update ──────────────────────────────
 
   await page.goto('/upload');
   await expect(page.locator('.app-shell')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Upload screenshots' })).toBeVisible();
+  await attribution('/upload');
+  await noOverflow('/upload (initial)');
 
   await page.getByRole('radio', { name: /Netflix/ }).check();
   await expect(page.getByText(modeExplanation('full-update', 'netflix'))).toBeVisible();
@@ -881,6 +980,7 @@ test('T-E2E-001: a first full update, a reconcile with removals, a suppression, 
   await attachGoldenScreenshots(page, 'netflix');
   await expect(page.getByTestId('accepted-file')).toHaveCount(3);
   await expect(page.getByTestId('dropzone-totals')).toContainText('3 screenshots');
+  await noOverflow('/upload (service + mode chosen, files attached)');
   await expect.poll(() => be.createdBodies[0]).toEqual({ service: 'netflix', mode: 'full-update' });
 
   await page.getByRole('button', { name: SUBMIT_LABEL }).click();
@@ -895,6 +995,9 @@ test('T-E2E-001: a first full update, a reconcile with removals, a suppression, 
 
   await page.goto('/batches/bat_e2e_1/review');
   await expect(page.getByRole('heading', { name: 'Review this batch' })).toBeVisible();
+  await attribution('/batches/:id/review (step 3, additions expanded)');
+  await axeState('/batches/:id/review (step 3, additions expanded)');
+  await noOverflow('/batches/:id/review (step 3)');
 
   const additions1 = page.getByTestId('review-additions');
   await expect(additions1.locator('summary')).toHaveText('New to your list (3)');
@@ -927,6 +1030,9 @@ test('T-E2E-001: a first full update, a reconcile with removals, a suppression, 
     await expect(row.getByTestId('date-added-label')).toHaveText(LABEL_B1);
   }
   await expect(page.getByTestId('freshness-label-netflix')).toHaveText('Netflix updated today');
+  await attribution('/ (populated list, step 4)');
+  await axeState('/ (populated list, step 4)');
+  await noOverflow('/ (populated list, step 4)');
 
   // ── Step 5: a second full update that removes Arrival and adds Sinners ─────
 
@@ -965,6 +1071,11 @@ test('T-E2E-001: a first full update, a reconcile with removals, a suppression, 
   const confirmDialog = page.getByTestId('removal-confirm');
   await expect(confirmDialog).toBeVisible();
   await expect(page.getByTestId('removal-confirm-list')).toContainText('Arrival');
+  // ⚠ A dialog is exactly where a control falls outside a 320 px viewport, and
+  // where axe finds a focus-trap or contrast defect a static route sweep never
+  // reaches (the dialog does not exist until Apply is pressed).
+  await axeState('removal-confirm dialog open (step 5)');
+  await noOverflow('removal-confirm dialog open (step 5)');
   await confirmDialog.getByRole('button', { name: REMOVAL_CONFIRM_LABEL }).click();
 
   await expect(page).toHaveURL('/');
@@ -999,18 +1110,23 @@ test('T-E2E-001: a first full update, a reconcile with removals, a suppression, 
     removedArrival.getByTestId('removed-date-added'),
     'the removed row keeps its ORIGINAL date, not the removal date',
   ).toHaveText(LABEL_B1);
+  await attribution('/removed (populated log, step 5)');
+  await noOverflow('/removed (populated log, step 5)');
 
   // ── Step 6: suppress Dune ("not interested") ──────────────────────────────
 
   await page.goto('/');
   await expect(page.getByTestId('title-row-ttl_dune')).toBeVisible();
   await page.getByTestId('title-row-ttl_dune').getByTestId('row-menu').click();
+  await noOverflow('row menu open (step 6)');
   await page.getByTestId('row-menu-suppress').click();
 
   const suppressDialog = page
     .getByRole('dialog')
     .filter({ has: page.getByRole('heading', { name: 'Not interested' }) });
   await expect(suppressDialog).toBeVisible();
+  await axeState('suppress dialog open (step 6)');
+  await noOverflow('suppress dialog open (step 6)');
   await suppressDialog.getByRole('button', { name: 'Not interested' }).click();
   await expect(suppressDialog.getByText(/is now on your Not interested list/)).toBeVisible();
   await suppressDialog.getByRole('button', { name: 'Close' }).click();
@@ -1031,6 +1147,8 @@ test('T-E2E-001: a first full update, a reconcile with removals, a suppression, 
     .locator('[data-testid="suppressed-row"]');
   await expect(suppressedRows).toHaveCount(1);
   await expect(suppressedRows.first().getByTestId('suppressed-name')).toHaveText('Dune');
+  await attribution('/not-interested (populated, step 6)');
+  await noOverflow('/not-interested (populated, step 6)');
 
   // ── Step 7: an append-only batch — Arrival reappears, Dune stays suppressed ─
 
@@ -1040,6 +1158,7 @@ test('T-E2E-001: a first full update, a reconcile with removals, a suppression, 
     expectedBatchId: 'bat_e2e_3',
   });
   await expect(page.getByRole('heading', { name: 'Review this batch' })).toBeVisible();
+  await noOverflow('/batches/:id/review (append-only, step 7)');
 
   // Arrival is a brand-new addition again (it was removed, not suppressed).
   const additions3 = page.getByTestId('review-additions');
@@ -1081,21 +1200,56 @@ test('T-E2E-001: a first full update, a reconcile with removals, a suppression, 
     removedArrival2.getByTestId('removed-date-added'),
     'the logged removal keeps its original date after the reappearance',
   ).toHaveText(LABEL_B1);
+  await attribution('/removed (populated log, step 7)');
+  await noOverflow('/removed (populated log, step 7)');
   // ⚠ RESOLVED (was "FINDING (Part 3)"): the ordinal chip on a SINGLE removal.
-  // This assertion used to pin the shipped behaviour — no chip at a total of
-  // one — and escalate the spec-vs-implementation conflict rather than work
-  // around it. That was the right call by the lane that found it, and the
-  // conflict has since been reconciled IN FAVOUR OF THE SPEC:
+  // This step used to pin the shipped behaviour — no chip at a total of one —
+  // and escalate a spec-vs-implementation conflict rather than work around it.
+  // The conflict has since been reconciled ON `main` IN FAVOUR OF THE SPEC:
   //   • `specs/testing.md` §5 step 7 (the authoritative AC→test mapping,
   //     NFR-003) requires /removed to show "Removal 1 of 1" by name;
-  //   • `specs/ui.md` "/removed" lists the ordinal chip as a per-ROW element;
+  //   • `specs/ui.md` "/removed" lists the ordinal chip as a per-ROW element,
+  //     with no singleton exception;
   //   • `specs/ux-states.md` §7.5 — "One row per removed listing, with ordinal
   //     chips".
-  // Nothing anywhere licensed the null, and `removalOrdinalLabel` cited a §7.5
-  // sentence that does not exist. `RemovedPage` now renders the chip whenever
-  // the total is at least one, so this step asserts what §5 actually asks for.
+  // Nothing licensed the null, and `RemovedPage.removalOrdinalLabel` cited a
+  // §7.5 sentence that does not exist. `RemovedPage` now renders the chip
+  // whenever the total is at least one (see its docblock), so this step asserts
+  // what §5 actually asks for: /removed is a LOG, not a recycle bin (L1/A33).
   await expect(
     removedArrival2.getByTestId('removed-ordinal'),
     'a single removal still carries its ordinal — /removed is a log, not a recycle bin (L1/A33)',
   ).toHaveText('Removal 1 of 1');
+}
+
+// ── The tests ───────────────────────────────────────────────────────────────
+//
+// ⚠ TWO `test()` CALLS, ONE BODY. Step 10 ("the whole journey re-runs at
+// 320×640") is the SAME `runOwnerJourney` at a narrow viewport, never a copy —
+// a second copy would diverge and only one would be maintained, the exact
+// second-implementation hazard the stub was bounded against. `T-META-004`
+// forbids a computed title, so the two viewports cannot be a `for` loop with a
+// templated name; they are two static-titled tests differing only by config.
+//
+// ⚠ The ids are `T-E2E-001a`/`b`, sub-ids of the ONE test §5 defines — the
+// `nextup/test-id-naming` rule requires each id be UNIQUE, and the project's
+// convention (§ `specs/testing.md` §11, e.g. `T-UI-023a…g`, `T-A11Y-001a…e`)
+// is to split a single spec criterion into suffixed cases. Both resolve to the
+// base `T-E2E-001` the backlog cites and the spec defines.
+
+test('T-E2E-001a: a first full update, a reconcile with removals, a suppression, and a reappearance', async ({
+  page,
+}) => {
+  await runOwnerJourney(page, { axeJourneyStates: true, narrow: false });
+});
+
+test('T-E2E-001b: the whole owner journey re-runs at 320x640 with no horizontal scroll', async ({
+  page,
+}) => {
+  // Step 10. Set BEFORE the first navigation so every screen lays out narrow.
+  // Overrides each project's device width (chromium 1280, iPhone 13 390), so
+  // this genuinely adds a 320 px run under BOTH engines rather than relying on
+  // mobile-safari's own — which is 390 px and would not catch a 320-px defect.
+  await page.setViewportSize(NARROW_VIEWPORT);
+  await runOwnerJourney(page, { axeJourneyStates: false, narrow: true });
 });
