@@ -474,6 +474,17 @@ export const REVIEW_LOAD_FAILED = "Couldn't load this review. Nothing has change
 export const REVIEW_RETRY_LABEL = 'Try again';
 
 /**
+ * `specs/ux-states.md` §6.16 — a 5xx (or a network failure) on the batch
+ * CLOSE. ⚠ NOT `REVIEW_LOAD_FAILED`: the review is still fully on screen and
+ * every disposition the owner made is intact, which is why the sentence ends
+ * *"your review is still here"*. The em dash is part of the copy — `T-UX-067a`
+ * asserts against this constant, not a substring, so a straight hyphen here
+ * would be caught, not silently accepted.
+ */
+export const REVIEW_APPLY_FAILED =
+  "Couldn't apply these changes. Nothing was changed — your review is still here.";
+
+/**
  * ⚠ A SECTION THAT APPLIES BUT IS EMPTY SAYS SO. `count: 0` means "we looked
  * and there was nothing"; `omitted` means "this question does not apply to
  * this mode" and renders no section at all. An empty `<details>` body would

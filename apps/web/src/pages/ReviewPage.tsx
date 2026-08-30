@@ -56,6 +56,7 @@ import {
 } from '../lib/reviewDispositions';
 import {
   REVIEW_APPLY_LABEL,
+  REVIEW_APPLY_FAILED,
   REVIEW_CONFIRM_ALL,
   REVIEW_DISCARD_LABEL,
   REVIEW_LOADING,
@@ -73,6 +74,14 @@ export interface ReviewPageProps {
   readonly loading?: boolean;
   readonly loadFailed?: boolean;
   readonly onRetry?: () => void;
+  /**
+   * `specs/ux-states.md` §6.16 — the last close attempt failed with a 5xx or a
+   * network error. ⚠ This is NOT `loadFailed`: the review is still on screen
+   * with every disposition intact (SD-11e). The message renders beside the
+   * apply control, and **Apply changes** is the "Try again" — see the action
+   * bar. The container clears it the instant a new attempt starts.
+   */
+  readonly applyFailed?: boolean;
   /**
    * ⚠ Takes `confirmRemovals`, which the container sends verbatim to
    * `POST /api/batches/:id/close`. It is `true` **only** when the owner has
@@ -226,6 +235,7 @@ export function ReviewPage({
   review = null,
   loading = false,
   loadFailed = false,
+  applyFailed = false,
   onRetry,
   onApply,
   onDiscard,
@@ -448,6 +458,17 @@ export function ReviewPage({
       {/* ⚠ SD-11d / `T-UX-011`. Sticky, so the primary action and the running
           counts stay reachable through a 200-candidate pass on a phone. */}
       <div className="review-action-bar" data-testid="review-action-bar">
+        {/* ⚠ `specs/ux-states.md` §6.16 (`T-UX-067`). The review above is left
+            fully intact — this is not the load-failure state. The message sits
+            beside the apply control because **Apply changes** IS the retry: it
+            is never disabled here, and re-pressing it re-runs the exact same
+            flow, re-opening the §6.10 removal dialog when there are removals so
+            `confirmRemovals` is never silently re-applied without the owner. */}
+        {applyFailed && (
+          <p role="alert" data-testid="review-apply-error">
+            {REVIEW_APPLY_FAILED}
+          </p>
+        )}
         <p className="review-action-bar__counts" data-testid="review-counts">
           {`${sections.additions.count} to add · ${sections.removals.count} to remove`}
         </p>

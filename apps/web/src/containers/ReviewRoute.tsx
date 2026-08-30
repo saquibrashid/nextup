@@ -18,6 +18,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import {
   apiClient,
+  ApiError,
+  RefusedError,
   type ApiClient,
   type CandidatePatchBody,
   type CloseBatchResult,
@@ -62,6 +64,11 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
   // string, so the counter IS the declared identity of "the review, again".
   const [generation, setGeneration] = useState(0);
 
+  // `specs/ux-states.md` §6.16. `true` when the last close attempt failed with
+  // a 5xx or a network error; cleared the instant a new attempt starts, so a
+  // subsequent success never leaves a stale error on screen during navigation.
+  const [applyFailed, setApplyFailed] = useState(false);
+
   const review = useResource(
     (signal) => client.getReview(batchId, signal),
     `review:${batchId}:${String(generation)}`,
@@ -102,14 +109,35 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
       // variable would re-show the notice on the next visit to `/`, and the
       // back button would take the owner to a screen still claiming a batch
       // had just been applied.
+      //
+      // Clear any prior §6.16 error the moment a fresh attempt starts, or a
+      // subsequent success leaves a stale "couldn't apply" alert on screen.
+      setApplyFailed(false);
       void client.closeBatch(batchId, confirmRemovals).then(
         (result) => {
           navigate('/', { state: { applied: toAppliedBatch(result) } });
         },
-        () => {
+        (error: unknown) => {
           // A failed close must NOT navigate: the batch is still in review and
           // the list has not changed. Sending the owner to `/` would show them
           // an unchanged list as though the close had succeeded.
+          //
+          // ⚠ But an empty handler leaves the owner with NO feedback on the
+          // irreversible full-update path — indistinguishable from a dead
+          // button, whose likeliest reaction is to press it again. §6.16
+          // surfaces the failure while keeping the review intact (SD-11e).
+          //
+          // ⚠ Scoped to the 5xx / network case ON PURPOSE. 409
+          // `PENDING_ADDITIONS` (§6.14), 409 `REMOVALS_NOT_CONFIRMED` (§6.15)
+          // and 401 (§6.18, already redirecting inside `request`) are DISTINCT
+          // specified states with their own ids and their own affordances —
+          // §6.16's "nothing was changed, try again" wording is wrong for
+          // them. They are currently unhandled here (see the PR finding); this
+          // handler must not swallow that distinction by claiming them as
+          // §6.16.
+          if (error instanceof ApiError && error.status < 500) return;
+          if (error instanceof RefusedError) return;
+          setApplyFailed(true);
         },
       );
     },
@@ -191,6 +219,7 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
       review={review.resource.kind === 'ok' ? review.resource.value : null}
       loading={review.resource.kind === 'loading'}
       loadFailed={review.resource.kind === 'failed'}
+      applyFailed={applyFailed}
       onRetry={review.reload}
       onApply={apply}
       onDiscard={discard}

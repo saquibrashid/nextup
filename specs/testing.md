@@ -827,6 +827,7 @@ ends up unmapped.
 | AC-3 | I | `T-BATCH-014` | Close applies additions, corrections and confirmed removals together |
 | AC-4 | I | `T-BATCH-006` | An abandoned/discarded in-review batch writes nothing to the list |
 | AC-5 | I | `T-BATCH-015` | A second open batch → 409 `OPEN_BATCH_EXISTS` naming the open batch |
+| — | C | `T-UX-067` | `specs/ux-states.md` §6.16: a **5xx or network** failure on the CLOSE renders *"Couldn't apply these changes. Nothing was changed — your review is still here."* with the review left fully intact (SD-11e) and **Apply changes** as the "Try again" (it is never disabled here, so re-pressing it re-runs the flow and re-opens the §6.10 dialog when there are removals — `confirmRemovals` is never silently re-applied). ⚠ **Why this row exists and what its absence cost:** the criterion carried an id that lived ONLY in `ux-states.md`. `check-test-ids` walks backlog → this spec and `check-orphan-tests` walks the other way from implemented tests, so an id defined in neither is seen by NEITHER gate — every gate stayed green while the state did not exist and `ReviewRoute`'s rejection handler was empty, giving the owner no feedback on the irreversible full-update path. Scoped to 5xx/network: the 409s (§6.14/§6.15) and 401 (§6.18) are distinct states, not this one. |
 
 ### US-006 — Extract candidate titles from the uploaded screenshots
 | AC | L | Test | Assertion |
