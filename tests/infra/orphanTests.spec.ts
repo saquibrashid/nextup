@@ -117,7 +117,7 @@ describe('T-META-006 — every defined test id is owned', () => {
     // stricter surfaces gaps that were always there — and the nine ids carry
     // their own justification at the point they are listed. Growth for any
     // other reason is the failure mode described above.
-    expect(BASELINE_ORPHANS.size).toBe(30);
+    expect(BASELINE_ORPHANS.size).toBe(29);
   });
 
   it('T-META-006f: a citation that is struck through does not count as ownership', () => {

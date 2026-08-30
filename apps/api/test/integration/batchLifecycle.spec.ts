@@ -256,6 +256,55 @@ describe('POST /api/batches/:batchId/submit (§6.14)', () => {
     await extractionSettled('b-retry');
   });
 
+  it('T-AI-014a: extractor failure leaves the list unchanged, keeps images, and can retry', async () => {
+    await seedBatch('b-extraction-error', 'draft');
+    await seedImage('b-extraction-error', 'i-extraction-error');
+    const batchForListing = await createUploadBatch(owner, {
+      id: 'b-existing-listing',
+      service: 'netflix',
+      mode: 'append-only',
+      status: 'applied',
+    });
+    const title = await createTitle(owner, {
+      id: 't-existing-listing',
+      workIdentity: 'tmdb:movie:438631',
+      state: 'active',
+      matchState: 'matched',
+      tmdbId: 438631,
+      tmdbMediaType: 'movie',
+      tmdbName: 'Dune',
+      tmdbReleaseYear: 2021,
+      sortDateAdded: new Date('2026-04-02T00:00:00.000Z'),
+      createdByBatchId: batchForListing.id,
+    });
+    await createServiceListing(owner, {
+      listingId: 'l-existing-listing',
+      titleId: title.id,
+      service: 'netflix',
+      state: 'active',
+      dateAdded: new Date('2026-04-02T00:00:00.000Z'),
+      createdByBatchId: batchForListing.id,
+    });
+    const before = await listSnapshot();
+
+    const res = await post('/api/batches/b-extraction-error/submit');
+    expect(res.status).toBe(202);
+    await extractionSettled('b-extraction-error');
+
+    const failed = await findUploadBatch(owner, 'b-extraction-error');
+    expect(failed?.status).toBe('extraction-failed');
+    expect(failed?.extractionErrorCode).toBe('EXTRACTOR_UNAVAILABLE');
+    expect(await listSnapshot()).toBe(before);
+    expect((await listImagesForBatch(owner, 'b-extraction-error')).map((i) => i.id)).toEqual([
+      'i-extraction-error',
+    ]);
+
+    const retry = await post('/api/batches/b-extraction-error/submit');
+    expect(retry.status).toBe(202);
+    expect(((await retry.json()) as Record<string, unknown>)['status']).toBe('submitted');
+    await extractionSettled('b-extraction-error');
+  });
+
   it('T-BATCH-019d: answers 404, never 403, for another owner’s batch', async () => {
     await seedBatch('b-mine', 'draft');
     await seedImage('b-mine', 'i-3');

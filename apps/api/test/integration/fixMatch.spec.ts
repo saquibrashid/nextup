@@ -281,6 +281,43 @@ describe('POST /api/titles/:titleId/fix-match', () => {
     expect(items.find((item) => item.titleId === title.id)?.workIdentity).toBe(DUNE_IDENTITY);
   });
 
+  it('T-TMDB-011a · a confirmed match stores exactly the allowed TMDB metadata shape', async () => {
+    const { title } = await seedTitle({});
+
+    const res = await fixMatch(title.id, { tmdbId: DUNE_TMDB_ID, mediaType: 'movie' });
+    expect(res.status).toBe(200);
+
+    const stored = await testPrisma().title.findFirstOrThrow({ where: { id: title.id } });
+    const storedMetadata = {
+      tmdbId: stored.tmdbId,
+      mediaType: stored.tmdbMediaType,
+      releaseYear: stored.tmdbReleaseYear,
+      runtimeMinutes: stored.tmdbRuntimeMinutes,
+      genres: JSON.parse(stored.tmdbGenres) as unknown,
+      posterPath: stored.tmdbPosterPath,
+      fetchedAt: stored.tmdbFetchedAt?.toISOString() ?? null,
+    };
+
+    expect(Object.keys(storedMetadata).sort()).toEqual([
+      'fetchedAt',
+      'genres',
+      'mediaType',
+      'posterPath',
+      'releaseYear',
+      'runtimeMinutes',
+      'tmdbId',
+    ]);
+    expect(storedMetadata).toEqual({
+      tmdbId: DUNE_TMDB_ID,
+      mediaType: 'movie',
+      releaseYear: 2021,
+      runtimeMinutes: 155,
+      genres: ['Science Fiction', 'Adventure'],
+      posterPath: '/d5NXSklXo0qyIYkgV94XAgMIckC.jpg',
+      fetchedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+    });
+  });
+
   it('T-FIX-002 · US-030 AC-2 · every listing survives byte-identical', async () => {
     const { title } = await seedTitle({ services: ['netflix', 'max'], dateAdded: '2025-11-30' });
     const before = await storedListings(title.id);
