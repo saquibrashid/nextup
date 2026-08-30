@@ -25,7 +25,16 @@
  * or read a recording. It decides, given two already-computed metric sets,
  * which reader the product should use. Producing those metric sets needs the
  * 12-image corpus (TASK-078) and the scorer (TASK-079), neither of which
- * exists yet — see the deferred claims in `tests/extraction/bakeoff.spec.ts`.
+ * exists yet — see the deferred claims in `packages/domain/test/bakeoff.spec.ts`.
+ *
+ * ⚠ THAT PATH IS LOAD-BEARING AND WAS CORRECTED IN PLACE (`A48`). This comment
+ * used to name ~~`tests/extraction/bakeoff.spec.ts`~~, which is where the suite
+ * was first written and where CI proved it must not live: `tests/extraction/**`
+ * is collected by the **`golden`** Vitest project, but the coverage gate runs
+ * the **`unit`** project only — so the cases executed, went green, and
+ * contributed **zero** coverage to the file they test, dropping
+ * `packages/domain/src/**` below its threshold. Pure domain logic is tested in
+ * `packages/domain/test/**`. Do not "restore" the old path.
  */
 
 /**
