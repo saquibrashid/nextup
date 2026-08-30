@@ -93,7 +93,7 @@ function isMatchRef(value: unknown): value is ReviewMatchRef {
  * which renders as a confident thumbnail of the wrong part of the screenshot.
  * A rejected box shows the whole image instead, which is honest.
  */
-function parseBoundingBoxes(
+export function parseBoundingBoxes(
   raw: string | null,
 ): { imageId: string; x: number; y: number; w: number; h: number }[] {
   if (raw === null || raw === '') return [];
