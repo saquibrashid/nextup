@@ -88,6 +88,28 @@
  * `b`, `d` and `f` are all set DIFFERENCES against a scanned corpus, so if the
  * scan returns nothing they pass vacuously and report success on an empty
  * suite. That failure mode has already been demonstrated against `T-META-008`.
+ *
+ * ── Paid down: 33 → 24, and the ghost class to ZERO ─────────────────────────
+ *
+ * The nine `T-DM-*` entries (`T-DM-002` and `T-DM-020`-`027`) were written up
+ * in `specs/testing.md` §12.1 and removed from both lists. That section already
+ * existed for exactly this class — "already implemented, never listed here" —
+ * so nothing had to be invented: each row states what the suite already
+ * asserts, and several turned out to be guarding named product invariants
+ * (`T-DM-021` is the schema-level enforcement of REQ-071, `T-DM-002g` pins the
+ * digest that every stored unmatched identity and every suppression depends
+ * on). ⚠ That is the argument for this gate rather than against it: the tests
+ * protecting the two most load-bearing invariants in the data model were the
+ * ones no document mentioned.
+ *
+ * ⚠ **A SHORTHAND RANGE CELL DEFINES NOTHING.** `T-DM-025` stayed in the
+ * undefined list while §29.1 carried a row reading `` `T-DM-025e`-`f` ``,
+ * because `f` alone is not an id and so survives as residue — the cell is
+ * prose by `definedTestIds`' rule. The abbreviation is used widely in the
+ * per-task sections (`` `T-IMG-013a`-`d` `` and friends) and reads perfectly
+ * to a human, which is precisely why it is worth knowing that it contributes
+ * NO definition. Those ids are defined only because some other cell names them
+ * in full. Write the ids out, or slash-separate them.
  */
 
 import { readFileSync, readdirSync } from 'node:fs';
@@ -112,15 +134,6 @@ const BASELINE_UNDEFINED = new Set([
   'T-AI-019',
   'T-CI-006',
   'T-CI-008',
-  'T-DM-002',
-  'T-DM-020',
-  'T-DM-021',
-  'T-DM-022',
-  'T-DM-023',
-  'T-DM-024',
-  'T-DM-025',
-  'T-DM-026',
-  'T-DM-027',
   'T-INFRA-003',
   'T-SEC-006',
   'T-UNDO-005',
@@ -152,18 +165,21 @@ const BASELINE_UNDEFINED = new Set([
  * documented in the wrong place and can be moved, while for these the only
  * surviving description of what the test protects is the test itself.
  *
+ * ⚠ **NOW EMPTY, AND THAT IS THE POINT OF A RATCHET.** The eight entries were
+ * the whole `packages/domain/test/**` schema and identity suite —
+ * `T-DM-002`/`020`-`027`, sixty-odd assertions covering the suppression
+ * invariant, the match-state triple, the two size ceilings and the pinned
+ * `'Dune'` digest — and they were paid down by writing their rows into
+ * `specs/testing.md` §12.1, which is where the same class was fixed before.
+ * `T-META-009f`'s remaining work is the `newGhosts` check: an EMPTY list is a
+ * cleared debt, not a disabled gate. Verified by mutation — pointing
+ * `documentationCorpus()` at a directory that does not exist still fails `f`,
+ * with the list empty, because all 24 surviving baseline entries then read as
+ * newly undocumented.
+ *
  * ⚠ MAY ONLY SHRINK. `T-META-009f` pins the size exactly, in both directions.
  */
-const BASELINE_GHOSTS = new Set([
-  'T-DM-002',
-  'T-DM-020',
-  'T-DM-021',
-  'T-DM-022',
-  'T-DM-023',
-  'T-DM-024',
-  'T-DM-026',
-  'T-DM-027',
-]);
+const BASELINE_GHOSTS = new Set<string>([]);
 
 /** Every `.md` under `specs/` and `docs/`, concatenated. */
 function documentationCorpus(root = ROOT): string {
@@ -249,7 +265,7 @@ describe('T-META-009 every test id the suite runs is defined in specs/testing.md
   });
 
   it('T-META-009c · the undefined baseline is pinned exactly, in both directions', () => {
-    expect(BASELINE_UNDEFINED.size).toBe(33);
+    expect(BASELINE_UNDEFINED.size).toBe(24);
   });
 
   it('T-META-009d · every baselined id is still implemented and still undefined', () => {
@@ -296,6 +312,6 @@ describe('T-META-009 every test id the suite runs is defined in specs/testing.md
         `statement of what they protect is the test body. Write the spec row.`,
     ).toEqual([]);
 
-    expect(BASELINE_GHOSTS.size).toBe(8);
+    expect(BASELINE_GHOSTS.size).toBe(0);
   });
 });
