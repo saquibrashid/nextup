@@ -96,9 +96,12 @@ export const BASELINE_ORPHANS = new Set([
   'T-INV-014',
   'T-INV-016',
   'T-MIG-002',
-  'T-RES-011',
-  'T-RES-012',
-  'T-RES-015',
+  // 'T-RES-011', 'T-RES-012', 'T-RES-015' removed (US-025 restore) —
+  // implemented in `apps/api/test/integration/restoreListing.spec.ts`
+  // alongside the `T-RES-013`/`014` cases that were built around them.
+  // `T-RES-015a` is the one with the most teeth: mutation-verified, a route
+  // that restores the row and THEN discovers the suppression returns a byte-
+  // identical 409 and passes `T-RES-013`.
   'T-RET-010',
   'T-REV-015',
   'T-SUP-015',
