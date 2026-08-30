@@ -73,12 +73,34 @@ export interface RemovedPageProps {
   readonly onUnsuppress?: (suppressionId: string) => Promise<unknown>;
 }
 
-/** §7.5's ordinal chip. `null` when the work has been removed exactly once. */
+/**
+ * §7.5's ordinal chip.
+ *
+ * ⚠ EVERY ROW CARRIES ONE, INCLUDING A WORK REMOVED EXACTLY ONCE. This
+ * function used to return `null` at `removalTotalForWork <= 1`, citing "§7.5"
+ * — which does not say that. Three specs say the opposite, and one of them is
+ * the definition of done:
+ *   • `specs/testing.md` §5 step 7 (the authoritative AC→test mapping,
+ *     NFR-003) requires /removed to show **"Removal 1 of 1"** by name;
+ *   • `specs/ui.md` "/removed" lists the ordinal chip as a per-**row**
+ *     element, with no singleton exception;
+ *   • `specs/ux-states.md` §7.5 — "One row per removed listing, with ordinal
+ *     chips."
+ *
+ * ⚠ AND THE CHIP EARNS ITS PLACE AT ONE. `/removed` is a historical LOG, not a
+ * recycle bin (L1/A33), and `specs/ui.md` requires that framing to be visible
+ * in the interface or repeated rows read as a bug. "Removal 1 of 1" is what
+ * tells the owner this row is one entry in a log that can hold more — so the
+ * singleton is the case the framing matters MOST for, not the case to drop it.
+ *
+ * `null` is reserved for a nonsensical total (< 1), which is a data fault
+ * rather than a display choice.
+ */
 export function removalOrdinalLabel(item: {
   removalOrdinal: number;
   removalTotalForWork: number;
 }): string | null {
-  if (item.removalTotalForWork <= 1) {
+  if (item.removalTotalForWork < 1) {
     return null;
   }
   return `Removal ${item.removalOrdinal} of ${item.removalTotalForWork}`;

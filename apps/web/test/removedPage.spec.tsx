@@ -155,11 +155,27 @@ describe('the removal log is never de-duplicated — T-UI-009', () => {
     ]);
   });
 
-  it('T-UI-009d: a work removed once shows no ordinal chip', () => {
+  it('T-UI-009d: a work removed once still shows "Removal 1 of 1"', () => {
+    // ⚠ THIS CASE USED TO ASSERT THE OPPOSITE, AND THAT IS THE FINDING. It
+    // pinned `removalOrdinalLabel`'s null-at-one behaviour, which contradicts
+    // `specs/testing.md` §5 step 7 (which names "Removal 1 of 1"), `ui.md`
+    // ("each row: … an ordinal chip") and `ux-states.md` §7.5. A test written
+    // to ratify the implementation instead of the spec makes the divergence
+    // invisible: the suite stays green precisely because it agrees with the
+    // defect.
+    //
+    // The singleton is the case the log framing matters MOST for — `/removed`
+    // is a historical log, not a recycle bin (L1/A33), and "Removal 1 of 1" is
+    // what says this row is one entry in a log that can hold more.
     render(<RemovedPage items={[removed()]} />);
 
-    expect(screen.queryByTestId('removed-ordinal')).toBeNull();
-    expect(removalOrdinalLabel({ removalOrdinal: 1, removalTotalForWork: 1 })).toBeNull();
+    expect(screen.getByTestId('removed-ordinal').textContent).toBe('Removal 1 of 1');
+    expect(removalOrdinalLabel({ removalOrdinal: 1, removalTotalForWork: 1 })).toBe(
+      'Removal 1 of 1',
+    );
+    // A nonsensical total is a data fault, not a display choice, and is the
+    // ONLY case that still renders no chip.
+    expect(removalOrdinalLabel({ removalOrdinal: 0, removalTotalForWork: 0 })).toBeNull();
   });
 
   it('T-UI-009e: the service is named on every row', () => {
