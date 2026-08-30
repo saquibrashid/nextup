@@ -7,7 +7,8 @@ workspace, including every dependabot pull request.
 
 ## 1. The one step that is not obvious
 
-After **any** version change, regenerate the third-party notices:
+After changing the version of a **production** dependency, regenerate the
+third-party notices:
 
 ```powershell
 npm run notices        # rewrites THIRD-PARTY-NOTICES.md
@@ -23,10 +24,23 @@ Licence check failed:
   - THIRD-PARTY-NOTICES.md is out of date. Run `npm run notices` and commit the result.
 ```
 
-⚠ **This is why every dependabot pull request is red.** Dependabot bumps the
-version, but it cannot run the generator, so the audit job fails on *every*
-bump — including a security patch. **A red dependabot check is almost always
-this, not a real failure.** Confirm before assuming the bump is at fault:
+⚠ **The gate covers the PRODUCTION tree only, and the distinction is the whole
+diagnostic value of this section.** `collectRuntimePackages()` filters
+`!meta.dev` (`tools/check-licences.mjs:102`) because dev dependencies are never
+distributed, so nothing about them belongs in a notices file. Therefore:
+
+- a bump of a **production** dependency (`@azure/identity`, `openai`,
+  `@prisma/client`, …) turns the audit job red until notices is re-run —
+  **and dependabot cannot run the generator**, so that PR can never go green
+  on its own. A security patch will sit unmerged behind a check that looks
+  like a real failure.
+- a bump of a **dev** dependency (`eslint`, `vite`, `vitest`, `globals`,
+  `@testing-library/*`, …) does **not** touch notices at all. **If a dev-only
+  bump is red, it is a real failure — go and read it.** Do not wave it through
+  as "just the notices thing"; that assumption is how a genuinely breaking
+  tooling upgrade gets merged.
+
+Confirm which case you are in before assuming anything:
 
 ```powershell
 $env:GH_CONFIG_DIR = "$HOME\.ghprofiles\gh-personal"
@@ -42,7 +56,8 @@ step, not the check.
 ## 2. Draining the dependabot queue
 
 The queue does not drain itself. Land the safe bumps together, in one commit,
-with notices regenerated once:
+with notices regenerated once (harmless for a dev-only batch, and correct the
+moment one production package is in it):
 
 ```powershell
 npm install --no-audit --no-fund <pkg>@<version> [...]   # add --save-dev for dev deps
