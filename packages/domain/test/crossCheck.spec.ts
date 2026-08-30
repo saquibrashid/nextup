@@ -1,14 +1,14 @@
 /**
  * TASK-056c — the OCR cross-check merge (`specs/ai.md` §2.1c).
  *
- * Test ids: `T-AI-034` (purity/determinism), `T-AI-019` (no inlined
- * thresholds).
+ * Test ids: `T-AI-034` (purity/determinism), `T-AI-039` (OCR orphan
+ * recovery), `T-AI-019` (no inlined thresholds).
  *
  * ⚠ These assertions are about a SAFETY property, not a quality metric. The
- * corpus-level recall and fabrication numbers (`T-AI-039`, `T-AI-032`) are
- * measured by the golden suite against recordings. What is proved here is the
- * narrower thing the golden suite cannot: that the merge is a pure function,
- * that it never drops an OCR line, and that its thresholds are named.
+ * corpus-level fabrication number (`T-AI-032`) is measured by the golden suite
+ * against recordings. What is proved here is the narrower thing the golden
+ * suite cannot: that the merge is a pure function, that it never drops an OCR
+ * line, and that its thresholds are named.
  *
  * ⚠ ALL BOXES ARE NORMALISED 0..1 (`NormalisedBox`), not pixels. A pixel-value
  * fixture still type-checks, and then every overlap silently computes to zero
@@ -132,7 +132,7 @@ describe('crossCheck (T-AI-034)', () => {
     expect(find(crossCheck(tiles, lines), 'Wednesday')?.ocrSupport).toBe('none');
   });
 
-  it('T-AI-034i - NEVER drops an unconsumed OCR line — it is emitted as an orphan', () => {
+  it('T-AI-039a - NEVER drops an unconsumed OCR line — it is emitted as an orphan', () => {
     // ⚠ THE POINT OF THE WHOLE STAGE (REQ-012, product invariant 2). An OCR
     // line the model did not report must survive to review. `crossCheck` is
     // deliberately NOT a filter: `cleanup.ts` classifies afterwards, so a
@@ -145,7 +145,7 @@ describe('crossCheck (T-AI-034)', () => {
     expect(orphan?.inferredTitle).toBeNull();
   });
 
-  it('T-AI-034j - emits short and chrome-like OCR orphans rather than filtering them', () => {
+  it('T-AI-039b - emits short and chrome-like OCR orphans rather than filtering them', () => {
     const noisy: OcrLine[] = [
       line('Up', { x: 0.8, y: 0.02, w: 0.05, h: 0.03 }),
       line('Max', { x: 0.8, y: 0.1, w: 0.07, h: 0.03 }),
