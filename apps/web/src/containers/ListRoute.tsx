@@ -101,6 +101,37 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
   const suppressions = useResource((signal) => client.getSuppressions(signal), 'suppressions');
 
   /**
+   * ⚠ Read ONLY when the unfiltered list came back empty — the single case in
+   * which the number changes what the owner is told (US-019 AC-5). On every
+   * normal load this resolves to `null` without a request, so the list keeps
+   * its three calls on a 0.25 vCPU replica; the fourth is spent only on the
+   * screen that would otherwise be wrong.
+   *
+   * ~~Superseded: "`removedCount` is not passed ... the blocker is no longer
+   * availability but cost: reading it would add a fourth request to every list
+   * load ... to answer a question that only matters when the unfiltered list
+   * came back empty. Its default of 0 is wrong in exactly one case ... leaving
+   * it defaulted keeps it findable and grep-able."~~ The cost objection was
+   * real and is answered by the condition rather than by paying it: "only
+   * matters when the list is empty" is itself the fetch predicate. Leaving the
+   * default in place shipped `must`-level copy that says "Nothing here yet" to
+   * an owner who has removed titles — which reads as data loss, the exact
+   * misreading US-019 AC-5 exists to prevent.
+   */
+  const unfilteredEmptyForCount =
+    titles.resource.kind === 'ok' &&
+    (filtered
+      ? all.resource.kind === 'ok' &&
+        all.resource.value !== null &&
+        all.resource.value.items.length === 0
+      : titles.resource.value.items.length === 0);
+
+  const removed = useResource(
+    (signal) => (unfilteredEmptyForCount ? client.getRemoved('', signal) : Promise.resolve(null)),
+    `removed:${String(unfilteredEmptyForCount)}`,
+  );
+
+  /**
    * ⚠ Informational, and NEVER a gate in front of the list (§2.1). Its failure
    * renders as `null`, which `FreshnessStrip` already treats as "state
    * unknown" (`T-FRESH-014`) — a failed strip must not blank the list.
@@ -118,19 +149,15 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
     all.resource.kind === 'ok' && all.resource.value !== null ? all.resource.value.items : items;
 
   /**
-   * ⚠ KNOWN GAP, DELIBERATELY NOT PAPERED OVER: `removedCount` is not passed.
-   * `GET /api/removed` (§6.9) and `client.getRemoved` now both exist, so the
-   * blocker is no longer availability but cost: reading it would add a fourth
-   * request to every list load on a single 0.25 vCPU replica to answer a
-   * question that only matters when the unfiltered list came back empty. Its
-   * default of 0 is wrong in exactly one case: an empty list where titles were
-   * removed and none suppressed, which then reads "Nothing here yet" instead
-   * of "Nothing on your list right now" (US-019 AC-5). Inventing a number
-   * would hide that; leaving it defaulted keeps it findable and grep-able.
+   * ⚠ `removedCount` is now supplied (see the conditional read above). It is
+   * the count of the removal LOG, which by product invariant 7 legitimately
+   * holds several rows for the same work over time — that is the right number
+   * here, because the empty-state link it labels goes to that log.
    *
-   * ~~Superseded: "because `GET /api/removed` (§6.9) does not exist yet — it
-   * belongs to Epic H."~~ The endpoint shipped with TASK-099; the comment
-   * outlived the fact it asserted.
+   * A failed read falls back to 0 rather than blanking the screen: the strip
+   * is informational and must never gate the list. The cost is the same
+   * wording gap that existed unconditionally before, now confined to an
+   * outright request failure.
    *
    * ⚠ `total` is capped at one page until the API returns a count, because
    * §6.2 answers with `items`/`nextCursor`/`limit` and no total. It is only
@@ -147,6 +174,11 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
       genres={collectGenres(unfiltered)}
       suppressedCount={
         suppressions.resource.kind === 'ok' ? suppressions.resource.value.items.length : 0
+      }
+      removedCount={
+        removed.resource.kind === 'ok' && removed.resource.value !== null
+          ? removed.resource.value.items.length
+          : 0
       }
       loading={titles.resource.kind === 'loading'}
       loadFailed={titles.resource.kind === 'failed'}

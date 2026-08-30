@@ -86,6 +86,12 @@ function stubClient(overrides: Record<string, unknown> = {}) {
     getTitles: record('getTitles', { items: [], nextCursor: null, limit: 50 }),
     getServiceState: record('getServiceState', { services: [] }),
     getSuppressions: record('getSuppressions', { items: [] }),
+    // These containers render an EMPTY list, which is exactly the state in
+    // which `ListRoute` reads the removed count for the US-019 AC-5 empty
+    // state (`T-DATA-002j`/`k`). Without the stub the whole file fails with
+    // "not a function", which reads as a broken undo rather than a missing
+    // fixture.
+    getRemoved: record('getRemoved', { items: [], nextCursor: null, limit: 50 }),
     getReview: record('getReview', emptyReview()),
     closeBatch: record('closeBatch', closeResult()),
     discardBatch: record('discardBatch', {}),
