@@ -142,7 +142,13 @@ describe('T-META-006 — every defined test id is owned', () => {
     // web, both mutation-verified, and both were the sole guard of what they
     // assert. `T-UX-099` also carried a false comment in the baseline claiming
     // it was not baselined — corrected in the same change.
-    expect(BASELINE_ORPHANS.size).toBe(9);
+    // 9 → 7: `T-INFRA-006` (§11-R4.2, the CI integration store) and
+    // `T-MIG-002` (the `M0` smoke migration, the `RSK-031` mitigation). These
+    // were the last two ACTIONABLE entries. What remains is the set that
+    // SHOULD stay: three `T-AUTH-*` deferred by §10, two findings that need an
+    // owner decision (`T-INV-014`, `T-INV-016`), and `T-UX-069`, catalogued as
+    // not implemented in v1. `T-A11Y-014` is the one open piece of real work.
+    expect(BASELINE_ORPHANS.size).toBe(7);
   });
 
   it('T-META-006f: a citation that is struck through does not count as ownership', () => {
