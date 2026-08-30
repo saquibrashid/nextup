@@ -81,6 +81,25 @@ export interface ReviewMatch extends ReviewMatchRef {
 }
 
 /** The candidate shape this module routes. Mirrors `specs/api.md` §6.17. */
+/**
+ * The region of one source image to render as a candidate's tile thumbnail
+ * (`specs/ui.md` §5.3a). Normalised `0..1`, origin top-left, so it is
+ * independent of the stored image's pixel dimensions.
+ *
+ * ⚠ `imageId` is carried rather than assumed to be `sourceImageIds[0]`. A
+ * candidate can be evidenced by boxes on more than one image (SD-02 collapse
+ * merges them), and cropping image A's rectangle out of image B renders a
+ * confidently-wrong region of the wrong screenshot — which is worse than
+ * showing the whole image, because it still looks like evidence.
+ */
+export interface ReviewTileCrop {
+  imageId: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface ReviewCandidate {
   candidateId: string;
   rawText: string;
@@ -94,6 +113,15 @@ export interface ReviewCandidate {
   match: ReviewMatch | null;
   alternatives: ReviewMatchRef[];
   sourceImageIds: string[];
+  /**
+   * §5.3a — the region of a source image to render as the tile thumbnail, or
+   * `null` when no honest crop exists and the whole image must be shown.
+   *
+   * ⚠ Computed SERVER-SIDE by `tileCropFor`, never derived in the client. The
+   * rule it encodes ("only a tile box, never a text-line box") is a statement
+   * about what the extractor produced, and the client cannot see `boxSource`.
+   */
+  tileCrop: ReviewTileCrop | null;
   disposition: ReviewDisposition;
   /** SD-02. Non-null ⇒ absorbed by the survivor; not rendered again. */
   collapsedIntoCandidateId: string | null;
@@ -246,6 +274,83 @@ export function sectionForCandidate(candidate: ReviewCandidate): ReviewSectionNa
   return candidate.classification === 'already-present-for-this-service'
     ? 'alreadyOnYourList'
     : 'additions';
+}
+
+// ── The §5.3a tile crop ────────────────────────────────────────────────────
+
+/** The two verdicts §5.3a gives a MANDATORY thumbnail presentation. */
+const TILE_THUMBNAIL_VERDICTS = new Set<CleanupVerdict>(['inferred-unverified', 'unreadable-tile']);
+
+/**
+ * How much of the surrounding image to keep around the tile, as a fraction of
+ * the tile's own size on each axis.
+ *
+ * A pixel-exact crop of the model's box clips the artwork it is supposed to
+ * make legible — reported boxes sit tight against the tile edge and are
+ * routinely a few percent off. The padding is proportional rather than
+ * absolute so it behaves the same on a phone screenshot and a desktop one.
+ */
+export const TILE_CROP_PADDING = 0.08;
+
+/**
+ * The region to crop for a candidate's tile thumbnail, or `null` to show the
+ * whole image.
+ *
+ * ⚠ **A crop is only offered for a TILE box (`boxSource === 'llm'`), never an
+ * OCR box.** §5.3a requires a thumbnail "at a size where the ARTWORK is
+ * legible". An OCR box is a text-LINE rectangle — a strip a few percent tall
+ * containing the caption — so cropping to it fills the thumbnail with the
+ * words the owner is already being shown as `rawText`, and shows none of the
+ * artwork that is the entire reason the thumbnail is mandatory. That failure
+ * is invisible in a test that only asserts "a crop was produced".
+ *
+ * ⚠ Returns `null` rather than a whole-image `{0,0,1,1}` box for the no-crop
+ * case, so the client renders its existing uncropped `<img>` path instead of a
+ * crop that happens to be the identity. A degenerate rectangle is refused for
+ * the same reason: a zero-width box scaled to fill a thumbnail is an infinite
+ * magnification of one column of pixels.
+ */
+export function tileCropFor(input: {
+  verdict: CleanupVerdict;
+  boxSource: string;
+  boundingBoxes: readonly { imageId: string; x: number; y: number; w: number; h: number }[];
+}): ReviewTileCrop | null {
+  if (!TILE_THUMBNAIL_VERDICTS.has(input.verdict)) return null;
+  if (input.boxSource !== 'llm') return null;
+
+  const first = input.boundingBoxes[0];
+  if (first === undefined) return null;
+
+  // Only the boxes on the SAME image as the first are unioned — see the
+  // `imageId` note on `ReviewTileCrop`.
+  const onImage = input.boundingBoxes.filter((box) => box.imageId === first.imageId);
+
+  let left = Number.POSITIVE_INFINITY;
+  let top = Number.POSITIVE_INFINITY;
+  let right = Number.NEGATIVE_INFINITY;
+  let bottom = Number.NEGATIVE_INFINITY;
+  for (const box of onImage) {
+    if (!Number.isFinite(box.x) || !Number.isFinite(box.y)) return null;
+    if (!Number.isFinite(box.w) || !Number.isFinite(box.h)) return null;
+    if (box.x < left) left = box.x;
+    if (box.y < top) top = box.y;
+    if (box.x + box.w > right) right = box.x + box.w;
+    if (box.y + box.h > bottom) bottom = box.y + box.h;
+  }
+
+  const padX = (right - left) * TILE_CROP_PADDING;
+  const padY = (bottom - top) * TILE_CROP_PADDING;
+  const x = clampUnit(left - padX);
+  const y = clampUnit(top - padY);
+  const w = clampUnit(right + padX) - x;
+  const h = clampUnit(bottom + padY) - y;
+  if (w <= 0 || h <= 0) return null;
+
+  return { imageId: first.imageId, x, y, w, h };
+}
+
+function clampUnit(value: number): number {
+  return value < 0 ? 0 : value > 1 ? 1 : value;
 }
 
 // ── Removal withholding (`specs/ai.md` §8.2) ───────────────────────────────

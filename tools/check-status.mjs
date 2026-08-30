@@ -355,13 +355,20 @@ export function isTestIdPresent(testId, definedTestIds) {
   if (definedTestIds.has(testId)) return true;
   if (/[a-z]$/.test(testId)) return false;
   for (const defined of definedTestIds) {
-    // The extra character must be a LETTER. Checking length alone made
+    // The extra characters must be LETTERS. Checking length alone made
     // `T-UI-023` look like a variant of `T-UI-02`, so an id whose trailing
     // digit was mistyped would silently resolve to a different criterion.
+    //
+    // ⚠ ONE OR TWO letters, not exactly one. `T-AI-033an` and `T-AI-041aa`
+    // are real ids in this repository, and a strict `+ 1` made a base id
+    // whose only delivered cases are double-lettered read as UNFINISHED —
+    // contradicting the rule stated directly above, that a base id is
+    // satisfied by any of its variants.
+    const extra = defined.length - testId.length;
     if (
-      defined.length === testId.length + 1 &&
+      (extra === 1 || extra === 2) &&
       defined.startsWith(testId) &&
-      /[a-z]$/.test(defined)
+      /^[a-z]{1,2}$/.test(defined.slice(testId.length))
     ) {
       return true;
     }

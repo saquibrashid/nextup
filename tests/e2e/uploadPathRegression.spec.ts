@@ -71,6 +71,8 @@ function duneCandidate(disposition: ReviewCandidate['disposition']): ReviewCandi
     provider: 'llm',
     verdict: 'title-candidate',
     ocrConfidence: 0.98,
+    // §5.3a — no crop: a `title-candidate` gets no mandatory tile thumbnail.
+    tileCrop: null,
     resolvedWorkIdentity: 'tmdb:movie:438631',
     match: {
       tmdbId: 438631,

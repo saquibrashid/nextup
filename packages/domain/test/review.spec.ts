@@ -21,6 +21,7 @@ import {
   removalsLabel,
   reviewBanner,
   sectionForCandidate,
+  tileCropFor,
   type BuildReviewInput,
   type ReviewCandidate,
 } from '../src/review.js';
@@ -424,5 +425,129 @@ describe('T-REV-010 — the response echoes the batch safety state verbatim', ()
     const frozen = JSON.stringify(candidates);
     buildReviewResponse(input({ candidates }));
     expect(JSON.stringify(candidates)).toBe(frozen);
+  });
+});
+
+// ── T-AI-041 · specs/ui.md §5.3a · the CROPPED tile thumbnail ──────────────
+//
+// §5.3a: "the cropped tile thumbnail must be rendered immediately beside the
+// proposed title, at a size where the ARTWORK is legible (>= 96 px on the
+// short edge)". `tileCropFor` decides WHICH region that is, or refuses.
+describe('T-AI-041 - tileCropFor selects the tile region, or refuses', () => {
+  const box = (
+    over: Partial<{ imageId: string; x: number; y: number; w: number; h: number }> = {},
+  ) => ({
+    imageId: 'img_1',
+    x: 0.2,
+    y: 0.4,
+    w: 0.2,
+    h: 0.2,
+    ...over,
+  });
+
+  it('T-AI-041f: an inferred-unverified candidate with an LLM tile box gets a padded crop', () => {
+    const crop = tileCropFor({
+      verdict: 'inferred-unverified',
+      boxSource: 'llm',
+      boundingBoxes: [box()],
+    });
+
+    expect(crop).not.toBeNull();
+    expect(crop?.imageId).toBe('img_1');
+    // ⚠ LITERALS, deliberately not `TILE_CROP_PADDING`. Expressing the
+    // expectation in terms of the constant makes the assertion recompute the
+    // implementation: setting the padding to 0 then satisfies it, and the
+    // padding that stops the artwork being clipped can be deleted silently.
+    // 0.2 wide, padded by 8% of its own width on each side => 0.184 .. 0.416.
+    expect(crop?.x).toBeCloseTo(0.184, 6);
+    expect(crop?.w).toBeCloseTo(0.232, 6);
+  });
+
+  it('T-AI-041g: an unreadable-tile candidate is cropped too - the tile is all it has', () => {
+    expect(
+      tileCropFor({ verdict: 'unreadable-tile', boxSource: 'llm', boundingBoxes: [box()] }),
+    ).not.toBeNull();
+  });
+
+  // ⚠ THE LOAD-BEARING CASE. An OCR box is a text-LINE strip, not artwork.
+  // Cropping to it fills the thumbnail with the caption the owner is already
+  // shown as `rawText` and shows none of the artwork that is the entire
+  // reason §5.3a makes the thumbnail mandatory. An implementation that
+  // "crops the box" without reading `boxSource` passes every other case here.
+  it('T-AI-041h: an OCR box yields NO crop - it is a text line, not the artwork', () => {
+    expect(
+      tileCropFor({
+        verdict: 'inferred-unverified',
+        boxSource: 'ocr',
+        boundingBoxes: [box({ h: 0.02 })],
+      }),
+    ).toBeNull();
+  });
+
+  it('T-AI-041i: a verdict with no mandatory thumbnail gets no crop', () => {
+    expect(
+      tileCropFor({ verdict: 'title-candidate', boxSource: 'llm', boundingBoxes: [box()] }),
+    ).toBeNull();
+  });
+
+  it('T-AI-041j: no boxes at all degrades to the whole image, not a throw', () => {
+    expect(
+      tileCropFor({ verdict: 'unreadable-tile', boxSource: 'llm', boundingBoxes: [] }),
+    ).toBeNull();
+  });
+
+  it('T-AI-041k: boxes are unioned, but only those on the SAME image as the first', () => {
+    const crop = tileCropFor({
+      verdict: 'inferred-unverified',
+      boxSource: 'llm',
+      boundingBoxes: [
+        box({ x: 0.2, y: 0.4, w: 0.1, h: 0.1 }),
+        box({ x: 0.35, y: 0.4, w: 0.1, h: 0.1 }),
+        // A box on a DIFFERENT image must not widen the rectangle - the crop
+        // is only meaningful against the image it was measured on.
+        box({ imageId: 'img_2', x: 0.9, y: 0.9, w: 0.05, h: 0.05 }),
+      ],
+    });
+
+    expect(crop?.imageId).toBe('img_1');
+    // Union spans 0.2 -> 0.45, i.e. 0.25 wide, plus 8% padding on both sides.
+    expect(crop?.w).toBeCloseTo(0.29, 6);
+    // and does NOT reach img_2's box at 0.9.
+    expect((crop?.x ?? 0) + (crop?.w ?? 0)).toBeLessThan(0.9);
+  });
+
+  it('T-AI-041l: a crop is clamped into the image, never negative or past the edge', () => {
+    const crop = tileCropFor({
+      verdict: 'inferred-unverified',
+      boxSource: 'llm',
+      boundingBoxes: [box({ x: 0, y: 0, w: 1, h: 1 })],
+    });
+
+    expect(crop?.x).toBe(0);
+    expect(crop?.y).toBe(0);
+    expect(crop?.w).toBe(1);
+    expect(crop?.h).toBe(1);
+  });
+
+  // A zero-width box scaled to fill a 96px thumbnail is an infinite
+  // magnification of one column of pixels, which renders as a smear.
+  it('T-AI-041m: a degenerate box is refused rather than magnified infinitely', () => {
+    expect(
+      tileCropFor({
+        verdict: 'unreadable-tile',
+        boxSource: 'llm',
+        boundingBoxes: [box({ w: 0, h: 0 })],
+      }),
+    ).toBeNull();
+  });
+
+  it('T-AI-041n: a non-finite coordinate degrades to the whole image', () => {
+    expect(
+      tileCropFor({
+        verdict: 'unreadable-tile',
+        boxSource: 'llm',
+        boundingBoxes: [box({ x: Number.NaN })],
+      }),
+    ).toBeNull();
   });
 });

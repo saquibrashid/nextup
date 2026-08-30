@@ -64,6 +64,13 @@ function candidate(overrides: Partial<ReviewCandidate> = {}): ReviewCandidate {
     match: match(),
     alternatives: [],
     sourceImageIds: ['img_1'],
+    // ⚠ Explicit, even though the spread of `Partial<ReviewCandidate>` below
+    // lets TypeScript accept its absence. That is exactly the trap: a spread
+    // of a Partial makes every property "possibly supplied by the override",
+    // so a NEW REQUIRED FIELD added to the contract typechecks here while
+    // arriving as `undefined` at runtime. Pin it so the compiler, not a
+    // render crash, is what tells the next person the contract moved.
+    tileCrop: null,
     disposition: 'pending',
     collapsedIntoCandidateId: null,
     classification: 'new',
@@ -187,5 +194,105 @@ describe('T-AI-041 · specs/testing.md §9 R2 · the tile thumbnail is rendered 
     expect(screen.queryByTestId('candidate-thumb')).not.toBeInTheDocument();
     // The corroborated match keeps its TMDB poster instead.
     expect(screen.getByTestId('candidate-poster')).toBeInTheDocument();
+  });
+});
+
+// ── The CROP half of §5.3a ─────────────────────────────────────────────────
+//
+// `T-AI-041a`-`e` above predate this block: they proved a tile IMAGE is
+// rendered and wired to `GET /api/images`, but the image they asserted was the
+// WHOLE SCREENSHOT. §5.3a asks for "the CROPPED tile thumbnail... at a size
+// where the artwork is legible (>= 96 px on the short edge)", so these cases
+// cover the part that was missing.
+//
+// ⚠ The crop is PRESENTATIONAL and deliberately so: the byte route serves
+// whole screenshots, and cropping server-side would put image processing on
+// the request path of a 0.25 vCPU / 0.5 GiB container (REQ-079). The image is
+// fetched whole either way, so the crop is a clipping wrapper with a scaled,
+// offset `<img>` inside it.
+describe('T-AI-041 · specs/ui.md §5.3a · the thumbnail is CROPPED to the tile', () => {
+  const crop = { imageId: 'img_abc', x: 0.25, y: 0.5, w: 0.25, h: 0.25 };
+
+  it('T-AI-041o: a candidate with a tile crop renders inside a clipping wrapper', () => {
+    render(
+      <ReviewPage
+        review={review([
+          candidate({
+            verdict: 'inferred-unverified',
+            sourceImageIds: ['img_abc'],
+            tileCrop: crop,
+          }),
+        ])}
+      />,
+    );
+
+    const wrapper = screen.getByTestId('candidate-thumb-crop');
+    // ⚠ `overflow: hidden` is the whole mechanism. Without it the scaled image
+    // is a very large picture spilling out of the card, and every assertion
+    // that merely finds an `<img>` still passes.
+    expect(wrapper.className).toContain('candidate-card__thumb--cropped');
+    expect(wrapper).toContainElement(screen.getByTestId('candidate-thumb'));
+  });
+
+  it('T-AI-041p: the image is scaled and offset so the tile region fills the box', () => {
+    render(
+      <ReviewPage
+        review={review([
+          candidate({
+            verdict: 'unreadable-tile',
+            rawText: '',
+            match: null,
+            sourceImageIds: ['img_abc'],
+            tileCrop: crop,
+          }),
+        ])}
+      />,
+    );
+
+    const img = screen.getByTestId('candidate-thumb');
+    // A quarter-width tile means the image is drawn at 400% and pulled left by
+    // its own start offset expressed in those magnified units.
+    // (The CSSOM normalises the emitted `400.0000%` to `400%`.)
+    expect(img.style.width).toBe('400%');
+    expect(img.style.height).toBe('400%');
+    expect(img.style.left).toBe('-100%');
+    expect(img.style.top).toBe('-200%');
+  });
+
+  it('T-AI-041q: the crop names the image it was measured on, not sourceImageIds[0]', () => {
+    // ⚠ After an SD-02 collapse a candidate carries several source images and
+    // they are NOT guaranteed to be in the order its boxes were recorded.
+    // Cropping image A's rectangle out of image B shows a confidently-wrong
+    // region of the wrong screenshot - evidence that looks like evidence.
+    render(
+      <ReviewPage
+        review={review([
+          candidate({
+            verdict: 'inferred-unverified',
+            sourceImageIds: ['img_other', 'img_abc'],
+            tileCrop: crop,
+          }),
+        ])}
+      />,
+    );
+
+    expect(screen.getByTestId('candidate-thumb')).toHaveAttribute('src', '/api/images/img_abc');
+  });
+
+  it('T-AI-041r: with no crop the whole screenshot is still shown, unwrapped', () => {
+    render(
+      <ReviewPage
+        review={review([
+          candidate({
+            verdict: 'inferred-unverified',
+            sourceImageIds: ['img_abc'],
+            tileCrop: null,
+          }),
+        ])}
+      />,
+    );
+
+    expect(screen.queryByTestId('candidate-thumb-crop')).toBeNull();
+    expect(screen.getByTestId('candidate-thumb')).toHaveAttribute('src', '/api/images/img_abc');
   });
 });

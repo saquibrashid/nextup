@@ -324,6 +324,18 @@ describe('T-STATUS-001 · the task status ledger and its gate', () => {
     expect(isTestIdPresent('T-UI-024', defined)).toBe(false);
     // A longer id that merely starts with the same text is not a variant.
     expect(isTestIdPresent('T-UI-02', new Set(['T-UI-023']))).toBe(false);
+    // ⚠ AND THE SAME MISTYPE WHERE THE VARIANT IS LETTERED. `T-UI-023a` is
+    // `T-UI-02` plus `3a` — two extra characters ENDING in a letter — so a
+    // check that merely asks "do the extras end in a letter" resolves a
+    // mistyped digit to a different criterion. The extras must be letters
+    // ALL THE WAY, which is why the test is anchored at both ends. The case
+    // above cannot catch this: its extra is the bare digit `3`.
+    expect(isTestIdPresent('T-UI-02', new Set(['T-UI-023a']))).toBe(false);
+    // A base id whose only delivered cases are DOUBLE-lettered is still
+    // present — `T-AI-033an` and `T-AI-041aa` are real ids here, and reading
+    // their base as unfinished would report delivered work as outstanding.
+    expect(isTestIdPresent('T-AI-041', new Set(['T-AI-041aa']))).toBe(true);
+    expect(isTestIdPresent('T-AI-041', new Set(['T-AI-041abc']))).toBe(false);
   });
 
   it('T-STATUS-001o · the ledger covers every task and the backlog file is the source', () => {

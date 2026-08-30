@@ -62,6 +62,15 @@ describe('T-META-005 every test id the backlog cites is defined in the testing s
     // `T-LIST-010a`…`c`. Requiring an exact match would report every such
     // split as undefined, which would train everyone to ignore the gate.
     expect(baseId('T-LIST-010a')).toBe('T-LIST-010');
+    // ⚠ AND THE DOUBLE-LETTERED FORM. `TEST_ID_RE` matches `[a-z]{0,2}`, so
+    // `T-AI-041aa` and `T-AI-033an` are ids this gate will read; stripping a
+    // single letter left `T-AI-041a`, which the spec does not define, and
+    // reported a correctly-cited case as a phantom citation while its
+    // single-letter siblings passed. The two bounds must move together.
+    expect(baseId('T-AI-041aa')).toBe('T-AI-041');
+    expect(baseId('T-AI-033an')).toBe('T-AI-033');
+    // A base id with no suffix is left alone.
+    expect(baseId('T-LIST-010')).toBe('T-LIST-010');
     expect(
       undefinedCitations(
         '| TASK-001 | x | S | — | `T-LIST-010a` |',

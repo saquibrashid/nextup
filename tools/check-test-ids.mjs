@@ -52,8 +52,16 @@ const TASK_RE = /TASK-\d{3}/;
 /** Drop `~~struck-through~~` spans. Non-greedy: see `check-status.mjs`. */
 export const stripStruckThrough = (s) => s.replace(/~~.*?~~/g, '');
 
-/** `T-LIST-010a` → `T-LIST-010`. The spec names criteria; suites split cases. */
-export const baseId = (id) => id.replace(/[a-z]$/, '');
+/**
+ * `T-LIST-010a` → `T-LIST-010`. The spec names criteria; suites split cases.
+ *
+ * ⚠ `{1,2}`, matching `TEST_ID_RE`'s own `[a-z]{0,2}` bound. Stripping a
+ * SINGLE letter silently mis-resolves every double-letter sub-id — `T-AI-041aa`
+ * became `T-AI-041a`, which the spec does not define, so a correctly-cited
+ * case was reported as a phantom citation while its single-letter siblings
+ * passed. The two bounds must move together.
+ */
+export const baseId = (id) => id.replace(/[a-z]{1,2}$/, '');
 
 /**
  * Every test id DEFINED by the testing spec, as base ids.
