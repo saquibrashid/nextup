@@ -121,7 +121,6 @@ export const BASELINE_ORPHANS = new Set([
   //
   // `T-AUTH-001/002/003` are level `E` — a real browser against a real IdP —
   // and are deferred by §10, not merely unwritten.
-  'T-AI-014',
   'T-AUTH-001',
   'T-AUTH-002',
   'T-AUTH-003',

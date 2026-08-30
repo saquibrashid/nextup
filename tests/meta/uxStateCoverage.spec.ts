@@ -82,7 +82,6 @@ const ID_PATTERN = /T-[A-Z0-9]+-\d+/g;
  */
 const KNOWN_UNCOVERED: readonly string[] = [
   'T-A11Y-006',
-  'T-AI-017',
   'T-AUTH-001',
   'T-AUTH-002',
   'T-AUTH-003',

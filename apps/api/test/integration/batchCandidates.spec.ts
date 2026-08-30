@@ -24,9 +24,15 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 
 import { createApp } from '../../src/app.js';
 import { CLIENT_PRINCIPAL_HEADER } from '../../src/auth/principal.js';
+import { resetTmdbRateLimiterForTests } from '../../src/clients/tmdbClient.js';
 import { resetAllowListWarning } from '../../src/middleware/allowList.js';
 import { closeTestPrisma, resetDatabase, testPrisma } from './harness.js';
 import { confirmPendingCandidates } from '../../src/repository/ownerData.js';
+import {
+  TMDB_UNAVAILABLE_TOKEN,
+  tmdbMswServer,
+  type ReplayOptions,
+} from '../../../../tests/fixtures/msw/tmdb/index.js';
 
 const OID = 'http://schemas.microsoft.com/identity/claims/objectidentifier';
 const SUBJECT = 'oid-owner-candidates';
@@ -50,6 +56,8 @@ let server: Server;
 let app: Express;
 let origin: string;
 let ownerId: string;
+let msw: ReturnType<typeof tmdbMswServer> | undefined;
+let calls: string[];
 
 interface PatchedCandidate {
   candidateId: string;
@@ -68,6 +76,28 @@ interface ConfirmAllBody {
   section: string;
   confirmed: number;
   skipped: number;
+}
+
+interface ReviewBody {
+  banner: string | null;
+  sections: {
+    unmatched: {
+      count: number;
+      items: { candidateId: string; rawText: string; resolvedWorkIdentity: string | null }[];
+    };
+  };
+}
+
+function startTmdb(options: ReplayOptions = {}): void {
+  msw?.close();
+  msw = tmdbMswServer({ ...options, calls });
+  msw.listen({
+    onUnhandledRequest: (request, print) => {
+      const { hostname } = new URL(request.url);
+      if (hostname === '127.0.0.1' || hostname === 'localhost' || hostname === '::1') return;
+      print.error();
+    },
+  });
 }
 
 const patchCandidate = (batchId: string, candidateId: string, body: unknown): Promise<Response> =>
@@ -93,7 +123,9 @@ const getReview = (batchId: string): Promise<Response> =>
 
 let batchSeq = 0;
 
-async function makeBatch(over: { status?: string; mode?: string } = {}): Promise<string> {
+async function makeBatch(
+  over: { status?: string; mode?: string; crossCheck?: string } = {},
+): Promise<string> {
   const id = `batch-cand-${++batchSeq}`;
   await testPrisma().uploadBatch.create({
     data: {
@@ -104,7 +136,7 @@ async function makeBatch(over: { status?: string; mode?: string } = {}): Promise
       status: over.status ?? 'in-review',
       lowYield: false,
       degradedExtraction: false,
-      crossCheck: 'ok',
+      crossCheck: over.crossCheck ?? 'ok',
     },
   });
   return id;
@@ -193,6 +225,7 @@ async function makeActiveListing(workIdentity: string, name: string): Promise<st
 
 beforeEach(async () => {
   resetAllowListWarning();
+  resetTmdbRateLimiterForTests();
   vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   process.env['NEXTUP_ALLOWED_SUBJECTS'] = SUBJECT;
   // ⚠ Deliberately UNCONFIGURED. The `reclassifyAsTitle` path calls TMDB, and
@@ -201,6 +234,7 @@ beforeEach(async () => {
   // client refuses locally (`TmdbUnavailableError`, not retryable), which is
   // exactly the outage path `T-REV-011af` asserts the rescue survives.
   process.env['TMDB_API_KEY'] = '';
+  calls = [];
   testPrisma();
   await resetDatabase();
 
@@ -224,6 +258,8 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  msw?.close();
+  msw = undefined;
   vi.restoreAllMocks();
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
@@ -555,6 +591,40 @@ describe('T-REV-011 · reclassifyAsTitle rescues a chrome-suspected item', () =>
       if (previous !== undefined) process.env['TMDB_API_KEY'] = previous;
     }
   });
+
+  it('T-AI-017a: a TMDB 503 leaves rescued candidates unmatched and the reviewable batch intact', async () => {
+    process.env['TMDB_API_KEY'] = 'test-key';
+    startTmdb();
+    const batchId = await makeBatch({ mode: 'full-update', crossCheck: 'llm-unavailable' });
+    const candidateId = await makeCandidate(batchId, {
+      rawText: `Dune ${TMDB_UNAVAILABLE_TOKEN}`,
+      verdict: 'chrome-suspected',
+      workIdentity: null,
+    });
+
+    const res = await patchCandidate(batchId, candidateId, { reclassifyAsTitle: true });
+    expect(res.status).toBe(200);
+
+    const [batch, candidate] = await Promise.all([
+      testPrisma().uploadBatch.findFirstOrThrow({ where: { id: batchId } }),
+      testPrisma().extractionCandidate.findFirstOrThrow({ where: { id: candidateId } }),
+    ]);
+    expect(batch.status).toBe('in-review');
+    expect(candidate.resolvedWorkIdentity).toBeNull();
+    expect(candidate.matchCandidates).toBeNull();
+    expect(calls).toHaveLength(3);
+
+    const review = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(review.banner).not.toBeNull();
+    expect(review.sections.unmatched.count).toBe(1);
+    expect(review.sections.unmatched.items).toEqual([
+      expect.objectContaining({
+        candidateId,
+        rawText: `Dune ${TMDB_UNAVAILABLE_TOKEN}`,
+        resolvedWorkIdentity: null,
+      }),
+    ]);
+  }, 15_000);
 });
 
 describe('T-REV-011 · confirm-all (§6.19)', () => {
