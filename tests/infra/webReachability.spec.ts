@@ -147,8 +147,16 @@ function callForm(method: string): RegExp {
  * - `ImageDropzone.onPasteFailed` — forwarded to `PasteButton` but supplied by
  *   no container, so a clipboard-read failure is silent in the SPA.
  * - `RemovalConfirmDialog.submitting` — the confirm/cancel buttons never
- *   disable while the removal is in flight. On the IRREVERSIBLE full-update
- *   path this is a double-submit waiting to happen.
+ *   disable while the removal is in flight. ⚠ INVESTIGATED, AND THE EXPOSURE
+ *   IS SMALLER THAN IT LOOKS: `ReviewPage`'s `onConfirm` calls
+ *   `setConfirming(false)` before `onApply`, so the dialog unmounts
+ *   synchronously and cannot itself be double-submitted, and a second close is
+ *   refused server-side with 409 `BATCH_NOT_IN_REVIEW` rather than applied
+ *   twice. What remains is the **Apply changes** button on the no-removals
+ *   path, which has no in-flight guard: a double-tap yields a success followed
+ *   by a spurious error, a UX wart rather than data loss. Recorded here so the
+ *   next reader does not re-derive it — and NOT fixed in the same breath,
+ *   because `ReviewPage.tsx` is a live edit surface.
  * - `BatchStatusPage.offline` — the offline banner never renders, so a poll
  *   that has stopped because the device dropped off the network is
  *   indistinguishable from one that is merely slow.
@@ -511,11 +519,11 @@ describe('T-INFRA-013 nothing finished is left unreachable', () => {
     expect(suppliedAttributes(cBody).names.has('onRestore')).toBe(true);
     expect(suppliedAttributes(cBody).names.has('value')).toBe(false);
 
-    const arrow = "<Thing onContinue={() => { go(); }} onRestore={(a) => f(a)} />";
+    const arrow = '<Thing onContinue={() => { go(); }} onRestore={(a) => f(a)} />';
     expect(openingTagBodies(arrow, 'Thing')).toHaveLength(1);
-    expect(suppliedAttributes(openingTagBodies(arrow, 'Thing')[0] ?? '').names.has('onRestore')).toBe(
-      true,
-    );
+    expect(
+      suppliedAttributes(openingTagBodies(arrow, 'Thing')[0] ?? '').names.has('onRestore'),
+    ).toBe(true);
 
     // Trap 1b — A BARE BOOLEAN ATTRIBUTE SUPPLIES THE PROP, with no `=` at
     // all. Matching `name\s*=` reported `CandidateCard.unidentified` as dead
@@ -526,14 +534,20 @@ describe('T-INFRA-013 nothing finished is left unreachable', () => {
     // identifier inside another prop's expression.
     const bare = suppliedAttributes(' candidate={c} unidentified ');
     expect(bare.names.has('unidentified')).toBe(true);
-    expect(suppliedAttributes(' onPick={() => setUnidentified(x)} ').names.has('unidentified')).toBe(
-      false,
-    );
+    expect(
+      suppliedAttributes(' onPick={() => setUnidentified(x)} ').names.has('unidentified'),
+    ).toBe(false);
 
     // Trap 2 — a prop whose TYPE is a function signature spans lines and
     // carries its own optional parameters. A line-wise scan read `opts?:`
     // inside `onRestore`'s type as a prop of the page.
-    expect(optionalPropsOf(['interface XProps {', '  readonly onR?: (', '    o?: number,', '  ) => void;', '}'].join('\n')).sort()).toEqual(['onR']);
+    expect(
+      optionalPropsOf(
+        ['interface XProps {', '  readonly onR?: (', '    o?: number,', '  ) => void;', '}'].join(
+          '\n',
+        ),
+      ).sort(),
+    ).toEqual(['onR']);
 
     // Trap 3 — a file exports several components and each props interface
     // belongs to ITS OWN one. Matching every interface to the file's basename
