@@ -227,13 +227,8 @@ const KNOWN_UNMAPPED: readonly string[] = [
  * ⚠ Shrink-only, like `KNOWN_UNMAPPED`. `T-META-001e` fails in both
  * directions, so landing any one of these forces its line out.
  *
- * `T-A11Y-002`, `T-A11Y-013` and `T-A11Y-015` are in flight on the viewport
- * a11y branch and are expected to leave this list first.
  */
 const KNOWN_PHANTOM_CITATIONS: readonly string[] = [
-  'T-A11Y-002',
-  'T-A11Y-013',
-  'T-A11Y-015',
   'T-AI-014',
   'T-AI-017',
   'T-AI-041',

@@ -363,7 +363,6 @@ test.describe('T-A11Y-001 — the 320 px floor', () => {
     await page.setViewportSize(NARROW);
 
     for (const route of ROUTES) {
-      console.log(`T-A11Y-001c measuring ${route}`);
       await page.goto(route);
       await expectStyledAndRendered(page);
       await expectNoHorizontalOverflow(page, route);
