@@ -223,7 +223,10 @@ async function seedImage(batchId: string, uploadedAt: string): Promise<void> {
 }
 
 const listingsFor = (titleId: string) =>
-  testPrisma().serviceListing.findMany({ where: { ownerId, titleId }, orderBy: { listingId: 'asc' } });
+  testPrisma().serviceListing.findMany({
+    where: { ownerId, titleId },
+    orderBy: { listingId: 'asc' },
+  });
 
 const titleFor = (identity: string) =>
   testPrisma().title.findFirst({ where: { ownerId, workIdentity: identity, state: 'active' } });

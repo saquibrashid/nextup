@@ -142,7 +142,12 @@ async function seedRemoved(opts: {
  * Seed an ACTIVE title + listing for a given workIdentity — used to produce
  * the duplicate condition T-RES-014 requires.
  */
-async function seedActive(opts: { workIdentity: string; name: string; service?: string; dateAdded?: string }) {
+async function seedActive(opts: {
+  workIdentity: string;
+  name: string;
+  service?: string;
+  dateAdded?: string;
+}) {
   seq += 1;
   const id = `ra-${String(seq).padStart(4, '0')}`;
   const service = opts.service ?? 'max';

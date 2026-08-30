@@ -560,7 +560,8 @@ describe('TASK-106 · `GET /api/suppressions` and `/unsuppress` against the real
     expect(second?.unsuppressedAt?.toISOString()).toBe(first?.unsuppressedAt?.toISOString());
   });
 
-  it('T-SUP-021n · NFR-008 · a foreign suppression id answers 404 and writes nothing', async () => {    const { title } = await seedTitle({ ownerId: otherOwner, workIdentity: 'tmdb:movie:708' });
+  it('T-SUP-021n · NFR-008 · a foreign suppression id answers 404 and writes nothing', async () => {
+    const { title } = await seedTitle({ ownerId: otherOwner, workIdentity: 'tmdb:movie:708' });
     await suppress(title.id, OTHER_SUBJECT);
     const [item] = await listSuppressions(OTHER_SUBJECT);
 
