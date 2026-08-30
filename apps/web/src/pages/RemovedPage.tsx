@@ -32,6 +32,7 @@ import { useState, type JSX } from 'react';
 import { SERVICE_LABELS, dateAddedLabel, removedOnLabel } from '@nextup/domain';
 
 import {
+  OFFLINE_DISABLED_REASON,
   REMOVED_CLEAR_SEARCH_LABEL,
   REMOVED_EMPTY_BODY,
   REMOVED_EMPTY_TITLE,
@@ -55,6 +56,7 @@ import {
 import { ApiError } from '../lib/apiClient';
 import type { RemovedItem, RestoreResponse } from '../lib/apiClient';
 import { TMDB_IMAGE_BASE } from '../components/TitleRow';
+import { useOnline } from '../lib/useOnline';
 
 export interface RemovedPageProps {
   readonly items?: readonly RemovedItem[];
@@ -148,11 +150,13 @@ function RestoreControl({
   onRestore,
   onUnsuppress,
   onDismiss,
+  offline,
 }: {
   item: RemovedItem;
   onRestore: (listingId: string, opts?: { confirmDuplicate?: boolean }) => Promise<RestoreResponse>;
   onUnsuppress: (suppressionId: string) => Promise<unknown>;
   onDismiss: (msg: string) => void;
+  offline: boolean;
 }): JSX.Element | null {
   const [state, setState] = useState<RestoreState>({ phase: 'idle' });
 
@@ -210,6 +214,7 @@ function RestoreControl({
         type="button"
         className="tap-target"
         data-testid="restore-button"
+        disabled={offline}
         onClick={() => void attemptRestore()}
       >
         {RESTORE_LABEL}
@@ -297,11 +302,13 @@ function RemovedRow({
   onRestore,
   onUnsuppress,
   onDismiss,
+  offline,
 }: {
   item: RemovedItem;
   onRestore: (listingId: string, opts?: { confirmDuplicate?: boolean }) => Promise<RestoreResponse>;
   onUnsuppress: (suppressionId: string) => Promise<unknown>;
   onDismiss: (msg: string) => void;
+  offline: boolean;
 }): JSX.Element {
   const ordinal = removalOrdinalLabel(item);
 
@@ -342,7 +349,9 @@ function RemovedRow({
           onRestore={onRestore}
           onUnsuppress={onUnsuppress}
           onDismiss={onDismiss}
+          offline={offline}
         />
+        {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
       </div>
     </li>
   );
@@ -358,6 +367,8 @@ export function RemovedPage({
   onRestore,
   onUnsuppress,
 }: RemovedPageProps): JSX.Element {
+  const online = useOnline();
+  const offline = !online;
   const searching = query.trim() !== '';
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
   const [announcement, setAnnouncement] = useState<string | null>(null);
@@ -432,6 +443,7 @@ export function RemovedPage({
               onRestore={doRestore}
               onUnsuppress={doUnsuppress}
               onDismiss={(msg) => handleDismiss(item.listingId, msg)}
+              offline={offline}
             />
           ))}
         </ul>

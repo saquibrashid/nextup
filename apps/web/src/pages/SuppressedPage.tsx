@@ -17,8 +17,10 @@
 // produce a new row and bypass it.
 
 import { useState, type JSX } from 'react';
+import { Link } from 'react-router-dom';
 
 import {
+  OFFLINE_DISABLED_REASON,
   RETRY_LABEL,
   SUPPRESSED_EMPTY_BACK,
   SUPPRESSED_EMPTY_BODY,
@@ -30,6 +32,7 @@ import {
 import { withName } from '../components/SuppressDialog';
 import type { SuppressionItem } from '../lib/apiClient';
 import { TMDB_IMAGE_BASE } from '../components/TitleRow';
+import { useOnline } from '../lib/useOnline';
 
 export interface SuppressedPageProps {
   readonly items?: readonly SuppressionItem[];
@@ -50,10 +53,12 @@ function SuppressionRow({
   item,
   onUnsuppress,
   onDone,
+  offline,
 }: {
   item: SuppressionItem;
   onUnsuppress: (suppressionId: string) => Promise<unknown>;
   onDone: (msg: string) => void;
+  offline: boolean;
 }): JSX.Element {
   const [rowState, setRowState] = useState<RowState>({ phase: 'idle' });
   const { displaySnapshot, identityStability, suppressionId } = item;
@@ -103,6 +108,7 @@ function SuppressionRow({
             type="button"
             className="tap-target"
             data-testid="stop-ignoring-button"
+            disabled={offline}
             onClick={() => setRowState({ phase: 'confirming' })}
           >
             Stop ignoring
@@ -116,6 +122,7 @@ function SuppressionRow({
               type="button"
               className="tap-target"
               data-testid="unsuppress-confirm-button"
+              disabled={offline}
               onClick={confirm}
             >
               Stop ignoring
@@ -129,6 +136,10 @@ function SuppressionRow({
               Cancel
             </button>
           </div>
+        )}
+
+        {offline && rowState.phase !== 'submitting' && (
+          <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>
         )}
 
         {rowState.phase === 'submitting' && (
@@ -164,6 +175,8 @@ export function SuppressedPage({
   onRetry,
   onUnsuppress = () => Promise.resolve(),
 }: SuppressedPageProps): JSX.Element {
+  const online = useOnline();
+  const offline = !online;
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
   const [announcement, setAnnouncement] = useState<string | null>(null);
 
@@ -209,9 +222,9 @@ export function SuppressedPage({
         <div data-testid="suppressed-empty">
           <p>{SUPPRESSED_EMPTY_TITLE}</p>
           <p>{SUPPRESSED_EMPTY_BODY}</p>
-          <a className="tap-target" href="/">
+          <Link className="tap-target" to="/">
             {SUPPRESSED_EMPTY_BACK}
-          </a>
+          </Link>
         </div>
       ) : (
         <ul data-testid="suppressed-list">
@@ -220,6 +233,7 @@ export function SuppressedPage({
               key={item.suppressionId}
               item={item}
               onUnsuppress={onUnsuppress}
+              offline={offline}
               onDone={(msg) => {
                 setDismissed((prev) => new Set([...prev, item.suppressionId]));
                 setAnnouncement(msg);

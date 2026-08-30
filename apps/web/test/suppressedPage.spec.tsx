@@ -15,11 +15,14 @@
  * the title reads differently in a future screenshot.
  */
 
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { render as rtlRender, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { SuppressedPage } from '../src/pages/SuppressedPage';
 import type { SuppressionItem } from '../src/lib/apiClient';
 import {
+  OFFLINE_DISABLED_REASON,
   RETRY_LABEL,
   SUPPRESSED_EMPTY_BODY,
   SUPPRESSED_EMPTY_TITLE,
@@ -28,6 +31,22 @@ import {
   UNSUPPRESS_CONFIRM_BODY,
 } from '../src/copy';
 import { withName } from '../src/components/SuppressDialog';
+
+function render(ui: ReactElement): ReturnType<typeof rtlRender> {
+  return rtlRender(ui, { wrapper: MemoryRouter });
+}
+
+function setNavigatorOnline(online: boolean): void {
+  Object.defineProperty(window.navigator, 'onLine', {
+    configurable: true,
+    get: () => online,
+  });
+  fireEvent(window, new Event(online ? 'online' : 'offline'));
+}
+
+afterEach(() => {
+  setNavigatorOnline(true);
+});
 
 function makeItem(overrides?: Partial<SuppressionItem>): SuppressionItem {
   return {
@@ -201,6 +220,21 @@ describe('suppressed-view UX states — §8', () => {
     expect(screen.getByRole('link', { name: 'Back' })).toHaveAttribute('href', '/');
   });
 
+  it('T-UX-081b: Back is router navigation, not a document reload', async () => {
+    rtlRender(
+      <MemoryRouter initialEntries={['/not-interested']}>
+        <Routes>
+          <Route path="/not-interested" element={<SuppressedPage items={[]} />} />
+          <Route path="/" element={<p data-testid="router-home">Combined list route</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('link', { name: 'Back' }));
+
+    expect(await screen.findByTestId('router-home')).toHaveTextContent('Combined list route');
+  });
+
   it('T-UX-082a: populated rows render from displaySnapshot', () => {
     render(
       <SuppressedPage
@@ -257,6 +291,53 @@ describe('suppressed-view UX states — §8', () => {
     expect(status).toHaveTextContent(withName(UNSUPPRESS_CONFIRM_BODY, 'The Test Movie'));
     expect(status).toHaveTextContent("This doesn't bring back anything that was removed");
     expect(screen.queryByTestId('suppressed-row')).not.toBeInTheDocument();
+  });
+});
+
+describe('offline state — T-UX-003 / §8.7 deferred surface', () => {
+  it('T-UX-003f: un-suppress is disabled offline with a visible reason, and rows remain readable', async () => {
+    setNavigatorOnline(true);
+    render(<SuppressedPage items={[makeItem()]} onUnsuppress={() => Promise.resolve()} />);
+
+    expect(screen.getByTestId('suppressed-name')).toHaveTextContent('The Test Movie');
+    expect(screen.getByTestId('stop-ignoring-button')).toBeEnabled();
+
+    setNavigatorOnline(false);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('stop-ignoring-button')).toBeDisabled();
+    });
+    expect(screen.getByText(OFFLINE_DISABLED_REASON)).toBeVisible();
+    expect(screen.getByTestId('suppressed-name')).toHaveTextContent('The Test Movie');
+
+    setNavigatorOnline(true);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('stop-ignoring-button')).toBeEnabled();
+    });
+    expect(screen.queryByText(OFFLINE_DISABLED_REASON)).not.toBeInTheDocument();
+  });
+
+  it('T-UX-003g: an in-flight un-suppress keeps its submitting state if the network drops', async () => {
+    const onUnsuppress = vi.fn(
+      () =>
+        new Promise<unknown>(() => {
+          /* keep the row in the submitting state */
+        }),
+    );
+    setNavigatorOnline(true);
+    render(<SuppressedPage items={[makeItem()]} onUnsuppress={onUnsuppress} />);
+
+    fireEvent.click(screen.getByTestId('stop-ignoring-button'));
+    fireEvent.click(screen.getByTestId('unsuppress-confirm-button'));
+    await waitFor(() => {
+      expect(screen.getByTestId('unsuppress-submitting')).toBeDisabled();
+    });
+
+    setNavigatorOnline(false);
+
+    expect(screen.getByTestId('unsuppress-submitting')).toHaveTextContent('Removing…');
+    expect(screen.queryByText(OFFLINE_DISABLED_REASON)).not.toBeInTheDocument();
   });
 });
 
