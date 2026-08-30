@@ -558,9 +558,11 @@ describe('T-PASTE-007 every ceiling applies identically to pasted images', () =>
 
   it('T-PASTE-007e: an empty request is refused for every source', async () => {
     const batchId = await openBatch();
-    const res = await postImages(batchId, [], 'paste');
-    expect(res.status).toBe(400);
-    expect(((await res.json()) as ErrorBody).error.code).toBe('VALIDATION_FAILED');
+    for (const source of ['paste', 'upload', 'drop'] as const) {
+      const res = await postImages(batchId, [], source);
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as ErrorBody).error.code).toBe('VALIDATION_FAILED');
+    }
   });
 });
 
