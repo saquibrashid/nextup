@@ -19,8 +19,9 @@
  */
 
 import type { JSX } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
+import { ErrorBoundary } from './ErrorBoundary';
 import { OfflineBanner } from './OfflineBanner';
 import { TmdbAttribution } from './TmdbAttribution';
 import { useOnline } from '../lib/useOnline';
@@ -32,6 +33,7 @@ const NAV_ITEMS = ROUTES.filter(
 
 export function AppShell(): JSX.Element {
   const online = useOnline();
+  const location = useLocation();
 
   return (
     <div className="app-shell">
@@ -55,7 +57,9 @@ export function AppShell(): JSX.Element {
       <OfflineBanner offline={!online} />
 
       <main>
-        <Outlet />
+        <ErrorBoundary resetKey={location.pathname}>
+          <Outlet />
+        </ErrorBoundary>
       </main>
 
       <footer data-testid="app-footer">
