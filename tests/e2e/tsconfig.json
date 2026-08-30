@@ -1,0 +1,28 @@
+{
+  // ⚠ A DRIFT ALARM, not a build. `tsc --noEmit -p tests/e2e/tsconfig.json`
+  // typechecks the e2e specs — and, transitively, the STATEFUL stub in
+  // `journey.spec.ts` against the real `@nextup/domain` and `apps/web` response
+  // types it is declared with. A server-side shape change then fails HERE
+  // instead of passing silently against a fiction (see the header of
+  // `journey.spec.ts`, Part 2).
+  //
+  // ⚠ This config is NOT yet part of `npm run typecheck` (root `tsc --build`
+  // references only domain/api/web/scripts, never `tests/**`). Wiring it in
+  // needs a `{ "path": "./tests/e2e" }` entry in the root `tsconfig.json` — a
+  // shared, cross-lane build-graph file this lane must not edit. Reported as a
+  // finding on TASK-094/TASK-108, not changed here.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["node"]
+  },
+  "include": ["**/*.ts", "**/*.tsx"]
+}
