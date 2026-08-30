@@ -32,6 +32,30 @@ import { AppError } from '../errors/AppError.js';
 /** `specs/api.md` §6.29 — the owner-facing sentence, verbatim. */
 export const TMDB_UNAVAILABLE_MESSAGE = "Couldn't reach TMDB. Try again in a moment.";
 
+/**
+ * The ONE place a `TmdbUnavailableError` becomes the closed `TMDB_UNAVAILABLE`
+ * envelope status. Returns `null` for anything else, so a caller threads it
+ * straight into a `catch` without swallowing unrelated failures:
+ *
+ *   const mapped = tmdbUnavailableAppError(error);
+ *   if (mapped) throw mapped;
+ *   throw error;
+ *
+ * ⚠ SHARED ON PURPOSE. Every route that reaches TMDB — search, manual entry,
+ * fix-match and the review-candidate PATCH — needs this exact mapping, and
+ * this task exists because two independently-written copies disagreed once:
+ * search mapped a 503 to 502 `TMDB_UNAVAILABLE`, the PATCH route let the same
+ * error fall through to a generic 500. One function is one place to get it
+ * right. The upstream error's own text is deliberately dropped — a fetch
+ * failure message can carry the request URL, and the TMDB URL carries the API
+ * key.
+ */
+export function tmdbUnavailableAppError(error: unknown): AppError | null {
+  return error instanceof TmdbUnavailableError
+    ? new AppError('TMDB_UNAVAILABLE', 502, TMDB_UNAVAILABLE_MESSAGE)
+    : null;
+}
+
 export interface TmdbSearchQuery {
   q: string;
   type?: MediaType;
@@ -104,9 +128,8 @@ export async function searchTmdb(
       query.type === undefined ? { limit: query.limit } : { type: query.type, limit: query.limit },
     );
   } catch (error) {
-    if (error instanceof TmdbUnavailableError) {
-      throw new AppError('TMDB_UNAVAILABLE', 502, TMDB_UNAVAILABLE_MESSAGE);
-    }
+    const mapped = tmdbUnavailableAppError(error);
+    if (mapped) throw mapped;
     throw error;
   }
 }
