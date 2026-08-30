@@ -103,6 +103,7 @@ export const BASELINE_ORPHANS = new Set([
   'T-UX-054',
   'T-UX-062',
   'T-UX-064',
+  'T-UX-099',
 ]);
 
 /** Every base id named by any `*.spec.*` / `*.test.*` file under `root`. */
