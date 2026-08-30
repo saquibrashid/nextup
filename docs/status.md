@@ -12,9 +12,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 | Status | Count |
 |---|---|
 | ⬜ todo | 14 |
-| 🚧 doing | 4 |
+| 🚧 doing | 3 |
 | ✅ done | 158 |
-| 🙋 owner | 3 |
+| 🙋 owner | 4 |
 | 💤 deferred | 0 |
 | **total** | **179** |
 
@@ -30,13 +30,13 @@ Not done, and every task they depend on is done.
 | `TASK-108` | S | Epic K — Platform, safety, and the shell |
 | `TASK-113` | S | Epic J — Recovery |
 | `TASK-125` | M | Epic K — Platform, safety, and the shell |
-| `TASK-126` | M | Epic K — Platform, safety, and the shell |
 
 ## Waiting on the owner
 
 | Task | Section | Note |
 |---|---|---|
 | `TASK-011` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Owner captured five real screenshots (`4a3da2c`); still owed the per-surface text-vs-artwork evidence file. ⚠ Its "Done when" names `Context/evidence/` — a directory that does not exist in this repo (authoring tree). |
+| `TASK-126` | Epic K — Platform, safety, and the shell | **The IMDb half is closed; the rental half is an OWNER DECISION, not remaining work.** `specs/testing.md` §9 gained the three missing mapping sections **US-044, US-045 and US-046** (14 criteria), each row citing tests that really run, and those 14 entries left `KNOWN_UNMAPPED`. Writing the mapping surfaced **one genuinely uncovered criterion — US-046 AC-2** ("two works sharing a title and year each get their own rating"): `T-IMDB-002d` asserted the *dedupe* direction only, and nothing anywhere asserted the converse. Added `T-IMDB-002f` (selection) and `T-IMDB-004h` (fetch-and-write). ⚠ **`T-IMDB-004h` alone killed the "write the answer back to `due[0]`" mutant — every one of the other 24 cases in the file passed** — so "the right rating on the wrong row", the exact defect US-046 exists to prevent, had no coverage at all. Four mutations, each killed by the expected test: dedupe keyed on a string instead of the id (killed `T-IMDB-002f`, `T-IMDB-004h`; **`T-IMDB-002d` passed unchanged**, which is the pairing argument in one observation); the write mapped back by position (killed `T-IMDB-004h` alone); a phantom `~~T-OMDB-099~~` planted in a new row (killed `T-META-001e`, proving the gate really reads the rows just added); a mapping row deleted (killed `T-META-001a` + `d`). ⚠ **NOT DONE, AND NOT BLOCKED ON A MAPPING CHORE: `KNOWN_UNMAPPED` still holds 28 criteria — US-040…US-043, the rental epic — and `docs/backlog.md` HAS NO RENTAL TASK OF ANY KIND.** They cannot be mapped by anyone: there is no implementation, so there is no test to name, and inventing rows would satisfy `T-META-001a` while failing `T-META-001e`. This task closes when that epic has a backlog and is built — it is an Epic to be written, not a gap in this gate. ⚠ **AND IT MUST NOT BE WRITTEN UNILATERALLY: `specs/data-model.md` §17 opens with "⚠️ DO NOT BUILD THIS IN v1, AND DO NOT WRITE A MIGRATION FOR IT", and tells a v1 lane agent that finds it to treat it as documentation, not work.** Epic L is fully specified — ADR-0010, REQ-082…REQ-087, `data-model.md` §17, PRD US-040…US-043 — so nothing is missing but the decision to promote it. **Promotion also REQUIRES amending US-036 AC-2 and `T-CI-005` from three non-owner-initiated processes to four in the same change** (the availability refresh is the fourth), which is a change to a `must` invariant and is the owner's to make. Re-marked `owner` rather than `doing` so it stops appearing as startable work: no agent can close it and no agent should try. ⚠ The "242 AC" headline in the task definition is itself stale: the PRD carries **283** criteria across 46 stories today. |
 | `TASK-134` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs the owner to APPLY to Microsoft for Azure OpenAI modified abuse monitoring — an approval, not code. `docs/parallel-execution-plan.md` §3 already lists it as owner-dependent; the ledger said `todo`, which advertised it to lane agents as startable work. |
 | `TASK-165` | Epic B — Capture & import | Needs a real iOS device to verify the clipboard paste path |
 
