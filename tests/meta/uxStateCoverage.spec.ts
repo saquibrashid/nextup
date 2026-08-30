@@ -116,7 +116,6 @@ const KNOWN_UNCOVERED: readonly string[] = [
   'T-UX-060',
   'T-UX-062',
   'T-UX-064',
-  'T-UX-066',
   // only because the state was still unasserted when this gate landed; the
   'T-UX-068',
   'T-UX-069',

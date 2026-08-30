@@ -485,6 +485,23 @@ export const REVIEW_APPLY_FAILED =
   "Couldn't apply these changes. Nothing was changed — your review is still here.";
 
 /**
+ * `specs/ux-states.md` §6.14 (`T-UX-066`) — a 409 `PENDING_ADDITIONS` on the
+ * CLOSE. The count is the number of still-pending candidates the server names
+ * in `details.pendingCandidateIds`; nothing was applied, and the owner is sent
+ * to the first pending card to decide it (see `ReviewPage`).
+ *
+ * ⚠ A FUNCTION, NOT A `{n}` TEMPLATE, because the sentence inflects on BOTH the
+ * noun and the verb — "1 title still needs a decision." vs the spec's own
+ * "2 titles still need a decision." A `.replace('{n}', …)` constant cannot say
+ * "needs"/"need", and a screen reading "1 titles still need a decision" over a
+ * single card is exactly the kind of small wrongness that makes the owner
+ * distrust the count the whole gate exists to make trustworthy.
+ */
+export function reviewPendingAdditions(count: number): string {
+  return count === 1 ? '1 title still needs a decision.' : `${count} titles still need a decision.`;
+}
+
+/**
  * ⚠ A SECTION THAT APPLIES BUT IS EMPTY SAYS SO. `count: 0` means "we looked
  * and there was nothing"; `omitted` means "this question does not apply to
  * this mode" and renders no section at all. An empty `<details>` body would

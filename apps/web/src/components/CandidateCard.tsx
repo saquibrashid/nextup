@@ -39,6 +39,17 @@ import { TMDB_IMAGE_BASE } from './TitleRow';
 
 const MEDIA_TYPE_LABELS: Record<string, string> = { movie: 'Film', tv: 'Series' };
 
+/**
+ * The stable DOM `id` of a candidate card, so `ReviewPage` can move focus to a
+ * specific one on a 409 `PENDING_ADDITIONS` (`ux-states.md` §6.14). ⚠ Defined
+ * HERE, next to the element it names, so the writer and the reader of the id
+ * cannot drift — a `getElementById` in `ReviewPage` guessing this format would
+ * silently focus nothing the moment either side changed.
+ */
+export function reviewCandidateDomId(candidateId: string): string {
+  return `review-candidate-${candidateId}`;
+}
+
 export interface CandidateCardProps {
   readonly candidate: ReviewCandidate;
   /**
@@ -93,7 +104,18 @@ export function CandidateCard({
     // because the windowed branch (SD-11c) must position and measure it. The
     // list semantics are unchanged — this card is still the only child of an
     // `<li>` inside the section's `<ul>`.
-    <div className="candidate-card" data-testid={`candidate-${candidate.candidateId}`}>
+    //
+    // ⚠ `id` + `tabIndex={-1}` make the card a PROGRAMMATIC focus target for
+    // the §6.14 pending-additions error, and nothing more. `-1` keeps it out
+    // of the tab order (it is not a control), so `T-REV-016b`'s keyboard-
+    // reachability check — which excludes `[tabindex="-1"]` — still reads the
+    // "Already on your list" cards as inert.
+    <div
+      className="candidate-card"
+      id={reviewCandidateDomId(candidate.candidateId)}
+      tabIndex={-1}
+      data-testid={`candidate-${candidate.candidateId}`}
+    >
       {needsThumbnail && thumbnailUrl !== null ? (
         <img
           className="candidate-card__thumb"

@@ -38,12 +38,12 @@
 // identifies each route by its unique level-1 heading, so a state without one
 // reads as a route that fell through to the catch-all.
 
-import { useState, type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import type { ReviewCandidate, ReviewResponse, ReviewSection } from '@nextup/domain';
 
 import type { TmdbSearchResult } from '../lib/apiClient';
 
-import { CandidateCard } from '../components/CandidateCard';
+import { CandidateCard, reviewCandidateDomId } from '../components/CandidateCard';
 import { CandidateList } from '../components/CandidateList';
 import { ManualEntryPanel } from '../components/ManualEntryPanel';
 import { RemovalConfirmDialog } from '../components/RemovalConfirmDialog';
@@ -67,6 +67,7 @@ import {
   REVIEW_RETRY_LABEL,
   REVIEW_SECTION_EMPTY,
   REVIEW_TITLE,
+  reviewPendingAdditions,
 } from '../copy';
 
 export interface ReviewPageProps {
@@ -82,6 +83,26 @@ export interface ReviewPageProps {
    * bar. The container clears it the instant a new attempt starts.
    */
   readonly applyFailed?: boolean;
+  /**
+   * `specs/ux-states.md` §6.14 (`T-UX-066`) — the candidate ids the server
+   * named in a 409 `PENDING_ADDITIONS` when the owner tried to close. Non-null
+   * renders the inline *"N titles still need a decision."* alert beside the
+   * apply control and moves focus to the first of these cards. Nothing was
+   * applied; **Apply changes** is the retry. `null` when the last close did
+   * not 409 on pending additions — the container clears it at each attempt.
+   */
+  readonly pendingAdditionIds?: readonly string[] | null;
+  /**
+   * `specs/ux-states.md` §6.15 (`T-REV-005`) — a monotonic nonce the container
+   * bumps when the server refuses the close with 409 `REMOVALS_NOT_CONFIRMED`.
+   * Each bump re-opens the §6.10 removal dialog so the owner confirms the
+   * group before the close is retried with `confirmRemovals: true`. ⚠ A nonce,
+   * not a boolean: the client's `needsConfirmation` can be `false` while the
+   * server still has removals to confirm (the two views diverged), and the
+   * dialog must re-open on EVERY such refusal, including a second identical
+   * one — a boolean would latch after the first.
+   */
+  readonly reconfirmSignal?: number;
   /**
    * ⚠ Takes `confirmRemovals`, which the container sends verbatim to
    * `POST /api/batches/:id/close`. It is `true` **only** when the owner has
@@ -236,6 +257,8 @@ export function ReviewPage({
   loading = false,
   loadFailed = false,
   applyFailed = false,
+  pendingAdditionIds = null,
+  reconfirmSignal = 0,
   onRetry,
   onApply,
   onDiscard,
@@ -251,6 +274,33 @@ export function ReviewPage({
   // the loading and failure branches below both return.
   const [confirmAllOverride, setConfirmAllOverride] = useState<LocalDispositionMap | null>(null);
   const [confirming, setConfirming] = useState(false);
+
+  // §6.14. When the server refuses the close with 409 `PENDING_ADDITIONS`, move
+  // focus (and scroll) to the first pending card the owner still has to decide.
+  // ⚠ Keyed on the array the container hands down, which is a FRESH array on
+  // every refusal, so a second identical refusal re-fires this — the owner who
+  // presses Apply again without deciding is taken back to the card, not left
+  // wondering why nothing moved. `scrollIntoView` is feature-detected: jsdom
+  // does not implement it, and a hard call would throw in every component test
+  // that touches this path.
+  useEffect(() => {
+    if (pendingAdditionIds === null) return;
+    for (const candidateId of pendingAdditionIds) {
+      const card = document.getElementById(reviewCandidateDomId(candidateId));
+      if (card === null) continue;
+      if (typeof card.scrollIntoView === 'function') card.scrollIntoView({ block: 'center' });
+      card.focus();
+      break;
+    }
+  }, [pendingAdditionIds]);
+
+  // §6.15. A bump of the nonce re-opens the removal dialog: the server refused
+  // with 409 `REMOVALS_NOT_CONFIRMED`, so the owner must confirm the group
+  // before the close is retried. `reconfirmSignal` starts at 0 and only the
+  // container increments it, so this never fires on first render.
+  useEffect(() => {
+    if (reconfirmSignal > 0) setConfirming(true);
+  }, [reconfirmSignal]);
 
   if (loadFailed) {
     return (
@@ -467,6 +517,16 @@ export function ReviewPage({
         {applyFailed && (
           <p role="alert" data-testid="review-apply-error">
             {REVIEW_APPLY_FAILED}
+          </p>
+        )}
+        {/* ⚠ `specs/ux-states.md` §6.14 (`T-UX-066`). A 409 `PENDING_ADDITIONS`:
+            the close was refused and NOTHING was applied. The count is the
+            number of cards the owner still has to decide, and the effect above
+            has already moved focus to the first of them. **Apply changes** is
+            the retry once the decisions are made. */}
+        {pendingAdditionIds !== null && pendingAdditionIds.length > 0 && (
+          <p role="alert" data-testid="review-pending-error">
+            {reviewPendingAdditions(pendingAdditionIds.length)}
           </p>
         )}
         <p className="review-action-bar__counts" data-testid="review-counts">
