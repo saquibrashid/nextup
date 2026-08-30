@@ -89,18 +89,26 @@
  * scan returns nothing they pass vacuously and report success on an empty
  * suite. That failure mode has already been demonstrated against `T-META-008`.
  *
- * ── Paid down: 33 → 24, and the ghost class to ZERO ─────────────────────────
+ * ── Paid down: 33 → 0, and the ghost class with it ─────────────────────────
  *
  * The nine `T-DM-*` entries (`T-DM-002` and `T-DM-020`-`027`) were written up
- * in `specs/testing.md` §12.1 and removed from both lists. That section already
- * existed for exactly this class — "already implemented, never listed here" —
- * so nothing had to be invented: each row states what the suite already
- * asserts, and several turned out to be guarding named product invariants
+ * in `specs/testing.md` §12.1, which already exists for this exact class
+ * (implemented, never listed). The remaining 24 — `T-AI-019`, `T-CI-006`,
+ * `T-CI-008`, `T-INFRA-003`, `T-SEC-006`, `T-UNDO-005` and the `T-UX-0xx`
+ * block — were §12.3's class and are imported in **§12.5**: most were fully
+ * specified in `specs/ux-states.md`, with wording, controls and the state's
+ * number, and had simply never reached the document NFR-003 makes the
+ * definition of done.
+ *
+ * Nothing was invented for either group; each row states what the suite
+ * already asserts. Several turned out to be guarding named product invariants
  * (`T-DM-021` is the schema-level enforcement of REQ-071, `T-DM-002g` pins the
  * digest that every stored unmatched identity and every suppression depends
- * on). ⚠ That is the argument for this gate rather than against it: the tests
- * protecting the two most load-bearing invariants in the data model were the
- * ones no document mentioned.
+ * on, `T-CI-008` is invariant 21's own gate). ⚠ That is the argument for this
+ * gate rather than against it: the tests protecting several of the most
+ * load-bearing invariants in the system were the ones no document mentioned.
+ *
+ * With both lists empty, `b` is a flat rule and `a` is what keeps it honest.
  *
  * ⚠ **A SHORTHAND RANGE CELL DEFINES NOTHING.** `T-DM-025` stayed in the
  * undefined list while §29.1 carried a row reading `` `T-DM-025e`-`f` ``,
@@ -126,56 +134,38 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 /**
  * Ids the suite runs that have NO defining row in `specs/testing.md`.
  *
- * ⚠ MAY ONLY SHRINK. `T-META-009c` pins the size exactly, in both directions.
- * The fix for a new entry is a row in `specs/testing.md` §12, never an edit
- * here. See the header for why these were not written blind.
+ * ⚠ **EMPTY — THE DEBT IS PAID, AND THE GATE IS NOW ABSOLUTE.** All 33 entries
+ * were written up rather than tolerated (see the header). `T-META-009b` is
+ * consequently a flat rule with no exceptions: **a test id that runs in CI has
+ * a defining row, or the build fails.**
+ *
+ * ⚠ MAY ONLY SHRINK — which, at zero, means it may not grow. `T-META-009c`
+ * pins the size exactly, in both directions, so re-introducing an exception is
+ * a two-line change a reviewer cannot miss rather than one quiet line in a
+ * list. The fix for a failure is a row in `specs/testing.md` §12, never an
+ * edit here.
  */
-const BASELINE_UNDEFINED = new Set([
-  'T-AI-019',
-  'T-CI-006',
-  'T-CI-008',
-  'T-INFRA-003',
-  'T-SEC-006',
-  'T-UNDO-005',
-  'T-UX-003',
-  'T-UX-050',
-  'T-UX-051',
-  'T-UX-052',
-  'T-UX-055',
-  'T-UX-056',
-  'T-UX-057',
-  'T-UX-058',
-  'T-UX-064',
-  'T-UX-070',
-  'T-UX-080',
-  'T-UX-081',
-  'T-UX-082',
-  'T-UX-083',
-  'T-UX-084',
-  'T-UX-095',
-  'T-UX-096',
-  'T-UX-098',
-]);
+const BASELINE_UNDEFINED = new Set<string>([]);
 
 /**
  * The subset of `BASELINE_UNDEFINED` that appears in NO `specs/**` or
  * `docs/**` markdown at all — not defined, not cited, not mentioned in prose.
  *
- * These are strictly worse than the rest of the baseline: the others are
- * documented in the wrong place and can be moved, while for these the only
- * surviving description of what the test protects is the test itself.
+ * These were strictly worse than the rest of the baseline: the others were
+ * documented in the wrong place and could be moved, while for these the only
+ * surviving description of what the test protected was the test itself. The
+ * eight were the whole `packages/domain/test/**` schema and identity suite,
+ * covering the suppression invariant, the match-state triple, the two size
+ * ceilings and the pinned `'Dune'` digest.
  *
- * ⚠ **NOW EMPTY, AND THAT IS THE POINT OF A RATCHET.** The eight entries were
- * the whole `packages/domain/test/**` schema and identity suite —
- * `T-DM-002`/`020`-`027`, sixty-odd assertions covering the suppression
- * invariant, the match-state triple, the two size ceilings and the pinned
- * `'Dune'` digest — and they were paid down by writing their rows into
- * `specs/testing.md` §12.1, which is where the same class was fixed before.
- * `T-META-009f`'s remaining work is the `newGhosts` check: an EMPTY list is a
- * cleared debt, not a disabled gate. Verified by mutation — pointing
- * `documentationCorpus()` at a directory that does not exist still fails `f`,
- * with the list empty, because all 24 surviving baseline entries then read as
- * newly undocumented.
+ * ⚠ **BOTH LISTS ARE NOW EMPTY, WHICH MAKES `f` THE VACUITY RISK IT WAS
+ * WRITTEN TO CATCH IN OTHERS.** Every set operation in `f` iterates
+ * `BASELINE_UNDEFINED`, so at zero they all pass over nothing — the earlier
+ * mutation (pointing `documentationCorpus()` at a directory that does not
+ * exist) failed `f` only while the list was non-empty, and would not now. `f`
+ * therefore asserts the corpus is real before it asserts anything about it,
+ * exactly as `a` does for the scan. Without that it would be a green test over
+ * an empty read, which is the failure mode this whole file exists to report.
  *
  * ⚠ MAY ONLY SHRINK. `T-META-009f` pins the size exactly, in both directions.
  */
@@ -265,7 +255,7 @@ describe('T-META-009 every test id the suite runs is defined in specs/testing.md
   });
 
   it('T-META-009c · the undefined baseline is pinned exactly, in both directions', () => {
-    expect(BASELINE_UNDEFINED.size).toBe(24);
+    expect(BASELINE_UNDEFINED.size).toBe(0);
   });
 
   it('T-META-009d · every baselined id is still implemented and still undefined', () => {
@@ -291,6 +281,13 @@ describe('T-META-009 every test id the suite runs is defined in specs/testing.md
   it('T-META-009f · the ghost subset is a subset, is real, and is pinned exactly', () => {
     const corpus = documentationCorpus();
     const stillUndefined = new Set(undefinedImplementedIds());
+
+    // ⚠ VACUITY GUARD. Every check below iterates BASELINE_UNDEFINED, which is
+    // now empty, so all of them pass over nothing and a blinded corpus would
+    // go unnoticed. Assert the read is real first — the same lesson `a`
+    // records for the suite scan.
+    expect(corpus.length).toBeGreaterThan(100_000);
+    expect(corpus.includes('T-META-009')).toBe(true);
 
     for (const id of BASELINE_GHOSTS) {
       expect(BASELINE_UNDEFINED.has(id), `${id} is a ghost but not in BASELINE_UNDEFINED`).toBe(
