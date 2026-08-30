@@ -386,7 +386,9 @@ describe('T-UX-097 — parsing and routing the 409', () => {
     );
     await screen.findByTestId('batches-list');
     fireEvent.click(screen.getByTestId('batch-card-undo'));
-    await Promise.resolve();
+    // The §9.10 outcome is rendered (covered in full by undoOutcomes.spec);
+    // here we only assert it is NOT forced into the §8.4 enumeration panel.
+    await screen.findByTestId('undo-already-undone');
     expect(screen.queryByTestId('undo-refusal-panel')).not.toBeInTheDocument();
   });
 });

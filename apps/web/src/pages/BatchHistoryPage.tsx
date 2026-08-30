@@ -29,6 +29,7 @@ import {
   BATCHES_LOAD_ERROR,
   BATCHES_TITLE,
   BATCHES_UNDO_LABEL,
+  BATCHES_UNDO_SUBMITTING,
   RETRY_LABEL,
 } from '../copy';
 import type { BatchHistoryItem } from '../lib/apiClient';
@@ -44,6 +45,12 @@ export interface BatchHistoryPageProps {
    * routes that refusal into the §9.8 panel. Absent when undo is not wired.
    */
   readonly onUndo?: (batchId: string) => void;
+  /**
+   * §9.6 — the batch whose undo is in flight. Its card shows *"Undoing…"* and
+   * its button is guarded against a second submit; every other card stays
+   * actionable. `null`/absent when no undo is in flight.
+   */
+  readonly undoingBatchId?: string | null;
 }
 
 /**
@@ -89,9 +96,11 @@ export function batchDate(item: BatchHistoryItem): string {
 function BatchCard({
   item,
   onUndo,
+  undoing = false,
 }: {
   item: BatchHistoryItem;
   onUndo?: (batchId: string) => void;
+  undoing?: boolean;
 }): JSX.Element {
   return (
     <li className="batch-card" data-testid="batch-card">
@@ -109,9 +118,11 @@ function BatchCard({
           type="button"
           className="batch-card__undo tap-target"
           data-testid="batch-card-undo"
+          disabled={undoing}
+          aria-busy={undoing}
           onClick={() => onUndo(item.batchId)}
         >
-          {BATCHES_UNDO_LABEL}
+          {undoing ? BATCHES_UNDO_SUBMITTING : BATCHES_UNDO_LABEL}
         </button>
       )}
     </li>
@@ -124,6 +135,7 @@ export function BatchHistoryPage({
   loadFailed = false,
   onRetry,
   onUndo,
+  undoingBatchId = null,
 }: BatchHistoryPageProps): JSX.Element {
   return (
     <>
@@ -152,7 +164,12 @@ export function BatchHistoryPage({
       ) : (
         <ul className="batch-history" data-testid="batches-list">
           {items.map((item) => (
-            <BatchCard key={item.batchId} item={item} {...(onUndo ? { onUndo } : {})} />
+            <BatchCard
+              key={item.batchId}
+              item={item}
+              undoing={item.batchId === undoingBatchId}
+              {...(onUndo ? { onUndo } : {})}
+            />
           ))}
         </ul>
       )}
