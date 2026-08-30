@@ -10,7 +10,7 @@
 
 > **Amendment note (spec-writer, phase 8).** This ADR was written as a
 > recommendation and is now **adopted with three amendments**, recorded as
-> decisions `SD-01`, `SD-05` and `SD-06` in `artifacts/specs/data-model.md` §2.
+> decisions `SD-01`, `SD-05` and `SD-06` in `specs/data-model.md` §2.
 > **(1) Option B is adopted** — `workIdentity` is one opaque string,
 > `tmdb:{movie|tv}:{id}` or `unmatched:<sha256(normaliseTitleText(raw))[0:16]>`,
 > and the same string is the suppression key in both forms, honouring A34's
@@ -203,7 +203,7 @@ first import — the `R-1`/`OQ-011` abandonment risk.
   constraint), REQ-009, REQ-012, REQ-024, REQ-065, REQ-066, REQ-071
 - `Context/mvp-definition.md` §17 L2, §9.2
 - `Context/open-questions.md` — OQ-015 (high, open), OQ-013
-- `artifacts/PRD.md` US-008, US-026, US-028, US-030; §12.3 R-5, R-7
+- `docs/PRD.md` US-008, US-026, US-028, US-030; §12.3 R-5, R-7
 - ADR-0001 (deterministic matching), ADR-0005 (identity in the model)
 
 ---

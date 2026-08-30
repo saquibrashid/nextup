@@ -6,7 +6,7 @@ revisedBy: solution-architect
 revision: 2
 phase: 8
 status: complete
-sourceOfTruth: artifacts/PRD.md, artifacts/adr/ADR-0001 (Revision 2), artifacts/diagrams/ai-pipeline.md
+sourceOfTruth: docs/PRD.md, docs/adr/ADR-0001 (Revision 2), docs/diagrams/ai-pipeline.md
 ---
 
 # specs/ai.md — nextup extraction and matching

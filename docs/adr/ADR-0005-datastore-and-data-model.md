@@ -814,7 +814,7 @@ the strongest available reading of `REQ-041`.
 - `Context/requirements.md` §1.4, §1.7, §3 (domain entities), REQ-005,
   REQ-006, REQ-024…REQ-028, REQ-036, REQ-041, REQ-062…REQ-068,
   REQ-070…REQ-076, NFR-001, NFR-008, NFR-012, NFR-014, NFR-018
-- `artifacts/PRD.md` §7.1 (title states and transitions), §7.3, §7.4
+- `docs/PRD.md` §7.1 (title states and transitions), §7.3, §7.4
 - ADR-0003 (hosting), ADR-0006 (image storage), ADR-0007 (work identity)
 
 ---

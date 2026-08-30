@@ -6,7 +6,7 @@ revisedAt: 2026-08-11T13:15:00-04:00
 revisedBy: solution-architect
 revision: 8
 status: complete
-sourceOfTruth: artifacts/PRD.md, Context/requirements.md, Context/mvp-definition.md §17–§18
+sourceOfTruth: docs/PRD.md, Context/requirements.md, Context/mvp-definition.md §17–§18
 ---
 
 # Architecture — nextup
@@ -154,7 +154,7 @@ sourceOfTruth: artifacts/PRD.md, Context/requirements.md, Context/mvp-definition
 > | **A43-M1** | **Pre-decode dimension/pixel guard.** Parse the HEIF `ispe` box (and the PNG/JPEG header) for width × height and **reject above `NEXTUP_MAX_DECODE_PIXELS` BEFORE allocating any decode buffer.** Default **25 MP at 0.5 GiB**, **50 MP at 1.0 GiB**. | **Explicitly retained by the owner even though the "mitigate and stay" option was not the one selected** — it is the thing that converts an unbounded crash into a bounded, explained refusal. Without it, "reactive" means "the container dies first and tells you nothing". | ADR-0008 R2.1; guard value moves **with** the memory size — runbook §2 |
 > | **A43-M2** | **Failure is isolated to ONE image.** A guard rejection, a decode failure or an OOM fails **that image only**; the batch is never partially committed and never corrupted; every other image in the batch survives. | The owner must be able to up-size and retry **just the affected image**. Reconciled explicitly against `REQ-074` and the transactional full-update guarantee below. | §Key flows → *Ingest transcode*; ADR-0008 R2.2 |
 > | **A43-M3** | **The surfaced error names memory/decode as the cause and points at the one-line remedy** (`IMAGE_TOO_LARGE_TO_DECODE` / `IMAGE_DECODE_OOM`, each citing `runbooks/scale-up-memory.md`). | **No blind debugging.** The `RSK-016` complaint was never "it runs out of memory", it was "the failure is undiagnosable". A named cause plus a named remedy is what removes that property. | ADR-0008 R2.3 (exact message text) |
-> | **A43-M4** | **`artifacts/runbooks/scale-up-memory.md`** — the exact `az` command, the exact `infra/aca.bicep` change, confirmation, cost delta and rollback, executable in one step. | The person running it has just had an import die. It must not require thought. | **NEW FILE**, this revision |
+> | **A43-M4** | **`docs/runbooks/scale-up-memory.md`** — the exact `az` command, the exact `infra/aca.bicep` change, confirmation, cost delta and rollback, executable in one step. | The person running it has just had an import die. It must not require thought. | **NEW FILE**, this revision |
 > | **A43-M5** | **An OOM/restart alert and log signal**, so the event is **observed, not inferred.** | Otherwise the "if it OOMs" trigger never fires — the owner just experiences a flaky app. | §Observability, new subsection *"Knowing that it OOMed"* |
 >
 > ⚠ **Honest limitation on A43-M5, stated rather than papered over:**
@@ -1434,7 +1434,7 @@ turns an unverified estimate into a monitored one.
 | **An ensemble or two-pass vision read** | ADR-0001 R2.8 — doubles the bill to duplicate what the free OCR cross-check already provides | A measured fabrication rate > 0.05 that prompt changes cannot fix |
 | **Runtime filtering of unsupported ("possibly fabricated") titles** | It would silently discard exactly the artwork-read titles the decision was made to obtain, violating `REQ-012`. They are **flagged and shown**, never hidden. `T-AI-042` enforces this | Never — this is a permanent prohibition, not a deferral |
 | **A user-controlled backup / export** | Not in the locked scope; Cosmos service-side backup is the only protection | ~~**Recommended for early promotion.**~~ *(superseded by the R3 row above)* |
-| **Performance, availability, accessibility, i18n targets** | `OQ-014` — genuinely undecided, and `NFR-002` forbids inventing them | Before `specs/ux.md` and `specs/testing.md` are finalised |
+| **Performance, availability, accessibility, i18n targets** | `OQ-014` — genuinely undecided, and `NFR-002` forbids inventing them | Before `specs/ux-states.md` and `specs/testing.md` are finalised |
 | **Runtime filter and sort (REQ-035/037)** | v1.1, decision D2 — TMDB runtime is ambiguous for TV and the record contains no decision. Runtime is still stored, so v1.1 is additive | A decision on TV runtime semantics |
 | **Editable date-added (REQ-059)** | v1.1, decision D1. Modelled now (`dateAddedEdited`) so v1.1 is additive, not a migration | ⚠ **Reinstating it reopens decision D3 and `OQ-023`** — creates-only undo rests on it being out of scope |
 | **Mixed-changeset batch undo (REQ-069)** | v1.1, decision D3. `REQ-075`'s enumerated refusal plus `REQ-074` re-extraction cover v1 | v1.1, or `REQ-059` being pulled forward |

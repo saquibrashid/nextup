@@ -3,7 +3,7 @@ createdAt: 2026-08-10T20:12:02-04:00
 createdBy: spec-writer
 phase: 8
 status: complete
-sourceOfTruth: artifacts/architecture.md, artifacts/adr/ADR-0002, ADR-0003, ADR-0006
+sourceOfTruth: docs/architecture.md, docs/adr/ADR-0002, ADR-0003, ADR-0006
 ---
 
 # specs/security.md — nextup

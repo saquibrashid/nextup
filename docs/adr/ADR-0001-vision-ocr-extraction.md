@@ -389,10 +389,10 @@ cross-check already provides.
 | Artifact | Change |
 |---|---|
 | `Context/requirements.md` | Already amended by the orchestrator: `NFR-012` carve-out, `NFR-012a` new. No further change. |
-| `artifacts/specs/ai.md` | §2 rewritten (hybrid pipeline, model config, cross-check), §3 verdicts extended, §7 thresholds, §8 low-yield + new degraded mode, §9 evaluation, §10 cost controls, §11 privacy |
-| `artifacts/specs/testing.md` | §3.1, §4, new §4A (live suite), §9 AC rows for US-006/US-013/US-014, §10 |
-| `artifacts/architecture.md` | Headline, container table, technology table, cost model, NFR table, observability, "Where this breaks", deferred list, risk register, ADR index |
-| `artifacts/backlog.md` | `TASK-010` re-scoped, `TASK-011` de-gated, `TASK-056` split into `TASK-056`/`TASK-056b`/`TASK-056c`, `TASK-078`/`TASK-079` extended, `TASK-122` allow-list, new `TASK-134` |
+| `specs/ai.md` | §2 rewritten (hybrid pipeline, model config, cross-check), §3 verdicts extended, §7 thresholds, §8 low-yield + new degraded mode, §9 evaluation, §10 cost controls, §11 privacy |
+| `specs/testing.md` | §3.1, §4, new §4A (live suite), §9 AC rows for US-006/US-013/US-014, §10 |
+| `docs/architecture.md` | Headline, container table, technology table, cost model, NFR table, observability, "Where this breaks", deferred list, risk register, ADR index |
+| `docs/backlog.md` | `TASK-010` re-scoped, `TASK-011` de-gated, `TASK-056` split into `TASK-056`/`TASK-056b`/`TASK-056c`, `TASK-078`/`TASK-079` extended, `TASK-122` allow-list, new `TASK-134` |
 | `Context/session-state.json` | `RSK-021` High→Low, `RSK-012` closed, new `RSK-028`, `OQ-005` re-resolved, `OQ-024` reframed, `CC-001` → applied |
 
 ---
@@ -719,7 +719,7 @@ Option A.
   … the fallback is manual entry with TMDB search"
 - `Context/requirements.md` — REQ-008, REQ-012, REQ-013, REQ-017,
   REQ-057, REQ-058, REQ-074, NFR-004, NFR-005, NFR-012
-- `artifacts/PRD.md` §6 US-006, US-007, US-008, US-034; §12.3 R-2, R-6
+- `docs/PRD.md` §6 US-006, US-007, US-008, US-034; §12.3 R-2, R-6
 - `Context/evidence/technology-options.md` §5.2 — TMDB API Terms of Use,
   including the AI-application restriction
 - **Pricing provenance:** figures are Azure and Azure OpenAI list prices

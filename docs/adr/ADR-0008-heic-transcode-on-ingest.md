@@ -115,7 +115,7 @@
 >
 > So: **compute stays 0.25 vCPU / 0.5 GiB; 0.5 vCPU / 1.0 GiB is the
 > pre-authorised reactive remedy** (`ADR-0003 R4`,
-> `artifacts/runbooks/scale-up-memory.md`, +~$4/mo → ~$15–18 total). Where
+> `docs/runbooks/scale-up-memory.md`, +~$4/mo → ~$15–18 total). Where
 > Revision 1's §Consequences says the remedy is "surfaced, not decided",
 > read: **decided — start small, up-size on a real OOM.**
 >
@@ -521,12 +521,12 @@ sign-off (this is analysis, not legal advice) — `TASK-144`.
 - `Context/evidence/heic-support.md` — the verified format, library,
   licence and browser-support facts this ADR rests on.
 - `Context/requirements.md` — REQ-004, REQ-007, REQ-074; ASM-058 / A42.
-- `artifacts/PRD.md` §7.5, US-004 AC-4/AC-7/AC-8, R-11.
+- `docs/PRD.md` §7.5, US-004 AC-4/AC-7/AC-8, R-11.
 - `specs/api.md` §5 / §5.1; `specs/ai.md` §2.0; `specs/security.md` §4.2;
   `specs/data-model.md` §3.8.
 - ADR-0001 (extraction), ADR-0003 (hosting/compute — `RSK-016`),
   ADR-0006 (screenshot storage — derived-PNG artefact).
 - `Context/open-questions.md` — OQ-027 (retain original HEIC?), **OQ-028
   (memory sizing — CLOSED at `A43`)**.
-- **`artifacts/runbooks/scale-up-memory.md`** — the reactive up-size
+- **`docs/runbooks/scale-up-memory.md`** — the reactive up-size
   procedure this ADR's error messages point at (`A43-M4`).
