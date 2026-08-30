@@ -131,7 +131,9 @@ describe('T-INFRA-015 every cited repository document exists', () => {
     const text = 'see `docs/PRD.md` and also `specs/gone.md` for detail';
     const exists = (p: string): boolean => p === 'docs/PRD.md';
 
-    expect(brokenCitations('f.md', text, exists)).toEqual([{ file: 'f.md', path: 'specs/gone.md' }]);
+    expect(brokenCitations('f.md', text, exists)).toEqual([
+      { file: 'f.md', path: 'specs/gone.md' },
+    ]);
     expect(brokenCitations('f.md', text, () => true)).toEqual([]);
     expect(brokenCitations('f.md', 'no citations here', exists)).toEqual([]);
 
