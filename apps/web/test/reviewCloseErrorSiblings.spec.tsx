@@ -222,7 +222,15 @@ describe('T-UX-066 — §6.14 409 PENDING_ADDITIONS', () => {
     expect(firstCard).not.toBeNull();
     // The owner is put ON the first thing they must act on, not merely told a
     // number they then have to hunt for in a 200-card list.
-    expect(document.activeElement).toBe(firstCard);
+    //
+    // ⚠ `waitFor`, not a bare assertion. `findByTestId('review-pending-error')`
+    // resolves as soon as the banner is in the DOM, but the focus move lives in
+    // a PASSIVE effect that React flushes after that commit, so sampling
+    // `activeElement` immediately is a race: it read `<body>` on a loaded CI
+    // runner while passing every local run. This does not weaken the check —
+    // `waitFor` still fails if focus never lands on the card, or lands
+    // elsewhere and stays there.
+    await waitFor(() => expect(document.activeElement).toBe(firstCard));
     expect(scrollSpy).toHaveBeenCalled();
   });
 
