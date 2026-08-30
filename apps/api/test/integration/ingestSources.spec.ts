@@ -527,6 +527,41 @@ describe('T-PASTE-007 every ceiling applies identically to pasted images', () =>
       fileName: expect.stringMatching(/^pasted-\d{8}-\d{6}-01\.png$/) as unknown,
     });
   });
+
+  it('T-PASTE-007d: the per-request file ceiling refuses a paste exactly as it refuses an upload', async () => {
+    const batchId = await openBatch();
+    const many = Array.from({ length: MAX_FILES_PER_REQUEST + 1 }, (_, i) => ({
+      name: `f${String(i)}.png`,
+      bytes: pngBytes(),
+    }));
+
+    for (const source of ['paste', 'upload'] as const) {
+      const res = await postImages(batchId, many, source);
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as ErrorBody).error.code).toBe('TOO_MANY_FILES_IN_REQUEST');
+    }
+    // Refusing the REQUEST means nothing landed — not a partial accept.
+    expect(await testPrisma().uploadedImage.count({ where: { ownerId, batchId } })).toBe(0);
+
+    for (const source of ['paste', 'upload'] as const) {
+      const beyondMulterBackstop = Array.from({ length: MAX_FILES_PER_REQUEST + 2 }, (_, i) => ({
+        name: `backstop-${String(i)}.png`,
+        bytes: pngBytes(),
+      }));
+
+      const res = await postImages(batchId, beyondMulterBackstop, source);
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as ErrorBody).error.code).toBe('TOO_MANY_FILES_IN_REQUEST');
+      expect(await testPrisma().uploadedImage.count({ where: { ownerId, batchId } })).toBe(0);
+    }
+  });
+
+  it('T-PASTE-007e: an empty request is refused for every source', async () => {
+    const batchId = await openBatch();
+    const res = await postImages(batchId, [], 'paste');
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as ErrorBody).error.code).toBe('VALIDATION_FAILED');
+  });
 });
 
 describe('T-IMG-002 / T-IMG-006 / T-IMG-010 partial acceptance across a real request', () => {
