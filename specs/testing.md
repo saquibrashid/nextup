@@ -1201,6 +1201,32 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 | AC-5 | M/§10 | — | Extraction cost assessment: a first-sprint verification task (`TASK-010`, architecture §Handover 7) |
 | AC-6 | S | `T-META-003` | Any decision claimed as verifiable resolves to a test id present in this file; unverifiable ones must appear in §10 |
 
+### US-044 — See the IMDb rating on my list
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | C | `T-IMDB-008` | `TitleRow` renders the rating to **one decimal place** and labels it `IMDb` — `8` renders as `8.0`, never as `8` |
+| AC-2 | S/I | `T-IMDB-007`, **`T-CI-005`** | The refresh is begun **by the read that serves the page** and never by a timer. `T-CI-005h` asserts both lazy refreshes are triggered by a READ; `T-CI-005g` pins the permitted non-owner processes at exactly three and names them. Without `T-CI-005` this row would be satisfied by a scheduler that happened to also run on access |
+| AC-3 | S/I | `T-IMDB-001`, `T-IMDB-006`, **`T-OMDB-004`** | A work with no usable `imdb_id` is **never stale** — there is nothing to ask (`T-IMDB-001e`) — and the route returns the no-rating state without asking OMDb anything (`T-IMDB-006c`). ⚠ **`T-OMDB-004e` is the half that matters**: it greps the executable source for a `t=` title query, because "we don't fall back to title text" is a claim about code that does not exist, and no behavioural test can observe the absence of a branch nobody took |
+| AC-4 | C/S | `T-IMDB-008`, `T-IMDB-003` | A null rating renders the **words**, never `0` (`T-IMDB-008c`), and an **absent field** is treated exactly like an explicit null (`T-IMDB-008d`) — `undefined.toFixed` is a crash, not a missing rating. `T-IMDB-003b` pins the same property one layer down: unknown stays unknown and never becomes zero |
+| AC-5 (failure) | S | `T-IMDB-004`, `T-IMDB-007`, `T-OMDB-004` | A transport failure **ends the pass and never throws** (`T-IMDB-004d`), an exhausted budget refreshes nothing and asks nothing (`T-IMDB-004e`, `T-OMDB-004b`), and the job never rejects whatever the store does (`T-IMDB-007d`). A rating is decoration on a page whose subject is the owner's list; a caller forced to wrap it in a try/catch has the wrong contract |
+| AC-6 (edge) | S | `T-IMDB-002`, `T-IMDB-004` | Selection is bounded by a per-request ceiling (`T-IMDB-002b`, 200 rows → `IMDB_REFRESH_PER_REQUEST`), capped again by the daily budget (`T-IMDB-002c`), deduplicated by IMDb id (`T-IMDB-002d`), and issued **one at a time** (`T-IMDB-004c`). The remainder refresh on the next render — that is what makes it lazy rather than a bulk backfill |
+
+### US-045 — Look up a rating for something I haven't saved
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | S | `T-IMDB-006` | `GET /api/imdb/lookup` resolves TMDB search → `imdb_id` → OMDb and returns the rating (`T-IMDB-006a`) |
+| AC-2 | S/C | `T-IMDB-006`, `T-IMDB-005`, `T-IMDB-008` | ⚠ **This is a negative, so it is asserted STRUCTURALLY, not behaviourally.** `T-IMDB-006h` requires the lookup module to contain **no repository writer at all** — a behavioural "no row appeared" check passes for a write that happens to fail, or that lands in a table the assertion does not read. `T-IMDB-005a` pins the only rating write in the product to the two rating columns, and `T-IMDB-008e` requires the screen to **say so to the owner** before they type |
+| AC-3 | S/C | `T-IMDB-006`, `T-IMDB-008` | A TMDB miss returns **null, not an unrated result** (`T-IMDB-006b`) and the screen reports not-found plainly (`T-IMDB-008g`). An unrated empty result and "no such film" look identical on screen and mean opposite things |
+| AC-4 | S/C | `T-IMDB-006`, `T-IMDB-008` | A work already on the owner's list is reported as such (`T-IMDB-006d`), and `T-IMDB-006e` pins the negative so the flag is not simply always true |
+| AC-5 (failure) | S/C | `T-IMDB-006`, `T-IMDB-008` | With TMDB reachable and OMDb not, the title still resolves and the rating shows the no-rating state (`T-IMDB-006f`); the upstream failure text never reaches the owner (`T-IMDB-006g`, `T-IMDB-008i`) |
+
+### US-046 — Trust that a rating belongs to the right film
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | S | **`T-OMDB-001`**, `T-OMDB-004` | Every retrieval sends the id as `i` and **sends no `t` parameter at all** (`T-OMDB-001b`), and `T-OMDB-004e` proves no source line anywhere builds a `t=` title query. Both halves are needed: the first says the request we make is right, the second says there is no other request we could make |
+| AC-2 | S | `T-IMDB-002`, `T-IMDB-004` | Two works sharing a title and year are asked **separately** (`T-IMDB-002f`) and each write lands on **its own row** (`T-IMDB-004h`). ⚠ These are the converse of the dedupe case `T-IMDB-002d`, and the pair is the point: collapsing on the **identifier** is correct and saves budget, collapsing on the **string** gives one of two remakes a confidently wrong rating. A selection keyed on `${title} ${year}` passes `T-IMDB-002d` unchanged and fails only here. ⚠ `T-IMDB-004h` covers the second half separately because a correct selection followed by a write mapped back by position or by title lands the 1984 rating on the 2021 row and looks completely normal |
+| AC-3 (failure) | S | `T-IMDB-001`, `T-IMDB-006`, `T-OMDB-004` | No `imdb_id` yields the no-rating state (`T-IMDB-001e`, `T-IMDB-006c`) and there is no title-search fallback to degrade into (`T-OMDB-004e`) — same three tests as US-044 AC-3, because the two stories state the same rule from the display side and the trust side |
+
 ---
 
 ## 9A. Structural tests not owned by a single acceptance criterion

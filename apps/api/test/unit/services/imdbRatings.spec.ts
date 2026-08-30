@@ -146,6 +146,22 @@ describe('T-IMDB-002 · REQ-093 · selection is bounded, deduplicated and budget
   it('T-IMDB-002e · an empty page asks nothing', () => {
     expect(selectForRefresh([], NOW, 1_000)).toEqual([]);
   });
+
+  it('T-IMDB-002f · US-046 AC-2 · two works sharing a title and year are asked SEPARATELY', () => {
+    // ⚠ THE CONVERSE OF `T-IMDB-002d`, AND THE ONE US-046 EXISTS FOR. Dedupe
+    // and confusion are the same operation seen from two sides: collapsing on
+    // the IDENTIFIER is correct and saves budget, collapsing on the STRING
+    // gives one of the two works a confidently wrong rating — "worse than no
+    // rating at all", in the story's own words. A `selectForRefresh` that
+    // keyed on `${title} ${year}` would pass `T-IMDB-002d` unchanged and fail
+    // only here, silently, on the two-remakes case nobody has in a fixture.
+    const rows = [
+      row({ id: 'dune-1984', imdbId: 'tt0087182', imdbRatingFetchedAt: null }),
+      row({ id: 'dune-2021', imdbId: 'tt1160419', imdbRatingFetchedAt: null }),
+    ];
+
+    expect(selectForRefresh(rows, NOW, 100).map((r) => r.id)).toEqual(['dune-1984', 'dune-2021']);
+  });
 });
 
 describe('T-IMDB-003 · REQ-091 · the tenths conversion never invents a rating', () => {
@@ -285,6 +301,26 @@ describe('T-IMDB-004 · REQ-093 · the refresh is serial, silent on failure, and
     });
 
     expect(writes[0]?.imdbRatingTenths).toBeNull();
+  });
+  it('T-IMDB-004h · US-046 AC-2 · each of two same-name works gets ITS OWN rating', async () => {
+    // The selection half is `T-IMDB-002f`; this is the fetch-and-write half.
+    // Both are needed: a correct selection followed by a write that maps the
+    // answer back by title, or by position after an out-of-order resolve,
+    // lands the 1984 rating on the 2021 row and looks completely normal.
+    const { client, asked } = stubClient({ tt0087182: 6.4, tt1160419: 8.0 });
+    const writes = await refreshRatings(
+      [
+        row({ id: 'dune-1984', imdbId: 'tt0087182', imdbRatingFetchedAt: null }),
+        row({ id: 'dune-2021', imdbId: 'tt1160419', imdbRatingFetchedAt: null }),
+      ],
+      { client, budget: 100, now: () => NOW },
+    );
+
+    expect(asked).toEqual(['tt0087182', 'tt1160419']);
+    expect(writes).toEqual([
+      { id: 'dune-1984', imdbRatingTenths: 64, imdbRatingFetchedAt: NOW },
+      { id: 'dune-2021', imdbRatingTenths: 80, imdbRatingFetchedAt: NOW },
+    ]);
   });
 });
 

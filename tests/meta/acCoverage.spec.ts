@@ -164,6 +164,17 @@ export function unmappedCriteria(prd: Set<string>, mapping: Set<string>): string
  *
  * ⚠ Do NOT add to this list to make a build pass. A new unmapped AC means a
  * criterion was written with no definition of done. Write the mapping row.
+ *
+ * ⚠ **THE 28 THAT REMAIN ARE NOT WAITING ON A MAPPING ROW — THEY ARE WAITING
+ * ON A BACKLOG.** US-040…US-043 (the rental epic) have no task in
+ * `docs/backlog.md` at all: `git grep -i rental docs/backlog.md` is empty. So
+ * unlike the IMDb half, which was written and then mapped, these cannot be
+ * mapped by anyone, because there is no implementation and therefore no test
+ * to name. Writing plausible-looking rows for them would satisfy
+ * `T-META-001a` and fail `T-META-001e`, and softening `e` to get past that is
+ * how this gate would become the thing it was built to catch. **TASK-126
+ * cannot close while this list is non-empty, and the missing work is an Epic
+ * for the backlog, not a mapping chore for this file.**
  */
 const KNOWN_UNMAPPED: readonly string[] = [
   // US-040 — Capture a rental storefront's new-release page
@@ -198,23 +209,6 @@ const KNOWN_UNMAPPED: readonly string[] = [
   'US-043 AC-4',
   'US-043 AC-5',
   'US-043 AC-6',
-  // US-044 — See the IMDb rating on my list
-  'US-044 AC-1',
-  'US-044 AC-2',
-  'US-044 AC-3',
-  'US-044 AC-4',
-  'US-044 AC-5',
-  'US-044 AC-6',
-  // US-045 — Look up a rating for something I haven't saved
-  'US-045 AC-1',
-  'US-045 AC-2',
-  'US-045 AC-3',
-  'US-045 AC-4',
-  'US-045 AC-5',
-  // US-046 — Trust that a rating belongs to the right film
-  'US-046 AC-1',
-  'US-046 AC-2',
-  'US-046 AC-3',
 ];
 
 /**
