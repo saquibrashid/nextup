@@ -109,6 +109,42 @@ const close = (batchId: string, body?: unknown): Promise<Response> =>
     body: JSON.stringify(body ?? {}),
   });
 
+/**
+ * The review and detail reads, used only by the `T-AI-036` block.
+ *
+ * ⚠ Real HTTP against the same app, not a direct call into `buildReviewResponse`.
+ * The withholding decision is made in the domain and consumed by two routes and
+ * the close service; a test that calls the domain function proves the function,
+ * not that the owner is shown the withheld section or that the store is left
+ * alone. Going through the routes is what makes these integration cases.
+ */
+const getReview = (batchId: string): Promise<Response> =>
+  fetch(`${origin}/api/batches/${batchId}/review`, {
+    headers: { [CLIENT_PRINCIPAL_HEADER]: principalHeader },
+  });
+
+const getBatch = (batchId: string): Promise<Response> =>
+  fetch(`${origin}/api/batches/${batchId}`, {
+    headers: { [CLIENT_PRINCIPAL_HEADER]: principalHeader },
+  });
+
+interface ReviewBody {
+  banner: string | null;
+  sections: {
+    removals: {
+      count: number;
+      omitted: boolean;
+      withheld: boolean;
+      withheldReason: string | null;
+      items: { listingId: string }[];
+    };
+  };
+}
+
+interface DetailBody {
+  provenance: { created: unknown[]; modified: unknown[]; removed: unknown[] };
+}
+
 const patchRemovals = (batchId: string, body: unknown): Promise<Response> =>
   fetch(`${origin}/api/batches/${batchId}/removals`, {
     method: 'PATCH',
@@ -684,5 +720,139 @@ describe('T-REM-015 — a mid-apply failure leaves the group unapplied in full',
       where: { ownerId, id: batchId },
     });
     expect(batch.status).toBe('in-review');
+  });
+});
+
+/* ── the degraded read at integration level (T-AI-036) ────────────────── */
+
+/**
+ * ⚠ **`specs/testing.md` types `T-AI-036` as `I`, and until this block it had
+ * no integration test at all.** The id existed only on unit cases in
+ * `unit/extraction/hybridExtractor.spec.ts` (which proves the extractor
+ * *reports* `llm-unavailable`) and `unit/runExtraction.spec.ts` (which proves
+ * the runner *carries* the flag onto the batch). Neither reaches a store, and
+ * the claim §6 row 13 makes — *"a degraded full-update batch never proposes
+ * removals"*, US-014 AC-6 — is a statement about what is IN THE STORE after a
+ * close. Deleting the withholding branch in `removalWithheldReason` left every
+ * `T-AI-036*` case green.
+ *
+ * ⚠ **Sub-letters `a`–`i` are ALREADY TAKEN, TWICE, meaning different things**
+ * — `T-AI-036b` is "issues both legs in parallel" in the extractor file and "a
+ * missing OCR leg is NOT degraded" in the runner file. This block starts at
+ * `j` rather than renumbering, so no existing citation moves; the collision
+ * between the two unit files is recorded as a finding, not silently reshuffled.
+ */
+describe('T-AI-036 — a degraded full-update withholds removals, at integration level', () => {
+  it('T-AI-036j · the review WITHHOLDS the removal section and says why', async () => {
+    // The review half. `withheld: true` with a reason is not the same as an
+    // empty section: an empty section tells the owner nothing disappeared,
+    // which is a claim this batch is not entitled to make.
+    const dune = await makeActiveTitle(DUNE, 'netflix', 'Dune');
+    await makeActiveTitle(ANDOR, 'netflix', 'Andor');
+    const batchId = await makeBatch({ degradedExtraction: true, crossCheck: 'llm-unavailable' });
+    await makeCandidate(batchId, DUNE, 'Dune');
+
+    const review = (await (await getReview(batchId)).json()) as ReviewBody;
+
+    expect(review.sections.removals.withheld).toBe(true);
+    expect(review.sections.removals.withheldReason).toBe('degraded-extraction');
+    expect(review.sections.removals.count).toBe(0);
+    expect(review.sections.removals.items).toEqual([]);
+    // NOT omitted: full-update always carries the section, it is withheld
+    // WITHIN it. Omitting it would make the degraded batch indistinguishable
+    // from an append-only one.
+    expect(review.sections.removals.omitted).toBe(false);
+    expect(review.banner).not.toBeNull();
+    expect((await listing(dune.listingId)).state).toBe('active');
+  });
+
+  it('T-AI-036k · the close writes an EMPTY provenance.removed — no listing_removed row', async () => {
+    // ⚠ THE HALF THAT WAS MISSING. `T-REV-005f` proves no listing changes
+    // state and no group is written; it does not look at `batchChange`. A
+    // `listing_removed` row written for a removal that never happened is
+    // undoable — the owner could "undo" their way into a state the batch
+    // never produced — and `GET /api/batches/:batchId` would report the
+    // degraded batch as having removed things (§6.15 `provenance.removed`).
+    const { andor, heat } = await threeListedTwoProposed();
+    const batchId = await makeBatch({ degradedExtraction: true, crossCheck: 'llm-unavailable' });
+    await makeCandidate(batchId, DUNE, 'Dune');
+
+    const res = await close(batchId);
+
+    expect(res.status).toBe(200);
+    expect(
+      await testPrisma().batchChange.count({
+        where: { ownerId, batchId, kind: 'listing_removed' },
+      }),
+    ).toBe(0);
+    expect((await listing(andor.listingId)).state).toBe('active');
+    expect((await listing(heat.listingId)).state).toBe('active');
+
+    const detail = (await (await getBatch(batchId)).json()) as DetailBody;
+    expect(detail.provenance.removed).toEqual([]);
+  });
+
+  it('T-AI-036l · the batch still COMPLETES and keeps its additions', async () => {
+    // US-014 AC-6 is "withholds removals", NOT "fails". A degraded read still
+    // saw titles, and refusing the whole batch would throw away the additions
+    // the owner did capture — the failure mode that makes an owner stop
+    // uploading.
+    await makeActiveTitle(ANDOR, 'netflix', 'Andor');
+    const batchId = await makeBatch({ degradedExtraction: true, crossCheck: 'llm-unavailable' });
+    await makeCandidate(batchId, MATRIX, 'The Matrix');
+
+    const res = await close(batchId);
+
+    expect(res.status).toBe(200);
+    const batch = await testPrisma().uploadBatch.findFirstOrThrow({
+      where: { ownerId, id: batchId },
+    });
+    expect(batch.status).toBe('applied');
+    expect(await testPrisma().title.count({ where: { ownerId, workIdentity: MATRIX } })).toBe(1);
+  });
+
+  it('T-AI-036m · ocr-unavailable does NOT withhold — removals are proposed and applied', async () => {
+    // ⚠ THE DISCRIMINATOR, and the reason this block is not just three
+    // assertions of the same thing. `removalWithheldReason` withholds on
+    // `llm-unavailable` ONLY: the primary reader is what identifies works, so
+    // losing the deterministic corroboration leg degrades confidence but does
+    // not make the read incomplete. A "withhold on any crossCheck !== ok"
+    // implementation passes j, k and l and would silently block EVERY
+    // full-update removal for the entire duration of an OCR outage — the
+    // owner's list would quietly stop reflecting what they removed, with a
+    // banner that says nothing about removals.
+    const { andor, heat } = await threeListedTwoProposed();
+    const batchId = await makeBatch({ degradedExtraction: true, crossCheck: 'ocr-unavailable' });
+    await makeCandidate(batchId, DUNE, 'Dune');
+
+    const review = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(review.sections.removals.withheld).toBe(false);
+    expect(review.sections.removals.withheldReason).toBeNull();
+    expect(review.sections.removals.count).toBe(2);
+
+    const res = await close(batchId, { confirmRemovals: true });
+
+    expect(res.status).toBe(200);
+    expect((await listing(andor.listingId)).state).toBe('removed');
+    expect((await listing(heat.listingId)).state).toBe('removed');
+  });
+
+  it('T-AI-036n · low-yield outranks the cross-check in the reported reason', async () => {
+    // Both conditions hold. `lowYield` is reported because it is the one the
+    // owner can act on — re-extract, add screenshots — where a degraded read
+    // is an outage they can only wait out. Asserting the ORDER matters: a
+    // reason chosen by whichever branch happens to be first would tell the
+    // owner to wait when they could fix it.
+    await makeActiveTitle(ANDOR, 'netflix', 'Andor');
+    const batchId = await makeBatch({
+      lowYield: true,
+      degradedExtraction: true,
+      crossCheck: 'llm-unavailable',
+    });
+
+    const review = (await (await getReview(batchId)).json()) as ReviewBody;
+
+    expect(review.sections.removals.withheld).toBe(true);
+    expect(review.sections.removals.withheldReason).toBe('low-yield');
   });
 });
