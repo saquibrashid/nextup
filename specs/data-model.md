@@ -1144,19 +1144,38 @@ under §8.4**, enumerating those titles.
 
 ## 9. Retention — REQ-028, and the absence that IS the requirement
 
-> **NO TTL IS CONFIGURED ANYWHERE IN nextup's DATA LAYER.**
-> Not on the Cosmos DB account, not on the `nextup` database, not on the
-> `owner-data` container, and not as `ttl` on any document. **The absence of a
-> TTL is REQ-028**, expressed at the deployment level. There is no purge job,
-> no archive job, no retention cutoff, no eviction, no oldest-first trimming,
-> and no "tidy-up" migration. Storage growth over years is **accepted**
-> (US-023 AC-4).
+> **NO TTL, EXPIRY OR SCHEDULED DELETION IS CONFIGURED ANYWHERE IN nextup's
+> DATA LAYER.**
+> Not on the Azure SQL server, not on the `nextup` database, and not on any
+> table or row. **The absence of an expiry mechanism is REQ-028**, expressed at
+> the deployment level. There is no purge job, no archive job, no retention
+> cutoff, no eviction, no oldest-first trimming, and no "tidy-up" migration.
+> Storage growth over years is **accepted** (US-023 AC-4).
 >
-> If you are reading this while considering adding a TTL, an expiry, or a
+> ⚠ **Under Azure SQL the prohibited mechanism has a different name, and that
+> is the whole reason this paragraph was rewritten.** There is no `defaultTtl`
+> and no per-document `ttl` to leave unset, so a reader checking for those
+> finds nothing to do and concludes the requirement is already satisfied. The
+> vectors that actually exist here are **SQL Agent jobs and Elastic Jobs
+> (`Microsoft.Sql/servers/jobAgents`), and both are prohibited** — that is what
+> `T-INV-013b`/`T-INV-013c` assert, and a scheduled `DELETE` is the same defect
+> a TTL would have been.
+>
+> If you are reading this while considering adding an expiry, a job agent, or a
 > clean-up script "for hygiene": **that is the defect this paragraph exists to
-> prevent.** Two tests will fail — `T-INV-013` (Bicep + live container
-> assertion that `defaultTtl` is unset and no document carries `ttl`) and
-> `T-INV-012` (no hard delete outside the §8.3 call site).
+> prevent.** Two tests will fail — `T-INV-013` (an ARM/Bicep assertion that no
+> job agent and no TTL-shaped property exists at any depth; the live-resource
+> half needs a deployed subscription and runs in the TASK-010 sprint, not CI)
+> and `T-INV-012` (no hard delete outside the §8.3 call site).
+
+~~**NO TTL IS CONFIGURED ANYWHERE IN nextup's DATA LAYER.** Not on the Cosmos
+DB account, not on the `nextup` database, not on the `owner-data` container,
+and not as `ttl` on any document. ... Two tests will fail — `T-INV-013` (Bicep
++ live container assertion that `defaultTtl` is unset and no document carries
+`ttl`) and `T-INV-012`.~~ *(Superseded: the datastore is Azure SQL — ADR-0005
+Rev 3. Retained struck through because this is an executable instruction, and
+the superseded wording named a mechanism that cannot exist here, making the
+prohibition read as vacuously satisfied.)*
 
 **The only automatic deletion in the entire product** is the Blob Storage
 lifecycle rule that deletes screenshot **bytes** 30 days after creation
@@ -1164,7 +1183,7 @@ lifecycle rule that deletes screenshot **bytes** 30 days after creation
 
 - is declared in `infra/storage.bicep`, scoped to the `screenshots` container
   by prefix, `delete` action at 30 days after creation;
-- **writes nothing to Cosmos DB** — no application code and no timer;
+- **writes nothing to the database** — no application code and no timer;
 - deletes **bytes only**. `uploadedImage`, `extractionCandidate`,
   `uploadBatch`, `Title`, `ServiceListing` and `Suppression` are untouched
   (US-035 AC-2);
