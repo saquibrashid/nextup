@@ -107,7 +107,6 @@ const KNOWN_UNCOVERED: readonly string[] = [
   'T-UX-053',
   'T-UX-054',
   'T-UX-055',
-  'T-UX-056',
   'T-UX-057',
   'T-UX-058',
   'T-UX-060',

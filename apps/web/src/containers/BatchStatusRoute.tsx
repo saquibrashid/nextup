@@ -45,11 +45,22 @@ export interface BatchStatusRouteProps {
   readonly client?: ApiClient;
   /** Injected so the hidden-tab rule is drivable without a real document. */
   readonly visibility?: () => boolean;
+  /**
+   * Injected so §5.8 is drivable without a real network.
+   *
+   * ⚠ Returns TRUE WHEN ONLINE, matching `navigator.onLine` rather than
+   * inverting it like `visibility`. The two seams read opposite ways because
+   * each mirrors the platform API it stands in for; inverting one to match the
+   * other would make every call site disagree with the DOM property it is
+   * named after.
+   */
+  readonly connectivity?: () => boolean;
 }
 
 export function BatchStatusRoute({
   client = apiClient,
   visibility,
+  connectivity,
 }: BatchStatusRouteProps = {}): JSX.Element {
   const params = useParams();
   const navigate = useNavigate();
@@ -58,6 +69,16 @@ export function BatchStatusRoute({
   const [batch, setBatch] = useState<BatchStatus | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [refused, setRefused] = useState(false);
+
+  const isOnline = useCallback(
+    (): boolean =>
+      connectivity === undefined
+        ? typeof navigator === 'undefined' || navigator.onLine !== false
+        : connectivity(),
+    [connectivity],
+  );
+
+  const [offline, setOffline] = useState(() => !isOnline());
 
   const isHidden = useCallback(
     (): boolean =>
@@ -68,6 +89,17 @@ export function BatchStatusRoute({
   // Read by the interval so the tick never closes over a stale status; state
   // alone would restart the timer on every response.
   const statusRef = useRef<string | null>(null);
+
+  /*
+   * ⚠ READ BY THE FAILURE PATH, not just the tick. §5.8 says "no error is
+   * invented", and the request that was already in flight when the connection
+   * dropped rejects a moment LATER — after the offline state is known, but
+   * from a `load()` the pause could not prevent. Without this the owner sees
+   * the extraction-failed screen for a batch that is extracting perfectly
+   * well, which is precisely the invented error.
+   */
+  const offlineRef = useRef(offline);
+  offlineRef.current = offline;
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
@@ -82,6 +114,9 @@ export function BatchStatusRoute({
           setRefused(true);
           return;
         }
+        // §5.8 — offline is not a failure of the batch. The last known state
+        // stays on screen under the banner.
+        if (offlineRef.current) return;
         setLoadFailed(true);
       }
     },
@@ -101,6 +136,10 @@ export function BatchStatusRoute({
       // Checked on every tick, not once at set-up: the owner switches tabs
       // mid-extraction, which is the whole case this exists for.
       if (isHidden()) return;
+      // §5.8 — the poll PAUSES rather than firing into a dead network. A tick
+      // that fires offline costs a rejected request and, without the guard in
+      // `load`, an invented error.
+      if (offlineRef.current) return;
       const status = statusRef.current;
       if (status !== null && !isRunning(status)) return;
       void load();
@@ -111,6 +150,32 @@ export function BatchStatusRoute({
       clearInterval(timer);
     };
   }, [isHidden, load]);
+
+  /**
+   * §5.8 — the banner, the pause, and the resume.
+   *
+   * ⚠ THE RESUME IS AN IMMEDIATE READ, not merely an un-pause. Waiting for the
+   * next tick would leave the owner looking at a stale status for up to the
+   * full interval after their connection visibly came back — which reads as
+   * the page having given up, the impression §5.8 exists to prevent.
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const goOffline = (): void => setOffline(true);
+    const goOnline = (): void => {
+      setOffline(false);
+      const status = statusRef.current;
+      if (status === null || isRunning(status)) void load();
+    };
+
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', goOnline);
+    return () => {
+      window.removeEventListener('offline', goOffline);
+      window.removeEventListener('online', goOnline);
+    };
+  }, [load]);
 
   /**
    * §4 / §5.4 — on `in-review` the owner is taken to the review pass.
@@ -129,6 +194,7 @@ export function BatchStatusRoute({
     <BatchStatusPage
       batch={batch}
       loadFailed={loadFailed}
+      offline={offline}
       onRetry={() => {
         void load();
       }}

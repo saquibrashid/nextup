@@ -153,8 +153,7 @@ function callForm(method: string): RegExp {
  *   nothing needs to today. Do not "fix" this by wiring a second, duplicate
  *   message into a container: that would render the rejection copy twice.
  *
- * Genuinely unwired, each a separately-tracked gap — NOT permission for a
- * third:
+ * Genuinely unwired, a separately-tracked gap — NOT permission for a second:
  * - `RemovalConfirmDialog.submitting` — the confirm/cancel buttons never
  *   disable while the removal is in flight. ⚠ INVESTIGATED, AND THE EXPOSURE
  *   IS SMALLER THAN IT LOOKS: `ReviewPage`'s `onConfirm` calls
@@ -166,9 +165,17 @@ function callForm(method: string): RegExp {
  *   by a spurious error, a UX wart rather than data loss. Recorded here so the
  *   next reader does not re-derive it — and NOT fixed in the same breath,
  *   because `ReviewPage.tsx` is a live edit surface.
- * - `BatchStatusPage.offline` — the offline banner never renders, so a poll
- *   that has stopped because the device dropped off the network is
- *   indistinguishable from one that is merely slow.
+ *
+ * ⚠ `BatchStatusPage.offline` WAS HERE AND IS NOW WIRED — and it was the same
+ * defect as `RefusalPage.signedInEmail` below, one layer down. The banner and
+ * its placement above the error branch were built correctly and no container
+ * ever passed the prop, so `ux-states.md` §5.8 ("polling pauses and resumes on
+ * reconnect; no error is invented") had never held: the poll kept firing into
+ * a dead network and the first rejection painted the load-failure screen over
+ * a batch that was extracting normally. `BatchStatusRoute` now owns an
+ * `offline` state, pauses the tick, resumes with an immediate read, and
+ * suppresses a failure that lands after the drop; `T-UX-056a`–`e` drive the
+ * ROUTE, never the page.
  *
  * ⚠ `RefusalPage.signedInEmail` WAS HERE AND IS NOW WIRED — left recorded
  * because of HOW it was missed. `ux-states.md` §2.11 requires the refusal to
@@ -186,7 +193,6 @@ const BASELINE_UNSUPPLIED = new Set([
   'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.disclaimer',
   'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.logoPath',
   'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.omdbDisclaimer',
-  'apps/web/src/pages/BatchStatusPage.tsx BatchStatusPage.offline',
   'apps/web/src/pages/ReviewPage.tsx ReviewPage.storage',
 ]);
 
