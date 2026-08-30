@@ -268,11 +268,37 @@ async function expectStyledAndRendered(page: Page): Promise<void> {
   expect(applied.font).not.toBe('');
 }
 
-async function expectNoHorizontalOverflow(page: Page): Promise<void> {
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-  );
-  expect(overflow).toBeLessThanOrEqual(0);
+async function expectNoHorizontalOverflow(page: Page, context = page.url()): Promise<void> {
+  const result = await page.evaluate(() => {
+    const clientWidth = document.documentElement.clientWidth;
+    const scrollWidth = document.documentElement.scrollWidth;
+    const offenders = [...document.body.querySelectorAll('*')]
+      .map((node) => {
+        const rect = node.getBoundingClientRect();
+        return {
+          tag: node.tagName.toLowerCase(),
+          className:
+            typeof node.getAttribute('class') === 'string' ? node.getAttribute('class') : '',
+          testId: node.getAttribute('data-testid') ?? '',
+          text: (node.textContent ?? '').trim().replace(/\s+/g, ' ').slice(0, 80),
+          left: Math.round(rect.left * 10) / 10,
+          right: Math.round(rect.right * 10) / 10,
+          width: Math.round(rect.width * 10) / 10,
+        };
+      })
+      .filter((rect) => rect.width > 0 && (rect.left < 0 || rect.right > clientWidth))
+      .sort((a, b) => b.right - a.right)
+      .slice(0, 5);
+
+    return {
+      clientWidth,
+      scrollWidth,
+      overflow: scrollWidth - clientWidth,
+      offenders,
+    };
+  });
+
+  expect(result.overflow, `${context} overflow: ${JSON.stringify(result)}`).toBeLessThanOrEqual(0);
 }
 
 async function expectTapTarget(locator: ReturnType<Page['locator']>): Promise<void> {
@@ -306,10 +332,7 @@ test.describe('T-A11Y-001 — the 320 px floor', () => {
     // the layout rather than an empty document.
     await expect(page.getByText(/A Very Long Film Title/)).toBeVisible();
 
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-    );
-    expect(overflow).toBeLessThanOrEqual(0);
+    await expectNoHorizontalOverflow(page, '/');
   });
 
   test('T-A11Y-001c: every route avoids horizontal scroll at 320 px', async ({ page }) => {
@@ -320,7 +343,7 @@ test.describe('T-A11Y-001 — the 320 px floor', () => {
     for (const route of ROUTES) {
       await page.goto(route);
       await expectStyledAndRendered(page);
-      await expectNoHorizontalOverflow(page);
+      await expectNoHorizontalOverflow(page, route);
     }
   });
 
