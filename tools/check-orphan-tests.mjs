@@ -98,7 +98,14 @@ export const BASELINE_ORPHANS = new Set([
   // agreement between the blob store and `uploadedImage`. Mutation-verified,
   // and it closed a real gap: skipping the blob write for PNGs was caught by
   // NO other test in that file.
-  'T-INFRA-006',
+  // ⚠ `T-INFRA-006` was REMOVED from this baseline — implemented in
+  // `tests/infra/ciIntegrationStore.spec.ts` as a static assertion over
+  // `.github/workflows/ci.yml`. Mutation-verified twice: dropping `-C` from the
+  // health command, and calling `/opt/mssql-tools18/bin/sqlcmd` bare on the
+  // runner instead of through `docker exec`, were each caught by exactly one
+  // case and by nothing else in the repo. It is deliberately STATIC — the
+  // failure it guards is a FLAKY gate, which is green most of the time by
+  // definition, so the only cheap moment to catch it is the diff.
   'T-INV-014',
   // ⚠ `T-INV-016` STAYS, and NOT because it is hard. As specified it asserts a
   // non-empty `title.duplicate_ack_seq` is written "in
@@ -110,7 +117,14 @@ export const BASELINE_ORPHANS = new Set([
   // editing the spec to agree with the implementation. This is a FINDING for
   // the owner, in the same class as `T-INV-014`.
   'T-INV-016',
-  'T-MIG-002',
+  // ⚠ `T-MIG-002` was REMOVED from this baseline — implemented in
+  // `apps/api/test/integration/migrationSmoke.spec.ts`. The census reads the
+  // migration FOLDER NAMES off disk, so the expected set grows by itself; a
+  // hand-written list would pass forever while the sixth migration quietly
+  // never ran. Mutation-verified against an un-migrated database (the literal
+  // `RSK-031` scenario — `002a` correctly stayed green, proving the connection
+  // check is not what is doing the work) and against a migration marked rolled
+  // back (`002b` alone).
   // 'T-RES-011', 'T-RES-012', 'T-RES-015' removed (US-025 restore) —
   // implemented in `apps/api/test/integration/restoreListing.spec.ts`
   // alongside the `T-RES-013`/`014` cases that were built around them.
