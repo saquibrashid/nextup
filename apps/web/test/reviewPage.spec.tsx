@@ -492,6 +492,60 @@ describe('the mode contract is visible in the DOM', () => {
     expect(summary.tagName).toBe('SUMMARY');
   });
 
+  it('T-UX-099a · US-015 AC-6 · the removals COUNT is on screen without expanding the section', () => {
+    // ⚠ THE COUNT IS THE OWNER'S ONLY CHEAP SANITY CHECK ON A FULL UPDATE.
+    // "3 to remove" when they expected one is the signal that the extraction
+    // under-read the screenshots — and it has to be legible at a glance, in
+    // the collapsed state, or it is not a check at all. Asserting the number
+    // is somewhere in the DOM would pass with it buried in the expanded list.
+    render(
+      <ReviewPage
+        review={review({
+          disappearedListings: [
+            { listingId: 'lst_1', titleId: 'ttl_1', name: 'Arrival', year: 2016, posterPath: null },
+            { listingId: 'lst_2', titleId: 'ttl_2', name: 'Heat', year: 1995, posterPath: null },
+          ],
+        })}
+      />,
+    );
+
+    const section = screen.getByTestId('review-removals');
+    const summary = within(section).getByText(/\(2\)/);
+    // The <summary> is the ONE element a closed <details> still renders.
+    expect(summary.tagName).toBe('SUMMARY');
+    expect(summary.closest('details')).not.toBeNull();
+  });
+
+  it('T-UX-099b · US-015 AC-6 · the count survives the section actually being closed', () => {
+    // `099a` proves the count is in the right element. This proves the claim
+    // that element makes: close the <details> and the number is still there.
+    // Without it, `099a` is an assertion about tag names rather than about
+    // what the owner can see.
+    render(
+      <ReviewPage
+        review={review({
+          disappearedListings: [
+            { listingId: 'lst_1', titleId: 'ttl_1', name: 'Arrival', year: 2016, posterPath: null },
+            { listingId: 'lst_2', titleId: 'ttl_2', name: 'Heat', year: 1995, posterPath: null },
+          ],
+        })}
+      />,
+    );
+
+    const details = within(screen.getByTestId('review-removals'))
+      .getByText(/\(2\)/)
+      .closest('details');
+    expect(details).not.toBeNull();
+    (details as HTMLDetailsElement).open = false;
+
+    expect(within(screen.getByTestId('review-removals')).getByText(/\(2\)/)).toBeVisible();
+    // The rows themselves are what collapsing is FOR — jsdom does not apply
+    // the UA stylesheet that hides them, so the honest assertion here is that
+    // the count is not one of them: it sits outside the list.
+    const list = screen.getByTestId('review-removals').querySelector('.review-section__list');
+    expect(list?.textContent ?? '').not.toContain('(2)');
+  });
+
   it('T-REV-013i: append-only renders NEITHER the known section NOR removals', () => {
     // REQ-022. `T-REM-011` (TASK-093) owns this properly; asserted here too
     // because the section components are written here and a regression is

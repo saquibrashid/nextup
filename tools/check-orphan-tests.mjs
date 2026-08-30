@@ -84,7 +84,9 @@ const SPEC_FILE_RE = /\.(spec|test)\.[cm]?[jt]sx?$/;
  */
 export const BASELINE_ORPHANS = new Set([
   'T-A11Y-014',
-  'T-ATTR-005',
+  // ⚠ `T-ATTR-005` was REMOVED from this baseline — implemented in
+  // `apps/web/test/attribution.spec.tsx`. Mutation-verified: hiding the
+  // attribution block on the logo's `error` event was caught by nothing else.
   // 'T-AUTH-003' removed — the gate reports it as owned.
   // 'T-DATE-010'..'T-DATE-013' removed (US-021 dates) — implemented in
   // `apps/api/test/integration/dateAdded.spec.ts`. They were the entries with
@@ -159,20 +161,23 @@ export const BASELINE_ORPHANS = new Set([
   'T-AUTH-002',
   'T-AUTH-003',
   'T-UX-069',
-  'T-UX-099',
-  // ⚠ `T-UX-099` IS baselined here, and the note that used to sit on this line
-  // claiming the opposite was itself an instance of the bug. It read: ~~"not
-  // baselined here: it is cited by a task, so it was never an orphan in this
-  // gate's sense"~~. It is cited by no task. The only thing that kept it out of
-  // this report was its own string literal in `acCoverage.spec.ts`'s
-  // `KNOWN_PHANTOM_CITATIONS`, which the old bare-occurrence predicate read as
-  // an implementation.
+  // ⚠ `T-UX-099` was REMOVED from this baseline — implemented in
+  // `apps/web/test/reviewPage.spec.tsx`. Mutation-verified: moving the count
+  // out of the `<summary>` and into the list body was caught by nothing else.
   //
-  // The distinction the note was reaching for is real and still worth keeping:
-  // "owned" here means an id a task cites, which is strictly weaker than "a
-  // test bearing this id runs". Filing a gap in the list that cannot see it
-  // hides it. What is NOT true is that either list can be reasoned about from
-  // the comments alone — check which gate actually reports the id.
+  // The history on this id is worth keeping, because it was itself an instance
+  // of this project's signature defect. The note that used to sit here read:
+  // ~~"not baselined here: it is cited by a task, so it was never an orphan in
+  // this gate's sense"~~ — while it WAS baselined, and is cited by no task. The
+  // only thing that kept it out of the report was its own string literal in
+  // `acCoverage.spec.ts`'s `KNOWN_PHANTOM_CITATIONS`, which the old
+  // bare-occurrence predicate read as an implementation.
+  //
+  // The distinction that note was reaching for is real and still worth
+  // keeping: "owned" here means an id a task cites, which is strictly weaker
+  // than "a test bearing this id runs". Filing a gap in the list that cannot
+  // see it hides it. What is NOT true is that either list can be reasoned
+  // about from the comments alone — check which gate actually reports the id.
 ]);
 
 /**
