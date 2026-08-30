@@ -58,6 +58,22 @@
  * the twenty-five that are merely in the wrong place. They are different
  * repairs — one needs a row written, the other needs a row moved.
  *
+ * ── The `T-FAKE-` namespace is not tests ────────────────────────────────────
+ *
+ * This gate's own first draft baselined `T-FAKE-006` as a ghost. It is not a
+ * test: it is a synthetic id inside a STRING LITERAL in `orphanTests.spec.ts`,
+ * planted into a scratch directory to prove that scanner distinguishes a real
+ * `it()` title from an id in a comment or an array. The scan reads it as a
+ * title because, in the file it is quoted in, it lexically is one.
+ *
+ * `T-FAKE-\d+` is an established convention here for exactly that — synthetic
+ * ids in gate self-tests, used across `orphanTests.spec.ts`, `status.spec.ts`,
+ * `invariantCoverage.spec.ts` and this file. So it is EXCLUDED rather than
+ * baselined. Baselining it would have been worse than noise: a ratchet entry
+ * that can never legitimately be paid down invites someone to write a spec row
+ * for a test that does not exist, which is the mis-citation class again.
+ * `T-META-009a` proves the exclusion is both in force and doing work.
+ *
  * ── The baselines are ratchets, not permissions ─────────────────────────────
  *
  * Neither list asserts its entries are acceptable. Writing 35 spec rows means
@@ -105,7 +121,6 @@ const BASELINE_UNDEFINED = new Set([
   'T-DM-025',
   'T-DM-026',
   'T-DM-027',
-  'T-FAKE-006',
   'T-INFRA-003',
   'T-SEC-006',
   'T-UNDO-005',
@@ -148,7 +163,6 @@ const BASELINE_GHOSTS = new Set([
   'T-DM-024',
   'T-DM-026',
   'T-DM-027',
-  'T-FAKE-006',
 ]);
 
 /** Every `.md` under `specs/` and `docs/`, concatenated. */
@@ -173,6 +187,13 @@ function documentationCorpus(root = ROOT): string {
 }
 
 /**
+ * Ids reserved for synthetic fixtures in gate self-tests. Never real tests.
+ * See the header: these are quoted inside string literals that the title scan
+ * legitimately reads as titles.
+ */
+const SYNTHETIC_ID_RE = /^T-FAKE-\d+$/;
+
+/**
  * The two scanned inputs, read through ONE function.
  *
  * ⚠ THE SHARING IS DELIBERATE AND WAS FORCED BY A MUTATION. `T-META-009a` was
@@ -182,8 +203,11 @@ function documentationCorpus(root = ROOT): string {
  * the same bytes, so a blinded scan fails the control that exists to catch it.
  */
 function scanned(): { implemented: Set<string>; defined: Set<string> } {
+  const implemented = new Set(
+    [...implementedTestIds(ROOT)].filter((id) => !SYNTHETIC_ID_RE.test(id)),
+  );
   return {
-    implemented: implementedTestIds(ROOT),
+    implemented,
     defined: definedTestIds(readFileSync(path.join(ROOT, 'specs', 'testing.md'), 'utf8')),
   };
 }
@@ -203,6 +227,14 @@ describe('T-META-009 every test id the suite runs is defined in specs/testing.md
     expect(defined.size).toBeGreaterThan(300);
     expect(implemented.has('T-META-009')).toBe(true);
     expect(defined.has('T-META-009')).toBe(true);
+
+    // The synthetic-id exclusion is IN FORCE and is DOING WORK. If the raw scan
+    // ever stops seeing a `T-FAKE-` id the exclusion has become decorative and
+    // the next fixture id will be baselined as debt, which is how `T-FAKE-006`
+    // reached this file's first draft.
+    expect([...implementedTestIds(ROOT)].some((id) => SYNTHETIC_ID_RE.test(id))).toBe(true);
+    expect([...implemented].some((id) => SYNTHETIC_ID_RE.test(id))).toBe(false);
+    expect([...defined].some((id) => SYNTHETIC_ID_RE.test(id))).toBe(false);
   });
 
   it('T-META-009b · no NEW test id runs without a defining row in the spec', () => {
@@ -217,7 +249,7 @@ describe('T-META-009 every test id the suite runs is defined in specs/testing.md
   });
 
   it('T-META-009c · the undefined baseline is pinned exactly, in both directions', () => {
-    expect(BASELINE_UNDEFINED.size).toBe(34);
+    expect(BASELINE_UNDEFINED.size).toBe(33);
   });
 
   it('T-META-009d · every baselined id is still implemented and still undefined', () => {
@@ -264,6 +296,6 @@ describe('T-META-009 every test id the suite runs is defined in specs/testing.md
         `statement of what they protect is the test body. Write the spec row.`,
     ).toEqual([]);
 
-    expect(BASELINE_GHOSTS.size).toBe(9);
+    expect(BASELINE_GHOSTS.size).toBe(8);
   });
 });
