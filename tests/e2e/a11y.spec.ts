@@ -160,22 +160,59 @@ const BATCHES = {
   ],
 };
 
+/**
+ * ⚠ **THIS STUB WAS AN INVENTED SHAPE AND THE REVIEW ROUTE RENDERED A BLANK
+ * PAGE FOR IT.** It declared `sections: { new, changed, removals, unmatched }`
+ * and a `summary`, none of which exist on `ReviewResponse`. The real contract
+ * is six *named* sections, each carrying `label`/`count`/`items`, plus
+ * `lowYield`, `banner` and `imagesWithNoText`.
+ *
+ * The consequence was not a loud failure. `document.body` on
+ * `/batches/:id/review` was **empty** — no heading, no error, no way back —
+ * and `T-A11Y-001c` ("every route avoids horizontal scroll at 320 px") had
+ * been passing on it since the day it was written, because a page with nothing
+ * on it cannot overflow. That is exactly the trivial pass this file's own
+ * header warns about, alive inside this file.
+ *
+ * The stub's header warning about `service-state` said the same thing about a
+ * different endpoint and was not generalised. It is now.
+ */
 const REVIEW = {
   batchId: '01J0000000000000000000BTCH',
   service: 'netflix',
   mode: 'append-only',
-  status: 'review',
-  createdAt: '2026-02-11T00:00:00.000Z',
-  images: [],
+  lowYield: false,
   degradedExtraction: false,
   crossCheck: 'ok',
+  banner: null,
   sections: {
-    new: [],
-    changed: [],
-    removals: [],
-    unmatched: [],
+    additions: { label: 'New to your list', count: 0, items: [] },
+    alreadyOnYourList: {
+      label: 'Already on your list',
+      count: 0,
+      items: [],
+      collapsedByDefault: true,
+      omitted: false,
+    },
+    probablyNotTitles: {
+      label: 'Probably not titles',
+      count: 0,
+      items: [],
+      collapsedByDefault: true,
+      omitted: false,
+    },
+    unmatched: { label: "Couldn't identify these", count: 0, items: [] },
+    unreadableTiles: { label: "Couldn't read these", count: 0, items: [] },
+    removals: {
+      label: 'No longer on Netflix',
+      count: 0,
+      items: [],
+      omitted: true,
+      withheld: false,
+      withheldReason: null,
+    },
   },
-  summary: { new: 0, changed: 0, removals: 0, unmatched: 0 },
+  imagesWithNoText: [],
 };
 
 const ONE_BY_ONE_PNG = Buffer.from(
@@ -529,6 +566,73 @@ test.describe('T-A11Y-012 — axe-core finds no violation', () => {
     const results = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
     const contrast = results.passes.find((rule) => rule.id === 'color-contrast');
     expect(contrast?.nodes.length ?? 0).toBeGreaterThan(0);
+  });
+
+  /**
+   * TASK-124's "Done when" is **every route**, not the list screen.
+   *
+   * ⚠ `T-A11Y-012a` SCANNED ONE ROUTE OUT OF TEN AND THE TASK READ AS
+   * DELIVERED. Nine of the surfaces the owner actually uses — including
+   * `/upload`, which is where every piece of data enters the product, and
+   * `/batches/:id/review`, which is where they confirm it — had never been put
+   * in front of axe at all. A route-scoped gate that runs on one route is the
+   * same defect class as a parity test that mounts one of two surfaces: it
+   * cannot fail for the reason it exists.
+   *
+   * Reported per route AND per rule, so a failure names the screen and the
+   * violation instead of an opaque boolean. `expectStyledAndRendered` runs
+   * first on every route for the reason in this file's header: axe finds no
+   * contrast pair on a page that never painted, so a broken route would
+   * otherwise scan clean.
+   */
+  test('T-A11Y-012c: EVERY route is free of serious and critical violations at 320 px', async ({
+    page,
+  }) => {
+    await enableClipboardRead(page);
+    await stubApi(page);
+    await page.setViewportSize(NARROW);
+
+    const found: string[] = [];
+    const contrastCheckedOn: string[] = [];
+
+    for (const route of ROUTES) {
+      await page.goto(route);
+      await expectStyledAndRendered(page);
+
+      /*
+       * ⚠ `/upload` OPENS ON THE SERVICE PICKER, NOT ON THE DROPZONE. Landing
+       * on the route and scanning it never reaches the ingest controls at all,
+       * so the sweep reported `/upload` clean while the primary affordance on
+       * it — the paste button — carried a serious contrast failure. Choosing a
+       * draft is the cheapest way to put the real capture surface on screen;
+       * the explicit visibility assertion stops this silently reverting to a
+       * picker-only scan if the flow changes.
+       */
+      if (route === '/upload') {
+        await chooseUploadDraft(page);
+        await expect(page.getByTestId('paste-button')).toBeVisible();
+      }
+
+      const results = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+        .analyze();
+
+      for (const violation of results.violations) {
+        if (violation.impact === 'serious' || violation.impact === 'critical') {
+          found.push(`${route} · ${violation.id} (${violation.impact})`);
+        }
+      }
+
+      // ⚠ Per route, not once for the run. A route that failed to paint
+      // contributes no violations and would otherwise be indistinguishable
+      // from a clean one — the exact trivial pass this file's header warns of.
+      if ((results.passes.find((rule) => rule.id === 'color-contrast')?.nodes.length ?? 0) > 0) {
+        contrastCheckedOn.push(route);
+      }
+    }
+
+    expect(found).toEqual([]);
+    expect(contrastCheckedOn).toEqual([...ROUTES]);
   });
 });
 

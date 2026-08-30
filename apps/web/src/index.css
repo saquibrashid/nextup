@@ -202,7 +202,7 @@ button {
 }
 
 .dropzone__choose,
-.dropzone__paste {
+.dropzone__paste > button {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -213,8 +213,26 @@ button {
  * ⚠ Paste is the PRIMARY affordance (ADR-0009) and file selection was NOT
  * replaced by it — the iOS Photos path and the laptop screenshot path both
  * still need the file input. Both are styled as real, equal controls.
+ *
+ * ⚠ **THESE RULES USED TO TARGET `.dropzone__paste` ITSELF, WHICH IS THE
+ * WRAPPING `<div>`, NOT THE BUTTON.** `.dropzone__choose` is a `<label>` and
+ * has no user-agent appearance of its own, so it took the surface background
+ * and looked like a real control. The paste `<button>` inside
+ * `.dropzone__paste` took nothing, and fell back to the browser's default
+ * button face — `#c0c0c0` on WebKit — under `--color-accent` text (`#1d4ed8`).
+ * That is **3.68:1, a serious WCAG AA contrast failure**, on the PRIMARY
+ * ingest affordance, on the owner's PRIMARY device.
+ *
+ * ⚠ **CHROMIUM HID IT.** Its default button face is `#efefef`, which clears
+ * 4.5:1 against the same text, so the identical markup passes there. Only the
+ * `mobile-safari` project sees this, and only since `T-A11Y-012c` started
+ * scanning `/upload` at all — `T-A11Y-012a` scanned the list screen alone.
+ *
+ * The slot also wraps the iOS hint, the rejection alert and the held-count
+ * notice, so styling the container as a control drew a bordered accent box
+ * around all of them. The control styling belongs on the control.
  */
-.dropzone__paste {
+.dropzone__paste > button {
   border-color: var(--color-accent);
   color: var(--color-accent);
   font-weight: 600;
