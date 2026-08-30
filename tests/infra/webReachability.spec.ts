@@ -126,6 +126,146 @@ function callForm(method: string): RegExp {
   return new RegExp(`\\.${method}\\s*\\(`);
 }
 
+/**
+ * Optional props a component declares AND uses, which no caller ever supplies.
+ *
+ * ⚠ **A RATCHET, NOT A PERMISSION**, and every entry states why it is not a
+ * defect. An entry whose justification you cannot write is a defect.
+ *
+ * Deliberate override seams — a real runtime default, overridable for tests:
+ * - `ImageDropzone.touch` — defaults to the `isTouchDevice()` probe. The prop's
+ *   own doc records that an EARLIER version had no probe and the iOS paste hint
+ *   therefore "rendered only in tests"; the probe is the fix, this is the seam.
+ * - `PasteCapture.target` — defaults to the real `document`.
+ * - `ReviewPage.storage` — defaults to real session storage.
+ * - `TmdbAttribution.disclaimer`, `.logoPath`, `.omdbDisclaimer` — the
+ *   attribution copy and asset are fixed by TMDB's terms; the props exist so a
+ *   test can assert the exact required strings rather than restate them.
+ *
+ * Genuinely unwired, each a separately-tracked gap — NOT permission for a
+ * fifth:
+ * - `ImageDropzone.onPasteFailed` — forwarded to `PasteButton` but supplied by
+ *   no container, so a clipboard-read failure is silent in the SPA.
+ * - `RemovalConfirmDialog.submitting` — the confirm/cancel buttons never
+ *   disable while the removal is in flight. On the IRREVERSIBLE full-update
+ *   path this is a double-submit waiting to happen.
+ * - `BatchStatusPage.offline` — the offline banner never renders, so a poll
+ *   that has stopped because the device dropped off the network is
+ *   indistinguishable from one that is merely slow.
+ * - `RefusalPage.signedInEmail` — the refusal screen never says WHICH account
+ *   was refused, which is precisely the information needed when a personal and
+ *   a work identity both resolve through the same `/common` issuer.
+ */
+const BASELINE_UNSUPPLIED = new Set([
+  'apps/web/src/components/ImageDropzone.tsx ImageDropzone.onPasteFailed',
+  'apps/web/src/components/ImageDropzone.tsx ImageDropzone.touch',
+  'apps/web/src/components/PasteCapture.tsx PasteCapture.target',
+  'apps/web/src/components/RemovalConfirmDialog.tsx RemovalConfirmDialog.submitting',
+  'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.disclaimer',
+  'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.logoPath',
+  'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.omdbDisclaimer',
+  'apps/web/src/pages/BatchStatusPage.tsx BatchStatusPage.offline',
+  'apps/web/src/pages/RefusalPage.tsx RefusalPage.signedInEmail',
+  'apps/web/src/pages/ReviewPage.tsx ReviewPage.storage',
+]);
+
+/**
+ * The body of a `<Name ...>` opening tag, honouring nesting and strings.
+ *
+ * ⚠ Ending at the first `>` is WRONG and inverts the result: an arrow-function
+ * prop contains a `>`, so every attribute after it reads as never-supplied.
+ */
+function openingTagBodies(text: string, name: string): string[] {
+  const bodies: string[] = [];
+  for (const m of text.matchAll(new RegExp(`<${name}(?=[\\s/>])`, 'g'))) {
+    const start = (m.index ?? 0) + m[0].length;
+    let depth = 0;
+    let quote: string | null = null;
+    let i = start;
+    for (; i < text.length; i++) {
+      const ch = text[i];
+      if (quote !== null) {
+        if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') quote = ch;
+      else if (ch === '{') depth++;
+      else if (ch === '}') depth--;
+      else if (ch === '>' && depth === 0) break;
+    }
+    bodies.push(text.slice(start, i));
+  }
+  return bodies;
+}
+
+/** Optional member names of an interface body, at depth 0 only. */
+function optionalPropsOf(interfaceSource: string): string[] {
+  const body = /\{([\s\S]*)\n?\}/.exec(interfaceSource);
+  if (body === null) return [];
+  const names: string[] = [];
+  let depth = 0;
+  for (const line of body[1].split('\n')) {
+    if (depth === 0) {
+      const p = /^\s*(?:readonly\s+)?(\w+)\?:/.exec(line);
+      if (p?.[1] !== undefined) names.push(p[1]);
+    }
+    for (const ch of line) {
+      if (ch === '(' || ch === '{' || ch === '[') depth++;
+      else if (ch === ')' || ch === '}' || ch === ']') depth--;
+    }
+  }
+  return names;
+}
+
+function componentFiles(): string[] {
+  return FILES.filter((f) => /[\\/](components|pages)[\\/]/.test(f));
+}
+
+/** Synthetic single-case driver, for the parser guards in `h`. */
+function unsuppliedIn(iface: string, component: string, prop: string, callSite: string): boolean {
+  let mounted = false;
+  for (const body of openingTagBodies(callSite, component)) {
+    mounted = true;
+    if (new RegExp(`\\b${prop}\\s*=`).test(body) || /\{\s*\.\.\./.test(body)) return false;
+  }
+  return mounted && optionalPropsOf(iface).includes(prop);
+}
+
+function neverSuppliedProps(): string[] {
+  const found: string[] = [];
+  for (const file of componentFiles()) {
+    const text = TEXT.get(file);
+    if (text === undefined) continue;
+
+    for (const m of text.matchAll(/interface\s+(\w+)Props\s*\{([\s\S]*?)\n\}/g)) {
+      const component = m[1];
+      if (component === undefined) continue;
+
+      for (const prop of optionalPropsOf(`{${m[2]}\n}`)) {
+        // Declared and destructured but otherwise unused is a dormant prop,
+        // not a broken feature: there is no behaviour behind it to be dead.
+        const uses = (text.match(new RegExp(`\\b${prop}\\b`, 'g')) ?? []).length;
+        if (uses < 2) continue;
+
+        let mounted = false;
+        let supplied = false;
+        for (const [, other] of TEXT) {
+          for (const body of openingTagBodies(other, component)) {
+            mounted = true;
+            if (new RegExp(`\\b${prop}\\s*=`).test(body) || /\{\s*\.\.\./.test(body)) {
+              supplied = true;
+            }
+          }
+        }
+        if (mounted && !supplied) {
+          found.push(`${path.relative(ROOT, file).replace(/\\/g, '/')} ${component}.${prop}`);
+        }
+      }
+    }
+  }
+  return found.sort();
+}
+
 function sourceFiles(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -233,5 +373,73 @@ describe('T-INFRA-013 nothing finished is left unreachable', () => {
     for (const line of calls) {
       expect(callForm('undoBatch').test(line)).toBe(true);
     }
+  });
+
+  it('T-INFRA-013f: every optional prop a component USES is supplied by some caller', () => {
+    // ⚠ THE FOURTH INSTANCE OF THIS DEFECT, AND THE FIRST THIS FILE COULD NOT
+    // SEE. `b` proves a client method is called; `d` proves a module is
+    // mounted. Neither can see a component that IS mounted, by a caller that
+    // simply never passes one of its props — the prop defaults, the branch
+    // guarded by it is dead, and the component's own test supplies the prop
+    // itself and goes green. That is disguise #1, the `T-PASTE-002i` shape.
+    //
+    // It was live in two places at once, both on the fabrication-review path
+    // that RSK-028 depends on: `CandidateCard.thumbnailUrl` (the tile the
+    // owner is supposed to verify an uncorroborated model guess against — a
+    // `must` in `specs/ui.md` §5.3a, never rendered) and
+    // `CandidateCard.unidentified` (the "not identified" chip, never shown).
+    // Both had passing component tests.
+    const offenders = neverSuppliedProps();
+    const unexpected = offenders.filter((o) => !BASELINE_UNSUPPLIED.has(o));
+    expect(unexpected).toEqual([]);
+  });
+
+  it('T-INFRA-013g: a baselined prop that has since been wired must leave the baseline', () => {
+    // The same discipline as `c`. Without it the ratchet loosens by one entry
+    // every time a gap is closed, and the list decays into a permission slip.
+    const offenders = new Set(neverSuppliedProps());
+    const stale = [...BASELINE_UNSUPPLIED].filter((entry) => !offenders.has(entry));
+    expect(stale).toEqual([]);
+  });
+
+  it('T-INFRA-013h: the prop sweep discriminates — its parser is guarded in both directions', () => {
+    // ⚠ NON-VACUITY PLUS THREE PARSER TRAPS, EACH OF WHICH MADE THIS SWEEP
+    // REPORT THE OPPOSITE OF THE TRUTH WHILE IT WAS BEING BUILT. A detector
+    // that silently returns [] satisfies `f` perfectly and measures nothing.
+    expect(componentFiles().length).toBeGreaterThan(10);
+    expect(BASELINE_UNSUPPLIED.size).toBeGreaterThan(0);
+
+    // Trap 1 — a JSX tag body cannot be matched up to the first `>`, because
+    // `onContinue={() => {...}}` contains one. Truncating there reported
+    // `BatchStatusPage.onContinue` and `RemovedPage.onRestore` as unsupplied
+    // when both are wired by their containers.
+    const arrow = "<Thing onContinue={() => { go(); }} onRestore={(a) => f(a)} />";
+    expect(openingTagBodies(arrow, 'Thing')).toHaveLength(1);
+    expect(/\bonRestore\s*=/.test(openingTagBodies(arrow, 'Thing')[0] ?? '')).toBe(true);
+
+    // Trap 2 — a prop whose TYPE is a function signature spans lines and
+    // carries its own optional parameters. A line-wise scan read `opts?:`
+    // inside `onRestore`'s type as a prop of the page.
+    expect(optionalPropsOf(['interface XProps {', '  readonly onR?: (', '    o?: number,', '  ) => void;', '}'].join('\n')).sort()).toEqual(['onR']);
+
+    // Trap 3 — a file exports several components and each props interface
+    // belongs to ITS OWN one. Matching every interface to the file's basename
+    // asked `<FilterBar>` about a prop of `<ZeroMatch>`, and reported two
+    // correctly-wired controls as dead.
+    expect(openingTagBodies('<ZeroMatch onClear={c} />', 'FilterBar')).toEqual([]);
+
+    // The positive control: a component mounted without a prop it uses IS
+    // reported, and supplying that prop silences it.
+    expect(unsuppliedIn('interface WProps { readonly hint?: string }', 'W', 'hint', '<W />')).toBe(
+      true,
+    );
+    expect(
+      unsuppliedIn('interface WProps { readonly hint?: string }', 'W', 'hint', '<W hint={x} />'),
+    ).toBe(false);
+    // A spread counts as supplying: `{...props}` may carry it and a gate that
+    // ignored that would fail on correct code and get deleted.
+    expect(
+      unsuppliedIn('interface WProps { readonly hint?: string }', 'W', 'hint', '<W {...rest} />'),
+    ).toBe(false);
   });
 });
