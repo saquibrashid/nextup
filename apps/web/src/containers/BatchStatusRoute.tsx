@@ -45,22 +45,11 @@ export interface BatchStatusRouteProps {
   readonly client?: ApiClient;
   /** Injected so the hidden-tab rule is drivable without a real document. */
   readonly visibility?: () => boolean;
-  /**
-   * Injected so §5.8 is drivable without a real network.
-   *
-   * ⚠ Returns TRUE WHEN ONLINE, matching `navigator.onLine` rather than
-   * inverting it like `visibility`. The two seams read opposite ways because
-   * each mirrors the platform API it stands in for; inverting one to match the
-   * other would make every call site disagree with the DOM property it is
-   * named after.
-   */
-  readonly connectivity?: () => boolean;
 }
 
 export function BatchStatusRoute({
   client = apiClient,
   visibility,
-  connectivity,
 }: BatchStatusRouteProps = {}): JSX.Element {
   const params = useParams();
   const navigate = useNavigate();
@@ -71,11 +60,8 @@ export function BatchStatusRoute({
   const [refused, setRefused] = useState(false);
 
   const isOnline = useCallback(
-    (): boolean =>
-      connectivity === undefined
-        ? typeof navigator === 'undefined' || navigator.onLine !== false
-        : connectivity(),
-    [connectivity],
+    (): boolean => typeof navigator === 'undefined' || navigator.onLine !== false,
+    [],
   );
 
   const [offline, setOffline] = useState(() => !isOnline());

@@ -25,11 +25,18 @@
 import { useEffect, useRef, type JSX } from 'react';
 
 import type { TitleListItem } from './TitleRow';
+import { OFFLINE_DISABLED_REASON } from '../copy';
 
 export type RowMenuChoice = 'suppress' | 'fix-match';
 
 export interface RowMenuProps {
   readonly item: TitleListItem;
+  /**
+   * §2.12 — the list is read-only offline. Both mutating items are disabled
+   * and the reason is stated as visible text; **Cancel** stays live, because
+   * a menu the owner cannot close is worse than one they cannot use.
+   */
+  readonly offline?: boolean;
   readonly onChoose: (choice: RowMenuChoice) => void;
   readonly onDismiss: () => void;
 }
@@ -39,15 +46,21 @@ export const ROW_MENU_SUPPRESS_LABEL = 'Not interested';
 export const ROW_MENU_FIX_MATCH_LABEL = 'Fix match';
 export const ROW_MENU_CANCEL_LABEL = 'Cancel';
 
-export function RowMenu({ item, onChoose, onDismiss }: RowMenuProps): JSX.Element {
+export function RowMenu({ item, offline = false, onChoose, onDismiss }: RowMenuProps): JSX.Element {
   const firstItem = useRef<HTMLButtonElement>(null);
+  const cancelItem = useRef<HTMLButtonElement>(null);
 
   // The menu opens in response to a keyboard or pointer activation, so focus
   // has to follow it: leaving focus on the `⋮` behind an open menu strands a
   // keyboard owner outside the thing they just opened.
+  //
+  // ⚠ OFFLINE THE FIRST ITEM IS DISABLED, and `focus()` on a disabled button
+  // does nothing at all — silently. Focus would stay on the `⋮`, which is the
+  // precise stranding this effect exists to prevent, so the fallback is
+  // **Cancel**: the one item that is still live.
   useEffect(() => {
-    firstItem.current?.focus();
-  }, []);
+    (offline ? cancelItem : firstItem).current?.focus();
+  }, [offline]);
 
   return (
     <div
@@ -65,6 +78,7 @@ export function RowMenu({ item, onChoose, onDismiss }: RowMenuProps): JSX.Elemen
         role="menuitem"
         className="tap-target"
         data-testid="row-menu-suppress"
+        disabled={offline}
         onClick={() => {
           onChoose('suppress');
         }}
@@ -76,15 +90,22 @@ export function RowMenu({ item, onChoose, onDismiss }: RowMenuProps): JSX.Elemen
         role="menuitem"
         className="tap-target"
         data-testid="row-menu-fix-match"
+        disabled={offline}
         onClick={() => {
           onChoose('fix-match');
         }}
       >
         {ROW_MENU_FIX_MATCH_LABEL}
       </button>
+      {offline && (
+        <span className="offline-reason" data-testid="row-menu-offline-reason">
+          {OFFLINE_DISABLED_REASON}
+        </span>
+      )}
       <button
         type="button"
         role="menuitem"
+        ref={cancelItem}
         className="tap-target"
         data-testid="row-menu-cancel"
         onClick={onDismiss}

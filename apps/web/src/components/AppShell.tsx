@@ -21,7 +21,9 @@
 import type { JSX } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 
+import { OfflineBanner } from './OfflineBanner';
 import { TmdbAttribution } from './TmdbAttribution';
+import { useOnline } from '../lib/useOnline';
 import { ROUTES } from '../routes';
 
 const NAV_ITEMS = ROUTES.filter(
@@ -29,6 +31,8 @@ const NAV_ITEMS = ROUTES.filter(
 );
 
 export function AppShell(): JSX.Element {
+  const online = useOnline();
+
   return (
     <div className="app-shell">
       <header>
@@ -47,6 +51,8 @@ export function AppShell(): JSX.Element {
           </ul>
         </nav>
       </header>
+
+      <OfflineBanner offline={!online} />
 
       <main>
         <Outlet />

@@ -30,7 +30,7 @@ import {
 } from '../components/FixMatchDialog';
 import { TitleList } from '../components/TitleList';
 import type { TitleListItem } from '../components/TitleRow';
-import { LIST_LOADING_BODY } from '../copy';
+import { LIST_LOADING_BODY, OFFLINE_NOTHING_LOADED, OFFLINE_SHOWING_CACHED } from '../copy';
 
 export interface ListPageProps {
   readonly items?: readonly TitleListItem[];
@@ -43,6 +43,12 @@ export interface ListPageProps {
   readonly suppressedCount?: number;
   /** True when `GET /api/titles` failed (`ux-states.md` §2.9). */
   readonly loadFailed?: boolean;
+  /**
+   * §2.12 — the connection is gone. The list becomes READ-ONLY: cached rows
+   * stay on screen and are marked as cached, and the row menu's mutating
+   * actions are withheld rather than offered and then failing.
+   */
+  readonly offline?: boolean;
   /**
    * True while the first read is in flight (`ux-states.md` §2.1).
    *
@@ -106,6 +112,7 @@ export function ListPage({
   removedCount = 0,
   suppressedCount = 0,
   loadFailed = false,
+  offline = false,
   loading = false,
   onRetry,
   applied,
@@ -172,11 +179,35 @@ export function ListPage({
       */}
       <FreshnessStrip services={serviceState} />
 
-      {loadFailed ? (
+      {/*
+        §2.12 (`T-UX-023`) — the rows the owner is looking at were loaded
+        before the connection went, and they say so. The banner in `AppShell`
+        states the fact; this states its consequence for what is on screen.
+      */}
+      {offline && items.length > 0 && (
+        <p className="offline-cached-note" data-testid="list-cached-note">
+          {OFFLINE_SHOWING_CACHED}
+        </p>
+      )}
+
+      {loadFailed && !offline ? (
         // ⚠ The filter bar is NOT rendered over a failed read. Its live count
         // would have to invent numbers it does not have, and "Showing 0 of 0"
         // beside "Nothing has changed" contradicts the reassurance.
         <ListLoadError {...(onRetry === undefined ? {} : { onRetry })} />
+      ) : offline && items.length === 0 ? (
+        /*
+          ⚠ §2.12 / `T-UX-023` — OFFLINE WITH NOTHING CACHED IS NOT AN EMPTY
+          LIST, and it is not the generic load failure either. Falling through
+          to the empty state would tell an owner with a full library that they
+          have never uploaded anything, which is the same damaging lie the
+          `loading` branch below exists to prevent — arrived at by a different
+          route. Falling through to `ListLoadError` would blame nextup for the
+          owner's network.
+        */
+        <p role="status" data-testid="list-offline-empty">
+          {OFFLINE_NOTHING_LOADED}
+        </p>
       ) : loading ? (
         // ⚠ Same reasoning as the failure branch, for the same reason: neither
         // the filter counts nor the empty state can tell the truth about data
@@ -207,6 +238,7 @@ export function ListPage({
           {menuFor !== null && (
             <RowMenu
               item={menuFor}
+              offline={offline}
               onDismiss={closeAll}
               onChoose={(choice) => {
                 const item = menuFor;

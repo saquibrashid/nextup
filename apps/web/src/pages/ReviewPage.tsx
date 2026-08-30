@@ -71,6 +71,7 @@ import {
   reviewCounts,
   reviewPendingAdditions,
 } from '../copy';
+import { OFFLINE_DISABLED_REASON } from '../copy';
 
 export interface ReviewPageProps {
   readonly review?: ReviewResponse | null;
@@ -97,6 +98,12 @@ export interface ReviewPageProps {
    * terminal state the batch ends in, not merely a wasted request.
    */
   readonly applying?: boolean;
+  /**
+   * §6.17 — the connection is gone. **Apply changes** and **Discard** are
+   * disabled with the reason as visible text; everything else on the page
+   * keeps working, because dispositions are local until the close.
+   */
+  readonly offline?: boolean;
   /**
    * `specs/ux-states.md` §6.14 (`T-UX-066`) — the candidate ids the server
    * named in a 409 `PENDING_ADDITIONS` when the owner tried to close. Non-null
@@ -291,6 +298,7 @@ export function ReviewPage({
   loadFailed = false,
   applyFailed = false,
   applying = false,
+  offline = false,
   pendingAdditionIds = null,
   reconfirmSignal = 0,
   onRetry,
@@ -579,6 +587,18 @@ export function ReviewPage({
             {reviewPendingAdditions(pendingAdditionIds.length)}
           </p>
         )}
+        {/* ⚠ `specs/ux-states.md` §6.17 (`T-UX-023`). Offline disables the
+            close — it is a `POST` — and states why, as visible text. What it
+            deliberately does NOT do is unmount, reset or discard anything: the
+            dispositions above keep working locally, exactly as §6.17 requires,
+            and are still there on reconnect. An offline state that recovers by
+            throwing away a half-finished review is the data-loss bug
+            `T-UX-024` exists to catch. */}
+        {offline && (
+          <p className="offline-reason" data-testid="review-offline-reason">
+            {OFFLINE_DISABLED_REASON}
+          </p>
+        )}
         <p className="review-action-bar__counts" data-testid="review-counts">
           {reviewCounts(
             sections.additions.count,
@@ -590,7 +610,7 @@ export function ReviewPage({
           type="button"
           className="tap-target"
           data-testid="discard-batch-button"
-          disabled={applying}
+          disabled={applying || offline}
           onClick={onDiscard}
         >
           {REVIEW_DISCARD_LABEL}
@@ -599,7 +619,7 @@ export function ReviewPage({
           type="button"
           className="tap-target"
           data-testid="apply-changes-button"
-          disabled={applying}
+          disabled={applying || offline}
           onClick={() => {
             // ⚠ The dialog is not a formality that can be skipped: without
             // removals there is nothing to confirm and the close goes straight

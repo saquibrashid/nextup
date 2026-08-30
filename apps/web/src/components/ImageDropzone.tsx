@@ -172,6 +172,15 @@ export interface ImageDropzoneProps {
   readonly onFilesAccepted?: (files: readonly File[], source: IngestSource) => void;
   /** Whether service and mode are chosen, so a batch exists (`ux-states.md` §4.0a). */
   readonly batchReady?: boolean;
+  /**
+   * §4.11 — passed to `PasteButton`, which a lost connection disables.
+   *
+   * ⚠ Deliberately NOT applied to the file input or the drop target. §4.11
+   * names submit and paste and nothing else, and the file input is the only
+   * route raw HEIC from iOS Photos can take; withdrawing it offline is a
+   * behaviour no spec asks for.
+   */
+  readonly offline?: boolean;
   /** TASK-161 maps this to the four §4.13–§4.15 messages. */
   readonly onPasteFailed?: (failure: PasteFailure) => void;
   /**
@@ -191,6 +200,7 @@ export interface ImageDropzoneProps {
 export function ImageDropzone({
   onFilesAccepted,
   batchReady = false,
+  offline = false,
   onPasteFailed,
   serverRejected = [],
   touch,
@@ -308,6 +318,7 @@ export function ImageDropzone({
         */}
         <PasteButton
           batchReady={batchReady}
+          offline={offline}
           onImagesPasted={(files) => {
             addFiles(files, 'paste');
           }}

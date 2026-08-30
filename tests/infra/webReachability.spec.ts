@@ -181,6 +181,19 @@ function callForm(method: string): RegExp {
  * omitted it, so a criterion with a green named test had never once held in
  * the running product. `OwnerGate` now supplies it from the 403 envelope, and
  * `T-UX-025h` drives it through the gate rather than the component.
+ *
+ * ⚠ `OwnerGate.client` IS A COLLABORATOR SUBSTITUTION, NOT A DEAD BRANCH —
+ * the one shape this gate over-reports, so the distinction is written down
+ * rather than left to whoever reads the failure next. `connectivity` was
+ * deleted rather than baselined because `navigator.onLine` is drivable
+ * directly by Playwright's `context.setOffline`, which made the seam pure
+ * duplication of a thing the real product already does. An `ApiClient` is
+ * NOT drivable without standing up a server, and `client` defaults to the
+ * real `apiClient`, so the production path runs the same code either way and
+ * there is no branch behind the prop to go dead. The test for the difference:
+ * if the default IS the real collaborator and the prop only swaps its
+ * implementation, baseline it; if the prop GATES behaviour the product would
+ * otherwise never reach, delete it and drive the real thing.
  */
 const BASELINE_UNSUPPLIED = new Set([
   'apps/web/src/components/ImageDropzone.tsx ImageDropzone.onPasteFailed',
@@ -189,6 +202,7 @@ const BASELINE_UNSUPPLIED = new Set([
   'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.disclaimer',
   'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.logoPath',
   'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.omdbDisclaimer',
+  'apps/web/src/containers/OwnerGate.tsx OwnerGate.client',
   'apps/web/src/pages/ReviewPage.tsx ReviewPage.storage',
 ]);
 
@@ -329,7 +343,17 @@ function optionalPropsOf(interfaceSource: string): string[] {
 }
 
 function componentFiles(): string[] {
-  return FILES.filter((f) => /[\\/](components|pages)[\\/]/.test(f));
+  /*
+   * ⚠ `containers` IS IN SCOPE, AND WAS THE GATE'S OWN BLIND SPOT. This
+   * filter read `(components|pages)` until the offline work, so an unsupplied
+   * prop on a route container was invisible to `f` — the one place the defect
+   * is MOST likely, because a container is mounted by `App.tsx` as a bare
+   * element with no attributes at all. Two live instances were found the
+   * moment the directory was added (`AppShell.connectivity`, flagged by CI,
+   * and `BatchStatusRoute.connectivity`, which had sat here unseen); both
+   * were deleted rather than baselined. Do not narrow this back.
+   */
+  return FILES.filter((f) => /[\\/](components|pages|containers)[\\/]/.test(f));
 }
 
 /** Synthetic single-case driver, for the parser guards in `h`. */

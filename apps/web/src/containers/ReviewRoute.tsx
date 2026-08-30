@@ -26,6 +26,7 @@ import {
 } from '../lib/apiClient';
 import { type AppliedBatch } from '../components/BatchAppliedNotice';
 import { useResource } from '../lib/useResource';
+import { useOnline } from '../lib/useOnline';
 import { RefusalPage } from '../pages/RefusalPage';
 import { ReviewPage, type ConfirmableSection } from '../pages/ReviewPage';
 
@@ -72,6 +73,14 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
   const params = useParams();
   const navigate = useNavigate();
   const batchId = params['batchId'] ?? '';
+
+  /*
+   * §6.17 — no refetch on reconnect. The review the owner is working through
+   * is the review they loaded; silently replacing it under them would discard
+   * every disposition they had made while offline, which is exactly the
+   * data-loss `T-UX-024` pairs with `T-UX-023` to prevent.
+   */
+  const online = useOnline();
 
   // Bumped to force a re-read after a bulk confirm. `useResource` keys on a
   // string, so the counter IS the declared identity of "the review, again".
@@ -274,6 +283,7 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
       loadFailed={review.resource.kind === 'failed'}
       applyFailed={applyFailed}
       applying={applying}
+      offline={!online}
       pendingAdditionIds={pendingAdditionIds}
       reconfirmSignal={reconfirmSignal}
       onRetry={review.reload}

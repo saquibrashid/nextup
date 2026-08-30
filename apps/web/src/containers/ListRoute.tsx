@@ -19,6 +19,7 @@ import { type AppliedBatch } from '../components/BatchAppliedNotice';
 import { isFiltered, parseFilters } from '../components/FilterBar';
 import { apiClient, type ApiClient, type TitleListItem } from '../lib/apiClient';
 import { useResource } from '../lib/useResource';
+import { useOnline } from '../lib/useOnline';
 import { ListPage } from '../pages/ListPage';
 import { RefusalPage } from '../pages/RefusalPage';
 
@@ -78,6 +79,15 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
   const applied = parseAppliedState(location.state);
 
   const titles = useResource((signal) => client.getTitles(query, signal), `titles:${query}`);
+
+  /*
+   * §2.12 / `T-UX-024` — the list refetches when the connection returns, so
+   * the cached rows and their "loaded earlier" note give way to live data
+   * without the owner having to reload. Nothing here is owner input, so a
+   * refetch loses nothing; that is why the review route deliberately does
+   * NOT do the same.
+   */
+  const online = useOnline({ onReconnect: titles.reload });
 
   /**
    * The unfiltered rows behind "Showing X of Y" and the genre facet.
@@ -182,6 +192,7 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
       }
       loading={titles.resource.kind === 'loading'}
       loadFailed={titles.resource.kind === 'failed'}
+      offline={!online}
       onRetry={titles.reload}
       /*
         ⚠ THE UNDO CHAIN (US-017 AC-1, §6.13). `applied` is present only on the
