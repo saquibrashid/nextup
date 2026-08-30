@@ -141,11 +141,20 @@ function callForm(method: string): RegExp {
  * - `TmdbAttribution.disclaimer`, `.logoPath`, `.omdbDisclaimer` — the
  *   attribution copy and asset are fixed by TMDB's terms; the props exist so a
  *   test can assert the exact required strings rather than restate them.
+ * - `ImageDropzone.onPasteFailed` — a pure NOTIFICATION seam, not the failure
+ *   UI. ⚠ INVESTIGATED, AND AN EARLIER JUSTIFICATION HERE WAS WRONG: it read
+ *   "a clipboard-read failure is silent in the SPA", which is false.
+ *   `PasteButton` holds its own `rejection` state and renders a
+ *   `role="alert"` carrying `PASTE_DENIED_BODY` / `PASTE_EMPTY_BODY` /
+ *   `PASTE_NOT_IMAGE_BODY` / `PASTE_ABANDONED_BODY`, so `ux-states.md` §4.15
+ *   is satisfied WITHOUT this prop — `T-PASTE-008a`–`h` prove all four paths,
+ *   including that no pending element outlives the promise. The prop exists so
+ *   a future container could observe a failure it does not itself render;
+ *   nothing needs to today. Do not "fix" this by wiring a second, duplicate
+ *   message into a container: that would render the rejection copy twice.
  *
  * Genuinely unwired, each a separately-tracked gap — NOT permission for a
- * fifth:
- * - `ImageDropzone.onPasteFailed` — forwarded to `PasteButton` but supplied by
- *   no container, so a clipboard-read failure is silent in the SPA.
+ * third:
  * - `RemovalConfirmDialog.submitting` — the confirm/cancel buttons never
  *   disable while the removal is in flight. ⚠ INVESTIGATED, AND THE EXPOSURE
  *   IS SMALLER THAN IT LOOKS: `ReviewPage`'s `onConfirm` calls
@@ -160,9 +169,14 @@ function callForm(method: string): RegExp {
  * - `BatchStatusPage.offline` — the offline banner never renders, so a poll
  *   that has stopped because the device dropped off the network is
  *   indistinguishable from one that is merely slow.
- * - `RefusalPage.signedInEmail` — the refusal screen never says WHICH account
- *   was refused, which is precisely the information needed when a personal and
- *   a work identity both resolve through the same `/common` issuer.
+ *
+ * ⚠ `RefusalPage.signedInEmail` WAS HERE AND IS NOW WIRED — left recorded
+ * because of HOW it was missed. `ux-states.md` §2.11 requires the refusal to
+ * name the signed-in account, and `T-UX-025a` asserted exactly that while
+ * hand-supplying the prop to `RefusalPage` in isolation. All nine callers
+ * omitted it, so a criterion with a green named test had never once held in
+ * the running product. `OwnerGate` now supplies it from the 403 envelope, and
+ * `T-UX-025h` drives it through the gate rather than the component.
  */
 const BASELINE_UNSUPPLIED = new Set([
   'apps/web/src/components/ImageDropzone.tsx ImageDropzone.onPasteFailed',
@@ -173,7 +187,6 @@ const BASELINE_UNSUPPLIED = new Set([
   'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.logoPath',
   'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.omdbDisclaimer',
   'apps/web/src/pages/BatchStatusPage.tsx BatchStatusPage.offline',
-  'apps/web/src/pages/RefusalPage.tsx RefusalPage.signedInEmail',
   'apps/web/src/pages/ReviewPage.tsx ReviewPage.storage',
 ]);
 

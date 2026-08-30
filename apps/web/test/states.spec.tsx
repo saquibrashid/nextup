@@ -245,4 +245,43 @@ describe('OwnerGate', () => {
     await userEvent.click(screen.getByRole('button', { name: RETRY_LABEL }));
     expect(attempts).toBeGreaterThan(before);
   });
+
+  it('T-UX-025h · specs/ux-states.md §2.11 · the gate shows WHICH account was refused', async () => {
+    /*
+     * ⚠ THIS IS THE ASSERTION `T-UX-025a` COULD NOT MAKE. That case hands
+     * `signedInEmail` to `RefusalPage` directly, so it proves the component
+     * renders a name it is given — and stayed green for as long as no caller
+     * gave it one. Every one of the nine `<RefusalPage reason="not-allowed" />`
+     * sites omitted the prop, so §2.11's "+ the signed-in email" had never
+     * appeared in the running product.
+     *
+     * The value therefore has to arrive the way it does at runtime: off the
+     * 403 envelope's `details`, through `useResource`'s `refused` payload, and
+     * out of the gate — not as a literal in this file.
+     */
+    render(
+      <OwnerGate
+        client={gateWith(() =>
+          Promise.reject(new RefusedError('Not allowed.', { signedInAs: 'stranger@example.com' })),
+        )}
+      />,
+    );
+
+    expect(await screen.findByText(REFUSAL_NOT_ALLOWED_TITLE)).toBeVisible();
+    expect(screen.getByTestId('refusal-email')).toHaveTextContent('stranger@example.com');
+  });
+
+  it('T-UX-025i · specs/security.md §2.2 · a refusal with no name still refuses, and shows no blank line', async () => {
+    // The name is display-only and optional: a principal without one, or an
+    // envelope from an older build, must still produce a clean refusal rather
+    // than "Signed in as" followed by nothing.
+    render(
+      <OwnerGate
+        client={gateWith(() => Promise.reject(new RefusedError('Not allowed.', { signedInAs: 7 })))}
+      />,
+    );
+
+    expect(await screen.findByText(REFUSAL_NOT_ALLOWED_TITLE)).toBeVisible();
+    expect(screen.queryByTestId('refusal-email')).toBeNull();
+  });
 });

@@ -61,7 +61,15 @@ export class ApiError extends Error {
 export class RefusedError extends Error {
   readonly details: Record<string, unknown>;
 
-  constructor(message: string, details: Record<string, unknown>) {
+  /**
+   * ⚠ `details` DEFAULTS, and the default is load-bearing rather than tidy.
+   * `readEnvelope` always supplies an object, so the wire path cannot omit it
+   * — but this class is constructed by hand in tests and by any future caller
+   * synthesising a refusal, and an `undefined` here reaches every reader of
+   * `details` as a property access on nothing. It took down the whole owner
+   * gate once, which is the one screen that must render when nothing else can.
+   */
+  constructor(message: string, details: Record<string, unknown> = {}) {
     super(message);
     this.name = 'RefusedError';
     this.details = details;

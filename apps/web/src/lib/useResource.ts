@@ -15,10 +15,32 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { RefusedError } from './apiClient';
 
+/**
+ * The `details` key the API decorates a 403 `NOT_ALLOWED` with
+ * (`apps/api/src/middleware/errorEnvelope.ts`).
+ *
+ * ⚠ Narrowed to `string`, not cast. `details` is `Record<string, unknown>` off
+ * the wire; a cast would let a number or an object reach the DOM as `[object
+ * Object]` on the one screen the owner reaches when nothing else works.
+ */
+const SIGNED_IN_AS_DETAIL = 'signedInAs';
+
+function signedInAsFrom(error: RefusedError): string | null {
+  const value = error.details?.[SIGNED_IN_AS_DETAIL];
+  return typeof value === 'string' && value !== '' ? value : null;
+}
+
 export type Resource<T> =
   | { readonly kind: 'loading' }
   | { readonly kind: 'ok'; readonly value: T }
-  | { readonly kind: 'refused' }
+  /**
+   * ⚠ `refused` CARRIES A PAYLOAD, unlike `failed`. `ux-states.md` §2.11
+   * requires the refusal to name the signed-in account, and this is the only
+   * place that fact survives: the refusal is thrown, so the screen never sees
+   * the response body unless the union carries it. `null` when the API did not
+   * supply one — an absent name renders no line at all, never a blank one.
+   */
+  | { readonly kind: 'refused'; readonly signedInAs: string | null }
   | { readonly kind: 'failed' };
 
 export interface UseResource<T> {
@@ -77,7 +99,11 @@ export function useResource<T>(
         // screen as broken in development — and only in development.
         if (controller.signal.aborted) return;
         if (!live) return;
-        setResource(error instanceof RefusedError ? { kind: 'refused' } : { kind: 'failed' });
+        setResource(
+          error instanceof RefusedError
+            ? { kind: 'refused', signedInAs: signedInAsFrom(error) }
+            : { kind: 'failed' },
+        );
       },
     );
 

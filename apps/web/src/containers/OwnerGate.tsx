@@ -54,8 +54,15 @@ export function OwnerGate({ client = apiClient }: OwnerGateProps = {}): JSX.Elem
       return <App />;
 
     // 403 `NOT_ALLOWED` — authenticated, but not the owner (US-001 AC-4).
+    // ⚠ The email is supplied HERE, and this is the only site that has to
+    // supply it. The eight per-container `<RefusalPage reason="not-allowed" />`
+    // fallbacks sit behind this gate and cannot be reached by a refused
+    // account, because the gate runs before the router mounts. Until this
+    // line existed, `specs/ux-states.md` §2.11's "+ the signed-in email" was
+    // asserted only by a test that hand-supplied the prop, so the product had
+    // never once shown it.
     case 'refused':
-      return <RefusalPage reason="not-allowed" />;
+      return <RefusalPage reason="not-allowed" signedInEmail={me.resource.signedInAs} />;
 
     /*
      * ⚠ CHROME-FREE, like the refusal itself. A spinner inside the shell would
