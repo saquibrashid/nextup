@@ -15,9 +15,20 @@
  * SCOPE — this rule sees one file at a time, so it enforces:
  *   1. the id prefix on every test title, and
  *   2. uniqueness WITHIN a file.
- * Cross-file uniqueness and the AC->test mapping are enforced by `T-META-001`
- * (TASK-126), which parses the whole suite. Both halves are needed; neither
- * subsumes the other.
+ * Cross-file uniqueness of SUFFIXED ids is enforced by `T-META-008`
+ * (`tests/infra/testIdUniqueness.spec.ts`), and the AC->test mapping by
+ * `T-META-001` (TASK-126), which parses the whole suite. All three are needed;
+ * none subsumes the others.
+ *
+ * ⚠ Corrected in place, because this is a claim a reader acts on. It read:
+ * ~~"Cross-file uniqueness and the AC->test mapping are enforced by
+ * `T-META-001` (TASK-126), which parses the whole suite. Both halves are
+ * needed; neither subsumes the other."~~ `T-META-001` maps ACs to test ids; it
+ * has never checked that a suffixed id is used only once. So cross-file
+ * uniqueness was documented as guaranteed, assigned to a named owner, and
+ * enforced by nothing — and 65 collisions accumulated behind the guarantee,
+ * including `T-AI-036b`, which names "issues both legs in parallel" in one
+ * file and "a missing OCR leg is NOT degraded" in another.
  */
 
 'use strict';
