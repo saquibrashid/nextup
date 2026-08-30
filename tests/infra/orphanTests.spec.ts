@@ -96,10 +96,28 @@ describe('T-META-006 — every defined test id is owned', () => {
     // ⚠ The whole gate collapses if the baseline can absorb tomorrow's orphan:
     // "add it to the list" is always the cheapest way to make a failing gate
     // pass, and it reinstates exactly the silence the gate exists to break.
-    // 60 is the count measured when the gate was introduced. Lowering this
-    // number is the work of assigning a criterion to a task; RAISING it is
-    // never correct.
-    expect(BASELINE_ORPHANS.size).toBeLessThanOrEqual(60);
+    //
+    // ⚠ THIS ASSERTION IS EXACT, AND IT IS EXACT BECAUSE THE INEQUALITY FAILED
+    // IN PRODUCTION. It used to read `toBeLessThanOrEqual(60)` — "60 is the
+    // count measured when the gate was introduced". The baseline was then
+    // worked down to 26 and the ceiling never followed it, leaving THIRTY-FOUR
+    // free slots. A test named "may only shrink" permitted growth for as long
+    // as that headroom lasted, and it was used: PR #134 added `T-UX-099` and
+    // CI stayed green. A high-water mark is not a ratchet.
+    //
+    // So: pin it. Lowering this number is the work of assigning a criterion to
+    // a task and is always welcome; raising it is never correct. An exact
+    // match also fails when the set SHRINKS without this constant being
+    // updated, which is deliberate — it is the same both-directions discipline
+    // `KNOWN_UNMAPPED` and `KNOWN_PHANTOM_CITATIONS` use, and it is what stops
+    // the bound drifting away from reality a second time.
+    //
+    // 21 → 30 in the same change that sharpened `implementedTestIds` to title
+    // position. That is the ONE legitimate growth reason — a detector that got
+    // stricter surfaces gaps that were always there — and the nine ids carry
+    // their own justification at the point they are listed. Growth for any
+    // other reason is the failure mode described above.
+    expect(BASELINE_ORPHANS.size).toBe(30);
   });
 
   it('T-META-006f: a citation that is struck through does not count as ownership', () => {
@@ -117,15 +135,18 @@ describe('T-META-006 — every defined test id is owned', () => {
     // hand. `resolvedBaselineIds` is what tells the next implementer which
     // entries are now dead weight.
     //
-    // ⚠ The id is read from the set rather than written as a literal. The
-    // walker credits any mention of an id in a spec FILE, so naming a real
-    // baseline entry here would mark it implemented — by this very test — and
-    // the live gate would report it as removable when nothing had built it.
-    // Observed with a hard-coded undo criterion; and then observed a SECOND
-    // time, because the comment recording the first observation still named
-    // the id. Documenting a phantom must not promote it, which is the same
-    // trap `check-test-ids.mjs` records for its own definition scan. Hence no
-    // real id appears anywhere in this file, comments included.
+    // ⚠ The id is read from the set rather than written as a literal. This
+    // began as a hard requirement: the walker used to credit ANY mention of an
+    // id in a spec FILE, so naming a real baseline entry here would mark it
+    // implemented — by this very test — and the live gate would report it as
+    // removable when nothing had built it. Observed with a hard-coded undo
+    // criterion; and then observed a SECOND time, because the comment
+    // recording the first observation still named the id.
+    //
+    // The walker now counts only title position (`T-META-006i`), so a literal
+    // here would no longer promote anything. The indirection stays anyway: it
+    // costs nothing, it survives the predicate being loosened again, and the
+    // failure it prevents is silent.
     const victim = [...BASELINE_ORPHANS][0] as string;
     plantSuite(victim);
     expect(
@@ -142,5 +163,39 @@ describe('T-META-006 — every defined test id is owned', () => {
     writeFileSync(path.join(dir, 'notes.md'), 'T-FAKE-002 is mentioned here', 'utf8');
     writeFileSync(path.join(dir, 'impl.ts'), '// T-FAKE-003 in a source comment', 'utf8');
     expect(implementedTestIds(scratch).size).toBe(0);
+  });
+
+  it('T-META-006i: an id that only appears as a literal in a spec file is not credited', () => {
+    // ⚠ THE DISCRIMINATING CASE FOR THE WHOLE OWNERSHIP NOTION, AND THE ONE
+    // THAT WAS MISSING WHILE THE GATE REPORTED THE OPPOSITE OF THE TRUTH.
+    //
+    // Gates in this repo record their known gaps as arrays of id literals
+    // inside `.spec.ts` files. Under a bare-occurrence walk, such a literal was
+    // read as an implementation — so writing down "this id has no test" was
+    // itself what made the id look tested, and four real gaps sat invisible
+    // behind their own baseline entries.
+    //
+    // `006d` cannot catch this: it plants a genuine `it()` and both predicates
+    // credit it. Only the negative half discriminates.
+    const dir = path.join(scratch, 'test');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      path.join(dir, 'baseline.spec.ts'),
+      [
+        "const KNOWN_GAPS = ['T-FAKE-001', 'T-FAKE-004'];",
+        '// T-FAKE-005 is discussed in a comment, which is also not a test.',
+        "it('T-FAKE-006: a real one', () => { expect(KNOWN_GAPS).toBeTruthy(); });",
+      ].join('\n'),
+      'utf8',
+    );
+
+    const implemented = implementedTestIds(scratch);
+    expect([...implemented].sort()).toEqual(['T-FAKE-006']);
+
+    // And the consequence that matters: a defined id recorded only as such a
+    // literal is still reported as an orphan.
+    expect(
+      orphanedTestIds(backlogCiting('`T-OTHER-001`'), specDefining('T-FAKE-001'), scratch),
+    ).toEqual(['T-FAKE-001']);
   });
 });
