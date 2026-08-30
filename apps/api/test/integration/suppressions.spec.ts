@@ -560,8 +560,7 @@ describe('TASK-106 · `GET /api/suppressions` and `/unsuppress` against the real
     expect(second?.unsuppressedAt?.toISOString()).toBe(first?.unsuppressedAt?.toISOString());
   });
 
-  it('T-SUP-021n · NFR-008 · a foreign suppression id answers 404 and writes nothing', async () => {
-    const { title } = await seedTitle({ ownerId: otherOwner, workIdentity: 'tmdb:movie:708' });
+  it('T-SUP-021n · NFR-008 · a foreign suppression id answers 404 and writes nothing', async () => {    const { title } = await seedTitle({ ownerId: otherOwner, workIdentity: 'tmdb:movie:708' });
     await suppress(title.id, OTHER_SUBJECT);
     const [item] = await listSuppressions(OTHER_SUBJECT);
 
@@ -570,5 +569,81 @@ describe('TASK-106 · `GET /api/suppressions` and `/unsuppress` against the real
 
     const row = await testPrisma().suppression.findFirst({ where: { ownerId: otherOwner } });
     expect(row?.active).toBe(true);
+  });
+
+  /* ── US-029 AC-3/AC-4 (T-SUP-022 / T-SUP-023) ─────────────────────────
+   *
+   * ⚠ These two criteria had written test ids and no tests — they sat in
+   * `BASELINE_ORPHANS` while the `T-SUP-021*` cases grew up around them. The
+   * pair is what makes un-suppression HONEST: AC-3 is the half owners expect
+   * (the row comes back), AC-4 is the half they do not (it comes back only if
+   * it never left). Testing one without the other is how "un-suppress" ends up
+   * quietly meaning "restore".
+   */
+
+  it('T-SUP-022 · US-029 AC-3 · un-suppressing a work with ACTIVE listings makes the row visible again', async () => {
+    const { title, listings } = await seedTitle({
+      workIdentity: 'tmdb:movie:722',
+      name: 'Visible Again',
+      services: ['netflix', 'max'],
+    });
+
+    await suppress(title.id);
+    // Stated positively first, so the "returns" assertion below cannot pass on
+    // a list that never filtered anything.
+    expect((await listTitles()).some((t) => t.titleId === title.id)).toBe(false);
+
+    const [item] = await listSuppressions();
+    const res = await unsuppress(item?.suppressionId ?? '');
+    expect(res.status).toBe(200);
+    // ⚠ `restoredAnything` stays FALSE even here, where the row does come
+    // back. Visibility is the anti-join lifting, not a restore, and the field
+    // is a plain statement of that (`specs/api.md` §6.8) rather than a status
+    // that happens to be false today.
+    expect((await res.json()) as { restoredAnything: boolean }).toMatchObject({
+      restoredAnything: false,
+    });
+
+    const after = await listTitles();
+    const back = after.find((t) => t.titleId === title.id);
+    expect(back).toBeDefined();
+    // BOTH badges, not just the one the suppression happened to be pressed
+    // from: suppression is keyed on the work, so lifting it must return the
+    // whole row (US-027 AC-5's mirror image).
+    expect(back?.badges.map((badge) => badge.service).sort()).toEqual(['max', 'netflix']);
+    expect(listings).toHaveLength(2);
+  });
+
+  it('T-SUP-023 · US-029 AC-4 · un-suppressing a work whose listings are ALL removed restores nothing', async () => {
+    const { title, listings, batch } = await seedTitle({
+      workIdentity: 'tmdb:movie:723',
+      name: 'Still Gone',
+      services: ['netflix', 'max'],
+    });
+    await suppress(title.id);
+    for (const listing of listings) {
+      await softDeleteServiceListing(owner, listing.listingId, {
+        removedAt: new Date(),
+        removedByBatchId: batch.id,
+      });
+    }
+
+    const [item] = await listSuppressions();
+    const res = await unsuppress(item?.suppressionId ?? '');
+    expect(res.status).toBe(200);
+    expect((await res.json()) as { restoredAnything: boolean }).toMatchObject({
+      restoredAnything: false,
+    });
+
+    // Every listing is still removed, and the work is still off the list. The
+    // owner is told this in `UNSUPPRESS_CONFIRM_BODY`; `T-UI-010q` asserts the
+    // copy half, this is the half that makes the copy true.
+    for (const listing of listings) {
+      const row = await testPrisma().serviceListing.findFirst({
+        where: { listingId: listing.listingId },
+      });
+      expect(row?.state).toBe('removed');
+    }
+    expect((await listTitles()).some((t) => t.titleId === title.id)).toBe(false);
   });
 });

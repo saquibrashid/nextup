@@ -104,9 +104,9 @@ export const BASELINE_ORPHANS = new Set([
   // identical 409 and passes `T-RES-013`.
   'T-RET-010',
   'T-REV-015',
-  'T-SUP-015',
-  'T-SUP-022',
-  'T-SUP-023',
+  // ⚠ `T-SUP-015`, `T-SUP-022` and `T-SUP-023` were REMOVED from this baseline:
+  // implemented in `suppressionLifecycle.spec.ts` (015a/b) and
+  // `suppressions.spec.ts` (022, 023), each mutation-tested.
   // ⚠ `T-UNDO-011`, `T-UNDO-012`, `T-UX-053`, `T-UX-054` and `T-UX-062` were
   // REMOVED from this baseline — the gate reported all five as owned, and each
   // is now implemented in TITLE position, which is this file's own strict

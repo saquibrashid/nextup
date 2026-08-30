@@ -744,3 +744,57 @@ describe('T-SUP-006 · US-028 AC-6′ · unmatched works are suppressible and fl
     expect(byIdentity.get(DUNE)).toBe('stable');
   });
 });
+
+describe('T-SUP-015 · US-028 AC-4 · suppression follows the IDENTITY, so a re-match escapes it', () => {
+  it('T-SUP-015a · the same work under a DIFFERENT tmdb identity is not gated', async () => {
+    // ⚠ THIS TEST ASSERTS A LIMITATION, NOT A FEATURE, AND THAT IS WHY IT HAS
+    // TO EXIST. Suppression is keyed on canonical work identity (REQ-071,
+    // product invariant 1) — the one design that survives a suppressed work
+    // reappearing as a brand-new row. The cost is that if the pipeline later
+    // matches the same physical work to a DIFFERENT TMDB entry, the old
+    // suppression does not reach the new identity, and the title the owner
+    // dismissed comes back.
+    //
+    // The remedy is fix-match migration (`T-FIX-005`), which moves the active
+    // suppression to the corrected identity. Writing this behaviour down as a
+    // test is what stops someone "fixing" it with a fuzzy or name-based match
+    // — which would gate works the owner never dismissed, silently, with no
+    // record of a row that was never created (`T-SUP-003c`).
+    const { titleId, listingId } = await makeActiveTitle(DUNE, 'netflix', 'Dune');
+    await suppressWork(titleId);
+    await removeFromService(titleId, listingId);
+
+    // The next capture reads the same tile, but the match resolves elsewhere.
+    const batchId = await makeBatch();
+    await makeConfirmedCandidate(batchId, HEAT, 'Dune');
+
+    const review = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(review.sections.additions.count).toBe(1);
+
+    const summary = ((await (await close(batchId)).json()) as CloseBody).summary;
+    expect(summary.suppressedGated).toBe(0);
+    expect(summary.titlesCreated).toBe(1);
+    expect((await countsFor(HEAT)).active).toBe(1);
+  });
+
+  it('T-SUP-015b · the ORIGINAL identity stays suppressed throughout', async () => {
+    // The other half. Without it, `015a` is also satisfied by a suppression
+    // that simply stopped working — the far worse defect, and the one that
+    // looks identical from the summary.
+    const { titleId, listingId } = await makeActiveTitle(DUNE, 'netflix', 'Dune');
+    await suppressWork(titleId);
+    await removeFromService(titleId, listingId);
+
+    const escaped = await makeBatch();
+    await makeConfirmedCandidate(escaped, HEAT, 'Dune');
+    await close(escaped);
+
+    const again = await makeBatch();
+    await makeConfirmedCandidate(again, DUNE, 'Dune');
+    const summary = ((await (await close(again)).json()) as CloseBody).summary;
+
+    expect(summary.suppressedGated).toBe(1);
+    expect(summary.titlesCreated).toBe(0);
+    expect((await countsFor(DUNE)).active).toBe(0);
+  });
+});
