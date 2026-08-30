@@ -288,14 +288,15 @@ describe('T-STATUS-001 · the task status ledger and its gate', () => {
     // replaced one of them and was in turn delivered by TASK-065, so it moved
     // on to `T-SUP-003`, which TASK-103 then delivered, and on again to
     // `T-IMG-017` (unbuilt) — `T-PERF-001` was tried first and rejected by
-    // this very assertion, which is the gate working. The other probe is
-    // `T-PASTE-010` (TASK-164, unbuilt).
+    // this very assertion, which is the gate working. The other probe was
+    // `T-PASTE-010`, which TASK-164 then delivered, so it moved on to
+    // `T-UX-068` (`ux-states.md` §6.17, unbuilt).
     // If it fails that way again, the fix is to move the probe to another
     // undelivered id, NEVER to relax the assertion.
     const defined = collectDefinedTestIds();
 
     // Both appear as fixtures in tools/eslint-rules/test-id-naming.spec.ts.
-    for (const probe of ['T-IMG-017', 'T-PASTE-010']) {
+    for (const probe of ['T-IMG-017', 'T-UX-068']) {
       expect(
         mentionedTestIds().has(probe),
         `${probe} is no longer mentioned anywhere, so it cannot probe anything`,
