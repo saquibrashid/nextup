@@ -68,6 +68,7 @@ import {
   REVIEW_RETRY_LABEL,
   REVIEW_SECTION_EMPTY,
   REVIEW_TITLE,
+  reviewCounts,
   reviewPendingAdditions,
 } from '../copy';
 
@@ -579,7 +580,11 @@ export function ReviewPage({
           </p>
         )}
         <p className="review-action-bar__counts" data-testid="review-counts">
-          {`${sections.additions.count} to add · ${sections.removals.count} to remove`}
+          {reviewCounts(
+            sections.additions.count,
+            sections.removals.count,
+            pendingIn(sections.additions.items) + pendingIn(sections.unmatched.items),
+          )}
         </p>
         <button
           type="button"

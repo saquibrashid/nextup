@@ -29,11 +29,13 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   buildReviewResponse,
+  pendingAdditionIds,
   type BuildReviewInput,
   type ReviewCandidate,
   type ReviewMatch,
 } from '@nextup/domain';
 
+import { reviewStorageKey } from '../src/lib/reviewDispositions';
 import { ReviewPage } from '../src/pages/ReviewPage';
 
 function match(overrides: Partial<ReviewMatch> = {}): ReviewMatch {
@@ -256,6 +258,134 @@ describe('T-UX-011 · specs/ui.md §5.4 SD-11d · the action bar is STICKY', () 
     for (const button of within(bar).getAllByRole('button')) {
       expect(button).toHaveClass('tap-target');
     }
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `T-UX-062` — `specs/ux-states.md` §6.7 partial review: the action bar reads
+ * *"9 to add · 3 to remove · 2 still to review"*.
+ *
+ * ⚠ **THE THIRD CLAUSE WAS MISSING AND IT IS THE LOAD-BEARING ONE.** The bar
+ * shipped reading only "N to add · M to remove" — the two numbers that say what
+ * a close would WRITE. Neither says whether the close will be ACCEPTED, and
+ * `closeBatch` refuses the whole batch with 409 `PENDING_ADDITIONS` while any
+ * decidable candidate is still `pending`. The owner's only way to discover an
+ * undecided card was therefore to press **Apply changes** and be refused, which
+ * is the §6.14 error state doing the job §6.7 exists to make unnecessary.
+ *
+ * ⚠ **THE COUNT IS ASSERTED AGAINST THE SERVER'S OWN GATE, NOT AGAINST A
+ * LITERAL.** `T-UX-062e` runs `pendingAdditionIds` — the exact function
+ * `closeBatch` calls — over the same fixture and requires the rendered number
+ * to equal its length. A hand-written expectation would go on agreeing after
+ * the gate's definition of "pending" changed, which is the one way this number
+ * can become a confident lie.
+ */
+describe('T-UX-062 · specs/ux-states.md §6.7 · the bar reports what is still undecided', () => {
+  /** Two additions and one unmatched row, each independently decidable. */
+  function partial(dispositions: {
+    readonly first: ReviewCandidate['disposition'];
+    readonly second: ReviewCandidate['disposition'];
+    readonly unmatched: ReviewCandidate['disposition'];
+  }) {
+    return {
+      candidates: [
+        candidate({ candidateId: 'cand_1', disposition: dispositions.first }),
+        candidate({
+          candidateId: 'cand_2',
+          rawText: 'ARRIVAL',
+          inferredTitle: 'Arrival',
+          resolvedWorkIdentity: 'tmdb:movie:329865',
+          match: match({ tmdbId: 329865, name: 'Arrival', releaseYear: 2016 }),
+          disposition: dispositions.second,
+        }),
+        candidate({
+          candidateId: 'cand_3',
+          rawText: 'SOME UNREADABLE THING',
+          inferredTitle: 'Some unreadable thing',
+          resolvedWorkIdentity: null,
+          match: null,
+          disposition: dispositions.unmatched,
+        }),
+      ],
+    } satisfies Partial<BuildReviewInput>;
+  }
+
+  it('T-UX-062a: undecided additions are reported as "still to review"', () => {
+    render(
+      <ReviewPage
+        review={review(partial({ first: 'pending', second: 'pending', unmatched: 'confirmed' }))}
+      />,
+    );
+
+    expect(screen.getByTestId('review-counts')).toHaveTextContent('2 still to review');
+  });
+
+  it('T-UX-062b: an undecided UNMATCHED row counts too — the close gate counts it', () => {
+    // ⚠ NOT A COMPLETENESS FLOURISH. `CLOSE_DECIDABLE_SECTIONS` is
+    // `['additions', 'unmatched']`, so a bar that counted additions alone would
+    // read "0 still to review" on a batch the server is about to refuse — a
+    // number that is worse than absent, because it is confidently wrong.
+    render(
+      <ReviewPage
+        review={review(partial({ first: 'confirmed', second: 'confirmed', unmatched: 'pending' }))}
+      />,
+    );
+
+    expect(screen.getByTestId('review-counts')).toHaveTextContent('1 still to review');
+  });
+
+  it('T-UX-062c: with everything decided the clause is ABSENT, not "0 still to review"', () => {
+    // §6.7 is the PARTIAL-review state. With nothing outstanding there is
+    // nothing to report, and a permanent "0 still to review" would train the
+    // owner to read past the one clause that ever needs their attention.
+    render(
+      <ReviewPage
+        review={review(
+          partial({ first: 'confirmed', second: 'discarded', unmatched: 'confirmed' }),
+        )}
+      />,
+    );
+
+    const counts = screen.getByTestId('review-counts');
+    expect(counts).toHaveTextContent('2 to add');
+    expect(counts.textContent).not.toContain('still to review');
+  });
+
+  it('T-UX-062d: a local (SD-11e) decision is reflected before the server has it', () => {
+    // The owner's presses are cached locally and the container refetches after
+    // them; a count read from `disposition` alone would sit at its old value
+    // through the whole gap, which is exactly when the owner is watching it.
+    const storage = new Map<string, string>();
+    const view = review(partial({ first: 'pending', second: 'pending', unmatched: 'pending' }));
+    storage.set(
+      reviewStorageKey(view.batchId),
+      JSON.stringify({ cand_1: 'confirmed', cand_3: 'discarded' }),
+    );
+
+    render(
+      <ReviewPage
+        review={view}
+        storage={{
+          getItem: (key) => storage.get(key) ?? null,
+          setItem: (key, value) => storage.set(key, value),
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('review-counts')).toHaveTextContent('1 still to review');
+  });
+
+  it('T-UX-062e: the number EQUALS what the server\u2019s close gate would refuse on', () => {
+    const input = partial({ first: 'pending', second: 'confirmed', unmatched: 'pending' });
+    const expected = pendingAdditionIds(input.candidates).length;
+
+    render(<ReviewPage review={review(input)} />);
+
+    // The gate's own answer, not a literal — see the block note above.
+    expect(expected).toBeGreaterThan(0);
+    expect(screen.getByTestId('review-counts')).toHaveTextContent(`${expected} still to review`);
   });
 });
 
