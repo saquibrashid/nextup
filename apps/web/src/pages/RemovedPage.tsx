@@ -232,15 +232,18 @@ function RestoreControl({
 
   if (state.phase === 'idle') {
     return (
-      <button
-        type="button"
-        className="tap-target"
-        data-testid="restore-button"
-        disabled={offline}
-        onClick={() => void attemptRestore()}
-      >
-        {RESTORE_LABEL}
-      </button>
+      <>
+        <button
+          type="button"
+          className="tap-target"
+          data-testid="restore-button"
+          disabled={offline}
+          onClick={() => void attemptRestore()}
+        >
+          {RESTORE_LABEL}
+        </button>
+        {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
+      </>
     );
   }
 
@@ -260,10 +263,12 @@ function RestoreControl({
           type="button"
           className="tap-target"
           data-testid="restore-keep-both"
+          disabled={offline}
           onClick={() => void attemptRestore(true)}
         >
           {RESTORE_DUPLICATE_KEEP_BOTH}
         </button>
+        {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
         <button
           type="button"
           className="tap-target"
@@ -284,10 +289,12 @@ function RestoreControl({
           type="button"
           className="tap-target"
           data-testid="restore-unsuppress-action"
+          disabled={offline}
           onClick={() => void doUnsuppressAndRetry()}
         >
           {RESTORE_SUPPRESSED_ACTION}
         </button>
+        {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
         <button
           type="button"
           className="tap-target"
@@ -308,10 +315,12 @@ function RestoreControl({
           type="button"
           className="tap-target"
           data-testid="restore-refresh"
+          disabled={offline}
           onClick={() => window.location.reload()}
         >
           {RESTORE_ALREADY_ACTIVE_REFRESH}
         </button>
+        {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
       </div>
     );
   }
@@ -373,7 +382,6 @@ function RemovedRow({
           onDismiss={onDismiss}
           offline={offline}
         />
-        {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
       </div>
     </li>
   );

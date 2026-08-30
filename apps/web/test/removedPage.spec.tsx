@@ -611,7 +611,7 @@ describe('409 LISTING_NOT_REMOVED — T-UX-076', () => {
   });
 
   describe('offline state — T-UX-003 / §7.11', () => {
-    it('T-UX-003e: restore is disabled offline with a visible reason, and rows remain readable', async () => {
+    it('T-UX-003h: restore is disabled offline with a visible reason, and rows remain readable', async () => {
       setNavigatorOnline(true);
       render(
         <RemovedPage
@@ -638,6 +638,134 @@ describe('409 LISTING_NOT_REMOVED — T-UX-076', () => {
         expect(screen.getByTestId('restore-button')).toBeEnabled();
       });
       expect(screen.queryByText(OFFLINE_DISABLED_REASON)).not.toBeInTheDocument();
+    });
+
+    it('T-UX-003i: Keep both is disabled if duplicate confirmation is already open when the network drops', async () => {
+      setNavigatorOnline(true);
+      const onRestore = vi.fn().mockRejectedValue(apiError('DUPLICATE_WORK_IDENTITY', 'Duplicate'));
+
+      render(
+        <RemovedPage
+          items={[removed({ name: 'The Matrix' })]}
+          onRestore={onRestore}
+          onUnsuppress={() => Promise.resolve()}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId('restore-button'));
+      await screen.findByTestId('restore-duplicate-dialog');
+      expect(screen.getByTestId('restore-keep-both')).toBeEnabled();
+
+      setNavigatorOnline(false);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('restore-keep-both')).toBeDisabled();
+      });
+      expect(screen.getByText(OFFLINE_DISABLED_REASON)).toBeVisible();
+      expect(screen.getByTestId('restore-duplicate-cancel')).toBeEnabled();
+
+      setNavigatorOnline(true);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('restore-keep-both')).toBeEnabled();
+      });
+      expect(screen.queryByText(OFFLINE_DISABLED_REASON)).not.toBeInTheDocument();
+    });
+
+    it('T-UX-003j: Stop ignoring and continue is disabled if the suppressed dialog is already open when the network drops', async () => {
+      setNavigatorOnline(true);
+      const onRestore = vi.fn().mockRejectedValue(
+        apiError('WORK_SUPPRESSED', 'Suppressed', {
+          unsuppressHref: '/api/suppressions/sup_99/unsuppress',
+        }),
+      );
+
+      render(
+        <RemovedPage
+          items={[removed({ name: 'The Matrix' })]}
+          onRestore={onRestore}
+          onUnsuppress={() => Promise.resolve()}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId('restore-button'));
+      await screen.findByTestId('restore-suppressed-dialog');
+      expect(screen.getByTestId('restore-unsuppress-action')).toBeEnabled();
+
+      setNavigatorOnline(false);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('restore-unsuppress-action')).toBeDisabled();
+      });
+      expect(screen.getByText(OFFLINE_DISABLED_REASON)).toBeVisible();
+      expect(screen.getByTestId('restore-suppressed-cancel')).toBeEnabled();
+
+      setNavigatorOnline(true);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('restore-unsuppress-action')).toBeEnabled();
+      });
+      expect(screen.queryByText(OFFLINE_DISABLED_REASON)).not.toBeInTheDocument();
+    });
+
+    it('T-UX-003k: an in-flight restore keeps its submitting state and shows no offline reason', async () => {
+      setNavigatorOnline(true);
+      const onRestore = vi.fn(
+        () =>
+          new Promise<RestoreResponse>(() => {
+            /* keep the row in the submitting state */
+          }),
+      );
+
+      render(
+        <RemovedPage
+          items={[removed()]}
+          onRestore={onRestore}
+          onUnsuppress={() => Promise.resolve()}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId('restore-button'));
+      expect(await screen.findByTestId('restore-submitting')).toHaveTextContent(
+        RESTORE_SUBMITTING_LABEL,
+      );
+
+      setNavigatorOnline(false);
+
+      expect(screen.getByTestId('restore-submitting')).toHaveTextContent(RESTORE_SUBMITTING_LABEL);
+      expect(screen.queryByText(OFFLINE_DISABLED_REASON)).not.toBeInTheDocument();
+    });
+
+    it('T-UX-003l: Refresh is disabled offline because it would trigger a document reload', async () => {
+      setNavigatorOnline(true);
+      const onRestore = vi
+        .fn()
+        .mockRejectedValue(apiError('LISTING_NOT_REMOVED', 'Already active'));
+
+      render(
+        <RemovedPage
+          items={[removed({ name: 'The Matrix' })]}
+          onRestore={onRestore}
+          onUnsuppress={() => Promise.resolve()}
+        />,
+      );
+
+      await userEvent.click(screen.getByTestId('restore-button'));
+      await screen.findByTestId('restore-already-active');
+      expect(screen.getByTestId('restore-refresh')).toBeEnabled();
+
+      setNavigatorOnline(false);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('restore-refresh')).toBeDisabled();
+      });
+      expect(screen.getByText(OFFLINE_DISABLED_REASON)).toBeVisible();
+
+      setNavigatorOnline(true);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('restore-refresh')).toBeEnabled();
+      });
     });
   });
 });
