@@ -71,28 +71,73 @@ updates:
       # typescript-eslint/typescript-eslint#10940.
       - dependency-name: 'typescript'
         versions: ['>=7.0.0 <7.1.0']
-      # Prisma 7 is a migration, not a bump. Verified locally on 2026-08-18 by
-      # taking `prisma` and `@prisma/client` to 7.9.1 together: `prisma
-      # generate` fails outright with P1012 — "The datasource property `url` is
-      # no longer supported in schema files." v7 moves the connection URL to a
-      # new `prisma.config.ts` and requires a DRIVER ADAPTER passed to the
-      # PrismaClient constructor for a direct connection.
+      # Prisma 7 is a migration, not a bump — and as of 2026-08-25 it is held
+      # for a REASON THAT IS NOT ABOUT EFFORT. Measured on a full v7 branch
+      # (`prisma`, `@prisma/client`, `@prisma/adapter-mssql` all at 7.9.1)
+      # against a real `mcr.microsoft.com/mssql/server:2022-latest`:
       #
-      # For nextup that means, at minimum: a new `prisma.config.ts`; a new
-      # runtime dependency on the SQL Server driver adapter (which needs an
-      # NFR-004 justification and an entry in the `tools/check-deps.mjs`
-      # allow-list); every PrismaClient construction site rewritten; and the
-      # migrate steps in CI and in `deploy.yml` revalidated against a live
-      # Azure SQL database. Grouping alone does NOT make it green.
+      #   • THE RUNTIME IS FINE. All 36 integration files / 550 tests pass on
+      #     v7, including the batch-close/undo transactions, the filtered
+      #     unique indexes, the CHECK constraints and the BIN2 collation. The
+      #     load-bearing duplicate-refusal mapping still works: v7 surfaces the
+      #     2627/2601 duplicate as Prisma `P2002` and `isUniqueViolation()`
+      #     catches it. So "it does not work" is NOT the objection.
+      #
+      #   • ⚠ THE OBJECTION IS THE PRODUCTION DEPENDENCY TREE. On v7,
+      #     `@prisma/client` pulls `prisma` into the PRODUCTION tree, which
+      #     pulls `mysql2` and `pg` — a MySQL driver and a PostgreSQL driver
+      #     shipped in a SQL-Server-only application (NFR-004). Worse, one of
+      #     them, `seq-queue@0.0.5` (via `mysql2`), declares NO `license` field
+      #     AT ALL — independently confirmed against the registry packument,
+      #     not just taken from the gate's output. `T-LICENSE-001d` goes red,
+      #     and correctly: an unlicensed package in the production tree of a
+      #     public repository is a legal exposure, not a gate annoyance. It
+      #     must not be silenced with a notices exception.
+      #
+      #   • The mechanical work is real but small and already scouted: v7
+      #     rejects `url = env("DATABASE_URL")` in the schema (`P1012`) and
+      #     wants a root `prisma.config.ts`; `prisma migrate diff
+      #     --from-schema-datasource` became `--from-config-datasource` in
+      #     `ci.yml`; and the CLI no longer auto-loads env vars, so the migrate
+      #     steps need their environment supplied explicitly.
+      #
+      #   • ⚠ Also observed and worth knowing before anyone debugs it: on v7 a
+      #     CHECK-constraint violation is MISLABELLED as "Foreign key
+      #     constraint violated on the constraint: <ck_name>". Harmless to the
+      #     tests (they assert rejection) and actively misleading in a log.
       #
       # There is no pressure to take it: v6 carries no advisory, and the audit
       # exception in `tools/check-audit.mjs` exists because npm's suggested
       # "fix" for GHSA-ggr8-5vv4-36mx is a prisma DOWNGRADE.
-      # UNBLOCKED BY: a dedicated task that does the adapter migration against
-      # a real Azure SQL database, with T-MIG-001 still passing.
+      # UNBLOCKED BY: `mysql2`/`pg` leaving the v7 production tree (or Prisma
+      # making them optional), which is what makes the licence regression go
+      # away. The schema/config migration is then a day's work, not a blocker.
+      #
+      # ~~Superseded (the effort estimate was right in spirit, wrong in
+      # detail): "requires a DRIVER ADAPTER passed to the PrismaClient
+      # constructor ... every PrismaClient construction site rewritten."~~ This
+      # repo has used `@prisma/adapter-mssql` since ADR-0005 Rev 3, so the
+      # adapter already exists and NO construction site needed rewriting on the
+      # v7 branch; removing `url` alone let the schema validate and generate.
       - dependency-name: 'prisma'
         update-types: ['version-update:semver-major']
       - dependency-name: '@prisma/client'
+        update-types: ['version-update:semver-major']
+      # ⚠ The adapter was MISSING from this list, which is the whole reason a
+      # v7 adapter PR could be raised at all while `prisma` and
+      # `@prisma/client` were held. It is the same migration: the `prisma`
+      # group makes them move together, and an ignore that covers two of three
+      # group members holds nothing.
+      - dependency-name: '@prisma/adapter-mssql'
+        update-types: ['version-update:semver-major']
+      # `@types/mssql` must track the `mssql` major actually installed, which
+      # `@prisma/adapter-mssql` chooses for us (v6 → `mssql@11`, v7 →
+      # `mssql@^12`). Floating the types to 12 against an `mssql@11` runtime
+      # type-checks this code against an API it will not meet at run time — the
+      # same failure shape as the `@types/node` entry above, and the same
+      # reason it is not merely "out of date".
+      # UNBLOCKED BY: the Prisma 7 migration above, which brings `mssql@12`.
+      - dependency-name: '@types/mssql'
         update-types: ['version-update:semver-major']
 
   # GitHub Actions used by the workflows.
