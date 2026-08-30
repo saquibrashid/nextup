@@ -25,14 +25,15 @@
  * change, not a code change, and is left to the owner.
  */
 
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { RemovedPage, removalOrdinalLabel, formatDateShort } from '../src/pages/RemovedPage';
 import type { RemovedItem, RestoreResponse } from '../src/lib/apiClient';
 import { ApiError } from '../src/lib/apiClient';
 import {
+  OFFLINE_DISABLED_REASON,
   REMOVED_CLEAR_SEARCH_LABEL,
   REMOVED_EMPTY_BODY,
   REMOVED_EMPTY_TITLE,
@@ -48,6 +49,18 @@ import {
   RESTORE_SUPPRESSED_BODY,
   RETRY_LABEL,
 } from '../src/copy';
+
+function setNavigatorOnline(online: boolean): void {
+  Object.defineProperty(window.navigator, 'onLine', {
+    configurable: true,
+    get: () => online,
+  });
+  fireEvent(window, new Event(online ? 'online' : 'offline'));
+}
+
+afterEach(() => {
+  setNavigatorOnline(true);
+});
 
 function removed(overrides: Partial<RemovedItem> = {}): RemovedItem {
   return {
@@ -579,5 +592,36 @@ describe('409 LISTING_NOT_REMOVED — T-UX-076', () => {
     const el = await screen.findByTestId('restore-already-active');
     expect(el.textContent).toContain(RESTORE_ALREADY_ACTIVE.replace('{name}', 'The Matrix'));
     expect(screen.getByTestId('restore-refresh')).toBeInTheDocument();
+  });
+
+  describe('offline state — T-UX-003 / §7.11', () => {
+    it('T-UX-003e: restore is disabled offline with a visible reason, and rows remain readable', async () => {
+      setNavigatorOnline(true);
+      render(
+        <RemovedPage
+          items={[removed()]}
+          onRestore={() => Promise.resolve(restoreResponse())}
+          onUnsuppress={() => Promise.resolve()}
+        />,
+      );
+
+      expect(screen.getByTestId('removed-name')).toHaveTextContent('The Matrix');
+      expect(screen.getByTestId('restore-button')).toBeEnabled();
+
+      setNavigatorOnline(false);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('restore-button')).toBeDisabled();
+      });
+      expect(screen.getByText(OFFLINE_DISABLED_REASON)).toBeVisible();
+      expect(screen.getByTestId('removed-name')).toHaveTextContent('The Matrix');
+
+      setNavigatorOnline(true);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('restore-button')).toBeEnabled();
+      });
+      expect(screen.queryByText(OFFLINE_DISABLED_REASON)).not.toBeInTheDocument();
+    });
   });
 });
