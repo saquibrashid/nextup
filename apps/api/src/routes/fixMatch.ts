@@ -38,11 +38,7 @@
 import { type MediaType, MEDIA_TYPES, suppressionIdFor, workIdentityForTmdb } from '@nextup/domain';
 import { type Router } from 'express';
 
-import {
-  type TmdbClient,
-  TmdbUnavailableError,
-  TmdbWorkNotFoundError,
-} from '../clients/tmdbClient.js';
+import { type TmdbClient, TmdbWorkNotFoundError } from '../clients/tmdbClient.js';
 import { AppError } from '../errors/AppError.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import {
@@ -54,7 +50,7 @@ import {
   updateTitle,
 } from '../repository/ownerData.js';
 import { toDisplaySnapshot } from './suppressions.js';
-import { TMDB_UNAVAILABLE_MESSAGE } from './tmdb.js';
+import { tmdbUnavailableAppError } from './tmdb.js';
 import { toIsoDate } from './titles.js';
 
 export interface FixMatchRequest {
@@ -249,11 +245,10 @@ export function registerFixMatchRoutes(router: Router, getClient: () => TmdbClie
           mediaType,
         });
       }
-      // The upstream text never reaches the owner: a fetch failure message can
-      // carry the request URL, and the TMDB URL carries the API key.
-      if (error instanceof TmdbUnavailableError) {
-        throw new AppError('TMDB_UNAVAILABLE', 502, TMDB_UNAVAILABLE_MESSAGE);
-      }
+      // An outage is a 502. The mapping is the shared one in `tmdb.ts`, so this
+      // route and every other TMDB-reaching route cannot drift apart.
+      const mapped = tmdbUnavailableAppError(error);
+      if (mapped) throw mapped;
       throw error;
     }
 

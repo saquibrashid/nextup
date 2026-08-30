@@ -48,7 +48,7 @@ import {
   updateCandidateDisposition,
 } from '../repository/ownerData.js';
 import { loadReviewCandidates } from './batchReview.js';
-import { TMDB_UNAVAILABLE_MESSAGE } from './tmdb.js';
+import { tmdbUnavailableAppError } from './tmdb.js';
 
 /** Loads the batch and refuses anything that is not open for review. */
 async function requireReviewableBatch(
@@ -239,14 +239,32 @@ export function registerBatchCandidateRoutes(
 
     const patch = unwrap<CandidatePatch>(parseCandidatePatch(req.body));
 
-    if (patch.kind === 'disposition') {
-      await updateCandidateDisposition(ownerId, candidateId, {
-        reviewDisposition: patch.disposition,
-      });
-    } else if (patch.kind === 'corrected') {
-      await applyCorrection(ownerId, candidateId, batch.service as Service, patch);
-    } else {
-      await applyReclassify(ownerId, candidateId, row, getTmdbClient);
+    // ⚠ ROUTE-LEVEL TMDB NET. A `TmdbUnavailableError` that reaches this
+    // handler becomes 502 `TMDB_UNAVAILABLE`, IDENTICALLY to `/tmdb/search`
+    // and via the SAME shared mapper — never the generic 500 the envelope
+    // gives an unrecognised throw. Today `applyReclassify` swallows the only
+    // such error on this route by design (an outage during a rescue leaves the
+    // item unmatched and the batch reviewable — `T-AI-017a`), so this net is
+    // not reached on the reclassify path. It exists because that swallow is
+    // one `return` away from being removed by a well-meaning refactor, which
+    // would otherwise turn a routine third-party outage into an opaque 500 on
+    // a route the owner uses mid-review. The `instanceof` check is what keeps
+    // it precise: a database failure here is NOT a TMDB outage and must stay a
+    // 500, so the mapper returns `null` for it and the error re-throws.
+    try {
+      if (patch.kind === 'disposition') {
+        await updateCandidateDisposition(ownerId, candidateId, {
+          reviewDisposition: patch.disposition,
+        });
+      } else if (patch.kind === 'corrected') {
+        await applyCorrection(ownerId, candidateId, batch.service as Service, patch);
+      } else {
+        await applyReclassify(ownerId, candidateId, row, getTmdbClient);
+      }
+    } catch (error) {
+      const mapped = tmdbUnavailableAppError(error);
+      if (mapped) throw mapped;
+      throw error;
     }
 
     const updated = await findExtractionCandidate(ownerId, candidateId);
@@ -363,11 +381,10 @@ export function registerBatchCandidateRoutes(
           mediaType: entry.mediaType,
         });
       }
-      // The upstream text never reaches the owner: a fetch failure message can
-      // carry the request URL, and the TMDB URL carries the API key.
-      if (error instanceof TmdbUnavailableError) {
-        throw new AppError('TMDB_UNAVAILABLE', 502, TMDB_UNAVAILABLE_MESSAGE);
-      }
+      // An outage is a 502 and the entry is simply not made. The mapping is the
+      // shared one in `tmdb.ts`, so this route and `/tmdb/search` cannot drift.
+      const mapped = tmdbUnavailableAppError(error);
+      if (mapped) throw mapped;
       throw error;
     }
 
