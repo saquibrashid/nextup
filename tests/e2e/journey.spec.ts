@@ -14,6 +14,29 @@ import {
 } from '@nextup/domain';
 
 import { REMOVAL_CONFIRM_LABEL, REVIEW_APPLY_LABEL, SUBMIT_LABEL } from '../../apps/web/src/copy';
+// ⚠ TYPE-ONLY, and that is load-bearing (Part 2). These are the SPA's own
+// statement of the response contracts; annotating the stub's builders with them
+// turns a server-side shape change into a typecheck failure in THIS file rather
+// than a silent pass against a fiction. `import type` is fully erased by
+// Playwright's esbuild loader, so there is no runtime coupling and no second
+// server — exactly the boundary Part 2 point 3 draws. See `tsconfig.json` beside
+// this file for how the alarm is actually run.
+import type {
+  AddImagesResult,
+  BatchStatus,
+  CloseBatchResult,
+  ConfirmAllResult,
+  CreatedBatch,
+  MeResponse,
+  RemovedItem,
+  RemovedResponse,
+  ServiceFreshness,
+  ServiceStateResponse,
+  SuppressionItem,
+  SuppressionsResponse,
+  TitleListItem,
+  TitleListResponse,
+} from '../../apps/web/src/lib/apiClient';
 
 /**
  * `T-E2E-001` — the single most valuable test in the suite (`specs/testing.md`
@@ -37,6 +60,67 @@ import { REMOVAL_CONFIRM_LABEL, REVIEW_APPLY_LABEL, SUBMIT_LABEL } from '../../a
  * ⚠ The stub is the backend, not a canned reply. Every review/close/list read
  * is computed from mutable state, so an assertion that would pass under a
  * row-id-keyed suppression, or a non-transactional close, genuinely fails.
+ *
+ * ───────────────────────────────────────────────────────────────────────────
+ * WHAT THIS FILE PROVES, AND WHAT IT ONLY *EXERCISES* — READ BEFORE TRUSTING IT
+ * ───────────────────────────────────────────────────────────────────────────
+ *
+ * ⚠ A stateful stub is a SECOND IMPLEMENTATION of the server. Every behaviour
+ * that only the stub enforces is a place where this e2e can stay GREEN while
+ * the real API is BROKEN. That is not a reason to undo the stub — a canned
+ * reply cannot express "reappearance vs suppression" at all, because that
+ * distinction only exists across batches — it is a reason to BOUND it, in
+ * writing, here.
+ *
+ * PROVEN HERE (these exercise the REAL SPA — the built `apps/web/dist` served
+ * by `vite preview` — so a regression in the front end fails this test):
+ *   • routing and navigation across /upload, /batches/:id/review, /, /removed,
+ *     /not-interested;
+ *   • the review sections — additions expanded, already-on-list collapsed with
+ *     a visible count, removals shown ticked, the append-only omissions;
+ *   • the removal-confirm DIALOG gate (Apply opens it; nothing is removed until
+ *     it is confirmed as a group);
+ *   • the rendered dates — a removed row shows its ORIGINAL dateAdded, a
+ *     reappearance shows TODAY — as PAINTED by the SPA, not as sent;
+ *   • the client-side hide of a just-suppressed row, and the freshness label.
+ *
+ * NOT PROVEN HERE — ENFORCED BY THE STUB, so a real-API regression is invisible
+ * to this file. Each is owned by an integration test that drives the real
+ * server (`specs/testing.md` §6, the non-negotiable core):
+ *   • REQ-071 — suppression keyed on WORK IDENTITY, surviving removal and
+ *     reappearance. Here the stub's `reconcile`/`titlesResponse` drop a
+ *     suppressed work; the identity KEYING itself is `T-SUP-003` (US-028 AC-3,
+ *     §6 row 4). The step-7 arrival-vs-dune CONTRAST is the most this file can
+ *     honestly show — a row-id-keyed server would still pass a naive
+ *     "dune is hidden" check.
+ *   • REQ-057 — a full-update review shows ALL extracted titles (reconcile by
+ *     ABSENCE, "already on your list" populated), so a failed extraction is
+ *     never misread as a removal. The stub computes it; the server contract is
+ *     `T-REV-006` (US-013 AC-6, §6 row 2).
+ *   • The removed view is never DE-DUPLICATED and each removal keeps its own
+ *     original date — the stub emits one row per removed listing; the server
+ *     contract is `T-REM-006` (US-024 AC-6, §6 row 3).
+ *   • Removals ticked-by-default and confirmed as ONE group — the stub ticks
+ *     and gates; the server contract is `T-UI-007`/`T-UI-008` (§6 row 9).
+ *   • The close is TRANSACTIONAL, soft-delete-forever, no TTL — the stub mutates
+ *     atomically in memory; the real guarantees are `T-INV-012`/`T-INV-013`
+ *     (§6 rows 7–8).
+ *
+ * ⚠ THE CONCRETE FAILURE MODE, so the next person does not have to imagine it:
+ * delete the server-side suppression filter in `apps/api` and EVERY e2e here
+ * stays green, because the stub still filters — while the owner's "not
+ * interested" decision has silently stopped working in production. Product
+ * invariant 1 exists because that class of defect has already been
+ * designed-around once in this project. This file is the LAST place that
+ * catches it, not the first.
+ *
+ * ⚠ DRIFT ALARM (Part 2): the response builders below are annotated with the
+ * SPA's own contract types (`@nextup/domain`, `apps/web/src/lib/apiClient`), so
+ * a server-side shape change fails `tsc --noEmit -p tests/e2e/tsconfig.json`
+ * instead of passing against a fiction. That tsconfig is NOT yet in
+ * `npm run typecheck` (root `tsc --build` never references `tests/**`); wiring
+ * it in is a one-line root-`tsconfig.json` change this lane must not make. See
+ * the TASK-094/TASK-108 findings in `docs/backlog.md`.
  */
 
 // ── The works catalogue ─────────────────────────────────────────────────────
@@ -327,7 +411,7 @@ function reviewResponse(be: Backend, batch: BatchRuntime): ReviewResponse {
   };
 }
 
-function titlesResponse(be: Backend) {
+function titlesResponse(be: Backend): TitleListResponse {
   const active = be.listings.filter((l) => l.state === 'active' && !isSuppressed(be, l.workId));
   const byWork = new Map<string, Listing[]>();
   for (const l of active) {
@@ -336,7 +420,7 @@ function titlesResponse(be: Backend) {
     byWork.set(l.workId, list);
   }
   const items = [...byWork.entries()]
-    .map(([workId, listings]) => {
+    .map(([workId, listings]): TitleListItem => {
       const w = work(workId);
       const sortDateAdded = listings.map((l) => l.dateAdded).reduce((a, b) => (a < b ? a : b));
       return {
@@ -359,12 +443,15 @@ function titlesResponse(be: Backend) {
         imdbRating: null,
       };
     })
-    // Newest-first, the product default (REQ-038).
-    .sort((a, b) => (a.sortDateAdded < b.sortDateAdded ? 1 : -1));
+    // Newest-first, the product default (REQ-038). `sortDateAdded` is
+    // `string | null` on the real contract (a title with no non-removed
+    // listing has no date); the stub always dates its rows, so a nullish guard
+    // keeps the comparator total without inventing an ordering.
+    .sort((a, b) => ((a.sortDateAdded ?? '') < (b.sortDateAdded ?? '') ? 1 : -1));
   return { items, nextCursor: null, limit: 50 };
 }
 
-function removedResponse(be: Backend) {
+function removedResponse(be: Backend): RemovedResponse {
   const removed = be.listings.filter((l) => l.state === 'removed');
   const byWork = new Map<string, Listing[]>();
   for (const l of removed) {
@@ -372,7 +459,7 @@ function removedResponse(be: Backend) {
     list.push(l);
     byWork.set(l.workId, list);
   }
-  const items = removed.map((l) => {
+  const items = removed.map((l): RemovedItem => {
     const peers = (byWork.get(l.workId) ?? [])
       .slice()
       .sort((a, b) => (a.removedAt ?? '').localeCompare(b.removedAt ?? ''));
@@ -401,8 +488,8 @@ function removedResponse(be: Backend) {
   return { items, nextCursor: null };
 }
 
-function suppressionsResponse(be: Backend) {
-  const items = [...be.suppressions.values()].map((s) => {
+function suppressionsResponse(be: Backend): SuppressionsResponse {
+  const items = [...be.suppressions.values()].map((s): SuppressionItem => {
     const w = work(s.workId);
     return {
       suppressionId: s.suppressionId,
@@ -421,8 +508,8 @@ function suppressionsResponse(be: Backend) {
   return { items };
 }
 
-function serviceStateResponse(be: Backend) {
-  const services = (['netflix', 'max'] as Service[]).map((svc) => {
+function serviceStateResponse(be: Backend): ServiceStateResponse {
+  const services = (['netflix', 'max'] as Service[]).map((svc): ServiceFreshness => {
     const completedAt = be.lastCompletedAt[svc] ?? null;
     const ageDays = completedAt !== null ? 0 : null;
     return {
@@ -436,9 +523,9 @@ function serviceStateResponse(be: Backend) {
   return { services };
 }
 
-function batchStatusResponse(batch: BatchRuntime) {
+function batchStatusResponse(batch: BatchRuntime): BatchStatus {
   const inReview = batch.submitted && batch.statusReads >= 2;
-  return {
+  const status: BatchStatus = {
     batchId: batch.batchId,
     service: batch.plan.service,
     mode: batch.plan.mode,
@@ -458,13 +545,18 @@ function batchStatusResponse(batch: BatchRuntime) {
     })),
     extractionError: null,
     lowYield: false,
-    progress: inReview ? undefined : { imagesDone: 1, imagesTotal: 3 },
     degradedExtraction: false,
     crossCheck: 'ok',
     provenance: { created: [], modified: [], removed: [] },
     changedNothing: true,
     titles: [],
   };
+  // ⚠ `progress` is OMITTED, not set to `undefined`, while in review — the
+  // §6.15 field is present only while extracting, and `exactOptionalPropertyTypes`
+  // (via the drift-alarm tsconfig) makes the difference a typecheck error, which
+  // is the contract the real API honours.
+  if (!inReview) status.progress = { imagesDone: 1, imagesTotal: 3 };
+  return status;
 }
 
 interface CloseOutcome {
@@ -538,20 +630,18 @@ function closeBatch(be: Backend, batch: BatchRuntime, confirmRemovals: boolean):
   be.lastCompletedAt[plan.service] = iso(TODAY);
   be.lastCompletedBatchId[plan.service] = batch.batchId;
 
-  return {
-    status: 200,
-    body: {
-      batchId: batch.batchId,
-      status: 'closed',
-      summary: {
-        listingsCreated: additionIds.length,
-        listingsRemoved: removalListings.length,
-        removalGroupId,
-      },
-      serviceState: { service: plan.service },
-      undoable: removalListings.length === 0,
+  const body: CloseBatchResult = {
+    batchId: batch.batchId,
+    status: 'closed',
+    summary: {
+      listingsCreated: additionIds.length,
+      listingsRemoved: removalListings.length,
+      removalGroupId,
     },
+    serviceState: { service: plan.service },
+    undoable: removalListings.length === 0,
   };
+  return { status: 200, body };
 }
 
 // ── The router ──────────────────────────────────────────────────────────────
@@ -574,14 +664,13 @@ async function stubBackend(page: Page, be: Backend): Promise<void> {
     const method = request.method();
 
     if (method === 'GET' && path === '/api/me') {
-      await route.fulfill(
-        ok({
-          ownerId: 'owner-e2e',
-          displayName: 'Owner',
-          signOutUrl: '/.auth/logout',
-          attribution: null,
-        }),
-      );
+      const me: MeResponse = {
+        ownerId: 'owner-e2e',
+        displayName: 'Owner',
+        signOutUrl: '/.auth/logout',
+        attribution: null,
+      };
+      await route.fulfill(ok(me));
       return;
     }
 
@@ -619,13 +708,14 @@ async function stubBackend(page: Page, be: Backend): Promise<void> {
         closed: false,
       });
       be.createdBodies.push(request.postDataJSON());
-      await fulfillJson(route, 201, {
+      const created: CreatedBatch = {
         batchId,
         service: plan.service,
         mode: plan.mode,
         status: 'open',
         createdAt: iso(TODAY),
-      });
+      };
+      await fulfillJson(route, 201, created);
       return;
     }
 
@@ -679,14 +769,15 @@ async function stubBackend(page: Page, be: Backend): Promise<void> {
       }
 
       if (method === 'POST' && suffix === '/images') {
-        await fulfillJson(route, 201, {
+        const result: AddImagesResult = {
           accepted: [1, 2, 3].map((n) => ({
             imageId: `img_${String(n)}`,
             fileName: `${batch.plan.service}-golden-${String(n)}.png`,
           })),
           rejected: [],
           batchTotals: { imageCount: 3, uploadedByteSize: 300, storedByteSize: 300 },
-        });
+        };
+        await fulfillJson(route, 201, result);
         return;
       }
 
@@ -711,9 +802,12 @@ async function stubBackend(page: Page, be: Backend): Promise<void> {
         be.confirmAllBodies.push(request.postDataJSON());
         batch.confirmedAdditions = true;
         const { additionIds } = reconcile(be, batch);
-        await route.fulfill(
-          ok({ section: 'additions', confirmed: additionIds.length, skipped: 0 }),
-        );
+        const result: ConfirmAllResult = {
+          section: 'additions',
+          confirmed: additionIds.length,
+          skipped: 0,
+        };
+        await route.fulfill(ok(result));
         return;
       }
 
@@ -978,8 +1072,25 @@ test('T-E2E-001: a first full update, a reconcile with removals, a suppression, 
     removedArrival2.getByTestId('removed-date-added'),
     'the logged removal keeps its original date after the reappearance',
   ).toHaveText(LABEL_B1);
-  // ⚠ FINDING: `specs/testing.md` §5 step 7 names an ordinal "Removal 1 of 1",
-  // but `RemovedPage.removalOrdinalLabel` suppresses the chip for a single
-  // removal (total <= 1), so no ordinal renders here. Recorded on TASK-108.
+  // ⚠ FINDING (Part 3), reported not worked around — a spec-vs-implementation
+  // conflict on the ordinal chip for a SINGLE removal:
+  //   • `specs/testing.md` §5 step 7 (authoritative AC→test mapping, NFR-003)
+  //     explicitly requires /removed to show "Removal 1 of 1" here;
+  //   • `specs/ui.md` (§ "/removed") lists the ordinal chip as a per-row
+  //     element and its example is "Removal 2 of 3" — silent on the singleton,
+  //     if anything implying every row carries one;
+  //   • `specs/ux-states.md` §7.5 says only "with ordinal chips" — silent on
+  //     the singleton;
+  //   • `RemovedPage.removalOrdinalLabel` returns null when
+  //     `removalTotalForWork <= 1` (citing "§7.5", which does not state it), so
+  //     NO ordinal renders for a work removed exactly once.
+  // The design specs do not specify the singleton suppression, so it is not
+  // "specified behaviour" this test can simply ratify; making the ordinal
+  // render for a singleton is a `RemovedPage` change this lane must not make,
+  // and forcing a second removal purely to light up the chip would bend the
+  // owner's actual path (the parent chose the finding over that coverage). The
+  // assertion therefore pins the SHIPPED behaviour (no chip for a singleton) so
+  // a regression is still caught, and the conflict is recorded on TASK-108 for
+  // the owner to reconcile.
   await expect(removedArrival2.getByTestId('removed-ordinal')).toHaveCount(0);
 });
