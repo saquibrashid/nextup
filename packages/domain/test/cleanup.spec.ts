@@ -2,6 +2,7 @@
  * TASK-057 — stage-2 deterministic clean-up (`specs/ai.md` §3).
  *
  * Test ids: `T-AI-004` (every verdict represented, nothing dropped),
+ * `T-AI-032` (unsupported primary-reader inferences are visibly flagged),
  * `T-AI-043` (a truncated caption resolves to the complete work while
  * `rawText` keeps the ellipsis).
  *
@@ -178,6 +179,33 @@ describe('cleanup — classify and surface, never drop (T-AI-004)', () => {
   it('T-AI-004l is pure — the same input classifies identically twice', () => {
     const items = [llm(), ocr({ rawText: 'Top 10', boundingBox: box(0.5, 0.5) })];
     expect(cleanup(items, { now: NOW })).toEqual(cleanup(items, { now: NOW }));
+  });
+});
+
+describe('unsupported inferences (T-AI-032)', () => {
+  it('T-AI-032a flags every LLM item with no OCR support as inferred-unverified', () => {
+    const out = cleanup(
+      [
+        llm({ rawText: '', inferredTitle: 'The Last of Us', basis: 'artwork', ocrSupport: 'none' }),
+        llm({ rawText: 'Visible text', inferredTitle: 'Invented Work', ocrSupport: 'none' }),
+      ],
+      { now: NOW },
+    );
+
+    expect(out.map((candidate) => candidate.cleanupVerdict)).toEqual([
+      'inferred-unverified',
+      'inferred-unverified',
+    ]);
+  });
+
+  it('T-AI-032b does not flag unchecked or corroborated primary-reader items as fabricated', () => {
+    expect(
+      verdicts([
+        llm({ ocrSupport: 'not-checked' }),
+        llm({ rawText: 'The Crwon', inferredTitle: 'The Crown', ocrSupport: 'partial' }),
+        llm({ ocrSupport: 'exact' }),
+      ]),
+    ).toEqual(['title-candidate', 'title-candidate', 'title-candidate']);
   });
 });
 
