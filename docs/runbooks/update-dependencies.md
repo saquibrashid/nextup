@@ -73,7 +73,9 @@ PR body — dependabot closes its own PR once the same version reaches `main`.
   6 → 7 changes the database adapter, and nothing in the unit or web suites
   touches a real database. It needs the integration project against
   `mcr.microsoft.com/mssql/server:2022-latest` (`specs/testing.md` §3.3a),
-  on its own branch, where a failure names the bump that caused it.
+  on its own branch, where a failure names the bump that caused it. ⚠ **That
+  investigation has been done and the answer was no** — see §5, and do not
+  redo it from scratch.
 - **A type package that pairs with a runtime package.** Bump `@types/mssql`
   with the adapter, never apart from it: types that disagree with the
   implementation are worse than types that lag it, because `tsc` will
@@ -109,3 +111,56 @@ npm run notices
 
 Then re-run the gates in §3. Do not pin a transitive dependency by hand in
 `package-lock.json` — the next `npm install` will undo it silently.
+
+## 5. Held bumps — investigated, and deliberately not taken
+
+A bump that was tried and rejected is **more valuable written down than a bump
+nobody looked at**, because the next person to see the red PR will otherwise
+spend the same day rediscovering it. Every entry here names the evidence and
+the condition that would change the answer.
+
+### Prisma 7 (`prisma`, `@prisma/client`, `@prisma/adapter-mssql`) — HELD
+
+Measured on a full v7 branch against a real
+`mcr.microsoft.com/mssql/server:2022-latest`, not reasoned about:
+
+- **The runtime is fine.** All 36 integration files / 550 tests pass on v7 —
+  the batch-close and undo transactions, the filtered unique indexes, the
+  `CHECK` constraints, the `Latin1_General_100_BIN2` collation. The
+  load-bearing duplicate-refusal mapping still works: v7 surfaces the SQL
+  Server `2627`/`2601` duplicate as Prisma `P2002`, and `isUniqueViolation()`
+  catches it. **"It does not work" is not the objection.**
+- ⚠ **The objection is the production dependency tree.** On v7,
+  `@prisma/client` pulls `prisma` into the **production** tree, which pulls
+  **`mysql2` and `pg`** — a MySQL driver and a PostgreSQL driver shipped in a
+  SQL-Server-only application (NFR-004). One of them, **`seq-queue@0.0.5`** via
+  `mysql2`, declares **no `license` field at all** (confirmed against the
+  registry packument, not merely read off the gate's output), so
+  `T-LICENSE-001d` goes red — correctly. An unlicensed package in the
+  production tree of a **public** repository is a legal exposure, not a gate
+  annoyance. ⚠ **Do not silence it with a notices exception.**
+- The mechanical work is real but small, and already scouted: v7 rejects
+  `url = env("DATABASE_URL")` in `prisma/schema.prisma` (`P1012`) and wants a
+  root `prisma.config.ts`; `prisma migrate diff --from-schema-datasource`
+  became `--from-config-datasource` in `ci.yml`; and the v7 CLI no longer
+  auto-loads env vars, so the migrate steps must be given their environment
+  explicitly. **No `PrismaClient` construction site needs rewriting** — this
+  repo has passed a driver adapter since ADR-0005 Rev 3.
+- ⚠ Worth knowing before anyone debugs it: on v7 a **`CHECK`-constraint
+  violation is mislabelled** as `Foreign key constraint violated on the
+  constraint: <ck_name>`. Harmless to the tests, which assert rejection, and
+  actively misleading in a log.
+
+There is no pressure to take it. v6 carries no advisory, and the audit
+exception in `tools/check-audit.mjs` exists precisely because npm's suggested
+"fix" for `GHSA-ggr8-5vv4-36mx` is a prisma **downgrade**.
+
+**Unblocked by:** `mysql2`/`pg` leaving the v7 production tree, or Prisma making
+them optional. That is what removes the licence regression; the schema and
+config migration is then a day's work rather than a blocker.
+
+**Enforced by** the `ignore` entries in `.github/dependabot.yml`, which now
+cover all three `prisma`-group members plus `@types/mssql`. ⚠ The adapter was
+originally **missing** from that list, which is the only reason a v7 adapter PR
+could be raised while the other two were held: an ignore that covers two of a
+group's three members holds nothing.
