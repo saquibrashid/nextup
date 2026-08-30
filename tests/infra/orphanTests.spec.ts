@@ -114,10 +114,16 @@ describe('T-META-006 — every defined test id is owned', () => {
     //
     // 21 → 30 in the same change that sharpened `implementedTestIds` to title
     // position. That is the ONE legitimate growth reason — a detector that got
-    // stricter surfaces gaps that were always there — and the nine ids carry
-    // their own justification at the point they are listed. Growth for any
-    // other reason is the failure mode described above.
-    expect(BASELINE_ORPHANS.size).toBe(29);
+    // stricter surfaces gaps that were always there — and the ids carry their
+    // own justification at the point they are listed. Growth for any other
+    // reason is the failure mode described above.
+    //
+    // 29 → 24: `T-UNDO-011`, `T-UNDO-012`, `T-UX-053`, `T-UX-054` and
+    // `T-UX-062` are now implemented in title position and were removed from
+    // the baseline. This is the direction the comment above calls "always
+    // welcome", and the exact match is what forced this constant to be updated
+    // in the same change rather than drifting.
+    expect(BASELINE_ORPHANS.size).toBe(24);
   });
 
   it('T-META-006f: a citation that is struck through does not count as ownership', () => {
