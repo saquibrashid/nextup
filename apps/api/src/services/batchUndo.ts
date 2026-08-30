@@ -2,15 +2,13 @@
  * TASK-112 — `POST /api/batches/:batchId/undo`, creates-only
  * (`specs/api.md` §6.25, `specs/data-model.md` §8.3, SD-03, REQ-067, US-032).
  *
- * ⚠ SCOPE. This module implements the CREATES-ONLY undo and the two lifecycle
- * refusals (`BATCH_ALREADY_UNDONE`, `BATCH_NOT_APPLIED`). The §8.4 refusal
- * ENUMERATION — every created/modified/removed entry with its per-item remedy
- * and `truncated: false` — is TASK-114, and the `later-owner-edits` detection
- * is TASK-113. Until those land, a non-creates-only batch is refused with the
- * right code and the right `reason` but a `details` payload carrying only the
- * batch id. That is deliberately visible rather than silently absent: the
- * refusal is a FEATURE (REQ-075), not an error path, and shipping it as a bare
- * 409 with no marker would leave nothing for the later task to find.
+ * ⚠ SCOPE. This module implements the CREATES-ONLY undo, the two lifecycle
+ * refusals (`BATCH_ALREADY_UNDONE`, `BATCH_NOT_APPLIED`), and the §8.4 refusal
+ * ENUMERATION (TASK-114, REQ-075, US-033) — every created/modified/removed
+ * entry with its per-item remedy, per-title `currentState`, and
+ * `truncated: false`. The `later-owner-edits` detection (TASK-113) is NOT here:
+ * it is not decidable from provenance alone, is owner-gated, and its literal is
+ * kept in the `reason` union only so the shape does not change when it lands.
  *
  * ⚠ THE WHOLE UNDO IS ONE TRANSACTION. Discarding titles, discarding listings,
  * re-deriving survivors, moving the batch to `undone` and reverting
@@ -22,21 +20,27 @@
  */
 
 import {
+  createsOnlyRefusalReason,
   deriveSortDateAdded,
   deriveTitleState,
   isCreatesOnly,
   planCreatesOnlyUndo,
   toBatchProvenance,
 } from '@nextup/domain';
+import type { BatchProvenance } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
 import {
   type Db,
   type OwnerId,
+  countBatchCreatedEffects,
   findPreviousAppliedBatch,
   findUploadBatch,
+  listActiveSuppressions,
   listBatchChanges,
   listListingsForTitle,
+  listServiceListingStatesByIds,
+  listTitleDisplaysByIds,
   runInTransaction,
   transitionUploadBatchStatus,
   updateTitle,
@@ -87,16 +91,37 @@ export async function undoBatch(ownerId: OwnerId, batchId: string): Promise<Undo
     });
   }
 
-  const provenance = toBatchProvenance(await listBatchChanges(ownerId, batchId));
+  const changeRows = await listBatchChanges(ownerId, batchId);
+  const provenance = toBatchProvenance(changeRows);
+
+  // §8.4 `provenance-unavailable` (US-033 AC-7). No `batch_change` rows can mean
+  // one of two things that look identical here: a batch that legitimately
+  // created nothing (undo is a no-op, US-032 AC-5), or a batch whose provenance
+  // was lost. Only the downstream effects tell them apart — a batch with no
+  // provenance but real created rows cannot be reversed and must be REFUSED,
+  // enumerated as far as it can be, rather than silently no-op'd into
+  // destroying rows it has no record of. US-031 AC-6 makes this unreachable in
+  // normal operation; the branch exists because the refusal must stay
+  // actionable if it ever is reached.
+  if (changeRows.length === 0) {
+    const effects = await countBatchCreatedEffects(ownerId, batchId);
+    if (effects > 0) {
+      throw new AppError(
+        'BATCH_NOT_CREATES_ONLY',
+        409,
+        'This batch cannot be undone as a whole.',
+        await buildRefusalDetails(ownerId, batchId, null),
+      );
+    }
+  }
 
   if (!isCreatesOnly(provenance)) {
-    // TASK-114 replaces `details` with the full §8.4 enumeration. The `reason`
-    // is already the spec's value so the shape only grows.
-    throw new AppError('BATCH_NOT_CREATES_ONLY', 409, 'This batch cannot be undone as a whole.', {
-      batchId,
-      reason: 'modified-or-removed',
-      truncated: false,
-    });
+    throw new AppError(
+      'BATCH_NOT_CREATES_ONLY',
+      409,
+      'This batch cannot be undone as a whole.',
+      await buildRefusalDetails(ownerId, batchId, provenance),
+    );
   }
 
   const plan = planCreatesOnlyUndo(provenance);
@@ -236,4 +261,203 @@ async function rederiveSurvivors(
       tx,
     );
   }
+}
+
+/* ── §8.4 refusal enumeration (TASK-114, REQ-075, US-033) ─────────────────── */
+
+/**
+ * Where a work stands NOW, relative to the owner's list, so the refusal panel
+ * can say what its remedy will do. NOT a `TitleState`: `'suppressed'` is the
+ * existence of a `Suppression` row against the WORK (REQ-071), evaluated here
+ * for display only and never written back onto the title.
+ */
+export type UndoRefusalCurrentState = 'active' | 'removed' | 'suppressed';
+
+export interface UndoRefusalCreatedEntry {
+  titleId: string;
+  name: string;
+  releaseYear: number | null;
+  posterPath: string | null;
+  currentState: UndoRefusalCurrentState;
+  remedy: 'not-interested';
+  remedyHref: string;
+}
+
+export interface UndoRefusalModifiedEntry {
+  titleId: string;
+  name: string;
+  releaseYear: number | null;
+  posterPath: string | null;
+  attr: string;
+  before: unknown;
+  currentState: UndoRefusalCurrentState;
+  remedy: 'fix-match';
+  remedyHref: string;
+}
+
+export interface UndoRefusalRemovedEntry {
+  titleId: string;
+  listingId: string;
+  name: string;
+  releaseYear: number | null;
+  posterPath: string | null;
+  currentState: UndoRefusalCurrentState;
+  remedy: 'restore';
+  remedyHref: string;
+}
+
+export interface UndoRefusalDetails {
+  batchId: string;
+  reason: 'modified-or-removed' | 'later-owner-edits' | 'provenance-unavailable';
+  created: UndoRefusalCreatedEntry[];
+  modified: UndoRefusalModifiedEntry[];
+  removed: UndoRefusalRemovedEntry[];
+  /**
+   * ⚠ ALWAYS `false`, typed as the literal so a summarising change fails to
+   * compile. The enumeration is NEVER capped, paged or sliced (US-033 AC-5,
+   * `specs/testing.md` §6 row 10): a truncated refusal shows the owner a
+   * partial list of what undo would touch and the difference is invisible. The
+   * UI paginates client-side.
+   */
+  truncated: false;
+  /** Carried on `AppError.details` (a `Record<string, unknown>`). */
+  [key: string]: unknown;
+}
+
+interface TitleDisplay {
+  workIdentity: string;
+  state: UndoRefusalCurrentState;
+  name: string;
+  releaseYear: number | null;
+  posterPath: string | null;
+}
+
+/**
+ * Build the §8.4 `details` payload for a non-creates-only (or
+ * provenance-unavailable) batch.
+ *
+ * ⚠ READ-ONLY. `T-UNDO-005` snapshots the owner partition before and after a
+ * refusal and asserts equality; this must not write. It reads the CURRENT
+ * title/listing/suppression rows so each entry's `currentState` reflects what
+ * has happened to the work SINCE the batch — a title the batch touched that has
+ * since been removed or suppressed STILL APPEARS, annotated (US-033 AC-6).
+ * Filtering those out is the tempting bug: it loses exactly the entries the
+ * owner most needs to see.
+ *
+ * @param provenance the batch's provenance, or `null` when it could not be read
+ *   (`reason: 'provenance-unavailable'`, US-033 AC-7).
+ */
+async function buildRefusalDetails(
+  ownerId: OwnerId,
+  batchId: string,
+  provenance: BatchProvenance | null,
+): Promise<UndoRefusalDetails> {
+  const reason = createsOnlyRefusalReason(provenance) ?? 'modified-or-removed';
+
+  // Provenance-unavailable: there is nothing to enumerate, but the refusal must
+  // still be a structured, actionable §8.4 body rather than a bare 409.
+  if (provenance === null) {
+    return { batchId, reason, created: [], modified: [], removed: [], truncated: false };
+  }
+
+  const titleIds = [
+    ...new Set([
+      ...provenance.created.map((entry) => entry.titleId),
+      ...provenance.modified.map((entry) => entry.titleId),
+      ...provenance.removed.map((entry) => entry.titleId),
+    ]),
+  ];
+  const listingIds = provenance.removed.map((entry) => entry.listingId);
+
+  const [titleRows, listingRows, suppressions] = await Promise.all([
+    listTitleDisplaysByIds(ownerId, titleIds),
+    listServiceListingStatesByIds(ownerId, listingIds),
+    listActiveSuppressions(ownerId),
+  ]);
+
+  const titles = new Map<string, TitleDisplay>(
+    titleRows.map((row) => [
+      row.id,
+      {
+        workIdentity: row.workIdentity,
+        state: row.state === 'removed' ? 'removed' : 'active',
+        name: row.tmdbName ?? row.rawExtractedText ?? '(unknown title)',
+        releaseYear: row.tmdbReleaseYear,
+        posterPath: row.tmdbPosterPath,
+      },
+    ]),
+  );
+  const listingStates = new Map<string, UndoRefusalCurrentState>(
+    listingRows.map((row) => [row.listingId, row.state === 'removed' ? 'removed' : 'active']),
+  );
+  const suppressedWorks = new Set(suppressions.map((row) => row.workIdentity));
+
+  // A title named by provenance that is somehow no longer readable is still
+  // enumerated — never dropped — so the count the owner sees matches what the
+  // batch touched.
+  const display = (titleId: string): TitleDisplay =>
+    titles.get(titleId) ?? {
+      workIdentity: '',
+      state: 'removed',
+      name: '(unavailable)',
+      releaseYear: null,
+      posterPath: null,
+    };
+
+  const currentState = (
+    titleId: string,
+    fallback: UndoRefusalCurrentState,
+  ): UndoRefusalCurrentState => {
+    const info = titles.get(titleId);
+    if (info !== undefined && suppressedWorks.has(info.workIdentity)) return 'suppressed';
+    return fallback;
+  };
+
+  const created: UndoRefusalCreatedEntry[] = provenance.created.map((entry) => {
+    const info = display(entry.titleId);
+    return {
+      titleId: entry.titleId,
+      name: info.name,
+      releaseYear: info.releaseYear,
+      posterPath: info.posterPath,
+      currentState: currentState(entry.titleId, info.state),
+      remedy: 'not-interested',
+      remedyHref: `/api/titles/${entry.titleId}/suppress`,
+    };
+  });
+
+  const modified: UndoRefusalModifiedEntry[] = provenance.modified.map((entry) => {
+    const info = display(entry.titleId);
+    return {
+      titleId: entry.titleId,
+      name: info.name,
+      releaseYear: info.releaseYear,
+      posterPath: info.posterPath,
+      attr: entry.attr,
+      before: entry.before,
+      currentState: currentState(entry.titleId, info.state),
+      remedy: 'fix-match',
+      remedyHref: `/api/titles/${entry.titleId}/fix-match`,
+    };
+  });
+
+  const removed: UndoRefusalRemovedEntry[] = provenance.removed.map((entry) => {
+    const info = display(entry.titleId);
+    return {
+      titleId: entry.titleId,
+      listingId: entry.listingId,
+      name: info.name,
+      releaseYear: info.releaseYear,
+      posterPath: info.posterPath,
+      // The remedy is `restore`, so the actionable state is the LISTING's — is
+      // it still removed? — falling back to the title's when the listing row
+      // could not be read. Suppression still wins: a restore onto a suppressed
+      // work is held back.
+      currentState: currentState(entry.titleId, listingStates.get(entry.listingId) ?? info.state),
+      remedy: 'restore',
+      remedyHref: `/api/listings/${entry.listingId}/restore`,
+    };
+  });
+
+  return { batchId, reason, created, modified, removed, truncated: false };
 }

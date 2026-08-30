@@ -184,13 +184,7 @@ export function unbackedInvariants(
  * calls non-negotiable *because its failure is silent*. An unwritten test here
  * is not a documentation gap — it is an invariant nobody is checking.
  */
-const KNOWN_UNBACKED: readonly string[] = [
-  // §6 row 10 — "the mixed-undo refusal enumerates EVERYTHING, never
-  // truncated" (US-033 AC-5). A truncated refusal shows the owner a partial
-  // list of what undo would touch; they act on it and the difference is
-  // invisible. Also carried by T-META-001's phantom baseline.
-  '§6 row 10: T-UNDO-006',
-];
+const KNOWN_UNBACKED: readonly string[] = [];
 
 /**
  * Non-vacuity floors. §6 holds 16 rows today and its heading has already been
