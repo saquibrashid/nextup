@@ -521,15 +521,45 @@ button {
   min-width: 0;
 }
 
+.title-row--skeleton,
 .suppressed-row--skeleton,
 .removed-row--skeleton {
   min-height: 4.5rem;
   opacity: 0.55;
 }
 
+.title-list--loading,
 .suppressed-list--loading,
 .removed-list--loading {
   pointer-events: none;
+}
+
+/*
+  §2.1 Loading (initial). The strip and bar keep the height of the real
+  controls so the list does not jump when data lands — a skeleton that
+  reserves the wrong space is a layout shift with extra steps.
+*/
+.freshness-strip--skeleton {
+  min-height: 2rem;
+  opacity: 0.55;
+}
+
+.filter-bar--skeleton {
+  min-height: 3rem;
+  opacity: 0.55;
+}
+
+.slow-response {
+  color: var(--color-text-muted);
+  padding: var(--space-3) 0;
+}
+
+.slow-response--stalled {
+  align-items: flex-start;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 /* ------------------------------------------------------ removal history -- */

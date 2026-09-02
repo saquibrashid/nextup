@@ -124,7 +124,16 @@ describe('T-DATA-002 — the list screen reads its data from the API', () => {
 
     renderRoute(client);
 
-    expect(screen.getByText(LIST_LOADING_BODY)).toBeInTheDocument();
+    /*
+      ⚠ `getByLabelText`, not `getByText`. `T-UX-010` replaced the bare
+      sentence with §2.1's skeletons, and the sentence became the accessible
+      NAME of the `role="status"` wrapper — the same shape `RemovedPage`
+      already used. The message still reaches the owner, so this assertion is
+      unchanged in substance; querying by visible text would now pass only by
+      restoring a paragraph the spec does not ask for.
+      ~~`expect(screen.getByText(LIST_LOADING_BODY)).toBeInTheDocument();`~~
+    */
+    expect(screen.getByLabelText(LIST_LOADING_BODY)).toBeInTheDocument();
     expect(screen.queryByTestId('list-empty-never-uploaded')).not.toBeInTheDocument();
 
     release(undefined);

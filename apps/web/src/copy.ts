@@ -1061,3 +1061,26 @@ export const BOUNDARY_BODY =
   'Something went wrong while drawing this page. Nothing you have saved was changed.';
 
 export const BOUNDARY_RETRY_LABEL = 'Try again';
+
+/*
+  specs/ux-states.md §1 — *"Never an indefinite spinner"*.
+
+  ⚠ SLOW_RESPONSE_BODY is a TRANSCRIPTION: §1 writes it out in full. It was
+  renamed from `ColdStartNotice` / *"Waking things up…"* by TASK-143, because
+  `minReplicas = 1` means there is no cold start and the old copy named a
+  cause that cannot occur. Do not restore the old wording.
+*/
+export const SLOW_RESPONSE_BODY = 'Still working…';
+
+/*
+  ⚠ FINDING - invented copy, pending owner review.
+
+  §1 specifies the 15-second BEHAVIOUR ("it becomes the `slow` error state
+  with a **Retry**") but writes no wording for it, and `specs/ui.md` §9 - the
+  copy register this file mirrors - has no row for it either. So it cannot be
+  transcribed, and is drafted here rather than pretending to be a §9 constant.
+  It follows the §1 rule that errors say what was NOT changed: nothing was
+  written, because nothing was requested to be written.
+*/
+export const SLOW_RESPONSE_STALLED_BODY =
+  'This is taking longer than it should. Nothing has been changed.';
