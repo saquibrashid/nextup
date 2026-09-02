@@ -465,6 +465,18 @@ button {
   padding: var(--space-1) var(--space-2);
 }
 
+/*
+  `specs/ux-states.md` §2.8 (`T-UX-017`) — "a subtle chip". Muted, not a
+  warning colour: nothing is wrong, the row is fully rendered from stored
+  metadata, and dressing it as an error would make the owner distrust data
+  that is almost always correct. The muted foreground is the shared token, so
+  the contrast floor is met in one place rather than re-picked here.
+*/
+.title-row__chip--stale {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
 .title-row__rating {
   color: var(--color-text);
   font-size: 0.875rem;

@@ -18,7 +18,12 @@
 import type { JSX } from 'react';
 import { SERVICE_LABELS, type Service } from '@nextup/domain';
 
-import { IMDB_RATING_ABSENT, IMDB_RATING_SOURCE, ROW_PENDING_LABEL } from '../copy';
+import {
+  IMDB_RATING_ABSENT,
+  IMDB_RATING_SOURCE,
+  METADATA_STALE_CHIP,
+  ROW_PENDING_LABEL,
+} from '../copy';
 
 /** `specs/ui.md` §2.2 - the poster size the row requests. */
 export const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w154';
@@ -52,6 +57,26 @@ export interface TitleListItem {
    * would flicker on every first render of every page.
    */
   readonly imdbRating?: number | null;
+  /**
+   * `specs/api.md` §6.4 — TMDB was unreachable, or this item missed the 5 s
+   * refresh budget, while the server built THIS response (NFR-014, REQ-076).
+   *
+   * ⚠ **`true` NEVER MEANS THE DATA IS MISSING OR WRONG.** Every metadata
+   * field above is populated exactly as normal — from nextup's stored copy —
+   * and the list deliberately succeeds rather than failing on TMDB
+   * (`specs/api.md` §6.4: *"The list never fails because of TMDB"*). So the
+   * row renders in full and gains a chip; it must never render degraded,
+   * blanked, or as an error.
+   *
+   * ⚠ **THIS IS NOT THE A46 STALENESS NUDGE** (product invariant 8). The
+   * per-service "you haven't updated in N days" concept was dropped whole;
+   * this flag is the surviving, still-required TMDB sense of "stale".
+   *
+   * Optional because the API is the only writer: a hand-built fixture or an
+   * older cached payload without the field means "not flagged", which is the
+   * same thing as `false` and the correct default for an unknown.
+   */
+  readonly metadataStale?: boolean | undefined;
 }
 
 export interface TitleRowProps {
@@ -137,6 +162,34 @@ export function TitleRow({ item, onOpenMenu, onFixMatch, pending }: TitleRowProp
         {unmatched && (
           <span className="title-row__chip" data-testid="unidentified-chip">
             Unidentified
+          </span>
+        )}
+
+        {/*
+          `specs/ux-states.md` §2.8 (`T-UX-017`). Rendered PER ROW, from the
+          per-item flag, because the refresh is per item: one title can miss
+          the 5 s budget on a page where every other title refreshed fine, and
+          a page-level banner would either accuse rows that are current or say
+          nothing about the one that is not.
+
+          ⚠ IT IS A SIBLING OF THE `Unidentified` CHIP, NOT AN ALTERNATIVE TO
+          IT. The two states are independent — an unmatched title still has
+          stored metadata that TMDB could fail to confirm — so an
+          `unmatched ? … : …` here would silently drop the stale signal on
+          exactly the rows whose data is least trustworthy.
+
+          ⚠ NOT A LIVE REGION AND NOT AN ALERT. §2.8's own "user can" column
+          is *"Everything, normally"*: nothing is broken, nothing is blocked
+          and there is no action to take, so interrupting a screen reader for
+          it would be noise. It is ordinary text, present in the accessibility
+          tree in reading order, which is what "subtle" means here.
+        */}
+        {item.metadataStale === true && (
+          <span
+            className="title-row__chip title-row__chip--stale"
+            data-testid="metadata-stale-chip"
+          >
+            {METADATA_STALE_CHIP}
           </span>
         )}
 
