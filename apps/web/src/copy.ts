@@ -419,12 +419,39 @@ export const LIST_LOADING_BODY = 'Loading your list…';
  * owner with 300 titles that they had 50 — the data-loss misreading US-019
  * AC-5 exists to prevent.
  *
- * ⚠ This is the count half of §2.6 only. The load-more sentinel that §2.1
- * item 4 of `specs/ui.md` also mandates is NOT built, so titles past the
- * first page remain unreachable. That is why the count must hedge rather
- * than claim: the hedge is honest about a list the UI cannot yet show.
+ * ⚠ The bound is retired as pages arrive: `LoadMoreSentinel` now fetches the
+ * rest of the list, so a fully loaded list states a flat total again. ~~"This
+ * is the count half of §2.6 only. The load-more sentinel that §2.1 item 4 of
+ * `specs/ui.md` also mandates is NOT built, so titles past the first page
+ * remain unreachable."~~ — true when the hedge shipped, and no longer.
  */
 export const AT_LEAST_PREFIX = 'at least ';
+
+/**
+ * The load-more sentinel (`specs/ux-states.md` §2.6, `specs/ui.md` §2.1 item 4).
+ *
+ * ⚠ THE BUTTON IS NOT A FALLBACK FOR THE OBSERVER; IT IS THE KEYBOARD PATH.
+ * `specs/ui.md` §2.1 item 4 requires **both**. An `IntersectionObserver` fires
+ * on scroll, and a keyboard-only owner tabbing through the rows never scrolls
+ * the sentinel into view at all — for them the auto-loader simply does not
+ * exist, and the list would end at row 50 with no way to continue.
+ *
+ * ⚠ The busy line is separate from the button's label and the button is NEVER
+ * disabled while loading. Disabling it moves focus to `document.body` mid-flow,
+ * which on a keyboard is indistinguishable from the page having jumped; the
+ * request is guarded in `useCursorPages` instead, where a double click cannot
+ * do any harm.
+ */
+export const LOAD_MORE = 'Load more';
+export const LOAD_MORE_BUSY = 'Loading more titles…';
+export const LOAD_MORE_RETRY = 'Try again';
+/**
+ * ⚠ SAYS WHAT IS STILL TRUE BEFORE IT SAYS WHAT FAILED. A bare "Couldn't load
+ * more" beneath a list that just stopped reads as the rest of the list being
+ * gone — the US-019 AC-5 misreading. Nothing on screen changed, and the
+ * message says so first.
+ */
+export const LOAD_MORE_FAILED = "Couldn't load more titles. The ones above are still here.";
 
 /* -------------------------------------------------------------------------- */
 /* Epic M — IMDb ratings (REQ-088…REQ-092, ADR-0011)                           */

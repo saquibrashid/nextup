@@ -115,20 +115,28 @@ const KNOWN_UNCOVERED: readonly string[] = [
   // own container and calls `cleanup()` between visits.
   'T-UX-010',
   // `T-UX-015` (§2.6 the count) removed at the 15 → 14 step: `T-UX-015a`-`e`
-  // in `apps/web/test/listCount.spec.tsx`.
-  // ⚠ PARTIAL, DELIBERATELY. §2.6 has two halves and only ONE ships here.
-  //   • The count no longer fabricates a total — COVERED. The UI rendered
-  //     `Showing 50 of 50` for a 300-title list, contradicting §2.6's bolded
-  //     "no total is fabricated" (NFR-018). It now says `of at least 50`
-  //     whenever the response carries a `nextCursor`.
-  //   • The load-more sentinel that `specs/ui.md` §2.1 item 4 mandates is
-  //     NOT BUILT. `ListRoute` still never advances the cursor, so titles
-  //     past `DEFAULT_PAGE_LIMIT = 50` remain unreachable in the UI.
-  // The id is removed anyway because the hedge is precisely what makes the
-  // missing half survivable and honest: the owner is told the list is longer
-  // than what is shown. ⚠ Do NOT read this removal as "pagination is done".
-  // The remaining work has no backlog task; see `T-UX-073` for the same gap
-  // in the removed view.
+  // in `apps/web/test/listCount.spec.tsx`, and the sentinel half at
+  // `T-UX-015f`-`r` in `apps/web/test/loadMore.spec.tsx`. §2.6 is now covered
+  // whole: the count no longer fabricates a total, AND the rest of the list is
+  // reachable.
+  // ~~"⚠ PARTIAL, DELIBERATELY. §2.6 has two halves and only ONE ships here...
+  // The load-more sentinel that `specs/ui.md` §2.1 item 4 mandates is NOT
+  // BUILT. `ListRoute` still never advances the cursor, so titles past
+  // `DEFAULT_PAGE_LIMIT = 50` remain unreachable in the UI... ⚠ Do NOT read
+  // this removal as 'pagination is done'."~~ — true for one PR, and now
+  // superseded. ~~"`T-UX-073` is still the same gap in the REMOVED view."~~ —
+  // also superseded: the removed view is wired in the same PR (below).
+  // `T-UX-073` (§7.4 Partial) removed at the 14 → 13 step: `T-UX-073a`-`f` in
+  // `apps/web/test/removedLoadMore.spec.tsx`. `RemovedRoute` now accumulates
+  // pages through the same `useCursorPages` hook and renders the same
+  // `LoadMoreSentinel`. ⚠ Mutation-verified with four mutations, and the third
+  // SURVIVED the file as first written: deleting the `!loading` guard changed
+  // nothing observable, because through the route `hasMore` is false whenever
+  // page 1 is in flight, so `T-UX-073e` passed on that coincidence rather than
+  // on the guard. `T-UX-073f` drives `RemovedPage` directly with the
+  // contradictory `loading` + `hasMore` pair the guard exists to refuse — the
+  // state a REFETCH reaches, where "Load more" would page a cursor belonging
+  // to the query the owner just left.
   // `T-UX-016` (§2.7 Populated) removed at the 20 → 19 step: `T-UX-016a`-`d` in
   // `apps/web/test/titleList.spec.tsx`, a file that did not exist before.
   // ⚠ NOTHING imported `TitleList` or queried `title-list` at all, while the
@@ -186,7 +194,6 @@ const KNOWN_UNCOVERED: readonly string[] = [
   // to sit under it. Restored in full.)
   'T-UX-068',
   'T-UX-069',
-  'T-UX-073',
 ];
 
 function collectSpecFiles(): string[] {

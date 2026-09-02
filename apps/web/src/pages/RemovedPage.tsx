@@ -56,6 +56,7 @@ import {
 import { ApiError } from '../lib/apiClient';
 import type { RemovedItem, RestoreResponse } from '../lib/apiClient';
 import { TMDB_IMAGE_BASE } from '../components/TitleRow';
+import { LoadMoreSentinel } from '../components/LoadMoreSentinel';
 import { useOnline } from '../lib/useOnline';
 
 export interface RemovedPageProps {
@@ -71,6 +72,11 @@ export interface RemovedPageProps {
     opts?: { confirmDuplicate?: boolean },
   ) => Promise<RestoreResponse>;
   readonly onUnsuppress?: (suppressionId: string) => Promise<unknown>;
+  /** The load-more sentinel (§7.4). Defaults leave it unrendered. */
+  readonly hasMore?: boolean;
+  readonly loadingMore?: boolean;
+  readonly loadMoreFailed?: boolean;
+  readonly onLoadMore?: () => void;
 }
 
 /**
@@ -396,6 +402,10 @@ export function RemovedPage({
   onClearSearch,
   onRestore,
   onUnsuppress,
+  hasMore = false,
+  loadingMore = false,
+  loadMoreFailed = false,
+  onLoadMore,
 }: RemovedPageProps): JSX.Element {
   const online = useOnline();
   const offline = !online;
@@ -477,6 +487,27 @@ export function RemovedPage({
             />
           ))}
         </ul>
+      )}
+      {/*
+        The load-more sentinel (`specs/ux-states.md` §7.4, `specs/ui.md` §2.1
+        item 4). ⚠ OUTSIDE the branch above so it survives the "no matches"
+        state — a search that matches nothing on page 1 may still match on page
+        2, and hiding the control there strands the owner on an empty screen
+        that is not actually empty. It renders nothing without a handler and
+        nothing once `hasMore` is false, so no other state gains a control.
+
+        ⚠ THE REMOVAL LOG IS WHERE THIS MATTERS MOST OVER TIME. By product
+        invariant 7 it legitimately accumulates several rows for the same work,
+        so it is the list most certain to outgrow one page — and the one whose
+        truncation reads exactly like the deletions being forgotten.
+      */}
+      {onLoadMore !== undefined && !loading && !loadFailed && (
+        <LoadMoreSentinel
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          loadMoreFailed={loadMoreFailed}
+          onLoadMore={onLoadMore}
+        />
       )}
     </>
   );
