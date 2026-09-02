@@ -155,8 +155,22 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
   if (titles.resource.kind === 'refused') return <RefusalPage reason="not-allowed" />;
 
   const items = titles.resource.kind === 'ok' ? titles.resource.value.items : [];
-  const unfiltered =
-    all.resource.kind === 'ok' && all.resource.value !== null ? all.resource.value.items : items;
+  const unfilteredResponse =
+    all.resource.kind === 'ok' && all.resource.value !== null
+      ? all.resource.value
+      : titles.resource.kind === 'ok'
+        ? titles.resource.value
+        : null;
+  const unfiltered = unfilteredResponse !== null ? unfilteredResponse.items : items;
+
+  /**
+   * ⚠ READ FROM THE SAME RESPONSE THAT SUPPLIED `total`, not from `titles`
+   * unconditionally. When a filter is active, `total` comes from the
+   * unfiltered `all` request, and taking the flag from the filtered one would
+   * pair a bound with the wrong number — the count would read "at least" on a
+   * complete list, or state a flat total on a truncated one.
+   */
+  const totalIsLowerBound = unfilteredResponse !== null && unfilteredResponse.nextCursor !== null;
 
   /**
    * ⚠ `removedCount` is now supplied (see the conditional read above). It is
@@ -169,10 +183,15 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
    * wording gap that existed unconditionally before, now confined to an
    * outright request failure.
    *
-   * ⚠ `total` is capped at one page until the API returns a count, because
-   * §6.2 answers with `items`/`nextCursor`/`limit` and no total. It is only
-   * consulted for the "of Y" display and for an empty unfiltered list, both of
-   * which are correct below the page size.
+   * ⚠ `total` is capped at one page because §6.2 answers with
+   * `items`/`nextCursor`/`limit` and no total, so `totalIsLowerBound` is
+   * passed beside it and the count renders *"of at least N"* (§2.6). ~~"It is
+   * only consulted for the 'of Y' display and for an empty unfiltered list,
+   * both of which are correct below the page size."~~ — **that was true and
+   * was still a defect**: nothing checked whether the list WAS below the page
+   * size, so a full page with a live `nextCursor` rendered "Showing 50 of 50"
+   * and told an owner with 300 titles they had 50. The empty-list use is
+   * unaffected; an empty page never has a next cursor.
    */
   return (
     <ListPage
@@ -181,6 +200,7 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
         serviceState.resource.kind === 'ok' ? serviceState.resource.value.services : null
       }
       total={unfiltered.length}
+      totalIsLowerBound={totalIsLowerBound}
       genres={collectGenres(unfiltered)}
       suppressedCount={
         suppressions.resource.kind === 'ok' ? suppressions.resource.value.items.length : 0

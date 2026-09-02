@@ -19,7 +19,7 @@ import type { JSX } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { SERVICES, type Service } from '@nextup/domain';
 
-import { CLEAR_FILTERS_LABEL, ZERO_MATCH_TITLE } from '../copy';
+import { AT_LEAST_PREFIX, CLEAR_FILTERS_LABEL, ZERO_MATCH_TITLE } from '../copy';
 
 /** `api.md` §6.2 — `type` is `movie|tv`. */
 export const MEDIA_TYPES = ['movie', 'tv'] as const;
@@ -102,9 +102,29 @@ export interface FilterBarProps {
   readonly shown: number;
   /** Rows before filtering. */
   readonly total: number;
+  /**
+   * `true` when `total` is a LOWER BOUND rather than the count — i.e. the API
+   * returned a `nextCursor` and there are more rows than have been fetched.
+   *
+   * ⚠ THIS EXISTS BECAUSE THE COUNT WAS A LIE. §2.6 says the count reads
+   * *"Showing 50 of at least 50"* and that **no total is fabricated** (there
+   * is no count query — NFR-018). The bar rendered "Showing 50 of 50" against
+   * a live `nextCursor`, telling an owner with 300 titles that they have 50.
+   * That is the data-loss misreading US-019 AC-5 exists to prevent, arrived at
+   * by arithmetic rather than by an empty state.
+   *
+   * ⚠ Defaults to `false` — the honest value when the caller knows nothing —
+   * so a caller that has genuinely counted its rows is unaffected.
+   */
+  readonly totalIsLowerBound?: boolean;
 }
 
-export function FilterBar({ genres = [], shown, total }: FilterBarProps): JSX.Element {
+export function FilterBar({
+  genres = [],
+  shown,
+  total,
+  totalIsLowerBound = false,
+}: FilterBarProps): JSX.Element {
   const [params, setParams] = useSearchParams();
   const filters = parseFilters(params);
 
@@ -196,7 +216,7 @@ export function FilterBar({ genres = [], shown, total }: FilterBarProps): JSX.El
         gets no signal at all.
       */}
       <p data-testid="filter-count" role="status">
-        {`Showing ${String(shown)} of ${String(total)}`}
+        {`Showing ${String(shown)} of ${totalIsLowerBound ? AT_LEAST_PREFIX : ''}${String(total)}`}
       </p>
     </div>
   );
