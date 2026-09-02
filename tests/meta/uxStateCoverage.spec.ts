@@ -88,7 +88,31 @@ const KNOWN_UNCOVERED: readonly string[] = [
   'T-AUTH-004',
   'T-SEC-008',
   'T-UX-001',
-  'T-UX-002',
+  // `T-UX-002` (§2 "no fetch rejection path ends without a rendered message")
+  // removed at the 19 → 18 step: `T-UX-002a`-`d` in
+  // `apps/web/test/failurePaths.spec.tsx`, a new file.
+  // ⚠ IT LOOKED COVERED SIX TIMES OVER. Every screen already had a failure
+  // test — `listRoute`, `removedRoute`, `suppressedRoute`, `batchesOffline`,
+  // `reviewCloseError` — and each asserts its exact copy, more strongly than
+  // anything the new file does. What none of them could assert is the word §2
+  // actually uses: **no**. A per-screen test proves the screens that HAVE a
+  // test; it is silent about the next screen added. The expected set is
+  // therefore read off `ROUTES` (already exported as data for `T-ATTR-002` /
+  // `T-A11Y-001`), and which routes read is DISCOVERED by observing `fetch`
+  // rather than declared, so neither list can drift.
+  // Mutation-verified three ways, each killing exactly one case and naming the
+  // route in its assertion message: swallowing a failed read
+  // (`loadFailed={false}`) killed `T-UX-002a`+`c`; putting `Failed to fetch`
+  // in the copy killed `T-UX-002b` alone; hiding the retry control killed
+  // `T-UX-002c` alone. `T-UX-002d` is the floor that stops the fetch-discovery
+  // trick exempting everything — measured at 6 fetching routes today,
+  // asserted at >= 4.
+  // ⚠ THE BATTERY EARNED ITS KEEP HERE. A first draft looped nine routes
+  // inside one test using the GLOBAL `screen` query; Testing Library unmounts
+  // between tests, not between `render` calls, so each route was credited with
+  // the alerts left by the routes before it. The suite was green and the
+  // `loadFailed={false}` mutation SURVIVED. The helper now queries the render's
+  // own container and calls `cleanup()` between visits.
   'T-UX-010',
   'T-UX-015',
   // `T-UX-016` (§2.7 Populated) removed at the 20 → 19 step: `T-UX-016a`-`d` in
