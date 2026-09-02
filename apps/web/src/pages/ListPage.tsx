@@ -30,6 +30,8 @@ import {
 } from '../components/FixMatchDialog';
 import { TitleList } from '../components/TitleList';
 import { LoadMoreSentinel } from '../components/LoadMoreSentinel';
+import { SlowResponseNotice } from '../components/SlowResponseNotice';
+import { useSlowRequest } from '../lib/useSlowRequest';
 import type { TitleListItem } from '../components/TitleRow';
 import { LIST_LOADING_BODY, OFFLINE_NOTHING_LOADED, OFFLINE_SHOWING_CACHED } from '../copy';
 
@@ -153,6 +155,9 @@ export function ListPage({
 }: ListPageProps): JSX.Element {
   const [params, setParams] = useSearchParams();
   const filters = parseFilters(params);
+  // §1 "Never an indefinite spinner" — drives the 1200 ms notice and the 15 s
+  // exit. ⚠ Above every early return: hooks may not be called conditionally.
+  const loadingPhase = useSlowRequest(loading);
   const [menuFor, setMenuFor] = useState<TitleListItem | null>(null);
   const [dialog, setDialog] = useState<OpenDialog | null>(null);
   /**
@@ -237,12 +242,40 @@ export function ListPage({
           {OFFLINE_NOTHING_LOADED}
         </p>
       ) : loading ? (
-        // ⚠ Same reasoning as the failure branch, for the same reason: neither
-        // the filter counts nor the empty state can tell the truth about data
-        // that has not arrived, and the empty state's lie is the damaging one.
-        <p role="status" data-testid="list-loading">
-          {LIST_LOADING_BODY}
-        </p>
+        /*
+          §2.1 Loading (initial), `T-UX-010`: the freshness strip and filter bar
+          as skeletons, six row skeletons, and past 1200 ms the slow notice.
+
+          ⚠ SIX ROWS, NOT THREE AND NOT ONE. The skeleton's whole job is to
+          claim the shape of what is coming; a single bar promises a list of
+          one, which is the same damaging lie about an owner's full library
+          that the empty state would tell.
+
+          ⚠ THE SKELETONS ARE `aria-hidden`. They carry no information a
+          screen-reader user can use, and announcing six empty rows describes a
+          list that does not exist. The single `role="status"` wrapper says
+          "loading" once, which is the whole message.
+
+          ~~Superseded: a bare `<p role="status">{LIST_LOADING_BODY}</p>`.~~ It
+          told the truth but showed nothing, and it never terminated — a
+          request that hung stayed on that sentence for ever, with no way to
+          learn it had stalled and nothing to retry.
+        */
+        <div role="status" data-testid="list-loading" aria-label={LIST_LOADING_BODY}>
+          <div className="freshness-strip freshness-strip--skeleton" aria-hidden="true" />
+          <div className="filter-bar filter-bar--skeleton" aria-hidden="true" />
+          <ul className="title-list title-list--loading" data-testid="list-loading-skeletons">
+            {[0, 1, 2, 3, 4, 5].map((index) => (
+              <li
+                key={index}
+                className="title-row title-row--skeleton"
+                data-testid="title-row-skeleton"
+                aria-hidden="true"
+              />
+            ))}
+          </ul>
+          <SlowResponseNotice phase={loadingPhase} onRetry={onRetry} />
+        </div>
       ) : (
         <>
           <FilterBar

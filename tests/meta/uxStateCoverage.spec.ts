@@ -107,7 +107,37 @@ const KNOWN_UNCOVERED: readonly string[] = [
   'T-AUTH-003',
   'T-AUTH-004',
   'T-SEC-008',
-  'T-UX-001',
+  // `T-UX-001` (§1 *"Never an indefinite spinner"*) removed at the 12 → 11
+  // step, together with `T-UX-010` below: `T-UX-001a`-`h` and `T-UX-010a`-`e`
+  // in `apps/web/test/slowResponse.spec.tsx`, a new file. Both ids go in one
+  // step because neither is testable alone — the hook without a screen proves
+  // only that a timer fires, and the screen without the hook proves only that
+  // grey boxes render.
+  // ⚠ NOTHING EXISTED. `SlowResponseNotice` was not a component that needed
+  // improving: TASK-143 renamed it IN THE SPEC (from `ColdStartNotice`,
+  // because `minReplicas = 1` means there is no cold start to name as the
+  // cause) while it had never been built at all. §1's central promise was
+  // documented, justified, renamed for accuracy — and enforced by nothing. A
+  // hung request showed *"Loading your list…"* for ever, with no way to learn
+  // it had stalled and nothing to retry.
+  // ⚠ THE 15 s STATE IS THE ID, NOT THE 1200 ms ONE. *"Still working…"* is
+  // always true while a request is pending, so alone it is an indefinite
+  // spinner that has learned to talk. `T-UX-001d`/`e` pin the exit: `role=
+  // "alert"`, a Retry, and the words *"Nothing has been changed"* — §1's
+  // ASM-029 defence, since a timeout is exactly when the owner cannot tell
+  // whether the request half-applied.
+  // ⚠ TWO WEAK TESTS WERE FOUND BY MUTATION, NOT BY REVIEW. (1) Every
+  // threshold was written `advance(SLOW_AFTER_MS - 1)`, which MOVES WITH the
+  // constant it exists to pin — setting the source to 0 made the test advance
+  // -1 ms and still pass. The literals 1200/15000 are now written out and the
+  // constants asserted against them. (2) The absence assertions checked only
+  // `slow-response`, so a component rendering the STALLED block early — a
+  // worse defect — slipped straight through; both ids are now checked.
+  // ⚠ `T-UX-001h` EXISTS BECAUSE `T-UX-001f` LOOKED SUFFICIENT AND WAS NOT.
+  // Deleting `clearTimeout(stalled)` from the hook's cleanup survived the
+  // whole first battery: `f` lets the first attempt run the full 15 s, so the
+  // leaked timer has already fired and there is nothing left to leak. The leak
+  // only bites when the first attempt settles EARLY, which is the common case.
   // `T-UX-002` (§2 "no fetch rejection path ends without a rendered message")
   // removed at the 19 → 18 step: `T-UX-002a`-`d` in
   // `apps/web/test/failurePaths.spec.tsx`, a new file.
@@ -133,7 +163,23 @@ const KNOWN_UNCOVERED: readonly string[] = [
   // the alerts left by the routes before it. The suite was green and the
   // `loadFailed={false}` mutation SURVIVED. The helper now queries the render's
   // own container and calls `cleanup()` between visits.
-  'T-UX-010',
+  // `T-UX-010` (§2.1 *"Loading (initial)"*) removed at the 12 → 11 step with
+  // `T-UX-001` above. The list rendered ONE sentence where §2.1 specifies a
+  // freshness-strip skeleton, a filter-bar skeleton and six row skeletons.
+  // ⚠ SIX IS LOAD-BEARING, AND `T-UX-010a` PINS IT. A skeleton's whole job is
+  // to claim the SHAPE of what is coming; one grey bar promises a list of one,
+  // which tells the owner the same damaging lie about a full library that the
+  // empty state would.
+  // ⚠ THE SKELETONS ARE `aria-hidden` (`T-UX-010b`). Announcing six empty rows
+  // describes a list that does not exist; the single `role="status"` wrapper
+  // carries the message, which is why `T-DATA-002c` had to move from
+  // `getByText` to `getByLabelText` in the same commit — the sentence became
+  // the wrapper's accessible NAME, not visible text.
+  // ⚠ `T-UX-010d`/`e` ARE THE WIRING CASES AND THEY ARE NOT REDUNDANT WITH
+  // `T-UX-001a`-`h`. Those drive a probe component, so every one of them still
+  // passes with `ListPage` never calling `useSlowRequest` at all — which is
+  // precisely the state this screen was in. Stubbing the phase to `'normal'`
+  // in the page kills `T-UX-010d`+`e` and nothing else.
   // `T-UX-015` (§2.6 the count) removed at the 15 → 14 step: `T-UX-015a`-`e`
   // in `apps/web/test/listCount.spec.tsx`, and the sentinel half at
   // `T-UX-015f`-`r` in `apps/web/test/loadMore.spec.tsx`. §2.6 is now covered
