@@ -118,17 +118,25 @@ export const BASELINE_ORPHANS = new Set([
   // case and by nothing else in the repo. It is deliberately STATIC — the
   // failure it guards is a FLAKY gate, which is green most of the time by
   // definition, so the only cheap moment to catch it is the diff.
-  'T-INV-014',
-  // ⚠ `T-INV-016` STAYS, and NOT because it is hard. As specified it asserts a
-  // non-empty `title.duplicate_ack_seq` is written "in
-  // `createTitleAllowingDuplicate()` and nowhere else". That function does not
-  // exist anywhere in the codebase, and `duplicateAckSeq` is written in TWO
-  // real places — `routes/fixMatch.ts` (~L288) and `routes/listings.ts`
-  // (~L107), both deliberately, both documented in place. Implementing the
-  // rule literally would fail; rewriting the rule to match the code would be
-  // editing the spec to agree with the implementation. This is a FINDING for
-  // the owner, in the same class as `T-INV-014`.
-  'T-INV-016',
+  // ⚠ `T-INV-014` was REMOVED from this baseline — implemented in
+  // `tests/infra/ownerLeadingIndexes.spec.ts` over `prisma/schema.prisma`.
+  // Removing it required an OWNER DECISION, because the rule as written was
+  // false and unimplementable: "every index leads with `owner_id`" was untrue
+  // of 12 indexes, all of them correctly, and `T-MIG-001` forbids `DROP INDEX`
+  // so they could not have been rewritten. The rule was narrowed in place to
+  // owner-scoped QUERY indexes with the 12 exempted BY NAME — an allow-list,
+  // not a shape predicate, so a future index cannot exempt itself by looking
+  // like a foreign key (`T-INV-014e`). Mutation-verified four ways, including
+  // one mutation of the real schema.
+  // ⚠ `T-INV-016` was REMOVED from this baseline — implemented in
+  // `tests/infra/duplicateAckWriters.spec.ts`. This one had been wrong TWICE:
+  // its first form grepped for a `dup:` prefix that appears nowhere and passed
+  // vacuously; its second named `createTitleAllowingDuplicate()`, which has
+  // never existed and could not be written, because BOTH real writers
+  // (`routes/fixMatch.ts`, `routes/listings.ts`) update titles that already
+  // exist. Making the code match the rule was checked and rejected — it would
+  // have meant renaming a restore path into a "create". The rule was re-pointed
+  // at the two real writers by owner decision. Mutation-verified four ways.
   // ⚠ `T-MIG-002` was REMOVED from this baseline — implemented in
   // `apps/api/test/integration/migrationSmoke.spec.ts`. The census reads the
   // migration FOLDER NAMES off disk, so the expected set grows by itself; a
