@@ -19,6 +19,7 @@ import { type AppliedBatch } from '../components/BatchAppliedNotice';
 import { isFiltered, parseFilters } from '../components/FilterBar';
 import { apiClient, type ApiClient, type TitleListItem } from '../lib/apiClient';
 import { useResource } from '../lib/useResource';
+import { useCursorPages } from '../lib/useCursorPages';
 import { useOnline } from '../lib/useOnline';
 import { ListPage } from '../pages/ListPage';
 import { RefusalPage } from '../pages/RefusalPage';
@@ -69,6 +70,25 @@ export function parseAppliedState(state: unknown): AppliedBatch | undefined {
     summary: { listingsCreated, listingsRemoved, removalGroupId },
     undoable,
   };
+}
+
+/**
+ * Adds `cursor` to the list query, replacing any that is already there.
+ *
+ * ⚠ REPLACES RATHER THAN APPENDS. `URLSearchParams.append` would produce
+ * `?cursor=A&cursor=B`; Express reads that as an ARRAY, and `parseCursor`
+ * rejects a non-string with `INVALID_CURSOR` — so page 3 would fail, every
+ * time, on a list long enough to have one.
+ *
+ * ⚠ The rest of the query is carried through verbatim. The cursor names a
+ * position within a particular ordering and filtering (`apps/api/src/
+ * pagination.ts`); paging without the filters would walk the DEFAULT list from
+ * a cursor cut out of a filtered one and mix two lists together.
+ */
+export function withCursor(query: string, cursor: string): string {
+  const next = new URLSearchParams(query);
+  next.set('cursor', cursor);
+  return next.toString();
 }
 
 export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Element {
@@ -148,29 +168,63 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
    */
   const serviceState = useResource((signal) => client.getServiceState(signal), 'service-state');
 
+  /**
+   * The pages after the first (`specs/ui.md` §2.1 item 4).
+   *
+   * ⚠ CALLED BEFORE THE REFUSAL RETURN BELOW, because hooks may not be
+   * conditional. It is handed `null` on every non-`ok` state, which is exactly
+   * what makes it reset when a retry or the reconnect refetch swaps page 1.
+   *
+   * ⚠ `query` IS SENT AS WELL AS THE CURSOR. The cursor is a position within a
+   * particular ordering and filtering; dropping the query would page through
+   * the DEFAULT list from a cursor cut out of a filtered one, silently mixing
+   * two lists together.
+   */
+  const paged = useCursorPages(
+    titles.resource.kind === 'ok' ? titles.resource.value : null,
+    (cursor, signal) =>
+      client.getTitles(withCursor(query, cursor), signal).then((page) => ({
+        items: page.items,
+        nextCursor: page.nextCursor,
+      })),
+    query,
+  );
+
   // A refusal is the whole screen: there is nothing to show around it, and the
   // retry the failure state offers could never succeed here (§12.2).
   // `not-allowed` specifically — a 403 is the allow-list, never an expired
   // session, which by §12.3 has already redirected and never reaches here.
   if (titles.resource.kind === 'refused') return <RefusalPage reason="not-allowed" />;
 
-  const items = titles.resource.kind === 'ok' ? titles.resource.value.items : [];
-  const unfilteredResponse =
-    all.resource.kind === 'ok' && all.resource.value !== null
-      ? all.resource.value
-      : titles.resource.kind === 'ok'
-        ? titles.resource.value
-        : null;
-  const unfiltered = unfilteredResponse !== null ? unfilteredResponse.items : items;
+  /**
+   * ⚠ THE ACCUMULATED ROWS, not `titles.resource.value.items`. Reading page 1
+   * here is what made every title past the fiftieth unreachable; the sentinel
+   * would load page 2 into state that nothing rendered.
+   */
+  const items = paged.items;
 
   /**
-   * ⚠ READ FROM THE SAME RESPONSE THAT SUPPLIED `total`, not from `titles`
+   * ⚠ The unfiltered rows for the count and the genre facet. When a filter is
+   * active this is the separate unpaged `all` request; when none is, the
+   * filtered request IS the unfiltered one, so the count follows the
+   * ACCUMULATED rows and grows as pages arrive.
+   */
+  const allResponse =
+    all.resource.kind === 'ok' && all.resource.value !== null ? all.resource.value : null;
+  const unfiltered = allResponse !== null ? allResponse.items : items;
+
+  /**
+   * ⚠ READ FROM THE SAME LIST THAT SUPPLIED `total`, not from `titles`
    * unconditionally. When a filter is active, `total` comes from the
    * unfiltered `all` request, and taking the flag from the filtered one would
    * pair a bound with the wrong number — the count would read "at least" on a
    * complete list, or state a flat total on a truncated one.
+   *
+   * ⚠ On the unfiltered path the bound now follows the ACCUMULATED pages, so
+   * loading the last page retires the "at least" instead of leaving it on a
+   * list that is demonstrably complete.
    */
-  const totalIsLowerBound = unfilteredResponse !== null && unfilteredResponse.nextCursor !== null;
+  const totalIsLowerBound = allResponse !== null ? allResponse.nextCursor !== null : paged.hasMore;
 
   /**
    * ⚠ `removedCount` is now supplied (see the conditional read above). It is
@@ -201,6 +255,10 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
       }
       total={unfiltered.length}
       totalIsLowerBound={totalIsLowerBound}
+      hasMore={paged.hasMore}
+      loadingMore={paged.loadingMore}
+      loadMoreFailed={paged.loadMoreFailed}
+      onLoadMore={paged.loadMore}
       genres={collectGenres(unfiltered)}
       suppressedCount={
         suppressions.resource.kind === 'ok' ? suppressions.resource.value.items.length : 0

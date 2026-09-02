@@ -39,6 +39,8 @@ import { useSearchParams } from 'react-router-dom';
 
 import { apiClient, type ApiClient } from '../lib/apiClient';
 import { useResource } from '../lib/useResource';
+import { useCursorPages } from '../lib/useCursorPages';
+import { withCursor } from './ListRoute';
 import { RefusalPage } from '../pages/RefusalPage';
 import { RemovedPage } from '../pages/RemovedPage';
 
@@ -53,13 +55,37 @@ export function RemovedRoute({ client = apiClient }: RemovedRouteProps = {}): JS
 
   const removed = useResource((signal) => client.getRemoved(query, signal), `removed:${query}`);
 
+  /**
+   * §7.4 — the pages after the first. ⚠ Called before the refusal return
+   * below, because hooks may not be conditional.
+   *
+   * ⚠ THE REMOVAL LOG IS THE LIST MOST CERTAIN TO OUTGROW ONE PAGE. By product
+   * invariant 7 a reappearing title becomes a brand-new row, so the log
+   * legitimately holds several entries for the same work over time and only
+   * ever grows. Truncated silently at 50, the oldest removals — the ones the
+   * owner is most likely to be hunting for — simply cease to exist on screen.
+   */
+  const paged = useCursorPages(
+    removed.resource.kind === 'ok' ? removed.resource.value : null,
+    (cursor, signal) =>
+      client.getRemoved(withCursor(query, cursor), signal).then((page) => ({
+        items: page.items,
+        nextCursor: page.nextCursor,
+      })),
+    query,
+  );
+
   // A refusal is the whole screen (§12.2): the owner is authenticated, so the
   // retry the failure state offers could never succeed.
   if (removed.resource.kind === 'refused') return <RefusalPage reason="not-allowed" />;
 
   return (
     <RemovedPage
-      items={removed.resource.kind === 'ok' ? removed.resource.value.items : []}
+      items={paged.items}
+      hasMore={paged.hasMore}
+      loadingMore={paged.loadingMore}
+      loadMoreFailed={paged.loadMoreFailed}
+      onLoadMore={paged.loadMore}
       loading={removed.resource.kind === 'loading'}
       loadFailed={removed.resource.kind === 'failed'}
       // ⚠ The APPLIED search, read back from the URL rather than from an

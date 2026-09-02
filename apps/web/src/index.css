@@ -610,6 +610,23 @@ button {
   color: var(--color-text-muted);
 }
 
+/* ---------------------------------------------------------- load more -- */
+
+/*
+  The cursor-pagination sentinel (`specs/ui.md` §2.1 item 4). Centred and given
+  vertical room deliberately: it is also the IntersectionObserver target, and a
+  zero-height element at the end of a list can be scrolled past without ever
+  intersecting the viewport on some browsers, which silently disables the
+  automatic half of the affordance.
+*/
+.load-more {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) 0;
+}
+
 /* ---------------------------------------------------------- attribution -- */
 
 /*

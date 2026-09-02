@@ -11,13 +11,14 @@
  * reached by arithmetic rather than by an empty state, and it is worse than an
  * empty state because it looks like a fact rather than like a message.
  *
- * ⚠ SCOPE. §2.6 also specifies the load-more sentinel, which is NOT built:
+ * ⚠ SCOPE. §2.6 also specifies the load-more sentinel, which is covered by
+ * `T-UX-015f`-`r` in `apps/web/test/loadMore.spec.tsx`. ~~"which is NOT built:
  * `nextCursor` is read here for the first time, and no code advances it. That
  * is `specs/ui.md` §2.1 item 4 and is separate work. This file deliberately
- * asserts only the half that can be true today — telling the truth about the
- * number — because the alternative was leaving the falsehood on screen until
- * pagination ships. A test that demanded the sentinel too would have to be
- * skipped, and a skipped test guards nothing.
+ * asserts only the half that can be true today."~~ — accurate when this file
+ * was written, and superseded by the sentinel shipping. The split between the
+ * two files is kept: this one is about what the NUMBER says, that one about
+ * what the owner can REACH, and the two failed independently.
  */
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';

@@ -29,6 +29,7 @@ import {
   type TmdbSearchResponse,
 } from '../components/FixMatchDialog';
 import { TitleList } from '../components/TitleList';
+import { LoadMoreSentinel } from '../components/LoadMoreSentinel';
 import type { TitleListItem } from '../components/TitleRow';
 import { LIST_LOADING_BODY, OFFLINE_NOTHING_LOADED, OFFLINE_SHOWING_CACHED } from '../copy';
 
@@ -48,6 +49,18 @@ export interface ListPageProps {
    * state that cannot occur — and would obscure the one that can.
    */
   readonly totalIsLowerBound?: boolean;
+  /**
+   * The load-more sentinel (`specs/ui.md` §2.1 item 4).
+   *
+   * ⚠ DEFAULTS TO `false`, so a caller that has not been taught to page shows
+   * no control rather than an inert one. The page owns none of this state: the
+   * cursor lives in the container, because the sentinel must survive the page
+   * re-rendering for a row menu or a dialog.
+   */
+  readonly hasMore?: boolean;
+  readonly loadingMore?: boolean;
+  readonly loadMoreFailed?: boolean;
+  readonly onLoadMore?: () => void;
   readonly genres?: readonly string[];
   readonly removedCount?: number;
   readonly suppressedCount?: number;
@@ -119,6 +132,10 @@ export function ListPage({
   serviceState = null,
   total,
   totalIsLowerBound = false,
+  hasMore = false,
+  loadingMore = false,
+  loadMoreFailed = false,
+  onLoadMore,
   genres = [],
   removedCount = 0,
   suppressedCount = 0,
@@ -251,6 +268,24 @@ export function ListPage({
                 }
               : {})}
           />
+          {/*
+            ⚠ BELOW THE LIST AND INSIDE THE SAME BRANCH. It must not render
+            over the loading, failure or offline states: a "Load more" beneath
+            "Couldn't load your list" offers to fetch page 2 of a list whose
+            page 1 never arrived.
+
+            ⚠ Rendered only when the container supplied a handler. `hasMore`
+            alone would draw a button with nothing behind it — the exact defect
+            the four row actions are passed as a set to avoid.
+          */}
+          {onLoadMore !== undefined && (
+            <LoadMoreSentinel
+              hasMore={hasMore}
+              loadingMore={loadingMore}
+              loadMoreFailed={loadMoreFailed}
+              onLoadMore={onLoadMore}
+            />
+          )}
           {menuFor !== null && (
             <RowMenu
               item={menuFor}
