@@ -371,3 +371,62 @@ describe('T-UX-033 - TMDB unavailable (502) dialog reports it; nothing is change
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * `ux-states.md` §3.7 - success WITH a suppression migration, and success
+ * without one.
+ *
+ * ⚠ WHY THE EXISTING SUCCESS CASE IS NOT ENOUGH. `T-UI-020i` drives the one
+ * response where `suppressionMigrated` is populated and asserts the notice
+ * appears. Nothing asserts the other direction, so rendering the notice
+ * UNCONDITIONALLY passes the whole suite - and tells the owner their `not
+ * interested` mark was moved on every single fix-match, including the ones
+ * where they never made one. §3.7 requires the migration to be stated when it
+ * happened; stating it when it did not is the same defect facing the other way.
+ *
+ * Product invariant 1 is what makes this load-bearing: suppression is keyed on
+ * canonical work identity, so a fix-match genuinely can move it. The owner has
+ * no other way to learn that it did.
+ */
+describe('T-UX-036 - the suppression migration is stated when it happened, and only then', () => {
+  async function reachSuccess(over: Partial<FixMatchDialogProps> = {}) {
+    const handles = mount(over);
+    const { user } = handles;
+
+    await user.type(screen.getByTestId('tmdb-search-input'), 'Dune');
+    await screen.findByTestId('tmdb-results');
+    await user.click(screen.getByTestId(`select-result-${SEARCH_RESULT.tmdbId}`));
+    await user.click(screen.getByTestId('confirm-fix-match'));
+    await screen.findByTestId('success-message');
+
+    return handles;
+  }
+
+  it('T-UX-036a states the migration, alongside the success message and not instead of it', async () => {
+    await reachSuccess({
+      fixMatch: () =>
+        Promise.resolve(
+          fixMatchResponse({
+            suppressionMigrated: { from: 'unmatched:abc123', to: 'tmdb:movie:438631' },
+          }),
+        ),
+    });
+
+    // Both, together. A notice that replaced the confirmation would leave the
+    // owner unsure the match itself had landed.
+    expect(screen.getByTestId('success-message')).toBeInTheDocument();
+    expect(screen.getByTestId('suppression-migrated').textContent).toBe(
+      FIXMATCH_SUPPRESSION_MIGRATED,
+    );
+  });
+
+  it('T-UX-036b says nothing about suppression when no mark was migrated', async () => {
+    await reachSuccess();
+
+    // The default response carries `suppressionMigrated: null` - nothing was
+    // moved, so claiming otherwise would be a false statement about the
+    // owner's own decisions.
+    expect(screen.getByTestId('success-message')).toBeInTheDocument();
+    expect(screen.queryByTestId('suppression-migrated')).toBeNull();
+  });
+});
