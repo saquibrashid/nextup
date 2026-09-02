@@ -125,7 +125,14 @@ const KNOWN_UNCOVERED: readonly string[] = [
   // `T-UX-016b`. The sort is the dangerous one — it is invisible on a single
   // screenful and only misorders against the API cursor at the page boundary.
   'T-UX-017',
-  'T-UX-020',
+  // `T-UX-020` (§2.11, the 403 full page) removed at the 17 → 15 step. It was
+  // never a missing test — it was a MAPPING defect. The state is fully
+  // covered by `T-UX-025a`–`h` in `apps/web/test/states.spec.tsx`, including
+  // `T-UX-025b`, "the refusal renders no list data, no nav and no partial
+  // UI", which is §2.11's exact claim word for word. Writing a `T-UX-020`
+  // would have duplicated `T-UX-025b` verbatim and left the repo with two
+  // names for one property — the shape that produces a "fix" applied to only
+  // one of them. §2.11 was re-pointed at `T-UX-025` instead.
   'T-UX-021',
   // `T-UX-036` (§3.7, fix-match success with a suppression migration) removed
   // at the 22 → 20 step: `T-UX-036a`/`b` in `apps/web/test/fixMatchDialog.spec.tsx`.
@@ -136,7 +143,16 @@ const KNOWN_UNCOVERED: readonly string[] = [
   // had been moved on every fix-match, including ones where they never made
   // one. Mutation-verified: `suppressionMigrated !== null` → `!== undefined`
   // killed `T-UX-036b` alone.
-  'T-UX-040',
+  // `T-UX-040` (§4.1, `/upload` initial) removed at the 17 → 15 step:
+  // `T-UX-040a`–`d` in `apps/web/test/uploadInitial.spec.tsx`.
+  // ⚠ It could not be implemented until the SPEC was fixed. §4.1 said the
+  // attach area was disabled with a visible reason; §4.0a, one row above it,
+  // says a paste arriving before selection is held client-side and not
+  // discarded. A disabled attach area cannot hold anything. The code has
+  // always implemented §4.0a — `ImageDropzone` contains no `disabled` at all
+  // — so §4.1 was corrected in place with the old wording struck through.
+  // Mutation-verified all four ways, including by re-implementing the
+  // superseded wording, which `T-UX-040a` and `b` both caught.
   // `T-UX-044` (§4.6, ceiling breached) removed at the 22 → 20 step:
   // `T-UX-044a`/`b`/`c` in `apps/web/test/imageDropzone.spec.tsx`.
   // ⚠ `T-UX-042b`/`c` call `reviewFiles()` directly and assert the returned

@@ -149,11 +149,19 @@ describe('T-META-006 — every defined test id is owned', () => {
     // owner decision (`T-INV-014`, `T-INV-016`), and `T-UX-069`, catalogued as
     // not implemented in v1. `T-A11Y-014` is the one open piece of real work.
     // 7 → 6: `T-A11Y-014` is implemented in `tests/e2e/a11y.spec.ts`. It was
-    // the LAST actionable entry — the six that remain are the six that SHOULD.
-    // Lowering this number further needs an owner decision on the two
-    // findings, not more tests, so a future implementer should not read a
-    // non-zero baseline as unfinished work.
-    expect(BASELINE_ORPHANS.size).toBe(6);
+    // the LAST entry actionable without an owner decision.
+    // 6 → 4: `T-INV-014` and `T-INV-016`, the two findings above, once the
+    // owner ruled on them. Both were SPEC defects, not missing tests: one rule
+    // was false of the schema and unimplementable given `T-MIG-001`, the other
+    // named a function that has never existed and had already passed vacuously
+    // in an earlier form. Both rules were corrected in place in
+    // `specs/testing.md` with the superseded text struck through, then
+    // implemented in `tests/infra/ownerLeadingIndexes.spec.ts` and
+    // `tests/infra/duplicateAckWriters.spec.ts` and mutation-verified.
+    // ⚠ The four that remain SHOULD remain, and a future implementer should
+    // not read a non-zero baseline as unfinished work: three `T-AUTH-*`
+    // deferred by §10, and `T-UX-069`, catalogued as not implemented in v1.
+    expect(BASELINE_ORPHANS.size).toBe(4);
   });
 
   it('T-META-006f: a citation that is struck through does not count as ownership', () => {
