@@ -20,13 +20,34 @@ export interface TitleListProps {
   readonly items: readonly TitleListItem[];
   readonly onOpenMenu?: ((item: TitleListItem) => void) | undefined;
   readonly onFixMatch?: ((item: TitleListItem) => void) | undefined;
+  /**
+   * The titles with a write in flight (`specs/ux-states.md` §2.13,
+   * `T-UX-021`).
+   *
+   * ⚠ **A SET OF IDS, NOT A BOOLEAN.** A single `busy` flag on the list is the
+   * shape §2.13 forbids in the same sentence it describes the dim — *"the rest
+   * of the list stays interactive"* — and it is the shape a well-meaning
+   * simplification reaches for first.
+   */
+  readonly pendingTitleIds?: ReadonlySet<string> | undefined;
 }
 
-export function TitleList({ items, onOpenMenu, onFixMatch }: TitleListProps): JSX.Element {
+export function TitleList({
+  items,
+  onOpenMenu,
+  onFixMatch,
+  pendingTitleIds,
+}: TitleListProps): JSX.Element {
   return (
     <ul className="title-list" data-testid="title-list">
       {items.map((item) => (
-        <TitleRow key={item.titleId} item={item} onOpenMenu={onOpenMenu} onFixMatch={onFixMatch} />
+        <TitleRow
+          key={item.titleId}
+          item={item}
+          onOpenMenu={onOpenMenu}
+          onFixMatch={onFixMatch}
+          pending={pendingTitleIds?.has(item.titleId) ?? false}
+        />
       ))}
     </ul>
   );

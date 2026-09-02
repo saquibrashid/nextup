@@ -18,7 +18,7 @@
 import type { JSX } from 'react';
 import { SERVICE_LABELS, type Service } from '@nextup/domain';
 
-import { IMDB_RATING_ABSENT, IMDB_RATING_SOURCE } from '../copy';
+import { IMDB_RATING_ABSENT, IMDB_RATING_SOURCE, ROW_PENDING_LABEL } from '../copy';
 
 /** `specs/ui.md` §2.2 - the poster size the row requests. */
 export const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w154';
@@ -65,6 +65,22 @@ export interface TitleRowProps {
    */
   readonly onOpenMenu?: ((item: TitleListItem) => void) | undefined;
   readonly onFixMatch?: ((item: TitleListItem) => void) | undefined;
+  /**
+   * `specs/ux-states.md` §2.13 **Submitting (row action)** (`T-UX-021`) — a
+   * write against THIS row is in flight.
+   *
+   * ⚠ **THE FLAG IS PER ROW, AND THAT IS THE WHOLE REQUIREMENT.** §2.13 says
+   * *"the rest of the list stays interactive"*, so the forbidden shape is a
+   * list-wide `busy` that disables every row while one of them is saving. On
+   * the owner's real list that reads as the app having frozen, and the natural
+   * response — reload — is the one action that can lose the in-flight write.
+   *
+   * ⚠ **`pending` DIMS AND DISABLES; IT NEVER HIDES.** `ListPage` already
+   * refuses to hide on `pending` (a failed request would leave a row hidden
+   * that is still on the list); this prop must not reintroduce that by the
+   * back door.
+   */
+  readonly pending?: boolean | undefined;
 }
 
 const MEDIA_TYPE_LABELS: Readonly<Record<TitleListItem['mediaType'], string>> = {
@@ -72,8 +88,9 @@ const MEDIA_TYPE_LABELS: Readonly<Record<TitleListItem['mediaType'], string>> = 
   tv: 'TV',
 };
 
-export function TitleRow({ item, onOpenMenu, onFixMatch }: TitleRowProps): JSX.Element {
+export function TitleRow({ item, onOpenMenu, onFixMatch, pending }: TitleRowProps): JSX.Element {
   const unmatched = item.matchState === 'unmatched';
+  const busy = pending === true;
 
   return (
     // ⚠ `id` IS A LINK TARGET, not decoration (TASK-076). v1 has no
@@ -84,6 +101,15 @@ export function TitleRow({ item, onOpenMenu, onFixMatch }: TitleRowProps): JSX.E
       className="title-row"
       id={`title-${item.titleId}`}
       data-testid={`title-row-${item.titleId}`}
+      // ⚠ `aria-busy` IS THE WHOLE §2.13 ROW STATE, VISUAL HALF INCLUDED. The
+      // dim is applied by `.title-row[aria-busy='true']` in `index.css` rather
+      // than by a `--pending` modifier class, for two reasons: `T-CSS-001c`
+      // forbids a computed `className` outright (a conditional one would make
+      // its static class scan silently incomplete), and — the better reason —
+      // deriving the dim FROM the accessible state makes it impossible to ship
+      // a row that looks busy but announces nothing, or announces busy and
+      // looks idle. There is one flag, so the two cannot disagree.
+      aria-busy={busy ? true : undefined}
     >
       {item.posterPath === null ? (
         // A neutral tile, never a broken <img>. §2.2: a missing poster is an
@@ -180,6 +206,20 @@ export function TitleRow({ item, onOpenMenu, onFixMatch }: TitleRowProps): JSX.E
 
       <div className="title-row__actions">
         {/*
+          ⚠ THE SPINNER IS RENDERED, NOT IMPLIED BY THE DIM. §2.13 asks for
+          both, and the dim alone is a colour-only state that says nothing
+          about *why* the row looks different — "greyed out" and "saving" are
+          indistinguishable at a glance, and the first invites a reload.
+          It carries text, not just a class: an unlabelled spinning glyph is
+          silent to a screen reader, and `aria-busy` on the row announces a
+          state without ever naming the action.
+        */}
+        {busy && (
+          <span role="status" className="title-row__spinner" data-testid="row-pending">
+            {ROW_PENDING_LABEL}
+          </span>
+        )}
+        {/*
           ⚠ THE AFFORDANCE IS CONDITIONAL ON A HANDLER, AND THAT IS THE POINT.
           Rendering the `⋮` unconditionally is what let the row menu ship
           inert for the whole of Epics I and J: `ListPage` passed no callbacks,
@@ -192,6 +232,11 @@ export function TitleRow({ item, onOpenMenu, onFixMatch }: TitleRowProps): JSX.E
               <button
                 type="button"
                 className="title-row__action tap-target"
+                // ⚠ DISABLED ON THIS ROW ONLY. A second write against a row
+                // whose first is still in flight is the double-submit §2.13
+                // exists to prevent; disabling the whole LIST instead is the
+                // failure mode it names in the same sentence.
+                disabled={busy}
                 onClick={() => {
                   onFixMatch(item);
                 }}
@@ -208,6 +253,7 @@ export function TitleRow({ item, onOpenMenu, onFixMatch }: TitleRowProps): JSX.E
                 aria-haspopup="menu"
                 aria-label={`Actions for ${item.name}`}
                 data-testid="row-menu"
+                disabled={busy}
                 onClick={() => {
                   onOpenMenu(item);
                 }}

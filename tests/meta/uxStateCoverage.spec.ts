@@ -221,7 +221,28 @@ const KNOWN_UNCOVERED: readonly string[] = [
   // would have duplicated `T-UX-025b` verbatim and left the repo with two
   // names for one property — the shape that produces a "fix" applied to only
   // one of them. §2.11 was re-pointed at `T-UX-025` instead.
-  'T-UX-021',
+  // `T-UX-021` (§2.13 **Submitting (row action)**) removed at the 10 → 9 step:
+  // `T-UX-021a`-`h` in `apps/web/test/rowPending.spec.tsx`, a new file.
+  // ⚠ THE STATE WAS MODELLED AND RENDERED NOWHERE. `SuppressDialog` has
+  // reported `'pending'` since TASK-102 and `ListPage` has stored it in
+  // `rowStates` ever since — it simply never reached the row, so a write in
+  // flight looked identical to an idle list. `TitleRow` now dims, sets
+  // `aria-busy`, renders a labelled `role="status"` spinner and disables its
+  // OWN control.
+  // ⚠ THE SECOND HALF OF §2.13 IS THE REQUIREMENT: *"the rest of the list
+  // stays interactive"*. A list-wide `busy` flag satisfies "the affected row
+  // dims" — it dims that row too — while doing exactly what the sentence
+  // forbids, and a frozen-looking list invites a reload, the one action that
+  // can lose the in-flight write. `T-UX-021c` is the only case that fails
+  // under that implementation, which is why it asserts the OTHER row.
+  // ⚠ `T-UX-021h` IS THE WIRING CASE AND IS NOT REDUNDANT. Every other case
+  // hands `TitleList` a set the test built, so all of them still pass with
+  // `ListPage` deriving `pendingTitleIds` from nothing and passing an empty
+  // set for ever — precisely the state the screen was in. Filtering the
+  // derivation to `false` kills `T-UX-021h` and nothing else.
+  // ⚠ The battery carried a NEGATIVE CONTROL (a comment-only edit) that
+  // correctly SURVIVED, so the seven kills are evidence the tests discriminate
+  // rather than evidence the harness fails everything it touches.
   // `T-UX-036` (§3.7, fix-match success with a suppression migration) removed
   // at the 22 → 20 step: `T-UX-036a`/`b` in `apps/web/test/fixMatchDialog.spec.tsx`.
   // ⚠ `T-UI-020i` already asserted the notice APPEARS when the response reports

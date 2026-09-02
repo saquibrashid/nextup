@@ -470,6 +470,19 @@ export const LOAD_MORE_FAILED = "Couldn't load more titles. The ones above are s
 export const IMDB_RATING_SOURCE = 'IMDb';
 export const IMDB_RATING_ABSENT = 'No IMDb rating';
 
+/*
+  `specs/ux-states.md` §2.13 **Submitting (row action)** (`T-UX-021`).
+
+  ⚠ FINDING — INVENTED COPY, PENDING OWNER REVIEW. §2.13 specifies the
+  behaviour ("the affected row dims with an inline spinner") but gives no
+  wording, and an unlabelled spinner is silent to a screen reader, so the
+  component needs *some* string. It names the row's state, not the action,
+  because the row does not know which of the §2.3 menu actions is in flight —
+  claiming "Removing…" when the owner chose *Fix match* would be a confident,
+  specific, wrong description of a write they cannot see.
+*/
+export const ROW_PENDING_LABEL = 'Saving…';
+
 /** The §6.31 lookup surface (REQ-092, US-045). */
 export const IMDB_LOOKUP_TITLE = 'Check a rating';
 export const IMDB_LOOKUP_BODY =
