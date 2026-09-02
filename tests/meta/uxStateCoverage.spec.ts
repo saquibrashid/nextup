@@ -95,9 +95,25 @@ const KNOWN_UNCOVERED: readonly string[] = [
   'T-UX-017',
   'T-UX-020',
   'T-UX-021',
-  'T-UX-036',
+  // `T-UX-036` (§3.7, fix-match success with a suppression migration) removed
+  // at the 22 → 20 step: `T-UX-036a`/`b` in `apps/web/test/fixMatchDialog.spec.tsx`.
+  // ⚠ `T-UI-020i` already asserted the notice APPEARS when the response reports
+  // a migration, and that is why this looked covered. It was not: nothing
+  // asserted the other direction, so making the notice unconditional passed all
+  // 22 cases in that file while telling the owner their "not interested" mark
+  // had been moved on every fix-match, including ones where they never made
+  // one. Mutation-verified: `suppressionMigrated !== null` → `!== undefined`
+  // killed `T-UX-036b` alone.
   'T-UX-040',
-  'T-UX-044',
+  // `T-UX-044` (§4.6, ceiling breached) removed at the 22 → 20 step:
+  // `T-UX-044a`/`b`/`c` in `apps/web/test/imageDropzone.spec.tsx`.
+  // ⚠ `T-UX-042b`/`c` call `reviewFiles()` directly and assert the returned
+  // string; §4.6 is a RENDERED state, and only the FORMAT rejection was ever
+  // asserted as rendered. Two mutations invisible to the old suite:
+  // a generic "That file is too big." reason (killed `T-UX-044a`), and
+  // `reviewFiles(files, 0)` instead of `accepted.length`, which lets the owner
+  // walk past the 40-image ceiling over successive attaches (killed
+  // `T-UX-044c` ALONE — no pre-existing case could see it).
   'T-UX-060',
   // ⚠ `T-UX-068` (§6.17, offline mid-review) IS LISTED DELIBERATELY AND MUST
   // NOT BE IMPLEMENTED TO CLEAR IT. It is `T-STATUS-001p`'s worked example of

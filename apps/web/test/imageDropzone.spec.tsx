@@ -285,3 +285,92 @@ describe('T-UX-042 - partial acceptance names every rejected file and its reason
     expect(screen.getByTestId('accepted-name')).toHaveTextContent('b.png');
   });
 });
+
+/**
+ * `ux-states.md` §4.6 - ceiling breached.
+ *
+ * ⚠ WHY THIS IS NOT ALREADY COVERED BY `T-UX-042b`/`c`. Those two call
+ * `reviewFiles()` directly and assert the returned string. §4.6 describes a
+ * RENDERED state, and the rendered path is asserted only for the unsupported
+ * FORMAT rejection (`T-UX-042a`) - never for either ceiling. A correct pure
+ * function whose reason never reaches `rejected-reason` satisfies every
+ * existing case while showing the owner nothing.
+ *
+ * ⚠ AND THE CEILING IS STATEFUL, WHICH A PURE TEST CANNOT SEE.
+ * `reviewFiles(files, alreadyAccepted)` is only as correct as the count the
+ * component hands it. Passing a literal `0` there lets the owner walk past the
+ * batch ceiling in successive attaches, and `T-UX-042c` - which supplies
+ * `alreadyAccepted` itself - stays green throughout. `T-UX-044c` is the only
+ * case that sees it.
+ */
+describe('T-UX-044 - a breached ceiling is rendered, names the number, and accumulates', () => {
+  it('T-UX-044a renders the size ceiling reason, naming the actual size and the limit', async () => {
+    render(<ImageDropzone />);
+
+    await userEvent.upload(
+      screen.getByTestId('file-input'),
+      [file('huge.png', 'image/png', 14 * 1024 * 1024)],
+      { applyAccept: false },
+    );
+
+    // The specific numbers reach the screen. "Too big" alone - or a reason
+    // computed correctly and then dropped on the floor - leaves the owner
+    // guessing how much to shrink the file by.
+    expect(screen.getByTestId('rejected-name')).toHaveTextContent('huge.png');
+    expect(screen.getByTestId('rejected-reason')).toHaveTextContent(
+      `That file is 14 MB. The limit is ${String(MAX_IMAGE_BYTES / (1024 * 1024))} MB.`,
+    );
+  });
+
+  it('T-UX-044b renders the count ceiling reason, naming the resulting count and the ceiling', async () => {
+    render(<ImageDropzone />);
+    const tooMany = Array.from({ length: MAX_IMAGES_PER_BATCH + 1 }, (_, index) =>
+      file(`shot-${String(index)}.png`, 'image/png'),
+    );
+
+    await userEvent.upload(screen.getByTestId('file-input'), tooMany, { applyAccept: false });
+
+    // Exactly one over: the ceiling admits MAX and refuses the next, and the
+    // refusal names both numbers rather than silently discarding the file.
+    expect(screen.getAllByTestId('accepted-file')).toHaveLength(MAX_IMAGES_PER_BATCH);
+    const rejections = screen.getAllByTestId('rejected-file');
+    expect(rejections).toHaveLength(1);
+    expect(within(rejections[0] as HTMLElement).getByTestId('rejected-reason')).toHaveTextContent(
+      `That would be ${String(MAX_IMAGES_PER_BATCH + 1)} screenshots. The limit is ${String(
+        MAX_IMAGES_PER_BATCH,
+      )} per batch.`,
+    );
+  });
+
+  it('T-UX-044c counts what is already attached, so the ceiling holds across separate attaches', async () => {
+    render(<ImageDropzone />);
+    const input = screen.getByTestId('file-input');
+    const firstAttach = Array.from({ length: MAX_IMAGES_PER_BATCH - 1 }, (_, index) =>
+      file(`first-${String(index)}.png`, 'image/png'),
+    );
+
+    await userEvent.upload(input, firstAttach, { applyAccept: false });
+    expect(screen.getAllByTestId('accepted-file')).toHaveLength(MAX_IMAGES_PER_BATCH - 1);
+
+    await userEvent.upload(
+      input,
+      [file('fills.png', 'image/png'), file('spills.png', 'image/png')],
+      {
+        applyAccept: false,
+      },
+    );
+
+    // The ceiling is evaluated against the batch as it WILL be, not against
+    // this one selection - so the second attach fills the last slot and the
+    // third file is refused by name.
+    expect(screen.getAllByTestId('accepted-file')).toHaveLength(MAX_IMAGES_PER_BATCH);
+    const rejections = screen.getAllByTestId('rejected-file');
+    expect(rejections).toHaveLength(1);
+    expect(within(rejections[0] as HTMLElement).getByTestId('rejected-name')).toHaveTextContent(
+      'spills.png',
+    );
+    expect(within(rejections[0] as HTMLElement).getByTestId('rejected-reason')).toHaveTextContent(
+      `That would be ${String(MAX_IMAGES_PER_BATCH + 1)} screenshots.`,
+    );
+  });
+});
