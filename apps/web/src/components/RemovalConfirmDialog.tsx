@@ -35,6 +35,8 @@ import { useId, type JSX } from 'react';
 
 import { SERVICE_LABELS, type ReviewRemovalItem, type Service } from '@nextup/domain';
 
+import { useDialogFocus } from '../lib/useDialogFocus';
+
 import {
   REMOVAL_CANCEL_LABEL,
   REMOVAL_CONFIRM_LABEL,
@@ -70,9 +72,16 @@ export function RemovalConfirmDialog({
 }: RemovalConfirmDialogProps): JSX.Element {
   const headingId = useId();
   const ticked = items.filter((item) => item.ticked);
+  /*
+    ⚠ Escape maps to CANCEL, never to confirm. This dialog authorises
+    deletions; the dismissal gesture must be the safe one.
+  */
+  const dialogRef = useDialogFocus(onCancel);
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-labelledby={headingId}
