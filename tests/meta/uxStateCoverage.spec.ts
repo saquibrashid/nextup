@@ -91,7 +91,15 @@ const KNOWN_UNCOVERED: readonly string[] = [
   'T-UX-002',
   'T-UX-010',
   'T-UX-015',
-  'T-UX-016',
+  // `T-UX-016` (§2.7 Populated) removed at the 20 → 19 step: `T-UX-016a`-`d` in
+  // `apps/web/test/titleList.spec.tsx`, a file that did not exist before.
+  // ⚠ NOTHING imported `TitleList` or queried `title-list` at all, while the
+  // component's own header forbids sorting, grouping and deduping and explains
+  // why. Mutation-verified with the three things it forbids: a client-side
+  // `sort()` by `sortDateAdded` killed `T-UX-016a` ALONE across all 47 web spec
+  // files; a dedupe by `name` killed `T-UX-016c`; one row per LISTING killed
+  // `T-UX-016b`. The sort is the dangerous one — it is invisible on a single
+  // screenful and only misorders against the API cursor at the page boundary.
   'T-UX-017',
   'T-UX-020',
   'T-UX-021',
