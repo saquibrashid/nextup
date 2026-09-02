@@ -379,6 +379,38 @@ button {
   padding: var(--space-3);
 }
 
+/*
+  `specs/ux-states.md` §2.13 (`T-UX-021`) — a write against this row is in
+  flight.
+
+  ⚠ KEYED ON `aria-busy`, NOT ON A MODIFIER CLASS. `T-CSS-001c` forbids a
+  computed `className` (a conditional one makes its static class scan silently
+  incomplete), but the better reason is that ONE flag now drives both halves:
+  there is no way to ship a row that looks busy and announces nothing, or that
+  announces busy and looks idle.
+
+  ⚠ THE DIM IS NOT THE WHOLE STATE. `TitleRow` also renders a labelled
+  `role="status"` spinner, because opacity alone is invisible to a screen
+  reader and indistinguishable from "disabled" to everyone else — and the
+  natural response to a list that looks frozen is a reload, the one action that
+  can lose the write in flight (`specs/ui.md` §10.2: colour is never the sole
+  carrier of meaning).
+
+  ⚠ SCOPED TO THE ROW. §2.13 requires the rest of the list to stay
+  interactive, so there is deliberately no list-level busy rule to pair with
+  this one.
+*/
+.title-row[aria-busy='true'] {
+  opacity: 0.6;
+}
+
+.title-row__spinner {
+  align-self: center;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
 .title-row__poster {
   border-radius: var(--radius);
   flex: 0 0 auto;

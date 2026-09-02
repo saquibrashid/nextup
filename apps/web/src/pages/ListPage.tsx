@@ -181,6 +181,19 @@ export function ListPage({
     fixMatchFn !== undefined;
 
   const visible = items.filter((item) => rowStates[item.titleId] !== 'suppressed');
+  /**
+   * `specs/ux-states.md` §2.13 (`T-UX-021`) — the rows with a write in flight.
+   *
+   * ⚠ DERIVED FROM `rowStates`, NOT A SECOND PIECE OF STATE. `SuppressDialog`
+   * already reports `pending` → `suppressed`/`present`; a parallel flag set
+   * beside it could disagree with it, and the disagreement would surface as a
+   * row stuck dim for ever after a failed write.
+   */
+  const pendingTitleIds = new Set(
+    Object.entries(rowStates)
+      .filter(([, state]) => state === 'pending')
+      .map(([titleId]) => titleId),
+  );
   const shown = visible.length;
   const unfilteredTotal = total ?? shown;
 
@@ -287,6 +300,7 @@ export function ListPage({
           <SortControl />
           <TitleList
             items={visible}
+            pendingTitleIds={pendingTitleIds}
             {...(rowActionsWired
               ? {
                   onOpenMenu: (item: TitleListItem) => {
