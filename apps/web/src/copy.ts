@@ -404,6 +404,28 @@ export const RETRY_LABEL = 'Retry';
  */
 export const LIST_LOADING_BODY = 'Loading your list…';
 
+/**
+ * Qualifies the count when the page shown is not the whole list (`T-UX-015`).
+ *
+ * ⚠ THE TRAILING SPACE IS PART OF THE CONSTANT. It is the separator between
+ * the qualifier and the number, so `'Showing 50 of at least 50'` reads
+ * correctly. Trimming it — which a well-meaning tidy-up will do on sight —
+ * yields `'of at least50'`. `T-UX-015d` asserts the space.
+ *
+ * ⚠ WHY THIS EXISTS. `specs/ux-states.md` §2.6 requires in bold that **no
+ * total is fabricated** (NFR-018). The list is served one page at a time
+ * (`DEFAULT_PAGE_LIMIT = 50`), so the row count in hand is a LOWER BOUND
+ * whenever the response carries a `nextCursor`; rendering it flat told an
+ * owner with 300 titles that they had 50 — the data-loss misreading US-019
+ * AC-5 exists to prevent.
+ *
+ * ⚠ This is the count half of §2.6 only. The load-more sentinel that §2.1
+ * item 4 of `specs/ui.md` also mandates is NOT built, so titles past the
+ * first page remain unreachable. That is why the count must hedge rather
+ * than claim: the hedge is honest about a list the UI cannot yet show.
+ */
+export const AT_LEAST_PREFIX = 'at least ';
+
 /* -------------------------------------------------------------------------- */
 /* Epic M — IMDb ratings (REQ-088…REQ-092, ADR-0011)                           */
 /* -------------------------------------------------------------------------- */

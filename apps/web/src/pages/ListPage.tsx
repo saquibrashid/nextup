@@ -38,6 +38,16 @@ export interface ListPageProps {
   readonly serviceState?: readonly ServiceFreshness[] | null;
   /** Rows the API would return unfiltered — the empty-state discriminator. */
   readonly total?: number;
+  /**
+   * `true` when more rows exist than were fetched (the API returned a
+   * `nextCursor`), making `total` a lower bound rather than a count.
+   *
+   * ⚠ It is passed STRAIGHT THROUGH to `FilterBar` and deliberately NOT fed
+   * to `ListEmptyState`: `hasMore` and "the list is empty" cannot both be
+   * true, so a discriminator that consulted it would be reasoning about a
+   * state that cannot occur — and would obscure the one that can.
+   */
+  readonly totalIsLowerBound?: boolean;
   readonly genres?: readonly string[];
   readonly removedCount?: number;
   readonly suppressedCount?: number;
@@ -108,6 +118,7 @@ export function ListPage({
   items = [],
   serviceState = null,
   total,
+  totalIsLowerBound = false,
   genres = [],
   removedCount = 0,
   suppressedCount = 0,
@@ -217,7 +228,12 @@ export function ListPage({
         </p>
       ) : (
         <>
-          <FilterBar genres={genres} shown={shown} total={unfilteredTotal} />
+          <FilterBar
+            genres={genres}
+            shown={shown}
+            total={unfilteredTotal}
+            totalIsLowerBound={totalIsLowerBound}
+          />
           <SortControl />
           <TitleList
             items={visible}
