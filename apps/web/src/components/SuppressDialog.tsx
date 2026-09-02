@@ -23,6 +23,8 @@
  */
 import { useCallback, useId, useState, type JSX } from 'react';
 
+import { useDialogFocus } from '../lib/useDialogFocus';
+
 import { SUPPRESS_CONFIRM_BODY } from '../copy';
 
 /** What the list should do with the row this dialog is acting on. */
@@ -99,6 +101,7 @@ export function SuppressDialog({
   // control's presence and its argument are the same fact and cannot diverge.
   const [undoTarget, setUndoTarget] = useState<string | null>(null);
   const headingId = useId();
+  const dialogRef = useDialogFocus(onClose);
 
   const confirm = useCallback(() => {
     setPhase('submitting');
@@ -139,7 +142,7 @@ export function SuppressDialog({
   );
 
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby={headingId}>
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={headingId}>
       <h2 id={headingId}>Not interested</h2>
 
       {(phase === 'confirm' || phase === 'submitting' || phase === 'error') && (

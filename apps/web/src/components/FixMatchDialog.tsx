@@ -27,6 +27,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type JSX } from 'react';
 
 import { FIXMATCH_SUPPRESSION_MIGRATED } from '../copy';
+import { useDialogFocus } from '../lib/useDialogFocus';
 
 /** 300 ms debounce matches the §2.3 spec. */
 const DEBOUNCE_MS = 300;
@@ -118,6 +119,7 @@ export function FixMatchDialog({
   } | null>(null);
   const [successResult, setSuccessResult] = useState<FixMatchResponse | null>(null);
   const headingId = useId();
+  const dialogRef = useDialogFocus(onClose);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Track the latest query so stale responses are discarded.
@@ -220,7 +222,7 @@ export function FixMatchDialog({
   }, [submit]);
 
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby={headingId}>
+    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={headingId}>
       <h2 id={headingId}>Fix match</h2>
 
       {/* ── Search phase ─────────────────────────────────────────────────── */}

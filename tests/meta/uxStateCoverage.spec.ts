@@ -81,7 +81,27 @@ const ID_PATTERN = /T-[A-Z0-9]+-\d+/g;
  * ratchet is shrink-only again from here.
  */
 const KNOWN_UNCOVERED: readonly string[] = [
-  'T-A11Y-006',
+  // `T-A11Y-006` (`specs/ui.md` §9 focus order) removed at the 13 → 12 step:
+  // `T-A11Y-006a`-`g` in `apps/web/test/dialogFocus.spec.tsx`.
+  // ⚠ ALL THREE DIALOGS SHIPPED WITH `aria-modal="true"` AND NONE OF THE
+  // BEHAVIOUR IT PROMISES — no trap, no restore, no `Escape`. That pairing is
+  // worse than an unlabelled div: `aria-modal` tells assistive technology the
+  // rest of the page is inert, so tabbing out lands the user in content their
+  // software has been told does not exist. `useDialogFocus` now supplies all
+  // three, and `T-A11Y-006e` reads the expected set OFF THE SOURCE — every
+  // component asserting `aria-modal` must call the hook — so a fourth dialog
+  // cannot ship untrapped past a green suite.
+  // ⚠ PARTIAL, AND THE RATCHET FORCED THE RETIREMENT (`T-META-007f` fails if
+  // an id is both asserted and declared a gap). `specs/ux-states.md` §1
+  // *"Focus after a state change"* — on success focus moves to the
+  // `role="status"` region, on error to `role="alert"` — is CARRIED BY THE
+  // SAME ID AND IS STILL UNASSERTED. ⚠ Do NOT read this removal as "focus
+  // management is done", and do NOT close that clause by focusing every live
+  // region: there are 53 across 23 components and most are AMBIENT
+  // (`OfflineBanner`, `FreshnessStrip`, `FilterBar`'s count, the load-more
+  // busy message). Focusing those would yank focus on every poll, which is a
+  // worse defect than the one being fixed. Which regions are action outcomes
+  // is an owner-level design decision, not a mechanical sweep.
   'T-AUTH-001',
   'T-AUTH-002',
   'T-AUTH-003',
