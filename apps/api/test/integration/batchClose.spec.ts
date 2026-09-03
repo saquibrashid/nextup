@@ -945,3 +945,125 @@ describe('T-PROV-013 · edits made OUTSIDE a batch write no batch provenance (US
     expect(await testPrisma().batchChange.count()).toBe(0);
   });
 });
+
+describe('T-PROV-014 · close links each applied candidate to the Title it resolved to (TASK-182)', () => {
+  // ⚠ THIS COLUMN WAS DEAD FOR THE WHOLE OF THE PROJECT. `resolved_title_id`
+  // was declared, indexed, foreign-keyed and even detached on discard, and
+  // NOTHING ever wrote it — so every row read `null` while the schema
+  // advertised a usable link. TASK-113's fix-match detector joined on it and
+  // its unit twin passed only because the fixture hand-fed the value; the
+  // integration run is what exposed it (`specs/testing.md` §22a). These cases
+  // exist so that can never be true again.
+  const resolvedTitleOf = async (candidateId: string): Promise<string | null> =>
+    (await testPrisma().extractionCandidate.findFirst({ where: { id: candidateId } }))
+      ?.resolvedTitleId ?? null;
+
+  it('T-PROV-014a: a candidate that CREATED a title points at that title', async () => {
+    const batchId = await makeBatch();
+    const candidateId = await makeCandidate(batchId, { disposition: 'confirmed' });
+
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+
+    const title = await testPrisma().title.findFirst({ where: { workIdentity: DUNE } });
+    expect(title?.id).toBeTruthy();
+    expect(await resolvedTitleOf(candidateId)).toBe(title?.id);
+  });
+
+  it('T-PROV-014b: a candidate that ATTACHED to a PRE-EXISTING title points at it too', async () => {
+    // The branch a creations-only implementation silently skips. "Which title
+    // did this read become" is as true here as for a new title, and a null
+    // would read as "this candidate resolved to nothing".
+    const titleId = await seedListing(DUNE, 'Dune', 'max');
+    const batchId = await makeBatch({ service: 'netflix' });
+    const candidateId = await makeCandidate(batchId, { disposition: 'confirmed' });
+
+    const body = (await (await closeBatchRequest(batchId)).json()) as CloseBody;
+    expect(body.summary.titlesCreated).toBe(0);
+    expect(body.summary.listingsCreated).toBe(1);
+
+    expect(await resolvedTitleOf(candidateId)).toBe(titleId);
+  });
+
+  it('T-PROV-014c: a DISCARDED candidate is left null — it resolved to nothing', async () => {
+    const batchId = await makeBatch();
+    const applied = await makeCandidate(batchId, { disposition: 'confirmed' });
+    const dropped = await makeCandidate(batchId, {
+      disposition: 'discarded',
+      workIdentity: HEAT,
+      rawText: 'Heat',
+    });
+
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+
+    expect(await resolvedTitleOf(applied)).not.toBeNull();
+    expect(await resolvedTitleOf(dropped)).toBeNull();
+  });
+
+  it('T-PROV-014d: a SUPPRESSION-GATED candidate is left null — no title was created for it', async () => {
+    // ⚠ `hideSuppressionsFromReview` DELIBERATELY. An ordinary suppression
+    // drops the candidate before the loop, so it never reaches the gate; only
+    // the review/close race does. The gate `continue`s before any title
+    // exists, so a link written above it would violate `fk_cand_resolved_title`
+    // and take the whole close down with it.
+    await testPrisma().suppression.create({
+      data: { id: 'sup-prov-014', ownerId, workIdentity: DUNE, active: true, displayName: 'Dune' },
+    });
+    const batchId = await makeBatch();
+    const gated = await makeCandidate(batchId, { disposition: 'confirmed' });
+
+    hideSuppressionsFromReview = true;
+    const body = (await (await closeBatchRequest(batchId)).json()) as CloseBody;
+    expect(body.summary.suppressedGated).toBe(1);
+    expect(await resolvedTitleOf(gated)).toBeNull();
+  });
+
+  it('T-PROV-014e: two candidates for the SAME work both point at the one title', async () => {
+    // Grouping by title is an implementation detail; both rows must still be
+    // written. A per-title flush that only ever wrote its first candidate
+    // would pass every single-row case above.
+    const titleId = await seedListing(DUNE, 'Dune', 'max');
+    const first = await makeBatch({ service: 'netflix' });
+    const a = await makeCandidate(first, { disposition: 'confirmed' });
+    expect((await closeBatchRequest(first)).status).toBe(200);
+
+    const second = await makeBatch({ service: 'netflix' });
+    const b = await makeCandidate(second, { disposition: 'confirmed' });
+    expect((await closeBatchRequest(second)).status).toBe(200);
+
+    expect(await resolvedTitleOf(a)).toBe(titleId);
+    expect(await resolvedTitleOf(b)).toBe(titleId);
+  });
+
+  it('T-PROV-014f: an SD-02 COLLAPSED loser is deliberately left null (derivable in one hop)', async () => {
+    // Not an oversight: the loser is absent from `applicable` by construction,
+    // and `collapsedIntoCandidateId` already names the survivor, which now
+    // names the title. A second copy is a second thing that can disagree.
+    const batchId = await makeBatch();
+    const winner = await makeCandidate(batchId, { disposition: 'confirmed' });
+    const loser = await makeCandidate(batchId, {
+      disposition: 'confirmed',
+      collapsedInto: winner,
+    });
+
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+
+    expect(await resolvedTitleOf(winner)).not.toBeNull();
+    expect(await resolvedTitleOf(loser)).toBeNull();
+    const row = await testPrisma().extractionCandidate.findFirst({ where: { id: loser } });
+    expect(row?.collapsedIntoCandidateId).toBe(winner);
+  });
+
+  it('T-PROV-014g: the link is written INSIDE the close transaction', async () => {
+    // Whole point of the FK. A link committed separately from its title can be
+    // orphaned by a rollback; here the failure is injected after the additions
+    // are written, and NOTHING — title, listing or link — may survive it.
+    const batchId = await makeBatch();
+    const candidateId = await makeCandidate(batchId, { disposition: 'confirmed' });
+
+    failServiceState = true;
+    expect((await closeBatchRequest(batchId)).status).toBe(500);
+
+    expect(await countTitles()).toBe(0);
+    expect(await resolvedTitleOf(candidateId)).toBeNull();
+  });
+});

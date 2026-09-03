@@ -1548,6 +1548,39 @@ export async function findExtractionCandidate(ownerId: OwnerId, id: string, tx?:
   return db(tx).extractionCandidate.findFirst({ where: { ownerId, id } });
 }
 
+/**
+ * Point a batch's applied candidates at the Title each one resolved to
+ * (TASK-182, `extraction_candidate.resolved_title_id`).
+ *
+ * ⚠ **THIS COLUMN WAS DECLARED, INDEXED, FOREIGN-KEYED AND DETACHED ON DISCARD
+ * FOR THE WHOLE OF THE PROJECT WITHOUT EVER BEING WRITTEN**, so it was `NULL`
+ * for every real row while looking like a usable link. TASK-113's fix-match
+ * detector joined on it; the no-store unit twin passed because its fixture
+ * hand-fed the column, and only the integration test caught that the feature
+ * could not work at all (`specs/testing.md` §22a). Writing it is what makes the
+ * schema tell the truth.
+ *
+ * ⚠ **CALL THIS INSIDE THE CLOSE TRANSACTION AND ONLY AFTER THE TITLES EXIST.**
+ * `fk_cand_resolved_title` is a real foreign key: a link written before its
+ * title, or committed separately from it, is a constraint violation rather
+ * than a stale pointer.
+ *
+ * Grouped by title so one statement covers every candidate that resolved to
+ * the same work, which is the SD-02 case.
+ */
+export async function setCandidateResolvedTitles(
+  ownerId: OwnerId,
+  links: readonly { readonly titleId: string; readonly candidateIds: readonly string[] }[],
+  tx?: Db,
+): Promise<void> {
+  for (const link of links) {
+    await db(tx).extractionCandidate.updateMany({
+      where: { ownerId, id: { in: [...link.candidateIds] } },
+      data: { resolvedTitleId: link.titleId },
+    });
+  }
+}
+
 export async function updateCandidateDisposition(
   ownerId: OwnerId,
   id: string,

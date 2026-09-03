@@ -76,6 +76,13 @@ const store: {
   batch: BatchRow | null;
   candidates: CandidateRow[];
   suppressions: { workIdentity: string }[];
+  /**
+   * Suppressions the REVIEW LOAD cannot see but the in-transaction re-check
+   * can — the owner suppressing a work from another tab between review and
+   * close. The only lever that reaches the gate inside the close transaction,
+   * because an ordinary suppression removes the candidate before the loop.
+   */
+  raceSuppressions: { workIdentity: string }[];
   titles: TitleRow[];
   listings: { titleId: string; service: string; dateAdded: Date }[];
   titleUpdates: { id: string; data: Record<string, unknown> }[];
@@ -107,10 +114,13 @@ const store: {
   softDeleted: { listingId: string; removedByGroupId?: string | null }[];
   /** Listing ids whose soft delete reports zero rows — the injected race. */
   softDeleteFails: string[];
+  /** TASK-182 — the candidate→title links the close flushed. */
+  resolvedLinks: { titleId: string; candidateIds: string[] }[];
 } = {
   batch: null,
   candidates: [],
   suppressions: [],
+  raceSuppressions: [],
   titles: [],
   listings: [],
   titleUpdates: [],
@@ -123,6 +133,7 @@ const store: {
   removalGroups: [],
   softDeleted: [],
   softDeleteFails: [],
+  resolvedLinks: [],
 };
 
 vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
@@ -171,20 +182,39 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
     },
     findActiveSuppression: (_ownerId: string, workIdentity: string) =>
       Promise.resolve(
-        store.suppressions.find((s) => s.workIdentity === workIdentity) ?? null,
+        [...store.suppressions, ...store.raceSuppressions].find(
+          (s) => s.workIdentity === workIdentity,
+        ) ?? null,
       ) as Promise<unknown>,
     findTitleByWorkIdentity: (_ownerId: string, workIdentity: string) =>
       Promise.resolve(store.titles.find((t) => t.workIdentity === workIdentity) ?? null),
+    setCandidateResolvedTitles: (
+      _ownerId: string,
+      links: { titleId: string; candidateIds: readonly string[] }[],
+    ) => {
+      // Recorded as given, NOT merged: a flush that wrote an empty group, or
+      // wrote the same title twice, must be visible to the assertions rather
+      // than tidied away by the fake.
+      for (const link of links) {
+        store.resolvedLinks.push({ titleId: link.titleId, candidateIds: [...link.candidateIds] });
+      }
+      return Promise.resolve(undefined);
+    },
     createTitle: (_ownerId: string, data: Record<string, unknown>) => {
+      // ⚠ The key is `id`, NOT `titleId` — `insertTitle` passes the Title row
+      // as the repository declares it. The fake read `titleId` and therefore
+      // recorded every created title with an `undefined` id and identity for
+      // the whole of the project; nothing asserted on them, so it never
+      // showed. `T-PROV-015a` is the first case that reads one back.
       store.titles.push({
-        id: data['titleId'] as string,
+        id: data['id'] as string,
         workIdentity: data['workIdentity'] as string,
         state: 'active',
         tmdbId: (data['tmdbId'] as number | undefined) ?? null,
         tmdbName: (data['tmdbName'] as string | null | undefined) ?? null,
         sortDateAdded: data['sortDateAdded'] as Date,
       });
-      return Promise.resolve({ id: data['titleId'] as string });
+      return Promise.resolve({ id: data['id'] as string });
     },
     updateTitle: (_ownerId: string, id: string, data: Record<string, unknown>) => {
       store.titleUpdates.push({ id, data });
@@ -315,6 +345,7 @@ beforeEach(async () => {
   };
   store.candidates = [];
   store.suppressions = [];
+  store.raceSuppressions = [];
   store.titles = [];
   store.listings = [];
   store.titleUpdates = [];
@@ -327,6 +358,7 @@ beforeEach(async () => {
   store.removalGroups = [];
   store.softDeleted = [];
   store.softDeleteFails = [];
+  store.resolvedLinks = [];
 
   const { createApp } = await import('../../src/app.js');
   app = createApp();
@@ -649,5 +681,132 @@ describe('T-REV-012ba-bh: removals at close, stubbed', () => {
     const update = store.titleUpdates.find((u) => u.id === 'title-heat');
     expect(update?.data['state']).toBe('removed');
     expect(update?.data['sortDateAdded']).toBeNull();
+  });
+});
+
+describe('T-PROV-015 · the candidate→title link is flushed inside the close (TASK-182)', () => {
+  // The locally runnable half of `T-PROV-014`. The store is a fake, so this
+  // proves WHICH candidates the close links and WHEN — never that the FK or
+  // the transaction hold, which only `T-PROV-014` against a real engine can.
+  //
+  // ⚠ These exist because `resolved_title_id` shipped declared, indexed and
+  // foreign-keyed while NOTHING wrote it (`specs/testing.md` §22a). The
+  // absence of a write is exactly the kind of defect a fixture that hand-feeds
+  // the column hides, so nothing here may seed the link.
+  const linkFor = (candidateId: string): string | null =>
+    store.resolvedLinks.find((l) => l.candidateIds.includes(candidateId))?.titleId ?? null;
+
+  it('T-PROV-015a: a candidate that created a title is linked to it', async () => {
+    const cand = makeCandidate();
+
+    expect((await closeBatch('batch-1')).status).toBe(200);
+
+    const title = store.titles.find((t) => t.workIdentity === DUNE);
+    expect(title?.id).toBeTruthy();
+    expect(linkFor(cand.id)).toBe(title?.id);
+  });
+
+  it('T-PROV-015b: a candidate that attached to an EXISTING title is linked too', async () => {
+    store.titles.push({
+      id: 'title-existing',
+      workIdentity: DUNE,
+      state: 'active',
+      tmdbId: 438631,
+      tmdbName: 'Dune',
+      sortDateAdded: new Date('2026-01-04'),
+    });
+    const cand = makeCandidate();
+
+    expect((await closeBatch('batch-1')).status).toBe(200);
+
+    expect(linkFor(cand.id)).toBe('title-existing');
+  });
+
+  it('T-PROV-015c: a discarded candidate is never linked', async () => {
+    const kept = makeCandidate();
+    const dropped = makeCandidate({
+      reviewDisposition: 'discarded',
+      resolvedWorkIdentity: HEAT,
+      rawText: 'Heat',
+    });
+
+    expect((await closeBatch('batch-1')).status).toBe(200);
+
+    expect(linkFor(kept.id)).not.toBeNull();
+    expect(linkFor(dropped.id)).toBeNull();
+  });
+
+  it('T-PROV-015d: a suppression-gated candidate is never linked', async () => {
+    // ⚠ USES THE RACE LEVER DELIBERATELY. An ordinary suppression removes the
+    // candidate before the loop ever starts, so it proves nothing about the
+    // gate; only a suppression the review load could not see reaches the
+    // `continue` inside the transaction. That `continue` happens BEFORE any
+    // title exists, so a link recorded above it would point at nothing —
+    // under the real FK, a constraint violation that fails the whole close.
+    store.raceSuppressions.push({ workIdentity: DUNE });
+    const gated = makeCandidate();
+
+    const res = await closeBatch('batch-1');
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as CloseBody).summary.listingsCreated).toBe(0);
+
+    expect(linkFor(gated.id)).toBeNull();
+    expect(store.resolvedLinks.flatMap((l) => l.candidateIds)).toEqual([]);
+  });
+
+  it('T-PROV-015e: an SD-02 collapsed loser is deliberately not linked', async () => {
+    const winner = makeCandidate();
+    const loser = makeCandidate({ collapsedIntoCandidateId: winner.id });
+
+    expect((await closeBatch('batch-1')).status).toBe(200);
+
+    expect(linkFor(winner.id)).not.toBeNull();
+    expect(linkFor(loser.id)).toBeNull();
+  });
+
+  it('T-PROV-015f: the flush happens INSIDE the one transaction', async () => {
+    // Ordering, which the inline `runInTransaction` stub can prove: the fake
+    // counts the transaction before running the callback, so a link recorded
+    // while the count is still 0 was written outside it.
+    //
+    // ⚠ IT CANNOT PROVE THE `tx` HANDLE IS PASSED. The fake ignores it, so a
+    // flush that ran in the right place on the WRONG connection still passes
+    // here; `T-PROV-014g` owns that against a real engine.
+    let transactionsWhenLinked = -1;
+    const cand = makeCandidate();
+    const originalPush = store.resolvedLinks.push.bind(store.resolvedLinks);
+    store.resolvedLinks.push = ((...items: { titleId: string; candidateIds: string[] }[]) => {
+      if (transactionsWhenLinked === -1) transactionsWhenLinked = store.transactions;
+      return originalPush(...items);
+    }) as typeof store.resolvedLinks.push;
+
+    expect((await closeBatch('batch-1')).status).toBe(200);
+    store.resolvedLinks.push = originalPush;
+
+    expect(linkFor(cand.id)).not.toBeNull();
+    expect(transactionsWhenLinked).toBe(1);
+  });
+
+  it('T-PROV-015g: an empty review flushes no links at all', async () => {
+    // The flush must not fire a statement per close regardless. Nothing was
+    // applied, so there is nothing to point anywhere.
+    expect((await closeBatch('batch-1')).status).toBe(200);
+
+    expect(store.resolvedLinks.flatMap((l) => l.candidateIds)).toEqual([]);
+  });
+
+  it('T-PROV-015h: TWO candidates for the same work are BOTH linked to the one title', async () => {
+    // Grouping by title is an implementation detail, and one that quietly
+    // drops rows if the flush writes only a group's first candidate — which
+    // every single-candidate case above would still pass.
+    const first = makeCandidate();
+    const second = makeCandidate({ rawText: 'DUNE (2021)', normalisedText: 'dune 2021' });
+
+    expect((await closeBatch('batch-1')).status).toBe(200);
+
+    const titleId = store.titles.find((t) => t.workIdentity === DUNE)?.id;
+    expect(titleId).toBeTruthy();
+    expect(linkFor(first.id)).toBe(titleId);
+    expect(linkFor(second.id)).toBe(titleId);
   });
 });
