@@ -28,6 +28,7 @@ import { useCallback, useEffect, useId, useRef, useState, type JSX } from 'react
 
 import { FIXMATCH_SUPPRESSION_MIGRATED } from '../copy';
 import { useDialogFocus } from '../lib/useDialogFocus';
+import { useOutcomeFocus } from '../lib/useOutcomeFocus';
 
 /** 300 ms debounce matches the §2.3 spec. */
 const DEBOUNCE_MS = 300;
@@ -120,6 +121,15 @@ export function FixMatchDialog({
   const [successResult, setSuccessResult] = useState<FixMatchResponse | null>(null);
   const headingId = useId();
   const dialogRef = useDialogFocus(onClose);
+
+  /*
+   * `T-A11Y-006` outcome half (`specs/ux-states.md` §1). The dialog stays open
+   * on success and swaps its whole body for the confirmation, so without this
+   * a screen-reader user is left focused on a **Cancel** button that has
+   * silently relabelled itself **Close**, with no announcement of what the
+   * match now is.
+   */
+  const successRef = useOutcomeFocus<HTMLParagraphElement>(phase === 'success');
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Track the latest query so stale responses are discarded.
@@ -368,7 +378,7 @@ export function FixMatchDialog({
       {/* ── Success (§3.7) ───────────────────────────────────────────────── */}
       {phase === 'success' && successResult !== null && (
         <>
-          <p role="status" data-testid="success-message">
+          <p role="status" data-testid="success-message" ref={successRef} tabIndex={-1}>
             Done. &ldquo;{name}&rdquo; is now matched.
           </p>
           {successResult.suppressionMigrated !== null && (

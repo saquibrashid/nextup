@@ -24,6 +24,7 @@
 import { useCallback, useId, useState, type JSX } from 'react';
 
 import { useDialogFocus } from '../lib/useDialogFocus';
+import { useOutcomeFocus } from '../lib/useOutcomeFocus';
 
 import { SUPPRESS_CONFIRM_BODY } from '../copy';
 
@@ -103,6 +104,19 @@ export function SuppressDialog({
   const headingId = useId();
   const dialogRef = useDialogFocus(onClose);
 
+  /*
+   * `T-A11Y-006` outcome half (`specs/ux-states.md` §1). Suppression is the
+   * one action here that makes a title disappear from the list, and the
+   * `role="status"` message is also where **Undo** lives — so a keyboard user
+   * who is not moved here has to hunt for the remedy for a change they may
+   * have made by mistake.
+   *
+   * ⚠ `'undone'` is deliberately EXCLUDED. It is reached by pressing **Undo**
+   * inside this dialog, and focusing the outcome then takes focus off the
+   * control the owner is still on.
+   */
+  const outcomeRef = useOutcomeFocus<HTMLParagraphElement>(phase === 'done' || phase === 'already');
+
   const confirm = useCallback(() => {
     setPhase('submitting');
     onRowState('pending');
@@ -152,12 +166,27 @@ export function SuppressDialog({
       {phase === 'error' && <p role="alert">{withName(SUPPRESS_FAILED_BODY, name)}</p>}
 
       {(phase === 'done' || phase === 'undoing') && (
-        <p role="status">{withName(SUPPRESS_SUCCESS_BODY, name)}</p>
+        <p role="status" ref={outcomeRef} tabIndex={-1}>
+          {withName(SUPPRESS_SUCCESS_BODY, name)}
+        </p>
       )}
 
-      {phase === 'already' && <p role="status">{withName(ALREADY_SUPPRESSED_BODY, name)}</p>}
+      {phase === 'already' && (
+        <p role="status" ref={outcomeRef} tabIndex={-1}>
+          {withName(ALREADY_SUPPRESSED_BODY, name)}
+        </p>
+      )}
 
-      {phase === 'undone' && <p role="status">{withName(SUPPRESS_UNDONE_BODY, name)}</p>}
+      {phase === 'undone' && (
+        // ⚠ Carries the ref but is NOT in the active set above. The ref is here
+        // so that widening the set to include `'undone'` genuinely moves focus
+        // — and is therefore caught by `T-A11Y-006i` — rather than being a
+        // no-op the suite cannot see. Undo is reached from a control the owner
+        // is standing on; focusing the result takes them off it.
+        <p role="status" ref={outcomeRef} tabIndex={-1}>
+          {withName(SUPPRESS_UNDONE_BODY, name)}
+        </p>
+      )}
 
       {(phase === 'confirm' || phase === 'error') && (
         <button type="button" onClick={confirm}>

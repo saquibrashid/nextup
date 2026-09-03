@@ -25,6 +25,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { REMOVAL_CANCEL_LABEL, REMOVAL_CONFIRM_LABEL } from '../src/copy';
+import { BatchAppliedNotice } from '../src/components/BatchAppliedNotice';
+import { FixMatchDialog } from '../src/components/FixMatchDialog';
 import { RemovalConfirmDialog } from '../src/components/RemovalConfirmDialog';
 import { SuppressDialog } from '../src/components/SuppressDialog';
 import type { ReviewRemovalItem } from '@nextup/domain';
@@ -241,5 +243,195 @@ describe('T-A11Y-006 dialogs trap focus, restore it, and close on Escape', () =>
 
     await user.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+/*
+ * ── The OUTCOME half of `T-A11Y-006` ────────────────────────────────────────
+ *
+ * `specs/ux-states.md` §1 *"Focus after a state change"*: on success focus
+ * moves to the `role="status"` region. `a`–`g` above closed the DIALOG half of
+ * this id and the ratchet note recorded this clause as still open.
+ *
+ * ⚠ **SCOPED TO THREE OUTCOMES BY OWNER DECISION, AND `m` IS WHAT KEEPS IT
+ * SCOPED.** There are 53 live regions across 23 components and most are
+ * ambient — the offline banner, the freshness strip, the filter's result
+ * count, the load-more busy message. Focusing those would yank focus while the
+ * owner is reading or typing, which is worse than the defect being fixed. `m`
+ * reads the source and fails both if a fourth component starts focusing
+ * outcomes AND if one of the three stops.
+ */
+describe('T-A11Y-006 action outcomes take focus, ambient regions do not', () => {
+  it('T-A11Y-006h: a suppression moves focus to the outcome that carries Undo', async () => {
+    const user = userEvent.setup();
+    render(
+      <SuppressDialog
+        titleId="t1"
+        name="Gone 1"
+        suppress={() => Promise.resolve({ suppressionId: 's1', alreadySuppressed: false })}
+        unsuppress={() => Promise.resolve({})}
+        onRowState={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Not interested' }));
+
+    const outcome = await screen.findByText(/is now on your Not interested list/i);
+    // ⚠ Identity, not `contains`: `focus()` on a `<p>` without `tabIndex={-1}`
+    // is a SILENT no-op, and a containment check would pass on the dialog
+    // container that already had focus.
+    expect(document.activeElement).toBe(outcome);
+  });
+
+  it('T-A11Y-006i: pressing Undo does not steal focus back from the owner', async () => {
+    const user = userEvent.setup();
+    render(
+      <SuppressDialog
+        titleId="t1"
+        name="Gone 1"
+        suppress={() => Promise.resolve({ suppressionId: 's1', alreadySuppressed: false })}
+        unsuppress={() => Promise.resolve({})}
+        onRowState={() => undefined}
+        onClose={() => undefined}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Not interested' }));
+    await screen.findByText(/is now on your Not interested list/i);
+
+    const undo = screen.getByRole('button', { name: /undo/i });
+    await user.click(undo);
+
+    // The undone message is an outcome too, but it is reached FROM a control
+    // the owner is standing on. Re-focusing here would move them off it.
+    await screen.findByText(/is off your Not interested list/i);
+    expect(document.activeElement).not.toBe(
+      await screen.findByText(/is off your Not interested list/i),
+    );
+  });
+
+  it('T-A11Y-006j: a follow-on state change does not re-steal focus', async () => {
+    /*
+      The applied notice focuses itself once, on arrival. It then re-renders
+      for reasons the owner drives — pressing **Undo** moves it through
+      `undoing` and into `undone` or `failed`. A hook that focused on every
+      render while active would yank focus off the very button being pressed,
+      mid-action. A mutation dropping the transition guard survived the whole
+      suite until this case existed.
+    */
+    const user = userEvent.setup();
+    render(
+      <BatchAppliedNotice
+        applied={{
+          batchId: 'batch-1',
+          service: 'netflix',
+          undoable: true,
+          summary: { listingsCreated: 9, listingsRemoved: 0, removalGroupId: null },
+        }}
+        undoRemovalGroup={() => Promise.resolve({})}
+        undoBatch={() => Promise.resolve({})}
+      />,
+    );
+
+    const summary = document.querySelector('.applied-notice-body');
+    expect(document.activeElement).toBe(summary);
+
+    await user.click(screen.getByRole('button', { name: /undo/i }));
+    await screen.findByText(/undone|undid|back/i);
+
+    expect(document.activeElement).not.toBe(document.querySelector('.applied-notice-body'));
+  });
+
+  it('T-A11Y-006k: a fix-match confirmation moves focus to the confirmation', async () => {
+    const user = userEvent.setup();
+    render(
+      <FixMatchDialog
+        titleId="ttl_1"
+        name="Dune"
+        badges={[{ service: 'netflix', listingId: 'l1', dateAdded: '2 Apr 2026' }]}
+        searchTmdb={() =>
+          Promise.resolve({
+            items: [
+              {
+                tmdbId: 438631,
+                mediaType: 'movie' as const,
+                name: 'Dune: Part One',
+                releaseYear: 2021,
+                posterPath: null,
+              },
+            ],
+          })
+        }
+        fixMatch={() =>
+          Promise.resolve({
+            titleId: 'ttl_1',
+            workIdentity: 'tmdb:movie:438631',
+            preserved: {
+              listingIds: ['l1'],
+              dateAdded: { l1: '2026-04-02' },
+              sortDateAdded: '2026-04-02',
+            },
+            suppressionMigrated: null,
+          })
+        }
+        onClose={() => undefined}
+      />,
+    );
+
+    await user.type(screen.getByTestId('tmdb-search-input'), 'Dune');
+    await screen.findByTestId('tmdb-results');
+    await user.click(screen.getByTestId('select-result-438631'));
+    await user.click(screen.getByTestId('confirm-fix-match'));
+
+    const success = await screen.findByTestId('success-message');
+    // The dialog stays open and swaps its whole body, so without this the
+    // owner is left on a Cancel button that silently relabelled itself Close.
+    expect(document.activeElement).toBe(success);
+  });
+
+  it('T-A11Y-006l: the applied summary takes focus on the screen it lands on', () => {
+    render(
+      <BatchAppliedNotice
+        applied={{
+          batchId: 'batch-1',
+          service: 'netflix',
+          undoable: true,
+          summary: { listingsCreated: 9, listingsRemoved: 0, removalGroupId: null },
+        }}
+        undoRemovalGroup={() => Promise.resolve({})}
+        undoBatch={() => Promise.resolve({})}
+      />,
+    );
+
+    const summary = document.querySelector('.applied-notice-body');
+    expect(document.activeElement).toBe(summary);
+  });
+
+  it('T-A11Y-006m: ONLY the three owner-chosen outcomes focus themselves', () => {
+    const users = readdirSync(COMPONENTS)
+      .filter((file) => file.endsWith('.tsx'))
+      .filter((file) => readFileSync(join(COMPONENTS, file), 'utf8').includes('useOutcomeFocus'))
+      .sort();
+
+    // ⚠ Fails in BOTH directions on purpose. A fourth entry means someone
+    // swept the ambient regions; a missing entry means an outcome silently
+    // stopped announcing itself while every other case here still passed.
+    expect(users).toEqual(['BatchAppliedNotice.tsx', 'FixMatchDialog.tsx', 'SuppressDialog.tsx']);
+  });
+
+  it('T-A11Y-006n: the ambient regions are left alone', () => {
+    const ambient = [
+      'OfflineBanner.tsx',
+      'FreshnessStrip.tsx',
+      'FilterBar.tsx',
+      'LoadMoreSentinel.tsx',
+    ];
+
+    for (const file of ambient) {
+      const source = readFileSync(join(COMPONENTS, file), 'utf8');
+      expect(source.includes('role="status"')).toBe(true);
+      expect(source.includes('useOutcomeFocus')).toBe(false);
+    }
   });
 });

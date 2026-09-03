@@ -32,6 +32,7 @@
 import { useCallback, useState, type JSX } from 'react';
 
 import { SERVICE_LABELS, type Service } from '@nextup/domain';
+import { useOutcomeFocus } from '../lib/useOutcomeFocus';
 
 /** The §6.22 close response, as much of it as this notice reads. */
 export interface AppliedBatch {
@@ -157,9 +158,22 @@ export function BatchAppliedNotice({
 
   const undone = phase === 'undone';
 
+  /*
+   * `T-A11Y-006` outcome half. The review close is the one navigation in the
+   * app that lands the owner on a DIFFERENT screen to report the result of
+   * something irreversible, so the summary — how many titles were added and
+   * removed — is what they came for. Without this the announcement is made to
+   * a screen reader whose focus is still at the top of the list.
+   *
+   * Keyed on mount, not on `phase`: `undone` and `failed` are follow-on states
+   * the owner reaches by pressing **Undo**, and re-focusing then would take
+   * focus off the very control they are using.
+   */
+  const appliedRef = useOutcomeFocus<HTMLParagraphElement>(true);
+
   return (
     <div className="applied-notice" data-testid="applied-notice">
-      <p role="status" className="applied-notice-body">
+      <p role="status" className="applied-notice-body" ref={appliedRef} tabIndex={-1}>
         {undone
           ? offer.kind === 'removal-group'
             ? UNDO_REMOVALS_DONE
