@@ -483,6 +483,26 @@ export const IMDB_RATING_ABSENT = 'No IMDb rating';
 */
 export const ROW_PENDING_LABEL = 'Saving…';
 
+/*
+  `specs/ux-states.md` §2.8 **Partial data — TMDB stale** (`T-UX-017`).
+  Transcribed verbatim from that row; this is spec copy, not a draft.
+
+  ⚠ THIS IS NOT THE STALENESS NUDGE, AND IT MUST NOT BE DELETED AS ONE. A46
+  dropped the FRESHNESS-STRIP stale chip, its threshold and its "Update now"
+  link outright (`specs/ui.md` §2.1 item 1) — that concerned how long ago the
+  OWNER last uploaded, and nagging about it was the thing the owner rejected.
+  This chip is the other, still-required sense of the word (product invariant
+  8): TMDB was unreachable or missed the 5 s budget while serving THIS page,
+  so the row's poster, genres and runtime are nextup's stored copy rather
+  than a freshly confirmed one (NFR-014, REQ-076, `specs/api.md` §6.4).
+
+  It says "may be", not "is": the stored metadata is usually still correct,
+  and the flag reports an unconfirmed read, never a known-wrong one. It also
+  makes no demand of the owner — there is nothing for them to do, and the
+  refresh retries by itself on the next view.
+*/
+export const METADATA_STALE_CHIP = 'Details may be out of date';
+
 /** The §6.31 lookup surface (REQ-092, US-045). */
 export const IMDB_LOOKUP_TITLE = 'Check a rating';
 export const IMDB_LOOKUP_BODY =

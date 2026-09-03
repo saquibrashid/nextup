@@ -212,7 +212,24 @@ const KNOWN_UNCOVERED: readonly string[] = [
   // files; a dedupe by `name` killed `T-UX-016c`; one row per LISTING killed
   // `T-UX-016b`. The sort is the dangerous one — it is invisible on a single
   // screenful and only misorders against the API cursor at the page boundary.
-  'T-UX-017',
+  // `T-UX-017` (§2.8 Partial data — TMDB stale) removed at the 9 → 8 step:
+  // `T-UX-017a`-`i` in `apps/web/test/metadataStale.spec.tsx`.
+  // ⚠ THIS ONE LOOKED LIKE A DELETED FEATURE AND WAS NOT. A46 dropped the
+  // freshness-strip staleness nudge whole, and `specs/ui.md` §2.1 item 1 lists
+  // "the stale chip" among the things it dropped — but that sentence is about
+  // how long ago the OWNER last uploaded. This chip is the other, still-
+  // required sense of the word (product invariant 8): TMDB unreachable or over
+  // the 5 s budget while serving one page (NFR-014, REQ-076, `api.md` §6.4).
+  // ⚠ THE FLAG HAD BEEN ON THE WIRE THE WHOLE TIME. `routes/titles.ts` emits
+  // `metadataStale` on every item and `apiClient` casts parsed JSON straight
+  // through, so the value arrived in the browser and was dropped for want of a
+  // field on `TitleListItem`. Nine mutations run, all killed by the named
+  // cases, alongside a comment-only negative control that survived. Three are
+  // worth naming: dimming the chip's condition to `!unmatched` killed `g`
+  // alone (the two chips are independent states); hiding the genres when stale
+  // killed `d` alone (§2.8 says rows RENDER from stored metadata — the flag is
+  // not an error); and a `TitleList` that passed `metadataStale: false` down
+  // killed `f` alone, which is the shape of the real defect this closed.
   // `T-UX-020` (§2.11, the 403 full page) removed at the 17 → 15 step. It was
   // never a missing test — it was a MAPPING defect. The state is fully
   // covered by `T-UX-025a`–`h` in `apps/web/test/states.spec.tsx`, including
