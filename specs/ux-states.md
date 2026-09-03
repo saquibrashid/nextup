@@ -128,7 +128,7 @@ Each state below names: **what the owner sees**, **what they can do**, and the
 
 | State | Owner sees | Can do | Test |
 |---|---|---|---|
-| **6.1 Loading** | Section skeletons with their counts already shown from `GET /api/batches/:batchId` | Wait | `T-UX-060` |
+| **6.1 Loading** | A card skeleton, sized from the candidate count carried forward from the batch screen; countless on a cold deep-link | Wait | `T-UX-060` |
 | **6.2 Empty — nothing extracted, `append-only`** | *"No titles were read from these screenshots."* + **Re-extract** / **Discard** / **Add a title manually** | All three | `T-UX-061` |
 | **6.3 Empty — nothing extracted, `full-update`** | `LOW_YIELD_FULL_UPDATE`. **The removals section is not rendered at all** and `removals.withheld === true`. | Re-extract / Discard / Add manually | `T-AI-021` |
 | **6.4 Low yield, `full-update`, some titles read** | Additions and "Already on your list" render; the removals section is replaced by the withheld notice; the action bar reads *"Nothing will be removed by this batch."* | Confirm additions only, re-extract, discard | `T-AI-021` |
@@ -146,6 +146,17 @@ Each state below names: **what the owner sees**, **what they can do**, and the
 | **6.16 Error — 5xx on close** | *"Couldn't apply these changes. Nothing was changed — your review is still here."* + **Try again**. Local dispositions are preserved (SD-11e) | Retry | `T-UX-067` |
 | **6.17 Offline mid-review** | Banner; dispositions keep working locally; **Apply changes** disabled with the reason | Keep reviewing | `T-UX-068` |
 | **6.18 Session expired mid-review (401)** | *"Your session ended. Sign in again — your review is still here."* + **Sign in**, returning to this URL. Local dispositions preserved | Sign in | `T-UX-069` |
+
+> **6.1, corrected.** The row above previously read *"Section skeletons with
+> their counts already shown from `GET /api/batches/:batchId`"*. That was not
+> implementable as written: the §6.15 payload carries `candidateCount` **per
+> image** and nothing per section, because sectioning (`sectionForCandidate`,
+> `packages/domain/src/review.ts`) happens when the review is built — so no
+> per-section count exists before the review has loaded. The owner ruled out
+> both an API change and a second request (a request issued to size a loading
+> state races the load it covers). What ships instead is a card count carried
+> forward in history state from the batch screen, validated on arrival, and a
+> **countless** skeleton whenever it is absent or unusable — never a guess.
 
 ---
 

@@ -14,7 +14,7 @@
  */
 
 import { useCallback, useEffect, useState, type JSX } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 
 import {
   apiClient,
@@ -27,6 +27,7 @@ import {
 } from '../lib/apiClient';
 import { SESSION_ENDED_REVIEW_BODY } from '../copy';
 import { type AppliedBatch } from '../components/BatchAppliedNotice';
+import { parseSkeletonCount } from '../components/ReviewSkeleton';
 import { useResource } from '../lib/useResource';
 import { useOnline } from '../lib/useOnline';
 import { RefusalPage } from '../pages/RefusalPage';
@@ -74,7 +75,19 @@ export function pendingCandidateIdsFrom(details: Record<string, unknown>): reado
 export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.Element {
   const params = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const batchId = params['batchId'] ?? '';
+
+  /**
+   * §6.1 (`T-UX-060`) — the placeholder count carried forward from the batch
+   * screen, or `null` on a cold deep-link into this URL.
+   *
+   * ⚠ **READ ONCE, NOT PER RENDER.** `navigate('/', { state: … })` on a close
+   * and the browser's own restoration both rewrite `location.state`; re-reading
+   * it would let the skeleton change shape underneath a load already in
+   * flight. It describes the batch we arrived for, so it is fixed on arrival.
+   */
+  const [skeletonCount] = useState<number | null>(() => parseSkeletonCount(location.state));
 
   /*
    * §6.17 — no refetch on reconnect. The review the owner is working through
@@ -320,6 +333,7 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
     <ReviewPage
       review={review.resource.kind === 'ok' ? review.resource.value : null}
       loading={review.resource.kind === 'loading'}
+      skeletonCount={skeletonCount}
       loadFailed={review.resource.kind === 'failed'}
       applyFailed={applyFailed}
       applying={applying}

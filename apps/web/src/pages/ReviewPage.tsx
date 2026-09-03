@@ -47,6 +47,7 @@ import { CandidateCard, reviewCandidateDomId } from '../components/CandidateCard
 import { CandidateList } from '../components/CandidateList';
 import { ManualEntryPanel } from '../components/ManualEntryPanel';
 import { RemovalConfirmDialog } from '../components/RemovalConfirmDialog';
+import { ReviewSkeleton } from '../components/ReviewSkeleton';
 import { UnmatchedActions } from '../components/UnmatchedActions';
 import {
   effectiveDisposition,
@@ -76,6 +77,13 @@ import { OFFLINE_DISABLED_REASON } from '../copy';
 export interface ReviewPageProps {
   readonly review?: ReviewResponse | null;
   readonly loading?: boolean;
+  /**
+   * `specs/ux-states.md` §6.1 (`T-UX-060`) — how many candidate cards to draw
+   * as placeholders while the review loads, or `null`/absent for the countless
+   * skeleton. Carried forward from the batch the owner came from; a cold
+   * deep-link into this URL has no such history and gets the countless one.
+   */
+  readonly skeletonCount?: number | null;
   readonly loadFailed?: boolean;
   readonly onRetry?: () => void;
   /**
@@ -302,6 +310,7 @@ function ReviewHeading({ subtitle }: { readonly subtitle: string | null }): JSX.
 export function ReviewPage({
   review = null,
   loading = false,
+  skeletonCount = null,
   loadFailed = false,
   applyFailed = false,
   applying = false,
@@ -389,6 +398,7 @@ export function ReviewPage({
         <p role="status" data-testid="review-loading">
           {REVIEW_LOADING}
         </p>
+        <ReviewSkeleton count={skeletonCount ?? null} />
       </>
     );
   }
