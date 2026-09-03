@@ -2347,6 +2347,43 @@ green.
 Both are corrected. The general rule: **when a task's named tests all exist
 and pass, the ledger is wrong, not the suite.** Check the ledger against the
 suite before starting anything the ready list offers, not after.
+
+### 18.4 `T-AUTH-001` and `T-SEC-008` retired — the record
+
+Both were named in `specs/ux-states.md` §10.1 and asserted by nothing.
+Retired there (corrected in place, with the superseded row struck through) and
+removed from `T-META-007`'s `KNOWN_UNCOVERED`. The ids are written out **here**
+rather than in `ux-states.md`, because `T-META-007` reads every id literal in
+that file as a state requiring an assertion — a superseded id left in a
+struck-through line there is resurrected as a live obligation by the gate that
+measures the document.
+
+**`T-SEC-008` was not a missing test; it was a wrong requirement.** It carried
+`specs/api.md` §7's claim that an unauthenticated `/api/*` returns *"401 with a
+JSON envelope"*. §18.2 above measured the live system in **August** and found
+401 with an **empty body** — but §7 was never updated to match, so the
+contradiction sat in the API spec for months, phrased as a requirement. It is
+the dangerous direction to "fix": the only way `/api/*` can answer with the
+application's envelope is for application code to run, and the only way
+application code runs unauthenticated is an `excludedPaths` bypass, which
+publishes the owner's list at the edge while every allow-list test still
+passes. `T-SMOKE-001` asserts the **absence** of a body precisely to catch
+that; a spec sentence demanding a body is a standing invitation to open the
+hole. `T-SEC-008` was also never defined in §12, so neither `check-test-ids`
+nor `check-orphan-tests` could see it — the same both-gates-blind shape as
+`T-UX-067` (§12, row for `T-UX-067`).
+
+**`T-AUTH-001` was a level mismatch.** *"Unauthenticated request to every route
+is refused with no nextup content"* is asserted against a **real deployment**
+by `T-SMOKE-001` (API) and `T-SMOKE-002` (SPA), and the configuration that
+produces it by `T-INFRA-008` — the substitution §18 already makes for
+`T-AUTH-001/002/003`, applied to the `ux-states.md` row that had not caught up.
+`T-AUTH-002`, `T-AUTH-003` and `T-AUTH-004` **stay** in `KNOWN_UNCOVERED` and
+stay named at §10.2/§10.4/§10.5: each needs a real interactive sign-in, and
+automating one means storing a credential in a public repository, which
+`specs/security.md` forbids. They are deployment-time manual checks, and saying
+so is the honest outcome.
+
 ---
 
 ## 19. TASK-035 — `dateAdded` is write-once (`T-INV-006`)
