@@ -35,11 +35,103 @@ export function isCreatesOnly(provenance: BatchProvenance): boolean {
 }
 
 /**
+ * TASK-113 — an owner edit made to a created title AFTER the batch closed.
+ *
+ * ⚠ **NOT DECIDABLE FROM PROVENANCE, WHICH IS THE WHOLE POINT.** Suppress and
+ * un-suppress write **no** `batch_change` row at all (US-031 AC-5, proven by
+ * `T-PROV-013`), and fix-match is an out-of-batch edit — so a batch whose
+ * created titles the owner has since suppressed or re-matched still looks
+ * perfectly creates-only to `isCreatesOnly`. The evidence is in the CURRENT
+ * rows, not the ledger, which is why this takes the rows as arguments.
+ */
+export type LaterOwnerEditKind = 'suppressed' | 'fix-matched';
+
+export interface LaterOwnerEdit {
+  titleId: string;
+  edit: LaterOwnerEditKind;
+}
+
+export interface LaterOwnerEditInput {
+  /** The batch's own `provenance.created`. */
+  readonly created: readonly { readonly titleId: string }[];
+  /** Each created title's work identity AS IT STANDS NOW. */
+  readonly currentIdentityByTitleId: ReadonlyMap<string, string>;
+  /**
+   * The identity the BATCH resolved for the title it created, read from the
+   * extraction candidate that produced it.
+   */
+  readonly identityAtCreationByTitleId: ReadonlyMap<string, string>;
+  /** Work identities carrying an ACTIVE suppression right now. */
+  readonly suppressedWorks: ReadonlySet<string>;
+}
+
+/**
+ * The titles a creates-only batch created that the owner has since suppressed
+ * or fix-matched (US-032 AC-4).
+ *
+ * Empty means the undo may proceed. Non-empty means it must be REFUSED and
+ * enumerated (US-033) — never partially applied: undoing a title the owner has
+ * since re-matched would destroy a decision the batch has no record of and no
+ * way to restore, and SD-03 discards rather than soft-deletes, so there is
+ * nothing to recover from afterwards.
+ *
+ * ⚠ **AN ACTIVE SUPPRESSION ON A CREATED TITLE NECESSARILY POSTDATES THE
+ * BATCH**, which is what makes it usable as evidence without a timestamp. A
+ * suppressed work is filtered out BEFORE any Title is created (REQ-071, US-009
+ * AC-4 / US-036 AC-2), so the batch cannot have created a title for an already
+ * suppressed identity — the suppression can only have arrived afterwards.
+ *
+ * ⚠ **FIX-MATCH IS DETECTED AS AN IDENTITY THAT MOVED, NOT AS A `matchState`.**
+ * Close writes `matchState: 'matched'` for every matched creation and fix-match
+ * writes the same value, so `matchState` cannot tell the two apart; the
+ * candidate's `resolvedWorkIdentity` is the only record of what the batch
+ * itself decided. An in-review correction overwrites that column inside the
+ * close, so it holds the identity as at close — not the pipeline's first guess.
+ *
+ * ⚠ **A TITLE WITH NO CURRENT IDENTITY IS NOT AN EDIT.** It is gone or
+ * unreadable, which the enumeration reports through `currentState`; treating an
+ * unreadable row as an owner edit would refuse an undo on the strength of a
+ * failed read.
+ *
+ * ⚠ **FIX-MATCH IS REPORTED IN PREFERENCE TO SUPPRESSION** when both apply. A
+ * suppression against a moved identity is the migrated one fix-match carried
+ * over (SD-06, TASK-110), so reporting it as an independent suppression would
+ * describe one owner action as two.
+ */
+export function detectLaterOwnerEdits(input: LaterOwnerEditInput): LaterOwnerEdit[] {
+  const edits: LaterOwnerEdit[] = [];
+  const seen = new Set<string>();
+
+  for (const entry of input.created) {
+    if (seen.has(entry.titleId)) continue;
+    seen.add(entry.titleId);
+
+    const current = input.currentIdentityByTitleId.get(entry.titleId);
+    if (current === undefined) continue;
+
+    const atCreation = input.identityAtCreationByTitleId.get(entry.titleId);
+    if (atCreation !== undefined && atCreation !== current) {
+      edits.push({ titleId: entry.titleId, edit: 'fix-matched' });
+      continue;
+    }
+
+    if (input.suppressedWorks.has(current)) {
+      edits.push({ titleId: entry.titleId, edit: 'suppressed' });
+    }
+  }
+
+  return edits;
+}
+
+/**
  * Why a batch is not creates-only, as §8.4's `details.reason`.
  *
- * `null` means it IS creates-only. `'later-owner-edits'` is not decidable from
- * provenance alone — it needs the current rows — so it is not produced here;
- * TASK-113 owns that branch.
+ * `null` means it IS creates-only **by provenance**. `'later-owner-edits'` is
+ * not decidable here — it needs the current rows, which `detectLaterOwnerEdits`
+ * takes as arguments — so the undo service decides that one and overrides this
+ * reason when it fires.
+ * ~~Superseded: "`'later-owner-edits'` … is not produced here; TASK-113 owns
+ * that branch."~~
  */
 export function createsOnlyRefusalReason(
   provenance: BatchProvenance | null,

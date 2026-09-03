@@ -1126,7 +1126,9 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 | AC-1 | U/I | `T-UNDO-001` | `isCreatesOnly` is a pure predicate over provenance; undo is offered only when true |
 | AC-2 | I | **`T-UNDO-002`** | After undo the list equals its pre-batch state exactly; `serviceState` reverts to the previous applied batch |
 | AC-3 | I | `T-UNDO-003` | `status: 'undone'`; a second undo → 409 `BATCH_ALREADY_UNDONE` |
-| AC-4 | I | **`T-UNDO-004`** | A creates-only batch whose title was since suppressed or fix-matched is **refused** and enumerated |
+| AC-4 | I | **`T-UNDO-004`** | A creates-only batch whose title was since suppressed or fix-matched is **refused** and enumerated — closed through the REAL close route, so the provenance the gate reads is the provenance close writes. Also covers the two ways the gate could over-refuse: an **inactive** (un-suppressed) row, and a suppression on a work the batch did not create |
+| AC-4 | U | **`T-UNDO-013`** | `detectLaterOwnerEdits` as pure data: suppression and identity-moved each detected; **fix-match reported in preference to suppression** when both apply (SD-06 migrates the suppression, so reporting both describes one owner action as two); an **absent** current identity or candidate row is **not** an edit; `created` deduplicated |
+| AC-4 | U | **`T-UNDO-014`** | The gate through the real route with no store: `409 BATCH_NOT_CREATES_ONLY` + `details.reason: 'later-owner-edits'`, still fully enumerated, writing **nothing**; an untouched batch still undoes; `BATCH_ALREADY_UNDONE` and `'modified-or-removed'` both still outrank it |
 | AC-5 | I | `T-UNDO-008` | A batch that created nothing undoes successfully as a no-op |
 | AC-6 | I | `T-UNDO-009` | Injected failure mid-undo → batch left applied, nothing partially reversed |
 | AC-2 | I | **`T-UNDO-010`** | The SD-03 discard module directly: the discard is REFUSED by `fk_change_listing` unless the provenance and candidate pointers are detached first; the detached rows themselves survive with their non-pointer columns intact (REQ-028, US-032 AC-3), and both deletes are owner-scoped |

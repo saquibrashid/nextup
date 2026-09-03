@@ -239,7 +239,12 @@ const KNOWN_PHANTOM_CITATIONS: readonly string[] = [
   // could never be an orphan — was WRONG, and wrong in the house pattern: the
   // only thing making it look cited was its own string literal on this line,
   // read by a gate that matched bare occurrence.
-  'T-UNDO-004',
+  //
+  // `T-UNDO-004` left this list by being IMPLEMENTED (TASK-113), not by being
+  // reclassified: `apps/api/test/integration/batchUndo.spec.ts` now carries the
+  // US-032 AC-4 cases. The list is empty and must stay a list — emptying it is
+  // the ratchet working, and re-adding an id needs the same justification as
+  // any first entry.
 ];
 
 /**
