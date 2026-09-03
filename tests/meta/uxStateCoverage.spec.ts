@@ -95,13 +95,19 @@ const KNOWN_UNCOVERED: readonly string[] = [
   // an id is both asserted and declared a gap). `specs/ux-states.md` §1
   // *"Focus after a state change"* — on success focus moves to the
   // `role="status"` region, on error to `role="alert"` — is CARRIED BY THE
-  // SAME ID AND IS STILL UNASSERTED. ⚠ Do NOT read this removal as "focus
-  // management is done", and do NOT close that clause by focusing every live
-  // region: there are 53 across 23 components and most are AMBIENT
-  // (`OfflineBanner`, `FreshnessStrip`, `FilterBar`'s count, the load-more
-  // busy message). Focusing those would yank focus on every poll, which is a
-  // worse defect than the one being fixed. Which regions are action outcomes
-  // is an owner-level design decision, not a mechanical sweep.
+  // SAME ID. ⚠ The SUCCESS half is now closed: `T-A11Y-006h`–`n` in the same
+  // file, scoped by owner decision to the three ACTION outcomes (review close,
+  // fix-match confirmation, suppression) via `useOutcomeFocus`.
+  // ⚠ Do NOT close the remainder by focusing every live region: there are 53
+  // across 23 components and most are AMBIENT (`OfflineBanner`,
+  // `FreshnessStrip`, `FilterBar`'s count, the load-more busy message).
+  // Focusing those would yank focus on every poll, which is a worse defect
+  // than the one being fixed — `T-A11Y-006m`/`n` now fail if anyone tries.
+  // ⚠ STILL OPEN: the ERROR half (focus to `role="alert"`), untouched here.
+  // ~~Superseded: "…is CARRIED BY THE SAME ID AND IS STILL UNASSERTED. ⚠ Do
+  // NOT read this removal as 'focus management is done'… Which regions are
+  // action outcomes is an owner-level design decision, not a mechanical
+  // sweep."~~ — the design decision has since been made by the owner.
   // ⚠ `T-AUTH-001` and `T-SEC-008` were removed at the 8 → 6 step, and NOT by
   // writing tests for them — both were retired from `specs/ux-states.md` §10.1
   // as wrong, with the full record in `specs/testing.md` §18.4.
