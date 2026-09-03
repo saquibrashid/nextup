@@ -255,6 +255,23 @@ export const SESSION_ENDED_TITLE = 'Your session ended.';
 /** `specs/ux-states.md` §2.10 - the action out of the 401 state. */
 export const SIGN_IN_AGAIN_LABEL = 'Sign in again';
 
+/**
+ * `specs/ux-states.md` §6.18 - the 401 seen FROM THE REVIEW, where the owner
+ * has uncommitted work.
+ *
+ * ⚠ This is a statement of fact, not reassurance-flavoured filler: review
+ * dispositions are persisted to `sessionStorage` by
+ * `apps/web/src/lib/reviewDispositions.ts` (SD-11e, `T-UI-027`) and a sign-in
+ * round trip does not clear them. If that persistence is ever removed this
+ * sentence becomes a lie, which is why `T-UX-069h` pins the two together.
+ *
+ * ⚠ Deliberately NOT shown on the other screens' 401s. Nothing is at stake on
+ * the list or the upload picker, and "your review is still here" on a screen
+ * with no review is noise that trains the owner to ignore the sentence on the
+ * one screen where it matters.
+ */
+export const SESSION_ENDED_REVIEW_BODY = 'Your review is still here.';
+
 /** `specs/ux-states.md` §2.11 - the only action offered on a refusal. */
 export const SIGN_OUT_LABEL = 'Sign out';
 

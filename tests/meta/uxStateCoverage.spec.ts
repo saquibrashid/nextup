@@ -313,7 +313,17 @@ const KNOWN_UNCOVERED: readonly string[] = [
   // that created this file, and read as if it applied to whichever id happened
   // to sit under it. Restored in full.)
   'T-UX-068',
-  'T-UX-069',
+  // `T-UX-069` (§6.18, session expired mid-review) removed at the 6 → 5 step:
+  // `T-UX-069a`–`j` in `apps/web/test/reviewSessionExpired.spec.tsx`.
+  // ⚠ The state needed CODE, not just copy. A 401 was intercepted globally in
+  // `apiClient.request`, which redirected before `ReviewRoute` saw the error —
+  // so the owner was bounced away from uncommitted dispositions with no reason
+  // to believe they had survived. The fix is a handler registered for the
+  // lifetime of the review screen ONLY (`setUnauthorizedHandler`); leaving it
+  // installed after unmount would disable the redirect app-wide, which
+  // `T-UX-069g` exists to catch. Mutation run also caught a tautology in the
+  // first draft of `T-UX-069b`: it compared the render to the same constant it
+  // rendered, so inverting the copy to "Your review is gone." passed.
 ];
 
 function collectSpecFiles(): string[] {

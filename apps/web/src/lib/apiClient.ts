@@ -92,7 +92,35 @@ export interface ApiClientDeps {
   currentPath?: () => string;
 }
 
+/**
+ * The one screen-scoped override of the 401 default (`specs/ux-states.md`
+ * §6.18, `T-UX-069`).
+ *
+ * ⚠ **This narrows the default for one mounted screen, and must never become
+ * the default itself.** Redirecting on 401 is right nearly everywhere: an Easy
+ * Auth session expires on a timer, so an error screen offering a retry that
+ * fails identically forever is the wrong answer (see `request` below). The
+ * review is the single exception, because the owner has *uncommitted work* —
+ * dispositions held in `sessionStorage` (SD-11e) that a silent bounce to the
+ * IdP gives them no reason to believe survived. §6.18 requires the screen to
+ * say so before they leave.
+ *
+ * ⚠ **Registration is lifecycle-scoped and MUST be cleared on unmount.** A
+ * handler left installed silently disables the redirect for the whole app, and
+ * the symptom — every other screen failing to recover from an expired session —
+ * appears nowhere near this file. `T-UX-069g` asserts the clear.
+ */
+let scopedUnauthorizedHandler: ((url: string) => void) | null = null;
+
+export function setUnauthorizedHandler(handler: ((url: string) => void) | null): void {
+  scopedUnauthorizedHandler = handler;
+}
+
 function defaultRedirect(url: string): void {
+  if (scopedUnauthorizedHandler !== null) {
+    scopedUnauthorizedHandler(url);
+    return;
+  }
   window.location.assign(url);
 }
 
