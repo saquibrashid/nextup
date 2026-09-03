@@ -220,14 +220,14 @@ describe('T-UNDO-013 · detectLaterOwnerEdits', () => {
     over: Partial<{
       created: { titleId: string }[];
       current: [string, string][];
-      atCreation: [string, string][];
+      resolved: string[];
       suppressed: string[];
     }> = {},
   ) {
     return {
       created: over.created ?? [{ titleId: 't1' }],
       currentIdentityByTitleId: new Map(over.current ?? [['t1', 'tmdb:movie:1']]),
-      identityAtCreationByTitleId: new Map(over.atCreation ?? [['t1', 'tmdb:movie:1']]),
+      identitiesResolvedByBatch: new Set(over.resolved ?? ['tmdb:movie:1']),
       suppressedWorks: new Set(over.suppressed ?? []),
     };
   }
@@ -269,13 +269,25 @@ describe('T-UNDO-013 · detectLaterOwnerEdits', () => {
     expect(detectLaterOwnerEdits(input({ current: [] }))).toEqual([]);
   });
 
-  it('T-UNDO-013g: a created title with no candidate row is judged on suppression alone', () => {
-    // ⚠ An absent `resolvedWorkIdentity` is NOT evidence of a move. Treating
-    // it as one would refuse every undo whose candidate rows are incomplete.
-    expect(detectLaterOwnerEdits(input({ atCreation: [] }))).toEqual([]);
-    expect(detectLaterOwnerEdits(input({ atCreation: [], suppressed: ['tmdb:movie:1'] }))).toEqual([
+  it('T-UNDO-013g: an EMPTY resolved set is judged on suppression alone', () => {
+    // ⚠ Missing or unreadable candidate rows are NOT evidence of a move.
+    // Treating them as one refuses every undo whose candidates are incomplete.
+    expect(detectLaterOwnerEdits(input({ resolved: [] }))).toEqual([]);
+    expect(detectLaterOwnerEdits(input({ resolved: [], suppressed: ['tmdb:movie:1'] }))).toEqual([
       { titleId: 't1', edit: 'suppressed' },
     ]);
+  });
+
+  it('T-UNDO-013k: a move onto an identity the batch ALSO resolved is not reported', () => {
+    // ⚠ A KNOWN, DELIBERATE LIMIT, and it is unreachable in practice: the
+    // work-identity unique index refuses a fix-match onto an identity another
+    // CONFIRMED candidate of the batch already holds a title for, and the
+    // service therefore builds the set from confirmed candidates only.
+    expect(
+      detectLaterOwnerEdits(
+        input({ current: [['t1', 'tmdb:movie:2']], resolved: ['tmdb:movie:1', 'tmdb:movie:2'] }),
+      ),
+    ).toEqual([]);
   });
 
   it('T-UNDO-013h: a title created twice in one provenance is reported once', () => {
@@ -295,11 +307,7 @@ describe('T-UNDO-013 · detectLaterOwnerEdits', () => {
           ['t2', 'tmdb:movie:22'],
           ['t3', 'tmdb:movie:3'],
         ],
-        atCreation: [
-          ['t1', 'tmdb:movie:1'],
-          ['t2', 'tmdb:movie:2'],
-          ['t3', 'tmdb:movie:3'],
-        ],
+        resolved: ['tmdb:movie:1', 'tmdb:movie:2', 'tmdb:movie:3'],
         suppressed: ['tmdb:movie:3'],
       }),
     );

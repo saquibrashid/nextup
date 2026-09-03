@@ -57,10 +57,16 @@ export interface LaterOwnerEditInput {
   /** Each created title's work identity AS IT STANDS NOW. */
   readonly currentIdentityByTitleId: ReadonlyMap<string, string>;
   /**
-   * The identity the BATCH resolved for the title it created, read from the
-   * extraction candidate that produced it.
+   * Every work identity this batch's CONFIRMED candidates resolved.
+   *
+   * ⚠ **A SET, NOT A PER-TITLE MAP, BECAUSE THE PER-TITLE LINK DOES NOT EXIST
+   * AT RUNTIME.** `extraction_candidate.resolved_title_id` is declared, indexed
+   * and detached on discard, but nothing in the application ever WRITES it — it
+   * is null for every real row. A detector keyed on it therefore never fires,
+   * which is precisely what the integration half of `T-UNDO-004` caught after
+   * the unit twin (which hand-fed the column) passed.
    */
-  readonly identityAtCreationByTitleId: ReadonlyMap<string, string>;
+  readonly identitiesResolvedByBatch: ReadonlySet<string>;
   /** Work identities carrying an ACTIVE suppression right now. */
   readonly suppressedWorks: ReadonlySet<string>;
 }
@@ -81,12 +87,28 @@ export interface LaterOwnerEditInput {
  * AC-4 / US-036 AC-2), so the batch cannot have created a title for an already
  * suppressed identity — the suppression can only have arrived afterwards.
  *
- * ⚠ **FIX-MATCH IS DETECTED AS AN IDENTITY THAT MOVED, NOT AS A `matchState`.**
+ * ⚠ **FIX-MATCH IS DETECTED AS AN IDENTITY THIS BATCH NEVER RESOLVED, NOT AS A
+ * `matchState`.**
  * Close writes `matchState: 'matched'` for every matched creation and fix-match
  * writes the same value, so `matchState` cannot tell the two apart; the
  * candidate's `resolvedWorkIdentity` is the only record of what the batch
  * itself decided. An in-review correction overwrites that column inside the
  * close, so it holds the identity as at close — not the pipeline's first guess.
+ *
+ * ⚠ **THE SET COMPARISON IS COMPLETE, NOT AN APPROXIMATION, AND THE REASON IS
+ * A UNIQUE INDEX.** The only way a fix-match could move a created title to an
+ * identity still IN the set is if another candidate of the same batch resolved
+ * it — and if that candidate was confirmed, its own title already holds that
+ * identity, so the move is refused by the one-row-per-work-identity index
+ * before it can happen. Restricting the set to CONFIRMED candidates is what
+ * closes the remaining hole: a discarded candidate's identity is a perfectly
+ * reachable fix-match target, and leaving it in the set would silently permit
+ * the undo.
+ *
+ * ⚠ **AN EMPTY SET IS NOT EVIDENCE OF ANYTHING.** A batch whose candidate rows
+ * are missing or unreadable must not have every created title reported as
+ * moved — that would refuse an undo on the strength of a failed read, the same
+ * failure the unknown-identity guard below avoids.
  *
  * ⚠ **A TITLE WITH NO CURRENT IDENTITY IS NOT AN EDIT.** It is gone or
  * unreadable, which the enumeration reports through `currentState`; treating an
@@ -109,8 +131,7 @@ export function detectLaterOwnerEdits(input: LaterOwnerEditInput): LaterOwnerEdi
     const current = input.currentIdentityByTitleId.get(entry.titleId);
     if (current === undefined) continue;
 
-    const atCreation = input.identityAtCreationByTitleId.get(entry.titleId);
-    if (atCreation !== undefined && atCreation !== current) {
+    if (input.identitiesResolvedByBatch.size > 0 && !input.identitiesResolvedByBatch.has(current)) {
       edits.push({ titleId: entry.titleId, edit: 'fix-matched' });
       continue;
     }

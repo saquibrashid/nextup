@@ -344,23 +344,22 @@ async function findLaterOwnerEdits(
 
   const currentIdentityByTitleId = new Map(titleRows.map((row) => [row.id, row.workIdentity]));
 
-  const identityAtCreationByTitleId = new Map<string, string>();
+  // ⚠ CONFIRMED ONLY. A discarded candidate's identity is a reachable
+  // fix-match target, so leaving it in the set would silently permit the undo
+  // that moved a title onto it. Confirmed identities cannot be reached by a
+  // fix-match (the work-identity unique index refuses the collision), so
+  // narrowing here loses nothing and closes the hole.
+  const identitiesResolvedByBatch = new Set<string>();
   for (const candidate of candidates) {
-    const { resolvedTitleId, resolvedWorkIdentity } = candidate;
-    if (resolvedTitleId === null || resolvedWorkIdentity === null) continue;
-    // ⚠ FIRST WINS. SD-02 collapses duplicate reads of one work onto a single
-    // title, so several candidates can name the same `resolvedTitleId`; they
-    // agree on the identity, and taking the last would make the answer depend
-    // on row order for no benefit.
-    if (!identityAtCreationByTitleId.has(resolvedTitleId)) {
-      identityAtCreationByTitleId.set(resolvedTitleId, resolvedWorkIdentity);
-    }
+    if (candidate.reviewDisposition !== 'confirmed') continue;
+    if (candidate.resolvedWorkIdentity === null) continue;
+    identitiesResolvedByBatch.add(candidate.resolvedWorkIdentity);
   }
 
   return detectLaterOwnerEdits({
     created: provenance.created,
     currentIdentityByTitleId,
-    identityAtCreationByTitleId,
+    identitiesResolvedByBatch,
     suppressedWorks: new Set(suppressions.map((row) => row.workIdentity)),
   });
 }

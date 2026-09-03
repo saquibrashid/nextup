@@ -1049,7 +1049,7 @@ describe('T-UNDO-004 · US-032 AC-4 · later owner edits refuse the undo', () =>
 
     const dune = await titleFor(DUNE);
     await testPrisma().suppression.create({
-      data: { id: 'undo-supp-1', ownerId, workIdentity: DUNE, active: true },
+      data: { id: 'undo-supp-1', ownerId, workIdentity: DUNE, active: true, displayName: 'Dune' },
     });
 
     const before = await snapshotList();
@@ -1118,6 +1118,7 @@ describe('T-UNDO-004 · US-032 AC-4 · later owner edits refuse the undo', () =>
         id: 'undo-supp-2',
         ownerId,
         workIdentity: DUNE,
+        displayName: 'Dune',
         active: false,
         unsuppressedAt: new Date('2026-02-02T00:00:00Z'),
       },
@@ -1133,7 +1134,7 @@ describe('T-UNDO-004 · US-032 AC-4 · later owner edits refuse the undo', () =>
     await makeConfirmedCandidate(batchId, DUNE, 'Dune');
     expect((await close(batchId)).status).toBe(200);
     await testPrisma().suppression.create({
-      data: { id: 'undo-supp-3', ownerId, workIdentity: HEAT, active: true },
+      data: { id: 'undo-supp-3', ownerId, workIdentity: HEAT, active: true, displayName: 'Heat' },
     });
 
     expect((await undo(batchId)).status).toBe(200);

@@ -84,7 +84,7 @@ const store: {
    * The batch's extraction candidates — the ONLY record of the work identity
    * the batch itself resolved for each title it created (TASK-113).
    */
-  candidates: { resolvedTitleId: string | null; resolvedWorkIdentity: string | null }[];
+  candidates: { reviewDisposition: string; resolvedWorkIdentity: string | null }[];
   /** Titles + listings this batch created — the provenance-unavailable signal. */
   createdEffects: number;
 } = {
@@ -745,7 +745,7 @@ describe('T-UNDO-014 — later owner edits refuse a creates-only undo', () => {
       tmdbReleaseYear: 2021,
       tmdbPosterPath: '/d.jpg',
     };
-    store.candidates = [{ resolvedTitleId: 'title-1', resolvedWorkIdentity: identity }];
+    store.candidates = [{ reviewDisposition: 'confirmed', resolvedWorkIdentity: identity }];
   }
 
   it('T-UNDO-014a: a created title the owner has since suppressed refuses the undo', async () => {
@@ -759,10 +759,28 @@ describe('T-UNDO-014 — later owner edits refuse a creates-only undo', () => {
   });
 
   it('T-UNDO-014b: a created title the owner has since fix-matched refuses the undo', async () => {
-    // The batch resolved `tmdb:movie:1`; the title now carries a different
-    // identity, which only a fix-match can have done.
+    // The batch resolved `tmdb:movie:1`; the title now carries an identity the
+    // batch never resolved, which only a fix-match can have done.
     seedCreatedTitle('tmdb:movie:1');
     store.titleDisplays['title-1']!.workIdentity = 'tmdb:movie:99';
+
+    const { status, details } = await refusal();
+    expect(status).toBe(409);
+    expect(details.reason).toBe('later-owner-edits');
+  });
+
+  it('T-UNDO-014i: a DISCARDED candidate identity does not excuse a fix-match', async () => {
+    // ⚠ The set is built from CONFIRMED candidates only, and this is the case
+    // that makes that matter: a discarded read is a perfectly reachable
+    // fix-match target (nothing holds its identity, so the unique index does
+    // not stand in the way). Counting it as "resolved by this batch" would
+    // silently let the undo through and discard the owner's correction.
+    seedCreatedTitle('tmdb:movie:1');
+    store.titleDisplays['title-1']!.workIdentity = 'tmdb:movie:99';
+    store.candidates.push({
+      reviewDisposition: 'discarded',
+      resolvedWorkIdentity: 'tmdb:movie:99',
+    });
 
     const { status, details } = await refusal();
     expect(status).toBe(409);
