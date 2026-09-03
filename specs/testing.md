@@ -1126,7 +1126,9 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 | AC-1 | U/I | `T-UNDO-001` | `isCreatesOnly` is a pure predicate over provenance; undo is offered only when true |
 | AC-2 | I | **`T-UNDO-002`** | After undo the list equals its pre-batch state exactly; `serviceState` reverts to the previous applied batch |
 | AC-3 | I | `T-UNDO-003` | `status: 'undone'`; a second undo → 409 `BATCH_ALREADY_UNDONE` |
-| AC-4 | I | **`T-UNDO-004`** | A creates-only batch whose title was since suppressed or fix-matched is **refused** and enumerated |
+| AC-4 | I | **`T-UNDO-004`** | A creates-only batch whose title was since suppressed or fix-matched is **refused** and enumerated — closed through the REAL close route, so the provenance the gate reads is the provenance close writes. Also covers the two ways the gate could over-refuse: an **inactive** (un-suppressed) row, and a suppression on a work the batch did not create |
+| AC-4 | U | **`T-UNDO-013`** | `detectLaterOwnerEdits` as pure data: suppression detected, and a current identity **outside the set of identities the batch resolved** detected as a fix-match; **fix-match reported in preference to suppression** when both apply (SD-06 migrates the suppression, so reporting both describes one owner action as two); an **absent** current identity or candidate row is **not** an edit; `created` deduplicated |
+| AC-4 | U | **`T-UNDO-014`** | The gate through the real route with no store: `409 BATCH_NOT_CREATES_ONLY` + `details.reason: 'later-owner-edits'`, still fully enumerated, writing **nothing**; an untouched batch still undoes; `BATCH_ALREADY_UNDONE` and `'modified-or-removed'` both still outrank it |
 | AC-5 | I | `T-UNDO-008` | A batch that created nothing undoes successfully as a no-op |
 | AC-6 | I | `T-UNDO-009` | Injected failure mid-undo → batch left applied, nothing partially reversed |
 | AC-2 | I | **`T-UNDO-010`** | The SD-03 discard module directly: the discard is REFUSED by `fk_change_listing` unless the provenance and candidate pointers are detached first; the detached rows themselves survive with their non-pointer columns intact (REQ-028, US-032 AC-3), and both deletes are owner-scoped |
@@ -2738,6 +2740,30 @@ keys. Mutation-verified: restoring the sibling form fails five existing cases
 schema: **before adding a key to a Prisma `where`, check whether a conditional
 spread above it already sets that key.**
 ---
+
+## 22a. Finding — `extraction_candidate.resolved_title_id` is declared but never written (TASK-113)
+
+`resolved_title_id` exists as a column with a foreign key
+(`fk_cand_resolved_title`) and its own index
+(`extraction_candidate_resolved_title`), and `undoDiscard.ts` nulls it before
+SD-03 destroys the titles it points at. **Nothing in `apps/api/src/**` ever
+assigns it.** It is passed through `updateCandidateDisposition`'s allowed field
+list, but no caller supplies it — so it is `NULL` for every real row.
+
+This was found by TASK-113, and found *only* by the integration half. The
+`later-owner-edits` detector was first written to join candidate → title on
+`resolved_title_id`; the no-store unit twin passed all eight cases because the
+fixture hand-fed the column, and `T-UNDO-004b` then returned **200 instead of
+409** against a real database. The detector could never have fired in
+production, and the feature would have shipped looking tested.
+
+The detector was reworked to compare each created title's current identity
+against the **set** of identities the batch's CONFIRMED candidates resolved,
+which needs no per-title link. The column is left as it is: populating it is a
+change to the close transaction and is not this task's scope. ⚠ **Anything
+later built on `resolved_title_id` must first make close write it** — and must
+be proven against the database, because a unit fixture will happily supply a
+value the application never does.
 
 ## 23. Query plans, and two errors the harness caught in itself (TASK-047)
 

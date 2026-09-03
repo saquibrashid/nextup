@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   createsOnlyRefusalReason,
+  detectLaterOwnerEdits,
   isCreatesOnly,
   planCreatesOnlyUndo,
   toBatchProvenance,
@@ -200,5 +201,123 @@ describe('T-UNDO-001 planCreatesOnlyUndo splits the two reversal shapes', () => 
     expect(plan.titleIdsToDiscard).toEqual([]);
     expect(plan.listingIdsToDiscard).toEqual([]);
     expect(plan.titleIdsToRederive).toEqual([]);
+  });
+});
+
+/**
+ * `T-UNDO-013` — `detectLaterOwnerEdits` is a pure function over the CURRENT
+ * rows (US-032 AC-4, TASK-113).
+ *
+ * ⚠ **WHY THIS CANNOT BE A PROVENANCE PREDICATE.** Suppress and un-suppress
+ * write no `batch_change` row at all (US-031 AC-5, `T-PROV-013`) and fix-match
+ * is an out-of-batch edit, so `isCreatesOnly` returns true for a batch whose
+ * created titles the owner has since re-decided. SD-03 then DISCARDS those
+ * rows outright — a hard delete of a decision the batch never recorded and
+ * cannot put back. The refusal is the only safe answer.
+ */
+describe('T-UNDO-013 · detectLaterOwnerEdits', () => {
+  function input(
+    over: Partial<{
+      created: { titleId: string }[];
+      current: [string, string][];
+      resolved: string[];
+      suppressed: string[];
+    }> = {},
+  ) {
+    return {
+      created: over.created ?? [{ titleId: 't1' }],
+      currentIdentityByTitleId: new Map(over.current ?? [['t1', 'tmdb:movie:1']]),
+      identitiesResolvedByBatch: new Set(over.resolved ?? ['tmdb:movie:1']),
+      suppressedWorks: new Set(over.suppressed ?? []),
+    };
+  }
+
+  it('T-UNDO-013a: an untouched created title is not an edit', () => {
+    expect(detectLaterOwnerEdits(input())).toEqual([]);
+  });
+
+  it('T-UNDO-013b: an active suppression on a created work is a later edit', () => {
+    // Sound WITHOUT a timestamp: a suppressed work is filtered out before any
+    // Title is created (REQ-071), so the suppression can only postdate the batch.
+    expect(detectLaterOwnerEdits(input({ suppressed: ['tmdb:movie:1'] }))).toEqual([
+      { titleId: 't1', edit: 'suppressed' },
+    ]);
+  });
+
+  it('T-UNDO-013c: an identity that MOVED since close is a fix-match', () => {
+    expect(detectLaterOwnerEdits(input({ current: [['t1', 'tmdb:movie:99']] }))).toEqual([
+      { titleId: 't1', edit: 'fix-matched' },
+    ]);
+  });
+
+  it('T-UNDO-013d: when both apply it reports fix-matched ONCE, not two edits', () => {
+    // The suppression against the moved identity is the one fix-match migrated
+    // (SD-06, TASK-110); reporting both describes one owner action as two.
+    const edits = detectLaterOwnerEdits(
+      input({ current: [['t1', 'tmdb:movie:99']], suppressed: ['tmdb:movie:99'] }),
+    );
+    expect(edits).toEqual([{ titleId: 't1', edit: 'fix-matched' }]);
+  });
+
+  it('T-UNDO-013e: a suppression on a work this batch did NOT create is ignored', () => {
+    expect(detectLaterOwnerEdits(input({ suppressed: ['tmdb:movie:2'] }))).toEqual([]);
+  });
+
+  it('T-UNDO-013f: a title with no CURRENT identity is not an edit', () => {
+    // It is gone or unreadable — reported via `currentState`. Refusing an undo
+    // on the strength of a failed read would strand the owner.
+    expect(detectLaterOwnerEdits(input({ current: [] }))).toEqual([]);
+  });
+
+  it('T-UNDO-013g: an EMPTY resolved set is judged on suppression alone', () => {
+    // ⚠ Missing or unreadable candidate rows are NOT evidence of a move.
+    // Treating them as one refuses every undo whose candidates are incomplete.
+    expect(detectLaterOwnerEdits(input({ resolved: [] }))).toEqual([]);
+    expect(detectLaterOwnerEdits(input({ resolved: [], suppressed: ['tmdb:movie:1'] }))).toEqual([
+      { titleId: 't1', edit: 'suppressed' },
+    ]);
+  });
+
+  it('T-UNDO-013k: a move onto an identity the batch ALSO resolved is not reported', () => {
+    // ⚠ A KNOWN, DELIBERATE LIMIT, and it is unreachable in practice: the
+    // work-identity unique index refuses a fix-match onto an identity another
+    // CONFIRMED candidate of the batch already holds a title for, and the
+    // service therefore builds the set from confirmed candidates only.
+    expect(
+      detectLaterOwnerEdits(
+        input({ current: [['t1', 'tmdb:movie:2']], resolved: ['tmdb:movie:1', 'tmdb:movie:2'] }),
+      ),
+    ).toEqual([]);
+  });
+
+  it('T-UNDO-013h: a title created twice in one provenance is reported once', () => {
+    // SD-02 collapses duplicate reads onto one title, so `created` can repeat.
+    const edits = detectLaterOwnerEdits(
+      input({ created: [{ titleId: 't1' }, { titleId: 't1' }], suppressed: ['tmdb:movie:1'] }),
+    );
+    expect(edits).toEqual([{ titleId: 't1', edit: 'suppressed' }]);
+  });
+
+  it('T-UNDO-013i: every edited title is reported, in created order', () => {
+    const edits = detectLaterOwnerEdits(
+      input({
+        created: [{ titleId: 't1' }, { titleId: 't2' }, { titleId: 't3' }],
+        current: [
+          ['t1', 'tmdb:movie:1'],
+          ['t2', 'tmdb:movie:22'],
+          ['t3', 'tmdb:movie:3'],
+        ],
+        resolved: ['tmdb:movie:1', 'tmdb:movie:2', 'tmdb:movie:3'],
+        suppressed: ['tmdb:movie:3'],
+      }),
+    );
+    expect(edits).toEqual([
+      { titleId: 't2', edit: 'fix-matched' },
+      { titleId: 't3', edit: 'suppressed' },
+    ]);
+  });
+
+  it('T-UNDO-013j: a batch that created nothing has nothing to refuse', () => {
+    expect(detectLaterOwnerEdits(input({ created: [] }))).toEqual([]);
   });
 });

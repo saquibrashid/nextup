@@ -1024,3 +1024,119 @@ describe('T-UNDO-005 · US-033 · a refusal writes NOTHING (the enumeration is r
     expect(row?.status).toBe('applied');
   });
 });
+
+/**
+ * `T-UNDO-004` — US-032 AC-4. A creates-only batch whose title the owner has
+ * SINCE suppressed or fix-matched is refused and enumerated (TASK-113).
+ *
+ * ⚠ **THESE BATCHES ARE GENUINELY CREATES-ONLY, WHICH IS THE DIFFICULTY.**
+ * Neither later edit writes a `batch_change` row — suppress and un-suppress
+ * write none at all (US-031 AC-5, `T-PROV-013`) and fix-match happens outside
+ * the batch — so provenance says "safe to undo" and SD-03 would then DISCARD
+ * the rows outright. There is no soft-deleted copy and no ledger entry to
+ * replay, so the owner's later decision would be destroyed with no way back.
+ *
+ * ⚠ EVERY CASE CLOSES THROUGH THE REAL ROUTE and asserts the pre-undo snapshot
+ * is unchanged afterwards: a refusal that quietly deleted half the batch first
+ * would still return 409.
+ */
+describe('T-UNDO-004 · US-032 AC-4 · later owner edits refuse the undo', () => {
+  it('T-UNDO-004a · a since-SUPPRESSED created title refuses, enumerated, writing nothing', async () => {
+    const batchId = await makeBatch();
+    await makeConfirmedCandidate(batchId, DUNE, 'Dune');
+    await makeConfirmedCandidate(batchId, HEAT, 'Heat');
+    expect((await close(batchId)).status).toBe(200);
+
+    const dune = await titleFor(DUNE);
+    await testPrisma().suppression.create({
+      data: { id: 'undo-supp-1', ownerId, workIdentity: DUNE, active: true, displayName: 'Dune' },
+    });
+
+    const before = await snapshotList();
+    const res = await undo(batchId);
+    expect(res.status).toBe(409);
+
+    const body = (await res.json()) as ErrorBody;
+    expect(body.error.code).toBe('BATCH_NOT_CREATES_ONLY');
+    const details = body.error.details as {
+      reason: string;
+      created: { titleId: string }[];
+      truncated: boolean;
+    };
+    expect(details.reason).toBe('later-owner-edits');
+    // Both created titles are listed — the refusal is a work list, not a
+    // pointer at the one row that tripped it (US-033 AC-5).
+    expect(details.created.map((e) => e.titleId).sort()).toEqual(
+      [dune.id, (await titleFor(HEAT)).id].sort(),
+    );
+    expect(details.truncated).toBe(false);
+
+    // Nothing was reversed and the batch is still applied and still undoable
+    // once the owner un-suppresses.
+    expect(await snapshotList()).toEqual(before);
+    const row = await testPrisma().uploadBatch.findFirst({ where: { id: batchId } });
+    expect(row?.status).toBe('applied');
+    expect(row?.undoneAt).toBeNull();
+  });
+
+  it('T-UNDO-004b · a since-FIX-MATCHED created title refuses the undo', async () => {
+    const batchId = await makeBatch();
+    await makeConfirmedCandidate(batchId, DUNE, 'Dune');
+    expect((await close(batchId)).status).toBe(200);
+
+    // The owner re-matched Dune to Andor after the fact. `matchState` cannot
+    // see this — close writes 'matched' and so does fix-match — so the only
+    // record of what the batch decided is the candidate's resolved identity.
+    const dune = await titleFor(DUNE);
+    await testPrisma().title.update({
+      where: { id: dune.id },
+      data: { workIdentity: ANDOR },
+    });
+
+    const before = await snapshotList();
+    const res = await undo(batchId);
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as ErrorBody;
+    expect(body.error.code).toBe('BATCH_NOT_CREATES_ONLY');
+    expect((body.error.details as { reason: string }).reason).toBe('later-owner-edits');
+
+    expect(await snapshotList()).toEqual(before);
+  });
+
+  it('T-UNDO-004c · an INACTIVE suppression does not refuse the undo', async () => {
+    // ⚠ Un-suppression leaves the row in place (`active: false`). Reading the
+    // table without the flag would permanently block undo for any work the
+    // owner had ever hidden and then un-hidden.
+    const before = await snapshotList();
+
+    const batchId = await makeBatch();
+    await makeConfirmedCandidate(batchId, DUNE, 'Dune');
+    expect((await close(batchId)).status).toBe(200);
+
+    await testPrisma().suppression.create({
+      data: {
+        id: 'undo-supp-2',
+        ownerId,
+        workIdentity: DUNE,
+        displayName: 'Dune',
+        active: false,
+        unsuppressedAt: new Date('2026-02-02T00:00:00Z'),
+      },
+    });
+
+    expect((await undo(batchId)).status).toBe(200);
+    expect(await snapshotList()).toEqual(before);
+  });
+
+  it('T-UNDO-004d · a suppression on a work the batch did NOT create is ignored', async () => {
+    // Heat is suppressed and pre-existing; the batch only created Dune.
+    const batchId = await makeBatch();
+    await makeConfirmedCandidate(batchId, DUNE, 'Dune');
+    expect((await close(batchId)).status).toBe(200);
+    await testPrisma().suppression.create({
+      data: { id: 'undo-supp-3', ownerId, workIdentity: HEAT, active: true, displayName: 'Heat' },
+    });
+
+    expect((await undo(batchId)).status).toBe(200);
+  });
+});

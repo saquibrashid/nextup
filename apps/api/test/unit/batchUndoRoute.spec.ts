@@ -80,6 +80,11 @@ const store: {
   listingStates: Record<string, string>;
   /** Active suppressions, keyed on WORK identity (REQ-071). */
   suppressions: { workIdentity: string }[];
+  /**
+   * The batch's extraction candidates — the ONLY record of the work identity
+   * the batch itself resolved for each title it created (TASK-113).
+   */
+  candidates: { reviewDisposition: string; resolvedWorkIdentity: string | null }[];
   /** Titles + listings this batch created — the provenance-unavailable signal. */
   createdEffects: number;
 } = {
@@ -98,6 +103,7 @@ const store: {
   titleDisplays: {},
   listingStates: {},
   suppressions: [],
+  candidates: [],
   createdEffects: 0,
 };
 
@@ -187,6 +193,8 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
       ) as Promise<never>,
     listActiveSuppressions: () =>
       Promise.resolve(store.suppressions.map((row) => ({ ...row }))) as Promise<never>,
+    listCandidatesForBatch: () =>
+      Promise.resolve(store.candidates.map((row) => ({ ...row }))) as Promise<never>,
     countBatchCreatedEffects: () => Promise.resolve(store.createdEffects),
   };
 });
@@ -272,6 +280,7 @@ beforeEach(async () => {
   store.titleDisplays = {};
   store.listingStates = {};
   store.suppressions = [];
+  store.candidates = [];
   store.createdEffects = 0;
 
   const { createApp } = await import('../../src/app.js');
@@ -688,5 +697,163 @@ describe('T-UNDO-002/003/008 · POST /undo without a store', () => {
     expect(store.transactions).toBe(0);
     expect(store.discardedTitles).toEqual([]);
     expect(store.discardedListings).toEqual([]);
+  });
+});
+
+/**
+ * TASK-113 — the `later-owner-edits` gate (US-032 AC-4), driven through the
+ * REAL route with no store.
+ *
+ * ⚠ **THIS GATE IS INVISIBLE TO PROVENANCE, WHICH IS WHY IT IS A GATE AND NOT
+ * A PREDICATE.** Suppress and un-suppress write no `batch_change` row at all
+ * (US-031 AC-5, `T-PROV-013`) and fix-match is an out-of-batch edit, so a batch
+ * whose created titles the owner has since re-decided still passes
+ * `isCreatesOnly` cleanly. Without this gate the undo proceeds and SD-03
+ * DISCARDS those rows — a hard delete of a decision the batch never recorded
+ * and cannot put back.
+ *
+ * ⚠ The refusal is READ-ONLY and the assertions on `store.transactions` /
+ * `discardedTitles` are the point, not decoration: `T-UNDO-005` requires that
+ * asking whether an undo is allowed changes nothing.
+ */
+describe('T-UNDO-014 — later owner edits refuse a creates-only undo', () => {
+  const refusal = async (): Promise<{
+    status: number;
+    code: string;
+    details: { reason: string; created: { titleId: string }[]; truncated: boolean };
+  }> => {
+    const res = await undo('batch-1');
+    const body = (await res.json()) as ErrorBody;
+    return {
+      status: res.status,
+      code: body.error.code,
+      details: body.error.details as never,
+    };
+  };
+
+  /** A creates-only batch that created exactly one matched title. */
+  function seedCreatedTitle(identity: string): void {
+    created('title-1', 'listing-1');
+    store.listingsByTitle['title-1'] = [
+      { listingId: 'listing-1', service: 'netflix', dateAdded: new Date('2026-02-01T00:00:00Z') },
+    ];
+    store.titleDisplays['title-1'] = {
+      workIdentity: identity,
+      state: 'active',
+      tmdbName: 'Dune',
+      rawExtractedText: 'dune',
+      tmdbReleaseYear: 2021,
+      tmdbPosterPath: '/d.jpg',
+    };
+    store.candidates = [{ reviewDisposition: 'confirmed', resolvedWorkIdentity: identity }];
+  }
+
+  it('T-UNDO-014a: a created title the owner has since suppressed refuses the undo', async () => {
+    seedCreatedTitle('tmdb:movie:1');
+    store.suppressions = [{ workIdentity: 'tmdb:movie:1' }];
+
+    const { status, code, details } = await refusal();
+    expect(status).toBe(409);
+    expect(code).toBe('BATCH_NOT_CREATES_ONLY');
+    expect(details.reason).toBe('later-owner-edits');
+  });
+
+  it('T-UNDO-014b: a created title the owner has since fix-matched refuses the undo', async () => {
+    // The batch resolved `tmdb:movie:1`; the title now carries an identity the
+    // batch never resolved, which only a fix-match can have done.
+    seedCreatedTitle('tmdb:movie:1');
+    store.titleDisplays['title-1']!.workIdentity = 'tmdb:movie:99';
+
+    const { status, details } = await refusal();
+    expect(status).toBe(409);
+    expect(details.reason).toBe('later-owner-edits');
+  });
+
+  it('T-UNDO-014i: a DISCARDED candidate identity does not excuse a fix-match', async () => {
+    // ⚠ The set is built from CONFIRMED candidates only, and this is the case
+    // that makes that matter: a discarded read is a perfectly reachable
+    // fix-match target (nothing holds its identity, so the unique index does
+    // not stand in the way). Counting it as "resolved by this batch" would
+    // silently let the undo through and discard the owner's correction.
+    seedCreatedTitle('tmdb:movie:1');
+    store.titleDisplays['title-1']!.workIdentity = 'tmdb:movie:99';
+    store.candidates.push({
+      reviewDisposition: 'discarded',
+      resolvedWorkIdentity: 'tmdb:movie:99',
+    });
+
+    const { status, details } = await refusal();
+    expect(status).toBe(409);
+    expect(details.reason).toBe('later-owner-edits');
+  });
+
+  it('T-UNDO-014c: the refusal still ENUMERATES what the batch created', async () => {
+    seedCreatedTitle('tmdb:movie:1');
+    store.suppressions = [{ workIdentity: 'tmdb:movie:1' }];
+
+    const { details } = await refusal();
+    // A refusal the owner cannot act on item-by-item is a dead end (US-033).
+    expect(details.created.map((entry) => entry.titleId)).toEqual(['title-1']);
+    expect(details.truncated).toBe(false);
+  });
+
+  it('T-UNDO-014d: the refusal writes NOTHING', async () => {
+    seedCreatedTitle('tmdb:movie:1');
+    store.suppressions = [{ workIdentity: 'tmdb:movie:1' }];
+
+    await refusal();
+    expect(store.transactions).toBe(0);
+    expect(store.discardedTitles).toEqual([]);
+    expect(store.discardedListings).toEqual([]);
+    expect(store.calls).toEqual([]);
+  });
+
+  it('T-UNDO-014e: an untouched creates-only batch still undoes', async () => {
+    // ⚠ The gate must not refuse the ordinary case. A detector that fired on
+    // every batch would pass every refusal case above and break the feature.
+    seedCreatedTitle('tmdb:movie:1');
+
+    const res = await undo('batch-1');
+    expect(res.status).toBe(200);
+    expect(store.discardedTitles).toEqual(['title-1']);
+  });
+
+  it('T-UNDO-014f: a suppression on some OTHER work does not refuse the undo', async () => {
+    seedCreatedTitle('tmdb:movie:1');
+    store.suppressions = [{ workIdentity: 'tmdb:movie:2' }];
+
+    const res = await undo('batch-1');
+    expect(res.status).toBe(200);
+  });
+
+  it('T-UNDO-014g: the gate runs BEFORE the lifecycle refusals it cannot outrank', async () => {
+    // An already-undone batch reports that, not a later edit: the owner cannot
+    // act on an enumeration for a batch that is already reversed.
+    seedCreatedTitle('tmdb:movie:1');
+    store.suppressions = [{ workIdentity: 'tmdb:movie:1' }];
+    store.batch!.status = 'undone';
+    store.batch!.undoneAt = new Date('2026-02-02T00:00:00.000Z');
+
+    const { code } = await refusal();
+    expect(code).toBe('BATCH_ALREADY_UNDONE');
+  });
+
+  it('T-UNDO-014h: `modified-or-removed` still outranks a later edit', async () => {
+    // Both are true here. The provenance reason is the one the owner can act
+    // on, and it is the one §8.4 has always reported for this shape.
+    seedCreatedTitle('tmdb:movie:1');
+    store.suppressions = [{ workIdentity: 'tmdb:movie:1' }];
+    store.changes.push({
+      kind: 'listing_removed',
+      titleId: 'title-1',
+      listingId: 'listing-1',
+      attr: null,
+      prevValue: null,
+      nextValue: null,
+    });
+    store.listingStates['listing-1'] = 'removed';
+
+    const { details } = await refusal();
+    expect(details.reason).toBe('modified-or-removed');
   });
 });

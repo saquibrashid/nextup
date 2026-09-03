@@ -22,17 +22,19 @@
 import {
   createsOnlyRefusalReason,
   deriveSortDateAdded,
+  detectLaterOwnerEdits,
   deriveTitleState,
   isCreatesOnly,
   planCreatesOnlyUndo,
   toBatchProvenance,
 } from '@nextup/domain';
-import type { BatchProvenance } from '@nextup/domain';
+import type { BatchProvenance, LaterOwnerEdit } from '@nextup/domain';
 import type {
   UndoRefusalCreatedEntry,
   UndoRefusalCurrentState,
   UndoRefusalDetails,
   UndoRefusalModifiedEntry,
+  UndoRefusalReason,
   UndoRefusalRemovedEntry,
 } from '@nextup/domain';
 
@@ -45,6 +47,7 @@ import {
   findUploadBatch,
   listActiveSuppressions,
   listBatchChanges,
+  listCandidatesForBatch,
   listListingsForTitle,
   listServiceListingStatesByIds,
   listTitleDisplaysByIds,
@@ -131,8 +134,22 @@ export async function undoBatch(ownerId: OwnerId, batchId: string): Promise<Undo
     );
   }
 
-  const plan = planCreatesOnlyUndo(provenance);
+  // TASK-113 (US-032 AC-4) — creates-only BY PROVENANCE is not the same as safe
+  // to reverse. If the owner has since suppressed or fix-matched one of the
+  // titles this batch created, undoing would DISCARD (SD-03, a hard delete)
+  // a row carrying a decision the batch has no record of and cannot restore.
+  // Refused and enumerated, never partially applied.
+  const laterEdits = await findLaterOwnerEdits(ownerId, batchId, provenance);
+  if (laterEdits.length > 0) {
+    throw new AppError(
+      'BATCH_NOT_CREATES_ONLY',
+      409,
+      'This batch cannot be undone as a whole.',
+      await buildRefusalDetails(ownerId, batchId, provenance, 'later-owner-edits'),
+    );
+  }
 
+  const plan = planCreatesOnlyUndo(provenance);
   // ⚠ Read the predecessor BEFORE the transaction moves this batch out of
   // `applied`. Doing it inside would still be correct today because the query
   // excludes this batch by id, but it makes the revert depend on that
@@ -297,6 +314,57 @@ interface TitleDisplay {
 }
 
 /**
+ * Read the rows `detectLaterOwnerEdits` needs and run it (TASK-113, US-032
+ * AC-4).
+ *
+ * ⚠ **READ-ONLY, like `buildRefusalDetails`.** `T-UNDO-005` snapshots the owner
+ * partition around a refusal and asserts equality: asking whether an undo is
+ * allowed must never change anything.
+ *
+ * ⚠ **THE CANDIDATE IS THE ONLY RECORD OF THE IDENTITY THE BATCH CHOSE.**
+ * `batch_change` holds no `create_title` identity, and suppression writes no
+ * change row at all (`T-PROV-013`), so there is nothing in the ledger to
+ * compare against — `extraction_candidate.resolvedWorkIdentity` is it. Undo
+ * detaches `resolved_title_id` (TASK-112), but only on a SUCCESSFUL undo, and
+ * this runs before one.
+ */
+async function findLaterOwnerEdits(
+  ownerId: OwnerId,
+  batchId: string,
+  provenance: BatchProvenance,
+): Promise<LaterOwnerEdit[]> {
+  if (provenance.created.length === 0) return [];
+
+  const titleIds = [...new Set(provenance.created.map((entry) => entry.titleId))];
+  const [titleRows, candidates, suppressions] = await Promise.all([
+    listTitleDisplaysByIds(ownerId, titleIds),
+    listCandidatesForBatch(ownerId, batchId),
+    listActiveSuppressions(ownerId),
+  ]);
+
+  const currentIdentityByTitleId = new Map(titleRows.map((row) => [row.id, row.workIdentity]));
+
+  // ⚠ CONFIRMED ONLY. A discarded candidate's identity is a reachable
+  // fix-match target, so leaving it in the set would silently permit the undo
+  // that moved a title onto it. Confirmed identities cannot be reached by a
+  // fix-match (the work-identity unique index refuses the collision), so
+  // narrowing here loses nothing and closes the hole.
+  const identitiesResolvedByBatch = new Set<string>();
+  for (const candidate of candidates) {
+    if (candidate.reviewDisposition !== 'confirmed') continue;
+    if (candidate.resolvedWorkIdentity === null) continue;
+    identitiesResolvedByBatch.add(candidate.resolvedWorkIdentity);
+  }
+
+  return detectLaterOwnerEdits({
+    created: provenance.created,
+    currentIdentityByTitleId,
+    identitiesResolvedByBatch,
+    suppressedWorks: new Set(suppressions.map((row) => row.workIdentity)),
+  });
+}
+
+/**
  * Build the §8.4 `details` payload for a non-creates-only (or
  * provenance-unavailable) batch.
  *
@@ -315,8 +383,14 @@ async function buildRefusalDetails(
   ownerId: OwnerId,
   batchId: string,
   provenance: BatchProvenance | null,
+  reasonOverride?: UndoRefusalReason,
 ): Promise<UndoRefusalDetails> {
-  const reason = createsOnlyRefusalReason(provenance) ?? 'modified-or-removed';
+  // ⚠ The override exists for `later-owner-edits` ONLY, and it is a parameter
+  // rather than a second builder because the ENUMERATION is identical: the
+  // owner needs the same actionable list of what the batch touched whichever
+  // way it was refused. `createsOnlyRefusalReason` cannot produce this value —
+  // by provenance the batch really is creates-only.
+  const reason = reasonOverride ?? createsOnlyRefusalReason(provenance) ?? 'modified-or-removed';
 
   // Provenance-unavailable: there is nothing to enumerate, but the refusal must
   // still be a structured, actionable §8.4 body rather than a bare 409.
