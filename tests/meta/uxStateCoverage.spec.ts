@@ -102,11 +102,27 @@ const KNOWN_UNCOVERED: readonly string[] = [
   // busy message). Focusing those would yank focus on every poll, which is a
   // worse defect than the one being fixed. Which regions are action outcomes
   // is an owner-level design decision, not a mechanical sweep.
-  'T-AUTH-001',
+  // ⚠ `T-AUTH-001` and `T-SEC-008` were removed at the 8 → 6 step, and NOT by
+  // writing tests for them — both were retired from `specs/ux-states.md` §10.1
+  // as wrong, with the full record in `specs/testing.md` §18.4.
+  // `T-SEC-008` carried `specs/api.md` §7's claim that an unauthenticated
+  // `/api/*` returns "401 with a JSON envelope". §18.2 measured the live
+  // system in August and found 401 with an EMPTY body; §7 was never updated.
+  // ⚠ It is the dangerous direction to "fix": the only way `/api/*` can answer
+  // with the application's envelope is for application code to run, and the
+  // only way that happens unauthenticated is an Easy Auth `excludedPaths`
+  // bypass — which serves the owner's whole list at the platform edge while
+  // `T-SEC-010`, `T-SEC-014` and every other allow-list test still passes,
+  // because the middleware they exercise is never reached. `T-SMOKE-001`
+  // asserts the ABSENCE of a body for exactly that reason.
+  // `T-AUTH-001` was a level mismatch: the state is asserted against a real
+  // deployment by `T-SMOKE-001`/`002` and its configuration by `T-INFRA-008`,
+  // which is the substitution `specs/testing.md` §18 already makes.
+  // ⚠ `T-AUTH-002`/`003`/`004` STAY. Each needs a real interactive sign-in,
+  // and automating one means storing a credential in a public repository.
   'T-AUTH-002',
   'T-AUTH-003',
   'T-AUTH-004',
-  'T-SEC-008',
   // `T-UX-001` (§1 *"Never an indefinite spinner"*) removed at the 12 → 11
   // step, together with `T-UX-010` below: `T-UX-001a`-`h` and `T-UX-010a`-`e`
   // in `apps/web/test/slowResponse.spec.tsx`, a new file. Both ids go in one

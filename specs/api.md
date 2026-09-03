@@ -1507,9 +1507,28 @@ here — it degrades to `"imdbRating": null` and the lookup still answers
 | **503** *(new, R5)* | **`IMAGE_DECODE_OOM` only.** The decode exhausted container memory. **Not a 500**: the cause is known, nothing was changed (§5.2.1), and there is a documented one-command remedy (`runbooks/scale-up-memory.md`). **No `Retry-After` header** — retrying before the up-size cannot succeed. |
 | 502 | Upstream (TMDB) unavailable |
 
-**No 3xx from `/api/*`.** Authentication redirects are issued by Container Apps
-Easy Auth on non-API paths; an unauthenticated `/api/*` call receives **401 with
-a JSON envelope**, never an HTML sign-in page (`T-SEC-008`).
+**No 3xx from `/api/*`.** Authentication is enforced by Container Apps Easy
+Auth at the platform edge, before any application code runs. An unauthenticated
+`/api/*` call receives the platform's **401 challenge with an EMPTY body** and
+a `WWW-Authenticate` header naming the Entra app — never an HTML sign-in page,
+and never a redirect (`T-SMOKE-001`).
+
+⚠ **The empty body is the security property, not an omission.** The only way
+`/api/*` could answer with this document's JSON error envelope is for
+application code to run, and the only way application code runs
+unauthenticated is an Easy Auth `excludedPaths` bypass — which publishes the
+owner's entire list at the edge while `T-SEC-010`, `T-SEC-014` and every other
+allow-list test still passes, because the middleware they exercise is never
+reached. `T-SMOKE-001` asserts the **absence** of a body for exactly this
+reason; `T-INFRA-008h` fails the build on any `excludedPaths` entry. The SPA
+never needed the envelope: `apps/web/src/lib/apiClient.ts` short-circuits
+`401` **before** reading a body.
+
+~~Superseded: "Authentication redirects are issued by Container Apps Easy Auth
+on non-API paths; an unauthenticated `/api/*` call receives **401 with a JSON
+envelope**, never an HTML sign-in page (`T-SEC-008`)." — the envelope half was
+never true of the deployed system, and satisfying it would have required
+opening the bypass above.~~
 
 ---
 

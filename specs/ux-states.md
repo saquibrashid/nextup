@@ -203,11 +203,50 @@ Each state below names: **what the owner sees**, **what they can do**, and the
 
 | State | Owner sees | Test |
 |---|---|---|
-| **10.1 Unauthenticated, any route** | Container Apps Easy Auth redirects to the Entra sign-in page before the SPA loads. `/api/*` returns 401 JSON, never HTML | `T-AUTH-001`, `T-SEC-008` |
+| **10.1 Unauthenticated, any route** | Container Apps Easy Auth intercepts the request before the SPA loads: a browser navigation is redirected to the Entra sign-in page, and `/api/*` receives the platform's **401 challenge with an empty body** and a `WWW-Authenticate` header naming the IdP — never an HTML sign-in page, and never a 3xx | `T-SMOKE-001`, `T-SMOKE-002`, `T-INFRA-008` |
 | **10.2 Authenticated, allow-listed** | The requested route, with the deep link preserved through the redirect (US-001 AC-2) | `T-AUTH-002` |
 | **10.3 Authenticated, NOT allow-listed** | Full-page refusal (§2.11). **No list data of any kind is fetched or rendered.** The highest-value test in the product | `T-SEC-010` |
 | **10.4 Session expired** | 401 → the sign-in-again state, returning to the current URL. In-progress review state is preserved (§6.18) | `T-AUTH-003` |
 | **10.5 Signed out** | Sign-out link is always present in the header; after sign-out the owner lands on the Entra signed-out page | `T-AUTH-004` |
+
+> ⚠ **CORRECTION to §10.1 — the body is EMPTY, and that is the security
+> property.** This row previously read *"`/api/*` returns 401 JSON, never
+> HTML"* and named two test ids. Both halves were wrong, and
+> they were wrong in a way that would have been **repaired in the dangerous
+> direction**: the only way to make `/api/*` answer with the application's JSON
+> error envelope is for application code to run, and the only way application
+> code runs unauthenticated is an Easy Auth `excludedPaths` bypass — which
+> publishes the owner's entire list at the platform edge while every
+> allow-list test in the repository still passes, because the middleware they
+> exercise is simply never reached. `T-SMOKE-001` asserts the **absence** of a
+> body for exactly this reason (*"a body means application code ran — check
+> excludedPaths"*), and `T-INFRA-008h` fails the build on any `excludedPaths`
+> entry. A spec sentence that asks for the opposite is a standing invitation
+> to open the hole.
+>
+> The client never needed the envelope: `apps/web/src/lib/apiClient.ts`
+> short-circuits `401` **before** reading a body, so the deployed shape has
+> always been handled correctly.
+>
+> The **test column** is corrected too. The two ids named here were asserted by
+> nothing, and one of them was never even defined in `specs/testing.md` §12, so
+> neither `check-test-ids` nor `check-orphan-tests` could see it. They are
+> recorded, in full and by name, in **`specs/testing.md` §18.2** — deliberately
+> not repeated here, because the UI-state coverage gate
+> (`tests/meta/uxStateCoverage.spec.ts`) reads every id literal in this file
+> as a state that must be asserted, and a superseded id written out in a
+> struck-through line would be resurrected as a live obligation by the very
+> gate that measures this document.
+>
+> `T-SMOKE-001`/`T-SMOKE-002` assert this state against a **real deployment**
+> in `deploy.yml`, and `T-INFRA-008` asserts the configuration that produces
+> it — the same shape as `T-INFRA-004` standing in for the blob purge (see
+> `specs/testing.md` §18). `T-AUTH-002`–`004` remain in §10.2/§10.4/§10.5 as
+> deployment-time manual checks: they require a real interactive sign-in, and
+> automating one means storing a credential.
+>
+> ~~Superseded: **10.1** *"Container Apps Easy Auth redirects to the Entra
+> sign-in page before the SPA loads. `/api/*` returns 401 JSON, never HTML"*.~~
 
 ---
 
