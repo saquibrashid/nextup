@@ -41,6 +41,26 @@ export function isRunning(status: string): boolean {
   return status === 'submitted' || status === 'extracting';
 }
 
+/**
+ * The history state that sizes the review's loading skeleton (§6.1,
+ * `T-UX-060`).
+ *
+ * ⚠ **`null` UNLESS EVERY IMAGE HAS REPORTED.** `candidateCount` is `null` on
+ * an image whose extraction has not landed, and summing it as zero would draw
+ * a confidently-too-small skeleton — a placeholder that under-reports what was
+ * read from the owner's screenshots. An absent count is the honest answer, and
+ * `parseSkeletonCount` renders the countless skeleton for it.
+ */
+export function skeletonState(batch: BatchStatus | null): { skeletonCount: number } | undefined {
+  if (batch === null) return undefined;
+  let total = 0;
+  for (const image of batch.images) {
+    if (image.candidateCount === null) return undefined;
+    total += image.candidateCount;
+  }
+  return { skeletonCount: total };
+}
+
 export interface BatchStatusRouteProps {
   readonly client?: ApiClient;
   /** Injected so the hidden-tab rule is drivable without a real document. */
@@ -169,10 +189,17 @@ export function BatchStatusRoute({
    * ⚠ A NAVIGATION, NOT A MUTATION. REQ-102 governs requests; this issues
    * none, and it is idempotent under StrictMode's double invoke because
    * navigating twice to the same path is one navigation.
+   *
+   * ⚠ **THE COUNT RIDES ALONG** (§6.1, `T-UX-060`). This screen already holds
+   * the batch, so the review's loading skeleton can be drawn at the right size
+   * without a second request. Carrying it here rather than fetching it there
+   * is the whole design: a request issued to size a loading state would outlast
+   * the load it is covering for.
    */
   useEffect(() => {
-    if (batch?.status === 'in-review') void navigate(`/batches/${batchId}/review`);
-  }, [batch?.status, batchId, navigate]);
+    if (batch?.status === 'in-review')
+      void navigate(`/batches/${batchId}/review`, { state: skeletonState(batch) });
+  }, [batch, batchId, navigate]);
 
   if (refused) return <RefusalPage reason="not-allowed" />;
 
@@ -189,7 +216,7 @@ export function BatchStatusRoute({
         void client.discardBatch(batchId).then(() => navigate('/'));
       }}
       onContinue={() => {
-        void navigate(`/batches/${batchId}/review`);
+        void navigate(`/batches/${batchId}/review`, { state: skeletonState(batch) });
       }}
       onUploadNew={() => {
         void navigate('/upload');

@@ -310,7 +310,17 @@ const KNOWN_UNCOVERED: readonly string[] = [
   // `reviewFiles(files, 0)` instead of `accepted.length`, which lets the owner
   // walk past the 40-image ceiling over successive attaches (killed
   // `T-UX-044c` ALONE — no pre-existing case could see it).
-  'T-UX-060',
+  // ⚠ `T-UX-060` (§6.1, review loading) WAS RETIRED FROM THIS LIST, and the
+  // reason it sat here so long is worth keeping: §6.1 named a source that
+  // cannot supply what it asked for. It wanted "section skeletons with their
+  // counts already shown from `GET /api/batches/:batchId`", but that payload
+  // carries `candidateCount` per IMAGE and nothing per section — sectioning
+  // happens when the review is built, so no per-section count exists before
+  // the review has loaded. The owner ruled out both an API change and a second
+  // request; §6.1 was corrected in place and the count now rides forward in
+  // history state, with a countless skeleton whenever it is absent. Asserted
+  // by `apps/web/test/reviewSkeleton.spec.tsx`.
+  //
   // ⚠ `T-UX-068` (§6.17, offline mid-review) IS LISTED DELIBERATELY AND MUST
   // NOT BE IMPLEMENTED TO CLEAR IT. It is `T-STATUS-001p`'s worked example of
   // a live probe, and a test asserting it here would make that example false.
