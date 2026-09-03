@@ -1021,17 +1021,23 @@ describe('T-PROV-014 · close links each applied candidate to the Title it resol
     // Grouping by title is an implementation detail; both rows must still be
     // written. A per-title flush that only ever wrote its first candidate
     // would pass every single-row case above.
-    const titleId = await seedListing(DUNE, 'Dune', 'max');
-    const first = await makeBatch({ service: 'netflix' });
-    const a = await makeCandidate(first, { disposition: 'confirmed' });
-    expect((await closeBatchRequest(first)).status).toBe(200);
+    //
+    // ⚠ ONE batch, not two. Two closes on the same service would be a second
+    // listing for a work that already has one — a different behaviour with its
+    // own rules, and not what this case is about.
+    const batchId = await makeBatch();
+    const first = await makeCandidate(batchId, { disposition: 'confirmed' });
+    const second = await makeCandidate(batchId, {
+      disposition: 'confirmed',
+      rawText: 'DUNE (2021)',
+    });
 
-    const second = await makeBatch({ service: 'netflix' });
-    const b = await makeCandidate(second, { disposition: 'confirmed' });
-    expect((await closeBatchRequest(second)).status).toBe(200);
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
 
-    expect(await resolvedTitleOf(a)).toBe(titleId);
-    expect(await resolvedTitleOf(b)).toBe(titleId);
+    const titleId = (await testPrisma().title.findFirst({ where: { workIdentity: DUNE } }))?.id;
+    expect(titleId).toBeTruthy();
+    expect(await resolvedTitleOf(first)).toBe(titleId);
+    expect(await resolvedTitleOf(second)).toBe(titleId);
   });
 
   it('T-PROV-014f: an SD-02 COLLAPSED loser is deliberately left null (derivable in one hop)', async () => {
