@@ -115,7 +115,7 @@ const store: {
   /** Listing ids whose soft delete reports zero rows — the injected race. */
   softDeleteFails: string[];
   /** TASK-182 — the candidate→title links the close flushed. */
-  resolvedLinks: { titleId: string; candidateIds: string[] }[];
+  resolvedLinks: { candidateId: string; titleId: string }[];
 } = {
   batch: null,
   candidates: [],
@@ -190,14 +190,12 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
       Promise.resolve(store.titles.find((t) => t.workIdentity === workIdentity) ?? null),
     setCandidateResolvedTitles: (
       _ownerId: string,
-      links: { titleId: string; candidateIds: readonly string[] }[],
+      links: { candidateId: string; titleId: string }[],
     ) => {
-      // Recorded as given, NOT merged: a flush that wrote an empty group, or
-      // wrote the same title twice, must be visible to the assertions rather
-      // than tidied away by the fake.
-      for (const link of links) {
-        store.resolvedLinks.push({ titleId: link.titleId, candidateIds: [...link.candidateIds] });
-      }
+      // Recorded as given, NOT de-duplicated: a flush that wrote the same
+      // candidate twice must be visible to the assertions rather than tidied
+      // away by the fake.
+      for (const link of links) store.resolvedLinks.push({ ...link });
       return Promise.resolve(undefined);
     },
     createTitle: (_ownerId: string, data: Record<string, unknown>) => {
@@ -694,7 +692,7 @@ describe('T-PROV-015 · the candidate→title link is flushed inside the close (
   // absence of a write is exactly the kind of defect a fixture that hand-feeds
   // the column hides, so nothing here may seed the link.
   const linkFor = (candidateId: string): string | null =>
-    store.resolvedLinks.find((l) => l.candidateIds.includes(candidateId))?.titleId ?? null;
+    store.resolvedLinks.find((l) => l.candidateId === candidateId)?.titleId ?? null;
 
   it('T-PROV-015a: a candidate that created a title is linked to it', async () => {
     const cand = makeCandidate();
@@ -751,7 +749,7 @@ describe('T-PROV-015 · the candidate→title link is flushed inside the close (
     expect(((await res.json()) as CloseBody).summary.listingsCreated).toBe(0);
 
     expect(linkFor(gated.id)).toBeNull();
-    expect(store.resolvedLinks.flatMap((l) => l.candidateIds)).toEqual([]);
+    expect(store.resolvedLinks).toEqual([]);
   });
 
   it('T-PROV-015e: an SD-02 collapsed loser is deliberately not linked', async () => {
@@ -775,7 +773,7 @@ describe('T-PROV-015 · the candidate→title link is flushed inside the close (
     let transactionsWhenLinked = -1;
     const cand = makeCandidate();
     const originalPush = store.resolvedLinks.push.bind(store.resolvedLinks);
-    store.resolvedLinks.push = ((...items: { titleId: string; candidateIds: string[] }[]) => {
+    store.resolvedLinks.push = ((...items: { candidateId: string; titleId: string }[]) => {
       if (transactionsWhenLinked === -1) transactionsWhenLinked = store.transactions;
       return originalPush(...items);
     }) as typeof store.resolvedLinks.push;
@@ -792,21 +790,30 @@ describe('T-PROV-015 · the candidate→title link is flushed inside the close (
     // applied, so there is nothing to point anywhere.
     expect((await closeBatch('batch-1')).status).toBe(200);
 
-    expect(store.resolvedLinks.flatMap((l) => l.candidateIds)).toEqual([]);
+    expect(store.resolvedLinks).toEqual([]);
   });
 
-  it('T-PROV-015h: TWO candidates for the same work are BOTH linked to the one title', async () => {
-    // Grouping by title is an implementation detail, and one that quietly
-    // drops rows if the flush writes only a group's first candidate — which
-    // every single-candidate case above would still pass.
+  it('T-PROV-015h: TWO applied candidates in one batch are linked ONE ROW EACH', async () => {
+    // ⚠ NOT a grouping case, and deliberately not one. Two candidates for the
+    // SAME work cannot both be applied — that needs two listings on one
+    // service and `listing_one_per_service` refuses it (it 500s against a real
+    // engine, which is how the grouped first draft of this code was caught).
+    // Two DIFFERENT works is the real shape, and it is what pins that the
+    // flush writes every link rather than only the first.
     const first = makeCandidate();
-    const second = makeCandidate({ rawText: 'DUNE (2021)', normalisedText: 'dune 2021' });
+    const second = makeCandidate({
+      resolvedWorkIdentity: HEAT,
+      rawText: 'Heat',
+      normalisedText: 'heat',
+      matchCandidates: JSON.stringify([
+        { tmdbId: 949, mediaType: 'movie', name: 'Heat', releaseYear: 1995, score: 1 },
+      ]),
+    });
 
     expect((await closeBatch('batch-1')).status).toBe(200);
 
-    const titleId = store.titles.find((t) => t.workIdentity === DUNE)?.id;
-    expect(titleId).toBeTruthy();
-    expect(linkFor(first.id)).toBe(titleId);
-    expect(linkFor(second.id)).toBe(titleId);
+    expect(linkFor(first.id)).toBe(store.titles.find((t) => t.workIdentity === DUNE)?.id);
+    expect(linkFor(second.id)).toBe(store.titles.find((t) => t.workIdentity === HEAT)?.id);
+    expect(store.resolvedLinks).toHaveLength(2);
   });
 });

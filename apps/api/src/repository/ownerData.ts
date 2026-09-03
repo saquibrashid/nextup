@@ -1565,17 +1565,22 @@ export async function findExtractionCandidate(ownerId: OwnerId, id: string, tx?:
  * title, or committed separately from it, is a constraint violation rather
  * than a stale pointer.
  *
- * Grouped by title so one statement covers every candidate that resolved to
- * the same work, which is the SD-02 case.
+ * ⚠ **Deliberately NOT grouped by title.** Grouping looks like an obvious
+ * saving and buys nothing: two applied candidates resolving to the same work in
+ * one batch would need two listings on one service, which
+ * `listing_one_per_service` refuses — SD-02 collapses them at review precisely
+ * so that never reaches close. A group can therefore only ever hold one
+ * candidate, and the grouped form was a branch no legitimate fixture could
+ * exercise.
  */
 export async function setCandidateResolvedTitles(
   ownerId: OwnerId,
-  links: readonly { readonly titleId: string; readonly candidateIds: readonly string[] }[],
+  links: readonly { readonly candidateId: string; readonly titleId: string }[],
   tx?: Db,
 ): Promise<void> {
   for (const link of links) {
     await db(tx).extractionCandidate.updateMany({
-      where: { ownerId, id: { in: [...link.candidateIds] } },
+      where: { ownerId, id: link.candidateId },
       data: { resolvedTitleId: link.titleId },
     });
   }

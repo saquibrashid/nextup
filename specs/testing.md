@@ -2758,6 +2758,18 @@ were open questions in the finding below:
   `applicable` by construction, and `collapsedIntoCandidateId` already names
   the survivor, which now names the title — derivable in one hop, and a second
   copy is a second thing that can disagree.
+- **One statement per candidate, not per title.** The first draft grouped by
+  title; CI proved that branch **unreachable**, because two applied candidates
+  for one work would need two listings on one service and
+  `listing_one_per_service` refuses it — SD-02 collapses them at review so it
+  never reaches close. The multi-candidate case passed against the fake, which
+  has no unique index, and **500'd against the engine**. ⚠ **A fake with no
+  constraints will accept a state the database forbids — the §22a trap wearing
+  a different hat.**
+- **The suppression cases needed the review/close RACE lever.** An ordinary
+  suppression removes the candidate *before* the additions loop, so it never
+  reaches the in-transaction gate: the mutation that records a link above that
+  gate **survived** the first version of both `T-PROV-014d` and `T-PROV-015d`.
 
 ⚠ **A consequence worth recording: `undoDiscard.ts`'s detach of this column was
 a no-op for the whole of the project.** TASK-112 nulled `resolved_title_id`

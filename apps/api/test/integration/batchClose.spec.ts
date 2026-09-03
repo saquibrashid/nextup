@@ -1017,27 +1017,28 @@ describe('T-PROV-014 · close links each applied candidate to the Title it resol
     expect(await resolvedTitleOf(gated)).toBeNull();
   });
 
-  it('T-PROV-014e: two candidates for the SAME work both point at the one title', async () => {
-    // Grouping by title is an implementation detail; both rows must still be
-    // written. A per-title flush that only ever wrote its first candidate
-    // would pass every single-row case above.
-    //
-    // ⚠ ONE batch, not two. Two closes on the same service would be a second
-    // listing for a work that already has one — a different behaviour with its
-    // own rules, and not what this case is about.
+  it('T-PROV-014e: TWO applied candidates in one batch are linked one row each', async () => {
+    // ⚠ TWO DIFFERENT WORKS, DELIBERATELY. Two candidates for the SAME work
+    // cannot both be applied — that needs two listings on one service and
+    // `listing_one_per_service` refuses it with a 500. SD-02 collapses them at
+    // review so it never reaches close, which is why the flush writes one row
+    // per candidate rather than one per title.
     const batchId = await makeBatch();
     const first = await makeCandidate(batchId, { disposition: 'confirmed' });
     const second = await makeCandidate(batchId, {
       disposition: 'confirmed',
-      rawText: 'DUNE (2021)',
+      workIdentity: HEAT,
+      rawText: 'Heat',
     });
 
     expect((await closeBatchRequest(batchId)).status).toBe(200);
 
-    const titleId = (await testPrisma().title.findFirst({ where: { workIdentity: DUNE } }))?.id;
-    expect(titleId).toBeTruthy();
-    expect(await resolvedTitleOf(first)).toBe(titleId);
-    expect(await resolvedTitleOf(second)).toBe(titleId);
+    const dune = await testPrisma().title.findFirst({ where: { workIdentity: DUNE } });
+    const heat = await testPrisma().title.findFirst({ where: { workIdentity: HEAT } });
+    expect(dune?.id).toBeTruthy();
+    expect(heat?.id).toBeTruthy();
+    expect(await resolvedTitleOf(first)).toBe(dune?.id);
+    expect(await resolvedTitleOf(second)).toBe(heat?.id);
   });
 
   it('T-PROV-014f: an SD-02 COLLAPSED loser is deliberately left null (derivable in one hop)', async () => {
