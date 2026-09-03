@@ -1119,6 +1119,8 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 | AC-4 | C | `T-UX-093` | The batch detail view shows created/modified/removed in full |
 | AC-5 | I | `T-PROV-013` | Out-of-batch changes carry `batchId: null` and appear in no provenance array |
 | AC-6 | I | **`T-PROV-001`** | If provenance cannot be written, the close fails atomically; nothing is persisted |
+| — | I | **`T-PROV-014`** | *(TASK-182)* Close links each **applied** candidate to the Title it resolved to (`resolved_title_id`) — the created branch **and** the attached-to-existing branch — inside the close transaction; discarded, suppression-gated and SD-02-collapsed rows stay `NULL`. ⚠ Its criterion is this AC-1: "which read became which title" is the per-candidate half of the same record, and the column was declared, indexed and foreign-keyed for the whole project **without anything writing it** (§22a) |
+| — | U | **`T-PROV-015`** | The no-store twin of `T-PROV-014` — WHICH candidates are linked and WHEN. ⚠ It **cannot** prove the FK or that the `tx` handle is passed; `T-PROV-014g` owns that against a real engine |
 
 ### US-032 — Undo an entire batch when it only created things
 | AC | L | Test | Assertion |
@@ -2741,29 +2743,74 @@ schema: **before adding a key to a Prisma `where`, check whether a conditional
 spread above it already sets that key.**
 ---
 
-## 22a. Finding — `extraction_candidate.resolved_title_id` is declared but never written (TASK-113)
+## 22a. Finding — `extraction_candidate.resolved_title_id` was declared but never written (TASK-113; closed by TASK-182)
 
-`resolved_title_id` exists as a column with a foreign key
-(`fk_cand_resolved_title`) and its own index
-(`extraction_candidate_resolved_title`), and `undoDiscard.ts` nulls it before
-SD-03 destroys the titles it points at. **Nothing in `apps/api/src/**` ever
-assigns it.** It is passed through `updateCandidateDisposition`'s allowed field
-list, but no caller supplies it — so it is `NULL` for every real row.
+**Closed by TASK-182.** `batchClose` now points every applied candidate at the
+Title it resolved to, flushed once after the additions loop and inside the same
+transaction, and the column is asserted by `T-PROV-014` (integration, against a
+real engine) and `T-PROV-015` (the no-store twin). Two things the fix pins that
+were open questions in the finding below:
 
-This was found by TASK-113, and found *only* by the integration half. The
-`later-owner-edits` detector was first written to join candidate → title on
-`resolved_title_id`; the no-store unit twin passed all eight cases because the
-fixture hand-fed the column, and `T-UNDO-004b` then returned **200 instead of
-409** against a real database. The detector could never have fired in
-production, and the feature would have shipped looking tested.
+- **Both branches are linked** — the candidate that created a title and the
+  candidate that attached to a pre-existing one. Linking only creations makes
+  the column mean something narrower than its name.
+- **SD-02-collapsed losers are deliberately left `NULL`.** They are absent from
+  `applicable` by construction, and `collapsedIntoCandidateId` already names
+  the survivor, which now names the title — derivable in one hop, and a second
+  copy is a second thing that can disagree.
+- **One statement per candidate, not per title.** The first draft grouped by
+  title; CI proved that branch **unreachable**, because two applied candidates
+  for one work would need two listings on one service and
+  `listing_one_per_service` refuses it — SD-02 collapses them at review so it
+  never reaches close. The multi-candidate case passed against the fake, which
+  has no unique index, and **500'd against the engine**. ⚠ **A fake with no
+  constraints will accept a state the database forbids — the §22a trap wearing
+  a different hat.**
+- **The suppression cases needed the review/close RACE lever.** An ordinary
+  suppression removes the candidate *before* the additions loop, so it never
+  reaches the in-transaction gate: the mutation that records a link above that
+  gate **survived** the first version of both `T-PROV-014d` and `T-PROV-015d`.
 
-The detector was reworked to compare each created title's current identity
-against the **set** of identities the batch's CONFIRMED candidates resolved,
-which needs no per-title link. The column is left as it is: populating it is a
-change to the close transaction and is not this task's scope. ⚠ **Anything
-later built on `resolved_title_id` must first make close write it** — and must
-be proven against the database, because a unit fixture will happily supply a
-value the application never does.
+⚠ **A consequence worth recording: `undoDiscard.ts`'s detach of this column was
+a no-op for the whole of the project.** TASK-112 nulled `resolved_title_id`
+before SD-03's delete, but the column could never be non-null, so that
+`updateMany` matched zero rows every time. It is load-bearing from TASK-182
+onwards — the first `DELETE` of a title with a linked candidate would otherwise
+fail on `fk_cand_resolved_title`.
+
+The finding as originally recorded, retained because the *lesson* is unchanged
+and the trap it names is generic:
+
+> `resolved_title_id` exists as a column with a foreign key
+> (`fk_cand_resolved_title`) and its own index
+> (`extraction_candidate_resolved_title`), and `undoDiscard.ts` nulls it before
+> SD-03 destroys the titles it points at. **Nothing in `apps/api/src/**` ever
+> assigns it.** It is passed through `updateCandidateDisposition`'s allowed
+> field list, but no caller supplies it — so it is `NULL` for every real row.
+>
+> This was found by TASK-113, and found *only* by the integration half. The
+> `later-owner-edits` detector was first written to join candidate → title on
+> `resolved_title_id`; the no-store unit twin passed all eight cases because
+> the fixture hand-fed the column, and `T-UNDO-004b` then returned **200
+> instead of 409** against a real database. The detector could never have fired
+> in production, and the feature would have shipped looking tested.
+>
+> ~~The detector was reworked to compare each created title's current identity
+> against the **set** of identities the batch's CONFIRMED candidates resolved,
+> which needs no per-title link. The column is left as it is: populating it is
+> a change to the close transaction and is not this task's scope. ⚠ **Anything
+> later built on `resolved_title_id` must first make close write it** — and
+> must be proven against the database, because a unit fixture will happily
+> supply a value the application never does.~~ *Superseded by TASK-182: close
+> writes it. The detector was NOT reverted to the join — a set comparison is
+> the better test of the same fact, and rewriting working, mutation-tested
+> logic to use a newly available column buys nothing.*
+
+⚠ **The generic trap, which is the reason this section stays:** a declared,
+indexed, foreign-keyed column is *not* evidence that anything writes it, and a
+fake that supplies a value the application never produces turns that gap into a
+green suite. When a test needs a column, seed it through the code path that
+would populate it in production, or assert against a real engine.
 
 ## 23. Query plans, and two errors the harness caught in itself (TASK-047)
 

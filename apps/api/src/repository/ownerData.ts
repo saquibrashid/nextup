@@ -1548,6 +1548,44 @@ export async function findExtractionCandidate(ownerId: OwnerId, id: string, tx?:
   return db(tx).extractionCandidate.findFirst({ where: { ownerId, id } });
 }
 
+/**
+ * Point a batch's applied candidates at the Title each one resolved to
+ * (TASK-182, `extraction_candidate.resolved_title_id`).
+ *
+ * ⚠ **THIS COLUMN WAS DECLARED, INDEXED, FOREIGN-KEYED AND DETACHED ON DISCARD
+ * FOR THE WHOLE OF THE PROJECT WITHOUT EVER BEING WRITTEN**, so it was `NULL`
+ * for every real row while looking like a usable link. TASK-113's fix-match
+ * detector joined on it; the no-store unit twin passed because its fixture
+ * hand-fed the column, and only the integration test caught that the feature
+ * could not work at all (`specs/testing.md` §22a). Writing it is what makes the
+ * schema tell the truth.
+ *
+ * ⚠ **CALL THIS INSIDE THE CLOSE TRANSACTION AND ONLY AFTER THE TITLES EXIST.**
+ * `fk_cand_resolved_title` is a real foreign key: a link written before its
+ * title, or committed separately from it, is a constraint violation rather
+ * than a stale pointer.
+ *
+ * ⚠ **Deliberately NOT grouped by title.** Grouping looks like an obvious
+ * saving and buys nothing: two applied candidates resolving to the same work in
+ * one batch would need two listings on one service, which
+ * `listing_one_per_service` refuses — SD-02 collapses them at review precisely
+ * so that never reaches close. A group can therefore only ever hold one
+ * candidate, and the grouped form was a branch no legitimate fixture could
+ * exercise.
+ */
+export async function setCandidateResolvedTitles(
+  ownerId: OwnerId,
+  links: readonly { readonly candidateId: string; readonly titleId: string }[],
+  tx?: Db,
+): Promise<void> {
+  for (const link of links) {
+    await db(tx).extractionCandidate.updateMany({
+      where: { ownerId, id: link.candidateId },
+      data: { resolvedTitleId: link.titleId },
+    });
+  }
+}
+
 export async function updateCandidateDisposition(
   ownerId: OwnerId,
   id: string,

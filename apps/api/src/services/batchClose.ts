@@ -75,6 +75,7 @@ import {
   listRemovalDecisions,
   recordBatchChange,
   runInTransaction,
+  setCandidateResolvedTitles,
   softDeleteServiceListing,
   updateTitle,
   upsertServiceState,
@@ -371,6 +372,8 @@ export async function closeBatch(
     let listingsCreated = 0;
     let unresolvedKept = 0;
     let gatedInTransaction = 0;
+    /** The candidate → Title links this close will flush (TASK-182). */
+    const resolvedTitleLinks: { candidateId: string; titleId: string }[] = [];
 
     for (const { candidate, kind } of applicable) {
       const workIdentity = identityFor(candidate);
@@ -415,6 +418,12 @@ export async function closeBatch(
       }
 
       if (kind === 'unresolved') unresolvedKept += 1;
+
+      // TASK-182. Recorded for BOTH branches: "which title did this read
+      // become" is as true of a candidate that attached to a pre-existing
+      // title as of one that created a new one, and restricting it to
+      // creations would make the column mean something narrower than its name.
+      resolvedTitleLinks.push({ candidateId: candidate.candidateId, titleId });
 
       // REQ-068 / §8.1: "match corrected during review" is a `modified` entry
       // carrying the BEFORE value. It is written here, at close, and not at
@@ -470,6 +479,26 @@ export async function closeBatch(
         tx,
       );
     }
+
+    // TASK-182 — point each applied candidate at the Title it resolved to.
+    //
+    // ⚠ AFTER THE LOOP, NOT INSIDE IT. `fk_cand_resolved_title` is a real
+    // foreign key, so the link cannot precede its title; flushing once here
+    // also keeps the per-candidate critical section as it was rather than
+    // adding a sixth round trip to it.
+    //
+    // ⚠ ONE STATEMENT PER CANDIDATE, NOT PER TITLE. Two applied candidates for
+    // one work would need two listings on one service, which
+    // listing_one_per_service refuses — SD-02 collapses them at review so it
+    // never reaches close. Grouping was therefore a branch nothing legitimate
+    // could exercise; the statement count is identical either way.
+    //
+    // ⚠ SD-02-COLLAPSED CANDIDATES ARE DELIBERATELY NOT LINKED. They are
+    // absent from `applicable` by construction, and their
+    // `collapsedIntoCandidateId` already names the survivor, which now names
+    // the title — so the link is derivable in one hop. Writing it twice would
+    // create a second thing that can disagree with the first.
+    await setCandidateResolvedTitles(ownerId, resolvedTitleLinks, tx);
 
     // ── removals (TASK-086/087/088) ─────────────────────────────────────
     //
