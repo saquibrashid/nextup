@@ -13,17 +13,19 @@
  * re-reading afterwards would be a request whose result is thrown away.
  */
 
-import { useCallback, useState, type JSX } from 'react';
+import { useCallback, useEffect, useState, type JSX } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import {
   apiClient,
   ApiError,
   RefusedError,
+  setUnauthorizedHandler,
   type ApiClient,
   type CandidatePatchBody,
   type CloseBatchResult,
 } from '../lib/apiClient';
+import { SESSION_ENDED_REVIEW_BODY } from '../copy';
 import { type AppliedBatch } from '../components/BatchAppliedNotice';
 import { useResource } from '../lib/useResource';
 import { useOnline } from '../lib/useOnline';
@@ -104,6 +106,27 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
   // refusal still re-opens it (a boolean would latch after the first).
   const [reconfirmSignal, setReconfirmSignal] = useState(0);
 
+  /*
+   * `specs/ux-states.md` §6.18 (`T-UX-069`) — the sign-in URL a 401 produced,
+   * or `null` while the session is live.
+   *
+   * ⚠ **The review is the one screen that intercepts its own 401 instead of
+   * bouncing to the IdP.** Everywhere else the redirect is right (see
+   * `apiClient.request`), but here the owner has uncommitted dispositions and
+   * a silent bounce gives them no reason to believe those survived — so §6.18
+   * requires the screen to say so first and let them press **Sign in**.
+   *
+   * ⚠ The handler is registered for the LIFETIME OF THIS SCREEN and cleared on
+   * unmount. Leaving it installed would disable the redirect app-wide from a
+   * screen the owner is no longer on.
+   */
+  const [sessionEndedHref, setSessionEndedHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    setUnauthorizedHandler((url) => setSessionEndedHref(url));
+    return () => setUnauthorizedHandler(null);
+  }, []);
+
   const review = useResource(
     (signal) => client.getReview(batchId, signal),
     `review:${batchId}:${String(generation)}`,
@@ -176,8 +199,10 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
           //     dialog so the owner confirms the group, then retries with
           //     `confirmRemovals: true`. Reachable when the client's and the
           //     server's view of "are there removals" diverged.
-          //   - 401 (§6.18) is already redirecting inside `request`; every
-          //     other 4xx (a refusal) is not a "try again" case either.
+          //   - 401 (§6.18) is handled by the screen-scoped handler installed
+          //     above, which renders the session-ended page instead of
+          //     redirecting; every other 4xx (a refusal) is not a "try again"
+          //     case either.
           //   - Only a 5xx or a network failure is §6.16.
           //
           // ⚠ CLEARED BEFORE THE BRANCHING, NOT INSIDE EACH ARM. Every one of
@@ -273,6 +298,21 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
       }),
     [patch],
   );
+
+  /*
+   * ⚠ BEFORE the refusal branch and before any review UI. A 401 can arrive
+   * from the initial load or from any action, and in every case the review on
+   * screen is being rendered against a session that no longer exists.
+   */
+  if (sessionEndedHref !== null) {
+    return (
+      <RefusalPage
+        reason="session-expired"
+        signInHref={sessionEndedHref}
+        reassurance={SESSION_ENDED_REVIEW_BODY}
+      />
+    );
+  }
 
   if (review.resource.kind === 'refused') return <RefusalPage reason="not-allowed" />;
 

@@ -59,9 +59,29 @@ export interface RefusalPageProps {
    * broken" and "I am signed in as the wrong account".
    */
   readonly signedInEmail?: string | null;
+  /**
+   * Where **Sign in again** points. Defaults to the bare Easy Auth endpoint.
+   *
+   * ⚠ §6.18 requires the review's 401 to return the owner to *this URL*, which
+   * the bare endpoint does not do — it lands them on `/`, i.e. the list, with
+   * their review apparently gone. The caller passes the URL the client already
+   * built (`signInUrl(currentPath)`), so the `post_login_redirect_uri` is
+   * constructed in exactly one place.
+   */
+  readonly signInHref?: string;
+  /**
+   * An extra sentence under the title, for a cause that has more to say than
+   * the title alone (§6.18). Rendered verbatim; never assembled here.
+   */
+  readonly reassurance?: string;
 }
 
-export function RefusalPage({ reason, signedInEmail = null }: RefusalPageProps): JSX.Element {
+export function RefusalPage({
+  reason,
+  signedInEmail = null,
+  signInHref = SIGN_IN_URL,
+  reassurance,
+}: RefusalPageProps): JSX.Element {
   const isRefused = reason === 'not-allowed';
 
   const title = isRefused
@@ -87,6 +107,9 @@ export function RefusalPage({ reason, signedInEmail = null }: RefusalPageProps):
         <section role="alert" aria-labelledby="refusal-title">
           <h1 id="refusal-title">{title}</h1>
           {body === null ? null : <p>{body}</p>}
+          {reassurance === undefined ? null : (
+            <p data-testid="refusal-reassurance">{reassurance}</p>
+          )}
 
           {isRefused && signedInEmail !== null && signedInEmail !== '' ? (
             <p className="refusal__account">
@@ -105,7 +128,7 @@ export function RefusalPage({ reason, signedInEmail = null }: RefusalPageProps):
               {SIGN_OUT_LABEL}
             </a>
           ) : (
-            <a className="tap-target" href={SIGN_IN_URL} data-testid="refusal-action">
+            <a className="tap-target" href={signInHref} data-testid="refusal-action">
               {SIGN_IN_AGAIN_LABEL}
             </a>
           )}
