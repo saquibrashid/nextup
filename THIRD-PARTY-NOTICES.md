@@ -246,7 +246,7 @@ so they do not relicense this work — but their notices must be retained.
 | `process` | 0.11.10 | MIT |
 | `proxy-addr` | 2.0.7 | MIT |
 | `pure-rand` | 6.1.0 | MIT |
-| `qs` | 6.15.3 | BSD-3-Clause |
+| `qs` | 6.16.0 | BSD-3-Clause |
 | `range-parser` | 1.3.0 | MIT |
 | `raw-body` | 3.0.2 | MIT |
 | `rc9` | 2.1.2 | MIT |
