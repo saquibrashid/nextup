@@ -119,11 +119,27 @@ param existingVisionEndpoint string = ''
 // NEXTUP_AOAI_DEPLOYMENT at the challenger because it is cheaper is precisely
 // the cost-motivated downgrade NFR-012a calls non-compliance.
 //
-// ⚠ STAGE 0 IS NOT YET DISCHARGED. §9.7 disqualifies a candidate outright if it
-// lacks vision, strict Structured Outputs, `temperature: 0` or `seed`. Several
-// GPT-5-family reasoning models reject `temperature` and `seed` entirely. If
-// gpt-5.4-mini does, it fails Stage 0 and no images are spent on it — that is
-// a valid, cheap outcome, not a bug in this deployment.
+// ✅ STAGE 0 IS DISCHARGED (measured live 2026-09-08 — see `specs/ai.md` §9.7).
+// §9.7 disqualifies a candidate outright if it lacks vision, strict Structured
+// Outputs, `temperature: 0` or `seed`. The concern below was that several
+// GPT-5-family reasoning models reject `temperature` and `seed` entirely.
+// PROBED AGAINST THE REAL DEPLOYMENT: gpt-5.4-mini supports ALL FOUR, plus
+// GlobalStandard availability in eastus2. It is NOT disqualified; Stage 1 may
+// proceed and images may be spent on it.
+//
+// ⚠ ONE REAL OBSTACLE FOUND, AND IT IS A PARAMETER NAME. gpt-5-4-mini REJECTS
+// `max_tokens` (`unsupported_parameter` — "use `max_completion_tokens`
+// instead"). §9.7 Stage 1 requires the arms differ ONLY by deployment name, so
+// a different token parameter per arm would invalidate the comparison. Verified
+// resolution: gpt-4.1 accepts `max_completion_tokens` TOO, so the harness sends
+// `max_completion_tokens` to BOTH arms. Production is unaffected — the primary
+// reader keeps `max_tokens: 4096` — but promoting the challenger would force
+// `config.ts` to switch spelling. Count that in the promotion cost.
+// ~~⚠ STAGE 0 IS NOT YET DISCHARGED. §9.7 disqualifies a candidate outright if
+// it lacks vision, strict Structured Outputs, `temperature: 0` or `seed`.
+// Several GPT-5-family reasoning models reject `temperature` and `seed`
+// entirely. If gpt-5.4-mini does, it fails Stage 0 and no images are spent on
+// it — that is a valid, cheap outcome, not a bug in this deployment.~~
 @description('Deploy a second model as the bake-off challenger. Does NOT change the primary reader.')
 param deployBakeOffModel bool = false
 
