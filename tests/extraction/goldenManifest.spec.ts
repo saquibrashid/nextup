@@ -1,0 +1,189 @@
+/**
+ * `T-AI-046` — the golden fixture manifest agrees with the golden corpus.
+ *
+ * TASK-078 commits two artefacts that describe the same thing: the image files
+ * under `tests/fixtures/golden/images/`, and `manifest.json`, which records
+ * per-image ground truth (`specs/ai.md` §9.1). Nothing connected them. A
+ * fixture could be added, renamed or deleted and the manifest would keep
+ * describing a corpus that no longer exists — which is this repository's
+ * dominant defect class (an instruction pointing at a file that is not there,
+ * see `T-INFRA-014`), reproduced inside the evidence base that TASK-079's
+ * metric gates are scored against.
+ *
+ * The consequence is not cosmetic. `expectedTitleCount` is the denominator of
+ * recall. An orphaned entry silently drops out of the score, and a fixture with
+ * no entry is silently never scored at all — in both directions the suite gets
+ * *greener*, so there is no failing test to investigate.
+ *
+ * `c` is the case worth reading. `BAKEOFF_CORPUS_IMAGES` is a merged,
+ * mutation-proven constant that the §9.7 bake-off uses to decide whether a
+ * measured delta is signal or noise, and until now it was only ever compared
+ * against a **literal** in `bakeoff.spec.ts`. Both could be edited together and
+ * agree perfectly while neither matched the corpus on disk. `c` binds the
+ * constant to the actual file count, so adding a twelfth fixture fails the
+ * build rather than quietly widening the noise band.
+ *
+ * `f` is the GPS case, and it is not hypothetical: TASK-151 shipped real
+ * latitude and longitude into this public repository. It asserts the property
+ * that matters (no coordinates) rather than "no metadata", because several
+ * owner captures legitimately carry benign EXIF — an iOS screenshot records
+ * `ImageDescription: "Screenshot"` and a timestamp — and a blanket ban would
+ * be red on arrival and promptly loosened.
+ *
+ * `g` is the positive control. `b` and `e` are set differences: a detector that
+ * finds nothing at all satisfies both, perfectly and vacuously. `g` drives the
+ * same comparison over synthetic inputs and asserts it fires on a corpus that
+ * disagrees AND stays quiet on one that agrees, because "reports everything" is
+ * as useless as "reports nothing".
+ */
+
+import { readFileSync, readdirSync } from 'node:fs';
+import { basename, extname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+import { BAKEOFF_CORPUS_IMAGES } from '@nextup/domain';
+import { describe, expect, it } from 'vitest';
+
+import { hasGpsCoordinates } from '../fixtures/golden/ingest/exifProbe.js';
+
+const GOLDEN_DIR = fileURLToPath(new URL('../fixtures/golden/', import.meta.url));
+const IMAGES_DIR = join(GOLDEN_DIR, 'images');
+
+/** Extensions that make a file part of the corpus. `specs/ai.md` §9.1. */
+const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.heic']);
+
+interface ManifestEntry {
+  id: string;
+  file: string;
+  service: string;
+  surface: string;
+  deviceClass: string;
+  expectedTitleCount: number;
+  expectedArtworkOnly: boolean;
+  captureNotes: string;
+  provenance: string;
+}
+
+interface Manifest {
+  corpusSize: number;
+  images: ManifestEntry[];
+}
+
+const manifest = JSON.parse(readFileSync(join(GOLDEN_DIR, 'manifest.json'), 'utf8')) as Manifest;
+
+const imageFiles = readdirSync(IMAGES_DIR)
+  .filter((name) => IMAGE_EXTENSIONS.has(extname(name).toLowerCase()))
+  .sort();
+
+/**
+ * The pure detector `b`, `e` and `g` all share: which files lack an entry, and
+ * which entries name a file that is not on disk. Kept separate from the corpus
+ * read so `g` can drive it over inputs it controls.
+ */
+function reconcile(
+  files: readonly string[],
+  entries: readonly { file: string }[],
+): { unlisted: string[]; missing: string[] } {
+  const listed = new Set(entries.map((entry) => entry.file));
+  const present = new Set(files);
+  return {
+    unlisted: files.filter((file) => !listed.has(file)).sort(),
+    missing: entries
+      .map((entry) => entry.file)
+      .filter((file) => !present.has(file))
+      .sort(),
+  };
+}
+
+describe('T-AI-046 — golden fixture manifest integrity', () => {
+  it('T-AI-046a — the corpus and the manifest are both non-empty (non-vacuity floor)', () => {
+    // Every other case is a comparison between these two collections. If
+    // either is empty the comparisons all pass while measuring nothing.
+    expect(imageFiles.length).toBeGreaterThanOrEqual(11);
+    expect(manifest.images.length).toBeGreaterThanOrEqual(11);
+    expect(manifest.corpusSize).toBeGreaterThanOrEqual(11);
+  });
+
+  it('T-AI-046b — every image has exactly one entry and every entry has its image', () => {
+    const { unlisted, missing } = reconcile(imageFiles, manifest.images);
+    expect(unlisted, 'image files with no manifest entry — these are never scored').toEqual([]);
+    expect(missing, 'manifest entries whose image is absent — these score against nothing').toEqual(
+      [],
+    );
+
+    const files = manifest.images.map((entry) => entry.file);
+    expect(new Set(files).size, 'two entries claim the same file').toBe(files.length);
+  });
+
+  it('T-AI-046c — corpusSize and BAKEOFF_CORPUS_IMAGES both match the real corpus', () => {
+    // The bake-off's noise band is expressed per-corpus-size. Comparing the
+    // constant against a literal in another test proves only that two hand-
+    // written numbers agree; this compares it against the files themselves.
+    expect(manifest.corpusSize).toBe(imageFiles.length);
+    expect(manifest.images.length).toBe(imageFiles.length);
+    expect(BAKEOFF_CORPUS_IMAGES).toBe(imageFiles.length);
+  });
+
+  it('T-AI-046d — every entry carries usable ground truth', () => {
+    for (const entry of manifest.images) {
+      expect(entry.id, `${entry.file}: id must be the basename`).toBe(
+        basename(entry.file, extname(entry.file)),
+      );
+      expect(
+        Number.isInteger(entry.expectedTitleCount),
+        `${entry.id}: count must be an integer`,
+      ).toBe(true);
+      expect(
+        entry.expectedTitleCount,
+        `${entry.id}: count must not be negative`,
+      ).toBeGreaterThanOrEqual(0);
+      expect(typeof entry.expectedArtworkOnly, `${entry.id}: artwork flag`).toBe('boolean');
+      expect(entry.service, `${entry.id}: service`).toMatch(/^(netflix|max)$/);
+      expect(entry.deviceClass, `${entry.id}: deviceClass`).toMatch(/^(mobile|desktop)$/);
+      // A stub note is worse than none: it looks like a considered decision.
+      expect(
+        entry.captureNotes.length,
+        `${entry.id}: captureNotes must say something`,
+      ).toBeGreaterThan(40);
+    }
+  });
+
+  it('T-AI-046e — provenance is one of the three real shapes and derivation resolves', () => {
+    const ids = new Set(manifest.images.map((entry) => entry.id));
+    for (const entry of manifest.images) {
+      expect(entry.provenance, `${entry.id}: provenance`).toMatch(
+        /^(owner-capture|synthetic|derived:[a-z0-9-]+)$/,
+      );
+      if (entry.provenance.startsWith('derived:')) {
+        const source = entry.provenance.slice('derived:'.length);
+        expect(ids.has(source), `${entry.id}: derived from unknown ${source}`).toBe(true);
+        expect(source, `${entry.id}: cannot be derived from itself`).not.toBe(entry.id);
+      }
+    }
+  });
+
+  it('T-AI-046f — no fixture carries GPS coordinates', () => {
+    // TASK-151 shipped real coordinates into this public repo. Asserted as
+    // "no GPS" rather than "no metadata" on purpose: benign EXIF (an iOS
+    // screenshot's ImageDescription and timestamp) is present and harmless,
+    // and a rule that is red on arrival gets loosened rather than obeyed.
+    const leaking = imageFiles.filter((file) =>
+      hasGpsCoordinates(new Uint8Array(readFileSync(join(IMAGES_DIR, file)))),
+    );
+    expect(leaking, 'fixtures leaking location data').toEqual([]);
+  });
+
+  it('T-AI-046g — the reconciliation detector fires on disagreement and not on agreement', () => {
+    // Positive control. `b` and `e` are set differences and pass vacuously on
+    // a detector that returns nothing; only driving it over a corpus that is
+    // KNOWN to disagree proves it still has teeth.
+    const agreeing = reconcile(['a.png', 'b.jpg'], [{ file: 'a.png' }, { file: 'b.jpg' }]);
+    expect(agreeing).toEqual({ unlisted: [], missing: [] });
+
+    const orphanFile = reconcile(['a.png', 'b.jpg'], [{ file: 'a.png' }]);
+    expect(orphanFile.unlisted).toEqual(['b.jpg']);
+
+    const orphanEntry = reconcile(['a.png'], [{ file: 'a.png' }, { file: 'ghost.png' }]);
+    expect(orphanEntry.missing).toEqual(['ghost.png']);
+  });
+});
