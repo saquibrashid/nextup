@@ -1068,12 +1068,55 @@ false` honoured, per §2.1a), `temperature: 0`, `seed`, and availability in the
 deployment region. Any of these missing changes the *contract*, not the
 quality, and §2.1a's guarantees stop holding.
 
+**✅ STAGE 0 DISCHARGED for `gpt-5.4-mini` — measured live 2026-09-08 against
+the real `oai-nextup-hriut4gw7lgg4` account, deployment `gpt-5-4-mini`.**
+The `infra/ai.bicep` comment warning that "several GPT-5-family reasoning
+models reject `temperature` and `seed` entirely" **did not apply here.**
+
+| Stage 0 gate | `gpt-4.1` (incumbent) | `gpt-5-4-mini` (challenger) |
+| --- | --- | --- |
+| Vision input | ✅ | ✅ |
+| **Strict** Structured Outputs (`strict: true`, `additionalProperties: false`) | ✅ | ✅ |
+| `temperature: 0` | ✅ | ✅ |
+| `seed` | ✅ | ✅ |
+| Region availability (`eastus2`, `GlobalStandard`) | ✅ | ✅ |
+
+**The challenger is NOT disqualified. Stage 1 may proceed.** On the one image
+tried during the probe (`hbo_iPhone.jpg`) both arms returned a byte-identical
+title array — a single image is not a result, but it does mean the comparison
+is live and worth running.
+
+⚠ **STAGE 0 FOUND ONE REAL OBSTACLE, AND IT IS A PARAMETER NAME.**
+`gpt-5-4-mini` **rejects `max_tokens` outright** —
+`unsupported_parameter: 'max_tokens' is not supported with this model. Use
+'max_completion_tokens' instead.` Taken naively that breaks Stage 1 below,
+which requires the arms differ **only** by deployment name: the two models
+would need *different* token parameters, a second forced difference.
+
+**It is resolvable, and the resolution was verified, not assumed:** `gpt-4.1`
+**also accepts `max_completion_tokens`** (probed directly). So the bake-off
+harness must send **`max_completion_tokens` to BOTH arms**. Do not "fix" the
+challenger arm by giving it a different parameter from the incumbent — that
+silently invalidates the comparison Stage 1 exists to protect.
+
+⚠ **This does NOT change production.** The primary reader's `max_tokens: 4096`
+(§4.2, and the config table below) is untouched, because `gpt-4.1` accepts it.
+But note the consequence for §9.7's decision rule: **if the challenger ever
+wins, promoting it is not only an `ADR-0001` revision and a deployment-name
+change — it also forces `config.ts` from `max_tokens` to
+`max_completion_tokens`.** That is a real promotion cost; count it.
+
 **Stage 1 — identical inputs.** Both models are recorded against the **same**
 `images/`, scored against the **same** `expected/`, and cross-checked against
 the **same** `ocr/`. The prompt (`EXTRACTION_SYSTEM_PROMPT`), the schema
-(`TILE_SCHEMA`), `detail: 'high'`, `max_tokens`, `temperature` and `seed` are
+(`TILE_SCHEMA`), `detail: 'high'`, **`max_completion_tokens`** *(corrected in
+place from `max_tokens` — see the Stage 0 discharge above; the challenger
+rejects `max_tokens`, and `max_completion_tokens` is the only spelling BOTH
+arms accept)*, `temperature` and `seed` are
 byte-identical between arms. **The only permitted difference is the deployment
 name.** A prompt tuned for one arm invalidates the comparison.
+~~The prompt, the schema, `detail: 'high'`, `max_tokens`, `temperature` and
+`seed` are byte-identical between arms.~~
 
 **Stage 2 — three runs per image per model.** `temperature: 0` and a fixed
 seed make a hosted service *nearly* deterministic, not deterministic. Report
