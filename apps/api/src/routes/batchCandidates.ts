@@ -31,6 +31,7 @@ import {
   type ManualEntry,
   type ReviewCandidate,
   type Service,
+  requireServiceOf,
 } from '@nextup/domain';
 import { type Router } from 'express';
 
@@ -257,7 +258,7 @@ export function registerBatchCandidateRoutes(
           reviewDisposition: patch.disposition,
         });
       } else if (patch.kind === 'corrected') {
-        await applyCorrection(ownerId, candidateId, batch.service as Service, patch);
+        await applyCorrection(ownerId, candidateId, requireServiceOf(batch), patch);
       } else {
         await applyReclassify(ownerId, candidateId, row, getTmdbClient);
       }
@@ -289,7 +290,7 @@ export function registerBatchCandidateRoutes(
       parseConfirmAllSection(req.body),
     );
 
-    const { candidates } = await loadReviewCandidates(ownerId, batch.id, batch.service as Service);
+    const { candidates } = await loadReviewCandidates(ownerId, batch.id, requireServiceOf(batch));
 
     // ⚠ Sections are decided by the SAME code the review response uses. A
     // second, simpler rule here — "everything with classification 'new'", say

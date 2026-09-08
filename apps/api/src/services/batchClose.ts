@@ -60,6 +60,7 @@ import {
   type CrossCheckOutcome,
   type ReviewCandidate,
   type Service,
+  requireServiceOf,
 } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
@@ -333,7 +334,7 @@ export async function closeBatch(
   options: CloseOptions = {},
 ): Promise<CloseResult> {
   const batch = await loadOwnedBatch(ownerId, batchId);
-  const service = batch.service as Service;
+  const service = requireServiceOf(batch);
 
   // ⚠ Read BEFORE the transition, not after. The candidate load is the input
   // to the pending guard, and a guard that ran after the batch had already

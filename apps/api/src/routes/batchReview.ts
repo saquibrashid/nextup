@@ -42,6 +42,7 @@ import {
   type ReviewMatchRef,
   type ReviewDisposition,
   type Service,
+  requireServiceOf,
 } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
@@ -276,7 +277,7 @@ export function registerBatchReviewRoutes(router: Router): void {
       });
     }
 
-    const service = batch.service as Service;
+    const service = requireServiceOf(batch);
     const [{ candidates, suppressed, activeListings }, images] = await Promise.all([
       loadReviewCandidates(ownerId, batchId, service),
       listImagesForBatch(ownerId, batchId),

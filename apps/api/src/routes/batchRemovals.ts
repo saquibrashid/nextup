@@ -20,7 +20,7 @@ import {
   parseRemovalPatch,
   REMOVAL_PATCH_MESSAGES,
   type BatchMode,
-  type Service,
+  requireServiceOf,
 } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
@@ -71,7 +71,7 @@ export function registerBatchRemovalRoutes(router: Router): void {
       });
     }
 
-    const service = batch.service as Service;
+    const service = requireServiceOf(batch);
     const loaded = await loadReviewCandidates(ownerId, batchId, service);
     const proposed = proposedRemovalsFrom(service, loaded);
     const proposedIds = new Set(proposed.map((item) => item.listingId));

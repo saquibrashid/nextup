@@ -16,6 +16,9 @@
  */
 
 import type { Server } from 'node:http';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { AddressInfo } from 'node:net';
 
 import type { Express } from 'express';
@@ -194,5 +197,32 @@ describe('T-WAIT-001 a discovery batch is forced append-only', () => {
         }),
       ).toBe(service);
     }
+  });
+});
+
+describe('T-WAIT-001e the compiler check is not cast away', () => {
+  it('T-WAIT-001e: no service-scoped path casts a batch service instead of validating it', () => {
+    // ⚠ THIS IS THE HOLE `requireServiceOf` WAS BUILT TO CLOSE, AND A CAST
+    // REOPENS IT SILENTLY. `batch.service as Service` typechecks, so making
+    // the column nullable produced NO compiler error at five call sites that
+    // are meaningless for a discovery batch — review, correction, removals and
+    // close. The cast asserts a fact the database no longer guarantees, and
+    // the failure it produces is a discovery batch quietly reconciled against
+    // a service it was never on.
+    const roots = [fileURLToPath(new URL('../../src/', import.meta.url))];
+    const files = roots.flatMap((root) =>
+      readdirSync(root, { recursive: true, withFileTypes: true })
+        .filter((e) => e.isFile() && e.name.endsWith('.ts'))
+        .map((e) => join(e.parentPath, e.name)),
+    );
+    expect(files.length).toBeGreaterThan(20);
+
+    const offenders = files.filter((f) =>
+      /batch\.service as Service/.test(readFileSync(f, 'utf8')),
+    );
+    expect(
+      offenders,
+      'use requireServiceOf(batch): it validates, and it throws for a discovery batch',
+    ).toEqual([]);
   });
 });
