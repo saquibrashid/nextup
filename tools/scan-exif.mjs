@@ -13,11 +13,35 @@
  * Without --strip this only reports. Exit code 1 if any file still carries a
  * real location or a device identity.
  *
- * --strip overwrites, IN PLACE and WITHOUT CHANGING ANY OFFSET OR LENGTH, the
- * GPS entry values and the Make/Model/Software/DateTime strings. Nothing is
- * removed and no entry count changes, because deleting an IFD entry would
- * require rewriting every offset after it — the container, the raster and the
- * rest of the EXIF layout stay byte-identical to what the device wrote.
+ * --strip overwrites, IN PLACE and WITHOUT CHANGING THE FILE LENGTH, the GPS
+ * entry values, the Make/Model/Software/DateTime strings, the vendor MakerNote,
+ * and finally the GPS sub-IFD's own entry count. The container, the raster and
+ * the IFD0/Exif layout stay byte-identical to what the device wrote.
+ *
+ * ⚠ **Zeroing the GPS sub-IFD COUNT as well as the values is deliberate, and it
+ * is a correction.** This tool originally blanked values only, on the reasoning
+ * that "a GPS IFD whose coordinates are zero carries no location". That is true
+ * of the coordinates and false of the file: `GPSLatitude` and `GPSLongitude`
+ * entries remained present, so `hasGpsCoordinates()` in
+ * `tests/fixtures/golden/ingest/exifProbe.ts` — the predicate `T-AI-046f`
+ * enforces over the whole golden corpus — still reported the file as carrying
+ * coordinates. The documented remediation tool therefore produced output that
+ * failed the gate, which is how two disagreeing definitions of "stripped" get
+ * discovered at the worst possible moment. `T-AI-046h` now drives this tool and
+ * asserts the gate accepts its output, so the two cannot diverge again.
+ *
+ * ⚠ **Nothing ran this tool, and that is why a leak survived for months.** It is
+ * referenced by no npm script and no workflow, so the GPS in the two golden
+ * monitor-photograph fixtures went to a PUBLIC repository in `4a3da2c` under a
+ * commit titled "add owner golden screenshots with metadata stripped". It is now
+ * reachable as `npm run check:exif`, and the durable guard is `T-AI-046f`, which
+ * runs on every CI run rather than waiting to be remembered.
+ *
+ * ~~Nothing is removed and no entry count changes, because deleting an IFD entry
+ * would require rewriting every offset after it~~ *(superseded: the concern is
+ * real for DELETING an entry from an array, which shifts everything after it,
+ * and does not apply to zeroing a sub-IFD's count — the entry bytes simply
+ * become dead space and no offset moves.)*
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -29,6 +53,7 @@ const MAKE = 0x010f;
 const MODEL = 0x0110;
 const DATETIME = 0x0132;
 const SOFTWARE = 0x0131;
+const MAKER_NOTE = 0x927c;
 
 const NAMES = {
   [MAKE]: 'Make',
@@ -165,18 +190,43 @@ function strip(buf, t) {
   const ifd0 = t + u32(t + 4);
   const n = u16(ifd0);
   let gpsOff = null;
+  let exifOff = null;
   for (let k = 0; k < n; k++) {
     const e = ifd0 + 2 + k * 12;
     const tag = u16(e);
     if (tag === GPS_IFD) gpsOff = t + u32(e + 8);
+    if (tag === EXIF_IFD) exifOff = t + u32(e + 8);
     if (NAMES[tag] && blankValue(e)) changed++;
+  }
+
+  // The vendor MakerNote is opaque, device-specific and dense with hardware
+  // identity. It lives in the Exif sub-IFD, not IFD0.
+  if (exifOff !== null && exifOff + 2 <= buf.length) {
+    const en = u16(exifOff);
+    if (en > 0 && en <= 256) {
+      for (let k = 0; k < en; k++) {
+        const e = exifOff + 2 + k * 12;
+        if (u16(e) === MAKER_NOTE && blankValue(e)) changed++;
+      }
+    }
   }
 
   if (gpsOff !== null && gpsOff + 2 <= buf.length) {
     const gn = u16(gpsOff);
     if (gn > 0 && gn <= 64) {
+      // Values FIRST: once the count is zero the entries can no longer be
+      // walked, and the coordinate bytes would be stranded in the file,
+      // invisible to a parser but plainly readable as hex. "Not visible to
+      // exiftool" is not "not published".
       for (let k = 0; k < gn; k++) {
         if (blankValue(gpsOff + 2 + k * 12)) changed++;
+      }
+      // Then the IFD itself — count, entries, and the trailing next-IFD
+      // pointer, which becomes 0 ("no next IFD") once the region is zeroed.
+      const end = gpsOff + 2 + gn * 12 + 4;
+      if (end <= buf.length) {
+        buf.fill(0, gpsOff, end);
+        changed++;
       }
     }
   }
