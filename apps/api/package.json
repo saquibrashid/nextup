@@ -20,7 +20,7 @@
     "heic-convert": "^2.1.0",
     "multer": "^2.2.0",
     "openai": "^7.4.0",
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.4"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
