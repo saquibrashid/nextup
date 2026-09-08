@@ -12,7 +12,7 @@
  *       overwrite the incumbent's evidence
  *
  * They cannot be asserted yet and are NOT stubbed here. The harness scores
- * against the 12-image corpus of §9.1 — `tests/fixtures/golden/` currently
+ * against the 11-image corpus of §9.1 — `tests/fixtures/golden/` currently
  * holds five owner screenshots and no `expected/`, `ocr/`, `llm/` or
  * `manifest.json` (TASK-078, `todo`), and the scorer that computes these
  * metrics is TASK-079, also `todo`. A test written against fixtures that do
@@ -79,7 +79,7 @@ const INCUMBENT: ReaderMetrics = {
   costUsdPerImage: 0.0094,
 };
 
-/** 12 images, ~120 expected titles: one title is ~0.0083 of aggregate recall. */
+/** 11 images, ~120 expected titles: one title is ~0.0083 of aggregate recall. */
 const EXPECTED_TITLE_TOTAL = 120;
 
 /** A delta guaranteed to clear the two-title band on a 120-title corpus. */
@@ -374,7 +374,7 @@ describe('T-AI-045e · a sub-two-title delta is "no measured difference", not a 
     expect(row?.status).toBe('worse-than-incumbent');
   });
 
-  it('T-AI-045s · claim e · an off-corpus run is flagged, because the band is sized for 12 images', () => {
+  it('T-AI-045s · claim e · an off-corpus run is flagged, because the band is sized for the whole corpus', () => {
     const decision = chooseReader(
       input({
         corpusImages: 3,
@@ -382,7 +382,15 @@ describe('T-AI-045e · a sub-two-title delta is "no measured difference", not a 
       }),
     );
 
-    expect(decision.reasons.join(' ')).toContain('not the 12');
+    // ⚠ Deliberately NOT a literal. This assertion read `'not the 12'` until
+    // TASK-011 deleted the `dark-mode-01` slot and the corpus became 11 — the
+    // literal pinned a number that legitimately changes, so it failed for a
+    // reason that had nothing to do with the claim. The claim is that an
+    // off-corpus run is *flagged* and that both sizes are named; that is what
+    // is asserted here.
+    const reasons = decision.reasons.join(' ');
+    expect(reasons).toContain(`not the ${String(BAKEOFF_CORPUS_IMAGES)}`);
+    expect(reasons).toContain('3 images');
   });
 });
 
