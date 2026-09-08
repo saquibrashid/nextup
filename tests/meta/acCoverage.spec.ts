@@ -178,12 +178,11 @@ export function unmappedCriteria(prd: Set<string>, mapping: Set<string>): string
  */
 const KNOWN_UNMAPPED: readonly string[] = [
   // US-040 — Capture a rental storefront's new-release page
-  'US-040 AC-1',
+  // ⚠ AC-1 and AC-6 were removed by TASK-183 — `T-WAIT-001` maps them.
   'US-040 AC-2',
   'US-040 AC-3',
   'US-040 AC-4',
   'US-040 AC-5',
-  'US-040 AC-6',
   // US-041 — Curate the rental page down to what I actually want
   'US-041 AC-1',
   'US-041 AC-2',
@@ -199,7 +198,7 @@ const KNOWN_UNMAPPED: readonly string[] = [
   'US-042 AC-5',
   'US-042 AC-6',
   'US-042 AC-7',
-  'US-042 AC-8',
+  // ⚠ AC-8 was removed by TASK-184 — `T-AVAIL-008` maps it.
   'US-042 AC-9',
   'US-042 AC-10',
   // US-043 — Browse and clear the waiting list

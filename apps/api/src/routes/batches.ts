@@ -15,6 +15,18 @@
  *      full-update batch reconciles a whole service against the list in one
  *      transaction (product invariant 3); two open batches could interleave
  *      and reconcile against each other's half-applied state.
+ *   3. **A discovery source is structurally append-only** (ADR-0010 D-2,
+ *      REQ-083). `full-update` is REFUSED HERE, at the boundary — not hidden
+ *      in the UI, and not decided from a client-supplied flag. A rotating
+ *      editorial feed reconciled as a full update proposes the owner's entire
+ *      waiting list for removal on the second capture, every time, so a caller
+ *      posting the request directly must be refused just as firmly as the SPA.
+ *      `T-WAIT-001c` is the case that fails a UI-only guard.
+ *
+ * ⚠ `source` NAMES EITHER KIND OF ORIGIN, AND `service` IS THE LEGACY ALIAS.
+ * A service batch and a discovery batch are the same shape at this endpoint;
+ * they differ in which of the two exclusive columns gets written
+ * (`splitBatchSource`). `SERVICES` is NOT widened — see ADR-0010 D-1.
  *
  * The batch is created in `draft`: images are attached afterwards
  * (§6.12) and nothing touches the owner's list until close (§6.22).
@@ -23,11 +35,15 @@
 import { type Router } from 'express';
 import {
   BATCH_MODES,
-  SERVICES,
+  BATCH_SOURCES,
+  discoveryModeExplanation,
+  forcedModeFor,
   modeExplanation,
+  modeRefusalFor,
+  splitBatchSource,
   ulid,
   type BatchMode,
-  type Service,
+  type BatchSource,
 } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
@@ -42,6 +58,7 @@ export const INITIAL_BATCH_STATUS = 'draft';
 
 interface CreateBatchBody {
   service?: unknown;
+  source?: unknown;
   mode?: unknown;
 }
 
@@ -73,8 +90,34 @@ export function registerBatchRoutes(router: Router): void {
     // regardless of what else the owner has in flight. Reversing these would
     // make the same bad request return 400 or 409 depending on unrelated
     // state, which is untestable and unhelpful.
-    const service = requireEnum<Service>(body.service, 'service', SERVICES);
+    //
+    // ⚠ `service` remains accepted as the field name so every existing client
+    // and test keeps working; `source` is the name that can also carry a
+    // discovery source. They are the same field, validated once against
+    // `BATCH_SOURCES`.
+    //
+    // ⚠ THE ERROR STILL NAMES `service`, DELIBERATELY. That is the field
+    // `specs/api.md` §6.11 documents and the one `T-BATCH-010i`/`j` assert on.
+    // Epic L needs this endpoint to ACCEPT a discovery source; renaming the
+    // field it reports would be unrequested churn in a documented contract.
+    const rawSource = body.source ?? body.service;
+    const source = requireEnum<BatchSource>(rawSource, 'service', BATCH_SOURCES);
     const mode = requireEnum<BatchMode>(body.mode, 'mode', BATCH_MODES);
+
+    // ⚠ REFUSED BY SOURCE TYPE, NEVER BY A CLIENT-SUPPLIED FLAG (ADR-0010 D-2,
+    // `T-WAIT-001b`/`c`). This runs before the open-batch lookup for the same
+    // reason the validation above does, and it is a REFUSAL rather than a
+    // silent coercion to append-only: quietly "fixing" the mode would tell the
+    // owner their full update succeeded while it did something else.
+    const refusal = modeRefusalFor(source, mode);
+    if (refusal !== null) {
+      throw new AppError('FULL_UPDATE_NOT_AVAILABLE_FOR_SOURCE', 400, refusal, {
+        source,
+        permittedModes: [forcedModeFor(source)],
+      });
+    }
+
+    const { service, discoverySource } = splitBatchSource(source);
 
     const open = await findOpenUploadBatch(ownerId);
     if (open) {
@@ -92,19 +135,29 @@ export function registerBatchRoutes(router: Router): void {
     const batch = await createUploadBatch(ownerId, {
       id: ulid(),
       service,
+      discoverySource,
       mode,
       status: INITIAL_BATCH_STATUS,
     });
 
     res.status(201).json({
       batchId: batch.id,
-      service: batch.service,
+      service,
+      discoverySource,
       mode: batch.mode,
       status: batch.status,
       createdAt: batch.createdAt.toISOString(),
       // Server-supplied so the consequence has ONE wording wherever it is
       // shown (US-003 AC-2/AC-3). Do not re-type this sentence in the SPA.
-      modeExplanation: modeExplanation(mode, service),
+      //
+      // ⚠ Rendered from the VALIDATED locals, not from the row read back. The
+      // stored columns widen to `string | null` through Prisma, and re-narrowing
+      // them here would be a cast asserting exactly what this handler already
+      // proved a few lines above.
+      modeExplanation:
+        service !== null
+          ? modeExplanation(mode, service)
+          : discoveryModeExplanation(discoverySource),
     });
   });
 

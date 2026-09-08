@@ -100,6 +100,9 @@ function aBatch(overrides: Partial<UploadBatch> = {}): UploadBatch {
     type: 'uploadBatch',
     ownerId: 'o_9f2c1a7b',
     service: 'netflix',
+    // ⚠ Required, not optional, and `null` here because `service` is set —
+    // `ck_batch_source_exclusive` (ADR-0010 D-1) permits exactly one origin.
+    discoverySource: null,
     mode: 'append-only',
     status: 'draft',
     derivedFromBatchId: null,

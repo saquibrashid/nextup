@@ -4,6 +4,10 @@
 // pure: no I/O, no Prisma, no Express, no React.
 
 export * from './attribution.js';
+// TASK-183 — the discovery-source rules (ADR-0010 D-1/D-2): which sources are
+// structurally append-only, and how a source splits into the two exclusive
+// store columns. Pure, so the refusal is testable without a route.
+export * from './batchSource.js';
 // TASK-064 — new vs already-present, PER SERVICE (`specs/ai.md` §6.1, REQ-010).
 export * from './classify.js';
 export * from './copy.js';

@@ -21,6 +21,7 @@
 
 import {
   createsOnlyRefusalReason,
+  requireServiceOf,
   deriveSortDateAdded,
   detectLaterOwnerEdits,
   deriveTitleState,
@@ -150,11 +151,20 @@ export async function undoBatch(ownerId: OwnerId, batchId: string): Promise<Undo
   }
 
   const plan = planCreatesOnlyUndo(provenance);
+  // ⚠ SERVICE-SCOPED, AND `requireServiceOf` IS THE POINT (ADR-0010 D-1).
+  //
+  // Undo reverts SERVICE STATE — "what this service's list looked like before
+  // the batch" — which is meaningless for a discovery capture: a discovery
+  // batch writes no `ServiceListing` and changes no service's list (Trap 3).
+  // Undoing one is a `WatchIntent` reversal, which TASK-185 owns. Until then
+  // this throws loudly rather than reverting the wrong service's state, and
+  // the compiler is what forced the decision to be made here at all.
+  const service = requireServiceOf(batch);
   // ⚠ Read the predecessor BEFORE the transaction moves this batch out of
   // `applied`. Doing it inside would still be correct today because the query
   // excludes this batch by id, but it makes the revert depend on that
   // exclusion staying exactly as written.
-  const previous = await findPreviousAppliedBatch(ownerId, batch.service, batchId);
+  const previous = await findPreviousAppliedBatch(ownerId, service, batchId);
   const revertedTo = previous?.completedAt ?? null;
 
   const undoneAt = new Date();
@@ -197,7 +207,7 @@ export async function undoBatch(ownerId: OwnerId, batchId: string): Promise<Undo
 
     await upsertServiceState(
       ownerId,
-      batch.service,
+      service,
       {
         lastCompletedBatchId: previous?.id ?? null,
         lastCompletedBatchAt: revertedTo,
@@ -216,7 +226,7 @@ export async function undoBatch(ownerId: OwnerId, batchId: string): Promise<Undo
         listingsRemoved: listingsUnderTitles.length + listingsDeleted,
       },
       serviceState: {
-        service: batch.service,
+        service: service,
         lastCompletedBatchAt: revertedTo?.toISOString() ?? null,
       },
     };
