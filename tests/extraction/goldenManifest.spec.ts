@@ -37,7 +37,9 @@
  * as useless as "reports nothing".
  */
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { copyFileSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { basename, extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -185,5 +187,37 @@ describe('T-AI-046 — golden fixture manifest integrity', () => {
 
     const orphanEntry = reconcile(['a.png'], [{ file: 'a.png' }, { file: 'ghost.png' }]);
     expect(orphanEntry.missing).toEqual(['ghost.png']);
+  });
+
+  it('T-AI-046h — the documented strip tool produces output this gate accepts', () => {
+    // Binds tool to gate. `tools/scan-exif.mjs --strip` is the remediation this
+    // repo documents, and it originally blanked GPS *values* while leaving the
+    // entries in place — so a file "stripped" with the documented tool still
+    // failed `f`. Two disagreeing definitions of "stripped", discoverable only
+    // at the moment someone needed it to work.
+    //
+    // Driven over a COPY: `heic-with-gps.heic` must KEEP its GPS IFD, because
+    // proving the production stripper copes with a real, fully-populated Apple
+    // layout is the entire reason that fixture exists.
+    const source = fileURLToPath(
+      new URL('../fixtures/golden/ingest/heic-with-gps.heic', import.meta.url),
+    );
+    const scratch = join(mkdtempSync(join(tmpdir(), 'nextup-exif-')), 'copy.heic');
+    copyFileSync(source, scratch);
+
+    const before = readFileSync(scratch);
+    expect(hasGpsCoordinates(new Uint8Array(before)), 'control: the copy starts dirty').toBe(true);
+
+    execFileSync(process.execPath, [
+      fileURLToPath(new URL('../../tools/scan-exif.mjs', import.meta.url)),
+      '--strip',
+      scratch,
+    ]);
+
+    const after = readFileSync(scratch);
+    expect(hasGpsCoordinates(new Uint8Array(after)), 'the tool must satisfy T-AI-046f').toBe(false);
+    // Length is the property the tool promises; a shorter file would mean it
+    // rewrote the container rather than overwriting values in place.
+    expect(after.length).toBe(before.length);
   });
 });
