@@ -3887,34 +3887,59 @@ rises from ~`` to ~``/month** (`T-INFRA-005t`--`w`).
 
 ---
 
-## 33. Waiting to stream (v1.1) — where its test ids live, and why not here
+## 33. Waiting to stream — PROMOTED TO v1 at `A52`; its test ids live in §38
 
-The v1.1 rental-discovery epic (PRD Epic L, US-040 - US-043, REQ-082 - REQ-087,
-ADR-0010) has a complete id-to-AC mapping already written. It lives in
-**ADR-0010 section 6**, not in this document.
+**The owner promoted Epic L on 2026-09-08 (`A52`).** It is no longer a v1.1
+deferral, and the condition this section used to describe as future work has
+been discharged: **the `T-WAIT-*` and `T-AVAIL-*` definition tables now live in
+§38 of this document**, moved out of ADR-0010 §6 in the same change that added
+`TASK-183` - `TASK-189` to `docs/backlog.md`. The two landed together, so no id
+was ever defined here without an owning task.
 
-That is deliberate. `check:orphans` (`T-META-006e`) fails on any id defined
-here that no backlog task owns and no suite implements, and it is correct to:
-per section 21.1, a defined-but-unbuilt acceptance criterion is the failure
-mode where every gate passes, the ledger reaches 100%, and the behaviour is
-simply absent. Defining a whole epic's ids here before the epic is scheduled
-would manufacture exactly that state.
+⚠ **The ids are DEFINED and OWNED, but not yet IMPLEMENTED, and that is the
+distinction to keep hold of.** `check:orphans` treats an id as owned if a
+backlog task cites it **or** a suite implements it - a backlog citation alone
+satisfies it. So the orphan gate is green today while every one of these 21
+ids is still unwritten. It is `T-META-001a`/`e` and the ledger that will tell
+you the truth, and the 28 Epic L criteria stay in `KNOWN_UNMAPPED` in
+`tests/meta/acCoverage.spec.ts` until real tests exist. **Do not add an Epic L
+row to §9's AC mapping until the test named in it actually runs** - a mapping
+row citing an unwritten id fails `T-META-001e`, and softening `e` to get past
+that is precisely how this gate becomes the thing it was built to catch.
 
-**When Epic L is promoted, move those tables into this document in the same
-change that adds its tasks to `docs/backlog.md`** - the two must land
-together, so the ids are never defined without an owner. Do **not** route
-around the gate by adding them to `BASELINE_ORPHANS`; that list may only
-shrink.
+### 33.1 `T-CI-005` is a TRIP-WIRE — do not amend it early
 
-One consequence is already recorded in ADR-0010 section 6.3 and is worth
-repeating here, because it lands on a gate this document owns: **`T-CI-005` asserts that
-exactly **three** non-owner-initiated processes exist (raised from two by
-Epic M, which added the IMDb rating refresh).** The availability refresh is a
-**fourth**, so `T-CI-005` goes red the moment Epic L lands. The correct
-response is to **amend the count to four** - naming the refresh, and asserting it is metadata-only and access-triggered - alongside
-`PRD.md` US-036 AC-2 and product invariant 5. The wrong response is to relax
-the gate into counting nothing in particular: its entire value is that the
-number is exact and small.
+**`T-CI-005g` asserts that exactly THREE non-owner-initiated processes exist**
+(raised from two by Epic M, which added the IMDb rating refresh). The
+availability refresh is a **fourth**, so `T-CI-005` goes red the moment the
+refresh is built.
+
+⚠ **That redness is the design, and the amendment is deliberately NOT part of
+the promotion.** It would have been easy - and wrong - to raise the count to
+four while writing the backlog: `PERMITTED_BACKGROUND_PROCESSES` would then
+name a process that does not exist, and the gate would sit loose by one named
+slot for however long the epic takes to build. Leaving it at three means the
+gate fires at exactly the moment the fourth process becomes real, which is the
+only moment at which anyone can check that it is genuinely metadata-only and
+access-triggered.
+
+**The amendment is owned by `TASK-187`**, the task that builds the refresh, and
+must land in that same commit: `PERMITTED_BACKGROUND_PROCESSES`, `T-CI-005g`,
+`PRD.md` US-036 AC-2 and product invariant 5, all four together. The owner has
+already approved the invariant change (`A52`), so `TASK-187` does **not** need
+to re-escalate - it needs to execute it.
+
+**The wrong response is to relax the gate into counting nothing in
+particular.** Its entire value is that the number is exact and small; a
+`T-CI-005` that permits "some" background processes asserts nothing at all.
+
+~~"The v1.1 rental-discovery epic has a complete id-to-AC mapping already
+written. It lives in **ADR-0010 section 6**, not in this document. That is
+deliberate... **When Epic L is promoted, move those tables into this document
+in the same change that adds its tasks to `docs/backlog.md`.**"~~
+*(Superseded at `A52` — that instruction has now been carried out; the tables
+are in §38. Retained only so a reader arriving from ADR-0010's old pointer
+knows the move already happened and does not do it twice.)*
 
 
 ## 34. Database authentication (TASK-141)
@@ -4234,3 +4259,63 @@ far more often than it catches a real regression.
 
 **That Tailwind is absent.** The dependency allow-list (`tools/check-deps.mjs`)
 already governs what may be installed; a second assertion would duplicate it.
+
+---
+
+## 38. Waiting to stream (Epic L, ADR-0010) — the test ids
+
+**Moved here from ADR-0010 §6 at `A52`**, in the same change that added
+`TASK-183` – `TASK-189` to `docs/backlog.md`. ADR-0010 §6 now points here; this
+is the authoritative copy and the only one that gates read.
+
+Requirements **REQ-082 – REQ-087**; stories **PRD Epic L / US-040 – US-043**;
+data model `specs/data-model.md` §17. The id→AC mapping below **is** the
+definition of done for Epic L, on the same terms as the rest of this document
+(NFR-003).
+
+⚠ **Every id below is DEFINED and CITED but NOT YET IMPLEMENTED.** See §33 for
+why that is a legitimate intermediate state and what still guards it — in
+short, `check:orphans` is satisfied by the backlog citation alone, so it is
+`KNOWN_UNMAPPED` and the ledger, not the orphan gate, that will tell you this
+epic is unbuilt. **Do not add these ids to §9's AC mapping until the named test
+actually runs.**
+
+### 38.1 `T-WAIT-*` — capture, curation and the waiting view
+
+| Id | Level | Owner | Claim |
+|---|---|---|---|
+| **`T-WAIT-001`** (`a`–`c`) | U | `TASK-183` | A batch whose source is a discovery source is created **append-only**. `a` the mode is forced to append-only; `b` an explicit `full-update` request is **refused at the API boundary** with an explanatory error, not merely hidden in the UI (US-040 AC-1/AC-6); `c` the refusal is by source type, never by a client-supplied flag. |
+| **`T-WAIT-002`** (`a`–`b`) | I | `TASK-185` | Reconciliation never runs for a discovery batch. `a` closing a second capture of the same page that omits a previously-seen title proposes **no** removal; `b` **the discriminating case** — the same omission in a Netflix full-update batch *does* propose one, without which `a` would pass against a build where reconciliation is simply broken (US-040 AC-4). |
+| **`T-WAIT-003`** (`a`–`b`) | I | `TASK-185` | A closed discovery batch creates **no** `ServiceListing` and leaves the combined list byte-identical before and after (US-040 AC-3, ADR-0010 Trap 3). `b` no service badge count changes (REQ-025). |
+| **`T-WAIT-004`** | U | `TASK-185` | A work already present in the combined list produces **no** `WatchIntent`; the review pass says so rather than silently discarding it (US-040 AC-5). |
+| **`T-WAIT-005`** | U | `TASK-186` | Every extracted candidate is shown and every disposition defaults to `pending` — no accept-by-inaction (US-041 AC-1, REQ-014). |
+| **`T-WAIT-006`** (`a`–`c`) | I | `TASK-186` | **Discard suppresses.** `a` discarding a discovery candidate creates a `Suppression` on canonical work identity; `b` **the load-bearing behavioural test** — capture the same page twice with a discard in between, and the second review pass does not contain it *at all*, the check being before record creation (US-041 AC-2/AC-3/AC-4, US-028 AC-2); `c` **the discriminating case** — discarding in a *Netflix* review pass does **not** suppress, so the behaviour is scoped to discovery sources (US-041 AC-5). |
+| **`T-WAIT-007`** | I | `TASK-186` | Suppression failure during close rolls back the whole batch; no partial curation is committed (US-041 AC-6). |
+| **`T-WAIT-008`** (`a`–`b`) | I | `TASK-189` | Graduation. `a` a waiting work later captured on Netflix enters the combined list by the ordinary path and its intent leaves the waiting view; `b` the satisfied intent is **retained, never hard-deleted** (US-043 AC-3/AC-5, REQ-028). |
+| **`T-WAIT-009`** | U | `TASK-189` | "Not interested" on a waiting work suppresses on canonical work identity like any other work (US-043 AC-4, REQ-070/071). |
+| **`T-WAIT-010`** | E | `TASK-189` | The empty waiting view explains what it is for and how to fill it (US-043 AC-6). |
+| **`T-WAIT-011`** | U | `TASK-184` | `WatchIntent.discoveredAt` **never** feeds the REQ-038 title-level date sort, which is defined over `ServiceListing.dateAdded` (`data-model.md` §17.1). |
+
+### 38.2 `T-AVAIL-*` — availability refresh
+
+| Id | Level | Owner | Claim |
+|---|---|---|---|
+| **`T-AVAIL-001`** (`a`–`b`) | I | `TASK-187` | `a` an intent whose `availabilityCheckedAt` is older than `WATCH_PROVIDER_MAX_AGE_DAYS` is refreshed when the waiting view is opened; `b` **the discriminating case** — one checked more recently is **not** refreshed, without which `a` passes against an unconditional refresh (US-042 AC-1). |
+| **`T-AVAIL-002`** (`a`–`b`) | I | `TASK-187` | **On access only.** `a` if the waiting view is never opened, **no** TMDB request is ever made; `b` **the structural assertion** — no scheduler, timer, queue, cron or background worker exists that triggers it (US-042 AC-2, REQ-041). |
+| **`T-AVAIL-003`** (`a`–`b`) | I | `TASK-188` | A work reported `flatrate` on a `SERVICES` member is **flagged with an invitation** and is **not** added to the combined list. `b` **the load-bearing negative** — combined-list membership and ordering are identical before and after the refresh (US-042 AC-3, ADR-0010 §4). |
+| **`T-AVAIL-004`** | I | `TASK-187` | The refresh creates, deletes or re-states **no** `Title`, `ServiceListing` or `Suppression`, and satisfies no intent on its own (US-042 AC-4). |
+| **`T-AVAIL-005`** | U | `TASK-187` | A work offered only to **rent or buy**, with no `flatrate` offer, stays waiting and is **not** flagged. ⚠ Inverting this inverts the feature: rent-availability is what the owner is waiting to escape (US-042 AC-5). |
+| **`T-AVAIL-006`** | U | `TASK-188` | Absent provider data renders *"not seen on your services as of &lt;date&gt;"*, never *"not streaming anywhere"* — a claim the data cannot support (US-042 AC-6, ADR-0010 Trap 4). |
+| **`T-AVAIL-007`** | I | `TASK-188` | TMDB unreachable: the view renders from last-known availability with its as-of date plus an unobtrusive failure note. Never blank, never an error page (US-042 AC-7). |
+| **`T-AVAIL-008`** | U | `TASK-184` | `WATCH_PROVIDER_MAX_AGE_DAYS` is a **third independent constant**, sharing no call site with `TMDB_METADATA_MAX_AGE_DAYS` or `IMAGE_RETENTION_DAYS`. **`T-INV-008` is extended from two constants to three** (US-042 AC-8, ADR-0010 Trap 5). |
+| **`T-AVAIL-009`** | E | `TASK-188` | Every surface rendering availability carries the **JustWatch** attribution (US-042 AC-9, REQ-087). |
+| **`T-AVAIL-010`** | U | `TASK-187` | `availabilityRegion` is **`US`** (`ASM-059`, owner-confirmed at `A49`) and is stored on the row and passed explicitly, never defaulted or hard-coded at the call site. |
+
+### 38.3 The `Owner` column is load-bearing
+
+The third column is not decoration. `check:orphans` resolves an id as owned by
+a **backlog citation**, so if a task's "Done when" cell and this table ever
+disagree about who owns an id, the gate follows the backlog and this table
+becomes the misleading one. **They are edited together or not at all.** All 21
+ids are cited across `TASK-183` – `TASK-189`; none is unowned, and none is
+owned twice.

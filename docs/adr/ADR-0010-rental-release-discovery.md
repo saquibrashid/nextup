@@ -229,65 +229,69 @@ feature inert.
 | Import the whole feed without review | The feed is mostly noise. Without the review pass as the curation step, the waiting list is unusable by the second capture. |
 
 ---
-## 6. Test ids — the definition of done for Epic L
+## 6. Test ids — MOVED to `specs/testing.md` §38 at `A52`
 
-> ⚠️ **These ids are reserved and specified; no test implements them yet, and
-> no v1 backlog task may cite them.** They are recorded **here rather than in
-> `specs/testing.md` deliberately.** `check:orphans` (`T-META-006e`) fails on
-> any id defined in `testing.md` that no task owns and no suite implements —
-> and it is right to: a defined-but-unbuilt acceptance criterion lets every
-> gate pass and the ledger reach 100% while the behaviour is simply missing
-> (`testing.md` §21.1). **Move these tables into `specs/testing.md` in the
-> same change that adds the Epic L tasks to `docs/backlog.md`, never before.**
-> ⚠️ Do **not** add them to `BASELINE_ORPHANS` — that list may only shrink.
->
-> Requirements **REQ-082 – REQ-087**; stories **PRD Epic L / US-040 – US-043**;
-> data model `specs/data-model.md` §17.
->
-> The id→AC mapping below **is** the definition of done for Epic L, on the
-> same terms as `specs/testing.md` itself (NFR-003).
+**Epic L was promoted to v1 by the owner on 2026-09-08 (`A52`), and the `T-WAIT-*`
+and `T-AVAIL-*` tables that used to sit here have MOVED to `specs/testing.md`
+§38** — in the same change that added `TASK-183` – `TASK-189` to
+`docs/backlog.md`, exactly as the instruction below required.
 
-### 6.1 `T-WAIT-*` — capture, curation and the waiting view
+**`specs/testing.md` §38 is now the authoritative copy, and the only one any
+gate reads. Do not restore a second copy here.** A duplicated id table drifts
+silently: `check:orphans` and `check-test-ids` both parse `specs/testing.md`
+alone, so a table here that disagreed with §38 would look authoritative to a
+human and be invisible to CI.
 
-| Id | Level | Claim |
-|---|---|---|
-| **`T-WAIT-001`** (`a`–`c`) | U | A batch whose source is a discovery source is created **append-only**. `a` the mode is forced to append-only; `b` an explicit `full-update` request is **refused at the API boundary** with an explanatory error, not merely hidden in the UI (US-040 AC-1/AC-6); `c` the refusal is by source type, never by a client-supplied flag. |
-| **`T-WAIT-002`** (`a`–`b`) | I | Reconciliation never runs for a discovery batch. `a` closing a second capture of the same page that omits a previously-seen title proposes **no** removal; `b` **the discriminating case** — the same omission in a Netflix full-update batch *does* propose one, without which `a` would pass against a build where reconciliation is simply broken (US-040 AC-4). |
-| **`T-WAIT-003`** (`a`–`b`) | I | A closed discovery batch creates **no** `ServiceListing` and leaves the combined list byte-identical before and after (US-040 AC-3, ADR-0010 Trap 3). `b` no service badge count changes (REQ-025). |
-| **`T-WAIT-004`** | U | A work already present in the combined list produces **no** `WatchIntent`; the review pass says so rather than silently discarding it (US-040 AC-5). |
-| **`T-WAIT-005`** | U | Every extracted candidate is shown and every disposition defaults to `pending` — no accept-by-inaction (US-041 AC-1, REQ-014). |
-| **`T-WAIT-006`** (`a`–`c`) | I | **Discard suppresses.** `a` discarding a discovery candidate creates a `Suppression` on canonical work identity; `b` **the load-bearing behavioural test** — capture the same page twice with a discard in between, and the second review pass does not contain it *at all*, the check being before record creation (US-041 AC-2/AC-3/AC-4, US-028 AC-2); `c` **the discriminating case** — discarding in a *Netflix* review pass does **not** suppress, so the behaviour is scoped to discovery sources (US-041 AC-5). |
-| **`T-WAIT-007`** | I | Suppression failure during close rolls back the whole batch; no partial curation is committed (US-041 AC-6). |
-| **`T-WAIT-008`** (`a`–`b`) | I | Graduation. `a` a waiting work later captured on Netflix enters the combined list by the ordinary path and its intent leaves the waiting view; `b` the satisfied intent is **retained, never hard-deleted** (US-043 AC-3/AC-5, REQ-028). |
-| **`T-WAIT-009`** | U | "Not interested" on a waiting work suppresses on canonical work identity like any other work (US-043 AC-4, REQ-070/071). |
-| **`T-WAIT-010`** | E | The empty waiting view explains what it is for and how to fill it (US-043 AC-6). |
-| **`T-WAIT-011`** | U | `WatchIntent.discoveredAt` **never** feeds the REQ-038 title-level date sort, which is defined over `ServiceListing.dateAdded` (`data-model.md` §17.1). |
+Requirements **REQ-082 – REQ-087**; stories **PRD Epic L / US-040 – US-043**;
+data model `specs/data-model.md` §17.
 
-### 6.2 `T-AVAIL-*` — availability refresh
-
-| Id | Level | Claim |
-|---|---|---|
-| **`T-AVAIL-001`** (`a`–`b`) | I | `a` an intent whose `availabilityCheckedAt` is older than `WATCH_PROVIDER_MAX_AGE_DAYS` is refreshed when the waiting view is opened; `b` **the discriminating case** — one checked more recently is **not** refreshed, without which `a` passes against an unconditional refresh (US-042 AC-1). |
-| **`T-AVAIL-002`** (`a`–`b`) | I | **On access only.** `a` if the waiting view is never opened, **no** TMDB request is ever made; `b` **the structural assertion** — no scheduler, timer, queue, cron or background worker exists that triggers it (US-042 AC-2, REQ-041). |
-| **`T-AVAIL-003`** (`a`–`b`) | I | A work reported `flatrate` on a `SERVICES` member is **flagged with an invitation** and is **not** added to the combined list. `b` **the load-bearing negative** — combined-list membership and ordering are identical before and after the refresh (US-042 AC-3, ADR-0010 §4). |
-| **`T-AVAIL-004`** | I | The refresh creates, deletes or re-states **no** `Title`, `ServiceListing` or `Suppression`, and satisfies no intent on its own (US-042 AC-4). |
-| **`T-AVAIL-005`** | U | A work offered only to **rent or buy**, with no `flatrate` offer, stays waiting and is **not** flagged. ⚠️ Inverting this inverts the feature: rent-availability is what the owner is waiting to escape (US-042 AC-5). |
-| **`T-AVAIL-006`** | U | Absent provider data renders *"not seen on your services as of <date>"*, never *"not streaming anywhere"* — a claim the data cannot support (US-042 AC-6, ADR-0010 Trap 4). |
-| **`T-AVAIL-007`** | I | TMDB unreachable: the view renders from last-known availability with its as-of date plus an unobtrusive failure note. Never blank, never an error page (US-042 AC-7). |
-| **`T-AVAIL-008`** | U | `WATCH_PROVIDER_MAX_AGE_DAYS` is a **third independent constant**, sharing no call site with `TMDB_METADATA_MAX_AGE_DAYS` or `IMAGE_RETENTION_DAYS`. **`T-INV-008` is extended from two constants to three** (US-042 AC-8, ADR-0010 Trap 5). |
-| **`T-AVAIL-009`** | E | Every surface rendering availability carries the **JustWatch** attribution (US-042 AC-9, REQ-087). |
-| **`T-AVAIL-010`** | U | `availabilityRegion` is **`US`** (`ASM-059`, owner-confirmed at `A49`) and is stored on the row and passed explicitly, never defaulted or hard-coded at the call site. |
+~~"⚠️ These ids are reserved and specified; no test implements them yet, and no
+v1 backlog task may cite them. They are recorded here rather than in
+`specs/testing.md` deliberately... **Move these tables into `specs/testing.md`
+in the same change that adds the Epic L tasks to `docs/backlog.md`, never
+before.**"~~
+*(Superseded at `A52` — the move has been carried out. Retained because the
+REASONING is still correct and still binding on the next epic that gets
+specified ahead of its schedule: defining an id in `testing.md` that no task
+owns manufactures the exact state where every gate passes and the behaviour is
+absent. It was right not to define them early, and it is right to define them
+now that tasks own them.)*
 
 ### 6.3 The gate that must be amended, not weakened
 
-⚠️ **`T-CI-005` asserts that exactly TWO non-owner-initiated processes exist.**
-The availability refresh is a third, so **`T-CI-005` will go red the moment
-this epic lands**. That is by design, and the correct response is to **amend
-it to three in the same change** — naming the availability refresh, and
-asserting it is metadata-only and access-triggered — alongside `PRD.md`
-US-036 AC-2 and product invariant 5.
+⚠️ **CORRECTED IN PLACE at `A52` — the count in the superseded text below is
+two revisions out of date and following it would set the gate to the wrong
+number.**
+
+**`T-CI-005g` today asserts that exactly THREE non-owner-initiated processes
+exist:** the lazy TMDB metadata refresh, the screenshot purge, and the IMDb
+rating refresh that **Epic M** added after this ADR was written. The
+availability refresh is therefore a **FOURTH**, not a third.
+
+`T-CI-005` will go red the moment the refresh is built. **That is by design and
+it is a trip-wire, not an accident** — see `specs/testing.md` §33.1, which is
+the authoritative statement of both the count and the sequencing. In short:
+
+- the amendment is **not** part of the promotion, and was deliberately not made
+  when the backlog rows were written — raising the count while nothing
+  implements the fourth process would leave `PERMITTED_BACKGROUND_PROCESSES`
+  naming a process that does not exist, and the gate loose by one named slot
+  for as long as the epic takes to build;
+- it is owned by **`TASK-187`**, the task that builds the refresh, and lands in
+  that same commit: `PERMITTED_BACKGROUND_PROCESSES`, `T-CI-005g`, `PRD.md`
+  US-036 AC-2 and product invariant 5, **all four together**;
+- the owner has already approved the invariant change (`A52`), so `TASK-187`
+  executes it rather than re-escalating it.
 
 **The wrong response is to relax the gate into counting nothing in
 particular.** Its value is entirely in the number being exact and small; a
 `T-CI-005` that permits "some" background processes asserts nothing at all.
 
+~~"⚠️ `T-CI-005` asserts that exactly TWO non-owner-initiated processes exist.
+The availability refresh is a third, so `T-CI-005` will go red the moment this
+epic lands... the correct response is to **amend it to three** in the same
+change."~~
+*(Superseded at `A52`. The count was two when this ADR was written; Epic M
+raised it to three. The availability refresh makes four. The PRINCIPLE —
+amend deliberately, never weaken — is unchanged and is why this paragraph is
+retained rather than deleted.)*

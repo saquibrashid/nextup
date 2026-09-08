@@ -2410,16 +2410,32 @@ Mitigations, none of which fully restores the 35-day window:
 
 ---
 
-## 17. WAITING TO STREAM — v1.1 DATA MODEL (NOT PART OF v1)
+## 17. WAITING TO STREAM — PROMOTED TO v1 at `A52` (Epic L)
 
-> ⚠️ **DO NOT BUILD THIS IN v1, AND DO NOT WRITE A MIGRATION FOR IT.**
-> This section exists so the v1.1 epic is not re-derived from scratch, and so
-> that v1 choices do not accidentally preclude it. It is **not** part of §15
-> or §16, which remain the authoritative v1 model. A v1 lane agent that finds
-> this section should treat it as documentation, not as work.
+> ✅ **BUILD THIS. The owner promoted Epic L to v1 on 2026-09-08 (`A52`), and
+> the migration this section used to forbid is now `TASK-184`'s job.**
+> This section is **authoritative implementation guidance**, alongside §15 and
+> §16 — not a sketch. Everything below survived promotion unchanged; only its
+> status changed.
+>
+> ⚠️ **It is still NOT part of §15/§16, and the split is deliberate.** §16 is
+> the v1 raw-migration inventory; the `WatchIntent` DDL below is additive and
+> arrives in its own migration, so keeping it here stops it being mistaken for
+> something already applied. Read §16's rules — filtered unique indexes,
+> `CHECK`, `ISJSON`, `Latin1_General_100_BIN2` — and follow them here.
 >
 > Decisions and traps: **ADR-0010**. Requirements: **REQ-082 – REQ-087**.
-> Stories: **PRD Epic L, US-040 – US-043**.
+> Stories: **PRD Epic L, US-040 – US-043**. Test ids: **`specs/testing.md` §38**
+> (moved out of ADR-0010 §6 at `A52`). Tasks: **`TASK-183` – `TASK-189`**.
+>
+> ~~"⚠️ **DO NOT BUILD THIS IN v1, AND DO NOT WRITE A MIGRATION FOR IT.** This
+> section exists so the v1.1 epic is not re-derived from scratch... A v1 lane
+> agent that finds this section should treat it as documentation, not as
+> work."~~
+> *(Superseded at `A52`. ⚠️ Corrected in place rather than banner-superseded
+> because it was an INSTRUCTION a machine executes, not rationale — the F-001
+> rule. An agent that read the old banner would down-tools on its own task.)*
+
 
 ### 17.1 `WatchIntent`
 
