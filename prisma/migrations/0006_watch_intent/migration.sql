@@ -37,16 +37,27 @@ ALTER TABLE [upload_batch] ALTER COLUMN [service] NVARCHAR(16) NULL;
 -- capped at `SERVICES.length` and the badge count counting badges.
 ALTER TABLE [upload_batch] ADD [discovery_source] NVARCHAR(64) NULL;
 
-ALTER TABLE [upload_batch] ADD CONSTRAINT [ck_batch_discovery_source]
-  CHECK ([discovery_source] IS NULL OR [discovery_source] IN ('fandango-at-home'));
+-- ── Why every statement below is wrapped in EXEC() ──────────────────────────
+--
+-- ⚠ THIS REPO HAS ALREADY BEEN BITTEN BY THIS TWICE (`0003`, `0004`).
+--
+-- `GO` is a SQLCMD batch separator, not T-SQL, and Prisma hands this file
+-- straight to the driver. Without a batch boundary the whole file is compiled
+-- before any of it runs, so every constraint naming the column added above
+-- fails to compile against a table that does not have it yet — SQL Server
+-- error 207, `Invalid column name 'discovery_source'`. `EXEC('...')` defers
+-- compilation of its argument to execution time, which is the batch boundary
+-- Prisma cannot otherwise express. Single quotes inside are doubled.
+EXEC('ALTER TABLE [upload_batch] ADD CONSTRAINT [ck_batch_discovery_source]
+  CHECK ([discovery_source] IS NULL OR [discovery_source] IN (''fandango-at-home''))');
 
 -- Exactly one origin. Neither set is a batch with no provenance; both set is a
 -- batch that is simultaneously a curated list and an editorial feed.
-ALTER TABLE [upload_batch] ADD CONSTRAINT [ck_batch_source_exclusive]
+EXEC('ALTER TABLE [upload_batch] ADD CONSTRAINT [ck_batch_source_exclusive]
   CHECK (
       ([service] IS NOT NULL AND [discovery_source] IS NULL)
    OR ([service] IS NULL     AND [discovery_source] IS NOT NULL)
-  );
+  )');
 
 -- ⚠ D-2 ENFORCED IN THE STORE, NOT ONLY AT THE ROUTE.
 --
@@ -54,8 +65,8 @@ ALTER TABLE [upload_batch] ADD CONSTRAINT [ck_batch_source_exclusive]
 -- source. This constraint is the second, independent line: a future route, a
 -- repair script or a direct write cannot create the one batch shape that would
 -- propose the owner's entire waiting list for removal on the next capture.
-ALTER TABLE [upload_batch] ADD CONSTRAINT [ck_batch_discovery_append_only]
-  CHECK ([discovery_source] IS NULL OR [mode] = 'append-only');
+EXEC('ALTER TABLE [upload_batch] ADD CONSTRAINT [ck_batch_discovery_append_only]
+  CHECK ([discovery_source] IS NULL OR [mode] = ''append-only'')');
 
 
 -- ═══════════════════════════════════════════════════════════════════════════
