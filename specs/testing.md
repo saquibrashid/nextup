@@ -471,7 +471,7 @@ Fully specified in **`specs/ai.md` §9**. Summary of what **CI** enforces
 | Chrome rejection | ≥ 0.80 | `T-AI-030` |
 | Match accuracy | ≥ 0.90 | `T-AI-031` |
 | **Determinism of stages 1c–5 across 3 runs** | **exactly 1.0** | `T-STUB-001`, **`T-AI-034`** |
-| Artwork-only fixture recall (`max-artwork-only-01.png`) | ≥ **0.80**, all `basis: 'artwork'`, verdict `inferred-unverified` | **`T-AI-035`** |
+| Artwork-only fixture recall (`netflix-artwork-only-01.png`) | ≥ **0.80**, all `basis: 'artwork'`, verdict `inferred-unverified` | **`T-AI-035`** |
 | **`blank-no-content-01.png`** triggers the low-yield path | must | `T-AI-021`, `T-AI-022` |
 | Degraded (LLM-unavailable) full-update withholds removals | must | **`T-AI-036`** |
 | Truncated caption resolves to the complete work, `rawText` keeps the ellipsis | must | **`T-AI-043`** |
@@ -480,11 +480,17 @@ Fully specified in **`specs/ai.md` §9**. Summary of what **CI** enforces
 
 > ### ⚠ The two fixture changes an implementer will get wrong
 >
-> **1. `max-artwork-only-01.png` has swapped roles.** Under Revision 1 it
-> had `expectedTitleCount: 0` and existed to prove the low-yield path
-> fired. Under Revision 2 the primary reader is **expected to read it**,
-> so its `expectedTitleCount` becomes the real number of works and it
-> becomes the headline **`RSK-021`** fixture (`T-AI-035`, recall ≥ 0.80).
+> **1. The artwork-only fixture swapped roles _and_ changed service.**
+> Under Revision 1 `max-artwork-only-01.png` had `expectedTitleCount: 0`
+> and existed to prove the low-yield path fired. Under Revision 2 the
+> primary reader is **expected to read it**, so its `expectedTitleCount`
+> becomes the real number of works and it becomes the headline
+> **`RSK-021`** fixture (`T-AI-035`, recall ≥ 0.80). TASK-011 then
+> measured all four surfaces and found **Max renders text captions on
+> both mobile and desktop** — the artwork-only surface is **Netflix
+> desktop**. The fixture is **`netflix-artwork-only-01.png`**
+> (`expectedTitleCount: 10`). ~~`max-artwork-only-01.png`~~ does not
+> exist; see `docs/evaluation/capture-surfaces.md`.
 >
 > **2. A new fixture, `blank-no-content-01.png`, takes over the low-yield
 > role.** `T-AI-021`/`T-AI-022` must be **repointed at it**, not deleted
@@ -493,7 +499,7 @@ Fully specified in **`specs/ai.md` §9**. Summary of what **CI** enforces
 > is to lower the artwork gate — which silently undoes the entire point
 > of ADR-0001 Revision 2.
 
-The fixture set is **committed** (12 images; their recorded **LLM** and
+The fixture set is **committed** (11 images; their recorded **LLM** and
 **OCR** responses; their expected pipeline output). It runs offline on
 every pull request. Because the LLM response is sampled, **refreshing the
 recordings always produces a diff** — so the review question after a
@@ -641,7 +647,7 @@ own."*~~
 tests/fixtures/
   seed.ts                 # deterministic owners, titles, listings, batches
   golden/                 # specs/ai.md §9 — images, recorded LLM + OCR, expected output
-    images/               # 12 images (incl. blank-no-content-01, truncated-titles-01)
+    images/               # 11 images (incl. blank-no-content-01, truncated-titles-01)
     ingest/               # A42 — HEIC/HEIF ingest fixtures (real device files):
                           #   iphone-camera-01.heic (EXIF+GPS present, in-bounds),
                           #   iphone-hdr-screenshot-01.heic, heif-brand-01.heif,
@@ -1683,7 +1689,7 @@ check what "done" means.
 | **`T-AI-010`** | S | `azureVisionExtractor.ts` is the **only** file permitted to import the Vision SDK (`specs/ai.md` §305). Confining the SDK to one adapter is what keeps `packages/domain` pure and the matcher deterministic (`NFR-012a`, ADR-0001). | `specs/ai.md` |
 | **`T-AI-033`** | I | The stage-1 provider-contract suite: the **real** `LlmVisionExtractor` and `AzureVisionExtractor` driven offline against committed HTTP recordings (§3.1a) — schema parsing, strict-schema rejection, 429/5xx retry timing, timeouts, content-filter refusals and both degraded paths. Offline, so it runs in CI without a key and without cost.  **Landing in two halves. The `AzureVisionExtractor` half is TASK-056** (`apps/api/test/unit/extraction/azureVisionExtractor.spec.ts`, recordings in `tests/fixtures/msw/vision/`): valid-result parsing, box normalisation and edge clamping, the mean-of-words line confidence, 429/5xx/transport retry timing at 1 s/4 s, non-retry of 4xx, the timeout kind, and the two **"a response we cannot use is never an empty one"** cases — a 200 with no `readResult` and a 200 with no image dimensions both reject, because an unread image reported as "no text" is, in full-update mode, a wave of removals. **The `LlmVisionExtractor` half is TASK-056b** — strict-schema rejection, the service-field rejection, `finish_reason: 'length'` and content-filter refusals all belong to a reader that does not exist yet, and squatting them earlier would make the suite green for behaviour nothing implements. | §3.1a prose |
 | **`T-CI-004`** | S | Neither `golden:live` nor `golden:record` is referenced by **any** workflow file (§4A). Both spend real money against real providers; a well-meaning "run the golden set in CI" would bill the owner per push and, worse, re-record the baseline the gates are measured against. | §4A prose |
-| **`T-AI-045` (new, TASK-168)** | S | The **primary-reader bake-off protocol** of `specs/ai.md` §9.7 is enforced as structure, not as good intentions. `a` the two arms differ **only** in deployment name — prompt, schema, `detail`, `max_tokens`, `temperature` and `seed` are byte-identical, because a prompt tuned for one arm turns a model comparison into a prompt comparison and nothing in the numbers would reveal it. `b` both arms score against the **same** `expected/` and the same `ocr/`; a per-model answer key would let a challenger be graded on an easier exam. `c` `llm/` recordings are model-scoped, so recording a challenger cannot overwrite the incumbent's evidence — the failure mode is silent and irreversible, and it destroys the only baseline the comparison needs. `d` the decision function is **pure and total** over the §9.7 table, defaults to the incumbent on any mixed result, and treats cost strictly as a tie-breaker (`NFR-012a`); mutation-proven by feeding it a challenger that is cheaper and worse and requiring the incumbent to survive. `e` a sub-two-title delta is reported as **"no measured difference"** on a 12-image corpus, not as a win. `f` neither the bake-off script nor its recorder is referenced by any workflow file — same reason as `T-CI-004`, which it extends. | `specs/ai.md` §9.7 |
+| **`T-AI-045` (new, TASK-168)** | S | The **primary-reader bake-off protocol** of `specs/ai.md` §9.7 is enforced as structure, not as good intentions. `a` the two arms differ **only** in deployment name — prompt, schema, `detail`, `max_tokens`, `temperature` and `seed` are byte-identical, because a prompt tuned for one arm turns a model comparison into a prompt comparison and nothing in the numbers would reveal it. `b` both arms score against the **same** `expected/` and the same `ocr/`; a per-model answer key would let a challenger be graded on an easier exam. `c` `llm/` recordings are model-scoped, so recording a challenger cannot overwrite the incumbent's evidence — the failure mode is silent and irreversible, and it destroys the only baseline the comparison needs. `d` the decision function is **pure and total** over the §9.7 table, defaults to the incumbent on any mixed result, and treats cost strictly as a tie-breaker (`NFR-012a`); mutation-proven by feeding it a challenger that is cheaper and worse and requiring the incumbent to survive. `e` a sub-two-title delta is reported as **"no measured difference"** on an 11-image corpus, not as a win. `f` neither the bake-off script nor its recorder is referenced by any workflow file — same reason as `T-CI-004`, which it extends. | `specs/ai.md` §9.7 |
 | **`T-CI-007`** | I | An outbound-blocking proxy observes **zero** requests during the CI test run. Egress in CI means a test is really an integration test against someone else's service: it fails on their outage, passes on their cached response, and quietly breaks the offline guarantee `T-AI-033` depends on.  **`o`–`r` (added with TASK-056): the guard hooks `fetch` AND `http.request`/`https.request`, and the two are not equivalent. `msw` mocks `fetch` by REPLACING it, so a mocked fetch never reaches the guard at all — which is why the TMDB suite needed nothing here. It cannot do that for `http.request`: to hand back a `ClientRequest` it must call the real one, having swapped the socket underneath, so the guard sees a request to a public hostname that no packet will ever leave for. The Azure SDKs speak `https.request` (`@azure/core-rest-pipeline`), so without a seam a fully-recorded, offline extractor suite is indistinguishable from a live one — `T-AI-033` could not exist. `registerMockedHost()` records such an attempt as `mocked`, never as `blocked`. The seam is only safe while it is narrow, so all three properties are asserted: `o` it works, `p` deregistration restores blocking (a registration that outlived its `msw` server would wave a REAL call through, silently, for the rest of the run), and `r` nothing outside `tests/fixtures/msw/**` calls it.** | §2 prose |
 | **`T-E2E-001`** | E | The full owner journey — sign in → upload → extract → match → review → confirm → see the combined list — specified end to end in §5 and called there **"the single most valuable test in the suite"**. It was cited by five backlog tasks (`TASK-080`, `094`, `108`, `130`, `164`) as their exit criterion while having no table cell anywhere. | §5 |
 | **`T-INFRA-001` (a…g)** | S | **Least-privilege RBAC across every grant the template issues.** `a` the committed template has no violation; `b` the blob grant is scoped to a **container**, never the storage account — an account-scoped grant hands the staging identity read/write on every production screenshot while every other test still passes; `c` mutation-proves `b`; `d` mutation-proves that deleting a grant is caught. **`e`–`g` added with TASK-010**, when the Azure OpenAI and Azure AI Vision grants arrived and the original "exactly one role assignment" shape stopped holding: `e` the two Cognitive Services grants are account-scoped and carry only the inference roles (**Cognitive Services OpenAI User**, **Cognitive Services User**); `f` mutation-proves that a promotion to a management role such as **Cognitive Services OpenAI Contributor** is caught — that role can create and delete model deployments, which is enough to swap the pinned model out from under the golden corpus with no commit and no test run (`NFR-012a`, invariant 9); `g` mutation-proves a grant escaping to resource-group scope is caught. ⚠ The role guid is **not on the `roleAssignment` resource**: both grant modules take it as a parameter, so the compiled nested template holds `[subscriptionResourceId(…, parameters('roleDefinitionId'))]` and the literal sits in a top-level template **variable**, behind `[variables(…)]`. A check that reads the assignment finds no guid at all and passes **vacuously**, so the allow-list carries an explicit vacuity guard that fails when it resolves nothing. | TASK-006, TASK-010, `specs/security.md` §6 |

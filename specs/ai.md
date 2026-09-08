@@ -888,18 +888,17 @@ every pull request.** Only T3 is new, and T3 never gates a merge.
 tests/fixtures/golden/
   manifest.json
   images/
-    netflix-mylist-mobile-01.png
-    netflix-mylist-mobile-02.png
-    netflix-mylist-desktop-01.png
-    netflix-continue-watching-01.png     # chrome-heavy negative case
-    max-saved-mobile-01.png
-    max-saved-desktop-01.png
-    max-artwork-only-01.png              # the RSK-021 case — see 9.4
+    netflix-mylist-mobile-01.jpg
+    netflix-mylist-mobile-02.jpg
+    netflix-mylist-desktop-01.heic       # photograph of a monitor — see captureNotes
+    netflix-continue-watching-01.jpg     # chrome-heavy negative case
+    max-saved-mobile-01.jpg
+    max-saved-desktop-01.heic            # photograph of a monitor — see captureNotes
+    netflix-artwork-only-01.png          # the RSK-021 case — see 9.4
     blank-no-content-01.png              # NEW (R2): genuinely empty; drives the low-yield path
     truncated-titles-01.png              # NEW (R2): ellipsised captions; drives the R2.3b case
     low-quality-jpeg-01.jpg
     rotated-01.png
-    dark-mode-01.png
   llm/
     <modelId>/<image>.llm.json           # RECORDED primary-reader response (raw HTTP body)
   ocr/
@@ -908,7 +907,32 @@ tests/fixtures/golden/
     <image>.expected.json                # the ASSERTED pipeline output
 ```
 
-⚠ **`llm/` is scoped BY MODEL, `ocr/` and `expected/` are not** — and the
+⚠ **The extensions above are the real formats, established by magic bytes, and
+the corpus is 11 images, not 12.** Both changes follow from TASK-011's
+measured capture-surface check (`docs/evaluation/capture-surfaces.md`,
+2026-09-08):
+
+- **`netflix-artwork-only-01.png` replaces `max-artwork-only-01.png`.**
+  Max renders a **text** caption on *both* mobile and desktop; the surface
+  that renders **artwork only** is **Netflix desktop**. `RSK-021` is real,
+  but it was attached to the wrong service. See §9.4.
+- **`dark-mode-01.png` is deleted, not deferred.** Neither service exposes a
+  light mode on either surface, so every capture the owner can take is
+  already dark. A "dark mode" fixture was a duplicate of the corpus, not a
+  variant of it.
+- **Two slots are photographs of a monitor**, not screenshots — hence HEIC.
+  They carry bezel, glare, keystone distortion and a mouse cursor. That is
+  deliberate coverage of a real capture path, but it means a recall miss on
+  those two images must be diagnosed as *capture quality* before it is
+  attributed to the reader. The clean-screenshot control for the same
+  Netflix desktop surface is `netflix-artwork-only-01.png`.
+
+~~`netflix-mylist-desktop-01.png` … `max-artwork-only-01.png` …
+`dark-mode-01.png`, all twelve `.png`~~ *(superseded: the extensions were
+assumed rather than observed, the artwork-only slot named the wrong service,
+and the dark-mode slot described a variant that does not exist.)*
+
+ — and the
 asymmetry is the point. `expected/` is ground truth about the *image*: it must
 be identical for every model, or a comparison between two models is really a
 comparison between two answer keys. `ocr/` is the deterministic cross-check and
@@ -952,7 +976,7 @@ account, no cost, every PR.
 
 | Metric | Definition | Gate |
 |---|---|---|
-| **Title recall** | expected titles produced as `title-candidate`, `low-confidence` or `inferred-unverified` ÷ expected titles | per-image `minRecall`; **aggregate ≥ 0.95** *(raised from 0.90 — `NFR-012a` buys quality, so the gate must reflect it; `max-artwork-only-01` is now **included**)* |
+| **Title recall** | expected titles produced as `title-candidate`, `low-confidence` or `inferred-unverified` ÷ expected titles | per-image `minRecall`; **aggregate ≥ 0.95** *(raised from 0.90 — `NFR-012a` buys quality, so the gate must reflect it; `netflix-artwork-only-01` is now **included**)* |
 | **False-title rate** | candidates verdicted `title-candidate` that are not expected titles | per-image `maxFalseTitles`; aggregate ≤ **0.10** |
 | **Fabrication rate** *(new, R2)* | candidates with `ocrSupport === 'none'` that are **neither** an expected title **nor** a TMDB match ÷ total candidates | ≤ **0.05** (`FABRICATION_RATE_CEILING`) — `T-AI-032` |
 | **Omission recovery** *(new, R2)* | expected titles present in the OCR recording but absent from the LLM recording that **are** recovered as `ocr-only` orphans | **1.0, non-negotiable** — `T-AI-039` |
@@ -984,12 +1008,18 @@ Under Revision 1, `max-artwork-only-01.png` had
 `expectedTitleCount: 0` and existed to prove the **low-yield path**
 fired. Under Revision 2 the primary reader is expected to **read it**.
 
+⚠ **The fixture also changed service.** TASK-011 measured all four
+surfaces (`docs/evaluation/capture-surfaces.md`): **Max shows a text
+caption on both mobile and desktop**, and the artwork-only surface is
+**Netflix desktop**. The fixture is `netflix-artwork-only-01.png`.
+`RSK-021` stands unchanged — only the service attribution was wrong.
+
 > ⚠ **The single most likely implementation error in this revision.**
-> `max-artwork-only-01.png` is **no longer** the low-yield fixture. Its
-> `expectedTitleCount` becomes the real number of works in the image and
-> it becomes the headline `RSK-021` fixture:
+> `netflix-artwork-only-01.png` is **not** a low-yield fixture. Its
+> `expectedTitleCount` is the real number of works in the image (**10**)
+> and it is the headline `RSK-021` fixture:
 >
-> - `T-AI-035`: recall on `max-artwork-only-01.png` ≥ **0.80**, with
+> - `T-AI-035`: recall on `netflix-artwork-only-01.png` ≥ **0.80**, with
 >   every recovered candidate carrying `basis: 'artwork'` and
 >   `cleanupVerdict: 'inferred-unverified'`.
 > - **A new fixture, `blank-no-content-01.png`** (a genuinely
@@ -998,6 +1028,11 @@ fired. Under Revision 2 the primary reader is expected to **read it**.
 >
 > Do not delete `T-AI-021`. Do not point it at the artwork fixture.
 > Repoint it at `blank-no-content-01.png`.
+
+~~`max-artwork-only-01.png` … it becomes the headline `RSK-021`
+fixture~~ *(superseded: measured at TASK-011 — Max is not the
+artwork-only service, Netflix desktop is.)*
+
 
 `truncated-titles-01.png` is the R2.3b fixture: `T-AI-043` asserts that
 an ellipsised caption resolves to the **complete** TMDB work, that
@@ -1020,7 +1055,7 @@ asserts **bands**, never equality:
 | L3 | **Unstable titles** — expected titles appearing in fewer than 3 of 3 runs | ≤ **5 %** of expected titles, **and each is printed by name** in the report |
 | L4 | Fabrication rate per run (§9.2 definition) | ≤ **0.05** |
 | L5 | False-title rate per run | ≤ **0.10** |
-| L6 | Artwork-only recall (`max-artwork-only-01.png`) | ≥ **0.80** in 3 of 3 |
+| L6 | Artwork-only recall (`netflix-artwork-only-01.png`) | ≥ **0.80** in 3 of 3 |
 | L7 | **Cost of the whole run**, computed from reported token usage | ≤ **$0.50** — a regression guard on prompt/token growth |
 
 > **The prohibitions, stated so they cannot be misread:**
@@ -1082,7 +1117,7 @@ models reject `temperature` and `seed` entirely" **did not apply here.**
 | Region availability (`eastus2`, `GlobalStandard`) | ✅ | ✅ |
 
 **The challenger is NOT disqualified. Stage 1 may proceed.** On the one image
-tried during the probe (`hbo_iPhone.jpg`) both arms returned a byte-identical
+tried during the probe (`max-saved-mobile-01.jpg`) both arms returned a byte-identical
 title array — a single image is not a result, but it does mean the comparison
 is live and worth running.
 
@@ -1142,7 +1177,8 @@ Better-on-some / worse-on-others means **the incumbent stays** — a mixed resul
 is not an upgrade, and defaulting to the incumbent under uncertainty is what
 keeps `NFR-012a` from being eroded one small regression at a time.
 
-**Stage 4 — what counts as a difference.** The corpus is **12 images**. One
+**Stage 4 — what counts as a difference.** The corpus is **11 images**
+*(12 until TASK-011 deleted the `dark-mode-01` slot; see §9.1)*. One
 title found or missed moves aggregate recall by roughly 1/N of a surface's
 titles, so **a single-title delta is noise, not evidence.** The report states
 per-image counts, not only aggregates, and any conclusion drawn from a
@@ -1157,10 +1193,13 @@ change", which is a result worth recording and not a wasted run.** A change of
 reader additionally requires an ADR-0001 revision; the model is named there,
 in this section, in §10's cost model and in `.env.example`.
 
-**Cost and safety of running it.** 12 images × 3 runs × 2 arms = **72 vision
-calls**, ≈ **$0.68** at §10's per-image figure. This is manual-only and never
+**Cost and safety of running it.** 11 images × 3 runs × 2 arms = **66 vision
+calls**, ≈ **$0.62** at §10's per-image figure. This is manual-only and never
 runs in CI — `T-CI-007` forbids egress from the test run, and these are real
 calls carrying real screenshots.
+
+~~12 images … 72 vision calls, ≈ $0.68~~ *(superseded at TASK-011: the
+`dark-mode-01` slot was deleted as a non-existent variant.)*
 
 
 ---

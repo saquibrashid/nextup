@@ -24,7 +24,7 @@
  * WHAT THIS MODULE DOES NOT DO. It does not run the bake-off, score anything,
  * or read a recording. It decides, given two already-computed metric sets,
  * which reader the product should use. Producing those metric sets needs the
- * 12-image corpus (TASK-078) and the scorer (TASK-079), neither of which
+ * 11-image corpus (TASK-078) and the scorer (TASK-079), neither of which
  * exists yet — see the deferred claims in `packages/domain/test/bakeoff.spec.ts`.
  *
  * ⚠ THAT PATH IS LOAD-BEARING AND WAS CORRECTED IN PLACE (`A48`). This comment
@@ -38,15 +38,22 @@
  */
 
 /**
- * The corpus is 12 images (§9.1, §9.7 Stage 4). Recorded so a run against a
+ * The corpus is 11 images (§9.1, §9.7 Stage 4). Recorded so a run against a
  * different corpus size is visible in the report rather than silent.
+ *
+ * ⚠ Was 12 until TASK-011 measured the capture surfaces
+ * (`docs/evaluation/capture-surfaces.md`, 2026-09-08) and deleted the
+ * `dark-mode-01` slot: neither service offers a light mode on either surface,
+ * so that fixture was a duplicate of the corpus rather than a variant of it.
+ * Leaving this at 12 would make every subsequent bake-off report a permanent
+ * false "off-corpus" warning, which is how a real one stops being read.
  */
-export const BAKEOFF_CORPUS_IMAGES = 12;
+export const BAKEOFF_CORPUS_IMAGES = 11;
 
 /**
  * A metric difference worth fewer than this many titles is NOT evidence.
  *
- * ⚠ §9.7 Stage 4. On a 12-image corpus one title found or missed moves
+ * ⚠ §9.7 Stage 4. On an 11-image corpus one title found or missed moves
  * aggregate recall by roughly 1/N of a surface's titles, so a single-title
  * delta is indistinguishable from run-to-run noise. Reporting it as a win is
  * how a model gets adopted on the strength of one lucky tile.
