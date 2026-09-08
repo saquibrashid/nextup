@@ -84,6 +84,35 @@ export const TMDB_METADATA_MAX_AGE_DAYS = 183;
  */
 export const IMDB_RATING_MAX_AGE_DAYS = 14;
 
+/**
+ * How stale a `WatchIntent`'s cached watch-provider availability may be before
+ * the next *open of the waiting view* refreshes it lazily (REQ-086, ADR-0010
+ * D-3, `specs/data-model.md` §17.3). Seven days.
+ *
+ * ⚠ **FOURTH MEMBER OF THE NEVER-UNIFY FAMILY.** {@link IMAGE_RETENTION_DAYS},
+ * {@link TMDB_METADATA_MAX_AGE_DAYS}, {@link IMDB_RATING_MAX_AGE_DAYS} and
+ * this constant are four separate declarations with four separate call sites,
+ * permanently. `T-INV-008` asserts it and `T-AVAIL-008` names this one.
+ *
+ * ⚠ **THE SPECS SAY "THIRD"; THAT IS SPEC DRIFT, NOT AN INSTRUCTION TO MERGE.**
+ * `data-model.md` §17.3, ADR-0010 Trap 5 and `testing.md` §38.2 were written
+ * before `IMDB_RATING_MAX_AGE_DAYS` existed (Epic M landed in between), so
+ * they count two existing constants where there are now three. The *rule* they
+ * state — declare it independently, share no call site — is unchanged and is
+ * what `DAY_CONSTANTS` in `config.spec.ts` enforces n-arily. Do not "correct"
+ * the count by unifying anything.
+ *
+ * ⚠ **BINDING THIS TO THE 183-DAY METADATA AGE WOULD MAKE EPIC L INERT.**
+ * Availability is the fast-moving signal the whole epic exists to catch: a
+ * work becomes streamable months before its descriptive metadata changes at
+ * all. Seven days is short because the cost is bounded by the size of the
+ * waiting list and paid only when the owner actually opens the view.
+ *
+ * ⚠ "Stale" is overloaded a THIRD time. This is availability staleness. It is
+ * not `metadataStale` (TMDB, 183 days) and not rating staleness (14 days).
+ */
+export const WATCH_PROVIDER_MAX_AGE_DAYS = 7;
+
 // ── The pre-decode pixel budget (`specs/api.md` §5.0.2, REQ-079) ────────────
 
 /**

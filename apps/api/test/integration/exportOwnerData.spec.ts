@@ -102,11 +102,17 @@ describe('T-EXPORT-001 — every owner row reaches the artefact', () => {
     // above is satisfied by an export of nothing compared against a model list
     // of nothing — both sides derive from the same source, so a DMMF that
     // failed to load would agree with itself.
-    expect(expected.length).toBe(11);
+    expect(expected.length).toBe(12);
     expect(expected).toContain('upload_batch');
     expect(expected).toContain('suppression');
     expect(expected).toContain('removal_decision');
     expect(expected).toContain('service_state');
+    // ⚠ Bumped 11 → 12 by TASK-184. `watch_intent` needed NO change to the
+    // export script — it is derived from the DMMF, which is the whole claim of
+    // `T-EXPORT-001b` — so this pin firing was the only signal that a new model
+    // had appeared at all. That is what it is for: a count nobody is forced to
+    // update is a count that stops meaning anything.
+    expect(expected).toContain('watch_intent');
   });
 
   it('T-EXPORT-001b: a table added to the schema is exported without touching the script', async () => {

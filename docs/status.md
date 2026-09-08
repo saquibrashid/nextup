@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 10 |
+| ⬜ todo | 8 |
 | 🚧 doing | 3 |
-| ✅ done | 172 |
+| ✅ done | 174 |
 | 🙋 owner | 2 |
 | 💤 deferred | 0 |
 | **total** | **187** |
@@ -26,8 +26,7 @@ Not done, and every task they depend on is done.
 |---|---|---|
 | `TASK-057` | M | Epic C — Extraction |
 | `TASK-126` | M | Epic K — Platform, safety, and the shell |
-| `TASK-183` | S | Epic L — Waiting to stream (rental-release discovery) |
-| `TASK-184` | M | Epic L — Waiting to stream (rental-release discovery) |
+| `TASK-185` | M | Epic L — Waiting to stream (rental-release discovery) |
 
 ## Waiting on the owner
 
@@ -38,7 +37,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-9 tasks cannot start yet.
+8 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -46,9 +45,8 @@ Not done, and every task they depend on is done.
 | `TASK-079` | `TASK-078` |
 | `TASK-079b` | `TASK-079` |
 | `TASK-168` | `TASK-079` |
-| `TASK-185` | `TASK-183`, `TASK-184` |
 | `TASK-186` | `TASK-185` |
-| `TASK-187` | `TASK-184`, `TASK-186` |
+| `TASK-187` | `TASK-186` |
 | `TASK-188` | `TASK-187` |
 | `TASK-189` | `TASK-186`, `TASK-188` |
 
@@ -228,3 +226,5 @@ Not done, and every task they depend on is done.
 | `TASK-180` | `T-CSS-001`, `T-CSS-005` | `T-CSS-001`, `T-CSS-005` |
 | `TASK-181` | `T-BOUND-001` (a–f). Found as a field defect three times over and each time written off as a bad test stub: a 200 of the wrong SHAPE throws mid-render, React unmounts the tree, and the owner gets a white page. ⚠ **Every existing sweep stayed green on it** — `role="main"` exists for the instant before the throw propagates — so `T-A11Y-001c` and `expectStyledAndRendered` could not have been strengthened into this. Three mutations, each killed by the intended case and no other: dropping `resetKey` killed `d` **alone** (the latch — React never clears boundary state, so the apology would render over a route that is fine); inverting the render guard killed `f` (the discriminator; `a`–`e` all pass against a boundary that apologises unconditionally, which would replace all ten routes); removing the wrapper from `AppShell` killed `a` + `c` + `d`. ⚠ The boundary wraps the `<Outlet />`, not the root: a root boundary takes the nav down with the crashed screen and strands the owner on the one page that does not work. | `T-A11Y-001c`, `T-BOUND-001` |
 | `TASK-182` | Closes the §22a finding: `extraction_candidate.resolved_title_id` was declared, indexed, foreign-keyed and detached-on-discard for the whole of the project **while nothing ever wrote it**. `batchClose` now accumulates `{candidateId, titleId}` through the additions loop and flushes once after it, **inside `runInTransaction`** — the FK is real, so a link cannot precede its title or be committed apart from it. `T-PROV-015` (8 no-store cases, mutation-tested: deleting the flush, linking only the created branch, writing only the first link, and recording above the suppression gate are each killed by their named case; a comment-only control survives) and `T-PROV-014` (7 integration cases). ⚠ **The first draft grouped the flush by title, and CI proved that branch UNREACHABLE**: two applied candidates for one work need two listings on one service, which `listing_one_per_service` refuses — SD-02 collapses them at review so it never reaches close. The multi-candidate case 500'd against the real engine while passing against the fake, which has no unique index. Replaced with one statement per candidate: identical statement count, and the untestable branch is gone. ⚠ **BOTH BRANCHES ARE LINKED** — attaching to a pre-existing title is as much "which title did this read become" as creating one; `T-PROV-014b`/`015b` are the cases a creations-only implementation fails. ⚠ **SD-02-collapsed losers are deliberately `NULL`**: absent from `applicable` by construction, and `collapsedIntoCandidateId` already names the survivor, which now names the title. ⚠ **`T-PROV-015d` had to use the review/close RACE lever** — an ordinary suppression drops the candidate before the loop, so it never reaches the in-transaction gate and the mutation that records above that gate SURVIVED the first version of the test. The same correction was applied to `T-PROV-014d`. ⚠ **A pre-existing fake defect surfaced here**: the unit twin's `createTitle` mock read `data['titleId']` where the repository is passed `data['id']`, so every created title had been recorded with an `undefined` id and identity since the file was written; nothing had ever read one back. ⚠ **TASK-112's detach of this column in `undoDiscard.ts` was a no-op until now** and is load-bearing from here on. The TASK-113 detector was **not** reverted to a join on the column — a set comparison tests the same fact and rewriting working, mutation-tested logic to use a newly available column buys nothing. | `T-PROV-014`, `T-PROV-015` |
+| `TASK-183` | Epic L wave 1. `packages/domain/src/batchSource.ts` holds the rules; `apps/api/src/routes/batches.ts` refuses discovery `full-update` at the boundary. `T-WAIT-001a`–`d` in `apps/api/test/unit/discoveryBatchSource.spec.ts`; `c` forges five request bodies a UI-only guard would pass. `SERVICES` is unchanged. `specs/testing.md` §9 gained US-040 AC-1/AC-6 and `KNOWN_UNMAPPED` lost them. ⚠ The error envelope's `details.field` stays `'service'` — `source` is accepted as an alias, but `T-BATCH-010i`/`j` pin the field name and renaming it would be unrequested contract churn. | `T-WAIT-001`, `T-WAIT-001c` |
+| `TASK-184` | Epic L wave 1. Migration **`0006_watch_intent`** — ⚠ **not `0005`**, which `0005_removal_decision` (TASK-085) took after Epic L was specified; migrations apply in filename order. `upload_batch.service` is **relaxed to NULL** and `discovery_source` added, with `ck_batch_source_exclusive` enforcing exactly one origin. ⚠ **`ck_batch_service` is NOT dropped and does not need to be** — a SQL Server CHECK rejects only what it evaluates FALSE, and `NULL IN ('netflix','max')` is UNKNOWN, so `T-MIG-001` is satisfied without touching it. `requireServiceOf()` **throws** on a discovery batch, which is what forced the compiler to name every service-scoped path. ⚠ **`WATCH_PROVIDER_MAX_AGE_DAYS = 7` is the FOURTH age constant, not the third** — Epic M's `IMDB_RATING_MAX_AGE_DAYS = 14` landed after ADR-0010 was written, so `data-model.md` §17.3, ADR-0010 Trap 5, PRD US-042 AC-8 and `specs/testing.md` §38.2 all said "third"; the last two are corrected in place, the rule itself is unchanged, and **nothing may be merged to make the count come out at three**. `T-WAIT-011` (a–d) and `T-AVAIL-008` pass. | `T-AVAIL-008`, `T-INV-008`, `T-MIG-001`, `T-WAIT-011` |

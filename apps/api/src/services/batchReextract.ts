@@ -55,7 +55,8 @@ export interface ReextractResult {
   batchId: string;
   derivedFromBatchId: string;
   status: 'submitted';
-  service: string;
+  service: string | null;
+  discoverySource: string | null;
   mode: string;
   imageCount: number;
 }
@@ -126,7 +127,14 @@ export async function reextractBatch(
     // re-read of the same pixels cannot honestly be attributed to a different
     // service, and re-asking would let the owner point a `full-update`
     // reconciliation at bytes captured as `append-only`.
+    //
+    // ⚠ The SOURCE is inherited whole, discovery or not (ADR-0010 D-1). A
+    // re-extraction of a discovery capture is still a discovery capture, and
+    // dropping `discoverySource` here would silently promote it to a service
+    // batch with no service — which `ck_batch_source_exclusive` would then
+    // reject at the store, correctly but obscurely.
     service: source.service,
+    discoverySource: source.discoverySource,
     mode: source.mode,
     derivedFromBatchId: source.id,
     // Straight to `submitted`: there is nothing to attach, so a `draft` state
@@ -166,6 +174,7 @@ export async function reextractBatch(
     derivedFromBatchId: source.id,
     status: 'submitted',
     service: source.service,
+    discoverySource: source.discoverySource,
     mode: source.mode,
     imageCount: images.length,
   };

@@ -54,7 +54,7 @@ import { tmdbUnavailableAppError } from './tmdb.js';
 async function requireReviewableBatch(
   ownerId: ReturnType<typeof requireOwnerId>,
   batchId: string,
-): Promise<{ id: string; service: string; status: string }> {
+): Promise<{ id: string; service: string | null; discoverySource: string | null; status: string }> {
   const batch = await findUploadBatch(ownerId, batchId);
   if (batch === null) {
     throw new AppError('NOT_FOUND', 404, 'No such batch.');

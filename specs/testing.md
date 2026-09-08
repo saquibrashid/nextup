@@ -1212,6 +1212,21 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 | AC-5 | M/§10 | — | Extraction cost assessment: a first-sprint verification task (`TASK-010`, architecture §Handover 7) |
 | AC-6 | S | `T-META-003` | Any decision claimed as verifiable resolves to a test id present in this file; unverifiable ones must appear in §10 |
 
+### US-040 — Capture a rental storefront's new-release page
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | `T-WAIT-001` | A batch whose source is a discovery source is forced to **append-only**, and an explicit `full-update` for that source is refused with an explanatory error (`a`, `b`). `apps/api/test/unit/discoveryBatchSource.spec.ts` |
+| AC-6 | U | `T-WAIT-001` | The refusal is at the **API boundary** and is decided by the **source type**, never by a client-supplied flag — `c` forges five request bodies that a UI-only guard would let through (`d` pins that a discovery source is never a member of `SERVICES`) |
+
+*(The remaining US-040 criteria are landed by `TASK-185`; until their tests exist they remain declared in `KNOWN_UNMAPPED`.)*
+
+### US-042 — Tell me when a waiting title reaches a service I have
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-8 | U | `T-AVAIL-008` | `WATCH_PROVIDER_MAX_AGE_DAYS` is declared independently in `apps/api/src/config.ts`, sharing **no call site** with `TMDB_METADATA_MAX_AGE_DAYS`, `IMAGE_RETENTION_DAYS` or `IMDB_RATING_MAX_AGE_DAYS`, and is shorter than the metadata age. ⚠ **The `T-INV-008` rule is extended to FOUR constants, not three** — see the correction at §38.2 |
+
+*(The remaining US-042 criteria are landed by `TASK-187`/`TASK-188`.)*
+
 ### US-044 — See the IMDb rating on my list
 | AC | L | Test | Assertion |
 |---|---|---|---|
@@ -4314,7 +4329,7 @@ actually runs.**
 | **`T-AVAIL-005`** | U | `TASK-187` | A work offered only to **rent or buy**, with no `flatrate` offer, stays waiting and is **not** flagged. ⚠ Inverting this inverts the feature: rent-availability is what the owner is waiting to escape (US-042 AC-5). |
 | **`T-AVAIL-006`** | U | `TASK-188` | Absent provider data renders *"not seen on your services as of &lt;date&gt;"*, never *"not streaming anywhere"* — a claim the data cannot support (US-042 AC-6, ADR-0010 Trap 4). |
 | **`T-AVAIL-007`** | I | `TASK-188` | TMDB unreachable: the view renders from last-known availability with its as-of date plus an unobtrusive failure note. Never blank, never an error page (US-042 AC-7). |
-| **`T-AVAIL-008`** | U | `TASK-184` | `WATCH_PROVIDER_MAX_AGE_DAYS` is a **third independent constant**, sharing no call site with `TMDB_METADATA_MAX_AGE_DAYS` or `IMAGE_RETENTION_DAYS`. **`T-INV-008` is extended from two constants to three** (US-042 AC-8, ADR-0010 Trap 5). |
+| **`T-AVAIL-008`** | U | `TASK-184` | `WATCH_PROVIDER_MAX_AGE_DAYS` is a **fourth independent constant**, sharing no call site with `TMDB_METADATA_MAX_AGE_DAYS`, `IMAGE_RETENTION_DAYS` or `IMDB_RATING_MAX_AGE_DAYS`. **`T-INV-008` is extended from three constants to four** (US-042 AC-8, ADR-0010 Trap 5). ~~"a **third independent constant** … extended from two constants to three"~~ *(Superseded, and corrected in place because this row is an instruction a builder executes: Epic M landed `IMDB_RATING_MAX_AGE_DAYS = 14` after ADR-0010 was written, so the count was already stale when Epic L started. **The RULE is unchanged and is the point** — each age constant is declared separately and shares no call site. ⚠ Nothing may be merged to make the count come out at three; `apps/api/test/unit/config.spec.ts` holds an n-ary `DAY_CONSTANTS` registry precisely so that adding one is a one-line change rather than a re-count. The same drift is present in `docs/PRD.md` US-042 AC-8 and `specs/data-model.md` §17.3.)* |
 | **`T-AVAIL-009`** | E | `TASK-188` | Every surface rendering availability carries the **JustWatch** attribution (US-042 AC-9, REQ-087). |
 | **`T-AVAIL-010`** | U | `TASK-187` | `availabilityRegion` is **`US`** (`ASM-059`, owner-confirmed at `A49`) and is stored on the row and passed explicitly, never defaulted or hard-coded at the call site. |
 

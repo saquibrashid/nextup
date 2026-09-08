@@ -60,6 +60,14 @@ export const ERROR_CODES = [
   'GROUP_ALREADY_REVERSED',
   'PARTIAL_FAILURE_PREVENTED',
 
+  // ── Discovery sources (Epic L, ADR-0010) ─────────────────────────────────
+  // ⚠ Refused BY SOURCE TYPE at the API boundary, never merely hidden in the
+  // UI (D-2, US-040 AC-6). A rotating editorial feed reconciled as a full
+  // update proposes the owner's entire waiting list for removal on the second
+  // capture, every time — so a caller crafting the request directly must be
+  // refused just as firmly as the SPA. `T-WAIT-001b`/`c`.
+  'FULL_UPDATE_NOT_AVAILABLE_FOR_SOURCE',
+
   // ── Upstream ─────────────────────────────────────────────────────────────
   'TMDB_WORK_NOT_FOUND',
   'TMDB_UNAVAILABLE',

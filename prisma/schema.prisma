@@ -35,9 +35,19 @@ model UploadBatch {
   id      String @id @db.NVarChar(200)
   ownerId String @map("owner_id") @db.NVarChar(200)
 
-  mode    String @db.NVarChar(16)
-  service String @db.NVarChar(16)
-  status  String @db.NVarChar(24)
+  mode    String  @db.NVarChar(16)
+  /// ⚠ NULL iff this is a discovery batch — `discoverySource` is set instead
+  /// (ADR-0010 D-1, migration `0006_watch_intent`). Exactly one of the two is
+  /// non-null (`ck_batch_source_exclusive`).
+  ///
+  /// ⚠ A discovery batch has NO truthful service and must never borrow one:
+  /// the combined list, the REQ-025 badge count and full-update reconciliation
+  /// all filter on this column. Use `requireServiceOf` from `@nextup/domain`.
+  service String? @db.NVarChar(16)
+  /// The rental storefront browsed, e.g. `fandango-at-home`.
+  /// ⚠ NOT a `SERVICES` member and never to be widened into one.
+  discoverySource String? @map("discovery_source") @db.NVarChar(64)
+  status  String  @db.NVarChar(24)
 
   /// US-034 AC-3 — set for re-extraction batches. Self-referential.
   derivedFromBatchId String?       @map("derived_from_batch_id") @db.NVarChar(200)
@@ -76,6 +86,7 @@ model UploadBatch {
   images          UploadedImage[]
   candidates      ExtractionCandidate[]
   serviceStates   ServiceState[]
+  watchIntents    WatchIntent[]
 
   @@index([ownerId, service, status], map: "upload_batch_owner_service_status")
   @@index([derivedFromBatchId], map: "upload_batch_derived_from")
@@ -148,6 +159,7 @@ model Title {
   listings   ServiceListing[]
   changes    BatchChange[]
   candidates ExtractionCandidate[]
+  watchIntents WatchIntent[]
 
   @@index([ownerId, state, sortDateAdded], map: "title_owner_state_sortdate")
   /// TASK-047, `specs/data-model.md` §16.6. Matches the list ORDER BY exactly:
@@ -157,6 +169,61 @@ model Title {
   @@index([ownerId, state, sortDateAdded(sort: Desc), id(sort: Asc)], map: "title_list_default")
   @@index([createdByBatchId], map: "title_created_by_batch")
   @@map("title")
+}
+
+/// *"The owner wants this work and it is not on a service they have."*
+/// `specs/data-model.md` §17.1, ADR-0010, migration `0006_watch_intent`.
+///
+/// ⚠ THIS IS NOT A `ServiceListing`, AND REUSING ONE IS ADR-0010 TRAP 3. A
+/// listing asserts "this work is on this service's saved list, added on this
+/// date"; an intent asserts the opposite. Overloading the entity would put
+/// waiting rows into the combined list's own query path and make the REQ-025
+/// badge count start counting things that are not badges.
+///
+/// ⚠ NOTHING HERE IS EVER HARD-DELETED (§17.4, REQ-028). A satisfied or
+/// suppressed intent is retained forever; there is no TTL and no scheduled
+/// deletion.
+model WatchIntent {
+  id      String @id(map: "pk_watch_intent") @db.NVarChar(200)
+  ownerId String @map("owner_id") @db.NVarChar(200)
+
+  titleId String @map("title_id") @db.NVarChar(200)
+  title   Title  @relation(fields: [titleId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_intent_title")
+
+  /// Denormalised for the suppression join, exactly as elsewhere (REQ-071).
+  workIdentity String @map("work_identity") @db.NVarChar(200)
+
+  /// ⚠ A DISCOVERY date, NOT a date-added. It must never feed the REQ-038
+  /// title-level date sort, which is defined over `ServiceListing.dateAdded`
+  /// (`T-WAIT-011`).
+  discoveredAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_intent_discovered") @map("discovered_at") @db.DateTime2
+
+  sourceBatchId String      @map("source_batch_id") @db.NVarChar(200)
+  sourceBatch   UploadBatch @relation(fields: [sourceBatchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_intent_batch")
+
+  /// ⚠ NOT a `SERVICES` member (ADR-0010 D-1).
+  discoverySource String @map("discovery_source") @db.NVarChar(64)
+
+  /// `waiting` | `satisfied` | `suppressed`. Soft only.
+  state       String    @db.NVarChar(16)
+  satisfiedAt DateTime? @map("satisfied_at") @db.DateTime2
+
+  /// NULL = never checked. Drives the lazy refresh (REQ-086).
+  availabilityCheckedAt DateTime? @map("availability_checked_at") @db.DateTime2
+
+  /// JSON array of providers reported `flatrate` for `availabilityRegion`.
+  /// ⚠ NULL ≠ "not streaming anywhere" — it means NOT KNOWN (ADR-0010 Trap 4).
+  availableOn String? @map("available_on") @db.NVarChar(Max)
+
+  /// ⚠ Explicit, never implicit (`T-AVAIL-010`, ASM-059, `A49`).
+  availabilityRegion String @default("US", map: "df_intent_region") @map("availability_region") @db.NVarChar(8)
+
+  /// ⚠ FILTERED to `state = 'waiting'`, so a historical satisfied row and a
+  /// later re-discovery of the same work both remain possible. The filter is
+  /// applied by raw SQL in the migration; Prisma cannot express it, so this
+  /// index is declared there and deliberately NOT mirrored here.
+  @@index([ownerId, state, availabilityCheckedAt], map: "ix_intent_owner_state_checked")
+  @@map("watch_intent")
 }
 
 /// A work's presence on ONE service. Soft-deleted forever — REQ-028.

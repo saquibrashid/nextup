@@ -11,6 +11,55 @@ export type Service = (typeof SERVICES)[number];
 export const BATCH_MODES = ['append-only', 'full-update'] as const; // REQ-003
 export type BatchMode = (typeof BATCH_MODES)[number];
 
+/**
+ * Rental storefronts the owner browses for newly-released titles (ADR-0010,
+ * REQ-082). A discovery source is a place to LOOK, never a place the owner
+ * has a saved list.
+ *
+ * ⚠ **THIS IS NOT A `SERVICES` MEMBER AND MUST NEVER BECOME ONE** (ADR-0010
+ * D-1). `SERVICES` means "a subscription service whose saved list the owner
+ * captures", and its members stay `['netflix','max']` so that `listings`
+ * remains capped at `SERVICES.length` and the REQ-025 badge count keeps
+ * counting badges. Five assumptions of the service model are false of an
+ * editorial feed — see the table in ADR-0010 §Context.
+ *
+ * ⚠ `BRD.md` §6.2 lists "Fandango at Home" among the v2 non-spine SERVICES.
+ * That is REQ-048 and it is the OPPOSITE treatment of the same brand name
+ * (ADR-0010 Trap 1). Reaching for the REQ-048 pattern here produces a
+ * "service" whose saved list is an editorial feed, and the first full-update
+ * capture proposes deleting the owner's entire waiting list.
+ */
+export const DISCOVERY_SOURCES = ['fandango-at-home'] as const; // REQ-082
+export type DiscoverySource = (typeof DISCOVERY_SOURCES)[number];
+
+/**
+ * Everywhere a batch's origin is named at the API boundary. The union exists
+ * so ONE validator accepts both kinds; it is deliberately NOT an enum of its
+ * own that either side could drift from.
+ */
+export const BATCH_SOURCES = [...SERVICES, ...DISCOVERY_SOURCES] as const;
+export type BatchSource = (typeof BATCH_SOURCES)[number];
+
+/** Narrows a validated batch source to a discovery source (ADR-0010 D-2). */
+export function isDiscoverySource(source: BatchSource): source is DiscoverySource {
+  return (DISCOVERY_SOURCES as readonly string[]).includes(source);
+}
+
+/**
+ * `WatchIntent.state` — `specs/data-model.md` §17.1.
+ *
+ * ⚠ SOFT ONLY. REQ-028 applies unchanged: a satisfied or suppressed intent is
+ * retained forever. There is no TTL and no scheduled deletion (§17.4), and
+ * `T-INV-012` must still show exactly one sanctioned hard delete after Epic L
+ * ships.
+ *
+ * ⚠ `TITLE_STATES` does NOT gain a `waiting` member for the same reason
+ * `'suppressed'` is absent from it: the waiting set is a different relation,
+ * not a state of a combined-list row (§17.2).
+ */
+export const WATCH_INTENT_STATES = ['waiting', 'satisfied', 'suppressed'] as const;
+export type WatchIntentState = (typeof WATCH_INTENT_STATES)[number];
+
 export const BATCH_STATUSES = [
   'draft', // created, images being attached; nothing extracted
   'submitted', // owner pressed submit; extraction queued in-process

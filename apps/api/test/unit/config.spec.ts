@@ -8,6 +8,7 @@ import {
   IMAGE_RETENTION_DAYS,
   IMDB_RATING_MAX_AGE_DAYS,
   TMDB_METADATA_MAX_AGE_DAYS,
+  WATCH_PROVIDER_MAX_AGE_DAYS,
 } from '../../src/config.js';
 
 // TASK-014 · US-035 AC-7. A static test, because the property being defended
@@ -16,10 +17,17 @@ import {
 // number aliased to another.
 //
 // ⚠ The family grew from two to three when ADR-0011 added
-// `IMDB_RATING_MAX_AGE_DAYS`. The name "the two 30-ish-day constants" is kept
-// for `T-INV-008`'s id stability, but the rule is now n-ary: EVERY pair must
-// stay independent, and a fourth member must extend `DAY_CONSTANTS` below
-// rather than be exempted from it.
+// `IMDB_RATING_MAX_AGE_DAYS`, and from three to FOUR when Epic L (ADR-0010)
+// added `WATCH_PROVIDER_MAX_AGE_DAYS`. The name "the two 30-ish-day constants"
+// is kept for `T-INV-008`'s id stability, but the rule is now n-ary: EVERY
+// pair must stay independent, and a new member must extend `DAY_CONSTANTS`
+// below rather than be exempted from it.
+//
+// ⚠ `data-model.md` §17.3, ADR-0010 Trap 5 and `testing.md` §38.2 all call
+// `WATCH_PROVIDER_MAX_AGE_DAYS` the "third" such constant. They were written
+// before Epic M landed `IMDB_RATING_MAX_AGE_DAYS`, so the ordinal is stale —
+// the RULE they state is not. Registering it here is the whole of what they
+// ask for; nothing is to be merged to make the count come out at three.
 
 const CONFIG_PATH = fileURLToPath(new URL('../../src/config.ts', import.meta.url));
 const source = readFileSync(CONFIG_PATH, 'utf8');
@@ -34,6 +42,7 @@ const DAY_CONSTANTS: ReadonlyArray<readonly [name: string, value: number]> = [
   ['IMAGE_RETENTION_DAYS', 30],
   ['TMDB_METADATA_MAX_AGE_DAYS', 183],
   ['IMDB_RATING_MAX_AGE_DAYS', 14],
+  ['WATCH_PROVIDER_MAX_AGE_DAYS', 7],
 ];
 
 describe('T-INV-008 the 30-ish-day constants stay separate', () => {
@@ -41,6 +50,7 @@ describe('T-INV-008 the 30-ish-day constants stay separate', () => {
     expect(IMAGE_RETENTION_DAYS).toBe(30);
     expect(TMDB_METADATA_MAX_AGE_DAYS).toBe(183);
     expect(IMDB_RATING_MAX_AGE_DAYS).toBe(14);
+    expect(WATCH_PROVIDER_MAX_AGE_DAYS).toBe(7);
   });
 
   it('T-INV-008b: each is its own literal declaration, not derived from any other', () => {
@@ -85,6 +95,31 @@ describe('T-INV-008 the 30-ish-day constants stay separate', () => {
         present.length,
         `${file} references ${present.join(' and ')}; these policies must never share a call site (US-035 AC-7)`,
       ).toBeLessThan(2);
+    }
+  });
+});
+
+// TASK-184 · US-042 AC-8 · ADR-0010 Trap 5.
+//
+// `T-INV-008` already forces the whole family apart n-arily, so this could look
+// redundant. It is not: `T-AVAIL-008` is the id Epic L is MEASURED by, and it
+// names the specific confusion that would make the feature inert rather than
+// merely untidy. If someone ever narrows `DAY_CONSTANTS`, this still fails.
+describe('T-AVAIL-008 availability age is independent of metadata age', () => {
+  it('T-AVAIL-008: WATCH_PROVIDER_MAX_AGE_DAYS is separately declared and not 183', () => {
+    expect(source).toMatch(/^export const WATCH_PROVIDER_MAX_AGE_DAYS = 7;$/m);
+
+    // ⚠ Inverting THIS is what makes Epic L inert. Availability is the
+    // fast-moving signal the epic exists to catch; a work becomes streamable
+    // months before its descriptive metadata changes at all. Bound to 183 days
+    // the waiting view would essentially never refresh.
+    expect(WATCH_PROVIDER_MAX_AGE_DAYS).not.toBe(TMDB_METADATA_MAX_AGE_DAYS);
+    expect(WATCH_PROVIDER_MAX_AGE_DAYS).toBeLessThan(TMDB_METADATA_MAX_AGE_DAYS);
+
+    // Not derived from any sibling, in either direction.
+    for (const [name] of DAY_CONSTANTS) {
+      if (name === 'WATCH_PROVIDER_MAX_AGE_DAYS') continue;
+      expect(source).not.toMatch(new RegExp(`WATCH_PROVIDER_MAX_AGE_DAYS\\s*=\\s*[^;]*${name}`));
     }
   });
 });

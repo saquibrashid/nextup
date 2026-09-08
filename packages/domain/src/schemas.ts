@@ -19,6 +19,7 @@ import {
   CANDIDATE_PROVIDERS,
   CLEANUP_VERDICTS,
   CROSS_CHECK_OUTCOMES,
+  DISCOVERY_SOURCES,
   EXTRACTION_ERROR_CODES,
   IMAGE_FORMATS,
   INGEST_SOURCES,
@@ -290,7 +291,11 @@ export const uploadBatchSchema = z
     id: idSchema,
     type: z.literal('uploadBatch'),
     ownerId: idSchema,
-    service: serviceSchema,
+    // ⚠ Exactly one of these is non-null (ADR-0010 D-1). A discovery batch has
+    // no truthful service; the `.refine` below is what stops a payload
+    // asserting both or neither.
+    service: serviceSchema.nullable(),
+    discoverySource: z.enum(DISCOVERY_SOURCES).nullable(),
     mode: batchModeSchema,
     status: batchStatusSchema,
     derivedFromBatchId: idSchema.nullable(),
@@ -315,6 +320,21 @@ export const uploadBatchSchema = z
   .refine((b) => (b.status === 'applied') === (b.completedAt !== null), {
     message: "completedAt is set if and only if status is 'applied'",
     path: ['completedAt'],
+  })
+  // Exactly one origin — mirrors `ck_batch_source_exclusive`. Neither set is a
+  // batch with no provenance; both set is a batch that is simultaneously a
+  // curated saved list and an editorial feed.
+  .refine((b) => (b.service === null) !== (b.discoverySource === null), {
+    message: 'exactly one of service and discoverySource must be set',
+    path: ['discoverySource'],
+  })
+  // ⚠ ADR-0010 D-2, mirroring `ck_batch_discovery_append_only`. The API
+  // boundary refuses this (`T-WAIT-001`); this is the parser refusing to
+  // REPRESENT it, so a stored row that somehow acquired the shape cannot be
+  // read back into the domain and acted on.
+  .refine((b) => b.discoverySource === null || b.mode === 'append-only', {
+    message: 'a discovery batch is always append-only',
+    path: ['mode'],
   }) satisfies z.ZodType<UploadBatch>;
 
 // ── Images ─────────────────────────────────────────────────────────────────

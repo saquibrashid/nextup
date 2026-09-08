@@ -32,6 +32,8 @@ import type {
   Service,
   TitleState,
   UploadFormat,
+  DiscoverySource,
+  WatchIntentState,
 } from './enums.js';
 
 /** ISO-8601 UTC instant, e.g. `2026-08-11T21:04:33.000Z`. */
@@ -153,9 +155,33 @@ export interface UploadBatch {
   id: string;
   type: 'uploadBatch';
   ownerId: string;
-  /** IMMUTABLE after submit (US-003 AC-6). */
-  service: Service;
-  /** IMMUTABLE after submit (US-003 AC-6). */
+  /**
+   * IMMUTABLE after submit (US-003 AC-6).
+   *
+   * ⚠ `null` **iff** this is a discovery batch, in which case
+   * `discoverySource` is set instead (ADR-0010 D-1). Exactly one of the two is
+   * non-null, and the database enforces it (`ck_batch_source_exclusive`).
+   *
+   * ⚠ **A discovery batch has NO truthful service and must never borrow one.**
+   * Storing `'netflix'` on a Fandango capture would make it a member of every
+   * service-scoped query in the product — the combined list, the REQ-025 badge
+   * count and full-update reconciliation all filter on this column. Use
+   * {@link requireServiceOf} on paths that genuinely need a service, so the
+   * compiler names them rather than letting a discovery batch drift into one.
+   */
+  service: Service | null;
+  /**
+   * The rental storefront browsed, e.g. `fandango-at-home` (ADR-0010 D-1).
+   * `null` for an ordinary service batch. Never a `SERVICES` member.
+   */
+  discoverySource: DiscoverySource | null;
+  /**
+   * IMMUTABLE after submit (US-003 AC-6).
+   *
+   * ⚠ Always `'append-only'` when `discoverySource` is set — forced, and an
+   * explicit `full-update` is refused at the API boundary rather than hidden
+   * in the UI (ADR-0010 D-2, `T-WAIT-001`).
+   */
   mode: BatchMode;
   status: BatchStatus;
   /** Set for re-extraction batches (US-034 AC-3). */
@@ -393,6 +419,61 @@ export interface ServiceState {
   lastCompletedBatchId: string | null;
 }
 
+// ── Watch intent (Epic L, ADR-0010) ────────────────────────────────────────
+
+/**
+ * *"The owner wants this work and it is not on a service they have."*
+ * `specs/data-model.md` §17.1.
+ *
+ * ⚠ **THIS IS NOT A `ServiceListing`, AND REUSING ONE IS ADR-0010 TRAP 3.** A
+ * `ServiceListing` asserts *"this work is on this service's saved list, added
+ * on this date"*; a `WatchIntent` asserts the exact opposite. Overloading the
+ * entity would put waiting rows into the combined list's own query path and
+ * make the REQ-025 badge count start counting things that are not badges.
+ */
+export interface WatchIntent {
+  id: string;
+  type: 'watchIntent';
+  ownerId: string;
+  /** The matched canonical work. */
+  titleId: string;
+  /** Denormalised for the suppression join, exactly as elsewhere (REQ-071). */
+  workIdentity: string;
+  /**
+   * ⚠ A **discovery** date, NOT a date-added. It must NEVER feed the REQ-038
+   * title-level date sort, which is defined over `ServiceListing.dateAdded`
+   * (`T-WAIT-011` is the only thing standing between this field and a
+   * silently wrong list order).
+   */
+  discoveredAt: IsoDateTime;
+  /** Provenance, as for every other record. */
+  sourceBatchId: string;
+  /** The storefront browsed. ⚠ Never a `SERVICES` member (ADR-0010 D-1). */
+  discoverySource: DiscoverySource;
+  /** Soft only — §17.4. Nothing here is ever hard-deleted. */
+  state: WatchIntentState;
+  /** Set when the work enters the combined list by the ordinary capture path. */
+  satisfiedAt: IsoDateTime | null;
+  /** `null` = never checked. Drives the lazy refresh (REQ-086). */
+  availabilityCheckedAt: IsoDateTime | null;
+  /**
+   * Provider identifiers reported `flatrate` for {@link availabilityRegion}.
+   *
+   * ⚠ `null` ≠ "not streaming anywhere" — it means **not known** (ADR-0010
+   * Trap 4). Rendering the stronger sentence is a claim the data cannot
+   * support; `T-AVAIL-006` asserts the weaker one.
+   */
+  availableOn: readonly string[] | null;
+  /**
+   * ⚠ Explicit, never implicit. `US` (`ASM-059`, owner-confirmed at `A49`).
+   * Stored on the row and passed explicitly: a hard-coded `'US'` scattered
+   * through the availability path is unfindable the day it changes, and a
+   * stored value is the only way to tell an answer computed for one region
+   * from one computed for another (`T-AVAIL-010`).
+   */
+  availabilityRegion: string;
+}
+
 // ── The discriminated union ────────────────────────────────────────────────
 
 /**
@@ -401,6 +482,12 @@ export interface ServiceState {
  * point.
  */
 export type OwnerDocument =
-  Title | Suppression | UploadBatch | UploadedImage | ExtractionCandidate | ServiceState;
+  | Title
+  | Suppression
+  | UploadBatch
+  | UploadedImage
+  | ExtractionCandidate
+  | ServiceState
+  | WatchIntent;
 
 export type OwnerDocumentType = OwnerDocument['type'];
