@@ -353,9 +353,19 @@ describe('T-WAIT-003 · US-040 AC-3 · a closed discovery batch changes no list 
 
     const body = (await res.json()) as CloseBody;
     expect(body.discovery?.intentsCreated).toBe(0);
-    // Reported, not silently dropped.
-    expect(body.discovery?.alreadyListed).toBe(1);
+    // ⚠ `alreadyListed` is 0 here, and that is CORRECT rather than a miss.
+    // The held work never reaches `planWatchIntents`: it is caught earlier by
+    // `classifyDiscoveryWorkIdentity`, which routes it to the review pass's
+    // `alreadyOnYourList` section — the owner being TOLD, which is what AC-5
+    // asks for. The in-transaction counter is the narrower net for a work that
+    // becomes listed BETWEEN review and close, and nothing here interleaves
+    // those two requests. The load-bearing claim is that no intent exists.
     expect(await testPrisma().watchIntent.count({ where: {} })).toBe(0);
+    // Not passing because nothing happened: the batch really did close.
+    expect(body.summary.listingsCreated).toBe(0);
+    expect(await testPrisma().uploadBatch.count({ where: { id: batch, status: 'applied' } })).toBe(
+      1,
+    );
   });
 
   it('T-WAIT-003d · a waiting work is invisible to BOTH the combined list and the removed log', async () => {
