@@ -1177,7 +1177,7 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 | AC | L | Test | Assertion |
 |---|---|---|---|
 | AC-1 | S/I | `T-MUT-001` | Every mutating route maps to an entry in the REQ-041 enumeration, asserted from a committed list; a new mutating route fails until added |
-| AC-2 | S | **`T-CI-005`** | Exactly three non-owner processes exist: lazy TMDB refresh, the blob lifecycle rule, and the lazy IMDb rating refresh (Epic M). No timer/cron/worker. ~~Superseded (Epic M): "Exactly two non-owner processes exist: lazy TMDB refresh and the blob lifecycle rule."~~ |
+| AC-2 | S | **`T-CI-005`** | Exactly four non-owner processes exist: lazy TMDB refresh, the blob lifecycle rule, the lazy IMDb rating refresh (Epic M), and the lazy watch-availability refresh (Epic L). No timer/cron/worker. ~~Superseded (Epic L): "Exactly three non-owner processes exist: lazy TMDB refresh, the blob lifecycle rule, and the lazy IMDb rating refresh (Epic M)."~~ ~~Superseded (Epic M): "Exactly two non-owner processes exist: lazy TMDB refresh and the blob lifecycle rule."~~ |
 | AC-3 | S | `T-MUT-001` | An operation outside the enumeration cannot be registered |
 | AC-4 | I | `T-MUT-002` | No auto-confirm, auto-restore or auto-suppress path exists: `restoreListing`, `createTitle` and `suppress` have only their sanctioned call sites |
 | AC-5 | S | `T-CI-005` | No scheduled job, webhook, timer or background worker touches list state |
@@ -1237,15 +1237,20 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 ### US-042 — Tell me when a waiting title reaches a service I have
 | AC | L | Test | Assertion |
 |---|---|---|---|
+| AC-1 | I | `T-AVAIL-001`, `T-AVAIL-010` | An intent last checked longer ago than `WATCH_PROVIDER_MAX_AGE_DAYS` is refreshed when the waiting view is opened (`T-AVAIL-001a`), a never-checked one is refreshed (`T-AVAIL-001c`), and a satisfied intent is neither listed nor asked about (`T-AVAIL-001d`). ⚠ **`T-AVAIL-001b` is the discriminating case** — a recently-checked intent is **not** refreshed, without which every other row here passes against a build that re-asks TMDB on every render for ever. `T-AVAIL-010d` pins the staleness rule itself, including the trap that "asked, and nobody carries it" is a real answer and must not be re-asked like a never-checked one |
+| AC-2 | I + U | `T-AVAIL-002`, **`T-CI-005`** | **On access only.** `T-AVAIL-002a` exercises `/api/me`, `/api/titles`, `/api/removed` and `/api/suppressions` with a due-for-refresh intent in the store and asserts **zero** outbound provider lookups, then opens the waiting view and asserts exactly one — both halves, because the first alone is satisfied by a build with no refresh at all. `T-AVAIL-002b` bounds one render at `AVAILABILITY_REFRESH_PER_REQUEST` and proves the remainder catch up on the next render rather than sweeping. The **structural** half is `T-CI-005`: `g` pins the permitted non-owner processes at exactly **four** and names them, `h` proves no timer reaches any of the three lazy refreshes and that `refreshAvailability` is reached only from the waiting route |
+| AC-4 | I | `T-AVAIL-004` | **The invariant-5 assertion.** `T-AVAIL-004a` counts `Title`, `ServiceListing`, `Suppression` and `WatchIntent` rows before and after a refresh that reports the work available on a service the owner **has** — the strongest temptation for a build to "helpfully" graduate it — and asserts the counts are identical, the intent is still `waiting`, and its `titleId`, `workIdentity` and `discoveredAt` are untouched. `T-AVAIL-004b` compares the rendered combined list byte for byte across the refresh, because membership, ordering and badges are what invariant 5 actually protects |
+| AC-5 | U | `T-AVAIL-005` | **Flatrate only.** A `rent`/`buy`-only payload yields `[]` and flags nothing (`a`); a `flatrate` offer on an owner service is flagged (`b`); a JustWatch name qualifier — *"Netflix Standard with Ads"*, *"Max Amazon Channel"* — still matches (`c`); a subscription provider the owner does not have is recorded but not flagged (`d`); and NOT KNOWN (`null`) stays distinguishable from ASKED-AND-NOBODY (`[]`) end to end (`e`). ⚠ Inverting this inverts the feature: rent-availability is exactly what the owner is waiting to escape |
 | AC-8 | U | `T-AVAIL-008` | `WATCH_PROVIDER_MAX_AGE_DAYS` is declared independently in `apps/api/src/config.ts`, sharing **no call site** with `TMDB_METADATA_MAX_AGE_DAYS`, `IMAGE_RETENTION_DAYS` or `IMDB_RATING_MAX_AGE_DAYS`, and is shorter than the metadata age. ⚠ **The `T-INV-008` rule is extended to FOUR constants, not three** — see the correction at §38.2 |
+| AC-10 | U | `T-AVAIL-010` | The region is `US` (`T-AVAIL-010a`) and is **passed from the row**, not hard-coded: `T-AVAIL-010b` refreshes two intents whose stored regions differ and asserts each lookup carried its own region and each write recorded it. ⚠ That is the only assertion in the suite a hard-coded `'US'` fails, and the bug it catches is a cached answer that silently answers a different question than it claims. `T-AVAIL-010c` adds the companion rule — a **failed** lookup writes nothing, because writing `null` would erase a known-good answer and, under Trap 4's rendering rule, downgrade the row to "not known" |
 
-*(The remaining US-042 criteria are landed by `TASK-187`/`TASK-188`.)*
+*(US-042 AC-3, AC-6, AC-7 and AC-9 are the presentation criteria, landed by `TASK-188`.)*
 
 ### US-044 — See the IMDb rating on my list
 | AC | L | Test | Assertion |
 |---|---|---|---|
 | AC-1 | C | `T-IMDB-008` | `TitleRow` renders the rating to **one decimal place** and labels it `IMDb` — `8` renders as `8.0`, never as `8` |
-| AC-2 | S/I | `T-IMDB-007`, **`T-CI-005`** | The refresh is begun **by the read that serves the page** and never by a timer. `T-CI-005h` asserts both lazy refreshes are triggered by a READ; `T-CI-005g` pins the permitted non-owner processes at exactly three and names them. Without `T-CI-005` this row would be satisfied by a scheduler that happened to also run on access |
+| AC-2 | S/I | `T-IMDB-007`, **`T-CI-005`** | The refresh is begun **by the read that serves the page** and never by a timer. `T-CI-005h` asserts all three lazy refreshes are triggered by a READ; `T-CI-005g` pins the permitted non-owner processes at exactly four and names them. Without `T-CI-005` this row would be satisfied by a scheduler that happened to also run on access |
 | AC-3 | S/I | `T-IMDB-001`, `T-IMDB-006`, **`T-OMDB-004`** | A work with no usable `imdb_id` is **never stale** — there is nothing to ask (`T-IMDB-001e`) — and the route returns the no-rating state without asking OMDb anything (`T-IMDB-006c`). ⚠ **`T-OMDB-004e` is the half that matters**: it greps the executable source for a `t=` title query, because "we don't fall back to title text" is a claim about code that does not exist, and no behavioural test can observe the absence of a branch nobody took |
 | AC-4 | C/S | `T-IMDB-008`, `T-IMDB-003` | A null rating renders the **words**, never `0` (`T-IMDB-008c`), and an **absent field** is treated exactly like an explicit null (`T-IMDB-008d`) — `undefined.toFixed` is a crash, not a missing rating. `T-IMDB-003b` pins the same property one layer down: unknown stays unknown and never becomes zero |
 | AC-5 (failure) | S | `T-IMDB-004`, `T-IMDB-007`, `T-OMDB-004` | A transport failure **ends the pass and never throws** (`T-IMDB-004d`), an exhausted budget refreshes nothing and asks nothing (`T-IMDB-004e`, `T-OMDB-004b`), and the job never rejects whatever the store does (`T-IMDB-007d`). A rating is decoration on a page whose subject is the owner's list; a caller forced to wrap it in a try/catch has the wrong contract |
@@ -3943,31 +3948,40 @@ row to §9's AC mapping until the test named in it actually runs** - a mapping
 row citing an unwritten id fails `T-META-001e`, and softening `e` to get past
 that is precisely how this gate becomes the thing it was built to catch.
 
-### 33.1 `T-CI-005` is a TRIP-WIRE — do not amend it early
+### 33.1 `T-CI-005` is a TRIP-WIRE — the amendment has now landed
 
-**`T-CI-005g` asserts that exactly THREE non-owner-initiated processes exist**
-(raised from two by Epic M, which added the IMDb rating refresh). The
-availability refresh is a **fourth**, so `T-CI-005` goes red the moment the
-refresh is built.
+**`T-CI-005g` asserts that exactly FOUR non-owner-initiated processes exist.**
+The fourth is the watch-availability refresh, added by `TASK-187` in the same
+commit that built it, exactly as this section required. The amendment landed in
+all five places together: `PERMITTED_BACKGROUND_PROCESSES` (which the
+`check-mutating-routes` script also counts), `T-CI-005g`, `T-MUT-001f`,
+`PRD.md` US-036 AC-2 and product invariant 5.
 
-⚠ **That redness is the design, and the amendment is deliberately NOT part of
-the promotion.** It would have been easy - and wrong - to raise the count to
-four while writing the backlog: `PERMITTED_BACKGROUND_PROCESSES` would then
-name a process that does not exist, and the gate would sit loose by one named
-slot for however long the epic takes to build. Leaving it at three means the
-gate fires at exactly the moment the fourth process becomes real, which is the
-only moment at which anyone can check that it is genuinely metadata-only and
-access-triggered.
-
-**The amendment is owned by `TASK-187`**, the task that builds the refresh, and
-must land in that same commit: `PERMITTED_BACKGROUND_PROCESSES`, `T-CI-005g`,
-`PRD.md` US-036 AC-2 and product invariant 5, all four together. The owner has
-already approved the invariant change (`A52`), so `TASK-187` does **not** need
-to re-escalate - it needs to execute it.
+⚠ **The rule this section exists to state is unchanged and still binding.** The
+count is a trip-wire, and a **fifth** process must not be added to
+`PERMITTED_BACKGROUND_PROCESSES` in advance of the code that needs it: a named
+slot for a process that does not exist leaves the gate loose by one for however
+long the work takes. Raise the count in the commit that makes the process real,
+which is the only moment anyone can check it is genuinely metadata-only and
+access-triggered. `T-CI-005h` is the half that checks it: it enumerates the
+lazy-refresh modules, proves none contains a timer, and proves
+`refreshAvailability` is reached only from the waiting route.
 
 **The wrong response is to relax the gate into counting nothing in
 particular.** Its entire value is that the number is exact and small; a
 `T-CI-005` that permits "some" background processes asserts nothing at all.
+
+~~Superseded (`TASK-187`): "**`T-CI-005g` asserts that exactly THREE
+non-owner-initiated processes exist** (raised from two by Epic M, which added
+the IMDb rating refresh). The availability refresh is a **fourth**, so
+`T-CI-005` goes red the moment the refresh is built. That redness is the
+design, and the amendment is deliberately NOT part of the promotion… The
+amendment is owned by `TASK-187`, the task that builds the refresh, and must
+land in that same commit… The owner has already approved the invariant change
+(`A52`), so `TASK-187` does not need to re-escalate - it needs to execute
+it."~~ *(Corrected in place, not by banner: this section is an instruction a
+builder executes literally, and leaving it saying "assert three" would have the
+next contributor undo the amendment.)*
 
 ~~"The v1.1 rental-discovery epic has a complete id-to-AC mapping already
 written. It lives in **ADR-0010 section 6**, not in this document. That is
@@ -4336,16 +4350,17 @@ actually runs.**
 
 | Id | Level | Owner | Claim |
 |---|---|---|---|
-| **`T-AVAIL-001`** (`a`–`b`) | I | `TASK-187` | `a` an intent whose `availabilityCheckedAt` is older than `WATCH_PROVIDER_MAX_AGE_DAYS` is refreshed when the waiting view is opened; `b` **the discriminating case** — one checked more recently is **not** refreshed, without which `a` passes against an unconditional refresh (US-042 AC-1). |
-| **`T-AVAIL-002`** (`a`–`b`) | I | `TASK-187` | **On access only.** `a` if the waiting view is never opened, **no** TMDB request is ever made; `b` **the structural assertion** — no scheduler, timer, queue, cron or background worker exists that triggers it (US-042 AC-2, REQ-041). |
+| **`T-AVAIL-001`** (`a`–`d`) | I | `TASK-187` | `a` an intent whose `availabilityCheckedAt` is older than `WATCH_PROVIDER_MAX_AGE_DAYS` is refreshed when the waiting view is opened, and the answer is **persisted**, not merely rendered; `b` **the discriminating case** — one checked more recently is **not** refreshed, without which `a` passes against an unconditional refresh; `c` a never-checked intent is refreshed, and a **failed** lookup leaves it NOT KNOWN and retryable rather than writing a null answer; `d` a `satisfied` intent is neither listed nor asked about (US-042 AC-1). |
+| **`T-AVAIL-002`** (`a`–`b`) | I | `TASK-187` | **On access only.** `a` with a due-for-refresh intent in the store, exercising `/api/me`, `/api/titles`, `/api/removed` and `/api/suppressions` makes **no** provider lookup — then opening the waiting view makes exactly one, because the negative alone is satisfied by a build with no refresh at all; `b` one render is bounded by `AVAILABILITY_REFRESH_PER_REQUEST` and the remainder catch up on the **next** render rather than sweeping. ⚠ The **structural** assertion — that no scheduler, timer, queue, cron or worker exists that triggers it — is `T-CI-005g`/`h`, not this row (US-042 AC-2, REQ-041). |
 | **`T-AVAIL-003`** (`a`–`b`) | I | `TASK-188` | A work reported `flatrate` on a `SERVICES` member is **flagged with an invitation** and is **not** added to the combined list. `b` **the load-bearing negative** — combined-list membership and ordering are identical before and after the refresh (US-042 AC-3, ADR-0010 §4). |
-| **`T-AVAIL-004`** | I | `TASK-187` | The refresh creates, deletes or re-states **no** `Title`, `ServiceListing` or `Suppression`, and satisfies no intent on its own (US-042 AC-4). |
-| **`T-AVAIL-005`** | U | `TASK-187` | A work offered only to **rent or buy**, with no `flatrate` offer, stays waiting and is **not** flagged. ⚠ Inverting this inverts the feature: rent-availability is what the owner is waiting to escape (US-042 AC-5). |
+| **`T-AVAIL-004`** (`a`–`c`) | I | `TASK-187` | `a` the refresh creates, deletes or re-states **no** `Title`, `ServiceListing` or `Suppression`, and satisfies no intent on its own — asserted by row counts taken before and after a refresh that reports the work available on a service the owner **has**, plus the intent's `state`, `titleId`, `workIdentity` and `discoveredAt` all unchanged; `b` the rendered combined list is byte-identical across the refresh, because membership, ordering and badges are what invariant 5 protects; `c` the write is observable through `repository/watchIntents.ts` — the module the unit coverage thresholds exclude (`T-INV-023a`), so the integration project is the only place its reader and writer meet a real engine (US-042 AC-4). |
+| **`T-AVAIL-005`** (`a`–`e`) | U | `TASK-187` | `a` a work offered only to **rent or buy**, with no `flatrate` offer, yields `[]` and is **not** flagged; `b` a `flatrate` offer on an owner service is; `c` a JustWatch name qualifier (*"Netflix Standard with Ads"*, *"Max Amazon Channel"*) still matches, so equality comparison is not enough; `d` a subscription provider the owner does not have is recorded but not flagged; `e` NOT KNOWN (`null`) stays distinguishable from ASKED-AND-NOBODY (`[]`), including the absent-region-key case. ⚠ Inverting `a` inverts the feature: rent-availability is what the owner is waiting to escape (US-042 AC-5). |
 | **`T-AVAIL-006`** | U | `TASK-188` | Absent provider data renders *"not seen on your services as of &lt;date&gt;"*, never *"not streaming anywhere"* — a claim the data cannot support (US-042 AC-6, ADR-0010 Trap 4). |
 | **`T-AVAIL-007`** | I | `TASK-188` | TMDB unreachable: the view renders from last-known availability with its as-of date plus an unobtrusive failure note. Never blank, never an error page (US-042 AC-7). |
 | **`T-AVAIL-008`** | U | `TASK-184` | `WATCH_PROVIDER_MAX_AGE_DAYS` is a **fourth independent constant**, sharing no call site with `TMDB_METADATA_MAX_AGE_DAYS`, `IMAGE_RETENTION_DAYS` or `IMDB_RATING_MAX_AGE_DAYS`. **`T-INV-008` is extended from three constants to four** (US-042 AC-8, ADR-0010 Trap 5). ~~"a **third independent constant** … extended from two constants to three"~~ *(Superseded, and corrected in place because this row is an instruction a builder executes: Epic M landed `IMDB_RATING_MAX_AGE_DAYS = 14` after ADR-0010 was written, so the count was already stale when Epic L started. **The RULE is unchanged and is the point** — each age constant is declared separately and shares no call site. ⚠ Nothing may be merged to make the count come out at three; `apps/api/test/unit/config.spec.ts` holds an n-ary `DAY_CONSTANTS` registry precisely so that adding one is a one-line change rather than a re-count. The same drift is present in `docs/PRD.md` US-042 AC-8 and `specs/data-model.md` §17.3.)* |
 | **`T-AVAIL-009`** | E | `TASK-188` | Every surface rendering availability carries the **JustWatch** attribution (US-042 AC-9, REQ-087). |
-| **`T-AVAIL-010`** | U | `TASK-187` | `availabilityRegion` is **`US`** (`ASM-059`, owner-confirmed at `A49`) and is stored on the row and passed explicitly, never defaulted or hard-coded at the call site. |
+| **`T-AVAIL-010`** (`a`–`e`) | U | `TASK-187` | `a` `availabilityRegion` is **`US`** (`ASM-059`, owner-confirmed at `A49`); `b` two intents with **different** stored regions each produce a lookup carrying their own region and a write recording it — the one assertion a hard-coded `'US'` fails; `c` a **failed** lookup writes nothing for that row, so a known-good answer is never erased into NOT KNOWN; `d` staleness — never-checked is stale, recently-checked is not, ASKED-AND-NOBODY is **not** re-asked, and a row with no TMDB id is never asked about; `e` selection is bounded by the per-request ceiling and asks for nothing when nothing is stale. |
+| **`T-AVAIL-011`** (`a`–`h`) | U | `TASK-187` | The `GET /api/waiting` HANDLER arm, repository and TMDB client mocked — and the file that carries the route's COVERAGE, since `npm run coverage` excludes the integration project. `a` a stale intent is refreshed, persisted through the narrow three-column writer, and rendered from the FRESH answer; `b` a fresh one asks TMDB nothing; `c` malformed stored JSON — unparseable, a non-array, or an array with non-string members — degrades to NOT KNOWN rather than a 500; `d` a TMDB failure is a **200 with the last-known answer**, never an error page and never a write; `e` an unmatched work is listed but never asked about, falling back to its raw extracted text for a name; `f` an empty waiting list is a 200 with no lookups; `g` the region comes from each row; `h` a title with neither a TMDB name nor raw text renders `''` rather than `undefined` (US-042 AC-1/AC-2/AC-7). |
 
 ### 38.3 The `Owner` column is load-bearing
 

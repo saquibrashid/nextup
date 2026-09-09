@@ -221,8 +221,42 @@ export class TmdbClient {
     };
   }
 
-  // ── HTTP ──────────────────────────────────────────────────────────────────
+  /**
+   * Which providers stream this work **on subscription** in `region`
+   * (REQ-086, ADR-0010).
+   *
+   * ⚠ **`flatrate` ONLY.** TMDB's `/watch/providers` also reports `rent`,
+   * `buy`, `ads` and `free`. A work the owner can rent is precisely what they
+   * are WAITING TO ESCAPE, so counting a rent offer as availability inverts
+   * the entire feature — `T-AVAIL-005` is the guard, and it is a unit test
+   * because the rule must not need a network to be checked.
+   *
+   * ⚠ **Returns `null` for "not known", `[]` for "asked, no flatrate offer".**
+   * They are different facts and the caller renders them differently: `null`
+   * must never become *"not streaming anywhere"* (ADR-0010 Trap 4). A missing
+   * region key in the response is `[]` — TMDB answered, and its answer for
+   * this region was "nobody".
+   *
+   * ⚠ TMDB attribution: this data is JustWatch's, and REQ-087 requires every
+   * surface that renders it to say so.
+   */
+  async getWatchProviders(
+    mediaType: MediaType,
+    tmdbId: number,
+    region: string,
+  ): Promise<string[] | null> {
+    const body = await this.#get<TmdbWatchProviderResponse>(
+      `/${mediaType}/${tmdbId}/watch/providers`,
+      {},
+      // A work TMDB does not know has no providers to report. That is a real
+      // answer ("nobody streams it"), not a failure — throwing here would make
+      // one unknown work fail the whole page render.
+      () => null as never,
+    );
+    return readFlatrateProviders(body, region);
+  }
 
+  // ── HTTP ──────────────────────────────────────────────────────────────────
   async #get<T>(
     path: string,
     params: Record<string, string>,
@@ -371,6 +405,53 @@ interface TmdbDetailResponse {
   imdb_id?: unknown;
   /** Present for both, once `append_to_response=external_ids` is sent. */
   external_ids?: { imdb_id?: unknown };
+}
+
+/**
+ * `/{media}/{id}/watch/providers`, as much of it as we read.
+ *
+ * ⚠ Only `flatrate` is declared. `rent`, `buy`, `ads` and `free` exist in the
+ * payload and are deliberately absent from this type, so a future edit cannot
+ * reach one by accident — see `getWatchProviders`.
+ */
+export interface TmdbWatchProviderResponse {
+  results?: Record<string, { flatrate?: Array<{ provider_name?: unknown }> } | undefined>;
+}
+
+/**
+ * The **flatrate-only** rule, as a pure function (`T-AVAIL-005`, REQ-086).
+ *
+ * ⚠ **INVERTING THIS INVERTS THE FEATURE.** TMDB's `/watch/providers` payload
+ * also carries `rent`, `buy`, `ads` and `free`. A work the owner can RENT is
+ * precisely what they recorded an intent to escape (US-042 AC-5), so a
+ * rent-only or buy-only offer must leave the intent waiting and unflagged.
+ *
+ * It lives out here, separate from the HTTP call, so the rule is a unit test
+ * against a literal payload rather than something that needs a recording and
+ * a network stack to check. `TmdbWatchProviderResponse` declares only
+ * `flatrate` for the same reason: an edit cannot reach `rent` by accident.
+ *
+ * ⚠ **`null` ≠ `[]`.** `null` is NOT KNOWN — TMDB gave us nothing usable. `[]`
+ * is the different, weaker fact that TMDB answered and no subscription
+ * provider carries it in this region, including the case of a region key that
+ * is simply absent from the response. The caller renders them differently and
+ * must be able to (ADR-0010 Trap 4).
+ */
+export function readFlatrateProviders(
+  body: TmdbWatchProviderResponse | null,
+  region: string,
+): string[] | null {
+  if (body === null || typeof body !== 'object') return null;
+
+  const forRegion = body.results?.[region];
+  if (forRegion === undefined) return [];
+
+  const flatrate = forRegion.flatrate;
+  if (!Array.isArray(flatrate)) return [];
+
+  return flatrate
+    .map((entry) => (typeof entry?.provider_name === 'string' ? entry.provider_name : ''))
+    .filter((name) => name.length > 0);
 }
 
 function toSearchItem(raw: unknown): TmdbSearchItem | null {
