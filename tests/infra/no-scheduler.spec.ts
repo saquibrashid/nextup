@@ -243,37 +243,44 @@ describe('T-CI-005 · no scheduler anywhere (US-010 AC-5, US-036 AC-2/AC-5)', ()
     ).toHaveLength(1);
   });
 
-  it('T-CI-005g: exactly three non-owner processes exist, and they are named', () => {
-    expect(PERMITTED_BACKGROUND_PROCESSES).toHaveLength(3);
+  it('T-CI-005g: exactly four non-owner processes exist, and they are named', () => {
+    expect(PERMITTED_BACKGROUND_PROCESSES).toHaveLength(4);
     expect((PERMITTED_BACKGROUND_PROCESSES as { op: string }[]).map((p) => p.op).sort()).toEqual([
       'imdb-rating-refresh',
       'screenshot-purge',
       'tmdb-metadata-refresh',
+      'watch-availability-refresh',
     ]);
     // Each one states WHY it is admissible. An unexplained entry is how a
-    // fourth arrives without anyone amending PRD §7.4.
+    // fifth arrives without anyone amending PRD §7.4.
     for (const p of PERMITTED_BACKGROUND_PROCESSES as { why: string }[]) {
       expect(p.why.length).toBeGreaterThan(20);
     }
   });
 
-  it('T-CI-005h: the two lazy refreshes are triggered by a READ, never by a timer', () => {
-    // The exemption in `specs/api.md` §6.4 is conditional on the trigger. Both
-    // refresh modules must be reachable only from a read handler — if either
+  it('T-CI-005h: the three lazy refreshes are triggered by a READ, never by a timer', () => {
+    // The exemption in `specs/api.md` §6.4 is conditional on the trigger. All
+    // three refresh modules must be reachable only from a read handler — if one
     // ever grew a timer it would stop being an exemption and start being the
     // thing invariant 5 forbids.
     const refresh = read('apps/api/src/services', ['.ts']).filter(({ file }) =>
-      /(tmdbRefresh|imdbRatings)\.ts$/.test(file),
+      /(tmdbRefresh|imdbRatings|watchAvailability)\.ts$/.test(file),
     );
     expect(refresh.map((s) => s.file)).toEqual([
       'apps/api/src/services/imdbRatings.ts',
       'apps/api/src/services/tmdbRefresh.ts',
+      'apps/api/src/services/watchAvailability.ts',
     ]);
     expect(findSchedulers(refresh, SOURCE_SCHEDULERS)).toEqual([]);
 
     const titles = readFileSync(path.join(ROOT, 'apps/api/src/routes/titles.ts'), 'utf8');
     expect(titles).toContain('refreshStaleMetadata');
     expect(titles).toContain('beginRatingRefresh');
+
+    // The availability refresh has exactly one caller, and it is the handler
+    // for `GET /api/waiting`. That is the whole of its access trigger.
+    const waiting = readFileSync(path.join(ROOT, 'apps/api/src/routes/waiting.ts'), 'utf8');
+    expect(waiting).toContain('refreshAvailability');
   });
 
   it('T-CI-005i: `setTimeout` alone is NOT a finding — the gate stays precise', () => {

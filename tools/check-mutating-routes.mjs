@@ -66,16 +66,24 @@ export const REQ_041_OPERATIONS = [
 ];
 
 /**
- * PRD §7.4 — the only THREE non-owner-initiated processes permitted to exist,
+ * PRD §7.4 — the only FOUR non-owner-initiated processes permitted to exist,
  * none of which changes user-visible list state. Invariant 5 of the
  * contributor instructions restates this as a hard rule.
  *
  * ⚠ THE TEST IS NOT THE COUNT — IT IS `changes user-visible LIST state`.
  * Invariant 5 forbids a scheduler touching membership, ordering or service
- * badges. All three entries below are metadata- or bytes-only, access- or
+ * badges. All four entries below are metadata- or bytes-only, access- or
  * time-triggered, and none of them can add, remove, reorder or re-badge a row.
- * A fourth entry is admissible only on the same terms, and is an amendment to
+ * A fifth entry is admissible only on the same terms, and is an amendment to
  * PRD §7.4 rather than an implementation decision.
+ *
+ * ~~Superseded (Epic L): "the only THREE non-owner-initiated processes."~~
+ * ADR-0010 added the watch-availability refresh, approved by the owner at
+ * `A52`. It qualifies on exactly the same terms as the two lazy refreshes it
+ * sits beside: triggered by opening the waiting view and by nothing else, and
+ * writing three columns on `watch_intent` and nothing else. It creates no
+ * `ServiceListing`, so it cannot put a waiting work into the combined list —
+ * graduation happens by the ordinary capture path (US-042 AC-4, TASK-189).
  *
  * ~~Superseded (Epic M): "the only two non-owner-initiated processes."~~
  * ADR-0011 added the IMDb rating refresh, which is the same shape as the TMDB
@@ -93,6 +101,10 @@ export const PERMITTED_BACKGROUND_PROCESSES = [
   {
     op: 'imdb-rating-refresh',
     why: 'lazy IMDb rating refresh on access — a display-only numeric field, never sorted or filtered on (REQ-093, ADR-0011 OQ-A)',
+  },
+  {
+    op: 'watch-availability-refresh',
+    why: 'lazy watch-availability refresh, triggered ONLY by opening the waiting view — metadata-only, writes three columns on watch_intent, creates no listing and satisfies no intent (REQ-086, US-042 AC-2/AC-4, ADR-0010, approved at A52)',
   },
 ];
 
@@ -395,9 +407,9 @@ export function checkRegistryAgainstReq041(registry = MUTATING_ROUTE_REGISTRY) {
     );
   }
 
-  if (PERMITTED_BACKGROUND_PROCESSES.length !== 3) {
+  if (PERMITTED_BACKGROUND_PROCESSES.length !== 4) {
     findings.push(
-      `PRD §7.4 permits exactly three non-owner processes; this list has ${PERMITTED_BACKGROUND_PROCESSES.length}. No scheduler may change user-visible list state (T-MUT-001, T-CI-005).`,
+      `PRD §7.4 permits exactly four non-owner processes; this list has ${PERMITTED_BACKGROUND_PROCESSES.length}. No scheduler may change user-visible list state (T-MUT-001, T-CI-005).`,
     );
   }
 

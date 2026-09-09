@@ -135,20 +135,24 @@ describe('T-MUT-001 · US-036 AC-1/AC-3 · REQ-041 is a closed enumeration (PRD 
     ]);
   });
 
-  it('T-MUT-001f · exactly three non-owner background processes are permitted', () => {
+  it('T-MUT-001f · exactly four non-owner background processes are permitted', () => {
     // Invariant 5: no scheduler may change user-visible list state. The only
     // permitted background work is metadata-only lazy refresh (TMDB fields,
-    // and since ADR-0011 the IMDb rating) and the 30-day blob purge.
+    // since ADR-0011 the IMDb rating, and since ADR-0010 the watch-provider
+    // availability) and the 30-day blob purge.
     //
-    // ⚠ The count is the tripwire, not the rule. Each of the three is
+    // ⚠ The count is the tripwire, not the rule. Each of the four is
     // permitted because it cannot add, remove, reorder or re-badge a row —
-    // and the rating specifically is display-only (ADR-0011 OQ-A: no sort by
-    // rating), which is what keeps it on this side of invariant 5.
-    expect(PERMITTED_BACKGROUND_PROCESSES).toHaveLength(3);
+    // the rating is display-only (ADR-0011 OQ-A: no sort by rating), and the
+    // availability refresh writes three `watch_intent` metadata columns,
+    // creates no listing and satisfies no intent (US-042 AC-4), which is what
+    // keeps both on this side of invariant 5.
+    expect(PERMITTED_BACKGROUND_PROCESSES).toHaveLength(4);
     expect(PERMITTED_BACKGROUND_PROCESSES.map((p: { op: string }) => p.op).sort()).toEqual([
       'imdb-rating-refresh',
       'screenshot-purge',
       'tmdb-metadata-refresh',
+      'watch-availability-refresh',
     ]);
 
     // None of them is an owner operation, and none shadows one.

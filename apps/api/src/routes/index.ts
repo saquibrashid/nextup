@@ -44,6 +44,7 @@ import { registerServiceStateRoutes } from './serviceState.js';
 import { registerSuppressionRoutes } from './suppressions.js';
 import { registerTitleRoutes } from './titles.js';
 import { registerTmdbRoutes } from './tmdb.js';
+import { registerWaitingRoutes } from './waiting.js';
 import { TmdbClient } from '../clients/tmdbClient.js';
 import { OmdbClient } from '../clients/omdbClient.js';
 
@@ -144,6 +145,15 @@ export function createApiRouter(): Router {
     () => new TmdbClient({ apiKey: process.env['TMDB_API_KEY'] ?? '' }),
   );
   registerSuppressionRoutes(apiRouter);
+  // TASK-187 (`specs/api.md`, US-042). ⚠ THIS ROUTE IS THE ONLY TRIGGER for
+  // the availability refresh — REQ-041 permits it because it is
+  // access-triggered and metadata-only. Nothing else in the process may call
+  // `refreshAvailability`, and `T-CI-005` / `T-AVAIL-002b` assert it.
+  //
+  // Per-request TMDB client for the same reason as `registerTmdbRoutes`: its
+  // in-process cache dies with the request and can never accumulate into a
+  // mirror of the TMDB catalogue.
+  registerWaitingRoutes(apiRouter);
   registerServiceStateRoutes(apiRouter);
   // TASK-045 (`specs/api.md` §6.29). The client is built PER REQUEST on
   // purpose: its in-process search cache then dies with the request and can

@@ -181,16 +181,13 @@ const KNOWN_UNMAPPED: readonly string[] = [
   // ⚠ AC-1 and AC-6 were removed by TASK-183 — `T-WAIT-001` maps them.
   'US-040 AC-2',
   // US-042 — Be told when a waiting title starts streaming
-  'US-042 AC-1',
-  'US-042 AC-2',
+  // ⚠ AC-1, AC-2, AC-4, AC-5 and AC-10 were removed by TASK-187 — `T-AVAIL-001`,
+  // `T-AVAIL-002`, `T-AVAIL-004`, `T-AVAIL-005` and `T-AVAIL-010` map them.
   'US-042 AC-3',
-  'US-042 AC-4',
-  'US-042 AC-5',
   'US-042 AC-6',
   'US-042 AC-7',
   // ⚠ AC-8 was removed by TASK-184 — `T-AVAIL-008` maps it.
   'US-042 AC-9',
-  'US-042 AC-10',
   // US-043 — Browse and clear the waiting list
   'US-043 AC-1',
   'US-043 AC-2',

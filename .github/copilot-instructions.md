@@ -87,7 +87,13 @@ project's design already; treat them as hard rules.
 5. **No scheduler may change user-visible LIST state** (membership, ordering,
    service badges). The only permitted background work is **metadata-only lazy
    refresh on access** and the **30-day blob purge** (REQ-041 as reworded at
-   A37). Exactly two non-owner processes may exist (`T-CI-005`).
+   A37). Exactly **four** non-owner processes may exist (`T-CI-005`), and they
+   are named in `PERMITTED_BACKGROUND_PROCESSES`: the lazy TMDB metadata
+   refresh, the 30-day screenshot purge, the lazy IMDb rating refresh, and the
+   lazy watch-availability refresh triggered by opening the waiting view
+   (Epic L, approved at `A52`). A fifth is an amendment to PRD §7.4, never an
+   implementation decision.
+   ~~Superseded: "Exactly two non-owner processes may exist."~~
 6. **Title-level date sort = EARLIEST date-added across the title's listings.**
    The default direction is **newest-first** (`dir=desc`, REQ-038, confirmed by
    the owner at A44), and the **oldest-first reverse control is `must`, not
