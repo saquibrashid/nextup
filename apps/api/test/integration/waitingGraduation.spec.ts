@@ -78,9 +78,10 @@ const titlesRequest = async (): Promise<{
 let seq = 0;
 
 /**
- * A waiting intent, exactly as the discovery close leaves one: a `waiting`
- * Title (so it is invisible to `/api/titles`) plus a `waiting` WatchIntent
- * pointing at it, sourced from an applied discovery batch.
+ * A waiting intent, exactly as the discovery close leaves one: a `removed`
+ * Title with a NULL `sortDateAdded` (so it is invisible to `/api/titles`) plus
+ * a `waiting` WatchIntent pointing at it, sourced from an applied discovery
+ * batch.
  */
 async function seedWaiting(workIdentity: string, name: string): Promise<string> {
   const n = ++seq;
@@ -104,9 +105,15 @@ async function seedWaiting(workIdentity: string, name: string): Promise<string> 
       id: `title-grad-${n}`,
       ownerId,
       workIdentity,
-      // ⚠ `waiting`, not `active` — a discovered work is NOT in the combined
-      // list. `listActiveTitles` filters on this.
-      state: 'waiting',
+      // ⚠ THERE IS NO `waiting` TITLE STATE — `ck_title_state` permits only
+      // `active` and `removed`. A waiting work is stored the way the discovery
+      // close stores one (`presenceFields` in `services/batchClose.ts`):
+      // `removed` with a NULL `sortDateAdded`, so it is invisible to
+      // `listActiveTitles` and carries no list date it never earned.
+      // ~~Superseded: `state: 'waiting'` — rejected by the CHECK constraint,
+      // which Prisma reports as a *foreign key* violation.~~
+      state: 'removed',
+      sortDateAdded: null,
       matchState: 'matched',
       tmdbId: Number(workIdentity.split(':')[2]),
       tmdbMediaType: 'movie',
