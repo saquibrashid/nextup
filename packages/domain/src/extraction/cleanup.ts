@@ -318,6 +318,51 @@ function classify(
   return 'title-candidate';
 }
 
+/** Trailing ellipsis in any of the forms the readers emit. */
+const TRUNCATION_MARKER = /(\u2026|\.\.\.?)\s*$/u;
+
+/**
+ * §3.1a R2 (TASK-198). Which of the two strings feeds matching.
+ *
+ * `inferredTitle` is the model's **de-truncated** title and is preferred, per
+ * R1, because it is what makes a cut-off tile caption matchable at all.
+ *
+ * ⚠ BUT A MODEL THAT *EXPANDS* A COMPLETE CAPTION IS NOT DE-TRUNCATING IT, AND
+ * THE EXPANSION IS NOT ALWAYS THE PROVIDER'S TITLE. Observed in the golden
+ * corpus: a tile captioned `RAW`, read as `RAW` by the model's own
+ * `visibleText` **and** independently by OCR, was reported with
+ * `identifiedTitle: 'WWE Raw'`. TMDB titles that work `Raw` (`tmdb:tv:4656`),
+ * so preferring the expansion searched for a string the provider does not use
+ * and lost the title in three separate images.
+ *
+ * The discriminator is not "is the inference different" — for a truncated
+ * caption it is *always* different, and suppressing that would break the very
+ * case R1 exists for. It is: **an inference that does not extend what was
+ * printed, over text two independent readers agree on, is an invention.**
+ * A de-truncation extends its prefix; `raw` -> `wwe raw` does not.
+ */
+export function preferredSource(item: ExtractedTextItem): string {
+  const inferred = item.inferredTitle;
+  if (inferred === null || item.rawText === '') return inferred ?? item.rawText;
+
+  // Only an *exact* independent corroboration is strong enough to overrule the
+  // model. `partial` is what a truncated caption scores against a full OCR
+  // line, so anything weaker must keep R1's behaviour.
+  if (item.ocrSupport !== 'exact') return inferred;
+
+  // The caption itself says it was cut off.
+  if (TRUNCATION_MARKER.test(item.rawText)) return inferred;
+
+  const normalisedRaw = normaliseTitleText(item.rawText);
+  const normalisedInferred = normaliseTitleText(inferred);
+  if (normalisedRaw === '' || normalisedRaw === normalisedInferred) return inferred;
+
+  // A genuine de-truncation extends the visible prefix; an invention does not.
+  if (normalisedInferred.startsWith(`${normalisedRaw} `)) return inferred;
+
+  return item.rawText;
+}
+
 /**
  * Stage 2, end to end. Pure: same input, same output, no clock of its own.
  *
@@ -333,8 +378,9 @@ export function cleanup(
 
   return groupReadingOrder(items).map((item) => {
     // §3.1a. `inferredTitle` is the identified work, which is what the matcher
-    // needs and what makes a truncated tile caption matchable at all.
-    const source = item.inferredTitle ?? item.rawText;
+    // needs and what makes a truncated tile caption matchable at all — except
+    // where it is an invention rather than a de-truncation (R2).
+    const source = preferredSource(item);
     const { text: matchText, year } = extractYear(source, now);
     const normalisedText = normaliseTitleText(matchText);
 

@@ -161,30 +161,46 @@ describe('T-AI-045 the bake-off is measured, and the pre-committed rule decides 
     const inc = aggregate(incScored);
     const chal = aggregate(chalScored);
 
-    expect(inc.recall).toBe(0.9104477611940298);
+    expect(inc.recall).toBe(0.9402985074626866);
     // ⚠ 0.2500 → 0.3143 AT TASK-195, AND THE DEFECT GOT SMALLER, NOT BIGGER.
     // The false-title COUNT fell 26 → 22; the denominator is `title-candidate`
     // count, and 34 chrome strings stopped being counted as title candidates.
     // Both arms are scored by the same code over the same answer key, so the
     // comparison below is unaffected — which is the property §9.7 Stage 1
     // exists to protect.
-    expect(inc.falseTitleRate).toBe(0.3142857142857143);
+    //
+    // ⚠ THEN 0.3143 → 0.2857 AT TASK-198, THE ORDINARY WAY: two fewer false
+    // titles (the `wwe raw` expansions), same denominator. Recall rose in the
+    // same commit, which is the pairing §3.1a R2 was designed to produce —
+    // the embellishment cost a recall point AND a false title, so removing it
+    // repays both.
+    expect(inc.falseTitleRate).toBe(0.2857142857142857);
     expect(inc.fabricationRate).toBe(0.011494252873563218);
 
-    expect(chal.recall).toBe(0.9253731343283582);
-    expect(chal.falseTitleRate).toBe(0.4523809523809524);
+    expect(chal.recall).toBe(0.9402985074626866);
+    expect(chal.falseTitleRate).toBe(0.44047619047619047);
     expect(chal.fabricationRate).toBe(0.035);
 
     // ⚠ THE SHAPE OF THE RESULT, STATED AS AN ASSERTION SO IT CANNOT BE
     // MISREAD FROM THE NUMBERS ALONE: the challenger reads MORE, and much of
-    // what it reads more of is wrong. Its recall advantage is **one title**
+    // what it reads more of is wrong. ~~Its recall advantage is **one title**
     // across the whole corpus — below `MIN_MEANINGFUL_TITLE_DELTA`, i.e.
-    // inside the noise band the rule was written to discount — while its
+    // inside the noise band the rule was written to discount~~ — while its
     // false-title rate is nearly ten points worse and it fabricates three
     // times as often. The clearest single instance: on `blank-no-content-01`,
     // a page with no works on it at all, the challenger returned TWO tiles
     // where the incumbent returned none.
-    expect(chal.recall).toBeGreaterThan(inc.recall);
+    //
+    // ⚠ AT TASK-198 THE RECALL ADVANTAGE BECAME **ZERO**, AND THE DIRECTION IS
+    // NOT AN ACCIDENT. The challenger's one-title lead was the incumbent's
+    // `wwe raw` expansion; §3.1a R2 is a STAGE-2 rule and applies to both arms
+    // equally, so it repaired the incumbent's only miss the challenger did not
+    // share. Both arms now sit at 63 of 67. The decision is unchanged and
+    // strictly stronger: the challenger no longer reads a single title more
+    // than the incumbent, and still costs 17 points of false-title rate.
+    // ~~expect(chal.recall).toBeGreaterThan(inc.recall)~~ is therefore dead —
+    // asserting it would now be asserting a defect.
+    expect(chal.recall).toBe(inc.recall);
     expect((chal.recall - inc.recall) * expectedTitleTotal).toBeLessThan(
       MIN_MEANINGFUL_TITLE_DELTA,
     );
