@@ -84,7 +84,7 @@ describe('T-UI-004 - PNG, JPEG and HEIC, all three, in accept and in the copy', 
 
   it('T-UI-004d accepts an unknown or empty type rather than hard-filtering on File.type', async () => {
     const onFilesAccepted = vi.fn();
-    render(<ImageDropzone onFilesAccepted={onFilesAccepted} />);
+    render(<ImageDropzone batchReady onFilesAccepted={onFilesAccepted} />);
 
     // iOS routinely reports HEIC as `application/octet-stream` or as nothing at
     // all. Refusing it here reintroduces exactly the defect A42 fixed; the
@@ -130,7 +130,7 @@ describe('T-UX-041 - the empty dropzone shows all three ingest affordances', () 
 
   it('T-UX-041b keeps file selection fully working when navigator.clipboard is absent', async () => {
     const onFilesAccepted = vi.fn();
-    render(<ImageDropzone onFilesAccepted={onFilesAccepted} />);
+    render(<ImageDropzone batchReady onFilesAccepted={onFilesAccepted} />);
 
     // Product invariant 19: `navigator.clipboard` does not exist over plain
     // `http://`. The file input is an equal path, not a fallback, so it must be
@@ -160,7 +160,7 @@ describe('T-UX-041 - the empty dropzone shows all three ingest affordances', () 
   it('T-UX-041d all three affordances end in the same path, none branching on source', async () => {
     withClipboard();
     const onFilesAccepted = vi.fn();
-    render(<ImageDropzone onFilesAccepted={onFilesAccepted} />);
+    render(<ImageDropzone batchReady onFilesAccepted={onFilesAccepted} />);
 
     await userEvent.upload(screen.getByTestId('file-input'), [file('a.png', 'image/png')], {
       applyAccept: false,

@@ -110,7 +110,11 @@ export function PasteButton({
   onPasteFailed,
   touch,
 }: PasteButtonProps): JSX.Element | null {
-  const { deliver, heldCount } = useHeldImages(batchReady, onImagesPasted);
+  const { deliver, heldCount } = useHeldImages<readonly File[]>(
+    batchReady,
+    onImagesPasted,
+    (files) => files,
+  );
   const [rejection, setRejection] = useState<PasteFailure | null>(null);
 
   // Read at render, not in an effect: the button must be absent from the very

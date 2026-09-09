@@ -197,6 +197,16 @@ export const IMAGE_ACCEPT_ATTRIBUTE = 'image/png,image/jpeg,image/heic,image/hei
 export const CHOOSE_FILES_LABEL = 'Choose files';
 
 /**
+ * Shown while images are held because no batch exists yet (§4.0a).
+ *
+ * ⚠ Deliberately NOT the same sentence as `PASTE_HELD_BODY`, and deliberately
+ * source-neutral. This one covers a drop and a file chooser as well as a
+ * desktop paste, so "Got your screenshot" would be wrong for a five-file
+ * selection and "pasted" would be wrong for two of the three affordances.
+ */
+export const DROPZONE_HELD_BODY = "Held — choose a service and a mode and they'll be attached.";
+
+/**
  * `specs/ui.md` §3.2 - a selected HEIC/HEIF tile.
  *
  * Only Safari renders HEIC in an `<img>`, so every other browser would show a
