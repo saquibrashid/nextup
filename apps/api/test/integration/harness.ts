@@ -59,6 +59,12 @@ export async function closeTestPrisma(): Promise<void> {
  * REQ-028 is soft-delete forever: there is no hard delete anywhere in the
  * application, and `T-INV-013`/`T-MIG-001` exist to keep it that way. The
  * order below is the reverse of the FK dependency order.
+ *
+ * ⚠ **A NEW TABLE MUST BE ADDED HERE IN THE SAME COMMIT AS ITS MIGRATION.**
+ * `watch_intent` shipped in `0006` without a line here and nothing failed,
+ * because no test created a row until `discoveryClose.spec.ts` did. The first
+ * one then broke `fk_intent_batch` on the NEXT reset — and the failure landed
+ * in whichever unrelated suite ran after it, not in the one that caused it.
  */
 export async function resetDatabase(db = testPrisma()): Promise<void> {
   await db.$executeRawUnsafe(`
@@ -71,6 +77,7 @@ export async function resetDatabase(db = testPrisma()): Promise<void> {
     DELETE FROM service_listing;
     DELETE FROM removal_group;
     DELETE FROM removal_decision;
+    DELETE FROM watch_intent;
     DELETE FROM title;
     DELETE FROM upload_batch;
   `);
