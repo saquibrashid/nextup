@@ -12,11 +12,11 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 | Status | Count |
 |---|---|
 | ⬜ todo | 2 |
-| 🚧 doing | 2 |
+| 🚧 doing | 3 |
 | ✅ done | 181 |
 | 🙋 owner | 2 |
 | 💤 deferred | 0 |
-| **total** | **187** |
+| **total** | **188** |
 
 ## Ready to start
 
@@ -27,6 +27,7 @@ Not done, and every task they depend on is done.
 | `TASK-057` | M | Epic C — Extraction |
 | `TASK-079` | S | Epic K — Platform, safety, and the shell |
 | `TASK-126` | M | Epic K — Platform, safety, and the shell |
+| `TASK-190` | M | Epic D — Matching & identity |
 
 ## Waiting on the owner
 

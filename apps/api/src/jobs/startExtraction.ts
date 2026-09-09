@@ -27,17 +27,20 @@
  * review and the owner closes the batch later (product invariant 5).
  */
 
-import { cleanup, ulid, type TitleExtractor } from '@nextup/domain';
+import { cleanup, ulid, type ExtractionCandidate, type TitleExtractor } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
+import { TmdbClient } from '../clients/tmdbClient.js';
 import { createExtractor } from '../extraction/factory.js';
 import { extractorConfigFromEnv } from '../extraction/configFromEnv.js';
 import { azureImageBlobStore, type ImageBlobStore } from '../storage/blobStore.js';
 import {
   createExtractionCandidate,
+  listCandidatesForReview,
   listImagesForBatch,
   recordExtractionOutcome,
   transitionUploadBatchStatus,
+  updateCandidateDisposition,
   type OwnerId,
 } from '../repository/ownerData.js';
 import {
@@ -47,6 +50,11 @@ import {
   type RunExtractionPorts,
   type RunExtractionResult,
 } from './runExtraction.js';
+import {
+  resolveCandidates,
+  type ResolveCandidatesPorts,
+  type ResolveCandidatesResult,
+} from './resolveCandidates.js';
 
 /** Injected in tests; defaulted to the real collaborators in production. */
 export interface StartExtractionDeps {
@@ -55,6 +63,8 @@ export interface StartExtractionDeps {
   extractor?: TitleExtractor;
   log?: (event: string, fields: Record<string, unknown>) => void;
   now?: () => number;
+  /** Overrides the environment-built TMDB client for stage 3. */
+  tmdbClient?: TmdbClient;
 }
 
 /**
@@ -62,11 +72,14 @@ export interface StartExtractionDeps {
  *
  * ⚠ NOT `extractionStatsSchema` from the domain. That schema is `.strict()`
  * and requires `candidatesCollapsed`, `matched`, `unmatched` and
- * `suppressedGated` — stages 3-5, which have not run (TASK-060). Writing zeros
- * for them to satisfy the schema would record measurements that were never
- * taken, into the one field `docs/architecture.md` calls the only evidence for
- * RSK-021. The stage-1 slice is nested under its own key instead, so stages
- * 3-5 can add theirs without any value here ever having been a lie.
+ * `suppressedGated` at the top level. Three of those are now measured — by
+ * stage 3, below — but `suppressedGated` is not: the suppression gate is
+ * applied at review-build time in `routes/batchReview.ts`, so a number written
+ * here would be an assumption, and this field is the only evidence
+ * `docs/architecture.md` recognises for RSK-021. The measured slices are
+ * nested under their own keys instead, so no value here has ever been a lie.
+ * ~~"stages 3-5, which have not run (TASK-060)"~~ *(corrected in place: stage
+ * 3 now runs — see `resolveCandidates.ts`.)*
  *
  * ⚠ `candidatesAfterCleanup` IS in that slice and IS honest: stage 2
  * (`cleanup`) runs inside `recordItems` below, so the count is measured rather
@@ -74,6 +87,13 @@ export interface StartExtractionDeps {
  */
 interface PersistedExtractionStats {
   stage1: RunExtractionResult['stats'];
+  /**
+   * Stage 3 (`specs/ai.md` §4) — collapse and identity resolution, measured by
+   * `resolveCandidates`. Absent when stage 1 failed, because a batch that never
+   * reached review never ran it; an absent slice therefore means "not run", and
+   * zeros always mean "run, and this is what it found".
+   */
+  stage3?: ResolveCandidatesResult;
   progress: ExtractionProgress;
   imageFailures?: readonly { imageId: string; fileName: string; code: string; message: string }[];
 }
@@ -177,6 +197,78 @@ export function extractionPorts(
 }
 
 /**
+ * Ports over the real store and database for stage 3 (`specs/ai.md` §4).
+ *
+ * The TMDB client is built lazily and ONCE per batch, so §4.1's in-process
+ * result cache and its rate limiter are shared by every candidate rather than
+ * reset per row.
+ */
+export function resolutionPorts(
+  ownerId: OwnerId,
+  batchId: string,
+  deps: StartExtractionDeps = {},
+): ResolveCandidatesPorts {
+  let client: TmdbClient | null = null;
+  const getClient = (): TmdbClient =>
+    deps.tmdbClient ?? (client ??= new TmdbClient({ apiKey: process.env['TMDB_API_KEY'] ?? '' }));
+
+  const ports: ResolveCandidatesPorts = {
+    async listCandidates() {
+      const rows = await listCandidatesForReview(ownerId, batchId);
+      return rows.map((row) => ({
+        id: row.id,
+        normalisedText: row.normalisedText,
+        extractedYear: row.extractedYear,
+        sourceImageIds: row.sourceImages.map((source) => source.imageId),
+        // UNTRUSTED at read: the column is JSON text, and a malformed value
+        // must cost this candidate its geometry, never the batch its stage.
+        boundingBoxes: parseBoundingBoxes(row.boundingBoxes),
+        ocrConfidence: row.ocrConfidence,
+        collapsedIntoCandidateId: row.collapsedIntoCandidateId,
+        resolvedWorkIdentity: row.resolvedWorkIdentity,
+      }));
+    },
+
+    async searchTmdb(query) {
+      return getClient().searchMulti(query);
+    },
+
+    async persist(resolution) {
+      await updateCandidateDisposition(ownerId, resolution.candidateId, {
+        resolvedWorkIdentity: resolution.resolvedWorkIdentity,
+        matchCandidates: JSON.stringify(resolution.matchCandidates),
+        collapsedIntoCandidateId: resolution.collapsedIntoCandidateId,
+      });
+    },
+  };
+
+  return deps.log ? { ...ports, log: deps.log } : ports;
+}
+
+/**
+ * `boundingBoxes` is stored as a JSON string and is untrusted at read.
+ * A row whose geometry cannot be parsed still resolves — it simply loses its
+ * place in SD-02's ordering key, which is a degraded collapse rather than a
+ * failed batch.
+ */
+function parseBoundingBoxes(raw: string | null): ExtractionCandidate['boundingBoxes'] {
+  if (raw === null) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (box): box is ExtractionCandidate['boundingBoxes'][number] =>
+        typeof box === 'object' &&
+        box !== null &&
+        typeof (box as { x?: unknown }).x === 'number' &&
+        typeof (box as { y?: unknown }).y === 'number',
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Run stage-1 extraction for a submitted batch. Never rejects.
  */
 export async function startExtraction(
@@ -243,6 +335,19 @@ export async function startExtraction(
     };
 
     if (result.status === 'in-review') {
+      // ⚠ STAGE 3 RUNS HERE, AND ITS FAILURE IS NOT THE BATCH'S FAILURE.
+      // The screenshots are read and staged by this point. A TMDB outage or a
+      // bug in resolution must leave the owner a reviewable batch of
+      // unidentified titles (US-007 AC-6, `T-AI-017`), never discard the read.
+      try {
+        stats.stage3 = await resolveCandidates({
+          imageOrder: images.map((image) => image.imageId),
+          ports: resolutionPorts(ownerId, batchId, deps),
+        });
+      } catch (error) {
+        log('extraction.resolution_failed', { batchId, error: String(error) });
+      }
+
       await recordExtractionOutcome(ownerId, batchId, {
         status: 'in-review',
         extractionStats: JSON.stringify(stats),

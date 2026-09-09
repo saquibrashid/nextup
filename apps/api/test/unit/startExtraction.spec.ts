@@ -28,7 +28,9 @@ import {
 import {
   createExtractionCandidate,
   listImagesForBatch,
+  listCandidatesForReview,
   recordExtractionOutcome,
+  updateCandidateDisposition,
   transitionUploadBatchStatus,
   type OwnerId,
 } from '../../src/repository/ownerData.js';
@@ -38,6 +40,8 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
   return {
     ...actual,
     createExtractionCandidate: vi.fn(),
+    listCandidatesForReview: vi.fn(),
+    updateCandidateDisposition: vi.fn(),
     listImagesForBatch: vi.fn(),
     recordExtractionOutcome: vi.fn(),
     transitionUploadBatchStatus: vi.fn(),
@@ -48,6 +52,8 @@ const OWNER = 'owner-hash' as OwnerId;
 const BATCH = 'batch-1';
 
 const mockCreate = vi.mocked(createExtractionCandidate);
+const mockReviewRows = vi.mocked(listCandidatesForReview);
+const mockResolve = vi.mocked(updateCandidateDisposition);
 const mockImages = vi.mocked(listImagesForBatch);
 const mockRecord = vi.mocked(recordExtractionOutcome);
 const mockClaim = vi.mocked(transitionUploadBatchStatus);
@@ -122,6 +128,8 @@ beforeEach(() => {
   mockImages.mockResolvedValue([imageRow('img-1')] as never);
   mockRecord.mockResolvedValue({ count: 1 } as never);
   mockCreate.mockResolvedValue({} as never);
+  mockReviewRows.mockResolvedValue([] as never);
+  mockResolve.mockResolvedValue({ count: 1 } as never);
 });
 
 describe('startExtraction', () => {
@@ -210,6 +218,59 @@ describe('startExtraction', () => {
     // preserve the old "stages 2-5 never ran" wording would have left the
     // low-yield decision with nothing to decide from.
     expect(stats['stage1']).toMatchObject({ candidatesAfterCleanup: 1 });
+  });
+
+  it('T-EXT-010v runs stage 3 and records what it measured — the wiring, not just the module', async () => {
+    // ⚠ THE DEFECT THIS GUARDS. `collapseOverlap` and `matchCandidate` were
+    // merged, unit-tested and called by NOTHING for the whole of the project:
+    // every candidate reached review with `resolvedWorkIdentity = null`, so the
+    // product identified no title at all, and both module suites stayed green
+    // throughout. A test that only exercises the modules can never catch that.
+    mockReviewRows.mockResolvedValue([
+      {
+        id: 'cand-1',
+        normalisedText: 'arcane',
+        extractedYear: null,
+        ocrConfidence: 0.9,
+        boundingBoxes: JSON.stringify([{ x: 0.1, y: 0.2, width: 0.3, height: 0.1 }]),
+        collapsedIntoCandidateId: null,
+        resolvedWorkIdentity: null,
+        sourceImages: [{ imageId: 'img-1' }],
+      },
+    ] as never);
+    const tmdbClient = {
+      searchMulti: vi.fn(async () => [
+        { tmdbId: 94605, mediaType: 'tv', name: 'Arcane', releaseYear: 2021, posterPath: null },
+      ]),
+    } as never;
+
+    await startExtraction(OWNER, BATCH, {
+      blobStore,
+      extractor: extractorReturning(),
+      tmdbClient,
+    });
+
+    // The identity was resolved AND written back — not merely computed.
+    expect(mockResolve).toHaveBeenCalledWith(
+      OWNER,
+      'cand-1',
+      expect.objectContaining({ resolvedWorkIdentity: 'tmdb:tv:94605' }),
+    );
+    // And the measurement is recorded under its own key, so an absent slice
+    // still means "stage 3 did not run" rather than "it found nothing".
+    expect(lastStats()['stage3']).toMatchObject({ matched: 1, unmatched: 0, tmdbQueries: 1 });
+    expect(lastStatus()).toBe('in-review');
+  });
+
+  it('T-EXT-010w reaches in-review even when stage 3 cannot run at all', async () => {
+    // Resolution is an enrichment of a batch whose screenshots are already read
+    // and staged. Losing it must cost the owner identities, never the read.
+    mockReviewRows.mockRejectedValue(new Error('database unreachable'));
+
+    await startExtraction(OWNER, BATCH, { blobStore, extractor: extractorReturning() });
+
+    expect(lastStatus()).toBe('in-review');
+    expect(lastStats()['stage3']).toBeUndefined();
   });
 
   it('T-AI-022a persists lowYield as state when the readers produced nothing', async () => {
