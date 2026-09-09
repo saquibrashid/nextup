@@ -156,6 +156,46 @@ describe('crossCheck (T-AI-034)', () => {
     expect(items.every((i) => i.provider === 'ocr-only')).toBe(true);
   });
 
+  it('T-AI-039d - an ARTWORK tile cannot consume a caption that contradicts it', () => {
+    // ⚠ THE CORRECTION THE OCR LEG EXISTS TO SUPPLY (REQ-012). A `basis:
+    // 'artwork'` tile is the model on record as NOT having read printed
+    // glyphs. If a line inside that tile disagrees with what the model
+    // inferred from the art, that line is the ONLY reading of the caption
+    // anyone has — consuming it on geometry alone would delete the correction
+    // using the very tile it corrects, silently, at stage 1.
+    const artTile = [
+      tile('Wednesday', { x: 0, y: 0, w: 0.3, h: 0.5 }, { basis: 'artwork', visibleText: null }),
+    ];
+    const caption = [line('Merlina', { x: 0.02, y: 0.4, w: 0.26, h: 0.06 })];
+    const items = crossCheck(artTile, caption);
+
+    const orphan = items.find((i) => i.rawText === 'Merlina');
+    expect(orphan?.provider).toBe('ocr-only');
+    // ...and the tile is still emitted, unsupported. Neither reading is
+    // discarded; the owner decides.
+    expect(find(items, 'Wednesday')?.ocrSupport).toBe('none');
+  });
+
+  it('T-AI-039e - a tile that DID read glyphs still consumes its own extra lines', () => {
+    // ⚠ THE MEASURED LIMIT ON `d`, AND IT IS LOAD-BEARING. Requiring agreement
+    // from every overlapping line, whatever the basis, was measured against
+    // the golden corpus: the false-title rate went 0.2500 → 0.4803 while
+    // recall and omission recovery did not move at all. A split caption, an
+    // episode badge, a runtime and a "New episodes" flash all disagree with
+    // the tile subject and would each become a candidate to dismiss. So a
+    // `text`/`both` tile — the model on record as having read the glyphs —
+    // keeps consuming on geometry.
+    const readTile = [tile('The Bear', { x: 0, y: 0, w: 0.3, h: 0.5 })];
+    const extras = [
+      line('The Bear', { x: 0.02, y: 0.36, w: 0.26, h: 0.06 }),
+      line('New episodes', { x: 0.02, y: 0.44, w: 0.26, h: 0.05 }),
+    ];
+    const items = crossCheck(readTile, extras);
+
+    expect(items.filter((i) => i.provider === 'ocr-only')).toHaveLength(0);
+    expect(find(items, 'The Bear')?.ocrSupport).toBe('exact');
+  });
+
   it('T-AI-034k - handles both empty legs without throwing', () => {
     expect(crossCheck([], [])).toEqual([]);
     expect(crossCheck(tiles, []).every((i) => i.ocrSupport === 'none')).toBe(true);
