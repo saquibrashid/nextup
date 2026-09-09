@@ -22,6 +22,13 @@
  * instructed not to report chrome as a tile, so applying a fixed vocabulary to
  * its output would suppress a genuine title named after a UI word — `Max`,
  * `Home`, `Profile` and `Search` are all real works.
+ *
+ * ⚠ AND IT IS ALSO CONSULTED BY §3.2 STEP 1 (`mergeable()` in `cleanup.ts`),
+ * WHICH IS NOT AN ABUSE OF THE VOCABULARY BUT THE ONLY THING THAT MAKES IT
+ * WORK. Grouping runs before classification, so without that call a nav bar is
+ * merged into one candidate and no term can ever match it (TASK-195). Changing
+ * this set therefore changes grouping too — measure the golden corpus, do not
+ * reason about it.
  */
 
 /** Verbatim from `specs/ai.md` §3.2 step 3. Do not add terms without the spec. */
@@ -52,6 +59,26 @@ export const CHROME_TERMS: ReadonlySet<string> = new Set([
   'hbo max',
   'max',
   'netflix',
+  // ── Added by TASK-195 (`specs/ai.md` §3.2 step 3, second list). Every one of
+  // these appears as its own OCR line in the golden corpus, is chrome by the
+  // answer key, and was reaching the owner as a title candidate.
+  'shows',
+  'tv shows',
+  'tv shows & movies',
+  'games',
+  'clips',
+  'browse by languages',
+  'my netflix',
+  'my stuff',
+  'my purchases',
+  'recommended for you',
+  'sort by',
+  'top matches',
+  "haven't started",
+  'started',
+  'new & hot',
+  "you haven't added anything yet.",
+  'titles you add to your list will appear here.',
 ]);
 
 /**
@@ -66,4 +93,22 @@ export function foldForChrome(raw: string): string {
 
 export function isChromeTerm(raw: string): boolean {
   return CHROME_TERMS.has(foldForChrome(raw));
+}
+
+/**
+ * Row headers that carry a variable tail and therefore cannot be a term.
+ *
+ * ⚠ PREFIXES, NOT SUBSTRINGS. Netflix renders `Continue Watching for <profile
+ * name>`, so the profile name — arbitrary owner-chosen text — is part of the
+ * line. No exact vocabulary can ever cover it, which is why the rule is
+ * anchored at the START of the line and requires the whole prefix. A
+ * substring test would delete a work whose title merely mentions one.
+ */
+const CHROME_LINE_PREFIXES: readonly string[] = ['continue watching for '];
+
+/** `isChromeTerm`, plus the variable-tail row headers above. */
+export function isChromeLine(raw: string): boolean {
+  const folded = foldForChrome(raw);
+  if (CHROME_TERMS.has(folded)) return true;
+  return CHROME_LINE_PREFIXES.some((p) => folded.startsWith(p) && folded.length > p.length);
 }

@@ -63,7 +63,7 @@
 
 import { CLEANUP_VERDICTS, type CleanupVerdict } from '../enums.js';
 import { normaliseTitleText } from '../identity.js';
-import { isChromeTerm } from './chromeTerms.js';
+import { isChromeLine } from './chromeTerms.js';
 import { EXTRACT_CONFIDENCE_FLOOR } from './thresholds.js';
 import type { ExtractedTextItem, NormalisedBox } from './TitleExtractor.js';
 
@@ -145,6 +145,20 @@ function union(a: NormalisedBox, b: NormalisedBox): NormalisedBox {
 }
 
 function mergeable(prev: ExtractedTextItem, next: ExtractedTextItem): boolean {
+  // ⚠ A CHROME LABEL IS A COMPLETE STRING AND MUST NOT BE GLUED TO ITS
+  // NEIGHBOUR. Step 1 runs BEFORE step 3, so without this a navigation bar —
+  // whose labels sit on one row inside `OCR_MERGE_GAP` of each other — is
+  // merged into `NETFLIX Home Shows Movies` and then matches no term in a
+  // vocabulary that is exact-match by design (TASK-079 finding 2). The
+  // vocabulary can never grow its way out of that: the merged string is a
+  // sentence the UI never showed.
+  //
+  // Refusing the merge is the conservative direction. Chrome that stays whole
+  // is classified `chrome-suspected` — a visible, one-click-reversible
+  // collapsed group — whereas a caption fragment wrongly held apart is still a
+  // candidate. Nothing is dropped either way.
+  if (isChromeLine(prev.rawText) || isChromeLine(next.rawText)) return false;
+
   const taller = Math.max(prev.boundingBox.h, next.boundingBox.h);
   const sameLine =
     Math.abs(centreY(prev.boundingBox) - centreY(next.boundingBox)) <
@@ -278,7 +292,7 @@ function classify(
 
   // Steps 3 and 4 — `ocr-only` only. Applying either to the primary reader
   // would suppress a genuine work called `Max`, `Home` or `1917`.
-  if (isOcrOnly && isChromeTerm(matchText)) {
+  if (isOcrOnly && isChromeLine(matchText)) {
     return 'chrome-suspected';
   }
   if (isOcrOnly && digitSymbolRatio(matchText) >= DIGIT_SYMBOL_RATIO_CEILING) {

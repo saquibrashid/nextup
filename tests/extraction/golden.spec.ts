@@ -128,23 +128,18 @@ const KNOWN_SHORTFALLS = {
    * to prevent. §7.4's collapse reunites the ones whose text matches exactly;
    * FRAGMENTS of a two-line caption (`stranger things vhs` + `special
    * edition`) survive as separate candidates and are counted here.
-   */
-  aggregateFalseTitleRate: 0.25,
-  /**
-   * The §3.2 vocabulary is a fixed list of 26 EXACT terms, and the corpus's
-   * real chrome is mostly outside it: `sort by`, `top matches`, `haven't
-   * started`, `clips`, `my netflix`, `my stuff`, `my purchases`,
-   * `recommended for you`. Worse, on both desktop captures OCR returns the
-   * whole navigation bar as ONE line (`netflix home shows movies`), which no
-   * exact-match vocabulary can ever match however many terms it holds.
    *
-   * ⚠ DO NOT FIX THIS BY ADDING TERMS. `chromeTerms.ts` says *"Do not add
-   * terms without the spec"*, and it is right to: the list is exact-match
-   * precisely so that a work named `Max` or `Home` survives. Widening it is a
-   * spec change, and the line-merging problem is not a vocabulary problem at
-   * all.
+   * ⚠ THIS NUMBER WENT UP AT TASK-195 WHILE THE DEFECT GOT SMALLER, AND THE
+   * DIRECTION IS A DENOMINATOR ARTEFACT, NOT A REGRESSION. The absolute count
+   * of false titles fell from **26 to 22**. The rate rose from 0.2500 to
+   * 0.3143 because its denominator is `title-candidate` COUNT, and 34 chrome
+   * strings that used to be counted as title candidates are now correctly
+   * `chrome-suspected` — so the same numerator is divided by 70 instead of
+   * 104. Anyone reading this number as "false titles got worse" is reading it
+   * backwards; the honest summary is that the corpus stopped hiding the rate
+   * behind a padded denominator.
    */
-  chromeRejectionRate: 0.2361111111111111,
+  aggregateFalseTitleRate: 0.3142857142857143,
   /**
    * 18 of 24. ⚠ THE MOST IMPORTANT FINDING IN THIS FILE, and one no synthetic
    * corpus would ever have produced: every single miss is a **2025 release
@@ -189,6 +184,32 @@ const KNOWN_SHORTFALLS = {
 } as const;
 
 /**
+ * Chrome rejection — **A GATE, NOT A PIN, SINCE TASK-195.**
+ *
+ * ⚠ IT LEFT `KNOWN_SHORTFALLS` BY CLEARING §9.2, WHICH IS EXACTLY WHAT
+ * `T-AI-030f` EXISTS TO FORCE. Measured 0.2361 when the ledger was written and
+ * **0.8750 now** against a floor of {@link CHROME_REJECTION_FLOOR}. The two
+ * causes recorded in TASK-079 finding (2) were both real and both fixed:
+ *
+ *   1. **The vocabulary genuinely did not cover this corpus** — `sort by`,
+ *      `top matches`, `clips`, `my netflix`, `my stuff`, `my purchases`,
+ *      `recommended for you` and nine more are now §3.2 terms.
+ *   2. **The nav bar was never one OCR line.** The finding said no exact
+ *      vocabulary could ever match `netflix home shows movies`, and that was
+ *      the right conclusion from the wrong premise: the RECORDINGS hold
+ *      `NETFLIX`, `Home`, `Shows`, `Movies` as four separate lines. §3.2 step
+ *      1's reading-order grouping — which runs BEFORE the chrome test — glued
+ *      them together, and the vocabulary was then asked to match a string the
+ *      UI never rendered. `mergeable()` now refuses to merge across a chrome
+ *      label.
+ *
+ * The residual 9 of 72 are OCR misses and rotation artefacts, not
+ * classification failures: the line is absent from the reader's output
+ * altogether, so no verdict can be assigned to it.
+ */
+const CHROME_REJECTION_MEASURED = 0.875;
+
+/**
  * The blank capture's three surviving strings, pinned exactly.
  *
  * ⚠ THIS TEST USED TO ASSERT AN EMPTY ARRAY, AND THAT WAS WRONG — not because
@@ -201,11 +222,23 @@ const KNOWN_SHORTFALLS = {
  * What matters for fabrication is that NOTHING resembling a work title
  * appears, and that is what is asserted.
  */
-const BLANK_PAGE_SURVIVING_CHROME = [
-  'you haven t added anything yet',
-  'titles you add to your list will appear here',
-  'new hot',
-];
+/**
+ * The blank capture's surviving strings — **now none, and that is a result,
+ * not a reset.**
+ *
+ * ⚠ READ THE HISTORY BEFORE TOUCHING THIS. It began as `[]`, and that was
+ * WRONG: the assertion described a property the product did not have. Three
+ * strings survived — the two empty-state sentences and the `New & Hot` nav
+ * heading — really on the screen, correctly read, correctly NOT fabricated,
+ * and outside §3.2's vocabulary. So the list was filled in to say what the
+ * product actually did.
+ *
+ * TASK-195 put all three into §3.2, so the honest value is `[]` **again**, by
+ * a completely different route. The empty array is now earned rather than
+ * assumed, and `T-AI-032c`'s second assertion (nothing uncorroborated) is what
+ * keeps it from being vacuous.
+ */
+const BLANK_PAGE_SURVIVING_CHROME: readonly string[] = [];
 
 describe('T-AI-030 the golden corpus is measured, and the measurement is pinned', () => {
   it('T-AI-030a · the corpus actually ran — no metric was scored on an empty pipeline', () => {
@@ -261,12 +294,15 @@ describe('T-AI-030 the golden corpus is measured, and the measurement is pinned'
     expect(KNOWN_SHORTFALLS.aggregateFalseTitleRate).toBeGreaterThan(AGGREGATE_FALSE_TITLE_CEILING);
   });
 
-  it('T-AI-030e · chrome rejection is pinned', () => {
+  it('T-AI-030e · chrome rejection CLEARS the §9.2 floor and is gated, not pinned', () => {
     const chromeTotal = scored.reduce((n, s) => n + s.expected.expectedChrome.length, 0);
     const rejected = scored.reduce((n, s) => n + s.chromeRejected, 0);
-    expect(chromeTotal).toBeGreaterThan(0);
-    expect(rejected / chromeTotal).toBe(KNOWN_SHORTFALLS.chromeRejectionRate);
-    expect(KNOWN_SHORTFALLS.chromeRejectionRate).toBeLessThan(CHROME_REJECTION_FLOOR);
+    expect(chromeTotal).toBe(72);
+    // The gate, asserted first because it is the one that matters.
+    expect(rejected / chromeTotal).toBeGreaterThanOrEqual(CHROME_REJECTION_FLOOR);
+    // And the exact value, so an improvement is recorded rather than absorbed
+    // and a silent slide toward the floor still fails.
+    expect(rejected / chromeTotal).toBe(CHROME_REJECTION_MEASURED);
   });
 
   it('T-AI-030f · the pins clear themselves the moment the shortfalls stop being real', () => {
@@ -292,12 +328,17 @@ describe('T-AI-030 the golden corpus is measured, and the measurement is pinned'
     // says: stop pinning that metric, gate it.
     expect(KNOWN_SHORTFALLS.aggregateRecall).toBeLessThan(AGGREGATE_RECALL_FLOOR);
     expect(KNOWN_SHORTFALLS.aggregateFalseTitleRate).toBeGreaterThan(AGGREGATE_FALSE_TITLE_CEILING);
-    expect(KNOWN_SHORTFALLS.chromeRejectionRate).toBeLessThan(CHROME_REJECTION_FLOOR);
     expect(KNOWN_SHORTFALLS.matchAccuracy).toBeLessThan(MATCH_ACCURACY_FLOOR);
     expect(KNOWN_SHORTFALLS.omissionRecovery).toBeLessThan(OMISSION_RECOVERY_FLOOR);
+    // ⚠ AND IT HAS NOW FIRED ONCE FOR REAL. `chromeRejectionRate` was the
+    // fifth entry here until TASK-195; it cleared §9.2, this guard failed as
+    // designed, and the metric was moved out of the ledger and gated by
+    // `T-AI-030e`. That is the whole mechanism working end to end — so the
+    // key must NOT come back, and the count below drops to match.
+    expect(Object.keys(KNOWN_SHORTFALLS)).not.toContain('chromeRejectionRate');
     // Non-vacuity: a ledger that lost its entries would pass every line above
     // by having nothing to check.
-    expect(Object.keys(KNOWN_SHORTFALLS).length).toBeGreaterThanOrEqual(5);
+    expect(Object.keys(KNOWN_SHORTFALLS).length).toBeGreaterThanOrEqual(4);
     // And the runner-side stage-3 deferral IS discharged (TASK-190) — asserted
     // positively so it cannot silently regress to the state this guard was
     // originally written to watch for.

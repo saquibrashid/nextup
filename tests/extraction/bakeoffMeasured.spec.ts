@@ -162,12 +162,18 @@ describe('T-AI-045 the bake-off is measured, and the pre-committed rule decides 
     const chal = aggregate(chalScored);
 
     expect(inc.recall).toBe(0.9104477611940298);
-    expect(inc.falseTitleRate).toBe(0.25);
-    expect(inc.fabricationRate).toBe(0.012987012987012988);
+    // ⚠ 0.2500 → 0.3143 AT TASK-195, AND THE DEFECT GOT SMALLER, NOT BIGGER.
+    // The false-title COUNT fell 26 → 22; the denominator is `title-candidate`
+    // count, and 34 chrome strings stopped being counted as title candidates.
+    // Both arms are scored by the same code over the same answer key, so the
+    // comparison below is unaffected — which is the property §9.7 Stage 1
+    // exists to protect.
+    expect(inc.falseTitleRate).toBe(0.3142857142857143);
+    expect(inc.fabricationRate).toBe(0.011494252873563218);
 
     expect(chal.recall).toBe(0.9253731343283582);
-    expect(chal.falseTitleRate).toBe(0.34782608695652173);
-    expect(chal.fabricationRate).toBe(0.040697674418604654);
+    expect(chal.falseTitleRate).toBe(0.4523809523809524);
+    expect(chal.fabricationRate).toBe(0.035);
 
     // ⚠ THE SHAPE OF THE RESULT, STATED AS AN ASSERTION SO IT CANNOT BE
     // MISREAD FROM THE NUMBERS ALONE: the challenger reads MORE, and much of
