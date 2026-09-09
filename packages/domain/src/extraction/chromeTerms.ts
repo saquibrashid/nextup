@@ -79,6 +79,23 @@ export const CHROME_TERMS: ReadonlySet<string> = new Set([
   'new & hot',
   "you haven't added anything yet.",
   'titles you add to your list will appear here.',
+  // ── Added by TASK-199 (owner decision, `docs/backlog.md`). Tile-painted
+  // BADGES rather than navigation, which is why the first pass of this
+  // vocabulary missed them: they are rendered ON the artwork, so they read
+  // like part of the tile. Each is correctly read by both legs, appears as
+  // its own OCR line on all three Max fixtures, and is never a work title.
+  //
+  // ⚠ `hbo` IS THE OTHER HALF OF THE `HBO max` WORDMARK, not a badge — the
+  // two words are separate OCR lines at the top-left of the desktop capture
+  // (y 0.014 and y 0.035) and `max` was already here. Adding one without the
+  // other left half a logo classified as a title.
+  //
+  // ⚠ SAFE ONLY BECAUSE STEP 3 IS `ocr-only`-SCOPED. `new` is three letters
+  // and generic; if this vocabulary were ever applied to the primary reader,
+  // this entry alone would suppress any work the model named `New`.
+  'hbo',
+  'hbo original',
+  'new',
 ]);
 
 /**

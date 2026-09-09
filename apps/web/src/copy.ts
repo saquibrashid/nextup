@@ -1023,6 +1023,22 @@ export const UNMATCHED_MATCH_LABEL = 'Use {name}';
 export const UNMATCHED_ACTION_FAILED = "Couldn't save that. Nothing has changed.";
 export const UNMATCHED_CANCEL_LABEL = 'Cancel';
 
+/* ------------------------------------------------------------------ *
+ * The §5.3 addition-card controls (TASK-200).
+ *
+ * ⚠ DIFFERENT WORDS FOR THE SAME THREE ACTIONS, AND THE DIFFERENCE MATTERS.
+ * An unmatched row is one TMDB could not name, so its keep action has to say
+ * what keeping MEANS ("Keep as unidentified"). An addition already carries a
+ * resolved match, so the same button is a plain "Confirm" — labelling it
+ * "Keep as unidentified" there would tell the owner their correctly matched
+ * title was unidentified.
+ * ------------------------------------------------------------------ */
+export const ADDITION_CONFIRM_LABEL = 'Confirm';
+export const ADDITION_CHANGE_MATCH_LABEL = 'Change match';
+export const ADDITION_DISCARD_LABEL = 'Not a title — discard';
+export const ADDITION_CONFIRMED = 'Confirmed. This will be added to your list.';
+export const ADDITION_DISCARDED = "Discarded. It won't be added to your list.";
+
 /**
  * TASK-028 — the owner gate (`apps/web/src/containers/OwnerGate.tsx`).
  *

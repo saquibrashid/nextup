@@ -174,11 +174,24 @@ describe('T-AI-045 the bake-off is measured, and the pre-committed rule decides 
     // same commit, which is the pairing §3.1a R2 was designed to produce —
     // the embellishment cost a recall point AND a false title, so removing it
     // repays both.
-    expect(inc.falseTitleRate).toBe(0.2857142857142857);
+    //
+    // ⚠ THEN 0.2857 → 0.2424 AT TASK-199, when the owner ruled that `HBO`,
+    // `HBO ORIGINAL` and `New` are chrome. The badge vocabulary is a stage-2
+    // rule and applies to BOTH arms, so the challenger moved too — 0.4405 →
+    // 0.4198 — and the comparison stays like-for-like. The incumbent's lead
+    // widened from 15.5 points to 17.7.
+    //
+    // ⚠ THE CHALLENGER'S MOVE WAS BRIEFLY RECORDED HERE AS "DID NOT MOVE AT
+    // ALL", WHICH WAS FALSE AND IS NOTED SO THE MISTAKE IS NOT REPEATED: a
+    // run of this file reported ONE failure, and it was read as "only the
+    // incumbent drifted". `expect` throws, so the first failing assertion in
+    // a test masks every later one in the same test. Re-run after fixing each
+    // pin; never infer from a single failure that the others held.
+    expect(inc.falseTitleRate).toBe(0.24242424242424243);
     expect(inc.fabricationRate).toBe(0.011494252873563218);
 
     expect(chal.recall).toBe(0.9402985074626866);
-    expect(chal.falseTitleRate).toBe(0.44047619047619047);
+    expect(chal.falseTitleRate).toBe(0.41975308641975306);
     expect(chal.fabricationRate).toBe(0.035);
 
     // ⚠ THE SHAPE OF THE RESULT, STATED AS AN ASSERTION SO IT CANNOT BE

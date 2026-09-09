@@ -493,6 +493,35 @@ export function ReviewPage({
             confirmAll('additions');
           }}
           pendingCount={pendingIn(sections.additions.items)}
+          renderCard={(candidate) => (
+            <CandidateCard
+              candidate={candidate}
+              thumbnailUrl={thumbnailUrlFor(candidate)}
+              actions={
+                /* ⚠ TASK-200 / `specs/ui.md` §5.3. Before this the additions
+                   section had NO per-card control, so one false extra among
+                   ten good rows — a fragment like "LEVANTE" split off
+                   "SOL LEVANTE" — could only be rejected by abandoning the
+                   whole batch. `unmatchedWired` is reused deliberately: the
+                   same four handlers serve both sections, and all-four-or-none
+                   still applies. */
+                unmatchedWired ? (
+                  <UnmatchedActions
+                    candidateId={candidate.candidateId}
+                    disposition={effectiveDisposition(
+                      candidate.disposition,
+                      local[candidate.candidateId],
+                    )}
+                    onDiscard={onDiscardU}
+                    onKeep={onKeepU}
+                    onMatch={onMatchU}
+                    onSearch={onSearchU}
+                    variant="addition"
+                  />
+                ) : null
+              }
+            />
+          )}
           section={sections.additions}
           testId="review-additions"
         />
