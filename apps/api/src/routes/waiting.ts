@@ -36,6 +36,7 @@ import { toIsoDate } from './titles.js';
 /** One row of the waiting view. Shaped field by field, never spread. */
 export interface WaitingItem {
   intentId: string;
+  titleId: string;
   workIdentity: string;
   name: string;
   releaseYear: number | null;
@@ -97,7 +98,10 @@ export function registerWaitingRoutes(
     // exactly the rows about to be rendered; handing it anything wider turns
     // the lazy refresh into the backfill sweep REQ-041 forbids.
     const stale = selectForAvailabilityRefresh(rows, now);
-    const writes = stale.length === 0 ? [] : await refreshAvailability(stale, getTmdb(), now);
+    const { writes, failedIds } =
+      stale.length === 0
+        ? { writes: [], failedIds: [] }
+        : await refreshAvailability(stale, getTmdb(), now);
 
     const fresh = new Map(writes.map((write) => [write.id, write]));
     for (const write of writes) {
@@ -117,6 +121,7 @@ export function registerWaitingRoutes(
 
       return {
         intentId: intent.id,
+        titleId: intent.titleId,
         workIdentity: intent.workIdentity,
         name: intent.title.tmdbName ?? intent.title.rawExtractedText ?? '',
         releaseYear: intent.title.tmdbReleaseYear,
@@ -130,6 +135,15 @@ export function registerWaitingRoutes(
       };
     });
 
-    res.status(200).json({ items, count: items.length });
+    res.status(200).json({
+      items,
+      count: items.length,
+      // ⚠ US-042 AC-7. `true` means at least one lookup this render THREW, so
+      // the rows above may be showing a last-known answer with an older as-of
+      // date. It is a note the client renders unobtrusively — never a non-200,
+      // never an error page: the waiting list is the owner's own data and
+      // renders from the store whatever TMDB is doing.
+      availabilityRefreshFailed: failedIds.length > 0,
+    });
   });
 }

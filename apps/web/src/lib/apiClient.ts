@@ -315,6 +315,46 @@ export interface SuppressionsResponse {
 }
 
 /**
+ * One row of `GET /api/waiting` (TASK-188/189, US-042/043, ADR-0010).
+ *
+ * ⚠ **`availableOn: null` MEANS NOT KNOWN, NOT "NOT STREAMING ANYWHERE"**
+ * (ADR-0010 Trap 4). `[]` is the different, weaker fact that TMDB answered and
+ * no subscription provider carries it. The two must render differently and
+ * neither may become the sentence the data cannot support.
+ *
+ * ⚠ **`titleId` IS HERE FOR "NOT INTERESTED"** (US-043 AC-4). Suppression is
+ * keyed on canonical work identity server-side (REQ-070/071), and the suppress
+ * endpoint takes the title id like it does everywhere else — a waiting work is
+ * suppressed by exactly the same call as a listed one, deliberately.
+ */
+export interface WaitingItem {
+  intentId: string;
+  titleId: string;
+  workIdentity: string;
+  name: string;
+  releaseYear: number | null;
+  posterPath: string | null;
+  discoveredAt: string;
+  discoverySource: string;
+  availableOn: string[] | null;
+  /** Which of the owner's own services carry it, or `null` for not known. */
+  flaggedOn: string[] | null;
+  availabilityCheckedAt: string | null;
+  availabilityRegion: string;
+}
+
+export interface WaitingResponse {
+  items: WaitingItem[];
+  count: number;
+  /**
+   * ⚠ At least one lookup THREW this render (US-042 AC-7). The rows are still
+   * the owner's data and still render; this only adds an unobtrusive note that
+   * the as-of dates may be older than expected. It is never an error page.
+   */
+  availabilityRefreshFailed: boolean;
+}
+
+/**
  * One row of `GET /api/removed` (`specs/api.md` §6.9) — one **removal**, never
  * one work.
  *
@@ -597,6 +637,16 @@ export function createApiClient(deps: ApiClientDeps = {}) {
 
     getSuppressions: (signal?: AbortSignal) =>
       request<SuppressionsResponse>('/api/suppressions', { signal }, deps),
+
+    /**
+     * ⚠ **THIS READ IS THE ONLY TRIGGER FOR THE AVAILABILITY REFRESH**
+     * (REQ-086, product invariant 5). It is deliberately a plain GET the
+     * container issues on render — there is no timer, no poll and no
+     * revalidation loop anywhere on the client, and adding one here would turn
+     * a lazy refresh into the background sweep REQ-041 forbids.
+     */
+    getWaiting: (signal?: AbortSignal) =>
+      request<WaitingResponse>('/api/waiting', { signal }, deps),
 
     suppressTitle: (titleId: string, reason?: string) =>
       request<{ suppressionId: string; workIdentity: string; alreadySuppressed: boolean }>(

@@ -165,16 +165,17 @@ export function unmappedCriteria(prd: Set<string>, mapping: Set<string>): string
  * ⚠ Do NOT add to this list to make a build pass. A new unmapped AC means a
  * criterion was written with no definition of done. Write the mapping row.
  *
- * ⚠ **THE 28 THAT REMAIN ARE NOT WAITING ON A MAPPING ROW — THEY ARE WAITING
- * ON A BACKLOG.** US-040…US-043 (the rental epic) have no task in
- * `docs/backlog.md` at all: `git grep -i rental docs/backlog.md` is empty. So
- * unlike the IMDb half, which was written and then mapped, these cannot be
- * mapped by anyone, because there is no implementation and therefore no test
- * to name. Writing plausible-looking rows for them would satisfy
- * `T-META-001a` and fail `T-META-001e`, and softening `e` to get past that is
- * how this gate would become the thing it was built to catch. **TASK-126
- * cannot close while this list is non-empty, and the missing work is an Epic
- * for the backlog, not a mapping chore for this file.**
+ * ⚠ **ONE ENTRY REMAINS, AND IT IS WAITING ON A BACKLOG, NOT ON A MAPPING
+ * ROW.** US-040 AC-2 lands with the extraction path; until that test exists
+ * there is nothing to name, and writing a plausible-looking row for it would
+ * satisfy `T-META-001a` and fail `T-META-001e`. Softening `e` to get past that
+ * is how this gate would become the thing it was built to catch. **TASK-126
+ * cannot close while this list is non-empty.**
+ *
+ * ~~"THE 28 THAT REMAIN … US-040…US-043 (the rental epic) have no task in
+ * `docs/backlog.md` at all"~~ *(Superseded. Epic L was subsequently written
+ * into the backlog as TASK-183…TASK-189 and built; the twenty-seven criteria
+ * of US-041, US-042 and US-043 are now mapped in `specs/testing.md` §9.)*
  */
 const KNOWN_UNMAPPED: readonly string[] = [
   // US-040 — Capture a rental storefront's new-release page
@@ -183,18 +184,12 @@ const KNOWN_UNMAPPED: readonly string[] = [
   // US-042 — Be told when a waiting title starts streaming
   // ⚠ AC-1, AC-2, AC-4, AC-5 and AC-10 were removed by TASK-187 — `T-AVAIL-001`,
   // `T-AVAIL-002`, `T-AVAIL-004`, `T-AVAIL-005` and `T-AVAIL-010` map them.
-  'US-042 AC-3',
-  'US-042 AC-6',
-  'US-042 AC-7',
+  // ⚠ AC-3, AC-6, AC-7 and AC-9 were removed by TASK-188 — `T-AVAIL-003`,
+  // `T-AVAIL-006`, `T-AVAIL-007` and `T-AVAIL-009` map them.
   // ⚠ AC-8 was removed by TASK-184 — `T-AVAIL-008` maps it.
-  'US-042 AC-9',
   // US-043 — Browse and clear the waiting list
-  'US-043 AC-1',
-  'US-043 AC-2',
-  'US-043 AC-3',
-  'US-043 AC-4',
-  'US-043 AC-5',
-  'US-043 AC-6',
+  // ⚠ ALL SIX were removed by TASK-189 — `T-WAIT-008`, `T-WAIT-009`,
+  // `T-WAIT-010`, `T-AVAIL-003` and `T-AVAIL-006` map them.
 ];
 
 /**

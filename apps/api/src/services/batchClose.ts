@@ -93,6 +93,7 @@ import {
   type Db,
   type OwnerId,
 } from '../repository/ownerData.js';
+import { satisfyWaitingIntents } from '../repository/watchIntents.js';
 import { canTransition, loadOwnedBatch, transitionBatch } from './batchLifecycle.js';
 
 export interface CloseResult {
@@ -705,6 +706,8 @@ export async function closeBatch(
     let gatedInTransaction = 0;
     /** The candidate → Title links this close will flush (TASK-182). */
     const resolvedTitleLinks: { candidateId: string; titleId: string }[] = [];
+    /** Works this close put on a service — the graduation set (TASK-189). */
+    const listedWorkIdentities: string[] = [];
 
     for (const { candidate, kind } of applicable) {
       const workIdentity = identityFor(candidate);
@@ -799,6 +802,7 @@ export async function closeBatch(
         tx,
       );
       listingsCreated += 1;
+      listedWorkIdentities.push(workIdentity);
       // §8.1: a listing added to an existing title is `created` with
       // `titleWasCreated: false`; a listing on a title this batch created
       // folds together with the row above into ONE §3.7 entry carrying both
@@ -830,6 +834,25 @@ export async function closeBatch(
     // the title — so the link is derivable in one hop. Writing it twice would
     // create a second thing that can disagree with the first.
     await setCandidateResolvedTitles(ownerId, resolvedTitleLinks, tx);
+
+    // ── graduation (TASK-189, US-043 AC-3) ──────────────────────────────
+    //
+    // ⚠ A CONSEQUENCE OF THE ORDINARY PATH, NEVER A SPECIAL CASE. Nothing
+    // above this line knows an intent exists: the candidate was reviewed, the
+    // title resolved and the listing written exactly as they are for a work
+    // nobody was waiting on. Only afterwards do we close whatever intent that
+    // fact happens to satisfy. A build that instead went looking for intents
+    // and wrote listings for them would put a work in the combined list that
+    // no capture ever saw, which is what ADR-0010 exists to prevent.
+    //
+    // ⚠ IN THE SAME TRANSACTION as the listings it follows from. A satisfied
+    // intent whose listing rolled back would leave the work in neither the
+    // combined list nor the waiting view — invisible, with no way to notice.
+    //
+    // ⚠ THE ROW IS RETAINED FOREVER (REQ-028, US-043 AC-5). It is re-stated,
+    // never deleted, and `T-INV-012` must still show exactly one sanctioned
+    // hard delete after this epic ships.
+    await satisfyWaitingIntents(ownerId, listedWorkIdentities, now, tx);
 
     // ── removals (TASK-086/087/088) ─────────────────────────────────────
     //

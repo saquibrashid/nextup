@@ -215,6 +215,11 @@ describe('T-AVAIL-011 · GET /api/waiting without a store', () => {
     expect(updateWatchIntentAvailability).not.toHaveBeenCalled();
     expect(body.items[0]?.availableOn).toEqual(['Max']);
     expect(body.items[0]?.availabilityCheckedAt).toBe(OLD.toISOString());
+    // ⚠ And the view is TOLD (US-042 AC-7), so it can render its unobtrusive
+    // note beside a last-known answer whose as-of date is now older than the
+    // owner might expect. A silent 200 here is indistinguishable from a
+    // successful refresh that found nothing due.
+    expect(body.availabilityRefreshFailed).toBe(true);
   });
 
   it('T-AVAIL-011e · an unmatched work is listed but never asked about', async () => {
@@ -236,7 +241,7 @@ describe('T-AVAIL-011 · GET /api/waiting without a store', () => {
 
     const { status, body } = await get();
     expect(status).toBe(200);
-    expect(body).toEqual({ items: [], count: 0 });
+    expect(body).toEqual({ items: [], count: 0, availabilityRefreshFailed: false });
     expect(getWatchProviders).not.toHaveBeenCalled();
   });
 

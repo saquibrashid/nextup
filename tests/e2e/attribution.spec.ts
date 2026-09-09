@@ -115,11 +115,11 @@ async function expectStyledAndRendered(page: Page): Promise<void> {
 }
 
 test.describe('T-ATTR-002 — the disclaimer is visible on every route, without interaction', () => {
-  test('T-ATTR-002a: ROUTES holds exactly nine routes plus the catch-all', () => {
+  test('T-ATTR-002a: ROUTES holds exactly ten routes plus the catch-all', () => {
     // Pins the set the two per-route loops below iterate. Without this they
     // are self-fulfilling: they cover whatever exists and report success.
-    expect(NON_CATCH_ALL).toHaveLength(9);
-    expect(PATHS).toHaveLength(10);
+    expect(NON_CATCH_ALL).toHaveLength(10);
+    expect(PATHS).toHaveLength(11);
   });
 
   /**

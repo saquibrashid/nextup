@@ -87,3 +87,33 @@ export async function updateWatchIntentAvailability(
 ) {
   return db(tx).watchIntent.updateMany({ where: { ownerId, id }, data });
 }
+
+/**
+ * Satisfy every waiting intent for these works (US-043 AC-3, `T-WAIT-008`).
+ *
+ * ⚠ **GRADUATION IS A CONSEQUENCE OF THE ORDINARY CAPTURE PATH, NEVER A
+ * SPECIAL CASE.** This is called from the service close, inside its
+ * transaction, after the listings it describes have been written — the work
+ * reached a service the normal way, and the intent is closing because of that
+ * fact rather than because anything went looking for intents to close.
+ *
+ * ⚠ **THE ROW IS RETAINED, NOT DELETED** (REQ-028, US-043 AC-5). There is no
+ * TTL and no scheduled deletion; a satisfied intent is history the owner can
+ * still be shown. `ck_intent_satisfied_coherent` refuses a satisfied intent
+ * with no date, so both columns move together or neither does.
+ *
+ * ⚠ Guarded on `state: 'waiting'`, so re-closing cannot re-date an intent that
+ * was already satisfied.
+ */
+export async function satisfyWaitingIntents(
+  ownerId: OwnerId,
+  workIdentities: readonly string[],
+  satisfiedAt: Date,
+  tx?: Db,
+) {
+  if (workIdentities.length === 0) return { count: 0 };
+  return db(tx).watchIntent.updateMany({
+    where: { ownerId, state: 'waiting', workIdentity: { in: [...workIdentities] } },
+    data: { state: 'satisfied', satisfiedAt },
+  });
+}
