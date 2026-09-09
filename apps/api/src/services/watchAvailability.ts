@@ -177,12 +177,30 @@ export interface WatchProviderSource {
  * TMDB client rate-limits internally; issuing eight at once buys a page render
  * nothing and makes the failure modes concurrent.
  */
+/**
+ * What one refresh pass produced: the rows to write, and the rows whose lookup
+ * failed.
+ *
+ * ⚠ **THE FAILURES ARE PART OF THE ANSWER, NOT AN ERROR.** US-042 AC-7 says
+ * the view renders last-known availability with an unobtrusive note that the
+ * refresh failed — never blank, never an error page. A caller that cannot tell
+ * "nothing was due" from "everything was due and TMDB was down" has no way to
+ * render that note, and the honest reading of a silent empty write list is the
+ * first of those two.
+ */
+export interface AvailabilityRefreshResult {
+  writes: AvailabilityWrite[];
+  /** Intent ids whose lookup threw. They keep their last-known answer. */
+  failedIds: string[];
+}
+
 export async function refreshAvailability(
   rows: readonly IntentRow[],
   source: WatchProviderSource,
   now: Date,
-): Promise<AvailabilityWrite[]> {
+): Promise<AvailabilityRefreshResult> {
   const writes: AvailabilityWrite[] = [];
+  const failedIds: string[] = [];
 
   for (const row of rows) {
     const mediaType = row.tmdbMediaType;
@@ -195,6 +213,7 @@ export async function refreshAvailability(
       // answered (`T-AVAIL-010`).
       providers = await source.getWatchProviders(mediaType, row.tmdbId, row.availabilityRegion);
     } catch {
+      failedIds.push(row.id);
       continue;
     }
 
@@ -206,5 +225,5 @@ export async function refreshAvailability(
     });
   }
 
-  return writes;
+  return { writes, failedIds };
 }

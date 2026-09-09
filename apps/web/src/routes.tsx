@@ -9,9 +9,14 @@
  * and would drift SILENTLY - the suite would keep passing while no longer
  * covering the new screen.
  *
- * ⚠ TEN ROUTES SINCE EPIC M, not nine. `/rating` (REQ-092) was added, and the
- * enumerate-from-here design is exactly what made that a one-line change
+ * ⚠ ELEVEN ROUTES SINCE EPIC L, not ten. `/waiting` (US-043) was added, and
+ * the enumerate-from-here design is exactly what made that a one-entry change
  * rather than a four-suite coverage hole.
+ *
+ * ~~⚠ TEN ROUTES SINCE EPIC M, not nine. `/rating` (REQ-092) was added~~
+ * *(Superseded — corrected in place: this comment is read as a statement of
+ * fact about the table below it, and a stale count here is how a new screen
+ * quietly stops being covered.)*
  */
 
 import type { ComponentType } from 'react';
@@ -26,6 +31,7 @@ import { RemovedRoute } from './containers/RemovedRoute';
 import { ReviewRoute } from './containers/ReviewRoute';
 import { SuppressedRoute } from './containers/SuppressedRoute';
 import { UploadRoute } from './containers/UploadRoute';
+import { WaitingRoute } from './containers/WaitingRoute';
 
 export interface RouteDefinition {
   /** The `react-router` path pattern. `*` is the catch-all. */
@@ -81,6 +87,12 @@ export const ROUTES: readonly RouteDefinition[] = [
     Component: SuppressedRoute,
     examplePath: '/not-interested',
     navLabel: 'Not interested',
+  },
+  {
+    path: '/waiting',
+    Component: WaitingRoute,
+    examplePath: '/waiting',
+    navLabel: 'Waiting to stream',
   },
   {
     path: '/about',

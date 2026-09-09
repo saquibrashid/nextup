@@ -118,7 +118,7 @@ describe('T-AVAIL-010 · ASM-059/A49 · the region is stored on the row and pass
       intent({ id: 'wi-gb', tmdbId: 2, availabilityRegion: 'GB' }),
     ];
 
-    const writes = await refreshAvailability(
+    const { writes } = await refreshAvailability(
       rows,
       {
         getWatchProviders: (_mediaType, tmdbId, region) => {
@@ -149,7 +149,7 @@ describe('T-AVAIL-010 · ASM-059/A49 · the region is stored on the row and pass
       intent({ id: 'wi-ok2', tmdbId: 3 }),
     ];
 
-    const writes = await refreshAvailability(
+    const { writes, failedIds } = await refreshAvailability(
       rows,
       {
         getWatchProviders: (_mediaType, tmdbId) =>
@@ -160,6 +160,10 @@ describe('T-AVAIL-010 · ASM-059/A49 · the region is stored on the row and pass
 
     // The failure fails ONE row, never the page.
     expect(writes.map((w) => w.id)).toEqual(['wi-ok', 'wi-ok2']);
+    // ⚠ And it is REPORTED rather than swallowed (US-042 AC-7). Without this,
+    // "nothing was due" and "everything was due and TMDB was down" are the
+    // same empty write list, and the view has no way to say which happened.
+    expect(failedIds).toEqual(['wi-fail']);
   });
 
   it('T-AVAIL-010d · staleness: never-checked is stale, recently-checked is not', () => {

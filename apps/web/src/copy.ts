@@ -1134,3 +1134,50 @@ export const SLOW_RESPONSE_BODY = 'Still working…';
 */
 export const SLOW_RESPONSE_STALLED_BODY =
   'This is taking longer than it should. Nothing has been changed.';
+
+/* ── the waiting view (TASK-188/189, US-042/US-043, ADR-0010) ───────────── */
+
+/** ux-states.md §8.1 pattern — the `/waiting` initial load. */
+export const WAITING_LOADING = 'Loading what you are waiting for…';
+
+/**
+ * US-043 AC-6. The empty view EXPLAINS ITSELF rather than rendering a bare
+ * "nothing here": this is the one screen an owner may open before they have
+ * ever used the feature, so it has to say what the view is for and how to
+ * fill it.
+ */
+export const WAITING_EMPTY_TITLE = "You aren't waiting on anything yet.";
+export const WAITING_EMPTY_BODY =
+  'Upload a screenshot of a rental storefront and keep the titles you want to watch. ' +
+  'They wait here until they reach Netflix or Max.';
+export const WAITING_EMPTY_ACTION = 'Upload a storefront screenshot';
+
+/**
+ * ⚠ **US-042 AC-6, ADR-0010 Trap 4 — THE SENTENCE THE DATA CAN SUPPORT.**
+ * `availableOn = null` means the question has not been answered, and `[]`
+ * means it was answered and no subscription provider carries it. Neither is
+ * "not streaming anywhere", which claims knowledge of every service in the
+ * world. Both render as a statement about the owner's OWN services, with the
+ * as-of date attached so the claim is bounded in time.
+ */
+export const WAITING_NOT_ON_YOUR_SERVICES = 'Not seen on your services as of';
+/** Never asked at all — there is not even an as-of date to show. */
+export const WAITING_NOT_CHECKED = 'Not checked yet.';
+
+/** US-042 AC-3 — the flag, with its invitation. Never an automatic add. */
+export const WAITING_NOW_ON_PREFIX = 'Now on';
+export const WAITING_NOW_ON_INVITATION = 'add it to your list';
+
+/**
+ * US-042 AC-7. Unobtrusive, and beside data that still rendered — the view is
+ * never blank and never an error page because TMDB had a bad minute.
+ */
+export const WAITING_REFRESH_FAILED =
+  "Couldn't check availability just now — showing what was last known.";
+
+/** US-042 AC-9 / REQ-087. A condition of using TMDB's watch-provider data. */
+export const JUSTWATCH_ATTRIBUTION = 'Streaming availability data provided by JustWatch.';
+
+/** US-043 AC-4 — the same suppression as anywhere else, keyed on identity. */
+export const WAITING_NOT_INTERESTED = 'Not interested';
+export const WAITING_SUPPRESS_FAILED = "Couldn't do that. Nothing was changed.";

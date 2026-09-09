@@ -34,6 +34,10 @@ const ROUTES = [
   '/batches/01J0000000000000000000BTCH/review',
   '/removed',
   '/not-interested',
+  // Epic L (US-043). Listed here so the accessibility sweep covers the waiting
+  // view; this list is a literal, so a new route is NOT picked up automatically
+  // and would silently go unchecked.
+  '/waiting',
   '/about',
   '/rating',
   '/no-such-route',

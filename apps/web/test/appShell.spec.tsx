@@ -1,8 +1,8 @@
 /**
- * TASK-025 - the app shell and the nine-route table (`specs/ui.md` §1).
+ * TASK-025 - the app shell and the eleven-route table (`specs/ui.md` §1).
  *
  * `T-UI-023` is defined in `specs/testing.md` §9A. The point of the test is
- * that "all nine routes" is a phrase FOUR later suites depend on
+ * that "all eleven routes" is a phrase FOUR later suites depend on
  * (`T-ATTR-002`, `T-ATTR-003`, `T-A11Y-001`, `T-A11Y-012`), and each of them
  * asserts something ACROSS the route set rather than about it. If a route were
  * missing from `ROUTES`, every one of those suites would keep passing while
@@ -26,10 +26,11 @@ function renderAt(path: string) {
 }
 
 describe('AppShell and routing', () => {
-  it('T-UI-023a · specs/ui.md §1 · the route table holds exactly the ten specified screens', () => {
+  it('T-UI-023a · specs/ui.md §1 · the route table holds exactly the eleven specified screens', () => {
     // ⚠ The EXACT PATH LIST is the assertion; the length is a redundant
     // restatement of it kept only so a diff reads clearly. Epic M added
-    // `/rating` (REQ-092), which is why this is ten and not nine.
+    // `/rating` (REQ-092) and Epic L added `/waiting` (US-043), which is why
+    // this is eleven and not nine.
     expect(ROUTES.map((route) => route.path)).toStrictEqual([
       '/',
       '/upload',
@@ -38,11 +39,12 @@ describe('AppShell and routing', () => {
       '/batches/:batchId/review',
       '/removed',
       '/not-interested',
+      '/waiting',
       '/about',
       '/rating',
       '*',
     ]);
-    expect(ROUTES).toHaveLength(10);
+    expect(ROUTES).toHaveLength(11);
   });
 
   it('T-UI-023b · specs/ui.md §1 · every route renders its own screen inside the shell', () => {
@@ -91,7 +93,7 @@ describe('AppShell and routing', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Batch history');
   });
 
-  it('T-UI-023f · specs/ui.md §1 · the nav exposes the seven top-level destinations', () => {
+  it('T-UI-023f · specs/ui.md §1 · the nav exposes the eight top-level destinations', () => {
     renderAt('/');
 
     const nav = screen.getByRole('navigation', { name: 'Primary' });
@@ -105,6 +107,9 @@ describe('AppShell and routing', () => {
       'Batches',
       'Removal history',
       'Not interested',
+      // Epic L (US-043). The waiting view is a top-level destination, not a
+      // filter of the list: nothing in it is on a service the owner has.
+      'Waiting to stream',
       'About',
       // Epic M (REQ-092). Reachable from the nav rather than only from a row,
       // because US-045 is about checking something the owner has NOT saved -

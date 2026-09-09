@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 5 |
+| ⬜ todo | 3 |
 | 🚧 doing | 3 |
-| ✅ done | 177 |
+| ✅ done | 179 |
 | 🙋 owner | 2 |
 | 💤 deferred | 0 |
 | **total** | **187** |
@@ -26,7 +26,6 @@ Not done, and every task they depend on is done.
 |---|---|---|
 | `TASK-057` | M | Epic C — Extraction |
 | `TASK-126` | M | Epic K — Platform, safety, and the shell |
-| `TASK-188` | M | Epic L — Waiting to stream (rental-release discovery) |
 
 ## Waiting on the owner
 
@@ -37,7 +36,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-5 tasks cannot start yet.
+4 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -45,7 +44,6 @@ Not done, and every task they depend on is done.
 | `TASK-079` | `TASK-078` |
 | `TASK-079b` | `TASK-079` |
 | `TASK-168` | `TASK-079` |
-| `TASK-189` | `TASK-188` |
 
 ## Done
 
@@ -228,3 +226,5 @@ Not done, and every task they depend on is done.
 | `TASK-185` | Epic L wave 2. `closeDiscoveryBatch` in `apps/api/src/services/batchClose.ts` branches before `requireServiceOf` and writes `WatchIntent` rows only; `planWatchIntents` in `packages/domain/src/watchIntent.ts` is the single decision point. Waiting titles are stored `state='removed'`, `sort_date_added=NULL` (owner-approved; `specs/data-model.md` §17.2a). No `batch_change` row is written for an intent — `ck_change_kind` is a closed 4-member CHECK and widening it needs a `DROP CONSTRAINT` that `T-MIG-001` forbids. `T-WAIT-002a`–`c`, `T-WAIT-003a`–`d`, `T-WAIT-004a`–`e`. | `T-WAIT-002`, `T-WAIT-002b`, `T-WAIT-003`, `T-WAIT-004` |
 | `TASK-186` | Epic L wave 3. `GET /api/batches/:id/review` now branches on `discoverySourceOf(batch)` instead of demanding `requireServiceOf`, so a discovery pass renders at all (`ReviewResponse.service` is `Service \| null` and carries `discoverySource`); the `alreadyOnYourList` section is shown for a discovery capture, where a SERVICE append-only pass omits it, because that is US-040 AC-5's reporting. Discard-suppresses is `discardedWorks` in `packages/domain/src/close.ts` (keyed on canonical work identity, REQ-071; candidates with no resolved identity are excluded because the review gate could never act on them) applied inside `closeDiscoveryBatch`'s transaction only, so a Netflix discard never suppresses. Tests: `T-WAIT-005` (`a`–`e`), `T-WAIT-006` (`a`–`k`), `T-WAIT-007` (`a`–`b`); all six US-041 criteria removed from `KNOWN_UNMAPPED`. | `T-WAIT-005`, `T-WAIT-006`, `T-WAIT-006b`, `T-WAIT-006c`, `T-WAIT-007` |
 | `TASK-187` | Epic L. The lazy, access-triggered, metadata-only availability refresh: `services/watchAvailability.ts` (pure decision half) + `routes/waiting.ts` (`GET /api/waiting`, the **only** trigger) + `readFlatrateProviders` on the TMDB client. ⚠ **The background-process invariant amendment, three → four, landed in this commit** — `PERMITTED_BACKGROUND_PROCESSES` and its count check in `tools/check-mutating-routes.mjs`, `T-CI-005g`/`h`, `T-MUT-001f`, PRD US-036 AC-2 + US-035 AC-3, and product invariant 5. `specs/testing.md` §33.1 corrected in place. Tests: `T-AVAIL-001` (a–d), `002` (a–b), `004` (a–b) integration; `T-AVAIL-005` (a–e), `010` (a–e), `011` (a–h) unit. ⚠ **Scope note:** `GET /api/waiting` was built HERE, not in `TASK-189` — it is the access trigger `T-AVAIL-001a`/`002a` need. `TASK-189` still owns the **web** route and the eleventh `ROUTES` entry. No migration: `0006_watch_intent` already ships all three columns and the filtered index. | `T-AVAIL-001`, `T-AVAIL-001b`, `T-AVAIL-002`, `T-AVAIL-004`, `T-AVAIL-005`, `T-AVAIL-010`, `T-AVAIL-011`, `T-CI-005`, `T-CI-005g` |
+| `TASK-188` | Epic L. Availability **presentation**: `pages/WaitingPage.tsx` (with the pure, exported `availabilityLine`), the `justwatch-attribution` block, and the `availabilityRefreshFailed` flag carried end to end — `refreshAvailability` now returns `{ writes, failedIds }` and `GET /api/waiting` reports whether any lookup failed. ⚠ **`availabilityLine` is exported specifically so `T-AVAIL-006e` can assert which SENTENCE is chosen** — a DOM query passes just as happily against the forbidden *"not streaming anywhere"*, and `T-AVAIL-006c` asserts that string absent from the whole document across all three data shapes. Mutation-checked: rewriting the sentence to the forbidden claim fails 5 of the 15 cases. Tests: `T-AVAIL-003a`/`b`, `T-AVAIL-007a`/`b` integration; `T-AVAIL-003c`/`d`, `T-AVAIL-006` (a–e), `T-AVAIL-007c`, `T-AVAIL-009b` unit; `T-AVAIL-009a` e2e. | `T-AVAIL-003`, `T-AVAIL-003b`, `T-AVAIL-006`, `T-AVAIL-007`, `T-AVAIL-009` |
+| `TASK-189` | Epic L. **Graduation and the waiting view.** `satisfyWaitingIntents` in `repository/watchIntents.ts`, called from the **service** close in `services/batchClose.ts` inside the same transaction, immediately after `setCandidateResolvedTitles`; the discovery close is untouched. Web: `containers/WaitingRoute.tsx` + the **eleventh** `ROUTES` entry, with the four suites that enumerate routes updated (`T-UI-023a`/`f`, `T-ATTR-002a`, and the literal list in `tests/e2e/a11y.spec.ts`). ⚠ **`batchCloseRoutes.spec.ts` needed a sibling `vi.mock` for `watchIntents.js`** — the ~20 unit twins mock only `ownerData.js`, so a new repository import in a mocked service reaches a real Prisma client and fails with `DATABASE_URL is not set`. Tests: `T-WAIT-008` (a–c) integration; `T-WAIT-009` (a–c), `T-WAIT-010b`–`d` unit; `T-WAIT-010a`/`e` e2e. ⚠ **FINDING, NOT BUILT: undo does not un-satisfy an intent.** Undoing a batch that graduated a work removes the listing but leaves `state = 'satisfied'`, so the work leaves BOTH the combined list and the waiting view silently. No AC and no test covers it; recorded here rather than built, because the remedy (un-satisfying on undo vs. treating graduation as final) is a product decision. | `T-INV-012`, `T-WAIT-008`, `T-WAIT-009`, `T-WAIT-010` |

@@ -565,16 +565,71 @@ button {
   min-width: 0;
 }
 
+/*
+ * TASK-188/189 (`specs/ui.md` §7). The waiting view reuses the suppressed-row
+ * geometry so a work the owner is waiting for reads as the same kind of thing
+ * as a work they have set aside — one poster, one body, the same weight.
+ */
+.waiting-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.waiting-row {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.waiting-row[aria-busy='true'] {
+  opacity: 0.6;
+}
+
+.waiting-row__poster {
+  border-radius: var(--radius);
+  flex: 0 0 auto;
+  height: 4.5rem;
+  object-fit: cover;
+  width: 3rem;
+}
+
+.waiting-row__poster--empty {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+
+.waiting-row__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/* The flag is the one genuinely good-news line on the screen. */
+.waiting-row__flag {
+  font-weight: 600;
+}
+
 .title-row--skeleton,
 .suppressed-row--skeleton,
-.removed-row--skeleton {
+.removed-row--skeleton,
+.waiting-row--skeleton {
   min-height: 4.5rem;
   opacity: 0.55;
 }
 
 .title-list--loading,
 .suppressed-list--loading,
-.removed-list--loading {
+.removed-list--loading,
+.waiting-list--loading {
   pointer-events: none;
 }
 
@@ -725,6 +780,17 @@ button {
 
 .tmdb-attribution__disclaimer {
   color: var(--color-text-muted);
+}
+
+/*
+ * ⚠ THE JUSTWATCH ATTRIBUTION IS A SEPARATE OBLIGATION (REQ-087) with its own
+ * condition — it belongs on every surface that renders availability, which is
+ * narrower than the TMDB footer above and must not be folded into it.
+ */
+.justwatch-attribution {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  margin-top: var(--space-4);
 }
 
 /* ------------------------------------------------- the review pass (§5) -- */

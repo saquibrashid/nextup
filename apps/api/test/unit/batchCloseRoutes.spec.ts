@@ -136,6 +136,10 @@ const store: {
   resolvedLinks: [],
 };
 
+vi.mock('../../src/repository/watchIntents.js', () => ({
+  satisfyWaitingIntents: () => Promise.resolve({ count: 0 }),
+}));
+
 vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/repository/ownerData.js')>();
   return {

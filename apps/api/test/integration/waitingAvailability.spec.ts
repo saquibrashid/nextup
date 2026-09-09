@@ -93,8 +93,11 @@ const daysAgo = (n: number): Date => new Date(Date.now() - n * MS_PER_DAY);
 
 interface WaitingBody {
   count: number;
+  availabilityRefreshFailed: boolean;
   items: {
     intentId: string;
+    titleId: string;
+    workIdentity: string;
     availableOn: string[] | null;
     flaggedOn: string[] | null;
     availabilityCheckedAt: string | null;
@@ -408,5 +411,134 @@ describe('T-AVAIL-004 · US-042 AC-4 · metadata-only: the refresh changes no li
     expect(refreshed[0]?.availabilityCheckedAt?.getTime()).toBeGreaterThan(daysAgo(1).getTime());
     expect(refreshed[0]?.availabilityRegion).toBe('US');
     expect(refreshed[0]?.availableOn).not.toBeNull();
+  });
+});
+
+describe('T-AVAIL-003 · US-042 AC-3 · flagged is an invitation, not an addition', () => {
+  it('T-AVAIL-003a · a flatrate hit on an owner service is flagged and stays OUT of the combined list', async () => {
+    providerResult = ['Netflix'];
+    const { intentId, titleId } = await makeWaitingIntent({
+      tmdbId: 438_631,
+      name: 'Dune',
+      checkedAt: daysAgo(90),
+    });
+
+    const { body } = await waitingRequest();
+    const item = body.items.find((i) => i.intentId === intentId);
+    expect(item?.flaggedOn).toEqual(['netflix']);
+
+    // ⚠ THE HALF THAT MATTERS. The flag is an invitation to go and add the
+    // work on Netflix and capture it; the app must not put a row in the
+    // combined list that no screenshot ever saw.
+    const titles = (await (await fetch(`${origin}/api/titles`, { headers: authed })).json()) as {
+      items: { titleId: string; workIdentity: string }[];
+    };
+    expect(titles.items.some((t) => t.workIdentity === 'tmdb:movie:438631')).toBe(false);
+    expect(titles.items.some((t) => t.titleId === titleId)).toBe(false);
+
+    // No ServiceListing was invented either — the flag is derived from TMDB,
+    // not from anything the owner's services actually told us they hold.
+    expect(await testPrisma().serviceListing.count({ where: { ownerId } })).toBe(0);
+  });
+
+  it('T-AVAIL-003b · membership AND ORDERING of a populated combined list are identical across a refresh', async () => {
+    // ⚠ THE LOAD-BEARING NEGATIVE (invariant 5). `T-AVAIL-004b` compares an
+    // EMPTY list, where any ordering claim is vacuous. Seed several real
+    // listings first so the comparison can actually fail.
+    await testPrisma().uploadBatch.create({
+      data: {
+        id: 'batch-av-list',
+        ownerId,
+        service: 'netflix',
+        discoverySource: null,
+        mode: 'append-only',
+        status: 'applied',
+        lowYield: false,
+        degradedExtraction: false,
+        crossCheck: 'ok',
+      },
+    });
+    for (const [index, name] of ['Arrival', 'Blade Runner 2049', 'Children of Men'].entries()) {
+      const titleId = `title-av-list-${index}`;
+      await testPrisma().title.create({
+        data: {
+          id: titleId,
+          ownerId,
+          workIdentity: `tmdb:movie:${9000 + index}`,
+          state: 'active',
+          matchState: 'matched',
+          tmdbId: 9000 + index,
+          tmdbMediaType: 'movie',
+          tmdbName: name,
+          tmdbReleaseYear: 2016 + index,
+          sortDateAdded: new Date(Date.UTC(2026, 0, 10 + index)),
+        },
+      });
+      await testPrisma().serviceListing.create({
+        data: {
+          listingId: `listing-av-list-${index}`,
+          ownerId,
+          titleId,
+          service: 'netflix',
+          state: 'active',
+          dateAdded: new Date(Date.UTC(2026, 0, 10 + index)),
+          createdByBatchId: 'batch-av-list',
+        },
+      });
+    }
+
+    await makeWaitingIntent({ tmdbId: 438_631, name: 'Dune', checkedAt: daysAgo(90) });
+
+    const before = await (await fetch(`${origin}/api/titles`, { headers: authed })).text();
+    await waitingRequest();
+    expect(providerCalls).toHaveLength(1);
+    const after = await (await fetch(`${origin}/api/titles`, { headers: authed })).text();
+
+    expect(after).toBe(before);
+    // Guard the guard: a comparison of two empty lists proves nothing, so
+    // assert the fixture really did populate the thing being compared.
+    expect(JSON.parse(before).items).toHaveLength(3);
+  });
+});
+
+describe('T-AVAIL-007 · US-042 AC-7 · a provider outage degrades, never blanks', () => {
+  it('T-AVAIL-007a · last-known availability and its as-of date survive an unreachable TMDB', async () => {
+    const checkedAt = daysAgo(90);
+    const { intentId } = await makeWaitingIntent({
+      tmdbId: 949,
+      name: 'Heat',
+      checkedAt,
+      availableOn: JSON.stringify(['Max']),
+    });
+    providerThrows = true;
+
+    const { status, body } = await waitingRequest();
+
+    // Never an error page: the view still renders, from what was last known.
+    expect(status).toBe(200);
+    expect(providerCalls).toHaveLength(1);
+    const item = body.items.find((i) => i.intentId === intentId);
+    expect(item?.availableOn).toEqual(['Max']);
+    expect(item?.flaggedOn).toEqual(['max']);
+    expect(item?.availabilityCheckedAt).toBe(checkedAt.toISOString());
+
+    // …with the unobtrusive note that today's answer is not today's.
+    expect(body.availabilityRefreshFailed).toBe(true);
+
+    // ⚠ AND THE STORE IS UNTOUCHED. A failed lookup that wrote `null` would
+    // ERASE a known-good answer and be indistinguishable from "asked, nobody
+    // carries it" on the very next render (ADR-0010 Trap 4).
+    const stored = await testPrisma().watchIntent.findUniqueOrThrow({ where: { id: intentId } });
+    expect(stored.availableOn).toBe(JSON.stringify(['Max']));
+    expect(stored.availabilityCheckedAt?.toISOString()).toBe(checkedAt.toISOString());
+  });
+
+  it('T-AVAIL-007b · a wholly successful render does NOT raise the failure note', async () => {
+    // The discriminating half: without it `007a` passes against a build that
+    // hard-codes `availabilityRefreshFailed: true`.
+    await makeWaitingIntent({ tmdbId: 438_631, name: 'Dune', checkedAt: daysAgo(90) });
+
+    const { body } = await waitingRequest();
+    expect(body.availabilityRefreshFailed).toBe(false);
   });
 });
