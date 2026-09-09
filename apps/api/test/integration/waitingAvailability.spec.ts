@@ -136,7 +136,7 @@ async function makeWaitingIntent(over: {
         service: null,
         discoverySource: 'fandango-at-home',
         mode: 'append-only',
-        status: 'closed',
+        status: 'applied',
         lowYield: false,
         degradedExtraction: false,
         crossCheck: 'ok',
@@ -173,6 +173,8 @@ async function makeWaitingIntent(over: {
       titleId,
       workIdentity,
       state: over.state ?? 'waiting',
+      satisfiedAt:
+        (over.state ?? 'waiting') === 'satisfied' ? new Date(Date.UTC(2026, 1, 1)) : null,
       sourceBatchId: SOURCE_BATCH,
       discoverySource: 'fandango-at-home',
       discoveredAt: new Date(Date.UTC(2026, 0, n)),
