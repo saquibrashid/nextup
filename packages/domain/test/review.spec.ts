@@ -551,3 +551,88 @@ describe('T-AI-041 - tileCropFor selects the tile region, or refuses', () => {
     ).toBeNull();
   });
 });
+
+describe('T-WAIT-005 · US-041 AC-1 · a DISCOVERY review pass renders, and shows everything', () => {
+  /**
+   * ⚠ THIS IS THE REGRESSION THAT MATTERED. Until TASK-186 the route asked
+   * `requireServiceOf(batch)` and a discovery batch THREW, so the owner could
+   * upload a rental-storefront capture, be told it was in review, and then be
+   * unable to open the review at all. `service: null` is the whole fix, and
+   * every assertion below is downstream of it.
+   */
+  const discovery = () =>
+    input({
+      service: null,
+      discoverySource: 'fandango-at-home',
+      mode: 'append-only',
+      candidates: [
+        candidate({ candidateId: 'a', classification: 'new' }),
+        candidate({
+          candidateId: 'b',
+          resolvedWorkIdentity: ANDOR,
+          classification: 'already-present-for-this-service',
+        }),
+        candidate({ candidateId: 'c', verdict: 'chrome-suspected' }),
+        candidate({ candidateId: 'd', verdict: 'unreadable-tile' }),
+        candidate({
+          candidateId: 'e',
+          resolvedWorkIdentity: 'unmatched:0123456789abcdef',
+          classification: null,
+        }),
+      ],
+    });
+
+  it('T-WAIT-005a: the response carries a null service and names the discovery source', () => {
+    const res = buildReviewResponse(discovery());
+    // Not a fabricated service (ADR-0010 D-1, Trap 3) — a storefront is not a
+    // SERVICES member and must never be rendered as a badge.
+    expect(res.service).toBeNull();
+    expect(res.discoverySource).toBe('fandango-at-home');
+  });
+
+  it('T-WAIT-005b: EVERY extracted candidate is routed to a section', () => {
+    const built = discovery();
+    const res = buildReviewResponse(built);
+    // The same assertion the route makes on the way out. A candidate that
+    // routes nowhere is a title the owner captured and was never shown.
+    expect(() => assertEveryCandidateRouted(built.candidates, res)).not.toThrow();
+  });
+
+  it('T-WAIT-005c: an already-listed work is SHOWN, not silently omitted', () => {
+    // ⚠ The discriminating case. A discovery capture is append-only, and for a
+    // SERVICE append-only pass this section is deliberately omitted ("already
+    // there, nothing to do"). For a discovery pass the same fact is the
+    // reporting US-040 AC-5 asks for, and omitting it would hide a title the
+    // owner definitely captured — breaking AC-1's "every extracted title".
+    const res = buildReviewResponse(discovery());
+    expect(res.sections.alreadyOnYourList.omitted).toBe(false);
+    expect(res.sections.alreadyOnYourList.count).toBe(1);
+    expect(res.sections.alreadyOnYourList.items.map((i) => i.candidateId)).toEqual(['b']);
+  });
+
+  it('T-WAIT-005d: every disposition defaults to pending — no accept-by-inaction', () => {
+    // REQ-014. Nothing enters the waiting list without an explicit action, so
+    // a freshly-rendered pass must contain no decided rows at all.
+    const res = buildReviewResponse(discovery());
+    const all = [
+      ...res.sections.additions.items,
+      ...res.sections.alreadyOnYourList.items,
+      ...res.sections.probablyNotTitles.items,
+      ...res.sections.unmatched.items,
+      ...res.sections.unreadableTiles.items,
+    ];
+    expect(all).toHaveLength(5);
+    expect(all.every((c) => c.disposition === 'pending')).toBe(true);
+  });
+
+  it('T-WAIT-005e: the removal section is omitted, and its label never names a service', () => {
+    // Reconciliation never runs for a discovery capture (US-040 AC-4). A label
+    // reading "No longer on Netflix" on a Fandango pass would assert a fact
+    // about the owner's Netflix list that this batch cannot know.
+    const res = buildReviewResponse(discovery());
+    expect(res.sections.removals.omitted).toBe(true);
+    expect(res.sections.removals.count).toBe(0);
+    expect(res.sections.removals.items).toEqual([]);
+    expect(removalsLabel(null)).not.toMatch(/Netflix|Max/);
+  });
+});

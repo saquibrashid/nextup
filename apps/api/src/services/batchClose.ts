@@ -49,9 +49,11 @@ import {
   deriveSortDateAdded,
   deriveTitleState,
   discardedCount,
+  discardedWorks,
   jsonScalar,
   pendingAdditionIds,
   removalWithheldReason,
+  suppressionIdFor,
   ulid,
   workIdentityForTmdb,
   workIdentityForUnmatched,
@@ -73,6 +75,7 @@ import {
   createRemovalGroup,
   createServiceListing,
   createTitle,
+  createSuppression,
   createWatchIntent,
   findActiveSuppression,
   findTitleByWorkIdentity,
@@ -80,6 +83,7 @@ import {
   listListingsForTitle,
   listRemovalDecisions,
   listWaitingWorkIdentities,
+  reactivateSuppression,
   recordBatchChange,
   runInTransaction,
   setCandidateResolvedTitles,
@@ -107,6 +111,17 @@ export interface CloseResult {
     intentsCreated: number;
     alreadyListed: number;
     alreadyWaiting: number;
+    /**
+     * How many `Suppression` rows this close wrote from discards (US-041
+     * AC-2).
+     *
+     * ⚠ Not the same number as `summary.discarded`. That counts every discard
+     * the owner made; this counts the ones that produced a suppression, which
+     * excludes candidates with no resolved work identity (see
+     * `discardedWorks`). Reporting one as the other would claim curation that
+     * did not happen.
+     */
+    suppressionsCreated: number;
   };
   undoable: boolean;
 }
@@ -521,6 +536,51 @@ async function closeDiscoveryBatch(
 
     await setCandidateResolvedTitles(ownerId, resolvedTitleLinks, tx);
 
+    // ── US-041 AC-2 — DISCARD SUPPRESSES ──────────────────────────────────
+    //
+    // ⚠ INSIDE the transaction, and deliberately so (AC-6, `T-WAIT-007`). A
+    // suppression written after the commit would leave a batch that created
+    // intents but curated nothing, and the owner would meet the same rejects
+    // again on the next capture with no way to tell the write had failed.
+    //
+    // ⚠ SCOPED TO THIS FUNCTION, which is the discovery path only (AC-5). The
+    // service path must NOT do this: a curated saved list does not re-present
+    // what the owner rejected, so suppressing there would silently hide works
+    // from a future Netflix capture that the owner only meant to skip once.
+    let suppressionsCreated = 0;
+    for (const work of discardedWorks(candidates)) {
+      // `loadReviewCandidates` has already dropped rows whose identity is
+      // suppressed, so this can only fire for a suppression made between the
+      // review load and now — the same race the intent loop re-checks for.
+      if ((await findActiveSuppression(ownerId, work.workIdentity, tx)) !== null) continue;
+
+      // A LIFTED suppression is re-armed rather than re-created:
+      // `suppression_one_active` is a filtered unique index, and the row for
+      // this identity may already exist with `active: false`. Creating a
+      // second one would violate the primary key on the deterministic id.
+      const { count } = await reactivateSuppression(ownerId, work.workIdentity, now, tx);
+      if (count > 0) {
+        suppressionsCreated += 1;
+        continue;
+      }
+
+      await createSuppression(
+        ownerId,
+        {
+          id: suppressionIdFor(work.workIdentity),
+          workIdentity: work.workIdentity,
+          active: true,
+          suppressedAt: now,
+          displayName: work.displayName,
+          displayReleaseYear: work.displayReleaseYear,
+          displayMediaType: work.displayMediaType,
+          displayPosterPath: work.displayPosterPath,
+        },
+        tx,
+      );
+      suppressionsCreated += 1;
+    }
+
     await transitionBatch(
       ownerId,
       batch,
@@ -546,6 +606,7 @@ async function closeDiscoveryBatch(
       intentsCreated,
       alreadyListed: plan.alreadyListed.length,
       alreadyWaiting: plan.alreadyWaiting.length,
+      suppressionsCreated,
     };
   });
 
@@ -564,6 +625,7 @@ async function closeDiscoveryBatch(
       intentsCreated: summary.intentsCreated,
       alreadyListed: summary.alreadyListed,
       alreadyWaiting: summary.alreadyWaiting,
+      suppressionsCreated: summary.suppressionsCreated,
     },
     undoable: canTransition('applied', 'undone'),
   };

@@ -405,6 +405,7 @@ function reviewResponse(be: Backend, batch: BatchRuntime): ReviewResponse {
   return {
     batchId: batch.batchId,
     service: plan.service,
+    discoverySource: null,
     mode: plan.mode,
     lowYield: false,
     degradedExtraction: false,

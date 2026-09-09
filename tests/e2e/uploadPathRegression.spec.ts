@@ -96,6 +96,7 @@ function reviewResponse(confirmed: boolean): ReviewResponse {
   return {
     batchId: BATCH_ID,
     service: 'netflix',
+    discoverySource: null,
     mode: 'full-update',
     lowYield: false,
     degradedExtraction: false,
@@ -168,6 +169,7 @@ async function stubApi(page: Page, state: UploadState): Promise<void> {
         body: JSON.stringify({
           batchId: BATCH_ID,
           service: 'netflix',
+          discoverySource: null,
           mode: 'full-update',
           status: 'open',
           createdAt: NOW,
@@ -210,6 +212,7 @@ async function stubApi(page: Page, state: UploadState): Promise<void> {
         ok({
           batchId: BATCH_ID,
           service: 'netflix',
+          discoverySource: null,
           mode: 'full-update',
           status: inReview ? 'in-review' : 'extracting',
           derivedFromBatchId: null,

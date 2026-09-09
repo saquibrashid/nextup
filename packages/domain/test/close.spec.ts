@@ -13,6 +13,7 @@ import {
   CLOSE_DECIDABLE_SECTIONS,
   applicableCandidates,
   discardedCount,
+  discardedWorks,
   pendingAdditionIds,
   sectionForCandidate,
   type ReviewCandidate,
@@ -198,5 +199,127 @@ describe('T-REV-011 · the disposition set close reads', () => {
       const discards = discardedCount(rows) > 0;
       expect([blocks, applies, discards].filter(Boolean), disposition).toHaveLength(1);
     }
+  });
+});
+
+describe('T-WAIT-006 · US-041 AC-2 · which discards become suppressions', () => {
+  /**
+   * The pure half of discard-suppresses. The behavioural claims (AC-3's "not
+   * present at all on the next capture", AC-5's Netflix scoping) are proven in
+   * `apps/api/test/integration/discoveryCurate.spec.ts`, because they are
+   * claims about what the STORE does across two requests.
+   */
+  it('T-WAIT-006d: a discarded candidate yields its canonical work identity, never its row id', () => {
+    // REQ-071, product invariant 1. Keying on the row id would appear to work
+    // and then silently stop, because a reappearing title is a NEW row.
+    const works = discardedWorks([
+      inSection('additions', { candidateId: 'a', disposition: 'discarded' }),
+    ]);
+    expect(works).toHaveLength(1);
+    expect(works[0]?.workIdentity).toBe(DUNE);
+    expect(works[0]?.workIdentity).not.toBe('a');
+  });
+
+  it('T-WAIT-006e: confirmed and pending candidates yield nothing', () => {
+    expect(
+      discardedWorks([
+        inSection('additions', { candidateId: 'a', disposition: 'confirmed' }),
+        inSection('additions', { candidateId: 'b', disposition: 'pending' }),
+        inSection('additions', { candidateId: 'c', disposition: 'corrected' }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it('T-WAIT-006f: a discard is collected from EVERY section, not just the decidable two', () => {
+    // A rotating editorial feed re-presents its junk tiles exactly as
+    // faithfully as its additions (AC-4), so curating the pass has to reach
+    // the collapsed sections too.
+    const works = discardedWorks([
+      inSection('probablyNotTitles', { candidateId: 'a', disposition: 'discarded' }),
+      inSection('unreadableTiles', {
+        candidateId: 'b',
+        disposition: 'discarded',
+        resolvedWorkIdentity: 'tmdb:tv:83867',
+      }),
+    ]);
+    expect(works.map((w) => w.candidateId)).toEqual(['a', 'b']);
+  });
+
+  it('T-WAIT-006g: a candidate with NO resolved identity yields nothing', () => {
+    // ⚠ Deliberate, not an oversight. The review suppression gate skips rows
+    // whose `resolvedWorkIdentity` is null, so a suppression written for an
+    // `unmatched:` identity could never gate anything — it would be a write
+    // with no effect that also fills the "Not interested" view with junk.
+    expect(
+      discardedWorks([
+        inSection('unmatched', {
+          candidateId: 'a',
+          disposition: 'discarded',
+          resolvedWorkIdentity: null,
+        }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it('T-WAIT-006h: a collapsed loser (SD-02) yields nothing', () => {
+    // It was absorbed into the survivor and never rendered, so nobody
+    // discarded it — its `disposition` is an artefact, not a decision.
+    expect(
+      discardedWorks([
+        candidate({ candidateId: 'a', disposition: 'discarded', collapsedIntoCandidateId: 'b' }),
+      ]),
+    ).toEqual([]);
+  });
+
+  it('T-WAIT-006i: two tiles for the same work are ONE suppression', () => {
+    // `suppression_one_active` is a filtered unique index; writing twice in
+    // one close would fail the whole batch on a duplicate the owner cannot
+    // see and cannot fix.
+    const works = discardedWorks([
+      inSection('additions', { candidateId: 'a', disposition: 'discarded' }),
+      inSection('additions', { candidateId: 'b', disposition: 'discarded' }),
+    ]);
+    expect(works).toHaveLength(1);
+  });
+
+  it('T-WAIT-006j: the display snapshot is frozen so the suppressed view needs no title row', () => {
+    // US-029 AC-1 — the work may have no `Title` at all, and a discovery
+    // discard NEVER creates one, so this is the only description that exists.
+    const works = discardedWorks([
+      inSection('additions', {
+        candidateId: 'a',
+        disposition: 'discarded',
+        match: {
+          tmdbId: 438631,
+          mediaType: 'movie',
+          name: 'Dune',
+          releaseYear: 2021,
+          posterPath: '/d.jpg',
+          score: 1,
+          uncertain: false,
+          ambiguous: false,
+        },
+      }),
+    ]);
+    expect(works[0]).toMatchObject({
+      displayName: 'Dune',
+      displayReleaseYear: 2021,
+      displayMediaType: 'movie',
+      displayPosterPath: '/d.jpg',
+    });
+  });
+
+  it('T-WAIT-006k: with no match, the name falls back to what was read', () => {
+    const works = discardedWorks([
+      inSection('additions', {
+        candidateId: 'a',
+        disposition: 'discarded',
+        match: null,
+        inferredTitle: null,
+        rawText: 'DUNE PART TWO',
+      }),
+    ]);
+    expect(works[0]?.displayName).toBe('DUNE PART TWO');
+    expect(works[0]?.displayReleaseYear).toBeNull();
   });
 });
