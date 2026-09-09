@@ -49,11 +49,41 @@ export function inMemoryRecordingStore(
  * hash must be recorded ALONGSIDE the recording it belongs to: if the image is
  * ever re-exported and its bytes change, the pairing must break loudly rather
  * than silently continuing to replay a recording of a different picture.
+ *
+ * ⚠ THE SHAPE IS `specs/ai.md` §9.1's, NOT A `Record<sha256, name>` MAP. This
+ * type was originally the map, authored before the manifest existed; TASK-078
+ * then landed the real file in the §9.1 shape (`{ corpusSize, images: [...] }`)
+ * and the two silently disagreed — `manifest[sha256]` was `undefined` for every
+ * image, so `goldenRecordingStore` degraded every fixture to the zero-yield
+ * path and the golden suite would have measured nothing while reporting green.
+ * `sha256` is additive (TASK-079), populated by `tools/golden-record.mjs`.
+ *
+ * ~~`export type GoldenManifest = Record<string, string>;`~~ *(superseded: it
+ * described a file that was never written.)*
  */
-export type GoldenManifest = Record<string, string>;
+export interface GoldenManifestImage {
+  id: string;
+  file: string;
+  /** sha256 of the COMMITTED image bytes. Absent until first recorded. */
+  sha256?: string;
+}
+
+export interface GoldenManifest {
+  images: GoldenManifestImage[];
+}
+
+/** The incumbent primary reader's recording directory (`specs/ai.md` §9.1). */
+export const DEFAULT_RECORDING_MODEL_ID = 'gpt-4.1';
 
 /**
  * A store backed by the committed golden fixtures.
+ *
+ * `modelId` selects the primary reader's recording directory. It is a
+ * parameter rather than a constant because §9.7's bake-off compares two
+ * readers over the SAME images and the SAME OCR: a flat `llm/` directory could
+ * hold only one of them, so evaluating a challenger would mean overwriting the
+ * incumbent's evidence. `ocr/` is deliberately NOT model-scoped — the
+ * deterministic cross-check does not vary with the primary reader.
  *
  * ⚠ Every read failure — absent directory, absent manifest, absent or
  * unparseable fixture — degrades to "no recording", which the stub reports as
@@ -61,20 +91,29 @@ export type GoldenManifest = Record<string, string>;
  * low-yield banner the product already has to handle (`specs/ai.md` §8) rather
  * than as a crash inside a job, which is much harder to attribute.
  */
-export function goldenRecordingStore(goldenDir: string): RecordingStore {
-  const manifest = readJson<GoldenManifest>(join(goldenDir, 'manifest.json')) ?? {};
+export function goldenRecordingStore(
+  goldenDir: string,
+  modelId: string = DEFAULT_RECORDING_MODEL_ID,
+): RecordingStore {
+  const manifest = readJson<GoldenManifest>(join(goldenDir, 'manifest.json'));
+  const byHash = new Map<string, string>();
+  for (const image of manifest?.images ?? []) {
+    if (typeof image.sha256 === 'string' && image.sha256 !== '') {
+      byHash.set(image.sha256, image.id);
+    }
+  }
   const cache = new Map<string, Recording | undefined>();
 
   return {
     get(sha256) {
       if (cache.has(sha256)) return cache.get(sha256);
 
-      const name = manifest[sha256];
+      const name = byHash.get(sha256);
       const recording =
         name === undefined
           ? undefined
           : {
-              llm: readJson<LlmTile[]>(join(goldenDir, 'llm', `${name}.llm.json`)) ?? [],
+              llm: readJson<LlmTile[]>(join(goldenDir, 'llm', modelId, `${name}.llm.json`)) ?? [],
               ocr: readJson<OcrLine[]>(join(goldenDir, 'ocr', `${name}.ocr.json`)) ?? [],
             };
 

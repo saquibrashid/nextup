@@ -1,0 +1,122 @@
+[
+  {
+    "visibleText": "LADIES FIRST",
+    "identifiedTitle": "Ladies First",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.041,
+      "y": 0.308,
+      "w": 0.151,
+      "h": 0.168
+    }
+  },
+  {
+    "visibleText": "RAW",
+    "identifiedTitle": "WWE Raw",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.198,
+      "y": 0.308,
+      "w": 0.151,
+      "h": 0.168
+    }
+  },
+  {
+    "visibleText": "WICKED FOR GOOD",
+    "identifiedTitle": "Wicked: Part One",
+    "basis": "text",
+    "confidence": 0.8,
+    "box": {
+      "x": 0.355,
+      "y": 0.308,
+      "w": 0.151,
+      "h": 0.168
+    }
+  },
+  {
+    "visibleText": "HIS & HERS",
+    "identifiedTitle": "His & Hers",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.512,
+      "y": 0.308,
+      "w": 0.151,
+      "h": 0.168
+    }
+  },
+  {
+    "visibleText": "MAN ON FIRE",
+    "identifiedTitle": "Man on Fire",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.669,
+      "y": 0.308,
+      "w": 0.151,
+      "h": 0.168
+    }
+  },
+  {
+    "visibleText": "STRANGER THINGS VHS SPECIAL EDITION",
+    "identifiedTitle": "Stranger Things: VHS Special Edition",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.826,
+      "y": 0.308,
+      "w": 0.151,
+      "h": 0.168
+    }
+  },
+  {
+    "visibleText": "In the hand of Dante",
+    "identifiedTitle": "In the Hand of Dante",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.041,
+      "y": 0.507,
+      "w": 0.151,
+      "h": 0.168
+    }
+  },
+  {
+    "visibleText": "LOUIS C.K. RIDICULOUS",
+    "identifiedTitle": "Louis C.K.: Ridiculous",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.198,
+      "y": 0.507,
+      "w": 0.151,
+      "h": 0.168
+    }
+  },
+  {
+    "visibleText": "Frankenstein",
+    "identifiedTitle": "Frankenstein",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.355,
+      "y": 0.507,
+      "w": 0.151,
+      "h": 0.168
+    }
+  },
+  {
+    "visibleText": "Dilwale Dulhania Le Jayenge",
+    "identifiedTitle": "Dilwale Dulhania Le Jayenge",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.512,
+      "y": 0.507,
+      "w": 0.151,
+      "h": 0.168
+    }
+  }
+]

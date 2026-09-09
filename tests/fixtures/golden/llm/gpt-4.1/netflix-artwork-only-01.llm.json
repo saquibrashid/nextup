@@ -1,0 +1,122 @@
+[
+  {
+    "visibleText": "STRANGER THINGS Tales from 85",
+    "identifiedTitle": "Stranger Things: Tales from 85",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.035,
+      "y": 0.343,
+      "w": 0.181,
+      "h": 0.242
+    }
+  },
+  {
+    "visibleText": "RAW",
+    "identifiedTitle": "WWE Raw",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.222,
+      "y": 0.343,
+      "w": 0.181,
+      "h": 0.242
+    }
+  },
+  {
+    "visibleText": "THE WHISPER MAN",
+    "identifiedTitle": "The Whisper Man",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.409,
+      "y": 0.343,
+      "w": 0.181,
+      "h": 0.242
+    }
+  },
+  {
+    "visibleText": "HAMNET",
+    "identifiedTitle": "Hamnet",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.596,
+      "y": 0.343,
+      "w": 0.181,
+      "h": 0.242
+    }
+  },
+  {
+    "visibleText": "LADIES FIRST",
+    "identifiedTitle": "Ladies First",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.783,
+      "y": 0.343,
+      "w": 0.181,
+      "h": 0.242
+    }
+  },
+  {
+    "visibleText": "HIS & HERS",
+    "identifiedTitle": "His & Hers",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.97,
+      "y": 0.343,
+      "w": 0.181,
+      "h": 0.242
+    }
+  },
+  {
+    "visibleText": "MAN ON FIRE",
+    "identifiedTitle": "Man on Fire",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.035,
+      "y": 0.627,
+      "w": 0.181,
+      "h": 0.242
+    }
+  },
+  {
+    "visibleText": "LOUIS C.K. RIDICULOUS",
+    "identifiedTitle": "Louis C.K.: Ridiculous",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.222,
+      "y": 0.627,
+      "w": 0.181,
+      "h": 0.242
+    }
+  },
+  {
+    "visibleText": "Frankenstein",
+    "identifiedTitle": "Frankenstein",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.409,
+      "y": 0.627,
+      "w": 0.181,
+      "h": 0.242
+    }
+  },
+  {
+    "visibleText": "SOL LEVANTE",
+    "identifiedTitle": "Sol Levante",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.596,
+      "y": 0.627,
+      "w": 0.181,
+      "h": 0.242
+    }
+  }
+]

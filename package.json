@@ -32,6 +32,7 @@
     "test:smoke": "playwright test --config playwright.smoke.config.ts",
     "test:a11y": "playwright test tests/e2e/a11y.spec.ts --pass-with-no-tests",
     "golden": "vitest run --project golden --passWithNoTests",
+    "golden:record": "node tools/golden-record.mjs",
     "test:infra": "vitest run --project infra",
     "check:audit": "node tools/check-audit.mjs",
     "check:deps": "node tools/check-deps.mjs",

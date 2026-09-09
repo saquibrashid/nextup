@@ -442,13 +442,25 @@ describe('T-AI-045f · the bake-off never runs in CI', () => {
   });
 });
 
-describe('T-AI-045a/b/c · deferred — the harness and the corpus do not exist yet', () => {
-  it('T-AI-045u · claims a/b/c · the corpus is genuinely absent, so they are deferred rather than passing vacuously', () => {
+describe('T-AI-045a/b/c · deferred — the ANSWER KEY does not exist yet', () => {
+  it('T-AI-045u · claims a/b/c · the answer key is genuinely absent, so they are deferred rather than passing vacuously', () => {
     // ⚠ THIS TEST GUARDS THE HONESTY OF THIS FILE'S OWN SCOPE NOTE, and it is
     // the reason a/b/c are not written as empty loops over a missing
-    // directory. It asserts the STATED REASON for deferral is still true. The
-    // moment TASK-078 lands the corpus, this test fails — which is the
-    // prompt to come back and write a, b and c for real.
+    // directory. It asserts the STATED REASON for deferral is still true, so
+    // it fails the moment that reason stops holding — which is the prompt to
+    // come back and write a, b and c for real.
+    //
+    // It fired as designed on 2026-09-09, when TASK-079's recorder landed
+    // `llm/gpt-4.1/` and `ocr/` from the live providers. Those two directories
+    // are therefore no longer part of the claim. What still blocks the
+    // bake-off is `expected/` — and it is the half that CANNOT be generated:
+    // an answer key derived from a model's own output grades that model
+    // against itself, which is precisely the comparison §9.7 exists to make
+    // impossible. Narrowed rather than deleted: dropping the case would leave
+    // a/b/c silently deferred with nothing to prompt their return.
+    //
+    // ~~`expect(present).not.toContain('ocr'); expect(present).not.toContain('llm');`~~
+    // *(superseded: the recordings landed; only the answer key remains.)*
     const golden = path.join(REPO_ROOT, 'tests/fixtures/golden');
     const present = readdirSync(golden).filter((entry) => {
       const full = path.join(golden, entry);
@@ -456,7 +468,13 @@ describe('T-AI-045a/b/c · deferred — the harness and the corpus do not exist 
     });
 
     expect(present).not.toContain('expected');
-    expect(present).not.toContain('ocr');
-    expect(present).not.toContain('llm');
+
+    // Non-vacuity, and it is load-bearing now that the claim is a single
+    // negative: if `tests/fixtures/golden` were ever moved or emptied, the
+    // assertion above would pass over nothing at all and report the corpus as
+    // "still absent" for ever.
+    expect(present).toContain('images');
+    expect(present).toContain('llm');
+    expect(present).toContain('ocr');
   });
 });
