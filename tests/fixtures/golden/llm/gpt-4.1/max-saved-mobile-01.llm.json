@@ -1,74 +1,74 @@
 [
   {
-    "visibleText": "LANTERNS Lanterns",
+    "visibleText": "LANTERNS\nLanterns",
     "identifiedTitle": "Lanterns",
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.03,
-      "y": 0.16,
-      "w": 0.44,
-      "h": 0.13
+      "x": 0.04,
+      "y": 0.143,
+      "w": 0.372,
+      "h": 0.112
     }
   },
   {
-    "visibleText": "NORMAL Normal 2026",
+    "visibleText": "NORMAL\nNormal\n2026",
     "identifiedTitle": "Normal",
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.03,
-      "y": 0.29,
-      "w": 0.44,
-      "h": 0.13
+      "x": 0.04,
+      "y": 0.266,
+      "w": 0.372,
+      "h": 0.112
     }
   },
   {
-    "visibleText": "The DRAMA The Drama 2026",
+    "visibleText": "The DRAMA\nThe Drama\n2026",
     "identifiedTitle": "The Drama",
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.03,
-      "y": 0.42,
-      "w": 0.44,
-      "h": 0.13
+      "x": 0.04,
+      "y": 0.389,
+      "w": 0.372,
+      "h": 0.112
     }
   },
   {
-    "visibleText": "ramy youssef in love Ramy Youssef: In Love 2026",
+    "visibleText": "ramy youssef in love\nRamy Youssef: In Love\n2026",
     "identifiedTitle": "Ramy Youssef: In Love",
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.03,
-      "y": 0.55,
-      "w": 0.44,
-      "h": 0.13
+      "x": 0.04,
+      "y": 0.512,
+      "w": 0.372,
+      "h": 0.112
     }
   },
   {
-    "visibleText": "GREENLAND 2 MIGRATION Greenland 2: Migration 2026",
+    "visibleText": "GREENLAND 2 MIGRATION\nGreenland 2: Migration\n2026",
     "identifiedTitle": "Greenland 2: Migration",
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.03,
-      "y": 0.68,
-      "w": 0.44,
-      "h": 0.13
+      "x": 0.04,
+      "y": 0.635,
+      "w": 0.372,
+      "h": 0.112
     }
   },
   {
-    "visibleText": "TRUE DETECTIVE NIGHT COUNTRY True Detective",
+    "visibleText": "TRUE DETECTIVE NIGHT COUNTRY\nTrue Detective",
     "identifiedTitle": "True Detective",
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.03,
-      "y": 0.81,
-      "w": 0.44,
-      "h": 0.13
+      "x": 0.04,
+      "y": 0.758,
+      "w": 0.372,
+      "h": 0.112
     }
   }
 ]

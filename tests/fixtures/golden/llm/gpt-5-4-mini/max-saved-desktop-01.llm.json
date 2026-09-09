@@ -1,0 +1,122 @@
+[
+  {
+    "visibleText": "Lanterns",
+    "identifiedTitle": "Lanterns",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.025,
+      "y": 0.357,
+      "w": 0.247,
+      "h": 0.286
+    }
+  },
+  {
+    "visibleText": "Normal\n2026",
+    "identifiedTitle": "Normal",
+    "basis": "both",
+    "confidence": 0.98,
+    "box": {
+      "x": 0.286,
+      "y": 0.357,
+      "w": 0.247,
+      "h": 0.286
+    }
+  },
+  {
+    "visibleText": "The Drama\n2026",
+    "identifiedTitle": "The Drama",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.521,
+      "y": 0.357,
+      "w": 0.247,
+      "h": 0.286
+    }
+  },
+  {
+    "visibleText": "Ramy Youssef: In Love\n2026",
+    "identifiedTitle": "Ramy Youssef: In Love",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.756,
+      "y": 0.357,
+      "w": 0.247,
+      "h": 0.286
+    }
+  },
+  {
+    "visibleText": "Greenland 2: Migration\n2026",
+    "identifiedTitle": "Greenland 2: Migration",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.025,
+      "y": 0.643,
+      "w": 0.247,
+      "h": 0.286
+    }
+  },
+  {
+    "visibleText": "True Detective",
+    "identifiedTitle": "True Detective",
+    "basis": "text",
+    "confidence": 0.95,
+    "box": {
+      "x": 0.286,
+      "y": 0.643,
+      "w": 0.247,
+      "h": 0.286
+    }
+  },
+  {
+    "visibleText": "The",
+    "identifiedTitle": null,
+    "basis": "unknown",
+    "confidence": 0,
+    "box": {
+      "x": 0.025,
+      "y": 0.929,
+      "w": 0.247,
+      "h": 0.071
+    }
+  },
+  {
+    "visibleText": "Lanterns",
+    "identifiedTitle": "Lanterns",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.286,
+      "y": 0.929,
+      "w": 0.247,
+      "h": 0.071
+    }
+  },
+  {
+    "visibleText": null,
+    "identifiedTitle": null,
+    "basis": "unknown",
+    "confidence": 0,
+    "box": {
+      "x": 0.521,
+      "y": 0.929,
+      "w": 0.247,
+      "h": 0.071
+    }
+  },
+  {
+    "visibleText": "Hard Knocks",
+    "identifiedTitle": "Hard Knocks",
+    "basis": "text",
+    "confidence": 0.96,
+    "box": {
+      "x": 0.756,
+      "y": 0.929,
+      "w": 0.247,
+      "h": 0.071
+    }
+  }
+]

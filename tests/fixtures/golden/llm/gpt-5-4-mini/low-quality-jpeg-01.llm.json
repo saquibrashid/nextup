@@ -1,0 +1,98 @@
+[
+  {
+    "visibleText": "Ladies First",
+    "identifiedTitle": "Ladies First",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.015,
+      "y": 0.469,
+      "w": 0.304,
+      "h": 0.171
+    }
+  },
+  {
+    "visibleText": "Raw",
+    "identifiedTitle": "Raw",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.015,
+      "y": 0.633,
+      "w": 0.304,
+      "h": 0.171
+    }
+  },
+  {
+    "visibleText": "Wicked: For Good",
+    "identifiedTitle": "Wicked: For Good",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.015,
+      "y": 0.798,
+      "w": 0.304,
+      "h": 0.171
+    }
+  },
+  {
+    "visibleText": "HIS & HERS",
+    "identifiedTitle": "His & Hers",
+    "basis": "both",
+    "confidence": 0.98,
+    "box": {
+      "x": 0.015,
+      "y": 0.962,
+      "w": 0.304,
+      "h": 0.171
+    }
+  },
+  {
+    "visibleText": "Man on Fire",
+    "identifiedTitle": "Man on Fire",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.015,
+      "y": 1,
+      "w": 0.304,
+      "h": 0.171
+    }
+  },
+  {
+    "visibleText": "Stranger Things: VHS\nSpecial Edition",
+    "identifiedTitle": "Stranger Things: VHS Special Edition",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.015,
+      "y": 1,
+      "w": 0.304,
+      "h": 0.171
+    }
+  },
+  {
+    "visibleText": "In the Hand of Dante",
+    "identifiedTitle": "In the Hand of Dante",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.015,
+      "y": 1,
+      "w": 0.304,
+      "h": 0.171
+    }
+  },
+  {
+    "visibleText": "Louis C.K. Ridiculous",
+    "identifiedTitle": "Louis C.K. Ridiculous",
+    "basis": "both",
+    "confidence": 0.86,
+    "box": {
+      "x": 0.015,
+      "y": 1,
+      "w": 0.304,
+      "h": 0.171
+    }
+  }
+]

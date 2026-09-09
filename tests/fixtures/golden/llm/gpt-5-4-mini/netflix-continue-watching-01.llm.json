@@ -1,0 +1,14 @@
+[
+  {
+    "visibleText": "In the Shadow of Dante",
+    "identifiedTitle": "In the Shadow of Dante",
+    "basis": "both",
+    "confidence": 0.98,
+    "box": {
+      "x": 0.024,
+      "y": 0.087,
+      "w": 0.243,
+      "h": 0.75
+    }
+  }
+]

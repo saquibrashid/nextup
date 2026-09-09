@@ -38,7 +38,7 @@
  * would key the recording on an artefact that exists nowhere in the repository.
  *
  * Usage:
- *   node tools/golden-record.mjs [--model <deployment>] [--only <imageId>] [--dry-run]
+ *   node tools/golden-record.mjs [--model <deployment>] [--only <imageId>] [--skip-ocr] [--dry-run]
  *
  * Requires `NEXTUP_AOAI_ENDPOINT`, `NEXTUP_VISION_ENDPOINT`, a signed-in Azure
  * identity with `Cognitive Services OpenAI User` + `Cognitive Services User`,
@@ -67,11 +67,12 @@ const MIME_BY_EXT = {
 };
 
 function parseArgs(argv) {
-  const args = { model: 'gpt-4.1', only: null, dryRun: false };
+  const args = { model: 'gpt-4.1', only: null, dryRun: false, skipOcr: false };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     if (flag === '--model') args.model = argv[++i];
     else if (flag === '--only') args.only = argv[++i];
+    else if (flag === '--skip-ocr') args.skipOcr = true;
     else if (flag === '--dry-run') args.dryRun = true;
     else throw new Error(`Unknown flag: ${flag}`);
   }
@@ -139,6 +140,13 @@ async function main() {
     endpoint: aoaiEndpoint,
     deployment: args.model,
     credential,
+    // ⚠ BOTH ARMS, ALWAYS — never only the challenger. `gpt-5-4-mini` rejects
+    // `max_tokens`, and answering that by giving the two arms different
+    // parameters would introduce a second difference into a comparison §9.7
+    // Stage 1 requires to differ only by deployment name. `gpt-4.1` accepts
+    // `max_completion_tokens` (verified live), so sending it to both keeps the
+    // arms identical. Production is untouched: it never sets this option.
+    tokenParam: 'max_completion_tokens',
   });
   const vision = new AzureVisionExtractor({ endpoint: visionEndpoint, credential });
 
@@ -182,14 +190,21 @@ async function main() {
       // product ships in has 0.5 GiB and the two `.heic` slots decode large.
       // Recording is not a throughput problem.
       const tiles = await llm.readTiles(sent, sentMime);
-      const lines = await vision.readLines(sent, sentMime);
+      // ⚠ `--skip-ocr` IS A CORRECTNESS FLAG, NOT A SPEED ONE. `ocr/` is
+      // deliberately NOT model-scoped, because §9.7 Stage 1 holds the OCR leg
+      // identical across arms — it is the constant the comparison is measured
+      // against. Re-reading it while recording a challenger would overwrite the
+      // incumbent's constant with a fresh read, so any drift in the OCR service
+      // would land in the challenger's favour or against it, indistinguishably
+      // from a difference in the models. Record OCR once, with the first arm.
+      const lines = args.skipOcr ? null : await vision.readLines(sent, sentMime);
 
       writeJson(join(GOLDEN, 'llm', args.model, `${image.id}.llm.json`), tiles);
-      writeJson(join(GOLDEN, 'ocr', `${image.id}.ocr.json`), lines);
+      if (lines !== null) writeJson(join(GOLDEN, 'ocr', `${image.id}.ocr.json`), lines);
 
       console.log(
         `✓ ${image.id.padEnd(30)} tiles=${String(tiles.length).padStart(3)} ` +
-          `ocrLines=${String(lines.length).padStart(3)} sha256=${sha256.slice(0, 12)}…`,
+          `ocrLines=${lines === null ? ' (kept)' : String(lines.length).padStart(3)} sha256=${sha256.slice(0, 12)}…`,
       );
     } catch (error) {
       failures += 1;

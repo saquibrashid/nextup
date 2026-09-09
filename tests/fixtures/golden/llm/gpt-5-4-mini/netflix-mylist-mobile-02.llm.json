@@ -1,0 +1,98 @@
+[
+  {
+    "visibleText": "Wicked: For Good",
+    "identifiedTitle": "Wicked: For Good",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.016,
+      "y": 0.258,
+      "w": 0.304,
+      "h": 0.086
+    }
+  },
+  {
+    "visibleText": "HIS & HERS",
+    "identifiedTitle": "His & Hers",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.016,
+      "y": 0.454,
+      "w": 0.304,
+      "h": 0.086
+    }
+  },
+  {
+    "visibleText": "Man on Fire",
+    "identifiedTitle": "Man on Fire",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.016,
+      "y": 0.651,
+      "w": 0.304,
+      "h": 0.086
+    }
+  },
+  {
+    "visibleText": "Stranger Things: VHS\nSpecial Edition",
+    "identifiedTitle": "Stranger Things: VHS Special Edition",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.016,
+      "y": 0.847,
+      "w": 0.304,
+      "h": 0.086
+    }
+  },
+  {
+    "visibleText": "In the Hand of Dante",
+    "identifiedTitle": "In the Hand of Dante",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.016,
+      "y": 0.994,
+      "w": 0.304,
+      "h": 0.086
+    }
+  },
+  {
+    "visibleText": "Louis C.K.: Ridiculous",
+    "identifiedTitle": "Louis C.K.: Ridiculous",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.016,
+      "y": 1,
+      "w": 0.304,
+      "h": 0.086
+    }
+  },
+  {
+    "visibleText": "Frankenstein",
+    "identifiedTitle": "Frankenstein",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.016,
+      "y": 1,
+      "w": 0.304,
+      "h": 0.086
+    }
+  },
+  {
+    "visibleText": "Dilwale Dulhania Le Jayenge",
+    "identifiedTitle": "Dilwale Dulhania Le Jayenge",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.016,
+      "y": 1,
+      "w": 0.304,
+      "h": 0.086
+    }
+  }
+]

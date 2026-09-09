@@ -1,0 +1,26 @@
+[
+  {
+    "visibleText": "You haven't added anything yet.",
+    "identifiedTitle": null,
+    "basis": "unknown",
+    "confidence": 0,
+    "box": {
+      "x": 0.049,
+      "y": 0.467,
+      "w": 0.566,
+      "h": 0.031
+    }
+  },
+  {
+    "visibleText": "Titles you add to your list will appear here.",
+    "identifiedTitle": null,
+    "basis": "unknown",
+    "confidence": 0,
+    "box": {
+      "x": 0.049,
+      "y": 0.507,
+      "w": 0.617,
+      "h": 0.028
+    }
+  }
+]

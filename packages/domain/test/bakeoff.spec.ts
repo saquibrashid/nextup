@@ -33,7 +33,7 @@
  * points at exactly one acceptance criterion.
  */
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -442,51 +442,49 @@ describe('T-AI-045f · the bake-off never runs in CI', () => {
   });
 });
 
-describe('T-AI-045a/b/c · deferred — the CHALLENGER has not been recorded yet', () => {
-  it('T-AI-045u · claims a/b/c · the challenger arm is genuinely absent, so they are deferred rather than passing vacuously', () => {
-    // ⚠ THIS TEST GUARDS THE HONESTY OF THIS FILE'S OWN SCOPE NOTE, and it is
-    // the reason a/b/c are not written as empty loops over a missing
-    // directory. It asserts the STATED REASON for deferral is still true, so
-    // it fails the moment that reason stops holding — which is the prompt to
-    // come back and write a, b and c for real.
-    //
-    // It has now fired TWICE, exactly as designed, and each time the claim
-    // narrowed rather than the test being deleted:
-    //
-    //   2026-09-09 — TASK-079's recorder landed `llm/gpt-4.1/` and `ocr/`
-    //     from the live providers, so the recordings left the claim.
-    //   2026-09-09 — TASK-078's answer key landed `expected/`, authored by
-    //     READING the eleven images rather than by reading any model's output,
-    //     so the answer key left the claim too.
-    //
-    // What remains is the one thing a comparison cannot do without: the
-    // CHALLENGER's own recordings. §9.7 Stage 1 requires both arms recorded
-    // against the same images and scored against the same key; with a single
-    // arm on disk, a/b/c could only ever compare the incumbent with itself.
-    //
-    // ~~`expect(present).not.toContain('ocr'); expect(present).not.toContain('llm');`~~
-    // ~~`expect(present).not.toContain('expected');`~~
-    // *(both superseded: the recordings and the answer key have landed.)*
-    const golden = path.join(REPO_ROOT, 'tests/fixtures/golden');
-    const present = readdirSync(golden).filter((entry) => {
-      const full = path.join(golden, entry);
-      return statSync(full).isDirectory();
-    });
+/**
+ * ⚠ THE DEFERRAL IS OVER. `T-AI-045a`/`b`/`c` are WRITTEN, and they live in
+ * `tests/extraction/bakeoffMeasured.spec.ts` — they must, because they replay
+ * the recorded arms through the API's `StubExtractor`, which this package
+ * cannot import.
+ *
+ * `T-AI-045u` existed to make sure they were not forgotten while their inputs
+ * were missing, and it fired three times, narrowing each time rather than
+ * being deleted: the recordings landed, then the answer key, then the
+ * challenger arm. All three are now on disk and the measured suite is green.
+ *
+ * ~~`expect(present).not.toContain('ocr'); expect(present).not.toContain('llm');`~~
+ * ~~`expect(present).not.toContain('expected');`~~
+ * ~~`expect(arms).toEqual(['gpt-4.1']);`~~
+ * *(all superseded — the inputs exist and a/b/c measure them.)*
+ */
+describe('T-AI-045v · the measured bake-off exists and is COLLECTED', () => {
+  it('T-AI-045v · claims a/b/c · the measured suite is on disk and inside a collected path', () => {
+    // ⚠ "IT EXISTS" IS NOT ENOUGH, AND THIS REPOSITORY HAS ALREADY BEEN BITTEN
+    // BY THE DIFFERENCE (`T-CI-008`). A `.spec.ts` outside a path some Vitest
+    // project collects never executes, and its assertions "pass" by never
+    // running — so a bake-off moved one directory sideways would report the
+    // same green as a bake-off that ran. `tests/extraction/**` is collected by
+    // the `golden` project, which CI job 7 runs.
+    const suite = path.join(REPO_ROOT, 'tests/extraction/bakeoffMeasured.spec.ts');
+    expect(existsSync(suite)).toBe(true);
 
-    // Recordings are model-scoped (`llm/<modelId>/`); OCR is not, because the
-    // OCR leg is held identical across arms by §9.7 Stage 1.
-    const arms = readdirSync(path.join(golden, 'llm')).filter((entry) =>
-      statSync(path.join(golden, 'llm', entry)).isDirectory(),
+    const source = readFileSync(suite, 'utf8');
+    for (const id of ['T-AI-045a', 'T-AI-045b', 'T-AI-045c']) {
+      expect(source, `${id} is not asserted by the measured suite`).toContain(id);
+    }
+
+    // It must feed the PRE-COMMITTED rule rather than restate a threshold of
+    // its own — the whole point of shipping `chooseReader` first.
+    expect(source).toContain('chooseReader');
+
+    // And it must genuinely compare TWO arms.
+    expect(source).toContain('gpt-4.1');
+    expect(source).toContain('gpt-5-4-mini');
+
+    const arms = readdirSync(path.join(REPO_ROOT, 'tests/fixtures/golden/llm')).filter((entry) =>
+      statSync(path.join(REPO_ROOT, 'tests/fixtures/golden/llm', entry)).isDirectory(),
     );
-    expect(arms).toEqual(['gpt-4.1']);
-
-    // Non-vacuity, and it is load-bearing now that the claim is a single
-    // negative: if `tests/fixtures/golden` were ever moved or emptied, the
-    // assertion above would pass over nothing at all and report the corpus as
-    // "still absent" for ever.
-    expect(present).toContain('images');
-    expect(present).toContain('expected');
-    expect(present).toContain('llm');
-    expect(present).toContain('ocr');
+    expect(arms.sort()).toEqual(['gpt-4.1', 'gpt-5-4-mini']);
   });
 });

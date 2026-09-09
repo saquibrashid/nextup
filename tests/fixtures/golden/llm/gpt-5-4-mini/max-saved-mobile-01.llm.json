@@ -1,0 +1,110 @@
+[
+  {
+    "visibleText": "New\nLanterns",
+    "identifiedTitle": "Lanterns",
+    "basis": "both",
+    "confidence": 0.98,
+    "box": {
+      "x": 0.04,
+      "y": 0.159,
+      "w": 0.37,
+      "h": 0.111
+    }
+  },
+  {
+    "visibleText": "New\nNormal\n2026",
+    "identifiedTitle": "Normal",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.04,
+      "y": 0.282,
+      "w": 0.37,
+      "h": 0.111
+    }
+  },
+  {
+    "visibleText": "The Drama\n2026",
+    "identifiedTitle": "The Drama",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.04,
+      "y": 0.405,
+      "w": 0.37,
+      "h": 0.111
+    }
+  },
+  {
+    "visibleText": "Ramy Youssef: In Love\n2026",
+    "identifiedTitle": "Ramy Youssef: In Love",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.04,
+      "y": 0.528,
+      "w": 0.37,
+      "h": 0.111
+    }
+  },
+  {
+    "visibleText": "Greenland 2: Migration\n2026",
+    "identifiedTitle": "Greenland 2: Migration",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.04,
+      "y": 0.651,
+      "w": 0.37,
+      "h": 0.111
+    }
+  },
+  {
+    "visibleText": "True Detective",
+    "identifiedTitle": "True Detective",
+    "basis": "both",
+    "confidence": 0.98,
+    "box": {
+      "x": 0.04,
+      "y": 0.774,
+      "w": 0.37,
+      "h": 0.111
+    }
+  },
+  {
+    "visibleText": "The Drama",
+    "identifiedTitle": "The Drama",
+    "basis": "both",
+    "confidence": 0.95,
+    "box": {
+      "x": 0.04,
+      "y": 0.897,
+      "w": 0.29,
+      "h": 0.07
+    }
+  },
+  {
+    "visibleText": "New\nLanterns",
+    "identifiedTitle": "Lanterns",
+    "basis": "both",
+    "confidence": 0.95,
+    "box": {
+      "x": 0.35,
+      "y": 0.897,
+      "w": 0.29,
+      "h": 0.07
+    }
+  },
+  {
+    "visibleText": null,
+    "identifiedTitle": null,
+    "basis": "unknown",
+    "confidence": 0,
+    "box": {
+      "x": 0.68,
+      "y": 0.897,
+      "w": 0.29,
+      "h": 0.07
+    }
+  }
+]

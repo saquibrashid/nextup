@@ -74,6 +74,39 @@ param omdbApiKey = readEnvironmentVariable('NEXTUP_OMDB_API_KEY')
 param allowedSubjects = readEnvironmentVariable('NEXTUP_ALLOWED_SUBJECTS', '')
 
 // ── AI provisioning (TASK-010) ─────────────────────────────────────────────
-// Production is deliberately LEFT OFF until the §9.7 bake-off reports. See
-// main.staging.bicepparam and docs/runbooks/vision-account-reuse.md.
-param deployAi = false
+// ⚠ THE §9.7 BAKE-OFF HAS REPORTED, AND THE INCUMBENT STAYS.
+// `tests/extraction/bakeoffMeasured.spec.ts` (`T-AI-045a`/`b`/`c`) scores both
+// arms offline on every PR and feeds the PRE-COMMITTED rule in
+// `chooseReader.ts`. `gpt-5-4-mini` was rejected on evidence, not on price: it
+// bought roughly ONE extra title of recall across the whole corpus — inside
+// the noise band the rule was written to discount — while fabricating three
+// times as often, including two invented tiles on a page with no works on it
+// at all. Production therefore deploys the reader it was always configured
+// for, `gpt-4.1` (ADR-0001), and the decision is re-checked in CI rather than
+// recorded in a document that can drift.
+//
+// ⚠ THE GATE IS NOT REMOVED, IT IS SATISFIED. If a future challenger wins,
+// promotion is an ADR-0001 revision AND a `max_tokens` →
+// `max_completion_tokens` change in `config.ts` (§9.7). Do not flip this back
+// to `false` to "save money": NFR-012a makes extraction quality-first, and a
+// cost-motivated downgrade is non-compliance rather than an optimisation.
+//
+// ~~`param deployAi = false` — "left off until the §9.7 bake-off reports".~~
+// *(superseded 2026-09-09: it reported.)*
+param deployAi = true
+
+// ⚠ VISION IS RE-USED, NOT PROVISIONED, AND THIS PAIR IS NOT OPTIONAL.
+// Azure AI Vision **F0 is limited to ONE ComputerVision account per
+// SUBSCRIPTION**, and this subscription already holds
+// `vision-f4n7ptoeq44pk`. Setting `deployAi = true` without these two lines
+// leaves `deployVision` at its `true` default and the production deployment
+// FAILS on a quota conflict — after the Azure OpenAI account has already been
+// created, so the failure is both confusing and half-applied.
+//
+// The role assignment on that account is issued OUT-OF-BAND (it lives in a
+// different resource group), per `docs/runbooks/vision-account-reuse.md`.
+// Its F0 quota — 5,000 tx/month, 20/min — is now shared three ways. §2.2
+// degrades gracefully when OCR is unavailable, so throttling costs a batch its
+// cross-check rather than costing it the batch.
+param deployVision = false
+param existingVisionEndpoint = 'https://vision-f4n7ptoeq44pk.cognitiveservices.azure.com/'

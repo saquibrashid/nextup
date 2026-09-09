@@ -3,12 +3,12 @@
     "visibleText": "In the sh...of Dante",
     "identifiedTitle": "In the Shadow of Dante",
     "basis": "text",
-    "confidence": 0.9,
+    "confidence": 0.95,
     "box": {
       "x": 0.03,
-      "y": 0.178,
-      "w": 0.293,
-      "h": 0.691
+      "y": 0.181,
+      "w": 0.282,
+      "h": 0.627
     }
   }
 ]

@@ -7,7 +7,7 @@
     "box": {
       "x": 0.025,
       "y": 0.236,
-      "w": 0.242,
+      "w": 0.234,
       "h": 0.246
     }
   },
@@ -17,9 +17,9 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.273,
+      "x": 0.265,
       "y": 0.236,
-      "w": 0.242,
+      "w": 0.234,
       "h": 0.246
     }
   },
@@ -29,9 +29,9 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.521,
+      "x": 0.505,
       "y": 0.236,
-      "w": 0.242,
+      "w": 0.234,
       "h": 0.246
     }
   },
@@ -41,9 +41,9 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.769,
+      "x": 0.745,
       "y": 0.236,
-      "w": 0.242,
+      "w": 0.234,
       "h": 0.246
     }
   },
@@ -54,20 +54,20 @@
     "confidence": 1,
     "box": {
       "x": 0.025,
-      "y": 0.507,
-      "w": 0.242,
+      "y": 0.511,
+      "w": 0.234,
       "h": 0.246
     }
   },
   {
-    "visibleText": "TRUE DETECTIVE NIGHT COUNTRY True Detective",
+    "visibleText": "TRUE DETECTIVE NIGHT COUNTRY",
     "identifiedTitle": "True Detective: Night Country",
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.273,
-      "y": 0.507,
-      "w": 0.242,
+      "x": 0.265,
+      "y": 0.511,
+      "w": 0.234,
       "h": 0.246
     }
   }
