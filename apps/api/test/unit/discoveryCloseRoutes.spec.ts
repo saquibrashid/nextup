@@ -230,7 +230,7 @@ afterEach(async () => {
 });
 
 describe('T-WAIT-003 · US-040 AC-3 · closing a discovery batch creates no listing', () => {
-  it('T-WAIT-003a: a confirmed discovery candidate yields an intent and NO service listing', async () => {
+  it('T-WAIT-003e: a confirmed discovery candidate yields an intent and NO service listing', async () => {
     store.candidates = [candidate('c1', DUNE, 'Dune')];
 
     const { status } = await close();
@@ -245,7 +245,7 @@ describe('T-WAIT-003 · US-040 AC-3 · closing a discovery batch creates no list
     });
   });
 
-  it('T-WAIT-003b: no service state is written — REQ-039 must not claim a service was refreshed', async () => {
+  it('T-WAIT-003f: no service state is written — REQ-039 must not claim a service was refreshed', async () => {
     store.candidates = [candidate('c1', DUNE, 'Dune')];
 
     const { body } = await close();
@@ -258,7 +258,7 @@ describe('T-WAIT-003 · US-040 AC-3 · closing a discovery batch creates no list
     expect(summary['removalGroupId']).toBeNull();
   });
 
-  it('T-WAIT-003d: the waiting title is stored `removed` with a null sort date, so it is in neither view', async () => {
+  it('T-WAIT-003g: the waiting title is stored `removed` with a null sort date, so it is in neither view', async () => {
     store.candidates = [candidate('c1', DUNE, 'Dune')];
 
     await close();
@@ -269,7 +269,7 @@ describe('T-WAIT-003 · US-040 AC-3 · closing a discovery batch creates no list
 });
 
 describe('T-WAIT-004 · US-040 AC-5 · a work already held produces no intent, and is reported', () => {
-  it('T-WAIT-004a: a work already in the combined list is REPORTED rather than silently dropped', async () => {
+  it('T-WAIT-004h: a work already in the combined list is REPORTED rather than silently dropped', async () => {
     store.listed = [DUNE];
     store.candidates = [candidate('c1', DUNE, 'Dune'), candidate('c2', HEAT, 'Heat')];
 
@@ -288,7 +288,7 @@ describe('T-WAIT-004 · US-040 AC-5 · a work already held produces no intent, a
     expect(store.intents[0]).toMatchObject({ workIdentity: HEAT });
   });
 
-  it('T-WAIT-004c: a work already waiting yields no second intent — the unique index would roll the close back', async () => {
+  it('T-WAIT-004i: a work already waiting yields no second intent — the unique index would roll the close back', async () => {
     store.waiting = [DUNE];
     store.candidates = [candidate('c1', DUNE, 'Dune')];
 
