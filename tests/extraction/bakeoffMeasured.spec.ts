@@ -193,22 +193,22 @@ describe('T-AI-045 the bake-off is measured, and the pre-committed rule decides 
     // so it applies to BOTH arms and the comparison stays like-for-like.
     // ⚠ THEN 0.1935 → 0.1525 AT TASK-204, the off-list region (§3.2 step 3b).
     // Again a pipeline rule, not an answer-key change, so both arms see it.
-    expect(inc.falseTitleRate).toBe(0.15254237288135594);
+    expect(inc.falseTitleRate).toBe(0.08771929824561403);
     // ⚠ The fabrication rate moved with it — 0.011494 → 0.011765 — and it went
     // UP while the pipeline got BETTER. Same single fabrication, divided by a
     // denominator two candidates smaller because the two fragments collapsed.
     // A denominator artefact, exactly like TASK-195's; do not read it as a
     // regression.
-    expect(inc.fabricationRate).toBe(0.011764705882352941);
+    expect(inc.fabricationRate).toBe(0.012048192771084338);
 
     expect(chal.recall).toBe(0.9402985074626866);
     // ⚠ THE CHALLENGER MOVED FURTHER THAN THE INCUMBENT AT TASK-203 — 0.4198 →
     // 0.3472 — and that is expected, not suspicious: it emits MORE readings of
     // each caption, so it had more fragments to lose. Its lead-gap narrowed
     // and the incumbent still wins by 15.4 points.
-    expect(chal.falseTitleRate).toBe(0.3472222222222222);
+    expect(chal.falseTitleRate).toBe(0.3);
     // Same denominator artefact as the incumbent's: 0.035 → 0.036649.
-    expect(chal.fabricationRate).toBe(0.03664921465968586);
+    expect(chal.fabricationRate).toBe(0.0374331550802139);
 
     // ⚠ THE SHAPE OF THE RESULT, STATED AS AN ASSERTION SO IT CANNOT BE
     // MISREAD FROM THE NUMBERS ALONE: the challenger reads MORE, and much of

@@ -123,76 +123,6 @@ const KNOWN_SHORTFALLS = {
    */
   aggregateRecall: 0.9402985074626866,
   /**
-   * Dominated by ONE systematic cause, not by many small ones: stage 1c's
-   * consumption of an OCR line is GEOMETRY-scoped, and on Netflix's mobile
-   * list layout the caption sits BESIDE the artwork rather than over it. The
-   * line never overlaps the tile box, is never marked consumed, and is
-   * re-emitted as an orphan — correctly, per `crossCheck.ts`'s header, since
-   * dropping it would be the very silent-omission failure the OCR leg exists
-   * to prevent. §7.4's collapse reunites the ones whose text matches exactly;
-   * FRAGMENTS of a two-line caption (`stranger things vhs` + `special
-   * edition`) survive as separate candidates and are counted here.
-   *
-   * ⚠ THIS NUMBER WENT UP AT TASK-195 WHILE THE DEFECT GOT SMALLER, AND THE
-   * DIRECTION IS A DENOMINATOR ARTEFACT, NOT A REGRESSION. The absolute count
-   * of false titles fell from **26 to 22**. The rate rose from 0.2500 to
-   * 0.3143 because its denominator is `title-candidate` COUNT, and 34 chrome
-   * strings that used to be counted as title candidates are now correctly
-   * `chrome-suspected` — so the same numerator is divided by 70 instead of
-   * 104. Anyone reading this number as "false titles got worse" is reading it
-   * backwards; the honest summary is that the corpus stopped hiding the rate
-   * behind a padded denominator.
-   *
-   * ⚠ AND IT WENT DOWN AT TASK-198 FOR THE ORDINARY REASON — 0.3143 to 0.2857,
-   * two fewer false titles, because the three `wwe raw` expansions stopped
-   * being emitted. Denominator unchanged at 70.
-   *
-   * ⚠ AND DOWN AGAIN AT TASK-199 — 0.2857 to 0.2424 — when the owner ruled
-   * that `HBO`, `HBO ORIGINAL` and `New` are chrome. Four badge instances left
-   * BOTH sides of the fraction (20/70 -> 16/66), because a `chrome-suspected`
-   * candidate is neither a false title nor a title candidate. ⚠ **THIS ONE
-   * CHANGED THE ANSWER KEY, WHICH IS NORMALLY THE FORBIDDEN MOVE.** It was
-   * legitimate only because the badges are genuinely printed on the images —
-   * `HBO` is half the `HBO max` wordmark — and because the vocabulary and the
-   * three answer keys were changed TOGETHER. Changing only the key would have
-   * bought this number by degrading chrome rejection, which is a real gate.
-   *
-   * ⚠ AND DOWN AGAIN AT TASK-203 — 0.2424 to 0.1935 — the FRAGMENT COLLAPSE
-   * (§7.4a). Two fragments (`wicked` beside `wicked for good`, `first` beside
-   * `ladies first`) now collapse into the caption that holds them whole, so
-   * they leave both sides of the fraction (8/33 -> 6/31). Recall is unchanged,
-   * which is the point: the proximity guard is what keeps `true detective`
-   * from collapsing into `true detective night country` and turning a
-   * false-title win into a recall loss.
-   *
-   * ⚠ THE REMAINING SIX ARE NOT FRAGMENTS OF THIS KIND, and the fragment pass
-   * cannot reach them. `stranger things vhs` + `special edition` sit at
-   * y≈0.75 while the candidate holding the whole caption is an ARTWORK read
-   * from a different tile at y≈0.88 — a caption-merge failure (§3.2 step 1),
-   * not an overlap failure. The four on `max-saved-desktop-01` are a
-   * recommendations region. Both are tracked separately; neither is bought by
-   * widening this pass.
-   *
-   * ⚠ AND DOWN AGAIN AT TASK-204 - 0.1935 to 0.1525 - the OFF-LIST REGION
-   * (§3.2 step 3b). Three `ocr-only` orphans on `max-saved-desktop-01`
-   * (`hard knocks`, `training camp with`, `seattle seahawks`) sit BELOW
-   * `Recommended For You` and are titles Max is promoting, not titles the
-   * owner saved. They are reclassified `chrome-suspected`, never dropped, so
-   * they leave both sides of the fraction (9/62 -> 9/59 - numerator 12->9,
-   * denominator 62->59).
-   *
-   * ⚠ TWO CORRECTIONS TO TASK-199'S LEDGER, RECORDED SO THE ESTIMATE IS NOT
-   * REUSED. (1) `og studios` on `max-saved-mobile-01` is NOT reachable by
-   * this rule: that recording contains NO `Recommended For You` line at all,
-   * so there is no anchor. The ledger's "mobile header at y 0.829" is not in
-   * the OCR. (2) The rule DOES fire on `rotated-01`, and it correctly derives
-   * the **x** axis there rather than `y` - which is the whole reason the axis
-   * is derived from the header's position relative to the primary reader's
-   * hull instead of assumed. It excludes nothing there, and per-image recall is
-   * unchanged.
-   */
-  aggregateFalseTitleRate: 0.15254237288135594,
-  /**
    * ~~2 of 4. ⚠ §9.2 sets this floor at **1.0 and calls it non-negotiable**, so
    * this is the most serious shortfall in the ledger — and its cause is the
    * same geometry-scoped consumption as the false-title rate, seen from the
@@ -263,6 +193,108 @@ const KNOWN_SHORTFALLS = {
  */
 const CHROME_REJECTION_MEASURED = 0.8481012658227848;
 
+/**
+ * The aggregate false-title rate — **A GATE, NOT A PIN, SINCE TASK-205.**
+ *
+ * ⚠ THE FOURTH METRIC TO LEAVE `KNOWN_SHORTFALLS` BY CLEARING §9.2, and the
+ * one the ledger below repeatedly predicted was unreachable. It was 0.2500
+ * when first measured and is **0.0877** now, against a ceiling of
+ * {@link AGGREGATE_FALSE_TITLE_CEILING}. The full history is retained
+ * verbatim below, INCLUDING the two paragraphs that called the last four
+ * survivors out of reach, because being wrong about that is the useful part:
+ * the fragment pass genuinely could not reach them, and the reason was that
+ * they were never an overlap failure at all.
+ *
+ * ⚠ WHAT ACTUALLY CLEARED IT (TASK-205, 0.1525 → 0.0877): §3.2 step 1b, the
+ * WRAPPED CAPTION continuation. `Stranger Things: VHS` and `Special Edition`
+ * are two OCR lines of ONE caption that wrapped — left edges flush at
+ * x = 0.350, vertical gap 0.0016 — and step 1 merged only along a line, so
+ * both halves survived as candidates while the whole title survived as
+ * neither. Joining them removes two false titles per image on two images AND
+ * produces `stranger things vhs special edition`, which is an EXPECTED title
+ * in both answer keys. Numerator 9 → 5, denominator 59 → 57.
+ *
+ * ⚠ THE FIVE SURVIVORS ARE NAMED, so this gate is not mistaken for perfection:
+ * `in the shadow of dante` and `true detective night country` are reader
+ * misreads already counted against recall; `2026 the drama` and `2026 normal`
+ * on `rotated-01` are LEADING-year fusions, and §3.2 step 5 lifts only
+ * TRAILING years — a leading-year strip would break real titles such as
+ * *2046*; and `og studios` sits on the one image whose recording contains no
+ * off-list header to anchor step 3b to.
+ *
+ * ⚠ THE HISTORY BELOW IS RETAINED VERBATIM.
+ *
+ * ---
+ *
+ * Dominated by ONE systematic cause, not by many small ones: stage 1c's
+ * consumption of an OCR line is GEOMETRY-scoped, and on Netflix's mobile
+ * list layout the caption sits BESIDE the artwork rather than over it. The
+ * line never overlaps the tile box, is never marked consumed, and is
+ * re-emitted as an orphan — correctly, per `crossCheck.ts`'s header, since
+ * dropping it would be the very silent-omission failure the OCR leg exists
+ * to prevent. §7.4's collapse reunites the ones whose text matches exactly;
+ * FRAGMENTS of a two-line caption (`stranger things vhs` + `special
+ * edition`) survive as separate candidates and are counted here.
+ *
+ * ⚠ THIS NUMBER WENT UP AT TASK-195 WHILE THE DEFECT GOT SMALLER, AND THE
+ * DIRECTION IS A DENOMINATOR ARTEFACT, NOT A REGRESSION. The absolute count
+ * of false titles fell from **26 to 22**. The rate rose from 0.2500 to
+ * 0.3143 because its denominator is `title-candidate` COUNT, and 34 chrome
+ * strings that used to be counted as title candidates are now correctly
+ * `chrome-suspected` — so the same numerator is divided by 70 instead of
+ * 104. Anyone reading this number as "false titles got worse" is reading it
+ * backwards; the honest summary is that the corpus stopped hiding the rate
+ * behind a padded denominator.
+ *
+ * ⚠ AND IT WENT DOWN AT TASK-198 FOR THE ORDINARY REASON — 0.3143 to 0.2857,
+ * two fewer false titles, because the three `wwe raw` expansions stopped
+ * being emitted. Denominator unchanged at 70.
+ *
+ * ⚠ AND DOWN AGAIN AT TASK-199 — 0.2857 to 0.2424 — when the owner ruled
+ * that `HBO`, `HBO ORIGINAL` and `New` are chrome. Four badge instances left
+ * BOTH sides of the fraction (20/70 -> 16/66), because a `chrome-suspected`
+ * candidate is neither a false title nor a title candidate. ⚠ **THIS ONE
+ * CHANGED THE ANSWER KEY, WHICH IS NORMALLY THE FORBIDDEN MOVE.** It was
+ * legitimate only because the badges are genuinely printed on the images —
+ * `HBO` is half the `HBO max` wordmark — and because the vocabulary and the
+ * three answer keys were changed TOGETHER. Changing only the key would have
+ * bought this number by degrading chrome rejection, which is a real gate.
+ *
+ * ⚠ AND DOWN AGAIN AT TASK-203 — 0.2424 to 0.1935 — the FRAGMENT COLLAPSE
+ * (§7.4a). Two fragments (`wicked` beside `wicked for good`, `first` beside
+ * `ladies first`) now collapse into the caption that holds them whole, so
+ * they leave both sides of the fraction (8/33 -> 6/31). Recall is unchanged,
+ * which is the point: the proximity guard is what keeps `true detective`
+ * from collapsing into `true detective night country` and turning a
+ * false-title win into a recall loss.
+ *
+ * ⚠ THE REMAINING SIX ARE NOT FRAGMENTS OF THIS KIND, and the fragment pass
+ * cannot reach them. `stranger things vhs` + `special edition` sit at
+ * y≈0.75 while the candidate holding the whole caption is an ARTWORK read
+ * from a different tile at y≈0.88 — a caption-merge failure (§3.2 step 1),
+ * not an overlap failure. The four on `max-saved-desktop-01` are a
+ * recommendations region. Both are tracked separately; neither is bought by
+ * widening this pass.
+ *
+ * ⚠ AND DOWN AGAIN AT TASK-204 - 0.1935 to 0.1525 - the OFF-LIST REGION
+ * (§3.2 step 3b). Three `ocr-only` orphans on `max-saved-desktop-01`
+ * (`hard knocks`, `training camp with`, `seattle seahawks`) sit BELOW
+ * `Recommended For You` and are titles Max is promoting, not titles the
+ * owner saved. They are reclassified `chrome-suspected`, never dropped, so
+ * they leave both sides of the fraction (9/62 -> 9/59 - numerator 12->9,
+ * denominator 62->59).
+ *
+ * ⚠ TWO CORRECTIONS TO TASK-199'S LEDGER, RECORDED SO THE ESTIMATE IS NOT
+ * REUSED. (1) `og studios` on `max-saved-mobile-01` is NOT reachable by
+ * this rule: that recording contains NO `Recommended For You` line at all,
+ * so there is no anchor. The ledger's "mobile header at y 0.829" is not in
+ * the OCR. (2) The rule DOES fire on `rotated-01`, and it correctly derives
+ * the **x** axis there rather than `y` - which is the whole reason the axis
+ * is derived from the header's position relative to the primary reader's
+ * hull instead of assumed. It excludes nothing there, and per-image recall is
+ * unchanged.
+ */
+const FALSE_TITLE_MEASURED = 0.08771929824561403;
 /**
  * Match accuracy — **A GATE, NOT A PIN, SINCE TASK-197.** 23 of 24.
  *
@@ -402,15 +434,18 @@ describe('T-AI-030 the golden corpus is measured, and the measurement is pinned'
     expect(KNOWN_SHORTFALLS.aggregateRecall).toBeLessThan(AGGREGATE_RECALL_FLOOR);
   });
 
-  it('T-AI-030d · the aggregate false-title rate is pinned', () => {
+  it('T-AI-030d · the aggregate false-title rate CLEARS the §9.2 ceiling and is gated, not pinned', () => {
     const titleCandidates = scored.reduce(
       (n, s) => n + s.candidates.filter((c) => c.cleanupVerdict === 'title-candidate').length,
       0,
     );
     const falseTotal = scored.reduce((n, s) => n + s.falseTitles, 0);
     expect(titleCandidates).toBeGreaterThan(0);
-    expect(falseTotal / titleCandidates).toBe(KNOWN_SHORTFALLS.aggregateFalseTitleRate);
-    expect(KNOWN_SHORTFALLS.aggregateFalseTitleRate).toBeGreaterThan(AGGREGATE_FALSE_TITLE_CEILING);
+    // The gate, asserted first because it is the one that matters.
+    expect(falseTotal / titleCandidates).toBeLessThanOrEqual(AGGREGATE_FALSE_TITLE_CEILING);
+    // And the exact value, so an improvement is recorded rather than absorbed
+    // and a silent slide toward the ceiling still fails.
+    expect(falseTotal / titleCandidates).toBe(FALSE_TITLE_MEASURED);
   });
 
   it('T-AI-030e · chrome rejection CLEARS the §9.2 floor and is gated, not pinned', () => {
@@ -446,20 +481,24 @@ describe('T-AI-030 the golden corpus is measured, and the measurement is pinned'
     // §9.2 threshold. The day extraction improves past one, this fails and
     // says: stop pinning that metric, gate it.
     expect(KNOWN_SHORTFALLS.aggregateRecall).toBeLessThan(AGGREGATE_RECALL_FLOOR);
-    expect(KNOWN_SHORTFALLS.aggregateFalseTitleRate).toBeGreaterThan(AGGREGATE_FALSE_TITLE_CEILING);
-    // ⚠ AND IT HAS NOW FIRED THREE TIMES FOR REAL. `chromeRejectionRate` was
+    // ⚠ AND IT HAS NOW FIRED FOUR TIMES FOR REAL. `chromeRejectionRate` was
     // the fifth entry here until TASK-195, `matchAccuracy` the fourth until
-    // TASK-197, and `omissionRecovery` the third until TASK-198; each cleared
-    // §9.2, this guard failed as designed, and the metric was moved out of the
-    // ledger and gated (by `T-AI-030e`, `T-AI-031b` and `T-AI-039c`
-    // respectively). That is the whole mechanism working end to end — so none
-    // of the three keys may come back, and the count below drops to match.
+    // TASK-197, `omissionRecovery` the third until TASK-198, and
+    // `aggregateFalseTitleRate` the second until TASK-205; each cleared §9.2,
+    // this guard failed as designed, and the metric was moved out of the
+    // ledger and gated (by `T-AI-030e`, `T-AI-031b`, `T-AI-039c` and
+    // `T-AI-030d` respectively). That is the whole mechanism working end to
+    // end — so none of the four keys may come back, and the count below drops
+    // to match.
     expect(Object.keys(KNOWN_SHORTFALLS)).not.toContain('chromeRejectionRate');
     expect(Object.keys(KNOWN_SHORTFALLS)).not.toContain('matchAccuracy');
     expect(Object.keys(KNOWN_SHORTFALLS)).not.toContain('omissionRecovery');
+    expect(Object.keys(KNOWN_SHORTFALLS)).not.toContain('aggregateFalseTitleRate');
     // Non-vacuity: a ledger that lost its entries would pass every line above
-    // by having nothing to check.
-    expect(Object.keys(KNOWN_SHORTFALLS).length).toBeGreaterThanOrEqual(2);
+    // by having nothing to check. ⚠ THE FLOOR IS NOW 1, NOT 2 — `aggregateRecall`
+    // is the LAST shortfall, and when it clears, this ledger and every pin in
+    // it goes away entirely rather than lingering as an empty object.
+    expect(Object.keys(KNOWN_SHORTFALLS).length).toBeGreaterThanOrEqual(1);
     // And the runner-side stage-3 deferral IS discharged (TASK-190) — asserted
     // positively so it cannot silently regress to the state this guard was
     // originally written to watch for.
