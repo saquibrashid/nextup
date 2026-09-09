@@ -158,10 +158,16 @@ describe('T-META-006 — every defined test id is owned', () => {
     // `specs/testing.md` with the superseded text struck through, then
     // implemented in `tests/infra/ownerLeadingIndexes.spec.ts` and
     // `tests/infra/duplicateAckWriters.spec.ts` and mutation-verified.
-    // ⚠ The four that remain SHOULD remain, and a future implementer should
+    // ⚠ The three that remain SHOULD remain, and a future implementer should
     // not read a non-zero baseline as unfinished work: three `T-AUTH-*`
-    // deferred by §10, and `T-UX-069`, catalogued as not implemented in v1.
-    expect(BASELINE_ORPHANS.size).toBe(4);
+    // deferred by §10.
+    // 4 → 3: `T-UX-069` (TASK-196). The baseline catalogued it as "not
+    // implemented in v1", but §6.18 IS implemented, as `T-UX-069a`–`j` in
+    // `apps/web/test/reviewSessionExpired.spec.tsx`, and
+    // `tests/meta/uxStateCoverage.spec.ts` had already retired it from its own
+    // unimplemented list. The live gate had been printing it as removable on
+    // every run. Nothing was built for this step — a stale claim was deleted.
+    expect(BASELINE_ORPHANS.size).toBe(3);
   });
 
   it('T-META-006f: a citation that is struck through does not count as ownership', () => {

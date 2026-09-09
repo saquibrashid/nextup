@@ -296,6 +296,53 @@ describe('cleanup — reading-order grouping (T-AI-004)', () => {
 
     expect(out[0]?.confidence).toBe(0.3);
   });
+
+  it('T-AI-004ai never merges a chrome label into its neighbour', () => {
+    // ⚠ THE BUG THIS EXISTS FOR (TASK-195, TASK-079 finding 2). Step 1 runs
+    // BEFORE step 3, and a navigation bar is a row of labels well inside
+    // `OCR_MERGE_GAP` of each other. Merged, they become `NETFLIX Home Shows
+    // Movies` — a string the UI never rendered, which the exact-match
+    // vocabulary can never match however many terms it gains. The whole
+    // navigation bar then reached the owner as title candidates.
+    const out = groupReadingOrder([
+      ocr({ rawText: 'NETFLIX', boundingBox: box(0.02, 0.02, 0.08, 0.02) }),
+      ocr({ rawText: 'Home', boundingBox: box(0.11, 0.02, 0.05, 0.02) }),
+      ocr({ rawText: 'Shows', boundingBox: box(0.17, 0.02, 0.05, 0.02) }),
+    ]);
+
+    expect(out.map((i) => i.rawText)).toEqual(['NETFLIX', 'Home', 'Shows']);
+  });
+
+  it('T-AI-004aj still merges genuine caption fragments beside a chrome label', () => {
+    // The limit on `v`, and the reason it is scoped to the label itself rather
+    // than to the row: refusing every merge on a row that happens to contain
+    // chrome would split two-line captions back apart and undo `q`.
+    const out = groupReadingOrder([
+      ocr({ rawText: 'Search', boundingBox: box(0.02, 0.02, 0.06, 0.02) }),
+      ocr({ rawText: 'Breaking', boundingBox: box(0.1, 0.2, 0.15, 0.04) }),
+      ocr({ rawText: 'Bad', boundingBox: box(0.26, 0.2, 0.08, 0.04) }),
+    ]);
+
+    expect(out.map((i) => i.rawText)).toEqual(['Search', 'Breaking Bad']);
+  });
+
+  it('T-AI-004ak classifies a row header whose tail is the owner\u2019s profile name', () => {
+    // `Continue Watching for <profile name>` carries arbitrary owner-chosen
+    // text, so no exact term can ever cover it. The rule is a PREFIX anchored
+    // at the start of the line — never a substring, which would delete a work
+    // whose title merely mentions one.
+    const out = cleanup([ocr({ rawText: "Continue Watching for Let's Go!" })], { now: NOW });
+
+    expect(out[0]?.cleanupVerdict).toBe('chrome-suspected');
+  });
+
+  it('T-AI-004al leaves a title that merely CONTAINS a chrome phrase alone', () => {
+    // The discriminating twin of `x`. A prefix rule that had been written as a
+    // substring test would take this one too.
+    const out = cleanup([ocr({ rawText: 'A Man for All Seasons' })], { now: NOW });
+
+    expect(out[0]?.cleanupVerdict).toBe('title-candidate');
+  });
 });
 
 describe('truncated captions (T-AI-043)', () => {

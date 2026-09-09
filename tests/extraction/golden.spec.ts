@@ -128,44 +128,18 @@ const KNOWN_SHORTFALLS = {
    * to prevent. §7.4's collapse reunites the ones whose text matches exactly;
    * FRAGMENTS of a two-line caption (`stranger things vhs` + `special
    * edition`) survive as separate candidates and are counted here.
+   *
+   * ⚠ THIS NUMBER WENT UP AT TASK-195 WHILE THE DEFECT GOT SMALLER, AND THE
+   * DIRECTION IS A DENOMINATOR ARTEFACT, NOT A REGRESSION. The absolute count
+   * of false titles fell from **26 to 22**. The rate rose from 0.2500 to
+   * 0.3143 because its denominator is `title-candidate` COUNT, and 34 chrome
+   * strings that used to be counted as title candidates are now correctly
+   * `chrome-suspected` — so the same numerator is divided by 70 instead of
+   * 104. Anyone reading this number as "false titles got worse" is reading it
+   * backwards; the honest summary is that the corpus stopped hiding the rate
+   * behind a padded denominator.
    */
-  aggregateFalseTitleRate: 0.25,
-  /**
-   * The §3.2 vocabulary is a fixed list of 26 EXACT terms, and the corpus's
-   * real chrome is mostly outside it: `sort by`, `top matches`, `haven't
-   * started`, `clips`, `my netflix`, `my stuff`, `my purchases`,
-   * `recommended for you`. Worse, on both desktop captures OCR returns the
-   * whole navigation bar as ONE line (`netflix home shows movies`), which no
-   * exact-match vocabulary can ever match however many terms it holds.
-   *
-   * ⚠ DO NOT FIX THIS BY ADDING TERMS. `chromeTerms.ts` says *"Do not add
-   * terms without the spec"*, and it is right to: the list is exact-match
-   * precisely so that a work named `Max` or `Home` survives. Widening it is a
-   * spec change, and the line-merging problem is not a vocabulary problem at
-   * all.
-   */
-  chromeRejectionRate: 0.2361111111111111,
-  /**
-   * 18 of 24. ⚠ THE MOST IMPORTANT FINDING IN THIS FILE, and one no synthetic
-   * corpus would ever have produced: every single miss is a **2025 release
-   * whose title collides exactly with a famous older work**.
-   *
-   *   ladies first, his & hers, man on fire, frankenstein, normal,
-   *   the hitchhiker's guide to the galaxy
-   *
-   * The matcher returns the FAMOUS one — Tony Scott's `Man on Fire`,
-   * Whale's `Frankenstein` — because a streaming caption carries no year, so
-   * `extractedYear` is null and popularity is all that is left to rank on.
-   * The owner's list is, by construction, mostly NEW releases, so the
-   * collision is not a rare edge: it is 25% of this corpus.
-   *
-   * ⚠ DO NOT "FIX" THIS BY TEACHING THE ANSWER KEY TO PREFER THE RECENT ONE.
-   * The key was resolved from the recorded TMDB payloads by exact normalised
-   * equality and then checked by hand against the images; it is right. Making
-   * the matcher agree by giving it the same recency preference would fix this
-   * corpus and break every genuinely-old title in the owner's list.
-   */
-  matchAccuracy: 0.75,
+  aggregateFalseTitleRate: 0.3142857142857143,
   /**
    * 2 of 4. ⚠ §9.2 sets this floor at **1.0 and calls it non-negotiable**, so
    * this is the most serious shortfall in the ledger — and its cause is the
@@ -189,6 +163,67 @@ const KNOWN_SHORTFALLS = {
 } as const;
 
 /**
+ * Chrome rejection — **A GATE, NOT A PIN, SINCE TASK-195.**
+ *
+ * ⚠ IT LEFT `KNOWN_SHORTFALLS` BY CLEARING §9.2, WHICH IS EXACTLY WHAT
+ * `T-AI-030f` EXISTS TO FORCE. Measured 0.2361 when the ledger was written and
+ * **0.8750 now** against a floor of {@link CHROME_REJECTION_FLOOR}. The two
+ * causes recorded in TASK-079 finding (2) were both real and both fixed:
+ *
+ *   1. **The vocabulary genuinely did not cover this corpus** — `sort by`,
+ *      `top matches`, `clips`, `my netflix`, `my stuff`, `my purchases`,
+ *      `recommended for you` and nine more are now §3.2 terms.
+ *   2. **The nav bar was never one OCR line.** The finding said no exact
+ *      vocabulary could ever match `netflix home shows movies`, and that was
+ *      the right conclusion from the wrong premise: the RECORDINGS hold
+ *      `NETFLIX`, `Home`, `Shows`, `Movies` as four separate lines. §3.2 step
+ *      1's reading-order grouping — which runs BEFORE the chrome test — glued
+ *      them together, and the vocabulary was then asked to match a string the
+ *      UI never rendered. `mergeable()` now refuses to merge across a chrome
+ *      label.
+ *
+ * The residual 9 of 72 are OCR misses and rotation artefacts, not
+ * classification failures: the line is absent from the reader's output
+ * altogether, so no verdict can be assigned to it.
+ */
+const CHROME_REJECTION_MEASURED = 0.875;
+
+/**
+ * Match accuracy — **A GATE, NOT A PIN, SINCE TASK-197.** 23 of 24.
+ *
+ * ⚠ THE SECOND METRIC TO LEAVE `KNOWN_SHORTFALLS` BY CLEARING §9.2. It was
+ * 0.75, and the ledger entry that used to sit here was the most emphatic in
+ * the file: every miss was a 2025 release colliding exactly with a famous
+ * older work (`ladies first`, `his & hers`, `man on fire`, `frankenstein`,
+ * `normal`, `the hitchhiker's guide to the galaxy`), 25 % of the corpus, with
+ * a standing warning never to answer it by teaching the matcher to prefer
+ * recent titles.
+ *
+ * ⚠ THAT WARNING STANDS AND WAS NOT VIOLATED. The cause was not an absence of
+ * a recency signal; it was a **reverse** recency preference nobody had
+ * noticed. §4.2 step 4 broke score ties by **lower `tmdbId`**, chosen because
+ * it is "stable forever" — but TMDB assigns ids monotonically, so lowest-id
+ * means oldest-work, every time. TASK-197 replaced it with the order TMDB
+ * itself returned the results in, which is an INPUT we already depend on
+ * wholly rather than a computation, and which ranks the old famous work first
+ * for an old famous title — `hitchhiker s guide to the galaxy` still resolves
+ * to the 2005 film over the 1981 series purely on that rule.
+ *
+ * ⚠ THE WORSE HALF OF THE OLD RULE WAS NEVER RECORDED AS A METRIC AT ALL: the
+ * same ordering selects the **top-5 alternates**, so where more than five
+ * works share a title, the recent one was pushed off the list entirely and the
+ * owner could not reach it in one tap (US-007 AC-4). Measured on this corpus,
+ * `ladies first` (20 results) and `frankenstein` (20 results) both had the
+ * correct identity absent from their own alternates. `T-AI-031d` guards it.
+ *
+ * The single residual miss is `man on fire`, where TMDB ranks a 2024 series
+ * above Tony Scott's 2004 film. It is genuinely ambiguous, it is flagged
+ * `ambiguous: true`, and the film IS in the alternates — one tap, which is
+ * exactly what the review pass exists to provide.
+ */
+const MATCH_ACCURACY_MEASURED = 23 / 24;
+
+/**
  * The blank capture's three surviving strings, pinned exactly.
  *
  * ⚠ THIS TEST USED TO ASSERT AN EMPTY ARRAY, AND THAT WAS WRONG — not because
@@ -201,11 +236,23 @@ const KNOWN_SHORTFALLS = {
  * What matters for fabrication is that NOTHING resembling a work title
  * appears, and that is what is asserted.
  */
-const BLANK_PAGE_SURVIVING_CHROME = [
-  'you haven t added anything yet',
-  'titles you add to your list will appear here',
-  'new hot',
-];
+/**
+ * The blank capture's surviving strings — **now none, and that is a result,
+ * not a reset.**
+ *
+ * ⚠ READ THE HISTORY BEFORE TOUCHING THIS. It began as `[]`, and that was
+ * WRONG: the assertion described a property the product did not have. Three
+ * strings survived — the two empty-state sentences and the `New & Hot` nav
+ * heading — really on the screen, correctly read, correctly NOT fabricated,
+ * and outside §3.2's vocabulary. So the list was filled in to say what the
+ * product actually did.
+ *
+ * TASK-195 put all three into §3.2, so the honest value is `[]` **again**, by
+ * a completely different route. The empty array is now earned rather than
+ * assumed, and `T-AI-032c`'s second assertion (nothing uncorroborated) is what
+ * keeps it from being vacuous.
+ */
+const BLANK_PAGE_SURVIVING_CHROME: readonly string[] = [];
 
 describe('T-AI-030 the golden corpus is measured, and the measurement is pinned', () => {
   it('T-AI-030a · the corpus actually ran — no metric was scored on an empty pipeline', () => {
@@ -261,12 +308,15 @@ describe('T-AI-030 the golden corpus is measured, and the measurement is pinned'
     expect(KNOWN_SHORTFALLS.aggregateFalseTitleRate).toBeGreaterThan(AGGREGATE_FALSE_TITLE_CEILING);
   });
 
-  it('T-AI-030e · chrome rejection is pinned', () => {
+  it('T-AI-030e · chrome rejection CLEARS the §9.2 floor and is gated, not pinned', () => {
     const chromeTotal = scored.reduce((n, s) => n + s.expected.expectedChrome.length, 0);
     const rejected = scored.reduce((n, s) => n + s.chromeRejected, 0);
-    expect(chromeTotal).toBeGreaterThan(0);
-    expect(rejected / chromeTotal).toBe(KNOWN_SHORTFALLS.chromeRejectionRate);
-    expect(KNOWN_SHORTFALLS.chromeRejectionRate).toBeLessThan(CHROME_REJECTION_FLOOR);
+    expect(chromeTotal).toBe(72);
+    // The gate, asserted first because it is the one that matters.
+    expect(rejected / chromeTotal).toBeGreaterThanOrEqual(CHROME_REJECTION_FLOOR);
+    // And the exact value, so an improvement is recorded rather than absorbed
+    // and a silent slide toward the floor still fails.
+    expect(rejected / chromeTotal).toBe(CHROME_REJECTION_MEASURED);
   });
 
   it('T-AI-030f · the pins clear themselves the moment the shortfalls stop being real', () => {
@@ -292,12 +342,18 @@ describe('T-AI-030 the golden corpus is measured, and the measurement is pinned'
     // says: stop pinning that metric, gate it.
     expect(KNOWN_SHORTFALLS.aggregateRecall).toBeLessThan(AGGREGATE_RECALL_FLOOR);
     expect(KNOWN_SHORTFALLS.aggregateFalseTitleRate).toBeGreaterThan(AGGREGATE_FALSE_TITLE_CEILING);
-    expect(KNOWN_SHORTFALLS.chromeRejectionRate).toBeLessThan(CHROME_REJECTION_FLOOR);
-    expect(KNOWN_SHORTFALLS.matchAccuracy).toBeLessThan(MATCH_ACCURACY_FLOOR);
     expect(KNOWN_SHORTFALLS.omissionRecovery).toBeLessThan(OMISSION_RECOVERY_FLOOR);
+    // ⚠ AND IT HAS NOW FIRED TWICE FOR REAL. `chromeRejectionRate` was the
+    // fifth entry here until TASK-195 and `matchAccuracy` the fourth until
+    // TASK-197; each cleared §9.2, this guard failed as designed, and the
+    // metric was moved out of the ledger and gated (by `T-AI-030e` and
+    // `T-AI-031b` respectively). That is the whole mechanism working end to
+    // end — so neither key may come back, and the count below drops to match.
+    expect(Object.keys(KNOWN_SHORTFALLS)).not.toContain('chromeRejectionRate');
+    expect(Object.keys(KNOWN_SHORTFALLS)).not.toContain('matchAccuracy');
     // Non-vacuity: a ledger that lost its entries would pass every line above
     // by having nothing to check.
-    expect(Object.keys(KNOWN_SHORTFALLS).length).toBeGreaterThanOrEqual(5);
+    expect(Object.keys(KNOWN_SHORTFALLS).length).toBeGreaterThanOrEqual(3);
     // And the runner-side stage-3 deferral IS discharged (TASK-190) — asserted
     // positively so it cannot silently regress to the state this guard was
     // originally written to watch for.
@@ -324,9 +380,10 @@ describe('T-AI-031 recorded TMDB results resolve the expected work identity', ()
     // ⚠ MEASURED HONESTLY, NOT GATED — and for a different reason than the
     // metrics above. Matching does not depend on the missing stages
     // (`matchCandidate()` is pure and its inputs are the committed TMDB
-    // recordings), so this number is real. It simply does not clear §9.2's
-    // floor, because of the 2025-title-collision problem recorded in
-    // KNOWN_SHORTFALLS.matchAccuracy.
+    // recordings), so this number is real. Since TASK-197 it also CLEARS
+    // §9.2's floor, so it is asserted as a gate and pinned exactly — see
+    // MATCH_ACCURACY_MEASURED for why the fix is not the recency preference
+    // the old ledger entry warned against.
     const seen = new Map<string, string>();
     for (const s of scored) {
       for (const c of s.expected.expectedCandidates) {
@@ -347,18 +404,48 @@ describe('T-AI-031 recorded TMDB results resolve the expected work identity', ()
     }
 
     const accuracy = (seen.size - wrong.length) / seen.size;
-    expect(accuracy, `mismatched:\n  ${wrong.join('\n  ')}`).toBe(KNOWN_SHORTFALLS.matchAccuracy);
-    expect(KNOWN_SHORTFALLS.matchAccuracy).toBeLessThan(MATCH_ACCURACY_FLOOR);
+    expect(accuracy, `mismatched:\n  ${wrong.join('\n  ')}`).toBe(MATCH_ACCURACY_MEASURED);
+    expect(accuracy).toBeGreaterThanOrEqual(MATCH_ACCURACY_FLOOR);
+    // The metric is a GATE now, not a ledger entry. If it is ever put back
+    // into KNOWN_SHORTFALLS the ratchet has been released.
+    expect(Object.keys(KNOWN_SHORTFALLS)).not.toContain('matchAccuracy');
 
-    // The misses are the recorded set, not a drifting one.
-    expect(wrong.map((w) => w.split(' -> ')[0]).sort()).toEqual([
-      'frankenstein',
-      'his hers',
-      'hitchhiker s guide to the galaxy',
-      'ladies first',
-      'man on fire',
-      'normal',
-    ]);
+    // The miss is the recorded one, not a drifting set.
+    expect(wrong.map((w) => w.split(' -> ')[0]).sort()).toEqual(['man on fire']);
+  });
+
+  it('T-AI-031d · the correct identity is always REACHABLE in the alternates', () => {
+    // ⚠ THIS IS THE HALF OF THE OLD `lower tmdbId` TIE-BREAK THAT NO METRIC
+    // MEASURED. Accuracy only asks whether the top pick is right; US-007 AC-4
+    // promises that when it is wrong the owner fixes it in ONE TAP. That
+    // promise is empty if the right answer is not in the five alternates —
+    // and under the old rule it systematically was not, because ids are
+    // monotonic, so "the five lowest ids" means "the five oldest works". Both
+    // `ladies first` and `frankenstein` return 20 exact-title results here,
+    // and the correct 2025/2026 identity sat outside the window entirely.
+    //
+    // Mutation check: restoring `x.tmdbId - y.tmdbId` as the primary
+    // tie-break fails this test on those two titles, not merely `T-AI-031b`.
+    const seen = new Map<string, string>();
+    for (const s of scored) {
+      for (const c of s.expected.expectedCandidates) {
+        seen.set(c.normalisedText, c.expectedWorkIdentity!);
+      }
+    }
+
+    const unreachable: string[] = [];
+    for (const [normalised, identity] of seen) {
+      const outcome = matchCandidate(
+        { normalisedText: normalised, extractedYear: null },
+        tmdbResultsFor(normalised),
+      );
+      const reachable = outcome.matchCandidates.some(
+        (c) => `tmdb:${c.mediaType}:${c.tmdbId}` === identity,
+      );
+      if (!reachable) unreachable.push(normalised);
+    }
+
+    expect(unreachable, 'the one-tap correction cannot reach these').toEqual([]);
   });
 
   it('T-AI-031c · a work seen in several captures resolves to ONE identity', () => {

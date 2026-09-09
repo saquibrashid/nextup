@@ -213,14 +213,57 @@ describe('T-TMDB-012 · alternatives are ranked, capped and never hidden', () =>
     expect([...scores].sort((a, b) => b - a)).toEqual(scores);
   });
 
-  it('T-TMDB-012b: equal scores are broken by the LOWER tmdbId, which is stable forever', () => {
+  it('T-TMDB-012b: equal scores are broken by the order TMDB RETURNED them in', () => {
+    // ⚠ CORRECTED IN PLACE BY TASK-197. This used to assert the LOWER tmdbId
+    // wins, on the reasoning that an id is "stable forever". It is — but ids
+    // are also assigned MONOTONICALLY, so lowest-id-wins is oldest-work-wins,
+    // a recency preference in reverse that nobody chose. It cost 6 of 24
+    // identities in the golden corpus, and worse, because the same order
+    // selects the five alternates, it pushed the recent work off the one-tap
+    // correction list altogether wherever more than five works share a title.
+    // ~~equal scores are broken by the LOWER tmdbId~~
+    //
+    // TMDB's own result order is an INPUT, not a computation: we already
+    // depend wholly on which results it returns, so consuming their order adds
+    // no new time-varying dependency, and the golden corpus replays recorded
+    // responses.
     const outcome = matchCandidate({ normalisedText: 'dune', extractedYear: null }, [
       aResult({ tmdbId: 999, name: 'Dune', releaseYear: null }),
       aResult({ tmdbId: 12, name: 'Dune', releaseYear: null }),
       aResult({ tmdbId: 500, name: 'Dune', releaseYear: null }),
     ]);
 
-    expect(outcome.matchCandidates.map((c) => c.tmdbId)).toEqual([12, 500, 999]);
+    expect(outcome.matchCandidates.map((c) => c.tmdbId)).toEqual([999, 12, 500]);
+  });
+
+  it('T-TMDB-012f: a higher score still beats provider order — the tie-break is only a TIE-break', () => {
+    // The discriminating twin of `b`. Without this, "preserve TMDB's order"
+    // could be implemented as "return TMDB's order", which would discard the
+    // Jaro-Winkler scoring entirely and pass `b` perfectly.
+    const outcome = matchCandidate({ normalisedText: 'dune', extractedYear: null }, [
+      aResult({ tmdbId: 999, name: 'Dune: Part Two', releaseYear: null }),
+      aResult({ tmdbId: 12, name: 'Dune', releaseYear: null }),
+    ]);
+
+    expect(outcome.matchCandidates[0]!.tmdbId).toBe(12);
+  });
+
+  it('T-TMDB-012g: the ordering is TOTAL — tmdbId remains the final tie-break', () => {
+    // §4.2 requires a total order so the merge is reproducible. Provider index
+    // is unique per call, so this is unreachable through `matchCandidate`; the
+    // assertion is that the rule survives as the last comparator rather than
+    // being dropped when the primary one changed. Two results at the same
+    // index cannot occur, so what is checked is the observable consequence:
+    // the same input always produces the same output, byte for byte.
+    const results = [
+      aResult({ tmdbId: 999, name: 'Dune', releaseYear: null }),
+      aResult({ tmdbId: 12, name: 'Dune', releaseYear: null }),
+      aResult({ tmdbId: 500, name: 'Dune', releaseYear: null }),
+    ];
+    const once = matchCandidate({ normalisedText: 'dune', extractedYear: null }, results);
+    const twice = matchCandidate({ normalisedText: 'dune', extractedYear: null }, results);
+
+    expect(JSON.stringify(once)).toBe(JSON.stringify(twice));
   });
 
   it('T-TMDB-012c: an auto-matched candidate still carries its alternatives (US-007 AC-4)', () => {

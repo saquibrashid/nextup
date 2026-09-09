@@ -194,7 +194,12 @@ export const BASELINE_ORPHANS = new Set([
   'T-AUTH-001',
   'T-AUTH-002',
   'T-AUTH-003',
-  'T-UX-069',
+  // ⚠ `T-UX-069` was REMOVED from this baseline (TASK-196). It was catalogued
+  // as "not implemented in v1", but `apps/web/test/reviewSessionExpired.spec.tsx`
+  // implements §6.18 as `T-UX-069a`–`j`, and `tests/meta/uxStateCoverage.spec.ts`
+  // had already dropped it from its own unimplemented list. The baseline entry
+  // was the last stale copy of a claim the rest of the suite had retired.
+  //
   // ⚠ `T-UX-099` was REMOVED from this baseline — implemented in
   // `apps/web/test/reviewPage.spec.tsx`. Mutation-verified: moving the count
   // out of the `<summary>` and into the list body was caught by nothing else.

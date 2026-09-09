@@ -563,9 +563,10 @@ favour of `inferredTitle`.**
 
 | # | Step | Rule |
 |---|---|---|
-| 1 | **Reading-order grouping** | **Applies only to `provider: 'ocr-only'` items.** Sort by `(round(y*40), x)`. Merge two items into one candidate when their vertical centres differ by < 40 % of the taller box's height **and** their horizontal gap is < 3 % of image width. ⚠ These three constants are **uncalibrated** and are now a *secondary* path only — the primary reader groups tiles natively (ADR-0001 R2.3a). `provider: 'llm'` items are already one-per-tile and are **never** merged. |
+| 1 | **Reading-order grouping** | **Applies only to `provider: 'ocr-only'` items.** Sort by `(round(y*40), x)`. Merge two items into one candidate when their vertical centres differ by < 40 % of the taller box's height **and** their horizontal gap is < 3 % of image width — **and neither of the two is itself a chrome line under step 3 (R3).** `provider: 'llm'` items are already one-per-tile and are **never** merged. ⚠ **THE CHROME EXCLUSION IS LOAD-BEARING, NOT A TIDY-UP (TASK-195).** A navigation bar is a row of labels well inside the 3 % gap, so without it `NETFLIX`, `Home`, `Shows`, `Movies` merge into one candidate, and step 3 — which is exact-match by design — is then asked to match a string the UI never rendered. That defeated chrome rejection over the whole golden corpus (0.2361; 0.8750 once this rule landed). Refusing the merge is the conservative direction: chrome kept whole becomes a visible, reversible `chrome-suspected` group, while a caption fragment wrongly held apart is still a candidate. ⚠ These three constants are **uncalibrated** and are now a *secondary* path only — the primary reader groups tiles natively (ADR-0001 R2.3a). |
 | 2 | **Length gate** | `matchText.length < 2` or `> 200` → `chrome-suspected`. |
-| 3 | **Chrome vocabulary** | Case-insensitive exact match against `CHROME_TERMS` (`packages/domain/src/extraction/chromeTerms.ts`, a pure module — ~~`apps/api/src/extraction/chromeTerms.ts`~~): `my list`, `continue watching`, `watchlist`, `saved`, `downloads`, `search`, `home`, `browse`, `settings`, `profile`, `new & popular`, `coming soon`, `top 10`, `trending now`, `for you`, `series`, `movies`, `sign out`, `remove from my list`, `play`, `more info`, `resume`, `episodes`, `hbo max`, `max`, `netflix`. → `chrome-suspected`. **Substring matches do not count** — "Play" as a whole line is chrome; *The Play* is a title. **Applies only to `provider: 'ocr-only'` items** — the primary reader is instructed not to report chrome as a tile, and applying a fixed vocabulary to its output would suppress a genuine title named after a UI word. |
+| 3 | **Chrome vocabulary** | Case-insensitive exact match against `CHROME_TERMS` (`packages/domain/src/extraction/chromeTerms.ts`, a pure module — ~~`apps/api/src/extraction/chromeTerms.ts`~~): `my list`, `continue watching`, `watchlist`, `saved`, `downloads`, `search`, `home`, `browse`, `settings`, `profile`, `new & popular`, `coming soon`, `top 10`, `trending now`, `for you`, `series`, `movies`, `sign out`, `remove from my list`, `play`, `more info`, `resume`, `episodes`, `hbo max`, `max`, `netflix`, **and (added R3, TASK-195, each one observed as its own OCR line in the golden corpus and marked chrome by the answer key)** `shows`, `tv shows`, `tv shows & movies`, `games`, `clips`, `browse by languages`, `my netflix`, `my stuff`, `my purchases`, `recommended for you`, `sort by`, `top matches`, `haven't started`, `started`, `new & hot`, `you haven't added anything yet.`, `titles you add to your list will appear here.`. → `chrome-suspected`. **Substring matches do not count** — "Play" as a whole line is chrome; *The Play* is a title. **Applies only to `provider: 'ocr-only'` items** — the primary reader is instructed not to report chrome as a tile, and applying a fixed vocabulary to its output would suppress a genuine title named after a UI word. |
+| 3a | **Chrome row headers (new, R3)** | A line whose **start** is one of `CHROME_LINE_PREFIXES` — currently `continue watching for ` — with a non-empty tail → `chrome-suspected`. ⚠ **A PREFIX, NEVER A SUBSTRING.** Netflix renders `Continue Watching for <profile name>`, and the profile name is arbitrary owner-chosen text no exact vocabulary can enumerate. A substring test would delete a work whose title merely mentions the phrase. Same scope as step 3: `ocr-only` items only. |
 | 4 | **Digit/symbol ratio** | > 60 % of characters are digits or punctuation → `chrome-suspected` (progress bars, durations, "1h 52m", "S2:E4"). `ocr-only` items only. |
 | 5 | **Year extraction** | A trailing or parenthesised 4-digit token in `1880..currentYear+5` is lifted into `extractedYear` and **removed from the text used for matching**. It is **not** part of identity (data-model SD-05). |
 | 6 | **Normalisation** | `normalisedText = normaliseTitleText(matchText)` — the single shared function (data-model §2.2). No second implementation. |
@@ -575,7 +576,7 @@ favour of `inferredTitle`.**
 | 8 | **Empty after normalisation** | `normalisedText === ''` and no thumbnail available → `chrome-suspected`. |
 | 9 | **Pass A collapse** | Deterministic pre-match overlap collapse on exact `normalisedText` (data-model §7.4). When an `llm` item and an `ocr-only` item collapse together, the **`llm` item wins** and its `ocrSupport` is upgraded to `'exact'`. |
 
-Everything not caught by 2/3/4/8 is `title-candidate`. Verdicts
+Everything not caught by 2/3/3a/4/8 is `title-candidate`. Verdicts
 `low-confidence`, `inferred-unverified` and `unreadable-tile` are
 **flags on a visible candidate**, not exclusions.
 
@@ -634,8 +635,31 @@ score(candidate, tmdbResult): number  // 0..1
    `candidate.extractedYear !== null` and TMDB's year is within ±1, add
    `0.05`; if it differs by more than 1, subtract `0.15`. Clamp to `0..1`.
 4. Popularity is **not** used in scoring — it would make the result
-   time-varying and untestable. Ties are broken by **lower `tmdbId`**, which is
-   stable forever.
+   time-varying and untestable. Ties are broken by **the order TMDB returned
+   the results in**, then by lower `tmdbId` so the order is total.
+   ~~Ties are broken by lower `tmdbId`, which is stable forever.~~
+   ⚠ **Corrected in place by TASK-197.** An id *is* stable forever, but TMDB
+   assigns ids **monotonically**, so "lowest id wins" is "oldest work wins" —
+   a recency preference in reverse, chosen by accident. It resolved 6 of the
+   24 golden identities to the wrong work (`frankenstein`, `man on fire`,
+   `normal`, `ladies first`, `his & hers`,
+   `the hitchhiker's guide to the galaxy` — all 2025/2026 releases colliding
+   exactly with a famous older work, 25 % of the corpus). The **worse**
+   consequence was that §4.3's top-5 alternates are cut from the same order,
+   so wherever more than five works share a title the recent one fell outside
+   the window and the owner could not reach it in one tap at all, silently
+   voiding US-007 AC-4. Measured: `ladies first` and `frankenstein` each
+   return 20 exact-title results and the correct identity was in neither list.
+   ⚠ **The returned order is an INPUT, not a computation, and this is not the
+   recency preference §4.2 forbids.** We already depend wholly on what TMDB
+   returns — which results exist, their names, their years — so consuming the
+   order it returned them in adds no new time-varying dependency, and the
+   golden corpus replays recorded responses, so it is exactly as testable as
+   before. TMDB ranks a genuinely old famous work first for an old famous
+   title, which is why `the hitchhiker's guide to the galaxy` resolves to the
+   2005 film over the 1981 series purely on this rule. Match accuracy
+   **0.75 → 0.9583**, clearing §9.2's floor of 0.90. `T-TMDB-012b`,
+   `T-TMDB-012f`, `T-AI-031b`, `T-AI-031d`.
 
 ### 4.3 Thresholds
 
