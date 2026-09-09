@@ -54,7 +54,7 @@ import type {
 } from './enums.js';
 import { CANDIDATE_CLASSIFICATIONS } from './enums.js';
 import type { IsoDate } from './types.js';
-import { DEGRADED_EXTRACTION_BANNER } from './copy.js';
+import { DEGRADED_EXTRACTION_BANNER, TMDB_UNAVAILABLE_BANNER } from './copy.js';
 
 /**
  * What the review RESPONSE may say about a candidate — a superset of the
@@ -221,6 +221,23 @@ export interface BuildReviewInput {
    */
   untickedListingIds?: ReadonlySet<string>;
   imagesWithNoText: readonly ReviewImageWithNoText[];
+  /**
+   * Did stage 3 fail to reach TMDB for this batch (`specs/ai.md` §4.3,
+   * US-007 AC-6)?
+   *
+   * ⚠ **WITHOUT THIS, A TMDB OUTAGE IS INDISTINGUISHABLE FROM A BATCH OF
+   * GENUINELY UNIDENTIFIABLE TITLES.** Both render the same way: every
+   * candidate lands in "Couldn't identify these" with an `unmatched:<hash>`
+   * identity. The difference matters because the remedies are opposite — an
+   * outage clears by itself and the batch is worth discarding and retrying
+   * later, whereas unidentifiable titles will still be unidentifiable
+   * tomorrow and are worth confirming now.
+   *
+   * Optional so that a caller which cannot know (an older payload, a batch
+   * extracted before stage 3 existed) is treated as "no outage reported"
+   * rather than forced to assert one either way.
+   */
+  tmdbUnavailable?: boolean;
 }
 
 // ── Output ─────────────────────────────────────────────────────────────────
@@ -254,6 +271,8 @@ export interface ReviewResponse {
   degradedExtraction: boolean;
   crossCheck: CrossCheckOutcome;
   banner: string | null;
+  /** See `BuildReviewInput.tmdbUnavailable`. Always present on the response. */
+  tmdbUnavailable: boolean;
   sections: {
     additions: ReviewSection<ReviewCandidate>;
     alreadyOnYourList: CollapsibleSection<ReviewCandidate>;
@@ -434,6 +453,30 @@ export function reviewBanner(input: {
   crossCheck: CrossCheckOutcome;
   candidateCount: number;
   imageCount: number;
+  tmdbUnavailable?: boolean;
+}): string | null {
+  // ⚠ **THE TWO BANNERS COMPOSE; THEY DO NOT COMPETE.** A batch can be both
+  // under-read AND unmatched, and each sentence answers a different question
+  // ("will anything be removed?" versus "why is nothing identified?").
+  // Picking one and dropping the other would silently withhold an answer the
+  // owner needs at exactly the moment they are deciding whether to confirm —
+  // which is the same defect §5.10 fixed by making one event raise one banner
+  // on both screens. `T-AI-017j`, `T-AI-017k`.
+  //
+  // The read-safety sentence comes FIRST: it is the one that governs whether
+  // anything is about to be deleted.
+  const readBanner = readSafetyBanner(input);
+  const tmdbBanner = input.tmdbUnavailable === true ? TMDB_UNAVAILABLE_BANNER : null;
+  if (readBanner !== null && tmdbBanner !== null) return `${readBanner} ${tmdbBanner}`;
+  return readBanner ?? tmdbBanner;
+}
+
+function readSafetyBanner(input: {
+  mode: BatchMode;
+  lowYield: boolean;
+  crossCheck: CrossCheckOutcome;
+  candidateCount: number;
+  imageCount: number;
 }): string | null {
   if (input.lowYield && input.mode === 'full-update') {
     return (
@@ -517,12 +560,14 @@ export function buildReviewResponse(input: BuildReviewInput): ReviewResponse {
     lowYield: input.lowYield,
     degradedExtraction: input.degradedExtraction,
     crossCheck: input.crossCheck,
+    tmdbUnavailable: input.tmdbUnavailable ?? false,
     banner: reviewBanner({
       mode: input.mode,
       lowYield: input.lowYield,
       crossCheck: input.crossCheck,
       candidateCount: visible.length,
       imageCount: input.imagesWithNoText.length + countDistinctImages(visible),
+      tmdbUnavailable: input.tmdbUnavailable ?? false,
     }),
     sections: {
       additions: {

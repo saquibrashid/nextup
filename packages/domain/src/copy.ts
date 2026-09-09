@@ -165,3 +165,24 @@ export const DEGRADED_EXTRACTION_BANNER =
   'One of the two readers was unavailable, so these results may be less ' +
   'complete than usual. Nothing has been removed from your list \u2014 you ' +
   'can still add titles, and you can re-read these screenshots later.';
+
+/* ------------------------------------- TMDB-unreachable banner (§4.3) ---- */
+
+/**
+ * `specs/ai.md` §4.3 / US-007 AC-6, quoted verbatim.
+ *
+ * ⚠ **THIS IS THE ONLY THING THAT DISTINGUISHES AN OUTAGE FROM A BATCH OF
+ * GENUINELY UNIDENTIFIABLE TITLES.** Stage 3 resolves every candidate to
+ * `unmatched:<hash>` when TMDB cannot be reached, which is pixel-identical on
+ * screen to a batch of captions the matcher legitimately could not place. The
+ * remedies are opposite — wait and retry versus confirm now — so leaving the
+ * two indistinguishable pushes the owner toward the wrong one.
+ *
+ * ⚠ **It never says the batch failed, because it did not.** Extraction is
+ * complete and the read is safe; only identification is missing. The wording
+ * therefore offers BOTH exits (confirm as unidentified, or discard and retry)
+ * rather than implying the work has to be redone.
+ */
+export const TMDB_UNAVAILABLE_BANNER =
+  'Couldn\u2019t reach TMDB \u2014 nothing was matched. You can still confirm ' +
+  'these as unidentified titles, or discard the batch and try again later.';
