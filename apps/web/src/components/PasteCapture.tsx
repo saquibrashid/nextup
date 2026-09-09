@@ -59,34 +59,46 @@ export function isEditableTarget(target: EventTarget | null): boolean {
 /**
  * Every image on a paste event, from both places the platform exposes them.
  *
- * `files` and `items` overlap in practice, so the same image is deduplicated
- * by identity - but neither alone is reliable across browsers, and dropping to
- * one would be a silent per-browser regression.
+ * ⚠ **`files` AND `items` ARE TWO VIEWS OF THE SAME CLIPBOARD, SO THEY MUST
+ * NEVER BE CONCATENATED.** Both are populated on a Chrome/Edge screenshot
+ * paste, and `DataTransferItem.getAsFile()` returns a **freshly constructed
+ * `File` on every call** — so an identity check (`found.includes(file)`)
+ * never matches across the two sides and each image is delivered TWICE.
+ * That is not theoretical: one paste produced two tiles, and repeated
+ * "nothing happened, try again" pastes filled the batch to its 10-image cap
+ * with copies of a single screenshot.
  *
- * ⚠ EVERY image is returned, not the first. A multi-image clipboard is
- * possible and truncating it would discard the owner's screenshots with no
- * message at all.
+ * ⚠ **AND IT CANNOT BE FIXED WITH A CONTENT KEY EITHER.** `name`, `size` and
+ * `type` match across the two sides, but `lastModified` is set at *call* time
+ * by some browsers, so a `name|size|type|lastModified` key silently stops
+ * deduplicating on exactly the browsers that populate both sides — the same
+ * bug again, and undetectable in jsdom. So we pick ONE side and never merge:
+ * whichever yields more images, which keeps every browser's richer view
+ * without ever counting the same clipboard entry twice.
+ *
+ * ⚠ EVERY image on the chosen side is returned, not the first. A multi-image
+ * clipboard is possible and truncating it would discard the owner's
+ * screenshots with no message at all.
  */
 export function imagesFromClipboard(data: DataTransfer | null): readonly File[] {
   if (data === null) return [];
 
-  const found: File[] = [];
-  const add = (file: File | null): void => {
-    if (file !== null && !found.includes(file)) found.push(file);
-  };
+  // `files` carries no `kind`, so a non-image arriving through that side is
+  // filtered on type alone. An empty `type` is kept: a browser that could not
+  // name the format is not a browser reporting a non-image.
+  const fromFiles = [...(data.files ?? [])].filter(
+    (file) => file.type === '' || file.type.startsWith('image/'),
+  );
 
-  for (const file of data.files ?? []) add(file);
-
+  const fromItems: File[] = [];
   for (const item of data.items ?? []) {
     if (item.kind !== 'file') continue;
     if (!item.type.startsWith('image/')) continue;
-    add(item.getAsFile());
+    const file = item.getAsFile();
+    if (file !== null) fromItems.push(file);
   }
 
-  // `files` carries no `kind`, so a non-image dragged in through that side is
-  // filtered here rather than at the `add` call - the `items` pass has already
-  // done its own filtering and would otherwise be applied twice.
-  return found.filter((file) => file.type === '' || file.type.startsWith('image/'));
+  return fromItems.length > fromFiles.length ? fromItems : fromFiles;
 }
 
 export function PasteCapture({ onImagesPasted, target }: PasteCaptureProps): JSX.Element | null {
