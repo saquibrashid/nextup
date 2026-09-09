@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 7 |
+| ⬜ todo | 6 |
 | 🚧 doing | 3 |
-| ✅ done | 175 |
+| ✅ done | 176 |
 | 🙋 owner | 2 |
 | 💤 deferred | 0 |
 | **total** | **187** |
@@ -26,7 +26,7 @@ Not done, and every task they depend on is done.
 |---|---|---|
 | `TASK-057` | M | Epic C — Extraction |
 | `TASK-126` | M | Epic K — Platform, safety, and the shell |
-| `TASK-186` | M | Epic L — Waiting to stream (rental-release discovery) |
+| `TASK-187` | M | Epic L — Waiting to stream (rental-release discovery) |
 
 ## Waiting on the owner
 
@@ -37,7 +37,7 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-7 tasks cannot start yet.
+6 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
@@ -45,9 +45,8 @@ Not done, and every task they depend on is done.
 | `TASK-079` | `TASK-078` |
 | `TASK-079b` | `TASK-079` |
 | `TASK-168` | `TASK-079` |
-| `TASK-187` | `TASK-186` |
 | `TASK-188` | `TASK-187` |
-| `TASK-189` | `TASK-186`, `TASK-188` |
+| `TASK-189` | `TASK-188` |
 
 ## Done
 
@@ -228,3 +227,4 @@ Not done, and every task they depend on is done.
 | `TASK-183` | Epic L wave 1. `packages/domain/src/batchSource.ts` holds the rules; `apps/api/src/routes/batches.ts` refuses discovery `full-update` at the boundary. `T-WAIT-001a`–`d` in `apps/api/test/unit/discoveryBatchSource.spec.ts`; `c` forges five request bodies a UI-only guard would pass. `SERVICES` is unchanged. `specs/testing.md` §9 gained US-040 AC-1/AC-6 and `KNOWN_UNMAPPED` lost them. ⚠ The error envelope's `details.field` stays `'service'` — `source` is accepted as an alias, but `T-BATCH-010i`/`j` pin the field name and renaming it would be unrequested contract churn. | `T-WAIT-001`, `T-WAIT-001c` |
 | `TASK-184` | Epic L wave 1. Migration **`0006_watch_intent`** — ⚠ **not `0005`**, which `0005_removal_decision` (TASK-085) took after Epic L was specified; migrations apply in filename order. `upload_batch.service` is **relaxed to NULL** and `discovery_source` added, with `ck_batch_source_exclusive` enforcing exactly one origin. ⚠ **`ck_batch_service` is NOT dropped and does not need to be** — a SQL Server CHECK rejects only what it evaluates FALSE, and `NULL IN ('netflix','max')` is UNKNOWN, so `T-MIG-001` is satisfied without touching it. `requireServiceOf()` **throws** on a discovery batch, which is what forced the compiler to name every service-scoped path. ⚠ **`WATCH_PROVIDER_MAX_AGE_DAYS = 7` is the FOURTH age constant, not the third** — Epic M's `IMDB_RATING_MAX_AGE_DAYS = 14` landed after ADR-0010 was written, so `data-model.md` §17.3, ADR-0010 Trap 5, PRD US-042 AC-8 and `specs/testing.md` §38.2 all said "third"; the last two are corrected in place, the rule itself is unchanged, and **nothing may be merged to make the count come out at three**. `T-WAIT-011` (a–d) and `T-AVAIL-008` pass. | `T-AVAIL-008`, `T-INV-008`, `T-MIG-001`, `T-WAIT-011` |
 | `TASK-185` | Epic L wave 2. `closeDiscoveryBatch` in `apps/api/src/services/batchClose.ts` branches before `requireServiceOf` and writes `WatchIntent` rows only; `planWatchIntents` in `packages/domain/src/watchIntent.ts` is the single decision point. Waiting titles are stored `state='removed'`, `sort_date_added=NULL` (owner-approved; `specs/data-model.md` §17.2a). No `batch_change` row is written for an intent — `ck_change_kind` is a closed 4-member CHECK and widening it needs a `DROP CONSTRAINT` that `T-MIG-001` forbids. `T-WAIT-002a`–`c`, `T-WAIT-003a`–`d`, `T-WAIT-004a`–`e`. | `T-WAIT-002`, `T-WAIT-002b`, `T-WAIT-003`, `T-WAIT-004` |
+| `TASK-186` | Epic L wave 3. `GET /api/batches/:id/review` now branches on `discoverySourceOf(batch)` instead of demanding `requireServiceOf`, so a discovery pass renders at all (`ReviewResponse.service` is `Service \| null` and carries `discoverySource`); the `alreadyOnYourList` section is shown for a discovery capture, where a SERVICE append-only pass omits it, because that is US-040 AC-5's reporting. Discard-suppresses is `discardedWorks` in `packages/domain/src/close.ts` (keyed on canonical work identity, REQ-071; candidates with no resolved identity are excluded because the review gate could never act on them) applied inside `closeDiscoveryBatch`'s transaction only, so a Netflix discard never suppresses. Tests: `T-WAIT-005` (`a`–`e`), `T-WAIT-006` (`a`–`k`), `T-WAIT-007` (`a`–`b`); all six US-041 criteria removed from `KNOWN_UNMAPPED`. | `T-WAIT-005`, `T-WAIT-006`, `T-WAIT-006b`, `T-WAIT-006c`, `T-WAIT-007` |

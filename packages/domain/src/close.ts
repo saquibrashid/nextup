@@ -133,3 +133,63 @@ export function discardedCount(candidates: readonly ReviewCandidate[]): number {
       candidate.collapsedIntoCandidateId === null && candidate.disposition === 'discarded',
   ).length;
 }
+
+/** One discarded work, shaped so a suppression can be written without a title row. */
+export interface DiscardedWork {
+  candidateId: string;
+  workIdentity: string;
+  displayName: string;
+  displayReleaseYear: number | null;
+  displayMediaType: string | null;
+  displayPosterPath: string | null;
+}
+
+/**
+ * The discarded candidates a DISCOVERY close must suppress (US-041 AC-2,
+ * REQ-085, ADR-0010 D-5).
+ *
+ * ⚠ ONLY candidates with a non-null `resolvedWorkIdentity`. The review
+ * suppression gate in `loadReviewCandidates` skips rows whose
+ * `resolvedWorkIdentity` is `null`, so a suppression written for an
+ * `unmatched:` identity could never gate anything — it would be a write with
+ * no effect that also fills the "Not interested" view with unreadable tiles.
+ * AC-3 ("does not appear in the review pass at all") is the point of this
+ * function, so its input is exactly the set the gate can act on.
+ *
+ * ⚠ NOT scoped to `CLOSE_DECIDABLE_SECTIONS`. A rotating editorial feed
+ * re-presents its `probablyNotTitles` rows just as faithfully as its
+ * additions, and AC-4's "unusable within about three captures" is about the
+ * whole pass, not one section of it. Collapsed losers (SD-02) are excluded
+ * because they were never rendered and so were never discarded by anyone.
+ *
+ * The display snapshot is frozen here for the same reason
+ * `toDisplaySnapshot` freezes it on the title path: the suppressed view must
+ * render without joining back to a `Title` that may not exist.
+ */
+export function discardedWorks(candidates: readonly ReviewCandidate[]): DiscardedWork[] {
+  const seen = new Set<string>();
+  const works: DiscardedWork[] = [];
+
+  for (const candidate of candidates) {
+    if (candidate.collapsedIntoCandidateId !== null) continue;
+    if (candidate.disposition !== 'discarded') continue;
+
+    const workIdentity = candidate.resolvedWorkIdentity;
+    if (workIdentity === null) continue;
+    // Two tiles for the same work, both discarded, are one decision. Writing
+    // twice would hit `suppression_one_active` and fail the close.
+    if (seen.has(workIdentity)) continue;
+    seen.add(workIdentity);
+
+    works.push({
+      candidateId: candidate.candidateId,
+      workIdentity,
+      displayName: candidate.match?.name ?? candidate.inferredTitle ?? candidate.rawText,
+      displayReleaseYear: candidate.match?.releaseYear ?? null,
+      displayMediaType: candidate.match?.mediaType ?? null,
+      displayPosterPath: candidate.match?.posterPath ?? null,
+    });
+  }
+
+  return works;
+}

@@ -44,6 +44,7 @@ import {
   type ReviewDisposition,
   type Service,
   requireServiceOf,
+  discoverySourceOf,
 } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
@@ -291,18 +292,28 @@ export function registerBatchReviewRoutes(router: Router): void {
       });
     }
 
-    const service = requireServiceOf(batch);
+    // ⚠ A discovery batch has NO service, and asking for one throws
+    // (`requireServiceOf`). TASK-186 / `T-WAIT-005`: the review pass has to
+    // render for a discovery capture, so the question asked here is "which
+    // kind of batch is this", not "which service is this".
+    const discoverySource = discoverySourceOf(batch);
+    const service = discoverySource === null ? requireServiceOf(batch) : null;
     const [{ candidates, suppressed, activeListings }, images] = await Promise.all([
       loadReviewCandidates(ownerId, batchId, service),
       listImagesForBatch(ownerId, batchId),
     ]);
     const decisions = await listRemovalDecisions(ownerId, batchId);
     const untickedListingIds = new Set(decisions.filter((d) => !d.ticked).map((d) => d.listingId));
-    const disappearedListings = proposedRemovalsFrom(service, {
-      candidates,
-      suppressed,
-      activeListings,
-    });
+    // Reconciliation never runs for a discovery capture (US-040 AC-4), so
+    // there is nothing that could disappear from it.
+    const disappearedListings =
+      service === null
+        ? []
+        : proposedRemovalsFrom(service, {
+            candidates,
+            suppressed,
+            activeListings,
+          });
     // ⚠ `candidateCount` is the DATUM, and `null` (not extracted yet) and `0`
     // (extracted, found nothing) are DIFFERENT and both meaningful — US-006
     // AC-3. Deriving this from "no candidate names this image" instead would
@@ -322,6 +333,7 @@ export function registerBatchReviewRoutes(router: Router): void {
     const response = buildReviewResponse({
       batchId: batch.id,
       service,
+      discoverySource,
       mode: batch.mode as BatchMode,
       lowYield: batch.lowYield,
       degradedExtraction: batch.degradedExtraction,

@@ -46,6 +46,7 @@ import type {
   CandidateProvider,
   CleanupVerdict,
   CrossCheckOutcome,
+  DiscoverySource,
   MediaType,
   OcrSupport,
   ReviewDisposition,
@@ -187,7 +188,17 @@ export interface ReviewImageWithNoText {
 
 export interface BuildReviewInput {
   batchId: string;
-  service: Service;
+  /**
+   * `null` for a DISCOVERY capture (TASK-186, ADR-0010 D-1).
+   *
+   * ⚠ Not a missing value — a discovery source is not a service, has no badge
+   * and owns no `ServiceListing` (ADR-0010 Trap 3). Defaulting it to a service
+   * to keep the type narrow would tell the owner a rental storefront had
+   * updated their Netflix list.
+   */
+  service: Service | null;
+  /** Which storefront this capture came from, or `null` for a service batch. */
+  discoverySource?: DiscoverySource | null;
   mode: BatchMode;
   lowYield: boolean;
   degradedExtraction: boolean;
@@ -235,7 +246,9 @@ export type RemovalWithheldReason = 'low-yield' | 'degraded-extraction';
 
 export interface ReviewResponse {
   batchId: string;
-  service: Service;
+  /** `null` for a discovery capture — see `BuildReviewInput.service`. */
+  service: Service | null;
+  discoverySource: DiscoverySource | null;
   mode: BatchMode;
   lowYield: boolean;
   degradedExtraction: boolean;
@@ -263,7 +276,13 @@ export const REVIEW_LABELS = {
 } as const;
 
 /** The removal label names the SERVICE, so the scope is unmistakable. */
-export function removalsLabel(service: Service): string {
+export function removalsLabel(service: Service | null): string {
+  // ⚠ A discovery capture has NO service and never reconciles (ADR-0010 D-1
+  // and D-2, US-040 AC-4), so its removal section is always `omitted: true`
+  // and this string is never rendered. It still has to BE a string; naming the
+  // reason beats an empty label that would read as a missing translation if a
+  // future change ever did render it.
+  if (service === null) return 'Removals do not apply to a discovery capture';
   return service === 'netflix' ? 'No longer on Netflix' : 'No longer on Max';
 }
 
@@ -477,6 +496,14 @@ export function buildReviewResponse(input: BuildReviewInput): ReviewResponse {
   }
 
   const fullUpdate = input.mode === 'full-update';
+  const discovery = input.service === null;
+  // ⚠ US-041 AC-1 — a discovery pass shows EVERY extracted title, including
+  // the ones already on the combined list. In append-only for a SERVICE the
+  // "already on your list" section is omitted because the answer is "nothing
+  // to do, it is already there"; for a discovery capture that same answer is
+  // the useful reporting US-040 AC-5 asks for ("you already have this"), and
+  // omitting it would hide a title the owner definitely captured.
+  const showAlready = fullUpdate || discovery;
   const withheldReason = fullUpdate
     ? removalWithheldReason({ lowYield: input.lowYield, crossCheck: input.crossCheck })
     : null;
@@ -485,6 +512,7 @@ export function buildReviewResponse(input: BuildReviewInput): ReviewResponse {
   return {
     batchId: input.batchId,
     service: input.service,
+    discoverySource: input.discoverySource ?? null,
     mode: input.mode,
     lowYield: input.lowYield,
     degradedExtraction: input.degradedExtraction,
@@ -505,10 +533,10 @@ export function buildReviewResponse(input: BuildReviewInput): ReviewResponse {
       alreadyOnYourList: {
         label: REVIEW_LABELS.alreadyOnYourList,
         // ⚠ In full-update the TRUE count and ALL items, never a summary.
-        count: fullUpdate ? buckets.alreadyOnYourList.length : 0,
+        count: showAlready ? buckets.alreadyOnYourList.length : 0,
         collapsedByDefault: true,
-        omitted: !fullUpdate,
-        items: fullUpdate ? buckets.alreadyOnYourList : [],
+        omitted: !showAlready,
+        items: showAlready ? buckets.alreadyOnYourList : [],
       },
       probablyNotTitles: {
         label: REVIEW_LABELS.probablyNotTitles,
