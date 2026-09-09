@@ -157,7 +157,6 @@ async function makeWaitingIntent(over: {
       workIdentity,
       state: 'active',
       matchState: 'matched',
-      rawExtractedText: over.name,
       tmdbId: over.tmdbId,
       tmdbMediaType: 'movie',
       tmdbName: over.name,
