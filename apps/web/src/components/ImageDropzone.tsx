@@ -26,6 +26,7 @@ import { MAX_IMAGES_PER_BATCH, MAX_IMAGE_BYTES } from '@nextup/domain';
 
 import {
   CHOOSE_FILES_LABEL,
+  DROPZONE_HELD_BODY,
   DROPZONE_ACTIVE_LABEL,
   DROPZONE_IDLE_LABEL,
   FOLDER_REJECTION,
@@ -197,6 +198,20 @@ export interface ImageDropzoneProps {
   readonly touch?: boolean;
 }
 
+/**
+ * One arrival at the dropzone, held together with the affordance it came from.
+ *
+ * ⚠ The `source` rides WITH the files rather than being re-derived on release.
+ * A hold that flattened to a bare `File[]` would have to guess an ingest source
+ * when it replayed, and `ADR-0009` exists precisely to tell the three apart.
+ */
+interface HeldAttach {
+  readonly files: readonly File[];
+  readonly source: IngestSource;
+}
+
+const heldAttachFiles = (payload: HeldAttach): readonly File[] => payload.files;
+
 export function ImageDropzone({
   onFilesAccepted,
   batchReady = false,
@@ -209,6 +224,18 @@ export function ImageDropzone({
   const [rejected, setRejected] = useState<readonly RejectedFile[]>([]);
   const [dragging, setDragging] = useState(false);
   const inputId = useId();
+
+  const deliverAccepted = useCallback(
+    (payload: HeldAttach): void => {
+      onFilesAccepted?.(payload.files, payload.source);
+    },
+    [onFilesAccepted],
+  );
+  const { deliver, heldCount } = useHeldImages<HeldAttach>(
+    batchReady,
+    deliverAccepted,
+    heldAttachFiles,
+  );
 
   const addFiles = useCallback(
     (
@@ -226,10 +253,23 @@ export function ImageDropzone({
       setRejected([...(extraRejections ?? []), ...review.rejected]);
       if (review.accepted.length > 0) {
         setAccepted([...accepted, ...review.accepted]);
-        onFilesAccepted?.(review.accepted, source);
+        /*
+         * ⚠ THROUGH THE HOLD, NEVER STRAIGHT TO THE CONSUMER. This is the one
+         * choke point every affordance passes through - listener paste, button
+         * paste, drop and the file chooser - so it is the only place the hold
+         * can be applied once and cannot be forgotten on a new path.
+         *
+         * It used to call `onFilesAccepted` directly here, and only the paste
+         * primitives held. Choosing a file before picking a service therefore
+         * lost it silently: `UploadRoute.attach` returns without a word when
+         * the selection is unset, so the owner saw "1 screenshots · 1.3 MB"
+         * and "Attach at least one screenshot first." at the same time, with
+         * no error to explain either. `T-PASTE-011` is the regression guard.
+         */
+        deliver({ files: review.accepted, source });
       }
     },
-    [accepted, onFilesAccepted],
+    [accepted, deliver],
   );
 
   const pastedByListener = useCallback(
@@ -238,10 +278,10 @@ export function ImageDropzone({
     },
     [addFiles],
   );
-  // The desktop listener holds too. A hold implemented only behind the button
-  // would leave Ctrl/Cmd+V silently lossy before service/mode are chosen —
-  // the same defect, on the platform where paste is used most.
-  const listener = useHeldImages(batchReady, pastedByListener);
+  // ⚠ NO SEPARATE HOLD HERE ANY MORE. The desktop listener used to wrap itself
+  // in its own `useHeldImages`, which meant the hold lived on two of the four
+  // paths into `addFiles` and not the other two. It now goes through `addFiles`
+  // like everything else, and `addFiles` holds for all of them.
 
   function onDrop(event: DragEvent<HTMLDivElement>): void {
     event.preventDefault();
@@ -292,7 +332,7 @@ export function ImageDropzone({
         open-draft view alike — and it cannot outlive the page and swallow a
         paste meant for the fix-match search box.
       */}
-      <PasteCapture onImagesPasted={listener.deliver} />
+      <PasteCapture onImagesPasted={pastedByListener} />
 
       <div
         className="dropzone__target"
@@ -346,6 +386,12 @@ export function ImageDropzone({
           }}
         />
       </div>
+
+      {heldCount > 0 && (
+        <p role="status" data-testid="dropzone-held">
+          {DROPZONE_HELD_BODY}
+        </p>
+      )}
 
       {accepted.length > 0 && (
         <>

@@ -493,7 +493,7 @@ describe('T-PASTE-009 - no clipboard API means no button, and no lost capability
   it('T-PASTE-009b keeps Choose files and the drop target fully functional without it', async () => {
     vi.stubGlobal('navigator', { ...navigator, clipboard: undefined });
     const onFilesAccepted = vi.fn();
-    render(<ImageDropzone onFilesAccepted={onFilesAccepted} />);
+    render(<ImageDropzone batchReady onFilesAccepted={onFilesAccepted} />);
 
     expect(screen.queryByRole('button', { name: /paste screenshot/i })).toBeNull();
     expect(screen.getByText(CHOOSE_FILES_LABEL)).toBeTruthy();
@@ -656,7 +656,7 @@ describe('T-PASTE-008 - PasteButton rejection messages (TASK-161)', () => {
 describe('T-PASTE-004 - drag-and-drop (TASK-162)', () => {
   it('T-PASTE-004a accepts two PNG files dropped on the target', async () => {
     const onFilesAccepted = vi.fn();
-    render(<ImageDropzone onFilesAccepted={onFilesAccepted} />);
+    render(<ImageDropzone batchReady onFilesAccepted={onFilesAccepted} />);
     const png1 = imageFile('a.png');
     const png2 = imageFile('b.png');
     const mockItem = (file: File) => ({
@@ -719,7 +719,7 @@ describe('T-PASTE-004 - drag-and-drop (TASK-162)', () => {
 
   it('T-PASTE-004f folder in mixed drop rejects folder and accepts files', async () => {
     const onFilesAccepted = vi.fn();
-    render(<ImageDropzone onFilesAccepted={onFilesAccepted} />);
+    render(<ImageDropzone batchReady onFilesAccepted={onFilesAccepted} />);
     const png = imageFile('photo.png');
     const fileItem = {
       webkitGetAsEntry: () => ({ isDirectory: false, name: 'photo.png' }),
@@ -741,13 +741,99 @@ describe('T-PASTE-004 - drag-and-drop (TASK-162)', () => {
 
   it('T-PASTE-004g drop without items API falls back to dataTransfer.files', async () => {
     const onFilesAccepted = vi.fn();
-    render(<ImageDropzone onFilesAccepted={onFilesAccepted} />);
+    render(<ImageDropzone batchReady onFilesAccepted={onFilesAccepted} />);
     const png = imageFile('fallback.png');
     // No items property — exercises the legacy fallback path.
     fireEvent.drop(screen.getByTestId('drop-target'), {
       dataTransfer: { files: [png] },
     });
     expect(onFilesAccepted).toHaveBeenCalledWith([png], 'drop');
+  });
+});
+
+/**
+ * T-PASTE-011 — EVERY ingest affordance holds when there is no batch yet.
+ *
+ * ⚠ THIS IS A REGRESSION GUARD FOR A DEFECT THE OWNER HIT IN PRODUCTION, AND
+ * IT IS THE CASE THE WHOLE `T-PASTE-004`/`T-UX-041` FAMILY COULD NOT SEE. Those
+ * tests all render the dropzone WITHOUT `batchReady` and assert the files reach
+ * `onFilesAccepted` immediately — which is precisely the behaviour that was
+ * broken. `ImageDropzone` happily called through; the loss happened one layer
+ * up, where `UploadRoute.attach` returns without a word if the service or mode
+ * is still unset. So the component tests passed, the container test passed, and
+ * the composition silently dropped the file.
+ *
+ * What the owner saw: choose a screenshot first, then pick Netflix and Full
+ * update, and the dropzone reads "1 screenshots · 1.3 MB" while the submit
+ * button says "Attach at least one screenshot first." — two contradictory true
+ * statements and no error, because nothing failed. Nothing was ever sent.
+ *
+ * ⚠ ASSERT ON THE HOLD-THEN-RELEASE PAIR, NEVER ON THE HOLD ALONE. "Not called
+ * while unready" passes perfectly if the file is DISCARDED, which is the
+ * original bug wearing the fix's clothes. Each case must prove the file arrives
+ * after `batchReady` flips, carrying its own ingest source.
+ */
+describe('T-PASTE-011 - every affordance holds until a batch exists', () => {
+  it('T-PASTE-011a holds a chosen file and releases it when the batch is ready', async () => {
+    const onFilesAccepted = vi.fn();
+    const { rerender } = render(<ImageDropzone onFilesAccepted={onFilesAccepted} />);
+
+    const png = imageFile('netflix_mylist.png');
+    await userEvent.setup().upload(screen.getByTestId('file-input'), png);
+
+    expect(onFilesAccepted).not.toHaveBeenCalled();
+    // It is HELD, not lost: the owner is told so, and the file is on screen.
+    expect(screen.getByTestId('dropzone-held')).toBeTruthy();
+    expect(screen.getByTestId('accepted-name')).toHaveTextContent('netflix_mylist.png');
+
+    rerender(<ImageDropzone batchReady onFilesAccepted={onFilesAccepted} />);
+
+    await waitFor(() => {
+      expect(onFilesAccepted).toHaveBeenCalledWith([png], 'upload');
+    });
+    expect(screen.queryByTestId('dropzone-held')).toBeNull();
+  });
+
+  it('T-PASTE-011b holds a dropped file and releases it as a drop, not a paste', async () => {
+    const onFilesAccepted = vi.fn();
+    const { rerender } = render(<ImageDropzone onFilesAccepted={onFilesAccepted} />);
+
+    const png = imageFile('dropped.png');
+    fireEvent.drop(screen.getByTestId('drop-target'), { dataTransfer: { files: [png] } });
+
+    expect(onFilesAccepted).not.toHaveBeenCalled();
+
+    rerender(<ImageDropzone batchReady onFilesAccepted={onFilesAccepted} />);
+
+    // ⚠ The source must survive the hold. A hold that flattened its queue to a
+    // bare `File[]` would have to guess on release, and `ADR-0009` exists to
+    // tell the three affordances apart.
+    await waitFor(() => {
+      expect(onFilesAccepted).toHaveBeenCalledWith([png], 'drop');
+    });
+  });
+
+  it('T-PASTE-011c releases a held drop and a held file selection with their own sources', async () => {
+    const onFilesAccepted = vi.fn();
+    const { rerender } = render(<ImageDropzone onFilesAccepted={onFilesAccepted} />);
+
+    const chosen = imageFile('chosen.png');
+    await userEvent.setup().upload(screen.getByTestId('file-input'), chosen);
+    const dropped = imageFile('dropped.png');
+    fireEvent.drop(screen.getByTestId('drop-target'), { dataTransfer: { files: [dropped] } });
+
+    expect(onFilesAccepted).not.toHaveBeenCalled();
+
+    rerender(<ImageDropzone batchReady onFilesAccepted={onFilesAccepted} />);
+
+    await waitFor(() => {
+      expect(onFilesAccepted).toHaveBeenCalledTimes(2);
+    });
+    // Arrival order preserved, and neither arrival is re-attributed to the other.
+    expect(onFilesAccepted.mock.calls.map(([, source]) => source)).toEqual(['upload', 'drop']);
+    expect(
+      onFilesAccepted.mock.calls.map(([files]) => (files as readonly File[])[0]?.name),
+    ).toEqual(['chosen.png', 'dropped.png']);
   });
 });
 
