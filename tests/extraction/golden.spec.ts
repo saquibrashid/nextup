@@ -269,19 +269,43 @@ describe('T-AI-030 the golden corpus is measured, and the measurement is pinned'
     expect(KNOWN_SHORTFALLS.chromeRejectionRate).toBeLessThan(CHROME_REJECTION_FLOOR);
   });
 
-  it('T-AI-030f · the gates turn ON when stages 3-5 land', () => {
-    // ⚠ A DEFERRAL GUARD, and it is meant to FAIL. The moment the extraction
-    // runner calls stage 4 or stage 5, the reason for pinning rather than
-    // gating disappears, and this test fails to say so — the same mechanism
-    // `T-AI-045u` uses for the answer key. Without it, "measure now, gate
-    // later" quietly becomes "measure forever".
+  it('T-AI-030f · the pins clear themselves the moment the shortfalls stop being real', () => {
+    // ⚠ A DEFERRAL GUARD, and it is meant to FAIL one day. Without it,
+    // "measure now, gate later" quietly becomes "measure forever" — the same
+    // mechanism `T-AI-045v` uses for the bake-off.
+    //
+    // ⚠ **THE PROXY WAS WRONG TWICE, AND BOTH ERRORS ARE RECORDED RATHER THAN
+    // TIDIED.** It first read the extraction RUNNER and failed if it named
+    // `collapseOverlap`/`matchCandidate`, on the reasoning that a runner
+    // calling stage 3 removes the reason for pinning. TASK-190 wired stage 3
+    // into the runner, and it fired exactly as designed. Re-pointing it at the
+    // SCORER then failed immediately for a better reason: `goldenScorer.ts`
+    // **already** applies the pre-match collapse (and `T-AI-031b` already
+    // scores matching), so stage 3 was never what these numbers were waiting
+    // for. ~~`expect(runner).not.toContain('collapseOverlap')`~~ and
+    // ~~`expect(scorer).not.toContain('collapseOverlap')`~~ are both dead.
+    //
+    // What actually pins them is the LEDGER: four product findings, each
+    // recorded above with its cause. So the clearing condition is the honest
+    // one — every pinned shortfall must still be on the failing side of its
+    // §9.2 threshold. The day extraction improves past one, this fails and
+    // says: stop pinning that metric, gate it.
+    expect(KNOWN_SHORTFALLS.aggregateRecall).toBeLessThan(AGGREGATE_RECALL_FLOOR);
+    expect(KNOWN_SHORTFALLS.aggregateFalseTitleRate).toBeGreaterThan(AGGREGATE_FALSE_TITLE_CEILING);
+    expect(KNOWN_SHORTFALLS.chromeRejectionRate).toBeLessThan(CHROME_REJECTION_FLOOR);
+    expect(KNOWN_SHORTFALLS.matchAccuracy).toBeLessThan(MATCH_ACCURACY_FLOOR);
+    expect(KNOWN_SHORTFALLS.omissionRecovery).toBeLessThan(OMISSION_RECOVERY_FLOOR);
+    // Non-vacuity: a ledger that lost its entries would pass every line above
+    // by having nothing to check.
+    expect(Object.keys(KNOWN_SHORTFALLS).length).toBeGreaterThanOrEqual(5);
+    // And the runner-side stage-3 deferral IS discharged (TASK-190) — asserted
+    // positively so it cannot silently regress to the state this guard was
+    // originally written to watch for.
     const runner = readFileSync(
       path.resolve(__dirname, '../../apps/api/src/jobs/startExtraction.ts'),
       'utf8',
     );
-    expect(runner).not.toContain('collapseOverlap');
-    expect(runner).not.toContain('matchCandidate');
-    // Non-vacuity: the file really is the extraction runner.
+    expect(runner).toContain('resolveCandidates');
     expect(runner).toContain('cleanup(');
   });
 });
