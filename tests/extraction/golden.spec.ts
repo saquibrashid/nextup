@@ -101,23 +101,27 @@ const scored = await scoreAll(DEFAULT_RECORDING_MODEL_ID);
  */
 const KNOWN_SHORTFALLS = {
   /**
-   * 61 of 67 expected titles. The six misses are FOUR distinct causes, all
-   * real and none of them fixture defects:
+   * ~~61~~ **63** of 67 expected titles. The ~~six~~ **four** misses are
+   * ~~FOUR~~ **THREE** distinct causes, all real and none of them fixture
+   * defects:
    *
    *   - `louis c k ridiculous` x2 — the phone's floating nav bar OCCLUDES the
    *     caption in `netflix-mylist-mobile-01` and in the JPEG derived from it.
    *     A reader that declines to name a tile it cannot see is behaving
    *     correctly; this is the corpus being honest, not the reader failing.
-   *   - `raw` x2 — the model reads the WWE logo baked into the artwork and
+   *   - ~~`raw` x2 — the model reads the WWE logo baked into the artwork and
    *     returns `wwe raw`. The visible caption is `Raw`, so the answer key is
-   *     right and the embellishment costs a recall point AND a false title.
+   *     right and the embellishment costs a recall point AND a false title.~~
+   *     **FIXED AT TASK-198 by §3.1a R2 — and note the ledger was right that
+   *     the answer key was right. Both recall and the false-title rate moved,
+   *     exactly as this entry predicted they would.**
    *   - `wicked for good` — on the desktop capture the model returned
    *     `wicked part one`, a DIFFERENT FILM. A genuine misidentification, and
    *     the most serious single finding in the corpus.
    *   - `in the hand of dante` — returned as `in the shadow of dante`, a
    *     misread of a script-face title treatment.
    */
-  aggregateRecall: 0.9104477611940298,
+  aggregateRecall: 0.9402985074626866,
   /**
    * Dominated by ONE systematic cause, not by many small ones: stage 1c's
    * consumption of an OCR line is GEOMETRY-scoped, and on Netflix's mobile
@@ -138,28 +142,38 @@ const KNOWN_SHORTFALLS = {
    * 104. Anyone reading this number as "false titles got worse" is reading it
    * backwards; the honest summary is that the corpus stopped hiding the rate
    * behind a padded denominator.
+   *
+   * ⚠ AND IT WENT DOWN AT TASK-198 FOR THE ORDINARY REASON — 0.3143 to 0.2857,
+   * two fewer false titles, because the three `wwe raw` expansions stopped
+   * being emitted. Denominator unchanged at 70.
    */
-  aggregateFalseTitleRate: 0.3142857142857143,
+  aggregateFalseTitleRate: 0.2857142857142857,
   /**
-   * 2 of 4. ⚠ §9.2 sets this floor at **1.0 and calls it non-negotiable**, so
+   * ~~2 of 4. ⚠ §9.2 sets this floor at **1.0 and calls it non-negotiable**, so
    * this is the most serious shortfall in the ledger — and its cause is the
    * same geometry-scoped consumption as the false-title rate, seen from the
-   * other side.
+   * other side.~~
    *
-   * Both misses are the title `Raw`. OCR read the caption correctly. The
+   * ~~Both misses are the title `Raw`. OCR read the caption correctly. The
    * vision model read the WWE logo burnt into the artwork and returned
    * `wwe raw`. On the DESKTOP layouts the caption sits *under* the artwork, so
    * its box DOES overlap the tile — stage 1c therefore marks the OCR line
    * consumed by the tile it contradicts, and the correct text is absorbed into
-   * the wrong one instead of surviving as an orphan.
+   * the wrong one instead of surviving as an orphan.~~
    *
-   * ⚠ So consumption is not merely noisy: on desktop it can DESTROY the very
+   * ~~⚠ So consumption is not merely noisy: on desktop it can DESTROY the very
    * correction the OCR leg exists to supply, while on mobile it fails to
    * consume anything and floods the candidate set instead. One rule, two
    * opposite failures, both traceable to `crossCheck.ts` L106-109 scoping
-   * consumption by geometry alone rather than by geometry AND text agreement.
+   * consumption by geometry alone rather than by geometry AND text
+   * agreement.~~
+   *
+   * ⚠ **RETIRED BY TASK-198 — NOW A GATE, SEE {@link OMISSION_RECOVERY_MEASURED}.
+   * THE DIAGNOSIS ABOVE WAS FALSE AND IS KEPT STRUCK THROUGH ONLY SO IT IS NOT
+   * RE-DERIVED.** The OCR line is not destroyed by consumption: it survives
+   * with `basis: 'both'`, `boxSource: 'ocr'` and `rawText: 'RAW'` intact.
+   * Nothing in `crossCheck.ts` needed changing.
    */
-  omissionRecovery: 0.5,
 } as const;
 
 /**
@@ -224,6 +238,36 @@ const CHROME_REJECTION_MEASURED = 0.875;
 const MATCH_ACCURACY_MEASURED = 23 / 24;
 
 /**
+ * Omission recovery — **A GATE, NOT A PIN, SINCE TASK-198.** 4 of 4.
+ *
+ * ⚠ THE THIRD METRIC TO LEAVE `KNOWN_SHORTFALLS` BY CLEARING §9.2, AND THE
+ * ONLY ONE WHOSE LEDGER ENTRY WAS SIMPLY WRONG. It read 0.5 against a floor
+ * §9.2 calls **non-negotiable**, and blamed stage 1c for consuming the `Raw`
+ * OCR line on geometry and destroying it. A probe falsified that outright: the
+ * candidate survives, with `rawText: 'RAW'`, `basis: 'both'` and
+ * `boxSource: 'ocr'`. Nothing was destroyed and `crossCheck.ts` was not at
+ * fault.
+ *
+ * ⚠ THE MODEL DID NOT MISREAD THE TILE EITHER. Its own `visibleText` is
+ * `"RAW"` — the same glyphs OCR read. It then reported
+ * `identifiedTitle: "WWE Raw"`, and §3.1a R1's `inferredTitle ?? rawText`
+ * handed the matcher the embellishment over a reading two independent readers
+ * agreed on. TMDB titles that work **`Raw`** (`tmdb:tv:4656`), so the expansion
+ * searched for a string the provider does not use, in three separate images.
+ *
+ * The fix is `preferredSource()` (§3.1a R2), and its whole difficulty is that
+ * "the inference differs from the caption" is **also true of every truncated
+ * tile**, which is the case R1 exists for. The discriminator is that a
+ * de-truncation *extends* the printed prefix and an invention does not.
+ * `T-AI-043c`-`f` are the discriminating twins.
+ *
+ * ⚠ THE SCORER'S PREDICATE WAS NOT TOUCHED. The denominator is still 4, so
+ * this is a product improvement and not a redefinition of the measurement —
+ * check that first if this number is ever questioned.
+ */
+const OMISSION_RECOVERY_MEASURED = 1;
+
+/**
  * The blank capture's three surviving strings, pinned exactly.
  *
  * ⚠ THIS TEST USED TO ASSERT AN EMPTY ARRAY, AND THAT WAS WRONG — not because
@@ -275,11 +319,11 @@ describe('T-AI-030 the golden corpus is measured, and the measurement is pinned'
     expect(measured).toEqual({
       'netflix-mylist-mobile-01': 7,
       'netflix-mylist-mobile-02': 8,
-      'netflix-mylist-desktop-01': 8,
+      'netflix-mylist-desktop-01': 9,
       'netflix-continue-watching-01': 0,
       'max-saved-mobile-01': 6,
       'max-saved-desktop-01': 6,
-      'netflix-artwork-only-01': 9,
+      'netflix-artwork-only-01': 10,
       'blank-no-content-01': 0,
       'truncated-titles-01': 4,
       'low-quality-jpeg-01': 7,
@@ -342,18 +386,19 @@ describe('T-AI-030 the golden corpus is measured, and the measurement is pinned'
     // says: stop pinning that metric, gate it.
     expect(KNOWN_SHORTFALLS.aggregateRecall).toBeLessThan(AGGREGATE_RECALL_FLOOR);
     expect(KNOWN_SHORTFALLS.aggregateFalseTitleRate).toBeGreaterThan(AGGREGATE_FALSE_TITLE_CEILING);
-    expect(KNOWN_SHORTFALLS.omissionRecovery).toBeLessThan(OMISSION_RECOVERY_FLOOR);
-    // ⚠ AND IT HAS NOW FIRED TWICE FOR REAL. `chromeRejectionRate` was the
-    // fifth entry here until TASK-195 and `matchAccuracy` the fourth until
-    // TASK-197; each cleared §9.2, this guard failed as designed, and the
-    // metric was moved out of the ledger and gated (by `T-AI-030e` and
-    // `T-AI-031b` respectively). That is the whole mechanism working end to
-    // end — so neither key may come back, and the count below drops to match.
+    // ⚠ AND IT HAS NOW FIRED THREE TIMES FOR REAL. `chromeRejectionRate` was
+    // the fifth entry here until TASK-195, `matchAccuracy` the fourth until
+    // TASK-197, and `omissionRecovery` the third until TASK-198; each cleared
+    // §9.2, this guard failed as designed, and the metric was moved out of the
+    // ledger and gated (by `T-AI-030e`, `T-AI-031b` and `T-AI-039c`
+    // respectively). That is the whole mechanism working end to end — so none
+    // of the three keys may come back, and the count below drops to match.
     expect(Object.keys(KNOWN_SHORTFALLS)).not.toContain('chromeRejectionRate');
     expect(Object.keys(KNOWN_SHORTFALLS)).not.toContain('matchAccuracy');
+    expect(Object.keys(KNOWN_SHORTFALLS)).not.toContain('omissionRecovery');
     // Non-vacuity: a ledger that lost its entries would pass every line above
     // by having nothing to check.
-    expect(Object.keys(KNOWN_SHORTFALLS).length).toBeGreaterThanOrEqual(3);
+    expect(Object.keys(KNOWN_SHORTFALLS).length).toBeGreaterThanOrEqual(2);
     // And the runner-side stage-3 deferral IS discharged (TASK-190) — asserted
     // positively so it cannot silently regress to the state this guard was
     // originally written to watch for.
@@ -543,11 +588,12 @@ describe('T-AI-035 the artwork-only capture is READ, not skipped', () => {
 });
 
 describe('T-AI-039 a title the model missed is recovered from the OCR leg', () => {
-  it('T-AI-039c · omission recovery is measured, and the two losses are named', () => {
+  it('T-AI-039c · omission recovery is measured, and it now clears the floor', () => {
     // ⚠ §9.2 puts this floor at 1.0 and calls it non-negotiable: the OCR leg
     // exists so that a title the vision model drops is not silently lost, and
-    // a rate below 1.0 means the second reader is decorative. The corpus does
-    // NOT clear it — see KNOWN_SHORTFALLS.omissionRecovery.
+    // a rate below 1.0 means the second reader is decorative. ~~The corpus does
+    // NOT clear it — see KNOWN_SHORTFALLS.omissionRecovery.~~ **The corpus
+    // clears it since TASK-198** — see OMISSION_RECOVERY_MEASURED.
     let recoverable = 0;
     let recovered = 0;
     const missed: string[] = [];
@@ -578,12 +624,10 @@ describe('T-AI-039 a title the model missed is recovered from the OCR leg', () =
     // non-negotiable metric quietly asserting nothing.
     expect(recoverable).toBe(4);
     expect(recovered / recoverable, `not recovered:\n  ${missed.join('\n  ')}`).toBe(
-      KNOWN_SHORTFALLS.omissionRecovery,
+      OMISSION_RECOVERY_MEASURED,
     );
-    expect(KNOWN_SHORTFALLS.omissionRecovery).toBeLessThan(OMISSION_RECOVERY_FLOOR);
-    expect(missed.sort()).toEqual([
-      'netflix-artwork-only-01: raw',
-      'netflix-mylist-desktop-01: raw',
-    ]);
+    // The gate itself, now that it can be one.
+    expect(OMISSION_RECOVERY_MEASURED).toBeGreaterThanOrEqual(OMISSION_RECOVERY_FLOOR);
+    expect(missed).toEqual([]);
   });
 });

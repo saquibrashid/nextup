@@ -467,7 +467,7 @@ Fully specified in **`specs/ai.md` §9**. Summary of what **CI** enforces
 | Title recall (aggregate, **including** the artwork-only fixture) | ≥ **0.95** *(raised from 0.90 — see note)* | `T-AI-030` |
 | False-title rate | ≤ 0.10 | `T-AI-030` |
 | **Fabrication rate** — candidates with `ocrSupport: 'none'` that are neither expected nor TMDB-matched | ≤ **0.05** | **`T-AI-032`** |
-| **Omission recovery** — an expected title present in the OCR recording but absent from the LLM recording is recovered as an `ocr-only` orphan | **1.0, non-negotiable** | **`T-AI-039`** |
+| **Omission recovery** — an expected title present in the OCR recording but absent from the LLM recording is recovered as an `ocr-only` orphan | **1.0, non-negotiable — ENFORCED as a gate since TASK-198, not pinned.** Measured **1.0** (4 of 4); was 0.5, and `T-AI-030f` fired to force the promotion. ⚠ **The ledger's stated cause was FALSE and was falsified by probe before anything was changed:** it blamed §2.1c geometry-scoped consumption for destroying the `Raw` OCR line, but the candidate survives intact (`rawText: 'RAW'`, `basis: 'both'`). The real cause was §3.1a R1 preferring an `identifiedTitle` of `WWE Raw` over glyphs *both* readers read as `RAW`. Fixed by §3.1a R2. ⚠ **The scorer's predicate was NOT changed and the denominator is still 4** — this is a product improvement, not a redefinition. | **`T-AI-039`** |
 | Chrome rejection | ≥ 0.80 — **ENFORCED as a gate since TASK-195, not pinned.** Measured **0.8750** (63 of 72); was 0.2361, and `T-AI-030f` fired to force the promotion. The two causes were the §3.2 vocabulary genuinely not covering this corpus **and** step 1's reading-order grouping fusing nav labels before step 3 could match them. | `T-AI-030` |
 | Match accuracy | ≥ 0.90 — **ENFORCED as a gate since TASK-197, not pinned.** Measured **0.9583** (23 of 24); was 0.75, and `T-AI-030f` fired to force the promotion. The cause was §4.2 step 4's `lower tmdbId` tie-break, which is oldest-work-wins because ids are monotonic. **`T-AI-031d` additionally guards the half no metric measured:** the same order cuts the top-5 alternates, so the correct identity must be *reachable* in one tap (US-007 AC-4), not merely ranked first. | `T-AI-031` |
 | **Determinism of stages 1c–5 across 3 runs** | **exactly 1.0** | `T-STUB-001`, **`T-AI-034`** |
@@ -475,6 +475,7 @@ Fully specified in **`specs/ai.md` §9**. Summary of what **CI** enforces
 | **`blank-no-content-01.png`** triggers the low-yield path | must | `T-AI-021`, `T-AI-022` |
 | Degraded (LLM-unavailable) full-update withholds removals | must | **`T-AI-036`** |
 | Truncated caption resolves to the complete work, `rawText` keeps the ellipsis | must | **`T-AI-043`** |
+| **An inference that REPLACES rather than extends the caption is rejected** (§3.1a R2) — `RAW` read identically by both legs must not become `WWE Raw` | must | **`T-AI-043`** (`c`–`f`) |
 | Prompt-injection fixture cannot escape the schema | must | **`T-AI-044`** |
 | `FABRICATION_RATE_CEILING` is never referenced at runtime | must | **`T-AI-042`** |
 

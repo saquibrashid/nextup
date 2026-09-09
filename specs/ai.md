@@ -548,16 +548,47 @@ inference — hence `packages/domain`, per §2.1c.
 ### 3.1a Which string feeds matching (new in Revision 2)
 
 ```ts
-const matchText = item.inferredTitle ?? item.rawText;
+const matchText = preferredSource(item); // packages/domain/src/extraction/cleanup.ts
 ```
 
-`inferredTitle` is preferred because it is the *identified work*, which
+~~```ts
+const matchText = item.inferredTitle ?? item.rawText;
+```~~
+
+**R1.** `inferredTitle` is preferred because it is the *identified work*, which
 is what the §4 matcher needs and what makes truncated tile captions
 matchable at all. `rawText` is **always retained verbatim** on the
 candidate and is **always shown in the review card** next to the
 resolved match (US-007 AC-3), so the owner can see exactly what was on
 screen versus what the reader concluded. **Never discard `rawText` in
 favour of `inferredTitle`.**
+
+**R2 (new in R3, TASK-198). R1 is reversed for an inference that does not
+*extend* what was printed.** Use `rawText` when **all** of:
+
+1. `inferredTitle` is present and normalises differently from `rawText`; **and**
+2. `ocrSupport === 'exact'` — the independent OCR leg read the same glyphs; **and**
+3. `rawText` carries no trailing truncation marker (`…`, `...`, `..`); **and**
+4. `normalise(inferredTitle)` does **not** start with `normalise(rawText) + ' '`.
+
+⚠ **THIS IS NOT "DISTRUST THE MODEL WHEN IT DISAGREES WITH THE CAPTION".**
+That rule would take every truncated tile with it, which is the entire case R1
+exists for. The field is documented as the reader's *de-truncated* title, and
+condition 4 is what holds it to that: **a de-truncation extends the printed
+prefix; an invention replaces it.**
+
+⚠ **WHY THIS IS LOAD-BEARING.** Observed across three golden images: a tile
+captioned `RAW`, whose `visibleText` the model itself returned as `"RAW"` and
+which OCR read identically, was reported as `identifiedTitle: "WWE Raw"`. TMDB
+titles that work **`Raw`** (`tmdb:tv:4656`), so R1 handed the matcher a string
+the provider does not use and the title was lost — costing a recall point *and*
+a false title each time. Non-negotiable omission recovery was 0.5 because of
+it; it is 1.0 with R2. Condition 4 is anchored at the **start** deliberately: a
+substring test would read `raw` inside `wwe raw` as a completion and reinstate
+the defect (`T-AI-043f`).
+
+Tests: `T-AI-043a` (truncation still wins), `T-AI-043c` (the invention),
+`T-AI-043d`/`e`/`f` (the discriminating twins).
 
 ### 3.2 Steps, in order
 

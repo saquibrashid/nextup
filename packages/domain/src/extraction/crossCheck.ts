@@ -111,8 +111,15 @@ export function crossCheck(llm: readonly LlmTile[], ocr: readonly OcrLine[]): Ex
       // artwork instead of the printed caption — `wwe raw` for a tile captioned
       // `Raw` — the caption overlapped, was consumed on geometry, and was never
       // emitted. The one line that contradicted the model was deleted BY the
-      // model's own tile, silently, at stage 1. Both `Raw` losses in
-      // `T-AI-039c` are this.
+      // model's own tile, silently, at stage 1. ~~Both `Raw` losses in
+      // `T-AI-039c` are this.~~ ⚠ **THEY ARE NOT — SEE TASK-198.** Those two
+      // losses were attributed here, then to the matcher, and were finally
+      // neither: the `Raw` line survives consumption intact, and the title was
+      // lost in stage 2 because §3.1a preferred an `identifiedTitle` of
+      // `WWE Raw` over glyphs both legs read as `RAW`. §3.1a R2 fixed it and
+      // nothing in this module changed. The failure mode described above is
+      // still real and still what this rule guards; it simply never had a
+      // demonstrated instance in the golden corpus.
       //
       // ⚠ THE RULE IS NARROWED TO `basis: 'artwork'` ON PURPOSE, AND THE WIDE
       // VERSION WAS MEASURED BEFORE IT WAS REJECTED. Requiring agreement from

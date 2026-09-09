@@ -376,4 +376,65 @@ describe('truncated captions (T-AI-043)', () => {
     expect(out[0]?.matchText).toBe('Some Show');
     expect(out[0]?.cleanupVerdict).toBe('title-candidate');
   });
+
+  // ── §3.1a R2 — invention vs de-truncation (TASK-198) ──────────────────────
+  //
+  // ⚠ THESE FOUR ARE ONE TEST IN FOUR PARTS AND MUST BE READ TOGETHER. `c` is
+  // the defect; `d`, `e` and `f` are the twins that stop the fix from being
+  // "distrust `inferredTitle` whenever it differs from the caption", which
+  // would take `T-AI-043a` with it — the case R1 exists for.
+  it('T-AI-043c prefers the CAPTION when the inference invents rather than completes', () => {
+    // The golden corpus, exactly: a tile captioned `RAW`, read as `RAW` by the
+    // model's own visibleText AND independently by OCR, reported as `WWE Raw`.
+    // TMDB titles that work `Raw` (tmdb:tv:4656), so the expansion searched
+    // for a string the provider does not use — three images, three losses.
+    const out = cleanup([llm({ rawText: 'RAW', inferredTitle: 'WWE Raw' })], { now: NOW });
+
+    expect(out[0]?.matchText).toBe('RAW');
+    expect(out[0]?.normalisedText).toBe('raw');
+    // The inference is not destroyed, only demoted — US-007 AC-3 shows both.
+    expect(out[0]?.item.inferredTitle).toBe('WWE Raw');
+  });
+
+  it('T-AI-043d keeps the inference when it EXTENDS the caption, with no ellipsis', () => {
+    // ⚠ THE TWIN THAT KILLS THE NAIVE FIX. Netflix does not always render an
+    // ellipsis, so "differs from the caption" and "has no truncation marker"
+    // are both true of a genuine de-truncation. Only the prefix test
+    // separates them: a completion extends what was printed, an invention
+    // replaces it.
+    const out = cleanup(
+      [
+        llm({
+          rawText: 'The Lord of the Rings',
+          inferredTitle: 'The Lord of the Rings: The Two Towers',
+        }),
+      ],
+      { now: NOW },
+    );
+
+    expect(out[0]?.matchText).toBe('The Lord of the Rings: The Two Towers');
+  });
+
+  it('T-AI-043e keeps the inference when OCR does not corroborate the caption exactly', () => {
+    // Only an exact independent reading is strong enough to overrule the
+    // model. `partial` is what a truncated caption scores against the full
+    // OCR line it came from, so anything weaker must keep R1's behaviour.
+    const out = cleanup(
+      [llm({ rawText: 'RAW', inferredTitle: 'WWE Raw', ocrSupport: 'partial' })],
+      {
+        now: NOW,
+      },
+    );
+
+    expect(out[0]?.matchText).toBe('WWE Raw');
+  });
+
+  it('T-AI-043f does not mistake a caption that is a SUFFIX of the inference for a completion', () => {
+    // `raw` is inside `wwe raw` — a substring test, or a bare `includes`,
+    // would call this a de-truncation and reinstate the whole defect. The
+    // rule is anchored at the START for exactly this reason.
+    const out = cleanup([llm({ rawText: 'Raw', inferredTitle: 'WWE Raw' })], { now: NOW });
+
+    expect(out[0]?.matchText).toBe('Raw');
+  });
 });
