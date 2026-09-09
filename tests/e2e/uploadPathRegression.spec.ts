@@ -101,6 +101,7 @@ function reviewResponse(confirmed: boolean): ReviewResponse {
     lowYield: false,
     degradedExtraction: false,
     crossCheck: 'ok',
+    tmdbUnavailable: false,
     banner: null,
     sections: {
       additions: {
@@ -235,6 +236,7 @@ async function stubApi(page: Page, state: UploadState): Promise<void> {
           progress: inReview ? undefined : { imagesDone: 0, imagesTotal: 1 },
           degradedExtraction: false,
           crossCheck: 'ok',
+          tmdbUnavailable: false,
           provenance: { created: [], modified: [], removed: [] },
           changedNothing: true,
           titles: [],

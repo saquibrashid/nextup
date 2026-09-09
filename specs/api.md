@@ -1171,6 +1171,7 @@ one (contrast §6.21).
   "lowYield": false,
   "degradedExtraction": false,
   "crossCheck": "ok",
+  "tmdbUnavailable": false,
   "banner": null,
   "sections": {
     "additions": {
@@ -1249,6 +1250,7 @@ one (contrast §6.21).
 |---|---|---|
 | `degradedExtraction` | `boolean` | `true` when only one of the two readers ran. Drives the non-dismissible banner in `specs/ux-states.md` §5.9/§5.10. |
 | `crossCheck` | `'ok' \| 'ocr-unavailable' \| 'llm-unavailable'` | Which reader was missing, so the banner can be specific. |
+| `tmdbUnavailable` | `boolean` | `true` when stage 3 could not reach TMDB for this batch (§4.3, US-007 AC-6). ⚠ **Read from the persisted stage-3 stats, never derived from "every candidate is `unmatched:`"** — a batch of genuinely unidentifiable captions renders identically, and the two have opposite remedies (wait and retry, versus confirm now). Absent stats ⇒ `false`: a batch extracted before stage 3 existed must not accuse TMDB of an outage nobody observed. Raises `TMDB_UNAVAILABLE_BANNER`, which **composes with** (does not displace) the low-yield and degraded-read banners. `T-AI-017`. |
 | Per item: `inferredTitle` | `string \| null` | The model's structured, de-truncated title. `null` on `ocr-only` orphans. |
 | Per item: `basis` | `'text' \| 'artwork' \| 'both' \| 'unknown'` | What the title was read from. `'artwork'` is the RSK-021 path. |
 | Per item: `ocrSupport` | `'exact' \| 'partial' \| 'none' \| 'not-checked'` | Independent corroboration. `'none'` ⇒ verdict `inferred-unverified` ⇒ the client **must** render the tile thumbnail (`T-AI-041`). |

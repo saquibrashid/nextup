@@ -13,7 +13,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { CLEANUP_VERDICTS } from '../src/enums.js';
-import { DEGRADED_EXTRACTION_BANNER } from '../src/copy.js';
+import { DEGRADED_EXTRACTION_BANNER, TMDB_UNAVAILABLE_BANNER } from '../src/copy.js';
 import {
   assertEveryCandidateRouted,
   buildReviewResponse,
@@ -397,6 +397,56 @@ describe('T-AI-021 — banner copy', () => {
     // §5.9 requires the same banner here and on `/batches/:batchId`, so the
     // thing under test is the identity, not the presence of some wording.
     expect(res.banner).toBe(DEGRADED_EXTRACTION_BANNER);
+  });
+});
+
+// ── §4.3 / US-007 AC-6 · the TMDB-unreachable banner ──────────────────────
+//
+// ⚠ THE OUTAGE AND A BATCH OF GENUINELY UNIDENTIFIABLE TITLES RENDER
+// IDENTICALLY without this banner: both put every candidate in "Couldn't
+// identify these" with an `unmatched:<hash>` identity. The remedies are
+// opposite — wait and retry, versus confirm now — so the distinction is the
+// whole value of the message.
+describe('T-AI-017 — the TMDB-unreachable banner', () => {
+  it('T-AI-017j · an outage is announced verbatim, and echoed as a flag', () => {
+    const res = buildReviewResponse(input({ tmdbUnavailable: true }));
+    // The SHARED constant, not a substring: the wording is quoted from
+    // `specs/ai.md` §4.3 and the thing under test is that identity.
+    expect(res.banner).toBe(TMDB_UNAVAILABLE_BANNER);
+    expect(res.tmdbUnavailable).toBe(true);
+  });
+
+  it('T-AI-017k · a read-safety banner and the outage banner COMPOSE, they do not compete', () => {
+    // Each answers a different question — "will anything be removed?" versus
+    // "why is nothing identified?" — and a batch can genuinely be both. If
+    // one silently displaced the other the owner would lose an answer at
+    // exactly the moment they decide whether to confirm.
+    const res = buildReviewResponse(input({ lowYield: true, tmdbUnavailable: true }));
+    expect(res.banner).toContain('nothing will be removed by this batch');
+    expect(res.banner).toContain(TMDB_UNAVAILABLE_BANNER);
+    // Read safety first: it is the one that governs deletion.
+    expect(res.banner?.indexOf(TMDB_UNAVAILABLE_BANNER)).toBeGreaterThan(0);
+  });
+
+  it('T-AI-017l · the degraded-read banner also composes with it', () => {
+    const res = buildReviewResponse(
+      input({ crossCheck: 'llm-unavailable', degradedExtraction: true, tmdbUnavailable: true }),
+    );
+    expect(res.banner).toContain(DEGRADED_EXTRACTION_BANNER);
+    expect(res.banner).toContain(TMDB_UNAVAILABLE_BANNER);
+  });
+
+  it('T-AI-017m · an omitted flag means "no outage reported", never an accusation', () => {
+    // A batch extracted before stage 3 existed, or one where stage 3 could not
+    // run at all, must not blame TMDB for an outage nobody observed.
+    const res = buildReviewResponse(input({ candidates: [candidate()] }));
+    expect(res.tmdbUnavailable).toBe(false);
+    expect(res.banner).toBeNull();
+  });
+
+  it('T-AI-017n · a healthy TMDB leaves an otherwise healthy batch bannerless', () => {
+    const res = buildReviewResponse(input({ candidates: [candidate()], tmdbUnavailable: false }));
+    expect(res.banner).toBeNull();
   });
 });
 

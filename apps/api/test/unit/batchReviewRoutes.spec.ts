@@ -36,6 +36,7 @@ interface BatchRow {
   lowYield?: boolean;
   degradedExtraction?: boolean;
   crossCheck?: string | null;
+  extractionStats?: string | null;
 }
 
 interface ListingRow {
@@ -450,6 +451,79 @@ describe('T-REV-010 · GET /review without a store', () => {
     };
     expect(body.sections['removals']?.items).toHaveLength(1);
     expect(body.sections['removals']?.withheldReason).toBeNull();
+  });
+
+  // ── §4.3 / US-007 AC-6 · the TMDB outage reaches the review pass ────────
+  //
+  // ⚠ The outage is READ FROM THE PERSISTED STAGE-3 STATS, never inferred
+  // from "every candidate is unmatched". That derivation is precisely the
+  // conflation the banner exists to prevent, because a batch of genuinely
+  // unidentifiable captions looks the same.
+  it('T-AI-017o: a recorded TMDB outage surfaces as a flag and a banner', async () => {
+    store.batch = {
+      id: 'batch-1',
+      service: 'netflix',
+      status: 'in-review',
+      mode: 'append-only',
+      extractionStats: JSON.stringify({ stage3: { tmdbUnavailable: true, matched: 0 } }),
+    };
+    makeCandidate({ id: 'c-1' });
+
+    const body = (await (await getReview('batch-1')).json()) as {
+      tmdbUnavailable: boolean;
+      banner: string | null;
+    };
+    expect(body.tmdbUnavailable).toBe(true);
+    expect(body.banner).toContain('reach TMDB');
+  });
+
+  it('T-AI-017p: unmatched candidates alone do NOT claim an outage', async () => {
+    // The distinction is the entire point: these titles will still be
+    // unidentifiable tomorrow, so "try again later" would be bad advice.
+    store.batch = { id: 'batch-1', service: 'netflix', status: 'in-review', mode: 'append-only' };
+    makeCandidate({ id: 'c-1', resolvedWorkIdentity: 'unmatched:abc123' });
+
+    const body = (await (await getReview('batch-1')).json()) as {
+      tmdbUnavailable: boolean;
+      banner: string | null;
+    };
+    expect(body.tmdbUnavailable).toBe(false);
+    expect(body.banner).toBeNull();
+  });
+
+  it('T-AI-017q: stats that never ran stage 3 report no outage', async () => {
+    // A batch extracted before stage 3 existed, or one where stage 3 threw,
+    // must not accuse TMDB of an outage nobody observed.
+    store.batch = {
+      id: 'batch-1',
+      service: 'netflix',
+      status: 'in-review',
+      mode: 'append-only',
+      extractionStats: JSON.stringify({ progress: { imagesDone: 2, imagesTotal: 2 } }),
+    };
+    makeCandidate({ id: 'c-1' });
+
+    const body = (await (await getReview('batch-1')).json()) as { tmdbUnavailable: boolean };
+    expect(body.tmdbUnavailable).toBe(false);
+  });
+
+  it('T-AI-017r: malformed stats do not take out the review pass', async () => {
+    // The column is `ISJSON`-guarded so this is unreachable through the app,
+    // but review is what the owner opens when something has already gone
+    // wrong — losing it over an observability field would hide the failure it
+    // exists to explain.
+    store.batch = {
+      id: 'batch-1',
+      service: 'netflix',
+      status: 'in-review',
+      mode: 'append-only',
+      extractionStats: '{not json',
+    };
+    makeCandidate({ id: 'c-1' });
+
+    const res = await getReview('batch-1');
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { tmdbUnavailable: boolean }).tmdbUnavailable).toBe(false);
   });
 
   it('T-AI-004ah: an SD-02 collapse loser keeps its survivor alive, and is not itself offered', async () => {

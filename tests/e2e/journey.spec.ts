@@ -410,6 +410,7 @@ function reviewResponse(be: Backend, batch: BatchRuntime): ReviewResponse {
     lowYield: false,
     degradedExtraction: false,
     crossCheck: 'ok',
+    tmdbUnavailable: false,
     banner: null,
     sections: {
       additions: {

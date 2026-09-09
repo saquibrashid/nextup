@@ -120,6 +120,38 @@ function isBoundingBox(
 }
 
 /**
+ * Did stage 3 report that TMDB was unreachable for this batch?
+ *
+ * ⚠ **READ FROM THE PERSISTED STATS, NOT INFERRED FROM THE CANDIDATES.** The
+ * tempting derivation — "every candidate is `unmatched:`" — is exactly the
+ * conflation this exists to prevent: a batch of genuinely unidentifiable
+ * captions looks identical. Only the runner knows which happened, and it
+ * already wrote the answer down (`ResolveCandidatesResult`, TASK-190).
+ *
+ * ⚠ Absent slice ⇒ `false` ("no outage was reported"), never `true`. A batch
+ * extracted before stage 3 existed, or one where stage 3 itself failed to
+ * run, must not accuse TMDB of an outage nobody observed.
+ */
+export function readTmdbUnavailable(extractionStats: string | null | undefined): boolean {
+  if (extractionStats === null || extractionStats === undefined || extractionStats === '') {
+    return false;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(extractionStats);
+  } catch {
+    // `ISJSON`-guarded column, so unreachable through the application — and
+    // the review pass is not the screen to take out over an observability
+    // field. See `readProgress` in `batchDetail.ts` for the same reasoning.
+    return false;
+  }
+  if (typeof parsed !== 'object' || parsed === null) return false;
+  const stage3 = (parsed as Record<string, unknown>)['stage3'];
+  if (typeof stage3 !== 'object' || stage3 === null) return false;
+  return (stage3 as Record<string, unknown>)['tmdbUnavailable'] === true;
+}
+
+/**
  * Loads a batch's candidates, gated and classified exactly as the review
  * response does.
  *
@@ -342,6 +374,7 @@ export function registerBatchReviewRoutes(router: Router): void {
       disappearedListings,
       untickedListingIds,
       imagesWithNoText,
+      tmdbUnavailable: readTmdbUnavailable(batch.extractionStats),
     });
 
     // REQ-012 is asserted on the way out, not merely tested. A verdict added

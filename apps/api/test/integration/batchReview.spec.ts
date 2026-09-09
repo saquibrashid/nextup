@@ -98,7 +98,13 @@ const getReview = (batchId: string): Promise<Response> =>
 let batchSeq = 0;
 
 async function makeBatch(
-  over: { mode?: string; service?: string; status?: string; lowYield?: boolean } = {},
+  over: {
+    mode?: string;
+    service?: string;
+    status?: string;
+    lowYield?: boolean;
+    extractionStats?: string;
+  } = {},
 ): Promise<string> {
   const id = `batch-review-${++batchSeq}`;
   await testPrisma().uploadBatch.create({
@@ -111,6 +117,7 @@ async function makeBatch(
       lowYield: over.lowYield ?? false,
       degradedExtraction: false,
       crossCheck: 'ok',
+      ...(over.extractionStats === undefined ? {} : { extractionStats: over.extractionStats }),
     },
   });
   return id;
@@ -340,6 +347,48 @@ describe('T-UX-063 unmatched candidates keep their own section and their raw tex
     expect(body.sections.unmatched.count).toBe(1);
     expect(body.sections.additions.count).toBe(0);
     expect(body.sections.alreadyOnYourList.count).toBe(0);
+  });
+});
+
+// ⚠ **THE OUTAGE AND A BATCH OF UNIDENTIFIABLE TITLES ARE THE SAME PICTURE
+// WITHOUT THIS.** `T-CLS-013a` directly above produces exactly the response an
+// outage produces — everything in `unmatched` — which is why the flag has to
+// come from what stage 3 RECORDED rather than from what the candidates look
+// like. What only a real engine can prove here is the round trip through the
+// `ISJSON`-CHECKed `extractionStats` column: a unit stub will echo back
+// whatever shape the test hands it, constraint or no constraint.
+describe('T-AI-017 · §4.3 · a recorded TMDB outage reaches the review pass', () => {
+  it('T-AI-017s: the outage survives the ISJSON-checked column and raises the banner', async () => {
+    const batchId = await makeBatch({
+      mode: 'append-only',
+      extractionStats: JSON.stringify({
+        stage3: { matched: 0, unmatched: 2, tmdbUnavailable: true, tmdbQueries: 1 },
+      }),
+    });
+    await makeCandidate(batchId, { workIdentity: 'unmatched:9f2b1c4d5e6f7a80', rawText: 'Dune' });
+    await makeCandidate(batchId, { workIdentity: 'unmatched:1a2b3c4d5e6f7a81', rawText: 'Andor' });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody & {
+      tmdbUnavailable: boolean;
+      banner: string | null;
+    };
+    expect(body.tmdbUnavailable).toBe(true);
+    expect(body.banner).toContain('reach TMDB');
+    // The batch is still fully reviewable — an outage never costs the read.
+    expect(body.sections.unmatched.count).toBe(2);
+  });
+
+  it('T-AI-017t: the SAME response shape without the stats claims no outage', async () => {
+    const batchId = await makeBatch({ mode: 'append-only' });
+    await makeCandidate(batchId, { workIdentity: 'unmatched:9f2b1c4d5e6f7a80', rawText: 'Dune' });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody & {
+      tmdbUnavailable: boolean;
+      banner: string | null;
+    };
+    expect(body.tmdbUnavailable).toBe(false);
+    expect(body.banner).toBeNull();
+    expect(body.sections.unmatched.count).toBe(1);
   });
 });
 
