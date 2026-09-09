@@ -165,12 +165,19 @@ export function unmappedCriteria(prd: Set<string>, mapping: Set<string>): string
  * ⚠ Do NOT add to this list to make a build pass. A new unmapped AC means a
  * criterion was written with no definition of done. Write the mapping row.
  *
- * ⚠ **ONE ENTRY REMAINS, AND IT IS WAITING ON A BACKLOG, NOT ON A MAPPING
- * ROW.** US-040 AC-2 lands with the extraction path; until that test exists
- * there is nothing to name, and writing a plausible-looking row for it would
- * satisfy `T-META-001a` and fail `T-META-001e`. Softening `e` to get past that
- * is how this gate would become the thing it was built to catch. **TASK-126
- * cannot close while this list is non-empty.**
+ * ⚠ **THIS LIST IS NOW EMPTY, AND `T-META-001e` KEEPS IT THAT WAY.** The
+ * final entry, US-040 AC-2, was mapped at TASK-126 by `T-WAIT-012`
+ * (`tests/infra/discoveryPipelineParity.spec.ts`). It took a structural test
+ * rather than a behavioural one: AC-2 promises there is no parallel pipeline,
+ * and running one screenshot through both batch kinds proves only that two
+ * paths agree on one input — which two separately-maintained pipelines would
+ * also do. See that file's header.
+ *
+ * ~~"ONE ENTRY REMAINS, AND IT IS WAITING ON A BACKLOG, NOT ON A MAPPING ROW.
+ * US-040 AC-2 lands with the extraction path; until that test exists there is
+ * nothing to name, and writing a plausible-looking row for it would satisfy
+ * `T-META-001a` and fail `T-META-001e`."~~ *(Superseded at TASK-126 — the
+ * extraction path landed at TASK-190 and the test now exists.)*
  *
  * ~~"THE 28 THAT REMAIN … US-040…US-043 (the rental epic) have no task in
  * `docs/backlog.md` at all"~~ *(Superseded. Epic L was subsequently written
@@ -180,7 +187,7 @@ export function unmappedCriteria(prd: Set<string>, mapping: Set<string>): string
 const KNOWN_UNMAPPED: readonly string[] = [
   // US-040 — Capture a rental storefront's new-release page
   // ⚠ AC-1 and AC-6 were removed by TASK-183 — `T-WAIT-001` maps them.
-  'US-040 AC-2',
+  // ⚠ AC-2 was removed by TASK-126 — `T-WAIT-012` maps it.
   // US-042 — Be told when a waiting title starts streaming
   // ⚠ AC-1, AC-2, AC-4, AC-5 and AC-10 were removed by TASK-187 — `T-AVAIL-001`,
   // `T-AVAIL-002`, `T-AVAIL-004`, `T-AVAIL-005` and `T-AVAIL-010` map them.
