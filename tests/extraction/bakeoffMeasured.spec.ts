@@ -191,7 +191,9 @@ describe('T-AI-045 the bake-off is measured, and the pre-committed rule decides 
     // ⚠ THEN 0.2424 → 0.1935 AT TASK-203, the fragment collapse (§7.4a). Like
     // the badge vocabulary this is a pipeline rule, not an answer-key change,
     // so it applies to BOTH arms and the comparison stays like-for-like.
-    expect(inc.falseTitleRate).toBe(0.1935483870967742);
+    // ⚠ THEN 0.1935 → 0.1525 AT TASK-204, the off-list region (§3.2 step 3b).
+    // Again a pipeline rule, not an answer-key change, so both arms see it.
+    expect(inc.falseTitleRate).toBe(0.15254237288135594);
     // ⚠ The fabrication rate moved with it — 0.011494 → 0.011765 — and it went
     // UP while the pipeline got BETTER. Same single fabrication, divided by a
     // denominator two candidates smaller because the two fragments collapsed.

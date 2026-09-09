@@ -99,6 +99,128 @@ export const OCR_MERGE_CENTRE_RATIO = 0.4;
 export const OCR_MERGE_GAP = 0.03;
 
 /* ------------------------------------------------------------------ *
+ * Step 3b — the off-list region (`specs/ai.md` §3.2 step 3b, TASK-204)
+ * ------------------------------------------------------------------ */
+
+/**
+ * Headers that open a region of titles the SERVICE is promoting rather than
+ * titles the OWNER saved. Everything past one of these, on the reading axis,
+ * is not on the owner's list.
+ *
+ * ⚠ WHOLE-LINE, EXACT, AND DELIBERATELY TINY. Each entry is a line observed
+ * verbatim in the golden corpus. A substring or prefix test here would exclude
+ * an arbitrary tail of a real list — this rule reclassifies by POSITION, so a
+ * false positive on the header costs every title below it, not one.
+ */
+export const OFF_LIST_REGION_HEADERS: readonly string[] = ['recommended for you'];
+
+/*
+ * ⚠ `start` / `end`, NOT `min` / `max`. A bare `max` identifier is banned in
+ * every production extraction source because `Max` is a streaming service
+ * (§2.1b RULE B, `T-AI-009d`); the scanner exempts `.max` so `Math.max` is
+ * fine, but a field or local named `max` is not. Renaming is the fix — do not
+ * weaken the ban.
+ */
+interface Extent {
+  readonly start: number;
+  readonly end: number;
+}
+
+function extentOn(boxes: readonly NormalisedBox[], axis: 'x' | 'y'): Extent | null {
+  if (boxes.length === 0) return null;
+  let start = Number.POSITIVE_INFINITY;
+  let end = Number.NEGATIVE_INFINITY;
+  for (const box of boxes) {
+    const lo = axis === 'y' ? box.y : box.x;
+    const hi = lo + (axis === 'y' ? box.h : box.w);
+    if (lo < start) start = lo;
+    if (hi > end) end = hi;
+  }
+  return { start, end };
+}
+
+interface OffListCut {
+  readonly axis: 'x' | 'y';
+  /** `1` — excluded beyond `at`; `-1` — excluded before it. */
+  readonly direction: 1 | -1;
+  readonly at: number;
+}
+
+/**
+ * Where the off-list region starts, or `null` when it cannot be established.
+ *
+ * ⚠ THE AXIS IS DERIVED, NEVER ASSUMED TO BE `y`. `rotated-01` in the golden
+ * corpus is rotated 90°, so its reading axis is `x` DESCENDING; a hard-coded
+ * "below the header" rule would there mean "to the right of it" and silently
+ * exclude nearly the whole list. The axis is read off the header's position
+ * relative to the hull of what the PRIMARY reader found: whichever axis the
+ * header sits outside the hull on is the reading axis, and the side it sits on
+ * is the excluded side.
+ *
+ * ⚠ IT REFUSES FAR MORE OFTEN THAN IT FIRES, ON PURPOSE. It returns `null`
+ * when there is no header, no primary-reader hull, when the header is INSIDE
+ * the hull on both axes (saved tiles on both sides — no cut is safe), and when
+ * it is outside on both (ambiguous). The cost of a wrong cut is losing real
+ * titles the owner saved, which is the one failure this product exists to
+ * avoid; the cost of refusing is the status quo.
+ */
+export function offListCut(items: readonly ExtractedTextItem[]): OffListCut | null {
+  const header = items.find(
+    (item) =>
+      item.provider === 'ocr-only' &&
+      OFF_LIST_REGION_HEADERS.includes(normaliseTitleText(item.rawText)),
+  );
+  if (header === undefined) return null;
+
+  const hullBoxes = items.filter((i) => i.provider === 'llm').map((i) => i.boundingBox);
+  if (hullBoxes.length === 0) return null;
+
+  const cuts: OffListCut[] = [];
+  for (const axis of ['y', 'x'] as const) {
+    const hull = extentOn(hullBoxes, axis)!;
+    const head = extentOn([header.boundingBox], axis)!;
+    if (head.start >= hull.end) cuts.push({ axis, direction: 1, at: head.start });
+    else if (head.end <= hull.start) cuts.push({ axis, direction: -1, at: head.end });
+  }
+
+  return cuts.length === 1 ? cuts[0]! : null;
+}
+
+/**
+ * Step 3b — reclassify `ocr-only` orphans that lie in the off-list region.
+ *
+ * ⚠ RECLASSIFY, NEVER DROP (REQ-012). The verdict is `chrome-suspected`, which
+ * `specs/data-model.md` §3.9 renders behind a labelled expander the owner can
+ * open and reverse. A drop would be the silent omission this product exists to
+ * avoid, and it is also why the metric this rule moves is the false-title
+ * rate and not recall.
+ *
+ * ⚠ `ocr-only` ONLY, exactly like steps 3, 3a and 4. The primary reader is the
+ * one that knows a tile from a promo, and the hull this rule derives its axis
+ * from is built out of its output — reclassifying its items would let the rule
+ * eat its own frame of reference.
+ */
+function applyOffListRegion(
+  items: readonly ExtractedTextItem[],
+  cleaned: readonly CleanedCandidate[],
+): CleanedCandidate[] {
+  const cut = offListCut(items);
+  if (cut === null) return [...cleaned];
+
+  return cleaned.map((candidate) => {
+    if (candidate.item.provider !== 'ocr-only') return candidate;
+    if (candidate.cleanupVerdict !== 'title-candidate') return candidate;
+
+    const box = candidate.item.boundingBox;
+    const lo = cut.axis === 'y' ? box.y : box.x;
+    const hi = lo + (cut.axis === 'y' ? box.h : box.w);
+    const beyond = cut.direction === 1 ? lo >= cut.at : hi <= cut.at;
+
+    return beyond ? { ...candidate, cleanupVerdict: 'chrome-suspected' as const } : candidate;
+  });
+}
+
+/* ------------------------------------------------------------------ *
  * Output
  * ------------------------------------------------------------------ */
 
@@ -376,7 +498,8 @@ export function cleanup(
 ): CleanedCandidate[] {
   const now = options.now ?? new Date();
 
-  return groupReadingOrder(items).map((item) => {
+  const grouped = groupReadingOrder(items);
+  const cleaned = grouped.map((item) => {
     // §3.1a. `inferredTitle` is the identified work, which is what the matcher
     // needs and what makes a truncated tile caption matchable at all — except
     // where it is an invention rather than a de-truncation (R2).
@@ -392,6 +515,12 @@ export function cleanup(
       cleanupVerdict: classify(item, matchText, normalisedText),
     };
   });
+
+  // Step 3b runs LAST because it is the only rule that needs every other
+  // verdict already decided: it reclassifies `title-candidate`s and must not
+  // overwrite `unreadable-tile` or `low-confidence`, which carry information
+  // step 3b does not have.
+  return applyOffListRegion(grouped, cleaned);
 }
 
 /** Every verdict this stage can produce. Used by `T-AI-004` for coverage. */
