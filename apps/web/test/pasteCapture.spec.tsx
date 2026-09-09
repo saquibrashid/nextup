@@ -96,8 +96,21 @@ function transfer(files: readonly File[], items: readonly DataTransferItem[] = [
   return { files, items } as unknown as DataTransfer;
 }
 
+/**
+ * ⚠ **RETURNS A FRESH `File` EVERY CALL, LIKE A REAL BROWSER.** This helper
+ * used to return the *same* instance the caller passed in, which made the
+ * identity-based deduplication in `imagesFromClipboard` appear to work while
+ * it never worked in production: Chrome and Edge populate BOTH
+ * `clipboardData.files` and `clipboardData.items` for a screenshot paste, and
+ * `getAsFile()` constructs a new object each time — so every pasted image was
+ * delivered twice. Do not "simplify" this back to `() => file`.
+ */
 function fileItem(file: File): DataTransferItem {
-  return { kind: 'file', type: file.type, getAsFile: () => file } as unknown as DataTransferItem;
+  return {
+    kind: 'file',
+    type: file.type,
+    getAsFile: () => new File([file], file.name, { type: file.type }),
+  } as unknown as DataTransferItem;
 }
 
 afterEach(() => {
@@ -183,7 +196,33 @@ describe('T-PASTE-001 - the desktop paste listener', () => {
     // silent per-browser regression.
     document.dispatchEvent(pasteEvent(transfer([shared], [fileItem(shared), fileItem(itemsOnly)])));
 
-    expect(onImagesPasted.mock.calls[0]?.[0]).toEqual([shared, itemsOnly]);
+    // ⚠ ASSERTED BY NAME, not by object equality. Two distinct `File`s carry
+    // no enumerable own properties, so `toEqual` compares them as equal and
+    // a duplicate would slip straight through.
+    expect((onImagesPasted.mock.calls[0]?.[0] as readonly File[]).map((f) => f.name)).toEqual([
+      'shot.png',
+      'items-only.png',
+    ]);
+  });
+
+  it('T-PASTE-001m delivers ONE file when both sides carry the same single image', () => {
+    /*
+     * ⚠ THE REGRESSION THE OWNER HIT. Chrome and Edge populate both
+     * `clipboardData.files` and `clipboardData.items` for a screenshot paste.
+     * The old identity dedupe (`found.includes(file)`) could never match
+     * across the two sides, because `getAsFile()` builds a new `File` on every
+     * call — so one Ctrl+V attached the same screenshot twice, and repeated
+     * "nothing happened" pastes stacked up copies of a single image.
+     */
+    const onImagesPasted = vi.fn();
+    render(<PasteCapture onImagesPasted={onImagesPasted} />);
+    const shot = imageFile('screenshot.png');
+
+    document.dispatchEvent(pasteEvent(transfer([shot], [fileItem(shot)])));
+
+    expect((onImagesPasted.mock.calls[0]?.[0] as readonly File[]).map((f) => f.name)).toEqual([
+      'screenshot.png',
+    ]);
   });
 
   it('T-PASTE-001g ignores a non-image file item', () => {
