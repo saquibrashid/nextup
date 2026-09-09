@@ -13,7 +13,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { SetupServerApi } from 'msw/node';
+import type { SetupServer } from 'msw/node';
 
 import { ExtractorError, isExtractorError } from '@nextup/domain';
 
@@ -62,7 +62,7 @@ import {
 const PNG_BYTES = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x01, 0x02]);
 const CORRELATION_ID = '00000000-0000-4000-8000-000000000001';
 
-let server: SetupServerApi | undefined;
+let server: SetupServer | undefined;
 
 interface Harness {
   extractor: LlmVisionExtractor;
@@ -81,9 +81,9 @@ function makeHarness(options: ReplayOptions = {}, timeoutMs = 50): Harness {
   const sleeps: number[] = [];
   const logs: LlmLogEvent[] = [];
 
-  server = aoaiMswServer({ ...options, calls });
-  server.listen({ onUnhandledRequest: 'error' });
-
+  const started = aoaiMswServer({ ...options, calls });
+  server = started;
+  started.listen({ onUnhandledRequest: 'error' });
   const extractor = new LlmVisionExtractor({
     endpoint: AOAI_ENDPOINT,
     deployment: AOAI_DEPLOYMENT,
@@ -338,7 +338,9 @@ describe('T-AI-033 responses we cannot use are never empty ones', () => {
    * silently delete the owner's list on a full update. They must all raise.
    */
   const rejects = async (fallback: ReplayOptions['fallback'], kind: string): Promise<void> => {
-    const h = makeHarness({ fallback });
+    // ⚠ `exactOptionalPropertyTypes` — `{ fallback: undefined }` is not the
+    // same type as `{}`, and the harness's default only applies to the latter.
+    const h = makeHarness(fallback === undefined ? {} : { fallback });
     const error = await h.extractor.readTiles(PNG_BYTES, 'image/png').catch((e: unknown) => e);
     expect(isExtractorError(error)).toBe(true);
     expect((error as ExtractorError).kind).toBe(kind);

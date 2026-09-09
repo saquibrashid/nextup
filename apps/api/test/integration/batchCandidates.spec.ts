@@ -27,7 +27,7 @@ import { CLIENT_PRINCIPAL_HEADER } from '../../src/auth/principal.js';
 import { resetTmdbRateLimiterForTests } from '../../src/clients/tmdbClient.js';
 import { resetAllowListWarning } from '../../src/middleware/allowList.js';
 import { closeTestPrisma, resetDatabase, testPrisma } from './harness.js';
-import { confirmPendingCandidates } from '../../src/repository/ownerData.js';
+import { asOwnerId, confirmPendingCandidates } from '../../src/repository/ownerData.js';
 import {
   TMDB_UNAVAILABLE_TOKEN,
   tmdbMswServer,
@@ -678,7 +678,7 @@ describe('T-REV-011 · confirm-all (§6.19)', () => {
       disposition: 'discarded',
     });
 
-    const { count } = await confirmPendingCandidates(ownerId, [pendingId, discardedId]);
+    const { count } = await confirmPendingCandidates(asOwnerId(ownerId), [pendingId, discardedId]);
 
     expect(count).toBe(1);
     const discarded = await testPrisma().extractionCandidate.findFirst({

@@ -174,7 +174,7 @@ describe('T-SEC-019 the dev principal shim never reaches production', () => {
       process.env['NODE_ENV'] = 'production';
       process.env['NEXTUP_DEV_SUBJECT'] = 'oid-dev';
       const shim = await import('../../dev/devPrincipal.js');
-      expect(shim.readDevPrincipal({})).toBeNull();
+      expect(shim.readDevPrincipal()).toBeNull();
     } finally {
       if (previous === undefined) delete process.env['NODE_ENV'];
       else process.env['NODE_ENV'] = previous;
@@ -188,7 +188,7 @@ describe('T-SEC-019 the dev principal shim never reaches production', () => {
     try {
       delete process.env['NEXTUP_DEV_SUBJECT'];
       const shim = await import('../../dev/devPrincipal.js');
-      expect(shim.readDevPrincipal({})).toBeNull();
+      expect(shim.readDevPrincipal()).toBeNull();
     } finally {
       if (previousSubject !== undefined) process.env['NEXTUP_DEV_SUBJECT'] = previousSubject;
     }

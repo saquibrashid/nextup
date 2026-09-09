@@ -29,15 +29,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const createIfNotExists = vi.fn(() => Promise.resolve());
-const uploadData = vi.fn(() => Promise.resolve());
+const uploadData = vi.fn<(body?: unknown, options?: unknown) => Promise<void>>(() =>
+  Promise.resolve(),
+);
 const exists = vi.fn(() => Promise.resolve(true));
 const downloadToBuffer = vi.fn(() => Promise.resolve(Buffer.from([1, 2, 3])));
 const deleteIfExists = vi.fn(() => Promise.resolve());
 const getBlockBlobClient = vi.fn(() => ({ uploadData, exists, downloadToBuffer, deleteIfExists }));
-const getContainerClient = vi.fn(() => ({ createIfNotExists, getBlockBlobClient }));
+const getContainerClient = vi.fn<(name?: string) => unknown>(() => ({
+  createIfNotExists,
+  getBlockBlobClient,
+}));
 const fromConnectionString = vi.fn(() => ({ getContainerClient }));
 /** Records the (endpoint, credential) pair the identity path constructs with. */
-const blobServiceCtor = vi.fn();
+const blobServiceCtor = vi.fn<(...args: unknown[]) => void>(() => undefined);
 const credentialCtor = vi.fn();
 
 vi.mock('@azure/storage-blob', () => ({

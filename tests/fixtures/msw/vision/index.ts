@@ -31,21 +31,22 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { http, HttpResponse, passthrough } from 'msw';
-import { setupServer, type SetupServerApi } from 'msw/node';
+import { http, HttpResponse, passthrough, type JsonBodyType } from 'msw';
+import { setupServer, type SetupServer } from 'msw/node';
 
 import { registerMockedHost, unregisterMockedHost } from '../../../../tools/egress-guard.mjs';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 
-const read = (name: string): unknown => JSON.parse(readFileSync(`${HERE}${name}`, 'utf8'));
+const read = (name: string): JsonBodyType =>
+  JSON.parse(readFileSync(`${HERE}${name}`, 'utf8')) as JsonBodyType;
 
 /** Where the recordings were captured from. Nothing ever reaches it. */
 export const VISION_ENDPOINT = 'https://nextup-vision.cognitiveservices.azure.com';
 
 export interface RecordedResponse {
   status: number;
-  body: unknown;
+  body: JsonBodyType;
 }
 
 /**
@@ -123,7 +124,7 @@ export interface ReplayOptions {
  * registration is scoped to a listening server precisely so it cannot outlive
  * the thing that guarantees nothing escapes.
  */
-export function visionMswServer(options: ReplayOptions = {}): SetupServerApi {
+export function visionMswServer(options: ReplayOptions = {}): SetupServer {
   const script = [...(options.script ?? [])];
 
   const handler = http.all(`${VISION_ENDPOINT}/computervision/*`, ({ request }) => {

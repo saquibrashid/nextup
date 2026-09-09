@@ -27,12 +27,13 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { http, HttpResponse, passthrough } from 'msw';
-import { setupServer, type SetupServerApi } from 'msw/node';
+import { http, HttpResponse, passthrough, type JsonBodyType } from 'msw';
+import { setupServer, type SetupServer } from 'msw/node';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 
-const read = (name: string): unknown => JSON.parse(readFileSync(`${HERE}${name}`, 'utf8'));
+const read = (name: string): JsonBodyType =>
+  JSON.parse(readFileSync(`${HERE}${name}`, 'utf8')) as JsonBodyType;
 
 /**
  * The token that drives US-007 AC-5 (`specs/testing.md` §3.2): a query
@@ -43,7 +44,7 @@ export const TMDB_UNAVAILABLE_TOKEN = '__tmdb_unavailable__';
 
 export interface RecordedResponse {
   status: number;
-  body: unknown;
+  body: JsonBodyType;
 }
 
 /**
@@ -124,7 +125,7 @@ export function recordedResponseFor(url: URL): RecordedResponse {
  * that none does. Loopback is passed through untouched so a test that also
  * drives a real Express server on an ephemeral port still works.
  */
-export function tmdbMswServer(options: ReplayOptions = {}): SetupServerApi {
+export function tmdbMswServer(options: ReplayOptions = {}): SetupServer {
   const script = [...(options.script ?? [])];
 
   const handler = http.all(`${TMDB_ORIGIN}/3/*`, ({ request }) => {

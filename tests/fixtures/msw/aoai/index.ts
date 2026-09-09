@@ -37,12 +37,13 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { http, HttpResponse, passthrough } from 'msw';
-import { setupServer, type SetupServerApi } from 'msw/node';
+import { http, HttpResponse, passthrough, type JsonBodyType } from 'msw';
+import { setupServer, type SetupServer } from 'msw/node';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 
-const read = (name: string): unknown => JSON.parse(readFileSync(`${HERE}${name}`, 'utf8'));
+const read = (name: string): JsonBodyType =>
+  JSON.parse(readFileSync(`${HERE}${name}`, 'utf8')) as JsonBodyType;
 
 /** Where the recordings were captured from. Nothing ever reaches it. */
 export const AOAI_ENDPOINT = 'https://nextup-aoai.openai.azure.com';
@@ -50,7 +51,7 @@ export const AOAI_DEPLOYMENT = 'nextup-extract';
 
 export interface RecordedResponse {
   status: number;
-  body: unknown;
+  body: JsonBodyType;
 }
 
 /**
@@ -164,7 +165,7 @@ export interface ReplayOptions {
  * request that WOULD have gone to the internet — which for this provider also
  * means a request carrying the owner's screenshot, and a bill.
  */
-export function aoaiMswServer(options: ReplayOptions = {}): SetupServerApi {
+export function aoaiMswServer(options: ReplayOptions = {}): SetupServer {
   const script = [...(options.script ?? [])];
 
   const handler = http.all(`${AOAI_ENDPOINT}/openai/*`, async ({ request }) => {
