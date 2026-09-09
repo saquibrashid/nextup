@@ -1,0 +1,50 @@
+[
+  {
+    "visibleText": "The Lord of the Rings: The Fell…",
+    "identifiedTitle": "The Lord of the Rings: The Fellowship of the Ring",
+    "basis": "text",
+    "confidence": 0.95,
+    "box": {
+      "x": 0.065,
+      "y": 0.137,
+      "w": 0.415,
+      "h": 0.355
+    }
+  },
+  {
+    "visibleText": "Everything Everywhere All at O…",
+    "identifiedTitle": "Everything Everywhere All at Once",
+    "basis": "text",
+    "confidence": 0.98,
+    "box": {
+      "x": 0.525,
+      "y": 0.137,
+      "w": 0.415,
+      "h": 0.355
+    }
+  },
+  {
+    "visibleText": "Dr. Strangelove or: How I Lear…",
+    "identifiedTitle": "Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb",
+    "basis": "text",
+    "confidence": 0.98,
+    "box": {
+      "x": 0.065,
+      "y": 0.527,
+      "w": 0.415,
+      "h": 0.355
+    }
+  },
+  {
+    "visibleText": "The Hitchhiker's Guide to the …",
+    "identifiedTitle": "The Hitchhiker's Guide to the Galaxy",
+    "basis": "text",
+    "confidence": 0.98,
+    "box": {
+      "x": 0.525,
+      "y": 0.527,
+      "w": 0.415,
+      "h": 0.355
+    }
+  }
+]

@@ -1,0 +1,74 @@
+[
+  {
+    "visibleText": "LANTERNS Lanterns",
+    "identifiedTitle": "Lanterns",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.03,
+      "y": 0.16,
+      "w": 0.44,
+      "h": 0.13
+    }
+  },
+  {
+    "visibleText": "NORMAL Normal 2026",
+    "identifiedTitle": "Normal",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.03,
+      "y": 0.29,
+      "w": 0.44,
+      "h": 0.13
+    }
+  },
+  {
+    "visibleText": "The DRAMA The Drama 2026",
+    "identifiedTitle": "The Drama",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.03,
+      "y": 0.42,
+      "w": 0.44,
+      "h": 0.13
+    }
+  },
+  {
+    "visibleText": "ramy youssef in love Ramy Youssef: In Love 2026",
+    "identifiedTitle": "Ramy Youssef: In Love",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.03,
+      "y": 0.55,
+      "w": 0.44,
+      "h": 0.13
+    }
+  },
+  {
+    "visibleText": "GREENLAND 2 MIGRATION Greenland 2: Migration 2026",
+    "identifiedTitle": "Greenland 2: Migration",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.03,
+      "y": 0.68,
+      "w": 0.44,
+      "h": 0.13
+    }
+  },
+  {
+    "visibleText": "TRUE DETECTIVE NIGHT COUNTRY True Detective",
+    "identifiedTitle": "True Detective",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.03,
+      "y": 0.81,
+      "w": 0.44,
+      "h": 0.13
+    }
+  }
+]

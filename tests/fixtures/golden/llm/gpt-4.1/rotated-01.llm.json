@@ -1,0 +1,74 @@
+[
+  {
+    "visibleText": "True Detective",
+    "identifiedTitle": "True Detective: Night Country",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.215,
+      "y": 0.099,
+      "w": 0.151,
+      "h": 0.346
+    }
+  },
+  {
+    "visibleText": "Greenland 2: Migration",
+    "identifiedTitle": "Greenland 2: Migration",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.366,
+      "y": 0.099,
+      "w": 0.151,
+      "h": 0.346
+    }
+  },
+  {
+    "visibleText": "Ramy Youssef: In Love",
+    "identifiedTitle": "Ramy Youssef: In Love",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.517,
+      "y": 0.099,
+      "w": 0.151,
+      "h": 0.346
+    }
+  },
+  {
+    "visibleText": "The Drama",
+    "identifiedTitle": "The Drama",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.668,
+      "y": 0.099,
+      "w": 0.151,
+      "h": 0.346
+    }
+  },
+  {
+    "visibleText": "Normal",
+    "identifiedTitle": "Normal",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.819,
+      "y": 0.099,
+      "w": 0.151,
+      "h": 0.346
+    }
+  },
+  {
+    "visibleText": "Lanterns",
+    "identifiedTitle": "Lanterns",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.97,
+      "y": 0.099,
+      "w": 0.151,
+      "h": 0.346
+    }
+  }
+]

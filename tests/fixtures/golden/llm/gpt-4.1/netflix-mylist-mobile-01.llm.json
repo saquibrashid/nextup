@@ -1,0 +1,86 @@
+[
+  {
+    "visibleText": "LADIES FIRST\nLadies First",
+    "identifiedTitle": "Ladies First",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.03,
+      "y": 0.236,
+      "w": 0.312,
+      "h": 0.104
+    }
+  },
+  {
+    "visibleText": "RAW\nRaw",
+    "identifiedTitle": "WWE Raw",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.03,
+      "y": 0.353,
+      "w": 0.312,
+      "h": 0.104
+    }
+  },
+  {
+    "visibleText": "WICKED FOR GOOD\nWicked: For Good",
+    "identifiedTitle": "Wicked: For Good",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.03,
+      "y": 0.47,
+      "w": 0.312,
+      "h": 0.104
+    }
+  },
+  {
+    "visibleText": "HIS & HERS\nHIS & HERS",
+    "identifiedTitle": "His & Hers",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.03,
+      "y": 0.587,
+      "w": 0.312,
+      "h": 0.104
+    }
+  },
+  {
+    "visibleText": "MAN ON FIRE\nMan on Fire",
+    "identifiedTitle": "Man on Fire",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.03,
+      "y": 0.704,
+      "w": 0.312,
+      "h": 0.104
+    }
+  },
+  {
+    "visibleText": "STRANGER THINGS VHS SPECIAL EDITION\nStranger Things: VHS Special Edition",
+    "identifiedTitle": "Stranger Things: VHS Special Edition",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.03,
+      "y": 0.821,
+      "w": 0.312,
+      "h": 0.104
+    }
+  },
+  {
+    "visibleText": "In the Hand of Dante\nIn the Hand of Dante",
+    "identifiedTitle": "In the Hand of Dante",
+    "basis": "both",
+    "confidence": 1,
+    "box": {
+      "x": 0.03,
+      "y": 0.938,
+      "w": 0.312,
+      "h": 0.104
+    }
+  }
+]

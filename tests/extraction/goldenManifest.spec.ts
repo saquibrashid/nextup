@@ -38,6 +38,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { copyFileSync, mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, extname, join } from 'node:path';
@@ -46,6 +47,7 @@ import { fileURLToPath } from 'node:url';
 import { BAKEOFF_CORPUS_IMAGES } from '@nextup/domain';
 import { describe, expect, it } from 'vitest';
 
+import { goldenRecordingStore, sha256OfBytes } from '../../apps/api/src/extraction/recordings.js';
 import { hasGpsCoordinates } from '../fixtures/golden/ingest/exifProbe.js';
 
 const GOLDEN_DIR = fileURLToPath(new URL('../fixtures/golden/', import.meta.url));
@@ -64,6 +66,8 @@ interface ManifestEntry {
   expectedArtworkOnly: boolean;
   captureNotes: string;
   provenance: string;
+  /** Added by TASK-079's recorder; asserted by `T-AI-047a`. */
+  sha256?: string;
 }
 
 interface Manifest {
@@ -219,5 +223,69 @@ describe('T-AI-046 — golden fixture manifest integrity', () => {
     // Length is the property the tool promises; a shorter file would mean it
     // rewrote the container rather than overwriting values in place.
     expect(after.length).toBe(before.length);
+  });
+});
+
+/**
+ * `T-AI-047` — the committed recordings are PAIRED with the images they were
+ * taken from, and the pairing is the thing the offline suite depends on.
+ *
+ * `goldenRecordingStore` keys on the sha256 of the bytes `extract()` is handed.
+ * If that key is absent or wrong, the store returns `undefined`, the stub
+ * reports the ZERO-YIELD path, and every metric in `specs/ai.md` §9.2 is
+ * computed over an empty reader response — recall 0, false-title rate 0,
+ * fabrication rate 0. Two of those three look like a *pass*.
+ *
+ * That is not hypothetical: `GoldenManifest` was declared as
+ * `Record<sha256, name>` while the committed manifest is §9.1's
+ * `{ corpusSize, images: [...] }`, so the lookup missed for all eleven images
+ * and nothing said so. `b` is the case that would have caught it — it asserts
+ * a recording comes back, not merely that a file exists somewhere.
+ */
+describe('T-AI-047 · recordings are paired with their images', () => {
+  it('T-AI-047a: every manifest entry carries the sha256 of its own image bytes', () => {
+    for (const entry of manifest.images) {
+      const bytes = readFileSync(join(IMAGES_DIR, entry.file));
+      const actual = createHash('sha256').update(bytes).digest('hex');
+      expect(
+        entry.sha256,
+        `${entry.id}: manifest sha256 must be the hash of ${entry.file}. ` +
+          'Re-run `npm run golden:record --  --dry-run` to repopulate it.',
+      ).toBe(actual);
+    }
+  });
+
+  it('T-AI-047b: the store resolves every image to its recorded pair', () => {
+    const store = goldenRecordingStore(GOLDEN_DIR);
+    for (const entry of manifest.images) {
+      const bytes = new Uint8Array(readFileSync(join(IMAGES_DIR, entry.file)));
+      const recording = store.get(sha256OfBytes(bytes));
+      expect(recording, `${entry.id}: no recording resolved from the image bytes`).toBeDefined();
+      // Every image in the corpus carries chrome text, so the OCR leg is
+      // non-empty for all eleven — including the blank one.
+      expect(recording?.ocr.length, `${entry.id}: OCR recording is empty`).toBeGreaterThan(0);
+
+      // ⚠ THE LLM LEG MUST BE ASSERTED SEPARATELY, AND THIS IS NOT BELT AND
+      // BRACES. `ocr/` is deliberately not model-scoped, so an OCR-only
+      // assertion passes unchanged when the model directory is wrong — proven:
+      // mutating `DEFAULT_RECORDING_MODEL_ID` to a non-existent deployment left
+      // all 31 cases green, because `readJson` degrades a missing recording to
+      // `[]` on purpose (a forgotten fixture must surface as the low-yield
+      // banner, not as a crash). That degradation is right for production and
+      // fatal for a metric suite, so the pairing is proven here instead.
+      if (entry.expectedTitleCount > 0) {
+        expect(
+          recording?.llm.length,
+          `${entry.id}: no primary-reader tiles — is the llm/<modelId>/ directory right?`,
+        ).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('T-AI-047c: an unrecorded image resolves to nothing rather than to a neighbour', () => {
+    // The negative control for `b`. A store that returned the first recording
+    // it found, or that ignored the key, would satisfy `b` perfectly.
+    const store = goldenRecordingStore(GOLDEN_DIR);
+    expect(store.get('0'.repeat(64))).toBeUndefined();
   });
 });

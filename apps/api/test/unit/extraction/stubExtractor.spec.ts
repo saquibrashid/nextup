@@ -36,6 +36,7 @@ import {
   readExtractorName,
 } from '../../../src/extraction/factory.js';
 import {
+  DEFAULT_RECORDING_MODEL_ID,
   goldenRecordingStore,
   inMemoryRecordingStore,
   sha256OfBytes,
@@ -304,6 +305,14 @@ describe('T-STUB-001j the golden recording store degrades instead of throwing', 
     writeFileSync(target, contents, 'utf8');
   }
 
+  // `specs/ai.md` §9.1: the manifest is an OBJECT with an `images` ARRAY, not
+  // a sha256→name map. The store read the map shape until 2026-09-09, so every
+  // lookup missed and every image silently took the zero-yield path.
+  // ~~Superseded: `JSON.stringify({ [sha]: 'dune' })`.~~
+  function manifestFor(id: string): string {
+    return JSON.stringify({ corpusSize: 1, images: [{ id, sha256: sha }] });
+  }
+
   it('T-STUB-001j · an absent directory or manifest is zero-yield, not a crash', () => {
     expect(goldenRecordingStore(join(goldenDir, 'does-not-exist')).get(sha)).toBeUndefined();
 
@@ -320,13 +329,13 @@ describe('T-STUB-001j the golden recording store degrades instead of throwing', 
     // Not `undefined`: the manifest DID pair this image, so the pairing is
     // intact and the recording is simply empty. Collapsing the two would hide
     // a half-committed fixture.
-    write('manifest.json', JSON.stringify({ [sha]: 'dune' }));
+    write('manifest.json', manifestFor('dune'));
     expect(goldenRecordingStore(goldenDir).get(sha)).toEqual({ llm: [], ocr: [] });
   });
 
   it('T-STUB-001m · a committed recording is read, and read once', () => {
-    write('manifest.json', JSON.stringify({ [sha]: 'dune' }));
-    write('llm/dune.llm.json', JSON.stringify(TILES));
+    write('manifest.json', manifestFor('dune'));
+    write(`llm/${DEFAULT_RECORDING_MODEL_ID}/dune.llm.json`, JSON.stringify(TILES));
     write('ocr/dune.ocr.json', JSON.stringify(LINES));
 
     const store = goldenRecordingStore(goldenDir);
