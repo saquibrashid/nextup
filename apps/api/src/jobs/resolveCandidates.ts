@@ -41,6 +41,7 @@
  */
 
 import {
+  collapseFragments,
   collapseOverlap,
   matchCandidate,
   unmatchedOutcome,
@@ -168,6 +169,24 @@ export async function resolveCandidates(
   // differently and then fail to collapse in pass B.
   const passA = collapseOverlap(initial, { pass: 'pre-match', imageOrder });
 
+  /*
+   * Pass A' — the fragment collapse (`TASK-199` finding (a), `specs/ai.md`
+   * §7.4a). Pass A reunites only on EXACT text, so a caption OCR split in two
+   * never rejoins the whole title sitting beside it and reaches review as a
+   * false extra.
+   *
+   * ⚠ AFTER pass A, never before. A fragment must not be parented onto a
+   * candidate that pass A is itself about to collapse, or
+   * `collapsedIntoCandidateId` would point at a loser.
+   *
+   * ⚠ BEFORE matching, like pass A, so a fragment never costs a TMDB call and
+   * never resolves to an identity of its own.
+   */
+  const passAFragments = collapseFragments(passA.candidates, {
+    pass: 'pre-match',
+    imageOrder,
+  });
+
   const cache = new Map<string, TmdbSearchResult[]>();
   let tmdbUnavailable = false;
   let tmdbQueries = 0;
@@ -175,7 +194,7 @@ export async function resolveCandidates(
   let uncertain = 0;
 
   const outcomes = new Map<string, MatchCandidate[]>();
-  const matched = passA.candidates.map((candidate) => candidate);
+  const matched = passAFragments.candidates.map((candidate) => candidate);
 
   for (let index = 0; index < matched.length; index += 1) {
     const candidate = matched[index];

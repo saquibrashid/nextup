@@ -121,6 +121,193 @@ function maxOcrConfidence(a: number | null, b: number | null): number | null {
 }
 
 /**
+ * How far apart, vertically, two candidates may sit and still be two readings
+ * of ONE on-screen caption. A fraction of image height.
+ *
+ * ⚠ THIS CONSTANT IS THE WHOLE SAFETY PROPERTY OF THE FRAGMENT COLLAPSE, AND
+ * IT IS MEASURED, NOT GUESSED. Text containment alone points BOTH WAYS in the
+ * real corpus and cannot tell the two directions apart:
+ *
+ *   "wicked"         ⊂ "wicked for good"                 fragment is the false one
+ *   "special edition"⊂ "stranger things vhs special edition"        ditto
+ *   "true detective" ⊂ "true detective night country"    CONTAINER is the false one
+ *
+ * The last pair is a token PREFIX exactly like the first, so shape, length and
+ * `ocrSupport` all fail to separate them - `true detective` is `exact`/`text`
+ * and so is `wicked`. What separates them is that a fragment is a
+ * mis-segmentation of the SAME caption and therefore sits on top of it, while
+ * two different tiles are far apart. Measured gaps in the golden corpus:
+ *
+ *   accepted (real fragments)      0.000, 0.000, 0.000, 0.0047
+ *   rejected (different tiles)     0.063, 0.083, 0.096, 0.103, 0.116
+ *
+ * 0.02 sits four times above the largest accepted gap and three times below
+ * the smallest rejected one. ⚠ Do NOT raise it to "catch more fragments": the
+ * next thing it catches is `true detective` collapsing into a title the answer
+ * key marks false, which trades a false title for a RECALL loss and is
+ * strictly worse than doing nothing.
+ */
+export const FRAGMENT_MAX_VERTICAL_GAP = 0.02;
+
+interface Span {
+  readonly top: number;
+  readonly bottom: number;
+}
+
+function spansOf(candidate: ExtractionCandidate): Span[] {
+  return candidate.boundingBoxes.map((box) => ({ top: box.y, bottom: box.y + box.h }));
+}
+
+/**
+ * The smallest vertical gap between any box of `a` and any box of `b`, or
+ * `Infinity` when either has no geometry at all. Overlapping spans give 0.
+ *
+ * ⚠ Missing geometry yields `Infinity`, so it never collapses. A candidate
+ * with no box carries no evidence that it is the same caption as anything, and
+ * defaulting it to "close enough" would collapse on text alone - which is the
+ * rule this whole function exists to refuse.
+ */
+function verticalGap(a: ExtractionCandidate, b: ExtractionCandidate): number {
+  const as = spansOf(a);
+  const bs = spansOf(b);
+  if (as.length === 0 || bs.length === 0) return Number.POSITIVE_INFINITY;
+
+  let best = Number.POSITIVE_INFINITY;
+  for (const x of as) {
+    for (const y of bs) {
+      const gap = x.top > y.bottom ? x.top - y.bottom : y.top > x.bottom ? y.top - x.bottom : 0;
+      if (gap < best) best = gap;
+    }
+  }
+  return best;
+}
+
+/**
+ * Whether `host` contains `fragment` at TOKEN boundaries.
+ *
+ * ⚠ Token-anchored, never a bare substring: `raw` is a substring of `brawl`,
+ * and a substring test would collapse WWE `Raw` into an unrelated title and
+ * re-open TASK-198's recall loss. The padding spaces are what make ` raw `
+ * fail against ` brawl `.
+ */
+export function containsAtTokenBoundary(host: string, fragment: string): boolean {
+  if (host === fragment || fragment.length === 0 || host.length <= fragment.length) return false;
+  return ` ${host} `.includes(` ${fragment} `);
+}
+
+function sharesAnImage(a: ExtractionCandidate, b: ExtractionCandidate): boolean {
+  return a.sourceImageIds.some((id) => b.sourceImageIds.includes(id));
+}
+
+/**
+ * Collapse OCR fragments into the whole title another candidate already holds
+ * on the same image (`TASK-199` finding (a), `specs/ai.md` §7.4a).
+ *
+ * §7.4's pre-match pass reunites on EXACT text, so a caption that OCR split -
+ * `wicked` beside `wicked for good`, `first` beside `ladies first` - never
+ * rejoins its host and is counted as a false title. This pass is the missing
+ * half, and it runs AFTER the exact pass so a fragment is never parented onto
+ * a candidate that is itself about to be collapsed.
+ *
+ * ⚠ COLLAPSE, NEVER DROP. The loser is retained with `collapsedIntoCandidateId`
+ * exactly as §7.4 does; dropping it is the silent omission REQ-012 forbids.
+ *
+ * ⚠ THREE GUARDS, ALL LOAD-BEARING, NONE OPTIONAL:
+ *   1. token boundaries  - see `containsAtTokenBoundary`
+ *   2. same image        - two tiles on two screenshots are two works
+ *   3. vertical proximity - see `FRAGMENT_MAX_VERTICAL_GAP`, the only guard
+ *      that separates a real fragment from a shorter DIFFERENT title
+ *
+ * ⚠ ONLY `title-candidate` PARTICIPATES, on both sides. `hbo` ⊂ `hbo original`
+ * are both chrome; letting verdicts mix would silently reclassify a chrome
+ * string as part of a title, or a title as part of chrome.
+ */
+export function collapseFragments(
+  candidates: readonly ExtractionCandidate[],
+  options: CollapseOptions,
+): CollapseResult {
+  const imageIndexById = new Map<string, number>();
+  options.imageOrder.forEach((imageId, index) => {
+    if (!imageIndexById.has(imageId)) imageIndexById.set(imageId, index);
+  });
+
+  const eligible = candidates.filter(
+    (c) =>
+      c.collapsedIntoCandidateId === null &&
+      c.cleanupVerdict === 'title-candidate' &&
+      c.normalisedText.length > 0,
+  );
+
+  const hostsFor = new Map<string, ExtractionCandidate[]>();
+  for (const fragment of eligible) {
+    const hosts = eligible.filter(
+      (host) =>
+        containsAtTokenBoundary(host.normalisedText, fragment.normalisedText) &&
+        sharesAnImage(host, fragment) &&
+        verticalGap(host, fragment) <= FRAGMENT_MAX_VERTICAL_GAP,
+    );
+    if (hosts.length > 0) hostsFor.set(fragment.id, hosts);
+  }
+
+  const absorbedBySurvivorId = new Map<string, ExtractionCandidate[]>();
+  const survivorIdByLoserId = new Map<string, string>();
+
+  for (const fragment of eligible) {
+    const hosts = hostsFor.get(fragment.id);
+    if (hosts === undefined) continue;
+    /*
+     * ⚠ ONLY A MAXIMAL HOST MAY ADOPT. `stranger things vhs` is a fragment of
+     * `stranger things vhs special edition`, and could equally have been a
+     * host for something shorter. Parenting onto a candidate that is itself
+     * collapsing would leave `collapsedIntoCandidateId` pointing at a loser,
+     * which §7.4 forbids and which no consumer expects.
+     */
+    const maximal = hosts.filter((host) => !hostsFor.has(host.id));
+    if (maximal.length === 0) continue;
+    // Deterministic among equals, by §7.4's own ordering key.
+    const survivor = [...maximal].sort((a, b) =>
+      compareOrderKeys(orderKeyFor(a, imageIndexById), orderKeyFor(b, imageIndexById)),
+    )[0]!;
+    survivorIdByLoserId.set(fragment.id, survivor.id);
+    const absorbed = absorbedBySurvivorId.get(survivor.id);
+    if (absorbed === undefined) absorbedBySurvivorId.set(survivor.id, [fragment]);
+    else absorbed.push(fragment);
+  }
+
+  const result = candidates.map((candidate) => {
+    const losers = absorbedBySurvivorId.get(candidate.id);
+    if (losers !== undefined) {
+      let sourceImageIds = candidate.sourceImageIds;
+      let boundingBoxes = candidate.boundingBoxes;
+      let ocrConfidence = candidate.ocrConfidence;
+      for (const loser of losers) {
+        sourceImageIds = unionSourceImageIds({ ...candidate, sourceImageIds }, loser);
+        boundingBoxes = [...boundingBoxes, ...loser.boundingBoxes];
+        ocrConfidence = maxOcrConfidence(ocrConfidence, loser.ocrConfidence);
+      }
+      return { ...candidate, sourceImageIds, boundingBoxes, ocrConfidence };
+    }
+
+    const survivorId = survivorIdByLoserId.get(candidate.id);
+    if (survivorId !== undefined) {
+      return {
+        ...candidate,
+        reviewDisposition: 'discarded' as const,
+        collapsedIntoCandidateId: survivorId,
+      };
+    }
+
+    return { ...candidate };
+  });
+
+  return {
+    candidates: result,
+    survivorIds: [...absorbedBySurvivorId.keys()],
+    collapsedIds: [...survivorIdByLoserId.keys()],
+  };
+}
+
+/**
  * Collapse candidates that name the same work within one batch (SD-02).
  *
  * Pure: it returns new candidate objects and mutates nothing the caller passed

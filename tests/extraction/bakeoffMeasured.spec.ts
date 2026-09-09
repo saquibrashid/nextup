@@ -187,12 +187,26 @@ describe('T-AI-045 the bake-off is measured, and the pre-committed rule decides 
     // incumbent drifted". `expect` throws, so the first failing assertion in
     // a test masks every later one in the same test. Re-run after fixing each
     // pin; never infer from a single failure that the others held.
-    expect(inc.falseTitleRate).toBe(0.24242424242424243);
-    expect(inc.fabricationRate).toBe(0.011494252873563218);
+    //
+    // ⚠ THEN 0.2424 → 0.1935 AT TASK-203, the fragment collapse (§7.4a). Like
+    // the badge vocabulary this is a pipeline rule, not an answer-key change,
+    // so it applies to BOTH arms and the comparison stays like-for-like.
+    expect(inc.falseTitleRate).toBe(0.1935483870967742);
+    // ⚠ The fabrication rate moved with it — 0.011494 → 0.011765 — and it went
+    // UP while the pipeline got BETTER. Same single fabrication, divided by a
+    // denominator two candidates smaller because the two fragments collapsed.
+    // A denominator artefact, exactly like TASK-195's; do not read it as a
+    // regression.
+    expect(inc.fabricationRate).toBe(0.011764705882352941);
 
     expect(chal.recall).toBe(0.9402985074626866);
-    expect(chal.falseTitleRate).toBe(0.41975308641975306);
-    expect(chal.fabricationRate).toBe(0.035);
+    // ⚠ THE CHALLENGER MOVED FURTHER THAN THE INCUMBENT AT TASK-203 — 0.4198 →
+    // 0.3472 — and that is expected, not suspicious: it emits MORE readings of
+    // each caption, so it had more fragments to lose. Its lead-gap narrowed
+    // and the incumbent still wins by 15.4 points.
+    expect(chal.falseTitleRate).toBe(0.3472222222222222);
+    // Same denominator artefact as the incumbent's: 0.035 → 0.036649.
+    expect(chal.fabricationRate).toBe(0.03664921465968586);
 
     // ⚠ THE SHAPE OF THE RESULT, STATED AS AN ASSERTION SO IT CANNOT BE
     // MISREAD FROM THE NUMBERS ALONE: the challenger reads MORE, and much of

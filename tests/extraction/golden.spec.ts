@@ -156,8 +156,24 @@ const KNOWN_SHORTFALLS = {
    * `HBO` is half the `HBO max` wordmark — and because the vocabulary and the
    * three answer keys were changed TOGETHER. Changing only the key would have
    * bought this number by degrading chrome rejection, which is a real gate.
+   *
+   * ⚠ AND DOWN AGAIN AT TASK-203 — 0.2424 to 0.1935 — the FRAGMENT COLLAPSE
+   * (§7.4a). Two fragments (`wicked` beside `wicked for good`, `first` beside
+   * `ladies first`) now collapse into the caption that holds them whole, so
+   * they leave both sides of the fraction (8/33 -> 6/31). Recall is unchanged,
+   * which is the point: the proximity guard is what keeps `true detective`
+   * from collapsing into `true detective night country` and turning a
+   * false-title win into a recall loss.
+   *
+   * ⚠ THE REMAINING SIX ARE NOT FRAGMENTS OF THIS KIND, and the fragment pass
+   * cannot reach them. `stranger things vhs` + `special edition` sit at
+   * y≈0.75 while the candidate holding the whole caption is an ARTWORK read
+   * from a different tile at y≈0.88 — a caption-merge failure (§3.2 step 1),
+   * not an overlap failure. The four on `max-saved-desktop-01` are a
+   * recommendations region. Both are tracked separately; neither is bought by
+   * widening this pass.
    */
-  aggregateFalseTitleRate: 0.24242424242424243,
+  aggregateFalseTitleRate: 0.1935483870967742,
   /**
    * ~~2 of 4. ⚠ §9.2 sets this floor at **1.0 and calls it non-negotiable**, so
    * this is the most serious shortfall in the ledger — and its cause is the
