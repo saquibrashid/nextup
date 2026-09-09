@@ -1,0 +1,88 @@
+{
+  "imageId": "netflix-artwork-only-01",
+  "expectedCandidates": [
+    {
+      "title": "Stranger Things: Tales From '85",
+      "normalisedText": "stranger things tales from 85",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:tv:224263",
+      "expectedBasis": "artwork"
+    },
+    {
+      "title": "Raw",
+      "normalisedText": "raw",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:tv:4656",
+      "expectedBasis": "artwork"
+    },
+    {
+      "title": "The Whisper Man",
+      "normalisedText": "whisper man",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:860508",
+      "expectedBasis": "artwork"
+    },
+    {
+      "title": "Hamnet",
+      "normalisedText": "hamnet",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:858024",
+      "expectedBasis": "artwork"
+    },
+    {
+      "title": "Ladies First",
+      "normalisedText": "ladies first",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:1368881",
+      "expectedBasis": "artwork"
+    },
+    {
+      "title": "His & Hers",
+      "normalisedText": "his hers",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:tv:259731",
+      "expectedBasis": "artwork"
+    },
+    {
+      "title": "Man on Fire",
+      "normalisedText": "man on fire",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:9509",
+      "expectedBasis": "artwork"
+    },
+    {
+      "title": "Louis C.K.: Ridiculous",
+      "normalisedText": "louis c k ridiculous",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:1662958",
+      "expectedBasis": "artwork"
+    },
+    {
+      "title": "Frankenstein",
+      "normalisedText": "frankenstein",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:1062722",
+      "expectedBasis": "artwork"
+    },
+    {
+      "title": "Sol Levante",
+      "normalisedText": "sol levante",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:688900",
+      "expectedBasis": "artwork"
+    }
+  ],
+  "expectedChrome": [
+    "netflix",
+    "home",
+    "shows",
+    "movies",
+    "games",
+    "new popular",
+    "my list",
+    "browse by languages"
+  ],
+  "minRecall": 0.8,
+  "maxFalseTitles": 2,
+  "maxFabricated": 0
+}

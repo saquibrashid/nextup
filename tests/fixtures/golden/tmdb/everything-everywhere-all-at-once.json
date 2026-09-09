@@ -1,0 +1,24 @@
+{
+  "query": "Everything Everywhere All at Once",
+  "normalisedText": "everything everywhere all at once",
+  "results": [
+    {
+      "id": 545611,
+      "mediaType": "movie",
+      "title": "Everything Everywhere All at Once",
+      "originalTitle": "Everything Everywhere All at Once",
+      "releaseDate": "2022-03-24",
+      "popularity": 23.8208,
+      "overview": "An aging Chinese immigrant is swept up in an insane adventure, where she alone can save what's important to her by connecting with the lives she could have led in other universes."
+    },
+    {
+      "id": 1258497,
+      "mediaType": "movie",
+      "title": "Almost Everything You Ever Wanted to Know About Everything Everywhere All at Once",
+      "originalTitle": "Almost Everything You Ever Wanted to Know About Everything Everywhere All at Once",
+      "releaseDate": "2022-07-05",
+      "popularity": 1.3088,
+      "overview": "A behind-the-scenes look at Everything Everywhere All at Once, with interviews from the directors/writers, cast and crew."
+    }
+  ]
+}

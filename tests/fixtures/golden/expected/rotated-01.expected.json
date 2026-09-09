@@ -1,0 +1,57 @@
+{
+  "imageId": "rotated-01",
+  "expectedCandidates": [
+    {
+      "title": "Lanterns",
+      "normalisedText": "lanterns",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:tv:95350",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "Normal",
+      "normalisedText": "normal",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:1242332",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "The Drama",
+      "normalisedText": "drama",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:1325734",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "Ramy Youssef: In Love",
+      "normalisedText": "ramy youssef in love",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:1657502",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "Greenland 2: Migration",
+      "normalisedText": "greenland 2 migration",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:840464",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "True Detective",
+      "normalisedText": "true detective",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:tv:46648",
+      "expectedBasis": "text"
+    }
+  ],
+  "expectedChrome": [
+    "my stuff",
+    "my list",
+    "continue watching",
+    "my purchases",
+    "recommended for you"
+  ],
+  "minRecall": 1,
+  "maxFalseTitles": 2,
+  "maxFabricated": 0
+}

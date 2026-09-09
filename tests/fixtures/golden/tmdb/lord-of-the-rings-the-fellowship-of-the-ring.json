@@ -1,0 +1,42 @@
+{
+  "query": "The Lord of the Rings: The Fellowship of the Ring",
+  "normalisedText": "lord of the rings the fellowship of the ring",
+  "results": [
+    {
+      "id": 120,
+      "mediaType": "movie",
+      "title": "The Lord of the Rings: The Fellowship of the Ring",
+      "originalTitle": "The Lord of the Rings: The Fellowship of the Ring",
+      "releaseDate": "2001-12-18",
+      "popularity": 39.8856,
+      "overview": "Young hobbit Frodo Baggins, after inheriting a mysterious ring from his uncle Bilbo, must leave his home in order to keep it from falling into the hands of its evil creator. Along the way, a fellowship is formed to protect the ringbearer and make sure that the ring arrives at its final destination: Mt. Doom, the only place where it can be destroyed."
+    },
+    {
+      "id": 622231,
+      "mediaType": "movie",
+      "title": "The Making of 'The Fellowship of the Ring'",
+      "originalTitle": "The Making of 'The Fellowship of the Ring'",
+      "releaseDate": "2006-08-29",
+      "popularity": 1.3261,
+      "overview": "A behind-the-scenes documentary on the making of 2001's \"The Lord of the Rings: The Fellowship of the Ring.\" Created by filmmaker Costa Botes, personally selected by director Peter Jackson, this documentary uses raw footage to reveal the inside story on how the greatest adventure film franchise was born."
+    },
+    {
+      "id": 123034,
+      "mediaType": "tv",
+      "title": "The Keepers",
+      "originalTitle": "Хранители",
+      "releaseDate": "1991-04-13",
+      "popularity": 1.7615,
+      "overview": "Soviet live-action film adaptation of J. R. R. Tolkien’s The Fellowship of the Ring, aired once in 1991 by Leningrad Television and then thought lost. It was rediscovered in 2021. It includes scenes of Tom Bombadil and the Barrow-wight omitted from Peter Jackson’s Lord of the Rings film trilogy."
+    },
+    {
+      "id": 192349,
+      "mediaType": "movie",
+      "title": "Beyond the Movie: The Fellowship of the Ring",
+      "originalTitle": "Beyond the Movie: The Fellowship of the Ring",
+      "releaseDate": "2001-12-23",
+      "popularity": 1.4143,
+      "overview": "A documentary about the influences on Tolkien, covering in brief his childhood and how he detested the onslaught of industry through the idyllic countryside, moving on to describe his fighting experience from WWI, and closing with a look at the Finnish inspiration for the scholar's self-invented languages of Elfish. In between are interviews with the cast of the films and some clips, by far the most from \"The Fellowship of the Ring\", but a few glimpses of Rohan riders (from \"The Two Towers\") are provided. Also, there are interviews with a range of the filmmakers."
+    }
+  ]
+}

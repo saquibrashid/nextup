@@ -1,0 +1,16 @@
+{
+  "imageId": "netflix-continue-watching-01",
+  "expectedCandidates": [
+    {
+      "title": "In the Hand of Dante",
+      "normalisedText": "in the hand of dante",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:1020047",
+      "expectedBasis": "text"
+    }
+  ],
+  "expectedChrome": ["continue watching for let s go"],
+  "minRecall": 1,
+  "maxFalseTitles": 1,
+  "maxFabricated": 0
+}

@@ -1,0 +1,24 @@
+{
+  "query": "Hamnet",
+  "normalisedText": "hamnet",
+  "results": [
+    {
+      "id": 858024,
+      "mediaType": "movie",
+      "title": "Hamnet",
+      "originalTitle": "Hamnet",
+      "releaseDate": "2025-11-26",
+      "popularity": 12.8785,
+      "overview": "The powerful story of love and loss that inspired the creation of Shakespeare's timeless masterpiece, Hamlet."
+    },
+    {
+      "id": 1712179,
+      "mediaType": "movie",
+      "title": "Inside Look: Hamnet",
+      "originalTitle": "Inside Look: Hamnet",
+      "releaseDate": "2025-12-01",
+      "popularity": 1.1517,
+      "overview": "An exclusive, behind-the-scenes look at the making of Chloé Zhao's \"Hamnet,\" a powerful story of love and loss that inspired the creation of one of Shakespeare's most timeless masterpieces."
+    }
+  ]
+}

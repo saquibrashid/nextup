@@ -1,0 +1,15 @@
+{
+  "query": "Stranger Things: VHS Special Edition",
+  "normalisedText": "stranger things vhs special edition",
+  "results": [
+    {
+      "id": 66732,
+      "mediaType": "tv",
+      "title": "Stranger Things",
+      "originalTitle": "Stranger Things",
+      "releaseDate": "2016-07-15",
+      "popularity": 99.3664,
+      "overview": "When a young boy vanishes, a small town uncovers a mystery involving secret experiments, terrifying supernatural forces, and one strange little girl."
+    }
+  ]
+}

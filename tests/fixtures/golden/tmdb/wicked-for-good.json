@@ -1,0 +1,33 @@
+{
+  "query": "Wicked: For Good",
+  "normalisedText": "wicked for good",
+  "results": [
+    {
+      "id": 967941,
+      "mediaType": "movie",
+      "title": "Wicked: For Good",
+      "originalTitle": "Wicked: For Good",
+      "releaseDate": "2025-11-19",
+      "popularity": 18.9708,
+      "overview": "As an angry mob rises against the Wicked Witch, Glinda and Elphaba will need to come together one final time. With their singular friendship now the fulcrum of their futures, they will need to truly see each other, with honesty and empathy, if they are to change themselves, and all of Oz, for good."
+    },
+    {
+      "id": 1606506,
+      "mediaType": "movie",
+      "title": "Making Wicked: For Good",
+      "originalTitle": "Making Wicked: For Good",
+      "releaseDate": "2025-12-30",
+      "popularity": 1.3131,
+      "overview": "Return to Oz for a fantastic behind-the-scenes journey with this expansive look inside the characters, choreography, and creativity that make up the movie's unforgettable world."
+    },
+    {
+      "id": 1578341,
+      "mediaType": "movie",
+      "title": "Wicked: For Good - A Sneak Peek",
+      "originalTitle": "Wicked: For Good - A Sneak Peek",
+      "releaseDate": "2025-11-07",
+      "popularity": 1.9115,
+      "overview": "In an exclusive sneak peek, Angela Bishop heads down the yellow brick road to the land of Oz with the Wicked for Good cast, who spill some tea before the movie lands in cinemas on November 20."
+    }
+  ]
+}

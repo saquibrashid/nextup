@@ -1,0 +1,24 @@
+{
+  "query": "Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb",
+  "normalisedText": "dr strangelove or how i learned to stop worrying and love the bomb",
+  "results": [
+    {
+      "id": 935,
+      "mediaType": "movie",
+      "title": "Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb",
+      "originalTitle": "Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb",
+      "releaseDate": "1964-01-29",
+      "popularity": 9.5539,
+      "overview": "After the insane General Jack D. Ripper initiates a nuclear strike on the Soviet Union, a war room full of politicians, generals and a Russian diplomat all frantically try to stop it."
+    },
+    {
+      "id": 196738,
+      "mediaType": "movie",
+      "title": "Inside: 'Dr. Strangelove or How I Learned to Stop Worrying and Love the Bomb'",
+      "originalTitle": "Inside: 'Dr. Strangelove or How I Learned to Stop Worrying and Love the Bomb'",
+      "releaseDate": "2000-05-05",
+      "popularity": 0.7479,
+      "overview": "A documentary on the making of Stanley Kubrick's classic 1964 film."
+    }
+  ]
+}
