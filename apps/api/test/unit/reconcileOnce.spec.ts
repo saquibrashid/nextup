@@ -70,6 +70,7 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
       Promise.resolve({
         id: 'batch-1',
         service: 'netflix',
+        discoverySource: null,
         status: 'in-review',
         mode: 'full-update',
         lowYield: false,

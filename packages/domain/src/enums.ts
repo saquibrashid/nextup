@@ -112,6 +112,17 @@ export type MatchState = (typeof MATCH_STATES)[number];
 export const MEDIA_TYPES = ['movie', 'tv'] as const; // REQ-033
 export type MediaType = (typeof MEDIA_TYPES)[number];
 
+/**
+ * The vocabulary the STORED `extracted_candidate.classification` column may
+ * hold, mirrored by `ck_cand_classification` and pinned by `T-INFRA` enum
+ * parity.
+ *
+ * ⚠ **Do not add a value here that is only ever derived at read time.**
+ * Widening this list obliges a matching SQL CHECK, and a CHECK can only be
+ * widened by dropping it — which `T-MIG-001` forbids. The review pass's
+ * larger, response-only vocabulary is `REVIEW_CLASSIFICATIONS` in
+ * `review.ts`; that is where a derived value belongs.
+ */
 export const CANDIDATE_CLASSIFICATIONS = [
   'new', // REQ-010
   'already-present-for-this-service',

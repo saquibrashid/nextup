@@ -27,6 +27,7 @@ import {
   assertEveryCandidateRouted,
   buildActiveListingIndex,
   buildReviewResponse,
+  classifyDiscoveryWorkIdentity,
   classifyWorkIdentity,
   computeRemovals,
   reconcile,
@@ -50,6 +51,7 @@ import { requireOwnerId } from '../middleware/requestContext.js';
 import {
   findUploadBatch,
   listActiveListingsForService,
+  listListedWorkIdentities,
   listActiveSuppressions,
   listCandidatesForReview,
   listImagesForBatch,
@@ -129,7 +131,7 @@ function isBoundingBox(
 export async function loadReviewCandidates(
   ownerId: ReturnType<typeof requireOwnerId>,
   batchId: string,
-  service: Service,
+  service: Service | null,
 ): Promise<{
   candidates: ReviewCandidate[];
   suppressed: Set<string>;
@@ -145,10 +147,19 @@ export async function loadReviewCandidates(
    */
   rows: Awaited<ReturnType<typeof listCandidatesForReview>>;
 }> {
-  const [rows, suppressions, activeListings] = await Promise.all([
+  const [rows, suppressions, activeListings, listedIdentities] = await Promise.all([
     listCandidatesForReview(ownerId, batchId),
     listActiveSuppressions(ownerId),
-    listActiveListingsForService(ownerId, service),
+    // ⚠ A discovery batch has NO service (ADR-0010 D-1), so there is no
+    // service whose active listings could be loaded. The empty array is not a
+    // degraded read: `activeListings` exists to feed removal planning, and
+    // reconciliation never runs for a discovery batch at all (US-040 AC-4).
+    service === null
+      ? Promise.resolve([] as Awaited<ReturnType<typeof listActiveListingsForService>>)
+      : listActiveListingsForService(ownerId, service),
+    // The combined-list membership question a discovery review asks instead
+    // (US-040 AC-5). Loaded only when it is the question being asked.
+    service === null ? listListedWorkIdentities(ownerId) : Promise.resolve(new Set<string>()),
   ]);
 
   // The suppression gate. Keyed on WORK IDENTITY, never on a row id
@@ -214,7 +225,10 @@ export async function loadReviewCandidates(
         }),
         disposition: row.reviewDisposition as ReviewDisposition,
         collapsedIntoCandidateId: row.collapsedIntoCandidateId,
-        classification: classifyWorkIdentity(row.resolvedWorkIdentity, service, index),
+        classification:
+          service === null
+            ? classifyDiscoveryWorkIdentity(row.resolvedWorkIdentity, listedIdentities)
+            : classifyWorkIdentity(row.resolvedWorkIdentity, service, index),
       };
     });
 

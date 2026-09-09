@@ -51,8 +51,32 @@ import type {
   ReviewDisposition,
   Service,
 } from './enums.js';
+import { CANDIDATE_CLASSIFICATIONS } from './enums.js';
 import type { IsoDate } from './types.js';
 import { DEGRADED_EXTRACTION_BANNER } from './copy.js';
+
+/**
+ * What the review RESPONSE may say about a candidate — a superset of the
+ * stored `CANDIDATE_CLASSIFICATIONS`.
+ *
+ * ⚠ **This is derived at read time and never written to a column,** which is
+ * exactly why it is separate. `ck_cand_classification` constrains the stored
+ * column, a CHECK can only be widened by dropping it, and `T-MIG-001` forbids
+ * `DROP CONSTRAINT`. Adding a read-time value to the stored vocabulary would
+ * have obliged a migration for a value that column can never hold; the enum
+ * parity gate catches that, and this split is the answer to it.
+ *
+ * `already-in-your-list` deliberately does NOT reuse
+ * `already-present-for-this-service`: that value names a service the owner can
+ * act on, and a discovery batch has no service (ADR-0010 D-1), so the same
+ * word would answer a question nobody asked. The review pass must SAY the work
+ * is already held (US-040 AC-5) and cannot say it in service-scoped terms.
+ */
+export const REVIEW_CLASSIFICATIONS = [
+  ...CANDIDATE_CLASSIFICATIONS,
+  'already-in-your-list',
+] as const;
+export type ReviewClassification = (typeof REVIEW_CLASSIFICATIONS)[number];
 
 /**
  * ⚠ `ZERO_YIELD_IMAGE_RATIO` USED TO BE DECLARED HERE AND WAS NEVER READ.
@@ -126,7 +150,7 @@ export interface ReviewCandidate {
   /** SD-02. Non-null ⇒ absorbed by the survivor; not rendered again. */
   collapsedIntoCandidateId: string | null;
   /** `null` for an unmatched candidate (`T-CLS-013`). */
-  classification: 'new' | 'already-present-for-this-service' | null;
+  classification: ReviewClassification | null;
 }
 
 /** A listing that may be proposed for removal. */
@@ -271,7 +295,13 @@ export function sectionForCandidate(candidate: ReviewCandidate): ReviewSectionNa
   ) {
     return 'unmatched';
   }
-  return candidate.classification === 'already-present-for-this-service'
+  // ⚠ BOTH "already" classifications route here. `already-in-your-list` is
+  // the discovery form of the same fact (US-040 AC-5) — the work is already
+  // held, so it is not an addition. Omitting it would put a work the owner
+  // already has into the additions section, where confirming it would be an
+  // instruction to add what is already there.
+  return candidate.classification === 'already-present-for-this-service' ||
+    candidate.classification === 'already-in-your-list'
     ? 'alreadyOnYourList'
     : 'additions';
 }

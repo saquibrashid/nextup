@@ -60,6 +60,9 @@ import {
   type CrossCheckOutcome,
   type ReviewCandidate,
   type Service,
+  type DiscoverySource,
+  planWatchIntents,
+  discoverySourceOf,
   requireServiceOf,
 } from '@nextup/domain';
 
@@ -70,10 +73,13 @@ import {
   createRemovalGroup,
   createServiceListing,
   createTitle,
+  createWatchIntent,
   findActiveSuppression,
   findTitleByWorkIdentity,
+  listListedWorkIdentities,
   listListingsForTitle,
   listRemovalDecisions,
+  listWaitingWorkIdentities,
   recordBatchChange,
   runInTransaction,
   setCandidateResolvedTitles,
@@ -90,7 +96,18 @@ export interface CloseResult {
   status: 'applied';
   completedAt: string;
   summary: CloseSummary;
-  serviceState: { service: Service; lastCompletedBatchAt: string };
+  /**
+   * ⚠ NULL FOR A DISCOVERY BATCH. A discovery capture updates no service, so
+   * there is no per-service freshness fact to report (REQ-039).
+   */
+  serviceState: { service: Service; lastCompletedBatchAt: string } | null;
+  /** Present only for a discovery batch (US-040). */
+  discovery?: {
+    discoverySource: DiscoverySource;
+    intentsCreated: number;
+    alreadyListed: number;
+    alreadyWaiting: number;
+  };
   undoable: boolean;
 }
 
@@ -182,6 +199,52 @@ function tmdbFieldsFor(
 }
 
 /**
+ * Whether the title this close is creating is a member of the combined list.
+ *
+ * `'waiting'` is the discovery case, and the two fields it changes are the two
+ * the combined list is built from.
+ */
+type TitlePresence = 'listed' | 'waiting';
+
+/**
+ * ⚠ **A WAITING TITLE IS STORED `removed` WITH NO DATE, AND THAT IS
+ * DELIBERATE** (owner decision, superseding the silence in
+ * `specs/data-model.md` §17).
+ *
+ * `WatchIntent.titleId` is a NOT NULL foreign key, so a waiting work must have
+ * a `Title` — but it has, by definition, no `ServiceListing` (ADR-0010 Trap
+ * 3). Two existing rules then decide the shape:
+ *
+ *  - `listActiveTitles` selects on `title.state = 'active'`, so an `active`
+ *    waiting title would be IN THE COMBINED LIST, which is exactly what
+ *    `T-WAIT-003` forbids;
+ *  - the removed view reads `service_listing` rows, not `title.state`, so a
+ *    `removed` title with no listing appears there either.
+ *
+ * `removed` therefore makes the row invisible to both views with no migration
+ * and no new `TITLE_STATES` member (§17.2 forbids a `waiting` one). It is also
+ * already the shape that occurs naturally when a work sitting in the removed
+ * log is re-discovered on a storefront.
+ *
+ * ⚠ `sortDateAdded` MUST be null. It is the REQ-038 sort key, and a discovery
+ * date written into it is precisely the confusion `T-WAIT-011` exists to
+ * prevent — one field further along the same path.
+ *
+ * The cost, accepted knowingly: invariant I-3 ("a title has at least one
+ * listing") becomes advisory for waiting works. Nothing asserts it as a gate;
+ * `deriveTitleState` throws on an empty listing set, and the discovery close
+ * never calls it because reconciliation never runs.
+ */
+function presenceFields(
+  presence: TitlePresence,
+  today: Date,
+): { state: 'active' | 'removed'; sortDateAdded: Date | null } {
+  return presence === 'waiting'
+    ? { state: 'removed', sortDateAdded: null }
+    : { state: 'active', sortDateAdded: today };
+}
+
+/**
  * Create the title row for a confirmed candidate.
  *
  * ⚠ THE TWO SHAPES ARE MUTUALLY EXCLUSIVE AND THE DATABASE ENFORCES IT. The
@@ -198,9 +261,11 @@ async function insertTitle(
   workIdentity: string,
   batchId: string,
   today: Date,
+  presence: TitlePresence = 'listed',
 ): Promise<string> {
   const id = ulid();
   const tmdb = tmdbFieldsFor(candidate, workIdentity);
+  const { state, sortDateAdded } = presenceFields(presence, today);
 
   if (kind === 'addition' && tmdb !== null) {
     await createTitle(
@@ -208,10 +273,10 @@ async function insertTitle(
       {
         id,
         workIdentity,
-        state: 'active',
+        state,
         matchState: 'matched',
         ...tmdb,
-        sortDateAdded: today,
+        sortDateAdded,
         createdByBatchId: batchId,
       },
       tx,
@@ -224,10 +289,10 @@ async function insertTitle(
     {
       id,
       workIdentity,
-      state: 'active',
+      state,
       matchState: 'unmatched',
       rawExtractedText: candidate.rawText,
-      sortDateAdded: today,
+      sortDateAdded,
       createdByBatchId: batchId,
     },
     tx,
@@ -320,6 +385,191 @@ async function planRemovals(
 }
 
 /**
+ * Apply a reviewed DISCOVERY batch (TASK-185, US-040).
+ *
+ * ⚠ WHAT THIS FUNCTION DOES NOT DO IS THE POINT OF IT. It creates no
+ * `ServiceListing`, plans no removals, creates no removal group, and writes no
+ * `ServiceState`. A storefront page is not a saved list, so a title missing
+ * from a later capture of it means nothing at all (US-040 AC-4) — and the only
+ * durable way to say "never" is for the reconciling code to be unreachable
+ * from here rather than skipped by a flag.
+ *
+ * ⚠ NO `batch_change` ROW IS WRITTEN FOR AN INTENT, and that is not an
+ * oversight. `ck_change_kind` is a CHECK constraint over exactly four kinds,
+ * widening it would need a `DROP CONSTRAINT` that `T-MIG-001` forbids, and
+ * nothing in TASK-185 asks for intent provenance. The `title_created` rows
+ * this path does write are already inside that vocabulary.
+ */
+async function closeDiscoveryBatch(
+  ownerId: OwnerId,
+  batch: Awaited<ReturnType<typeof loadOwnedBatch>>,
+  discoverySource: DiscoverySource,
+  now: Date,
+): Promise<CloseResult> {
+  const loaded = await loadReviewCandidates(ownerId, batch.id, null);
+  const { candidates, rows, suppressed } = loaded;
+
+  const pending = pendingAdditionIds(candidates);
+  if (pending.length > 0) {
+    throw new AppError(
+      'PENDING_ADDITIONS',
+      409,
+      pending.length === 1
+        ? '1 title still needs a decision.'
+        : `${pending.length} titles still need a decision.`,
+      { batchId: batch.id, pendingCandidateIds: pending },
+    );
+  }
+
+  const applicable = applicableCandidates(candidates);
+  const discarded = discardedCount(candidates);
+  const suppressedGated = rows.filter(
+    (row) => row.resolvedWorkIdentity !== null && suppressed.has(row.resolvedWorkIdentity),
+  ).length;
+
+  const today = dateOnly(now);
+
+  const summary = await runInTransaction(async (tx) => {
+    // Read INSIDE the transaction. Both sets decide whether a row is written,
+    // and a set read before the transaction opened could be contradicted by
+    // the unique index the moment the write lands.
+    const [listed, waiting] = await Promise.all([
+      listListedWorkIdentities(ownerId, tx),
+      listWaitingWorkIdentities(ownerId, tx),
+    ]);
+
+    const withIdentity = applicable.map(({ candidate, kind }) => ({
+      candidate,
+      kind,
+      candidateId: candidate.candidateId,
+      workIdentity: identityFor(candidate),
+    }));
+    const plan = planWatchIntents(withIdentity, { listed, waiting });
+    const byCandidateId = new Map(withIdentity.map((entry) => [entry.candidateId, entry]));
+
+    let titlesCreated = 0;
+    let intentsCreated = 0;
+    let unresolvedKept = 0;
+    let gatedInTransaction = 0;
+    const resolvedTitleLinks: { candidateId: string; titleId: string }[] = [];
+
+    for (const planned of plan.intents) {
+      const entry = byCandidateId.get(planned.candidateId);
+      /* c8 ignore next -- the map is built from the same array the plan is */
+      if (entry === undefined) continue;
+      const { candidate, kind, workIdentity } = entry;
+
+      // Property 3, re-checked in the transaction exactly as the service path
+      // does: review and close are separate requests and the store is the only
+      // thing that has seen both.
+      if ((await findActiveSuppression(ownerId, workIdentity, tx)) !== null) {
+        gatedInTransaction += 1;
+        continue;
+      }
+
+      const existing = await findTitleByWorkIdentity(ownerId, workIdentity, tx);
+      let titleId: string;
+
+      if (existing === null) {
+        titleId = await insertTitle(
+          ownerId,
+          tx,
+          candidate,
+          kind,
+          workIdentity,
+          batch.id,
+          today,
+          'waiting',
+        );
+        titlesCreated += 1;
+        await recordBatchChange(
+          ownerId,
+          {
+            batchId: batch.id,
+            kind: 'title_created',
+            titleId,
+            nextValue: jsonScalar(workIdentity),
+          },
+          tx,
+        );
+      } else {
+        // ⚠ AN EXISTING TITLE IS REUSED AS IT STANDS — no state change, no
+        // date change. A work in the removed log that a storefront now offers
+        // is a legitimate re-discovery, but promoting its title back to
+        // `active` here would put it in the combined list without a listing,
+        // which is the one thing this whole path exists not to do.
+        titleId = existing.id;
+      }
+
+      if (kind === 'unresolved') unresolvedKept += 1;
+      resolvedTitleLinks.push({ candidateId: candidate.candidateId, titleId });
+
+      await createWatchIntent(
+        ownerId,
+        {
+          id: ulid(),
+          titleId,
+          workIdentity,
+          sourceBatchId: batch.id,
+          discoverySource,
+          state: 'waiting',
+        },
+        tx,
+      );
+      intentsCreated += 1;
+    }
+
+    await setCandidateResolvedTitles(ownerId, resolvedTitleLinks, tx);
+
+    await transitionBatch(
+      ownerId,
+      batch,
+      'applied',
+      'BATCH_NOT_IN_REVIEW',
+      'That batch is not in review.',
+      { completedAt: now },
+      tx,
+    );
+
+    return {
+      summary: {
+        titlesCreated,
+        // ⚠ Hard zero, not a count that happens to be zero. REQ-025's badge
+        // count is derived from listings, and this path cannot create one.
+        listingsCreated: 0,
+        listingsRemoved: 0,
+        unresolvedKept,
+        discarded,
+        suppressedGated: suppressedGated + gatedInTransaction,
+        removalGroupId: null,
+      } satisfies CloseSummary,
+      intentsCreated,
+      alreadyListed: plan.alreadyListed.length,
+      alreadyWaiting: plan.alreadyWaiting.length,
+    };
+  });
+
+  return {
+    batchId: batch.id,
+    status: 'applied',
+    completedAt: now.toISOString(),
+    summary: summary.summary,
+    // ⚠ NULL, not a fabricated service. REQ-039's per-service freshness strip
+    // says when each SERVICE was last updated, and a discovery capture updated
+    // none of them — writing one here would tell the owner their Netflix list
+    // was refreshed by a Fandango screenshot.
+    serviceState: null,
+    discovery: {
+      discoverySource,
+      intentsCreated: summary.intentsCreated,
+      alreadyListed: summary.alreadyListed,
+      alreadyWaiting: summary.alreadyWaiting,
+    },
+    undoable: canTransition('applied', 'undone'),
+  };
+}
+
+/**
  * Apply a reviewed batch.
  *
  * Throws `PENDING_ADDITIONS` (409), `REMOVALS_NOT_CONFIRMED` (409) or
@@ -334,6 +584,24 @@ export async function closeBatch(
   options: CloseOptions = {},
 ): Promise<CloseResult> {
   const batch = await loadOwnedBatch(ownerId, batchId);
+
+  // ⚠ THE BRANCH IS ON THE STORED SOURCE, AND IT LEADS TO A WHOLE SEPARATE
+  // PATH — not to a set of `if (discovery)` guards threaded through the
+  // service path below. US-040 AC-4 says reconciliation NEVER runs for a
+  // discovery batch, and the only way to make "never" structural rather than
+  // conditional is for the reconciling code to be somewhere this call can no
+  // longer reach.
+  //
+  // ⚠ `discoverySourceOf` VALIDATES rather than casts, for the same reason
+  // `requireServiceOf` does: the column widens to `string | null` through
+  // Prisma, and a cast here would be a silent promise about a value nobody
+  // checked — one that would then be written onto every intent this close
+  // creates.
+  const discoverySource = discoverySourceOf(batch);
+  if (discoverySource !== null) {
+    return closeDiscoveryBatch(ownerId, batch, discoverySource, now);
+  }
+
   const service = requireServiceOf(batch);
 
   // ⚠ Read BEFORE the transition, not after. The candidate load is the input

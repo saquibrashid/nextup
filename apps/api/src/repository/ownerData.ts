@@ -322,6 +322,67 @@ export async function findTitle(ownerId: OwnerId, id: string, tx?: Db) {
 }
 
 /**
+ * Every work identity currently in the COMBINED LIST — that is, holding at
+ * least one active `ServiceListing` on any service (US-040 AC-5).
+ *
+ * ⚠ Derived from `service_listing`, NOT from `title.state`. A waiting work's
+ * title is stored `removed` with no listing at all (§17.2 as implemented), so
+ * a title-state read would answer a different question — and specifically it
+ * would answer "no" for a work whose only listing was removed, which is
+ * correct, and "yes" for nothing else, which is not how the combined list is
+ * built. Reading the same table the list reads is the only way the two agree.
+ */
+export async function listListedWorkIdentities(ownerId: OwnerId, tx?: Db): Promise<Set<string>> {
+  const rows = await db(tx).serviceListing.findMany({
+    where: { ownerId, state: 'active' },
+    select: { title: { select: { workIdentity: true } } },
+  });
+  return new Set(rows.map((row) => row.title.workIdentity));
+}
+
+/**
+ * Every work identity with an OPEN watch intent (`state = 'waiting'`).
+ *
+ * Read as a set for the same reason as above: the caller's question is
+ * membership, and `ux_intent_owner_title_waiting` guarantees at most one row
+ * per work, so a list would only invite a caller to wonder about duplicates
+ * the index has already ruled out.
+ */
+export async function listWaitingWorkIdentities(ownerId: OwnerId, tx?: Db): Promise<Set<string>> {
+  const rows = await db(tx).watchIntent.findMany({
+    where: { ownerId, state: 'waiting' },
+    select: { workIdentity: true },
+  });
+  return new Set(rows.map((row) => row.workIdentity));
+}
+
+/**
+ * Persist ONE watch intent (REQ-082, ADR-0010).
+ *
+ * ⚠ There is no `updateWatchIntent` beside this deliberately: TASK-185 only
+ * ever creates. Satisfaction (TASK-189) and the availability refresh
+ * (TASK-187) each own their own narrow writer, for the same reason
+ * `updateTitleRating` and `updateTitleMetadata` are separate — a general
+ * `data` object here would let a later caller move an intent's state or its
+ * work identity without anything noticing.
+ */
+export async function createWatchIntent(
+  ownerId: OwnerId,
+  data: Omit<Prisma.WatchIntentUncheckedCreateInput, 'ownerId'>,
+  tx?: Db,
+) {
+  return db(tx).watchIntent.create({ data: { ...data, ownerId } });
+}
+
+/** Every watch intent for a work, whatever its state. Test and undo support. */
+export async function listWatchIntentsForBatch(ownerId: OwnerId, batchId: string, tx?: Db) {
+  return db(tx).watchIntent.findMany({
+    where: { ownerId, sourceBatchId: batchId },
+    orderBy: { id: 'asc' },
+  });
+}
+
+/**
  * Active titles, newest-first by `sortDateAdded`.
  *
  * `sortDateAdded` is the EARLIEST date-added across the title's listings
