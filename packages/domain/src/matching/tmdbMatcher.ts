@@ -110,9 +110,20 @@ function clamp01(value: number): number {
  *
  * ⚠ Popularity is deliberately NOT an input. It changes daily, which would
  * make the same batch score differently on two runs and every golden fixture
- * untestable. Ties are broken by lower `tmdbId`, which is stable forever —
- * that tie-break lives in {@link matchCandidate}'s sort, because it is an
- * ordering rule rather than a property of a single pair.
+ * untestable. Ties are broken by the order TMDB itself returned the results
+ * in — see {@link matchCandidate}'s sort, because it is an ordering rule
+ * rather than a property of a single pair.
+ *
+ * ⚠ ~~Ties are broken by lower `tmdbId`, which is stable forever.~~
+ * **Superseded by TASK-197 (`specs/ai.md` §4.2 step 4, corrected in place).**
+ * TMDB ids are assigned monotonically, so "lowest id wins" is "oldest work
+ * wins" — a recency preference in reverse, chosen by accident. It cost 6 of
+ * 24 identities in the golden corpus, but the far worse consequence is that
+ * the SAME ordering selects the top-5 alternates, so when more than five
+ * works share a title the recent one was pushed out of the one-tap correction
+ * list entirely (US-007 AC-4) and the owner could not reach it at all.
+ * Measured on the corpus: `ladies first` and `frankenstein` both had the
+ * correct identity absent from their alternates.
  */
 export function scoreTmdbResult(candidate: MatchableCandidate, result: TmdbSearchResult): number {
   const a = candidate.normalisedText;
@@ -142,18 +153,47 @@ export function matchCandidate(
   candidate: MatchableCandidate,
   results: readonly TmdbSearchResult[],
 ): MatchOutcome {
-  const scored: MatchCandidate[] = results
-    .map((result) => ({
+  const scored: (MatchCandidate & { readonly providerIndex: number })[] = results
+    .map((result, providerIndex) => ({
       tmdbId: result.tmdbId,
       mediaType: result.mediaType,
       name: result.name,
       releaseYear: result.releaseYear,
       posterPath: result.posterPath,
       score: scoreTmdbResult(candidate, result),
+      providerIndex,
     }))
-    .sort((x, y) => (y.score !== x.score ? y.score - x.score : x.tmdbId - y.tmdbId));
+    // Score first; then TMDB's OWN returned order; then `tmdbId` so the order
+    // is total and no two results can ever compare equal.
+    //
+    // ⚠ `providerIndex` is an INPUT, not a computation. We already depend
+    // wholly on what TMDB returns — which results exist, their names, their
+    // years — so consuming the order it returned them in adds no new
+    // time-varying dependency, and the golden corpus replays recorded
+    // responses, so it stays exactly as testable as before. What it is NOT is
+    // a recency preference: TMDB ranks a genuinely old famous work first for
+    // an old famous title, which is why `hitchhiker s guide to the galaxy`
+    // resolves to the 2005 film and not the 1981 series purely on this rule.
+    .sort((x, y) => {
+      if (y.score !== x.score) return y.score - x.score;
+      if (x.providerIndex !== y.providerIndex) return x.providerIndex - y.providerIndex;
+      return x.tmdbId - y.tmdbId;
+    });
 
-  const matchCandidates = scored.slice(0, MATCH_ALTERNATIVES_LIMIT);
+  // `providerIndex` is an ordering device only — it never leaves this function,
+  // so the shape returned to the API and the SPA is unchanged.
+  const ranked: MatchCandidate[] = scored.map(
+    ({ tmdbId, mediaType, name, releaseYear, posterPath, score }) => ({
+      tmdbId,
+      mediaType,
+      name,
+      releaseYear,
+      posterPath,
+      score,
+    }),
+  );
+
+  const matchCandidates = ranked.slice(0, MATCH_ALTERNATIVES_LIMIT);
   const top = matchCandidates[0];
 
   if (top === undefined || top.score < MATCH_REVIEW_FLOOR) {

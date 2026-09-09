@@ -469,7 +469,7 @@ Fully specified in **`specs/ai.md` §9**. Summary of what **CI** enforces
 | **Fabrication rate** — candidates with `ocrSupport: 'none'` that are neither expected nor TMDB-matched | ≤ **0.05** | **`T-AI-032`** |
 | **Omission recovery** — an expected title present in the OCR recording but absent from the LLM recording is recovered as an `ocr-only` orphan | **1.0, non-negotiable** | **`T-AI-039`** |
 | Chrome rejection | ≥ 0.80 — **ENFORCED as a gate since TASK-195, not pinned.** Measured **0.8750** (63 of 72); was 0.2361, and `T-AI-030f` fired to force the promotion. The two causes were the §3.2 vocabulary genuinely not covering this corpus **and** step 1's reading-order grouping fusing nav labels before step 3 could match them. | `T-AI-030` |
-| Match accuracy | ≥ 0.90 | `T-AI-031` |
+| Match accuracy | ≥ 0.90 — **ENFORCED as a gate since TASK-197, not pinned.** Measured **0.9583** (23 of 24); was 0.75, and `T-AI-030f` fired to force the promotion. The cause was §4.2 step 4's `lower tmdbId` tie-break, which is oldest-work-wins because ids are monotonic. **`T-AI-031d` additionally guards the half no metric measured:** the same order cuts the top-5 alternates, so the correct identity must be *reachable* in one tap (US-007 AC-4), not merely ranked first. | `T-AI-031` |
 | **Determinism of stages 1c–5 across 3 runs** | **exactly 1.0** | `T-STUB-001`, **`T-AI-034`** |
 | Artwork-only fixture recall (`netflix-artwork-only-01.png`) | ≥ **0.80**, all `basis: 'artwork'`, verdict `inferred-unverified` | **`T-AI-035`** |
 | **`blank-no-content-01.png`** triggers the low-yield path | must | `T-AI-021`, `T-AI-022` |
@@ -864,7 +864,7 @@ ends up unmapped.
 | AC-1 | U/I | `T-TMDB-010` | Matching queries TMDB with the normalised text; deterministic scoring |
 | AC-2 | I | `T-TMDB-011` | Confirmed match stores exactly type, year, runtime, genres, poster path, tmdbId, fetchedAt |
 | AC-3 | C | `T-UX-062` | Review card shows poster, name, year, type and the raw extracted text |
-| AC-4 | U/C | `T-TMDB-012` | Ambiguous match returns top-5 alternatives inline, flagged `ambiguous` |
+| AC-4 | U/C | `T-TMDB-012` | Ambiguous match returns top-5 alternatives inline, flagged `ambiguous` <br> **TASK-197 corrected `T-TMDB-012b` in place and added `f`/`g`.** `b` asserted that equal scores are broken by the lower `tmdbId`; ids are monotonic, so that rule was oldest-work-wins, and because the same order cuts the top-5 it removed the recent work from the alternates entirely wherever more than five works share a title — voiding this very criterion silently. `b` now asserts TMDB's own returned order; `f` is its discriminating twin, proving the tie-break is only a tie-break and a higher score still wins, so the rule cannot degrade into "return TMDB's order" and discard scoring; `g` asserts the ordering stays total and reproducible. |
 | AC-5 | I | **`T-AI-017`** | TMDB 503 → all candidates unmatched, batch still reaches `in-review`, banner shown, no failure |
 | AC-6 | U | `T-TMDB-013` | Zod rejects any TMDB field outside the stored allow-list; nothing extra is persisted |
 
