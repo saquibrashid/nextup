@@ -1045,6 +1045,51 @@ at the storage layer while the review pass shows one item per work
 *(Schema addendum: `ExtractionCandidate` carries
 `collapsedIntoCandidateId: string | null`.)*
 
+### 7.4a The fragment collapse — A′ (TASK-199 finding (a), TASK-203)
+
+Pass A reunites on **exact** text, so a caption OCR split in two never rejoins
+the candidate that holds it whole and reaches review as a **false extra**:
+`wicked` beside `wicked for good`, `first` beside `ladies first`. Pass **A′**
+runs between A and matching — after A, so a fragment is never parented onto a
+candidate A is itself about to collapse; before matching, so a fragment never
+costs a TMDB call and never resolves to an identity of its own.
+
+A candidate is a fragment of a **host** only when **all four** hold:
+
+| Guard | Rule | Why it is load-bearing |
+|---|---|---|
+| **Token boundary** | `` ` host ` `` contains `` ` fragment ` `` | a bare substring collapses WWE `Raw` into `brawl`, re-opening TASK-198's recall loss |
+| **Same image** | they share a `sourceImageId` | two tiles on two screenshots are two works, and their coordinates are not comparable |
+| **Vertical proximity** | smallest gap between any two boxes ≤ `FRAGMENT_MAX_VERTICAL_GAP` (**0.02** of image height) | see below — **this is the whole safety property** |
+| **Verdict** | both are `title-candidate` | `hbo` ⊂ `hbo original` are both chrome; mixing verdicts silently reclassifies chrome as part of a title |
+
+⚠ **Text containment points BOTH WAYS in the real corpus, and nothing but
+geometry separates the directions.** `wicked` ⊂ `wicked for good` — the
+*fragment* is the false one. `true detective` ⊂ `true detective night country` —
+the *container* is the false one. Both are token prefixes; shape, length,
+prefix position and `ocrSupport` are identical (`exact`/`text` in both).
+Measured vertical gaps in the golden corpus:
+
+- accepted (real fragments) — `0.000, 0.000, 0.000, 0.0047`
+- rejected (different tiles) — `0.063, 0.083, 0.096, 0.103, 0.116`
+
+0.02 sits **4×** above the largest accepted gap and **3×** below the smallest
+rejected one. ⚠ **Do not raise it to catch more fragments**: the next thing it
+catches is `true detective` collapsing into a title the answer key marks false,
+trading a false title for a **recall loss** — strictly worse than doing nothing.
+A candidate with **no** geometry never collapses; absent evidence is not
+proximity.
+
+Only a **maximal** host may adopt — one that is not itself a fragment of
+something else — or `collapsedIntoCandidateId` would point at a loser.
+Absorption and retention are exactly pass A's: union, concatenate, max, and the
+loser is **kept** with `reviewDisposition: 'discarded'`. Tests `T-AI-048`.
+
+Measured effect: aggregate false-title rate **0.2424 → 0.1935**, recall
+unchanged. The false titles this pass cannot reach are **caption merges**
+(§3.2 step 1) and a **recommendations region**, tracked separately; neither is
+bought by widening this pass.
+
 ---
 
 ## 8. Provenance, undo and removal groups

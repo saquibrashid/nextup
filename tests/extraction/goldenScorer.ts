@@ -22,6 +22,7 @@ import path from 'node:path';
 
 import {
   cleanup,
+  collapseFragments,
   collapseOverlap,
   crossCheck,
   type CleanedCandidate,
@@ -40,7 +41,8 @@ export const EXPECTED = path.join(GOLDEN, 'expected');
 export const TMDB = path.join(GOLDEN, 'tmdb');
 
 /**
- * ⚠ `now` IS PINNED. `cleanup()` judges an extracted year plausible against
+ * ⚠ 
+ow` IS PINNED. `cleanup()` judges an extracted year plausible against
  * the current date, so an unpinned clock makes every verdict a function of the
  * day the suite runs — a fixture whose year sits at the future allowance
  * boundary would flip from `title-candidate` to `low-confidence` on its own,
@@ -198,7 +200,14 @@ export async function scoreAll(modelId: string): Promise<Scored[]> {
       cleaned.map((c, i) => asCandidate(c, image.id, i)),
       { pass: 'pre-match', imageOrder: [image.id] },
     );
-    const candidates = collapsed.candidates.filter((c) => c.collapsedIntoCandidateId === null);
+    // Stage 4's second half — the fragment collapse (§7.4a). Measured here for
+    // the same reason pass A is: the scorer must run the pipeline the product
+    // runs, or the metrics describe a product that does not exist.
+    const fragments = collapseFragments(collapsed.candidates, {
+      pass: 'pre-match',
+      imageOrder: [image.id],
+    });
+    const candidates = fragments.candidates.filter((c) => c.collapsedIntoCandidateId === null);
 
     const expectedTexts = new Set(expected.expectedCandidates.map((c) => c.normalisedText));
     const chromeTexts = new Set(expected.expectedChrome);
