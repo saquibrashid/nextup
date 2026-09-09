@@ -5,10 +5,10 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.041,
-      "y": 0.308,
-      "w": 0.151,
-      "h": 0.168
+      "x": 0.044,
+      "y": 0.312,
+      "w": 0.17,
+      "h": 0.17
     }
   },
   {
@@ -17,10 +17,10 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.198,
-      "y": 0.308,
-      "w": 0.151,
-      "h": 0.168
+      "x": 0.217,
+      "y": 0.312,
+      "w": 0.17,
+      "h": 0.17
     }
   },
   {
@@ -29,10 +29,10 @@
     "basis": "text",
     "confidence": 0.8,
     "box": {
-      "x": 0.355,
-      "y": 0.308,
-      "w": 0.151,
-      "h": 0.168
+      "x": 0.39,
+      "y": 0.312,
+      "w": 0.17,
+      "h": 0.17
     }
   },
   {
@@ -41,10 +41,10 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.512,
-      "y": 0.308,
-      "w": 0.151,
-      "h": 0.168
+      "x": 0.563,
+      "y": 0.312,
+      "w": 0.17,
+      "h": 0.17
     }
   },
   {
@@ -53,34 +53,34 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.669,
-      "y": 0.308,
-      "w": 0.151,
-      "h": 0.168
+      "x": 0.736,
+      "y": 0.312,
+      "w": 0.17,
+      "h": 0.17
     }
   },
   {
     "visibleText": "STRANGER THINGS VHS SPECIAL EDITION",
-    "identifiedTitle": "Stranger Things: VHS Special Edition",
+    "identifiedTitle": "Stranger Things VHS Special Edition",
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.826,
-      "y": 0.308,
-      "w": 0.151,
-      "h": 0.168
+      "x": 0.909,
+      "y": 0.312,
+      "w": 0.17,
+      "h": 0.17
     }
   },
   {
     "visibleText": "In the hand of Dante",
     "identifiedTitle": "In the Hand of Dante",
-    "basis": "both",
+    "basis": "text",
     "confidence": 1,
     "box": {
-      "x": 0.041,
+      "x": 0.044,
       "y": 0.507,
-      "w": 0.151,
-      "h": 0.168
+      "w": 0.17,
+      "h": 0.17
     }
   },
   {
@@ -89,10 +89,10 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.198,
+      "x": 0.217,
       "y": 0.507,
-      "w": 0.151,
-      "h": 0.168
+      "w": 0.17,
+      "h": 0.17
     }
   },
   {
@@ -101,10 +101,10 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.355,
+      "x": 0.39,
       "y": 0.507,
-      "w": 0.151,
-      "h": 0.168
+      "w": 0.17,
+      "h": 0.17
     }
   },
   {
@@ -113,10 +113,10 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.512,
+      "x": 0.563,
       "y": 0.507,
-      "w": 0.151,
-      "h": 0.168
+      "w": 0.17,
+      "h": 0.17
     }
   }
 ]

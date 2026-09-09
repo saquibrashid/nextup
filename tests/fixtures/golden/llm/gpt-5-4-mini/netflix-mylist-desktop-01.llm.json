@@ -1,0 +1,122 @@
+[
+  {
+    "visibleText": "LADIES FIRST",
+    "identifiedTitle": "Ladies First",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.032,
+      "y": 0.338,
+      "w": 0.168,
+      "h": 0.091
+    }
+  },
+  {
+    "visibleText": "RAW",
+    "identifiedTitle": "WWE Raw",
+    "basis": "both",
+    "confidence": 0.98,
+    "box": {
+      "x": 0.205,
+      "y": 0.338,
+      "w": 0.168,
+      "h": 0.091
+    }
+  },
+  {
+    "visibleText": "WICKED FOR GOOD",
+    "identifiedTitle": "Wicked: For Good",
+    "basis": "both",
+    "confidence": 0.97,
+    "box": {
+      "x": 0.359,
+      "y": 0.338,
+      "w": 0.168,
+      "h": 0.091
+    }
+  },
+  {
+    "visibleText": "HIS & HERS",
+    "identifiedTitle": "His & Hers",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.513,
+      "y": 0.338,
+      "w": 0.168,
+      "h": 0.091
+    }
+  },
+  {
+    "visibleText": "MAN ON FIRE",
+    "identifiedTitle": "Man on Fire",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.668,
+      "y": 0.338,
+      "w": 0.168,
+      "h": 0.091
+    }
+  },
+  {
+    "visibleText": "STRANGER THINGS\nVHS SPECIAL EDITION",
+    "identifiedTitle": "Stranger Things: VHS Special Edition",
+    "basis": "both",
+    "confidence": 0.98,
+    "box": {
+      "x": 0.822,
+      "y": 0.338,
+      "w": 0.168,
+      "h": 0.091
+    }
+  },
+  {
+    "visibleText": "In the Hand of Dante",
+    "identifiedTitle": "In the Hand of Dante",
+    "basis": "both",
+    "confidence": 0.96,
+    "box": {
+      "x": 0.032,
+      "y": 0.607,
+      "w": 0.168,
+      "h": 0.091
+    }
+  },
+  {
+    "visibleText": "LOUIS C.K. RIDICULOUS",
+    "identifiedTitle": "Louis C.K. Ridiculous",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.205,
+      "y": 0.607,
+      "w": 0.168,
+      "h": 0.091
+    }
+  },
+  {
+    "visibleText": "Frankenstein",
+    "identifiedTitle": "Frankenstein",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.359,
+      "y": 0.607,
+      "w": 0.168,
+      "h": 0.091
+    }
+  },
+  {
+    "visibleText": "Dora's Big Idea",
+    "identifiedTitle": "Dora's Big Idea",
+    "basis": "both",
+    "confidence": 0.95,
+    "box": {
+      "x": 0.513,
+      "y": 0.607,
+      "w": 0.168,
+      "h": 0.091
+    }
+  }
+]

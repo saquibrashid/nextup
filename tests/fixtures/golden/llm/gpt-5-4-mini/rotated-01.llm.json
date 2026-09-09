@@ -1,0 +1,74 @@
+[
+  {
+    "visibleText": "Lanterns",
+    "identifiedTitle": "Lanterns",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.756,
+      "y": 0.045,
+      "w": 0.104,
+      "h": 0.351
+    }
+  },
+  {
+    "visibleText": "Normal",
+    "identifiedTitle": "Normal",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.638,
+      "y": 0.045,
+      "w": 0.104,
+      "h": 0.351
+    }
+  },
+  {
+    "visibleText": "The Drama",
+    "identifiedTitle": "The Drama",
+    "basis": "both",
+    "confidence": 0.98,
+    "box": {
+      "x": 0.52,
+      "y": 0.045,
+      "w": 0.104,
+      "h": 0.351
+    }
+  },
+  {
+    "visibleText": "Ramy Youssef: In Love",
+    "identifiedTitle": "Ramy Youssef: In Love",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.402,
+      "y": 0.045,
+      "w": 0.104,
+      "h": 0.351
+    }
+  },
+  {
+    "visibleText": "Greenland 2: Migration",
+    "identifiedTitle": "Greenland 2: Migration",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.284,
+      "y": 0.045,
+      "w": 0.104,
+      "h": 0.351
+    }
+  },
+  {
+    "visibleText": "True Detective",
+    "identifiedTitle": "True Detective",
+    "basis": "both",
+    "confidence": 0.99,
+    "box": {
+      "x": 0.166,
+      "y": 0.045,
+      "w": 0.104,
+      "h": 0.351
+    }
+  }
+]

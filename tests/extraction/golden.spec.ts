@@ -2,10 +2,15 @@
  * T1 — the offline golden metric suite (`specs/ai.md` §9.2, TASK-079).
  *
  * The committed recordings are replayed through the **real** `crossCheck()`,
- * the **real** `cleanup()` and the **real** `matchCandidate()`, and scored
- * against `expected/` — the answer key, which was authored by reading the
- * images and never from any reader's output (`tools/golden-expected.mjs`).
- * No network, no Azure account, no cost, every PR.
+ * the **real** `cleanup()`, the **real** §7.4 collapse and the **real**
+ * `matchCandidate()`, and scored against `expected/` — the answer key, which
+ * was authored by reading the images and never from any reader's output
+ * (`tools/golden-expected.mjs`). No network, no Azure account, no cost, every
+ * PR.
+ *
+ * ⚠ THE SCORING LIVES IN `goldenScorer.ts`, NOT HERE, and it is shared with
+ * the §9.7 bake-off. Two copies of the scoring code would report a difference
+ * between the COPIES as a difference between the MODELS.
  *
  * ⚠ EVERY METRIC HERE HAS A ZERO-YIELD FAILURE MODE THAT READS AS A PASS.
  * If the recordings were not found, recall is 0 (caught), but the false-title
@@ -22,35 +27,28 @@
  * not for changing the number.
  */
 
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  cleanup,
-  collapseOverlap,
-  crossCheck,
-  matchCandidate,
-  normaliseTitleText,
-  type CleanedCandidate,
-  type ExtractionCandidate,
-  type MediaType,
-  type TmdbSearchResult,
-} from '@nextup/domain';
+import { matchCandidate, normaliseTitleText } from '@nextup/domain';
 
 import {
   DEFAULT_RECORDING_MODEL_ID,
   goldenRecordingStore,
   sha256OfBytes,
 } from '../../apps/api/src/extraction/recordings.js';
-import { StubExtractor } from '../../apps/api/src/extraction/stubExtractor.js';
-import type { ImageMimeType } from '@nextup/domain';
 
-const GOLDEN = path.resolve(__dirname, '../fixtures/golden');
-const IMAGES = path.join(GOLDEN, 'images');
-const EXPECTED = path.join(GOLDEN, 'expected');
-const TMDB = path.join(GOLDEN, 'tmdb');
+import {
+  GOLDEN,
+  IMAGES,
+  RECALL_VERDICTS,
+  manifest,
+  hasTmdbFixture,
+  scoreAll,
+  tmdbResultsFor,
+} from './goldenScorer.js';
 
 /* ------------------------------------------------------------------ *
  * §9.2 gates. Named constants, because a bare `0.95` inside an
@@ -59,219 +57,13 @@ const TMDB = path.join(GOLDEN, 'tmdb');
 const AGGREGATE_RECALL_FLOOR = 0.95;
 const AGGREGATE_FALSE_TITLE_CEILING = 0.1;
 const FABRICATION_RATE_CEILING = 0.05;
+const OMISSION_RECOVERY_FLOOR = 1.0;
 const CHROME_REJECTION_FLOOR = 0.8;
 const MATCH_ACCURACY_FLOOR = 0.9;
 const ARTWORK_RECALL_FLOOR = 0.8;
-const OMISSION_RECOVERY_FLOOR = 1.0;
-
-/** §9.2: a title the reader FOUND, however it flagged it. */
-const RECALL_VERDICTS = new Set(['title-candidate', 'low-confidence', 'inferred-unverified']);
-
-interface ExpectedCandidate {
-  readonly title: string;
-  readonly normalisedText: string;
-  readonly verdict: string;
-  readonly expectedWorkIdentity: string | null;
-  readonly expectedBasis: string;
-}
-
-interface ExpectedDoc {
-  readonly imageId: string;
-  readonly expectedCandidates: readonly ExpectedCandidate[];
-  readonly expectedChrome: readonly string[];
-  readonly minRecall: number;
-  readonly maxFalseTitles: number;
-  readonly maxFabricated: number;
-}
-
-interface ManifestImage {
-  readonly id: string;
-  readonly file: string;
-  readonly sha256?: string;
-  readonly expectedArtworkOnly?: boolean;
-}
-
-const manifest = JSON.parse(readFileSync(path.join(GOLDEN, 'manifest.json'), 'utf8')) as {
-  images: ManifestImage[];
-};
-
-const MIME: Record<string, ImageMimeType> = {
-  '.png': 'image/png',
-  '.jpg': 'image/jpeg',
-  '.jpeg': 'image/jpeg',
-  '.heic': 'image/heic',
-};
 
 const store = goldenRecordingStore(GOLDEN, DEFAULT_RECORDING_MODEL_ID);
-const extractor = new StubExtractor({ recordings: store, crossCheck });
-
-interface Scored {
-  readonly image: ManifestImage;
-  readonly expected: ExpectedDoc;
-  readonly candidates: readonly ExtractionCandidate[];
-  readonly recall: number;
-  readonly found: number;
-  readonly falseTitles: number;
-  readonly fabricated: number;
-  readonly chromeRejected: number;
-}
-
-/**
- * ⚠ `now` IS PINNED. `cleanup()` judges an extracted year plausible against
- * the current date, so an unpinned clock makes this suite's verdicts a
- * function of the day it runs — a fixture whose year sits at the future
- * allowance boundary would flip from `title-candidate` to `low-confidence`
- * on its own, months after anyone touched the code.
- */
-const NOW = new Date('2026-09-09T00:00:00.000Z');
-
-/**
- * Promote stage-2 output into the stored shape stage 4 operates on.
- *
- * ⚠ THIS SUITE MUST RUN §7.4's COLLAPSE, AND THE PRODUCTION RUNNER DOES NOT
- * RUN IT YET. `apps/api/src/jobs/startExtraction.ts` stops after `cleanup()`
- * and says so — stages 3–5 are TASK-060. Measuring the raw stage-2 output
- * would therefore score the SAME work twice on every Netflix mobile capture,
- * because stage 1c's consumption is GEOMETRY-scoped: the caption on Netflix's
- * mobile list layout sits beside the artwork rather than over it, so the OCR
- * line never overlaps the tile's box, is never marked consumed, and is
- * correctly re-emitted as an orphan. Both readings are right; they are one
- * title. Counting the orphan as a false title would report a defect that does
- * not exist, and would do it on 6 of the 11 images.
- */
-function asCandidate(cleaned: CleanedCandidate, imageId: string, seq: number): ExtractionCandidate {
-  return {
-    id: `cand:golden:${imageId}:${String(seq)}`,
-    type: 'extractionCandidate',
-    ownerId: 'o_golden',
-    batchId: 'golden',
-    sourceImageIds: [imageId],
-    rawText: cleaned.item.rawText,
-    inferredTitle: cleaned.item.inferredTitle,
-    basis: cleaned.item.basis,
-    ocrSupport: cleaned.item.ocrSupport,
-    provider: cleaned.item.provider,
-    normalisedText: cleaned.normalisedText,
-    extractedYear: cleaned.extractedYear,
-    boundingBoxes: [cleaned.item.boundingBox],
-    boxSource: cleaned.item.boxSource,
-    ocrConfidence: cleaned.item.confidence,
-    cleanupVerdict: cleaned.cleanupVerdict,
-    resolvedWorkIdentity: null,
-    matchCandidates: [],
-    classification: null,
-    reviewDisposition: 'pending',
-    correctedToTmdbId: null,
-    collapsedIntoCandidateId: null,
-    createdAt: NOW.toISOString(),
-  };
-}
-
-async function scoreAll(): Promise<Scored[]> {
-  const out: Scored[] = [];
-
-  for (const image of manifest.images) {
-    const expected = JSON.parse(
-      readFileSync(path.join(EXPECTED, `${image.id}.expected.json`), 'utf8'),
-    ) as ExpectedDoc;
-
-    const bytes = readFileSync(path.join(IMAGES, image.file));
-    const mime = MIME[path.extname(image.file).toLowerCase()];
-    expect(mime, `${image.file} has an unmapped extension`).toBeDefined();
-
-    const result = await extractor.extract(bytes, mime!);
-    const cleaned = cleanup(result.items, { now: NOW });
-
-    // Stage 4, the REAL one. Losers are retained by design (REQ-012), so the
-    // survivors are the works — `collapsedIntoCandidateId === null`.
-    const collapsed = collapseOverlap(
-      cleaned.map((c, i) => asCandidate(c, image.id, i)),
-      { pass: 'pre-match', imageOrder: [image.id] },
-    );
-    const candidates = collapsed.candidates.filter((c) => c.collapsedIntoCandidateId === null);
-
-    const expectedTexts = new Set(expected.expectedCandidates.map((c) => c.normalisedText));
-    const chromeTexts = new Set(expected.expectedChrome);
-
-    const foundTexts = new Set(
-      candidates.filter((c) => RECALL_VERDICTS.has(c.cleanupVerdict)).map((c) => c.normalisedText),
-    );
-    const found = [...expectedTexts].filter((t) => foundTexts.has(t)).length;
-
-    // ⚠ Recall over an EMPTY expected set is 1.0, not 0. `blank-no-content-01`
-    // has no titles at all; scoring 0/0 as a failure would make the one image
-    // that exists to test fabrication fail permanently on recall instead.
-    const recall = expectedTexts.size === 0 ? 1 : found / expectedTexts.size;
-
-    // ⚠ Chrome is EXCLUDED from the false-title count, and deliberately so:
-    // chrome that leaked through as a title is measured by the chrome
-    // rejection metric, and counting it twice would let one defect blow two
-    // unrelated gates and obscure which one actually moved.
-    const falseTitles = candidates.filter(
-      (c) =>
-        c.cleanupVerdict === 'title-candidate' &&
-        !expectedTexts.has(c.normalisedText) &&
-        !chromeTexts.has(c.normalisedText),
-    ).length;
-
-    // §9.2 fabrication: `ocrSupport === 'none'` AND neither an expected title
-    // nor a TMDB match. An artwork read is uncorroborated BY DESIGN, so
-    // "uncorroborated" alone is not fabrication — §9.4.
-    const fabricated = candidates.filter(
-      (c) =>
-        c.ocrSupport === 'none' &&
-        !expectedTexts.has(c.normalisedText) &&
-        !hasTmdbFixture(c.normalisedText),
-    ).length;
-
-    const chromeRejected = [...chromeTexts].filter((t) =>
-      candidates.some((c) => c.normalisedText === t && c.cleanupVerdict === 'chrome-suspected'),
-    ).length;
-
-    out.push({
-      image,
-      expected,
-      candidates,
-      recall,
-      found,
-      falseTitles,
-      fabricated,
-      chromeRejected,
-    });
-  }
-
-  return out;
-}
-
-const tmdbFiles = new Set(readdirSync(TMDB));
-const slug = (normalised: string): string => `${normalised.replace(/ /g, '-')}.json`;
-function hasTmdbFixture(normalised: string): boolean {
-  return tmdbFiles.has(slug(normalised));
-}
-
-interface RecordedTmdb {
-  readonly results: readonly {
-    readonly id: number;
-    readonly mediaType: MediaType;
-    readonly title: string;
-    readonly releaseDate: string | null;
-  }[];
-}
-
-function tmdbResultsFor(normalised: string): TmdbSearchResult[] {
-  if (!hasTmdbFixture(normalised)) return [];
-  const doc = JSON.parse(readFileSync(path.join(TMDB, slug(normalised)), 'utf8')) as RecordedTmdb;
-  return doc.results.map((r) => ({
-    tmdbId: r.id,
-    mediaType: r.mediaType,
-    name: r.title,
-    releaseYear: r.releaseDate === null ? null : Number(r.releaseDate.slice(0, 4)),
-    posterPath: null,
-  }));
-}
-
-const scored = await scoreAll();
-
+const scored = await scoreAll(DEFAULT_RECORDING_MODEL_ID);
 /* ------------------------------------------------------------------ *
  * ⚠ WHY THE §9.2 GATES ARE NOT ASSERTED AS PASS/FAIL YET, AND WHAT IS
  *   ASSERTED INSTEAD.
@@ -337,7 +129,7 @@ const KNOWN_SHORTFALLS = {
    * FRAGMENTS of a two-line caption (`stranger things vhs` + `special
    * edition`) survive as separate candidates and are counted here.
    */
-  aggregateFalseTitleRate: 0.25961538461538464,
+  aggregateFalseTitleRate: 0.25,
   /**
    * The §3.2 vocabulary is a fixed list of 26 EXACT terms, and the corpus's
    * real chrome is mostly outside it: `sort by`, `top matches`, `haven't
@@ -352,7 +144,7 @@ const KNOWN_SHORTFALLS = {
    * spec change, and the line-merging problem is not a vocabulary problem at
    * all.
    */
-  chromeRejectionRate: 0.2222222222222222,
+  chromeRejectionRate: 0.2361111111111111,
   /**
    * 18 of 24. ⚠ THE MOST IMPORTANT FINDING IN THIS FILE, and one no synthetic
    * corpus would ever have produced: every single miss is a **2025 release
@@ -375,7 +167,7 @@ const KNOWN_SHORTFALLS = {
    */
   matchAccuracy: 0.75,
   /**
-   * 4 of 6. ⚠ §9.2 sets this floor at **1.0 and calls it non-negotiable**, so
+   * 2 of 4. ⚠ §9.2 sets this floor at **1.0 and calls it non-negotiable**, so
    * this is the most serious shortfall in the ledger — and its cause is the
    * same geometry-scoped consumption as the false-title rate, seen from the
    * other side.
@@ -393,7 +185,7 @@ const KNOWN_SHORTFALLS = {
    * opposite failures, both traceable to `crossCheck.ts` L106-109 scoping
    * consumption by geometry alone rather than by geometry AND text agreement.
    */
-  omissionRecovery: 0.6666666666666666,
+  omissionRecovery: 0.5,
 } as const;
 
 /**
@@ -673,7 +465,7 @@ describe('T-AI-039 a title the model missed is recovered from the OCR leg', () =
     // recordings rather than of the code. It is pinned so that a corpus which
     // stops exercising this stops doing so VISIBLY, instead of leaving a
     // non-negotiable metric quietly asserting nothing.
-    expect(recoverable).toBe(6);
+    expect(recoverable).toBe(4);
     expect(recovered / recoverable, `not recovered:\n  ${missed.join('\n  ')}`).toBe(
       KNOWN_SHORTFALLS.omissionRecovery,
     );

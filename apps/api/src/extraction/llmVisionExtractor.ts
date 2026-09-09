@@ -111,6 +111,26 @@ export interface LlmVisionExtractorOptions {
    */
   credential: TokenCredential;
   apiVersion?: string;
+  /**
+   * Which token-ceiling parameter to send. **Production must not set this** —
+   * it defaults to `max_tokens`, which is what §4.2 specifies and what
+   * `gpt-4.1` accepts.
+   *
+   * ⚠ IT EXISTS FOR THE §9.7 BAKE-OFF, AND THE REASON IS NOT COSMETIC.
+   * `gpt-5-4-mini` **rejects `max_tokens` outright** —
+   * *"'max_tokens' is not supported with this model. Use
+   * 'max_completion_tokens' instead."* — so a challenger arm cannot be
+   * recorded at all without this. Stage 1 requires the two arms differ **only**
+   * by deployment name, so the fix is NOT to give the challenger a different
+   * parameter from the incumbent: it is to send `max_completion_tokens` to
+   * **both**, which was verified against the live `gpt-4.1` deployment before
+   * being relied on here.
+   *
+   * ⚠ A CONSEQUENCE WORTH COUNTING, per §9.7: if the challenger ever wins,
+   * promoting it forces production from `max_tokens` to
+   * `max_completion_tokens` as well as an ADR-0001 revision.
+   */
+  tokenParam?: 'max_tokens' | 'max_completion_tokens';
   /** Injected so retry backoff does not add five seconds to every test. */
   sleep?: (ms: number) => Promise<void>;
   /** Injected so the timeout path is assertable without waiting 60 s. */
@@ -193,9 +213,11 @@ export class LlmVisionExtractor implements TitleExtractor {
   readonly #timeoutMs: number;
   readonly #newCorrelationId: () => string;
   readonly #log: (event: LlmLogEvent) => void;
+  readonly #tokenParam: 'max_tokens' | 'max_completion_tokens';
 
   constructor(options: LlmVisionExtractorOptions) {
     this.#deployment = options.deployment;
+    this.#tokenParam = options.tokenParam ?? 'max_tokens';
     this.#sleep = options.sleep ?? realSleep;
     this.#timeoutMs = options.timeoutMs ?? AOAI_TIMEOUT_MS;
     this.#newCorrelationId = options.newCorrelationId ?? (() => randomUUID());
@@ -363,7 +385,7 @@ export class LlmVisionExtractor implements TitleExtractor {
           temperature: AOAI_TEMPERATURE,
           top_p: AOAI_TOP_P,
           seed: AOAI_SEED,
-          max_tokens: AOAI_MAX_TOKENS,
+          [this.#tokenParam]: AOAI_MAX_TOKENS,
           response_format: {
             type: 'json_schema',
             json_schema: { name: TILE_SCHEMA_NAME, strict: true, schema: TILE_SCHEMA },

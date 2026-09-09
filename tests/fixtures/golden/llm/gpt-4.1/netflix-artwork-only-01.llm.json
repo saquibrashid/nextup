@@ -1,11 +1,11 @@
 [
   {
-    "visibleText": "STRANGER THINGS Tales from 85",
+    "visibleText": "STRANGER THINGS TALES FROM 85",
     "identifiedTitle": "Stranger Things: Tales from 85",
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.035,
+      "x": 0.058,
       "y": 0.343,
       "w": 0.181,
       "h": 0.242
@@ -17,7 +17,7 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.222,
+      "x": 0.247,
       "y": 0.343,
       "w": 0.181,
       "h": 0.242
@@ -29,7 +29,7 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.409,
+      "x": 0.436,
       "y": 0.343,
       "w": 0.181,
       "h": 0.242
@@ -41,7 +41,7 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.596,
+      "x": 0.625,
       "y": 0.343,
       "w": 0.181,
       "h": 0.242
@@ -53,7 +53,7 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.783,
+      "x": 0.814,
       "y": 0.343,
       "w": 0.181,
       "h": 0.242
@@ -65,7 +65,7 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.97,
+      "x": 1,
       "y": 0.343,
       "w": 0.181,
       "h": 0.242
@@ -77,7 +77,7 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.035,
+      "x": 0.058,
       "y": 0.627,
       "w": 0.181,
       "h": 0.242
@@ -89,7 +89,7 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.222,
+      "x": 0.247,
       "y": 0.627,
       "w": 0.181,
       "h": 0.242
@@ -101,7 +101,7 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.409,
+      "x": 0.436,
       "y": 0.627,
       "w": 0.181,
       "h": 0.242
@@ -113,7 +113,7 @@
     "basis": "both",
     "confidence": 1,
     "box": {
-      "x": 0.596,
+      "x": 0.625,
       "y": 0.627,
       "w": 0.181,
       "h": 0.242
