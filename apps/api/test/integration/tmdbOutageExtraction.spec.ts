@@ -203,7 +203,7 @@ describe('T-AI-017 · §4.3 · a live TMDB 503 records itself and is shown to th
     // 3 — every candidate resolved to an `unmatched:` identity, never `null`
     //     and never a guess.
     const candidates = await testPrisma().extractionCandidate.findMany({
-      where: { ownerId, batchId: 'batch-outage-1' },
+      where: { ownerId: owner, batchId: 'batch-outage-1' },
     });
     expect(candidates.length).toBeGreaterThan(0);
     for (const candidate of candidates) {
@@ -237,7 +237,7 @@ describe('T-AI-017 · §4.3 · a live TMDB 503 records itself and is shown to th
     });
 
     const candidates = await testPrisma().extractionCandidate.findMany({
-      where: { ownerId, batchId: 'batch-outage-2' },
+      where: { ownerId: owner, batchId: 'batch-outage-2' },
     });
     expect(candidates.length).toBe(2);
     const searches = calls.filter((call) => call.includes('/search/multi'));
