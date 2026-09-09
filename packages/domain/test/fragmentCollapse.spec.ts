@@ -282,7 +282,7 @@ describe('T-AI-048 · the fragment collapse', () => {
 
   it('T-AI-048j: a candidate with no geometry never collapses — absent evidence is not proximity', () => {
     const [host, fragment] = pair('wicked for good', 'wicked', 0.5);
-    const noBoxes = { ...fragment, boundingBoxes: [], boxSource: 'none' as const };
+    const noBoxes = { ...fragment, boundingBoxes: [] };
 
     const result = collapseFragments([host, noBoxes], { pass: 'pre-match', imageOrder });
 
