@@ -1,0 +1,15 @@
+{
+  "query": "In the Hand of Dante",
+  "normalisedText": "in the hand of dante",
+  "results": [
+    {
+      "id": 1020047,
+      "mediaType": "movie",
+      "title": "In the Hand of Dante",
+      "originalTitle": "In the Hand of Dante",
+      "releaseDate": "2026-06-12",
+      "popularity": 5.1032,
+      "overview": "A Vatican priest discovers Dante's original Divine Comedy manuscript. When asked to authenticate it, writer Nick Tosches steals it, while a parallel story follows Dante's quest to create his masterpiece."
+    }
+  ]
+}

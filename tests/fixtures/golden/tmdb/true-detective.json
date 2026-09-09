@@ -1,0 +1,87 @@
+{
+  "query": "True Detective",
+  "normalisedText": "true detective",
+  "results": [
+    {
+      "id": 46648,
+      "mediaType": "tv",
+      "title": "True Detective",
+      "originalTitle": "True Detective",
+      "releaseDate": "2014-01-12",
+      "popularity": 66.0733,
+      "overview": "An American anthology police detective series utilizing multiple timelines in which investigations seem to unearth personal and professional secrets of those involved, both within or outside the law."
+    },
+    {
+      "id": 248248,
+      "mediaType": "tv",
+      "title": "True Detective Mr. Qin",
+      "originalTitle": "真探秦先生",
+      "releaseDate": "2023-04-04",
+      "popularity": 2.7686,
+      "overview": "The adventures of Mr. Qin as he embarks on a suspenseful journey into the supernatural to solve eerie cases in the city."
+    },
+    {
+      "id": 234994,
+      "mediaType": "tv",
+      "title": "True Crime Story: Citizen Detective",
+      "originalTitle": "True Crime Story: Citizen Detective",
+      "releaseDate": "2023-10-12",
+      "popularity": 1.8361,
+      "overview": "The gripping stories of everyday citizens who have solved or are attempting to solve a murder. Each episode focuses on an individual citizen detective – or a group working together – and the case that they’re consumed by, unpacking the details of the case and exploring the psyches of those who simply need to know what happened and why?"
+    },
+    {
+      "id": 1539875,
+      "mediaType": "movie",
+      "title": "Samurai Detective Onihei: True Master",
+      "originalTitle": "鬼平犯科帳 血頭の丹兵衛",
+      "releaseDate": "2024-07-06",
+      "popularity": 2.8958,
+      "overview": "The story follows detective Heizo, played by Koshiro Matsumoto, who investigates Tanbei Chigashira, a notorious thief. Kumehachi, a former member of Tanbei's gang, claims that their former leader is an impostor. The real Tanbei Chigashira followed three strict rules: do not kill, do not rape women, and do not steal from the poor."
+    },
+    {
+      "id": 1095131,
+      "mediaType": "movie",
+      "title": "TRUE DARKNESS: DETECTIVES",
+      "originalTitle": "TRUE DARKNESS: DETECTIVES",
+      "releaseDate": "2022-02-22",
+      "popularity": 0.9185,
+      "overview": "Jake gets himself arrested to deliver a message to a cynical cop, but will he believe Jake when he finds out who it’s from?"
+    },
+    {
+      "id": 245712,
+      "mediaType": "tv",
+      "title": "True Detectives",
+      "originalTitle": "True Detectives",
+      "releaseDate": "1990-12-28",
+      "popularity": 0.677,
+      "overview": "Reality based TV series where real and amateur detectives present some of their toughest cases through dramatic re-enactments and interviews with actual eyewitnesses."
+    },
+    {
+      "id": 1756397,
+      "mediaType": "movie",
+      "title": "True Detectives",
+      "originalTitle": "True Detectives",
+      "releaseDate": null,
+      "popularity": 0.5354,
+      "overview": "As two detectives wander between the labyrinth of a city and an endless desert in search of their colleague’s killer, the investigation slowly dissolves into a meditation on memory, identity, and the nature of guilt."
+    },
+    {
+      "id": 979287,
+      "mediaType": "movie",
+      "title": "Nandor Fodor and the Talking Mongoose",
+      "originalTitle": "Nandor Fodor and the Talking Mongoose",
+      "releaseDate": "2023-09-01",
+      "popularity": 2.8145,
+      "overview": "In 1935, Hungarian-American para-psychologist Nandor Fodor began his investigation of a strange occurrence on the Isle of Man. An average British family, the Irvings, claimed to have been contacted by a mysterious entity at their farm. A talking mongoose. Named Gef (Pronounced \"Jeff\".)"
+    },
+    {
+      "id": 37144,
+      "mediaType": "movie",
+      "title": "True Crime",
+      "originalTitle": "True Crime",
+      "releaseDate": "1995-12-01",
+      "popularity": 1.8625,
+      "overview": "Mary Giordano is a bright, intelligent student who goes to a catholic school. She also has an addiction to mystery novels and detective magazines, which inspire her to do her own detective work. When she starts snooping around on the case of a murderer of teenage girls, it gets her in hot water with her mentor Detective Jerry Gunn. But it also starts a team up with police cadet Tony Campbell. The two work together to find the murderer. But the closer Mary gets to solving the murder, the more danger she puts herself in of being the next victim."
+    }
+  ]
+}

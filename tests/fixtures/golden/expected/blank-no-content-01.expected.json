@@ -1,0 +1,15 @@
+{
+  "imageId": "blank-no-content-01",
+  "expectedCandidates": [],
+  "expectedChrome": [
+    "my list",
+    "search",
+    "you haven t added anything yet",
+    "titles you add to your list will appear here",
+    "home",
+    "new hot"
+  ],
+  "minRecall": 1,
+  "maxFalseTitles": 0,
+  "maxFabricated": 0
+}

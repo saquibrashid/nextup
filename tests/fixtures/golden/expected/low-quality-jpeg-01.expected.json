@@ -1,0 +1,79 @@
+{
+  "imageId": "low-quality-jpeg-01",
+  "expectedCandidates": [
+    {
+      "title": "Ladies First",
+      "normalisedText": "ladies first",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:1368881",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "Raw",
+      "normalisedText": "raw",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:tv:4656",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "Wicked: For Good",
+      "normalisedText": "wicked for good",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:967941",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "His & Hers",
+      "normalisedText": "his hers",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:tv:259731",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "Man on Fire",
+      "normalisedText": "man on fire",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:9509",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "Stranger Things: VHS Special Edition",
+      "normalisedText": "stranger things vhs special edition",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:tv:66732",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "In the Hand of Dante",
+      "normalisedText": "in the hand of dante",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:1020047",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "Louis C.K.: Ridiculous",
+      "normalisedText": "louis c k ridiculous",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:1662958",
+      "expectedBasis": "text"
+    }
+  ],
+  "expectedChrome": [
+    "my list",
+    "tv shows movies",
+    "games",
+    "home",
+    "clips",
+    "search",
+    "my netflix",
+    "tv shows",
+    "movies",
+    "haven t started",
+    "started",
+    "sort by",
+    "top matches"
+  ],
+  "minRecall": 0.85,
+  "maxFalseTitles": 1,
+  "maxFabricated": 0
+}

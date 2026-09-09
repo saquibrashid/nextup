@@ -1,0 +1,24 @@
+{
+  "query": "Stranger Things: Tales From '85",
+  "normalisedText": "stranger things tales from 85",
+  "results": [
+    {
+      "id": 224263,
+      "mediaType": "tv",
+      "title": "Stranger Things: Tales from '85",
+      "originalTitle": "Stranger Things: Tales from '85",
+      "releaseDate": "2026-04-23",
+      "popularity": 28.513,
+      "overview": "Winter. Hawkins. 1985. Welcome back to a town crawling with secrets, where beloved heroes are facing fresh mysteries... and an all-new breed of strange."
+    },
+    {
+      "id": 1664583,
+      "mediaType": "movie",
+      "title": "Stranger Things: Tales from '85 Theatrical Preview",
+      "originalTitle": "Stranger Things: Tales from '85 Theatrical Preview",
+      "releaseDate": "2026-04-18",
+      "popularity": 1.751,
+      "overview": "In the winter of 1985, snow blankets the town and the horrors of the Upside Down are finally fading. Our heroes Eleven, Mike, Will, Dustin, Lucas, and Max have settled back into a normal life of D&D, snowball fights, and quiet days. But beneath the ice, something terrifying has awakened. A special limited theatrical screening of the first two episodes."
+    }
+  ]
+}

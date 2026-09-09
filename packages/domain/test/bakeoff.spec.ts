@@ -442,38 +442,50 @@ describe('T-AI-045f · the bake-off never runs in CI', () => {
   });
 });
 
-describe('T-AI-045a/b/c · deferred — the ANSWER KEY does not exist yet', () => {
-  it('T-AI-045u · claims a/b/c · the answer key is genuinely absent, so they are deferred rather than passing vacuously', () => {
+describe('T-AI-045a/b/c · deferred — the CHALLENGER has not been recorded yet', () => {
+  it('T-AI-045u · claims a/b/c · the challenger arm is genuinely absent, so they are deferred rather than passing vacuously', () => {
     // ⚠ THIS TEST GUARDS THE HONESTY OF THIS FILE'S OWN SCOPE NOTE, and it is
     // the reason a/b/c are not written as empty loops over a missing
     // directory. It asserts the STATED REASON for deferral is still true, so
     // it fails the moment that reason stops holding — which is the prompt to
     // come back and write a, b and c for real.
     //
-    // It fired as designed on 2026-09-09, when TASK-079's recorder landed
-    // `llm/gpt-4.1/` and `ocr/` from the live providers. Those two directories
-    // are therefore no longer part of the claim. What still blocks the
-    // bake-off is `expected/` — and it is the half that CANNOT be generated:
-    // an answer key derived from a model's own output grades that model
-    // against itself, which is precisely the comparison §9.7 exists to make
-    // impossible. Narrowed rather than deleted: dropping the case would leave
-    // a/b/c silently deferred with nothing to prompt their return.
+    // It has now fired TWICE, exactly as designed, and each time the claim
+    // narrowed rather than the test being deleted:
+    //
+    //   2026-09-09 — TASK-079's recorder landed `llm/gpt-4.1/` and `ocr/`
+    //     from the live providers, so the recordings left the claim.
+    //   2026-09-09 — TASK-078's answer key landed `expected/`, authored by
+    //     READING the eleven images rather than by reading any model's output,
+    //     so the answer key left the claim too.
+    //
+    // What remains is the one thing a comparison cannot do without: the
+    // CHALLENGER's own recordings. §9.7 Stage 1 requires both arms recorded
+    // against the same images and scored against the same key; with a single
+    // arm on disk, a/b/c could only ever compare the incumbent with itself.
     //
     // ~~`expect(present).not.toContain('ocr'); expect(present).not.toContain('llm');`~~
-    // *(superseded: the recordings landed; only the answer key remains.)*
+    // ~~`expect(present).not.toContain('expected');`~~
+    // *(both superseded: the recordings and the answer key have landed.)*
     const golden = path.join(REPO_ROOT, 'tests/fixtures/golden');
     const present = readdirSync(golden).filter((entry) => {
       const full = path.join(golden, entry);
       return statSync(full).isDirectory();
     });
 
-    expect(present).not.toContain('expected');
+    // Recordings are model-scoped (`llm/<modelId>/`); OCR is not, because the
+    // OCR leg is held identical across arms by §9.7 Stage 1.
+    const arms = readdirSync(path.join(golden, 'llm')).filter((entry) =>
+      statSync(path.join(golden, 'llm', entry)).isDirectory(),
+    );
+    expect(arms).toEqual(['gpt-4.1']);
 
     // Non-vacuity, and it is load-bearing now that the claim is a single
     // negative: if `tests/fixtures/golden` were ever moved or emptied, the
     // assertion above would pass over nothing at all and report the corpus as
     // "still absent" for ever.
     expect(present).toContain('images');
+    expect(present).toContain('expected');
     expect(present).toContain('llm');
     expect(present).toContain('ocr');
   });

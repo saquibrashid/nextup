@@ -1,0 +1,15 @@
+{
+  "query": "The Whisper Man",
+  "normalisedText": "whisper man",
+  "results": [
+    {
+      "id": 860508,
+      "mediaType": "movie",
+      "title": "The Whisper Man",
+      "originalTitle": "The Whisper Man",
+      "releaseDate": "2026-08-27",
+      "popularity": 118.3923,
+      "overview": "When his young son vanishes, a widower enlists help from his estranged father, a retired detective who put away the serial killer now linked to the case."
+    }
+  ]
+}

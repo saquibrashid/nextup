@@ -1,0 +1,88 @@
+{
+  "imageId": "netflix-mylist-desktop-01",
+  "expectedCandidates": [
+    {
+      "title": "Ladies First",
+      "normalisedText": "ladies first",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:1368881",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "Raw",
+      "normalisedText": "raw",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:tv:4656",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "Wicked: For Good",
+      "normalisedText": "wicked for good",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:967941",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "His & Hers",
+      "normalisedText": "his hers",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:tv:259731",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "Man on Fire",
+      "normalisedText": "man on fire",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:9509",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "Stranger Things: VHS Special Edition",
+      "normalisedText": "stranger things vhs special edition",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:tv:66732",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "In the Hand of Dante",
+      "normalisedText": "in the hand of dante",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:1020047",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "Louis C.K.: Ridiculous",
+      "normalisedText": "louis c k ridiculous",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:1662958",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "Frankenstein",
+      "normalisedText": "frankenstein",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:1062722",
+      "expectedBasis": "text"
+    },
+    {
+      "title": "Dilwale Dulhania Le Jayenge",
+      "normalisedText": "dilwale dulhania le jayenge",
+      "verdict": "title-candidate",
+      "expectedWorkIdentity": "tmdb:movie:19404",
+      "expectedBasis": "text"
+    }
+  ],
+  "expectedChrome": [
+    "netflix",
+    "home",
+    "shows",
+    "movies",
+    "games",
+    "new popular",
+    "my list",
+    "browse by languages"
+  ],
+  "minRecall": 1,
+  "maxFalseTitles": 1,
+  "maxFabricated": 0
+}
