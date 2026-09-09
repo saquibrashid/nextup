@@ -110,6 +110,33 @@ export function requireServiceOf(batch: {
   return batch.service as Service;
 }
 
+/**
+ * The discovery source a batch was captured from, or `null` when it is an
+ * ordinary service batch.
+ *
+ * ⚠ The mirror image of `requireServiceOf`, and it VALIDATES for the same
+ * reason: `discovery_source` widens to `string | null` through Prisma, so a
+ * cast would let an unrecognised stored value reach the intent-writing path
+ * and be persisted onto every `WatchIntent` it created.
+ *
+ * ⚠ Returns `null` rather than throwing, because unlike `requireServiceOf`
+ * this is the DISCRIMINATOR — callers ask it in order to choose a path, and a
+ * throw would make "this is an ordinary Netflix batch" an exception.
+ */
+export function discoverySourceOf(batch: {
+  id: string;
+  discoverySource: string | null;
+}): DiscoverySource | null {
+  if (batch.discoverySource === null) return null;
+  if (!(DISCOVERY_SOURCES as readonly string[]).includes(batch.discoverySource)) {
+    throw new Error(
+      `Batch ${batch.id} has discovery source "${batch.discoverySource}", which is not a ` +
+        'DISCOVERY_SOURCES member.',
+    );
+  }
+  return batch.discoverySource as DiscoverySource;
+}
+
 /** Display names, mirroring `SERVICE_LABELS` in `copy.ts`. */
 export const DISCOVERY_SOURCE_LABELS: Readonly<Record<DiscoverySource, string>> = {
   'fandango-at-home': 'Fandango at Home',

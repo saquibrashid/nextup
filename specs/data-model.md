@@ -2478,12 +2478,31 @@ Mitigations, none of which fully restores the 35-day window:
   `packages/domain/src/enums.ts`): the waiting set is a different relation, not
   a state of a combined-list row.
 
-### 17.3 The third age constant
+### 17.2a The row shape of a waiting work
+
+`WatchIntent.title_id` is `NOT NULL`, so every waiting work needs a `Title` —
+but by §17.2 it has **no `ServiceListing`**. The row is therefore stored:
+
+| Column | Value | Why |
+|---|---|---|
+| `state` | `'removed'` | `listActiveTitles` filters `state = 'active'`, so an `active` title with no listing would appear in the combined list and break AC-3 / `T-WAIT-003a`. |
+| `sort_date_added` | `NULL` | The work was never added to a list; there is no date to sort it by. |
+
+⚠️ It does **not** appear in the removed log either: that view queries
+`service_listing` rows, not `title.state`, and this title owns none
+(`T-WAIT-003d` pins both halves). ⚠️ Invariant **I-3** ("a title has at least
+one listing") is consequently **advisory, not enforced,** for waiting works,
+and `deriveTitleState` — which throws on zero listings — is never reached
+because reconciliation never runs for a discovery batch (§17.2, AC-4). This
+shape is not novel: it is already what a work in the removed log looks like
+when it is re-discovered.
+
+### 17.3 The fourth age constant
 
 `WATCH_PROVIDER_MAX_AGE_DAYS` is declared in `apps/api/src/config.ts`
-**independently** of `TMDB_METADATA_MAX_AGE_DAYS = 183` (NFR-014) and
-`IMAGE_RETENTION_DAYS = 30` (NFR-019). `T-INV-008` currently forces the
-existing two apart and must be extended to three. ⚠️ Binding availability to
+**independently** of `TMDB_METADATA_MAX_AGE_DAYS = 183` (NFR-014),
+`IMDB_RATING_MAX_AGE_DAYS = 14` (Epic M) and `IMAGE_RETENTION_DAYS = 30`
+(NFR-019). `T-INV-008` forces all four apart. ⚠️ Binding availability to
 the 183-day metadata age would make the feature inert — availability is the
 fast-moving signal the epic exists to catch.
 

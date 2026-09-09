@@ -180,9 +180,6 @@ const KNOWN_UNMAPPED: readonly string[] = [
   // US-040 — Capture a rental storefront's new-release page
   // ⚠ AC-1 and AC-6 were removed by TASK-183 — `T-WAIT-001` maps them.
   'US-040 AC-2',
-  'US-040 AC-3',
-  'US-040 AC-4',
-  'US-040 AC-5',
   // US-041 — Curate the rental page down to what I actually want
   'US-041 AC-1',
   'US-041 AC-2',

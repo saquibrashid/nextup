@@ -8,6 +8,7 @@ export * from './attribution.js';
 // structurally append-only, and how a source splits into the two exclusive
 // store columns. Pure, so the refusal is testable without a route.
 export * from './batchSource.js';
+export * from './watchIntent.js';
 // TASK-064 — new vs already-present, PER SERVICE (`specs/ai.md` §6.1, REQ-010).
 export * from './classify.js';
 export * from './copy.js';
