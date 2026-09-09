@@ -172,8 +172,26 @@ const KNOWN_SHORTFALLS = {
    * not an overlap failure. The four on `max-saved-desktop-01` are a
    * recommendations region. Both are tracked separately; neither is bought by
    * widening this pass.
+   *
+   * ⚠ AND DOWN AGAIN AT TASK-204 - 0.1935 to 0.1525 - the OFF-LIST REGION
+   * (§3.2 step 3b). Three `ocr-only` orphans on `max-saved-desktop-01`
+   * (`hard knocks`, `training camp with`, `seattle seahawks`) sit BELOW
+   * `Recommended For You` and are titles Max is promoting, not titles the
+   * owner saved. They are reclassified `chrome-suspected`, never dropped, so
+   * they leave both sides of the fraction (9/62 -> 9/59 - numerator 12->9,
+   * denominator 62->59).
+   *
+   * ⚠ TWO CORRECTIONS TO TASK-199'S LEDGER, RECORDED SO THE ESTIMATE IS NOT
+   * REUSED. (1) `og studios` on `max-saved-mobile-01` is NOT reachable by
+   * this rule: that recording contains NO `Recommended For You` line at all,
+   * so there is no anchor. The ledger's "mobile header at y 0.829" is not in
+   * the OCR. (2) The rule DOES fire on `rotated-01`, and it correctly derives
+   * the **x** axis there rather than `y` - which is the whole reason the axis
+   * is derived from the header's position relative to the primary reader's
+   * hull instead of assumed. It excludes nothing there, and per-image recall is
+   * unchanged.
    */
-  aggregateFalseTitleRate: 0.1935483870967742,
+  aggregateFalseTitleRate: 0.15254237288135594,
   /**
    * ~~2 of 4. ⚠ §9.2 sets this floor at **1.0 and calls it non-negotiable**, so
    * this is the most serious shortfall in the ledger — and its cause is the
