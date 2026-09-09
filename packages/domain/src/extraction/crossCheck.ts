@@ -103,14 +103,45 @@ export function crossCheck(llm: readonly LlmTile[], ocr: readonly OcrLine[]): Ex
       // screen must not corroborate this tile (§2.1c step 1).
       if (boxOverlapRatio(tile.box, entry.line.box) < OCR_BOX_OVERLAP_MIN) continue;
 
-      // An overlapping line always counts as consumed, even if it scores
-      // badly. It is the caption of THIS tile; re-emitting it as an orphan
-      // would duplicate the tile as a second, text-only candidate.
-      consumed.add(index);
-
-      if (subject === '' || entry.normalised === '') continue;
+      // ⚠ GEOMETRY ALONE USED TO CONSUME, AND THAT DESTROYED THE CORRECTION
+      // THIS STEP EXISTS TO SUPPLY (REQ-012, TASK-079 finding 1).
+      //
+      // On a desktop capture the caption sits UNDER the artwork, inside the
+      // tile box, so it overlaps. When the model reads the logo baked into the
+      // artwork instead of the printed caption — `wwe raw` for a tile captioned
+      // `Raw` — the caption overlapped, was consumed on geometry, and was never
+      // emitted. The one line that contradicted the model was deleted BY the
+      // model's own tile, silently, at stage 1. Both `Raw` losses in
+      // `T-AI-039c` are this.
+      //
+      // ⚠ THE RULE IS NARROWED TO `basis: 'artwork'` ON PURPOSE, AND THE WIDE
+      // VERSION WAS MEASURED BEFORE IT WAS REJECTED. Requiring agreement from
+      // EVERY overlapping line — the fix as first written down in TASK-079 —
+      // takes the golden false-title rate from 0.2500 to 0.4803 while moving
+      // recall and omission recovery not at all: a caption that OCR splits
+      // across two lines, an episode badge, a runtime, a "New episodes" flash
+      // all disagree with the tile subject and would each become a candidate
+      // the owner has to dismiss. That is a worse product, bought with no
+      // recovery.
+      //
+      // An **artwork** basis is the one case where the model is on record as
+      // NOT having read the printed glyphs. There, an overlapping line that
+      // disagrees is the only reading of the caption anyone has, so it survives
+      // as an orphan — visible, classified by `cleanup.ts`, reversible — which
+      // is this module's governing rule (see the header), not an exception.
+      const artworkDerived = tile.basis === 'artwork';
+      if (subject === '' || entry.normalised === '') {
+        // Nothing to agree or disagree with. Geometry is the only evidence
+        // there is, so it still decides — withholding consumption here would
+        // duplicate a caption the model simply did not transcribe, without any
+        // contradiction to justify the duplicate.
+        consumed.add(index);
+        continue;
+      }
 
       const score = subject === entry.normalised ? 1 : jaroWinkler(subject, entry.normalised);
+      if (!artworkDerived || score >= OCR_SUPPORT_PARTIAL) consumed.add(index);
+
       // Strictly greater: the FIRST best-scoring line wins, so the result does
       // not depend on the reader's arbitrary line order.
       if (score > bestScore) {
