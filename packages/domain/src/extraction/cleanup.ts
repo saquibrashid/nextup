@@ -98,6 +98,38 @@ export const OCR_MERGE_CENTRE_RATIO = 0.4;
 /** Horizontal gap below this fraction of image width may merge. */
 export const OCR_MERGE_GAP = 0.03;
 
+/**
+ * Step 1b constants — the WRAPPED CAPTION continuation (`specs/ai.md` §3.2
+ * step 1b, TASK-205).
+ *
+ * A caption too long for its column wraps onto a second line, and OCR returns
+ * the two lines as two items. Step 1 merges only along a line, so the halves
+ * survive as two candidates and BOTH are false titles while the real title is
+ * present as neither. Measured on the golden corpus: `Stranger Things: VHS`
+ * and `Special Edition` on `netflix-mylist-mobile-01` and `low-quality-jpeg-01`
+ * are four of the nine remaining false titles, and their join —
+ * `Stranger Things: VHS Special Edition` — is an EXPECTED title in both answer
+ * keys. So the merge removes four false titles and adds two recalled ones.
+ *
+ * ⚠ THESE THREE ARE CALIBRATED AGAINST THE CORPUS, unlike step 1's. The
+ * numbers below are the measured separation between a wrap and a neighbouring
+ * work, and the two populations are three orders of magnitude apart — there is
+ * no judgement in the choice:
+ *
+ *   wrapped continuation   x offset 0.0000   vertical gap 0.0016
+ *   next tile's caption    x offset 0.0016   vertical gap 0.0790 – 0.1010
+ *
+ * The gap ceiling therefore sits ~6x above the observed wrap and ~9x below the
+ * closest distinct work. Widening it past ~0.04 starts fusing adjacent tiles,
+ * which is the one failure this whole cleanup pass exists to prevent: two
+ * works glued into one candidate is a title LOST, not merely a title wrong.
+ */
+export const CAPTION_WRAP_GAP_CEILING = 0.01;
+/** Left edges further apart than this fraction of image width never wrap. */
+export const CAPTION_WRAP_X_TOLERANCE = 0.01;
+/** A wrap re-uses the caption's font, so the shorter box may not be squat. */
+export const CAPTION_WRAP_HEIGHT_RATIO = 0.6;
+
 /* ------------------------------------------------------------------ *
  * Step 3b — the off-list region (`specs/ai.md` §3.2 step 3b, TASK-204)
  * ------------------------------------------------------------------ */
@@ -289,6 +321,45 @@ function mergeable(prev: ExtractedTextItem, next: ExtractedTextItem): boolean {
   return sameLine && gap < OCR_MERGE_GAP;
 }
 
+/**
+ * Step 1b — does `next` continue `prev` as the second line of a wrapped
+ * caption?
+ *
+ * Deliberately NOT the `sameLine` test with the axes swapped. A wrap is
+ * recognised by three properties at once, and any one of them alone matches
+ * something else in a real capture:
+ *
+ *  - **left edges flush.** A wrapped line starts exactly where its first line
+ *    started. A stacked *different* caption also does, which is why this is
+ *    necessary but nowhere near sufficient.
+ *  - **the vertical gap is leading, not layout.** See the measured table on
+ *    `CAPTION_WRAP_GAP_CEILING`; this is the guard that actually separates the
+ *    two populations.
+ *  - **comparable height.** The wrap re-uses the caption's font. A badge or a
+ *    metadata line set in a smaller face is a different element, not a
+ *    continuation.
+ *
+ * The chrome refusal is inherited from step 1 for the same reason: step 3 is
+ * exact-match and runs later, so a label glued to anything is a label that can
+ * never be recognised as chrome again.
+ */
+function wrapsUnder(prev: ExtractedTextItem, next: ExtractedTextItem): boolean {
+  if (isChromeLine(prev.rawText) || isChromeLine(next.rawText)) return false;
+
+  const p = prev.boundingBox;
+  const n = next.boundingBox;
+  if (Math.abs(n.x - p.x) > CAPTION_WRAP_X_TOLERANCE) return false;
+
+  // A negative gap means the boxes overlap vertically — that is step 1's
+  // same-line case, or a duplicate read. Neither is a wrap.
+  const gap = n.y - (p.y + p.h);
+  if (gap < 0 || gap > CAPTION_WRAP_GAP_CEILING) return false;
+
+  const taller = Math.max(p.h, n.h);
+  if (taller <= 0) return false;
+  return Math.min(p.h, n.h) / taller >= CAPTION_WRAP_HEIGHT_RATIO;
+}
+
 function mergeTwo(prev: ExtractedTextItem, next: ExtractedTextItem): ExtractedTextItem {
   // Both texts are kept, in reading order. This is the whole reason merging is
   // not dropping.
@@ -329,7 +400,34 @@ export function groupReadingOrder(items: readonly ExtractedTextItem[]): Extracte
       merged.push(item);
     }
   }
-  return [...llm, ...merged];
+
+  // Step 1b runs as a SECOND pass, not as another branch of the first. A wrap
+  // is only recognisable once both of its lines are whole: if the first line
+  // itself merged horizontally, the union box is what a continuation has to
+  // line up under, and testing before that would compare against a fragment.
+  //
+  // ⚠ THE HOST IS TESTED BY ITS LAST LINE, NOT BY ITS ACCUMULATED BOX. A
+  // three-line caption fails outright otherwise: after two lines merge, the
+  // union is ~2x a line tall, and the height guard then rejects the third line
+  // for being half the height of the thing it is a continuation of. The gap
+  // and the left edge happen to be identical either way — a union's bottom IS
+  // its last line's bottom, and a flush chain shares one left edge — so the
+  // last line is the correct reference for all three guards, not merely a
+  // convenient one.
+  const wrapped: ExtractedTextItem[] = [];
+  const lastLine: ExtractedTextItem[] = [];
+  for (const item of merged) {
+    const open = lastLine[lastLine.length - 1];
+    const host = wrapped[wrapped.length - 1];
+    if (open !== undefined && host !== undefined && wrapsUnder(open, item)) {
+      wrapped[wrapped.length - 1] = mergeTwo(host, item);
+      lastLine[lastLine.length - 1] = item;
+    } else {
+      wrapped.push(item);
+      lastLine.push(item);
+    }
+  }
+  return [...llm, ...wrapped];
 }
 
 /* ------------------------------------------------------------------ *
