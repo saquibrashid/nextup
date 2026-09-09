@@ -35,7 +35,7 @@ function candidate(overrides: Partial<ResolvableCandidate> & { id: string }): Re
     normalisedText: 'severance',
     extractedYear: null,
     sourceImageIds: [IMAGE_A],
-    boundingBoxes: [{ x: 0.1, y: 0.1, width: 0.2, height: 0.1 }],
+    boundingBoxes: [{ imageId: 'img-1', x: 0.1, y: 0.1, w: 0.2, h: 0.1 }],
     ocrConfidence: 0.9,
     collapsedIntoCandidateId: null,
     resolvedWorkIdentity: null,

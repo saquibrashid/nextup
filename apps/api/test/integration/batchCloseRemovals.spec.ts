@@ -630,8 +630,9 @@ describe('T-REM-016 / T-REM-018 — the removal transition', () => {
       for (const name of models) {
         const key = name.charAt(0).toLowerCase() + name.slice(1);
         const delegate = (
-          testPrisma() as unknown as Record<string, { count: () => Promise<number> }>
+          testPrisma() as unknown as Record<string, { count: () => Promise<number> } | undefined>
         )[key];
+        if (delegate === undefined) throw new Error(`no Prisma delegate for model ${name}`);
         out[name] = await delegate.count();
       }
       return out;

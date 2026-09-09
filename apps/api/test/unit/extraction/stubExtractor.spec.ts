@@ -412,7 +412,7 @@ describe('T-STUB-001o the ordering is total, tie-free and locale-independent', (
   it('T-STUB-001q · a null visibleText becomes empty text, never the string "null"', () => {
     const box = { x: 0.1, y: 0.2, w: 0.2, h: 0.3 };
     const items = llmOnlyItems([
-      { visibleText: null, identifiedTitle: 'Dune', basis: 'art', confidence: 0.5, box },
+      { visibleText: null, identifiedTitle: 'Dune', basis: 'artwork', confidence: 0.5, box },
     ]);
     expect(items[0]?.rawText).toBe('');
     expect(items[0]?.ocrSupport).toBe('not-checked');

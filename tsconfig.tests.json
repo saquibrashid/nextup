@@ -1,0 +1,42 @@
+{
+  // ⚠ A DRIFT ALARM FOR THE TEST SUITE ITSELF, not a build. Modelled on
+  // `tests/e2e/tsconfig.json` — read that file's header first; the same
+  // reasoning about staying OUT of the root `references` array applies here.
+  //
+  // WHY THIS EXISTS. Before it, no tsconfig included a single Vitest spec.
+  // `tsc --build` compiles `src/**` of each workspace, and `typecheck:e2e`
+  // covers `tests/e2e/**` — the ~240 Vitest-collected spec files in between
+  // were typechecked by nothing at all. ESLint does not typecheck, so a spec
+  // could reference an undefined variable, pass lint, and fail only when the
+  // assertion happened to execute. That is exactly how `T-AI-017u`/`v` shipped
+  // to CI with `where: { ownerId, ... }` naming a variable that did not exist
+  // in the file (TASK-192).
+  //
+  // ⚠ AND IT MATTERS MOST FOR THE SPECS A RUNNER SKIPS. `T-CI-008` guards
+  // against a spec file sitting outside every collected path, but a spec that
+  // IS collected can still contain a whole `describe` that never runs — a
+  // guarded branch, a `.skip`, a failure path reached only on some inputs.
+  // Type errors there are invisible forever. Static checking is the only thing
+  // that reaches them.
+  //
+  // `T-INFRA-017` asserts this config is wired into `npm run typecheck`, so
+  // dropping it from the script fails CI rather than silently returning the
+  // suite to being unchecked.
+  //
+  // ⚠ SCOPE IS DELIBERATELY PARTIAL AND MUST ONLY GROW. `tests/infra/**` and
+  // `apps/web/test/**` are not included yet: they carry ~237 further errors,
+  // dominated by implicit-any callback parameters. They are a separate task.
+  // **Do not "fix" them by setting `noImplicitAny: false`** — that would
+  // disable the alarm precisely for the files it is loudest about.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
+  "include": ["apps/api/test/**/*.ts", "packages/domain/test/**/*.ts"]
+}

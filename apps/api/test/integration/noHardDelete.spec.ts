@@ -160,8 +160,22 @@ async function makeImage(batchId: string): Promise<string> {
   return id;
 }
 
-/** Every owner-visible record, counted. */
-async function census(): Promise<Record<string, number>> {
+/**
+ * Every owner-visible record, counted.
+ *
+ * ⚠ The return type is spelled out rather than `Record<string, number>`:
+ * under `noUncheckedIndexedAccess` an index signature makes every read
+ * `number | undefined`, so `before.images - 1` does not typecheck, and a
+ * typo'd key would silently read `undefined` instead of failing.
+ */
+async function census(): Promise<{
+  titles: number;
+  listings: number;
+  suppressions: number;
+  candidates: number;
+  images: number;
+  changes: number;
+}> {
   const where = { where: { ownerId } };
   return {
     titles: await testPrisma().title.count(where),

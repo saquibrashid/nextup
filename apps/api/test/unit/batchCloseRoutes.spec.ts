@@ -69,6 +69,8 @@ interface TitleRow {
   id: string;
   workIdentity: string;
   state: string;
+  tmdbId: number | null;
+  tmdbName: string | null;
   sortDateAdded: Date | null;
 }
 
@@ -92,6 +94,8 @@ const store: {
     kind: string;
     titleId: string | null;
     listingId: string | null;
+    attr: string | null;
+    prevValue: string | null;
     nextValue: string | null;
   }[];
   transactions: number;
@@ -458,7 +462,15 @@ describe('T-REV-012 · POST /close without a store', () => {
   });
 
   it('T-REV-012al: a batch that is not in review is 409 BATCH_NOT_IN_REVIEW', async () => {
-    store.batch = { id: 'batch-1', service: 'netflix', status: 'open', mode: 'append-only' };
+    store.batch = {
+      id: 'batch-1',
+      service: 'netflix',
+      status: 'open',
+      mode: 'append-only',
+      lowYield: false,
+      degradedExtraction: false,
+      crossCheck: null,
+    };
     const res = await closeBatch('batch-1');
     expect(res.status).toBe(409);
     expect(((await res.json()) as { error: { code: string } }).error.code).toBe(
@@ -471,6 +483,8 @@ describe('T-REV-012 · POST /close without a store', () => {
       id: 'title-1',
       workIdentity: DUNE,
       state: 'active',
+      tmdbId: null,
+      tmdbName: null,
       sortDateAdded: new Date('2025-01-01T00:00:00Z'),
     });
     makeCandidate();

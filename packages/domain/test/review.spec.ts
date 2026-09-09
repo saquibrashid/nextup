@@ -46,6 +46,7 @@ function candidate(over: Partial<ReviewCandidate> = {}): ReviewCandidate {
     disposition: 'pending',
     collapsedIntoCandidateId: null,
     classification: 'new',
+    tileCrop: null,
     ...over,
   };
 }
@@ -238,9 +239,11 @@ describe('T-AI-004 — nothing is dropped; every verdict is reachable', () => {
 
   it('T-AI-004ac · images that yielded no text are named, never silently skipped', () => {
     const res = buildReviewResponse(
-      input({ imagesWithNoText: [{ imageId: 'i9', fileName: 'IMG_0428.PNG' }] }),
+      input({ imagesWithNoText: [{ imageId: 'i9', fileName: 'IMG_0428.PNG', href: '/i9' }] }),
     );
-    expect(res.imagesWithNoText).toEqual([{ imageId: 'i9', fileName: 'IMG_0428.PNG' }]);
+    expect(res.imagesWithNoText).toEqual([
+      { imageId: 'i9', fileName: 'IMG_0428.PNG', href: '/i9' },
+    ]);
   });
 });
 

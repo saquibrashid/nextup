@@ -20,7 +20,7 @@
  */
 
 import { HttpResponse, http, passthrough } from 'msw';
-import { setupServer, type SetupServerApi } from 'msw/node';
+import { setupServer, type SetupServer } from 'msw/node';
 
 import { registerMockedHost, unregisterMockedHost } from '../../../../tools/egress-guard.mjs';
 import { AOAI_ENDPOINT, VALID as AOAI_VALID } from '../aoai/index.js';
@@ -44,7 +44,7 @@ export interface Wire {
  * caller: an unhandled request is one that would have gone to the internet
  * carrying the owner's screenshot.
  */
-export function recordingInferenceServer(wires: Wire[]): SetupServerApi {
+export function recordingInferenceServer(wires: Wire[]): SetupServer {
   const capture =
     (host: InferenceHost) =>
     async (request: Request): Promise<void> => {

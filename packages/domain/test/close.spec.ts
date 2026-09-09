@@ -39,6 +39,7 @@ function candidate(over: Partial<ReviewCandidate> = {}): ReviewCandidate {
     disposition: 'pending',
     collapsedIntoCandidateId: null,
     classification: 'new',
+    tileCrop: null,
     ...over,
   };
 }

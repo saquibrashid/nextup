@@ -106,7 +106,7 @@ const store: {
   candidates: CandidateRow[];
   suppressions: { workIdentity: string }[];
   listings: ListingRow[];
-  images: { id: string; candidateCount: number | null }[];
+  images: { id: string; candidateCount: number | null; fileName: string }[];
   writes: { id: string; data: Record<string, unknown> }[];
   bulkConfirmed: string[];
   searchMulti: (query: string) => Promise<unknown[]>;
@@ -295,11 +295,11 @@ describe('T-REV-010 · GET /review without a store', () => {
     });
     makeCandidate({ id: 'c-chrome', cleanupVerdict: 'chrome-suspected' });
     store.images = [
-      { id: 'img-1', candidateCount: 3 },
+      { id: 'img-1', candidateCount: 3, fileName: 'a.png' },
       // 0 is "extracted, found nothing"; null is "not extracted yet". Only the
       // first is an empty image (US-006 AC-3).
-      { id: 'img-2', candidateCount: 0 },
-      { id: 'img-3', candidateCount: null },
+      { id: 'img-2', candidateCount: 0, fileName: 'b.png' },
+      { id: 'img-3', candidateCount: null, fileName: 'c.png' },
     ];
 
     const res = await getReview('batch-1');
@@ -313,7 +313,9 @@ describe('T-REV-010 · GET /review without a store', () => {
     expect(body.sections['probablyNotTitles']?.items.map((i) => i.candidateId)).toEqual([
       'c-chrome',
     ]);
-    expect(body.imagesWithNoText).toEqual([{ imageId: 'img-2', href: '/api/images/img-2' }]);
+    expect(body.imagesWithNoText).toEqual([
+      { imageId: 'img-2', fileName: 'b.png', href: '/api/images/img-2' },
+    ]);
   });
 
   it('T-AI-020j: a zero-yield image carries an API href so it can be THUMBNAILED', async () => {

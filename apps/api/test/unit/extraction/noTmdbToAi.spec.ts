@@ -29,7 +29,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { type SetupServerApi } from 'msw/node';
+import { type SetupServer } from 'msw/node';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { AzureVisionExtractor } from '../../../src/extraction/azureVisionExtractor.js';
@@ -121,7 +121,7 @@ function tmdbContentIn(wire: Wire): string[] {
   return TMDB_CONTENT.filter((needle) => haystack.includes(needle));
 }
 
-let server: SetupServerApi | undefined;
+let server: SetupServer | undefined;
 
 afterEach(() => {
   server?.close();

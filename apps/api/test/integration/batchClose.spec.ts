@@ -692,7 +692,9 @@ describe('T-PROV-010 · close records what it created', () => {
     expect((await closeBatchRequest(batchId)).status).toBe(200);
 
     const title = await testPrisma().title.findFirst({ where: { workIdentity: DUNE } });
-    const listing = await testPrisma().serviceListing.findFirst({ where: { titleId: title?.id } });
+    const listing = await testPrisma().serviceListing.findFirst({
+      where: { titleId: title?.id ?? '' },
+    });
     expect(title?.createdByBatchId).toBe(batchId);
     expect(listing?.createdByBatchId).toBe(batchId);
 

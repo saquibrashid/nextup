@@ -168,7 +168,7 @@ describe('startExtraction', () => {
     });
 
     expect(mockCreate).toHaveBeenCalledTimes(2);
-    const [owner, data] = mockCreate.mock.calls[0] as [OwnerId, Record<string, unknown>];
+    const [owner, data] = mockCreate.mock.calls[0] as unknown as [OwnerId, Record<string, unknown>];
     expect(owner).toBe(OWNER);
     expect(data).toMatchObject({
       batchId: BATCH,

@@ -103,9 +103,10 @@ function tracking(bytesPerImage = 1024, fill = false): Tracker {
       if (fill) bytes.fill(1);
       return bytes;
     },
-    async recordItems(image) {
+    async recordItems(image, items) {
       order.push(`record:${image.imageId}`);
       await Promise.resolve();
+      return items.length;
     },
     reportProgress() {
       live = Math.max(0, live - 1);
@@ -287,7 +288,7 @@ describe('T-IMG-026 - peak RSS across a batch of max-size images', () => {
         ...tracker.ports,
         async recordItems(image, items) {
           peak = Math.max(peak, process.memoryUsage().rss - baseline);
-          await tracker.ports.recordItems(image, items);
+          return await tracker.ports.recordItems(image, items);
         },
       },
     });

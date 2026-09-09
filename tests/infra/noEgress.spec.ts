@@ -61,6 +61,12 @@ function collectSources(): Array<{ relPath: string; text: string }> {
         continue;
       }
       if (!/\.(ts|tsx|mts|cts|mjs|js)$/.test(entry.name)) continue;
+      // ⚠ Declaration files declare; they never call. `registerMockedHost(...)`
+      // in a `.d.mts` is a SIGNATURE, and the `\bname\s*\(` probes below cannot
+      // tell it from an invocation — `tools/egress-guard.d.mts` (TASK-193, the
+      // types for this very module) failed `r` on its first day for saying what
+      // the function takes.
+      if (/\.d\.(ts|mts|cts)$/.test(entry.name)) continue;
       out.push({
         relPath: path.relative(ROOT, next).split(path.sep).join('/'),
         text: readFileSync(next, 'utf8'),

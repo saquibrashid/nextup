@@ -114,6 +114,7 @@ interface Body {
     availabilityCheckedAt: string | null;
     availabilityRegion: string;
   }[];
+  availabilityRefreshFailed: boolean;
 }
 
 const get = async (): Promise<{ status: number; body: Body }> => {
