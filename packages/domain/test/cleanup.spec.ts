@@ -343,6 +343,53 @@ describe('cleanup — reading-order grouping (T-AI-004)', () => {
 
     expect(out[0]?.cleanupVerdict).toBe('title-candidate');
   });
+
+  /* ---------------------------------------------------------------- *
+   * TASK-199 — the tile-painted badge vocabulary.
+   *
+   * These read like part of the artwork rather than like navigation, which
+   * is why the first pass of the vocabulary missed them entirely.
+   * ---------------------------------------------------------------- */
+
+  it('T-AI-004am classifies the tile-painted badges as chrome', () => {
+    const out = cleanup(
+      [ocr({ rawText: 'New' }), ocr({ rawText: 'HBO ORIGINAL' }), ocr({ rawText: 'HBO' })],
+      { now: NOW },
+    );
+
+    expect(out.map((c) => c.cleanupVerdict)).toEqual([
+      'chrome-suspected',
+      'chrome-suspected',
+      'chrome-suspected',
+    ]);
+  });
+
+  it('T-AI-004an NEVER applies the badge vocabulary to the primary reader', () => {
+    // ⚠ THE SAFETY TWIN, AND THE REASON `new` IS TOLERABLE AS A TERM AT ALL.
+    // It is three generic letters. Step 3 is `ocr-only`-scoped precisely so a
+    // work the MODEL named can never be deleted by a UI word, and if that
+    // scoping is ever relaxed this entry is the one that starts eating titles.
+    const out = cleanup([llm({ rawText: 'New', inferredTitle: 'New' })], { now: NOW });
+
+    expect(out[0]?.cleanupVerdict).toBe('title-candidate');
+  });
+
+  it('T-AI-004ao does not take a title that merely STARTS with a badge word', () => {
+    // Exact-line matching, restated for the shortest and most dangerous term.
+    // A substring or prefix test would delete this real series.
+    const out = cleanup([ocr({ rawText: 'New Amsterdam' })], { now: NOW });
+
+    expect(out[0]?.cleanupVerdict).toBe('title-candidate');
+  });
+
+  it('T-AI-004ap treats both halves of the HBO max wordmark alike', () => {
+    // The two words are separate OCR lines at the top-left of the desktop
+    // capture. `max` was already a term; `hbo` was not, so half a logo was
+    // reaching the owner as a title to confirm.
+    const out = cleanup([ocr({ rawText: 'HBO' }), ocr({ rawText: 'max' })], { now: NOW });
+
+    expect(out.map((c) => c.cleanupVerdict)).toEqual(['chrome-suspected', 'chrome-suspected']);
+  });
 });
 
 describe('truncated captions (T-AI-043)', () => {

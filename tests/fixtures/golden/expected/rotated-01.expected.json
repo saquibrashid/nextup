@@ -49,7 +49,9 @@
     "my list",
     "continue watching",
     "my purchases",
-    "recommended for you"
+    "recommended for you",
+    "hbo original",
+    "new"
   ],
   "minRecall": 1,
   "maxFalseTitles": 2,

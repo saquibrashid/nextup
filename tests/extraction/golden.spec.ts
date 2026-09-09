@@ -146,8 +146,18 @@ const KNOWN_SHORTFALLS = {
    * ⚠ AND IT WENT DOWN AT TASK-198 FOR THE ORDINARY REASON — 0.3143 to 0.2857,
    * two fewer false titles, because the three `wwe raw` expansions stopped
    * being emitted. Denominator unchanged at 70.
+   *
+   * ⚠ AND DOWN AGAIN AT TASK-199 — 0.2857 to 0.2424 — when the owner ruled
+   * that `HBO`, `HBO ORIGINAL` and `New` are chrome. Four badge instances left
+   * BOTH sides of the fraction (20/70 -> 16/66), because a `chrome-suspected`
+   * candidate is neither a false title nor a title candidate. ⚠ **THIS ONE
+   * CHANGED THE ANSWER KEY, WHICH IS NORMALLY THE FORBIDDEN MOVE.** It was
+   * legitimate only because the badges are genuinely printed on the images —
+   * `HBO` is half the `HBO max` wordmark — and because the vocabulary and the
+   * three answer keys were changed TOGETHER. Changing only the key would have
+   * bought this number by degrading chrome rejection, which is a real gate.
    */
-  aggregateFalseTitleRate: 0.2857142857142857,
+  aggregateFalseTitleRate: 0.24242424242424243,
   /**
    * ~~2 of 4. ⚠ §9.2 sets this floor at **1.0 and calls it non-negotiable**, so
    * this is the most serious shortfall in the ledger — and its cause is the
@@ -199,8 +209,25 @@ const KNOWN_SHORTFALLS = {
  * The residual 9 of 72 are OCR misses and rotation artefacts, not
  * classification failures: the line is absent from the reader's output
  * altogether, so no verdict can be assigned to it.
+ *
+ * ⚠ **0.8750 → 0.8481 AT TASK-199, AND THIS ONE GOT WORSE ON PURPOSE.** Do not
+ * "fix" it by trimming the answer keys. The owner ruled that `HBO`,
+ * `HBO ORIGINAL` and `New` are chrome, so seven entries were added across the
+ * three Max keys — but the pipeline only isolates FOUR of them as standalone
+ * candidates. On `max-saved-mobile-01` and `rotated-01`, §3.2 step 1's
+ * reading-order grouping merges the badges into the adjacent tile caption
+ * before step 3 can test them, so `hbo original` and `new` never exist as
+ * lines to classify. Numerator 63 → 67, denominator 72 → 79.
+ *
+ * ⚠ THAT DROP IS THE METRIC WORKING, NOT FAILING. The badges were always on
+ * those images; the key was previously silent about them, which flattered this
+ * number. What the new value measures is a REAL residual defect — the same
+ * grouping-runs-before-classification cause TASK-195 fixed for the nav bar,
+ * surviving in a second place. It is 4.8 points clear of the 0.80 floor, and
+ * the honest way to recover it is to make grouping stop swallowing the badges,
+ * not to stop writing them down.
  */
-const CHROME_REJECTION_MEASURED = 0.875;
+const CHROME_REJECTION_MEASURED = 0.8481012658227848;
 
 /**
  * Match accuracy — **A GATE, NOT A PIN, SINCE TASK-197.** 23 of 24.
@@ -355,7 +382,7 @@ describe('T-AI-030 the golden corpus is measured, and the measurement is pinned'
   it('T-AI-030e · chrome rejection CLEARS the §9.2 floor and is gated, not pinned', () => {
     const chromeTotal = scored.reduce((n, s) => n + s.expected.expectedChrome.length, 0);
     const rejected = scored.reduce((n, s) => n + s.chromeRejected, 0);
-    expect(chromeTotal).toBe(72);
+    expect(chromeTotal).toBe(79);
     // The gate, asserted first because it is the one that matters.
     expect(rejected / chromeTotal).toBeGreaterThanOrEqual(CHROME_REJECTION_FLOOR);
     // And the exact value, so an improvement is recorded rather than absorbed

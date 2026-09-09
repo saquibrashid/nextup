@@ -28,6 +28,11 @@
 import { useState, type FormEvent, type JSX } from 'react';
 
 import {
+  ADDITION_CHANGE_MATCH_LABEL,
+  ADDITION_CONFIRM_LABEL,
+  ADDITION_CONFIRMED,
+  ADDITION_DISCARD_LABEL,
+  ADDITION_DISCARDED,
   UNMATCHED_ACTION_FAILED,
   UNMATCHED_CANCEL_LABEL,
   UNMATCHED_DISCARD_LABEL,
@@ -46,8 +51,55 @@ import {
 import { resultLabel } from './ManualEntryPanel';
 import type { TmdbSearchResult } from '../lib/apiClient';
 
+export type CandidateActionsVariant = 'unmatched' | 'addition';
+
+interface VariantCopy {
+  readonly keepLabel: string;
+  readonly findLabel: string;
+  readonly discardLabel: string;
+  readonly keptText: string;
+  readonly discardedText: string;
+}
+
+/**
+ * ⚠ **THE KEEP LABEL IS NOT SHARED, AND MUST NOT BE.** On an unmatched card
+ * the button has to say what keeping MEANS, because the row will be stored
+ * under an `unmatched:` identity. An addition already carries a resolved TMDB
+ * match, so the same words would tell the owner a correctly identified title
+ * was unidentified.
+ */
+const VARIANT_COPY: Record<CandidateActionsVariant, VariantCopy> = {
+  unmatched: {
+    keepLabel: UNMATCHED_KEEP_LABEL,
+    findLabel: UNMATCHED_FIND_LABEL,
+    discardLabel: UNMATCHED_DISCARD_LABEL,
+    keptText: UNMATCHED_KEPT,
+    discardedText: UNMATCHED_DISCARDED,
+  },
+  addition: {
+    keepLabel: ADDITION_CONFIRM_LABEL,
+    findLabel: ADDITION_CHANGE_MATCH_LABEL,
+    discardLabel: ADDITION_DISCARD_LABEL,
+    keptText: ADDITION_CONFIRMED,
+    discardedText: ADDITION_DISCARDED,
+  },
+};
+
 export interface UnmatchedActionsProps {
   readonly candidateId: string;
+  /**
+   * Which review section this card sits in. Drives the button words and the
+   * test ids ONLY — the three patches are identical, because the API has no
+   * notion of sections either (`PATCH …/candidates/:id` takes a disposition).
+   *
+   * ⚠ **`'addition'` IS NOT AN AFTERTHOUGHT VARIANT.** `specs/ui.md` §5.3
+   * requires Confirm / Change match / Discard on the review card, and the
+   * additions section shipped without any of them (TASK-200): the only control
+   * was "Confirm all {n}", so an owner who saw one false extra among ten good
+   * rows had no way to reject it short of abandoning the batch. That is the
+   * defect this prop closes — do not "simplify" it back to unmatched-only.
+   */
+  readonly variant?: CandidateActionsVariant;
   /**
    * The disposition as the owner last left it — server value merged with the
    * local override, decided by the caller. `'pending'` is the only state that
@@ -86,9 +138,9 @@ function outcomeFor(disposition: string): Outcome | null {
   return null;
 }
 
-function outcomeText(outcome: Outcome): string {
-  if (outcome.kind === 'kept') return UNMATCHED_KEPT;
-  if (outcome.kind === 'discarded') return UNMATCHED_DISCARDED;
+function outcomeText(outcome: Outcome, copy: VariantCopy): string {
+  if (outcome.kind === 'kept') return copy.keptText;
+  if (outcome.kind === 'discarded') return copy.discardedText;
   return outcome.name === null
     ? UNMATCHED_MATCHED_UNNAMED
     : UNMATCHED_MATCHED.replace('{name}', outcome.name);
@@ -96,6 +148,7 @@ function outcomeText(outcome: Outcome): string {
 
 export function UnmatchedActions({
   candidateId,
+  variant = 'unmatched',
   disposition,
   onKeep,
   onDiscard,
@@ -111,6 +164,7 @@ export function UnmatchedActions({
   const [failure, setFailure] = useState<string | null>(null);
   const [local, setLocal] = useState<Outcome | null>(null);
 
+  const copy = VARIANT_COPY[variant];
   const outcome = local ?? outcomeFor(disposition);
 
   const run = (action: () => Promise<void>, next: Outcome): void => {
@@ -155,20 +209,20 @@ export function UnmatchedActions({
 
   if (outcome !== null) {
     return (
-      <p className="unmatched-actions__outcome" data-testid="unmatched-outcome" role="status">
-        {outcomeText(outcome)}
+      <p className="unmatched-actions__outcome" data-testid={`${variant}-outcome`} role="status">
+        {outcomeText(outcome, copy)}
       </p>
     );
   }
 
   return (
-    <div className="unmatched-actions" data-testid="unmatched-actions">
+    <div className="unmatched-actions" data-testid={`${variant}-actions`}>
       <div className="unmatched-actions__buttons">
         {/* ⚠ FIRST. See the header note — this is the outcome US-008 exists for. */}
         <button
           type="button"
           className="tap-target"
-          data-testid="unmatched-keep"
+          data-testid={`${variant}-keep`}
           disabled={busy}
           onClick={() => {
             run(
@@ -179,23 +233,23 @@ export function UnmatchedActions({
             );
           }}
         >
-          {UNMATCHED_KEEP_LABEL}
+          {copy.keepLabel}
         </button>
         <button
           type="button"
           className="tap-target"
-          data-testid="unmatched-find"
+          data-testid={`${variant}-find`}
           disabled={busy}
           onClick={() => {
             setSearchOpen(!searchOpen);
           }}
         >
-          {searchOpen ? UNMATCHED_CANCEL_LABEL : UNMATCHED_FIND_LABEL}
+          {searchOpen ? UNMATCHED_CANCEL_LABEL : copy.findLabel}
         </button>
         <button
           type="button"
           className="tap-target"
-          data-testid="unmatched-discard"
+          data-testid={`${variant}-discard`}
           disabled={busy}
           onClick={() => {
             run(
@@ -206,16 +260,16 @@ export function UnmatchedActions({
             );
           }}
         >
-          {UNMATCHED_DISCARD_LABEL}
+          {copy.discardLabel}
         </button>
       </div>
 
       {searchOpen && (
         <>
           <form className="unmatched-actions__form" onSubmit={search}>
-            <label htmlFor={`unmatched-q-${candidateId}`}>{UNMATCHED_SEARCH_LABEL}</label>
+            <label htmlFor={`${variant}-q-${candidateId}`}>{UNMATCHED_SEARCH_LABEL}</label>
             <input
-              id={`unmatched-q-${candidateId}`}
+              id={`${variant}-q-${candidateId}`}
               type="search"
               value={query}
               onChange={(event) => {
@@ -260,7 +314,7 @@ export function UnmatchedActions({
       )}
 
       {failure !== null && (
-        <p role="alert" data-testid="unmatched-failure">
+        <p role="alert" data-testid={`${variant}-failure`}>
           {failure}
         </p>
       )}
