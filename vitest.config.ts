@@ -139,6 +139,35 @@ export default defineConfig({
       },
       {
         resolve: { alias: domainAlias },
+        /**
+         * `live` — the §4A manual quality suite. MANUAL ONLY, COSTS MONEY.
+         *
+         * ⚠ IT IS A PROJECT SO THAT THE FILE IS NOT AN ORPHAN, NOT SO THAT IT
+         * RUNS. `T-CI-008` fails a `.spec.*` file no runner collects, because
+         * an uncollected spec passes by never executing — and `goldenLive`
+         * would be the worst possible file to be silently dead, since nothing
+         * else in the repository ever touches the live providers. Every other
+         * script names its project explicitly (`test:unit`, `test:int`,
+         * `test:web`, `golden`, `test:infra`, `test:meta`, `coverage`), so
+         * naming this one here cannot pull it into any of them; only
+         * `npm run golden:live` selects it, and `T-CI-007l` asserts exactly
+         * that, file by file.
+         *
+         * ⚠ `setupFiles` IS OMITTED DELIBERATELY. Every other project installs
+         * the `T-CI-007` egress guard, which blocks all non-loopback traffic.
+         * This is the one suite whose entire purpose is to leave the machine.
+         */
+        test: {
+          name: 'live',
+          environment: 'node',
+          include: ['tests/extraction/goldenLive.spec.ts'],
+          // Three live runs over eleven images, sequential by design.
+          testTimeout: 30 * 60_000,
+          hookTimeout: 30 * 60_000,
+        },
+      },
+      {
+        resolve: { alias: domainAlias },
         // Static assertions over Bicep and migrations: T-INFRA-*, T-INV-013,
         // T-MIG-001. No Azure subscription required.
         test: {

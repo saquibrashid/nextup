@@ -32,7 +32,10 @@ import {
   type TmdbSearchResult,
 } from '@nextup/domain';
 
-import { goldenRecordingStore } from '../../apps/api/src/extraction/recordings.js';
+import {
+  goldenRecordingStore,
+  type RecordingStore,
+} from '../../apps/api/src/extraction/recordings.js';
 import { StubExtractor } from '../../apps/api/src/extraction/stubExtractor.js';
 
 export const GOLDEN = path.resolve(__dirname, '../fixtures/golden');
@@ -57,12 +60,44 @@ export const RECALL_VERDICTS = new Set([
   'inferred-unverified',
 ]);
 
+/**
+ * ⚠ `.heic` MAPS TO `image/png`, AND THAT IS NOT A TYPO.
+ * `ImageMimeType` is `'image/png' | 'image/jpeg'` and carries an explicit "do
+ * not widen" note: HEIC is transcoded to lossless PNG at ingest (REQ-077,
+ * ADR-0008) because neither reader accepts it, so no extractor in this product
+ * is ever handed `image/heic`. The two `.heic` fixtures reach stage 1 as PNG
+ * in production and must here too. The previous `'image/heic'` value was a
+ * type error nothing checked — `tsconfig.tests.json` did not cover this
+ * directory until the live suite needed it to.
+ */
 const MIME: Record<string, ImageMimeType> = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
-  '.heic': 'image/heic',
+  '.heic': 'image/png',
+  '.heif': 'image/png',
 };
+
+/** The MIME type a corpus image reaches stage 1 as. Throws on an unmapped extension. */
+export function mimeOf(file: string): ImageMimeType {
+  const mime = MIME[path.extname(file).toLowerCase()];
+  if (mime === undefined) throw new Error(`${file} has an unmapped extension`);
+  return mime;
+}
+
+/**
+ * Whether a corpus image needs the REQ-077 transcode before a provider call.
+ *
+ * ⚠ Keyed on the extension, matching `tools/golden-record.mjs`. Invariant 17
+ * requires production to sniff the format rather than trust an ingest source,
+ * and it does; here the two must agree byte-for-byte with what the recorder
+ * sent, or the live suite would be comparing against recordings taken from
+ * different input bytes — so the recorder's rule is the one to copy.
+ */
+export function needsTranscode(file: string): boolean {
+  const ext = path.extname(file).toLowerCase();
+  return ext === '.heic' || ext === '.heif';
+}
 
 export interface ManifestImage {
   readonly id: string;
@@ -159,7 +194,12 @@ function asCandidate(cleaned: CleanedCandidate, imageId: string, seq: number): E
     provider: cleaned.item.provider,
     normalisedText: cleaned.normalisedText,
     extractedYear: cleaned.extractedYear,
-    boundingBoxes: [cleaned.item.boundingBox],
+    // `NormalisedBox` carries no `imageId`; a stored `BoundingBox` does. The
+    // scorer replays one image at a time, so it is this image's — supplied
+    // here rather than left off, which is what the pre-TASK-079b code did and
+    // no typecheck ever saw (`tsconfig.tests.json` did not cover this
+    // directory until the live suite needed it to).
+    boundingBoxes: [{ ...cleaned.item.boundingBox, imageId }],
     boxSource: cleaned.item.boxSource,
     ocrConfidence: cleaned.item.confidence,
     cleanupVerdict: cleaned.cleanupVerdict,
@@ -181,15 +221,34 @@ function asCandidate(cleaned: CleanedCandidate, imageId: string, seq: number): E
  * comparison is measured against.
  */
 export async function scoreAll(modelId: string): Promise<Scored[]> {
-  const store = goldenRecordingStore(GOLDEN, modelId);
+  return scoreWithStore(goldenRecordingStore(GOLDEN, modelId));
+}
+
+/**
+ * Replay the corpus against an ARBITRARY recording store.
+ *
+ * ⚠ THIS SEAM EXISTS SO THE LIVE SUITE (§4A, `goldenLive.spec.ts`) SCORES
+ * THROUGH THIS EXACT CODE. §9.7 Stage 1 argues that two arms of a comparison
+ * must differ only by which reader answered; the live-versus-offline
+ * comparison is the same argument with higher stakes, because its whole
+ * purpose is to detect model DRIFT. A live suite carrying its own copy of the
+ * scoring rules would report every divergence between the copies as drift in
+ * the model, which is the one conclusion it exists to support and therefore
+ * the one it must not be able to manufacture.
+ *
+ * The live caller builds an `inMemoryRecordingStore` from what the live
+ * providers just said, keyed by the same sha256 of the same committed bytes.
+ * Everything downstream — `StubExtractor`, `crossCheck`, `cleanup`, both
+ * collapse passes, the answer key, the pinned clock — is shared.
+ */
+export async function scoreWithStore(store: RecordingStore): Promise<Scored[]> {
   const extractor = new StubExtractor({ recordings: store, crossCheck });
   const out: Scored[] = [];
 
   for (const image of manifest.images) {
     const expected = expectedFor(image.id);
     const bytes = readFileSync(path.join(IMAGES, image.file));
-    const mime = MIME[path.extname(image.file).toLowerCase()];
-    if (mime === undefined) throw new Error(`${image.file} has an unmapped extension`);
+    const mime = mimeOf(image.file);
 
     const result = await extractor.extract(bytes, mime);
     const cleaned = cleanup(result.items, { now: NOW });

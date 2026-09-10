@@ -38,5 +38,5 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node"]
   },
-  "include": ["apps/api/test/**/*.ts", "packages/domain/test/**/*.ts"]
+  "include": ["apps/api/test/**/*.ts", "packages/domain/test/**/*.ts", "tests/extraction/**/*.ts"]
 }
