@@ -36,8 +36,17 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * PRD §7.4 — the eight owner-initiated operations that may change
+ * PRD §7.4 — the ten owner-initiated operations that may change
  * user-visible list state. **This list is closed.**
+ *
+ * ~~Superseded: "the eight owner-initiated operations."~~ US-047 and US-048
+ * added the standalone manual add and manual removal, approved by the owner
+ * when a false extraction ("LEVANTE", a wrapped-caption split of "Sol
+ * Levante") proved unreachable by every existing remedy: suppression hides the
+ * work forever rather than correcting a mistake, fix-match repoints a row that
+ * should not exist at all, and re-uploading cannot delete anything the service
+ * still lists. Both are owner-initiated, synchronous and undoable, which is
+ * what puts them on this side of REQ-041 rather than in conflict with it.
  */
 export const REQ_041_OPERATIONS = [
   {
@@ -63,6 +72,18 @@ export const REQ_041_OPERATIONS = [
   { id: 6, op: 'undo-batch', story: 'US-032', what: 'Undoing a creates-only batch' },
   { id: 7, op: 'suppress', story: 'US-027', what: 'Suppressing a work' },
   { id: 8, op: 'unsuppress', story: 'US-029', what: 'Un-suppressing a work' },
+  {
+    id: 9,
+    op: 'add-title',
+    story: 'US-047',
+    what: 'Adding a title to the list by hand, outside any upload batch',
+  },
+  {
+    id: 10,
+    op: 'remove-title',
+    story: 'US-048',
+    what: 'Removing a title from the list by hand, without suppressing the work',
+  },
 ];
 
 /**
@@ -148,6 +169,18 @@ export const MUTATING_ROUTE_REGISTRY = [
     op: 'fix-match',
   },
   { method: 'POST', path: '/api/batches/:batchId/undo', changesListState: true, op: 'undo-batch' },
+  {
+    method: 'POST',
+    path: '/api/titles',
+    changesListState: true,
+    op: 'add-title',
+  },
+  {
+    method: 'DELETE',
+    path: '/api/titles/:titleId',
+    changesListState: true,
+    op: 'remove-title',
+  },
   { method: 'POST', path: '/api/titles/:titleId/suppress', changesListState: true, op: 'suppress' },
   {
     method: 'POST',
@@ -401,9 +434,12 @@ export function checkRegistryAgainstReq041(registry = MUTATING_ROUTE_REGISTRY) {
     }
   }
 
-  if (REQ_041_OPERATIONS.length !== 8) {
+  // ⚠ The literal is the CLOSEDNESS, restated where a widening would be made.
+  // ~~Superseded: 8, before US-047/US-048 added the manual add and removal.~~
+  // Changing it is an amendment to PRD §7.4, not a build fix.
+  if (REQ_041_OPERATIONS.length !== 10) {
     findings.push(
-      `REQ-041 §7.4 enumerates 8 owner-initiated operations; this list has ${REQ_041_OPERATIONS.length}. The list is CLOSED (T-MUT-001).`,
+      `REQ-041 §7.4 enumerates 10 owner-initiated operations; this list has ${REQ_041_OPERATIONS.length}. The list is CLOSED (T-MUT-001).`,
     );
   }
 

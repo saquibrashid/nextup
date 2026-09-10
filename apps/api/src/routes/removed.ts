@@ -119,6 +119,12 @@ export function toRemovedItem(
     removedAt: row.removed_at.toISOString(),
     removedByBatchId: row.removed_by_batch_id,
     removedByGroupId: row.removed_by_group_id,
+    // ⚠ DERIVED FROM THE BATCH ID, NOT STORED. `owner` means the owner removed
+    // this by hand (US-048); `batch` means a full-update close did. The client
+    // needs the distinction because "Removed by you" and "Removed by the
+    // Netflix update on 3 May" send the owner to completely different places
+    // when they are trying to work out why a title left their list.
+    removedBy: row.removed_by_batch_id === null ? 'owner' : 'batch',
     removalOrdinal: rank.ordinal,
     removalTotalForWork: rank.total,
     restorable: !suppressed,

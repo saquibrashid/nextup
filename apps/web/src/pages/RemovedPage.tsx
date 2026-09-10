@@ -33,6 +33,7 @@ import { SERVICE_LABELS, dateAddedLabel, removedOnLabel } from '@nextup/domain';
 
 import {
   OFFLINE_DISABLED_REASON,
+  REMOVED_BY_OWNER,
   REMOVED_CLEAR_SEARCH_LABEL,
   REMOVED_EMPTY_BODY,
   REMOVED_EMPTY_TITLE,
@@ -376,6 +377,18 @@ function RemovedRow({
         <span data-testid="removed-date-removed">
           {removedOnLabel(item.removedAt.slice(0, 10))}
         </span>
+        {/*
+          US-048 — WHO removed it. ⚠ Shown only for an owner removal, not as a
+          label on every row: "Removed by a Netflix update" is already implied
+          by this being the removed log, whereas "you did this by hand" is the
+          fact that answers the question the owner actually arrives with —
+          *why is this not on my list?* — when no upload explains it.
+        */}
+        {item.removedBy === 'owner' && (
+          <span className="removed-row__by" data-testid="removed-by-owner">
+            {REMOVED_BY_OWNER}
+          </span>
+        )}
         {ordinal !== null && (
           <span className="removed-row__ordinal" data-testid="removed-ordinal">
             {ordinal}

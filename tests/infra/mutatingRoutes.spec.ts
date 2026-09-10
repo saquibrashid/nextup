@@ -121,12 +121,19 @@ describe('T-MUT-001 · US-036 AC-1/AC-3 · REQ-041 is a closed enumeration (PRD 
     expect(findings).toEqual([]);
   });
 
-  it('T-MUT-001e · the enumeration holds exactly the eight REQ-041 operations', () => {
-    expect(REQ_041_OPERATIONS).toHaveLength(8);
+  it('T-MUT-001e · the enumeration holds exactly the ten REQ-041 operations', () => {
+    // ⚠ The count is not the point — the CLOSEDNESS is. Widening REQ-041 is an
+    // amendment to PRD §7.4, so this test failing means someone must decide,
+    // not that someone must bump a number.
+    // ~~Superseded: eight, before US-047/US-048 added the manual add and the
+    // manual removal.~~
+    expect(REQ_041_OPERATIONS).toHaveLength(10);
     expect(REQ_041_OPERATIONS.map((o: { op: string }) => o.op).sort()).toEqual([
+      'add-title',
       'close-batch',
       'confirm-removal-group',
       'fix-match',
+      'remove-title',
       'restore-listing',
       'suppress',
       'undo-batch',

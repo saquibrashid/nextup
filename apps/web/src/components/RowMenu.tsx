@@ -25,9 +25,9 @@
 import { useEffect, useRef, type JSX } from 'react';
 
 import type { TitleListItem } from './TitleRow';
-import { OFFLINE_DISABLED_REASON } from '../copy';
+import { OFFLINE_DISABLED_REASON, ROW_MENU_REMOVE_LABEL } from '../copy';
 
-export type RowMenuChoice = 'suppress' | 'fix-match';
+export type RowMenuChoice = 'suppress' | 'fix-match' | 'remove';
 
 export interface RowMenuProps {
   readonly item: TitleListItem;
@@ -45,7 +45,6 @@ export interface RowMenuProps {
 export const ROW_MENU_SUPPRESS_LABEL = 'Not interested';
 export const ROW_MENU_FIX_MATCH_LABEL = 'Fix match';
 export const ROW_MENU_CANCEL_LABEL = 'Cancel';
-
 export function RowMenu({ item, offline = false, onChoose, onDismiss }: RowMenuProps): JSX.Element {
   const firstItem = useRef<HTMLButtonElement>(null);
   const cancelItem = useRef<HTMLButtonElement>(null);
@@ -96,6 +95,34 @@ export function RowMenu({ item, offline = false, onChoose, onDismiss }: RowMenuP
         }}
       >
         {ROW_MENU_FIX_MATCH_LABEL}
+      </button>
+      {/*
+        US-048 — the third item, and the one the owner reaches for when a
+        capture invented a title that was never on the service.
+
+        ⚠ IT IS LAST, BELOW "Not interested", ON PURPOSE. Both hide the row, so
+        whichever is nearest the thumb is the one a hurried owner picks — and
+        of the two, suppression is the irreversible-by-default one (it survives
+        every future upload, keyed on work identity). Ordering the destructive-
+        to-a-real-work item first and the recoverable one second would make the
+        cheap mistake the easy one.
+
+        ⚠ Disabled offline like every other mutating item (§2.12). The list is
+        read-only offline, and a remove that appeared to work and then did not
+        would look exactly like the data loss the removed log exists to
+        disprove.
+      */}
+      <button
+        type="button"
+        role="menuitem"
+        className="tap-target"
+        data-testid="row-menu-remove"
+        disabled={offline}
+        onClick={() => {
+          onChoose('remove');
+        }}
+      >
+        {ROW_MENU_REMOVE_LABEL}
       </button>
       {offline && (
         <span className="offline-reason" data-testid="row-menu-offline-reason">

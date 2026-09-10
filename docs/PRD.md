@@ -208,7 +208,7 @@ A title was removed months ago. It shows up again in a new capture. nextup creat
 | G | Freshness | The owner can tell when each service's slice was last updated. | US-022 |
 | H | Removed view and history | Soft delete forever, browsable history, explicit restore, reappearance semantics. | US-023, US-024, US-025, US-026 |
 | I | Suppression | Not-interested that survives reappearance. | US-027, US-028, US-029 |
-| J | Recovery | Fix match, batch undo, undo refusal, re-extraction, image retention. | US-030, US-031, US-032, US-033, US-034, US-035 |
+| J | Recovery | Fix match, batch undo, undo refusal, re-extraction, image retention, and the manual list edits that repair a false extraction. | US-030, US-031, US-032, US-033, US-034, US-035, US-047, US-048 |
 | K | Platform guarantees | The invariants that make the rest safe. | US-036, US-037, US-038, US-039 |
 | **L** *(v1.1 — specified, not scheduled)* | **Waiting to stream** | Record what I noticed on a rental storefront, and tell me when it reaches a service I have. | US-040, US-041, US-042, US-043 |
 | **M** *(v1.1 — specified, not scheduled)* | **IMDb ratings** | Show me the IMDb rating on my list, and let me look up a rating for anything I haven't saved. | US-044, US-045, US-046 |
@@ -1043,6 +1043,60 @@ Added at `A48` for **Epic L (v1.1)** — these terms have no meaning in v1:
 **Out of scope for this story:** any retention of list data — there is none; retention applies to images alone.
 **Open questions:** none.
 
+#### US-047 — Add a title to my list by hand
+
+**As** the owner
+**I want** to put a title on my list without uploading a screenshot
+**So that** I can add something I know is there when extraction missed it, or when I have no screenshot to give
+
+**Traces to:** REQ-005, REQ-041, REQ-059, REQ-071
+**Priority:** must
+**Epic:** J
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | A work found on TMDB, and a service | The owner confirms the add | A row appears on the combined list carrying that service's badge, dated today (`T-MANUAL-001`) |
+| AC-2 (failure) | A work already on the list for that service | The owner adds it again | It is refused and named as already present. No second listing and no orphaned title are written (`T-MANUAL-002`) |
+| AC-3 | A work already on the list for a **different** service | The owner adds it on the second service | The existing row gains a **badge**. A second row is never created — REQ-005 is one row per work, and the owner has no way to merge two (`T-MANUAL-003`) |
+| AC-4 (failure) | A work the owner has marked not interested | The owner tries to add it | It is refused, and the message names un-suppressing as the way forward. TMDB is **not** consulted — suppression needs no network, so an outage must not stop this answering (REQ-071, `T-MANUAL-004`) |
+| AC-5 (failure) | TMDB has no such work, or TMDB is unreachable | The owner tries to add it | It is refused and **nothing at all is written**. A work with no name would sit on the list permanently blank (`T-MANUAL-005`) |
+| AC-6 | Any manual add | It succeeds | Its date-added is **today**, always. A `dateAdded` supplied in the request cannot override it: `date_added` is write-once (`T-INV-006`) and editing it stays deferred to v1.1 (NG-8, REQ-059, `T-MANUAL-006`) |
+| AC-7 | A row held since an earlier date, gaining a second badge today | The add succeeds | The row keeps its **earliest** date and does not move in the default newest-first sort (REQ-038, product invariant 6, `T-MANUAL-007`) |
+
+**Out of scope for this story:** choosing the date, entering a work TMDB does not hold, and adding to more than one service in a single action.
+**Open questions:** none.
+
+#### US-048 — Remove a title from my list by hand
+
+**As** the owner
+**I want** to take a title off my list without saying I am not interested in it
+**So that** I can delete a row extraction invented, without hiding a real film I never rejected
+
+**Traces to:** REQ-005, REQ-028, REQ-041, REQ-063, REQ-071
+**Priority:** must
+**Epic:** J
+
+⚠ **This story exists because a false extraction is a third thing.** A wrapped
+caption split "SOL LEVANTE" across two lines and produced a phantom row for a
+work the services never listed. **Not interested** (US-027) would have written
+a permanent suppression against a real film, so if it ever legitimately
+appeared it would be silently hidden; **fix match** (US-030) repoints a row
+that should not exist at all; and a fresh full-update capture cannot delete
+anything the service still lists. Removing says only *this is not on my list*.
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | A row on the combined list | The owner removes it | The row leaves the list and each of its active listings becomes `removed` (`T-MANUAL-008`) |
+| AC-2 | Any manual removal | It completes | **No Suppression is written.** The work may legitimately reappear in a later capture as a brand-new row dated today (REQ-071, product invariant 7), and adding it back by hand succeeds rather than hitting the suppression gate (`T-MANUAL-009`) |
+| AC-3 | Any manual removal | It completes | **Nothing is hard-deleted.** "Delete" is the owner's word for it, not the store's: the Title and its listings survive and appear in the removed view (REQ-028, `T-MANUAL-010`, `T-INV-012`) |
+| AC-4 | A manually removed listing | The removed view is opened | It is attributed to the owner rather than to a batch, because no upload explains it (`T-MANUAL-014`, `T-MANUAL-015`) |
+| AC-5 | A manual removal the owner regrets | Undo is taken | Exactly the listings that were removed come back, through the **existing** restore path (US-025). No second restore path exists (`T-REAP-014`, `T-MANUAL-011`) |
+| AC-6 (failure) | A title already removed, or one the owner has suppressed | The owner tries to remove it | It is refused and nothing changes. A suppressed work is refused with its un-suppress escape hatch named — removing its listings would be invisible until un-suppression and would then silently redirect it from the combined list (US-029 AC-3) to the removed view (AC-4) (`T-MANUAL-012`) |
+| AC-7 | A row carrying two service badges | The owner removes it | Both services go in one action, because the row is the unit the owner acts on (the US-027 AC-5 analogue). Two removed-view entries are logged, each independently restorable (`T-MANUAL-013`) |
+
+**Out of scope for this story:** removing a single badge from a two-badge row, and any hard delete — there is none, and REQ-028 forbids adding one.
+**Open questions:** none.
+
 ### Epic K — Platform guarantees
 
 #### US-036 — Nothing but the owner changes user-visible list state
@@ -1059,7 +1113,7 @@ Added at `A48` for **Epic L (v1.1)** — these terms have no meaning in v1:
 |---|---|---|---|
 | AC-1 | The set of operations that mutate user-visible list state | The system is inspected | It is exactly the closed enumeration in §7.4, all of them owner-initiated (REQ-041) |
 | AC-2 | Non-owner-initiated processes | The system is inspected | Exactly **four** exist: the lazy TMDB metadata refresh on access (REQ-076, US-010), the screenshot image purge (NFR-019, US-035), the lazy IMDb rating refresh on access (REQ-093, Epic M), and the lazy watch-availability refresh triggered by opening the waiting view (REQ-086, Epic L). None changes user-visible list state (REQ-041) — the rating in particular is display-only and is never sorted or filtered on (ADR-0011 OQ-A), and the availability refresh writes only `watch_intent` metadata columns, creates no listing and satisfies no intent, so a waiting work still reaches the combined list only by the ordinary capture path (US-042 AC-4, ADR-0010; approved at A52). ~~Superseded (Epic L): "Exactly three exist: the lazy TMDB metadata refresh on access (REQ-076, US-010), the screenshot image purge (NFR-019, US-035), and the lazy IMDb rating refresh on access (REQ-093, Epic M)."~~ ~~Superseded (Epic M): "Exactly two exist: the lazy TMDB metadata refresh on access (REQ-076, US-010) and the screenshot image purge (NFR-019, US-035). Neither changes user-visible list state (REQ-041)."~~ |
-| AC-3 | Any operation not in the §7.4 enumeration | It is proposed | It is **forbidden by default**. The enumeration is closed; extending it is an explicit amendment to REQ-041, which has already been widened five times |
+| AC-3 | Any operation not in the §7.4 enumeration | It is proposed | It is **forbidden by default**. The enumeration is closed; extending it is an explicit amendment to REQ-041, which has already been widened six times ~~Superseded: "five times."~~ |
 | AC-4 (edge) | A convenience feature that would auto-confirm, auto-restore, auto-merge or auto-clean anything | It is considered | It is prohibited, regardless of how safe it seems |
 | AC-5 (failure) | Any scheduled job, webhook, timer or background worker that writes list state | Automated verification runs | The test fails (NFR-003, NFR-005) |
 | AC-6 | Telemetry, analytics and usage tracking | The system is inspected | None exists (NFR-005, REQ-052) |
@@ -1425,6 +1479,18 @@ The reason full update shows already-known titles (REQ-057) is the product's mos
 6. Undoing a creates-only batch (US-032).
 7. Suppressing a work (US-027).
 8. Un-suppressing a work (US-029).
+9. Adding a title to the list by hand, outside any upload batch (US-047).
+10. Removing a title from the list by hand, without suppressing the work (US-048).
+
+~~Superseded: entries 1–8 only, before the manual list edits were added.~~ The
+amendment was made because a **false extraction** — a title the services never
+listed, invented by a wrapped caption splitting across two lines — was
+reachable by none of 1–8. Suppression (7) hides a work permanently and is
+scoped to the work identity, so it is the wrong instrument for correcting the
+system's own mistake; fix-match (5) repoints a row that should not exist at
+all; and closing a batch (1) cannot delete anything the service still lists.
+The two new operations carry the same properties as the eight they join:
+owner-initiated, synchronous, visible in the removed log, and reversible.
 
 **Non-owner-initiated processes permitted to exist — exactly three, and none changes user-visible list state:**
 
@@ -1434,7 +1500,7 @@ The reason full update shows already-known titles (REQ-057) is the product's mos
 
 ~~Superseded (Epic M): "exactly two, and neither changes user-visible list state," with entries 1 and 2 only.~~
 
-Anything not on these lists is **forbidden by default**. REQ-041 has already been widened five times during requirements work; widening it again is an explicit amendment, not an implementation decision.
+Anything not on these lists is **forbidden by default**. REQ-041 has already been widened six times during requirements work; widening it again is an explicit amendment, not an implementation decision. ~~Superseded: "widened five times."~~
 
 ### 7.5 Validation and input rules
 

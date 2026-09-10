@@ -34,6 +34,7 @@ import { registerBatchRemovalRoutes } from './batchRemovals.js';
 import { registerBatchReviewRoutes } from './batchReview.js';
 import { registerBatchUndoRoutes } from './batchUndo.js';
 import { registerListingRoutes } from './listings.js';
+import { registerManualListEditRoutes } from './manualListEdits.js';
 import { registerFixMatchRoutes } from './fixMatch.js';
 import { registerImageRoutes } from './images.js';
 import { registerImdbRoutes } from './imdb.js';
@@ -137,6 +138,18 @@ export function createApiRouter(): Router {
   // §6.10 (US-025) — explicit restore from the removed view. Registered next
   // to the removed view route it complements.
   registerListingRoutes(apiRouter);
+  // §6.30/§6.32 (US-047, US-048) — the owner adds or removes a title by hand,
+  // outside any batch. Registered after `registerTitleRoutes` so `POST
+  // /titles` and `DELETE /titles/:id` sit beside the reads they mutate, and
+  // given the same per-request TMDB client for the same reason as
+  // `registerTmdbRoutes` below.
+  //
+  // ⚠ This is NOT a background process and does not engage REQ-041: both
+  // handlers run only inside an owner-initiated request (`T-CI-005`).
+  registerManualListEditRoutes(
+    apiRouter,
+    () => new TmdbClient({ apiKey: process.env['TMDB_API_KEY'] ?? '' }),
+  );
   // §6.5 (US-030) — the owner corrects a wrong match. Registered after the
   // title routes it acts on, and given the same per-request TMDB client for
   // the same reason as `registerTmdbRoutes` below.

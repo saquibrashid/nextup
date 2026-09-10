@@ -61,6 +61,7 @@ Each state below names: **what the owner sees**, **what they can do**, and the
 | **2.12 Offline** | Global offline banner; last-loaded rows retained and marked | Read only | `T-UX-003` |
 | **2.13 Submitting (row action)** | The affected row dims with an inline spinner; the rest of the list stays interactive | Wait, or act on other rows | `T-UX-021` |
 | **2.14 Success (row action)** | The row animates out (suppress) or updates (fix match); a `role="status"` message names what happened and offers **Undo** where one exists | Undo, continue | `T-UX-022` |
+| **2.15 Add a title by hand** *(new — US-047)* | An **"Add a title"** button above the list, outside every loading/failure branch. ⚠ Deliberately **not** inside the empty state: it is needed most when the list is long and full — extraction missed one title out of two hundred, and re-capturing the whole service to catch it is the friction this removes. Disabled offline with `OFFLINE_DISABLED_REASON` as **text**, like every other mutating control (§2.12) | Open the add dialog (§3.8) | `T-MANUAL-023`, `T-MANUAL-029` |
 
 ---
 
@@ -75,6 +76,14 @@ Each state below names: **what the owner sees**, **what they can do**, and the
 | **3.5 Fix match — 409 `DUPLICATE_WORK_IDENTITY`** | *"You already have '{name}' on your list. Do you want two rows for it?"* + **"Yes, keep both"** (re-sends `confirmDuplicate: true`) / **"Open the existing one"** / **Cancel** | All three | `T-UX-034` |
 | **3.6 Fix match / restore — 409 `TARGET_WORK_SUPPRESSED` or `WORK_SUPPRESSED`** | *"You marked '{name}' as not interested. Stop ignoring it first?"* + **"Stop ignoring and continue"** (calls unsuppress then retries) / **Cancel** | Both | `T-UX-035` |
 | **3.7 Fix match — success with suppression migration** | Success message plus `FIXMATCH_SUPPRESSION_MIGRATED` — **the migration is always stated, never silent** (data-model SD-06) | Close | `T-UX-036` / `T-FIX-005` |
+| **3.8 Remove — confirm** *(new — US-048)* | `REMOVE_TITLE_CONFIRM_BODY` with the title name. ⚠ **The sentence must say the work is NOT marked "not interested" and CAN come back.** Remove and Not interested are adjacent items on one menu with visually identical outcomes — the row disappears — and mean opposite things (§3.1). An owner who reads one as the other permanently suppresses a real work they never rejected | Confirm / Cancel | `T-MANUAL-017` |
+| **3.9 Remove — removed, with Undo** *(new — US-048)* | `REMOVE_TITLE_DONE` in `role="status"`, plus **Undo**. Undo calls the **existing** `POST /api/listings/:id/restore` once per removed listing — every one of them, because a two-badge row removes two and a partial restore looks exactly like a success | Undo, close | `T-MANUAL-018`, `T-MANUAL-019` |
+| **3.10 Remove — undone** *(new — US-048)* | `REMOVE_TITLE_UNDONE`; the row is back on the list | Close | `T-MANUAL-019` |
+| **3.11 Remove — 409 `TITLE_NOT_ACTIVE`** *(new — US-048)* | `REMOVE_TITLE_NOT_ACTIVE` — *"That title is already off your list."* ⚠ A `role="status"`, **not** an error: the state the owner asked for already holds, and calling it a failure invites a retry of something already done | Close | `T-MANUAL-020` |
+| **3.12 Remove — failed** *(new — US-048)* | `REMOVE_TITLE_FAILED` — it must say **nothing has changed**, and **the row returns to the list**. A bare *"couldn't remove that"* leaves the owner unsure whether it is half-removed, and the safe-feeling response to that doubt is to press it again. ⚠ A failed **undo** is the one exception: the row stays hidden, because the removal itself did succeed | Retry from the menu | `T-MANUAL-021` |
+| **3.13 Add — search and choose** *(new — US-047)* | `ADD_TITLE_HEADING`, a debounced TMDB search (same debounce and behaviour as §3.3), then a chosen work and a service picker with **no pre-selected option**. Submitting without one shows `ADD_TITLE_SERVICE_REQUIRED` and sends nothing. ⚠ A default service would write a badge the owner never chose, and the next full-update of that service would then propose the title for removal | Search, choose, pick a service, add, cancel | `T-MANUAL-024`, `T-MANUAL-025` |
+| **3.14 Add — added** *(new — US-047)* | `ADD_TITLE_DONE`, or `ADD_TITLE_DONE_BADGE_ONLY` when the work was already on the list for another service and gained a **badge** rather than a row (REQ-005). The list refetches on **success**, never on close | Close | `T-MANUAL-026` |
+| **3.15 Add — 409 `DUPLICATE_WORK_IDENTITY` / 409 `WORK_SUPPRESSED` / 502** *(new — US-047)* | `ADD_TITLE_DUPLICATE`; or the suppression refusal **with the `unsuppressHref` way out of it**, not merely the refusal; or the §3.4 TMDB-unavailable copy. Nothing was written, so the list is **not** refetched | Change the choice, un-suppress, retry, cancel | `T-MANUAL-027`, `T-MANUAL-028` |
 
 ---
 
@@ -168,7 +177,7 @@ Each state below names: **what the owner sees**, **what they can do**, and the
 | **7.2 Empty — nothing ever removed** | *"Nothing has been removed yet."* + *"When a title leaves your list, it's kept here forever."* | Back to `/` | `T-UX-071` |
 | **7.3 Empty — search/filter matched nothing** | *"No removals match '{q}'."* + **Clear search**. **Distinct from 7.2** | Clear | `T-UX-072` |
 | **7.4 Partial** | Page 1 + load-more sentinel | Load more | `T-UX-073` |
-| **7.5 Populated** | One row per removed listing, with ordinal chips. **Never de-duplicated** | Search, filter, restore | `T-UI-009` |
+| **7.5 Populated** | One row per removed listing, with ordinal chips. **Never de-duplicated**. A row whose `removedBy` is `"owner"` also carries a `REMOVED_BY_OWNER` chip — *"Removed by you"* — because a manual removal (§3.9) has no upload to explain it, and *why is this not on my list?* is the question the owner arrives here with | Search, filter, restore | `T-UI-009`, `T-MANUAL-014`, `T-MANUAL-015` |
 | **7.6 Submitting (restore)** | The row dims with a spinner | Wait | `T-UX-074` |
 | **7.7 Success (restore)** | Row moves out; `role="status"`: *"'{name}' is back on your Netflix list, with its original date (4 Jan 2026)."* — **naming the original date** makes US-025 AC-2 visible | Continue | `T-UX-075` |
 | **7.8 Error — 409 `DUPLICATE_WORK_IDENTITY`** | §3.5's dialog | Keep both / cancel | `T-UX-034` |
@@ -265,7 +274,7 @@ Each state below names: **what the owner sees**, **what they can do**, and the
 
 | Surface | initial | empty | partial | populated | error | offline | submitting | success |
 |---|---|---|---|---|---|---|---|---|
-| Combined list | 2.1/2.2 | 2.3/2.4/2.5 | 2.6/2.8 | 2.7 | 2.9–2.11 | 2.12 | 2.13 | 2.14 |
+| Combined list | 2.1/2.2 | 2.3/2.4/2.5 | 2.6/2.8 | 2.7/**2.15** | 2.9–2.11 | 2.12 | 2.13 | 2.14 |
 | Upload | 4.1/4.2 | 4.3 | 4.4 | 4.7 | 4.5/4.6/4.6a/4.6b/4.10/**4.13–4.16**/**4.18** | 4.11 | 4.8 | 4.9/**4.12** |
 | Batch status | 5.1 | — | 5.2/5.3 | 5.3 | 5.5–5.7 | 5.8 | 5.1/5.2 | 5.4 |
 | Review | 6.1 | 6.2/6.3 | 6.4/6.7 | 6.5/6.6 | 6.9/6.14–6.16/6.18 | 6.17 | 6.12 | 6.13 |

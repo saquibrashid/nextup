@@ -75,7 +75,20 @@ export function registerListingRoutes(router: Router): void {
     }
 
     const existingActive = await findActiveTitleByWorkIdentity(ownerId, workIdentity);
-    if (existingActive !== null && !confirmDuplicate) {
+    // ⚠ THE TITLE'S OWN ROW IS NOT A DUPLICATE OF ITSELF. The check exists for
+    // the REAPPEARANCE case (product invariant 7): the work came back in a
+    // later capture as a brand-new title, so restoring the old listing would
+    // put two rows for one work on the list. When `existingActive` IS this
+    // listing's own title, none of that applies — the title is simply already
+    // active because a SIBLING listing of it is.
+    //
+    // That happens the moment a title has two service badges and both are
+    // restored, and the message it produced ("a newer version of that title is
+    // already on your list") named a row that did not exist. It became routine
+    // with US-048: undoing a manual removal restores every listing the removal
+    // took, so a two-badge undo hit this on the second call and left the row
+    // half-restored with no way to finish (`T-MANUAL-011`).
+    if (existingActive !== null && existingActive.id !== listing.titleId && !confirmDuplicate) {
       throw new AppError(
         'DUPLICATE_WORK_IDENTITY',
         409,

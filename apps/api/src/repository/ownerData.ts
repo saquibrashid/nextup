@@ -1207,11 +1207,23 @@ export async function findActiveSuppressedWorks(
  * counterpart in this file and there must never be one: no TTL, no purge job,
  * no scheduled deletion anywhere. The *absence* of such a mechanism IS the
  * requirement, and `T-INV-013` / `T-MIG-001` guard it.
+ *
+ * ⚠ `removedByBatchId: null` is a REAL, supported value, not a missing read:
+ * it is how US-048 records "the owner removed this by hand". The UI reads it
+ * to say "Removed by you" instead of naming a batch (`specs/api.md` §6.9), so
+ * defaulting it to any batch id would be an outright false provenance claim.
+ * Note the "hard delete" in the US-048 UI wording is user-facing only — the
+ * row is still soft-deleted here, and `T-INV-013` asserts no route ever calls
+ * `prisma.*.delete()` on a listing or a title.
  */
 export async function softDeleteServiceListing(
   ownerId: OwnerId,
   listingId: string,
-  removal: { removedByBatchId: string; removedByGroupId?: string | null; removedAt: Date },
+  removal: {
+    removedByBatchId: string | null;
+    removedByGroupId?: string | null;
+    removedAt: Date;
+  },
   tx?: Db,
 ) {
   return db(tx).serviceListing.updateMany({
