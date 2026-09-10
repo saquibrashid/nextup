@@ -12,7 +12,7 @@
 // silently disagree with the cursor the API pages on, so page 2 would interleave
 // wrongly with page 1 and the owner would see rows apparently jump position.
 
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 import { TitleRow, type TitleListItem } from './TitleRow';
 
@@ -30,6 +30,12 @@ export interface TitleListProps {
    * simplification reaches for first.
    */
   readonly pendingTitleIds?: ReadonlySet<string> | undefined;
+  /**
+   * REQ-105 — returns the open menu for `item`, or `undefined` for every row
+   * that is not the open one. The list does not decide which row that is; it
+   * only gives the caller a place to put it that is inside the right row.
+   */
+  readonly renderMenu?: ((item: TitleListItem) => ReactNode) | undefined;
 }
 
 export function TitleList({
@@ -37,6 +43,7 @@ export function TitleList({
   onOpenMenu,
   onFixMatch,
   pendingTitleIds,
+  renderMenu,
 }: TitleListProps): JSX.Element {
   return (
     <ul className="title-list" data-testid="title-list">
@@ -47,6 +54,7 @@ export function TitleList({
           onOpenMenu={onOpenMenu}
           onFixMatch={onFixMatch}
           pending={pendingTitleIds?.has(item.titleId) ?? false}
+          menu={renderMenu?.(item)}
         />
       ))}
     </ul>

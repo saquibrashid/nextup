@@ -30,6 +30,17 @@
    * only consumer, so the minimum cannot drift between controls.
    */
   --tap-target-min: 44px;
+  /*
+   * REQ-105 — the open row menu overlaps the row beneath it, so it needs a
+   * shadow to read as a layer rather than as part of that row.
+   *
+   * ⚠ Declared here because `T-CSS-003c` forbids any `rgb()`/`hsl()` literal
+   * outside `:root` — the gate that stops `T-CSS-003b`'s hex-literal rule from
+   * being evaded by changing notation. It is deliberately NOT named
+   * `--color-*`: it is a composite shadow value, not a colour, and the
+   * contrast-pair sweep reads colour tokens.
+   */
+  --shadow-menu: 0 4px 12px rgb(17 24 39 / 15%);
 
   /*
    * ⚠ EVERY RATIO BELOW WAS COMPUTED, NOT EYEBALLED, AND `T-CSS-004`
@@ -360,14 +371,35 @@ button {
 
 /* The `⋮` row menu (`specs/ui.md` §2.3). Items stack so each keeps the full
    44 px tap target on a phone. */
+/*
+ * REQ-105 — the open row menu is anchored to the row it was opened from.
+ *
+ * ⚠ `position: absolute` here only works because `ListPage` now renders the
+ * menu INSIDE the row's `.title-row__actions` (which is `position: relative`).
+ * Absolute positioning resolves against the nearest positioned ancestor; while
+ * the menu was a sibling of `<TitleList>` that ancestor was the page, which is
+ * exactly how it came to render below every row. **If the menu is ever moved
+ * back out of the row, this rule silently stops anchoring and starts floating
+ * over the page** — the failure is visual only, so `T-UX-100` asserts DOM
+ * ancestry rather than screen position.
+ *
+ * `right: 0` opens it leftward from the trigger so a menu on a narrow screen
+ * cannot push the row wider and reintroduce the 320 px horizontal scroll that
+ * `T-A11Y-001` forbids.
+ */
 .row-menu {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow-menu);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-3);
+  position: absolute;
+  right: 0;
+  top: calc(var(--tap-target-min) + var(--space-1));
+  z-index: 10;
 }
 
 .title-row {
@@ -428,11 +460,24 @@ button {
   border: 1px solid var(--color-border);
 }
 
+/*
+ * REQ-108 — the owner's words were "the text in the tiles is scrunched
+ * together". Five stacked lines (name, meta, rating, date, badges) separated
+ * by `--space-1` (4px) read as one paragraph rather than as five independent
+ * facts.
+ *
+ * ⚠ **Do NOT create this whitespace by deleting a line instead.** The density
+ * direction is "metadata trimmed", so removing a row of text both looks like
+ * spacing and satisfies a stated preference — and in a diff, deleting a line
+ * because it is unused is indistinguishable from deleting it to manufacture
+ * a gap. What (if anything) gets trimmed is REQ-112, it is still an open
+ * question with the owner, and it is deliberately not settled here.
+ */
 .title-row__body {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
   min-width: 0; /* ⚠ Without this a long title forces horizontal scroll at 320 px. */
 }
 
@@ -445,6 +490,33 @@ button {
 .title-row__date {
   color: var(--color-text-muted);
   font-size: 0.875rem;
+}
+
+/*
+ * REQ-106 — `specs/ui.md` §2.2 specifies this line as "Year · type · genres"
+ * and it rendered as `TV2004Animation, Sci-Fi & Fantasy`: three adjacent
+ * `<span>`s with nothing between them.
+ *
+ * ⚠ **This is a correctness fix, not a style tweak.** `Movie2026Action` is not
+ * a thing; with the facts run together the owner cannot tell a missing
+ * separator from a missing field, and the concatenation reads as a title.
+ *
+ * ⚠ **The `·` is CSS-generated ON PURPOSE and must not be moved into the JSX.**
+ * It is decoration: a literal `·` in a text node puts "middot" into the row's
+ * accessible name between every fact, which a screen reader then announces.
+ * `T-UX-103` asserts the accessible name stays clean, and it would pass
+ * vacuously in jsdom (which does not render `::before`) if the character were
+ * ever inlined — so that test is paired with `T-UX-102` on the visual side.
+ */
+.title-row__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+}
+
+.title-row__meta > span + span::before {
+  content: '·';
+  margin-right: var(--space-2);
 }
 
 .title-row__badges {
@@ -498,14 +570,36 @@ button {
   font-size: 0.75rem;
 }
 
+/*
+ * REQ-107 — `align-items` IS THE REQUIREMENT, NOT A TIDY-UP.
+ *
+ * `.title-row` is `display: flex` with the default `align-items: stretch`, so
+ * this box stretched to the row's full height and the `⋮` button inside it
+ * stretched with it. `.tap-target`'s `min-height: 44px` is a FLOOR, not a
+ * ceiling, so nothing capped it: the button rendered as a tall bordered grey
+ * column that reads as a structural panel rather than a control.
+ *
+ * ⚠ **The 44 px target is unchanged** (`T-A11Y-001b`, NFR-006). This narrows
+ * the BOX, it does not shrink the TARGET — conflating the two would regress a
+ * passing accessibility gate in order to fix an appearance.
+ *
+ * REQ-105 — `position: relative` lives HERE, on the actions box, because that
+ * is the element the open `.row-menu` is a DOM child of. It used to sit on
+ * `.title-row__menu` (the button), which is a containing block the menu was
+ * never a descendant of: the stylesheet had been written for a tree the JSX
+ * did not build, so the menu resolved against the page and rendered below the
+ * whole list.
+ */
 .title-row__actions {
+  align-items: flex-start;
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  position: relative;
 }
 
 .title-row__menu {
-  position: relative;
+  flex: 0 0 auto;
 }
 
 .title-row__action {
