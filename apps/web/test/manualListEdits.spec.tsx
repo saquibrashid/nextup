@@ -202,6 +202,27 @@ describe('US-048 — removing a title by hand from the row menu', () => {
     expect((remove as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByTestId('row-menu-offline-reason')).toBeTruthy();
   });
+
+  it('T-MANUAL-031: the Remove ITEM is absent when its dialog could not open — never present-but-dead', async () => {
+    // ⚠ THE PARTIAL-WIRING CASE, WHICH `T-MANUAL-030` CANNOT SEE. The dialog
+    // needs BOTH the call and its undo, so a container that wired the other
+    // four row handlers and only `onRemoveTitle` — or only
+    // `onRestoreListing` — would draw a third menu item that opens nothing.
+    // That is precisely the shape `rowMenu.spec.tsx` was written after: a
+    // finished dialog mounted by nothing, with a green suite over it. The
+    // other two items must still work, so this is not "the menu disappeared".
+    const user = userEvent.setup();
+    const props = wiring();
+    const withoutUndo: ListPageProps = { ...props };
+    delete (withoutUndo as { onRestoreListing?: unknown }).onRestoreListing;
+    render(<ListPage {...withoutUndo} />);
+    await openMenu(user, 'Dune');
+
+    const menu = await screen.findByRole('menu', { name: 'Actions for Dune' });
+    expect(screen.queryByTestId('row-menu-remove')).toBeNull();
+    expect(within(menu).getByRole('menuitem', { name: 'Not interested' })).toBeTruthy();
+    expect(within(menu).getByRole('menuitem', { name: 'Fix match' })).toBeTruthy();
+  });
 });
 
 describe('US-047 — adding a title by hand, outside any batch', () => {

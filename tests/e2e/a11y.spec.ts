@@ -480,8 +480,9 @@ test.describe('T-A11Y-001 — the 320 px floor', () => {
     await expectNoHorizontalOverflow(page);
 
     const items = menu.getByRole('menuitem');
-    await expect(items).toHaveCount(3);
-    for (let i = 0; i < 3; i += 1) {
+    // Four since US-048: Not interested, Fix match, Remove from list, Cancel.
+    await expect(items).toHaveCount(4);
+    for (let i = 0; i < 4; i += 1) {
       await expectTapTarget(items.nth(i));
     }
   });

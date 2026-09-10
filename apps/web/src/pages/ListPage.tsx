@@ -430,6 +430,7 @@ export function ListPage({
             <RowMenu
               item={menuFor}
               offline={offline}
+              canRemove={removeWired}
               onDismiss={closeAll}
               onChoose={(choice) => {
                 const item = menuFor;
