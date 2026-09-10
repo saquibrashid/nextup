@@ -560,15 +560,45 @@ const TRUNCATION_MARKER = /(\u2026|\.\.\.?)\s*$/u;
  * case R1 exists for. It is: **an inference that does not extend what was
  * printed, over text two independent readers agree on, is an invention.**
  * A de-truncation extends its prefix; `raw` -> `wwe raw` does not.
+ *
+ * **R3 (TASK-206). R2 was gated on `ocrSupport === 'exact'`, AND THAT GATE WAS
+ * THE BUG.** The reasoning was "only an exact independent corroboration is
+ * strong enough to overrule the model", which sounds cautious and is not: it
+ * treats OCR SILENCE as evidence FOR the model. `netflix-mylist-desktop-01`
+ * carries a tile whose `rawText` is `WICKED FOR GOOD` — read correctly, in
+ * full, with no ellipsis — reported with `identifiedTitle: 'Wicked: Part One'`,
+ * A DIFFERENT FILM. It scored `ocrSupport: 'none'`, so R2 never ran and the
+ * invention won unopposed. It cost a recall point and a fabrication, and it
+ * was logged in the golden ledger for four tasks as a READER misidentification
+ * when the correct string had been in the record all along.
+ *
+ * ⚠ THE CORROBORATION GATE IS NARROWED TO `partial` ONLY, WHICH IS THE ONLY
+ * VALUE THAT CARRIES REAL INFORMATION HERE. `partial` is the signature of a
+ * caption truncated on screen scored against a full OCR line — precisely the
+ * case R1 exists for — so it must keep preferring the inference. `none` is
+ * silence and says nothing either way, so it falls through to the structural
+ * test, which needs no corroboration to work: it asks whether the inference
+ * EXTENDS what was printed, and that question is answerable from the two
+ * strings alone.
+ *
+ * ⚠ AND THE STRUCTURAL TEST IS TWO-SIDED, because the one-sided version
+ * regressed a real title the moment `none` started reaching it. When step 1 or
+ * 1b merges two lines, the printed text is the LONGER string and the model
+ * often titles only the first line — `true detective night country true
+ * detective` printed, `True Detective: Night Country` inferred. The inference
+ * is CONTAINED IN the printed text there, which is a selection out of it, not
+ * an invention. So containment in EITHER direction keeps the inference; only a
+ * genuine contradiction — neither string a prefix of the other — hands it back
+ * to what was printed.
  */
 export function preferredSource(item: ExtractedTextItem): string {
   const inferred = item.inferredTitle;
   if (inferred === null || item.rawText === '') return inferred ?? item.rawText;
 
-  // Only an *exact* independent corroboration is strong enough to overrule the
-  // model. `partial` is what a truncated caption scores against a full OCR
-  // line, so anything weaker must keep R1's behaviour.
-  if (item.ocrSupport !== 'exact') return inferred;
+  // `partial` is the signature of a caption truncated on screen scored against
+  // a full OCR line — exactly the case R1 exists for — so it keeps R1's
+  // behaviour. `exact` and `none` both fall through to the structural test.
+  if (item.ocrSupport === 'partial') return inferred;
 
   // The caption itself says it was cut off.
   if (TRUNCATION_MARKER.test(item.rawText)) return inferred;
@@ -579,6 +609,12 @@ export function preferredSource(item: ExtractedTextItem): string {
 
   // A genuine de-truncation extends the visible prefix; an invention does not.
   if (normalisedInferred.startsWith(`${normalisedRaw} `)) return inferred;
+
+  // The mirror: the inference is *contained in* what was printed. That happens
+  // when step 1/1b merged two lines and the model titled only the first, so the
+  // printed text is the longer, doubled string. A selection out of the printed
+  // text is not an invention either — it is the better of the two.
+  if (normalisedRaw.startsWith(`${normalisedInferred} `)) return inferred;
 
   return item.rawText;
 }
