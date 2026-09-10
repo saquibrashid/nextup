@@ -462,10 +462,15 @@ describe('truncated captions (T-AI-043)', () => {
     expect(out[0]?.matchText).toBe('The Lord of the Rings: The Two Towers');
   });
 
-  it('T-AI-043e keeps the inference when OCR does not corroborate the caption exactly', () => {
-    // Only an exact independent reading is strong enough to overrule the
+  it('T-AI-043e keeps the inference when OCR PARTIALLY corroborates the caption', () => {
+    // ~~Only an exact independent reading is strong enough to overrule the
     // model. `partial` is what a truncated caption scores against the full
-    // OCR line it came from, so anything weaker must keep R1's behaviour.
+    // OCR line it came from, so anything weaker must keep R1's behaviour.~~
+    // ⚠ NARROWED AT R3 (TASK-206): the second sentence was right and the first
+    // was wrong. `partial` really is the signature of a caption truncated on
+    // screen, so it still keeps R1's behaviour — but `none` is SILENCE, and
+    // treating silence as evidence for the model is what let `wicked part one`
+    // through. See `T-AI-043g`.
     const out = cleanup(
       [llm({ rawText: 'RAW', inferredTitle: 'WWE Raw', ocrSupport: 'partial' })],
       {
@@ -483,5 +488,88 @@ describe('truncated captions (T-AI-043)', () => {
     const out = cleanup([llm({ rawText: 'Raw', inferredTitle: 'WWE Raw' })], { now: NOW });
 
     expect(out[0]?.matchText).toBe('Raw');
+  });
+
+  // ── §3.1a R3 — silence is not corroboration (TASK-206) ────────────────────
+  //
+  // ⚠ THESE FOUR ARE ALSO ONE TEST IN FOUR PARTS. `g` is the defect; `h`, `i`
+  // and `j` are the twins that stop the narrowing from becoming "distrust the
+  // inference whenever OCR is silent", which would break de-truncation on
+  // every tile OCR could not read — the commonest tile in the corpus.
+  it('T-AI-043g prefers the CAPTION over an invention even when OCR is SILENT', () => {
+    // The golden corpus, exactly: `netflix-mylist-desktop-01` carries a tile
+    // whose caption reads WICKED FOR GOOD in full, with no ellipsis, reported
+    // as `Wicked: Part One` — A DIFFERENT FILM. It scored `ocrSupport: 'none'`,
+    // so R2's `=== 'exact'` gate skipped it and the invention won unopposed. It
+    // was logged as a READER misidentification for four tasks while the correct
+    // string sat in the record.
+    const out = cleanup(
+      [llm({ rawText: 'WICKED FOR GOOD', inferredTitle: 'Wicked: Part One', ocrSupport: 'none' })],
+      { now: NOW },
+    );
+
+    expect(out[0]?.matchText).toBe('WICKED FOR GOOD');
+    expect(out[0]?.normalisedText).toBe('wicked for good');
+    // Demoted, not destroyed — US-007 AC-3 still shows the owner both.
+    expect(out[0]?.item.inferredTitle).toBe('Wicked: Part One');
+  });
+
+  it('T-AI-043h still de-truncates an ELLIPSIS caption OCR could not read', () => {
+    // ⚠ THE TWIN THAT MATTERS MOST. `in the hand of dante` is in the corpus as
+    // `In the sh...of Dante`: the screen itself was cut off, so the inference
+    // is the only matchable string there is. If R3 took this case too, every
+    // truncated caption on an OCR-silent tile would become unmatchable.
+    const out = cleanup(
+      [
+        llm({
+          rawText: 'The Lord of the Ri...',
+          inferredTitle: 'The Lord of the Rings',
+          ocrSupport: 'none',
+        }),
+      ],
+      { now: NOW },
+    );
+
+    expect(out[0]?.matchText).toBe('The Lord of the Rings');
+  });
+
+  it('T-AI-043i still de-truncates a PREFIX caption OCR could not read', () => {
+    // The no-ellipsis half of `h`. The prefix test, not the marker, is what
+    // carries de-truncation — and it needs no corroboration to work, which is
+    // the whole reason `none` can safely fall through to it.
+    const out = cleanup(
+      [
+        llm({
+          rawText: 'The Lord of the Rings',
+          inferredTitle: 'The Lord of the Rings: The Two Towers',
+          ocrSupport: 'none',
+        }),
+      ],
+      { now: NOW },
+    );
+
+    expect(out[0]?.matchText).toBe('The Lord of the Rings: The Two Towers');
+  });
+
+  it('T-AI-043j keeps an inference CONTAINED IN a merged caption', () => {
+    // ⚠ THE REGRESSION R3 CAUSED BEFORE THE RULE WAS MADE TWO-SIDED, CAUGHT BY
+    // THE GOLDEN CORPUS: when step 1/1b merges two lines the printed text is
+    // the LONGER string and the model titles only the first, so
+    // `true detective night country true detective` was printed and
+    // `True Detective: Night Country` inferred. One-sided, R3 handed back the
+    // doubled string and invented a false title where there had been none.
+    // Containment in EITHER direction is a selection, not an invention.
+    const out = cleanup(
+      [
+        llm({
+          rawText: 'True Detective Night Country True Detective',
+          inferredTitle: 'True Detective: Night Country',
+          ocrSupport: 'none',
+        }),
+      ],
+      { now: NOW },
+    );
+
+    expect(out[0]?.matchText).toBe('True Detective: Night Country');
   });
 });

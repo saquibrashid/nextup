@@ -567,9 +567,13 @@ favour of `inferredTitle`.**
 *extend* what was printed.** Use `rawText` when **all** of:
 
 1. `inferredTitle` is present and normalises differently from `rawText`; **and**
-2. `ocrSupport === 'exact'` — the independent OCR leg read the same glyphs; **and**
+2. `ocrSupport !== 'partial'` — see R3; ~~`ocrSupport === 'exact'` — the
+   independent OCR leg read the same glyphs~~; **and**
 3. `rawText` carries no trailing truncation marker (`…`, `...`, `..`); **and**
-4. `normalise(inferredTitle)` does **not** start with `normalise(rawText) + ' '`.
+4. `normalise(inferredTitle)` does **not** start with `normalise(rawText) + ' '`;
+   **and**
+5. `normalise(rawText)` does **not** start with `normalise(inferredTitle) + ' '`
+   — see R3.
 
 ⚠ **THIS IS NOT "DISTRUST THE MODEL WHEN IT DISAGREES WITH THE CAPTION".**
 That rule would take every truncated tile with it, which is the entire case R1
@@ -587,8 +591,41 @@ it; it is 1.0 with R2. Condition 4 is anchored at the **start** deliberately: a
 substring test would read `raw` inside `wwe raw` as a completion and reinstate
 the defect (`T-AI-043f`).
 
+**R3 (new in R3, TASK-206). Silence is not corroboration, and containment runs
+both ways.** R2's condition 2 required `ocrSupport === 'exact'`, on the
+reasoning that only an exact independent reading is strong enough to overrule
+the model. **That was wrong, and the wrongness is specific: it treats OCR
+SILENCE as evidence FOR the model.** Condition 2 is narrowed to *exclude
+`partial` only*, and condition 5 is added.
+
+- **`partial` keeps R1's behaviour**, because it is the actual signature of a
+  caption truncated on screen scored against the full OCR line it came from.
+- **`none` falls through to conditions 3-5**, which need no corroboration to
+  work: they ask whether the inference *extends* what was printed, and that is
+  answerable from the two strings alone.
+- **Condition 5 is the mirror of condition 4.** When §3.2 step 1/1b merges two
+  lines, the *printed* text is the longer string and the model often titles
+  only the first — `true detective night country true detective` printed,
+  `True Detective: Night Country` inferred. The inference is *contained in* the
+  printed text there, which is a **selection out of it, not an invention**.
+  Without condition 5, R3 hands back the doubled string and manufactures a
+  false title where there was none. Only a genuine **contradiction** — neither
+  string a prefix of the other — reverts to what was printed.
+
+⚠ **WHY R3 IS LOAD-BEARING.** `netflix-mylist-desktop-01` carries a tile whose
+caption reads **`WICKED FOR GOOD`** in full, with no ellipsis, reported as
+`identifiedTitle: "Wicked: Part One"` — **a different film**. It scored
+`ocrSupport: 'none'`, so R2's gate skipped it and the invention won unopposed.
+It was recorded in the golden ledger as a *reader misidentification* for four
+tasks while the correct string sat in the record the whole time. R3 took
+aggregate recall from 0.9403 to **0.9552**, clearing §9.2's 0.95 floor, and the
+incumbent's fabrication rate to **zero**. ⚠ **The general lesson, which TASK-198
+also taught and which this spec now states twice on purpose: when a golden
+metric looks like reader quality, suspect the pipeline first.**
+
 Tests: `T-AI-043a` (truncation still wins), `T-AI-043c` (the invention),
-`T-AI-043d`/`e`/`f` (the discriminating twins).
+`T-AI-043d`/`e`/`f` (the discriminating twins), `T-AI-043g` (the R3 defect),
+`T-AI-043h`/`i`/`j` (the R3 twins).
 
 ### 3.2 Steps, in order
 

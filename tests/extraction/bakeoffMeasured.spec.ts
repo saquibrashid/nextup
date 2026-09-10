@@ -161,7 +161,12 @@ describe('T-AI-045 the bake-off is measured, and the pre-committed rule decides 
     const inc = aggregate(incScored);
     const chal = aggregate(chalScored);
 
-    expect(inc.recall).toBe(0.9402985074626866);
+    // ⚠ 0.9403 → 0.9552 AT TASK-206, §3.1a R3, AND IT CLEARS THE §9.2 FLOOR OF
+    // 0.95 FOR THE FIRST TIME. A pipeline rule again, not an answer-key change,
+    // so BOTH arms move by the same title (`wicked for good`, whose correct
+    // caption the reader had transcribed and then overridden) and the
+    // comparison stays like-for-like.
+    expect(inc.recall).toBe(0.9552238805970149);
     // ⚠ 0.2500 → 0.3143 AT TASK-195, AND THE DEFECT GOT SMALLER, NOT BIGGER.
     // The false-title COUNT fell 26 → 22; the denominator is `title-candidate`
     // count, and 34 chrome strings stopped being counted as title candidates.
@@ -199,16 +204,26 @@ describe('T-AI-045 the bake-off is measured, and the pre-committed rule decides 
     // denominator two candidates smaller because the two fragments collapsed.
     // A denominator artefact, exactly like TASK-195's; do not read it as a
     // regression.
-    expect(inc.fabricationRate).toBe(0.012048192771084338);
+    // ⚠ AND AT TASK-206 IT REACHED ZERO — the last incumbent fabrication was
+    // `wicked part one`, which R3 showed was never a fabrication by the reader
+    // at all: `rawText` held `WICKED FOR GOOD` and stage 2 was preferring the
+    // override. ⚠ DO NOT READ 0 AS "THIS MODEL NEVER INVENTS"; it means nothing
+    // it invented is still being preferred over what it transcribed. The
+    // challenger below still fabricates, on the same recordings, which is the
+    // control that keeps this number meaningful.
+    expect(inc.fabricationRate).toBe(0);
 
-    expect(chal.recall).toBe(0.9402985074626866);
+    expect(chal.recall).toBe(0.9552238805970149);
     // ⚠ THE CHALLENGER MOVED FURTHER THAN THE INCUMBENT AT TASK-203 — 0.4198 →
     // 0.3472 — and that is expected, not suspicious: it emits MORE readings of
     // each caption, so it had more fragments to lose. Its lead-gap narrowed
     // and the incumbent still wins by 15.4 points.
     expect(chal.falseTitleRate).toBe(0.3);
-    // Same denominator artefact as the incumbent's: 0.035 → 0.036649.
-    expect(chal.fabricationRate).toBe(0.0374331550802139);
+    // Same denominator artefact as the incumbent's: 0.035 → 0.036649. Then
+    // 0.036649 → 0.037234 at TASK-206, as R3 handed a handful of challenger
+    // captions back to their printed text too. It stays an order of magnitude
+    // above the incumbent's zero, which is the point of scoring both.
+    expect(chal.fabricationRate).toBe(0.03723404255319149);
 
     // ⚠ THE SHAPE OF THE RESULT, STATED AS AN ASSERTION SO IT CANNOT BE
     // MISREAD FROM THE NUMBERS ALONE: the challenger reads MORE, and much of

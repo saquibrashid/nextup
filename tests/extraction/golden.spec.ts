@@ -87,68 +87,63 @@ const scored = await scoreAll(DEFAULT_RECORDING_MODEL_ID);
  *   - an IMPROVEMENT also fails CI, deliberately, forcing the new number to be
  *     recorded rather than absorbed silently.
  *
- * ⚠ THE KNOWN SHORTFALLS BELOW ARE A LEDGER, NOT A SET OF RELAXED GATES.
- * The §9.2 constants above are unchanged and are asserted against the ledger,
- * so the gap between what the product requires and what the corpus currently
- * scores is stated as a number in CI rather than left as a footnote. Do NOT
- * "fix" a failure here by editing a baseline number to match new output
- * without first understanding which of the two it is.
+ * ⚠ EVERY §9.2 METRIC IN THIS FILE IS NOW A GATE. There was a ledger of known
+ * shortfalls here — a set of pinned numbers on the failing side of their §9.2
+ * thresholds, each with its cause — and `T-AI-030f` existed to force entries
+ * out of it as extraction improved. It fired five times and the last entry
+ * left at TASK-206, so the ledger is gone. Do NOT "fix" a failure here by
+ * editing a baseline number to match new output without first understanding
+ * which of the two it is, and do NOT reintroduce a ledger to park a
+ * regression in: `T-AI-030f` now fails if one comes back.
  */
 
 /**
- * Every departure from a §9.2 gate, with the cause established by reading the
- * recordings — not guesses.
+ * Aggregate recall — **A GATE, NOT A PIN, SINCE TASK-206.**
+ *
+ * ⚠ THE FIFTH AND LAST METRIC TO LEAVE `KNOWN_SHORTFALLS` BY CLEARING §9.2,
+ * AND WITH IT THE LEDGER ITSELF IS GONE — exactly as `T-AI-030f` said it
+ * would be. There is no `KNOWN_SHORTFALLS` object any more and there must not
+ * be one again; every §9.2 metric this corpus measures is now gated.
+ *
+ * 63 of 67 → **64 of 67** against a floor of {@link AGGREGATE_RECALL_FLOOR}.
+ * The history, kept because each entry names a cause that was established by
+ * reading the recordings rather than guessed:
+ *
+ *   - ~~`raw` x2 — the model reads the WWE logo baked into the artwork and
+ *     returns `wwe raw`. The visible caption is `Raw`, so the answer key is
+ *     right and the embellishment costs a recall point AND a false title.~~
+ *     **FIXED AT TASK-198 by §3.1a R2 — and note the ledger was right that
+ *     the answer key was right. Both recall and the false-title rate moved,
+ *     exactly as this entry predicted they would.**
+ *   - ~~`wicked for good` — on the desktop capture the model returned
+ *     `wicked part one`, a DIFFERENT FILM. A genuine misidentification, and
+ *     the most serious single finding in the corpus.~~
+ *     **FIXED AT TASK-206 by §3.1a R3, AND IT WAS NEVER A MISIDENTIFICATION.**
+ *     The reader transcribed the caption CORRECTLY — `rawText` is
+ *     `WICKED FOR GOOD` — and then overrode itself with
+ *     `inferredTitle: 'Wicked: Part One'`. R2 already existed to reject that
+ *     kind of invention, but it was gated on `ocrSupport === 'exact'` and this
+ *     tile scored `none`, so the invention won unopposed. ⚠ THE LESSON IS THE
+ *     ONE TASK-198 ALSO TAUGHT: a "reader quality" finding here was really a
+ *     STAGE-2 defect, and the correct string was sitting in the record the
+ *     whole time. Suspect the pipeline before the model.
+ *   - `louis c k ridiculous` x2 — the phone's floating nav bar OCCLUDES the
+ *     caption in `netflix-mylist-mobile-01` and in the JPEG derived from it.
+ *     ⚠ **THESE TWO ARE A MEASUREMENT ARTEFACT AND MUST NOT BE "FIXED".** This
+ *     corpus scores each image in ISOLATION; the product does not. The title
+ *     IS extracted from `netflix-mylist-mobile-02`, the next screenshot of the
+ *     same list, and `resolveCandidates.ts` collapses across every image in
+ *     the batch with `imageOrder`. So the owner loses nothing — the two points
+ *     are the price of a per-image metric, and the honest response is to say
+ *     so here rather than to stitch the images together (which would fuse N
+ *     images into one failure unit, against REQ-080/081).
+ *   - `in the hand of dante` — returned as `in the shadow of dante`. The ONLY
+ *     surviving miss that is genuinely the reader's. The caption is truncated
+ *     on screen — `rawText` is `In the sh...of Dante` — so `shadow` is a
+ *     faithful reading of what was visible, and no stage-2 rule can recover a
+ *     word the screen never showed. Fixing it needs the reader, not this file.
  */
-const KNOWN_SHORTFALLS = {
-  /**
-   * ~~61~~ **63** of 67 expected titles. The ~~six~~ **four** misses are
-   * ~~FOUR~~ **THREE** distinct causes, all real and none of them fixture
-   * defects:
-   *
-   *   - `louis c k ridiculous` x2 — the phone's floating nav bar OCCLUDES the
-   *     caption in `netflix-mylist-mobile-01` and in the JPEG derived from it.
-   *     A reader that declines to name a tile it cannot see is behaving
-   *     correctly; this is the corpus being honest, not the reader failing.
-   *   - ~~`raw` x2 — the model reads the WWE logo baked into the artwork and
-   *     returns `wwe raw`. The visible caption is `Raw`, so the answer key is
-   *     right and the embellishment costs a recall point AND a false title.~~
-   *     **FIXED AT TASK-198 by §3.1a R2 — and note the ledger was right that
-   *     the answer key was right. Both recall and the false-title rate moved,
-   *     exactly as this entry predicted they would.**
-   *   - `wicked for good` — on the desktop capture the model returned
-   *     `wicked part one`, a DIFFERENT FILM. A genuine misidentification, and
-   *     the most serious single finding in the corpus.
-   *   - `in the hand of dante` — returned as `in the shadow of dante`, a
-   *     misread of a script-face title treatment.
-   */
-  aggregateRecall: 0.9402985074626866,
-  /**
-   * ~~2 of 4. ⚠ §9.2 sets this floor at **1.0 and calls it non-negotiable**, so
-   * this is the most serious shortfall in the ledger — and its cause is the
-   * same geometry-scoped consumption as the false-title rate, seen from the
-   * other side.~~
-   *
-   * ~~Both misses are the title `Raw`. OCR read the caption correctly. The
-   * vision model read the WWE logo burnt into the artwork and returned
-   * `wwe raw`. On the DESKTOP layouts the caption sits *under* the artwork, so
-   * its box DOES overlap the tile — stage 1c therefore marks the OCR line
-   * consumed by the tile it contradicts, and the correct text is absorbed into
-   * the wrong one instead of surviving as an orphan.~~
-   *
-   * ~~⚠ So consumption is not merely noisy: on desktop it can DESTROY the very
-   * correction the OCR leg exists to supply, while on mobile it fails to
-   * consume anything and floods the candidate set instead. One rule, two
-   * opposite failures, both traceable to `crossCheck.ts` L106-109 scoping
-   * consumption by geometry alone rather than by geometry AND text
-   * agreement.~~
-   *
-   * ⚠ **RETIRED BY TASK-198 — NOW A GATE, SEE {@link OMISSION_RECOVERY_MEASURED}.
-   * THE DIAGNOSIS ABOVE WAS FALSE AND IS KEPT STRUCK THROUGH ONLY SO IT IS NOT
-   * RE-DERIVED.** The OCR line is not destroyed by consumption: it survives
-   * with `basis: 'both'`, `boxSource: 'ocr'` and `rawText: 'RAW'` intact.
-   * Nothing in `crossCheck.ts` needed changing.
-   */
-} as const;
+const AGGREGATE_RECALL_MEASURED = 0.9552238805970149;
 
 /**
  * Chrome rejection — **A GATE, NOT A PIN, SINCE TASK-195.**
@@ -412,7 +407,7 @@ describe('T-AI-030 the golden corpus is measured, and the measurement is pinned'
     expect(measured).toEqual({
       'netflix-mylist-mobile-01': 7,
       'netflix-mylist-mobile-02': 8,
-      'netflix-mylist-desktop-01': 9,
+      'netflix-mylist-desktop-01': 10,
       'netflix-continue-watching-01': 0,
       'max-saved-mobile-01': 6,
       'max-saved-desktop-01': 6,
@@ -424,14 +419,15 @@ describe('T-AI-030 the golden corpus is measured, and the measurement is pinned'
     });
   });
 
-  it('T-AI-030c · aggregate recall is pinned, and its distance from the §9.2 floor is stated', () => {
+  it('T-AI-030c · aggregate recall CLEARS the §9.2 floor and is gated, not pinned', () => {
     const expectedTotal = scored.reduce((n, s) => n + s.expected.expectedCandidates.length, 0);
     const foundTotal = scored.reduce((n, s) => n + s.found, 0);
     expect(expectedTotal).toBe(67);
-    expect(foundTotal / expectedTotal).toBe(KNOWN_SHORTFALLS.aggregateRecall);
-    // The gate itself, restated so the shortfall is visible in the source
-    // rather than only in a document.
-    expect(KNOWN_SHORTFALLS.aggregateRecall).toBeLessThan(AGGREGATE_RECALL_FLOOR);
+    // The gate, asserted first because it is the one that matters.
+    expect(foundTotal / expectedTotal).toBeGreaterThanOrEqual(AGGREGATE_RECALL_FLOOR);
+    // And the exact value, so an improvement is recorded rather than absorbed
+    // and a silent slide toward the floor still fails.
+    expect(foundTotal / expectedTotal).toBe(AGGREGATE_RECALL_MEASURED);
   });
 
   it('T-AI-030d · the aggregate false-title rate CLEARS the §9.2 ceiling and is gated, not pinned', () => {
@@ -459,10 +455,10 @@ describe('T-AI-030 the golden corpus is measured, and the measurement is pinned'
     expect(rejected / chromeTotal).toBe(CHROME_REJECTION_MEASURED);
   });
 
-  it('T-AI-030f · the pins clear themselves the moment the shortfalls stop being real', () => {
-    // ⚠ A DEFERRAL GUARD, and it is meant to FAIL one day. Without it,
-    // "measure now, gate later" quietly becomes "measure forever" — the same
-    // mechanism `T-AI-045v` uses for the bake-off.
+  it('T-AI-030f · the ledger is GONE, and cannot come back', () => {
+    // ⚠ A DEFERRAL GUARD THAT HAS NOW DISCHARGED ITSELF COMPLETELY. Without
+    // it, "measure now, gate later" quietly becomes "measure forever" — the
+    // same mechanism `T-AI-045v` uses for the bake-off.
     //
     // ⚠ **THE PROXY WAS WRONG TWICE, AND BOTH ERRORS ARE RECORDED RATHER THAN
     // TIDIED.** It first read the extraction RUNNER and failed if it named
@@ -475,30 +471,42 @@ describe('T-AI-030 the golden corpus is measured, and the measurement is pinned'
     // for. ~~`expect(runner).not.toContain('collapseOverlap')`~~ and
     // ~~`expect(scorer).not.toContain('collapseOverlap')`~~ are both dead.
     //
-    // What actually pins them is the LEDGER: four product findings, each
+    // ~~What actually pins them is the LEDGER: four product findings, each
     // recorded above with its cause. So the clearing condition is the honest
     // one — every pinned shortfall must still be on the failing side of its
     // §9.2 threshold. The day extraction improves past one, this fails and
-    // says: stop pinning that metric, gate it.
-    expect(KNOWN_SHORTFALLS.aggregateRecall).toBeLessThan(AGGREGATE_RECALL_FLOOR);
-    // ⚠ AND IT HAS NOW FIRED FOUR TIMES FOR REAL. `chromeRejectionRate` was
-    // the fifth entry here until TASK-195, `matchAccuracy` the fourth until
-    // TASK-197, `omissionRecovery` the third until TASK-198, and
-    // `aggregateFalseTitleRate` the second until TASK-205; each cleared §9.2,
-    // this guard failed as designed, and the metric was moved out of the
-    // ledger and gated (by `T-AI-030e`, `T-AI-031b`, `T-AI-039c` and
-    // `T-AI-030d` respectively). That is the whole mechanism working end to
-    // end — so none of the four keys may come back, and the count below drops
-    // to match.
-    expect(Object.keys(KNOWN_SHORTFALLS)).not.toContain('chromeRejectionRate');
-    expect(Object.keys(KNOWN_SHORTFALLS)).not.toContain('matchAccuracy');
-    expect(Object.keys(KNOWN_SHORTFALLS)).not.toContain('omissionRecovery');
-    expect(Object.keys(KNOWN_SHORTFALLS)).not.toContain('aggregateFalseTitleRate');
-    // Non-vacuity: a ledger that lost its entries would pass every line above
-    // by having nothing to check. ⚠ THE FLOOR IS NOW 1, NOT 2 — `aggregateRecall`
-    // is the LAST shortfall, and when it clears, this ledger and every pin in
-    // it goes away entirely rather than lingering as an empty object.
-    expect(Object.keys(KNOWN_SHORTFALLS).length).toBeGreaterThanOrEqual(1);
+    // says: stop pinning that metric, gate it.~~
+    // ~~`expect(KNOWN_SHORTFALLS_aggregateRecall).toBeLessThan(...)`~~
+    //
+    // ⚠ **IT FIRED FIVE TIMES AND THEN RAN OUT OF LEDGER.**
+    // `chromeRejectionRate` was the fifth entry until TASK-195,
+    // `matchAccuracy` the fourth until TASK-197, `omissionRecovery` the third
+    // until TASK-198, `aggregateFalseTitleRate` the second until TASK-205, and
+    // `aggregateRecall` the last until TASK-206; each cleared §9.2, this guard
+    // failed as designed, and the metric was moved out and gated (by
+    // `T-AI-030e`, `T-AI-031b`, `T-AI-039c`, `T-AI-030d` and `T-AI-030c`
+    // respectively). That is the whole mechanism working end to end.
+    //
+    // ⚠ SO THE ASSERTION IS NOW STRUCTURAL, AND IT IS DELIBERATELY A SOURCE
+    // GREP FOR THE DECLARATION. A key-based check
+    // (`Object.keys(<the ledger>)`) cannot express "the object does not
+    // exist" — it would not compile. The previous non-vacuity floor existed
+    // precisely because an EMPTY ledger would have passed every key check by
+    // having nothing to check; the endpoint that guard was steering toward is
+    // a file with no ledger in it at all, so that is what is asserted. A
+    // future metric that regresses must be fixed or its floor renegotiated in
+    // §9.2 — it may NOT be parked in a revived ledger.
+    //
+    // ⚠ The grep matches the DECLARATION only. Every surviving mention above
+    // is a struck-through history note and must stay readable, so a bare-name
+    // grep would fail on this file's own comments.
+    // ⚠ THE NEEDLE IS BUILT, NOT WRITTEN — a literal here would match ITSELF
+    // and the test would fail on its own source, which it did on first run.
+    const declaration = `const ${'KNOWN'}_SHORTFALLS`;
+    const self = readFileSync(path.resolve(__dirname, 'golden.spec.ts'), 'utf8');
+    expect(self).not.toContain(declaration);
+    // Non-vacuity: this grep is worthless if the file could not be read.
+    expect(self).toContain('const AGGREGATE_RECALL_MEASURED');
     // And the runner-side stage-3 deferral IS discharged (TASK-190) — asserted
     // positively so it cannot silently regress to the state this guard was
     // originally written to watch for.
@@ -551,9 +559,11 @@ describe('T-AI-031 recorded TMDB results resolve the expected work identity', ()
     const accuracy = (seen.size - wrong.length) / seen.size;
     expect(accuracy, `mismatched:\n  ${wrong.join('\n  ')}`).toBe(MATCH_ACCURACY_MEASURED);
     expect(accuracy).toBeGreaterThanOrEqual(MATCH_ACCURACY_FLOOR);
-    // The metric is a GATE now, not a ledger entry. If it is ever put back
-    // into KNOWN_SHORTFALLS the ratchet has been released.
-    expect(Object.keys(KNOWN_SHORTFALLS)).not.toContain('matchAccuracy');
+    // The metric is a GATE now, not a ledger entry — and since TASK-206 there
+    // is no ledger at all to put it back into. `T-AI-030f` holds that line for
+    // every metric in this file, so the per-metric key check here is retired
+    // rather than duplicated.
+    // ~~`expect(Object.keys(<the ledger>)).not.toContain('matchAccuracy')`~~
 
     // The miss is the recorded one, not a drifting set.
     expect(wrong.map((w) => w.split(' -> ')[0]).sort()).toEqual(['man on fire']);
@@ -626,26 +636,43 @@ describe('T-AI-032 fabrication is measured, and the contentless page yields noth
     expect(fabricated / total).toBeLessThanOrEqual(FABRICATION_RATE_CEILING);
   });
 
-  it('T-AI-032e · the two fabrications in the corpus are the known ones', () => {
-    const found = scored
-      .flatMap((s) =>
-        s.candidates
-          .filter(
-            (c) =>
-              c.ocrSupport === 'none' &&
-              !s.expected.expectedCandidates.some((e) => e.normalisedText === c.normalisedText) &&
-              !hasTmdbFixture(c.normalisedText),
-          )
-          .map((c) => `${s.image.id}: ${c.normalisedText}`),
-      )
+  it('T-AI-032e · the corpus now fabricates NOTHING, and that is not vacuous', () => {
+    const noneSupport = scored.flatMap((s) =>
+      s.candidates
+        .filter((c) => c.ocrSupport === 'none')
+        .map((c) => ({
+          id: `${s.image.id}: ${c.normalisedText}`,
+          text: c.normalisedText,
+          expected: s.expected.expectedCandidates.some(
+            (e) => e.normalisedText === c.normalisedText,
+          ),
+        })),
+    );
+    const found = noneSupport
+      .filter((c) => !c.expected && !hasTmdbFixture(c.text))
+      .map((c) => c.id)
       .sort();
-    // `wicked part one` is a real misidentification of the Wicked: For Good
+    // ⚠ WAS TWO, IS NOW ZERO — AND BOTH WENT THE SAME WAY, WHICH IS THE POINT.
+    // ~~`wicked part one` is a real misidentification of the Wicked: For Good
     // tile; `wwe raw` survives on the degraded JPEG only, where OCR could not
-    // corroborate the caption it corroborated on the clean source.
-    expect(found).toEqual([
-      'low-quality-jpeg-01: wwe raw',
-      'netflix-mylist-desktop-01: wicked part one',
-    ]);
+    // corroborate the caption it corroborated on the clean source.~~
+    // Neither was a fabrication by the READER. In both cases the reader's own
+    // `rawText` held the correct caption and `inferredTitle` overrode it, so
+    // both were stage-2 defects in §3.1a's source preference: `wwe raw` fixed
+    // by R2 (TASK-198), `wicked part one` by R3 (TASK-206). ⚠ DO NOT READ THIS
+    // ZERO AS "THE MODEL NEVER INVENTS" — it means nothing the model invented
+    // is still being PREFERRED over what it transcribed.
+    expect(found).toEqual([]);
+    // Non-vacuity, because an empty expectation is exactly the shape a broken
+    // filter produces. There must still be uncorroborated candidates for this
+    // to rule on — the reader does still name tiles OCR cannot confirm.
+    expect(noneSupport.length).toBeGreaterThan(0);
+    // ⚠ AND THE REASON THEY CLEAR IS STRONGER THAN THE RULE ABOVE REQUIRES, SO
+    // SAY SO RATHER THAN LET IT ROT. Every uncorroborated candidate is now an
+    // EXPECTED title; none of them is merely excused by having a TMDB fixture.
+    // If this line ever fails while `found` still passes, the fixture escape
+    // has started doing real work again and wants re-reading.
+    expect(noneSupport.filter((c) => !c.expected)).toEqual([]);
   });
 
   it('T-AI-032c · the contentless page invents no work title', () => {
