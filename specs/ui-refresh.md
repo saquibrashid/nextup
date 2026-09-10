@@ -243,6 +243,48 @@ correction fails and the screen looks identical.
    back**, not to patch the fallback string. Patching the string would make the
    screen assert a name it does not have.
 
+**Where the name actually goes missing — a third fault, on the server, and it
+is the one that decides the size of this fix.**
+
+`ReviewRoute.tsx` **does** refetch after `patchCandidate`, so the naive theory
+("the screen never reloads") is wrong. The refetched payload is what is
+impoverished. `routes/batchReview.ts:222-240` builds each candidate's `match`
+from `parseMatchCandidates(row.matchCandidates)` — the stored **match
+candidates**, which are the *extraction's* guesses. `applyCorrection`
+(`routes/batchCandidates.ts:153-168`) writes `resolvedWorkIdentity`,
+`correctedToTmdbId` and the verdict — but **does not rewrite
+`matchCandidates`**. So after a correction the row's `resolvedWorkIdentity`
+starts with `tmdb:` and the guard at line 226 passes, which means `match` is
+served from `alternatives[0]`: **the original wrong match**. The screen is not
+merely unnamed, it is re-serving the identity the owner just rejected.
+
+⚠ **The manual-add path already does this correctly** — `addCandidate`
+(`batchCandidates.ts:429-441`) writes a one-entry `matchCandidates` array from
+the chosen work. The correction path is the outlier.
+
+**The scope question, which is an owner/design call and NOT settled here.**
+`applyCorrection` is deliberately **network-free**: its header states *"a TMDB
+outage must not stop the owner fixing a wrong match"*. It therefore has the
+`tmdbId` and `mediaType` but **not** the name, year or poster. Three ways out,
+with different costs:
+
+1. **The client sends the display fields it already has.** `TmdbSearchResult`
+   carries `name`, `releaseYear` and `posterPath` at correction time. Cheapest,
+   keeps the no-network property — but it takes display data from the request
+   body, and `specs/api.md`'s patch schema would have to widen to admit it.
+2. **The server fetches TMDB detail during the correction.** Authoritative, and
+   it matches what `addCandidate` does — but it **reverses the explicit outage
+   decision** recorded in that function's header comment.
+3. **The server resolves lazily on the review read**, from the metadata cache,
+   falling back to the raw identity on a miss. No schema change and no outage
+   coupling, but it adds a lookup to the hottest read on the review page.
+
+**Do not pick one silently.** Option 2 contradicts a decision already written
+down; option 1 changes a published request contract. ⚠ A fourth option —
+**keeping the corrected name only in client state** — is the one to reject
+outright: it would look correct in the click path and break on exactly the
+re-render this requirement exists to fix, which is the present bug rebuilt.
+
 **What good looks like:** the corrected poster replaces the wrong one, the
 heading shows the corrected name and year, the card is chipped as corrected,
 and a live-region message names what it was corrected to. This is the same
