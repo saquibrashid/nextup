@@ -258,32 +258,60 @@ starts with `tmdb:` and the guard at line 226 passes, which means `match` is
 served from `alternatives[0]`: **the original wrong match**. The screen is not
 merely unnamed, it is re-serving the identity the owner just rejected.
 
-⚠ **The manual-add path already does this correctly** — `addCandidate`
-(`batchCandidates.ts:429-441`) writes a one-entry `matchCandidates` array from
-the chosen work. The correction path is the outlier.
+⚠ **The manual-add path (`addCandidate`, `batchCandidates.ts:429-441`) DOES
+write a one-entry `matchCandidates` array from the chosen work — but do NOT
+read that as evidence the correction path merely forgot to.** The non-rewrite
+on correction is **deliberate and load-bearing**, and
+`services/batchClose.ts:167-186` records why in a comment written after the bug
+it caused: *"correcting a candidate deliberately does NOT rewrite
+`matchCandidates` (the owner corrected the decision, not the extraction)"*.
+`tmdbFieldsFor` was hardened to choose metadata **by identity, never by
+position** precisely because an earlier version read `alternatives[0]` at close
+and stored the film the owner had just rejected — the row said
+`tmdb:movie:949` while its name, year and poster all still said `438631`. The
+`title_match_coherent` constraint does not catch that: it checks null-ness, not
+agreement.
+
+**So `matchCandidates` must NOT be rewritten to carry the corrected name.**
+That is the one fix shape that looks obvious and re-opens a bug this codebase
+has already paid for. The extraction's guesses and the owner's decision are two
+different facts, and the schema keeps them apart on purpose.
+
+**Where the name legitimately comes from.** The same `batchClose` comment names
+the existing mechanism: when the corrected target is not among the alternatives
+*"there is no name to store and none is invented … `tmdbFetchedAt` stays null
+so the lazy refresh (REQ-076, NFR-014) fills the display fields on first
+access."* That is why the correction looks right on the **list** after apply.
+It does nothing for the **review screen**, which runs *before* any `Title` row
+exists — so at review time the server holds an identity and, by design, no
+name. **That is the actual shape of REQ-109: not a lost name, but a name the
+server has never had at that point in the flow.**
 
 **The scope question, which is an owner/design call and NOT settled here.**
-`applyCorrection` is deliberately **network-free**: its header states *"a TMDB
-outage must not stop the owner fixing a wrong match"*. It therefore has the
-`tmdbId` and `mediaType` but **not** the name, year or poster. Three ways out,
-with different costs:
+`applyCorrection` is additionally **network-free** on purpose: its header
+states *"a TMDB outage must not stop the owner fixing a wrong match"*. Three
+ways out, with different costs:
 
-1. **The client sends the display fields it already has.** `TmdbSearchResult`
-   carries `name`, `releaseYear` and `posterPath` at correction time. Cheapest,
-   keeps the no-network property — but it takes display data from the request
-   body, and `specs/api.md`'s patch schema would have to widen to admit it.
-2. **The server fetches TMDB detail during the correction.** Authoritative, and
-   it matches what `addCandidate` does — but it **reverses the explicit outage
-   decision** recorded in that function's header comment.
-3. **The server resolves lazily on the review read**, from the metadata cache,
-   falling back to the raw identity on a miss. No schema change and no outage
-   coupling, but it adds a lookup to the hottest read on the review page.
+1. **Carry the display fields the client already holds** — `TmdbSearchResult`
+   has `name`, `releaseYear` and `posterPath` at correction time — in a **new,
+   separate candidate field**, never inside `matchCandidates`. Keeps the outage
+   property and keeps decision and extraction apart, but it needs a column (so
+   a migration) and widens the patch schema in `specs/api.md`.
+2. **The server fetches TMDB detail during the correction.** Authoritative and
+   needs no new column — but it **reverses the explicit outage decision**
+   recorded in that function's header comment.
+3. **The server resolves on the review read from the owner's `Title` rows.** No
+   schema change and no outage coupling — but it is **only a partial fix**: a
+   correction onto a work that is not already on the owner's list has no
+   `Title` row yet, and that is the common case for the corrections this
+   requirement is about.
 
-**Do not pick one silently.** Option 2 contradicts a decision already written
-down; option 1 changes a published request contract. ⚠ A fourth option —
-**keeping the corrected name only in client state** — is the one to reject
-outright: it would look correct in the click path and break on exactly the
-re-render this requirement exists to fix, which is the present bug rebuilt.
+**Do not pick one silently.** Each gives something up: 1 a migration and a
+published request contract, 2 a decision already written down, 3 correctness in
+the common case. ⚠ A fourth option — **keeping the corrected name only in
+client state** — is the one to reject outright: it would look correct in the
+click path and break on exactly the re-render this requirement exists to fix,
+which is the present bug rebuilt.
 
 **What good looks like:** the corrected poster replaces the wrong one, the
 heading shows the corrected name and year, the card is chipped as corrected,
