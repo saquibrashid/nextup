@@ -11,10 +11,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 1 |
+| ⬜ todo | 0 |
 | 🚧 doing | 0 |
 | ✅ done | 201 |
-| 🙋 owner | 2 |
+| 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **204** |
 
@@ -22,14 +22,13 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 Not done, and every task they depend on is done.
 
-| Task | Size | Section |
-|---|---|---|
-| `TASK-079b` | S | Epic K — Platform, safety, and the shell |
+_Nothing is ready: every unfinished task is waiting on a dependency._
 
 ## Waiting on the owner
 
 | Task | Section | Note |
 |---|---|---|
+| `TASK-079b` | Epic K — Platform, safety, and the shell | **THE SUITE IS BUILT, GATED AND TYPECHECKED; THE BASELINE REPORT COSTS MONEY AND IS THE OWNER’S TO RUN.** Delivered: `tests/extraction/goldenLive.spec.ts` (`T-AI-051` `a`–`j`) implementing §4A L1–L7 — 3 live runs over the 11 golden images, per-image recall floors, pairwise Jaccard ≥ 0.95, unstable titles ≤ 5 % **each printed by name**, fabrication ≤ 0.05, false-title ≤ 0.10, artwork-only ≥ 0.80, cost ≤ $0.50 — plus the report writer for `docs/evaluation/golden-<ISO date>.md`. ⚠ **THE REPORT IS WRITTEN BEFORE ANY BAND IS JUDGED.** A run that fails a band is the run whose numbers matter most; a report emitted only on success discards exactly those, and a drop between two reports is the only early warning of model drift this product has. ⚠ **`T-AI-051i` IS ASSERTED FIRST AND EVERYTHING ELSE DEPENDS ON IT.** A run that reached no provider scores recall 0 — but *also* false-title 0 and fabrication 0, so L4 and L5 **pass**. Two bands agreeing on an empty run is the shape of a broken harness, not evidence, so `i` requires one LLM call and one OCR call per image, non-zero prompt tokens and a non-empty accepted set before any other number is believed. ⚠ **IT SCORES THROUGH THE SHARED SCORER, NOT A COPY.** `goldenScorer.ts` gained `scoreWithStore()` and the live suite feeds it an `inMemoryRecordingStore` of what the live providers just said, keyed by the same sha256 of the same committed bytes. §9.7 Stage 1’s argument applies with more force here: a live suite with its own scoring rules would report divergence between the copies as model drift, which is the one conclusion it exists to support and therefore the one it must not be able to manufacture. ⚠ **IT IS A VITEST PROJECT (`live`) SO THAT IT IS NOT INVISIBLE, NOT SO THAT IT RUNS.** `T-CI-008` fails any spec no runner collects, and a silently dead `goldenLive.spec.ts` is this product’s model-drift alarm disconnected while every gate stays green. `T-CI-007l` was **rewritten** because its old claim (“excluded from every Vitest project”) would now pass vacuously: it asserts `golden:live` is the only script selecting `live`, that nothing reaches it transitively through `npm run`, and that no script runs a bare `vitest run` with no `--project`. The `live` project omits `setupFiles` on purpose — every other project installs the `T-CI-007` egress guard, and this is the one suite whose whole purpose is to leave the machine. ⚠ **`MIN_RECALL` IS A BAND TABLE, NOT THE OFFLINE MEASUREMENTS.** The reader is sampled, so pinning per-image recall would fail on the model’s own variance and teach the owner to ignore the suite. `T-AI-051j` replays the committed recordings (free) and fails if any floor exceeds what they already achieve, so the table cannot drift into aspiration and turn L1 red on a good day. `netflix-continue-watching-01`’s floor is **0 on purpose** — `T-AI-030b` records `found: 0` for its one expected title, and a floor above a known offline shortfall would fail every live run for something that is not drift. **FOUND WHILE BUILDING, AND FIXED:** `tsconfig.tests.json` did not cover `tests/extraction/**`, so the golden scorer had never been typechecked. Adding it (the header says the scope **must only grow**) surfaced two real type errors in `goldenScorer.ts` that esbuild had been stripping unseen: `boundingBoxes` was built from a `NormalisedBox` with no `imageId`, and `.heic` was mapped to `image/heic` — a value `ImageMimeType` does not contain and is explicitly documented never to gain, because HEIC is transcoded to PNG at ingest (REQ-077/ADR-0008) and no extractor in this product is ever handed it. Both fixed; `npm run golden` still 5/5 with no metric movement. **WHAT REMAINS IS ONE OWNER ACTION.** Export `NEXTUP_AOAI_ENDPOINT` and `NEXTUP_VISION_ENDPOINT`, sign in with an identity holding `Cognitive Services OpenAI User` + `Cognitive Services User`, run `npm run golden:live` (~$0.40, a few minutes), review the generated `docs/evaluation/golden-<ISO date>.md` and commit it as the baseline. Until that exists there is nothing to compare a future run against. |
 | `TASK-134` | 3. Milestone M0 — Repo, CI gate, deployable shell, risk-first checks | Needs the owner to APPLY to Microsoft for Azure OpenAI modified abuse monitoring — an approval, not code. `docs/parallel-execution-plan.md` §3 already lists it as owner-dependent; the ledger said `todo`, which advertised it to lane agents as startable work. |
 | `TASK-165` | Epic B — Capture & import | Needs a real iOS device to verify the clipboard paste path |
 

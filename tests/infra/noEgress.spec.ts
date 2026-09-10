@@ -198,15 +198,57 @@ describe('T-CI-007 · specs/testing.md §3 · the suite runs offline', () => {
     expect(globalThis.fetch).toBe(beforeFetch);
   });
 
-  it('T-CI-007l · the live extractor suite is excluded from every Vitest project', () => {
+  it('T-CI-007l · the live extractor suite runs only under `golden:live`, never under any other script', () => {
     // `goldenLive.spec.ts` calls the real providers and COSTS MONEY
     // (specs/testing.md §4A). It is the one file whose accidental inclusion
     // would be both egress and a bill.
+    //
+    // ⚠ THIS ASSERTION CHANGED AT TASK-079b AND THE OLD ONE WOULD NOW PASS
+    // VACUOUSLY. It used to read "excluded from every Vitest project", which
+    // was satisfied by the `golden` project's `exclude` line alone. The file
+    // is now collected by a dedicated `live` project — it had to be, because
+    // `T-CI-008` fails a spec no runner collects and a silently-dead
+    // goldenLive is the product's model-drift alarm disconnected while every
+    // gate stays green. So the property worth asserting is no longer "no
+    // project collects it" but "no script anyone runs SELECTS the project that
+    // does", and that is checked against package.json, script by script.
     const config = readFileSync(path.join(ROOT, 'vitest.config.ts'), 'utf8');
     expect(config).toContain('goldenLive.spec.ts');
-    expect(config, 'it must be EXCLUDED, not merely mentioned').toMatch(
+    expect(config, 'the offline `golden` project must EXCLUDE it, not merely mention it').toMatch(
       /exclude:\s*\[[^\]]*goldenLive\.spec\.ts/,
     );
+
+    const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    const scripts = Object.entries(pkg.scripts);
+    expect(scripts.length).toBeGreaterThan(0); // non-vacuity
+
+    // Exactly one script may select the `live` project, and it is the manual one.
+    const selectsLive = scripts
+      .filter(([, body]) => /--project(=|\s+)live\b/.test(body))
+      .map(([name]) => name);
+    expect(selectsLive).toEqual(['golden:live']);
+
+    // ⚠ AND NOTHING MAY REACH IT TRANSITIVELY. `npm run test` is a chain of
+    // other scripts; a `golden:live` added anywhere in that chain would be
+    // invisible to the check above.
+    const reachable = new Set<string>();
+    const walk = (name: string): void => {
+      if (reachable.has(name)) return;
+      reachable.add(name);
+      const body = pkg.scripts[name] ?? '';
+      for (const match of body.matchAll(/npm run ([\w:-]+)/g)) walk(match[1] as string);
+    };
+    for (const entry of ['test', 'coverage', 'golden', 'test:infra', 'test:meta']) walk(entry);
+    expect([...reachable].filter((s) => s === 'golden:live')).toEqual([]);
+
+    // A bare `vitest run` with no `--project` would collect EVERY project,
+    // including `live`. No script may do that.
+    const bareVitest = scripts
+      .filter(([, body]) => /\bvitest run\b/.test(body) && !/--project/.test(body))
+      .map(([name]) => name);
+    expect(bareVitest).toEqual([]);
   });
 
   it('T-CI-007m · the three live provider hosts are blocked by the guard', async () => {
