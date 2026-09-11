@@ -716,6 +716,18 @@ button {
 }
 
 /*
+ * US-048 — an owner removal has no upload to explain it, so the provenance is
+ * given the same weight as the ordinal rather than the muted metadata colour:
+ * it answers a question the rest of the row cannot.
+ */
+.removed-row__by {
+  align-self: flex-start;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0 var(--space-1);
+}
+
+/*
  * ⚠ The ordinal is the one element that explains why the same title appears
  * more than once, so it is given a border rather than being folded into the
  * muted metadata line where it would read as noise.

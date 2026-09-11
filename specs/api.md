@@ -255,6 +255,8 @@ typed data and never re-check it.
 | GET | `/api/images/:imageId` | US-036 |
 | GET | `/api/service-state` | US-022 |
 | GET | `/api/tmdb/search` | US-007, US-009, US-030 |
+| POST | `/api/titles` | US-047 |
+| DELETE | `/api/titles/:titleId` | US-048 |
 
 ---
 
@@ -922,6 +924,7 @@ Query: `q` (title text, 1..100), `service`, `limit`, `cursor`.
       "dateAdded": "2026-04-02",
       "removedAt": "2026-07-14T09:31:02.117Z",
       "removedByBatchId": "01J8YY...",
+      "removedBy": "batch",
       "removalOrdinal": 2,
       "removalTotalForWork": 3,
       "restorable": true,
@@ -935,6 +938,12 @@ Query: `q` (title text, 1..100), `service`, `limit`, `cursor`.
 (US-024 AC-6). Ordering: `removedAt` descending, tie-broken by `listingId`
 ascending.
 
+`removedBy` is `"owner"` when `removedByBatchId` is `null` and `"batch"`
+otherwise (US-048 AC-4). It is **derived server-side rather than stored**, so
+the two readings cannot drift. It exists because a manual removal (§6.32) has
+no upload to explain it, and *why is this not on my list?* is the question the
+owner arrives at the removed view with.
+
 ### 6.10 `POST /api/listings/:listingId/restore` (US-025)
 
 Body: `{ "confirmDuplicate": false }`
@@ -943,7 +952,7 @@ Body: `{ "confirmDuplicate": false }`
 |---|---|---|
 | 200 | — | restored; `dateAdded` is the **original**, not today (US-025 AC-2) |
 | 409 | `WORK_SUPPRESSED` | the work is actively suppressed; `details.unsuppressHref` (US-025 AC-6) |
-| 409 | `DUPLICATE_WORK_IDENTITY` | an active title already holds this work and `confirmDuplicate !== true`; `details.existingTitleId` (US-025 AC-5) |
+| 409 | `DUPLICATE_WORK_IDENTITY` | a **different** active title already holds this work and `confirmDuplicate !== true`; `details.existingTitleId` (US-025 AC-5). ⚠ The listing's **own** title being active is not a duplicate — that is a sibling badge of the same row, and it happens every time a two-badge row is restored (US-048 AC-5, `T-MANUAL-011`). ~~Superseded: "an active title already holds this work", which fired on the row's own title and left a two-badge restore stuck half-done.~~ |
 | 409 | `LISTING_NOT_REMOVED` | already active (US-025 AC-4) |
 
 **200**
@@ -1487,6 +1496,100 @@ as well as an active one — a work sitting in the log IS already known.
 here — it degrades to `"imdbRating": null` and the lookup still answers
 (US-045 AC-5).
 
+### 6.30 `POST /api/titles` — add a title by hand (US-047)
+
+Body: `{ "tmdbId": 438631, "mediaType": "movie", "service": "netflix" }` — all
+three required.
+
+⚠ **THE ACCEPTED FIELD SET IS CLOSED, and the omissions are the specification:**
+
+- **No `name`.** The display name is read from TMDB, never supplied (SD-05,
+  as §6.20). A caller-supplied name would let the list hold a work TMDB cannot
+  resolve, which renders permanently blank.
+- **No `dateAdded`.** The date is **today, always**. `service_listing.date_added`
+  is write-once (`T-INV-006`) and editing it stays deferred to v1.1 (NG-8,
+  REQ-059). The field is not read — accepting it and dropping it would tell the
+  owner a date was honoured that never reached the store (US-047 AC-6).
+
+| Status | Code | When |
+|---|---|---|
+| 201 | — | added |
+| 400 | `VALIDATION_FAILED` | a missing or ill-typed field |
+| 409 | `WORK_SUPPRESSED` | the work is actively suppressed; `details.unsuppressHref` (US-047 AC-4) |
+| 409 | `DUPLICATE_WORK_IDENTITY` | the work is already on the list for **that service**; `details.service` (US-047 AC-2) |
+| 404 | `TMDB_WORK_NOT_FOUND` | TMDB has no such work |
+| 502 | `TMDB_UNAVAILABLE` | as §6.29 |
+
+**201**
+```jsonc
+{ "titleId": "01J8ZC…", "listingId": "01J8ZD…",
+  "workIdentity": "tmdb:movie:438631", "service": "netflix",
+  "name": "Dune", "dateAdded": "2026-04-02", "titleWasCreated": false }
+```
+
+**Gate order is suppression → TMDB**, the same as §6.5 fix-match and for the
+same reasons: suppression needs no network, so a TMDB outage must not stop it
+answering, and *"you told me to stop showing you this"* is the reason the owner
+needs to hear first. `T-MANUAL-004` asserts **zero** TMDB calls on that path.
+
+**New title vs new badge** is **not re-derived here** — it is `batchClose`'s
+rule: look the work identity up in **any** state, and create a new title only
+when there is none or it is not active. REQ-005 is one row per work with a
+badge per service, and the owner has no affordance to merge two rows, so a work
+already on Netflix that is added on Max must gain a **badge** (`T-MANUAL-003`).
+When it joins an existing row, `sortDateAdded` moves only if today is
+**earlier** than the value held — the title-level date is the earliest across
+its listings (product invariant 6, `T-MANUAL-007`).
+
+Duplicates are detected from the store's filtered unique index
+`listing_one_per_service (owner, title, service) WHERE state='active'`, not
+from a pre-`SELECT`: only the index sees the race between two adds of the same
+work. A **removed** listing for the same pair does not collide, and that is
+intended — the removed view is a log (product invariant 7) and both rows are
+true.
+
+### 6.32 `DELETE /api/titles/:titleId` — remove a title by hand (US-048)
+
+No body.
+
+⚠ **"DELETE" IS THE OWNER'S WORD, NOT THE STORE'S.** This is a soft delete —
+`state='removed'`, retained for ever (REQ-028) — which is what makes it visible
+in §6.9 and reversible through the **existing** §6.10 restore. No second undo
+path exists: `T-REAP-014` asserts `restoreServiceListing` has exactly two call
+sites, and a third would be a second way to bring a listing back.
+
+⚠ **IT WRITES NO SUPPRESSION, AND THAT IS THE WHOLE DISTINCTION FROM §6.6.**
+Removing says *this is not on my list*; the work may legitimately return in a
+later capture as a brand-new row dated today (product invariant 7). Suppression
+says *never show me this work again* and is keyed on the work identity for ever
+(REQ-071). `T-MANUAL-009` asserts the suppression table, not the response.
+
+**Whole row, every service.** The analogue is US-027 AC-5: the row is the unit
+the owner sees and acts on. §6.9 is one item per removed **listing**, so a
+two-badge removal correctly writes two log entries, each independently
+restorable (`T-MANUAL-013`).
+
+| Status | Code | When |
+|---|---|---|
+| 200 | — | removed |
+| 404 | `NOT_FOUND` | no such title **for this owner** — a foreign id is indistinguishable from a missing one (`T-SEC-002d`) |
+| 409 | `WORK_SUPPRESSED` | the work is actively suppressed; `details.unsuppressHref` (US-048 AC-6) |
+| 409 | `TITLE_NOT_ACTIVE` | the title has no active listing. Not a 404: the owner may be looking at it in the removed view, where a 404 would read as data loss |
+
+**200**
+```jsonc
+{ "titleId": "01J8ZC…", "state": "removed",
+  "removedListingIds": ["01J8ZD…"],
+  "removedAt": "2026-07-14T09:31:02.117Z", "suppressed": false }
+```
+
+`suppressed: false` is named rather than implied so the client copy can promise
+it without re-deriving it. Refusal order is **suppression → not-active**, as
+§6.10: the escape hatch is the part the owner can act on. A suppressed work is
+refused even when its listings are still `active`, because removing them would
+be invisible until un-suppression and would then silently redirect the work
+from the combined list (US-029 AC-3) to the removed view (AC-4).
+
 ---
 
 ## 7. Status-code policy
@@ -1550,9 +1653,13 @@ PAYLOAD_TOO_LARGE, UNSUPPORTED_IMAGE_FORMAT, IMAGE_DIMENSIONS_UNSUPPORTED,
 IMAGE_TOO_LARGE_TO_DECODE, IMAGE_DECODE_OOM, IMAGE_DECODE_FAILED,
 IMAGE_EXPIRED, IMAGES_PURGED,
 DUPLICATE_WORK_IDENTITY, WORK_SUPPRESSED, TARGET_WORK_SUPPRESSED,
-LISTING_NOT_REMOVED, GROUP_ALREADY_REVERSED, PARTIAL_FAILURE_PREVENTED,
+LISTING_NOT_REMOVED, TITLE_NOT_ACTIVE, GROUP_ALREADY_REVERSED,
+PARTIAL_FAILURE_PREVENTED,
 TMDB_WORK_NOT_FOUND, TMDB_UNAVAILABLE
 ```
+~~Superseded: the same union without `TITLE_NOT_ACTIVE`, added with §6.32
+(US-048). It is deliberately NOT `LISTING_NOT_REMOVED`: that one answers "this
+listing is already active", the opposite condition.~~
 `T-API-003` asserts every code thrown anywhere in `apps/api/src` is a member of
 this union (type-level) and that every member has at least one test.
 

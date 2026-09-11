@@ -248,11 +248,25 @@ describe('toRemovedItem', () => {
       removedAt: '2026-07-14T09:31:02.117Z',
       removedByBatchId: 'b-1',
       removedByGroupId: null,
+      removedBy: 'batch',
       removalOrdinal: 2,
       removalTotalForWork: 3,
       restorable: true,
       suppressed: false,
     });
+  });
+
+  /*
+   * US-048 — the removed log is the ONLY place an owner removal can be
+   * explained, because nothing else on the row differs from a batch removal.
+   * Derived from the batch id rather than stored so the two cannot disagree.
+   */
+  it('T-MANUAL-014: a removal with no batch is attributed to the owner', () => {
+    expect(toRemovedItem(row({ removed_by_batch_id: null }), rank, false).removedBy).toBe('owner');
+  });
+
+  it('T-MANUAL-015: a removal carrying a batch id is never attributed to the owner', () => {
+    expect(toRemovedItem(row({ removed_by_batch_id: 'b-9' }), rank, false).removedBy).toBe('batch');
   });
 
   it('T-REM-021j: falls back to the raw extracted text for an UNMATCHED row', () => {

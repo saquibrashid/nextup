@@ -252,8 +252,13 @@ model ServiceListing {
   removedByGroupId String?       @map("removed_by_group_id") @db.NVarChar(200)
   removedByGroup   RemovalGroup? @relation(fields: [removedByGroupId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_listing_removed_by_group")
 
-  createdByBatchId String      @map("created_by_batch_id") @db.NVarChar(200)
-  createdByBatch   UploadBatch @relation("ListingCreatedBy", fields: [createdByBatchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_listing_created_by_batch")
+  /// NULL means the OWNER created this listing directly (US-047 "Add title"),
+  /// not an upload batch — migration `0007_manual_list_edits`. It is not a
+  /// missing read and must never be defaulted to a synthetic batch id: a batch
+  /// row the owner never uploaded would surface in US-031 provenance and in
+  /// the REQ-039 freshness strip as a capture that never happened.
+  createdByBatchId String?      @map("created_by_batch_id") @db.NVarChar(200)
+  createdByBatch   UploadBatch? @relation("ListingCreatedBy", fields: [createdByBatchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_listing_created_by_batch")
 
   changes BatchChange[]
 

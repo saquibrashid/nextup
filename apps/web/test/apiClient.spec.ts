@@ -113,6 +113,8 @@ describe('T-DATA-003 — every method sends credentials', () => {
       undoBatch: () => client.undoBatch('bat_1'),
       undoRemovalGroup: () => client.undoRemovalGroup('grp_1'),
       restoreListing: () => client.restoreListing('lst_1'),
+      addTitle: () => client.addTitle({ tmdbId: 438631, mediaType: 'movie', service: 'netflix' }),
+      removeTitle: () => client.removeTitle('ttl_1'),
       lookupImdb: () => client.lookupImdb('The Matrix'),
     };
 

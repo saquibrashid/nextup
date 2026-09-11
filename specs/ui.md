@@ -154,7 +154,7 @@ restore, suppress, un-suppress or fix-match.
 | Year · type · genres | `releaseYear`, `mediaType`, `genres` | Genres render as plain text; `genres: []` renders **nothing at all**, never "Unknown" (US-019 AC-6) |
 | **Service badges** | `badges[]` | One badge per **active** listing (REQ-026). Badges are text-labelled (`Netflix`, `Max`), not colour-only — colour is never the sole carrier of meaning |
 | Date-added label | `dateAddedLabel` | Rendered **verbatim from the API** (`specs/api.md` §6.2). REQ-061: it always contains "to nextup". The component **must not** construct this string. |
-| Row menu | — | `⋮` button → **Not interested** (US-027), **Fix match** (US-030). 44×44 px hit area. |
+| Row menu | — | `⋮` button → **Not interested** (US-027), **Fix match** (US-030), **Remove from list** (US-048). 44×44 px hit area. ⚠ **Three items, and Remove was ADDED beside "Not interested", not in place of it.** They read alike — the row disappears either way — and mean opposite things: suppression is a permanent, work-identity decision that survives every future upload (REQ-071), while removal asserts nothing about the work and lets a later capture legitimately bring it back as a new row (product invariant 7). Collapsing them into one item is the defect this row exists to prevent; `T-MANUAL-016` fails if either disappears. |
 
 A row for an **unmatched** title (`matchState === 'unmatched'`) shows the raw
 extracted text as its name, an **"Unidentified"** chip, and a **"Find a
@@ -172,6 +172,21 @@ match"** action opening the fix-match dialog (US-008 AC-5).
   *"Your Netflix badge and the date you added it (2 Apr 2026) stay the same."*
   (US-030 AC-2/AC-3). Handles the three 409s from `specs/api.md` §6.5 inline
   (`specs/ux-states.md` §3.5).
+- **Remove from list** (`components/RemoveTitleDialog.tsx`, US-048) — confirm →
+  `DELETE /api/titles/:titleId` (`specs/api.md` §6.32), then the outcome with
+  **Undo**. ⚠ The undo calls the **existing** `POST /api/listings/:id/restore`
+  once per removed listing — every id in `removedListingIds`, because a
+  two-badge row removes two and a partial restore is indistinguishable from a
+  success. No second restore path is added: `T-REAP-014` pins
+  `restoreServiceListing` to exactly two call sites. Failure states are
+  `specs/ux-states.md` §3.11/§3.12.
+
+The **add** affordance is not a row menu item — it belongs to no row. It is an
+**"Add title"** button above the list (`components/AddTitleDialog.tsx`,
+US-047), outside every loading and failure branch, opening a debounced TMDB
+search and a service picker with **no default**
+(`specs/ux-states.md` §2.15/§3.13). It exists because a title extraction missed
+is otherwise only fixable by re-capturing an entire service.
 
 ---
 
@@ -651,6 +666,22 @@ change is one diff and a test can assert it.
 | **`IMDB_LOOKUP_FAILED`** *(new, Epic M)* | *Couldn't run that lookup. Nothing has changed.* | Mirrors `LIST_LOAD_FAILED_BODY` — same reassurance, same reason |
 | **`IMDB_LOOKUP_IN_LIST`** *(new, Epic M)* | *Already on your list.* | US-045 AC-4 — matched on canonical `workIdentity`, never on the typed string |
 | **`LIST_LOADING_BODY`** *(new, Epic N)* | *Loading your list…* | §12.2 — ⚠ **an empty list and a not-yet-loaded list are indistinguishable from the rows alone.** Without a distinct loading state, `listEmptyKind()` sees zero rows and no filters on every page load and renders *"Nothing here yet"* to an owner whose list is full — a data-loss misreading US-019 AC-5 exists to prevent. `T-DATA-002c` |
+| **`ROW_MENU_REMOVE_LABEL`** *(new, US-048)* | *Remove from list* | §2.2 — the **third** row-menu item, beside "Not interested" and never instead of it |
+| **`REMOVE_TITLE_CONFIRM_BODY`** *(new, US-048)* | *"{name}" will be taken off your list and logged in Removal history, where you can put it back. It isn't marked "not interested", so a future upload can add it again.* | ⚠ **Every clause is load-bearing, and the contrast with `SUPPRESS_CONFIRM_BODY` is the point.** The two actions are adjacent menu items with visually identical outcomes and opposite meanings; an owner who reads this as the other one permanently suppresses a real work they never rejected. The reappearance is stated, not left to be inferred |
+| **`REMOVE_TITLE_DONE`** *(new, US-048)* | *Removed. "{name}" is in Removal history.* | `ux-states.md` §3.9 — names where it went, so it does not read as deletion |
+| **`REMOVE_TITLE_UNDO_LABEL`** *(new, US-048)* | *Undo* | §3.9 — restores every removed listing, one call each |
+| **`REMOVE_TITLE_UNDONE`** *(new, US-048)* | *Back on your list.* | §3.10 |
+| **`REMOVE_TITLE_FAILED`** *(new, US-048)* | *Couldn't remove that. Nothing has changed.* | §3.12 — ⚠ **it must say nothing changed.** A bare *"couldn't remove that"* leaves the owner unsure whether the title is half-removed, and the safe-feeling answer to that doubt is to press it again |
+| **`REMOVE_TITLE_NOT_ACTIVE`** *(new, US-048)* | *That title is already off your list.* | §3.11 — 409 `TITLE_NOT_ACTIVE`, rendered as a **status, not an error**: the asked-for state already holds |
+| **`REMOVED_BY_OWNER`** *(new, US-048)* | *Removed by you* | §7.5 — the provenance chip when `removedBy === 'owner'`. A manual removal has no upload to explain it |
+| **`ADD_TITLE_LABEL`** *(new, US-047)* | *Add title* | §2.15 — the button above the list, **not** a row-menu item |
+| **`ADD_TITLE_HEADING`** *(new, US-047)* | *Add a title* | §3.13 |
+| **`ADD_TITLE_SEARCH_LABEL`** *(new, US-047)* | *Search TMDB* | §10 — a real label, not placeholder text |
+| **`ADD_TITLE_SERVICE_LABEL`** *(new, US-047)* | *Which service is it saved on?* | §3.13 — asks a factual question, because the badge is a factual claim |
+| **`ADD_TITLE_SERVICE_REQUIRED`** *(new, US-047)* | *Pick the service it’s saved on.* | ⚠ **The picker has NO default.** A default writes a badge the owner never chose, and the next full-update of that service then proposes the title for removal. Same reasoning as `POST /api/batches` having no default mode (US-003 AC-5) |
+| **`ADD_TITLE_DONE`** *(new, US-047)* | *Added. "{name}" is on your list.* | §3.14 |
+| **`ADD_TITLE_DONE_BADGE_ONLY`** *(new, US-047)* | *"{name}" was already on your list — it now has a {service} badge too.* | §3.14 — the `titleWasCreated: false` case. *"Added to your list"* would be wrong: the row was already there and only the badge is new (REQ-005) |
+| **`ADD_TITLE_DUPLICATE`** *(new, US-047)* | *That title is already on your list for that service.* | §3.15 — 409 `DUPLICATE_WORK_IDENTITY` |
 
 **(R5) The three memory/decode messages themselves are deliberately NOT copy
 constants.** `IMAGE_TOO_LARGE_TO_DECODE`, `IMAGE_DECODE_OOM` and

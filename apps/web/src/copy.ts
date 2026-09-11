@@ -54,6 +54,79 @@ export const SUPPRESS_CONFIRM_BODY =
 export const UNSUPPRESS_CONFIRM_BODY =
   '"{name}" can be added again by a future upload. This doesn\'t bring back anything that was removed — check Removal history for that.';
 
+/* ------------------------------------------------------------------ *
+ * Manual list edits — `specs/ui.md` §9, US-047 / US-048, TASK-207
+ * ------------------------------------------------------------------ */
+
+/**
+ * US-048 AC-2 — the removal confirmation.
+ *
+ * ⚠ EVERY CLAUSE IS LOAD-BEARING, and the contrast with
+ * `SUPPRESS_CONFIRM_BODY` above is the whole point of this string. The two
+ * actions are adjacent items on one menu and produce visually identical
+ * outcomes — the row disappears — but they mean opposite things:
+ *
+ *   - suppress  → "never show me this work again", for ever, keyed on work
+ *                 identity, survives every future upload.
+ *   - remove    → "this is not on my list", asserts nothing about the work,
+ *                 so a later capture legitimately brings it back.
+ *
+ * An owner who reads this as the other one will pick the wrong tool for a
+ * false extraction and permanently suppress a real work they never rejected.
+ * That is precisely the confusion the owner hit, so the sentence names the
+ * reappearance explicitly rather than leaving it to be inferred.
+ */
+export const REMOVE_TITLE_CONFIRM_BODY =
+  '"{name}" will be taken off your list and logged in Removal history, where you can put it back. It isn\'t marked "not interested", so a future upload can add it again.';
+
+/** US-048 AC-3 — the outcome, with Undo (`ux-states.md` §2.14 shape). */
+export const REMOVE_TITLE_DONE = 'Removed. "{name}" is in Removal history.';
+export const REMOVE_TITLE_UNDO_LABEL = 'Undo';
+export const REMOVE_TITLE_UNDONE = 'Back on your list.';
+
+/**
+ * US-048 AC-5 — the removal failed and NOTHING changed.
+ *
+ * ⚠ It must say nothing changed. A bare "couldn't remove that" leaves the
+ * owner unsure whether the title is half-removed, and the safe response to
+ * that doubt is to press it again.
+ */
+export const REMOVE_TITLE_FAILED = "Couldn't remove that. Nothing has changed.";
+
+/** US-048 AC-6 — 409 `TITLE_NOT_ACTIVE`; already gone, so nothing to do. */
+export const REMOVE_TITLE_NOT_ACTIVE = 'That title is already off your list.';
+
+/** US-048 — the removed row's provenance when no batch explains it. */
+export const REMOVED_BY_OWNER = 'Removed by you';
+
+/** §2.2 row menu — the third item. */
+export const ROW_MENU_REMOVE_LABEL = 'Remove from list';
+
+/** US-047 — the standalone add affordance on the list. */
+export const ADD_TITLE_LABEL = 'Add title';
+export const ADD_TITLE_HEADING = 'Add a title';
+export const ADD_TITLE_SEARCH_LABEL = 'Search TMDB';
+export const ADD_TITLE_SERVICE_LABEL = 'Which service is it saved on?';
+
+/**
+ * US-047 AC-4 — the service is REQUIRED and has no default.
+ *
+ * ⚠ Defaulting it would be a silent data error: the badge is a factual claim
+ * about where the owner saved the title, and a wrong one makes the next
+ * full-update reconciliation of that service propose the title for removal.
+ * The same reasoning as `POST /api/batches` having no default mode
+ * (US-003 AC-5).
+ */
+export const ADD_TITLE_SERVICE_REQUIRED = 'Pick the service it’s saved on.';
+
+/** US-047 AC-3 — the outcome, both shapes. */
+export const ADD_TITLE_DONE = 'Added. "{name}" is on your list.';
+export const ADD_TITLE_DONE_BADGE_ONLY =
+  '"{name}" was already on your list — it now has a {service} badge too.';
+
+/** US-047 AC-5 — 409 `DUPLICATE_WORK_IDENTITY`, already on that service. */
+export const ADD_TITLE_DUPLICATE = 'That title is already on your list for that service.';
+
 /** data-model §2.3.3 - suppression keyed on read text rather than a work id. */
 export const UNMATCHED_SUPPRESSION_CAVEAT =
   "We couldn't identify this title, so we're matching it on the text we read. If a future screenshot reads slightly differently, it may come back.";

@@ -29,11 +29,23 @@ import {
   type TmdbSearchResponse,
 } from '../components/FixMatchDialog';
 import { TitleList } from '../components/TitleList';
+import {
+  AddTitleDialog,
+  type AddTitleRequest,
+  type AddTitleResult,
+} from '../components/AddTitleDialog';
+import { RemoveTitleDialog, type RemoveTitleResult } from '../components/RemoveTitleDialog';
 import { LoadMoreSentinel } from '../components/LoadMoreSentinel';
 import { SlowResponseNotice } from '../components/SlowResponseNotice';
 import { useSlowRequest } from '../lib/useSlowRequest';
 import type { TitleListItem } from '../components/TitleRow';
-import { LIST_LOADING_BODY, OFFLINE_NOTHING_LOADED, OFFLINE_SHOWING_CACHED } from '../copy';
+import {
+  ADD_TITLE_LABEL,
+  LIST_LOADING_BODY,
+  OFFLINE_DISABLED_REASON,
+  OFFLINE_NOTHING_LOADED,
+  OFFLINE_SHOWING_CACHED,
+} from '../copy';
 
 export interface ListPageProps {
   readonly items?: readonly TitleListItem[];
@@ -104,6 +116,21 @@ export interface ListPageProps {
   readonly onUnsuppress?: (suppressionId: string) => Promise<unknown>;
   readonly onSearchTmdb?: (query: string) => Promise<TmdbSearchResponse>;
   readonly onFixMatch?: (titleId: string, body: FixMatchRequest) => Promise<FixMatchResponse>;
+  /**
+   * §6.32 (US-048) — take a title off the list by hand.
+   *
+   * ⚠ NOT part of the all-four-or-none set above, deliberately. That set is
+   * grouped because "Fix match" needs BOTH a search and a submit and is
+   * useless with one; removal needs neither. Folding it in would mean a TMDB
+   * outage that broke search also withdrew the remove affordance — the one
+   * action that needs no network but the owner's own store.
+   */
+  readonly onRemoveTitle?: (titleId: string) => Promise<RemoveTitleResult>;
+  readonly onRestoreListing?: (listingId: string) => Promise<unknown>;
+  /** §6.30 (US-047) — the standalone add. Needs `onSearchTmdb` to be useful. */
+  readonly onAddTitle?: (body: AddTitleRequest) => Promise<AddTitleResult>;
+  /** Refetch after a manual add so the new row appears without a reload. */
+  readonly onReload?: () => void;
 }
 
 /** `POST /api/titles/:titleId/suppress` — `specs/api.md` §6.6. */
@@ -116,7 +143,9 @@ interface SuppressedResult {
 /** Which dialog the row menu opened, and over which row. */
 type OpenDialog =
   | { readonly kind: 'suppress'; readonly item: TitleListItem }
-  | { readonly kind: 'fix-match'; readonly item: TitleListItem };
+  | { readonly kind: 'fix-match'; readonly item: TitleListItem }
+  | { readonly kind: 'remove'; readonly item: TitleListItem }
+  | { readonly kind: 'add' };
 
 /**
  * ⚠ Rejects rather than resolving. A missing handler means the container did
@@ -152,6 +181,10 @@ export function ListPage({
   onUnsuppress,
   onSearchTmdb,
   onFixMatch,
+  onRemoveTitle,
+  onRestoreListing,
+  onAddTitle,
+  onReload,
 }: ListPageProps): JSX.Element {
   const [params, setParams] = useSearchParams();
   const filters = parseFilters(params);
@@ -174,6 +207,19 @@ export function ListPage({
   const unsuppressFn = onUnsuppress;
   const searchFn = onSearchTmdb;
   const fixMatchFn = onFixMatch;
+  const removeFn = onRemoveTitle;
+  const restoreFn = onRestoreListing;
+  const addFn = onAddTitle;
+  /**
+   * ⚠ BOTH OR NEITHER, for the same reason the four above are grouped. The
+   * remove dialog's Undo calls `restoreListing`; offering a removal whose undo
+   * cannot run would take a title off the list and then strand the owner with
+   * a dead **Undo** — on the one action whose safety rests entirely on being
+   * reversible.
+   */
+  const removeWired = removeFn !== undefined && restoreFn !== undefined;
+  /** The add affordance needs a search AND a submit; one without the other is inert. */
+  const addWired = addFn !== undefined && searchFn !== undefined;
   const rowActionsWired =
     suppressFn !== undefined &&
     unsuppressFn !== undefined &&
@@ -205,6 +251,53 @@ export function ListPage({
   return (
     <>
       <h1>Your list</h1>
+      {/*
+        US-047 — the standalone add, ABOVE the list and outside every
+        loading/failure branch.
+
+        ⚠ Deliberately not inside the empty state. It is needed most when the
+        list is full and long: extraction missed one title out of two hundred,
+        and re-uploading the whole service to capture it is exactly the
+        friction this affordance removes.
+
+        ⚠ Disabled offline, with the reason stated as text, like every other
+        mutating control (§2.12).
+      */}
+      {addWired && (
+        <>
+          <button
+            type="button"
+            className="tap-target"
+            data-testid="add-title-open"
+            disabled={offline}
+            onClick={() => {
+              setDialog({ kind: 'add' });
+            }}
+          >
+            {ADD_TITLE_LABEL}
+          </button>
+          {offline && (
+            <span className="offline-reason" data-testid="add-title-offline-reason">
+              {OFFLINE_DISABLED_REASON}
+            </span>
+          )}
+          {/*
+            ⚠ RENDERED HERE, BESIDE ITS BUTTON, AND NOT INSIDE THE LIST BRANCH
+            BELOW. The button is outside every loading/failure branch, so a
+            dialog rendered inside one would open from a screen where the list
+            read failed and then not exist. `onAdded` fires on SUCCESS, not on
+            close: closing is not evidence anything was written.
+          */}
+          {dialog !== null && dialog.kind === 'add' && (
+            <AddTitleDialog
+              searchTmdb={searchFn}
+              addTitle={addFn}
+              onClose={closeAll}
+              {...(onReload === undefined ? {} : { onAdded: onReload })}
+            />
+          )}
+        </>
+      )}
       {/*
         ⚠ OUTSIDE the loading/failure branches below. The notice reports a
         write that has already happened; hiding it because `GET /api/titles`
@@ -337,12 +430,17 @@ export function ListPage({
             <RowMenu
               item={menuFor}
               offline={offline}
+              canRemove={removeWired}
               onDismiss={closeAll}
               onChoose={(choice) => {
                 const item = menuFor;
                 setMenuFor(null);
                 setDialog(
-                  choice === 'suppress' ? { kind: 'suppress', item } : { kind: 'fix-match', item },
+                  choice === 'suppress'
+                    ? { kind: 'suppress', item }
+                    : choice === 'remove'
+                      ? { kind: 'remove', item }
+                      : { kind: 'fix-match', item },
                 );
               }}
             />
@@ -376,6 +474,27 @@ export function ListPage({
                 onClose={closeAll}
               />
             )}
+          {/*
+            US-048 — the removal dialog. Rendered on the same terms as the
+            suppress one: only when BOTH its call and its undo are wired.
+          */}
+          {dialog !== null && dialog.kind === 'remove' && removeWired && (
+            <RemoveTitleDialog
+              titleId={dialog.item.titleId}
+              name={dialog.item.name}
+              removeTitle={removeFn}
+              restoreListing={restoreFn}
+              onRowState={(state) => {
+                setRowStates((prev) => ({ ...prev, [dialog.item.titleId]: state }));
+              }}
+              onClose={closeAll}
+            />
+          )}
+          {/*
+            US-047 — the standalone add. ⚠ `onReload` is called on success, not
+            on close: the new row has to appear without the owner reloading, and
+            closing the dialog is not evidence anything was written.
+          */}
           <ListEmptyState
             facts={{ shown, total: unfilteredTotal, filters, removedCount, suppressedCount }}
             onClearFilters={() => {

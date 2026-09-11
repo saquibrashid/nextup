@@ -525,6 +525,7 @@ function removedResponse(be: Backend): RemovedResponse {
       dateAdded: l.dateAdded,
       removedAt: l.removedAt ?? iso(TODAY),
       removedByBatchId: l.removedByBatchId,
+      removedBy: l.removedByBatchId === null ? 'owner' : 'batch',
       removedByGroupId: l.removedByGroupId,
       removalOrdinal: ordinal,
       removalTotalForWork: peers.length,

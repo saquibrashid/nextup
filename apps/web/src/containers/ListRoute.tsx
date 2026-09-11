@@ -294,6 +294,14 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
       onUnsuppress={(suppressionId) => client.unsuppress(suppressionId)}
       onSearchTmdb={(query) => client.searchTmdb(query)}
       onFixMatch={(titleId, body) => client.fixMatch(titleId, body)}
+      // US-048 — removal and the undo it depends on, wired as a pair:
+      // `ListPage` renders the affordance only when both are present.
+      onRemoveTitle={(titleId) => client.removeTitle(titleId)}
+      onRestoreListing={(listingId) => client.restoreListing(listingId)}
+      // US-047 — the standalone add, and the refetch that makes the new row
+      // visible without a reload.
+      onAddTitle={(body) => client.addTitle(body)}
+      onReload={titles.reload}
     />
   );
 }

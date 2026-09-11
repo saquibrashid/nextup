@@ -408,16 +408,25 @@ describe('T-A11Y-006 action outcomes take focus, ambient regions do not', () => 
     expect(document.activeElement).toBe(summary);
   });
 
-  it('T-A11Y-006m: ONLY the three owner-chosen outcomes focus themselves', () => {
+  it('T-A11Y-006m: ONLY the owner-chosen outcomes focus themselves', () => {
     const users = readdirSync(COMPONENTS)
       .filter((file) => file.endsWith('.tsx'))
       .filter((file) => readFileSync(join(COMPONENTS, file), 'utf8').includes('useOutcomeFocus'))
       .sort();
 
-    // ⚠ Fails in BOTH directions on purpose. A fourth entry means someone
+    // ⚠ Fails in BOTH directions on purpose. An extra entry means someone
     // swept the ambient regions; a missing entry means an outcome silently
     // stopped announcing itself while every other case here still passed.
-    expect(users).toEqual(['BatchAppliedNotice.tsx', 'FixMatchDialog.tsx', 'SuppressDialog.tsx']);
+    // AddTitleDialog and RemoveTitleDialog joined at US-047/US-048: both swap
+    // their whole body for a result the owner asked for, which is the same
+    // shape of change FixMatchDialog makes.
+    expect(users).toEqual([
+      'AddTitleDialog.tsx',
+      'BatchAppliedNotice.tsx',
+      'FixMatchDialog.tsx',
+      'RemoveTitleDialog.tsx',
+      'SuppressDialog.tsx',
+    ]);
   });
 
   it('T-A11Y-006n: the ambient regions are left alone', () => {

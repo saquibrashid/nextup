@@ -57,6 +57,12 @@ export const ERROR_CODES = [
   'WORK_SUPPRESSED',
   'TARGET_WORK_SUPPRESSED',
   'LISTING_NOT_REMOVED',
+  // US-048. The owner asked to remove a title that holds no active listing —
+  // it is already removed, or it is a waiting work that was never on a
+  // service. Distinct from `LISTING_NOT_REMOVED`, which is its exact mirror on
+  // the restore path, and distinct from `NOT_FOUND`: the title EXISTS and the
+  // owner can see it, so a 404 would read as data loss.
+  'TITLE_NOT_ACTIVE',
   'GROUP_ALREADY_REVERSED',
   'PARTIAL_FAILURE_PREVENTED',
 

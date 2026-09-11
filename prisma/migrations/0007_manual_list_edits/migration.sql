@@ -1,0 +1,45 @@
+-- Manual list edits — the owner adds or removes a title WITHOUT an upload batch.
+--
+-- ── Why ─────────────────────────────────────────────────────────────────────
+--
+-- Every listing until now was born inside an UploadBatch, so
+-- `service_listing.created_by_batch_id` was NOT NULL and the FK to
+-- `upload_batch` carried the whole provenance story. US-047 ("Add title") and
+-- US-048 ("Remove from list") introduce a second, equally legitimate origin:
+-- the owner, acting directly on the list.
+--
+-- The alternative — minting a synthetic UploadBatch per manual edit — was
+-- rejected. It would put rows into `GET /api/batches` (US-031 provenance) that
+-- the owner never uploaded, collide with `findOpenUploadBatch`'s
+-- one-open-batch rule (OPEN_BATCH_EXISTS), and write a `service_state`
+-- last-completed-batch that never captured anything, corrupting the REQ-039
+-- freshness strip. A NULL means exactly what it says: no batch created this.
+--
+-- The removal half needs NO schema change. `removed_by_batch_id` and
+-- `removed_by_group_id` have been nullable since 0001, so a manual removal is
+-- already expressible as `state='removed'` with both NULL.
+--
+-- ── Additive only (§16.8, `T-MIG-001`) ──────────────────────────────────────
+--
+-- Nothing is dropped, renamed, truncated or rewritten. Widening NOT NULL to
+-- NULL cannot lose a row or a value: every existing row keeps its batch id.
+-- The FK `fk_listing_created_by_batch` and the index
+-- `service_listing_created_by_batch` both survive an ALTER COLUMN untouched —
+-- verified by applying this file to mssql/server:2022-latest, not inferred.
+--
+-- ⚠ THE COLLATE CLAUSE IS LOAD-BEARING, NOT DECORATION.
+--
+-- `ALTER COLUMN` on SQL Server rewrites the column definition WHOLESALE from
+-- what this statement says. Omitting `COLLATE` does not "keep the existing
+-- collation" — it resets the column to the DATABASE default. Every id column
+-- in 0001 is `Latin1_General_100_BIN2` (a binary, case-sensitive collation) so
+-- that a ULID compares byte-for-byte; silently demoting this one to the
+-- database default would make `WHERE created_by_batch_id = @id` newly
+-- case-INSENSITIVE, and would break the FK's collation match with
+-- `upload_batch.id`.
+--
+-- ⚠ `EXEC()` for the same reason as 0003: `GO` is a SQLCMD separator, not
+-- T-SQL, and Prisma hands this file straight to the driver.
+EXEC('ALTER TABLE [service_listing]
+      ALTER COLUMN [created_by_batch_id] NVARCHAR(200)
+      COLLATE Latin1_General_100_BIN2 NULL;');

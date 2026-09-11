@@ -383,6 +383,12 @@ export interface RemovedItem {
   removedAt: string;
   removedByBatchId: string | null;
   removedByGroupId: string | null;
+  /**
+   * `'owner'` when the owner removed it by hand (US-048), `'batch'` when a
+   * full-update close did. Derived server-side from `removedByBatchId` so the
+   * two readings cannot drift.
+   */
+  removedBy: 'owner' | 'batch';
   removalOrdinal: number;
   removalTotalForWork: number;
   restorable: boolean;
@@ -406,6 +412,34 @@ export interface RestoreResponse {
   dateAdded: string;
   titleState: string;
   sortDateAdded: string | null;
+}
+
+/** §6.30 (US-047) — the standalone manual add. */
+export interface AddTitleResponse {
+  titleId: string;
+  listingId: string;
+  workIdentity: string;
+  service: string;
+  name: string;
+  dateAdded: string;
+  /**
+   * `false` when the work was already on the list for ANOTHER service and this
+   * add gave it a second badge instead of a second row (REQ-005). The success
+   * copy differs, because "added to your list" would be wrong: the row was
+   * already there and only the badge is new.
+   */
+  titleWasCreated: boolean;
+}
+
+/** §6.32 (US-048) — the standalone manual removal. */
+export interface RemoveTitleResponse {
+  titleId: string;
+  state: string;
+  /** Undo feeds these straight back to `restoreListing` — one call each. */
+  removedListingIds: string[];
+  removedAt: string;
+  /** Always `false`; §6.32 writes no suppression. Named so the copy can say so. */
+  suppressed: boolean;
 }
 
 export interface MeResponse {
@@ -652,6 +686,38 @@ export function createApiClient(deps: ApiClientDeps = {}) {
       request<{ suppressionId: string; workIdentity: string; alreadySuppressed: boolean }>(
         `/api/titles/${encodeURIComponent(titleId)}/suppress`,
         { method: 'POST', body: reason === undefined ? {} : { reason } },
+        deps,
+      ),
+
+    /**
+     * §6.30 (US-047) — put a work on the list by hand, outside any batch.
+     *
+     * ⚠ The body carries NO `name` and NO `dateAdded`. The name is read from
+     * TMDB server-side (SD-05) and the date is always today (NG-8 defers
+     * editing it to v1.1), so sending either would be a value the API ignores
+     * while the caller believes it was honoured.
+     */
+    addTitle: (body: { tmdbId: number; mediaType: 'movie' | 'tv'; service: string }) =>
+      request<AddTitleResponse>('/api/titles', { method: 'POST', body }, deps),
+
+    /**
+     * §6.32 (US-048) — take a title off the list by hand.
+     *
+     * ⚠ **THIS IS NOT SUPPRESSION AND MUST NEVER BE ALIASED ONTO IT.** It
+     * removes the row and asserts nothing about the work, so a later capture
+     * can legitimately bring it back as a new row dated today (product
+     * invariant 7). `suppressTitle` above is the permanent, work-identity
+     * decision. The two are one tap apart in the row menu, so the difference
+     * lives in the copy and in these two comments.
+     *
+     * ⚠ **"DELETE" IS THE HTTP VERB, NOT THE STORAGE OUTCOME.** The server
+     * soft-deletes for ever (REQ-028); the returned `removedListingIds` are
+     * what `restoreListing` above takes to undo it.
+     */
+    removeTitle: (titleId: string) =>
+      request<RemoveTitleResponse>(
+        `/api/titles/${encodeURIComponent(titleId)}`,
+        { method: 'DELETE' },
         deps,
       ),
 
