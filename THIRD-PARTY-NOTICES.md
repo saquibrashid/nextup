@@ -89,7 +89,7 @@ so they do not relicense this work — but their notices must be retained.
 | `@img/sharp-win32-ia32` | 0.35.4 | Apache-2.0 AND LGPL-3.0-or-later |
 | `@img/sharp-win32-x64` | 0.35.4 | Apache-2.0 AND LGPL-3.0-or-later |
 | `@js-joda/core` | 5.7.0 | BSD-3-Clause |
-| `@noble/hashes` | 2.3.0 | MIT |
+| `@noble/hashes` | 2.4.0 | MIT |
 | `@nodable/entities` | 3.0.0 | MIT |
 | `@prisma/adapter-mssql` | 6.19.3 | Apache-2.0 |
 | `@prisma/client` | 6.19.3 | Apache-2.0 |
