@@ -15,7 +15,7 @@
 // would be a second implementation of a rule whose whole point is having one.
 // `T-LIST-018` asserts the marker on every rendered label.
 
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 import { SERVICE_LABELS, type Service } from '@nextup/domain';
 
 import {
@@ -91,6 +91,15 @@ export interface TitleRowProps {
   readonly onOpenMenu?: ((item: TitleListItem) => void) | undefined;
   readonly onFixMatch?: ((item: TitleListItem) => void) | undefined;
   /**
+   * REQ-105 — the open row menu, rendered inside this row's actions box.
+   *
+   * ⚠ **A slot, not a set of menu props.** The row must not learn what the
+   * menu contains; `ListPage` owns that, including `canRemove`'s deliberate
+   * `false` default. Passing `undefined` (every row except the open one) is
+   * the normal case.
+   */
+  readonly menu?: ReactNode | undefined;
+  /**
    * `specs/ux-states.md` §2.13 **Submitting (row action)** (`T-UX-021`) — a
    * write against THIS row is in flight.
    *
@@ -113,7 +122,13 @@ const MEDIA_TYPE_LABELS: Readonly<Record<TitleListItem['mediaType'], string>> = 
   tv: 'TV',
 };
 
-export function TitleRow({ item, onOpenMenu, onFixMatch, pending }: TitleRowProps): JSX.Element {
+export function TitleRow({
+  item,
+  onOpenMenu,
+  onFixMatch,
+  pending,
+  menu,
+}: TitleRowProps): JSX.Element {
   const unmatched = item.matchState === 'unmatched';
   const busy = pending === true;
 
@@ -194,8 +209,15 @@ export function TitleRow({ item, onOpenMenu, onFixMatch, pending }: TitleRowProp
         )}
 
         <p className="title-row__meta" data-testid="title-meta">
-          <span data-testid="media-type">{MEDIA_TYPE_LABELS[item.mediaType]}</span>
+          {/*
+            REQ-106 — ORDER IS `Year · type · genres`, per `specs/ui.md` §2.2.
+            It previously rendered type-then-year, which is why the owner's
+            screenshot read `TV2004Animation`. The separators themselves are
+            CSS-generated (`.title-row__meta > span + span::before`) so they
+            stay out of the row's accessible name.
+          */}
           {item.releaseYear !== null && <span data-testid="release-year">{item.releaseYear}</span>}
+          <span data-testid="media-type">{MEDIA_TYPE_LABELS[item.mediaType]}</span>
           {/*
             US-019 AC-6: an empty genre list renders NOTHING - not "Unknown",
             not "-". A placeholder would read as a fact about the work rather
@@ -314,6 +336,25 @@ export function TitleRow({ item, onOpenMenu, onFixMatch, pending }: TitleRowProp
                 ⋮
               </button>
             )}
+        {/*
+          REQ-105 — THE OPEN MENU RENDERS HERE, INSIDE THE ROW.
+
+          ⚠ **This slot is the entire fix, and it is structural.** The menu used
+          to be mounted by `ListPage` as a SIBLING of `<TitleList>`, after the
+          load-more sentinel, so it appeared at the bottom of the page however
+          far up the list the owner had tapped. `index.css` had already declared
+          the containing block for it — on an element the menu was never a
+          descendant of — which is why no CSS change could ever have fixed this
+          and why both CSS-shaped attempts are wrong: `position: absolute`
+          resolves against the page, and `position: fixed` just relocates the
+          same detachment to the viewport and then breaks on scroll.
+
+          It is a `ReactNode` slot rather than the menu's own props because
+          `TitleRow` must not learn what the menu items are: the row renders a
+          title, and every decision about which actions exist (including
+          `canRemove`'s deliberate `false` default) stays with `ListPage`.
+        */}
+        {menu}
       </div>
     </li>
   );

@@ -407,6 +407,26 @@ export function ListPage({
                   },
                 }
               : {})}
+            renderMenu={(item) =>
+              menuFor !== null && menuFor.titleId === item.titleId ? (
+                <RowMenu
+                  item={menuFor}
+                  offline={offline}
+                  canRemove={removeWired}
+                  onDismiss={closeAll}
+                  onChoose={(choice) => {
+                    setMenuFor(null);
+                    setDialog(
+                      choice === 'suppress'
+                        ? { kind: 'suppress', item }
+                        : choice === 'remove'
+                          ? { kind: 'remove', item }
+                          : { kind: 'fix-match', item },
+                    );
+                  }}
+                />
+              ) : undefined
+            }
           />
           {/*
             ⚠ BELOW THE LIST AND INSIDE THE SAME BRANCH. It must not render
@@ -426,25 +446,21 @@ export function ListPage({
               onLoadMore={onLoadMore}
             />
           )}
-          {menuFor !== null && (
-            <RowMenu
-              item={menuFor}
-              offline={offline}
-              canRemove={removeWired}
-              onDismiss={closeAll}
-              onChoose={(choice) => {
-                const item = menuFor;
-                setMenuFor(null);
-                setDialog(
-                  choice === 'suppress'
-                    ? { kind: 'suppress', item }
-                    : choice === 'remove'
-                      ? { kind: 'remove', item }
-                      : { kind: 'fix-match', item },
-                );
-              }}
-            />
-          )}
+          {/*
+            REQ-105 — the open row menu is NOT rendered here any more.
+
+            ⚠ **It used to be, and that was the defect.** Mounted at this point
+            it is a sibling of `<TitleList>`, after the load-more sentinel, so
+            it appeared at the BOTTOM OF THE PAGE however far up the list the
+            owner tapped `⋮`. It is now passed into `TitleList`'s `renderMenu`
+            slot above, which places it inside the open row's actions box —
+            the element `.title-row__actions { position: relative }` was
+            written for all along.
+
+            Do not "simplify" it back to a page-level mount: `T-UX-100` asserts
+            DOM ancestry, not screen position, precisely because a floating
+            menu that happens to land near the row passes any visual check.
+          */}
           {dialog !== null && suppressFn !== undefined && unsuppressFn !== undefined && (
             <>
               {dialog.kind === 'suppress' && (
