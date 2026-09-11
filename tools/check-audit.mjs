@@ -71,6 +71,43 @@ function runAudit() {
   }
 }
 
+function defaultSleep(ms) {
+  // Synchronous by design: the gate is a straight-line script, and an async
+  // main() here would change how a thrown error sets the process exit code.
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+/**
+ * Fetch the report, retrying a transport failure a few times.
+ *
+ * The audit endpoint is a remote service in the middle of being retired, and
+ * its failures here are intermittent — this same tree audited clean an hour
+ * either side of a `400`. A gate that goes red on somebody else's outage is a
+ * gate that gets switched off, so a couple of retries is the difference
+ * between this control surviving and this control being deleted. It still
+ * FAILS after the last attempt: a repeatable outage must block, because an
+ * unchecked production tree is not a passing one.
+ */
+export function loadReport({ attempts = 3, waitMs = 4000, sleep = defaultSleep, read } = {}) {
+  const fetchOnce = read ?? (() => assertAuditRan(JSON.parse(runAudit())));
+  let last;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return fetchOnce();
+    } catch (err) {
+      last = err;
+      if (attempt < attempts) {
+        console.error(
+          `npm audit attempt ${attempt} of ${attempts} failed (${err.message.split('\n')[0]}); ` +
+            `retrying in ${waitMs}ms.`,
+        );
+        sleep(waitMs);
+      }
+    }
+  }
+  throw last;
+}
+
 export function collectAdvisories(report) {
   const found = new Map();
   for (const vuln of Object.values(report.vulnerabilities ?? {})) {
@@ -89,13 +126,61 @@ export function collectAdvisories(report) {
   return found;
 }
 
+/**
+ * Reject a payload that is not an audit result at all.
+ *
+ * ⚠ "NO ADVISORIES" AND "THE AUDIT DID NOT RUN" ARE THE SAME SHAPE, AND THE
+ * DIFFERENCE IS THE WHOLE GATE.
+ *
+ * When npm's audit endpoint is unavailable — it returned `400 Bad Request` on
+ * the quick-audit route while being retired, and is documented as retiring —
+ * `npm audit --json` still exits with a parseable JSON document on stdout.
+ * That document carries an `error` object and NO `vulnerabilities` key. Fed
+ * straight to `collectAdvisories` it yields an empty map, which is
+ * indistinguishable from a clean tree.
+ *
+ * Both of this gate's rules then invert:
+ *
+ *   - Rule 1 (unreviewed advisories fail) passes vacuously — an outage would
+ *     wave through a genuine unfixed critical.
+ *   - Rule 2 (stale exceptions fail) fires on EVERY exception at once, telling
+ *     the reader to delete a documented, still-applicable suppression because
+ *     "upstream has fixed it". That advice is confidently wrong and destroys
+ *     reviewed security reasoning.
+ *
+ * The second is why this throws rather than warns. A transport failure must
+ * read as "the audit could not be run", never as a finding about the tree.
+ */
+export function assertAuditRan(report) {
+  if (report && typeof report === 'object' && report.vulnerabilities !== undefined) return report;
+
+  const detail =
+    report && typeof report === 'object' && report.error
+      ? `${report.error.code ?? 'error'}: ${report.error.summary ?? report.error.detail ?? 'no summary'}`
+      : 'the report has no `vulnerabilities` key';
+
+  throw new Error(
+    'npm audit did not return a usable report, so the production tree was NEVER CHECKED.\n' +
+      `    ${detail}\n` +
+      '    This is an audit failure, not a clean result — do not read it as "no advisories",\n' +
+      '    and do NOT delete any exception on the strength of it. Re-run; if npm\u2019s audit\n' +
+      '    endpoint is down or retired, fix the gate rather than skipping it.',
+  );
+}
+
 // Only shell out when run as a gate; importing this module for tests must not
 // invoke npm.
 if (
   process.argv[1] &&
   import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/').split('/').pop())
 ) {
-  const report = JSON.parse(runAudit());
+  let report;
+  try {
+    report = loadReport();
+  } catch (err) {
+    console.error(`\nProduction dependency audit COULD NOT RUN:\n\n  - ${err.message}\n`);
+    process.exit(1);
+  }
   const found = collectAdvisories(report);
   const allowed = new Map(EXCEPTIONS.map((e) => [e.id, e]));
   const problems = [];

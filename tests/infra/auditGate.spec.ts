@@ -2,7 +2,12 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { EXCEPTIONS, collectAdvisories } from '../../tools/check-audit.mjs';
+import {
+  EXCEPTIONS,
+  assertAuditRan,
+  collectAdvisories,
+  loadReport,
+} from '../../tools/check-audit.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '../..');
 const ciYml = readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8');
@@ -85,5 +90,61 @@ describe('T-SEC-034 the production audit gate suppresses by exception, never by 
     // compromise invisible — it runs in CI with repository credentials.
     expect(ciYml).toMatch(/npm audit --audit-level=high/);
     expect(ciYml).toMatch(/continue-on-error: true/);
+  });
+
+  it('T-SEC-034h: an audit that did not run is rejected, not read as a clean tree', () => {
+    /*
+      ⚠ THIS IS THE BUG THAT REACHED CI, AND IT FAILED IN THE DESTRUCTIVE
+      DIRECTION.
+
+      npm's quick-audit endpoint returned `400 Bad Request` while being
+      retired. `npm audit --json` still printed parseable JSON — an `error`
+      object with no `vulnerabilities` key — so the gate saw zero advisories
+      and concluded that the one documented, still-applicable exception was
+      STALE, instructing the reader to delete reviewed security reasoning
+      because "upstream has fixed it".
+
+      The same empty shape would also wave through a genuine unfixed critical.
+      A transport failure must never be interpreted as a statement about the
+      dependency tree.
+    */
+    const outage = {
+      error: { code: 'EAUDITENDPOINT', summary: 'audit endpoint returned an error' },
+    };
+
+    expect(() => assertAuditRan(outage)).toThrow(/NEVER CHECKED/);
+    expect(() => assertAuditRan(outage)).toThrow(/audit endpoint returned an error/);
+    // The advice matters as much as the failure: the old message told you to
+    // delete the exception.
+    expect(() => assertAuditRan(outage)).toThrow(/do NOT delete any exception/);
+
+    // A real report with no findings is still a valid, passing result.
+    expect(assertAuditRan({ vulnerabilities: {} })).toEqual({ vulnerabilities: {} });
+  });
+
+  it('T-SEC-034i: a transient outage is retried, and a persistent one still fails closed', () => {
+    // A gate that goes red on somebody else's intermittent outage gets
+    // switched off — but retrying forever, or passing after the last attempt,
+    // would leave the production tree unchecked and call it green.
+    const slept: number[] = [];
+    let calls = 0;
+    const flaky = () => {
+      calls += 1;
+      if (calls < 3) throw new Error('npm audit did not return a usable report');
+      return { vulnerabilities: {} };
+    };
+
+    expect(loadReport({ read: flaky, waitMs: 1, sleep: (ms: number) => slept.push(ms) })).toEqual({
+      vulnerabilities: {},
+    });
+    expect(calls).toBe(3);
+    expect(slept).toEqual([1, 1]);
+
+    const alwaysDown = () => {
+      throw new Error('npm audit did not return a usable report');
+    };
+    expect(() => loadReport({ read: alwaysDown, attempts: 2, waitMs: 1, sleep: () => {} })).toThrow(
+      /usable report/,
+    );
   });
 });
