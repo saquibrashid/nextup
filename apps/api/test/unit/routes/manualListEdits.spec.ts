@@ -366,7 +366,7 @@ describe('POST /api/titles — §6.30 add by hand', () => {
   });
 
   it('T-MANUAL-035c · a TMDB outage is reported as an outage, and writes NOTHING', async () => {
-    getWork.mockRejectedValue(new TmdbUnavailableError('boom'));
+    getWork.mockRejectedValue(new TmdbUnavailableError('boom', 503, true));
 
     const response = await add();
     expect(((await response.json()) as ErrorBody).error.code).toBe('TMDB_UNAVAILABLE');
