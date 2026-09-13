@@ -165,6 +165,36 @@ originally **missing** from that list, which is the only reason a v7 adapter PR
 could be raised while the other two were held: an ignore that covers two of a
 group's three members holds nothing.
 
+### Vitest 5 (`vitest`, `@vitest/coverage-v8`) — HELD, and it is really a Node upgrade
+
+`vitest@5` peer-requires `@types/node@^22.0.0 || >=24.0.0`. The install fails
+`ERESOLVE` before a single test runs, which is why **all twelve CI jobs go red
+at once** rather than one suite failing — read that signature as "the tree did
+not install", not "the test suite broke".
+
+Node **20** is pinned in four coupled places, and they move together or not at
+all:
+
+| Where | Value |
+| --- | --- |
+| `.nvmrc` | `20` — every CI job reads it via `node-version-file` |
+| `package.json` | `"engines": { "node": ">=20 <21" }` |
+| `Dockerfile` | `ARG NODE_IMAGE=node:20-alpine@sha256:fb4cd12…` (digest-pinned deliberately) |
+| `package.json` | `@types/node@^20.14.10` |
+
+⚠ **Bumping `@types/node` alone is worse than leaving this held**, not a
+partial step towards it: type definitions ahead of the runtime describe APIs
+the deployed container does not have, so the failure moves out of `tsc` and
+into production.
+
+**Unblocked by** a deliberate Node 20 → 22 upgrade, which is worth doing on its
+own merits — **Node 20 reached end of life on 2026-04-30** and receives no
+further security patches. ⚠ Schedule it rather than merging it casually:
+`deploy` runs on **every push to `main`**, so the merge itself ships a new
+runtime image to production. Take it on its own branch, watch the held-revision
+smoke suite (`T-CI-009o`–`q`), and expect to re-pin the image digest.
+
+
 ## 6. `package-lock.json` carries `sha1-` integrity — investigated, nothing to do
 
 Most of the lockfile's `integrity` hashes are **`sha1-`**, not `sha512-`. This
@@ -229,3 +259,68 @@ enormous lockfile diff in review. The review expectation is the mitigation: a
 dependency PR should **add or keep `sha512-`/`registry.npmjs.org`** entries;
 one that **adds `sha1-`** entries or repoints `resolved` at `ms-feed-*`
 (especially a full regen) is the red flag to inspect by hand.
+
+## 7. `npm ci` fails with a 404 for a version that certainly exists
+
+**Symptom.** A clean install of `main` dies on one package:
+
+```
+npm error 404 Not Found - GET https://packagefeedproxy.microsoft.io/npm/@typescript-eslint/visitor-keys/-/visitor-keys-8.70.0.tgz
+npm error 404  Cannot find the file visitor-keys-8.70.0.tgz in package '@typescript-eslint/visitor-keys 8.70.0' in feed 'npm-public'
+```
+
+**This is not a misconfiguration, and there is no npm setting that fixes it.**
+npm is already pointed at the proxy (`registry` =
+`https://packagefeedproxy.microsoft.io/npm/`, `replace-registry-host=npmjs`),
+which is exactly what IT prescribes — §6 explains why. The cause is that the
+proxy **lags upstream**: dependabot resolves against the public registry on a
+GitHub runner and commits a lockfile naming a version published minutes
+earlier, and the internal feed has not mirrored it yet.
+
+Confirm it is a sync gap rather than a bad lockfile entry — the proxy's own
+packument is the evidence:
+
+```powershell
+npm view "@typescript-eslint/visitor-keys" versions --prefer-online --json | Select-Object -Last 4
+# ..., "8.69.0", "8.69.1-alpha.0"   <- 8.70.0 is simply absent
+```
+
+⚠ **The feed does not fetch on demand.** A direct `GET` of the version
+document, `npm view <pkg>@<version>`, and `npm pack <pkg>@<version>` were all
+tried and all 404 — none of them warms the cache. **Waiting is the fix.**
+
+⚠ **`npm install` is NOT a workaround.** It re-resolves, but the root
+`package.json` pins the same family (`@typescript-eslint/eslint-plugin@^8.70.0`),
+so resolution fails again — this time as `notarget`.
+
+**What must NOT be done:**
+
+- **Do not add an `overrides` entry** pinning the transitive package back to a
+  version the proxy happens to hold. It would be committed, it would apply to
+  CI and to production builds, and it pins a linting toolchain backwards for
+  everyone to work around one machine's cache.
+- **Do not commit a regenerated lockfile** produced to get past it — see §6:
+  a proxy-side regeneration downgrades `sha512-` entries to `sha1-`.
+- **Do not point npm at `registry.npmjs.org`.** It is IT-blocked and
+  unreachable; the TLS handshake fails.
+
+**CI is unaffected.** GitHub-hosted runners install from the public registry,
+so a PR blocked locally still goes green — verify there rather than locally.
+
+**To keep working meanwhile**, install from the manifests as they were *before*
+the bump that introduced the unmirrored version, then put the current ones
+back. `node_modules` ends up a few dev-dependency versions behind `main`, which
+is adequate for running the suites:
+
+```powershell
+$before = "<sha of the commit before the offending bump>"
+git checkout $before -- package.json package-lock.json apps/api/package.json apps/web/package.json packages/domain/package.json
+npm ci --no-audit --no-fund
+git checkout HEAD -- package.json package-lock.json apps/api/package.json apps/web/package.json packages/domain/package.json
+npx prisma generate     # npm ci wipes the generated client; without this
+                        # `npm run typecheck` reports TS7006 on Prisma.DMMF
+```
+
+⚠ `git status` **must be clean afterwards.** The whole point of the second
+`checkout` is that the older manifests never reach a commit.
+
