@@ -444,20 +444,22 @@ export interface TitlePageOptions {
   limit: number;
   dir: 'asc' | 'desc';
   /**
-   * The keyset position, in whichever sort issued it. The two shapes are
+   * The keyset position, in whichever sort issued it. The shapes are
    * discriminated by key set, exactly as `AnyListCursor` is, and `sort` below
    * says which one is expected.
    */
   cursor?:
     | { sortDateAdded: string; id: string }
     | { runtimeMinutes: number | null; id: string }
+    | { releaseYear: number | null; id: string }
+    | { ratingTenths: number | null; id: string }
     | undefined;
   services?: readonly string[];
   mediaType?: string | undefined;
   genres?: readonly string[];
   /** REQ-035. `[]` means no runtime filter — NOT "every bucket". */
   runtimes?: readonly RuntimeBucket[];
-  sort?: 'dateAdded' | 'runtime';
+  sort?: 'dateAdded' | 'runtime' | 'releaseYear' | 'rating';
 }
 
 /**
@@ -501,15 +503,35 @@ function runtimeFilter(buckets: readonly RuntimeBucket[]): object {
 }
 
 /**
- * The keyset predicate for the RUNTIME order (REQ-037).
+ * The ordered column for each sort key.
+ *
+ * ⚠ **THE KEYSET AND THE `ORDER BY` READ THE SAME MAP FOR A REASON.** A keyset
+ * predicate that names a different column from its own `ORDER BY` does not
+ * error — it returns a page of plausible rows with an arbitrary subset
+ * skipped or repeated at each boundary, which is indistinguishable from data
+ * loss. Naming the column once makes that divergence unrepresentable.
+ */
+const TITLE_ORDER_COLUMN: Record<
+  NonNullable<TitlePageOptions['sort']>,
+  'sortDateAdded' | 'tmdbRuntimeMinutes' | 'tmdbReleaseYear' | 'imdbRatingTenths'
+> = {
+  dateAdded: 'sortDateAdded',
+  runtime: 'tmdbRuntimeMinutes',
+  releaseYear: 'tmdbReleaseYear',
+  rating: 'imdbRatingTenths',
+};
+
+/**
+ * The keyset predicate shared by every NULLABLE-INTEGER order — runtime
+ * (REQ-037), release year and rating (both `A53`).
  *
  * ⚠ **THREE BRANCHES, NOT TWO, AND THE THIRD IS THE ONE THAT LOSES ROWS.**
- * Runtime sorts `NULL`s LAST in both directions, so the order is
+ * All three keys sort `NULL`s LAST in both directions, so the order is
  * `[non-null rows in dir] … [null rows by id]`. From a non-null position the
- * remaining rows are therefore *"a further runtime in `dir`"*, OR *"the same
- * runtime and a larger id"*, OR **"any row with no runtime at all"** — and
+ * remaining rows are therefore *"a further value in `dir`"*, OR *"the same
+ * value and a larger id"*, OR **"any row with no value at all"** — and
  * omitting that last branch silently truncates the list at the first unknown
- * runtime. The rows are still there; they simply never arrive, which is the
+ * value. The rows are still there; they simply never arrive, which is the
  * exact shape of loss this product is built to avoid.
  *
  * ⚠ From a position INSIDE the null block the only remaining rows are later
@@ -519,17 +541,28 @@ function runtimeFilter(buckets: readonly RuntimeBucket[]): object {
  * ⚠ The id branch is `gt` in BOTH directions, mirroring the `id: 'asc'`
  * tie-break — the same asymmetry, and the same reason, as the date keyset
  * above.
+ *
+ * ⚠ **IT IS ONE FUNCTION BECAUSE IT WAS NEARLY THREE.** Release year and
+ * rating were added with the same nullable semantics; copying this predicate
+ * per sort is three independent chances to drop the third branch, and the
+ * resulting truncation is invisible until a real list has an unrated title
+ * near the top.
  */
-function runtimeKeyset(cursor: { runtimeMinutes: number | null; id: string }, dir: 'asc' | 'desc') {
-  if (cursor.runtimeMinutes === null) {
-    return { tmdbRuntimeMinutes: null, id: { gt: cursor.id } };
+function nullableIntKeyset(
+  column: 'tmdbRuntimeMinutes' | 'tmdbReleaseYear' | 'imdbRatingTenths',
+  value: number | null,
+  id: string,
+  dir: 'asc' | 'desc',
+) {
+  if (value === null) {
+    return { [column]: null, id: { gt: id } };
   }
   const before = dir === 'desc' ? 'lt' : 'gt';
   return {
     OR: [
-      { tmdbRuntimeMinutes: { [before]: cursor.runtimeMinutes } },
-      { tmdbRuntimeMinutes: cursor.runtimeMinutes, id: { gt: cursor.id } },
-      { tmdbRuntimeMinutes: null },
+      { [column]: { [before]: value } },
+      { [column]: value, id: { gt: id } },
+      { [column]: null },
     ],
   };
 }
@@ -701,6 +734,74 @@ export async function countRuntimeUnknown(
   });
 }
 
+/**
+ * The rating columns of every title the CURRENT FILTERS admit — the whole
+ * sortable set, not one page (`A53`, REQ-041, `specs/api.md` §6.2a).
+ *
+ * ⚠ **THE PAGE IS THE WRONG SCOPE HERE, AND IT IS THE TEMPTING ONE.** Under
+ * `sort=rating` the key being refreshed is the key being ordered by. Refreshing
+ * only the rows on page 1 computes the ORDER from stale values and then renders
+ * FRESH ones into it — an `8.4` sitting below a `7.1`, with nothing wrong on
+ * screen except the order, and no error anywhere. The sweep must see every row
+ * that could compete for a position before the `ORDER BY` runs.
+ *
+ * ⚠ **IT IS NOT A BACKFILL AND MUST NOT BECOME ONE.** It is owner-initiated,
+ * synchronous inside the request that asked for a rating-ordered list, and
+ * bounded by both a count ceiling and a wall-clock deadline
+ * (`IMDB_SWEEP_PER_REQUEST` / `IMDB_SWEEP_BUDGET_MS`). Rows it does not reach
+ * keep their cached-or-absent value and sort on it. No timer may call this.
+ *
+ * ⚠ **NARROW ON PURPOSE.** Four columns. Widening it to the full title shape
+ * would make an owner-library-sized read of every relation on every
+ * rating-sorted render.
+ */
+export async function listTitleRatingRows(
+  ownerId: OwnerId,
+  options: Omit<TitlePageOptions, 'limit' | 'dir' | 'cursor' | 'sort'>,
+  tx?: Db,
+): Promise<
+  {
+    id: string;
+    imdbId: string | null;
+    imdbRatingTenths: number | null;
+    imdbRatingFetchedAt: Date | null;
+  }[]
+> {
+  const conn = db(tx);
+  const { services = [], mediaType, genres = [], runtimes = [] } = options;
+
+  const suppressed = await conn.suppression.findMany({
+    where: { ownerId, active: true },
+    select: { workIdentity: true },
+  });
+
+  const base = baseTitleListWhere(ownerId, {
+    suppressedIdentities: suppressed.map((s) => s.workIdentity),
+    services,
+    mediaType,
+    genres,
+  });
+
+  return conn.title.findMany({
+    // ⚠ `ownerId` RESTATED for `T-SEC-021`, which reads the source textually
+    // and cannot follow a binding that arrives through a spread. Same value;
+    // the explicit key wins because it is last.
+    where: { ...base, ownerId, AND: [...base.AND, runtimeFilter(runtimes)] },
+    select: {
+      id: true,
+      imdbId: true,
+      imdbRatingTenths: true,
+      imdbRatingFetchedAt: true,
+    },
+    // ⚠ Ordered so the sweep's ceiling bites in a STABLE place. Without an
+    // order the rows arrive in whatever order the engine chooses, so which
+    // rows a truncated sweep refreshed would differ between two identical
+    // requests — and the list would reorder itself on refresh for no reason
+    // the owner could see.
+    orderBy: [{ imdbRatingFetchedAt: { sort: 'asc', nulls: 'first' } }, { id: 'asc' }],
+  });
+}
+
 export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions, tx?: Db) {
   const conn = db(tx);
   const {
@@ -738,16 +839,22 @@ export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions,
     cursor === undefined
       ? {}
       : 'runtimeMinutes' in cursor
-        ? runtimeKeyset(cursor, dir)
-        : {
-            OR: [
-              { sortDateAdded: { [before]: new Date(`${cursor.sortDateAdded}T00:00:00.000Z`) } },
-              {
-                sortDateAdded: new Date(`${cursor.sortDateAdded}T00:00:00.000Z`),
-                id: { gt: cursor.id },
-              },
-            ],
-          };
+        ? nullableIntKeyset('tmdbRuntimeMinutes', cursor.runtimeMinutes, cursor.id, dir)
+        : 'releaseYear' in cursor
+          ? nullableIntKeyset('tmdbReleaseYear', cursor.releaseYear, cursor.id, dir)
+          : 'ratingTenths' in cursor
+            ? nullableIntKeyset('imdbRatingTenths', cursor.ratingTenths, cursor.id, dir)
+            : {
+                OR: [
+                  {
+                    sortDateAdded: { [before]: new Date(`${cursor.sortDateAdded}T00:00:00.000Z`) },
+                  },
+                  {
+                    sortDateAdded: new Date(`${cursor.sortDateAdded}T00:00:00.000Z`),
+                    id: { gt: cursor.id },
+                  },
+                ],
+              };
 
   const base = baseTitleListWhere(ownerId, {
     suppressedIdentities: suppressed.map((s) => s.workIdentity),
@@ -783,10 +890,13 @@ export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions,
     // reason (`compareTitlesByRuntime`): "Shortest first" opening with every
     // unknown runtime would present an absence of data as a claim that those
     // titles are the shortest.
-    orderBy:
-      sort === 'runtime'
-        ? [{ tmdbRuntimeMinutes: { sort: dir, nulls: 'last' } }, { id: 'asc' }]
-        : [{ sortDateAdded: { sort: dir, nulls: 'last' } }, { id: 'asc' }],
+    // ⚠ The runtime order follows the same three rules and for a sharper
+    // reason (`compareTitlesByRuntime`): "Shortest first" opening with every
+    // unknown runtime would present an absence of data as a claim that those
+    // titles are the shortest. Release year and rating (`A53`) inherit the
+    // identical treatment — an unrated title floated to the top of "highest
+    // rated" would be the same lie in a different column.
+    orderBy: [{ [TITLE_ORDER_COLUMN[sort]]: { sort: dir, nulls: 'last' } }, { id: 'asc' }],
     take: limit + 1,
     include: {
       listings: {

@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 8 |
 | 🚧 doing | 0 |
-| ✅ done | 205 |
+| ✅ done | 206 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **216** |
+| **total** | **217** |
 
 ## Ready to start
 
@@ -25,7 +25,7 @@ Not done, and every task they depend on is done.
 | Task | Size | Section |
 |---|---|---|
 | `TASK-209` | S | 5P. Epic P — the visual refresh (ADR-0013, `specs/ui-refresh.md`, `A53`) |
-| `TASK-216` | L | 5P. Epic P — the visual refresh (ADR-0013, `specs/ui-refresh.md`, `A53`) |
+| `TASK-219` | M | 5P. Epic P — the visual refresh (ADR-0013, `specs/ui-refresh.md`, `A53`) |
 
 ## Waiting on the owner
 
@@ -45,7 +45,7 @@ Not done, and every task they depend on is done.
 | `TASK-211` | `TASK-210` |
 | `TASK-212` | `TASK-210` |
 | `TASK-213` | `TASK-212` |
-| `TASK-217` | `TASK-210`, `TASK-216` |
+| `TASK-217` | `TASK-210` |
 | `TASK-218` | `TASK-210` |
 
 ## Done
@@ -257,3 +257,4 @@ Not done, and every task they depend on is done.
 | `TASK-208` | `T-CSS-006a-d`, `T-CSS-007a-c` and the updated `T-CSS-004c`/`004e` in `apps/web/test/stylesheet.spec.ts` (28 tests). Accent moved to ADR-0013's `#4338ca` (7.90:1) and the pinned ratio updated with it. 16 raw font-size literals in 5 ad-hoc sizes, 13 raw font-weights and 1 raw line-height replaced by tokens. Both genre-chip rules moved off `--text-xs` to the `--text-sm` §7b names. ⚠ Each new gate was mutation-tested to prove it fails on a regression rather than passing vacuously. | `T-CSS-003`, `T-CSS-004`, `T-CSS-006`, `T-CSS-007` |
 | `TASK-214` | ⚠ **Shipped by someone else in `4137666` while Epic P was being specified, NOT built under this task.** `T-API-019`/`020`/`021` are live in `titleRuntime.spec.ts` and `titlesQuery.spec.ts`. Kept rather than deleted so the ids retain an owner for `check:orphans`. | `T-API-019`, `T-API-020`, `T-API-021` |
 | `TASK-215` | ahead-of:TASK-212 — ⚠ **Shipped by someone else in `4137666`**, same as TASK-214. `T-UX-120` – `T-UX-124` are defined above §39 and live. Kept so those ids retain an owner. ⚠ **It shipped against the CURRENT row, not the refreshed one**, so TASK-212 inherits the duty of carrying the runtime rendering into the new row component — see the warning on that task. | `T-UX-120`, `T-UX-121`, `T-UX-122`, `T-UX-123`, `T-UX-124` |
+| `TASK-216` | `sort=releaseYear` and `sort=rating` on `GET /api/titles`, and the REQ-041 synchronous sweep. The sweep runs **inside the request and before the `ORDER BY`** under `sort=rating` only (`routes/titles.ts`), over the **whole filtered set** via the new `listTitleRatingRows`, bounded by `IMDB_SWEEP_PER_REQUEST` **and** a new wall-clock `deadline` in `refreshRatings`. Unit: `titlesSortRoute.spec.ts` (`T-API-023a/b`, `024a/b/c`, `025a`, `026a/b`, `027a/b/c`), `titlesQuery.spec.ts` (`T-API-023l/m/n`, `026c`, `027l/m`), `ordering.spec.ts` (`T-API-023i/j/k`, `027j/k`). Integration: `titleSorts.spec.ts`, 12 cases against a real SQL Server. `T-IMDB-005b` **rewritten, not deleted** — it now guards the sweep's POSITION rather than the absence of a sort key. ⚠ **`sort=name` was cut to TASK-219**: the `BIN2` collation makes it a migration, not a sort key — see ~~`T-API-029`~~ (TASK-219's test, struck so `check:status` does not read it as a duty of this task). Three defects found on the way and fixed: a sweep failure 500-ing the whole list, `T-API-026` specified against `INVALID_QUERY` (not a member of the closed enum), and `api.md` §6.2 advertising `sort=name` as shippable. Mutation-tested: dropping the third keyset branch fails 2 cases, dropping `nulls: 'last'` fails 7, dropping the `await` fails `T-IMDB-005b`. | `T-API-023`, `T-API-024`, `T-API-025`, `T-API-026`, `T-API-027`, `T-CI-005`, `T-IMDB-005b` |

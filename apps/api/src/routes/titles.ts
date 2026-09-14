@@ -21,10 +21,21 @@
 import { dateAddedLabel } from '@nextup/domain';
 import { type Router } from 'express';
 
-import { encodeCursor, encodeRuntimeCursor } from '../pagination.js';
+import {
+  encodeCursor,
+  encodeRatingCursor,
+  encodeReleaseYearCursor,
+  encodeRuntimeCursor,
+} from '../pagination.js';
 import { AppError } from '../errors/AppError.js';
-import { beginRatingRefresh } from '../jobs/refreshRatings.js';
-import { countRuntimeUnknown, findTitleDetail, listTitlePage } from '../repository/ownerData.js';
+import { beginRatingRefresh, runRatingRefresh } from '../jobs/refreshRatings.js';
+import { IMDB_SWEEP_BUDGET_MS, IMDB_SWEEP_PER_REQUEST } from '../services/imdbRatings.js';
+import {
+  countRuntimeUnknown,
+  findTitleDetail,
+  listTitlePage,
+  listTitleRatingRows,
+} from '../repository/ownerData.js';
 import { fromTenths, type RatingRow } from '../services/imdbRatings.js';
 import {
   refreshStaleMetadata,
@@ -245,6 +256,55 @@ export function registerTitleRoutes(router: Router): void {
     // without one, which is what lets the unit suite assert them.
     const query = parseTitleListQuery(req.query);
 
+    // REQ-041 / `A53`, `specs/api.md` §6.2a — THE PRICE OF A RATING SORT.
+    //
+    // ⚠ **BEFORE THE ORDERED READ, AND OVER THE WHOLE FILTERED SET.** Every
+    // other sort key is immutable while the owner looks at it: the date is
+    // theirs, the year and the runtime are properties of the work. The rating
+    // is not — it is fetched from OMDb and it changes. Leaving the refresh
+    // where it is for every other sort (AFTER `res.json`, see
+    // `refreshRatings.ts`) would mean a background write reordering a list the
+    // owner is already looking at, which product invariant 5 forbids outright.
+    // Running it here, synchronously, inside the request that asked for a
+    // rating-ordered list, keeps the write owner-initiated — `T-CI-005`'s
+    // process count does not move, because this makes the work MORE inside the
+    // owner's action, not less.
+    //
+    // ⚠ **THE PAGE IS THE WRONG SCOPE AND IT IS THE OBVIOUS ONE.** Refreshing
+    // only the rows this page will return computes the order from stale values
+    // and renders fresh ones into it — an 8.4 below a 7.1, with no error
+    // anywhere. Hence `listTitleRatingRows`, which is filtered but not paged.
+    //
+    // ⚠ **BOUNDED, AND WHAT IT MISSES IS NOT AN ERROR.** Rows the ceiling or
+    // the deadline does not reach keep their cached-or-absent value and sort
+    // on it (`T-API-025`). That is honest: it is the same number the row
+    // displays.
+    if (query.sort === 'rating') {
+      // ⚠ **THE SWEEP CANNOT FAIL THE LIST** (`T-API-025`). `runRatingRefresh`
+      // is documented never to reject, but the owner's list is the subject of
+      // this page and the rating is decoration on it — resting a 200 on
+      // another module's promise not to throw means a bug there takes the
+      // whole list down, and the owner sees an error where they asked for
+      // their watchlist. Rows this pass did not reach keep their
+      // cached-or-absent value and are ordered on it, which is honest: it is
+      // the same number the row displays. The scope query is inside the guard
+      // for the same reason.
+      try {
+        const sweepRows = await listTitleRatingRows(ownerId, {
+          services: query.services,
+          mediaType: query.mediaType,
+          genres: query.genres,
+          runtimes: query.runtimes,
+        });
+        await runRatingRefresh(ownerId, sweepRows, {
+          limit: IMDB_SWEEP_PER_REQUEST,
+          deadline: new Date(Date.now() + IMDB_SWEEP_BUDGET_MS),
+        });
+      } catch {
+        // Deliberately swallowed. See above.
+      }
+    }
+
     const { rows, hasMore } = await listTitlePage(ownerId, {
       limit: query.limit,
       dir: query.dir,
@@ -295,23 +355,38 @@ export function registerTitleRoutes(router: Router): void {
     //
     // ⚠ THE NULL GUARD IS PER SORT, AND ONLY THE DATE SORT HAS ONE. A row with
     // no `sortDateAdded` cannot be encoded as a date position, so the list
-    // honestly stops there. A row with no RUNTIME can be: `null` is a real,
-    // encodable position at the end of the runtime order, and refusing it
-    // would truncate every runtime-sorted list at the first unknown runtime —
-    // silently, and exactly where the owner is least able to notice.
+    // honestly stops there. A row with no RUNTIME, YEAR or RATING can be:
+    // `null` is a real, encodable position at the end of each of those orders,
+    // and refusing it would truncate every such list at the first unknown
+    // value — silently, and exactly where the owner is least able to notice.
     const last = rows.at(-1);
+    const lastRow = last === undefined ? undefined : (last as unknown as TitleRow);
     const nextCursor = !hasMore
       ? null
       : query.sort === 'runtime'
-        ? last === undefined
+        ? lastRow === undefined
           ? null
           : encodeRuntimeCursor({
-              runtimeMinutes: (last as unknown as TitleRow).tmdbRuntimeMinutes,
-              id: last.id,
+              runtimeMinutes: lastRow.tmdbRuntimeMinutes,
+              id: lastRow.id,
             })
-        : last?.sortDateAdded != null
-          ? encodeCursor({ sortDateAdded: toIsoDate(last.sortDateAdded), id: last.id })
-          : null;
+        : query.sort === 'releaseYear'
+          ? lastRow === undefined
+            ? null
+            : encodeReleaseYearCursor({
+                releaseYear: lastRow.tmdbReleaseYear,
+                id: lastRow.id,
+              })
+          : query.sort === 'rating'
+            ? lastRow === undefined
+              ? null
+              : encodeRatingCursor({
+                  ratingTenths: lastRow.imdbRatingTenths ?? null,
+                  id: lastRow.id,
+                })
+            : last?.sortDateAdded != null
+              ? encodeCursor({ sortDateAdded: toIsoDate(last.sortDateAdded), id: last.id })
+              : null;
 
     res.status(200).json({ items, nextCursor, limit: query.limit, runtimeUnknownHidden });
 

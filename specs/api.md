@@ -797,15 +797,31 @@ dropped**, which is what `T-ATTR-006a` asserts rather than byte equality.
 
 Query: `service` (`netflix|max`, repeatable), `type` (`movie|tv`),
 `genre` (string, repeatable), `runtime` (`under30|30-60|60-120|over120`,
-repeatable), `sort` (`dateAdded` default | `name` | `releaseYear` | `runtime` |
+repeatable), `sort` (`dateAdded` default | `releaseYear` | `runtime` |
 `rating`), `dir` (`desc` default | `asc`), `limit`, `cursor`.
 
-⚠ **`name`, `releaseYear` and `rating` were added at `A53` (2026-09-14, OQ-3 /
-OQ-3b).** `rating` is the one that carries conditions — read §6.2a and ADR-0011
+⚠ **`releaseYear` and `rating` were added at `A53` (2026-09-14, OQ-3 / OQ-3b).**
+`rating` is the one that carries conditions — read §6.2a and ADR-0011
 Revision 1 before implementing it. An unrecognised `sort` is **400
-`INVALID_QUERY`**, never a silent fall back to `dateAdded`: a mistyped key that
-quietly returns the default ordering looks like a working sort that does
-nothing.
+`VALIDATION_FAILED`**, never a silent fall back to `dateAdded`: a mistyped key
+that quietly returns the default ordering looks like a working sort that does
+nothing. ~~"400 `INVALID_QUERY`"~~ — corrected in place: `INVALID_QUERY` is not
+a member of the closed enum in `packages/domain/src/errorCodes.ts`.
+
+⚠ **`name` IS NOT IN THAT LIST, AND ITS ABSENCE IS DELIBERATE — see TASK-219 /
+`T-API-029`.** `A53` accepted it, but the database default collation is
+`Latin1_General_100_BIN2`, which is **binary**: an unqualified
+`ORDER BY tmdb_name` sorts `apple` after `Zebra`, and on a title-cased fixture
+that still looks alphabetical, so the obvious test passes while the feature is
+wrong for the owner. Prisma can express neither `COLLATE` nor `LOWER()` in
+`orderBy`, and rewriting the list query as raw SQL takes it outside
+`T-SEC-021`'s textual `ownerId` check — trading a display defect for a
+**tenancy** one. It needs a derived-and-stored case-folded column plus a
+migration and a backfill. Until then `sort=name` is one of the 400s above,
+which is the honest state; a silent fall back would be a sort that appears to
+work and does nothing.
+~~Superseded: "`sort` (`dateAdded` default | `name` | `releaseYear` | `runtime`
+| `rating`) … `name`, `releaseYear` and `rating` were added at `A53`."~~
 
 #### 6.2a ⚠ `sort=rating` is not an ordinary sort key (`A53`, ADR-0011 Rev 1)
 

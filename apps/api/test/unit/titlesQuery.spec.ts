@@ -21,12 +21,20 @@ import {
   DEFAULT_PAGE_LIMIT,
   MAX_PAGE_LIMIT,
   decodeCursor,
+  decodeRatingCursor,
+  decodeReleaseYearCursor,
   decodeRuntimeCursor,
   encodeCursor,
+  encodeRatingCursor,
+  encodeReleaseYearCursor,
   encodeRuntimeCursor,
   parseLimit,
 } from '../../src/pagination.js';
-import { DEFAULT_SORT_DIRECTION, parseTitleListQuery } from '../../src/routes/titlesQuery.js';
+import {
+  DEFAULT_SORT_DIRECTION,
+  TITLE_SORTS,
+  parseTitleListQuery,
+} from '../../src/routes/titlesQuery.js';
 
 /** Runs `fn` and returns the AppError it threw, failing if it threw nothing. */
 function thrown(fn: () => unknown): AppError {
@@ -335,5 +343,69 @@ describe('the cursor is SORT-AWARE (`specs/api.md` §3)', () => {
     expect(
       thrown(() => parseTitleListQuery({ cursor: encodeRuntimeCursor(RUNTIME_POSITION) })).code,
     ).toBe('INVALID_CURSOR');
+  });
+});
+
+describe('the two NEW sort cursors are distinct shapes, not one nullable-int shape (`A53`)', () => {
+  const YEAR = { releaseYear: 1999, id: '01J8ZC000000000000000000' };
+  const RATING = { ratingTenths: 84, id: '01J8ZC000000000000000000' };
+
+  it('T-API-027l: a year cursor round-trips, and `null` is a legitimate position', () => {
+    expect(decodeReleaseYearCursor(encodeReleaseYearCursor(YEAR))).toEqual(YEAR);
+    const atNull = { releaseYear: null, id: '01J8ZC000000000000000000' };
+    expect(decodeReleaseYearCursor(encodeReleaseYearCursor(atNull))).toEqual(atNull);
+  });
+
+  it('T-API-023l: a rating cursor round-trips, and `null` is a legitimate position', () => {
+    expect(decodeRatingCursor(encodeRatingCursor(RATING))).toEqual(RATING);
+    const atNull = { ratingTenths: null, id: '01J8ZC000000000000000000' };
+    expect(decodeRatingCursor(encodeRatingCursor(atNull))).toEqual(atNull);
+  });
+
+  it('T-API-023m: the YEAR and RATING cursors are NOT interchangeable', () => {
+    // ⚠ THE REASON THE KEY NAMES DIFFER. Both are `{ nullable int, id }`. Had
+    // they shared a key name they would be structurally identical, and a
+    // cursor cut from a year-ordered list would be silently accepted by a
+    // rating-ordered one — a keyset that does not mirror its own ORDER BY,
+    // skipping and repeating rows at every boundary. Discrimination by key set
+    // is what makes that a loud 400 instead.
+    expect(thrown(() => decodeRatingCursor(encodeReleaseYearCursor(YEAR))).code).toBe(
+      'INVALID_CURSOR',
+    );
+    expect(thrown(() => decodeReleaseYearCursor(encodeRatingCursor(RATING))).code).toBe(
+      'INVALID_CURSOR',
+    );
+  });
+
+  it('T-API-023n: a FLOAT rating is refused — the column is tenths', () => {
+    // ⚠ 8.4 rather than 84. A float compares unpredictably against an integer
+    // column, so the boundary row vanishes and the page is quietly one row
+    // short. Nothing reports that, which is why it is refused at the door.
+    const float = Buffer.from(JSON.stringify({ ratingTenths: 8.4, id: 'x' }), 'utf8').toString(
+      'base64url',
+    );
+    expect(thrown(() => decodeRatingCursor(float)).code).toBe('INVALID_CURSOR');
+  });
+
+  it('T-API-027m: the parser routes each sort to its OWN decoder', () => {
+    expect(
+      parseTitleListQuery({ sort: 'releaseYear', cursor: encodeReleaseYearCursor(YEAR) }).cursor,
+    ).toEqual(YEAR);
+    expect(
+      parseTitleListQuery({ sort: 'rating', cursor: encodeRatingCursor(RATING) }).cursor,
+    ).toEqual(RATING);
+    expect(
+      thrown(() => parseTitleListQuery({ sort: 'rating', cursor: encodeReleaseYearCursor(YEAR) }))
+        .code,
+    ).toBe('INVALID_CURSOR');
+  });
+
+  it('T-API-026c: `sort=name` is not a supported key, and the rejection names the ones that are', () => {
+    // ⚠ Deferred to TASK-219 by the BIN2 collation, not forgotten. A silent
+    // fall back to `dateAdded` would be a sort that appears to work and does
+    // nothing.
+    const error = thrown(() => parseTitleListQuery({ sort: 'name' }));
+    expect(error.httpStatus).toBe(400);
+    expect(TITLE_SORTS as readonly string[]).not.toContain('name');
   });
 });

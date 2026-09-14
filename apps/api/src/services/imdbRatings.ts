@@ -8,11 +8,20 @@
  * ordering and no service badge. There is no timer, no sweep, no backfill.
  * `T-CI-005` / `T-MUT-001f` hold the line.
  *
- * ⚠ **REQ-095 IS WHY THIS IS ALLOWED AT ALL.** The rating is never a sort key.
- * The moment a list could be ordered by rating, a background write to a rating
- * would reorder the list, and the refresh would be squarely inside invariant 5.
- * Adding a rating sort is therefore not a UI change — it invalidates this
- * file's right to exist.
+ * ⚠ **REQ-095 WAS WHY THIS WAS ALLOWED, AND REQ-095 WAS REVERSED (`A53`).**
+ * The owner may now order the list by rating, so a BACKGROUND write to a
+ * rating would reorder the list between renders — squarely inside invariant 5.
+ * That is paid for in `routes/titles.ts`: under `sort=rating` the refresh is
+ * **synchronous, over the whole filtered set, before the `ORDER BY`**, and
+ * therefore still owner-initiated rather than a scheduler. Read ADR-0011
+ * Revision 1 before touching either path. Under every other sort the rating is
+ * display-only and the lazy after-the-response refresh below stands unchanged.
+ *
+ * ~~Superseded: "REQ-095 IS WHY THIS IS ALLOWED AT ALL. The rating is never a
+ * sort key. The moment a list could be ordered by rating, a background write
+ * to a rating would reorder the list, and the refresh would be squarely inside
+ * invariant 5. Adding a rating sort is therefore not a UI change — it
+ * invalidates this file's right to exist."~~
  *
  * ── The shape ───────────────────────────────────────────────────────────────
  *
@@ -36,6 +45,24 @@ import { isImdbId, type OmdbClient } from '../clients/omdbClient.js';
  * The rest simply refresh on the next render, which is what "lazy" means.
  */
 export const IMDB_REFRESH_PER_REQUEST = 8;
+
+/**
+ * The two bounds on the SYNCHRONOUS rating sweep (`A53`, REQ-041).
+ *
+ * ⚠ **BOTH, NOT EITHER.** The count ceiling bounds how much of the daily OMDb
+ * budget one render may spend; the wall-clock budget bounds how long the owner
+ * waits. A count alone is not a latency bound — 24 serial calls to a slow
+ * free-tier API is an unbounded wait in practice — and a clock alone is not a
+ * budget bound, because a fast API would drain the day's allowance in one
+ * render.
+ *
+ * ⚠ The ceiling is higher than `IMDB_REFRESH_PER_REQUEST` because the scope is
+ * the whole filtered set rather than a page, and lower than "all of it"
+ * because the owner is waiting. Rows beyond it sort on their cached-or-absent
+ * value, honestly (`T-API-025`).
+ */
+export const IMDB_SWEEP_PER_REQUEST = 24;
+export const IMDB_SWEEP_BUDGET_MS = 2_000;
 
 /** A stored rating, as the refresh sees it. */
 export interface RatingRow {
@@ -137,6 +164,15 @@ export interface RefreshDeps {
   budget: number;
   now?: () => Date;
   limit?: number;
+  /**
+   * Wall-clock cut-off. The pass stops issuing requests once it is reached.
+   *
+   * ⚠ Checked BEFORE each request, never after — a check after the call
+   * bounds nothing, because the request that blew the budget has already been
+   * paid for. Absent means no deadline, which is right for the fire-and-forget
+   * caller: nobody is waiting on it.
+   */
+  deadline?: Date;
 }
 
 /**
@@ -166,6 +202,7 @@ export async function refreshRatings(
   const writes: RatingWrite[] = [];
 
   for (const row of due) {
+    if (deps.deadline !== undefined && now().getTime() >= deps.deadline.getTime()) break;
     try {
       const result = await deps.client.getRating(row.imdbId as string);
       writes.push({
