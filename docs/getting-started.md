@@ -11,7 +11,7 @@ that might rate-limit you.
 
 | Tool       | Version                        | Why                                                                                                 |
 | ---------- | ------------------------------ | --------------------------------------------------------------------------------------------------- |
-| **Node**   | 20.x — see [`.nvmrc`](../.nvmrc) | The engine the container runs. `nvm use` picks it up.                                               |
+| **Node**   | 22.x — see [`.nvmrc`](../.nvmrc) | The engine the container runs. `nvm use` picks it up.                                               |
 | **npm**    | 10+ (ships with Node 20)       | Workspaces.                                                                                          |
 | **Docker** | any current version            | The SQL Server 2022 and Azurite containers the integration suite runs against.                       |
 

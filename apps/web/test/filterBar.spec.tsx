@@ -60,9 +60,12 @@ function url(): string {
 }
 
 function box(name: string, value: string): HTMLInputElement {
-  // ⚠ `Array.from`, NOT `.values().find(...)`. Iterator helpers are ES2025 and
-  // absent on Node 20, which is what `.nvmrc` and `engines` pin and what CI
-  // runs; a newer local Node makes the iterator form pass here and fail there.
+  // `Array.from`, NOT `.values().find(...)`. Both work now that the runtime is
+  // Node 22 (iterator helpers landed in V8 12.2), so this is a readability
+  // choice rather than a constraint — but it is the form that cannot diverge
+  // between a local Node and the one CI reads from `.nvmrc`, so leave it.
+  // ~~Superseded: "Iterator helpers are ES2025 and absent on Node 20, which is
+  // what `.nvmrc` and `engines` pin and what CI runs."~~
   const found = Array.from(
     document.querySelectorAll<HTMLInputElement>(`input[name="${name}"]`),
   ).find((input) => input.value === value);

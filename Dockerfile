@@ -6,10 +6,14 @@
 # no CORS handling at all (`T-API-001`).
 #
 # The base image is pinned BY DIGEST, not by tag (specs/security.md §8). A tag
-# is mutable — `node:20-alpine` silently becomes a different image, so a build
+# is mutable — `node:22-alpine` silently becomes a different image, so a build
 # that passed CI is not the build that ships. Refresh the digest deliberately,
 # in its own commit, in both stages together.
-ARG NODE_IMAGE=node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293
+#
+# ⚠ The major here is one of four coupled pins — `.nvmrc`, `engines` and
+# `@types/node` are the others. Moving one alone ships a runtime that does not
+# match what CI typechecked. See `docs/runbooks/update-dependencies.md` §5.
+ARG NODE_IMAGE=node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32
 
 # Registry override for networks where the public npm registry is unreachable
 # (for example a corporate proxy). The DEFAULT must stay the public registry:
@@ -94,7 +98,7 @@ COPY --from=build /app/node_modules/.prisma node_modules/.prisma
 #
 # Copying from the build stage keeps `--omit=optional` (which is there for
 # attack surface) and still ships the binary. Both stages use the same base
-# image, so the build stage resolved the correct libc variant — `node:20-alpine`
+# image, so the build stage resolved the correct libc variant — `node:22-alpine`
 # is musl, so this is `@img/sharp-linuxmusl-x64`. If the base image ever moves
 # to a glibc variant this keeps working, because the resolution happens in the
 # build stage rather than being hard-coded here.

@@ -17,7 +17,7 @@ the revision banners in the docs.
 ## Setup
 
 ```bash
-nvm use            # Node 20 (see .nvmrc)
+nvm use            # Node 22 (see .nvmrc)
 npm ci
 npx prisma generate --schema prisma/schema.prisma
 cp .env.example .env

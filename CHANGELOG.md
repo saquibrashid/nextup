@@ -6,6 +6,42 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- **The runtime moved to Node 22.** Node 20 reached end of life on 2026-04-30
+  and receives no further security patches, so the container was running an
+  unpatched engine.
+  - **This is step 1 of 3, and it deliberately changes no lockfile.** The three
+    *runtime* pins moved together — `.nvmrc` (`22`), `engines`
+    (`">=22 <23"`) and the `Dockerfile` base image, re-pinned by digest to
+    `node:22-alpine@sha256:c610fcdf…`. `@types/node` **stayed on `^20`**.
+  - **Why the types lag on purpose:** types *behind* the runtime only hide new
+    APIs, while types *ahead* of it compile against methods the deployed
+    container does not have — `tsc` passes and the failure lands in production.
+    Steps 2 and 3 (release the `@types/node`, `jsdom` and
+    `@testing-library/jest-dom` holds, then `vitest@5`) rewrite the lockfile and
+    must be raised by Dependabot against `registry.npmjs.org`; they are
+    sequenced in `docs/runbooks/update-dependencies.md` §5.
+  - ⚠ **The merge itself ships an image** — `deploy` runs on every push to
+    `main` — so the real verification is the held-revision smoke suite
+    (`T-CI-009o`–`q`) on the deploy run, not CI.
+- **`T-INFRA-018` — a gate against the four Node pins drifting apart.**
+  - **The defect it prevents:** the Node major is one decision written in four
+    files, kept in step only by a comment. If `.nvmrc` moves and the
+    `Dockerfile` does not, CI lints, typechecks and runs ~240 specs against an
+    engine the container never ships — twelve green checks describing a build
+    that does not exist, with the break deferred to production.
+  - `c` also refuses a range that merely *includes* the pinned major: an
+    `engines` of `>=20` is documentation, not a pin.
+  - `d` is **one-sided on purpose** — it fails only when `@types/node` runs
+    *ahead* of the runtime, so the deliberate types-lag above is a state the
+    gate permits rather than a lag it nags about.
+  - `a` is the positive control, and load-bearing: every other case compares
+    two parsed values, and `undefined === undefined` would report perfect
+    agreement between two files the test had silently stopped reading.
+  - Same principle as `T-INFRA-005` for the memory/decode-guard pair — one
+    setting expressed in two places is one setting, and a test has to say so.
+
 ### Added
 
 ### Added

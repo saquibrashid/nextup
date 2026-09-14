@@ -165,34 +165,52 @@ originally **missing** from that list, which is the only reason a v7 adapter PR
 could be raised while the other two were held: an ignore that covers two of a
 group's three members holds nothing.
 
-### Vitest 5 (`vitest`, `@vitest/coverage-v8`) — HELD, and it is really a Node upgrade
+### Vitest 5 (`vitest`, `@vitest/coverage-v8`) — the runtime half is DONE
 
 `vitest@5` peer-requires `@types/node@^22.0.0 || >=24.0.0`. The install fails
 `ERESOLVE` before a single test runs, which is why **all twelve CI jobs go red
 at once** rather than one suite failing — read that signature as "the tree did
 not install", not "the test suite broke".
 
-Node **20** is pinned in four coupled places, and they move together or not at
-all:
+The Node major is pinned in four coupled places, and they move together or not
+at all:
 
 | Where | Value |
 | --- | --- |
-| `.nvmrc` | `20` — every CI job reads it via `node-version-file` |
-| `package.json` | `"engines": { "node": ">=20 <21" }` |
-| `Dockerfile` | `ARG NODE_IMAGE=node:20-alpine@sha256:fb4cd12…` (digest-pinned deliberately) |
-| `package.json` | `@types/node@^20.14.10` |
+| `.nvmrc` | `22` — every CI job reads it via `node-version-file` |
+| `package.json` | `"engines": { "node": ">=22 <23" }` |
+| `Dockerfile` | `ARG NODE_IMAGE=node:22-alpine@sha256:c610fcdf…` (digest-pinned deliberately) |
+| `package.json` | `@types/node@^20.14.10` — **still on 20, deliberately** |
 
 ⚠ **Bumping `@types/node` alone is worse than leaving this held**, not a
 partial step towards it: type definitions ahead of the runtime describe APIs
 the deployed container does not have, so the failure moves out of `tsc` and
-into production.
+into production. Types *behind* the runtime is the safe direction, which is why
+the first three rows moved without the fourth.
 
-**Unblocked by** a deliberate Node 20 → 22 upgrade, which is worth doing on its
-own merits — **Node 20 reached end of life on 2026-04-30** and receives no
-further security patches. ⚠ Schedule it rather than merging it casually:
-`deploy` runs on **every push to `main`**, so the merge itself ships a new
-runtime image to production. Take it on its own branch, watch the held-revision
-smoke suite (`T-CI-009o`–`q`), and expect to re-pin the image digest.
+**The runtime moved to Node 22 in three steps, and step 2 is the one still
+outstanding:**
+
+1. **Done** — the runtime pins (`.nvmrc`, `engines`, the `Dockerfile` digest)
+   moved to 22 in a single commit that changed **no lockfile**. That is what
+   made it verifiable while the proxy lag in §7 blocks a local `npm ci`.
+2. **Next, once a production deploy on Node 22 has succeeded** — remove the
+   `@types/node`, `jsdom` and `@testing-library/jest-dom` `ignore` entries in
+   `.github/dependabot.yml` and let Dependabot raise those bumps. ⚠ Let
+   **Dependabot** regenerate the lockfile, not a local `npm install`: its runner
+   resolves against `registry.npmjs.org` and writes `sha512-` integrity, and a
+   local install here would write internal-proxy URLs into a public repo (§6).
+3. **Then** rebase the held `vitest@5` PR, which installs cleanly once
+   `@types/node` is on 22.
+
+⚠ `deploy` runs on **every push to `main`**, so each of these merges ships an
+image. Step 1 shipped a new base image — the verification for it is the
+held-revision smoke suite (`T-CI-009o`–`q`) on the deploy run, not CI.
+
+~~Superseded (runtime now on 22): "Node **20** is pinned in four coupled
+places… **Unblocked by** a deliberate Node 20 → 22 upgrade, which is worth
+doing on its own merits — **Node 20 reached end of life on 2026-04-30** and
+receives no further security patches."~~
 
 
 ## 6. `package-lock.json` carries `sha1-` integrity — investigated, nothing to do

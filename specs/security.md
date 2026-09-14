@@ -525,7 +525,7 @@ a **CI allow-list check**, not a review convention.
 | Telemetry allow-list check | §8 — `T-SEC-009` |
 | Secret scanning | `gitleaks` in CI; GitHub secret scanning and push protection enabled on the repository |
 | SBOM | `npm sbom --sbom-format cyclonedx` produced on release and attached to the GitHub release |
-| Base image | `node:20-alpine` pinned by digest; rebuilt weekly by a scheduled workflow. **This is a CI schedule, not an application scheduler** — it changes no list state and satisfies REQ-041, which governs the running system |
+| Base image | `node:22-alpine` pinned by digest; rebuilt weekly by a scheduled workflow. **This is a CI schedule, not an application scheduler** — it changes no list state and satisfies REQ-041, which governs the running system |
 
 ---
 
