@@ -944,10 +944,47 @@ stylesheet, no import in `main.tsx`, and no Tailwind, while 43 `className`
 attributes across the components already used a consistent semantic vocabulary.
 ADR-0004 Revision 2 keeps that vocabulary and drops Tailwind.
 
-### 13.1 The vocabulary is already fixed — do not invent a second one
+### 13.1 ⚠ THE CORRESPONDENCE IS FIXED — THE VOCABULARY IS NOT
 
-Components ship these names. The stylesheet defines them; it does not rename
-them (`T-CSS-001`).
+> ⚠ **THIS HEADING USED TO READ *"The vocabulary is already fixed — do not
+> invent a second one"*, AND THAT SENTENCE IS WHY THE APPLICATION SHIPPED
+> LOOKING UNSTYLED.** Read together with `T-CSS-001`'s both-directions rule —
+> *every class used is defined, **and every rule defined is used*** — it was
+> taken to mean that **no CSS rule may exist for a selector no component
+> already carries**. So every unclassed element (`<nav>`, `<ul>`, `<li>`,
+> `<fieldset>`, `<input type="checkbox">`) was left to render at browser
+> defaults **permanently**, and `AppShell.tsx`'s primary navigation — which
+> has no `className` at all — became a vertical stack of blue underlined
+> links. The owner opened it and reported the app as broken. Nothing had
+> failed.
+>
+> ⚠ **`T-CSS-001` WAS NEVER THE BLOCKER — THE PROSE WAS.** The test inspects
+> **class names only**, so an element selector such as `nav ul { … }` would
+> have passed at every point in this project's history. An agent that read the
+> old heading and declined to add a class had understood the sentence
+> correctly and shipped the defect anyway.
+
+**The rule, stated correctly:** the class vocabulary **may grow**. What may not
+drift is the **correspondence** — a class used by a component must be defined
+in the stylesheet, and a rule in the stylesheet must be used by a component
+(`T-CSS-001`, both directions). Adding a class **and** its rule in the same
+change satisfies both. Renaming one side without the other still breaks the
+build rather than the page, which is the property worth keeping.
+
+⚠ **Do not invent a SECOND vocabulary** — a parallel naming scheme alongside
+the one below is what the old heading was reaching for, and that prohibition
+stands. Extending the existing scheme is not that.
+
+~~Superseded, and corrected in place rather than banner-superseded because this
+section is an instruction a builder executes (the F-001 rule): "**13.1 The
+vocabulary is already fixed — do not invent a second one.** Components ship
+these names. The stylesheet defines them; it does not rename them
+(`T-CSS-001`)."~~
+
+Components ship the names below, and **Epic P adds more** (`docs/backlog.md`
+§5P, `specs/ui-refresh.md` §7b–§7d): navigation, the review sections, the sort
+control, the icon set and the component primitives all need classes that do
+not exist yet. **Add them with their rules.**
 
 ⚠ **`T-CSS-002` asserts `main.tsx` imports the stylesheet.** Without it every
 other assertion in this section passes on a document that renders unstyled —
@@ -973,6 +1010,7 @@ Modifiers use the `--` suffix already in use: `title-row__poster--empty`,
 | Token | Value | Why it is a token |
 |---|---|---|
 | `--bp-sm` | `640px` | §10.1. Named so a breakpoint cannot be typed twice with different values |
+| `--bp-md` | `768px` *(new, Epic P)* | ADR-0013's hybrid switch: list rows below it, grid above (`T-UX-110`, `T-UX-111`) |
 | `--bp-lg` | `1024px` | §10.1 |
 | `--layout-max-width` | `56rem` | §10.1's readable column. Replaces the stray `max-w-4xl` |
 | `--tap-target-min` | `44px` | NFR-006. **The one definition**; `.tap-target` is its only consumer |
@@ -980,12 +1018,15 @@ Modifiers use the `--` suffix already in use: `title-row__poster--empty`,
 | `--color-text-muted` | `#4b5563` | 7.6:1 / 7.2:1. Comfortably over the 4.5:1 floor even on the tinted background |
 | `--color-bg` | `#f9fafb` | |
 | `--color-surface` | `#ffffff` | |
-| `--color-border` | `#878d99` | ⚠ **3.3:1 / 3.2:1 — chosen by calculation, not by eye.** §10.2 requires ≥ 3:1 for UI boundaries, and the conventional light-grey border (`#d1d5db`) is **1.47:1** — it fails by a factor of two while looking entirely normal |
-| `--color-accent` | `#1d4ed8` | Links and primary actions; 6.7:1 on white |
+| `--color-border` | `#878d99` | ⚠ **3.33:1 / 3.19:1 — chosen by calculation, not by eye.** §10.2 requires ≥ 3:1 for UI boundaries, and the conventional light-grey border (`#d1d5db`) is **1.47:1** — it fails by a factor of two while looking entirely normal |
+| `--color-accent` | `#4338ca` *(Epic P, ADR-0013)* | ⚠ **The owner's chosen deeper indigo.** **7.90:1** on `--color-surface`, **7.56:1** on `--color-bg` — and **white text ON it is also 7.90:1**, so the one token serves both the link colour and the filled primary button without a second value. ⚠ **`apps/web/test/stylesheet.spec.ts` asserts `toBeCloseTo(6.7, 0)` for this pair and will fail when the token changes — update the number, do not widen the precision** (TASK-208). ~~`#1d4ed8`, 6.70:1 — superseded by ADR-0013~~ |
 | `--color-danger` | `#b91c1c` | 6.5:1 on white. Destructive confirmation only |
 | `--space-1` … `--space-6` | `4px` `8px` `12px` `16px` `24px` `32px` | A closed scale |
 | `--radius` | `6px` | |
-| `--font-stack` | system UI stack | No web font: no third-party request (NFR-005), no layout shift |
+| `--font-stack` | system UI stack | ⚠ **No web font — reaffirmed by the owner at `A53` (OQ-8).** No third-party request (NFR-005), no layout shift, **no new dependency**. The typographic hierarchy comes from the scale below, not from a typeface |
+| `--text-xs` … `--text-2xl` *(new, Epic P)* | `0.75rem` `0.875rem` `1rem` `1.125rem` `1.375rem` `1.75rem` | **REQ-123.** ⚠ **There was no scale at all, which is why every screen rendered at one size and nothing read as a heading.** `rem`, never `px`, so the owner's browser text-size setting is honoured. ⚠ **`--text-xs` is for non-primary content only — `T-CSS-007` fails if primary content computes below `--text-sm`** |
+| `--leading-tight` / `--leading-normal` *(new, Epic P)* | `1.25` / `1.5` | Unitless, so they scale with the element's own size instead of inheriting a computed pixel height |
+| `--weight-normal` / `--weight-medium` / `--weight-bold` *(new, Epic P)* | `400` / `500` / `700` | A closed set. The system stack has no reliable intermediate weights beyond these |
 
 ⚠ **EVERY RATIO ABOVE WAS COMPUTED, AND FOUR DRAFTED VALUES WERE WRONG.** The
 first draft of this table asserted `#d1d5db` was "≥ 3:1" when it is **1.47:1**,
@@ -1007,15 +1048,41 @@ Writing it desktop-first means the **floor** — the width NFR-006 actually
 mandates and `T-A11Y-001` actually tests — is the case reached by subtraction.
 
 No dark mode: it doubles every contrast obligation in §13.2 for a
-single-owner app that never asked for it. `prefers-reduced-motion: reduce`
-**is** honoured (`T-CSS-005`) because it is one rule and an accessibility
-obligation, not a preference.
+single-owner app that never asked for it. ⚠ **ADR-0013 explicitly declines to
+reopen this**, and a dark-theme draft written during Epic P's specification was
+**reverted** for contradicting it (`specs/ui-refresh.md` §2).
+`prefers-reduced-motion: reduce` **is** honoured (`T-CSS-005`) because it is
+one rule and an accessibility obligation, not a preference.
+
+### 13.3a The visual direction is ADR-0013's, and it is the owner's
+
+⚠ **Read `docs/adr/ADR-0013-ui-refresh.md` before writing any visual `must`.**
+The tokens in §13.2 are the vocabulary; ADR-0013 is the *taste*, and it was
+chosen by the owner: light theme, **deeper indigo/violet accent**, hybrid
+grid/list, balanced density, larger uniform posters. It does **not** reopen the
+no-Tailwind or no-dark-mode decisions.
+
+Epic P (`docs/backlog.md` §5P, `specs/ui-refresh.md` §7b–§7d) adds three things
+this section did not previously have, each with its own requirement:
+
+| | Where | Requirement |
+|---|---|---|
+| **A typographic scale** | §13.2's `--text-*`, `--leading-*`, `--weight-*` | **REQ-123** — on the system stack, no web font (`A53`, OQ-8) |
+| **An icon set** | `apps/web/src/icons/`, a **closed set of 13 inline SVGs** | **REQ-124** — no library, no dependency. `stroke="currentColor"` and **no hard-coded colour**, so an icon inherits a token `T-CSS-004` has already proved |
+| **Component primitives** | `apps/web/src/components/ui/` | **REQ-125** — every interactive control comes from a primitive; a surviving bare `<button>` or `<fieldset>` is the native-widget look the owner reported |
+
+⚠ **`T-CSS-001c` FORBIDS A COMPUTED `className`, AND THAT SHAPES THE
+PRIMITIVES.** A variant must resolve through a **static lookup from a literal
+map** — `STYLES[variant]` — never a template literal. A class assembled at
+runtime is invisible to `T-CSS-001`'s both-directions check, which is precisely
+how an unstyled element gets past the gate that exists to catch it.
+`specs/ui-refresh.md` §7d widens the rule to permit that one form and no other.
 
 ### 13.4 What the stylesheet may not do
 
 | Not allowed | Why |
 |---|---|
-| A web font, an icon font, or any external `@import` | A third-party request per page load. NFR-005 and `T-CI-007`'s egress rule |
+| A web font, an icon font, or any external `@import` | A third-party request per page load. NFR-005 and `T-CI-007`'s egress rule. ⚠ **Reaffirmed by the owner at `A53`** — Epic P's icons are **inline SVG components**, which is not an icon font and is explicitly allowed |
 | `!important` outside a `prefers-reduced-motion` reset | It is how a token gets bypassed rather than changed |
 | Styling on a `data-testid` | Couples the test contract to presentation, so a visual tidy-up silently breaks tests |
 | A hard-coded colour or breakpoint outside `:root` | Defeats §13.2. `T-CSS-003` greps for hex literals and `px` breakpoints in rule bodies |
