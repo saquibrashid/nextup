@@ -54,7 +54,7 @@ staging database, Container Apps at `0.25 vCPU / 0.5 GiB`, ghcr.io). See
 
 ### Prerequisites
 
-- **Node 20** (see [`.nvmrc`](.nvmrc); `nvm use`)
+- **Node 22** (see [`.nvmrc`](.nvmrc); `nvm use`)
 - **Docker** — for the local SQL Server test container
   (`mcr.microsoft.com/mssql/server:2022-latest`) and Azurite blob emulator
 - An Azure subscription **only** for deploying (not for local dev): Azure SQL

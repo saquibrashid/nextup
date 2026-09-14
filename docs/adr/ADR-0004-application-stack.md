@@ -185,8 +185,11 @@ than eliminating the second language.
   US-024 AC-6 (do not de-duplicate the removed view), US-028 AC-3
   (suppress → remove → re-upload), US-011 AC-5 (TMDB attribution),
   US-001 AC-4 (allow-list refusal) — are the non-negotiable core.
-- Node 20 LTS is pinned in `.nvmrc`, `package.json` engines, the
+- Node 22 LTS is pinned in `.nvmrc`, `package.json` engines, the
   Dockerfile and the GitHub Actions workflow, so all four agree.
+  ~~Superseded: "Node 20 LTS is pinned…"~~ — the runtime moved to 22
+  when Node 20 reached end of life (2026-04-30); the coupled pin set
+  and the ordering are in `docs/runbooks/update-dependencies.md` §5.
 
 ## Revision 2 — 2026-08-25 — **styling and the data layer, corrected to reality**
 
