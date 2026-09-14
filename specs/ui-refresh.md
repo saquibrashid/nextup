@@ -520,7 +520,7 @@ are the whole map.
 |---|---|
 | `T-UX-125` | A TV title whose stored genres contain `Action & Adventure` renders the chips `Action` and `Adventure`, and does **not** render `Action & Adventure`. |
 | `T-UX-126` | The genre filter list contains no combined TV name — `Action & Adventure`, `Sci-Fi & Fantasy` and `War & Politics` never appear as options. |
-| `T-API-022` | `?genre=Action` returns **both** a film tagged `Action` and a TV title tagged `Action & Adventure`; `?genre=War` returns a title tagged `War & Politics`. |
+| `T-API-028` | `?genre=Action` returns **both** a film tagged `Action` and a TV title tagged `Action & Adventure`; `?genre=War` returns a title tagged `War & Politics`. |
 | `T-UX-127` | The compact row wraps genres to at most one line with a `+n` overflow, and a genre in the **active filter** is always visible rather than hidden behind `+n`. |
 
 ⚠ **"Trimmed" means moved, not deleted, and one line may not move at all.** The
@@ -1160,7 +1160,7 @@ not *placement* — a control moved into a collapsed menu still answers to
 | **The rating refresh's SYNCHRONY** *(new, `A53`)* | ⚠ **This is the load-bearing half of the REQ-095 reversal and the easiest to lose.** REQ-090's refresh fires **after the response**; that was legal only while the rating could not change ordering. Under `sort=rating` it must run **inside the request, before the `ORDER BY`**. The failure mode is invisible in a unit test and invisible on screen — the list simply reorders itself between renders — and "move the await out of the hot path" reads like a performance fix. ⚠ **`T-IMDB-005b` asserted the module exports no sort helper; it will fail correctly and must be REWRITTEN, not deleted** | `T-API-024`, `T-IMDB-005` |
 | **The rating sweep's SCOPE** *(new, `A53`)* | Sweeping only the **page** instead of the **sortable set** looks like a faithful reading of ADR-0011 D-6 and produces a page ordered by pre-refresh values but rendered with post-refresh ones — an `8.4` sitting below a `7.1`. It passes any test that checks "ratings were refreshed" | `T-API-024`, `T-API-025` |
 | **`sort=name` under a BINARY collation** *(new, `A53`)* | The database collation is `Latin1_General_100_BIN2`. An unqualified `ORDER BY title` is therefore **byte order**: every lower-case title sorts after every upper-case one, and `apple` follows `Zebra`. It looks alphabetical at a glance on a list that happens to be title-cased | `T-API-027` |
-| **The genre filter's completeness** *(new, 2026-09-14)* | §4.4's normalisation is one-to-many and must be applied to **both** the display and the filter. Doing only one produces a screen that looks fixed while the facet still under-returns — and the symptom the owner reported (redundant chips) **disappears** after a display-only fix, which is exactly what makes it convincing | `T-UX-125`, `T-UX-126`, `T-API-022` |
+| **The genre filter's completeness** *(new, 2026-09-14)* | §4.4's normalisation is one-to-many and must be applied to **both** the display and the filter. Doing only one produces a screen that looks fixed while the facet still under-returns — and the symptom the owner reported (redundant chips) **disappears** after a display-only fix, which is exactly what makes it convincing | `T-UX-125`, `T-UX-126`, `T-API-028` |
 | **The review sections' completeness** *(new, 2026-09-14)* | REQ-122 makes three sections distinguishable. The neighbouring idea — collapsing or hiding the already-correct rows to shorten the list — **deletes the product's core safety property** and looks like the same kind of tidy-up | `T-UX-136` |
 | **Oldest-first in one action** *(new, 2026-09-14)* | §5b's field selector makes it tempting to fold direction into a single ten-option list. Every behavioural test still passes, because `click()` still reaches it | `T-UX-131` |
 | **Removed/suppressed distinction** | Two similar-looking screens invite a merge. Suppression is keyed on **canonical work identity**, removal on the listing — different mechanisms, different meanings. | REQ-071 |
@@ -1235,7 +1235,7 @@ The full reserved set is now:
 | `REQ-` | **REQ-105 – REQ-125** | REQ-120 (§4.4), REQ-121 (§5b), REQ-122 (§6a.1), REQ-123 – REQ-125 (§7b – §7d) |
 | `US-` | **US-049 – US-059** | US-056 – US-059 above |
 | `T-UX-` | **`T-UX-100` – `T-UX-136`** | `T-UX-125` – `T-UX-136` |
-| `T-API-` | **`T-API-019` – `T-API-027`** | `T-API-022` (§4.4), `T-API-023` – `T-API-027` (§7a) |
+| `T-API-` | **`T-API-019` – `T-API-028`** | `T-API-023` – `T-API-027` (§7a); `T-API-028` (§4.4). ⚠ The genre test was first written as `T-API-022`, which REQ-109 **already owns** — renumbered to `028`. A reserved range does not stay free while other work merges. |
 | `T-UI-` | **`T-UI-029` – `T-UI-032`** | `T-UI-030` – `T-UI-032` (§7c, §7d) |
 | `T-CSS-` | **`T-CSS-006` – `T-CSS-007`** | §7b |
 | `T-A11Y-` | **`T-A11Y-014` – `T-A11Y-015`** | §7c, §7d |
