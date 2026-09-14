@@ -288,7 +288,8 @@ exists — so at review time the server holds an identity and, by design, no
 name. **That is the actual shape of REQ-109: not a lost name, but a name the
 server has never had at that point in the flow.**
 
-**The scope question — three ways out, with different costs.**
+**The scope question — ✅ RESOLVED: the owner chose OPTION 1 below. Build
+option 1; options 2 and 3 are recorded for rationale only.**
 `applyCorrection` is additionally **network-free** on purpose: its header
 states *"a TMDB outage must not stop the owner fixing a wrong match"*:
 
@@ -306,9 +307,8 @@ states *"a TMDB outage must not stop the owner fixing a wrong match"*:
    `Title` row yet, and that is the common case for the corrections this
    requirement is about.
 
-**The scope question — ✅ RESOLVED 2026-09-14: the owner chose OPTION 1.**
-
-`applyCorrection` stays **network-free**, and the client carries the display
+**Option 1, as built.** `applyCorrection` stays **network-free**, and the
+client carries the display
 fields it already holds — `TmdbSearchResult`'s `name`, `releaseYear` and
 `posterPath`, values **this server itself returned** from `/api/tmdb/search` —
 in three new candidate columns (`0008_corrected_display`). The review read
