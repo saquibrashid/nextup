@@ -48,6 +48,42 @@ export interface ListCursor {
   id: string;
 }
 
+/**
+ * A position in the RUNTIME-ordered list (REQ-037, `A48`).
+ *
+ * ⚠ **THE CURSOR MUST CARRY THE KEY THE LIST IS ACTUALLY ORDERED BY.** A
+ * keyset predicate that does not mirror its own `ORDER BY` skips or repeats
+ * rows at every page boundary, and that is indistinguishable from data loss —
+ * the failure mode this whole product is designed against. Paging a
+ * runtime-sorted list with a date cursor is exactly that mistake, and it
+ * cannot be caught by any test that never asks for a second page.
+ *
+ * ⚠ **`runtimeMinutes` is NULLABLE here, and that is the hard part.** Runtime
+ * sorts `NULL`s last in both directions, so a cursor sitting in the `NULL`
+ * block must page WITHIN it by id and must not re-admit the non-null rows it
+ * has already passed. See the three-branch keyset in `listTitlePage`.
+ */
+export interface RuntimeListCursor {
+  runtimeMinutes: number | null;
+  id: string;
+}
+
+/**
+ * The cursor for whichever sort issued it.
+ *
+ * ⚠ **The shapes are DISCRIMINATED BY KEY SET, not by a `sort` field**, and
+ * `decodeCursor`'s existing exact-key check is what makes that safe for free:
+ * a cursor issued under `sort=dateAdded` cannot be read as a runtime cursor,
+ * so switching sort mid-page is a loud `INVALID_CURSOR` rather than a page of
+ * quietly wrong rows. Adding a `sort` field would make the two shapes
+ * structurally identical and lose that property.
+ */
+export type AnyListCursor = ListCursor | RuntimeListCursor;
+
+export function isRuntimeCursor(cursor: AnyListCursor): cursor is RuntimeListCursor {
+  return 'runtimeMinutes' in cursor;
+}
+
 /** Guards against a hostile or corrupt id being echoed into a query. */
 const MAX_CURSOR_ID_LENGTH = 200;
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -72,6 +108,20 @@ export function encodeCursor(cursor: ListCursor): string {
 }
 
 /**
+ * The runtime-ordered counterpart. Same byte-stability rule: key order is
+ * fixed here and `decodeRuntimeCursor` re-encodes and compares.
+ *
+ * ⚠ `runtimeMinutes: null` is a REAL, encodable position — the `NULL` block
+ * sits at the end of the order in both directions and has to be pageable like
+ * any other. Refusing to encode it would silently truncate the list at the
+ * first unknown runtime, which is the data-loss shape again.
+ */
+export function encodeRuntimeCursor(cursor: RuntimeListCursor): string {
+  const json = JSON.stringify({ runtimeMinutes: cursor.runtimeMinutes, id: cursor.id });
+  return Buffer.from(json, 'utf8').toString('base64url');
+}
+
+/**
  * Decode a cursor, or throw `INVALID_CURSOR`.
  *
  * ⚠ The re-encode comparison at the end is load-bearing, not belt-and-braces.
@@ -82,6 +132,79 @@ export function encodeCursor(cursor: ListCursor): string {
  * input is what makes "tampered" detectable at all without a signature.
  */
 export function decodeCursor(raw: string): ListCursor {
+  const parsed = decodeEnvelope(raw);
+
+  const keys = Object.keys(parsed);
+  if (keys.length !== 2 || !keys.includes('sortDateAdded') || !keys.includes('id')) {
+    // Exactly the two keys: an extra key means someone is building cursors we
+    // did not issue, and accepting it would make the shape a de-facto public
+    // contract that clients are explicitly forbidden to parse.
+    //
+    // ⚠ It is ALSO what makes the two sort shapes safe to discriminate by key
+    // set (see `AnyListCursor`): a runtime cursor fed to the date sort lands
+    // here as a loud 400 rather than being read as a date position.
+    throw invalidCursor('unexpected-keys');
+  }
+
+  const { sortDateAdded, id } = parsed as { sortDateAdded: unknown; id: unknown };
+
+  if (typeof sortDateAdded !== 'string' || !ISO_DATE_RE.test(sortDateAdded)) {
+    throw invalidCursor('bad-sort-date');
+  }
+  requireCursorId(id);
+
+  const cursor: ListCursor = { sortDateAdded, id: id as string };
+  if (encodeCursor(cursor) !== raw) {
+    throw invalidCursor('not-canonical');
+  }
+  return cursor;
+}
+
+/**
+ * The runtime-ordered cursor (REQ-037).
+ *
+ * ⚠ `runtimeMinutes` must be `null` OR a non-negative safe integer. A float or
+ * a `NaN` would compare unpredictably against an integer column and produce a
+ * page boundary that moves; refusing it keeps the keyset total.
+ */
+export function decodeRuntimeCursor(raw: string): RuntimeListCursor {
+  const parsed = decodeEnvelope(raw);
+
+  const keys = Object.keys(parsed);
+  if (keys.length !== 2 || !keys.includes('runtimeMinutes') || !keys.includes('id')) {
+    throw invalidCursor('unexpected-keys');
+  }
+
+  const { runtimeMinutes, id } = parsed as { runtimeMinutes: unknown; id: unknown };
+
+  if (
+    runtimeMinutes !== null &&
+    (typeof runtimeMinutes !== 'number' ||
+      !Number.isSafeInteger(runtimeMinutes) ||
+      runtimeMinutes < 0)
+  ) {
+    throw invalidCursor('bad-runtime');
+  }
+  requireCursorId(id);
+
+  const cursor: RuntimeListCursor = {
+    runtimeMinutes: runtimeMinutes as number | null,
+    id: id as string,
+  };
+  if (encodeRuntimeCursor(cursor) !== raw) {
+    throw invalidCursor('not-canonical');
+  }
+  return cursor;
+}
+
+function requireCursorId(id: unknown): void {
+  if (typeof id !== 'string' || id.length === 0 || id.length > MAX_CURSOR_ID_LENGTH) {
+    throw invalidCursor('bad-id');
+  }
+}
+
+/** The decode steps both cursor shapes share, up to "it is a plain object". */
+function decodeEnvelope(raw: string): Record<string, unknown> {
   if (raw.length === 0 || raw.length > 512) {
     throw invalidCursor('length');
   }
@@ -104,28 +227,7 @@ export function decodeCursor(raw: string): ListCursor {
     throw invalidCursor('not-an-object');
   }
 
-  const keys = Object.keys(parsed);
-  if (keys.length !== 2 || !keys.includes('sortDateAdded') || !keys.includes('id')) {
-    // Exactly the two keys: an extra key means someone is building cursors we
-    // did not issue, and accepting it would make the shape a de-facto public
-    // contract that clients are explicitly forbidden to parse.
-    throw invalidCursor('unexpected-keys');
-  }
-
-  const { sortDateAdded, id } = parsed as { sortDateAdded: unknown; id: unknown };
-
-  if (typeof sortDateAdded !== 'string' || !ISO_DATE_RE.test(sortDateAdded)) {
-    throw invalidCursor('bad-sort-date');
-  }
-  if (typeof id !== 'string' || id.length === 0 || id.length > MAX_CURSOR_ID_LENGTH) {
-    throw invalidCursor('bad-id');
-  }
-
-  const cursor: ListCursor = { sortDateAdded, id };
-  if (encodeCursor(cursor) !== raw) {
-    throw invalidCursor('not-canonical');
-  }
-  return cursor;
+  return parsed as Record<string, unknown>;
 }
 
 /**

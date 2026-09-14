@@ -64,6 +64,12 @@ export interface ListPageProps {
    */
   readonly totalIsLowerBound?: boolean;
   /**
+   * REQ-035 (`T-UX-124`) — passed STRAIGHT THROUGH to `FilterBar`, which owns
+   * the disclosure. It is the server's count over the whole filtered set; see
+   * `FilterBarProps` for why it cannot be derived from `items`.
+   */
+  readonly runtimeUnknownHidden?: number | null;
+  /**
    * The load-more sentinel (`specs/ui.md` §2.1 item 4).
    *
    * ⚠ DEFAULTS TO `false`, so a caller that has not been taught to page shows
@@ -163,6 +169,7 @@ export function ListPage({
   serviceState = null,
   total,
   totalIsLowerBound = false,
+  runtimeUnknownHidden = null,
   hasMore = false,
   loadingMore = false,
   loadMoreFailed = false,
@@ -389,6 +396,7 @@ export function ListPage({
             shown={shown}
             total={unfilteredTotal}
             totalIsLowerBound={totalIsLowerBound}
+            runtimeUnknownHidden={runtimeUnknownHidden}
           />
           <SortControl />
           <TitleList

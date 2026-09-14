@@ -17,9 +17,21 @@
 
 import type { JSX } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { SERVICES, type Service } from '@nextup/domain';
+import {
+  RUNTIME_BUCKETS,
+  SERVICES,
+  isRuntimeBucket,
+  type RuntimeBucket,
+  type Service,
+} from '@nextup/domain';
 
-import { AT_LEAST_PREFIX, CLEAR_FILTERS_LABEL, ZERO_MATCH_TITLE } from '../copy';
+import {
+  AT_LEAST_PREFIX,
+  CLEAR_FILTERS_LABEL,
+  RUNTIME_BUCKET_LABELS,
+  ZERO_MATCH_TITLE,
+  runtimeUnknownHiddenLabel,
+} from '../copy';
 
 /** `api.md` §6.2 — `type` is `movie|tv`. */
 export const MEDIA_TYPES = ['movie', 'tv'] as const;
@@ -30,9 +42,11 @@ export interface ListFilters {
   readonly services: readonly Service[];
   readonly types: readonly MediaType[];
   readonly genres: readonly string[];
+  /** REQ-035 — bucket tokens, OR'd within the dimension like the rest. */
+  readonly runtimes: readonly RuntimeBucket[];
 }
 
-export const NO_FILTERS: ListFilters = { services: [], types: [], genres: [] };
+export const NO_FILTERS: ListFilters = { services: [], types: [], genres: [], runtimes: [] };
 
 function isService(value: string): value is Service {
   return (SERVICES as readonly string[]).includes(value);
@@ -59,6 +73,7 @@ export function parseFilters(params: URLSearchParams): ListFilters {
     services: params.getAll('service').filter(isService),
     types: params.getAll('type').filter(isMediaType),
     genres: params.getAll('genre').filter((genre) => genre !== ''),
+    runtimes: params.getAll('runtime').filter(isRuntimeBucket),
   };
 }
 
@@ -76,19 +91,34 @@ export function applyFilters(params: URLSearchParams, filters: ListFilters): URL
   next.delete('service');
   next.delete('type');
   next.delete('genre');
+  next.delete('runtime');
   for (const service of filters.services) next.append('service', service);
   for (const type of filters.types) next.append('type', type);
   for (const genre of filters.genres) next.append('genre', genre);
+  for (const runtime of filters.runtimes) next.append('runtime', runtime);
   return next;
 }
 
 export function isFiltered(filters: ListFilters): boolean {
-  return filters.services.length + filters.types.length + filters.genres.length > 0;
+  return (
+    filters.services.length +
+      filters.types.length +
+      filters.genres.length +
+      filters.runtimes.length >
+    0
+  );
 }
 
 /** The chips §2.4 shows alongside the zero-match message, in URL order. */
 export function activeFilterChips(filters: ListFilters): readonly string[] {
-  return [...filters.services, ...filters.types, ...filters.genres];
+  return [
+    ...filters.services,
+    ...filters.types,
+    ...filters.genres,
+    // Named, not tokenised: a chip reading `60-120` states the cause of an
+    // empty list in a vocabulary the owner never chose it in.
+    ...filters.runtimes.map((bucket) => RUNTIME_BUCKET_LABELS[bucket]),
+  ];
 }
 
 function toggle<T>(values: readonly T[], value: T): readonly T[] {
@@ -117,6 +147,24 @@ export interface FilterBarProps {
    * so a caller that has genuinely counted its rows is unaffected.
    */
   readonly totalIsLowerBound?: boolean;
+  /**
+   * REQ-035 (`T-UX-124`) — how many titles the runtime filter is hiding
+   * because they have no runtime at all. `null` when no runtime filter is
+   * active, and `0` when one is and nothing was hidden.
+   *
+   * ⚠ THIS NUMBER COMES FROM THE SERVER AND CANNOT BE COMPUTED HERE. The
+   * client has, by definition, not been sent the rows that were excluded, so
+   * any count taken over `items` is a count of what survived the filter — it
+   * would render `0` on every list, look right in every fixture, and never be
+   * true.
+   *
+   * ⚠ `null` AND `0` ARE DIFFERENT STATES and must not be collapsed to a
+   * falsy check that happens to hide both. They agree today (neither renders)
+   * but they mean "not asked" and "asked, none hidden"; merging them loses the
+   * ability to tell a filter that hid nothing from a filter that was never
+   * applied.
+   */
+  readonly runtimeUnknownHidden?: number | null;
 }
 
 export function FilterBar({
@@ -124,6 +172,7 @@ export function FilterBar({
   shown,
   total,
   totalIsLowerBound = false,
+  runtimeUnknownHidden = null,
 }: FilterBarProps): JSX.Element {
   const [params, setParams] = useSearchParams();
   const filters = parseFilters(params);
@@ -193,6 +242,32 @@ export function FilterBar({
       )}
 
       {/*
+        REQ-035 — the runtime buckets. ALWAYS PRESENT, unlike the genre
+        fieldset above, which is conditional on the list actually containing
+        genres. The bucket set is fixed by `RUNTIME_BUCKET_BOUNDS` rather than
+        derived from the data, so hiding it when no title happens to have a
+        runtime would remove the only control that explains why the list is
+        the length it is.
+      */}
+      <fieldset data-testid="filter-runtime">
+        <legend>Runtime</legend>
+        {RUNTIME_BUCKETS.map((bucket) => (
+          <label key={bucket}>
+            <input
+              type="checkbox"
+              name="runtime"
+              value={bucket}
+              checked={filters.runtimes.includes(bucket)}
+              onChange={() => {
+                update({ ...filters, runtimes: toggle(filters.runtimes, bucket) });
+              }}
+            />
+            {RUNTIME_BUCKET_LABELS[bucket]}
+          </label>
+        ))}
+      </fieldset>
+
+      {/*
         Present only when something is filtered: a permanently-visible "Clear
         filters" on an unfiltered list implies filters are active when they are
         not.
@@ -218,6 +293,27 @@ export function FilterBar({
       <p data-testid="filter-count" role="status">
         {`Showing ${String(shown)} of ${totalIsLowerBound ? AT_LEAST_PREFIX : ''}${String(total)}`}
       </p>
+
+      {/*
+        REQ-035 (`T-UX-124`) — PRODUCT INVARIANT 2 IN A NEW PLACE: nothing
+        leaves the owner's list without telling them. A runtime filter drops
+        every title TMDB never supplied a runtime for; without this line the
+        list simply gets shorter and nothing accounts for the difference.
+
+        ⚠ `> 0`, NOT TRUTHINESS — and the distinction is deliberate. `0` means
+        the filter is active and hid nothing, which is worth NOT saying (a
+        standing "0 titles are hidden" is noise); `null` means no runtime
+        filter is active at all. Both render nothing here, but they are
+        different facts and the condition names which one it is testing.
+
+        `role="status"` for the same reason the count above has it: a sighted
+        owner sees the list shrink, a screen-reader user gets no other signal.
+      */}
+      {runtimeUnknownHidden !== null && runtimeUnknownHidden > 0 && (
+        <p data-testid="runtime-unknown-hidden" role="status">
+          {runtimeUnknownHiddenLabel(runtimeUnknownHidden)}
+        </p>
+      )}
     </div>
   );
 }

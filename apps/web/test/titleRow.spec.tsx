@@ -12,6 +12,8 @@
  * rebuilding it.
  */
 
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { render as rtlRender, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -21,6 +23,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { TitleRow, TMDB_IMAGE_BASE, type TitleListItem } from '../src/components/TitleRow';
 import { ListPage } from '../src/pages/ListPage';
+import { RUNTIME_UNKNOWN } from '../src/copy';
 
 /** `ListPage` mounts the freshness strip, whose chips are router `Link`s. */
 function render(ui: ReactElement): ReturnType<typeof rtlRender> {
@@ -298,5 +301,71 @@ describe('T-UI-012 - the row makes no automated or credentialed approach to a st
       /^https?:/i.test(url),
     );
     expect(remote).toEqual([`${TMDB_IMAGE_BASE}/d5NXSklXo0qyIYkgV94XAgMIckC.jpg`]);
+  });
+});
+
+describe('REQ-119 - the runtime is on the row (`specs/ui-refresh.md` §5a)', () => {
+  it('T-UX-121a a film renders `1h 55m` with no per-episode suffix', () => {
+    // 115, not 155: `1h 55m` is REQ-119's own worked example. The DUNE fixture
+    // is 155 minutes (2h 35m), which is why this passes an explicit runtime
+    // rather than leaning on the default.
+    renderRow({ mediaType: 'movie', runtimeMinutes: 115 });
+
+    expect(screen.getByTestId('runtime').textContent).toBe('1h 55m');
+    expect(screen.getByTestId('runtime').textContent).not.toContain('/ep');
+  });
+
+  it('T-UX-121b a series renders the `/ep` suffix', () => {
+    // ⚠ THE SUFFIX IS THE REQUIREMENT, NOT A FLOURISH. TMDB gives a series an
+    // `episode_run_time` ARRAY and `tmdbClient.readRuntime` takes its first
+    // element, so the stored number is ONE EPISODE. A bare `45m` beside a
+    // nine-season series is a false statement about the work, and false in the
+    // direction that matters - the owner is choosing what to watch tonight.
+    renderRow({ mediaType: 'tv', runtimeMinutes: 45 });
+
+    expect(screen.getByTestId('runtime').textContent).toBe('45m/ep');
+  });
+
+  it('T-UX-121c the runtime is LAST in the meta line, after the genres', () => {
+    const row = renderRow({});
+    const meta = within(row).getByTestId('title-meta');
+    const order = Array.from(meta.querySelectorAll('span')).map((s) => s.dataset['testid']);
+
+    expect(order).toEqual(['release-year', 'media-type', 'genres', 'runtime']);
+  });
+
+  it('T-UX-122a a null runtime renders the WORDS, never `0m` and never an empty slot', () => {
+    // ⚠ THIS DELIBERATELY DIFFERS FROM THE EMPTY-GENRE RULE (US-019 AC-6),
+    // which renders nothing. Runtime is FILTERABLE (REQ-035) and a null runtime
+    // satisfies no bucket, so whether a row has one decides whether it can
+    // appear at all. An owner who cannot see that a title has no runtime cannot
+    // understand why it vanished when they filtered.
+    renderRow({ runtimeMinutes: null });
+
+    const runtime = screen.getByTestId('runtime');
+    expect(runtime.textContent).toBe(RUNTIME_UNKNOWN);
+    expect(runtime.textContent).not.toMatch(/\b0m\b/);
+    expect(runtime.textContent?.trim()).not.toBe('');
+  });
+
+  it('T-UX-122b a zero runtime is unknown, not "0m"', () => {
+    // TMDB stores `0` for works it has no runtime for, so this is a real row
+    // rather than a defensive hypothetical. `0m` is not a length, and it would
+    // read as a claim that the title is zero minutes long.
+    renderRow({ runtimeMinutes: 0 });
+
+    expect(screen.getByTestId('runtime').textContent).toBe(RUNTIME_UNKNOWN);
+  });
+
+  it('T-UX-122c the unknown wording is the shared constant, not a local string', () => {
+    // `specs/ui.md` §9: owner-facing copy lives in `copy.ts` so a wording
+    // change is one diff. A literal inlined into the component would pass every
+    // assertion above and silently fork the wording.
+    const source = readFileSync(
+      join(process.cwd(), 'apps/web/src/components/TitleRow.tsx'),
+      'utf8',
+    );
+    expect(source).toContain('RUNTIME_UNKNOWN');
+    expect(source).not.toContain("'Runtime unknown'");
   });
 });

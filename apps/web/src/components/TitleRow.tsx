@@ -16,13 +16,14 @@
 // `T-LIST-018` asserts the marker on every rendered label.
 
 import type { JSX, ReactNode } from 'react';
-import { SERVICE_LABELS, type Service } from '@nextup/domain';
+import { SERVICE_LABELS, formatRuntime, type Service } from '@nextup/domain';
 
 import {
   IMDB_RATING_ABSENT,
   IMDB_RATING_SOURCE,
   METADATA_STALE_CHIP,
   ROW_PENDING_LABEL,
+  RUNTIME_UNKNOWN,
 } from '../copy';
 
 /** `specs/ui.md` §2.2 - the poster size the row requests. */
@@ -224,6 +225,26 @@ export function TitleRow({
             than an absence of data, and the owner cannot tell the difference.
           */}
           {item.genres.length > 0 && <span data-testid="genres">{item.genres.join(', ')}</span>}
+          {/*
+            REQ-119 - runtime is LAST in `Year · type · genres · runtime`, and
+            the unknown case is NAMED rather than omitted.
+
+            ⚠ THIS DELIBERATELY DIFFERS FROM THE GENRE BRANCH DIRECTLY ABOVE,
+            and the difference is the requirement. An empty genre list renders
+            nothing because genres do not decide whether the row can appear.
+            RUNTIME DOES: it is filterable (REQ-035), and a `null` runtime
+            satisfies no bucket, so a title with no runtime vanishes the moment
+            any bucket is selected. An owner who cannot see that a title has no
+            runtime cannot understand why it disappeared. This follows the
+            missing-rating precedent (REQ-091), not the genre one.
+
+            The `/ep` suffix on TV comes from `formatRuntime`; see its comment
+            for why a bare `45m` beside a nine-season series is a false
+            statement rather than a terse one.
+          */}
+          <span data-testid="runtime">
+            {formatRuntime(item.runtimeMinutes, item.mediaType) ?? RUNTIME_UNKNOWN}
+          </span>
         </p>
 
         {/*

@@ -16,11 +16,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { AppError } from '../../src/errors/AppError.js';
+import { RUNTIME_BUCKETS } from '@nextup/domain';
 import {
   DEFAULT_PAGE_LIMIT,
   MAX_PAGE_LIMIT,
   decodeCursor,
+  decodeRuntimeCursor,
   encodeCursor,
+  encodeRuntimeCursor,
   parseLimit,
 } from '../../src/pagination.js';
 import { DEFAULT_SORT_DIRECTION, parseTitleListQuery } from '../../src/routes/titlesQuery.js';
@@ -235,5 +238,102 @@ describe('T-LIST-029 the list query contract', () => {
       'someone-else',
     );
     expect(Object.keys(query)).not.toContain('ownerId');
+  });
+});
+
+describe('REQ-035 / REQ-037 - the runtime filter and sort query (`specs/ui-refresh.md` §5a)', () => {
+  it('T-API-021a an unrecognised runtime bucket is a 400, not a silently ignored filter', () => {
+    // The §3 enum rule. Dropping the token instead would answer an unfiltered
+    // list to a request that explicitly asked for a filter - the owner sees
+    // more titles than they asked for and nothing says why.
+    const error = thrown(() => parseTitleListQuery({ runtime: '90min' }));
+    expect(error.httpStatus).toBe(400);
+    expect(error.code).toBe('VALIDATION_FAILED');
+  });
+
+  it('T-API-021b every bucket the domain defines is accepted', () => {
+    // Pinned against the domain constant rather than a copied list: a bucket
+    // added there and forgotten here would be a 400 on a token the UI renders.
+    for (const bucket of RUNTIME_BUCKETS) {
+      expect(parseTitleListQuery({ runtime: bucket }).runtimes).toEqual([bucket]);
+    }
+  });
+
+  it('T-API-021c repeated buckets are OR-ed within the dimension', () => {
+    expect(parseTitleListQuery({ runtime: ['under30', 'over120'] }).runtimes).toEqual([
+      'under30',
+      'over120',
+    ]);
+  });
+
+  it('T-API-021d absent means no runtime filter, never a default bucket', () => {
+    expect(parseTitleListQuery({}).runtimes).toEqual([]);
+  });
+
+  it('T-API-021e: an unrecognised sort key is a 400', () => {
+    // ⚠ INCLUDING `imdbRating` - REQ-095 / `A51`. The rating is display-only;
+    // a sort key for it must not exist on either side.
+    expect(thrown(() => parseTitleListQuery({ sort: 'imdbRating' })).httpStatus).toBe(400);
+    expect(thrown(() => parseTitleListQuery({ sort: 'name' })).httpStatus).toBe(400);
+  });
+
+  it('T-API-021f: the sort key defaults to dateAdded when absent', () => {
+    expect(parseTitleListQuery({}).sort).toBe('dateAdded');
+    expect(parseTitleListQuery({ sort: 'runtime' }).sort).toBe('runtime');
+  });
+});
+
+describe('the cursor is SORT-AWARE (`specs/api.md` §3)', () => {
+  const RUNTIME_POSITION = { runtimeMinutes: 115, id: '01J8ZC000000000000000000' };
+
+  it('T-API-019n: a runtime cursor round-trips exactly', () => {
+    expect(decodeRuntimeCursor(encodeRuntimeCursor(RUNTIME_POSITION))).toEqual(RUNTIME_POSITION);
+  });
+
+  it('T-API-019o: a NULL runtime is a legitimate, encodable position', () => {
+    // ⚠ NOT A DEFENSIVE CASE. Runtime sorts nulls LAST, so the tail of every
+    // runtime-ordered list is the unknown block. Refusing to encode it would
+    // truncate the list at the first unknown runtime - silently, and exactly
+    // where the owner is least able to notice.
+    const atNull = { runtimeMinutes: null, id: '01J8ZC000000000000000000' };
+    expect(decodeRuntimeCursor(encodeRuntimeCursor(atNull))).toEqual(atNull);
+  });
+
+  it('T-API-019p: a DATE cursor handed to the runtime decoder is a loud 400, not a wrong page', () => {
+    // ⚠ THIS IS WHY THE TWO SHAPES ARE DISCRIMINATED BY THEIR KEY SET rather
+    // than by a `sort` field inside the envelope. With a `sort` field the two
+    // would be structurally identical and a cursor cut from one ordering would
+    // be accepted by the other - producing a keyset predicate that does not
+    // mirror its own ORDER BY, which skips and repeats rows at every page
+    // boundary. That is indistinguishable from data loss and invisible to any
+    // test that never asks for a second page.
+    const error = thrown(() => decodeRuntimeCursor(encodeCursor(VALID)));
+    expect(error.httpStatus).toBe(400);
+    expect(error.code).toBe('INVALID_CURSOR');
+  });
+
+  it('T-API-019q: a RUNTIME cursor handed to the date decoder is a loud 400 too', () => {
+    // The same property in the other direction - this is the one the owner
+    // actually hits, by switching the sort while a page is loaded.
+    const error = thrown(() => decodeCursor(encodeRuntimeCursor(RUNTIME_POSITION)));
+    expect(error.httpStatus).toBe(400);
+    expect(error.code).toBe('INVALID_CURSOR');
+  });
+
+  it('T-API-019r: the query parser decodes the cursor belonging to the ACTIVE sort', () => {
+    expect(
+      parseTitleListQuery({ sort: 'runtime', cursor: encodeRuntimeCursor(RUNTIME_POSITION) })
+        .cursor,
+    ).toEqual(RUNTIME_POSITION);
+    expect(parseTitleListQuery({ cursor: encodeCursor(VALID) }).cursor).toEqual(VALID);
+  });
+
+  it('T-API-019s: mixing a cursor with the other sort is rejected by the parser, not by the database', () => {
+    expect(
+      thrown(() => parseTitleListQuery({ sort: 'runtime', cursor: encodeCursor(VALID) })).code,
+    ).toBe('INVALID_CURSOR');
+    expect(
+      thrown(() => parseTitleListQuery({ cursor: encodeRuntimeCursor(RUNTIME_POSITION) })).code,
+    ).toBe('INVALID_CURSOR');
   });
 });

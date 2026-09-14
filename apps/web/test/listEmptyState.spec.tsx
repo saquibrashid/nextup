@@ -66,7 +66,10 @@ describe('T-UX-012 - the never-uploaded empty state', () => {
   it('T-UX-012c is not shown when a filter is what emptied the list', () => {
     render(
       <ListEmptyState
-        facts={facts({ total: 0, filters: { services: ['netflix'], types: [], genres: [] } })}
+        facts={facts({
+          total: 0,
+          filters: { services: ['netflix'], types: [], genres: [], runtimes: [] },
+        })}
       />,
     );
 
@@ -117,7 +120,10 @@ describe('T-UX-014 - the everything-removed-or-suppressed empty state', () => {
     // open; the filter is the one the owner can act on from here.
     expect(
       listEmptyKind(
-        facts({ removedCount: 4, filters: { services: [], types: ['tv'], genres: [] } }),
+        facts({
+          removedCount: 4,
+          filters: { services: [], types: ['tv'], genres: [], runtimes: [] },
+        }),
       ),
     ).toBe('zero-match');
   });

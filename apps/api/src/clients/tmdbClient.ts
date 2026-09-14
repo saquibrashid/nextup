@@ -25,7 +25,7 @@
  * backlog is the work order, so the file is here.
  */
 
-import type { MediaType } from '@nextup/domain';
+import { isKnownRuntime, type MediaType } from '@nextup/domain';
 
 export const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
@@ -493,13 +493,29 @@ function readYear(row: Record<string, unknown> | TmdbDetailResponse): number | n
   return Number.isInteger(year) ? year : null;
 }
 
+/**
+ * The runtime in minutes, or `null` when TMDB has none.
+ *
+ * ⚠ **A `0` FROM TMDB IS `null`, NOT A RUNTIME.** TMDB returns `runtime: 0`
+ * for works it holds no runtime for, so without this the column stores a zero
+ * that every reader then has to remember to special-case: it would display as
+ * "Runtime unknown" (`isKnownRuntime`), satisfy no bucket, be counted among
+ * the hidden unknowns — and still sort to the top of "Shortest first", because
+ * `ORDER BY` has no `where` to filter it. Normalising at the boundary is the
+ * only place that fixes all four at once.
+ *
+ * Series carry a list of per-episode runtimes; the first is the usual one, and
+ * the `/ep` suffix on the row is what keeps that honest.
+ */
 function readRuntime(body: TmdbDetailResponse): number | null {
-  if (typeof body.runtime === 'number') return body.runtime;
-  // Series carry a list of per-episode runtimes; the first is the usual one.
-  if (Array.isArray(body.episode_run_time) && typeof body.episode_run_time[0] === 'number') {
-    return body.episode_run_time[0];
-  }
-  return null;
+  const raw =
+    typeof body.runtime === 'number'
+      ? body.runtime
+      : Array.isArray(body.episode_run_time) && typeof body.episode_run_time[0] === 'number'
+        ? body.episode_run_time[0]
+        : null;
+
+  return isKnownRuntime(raw) ? raw : null;
 }
 
 /**

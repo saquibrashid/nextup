@@ -248,6 +248,16 @@ export interface TitleListResponse {
   items: WireTitleListItem[];
   nextCursor: string | null;
   limit: number;
+  /**
+   * REQ-035 — how many titles the active runtime filter hid because they have
+   * no runtime (`T-UX-124`). `null` when no runtime filter is active.
+   *
+   * ⚠ OPTIONAL ON THE WIRE TYPE, deliberately: the field is new, and a
+   * response cached by a browser or served by a mid-deploy replica will not
+   * carry it. `undefined` and `null` both mean "do not render the disclosure",
+   * which is the honest reading of "nothing told me a filter hid anything".
+   */
+  runtimeUnknownHidden?: number | null;
 }
 
 export interface ServiceStateResponse {

@@ -18,8 +18,13 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { JSX } from 'react';
 import { MemoryRouter, Routes, Route, useSearchParams } from 'react-router-dom';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { SortControl, readSortDir } from '../src/components/SortControl';
-import { SORT_NEWEST_LABEL, SORT_OLDEST_LABEL } from '../src/copy';
+import { SortControl, readSortDir, readSortKey, SORT_KEYS } from '../src/components/SortControl';
+import {
+  SORT_LONGEST_LABEL,
+  SORT_NEWEST_LABEL,
+  SORT_OLDEST_LABEL,
+  SORT_SHORTEST_LABEL,
+} from '../src/copy';
 
 /**
  * Helper: renders SortControl inside a MemoryRouter with the given initial URL.
@@ -216,5 +221,89 @@ describe('T-UI-024 — SortControl', () => {
     });
     expect(new URLSearchParams(probeSearch()).has('dir')).toBe(false);
     expect(screen.getByTestId('sort-control')).toHaveTextContent(SORT_NEWEST_LABEL);
+  });
+});
+
+describe('REQ-037 / T-UX-120 - the sort KEY (`specs/ui-refresh.md` §5a)', () => {
+  it('T-UX-120a defaults to date-added with no `sort` in the URL', () => {
+    renderWithProbe('/');
+
+    expect(readSortKey(new URLSearchParams(probeSearch()))).toBe('dateAdded');
+    expect(screen.getByTestId('sort-control').textContent).toBe(SORT_NEWEST_LABEL);
+  });
+
+  it('T-UX-120b selecting Runtime relabels the direction toggle', () => {
+    // ⚠ THIS IS THE REQUIREMENT, NOT POLISH. "Newest first" on a
+    // runtime-ordered list names a different column from the one the list is
+    // ordered by. The label is the only thing on screen that says what the
+    // order means, so a stale one is a false statement the owner cannot check.
+    renderWithProbe('/');
+    expect(screen.getByTestId('sort-control').textContent).toBe(SORT_NEWEST_LABEL);
+
+    fireEvent.click(screen.getByDisplayValue('runtime'));
+
+    expect(screen.getByTestId('sort-control').textContent).toBe(SORT_LONGEST_LABEL);
+    expect(new URLSearchParams(probeSearch()).get('sort')).toBe('runtime');
+  });
+
+  it('T-UX-120c the runtime labels are Shortest/Longest, never Newest/Oldest', () => {
+    renderWithProbe('/?sort=runtime&dir=asc');
+    expect(screen.getByTestId('sort-control').textContent).toBe(SORT_SHORTEST_LABEL);
+
+    renderWithProbe('/?sort=runtime&dir=desc');
+    const buttons = screen.getAllByTestId('sort-control');
+    expect(buttons.at(-1)?.textContent).toBe(SORT_LONGEST_LABEL);
+  });
+
+  it('T-UX-120d changing the key does NOT reset the direction', () => {
+    // `desc` means newest-first under one key and longest-first under the
+    // other; both are the same "most of the thing first" default, so carrying
+    // the choice across preserves it rather than silently discarding it.
+    renderWithProbe('/?dir=asc');
+    fireEvent.click(screen.getByDisplayValue('runtime'));
+
+    expect(new URLSearchParams(probeSearch()).get('dir')).toBe('asc');
+    expect(screen.getByTestId('sort-control').textContent).toBe(SORT_SHORTEST_LABEL);
+  });
+
+  it('T-UX-120e returning to date-added REMOVES `sort` rather than writing the default', () => {
+    // An absent `sort` already means `dateAdded` to the API (`specs/api.md`
+    // §6.2), so writing it adds a parameter to every URL and changes the fetch
+    // key for no effect - the same rule the `dir` reconciliation follows.
+    renderWithProbe('/?sort=runtime');
+    fireEvent.click(screen.getByDisplayValue('dateAdded'));
+
+    expect(new URLSearchParams(probeSearch()).has('sort')).toBe(false);
+    expect(screen.getByTestId('sort-control').textContent).toBe(SORT_NEWEST_LABEL);
+  });
+
+  it('T-UX-120f an unrecognised `sort` falls back to date-added rather than erroring', () => {
+    expect(readSortKey(new URLSearchParams('sort=imdbRating'))).toBe('dateAdded');
+    expect(readSortKey(new URLSearchParams('sort='))).toBe('dateAdded');
+    expect(readSortKey(new URLSearchParams(''))).toBe('dateAdded');
+  });
+
+  it('T-UX-119 there is NO rating sort option, and there must never be one', () => {
+    // REQ-095, owner decision `A51`: the IMDb rating is display-only. It is the
+    // most tempting key in this file precisely because the row renders it.
+    expect(SORT_KEYS).toEqual(['dateAdded', 'runtime']);
+    expect(SORT_KEYS as readonly string[]).not.toContain('imdbRating');
+
+    renderWithProbe('/');
+    expect(screen.queryByDisplayValue('imdbRating')).toBeNull();
+  });
+
+  it('T-UX-120g the key is NOT persisted in session storage, unlike the direction', () => {
+    // A remembered key would reorder the list on a fresh visit that carries no
+    // `sort`, and the URL reconciliation would then rewrite the address bar on
+    // arrival. The direction is a preference about one list; the key is which
+    // list it is.
+    renderWithProbe('/');
+    fireEvent.click(screen.getByDisplayValue('runtime'));
+
+    const stored = Object.keys(sessionStorage).filter((key) => key.includes('sort'));
+    for (const key of stored) {
+      expect(sessionStorage.getItem(key)).not.toBe('runtime');
+    }
   });
 });

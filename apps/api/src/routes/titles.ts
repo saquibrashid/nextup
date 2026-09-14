@@ -21,10 +21,10 @@
 import { dateAddedLabel } from '@nextup/domain';
 import { type Router } from 'express';
 
-import { encodeCursor } from '../pagination.js';
+import { encodeCursor, encodeRuntimeCursor } from '../pagination.js';
 import { AppError } from '../errors/AppError.js';
 import { beginRatingRefresh } from '../jobs/refreshRatings.js';
-import { findTitleDetail, listTitlePage } from '../repository/ownerData.js';
+import { countRuntimeUnknown, findTitleDetail, listTitlePage } from '../repository/ownerData.js';
 import { fromTenths, type RatingRow } from '../services/imdbRatings.js';
 import {
   refreshStaleMetadata,
@@ -252,7 +252,24 @@ export function registerTitleRoutes(router: Router): void {
       services: query.services,
       mediaType: query.mediaType,
       genres: query.genres,
+      runtimes: query.runtimes,
+      sort: query.sort,
     });
+
+    // REQ-035, `specs/api.md` §6.2. `null` when no runtime filter is active
+    // and a NUMBER when one is — including `0`. The two are different states:
+    // a `0` that means "not asked" cannot later be told apart from a `0` that
+    // means "asked, none hidden", and the UI renders the disclosure for
+    // neither. The count is skipped entirely when no filter is active, so the
+    // default list still costs exactly what it did before.
+    const runtimeUnknownHidden =
+      query.runtimes.length === 0
+        ? null
+        : await countRuntimeUnknown(ownerId, {
+            services: query.services,
+            mediaType: query.mediaType,
+            genres: query.genres,
+          });
 
     // REQ-076 / NFR-014, `specs/api.md` §6.4. BEFORE the response, and only
     // for the rows on this page: `metadataStale` has to be on the item being
@@ -269,13 +286,34 @@ export function registerTitleRoutes(router: Router): void {
     // The cursor is built from the LAST ROW RETURNED, never from a count or an
     // index. That is what makes it a position rather than an offset, and it is
     // why a row inserted between two requests cannot shift the page boundary.
+    //
+    // ⚠ IT IS BUILT FROM THE KEY THE LIST IS ACTUALLY ORDERED BY. A date
+    // cursor against a runtime-ordered list is a keyset that does not mirror
+    // its own `ORDER BY`, and such a predicate skips or repeats rows at every
+    // page boundary — indistinguishable from data loss, and invisible to any
+    // test that never asks for a second page.
+    //
+    // ⚠ THE NULL GUARD IS PER SORT, AND ONLY THE DATE SORT HAS ONE. A row with
+    // no `sortDateAdded` cannot be encoded as a date position, so the list
+    // honestly stops there. A row with no RUNTIME can be: `null` is a real,
+    // encodable position at the end of the runtime order, and refusing it
+    // would truncate every runtime-sorted list at the first unknown runtime —
+    // silently, and exactly where the owner is least able to notice.
     const last = rows.at(-1);
-    const nextCursor =
-      hasMore && last?.sortDateAdded != null
-        ? encodeCursor({ sortDateAdded: toIsoDate(last.sortDateAdded), id: last.id })
-        : null;
+    const nextCursor = !hasMore
+      ? null
+      : query.sort === 'runtime'
+        ? last === undefined
+          ? null
+          : encodeRuntimeCursor({
+              runtimeMinutes: (last as unknown as TitleRow).tmdbRuntimeMinutes,
+              id: last.id,
+            })
+        : last?.sortDateAdded != null
+          ? encodeCursor({ sortDateAdded: toIsoDate(last.sortDateAdded), id: last.id })
+          : null;
 
-    res.status(200).json({ items, nextCursor, limit: query.limit });
+    res.status(200).json({ items, nextCursor, limit: query.limit, runtimeUnknownHidden });
 
     // REQ-090. AFTER the response, deliberately — see `refreshRatings.ts`.
     // The owner's list is already on the wire; anything stale here shows up on

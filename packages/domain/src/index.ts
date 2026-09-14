@@ -63,5 +63,6 @@ export * from './schemas.js';
 // TASK-061 — the TMDB storage allow-list POLICY (US-007 AC-6, REQ-029): an
 // unlisted field is rejected, never stripped. Also a Rule A defence.
 export * from './tmdbStorage.js';
+export * from './titleRuntime.js';
 export * from './types.js';
 export * from './undo.js';
