@@ -106,7 +106,7 @@ The feeder loop's ergonomics are the single largest adoption risk (M5, OQ-011). 
 | NG-5 | Native mobile applications. | Responsive web only. | REQ-050 |
 | NG-6 | Notifications, background jobs that change list state, telemetry or analytics. | The owner is the only actor on list state. | REQ-041, REQ-051, REQ-052, NFR-005 |
 | NG-7 | Services beyond Netflix and Max. | v1 scope lock. | REQ-053 |
-| NG-8 | Runtime-based filtering and sorting; editing the date-added value; undo of mixed-changeset batches. | Deferred to v1.1 — see §11.2. | REQ-035, REQ-037, REQ-059, REQ-069 |
+| NG-8 | ~~Runtime-based filtering and sorting;~~ **(promoted into scope at `A48` — see §11.2 and `specs/ui-refresh.md` §5a)** editing the date-added value; undo of mixed-changeset batches. | Deferred to v1.1 — see §11.2. | ~~REQ-035, REQ-037,~~ REQ-059, REQ-069 |
 
 ---
 
@@ -675,7 +675,7 @@ Added at `A48` for **Epic L (v1.1)** — these terms have no meaning in v1:
 | AC-6 (edge) | A title whose TMDB record carries no genre | A genre filter is applied | It is excluded from genre-filtered results and is not silently assigned a default genre. It remains visible when no genre filter is active |
 | AC-7 (failure) | Filters applied on a phone at the 320px viewport floor | The list renders | The filter controls remain usable and do not occlude the list (NFR-006) |
 
-**Out of scope for this story:** filtering by runtime (REQ-035, deferred to v1.1), free-text search of the combined list, filtering the removed view (US-024 covers that separately).
+**Out of scope for this story:** free-text search of the combined list, filtering the removed view (US-024 covers that separately). ~~"filtering by runtime (REQ-035, deferred to v1.1)"~~ — **REQ-035 was promoted into scope at `A48`** and is carried by **US-055**, not by this story; see `specs/ui-refresh.md` §5a.
 **Open questions:** none.
 
 #### US-020 — Sort by date added, using the earliest listing date
@@ -698,7 +698,7 @@ Added at `A48` for **Epic L (v1.1)** — these terms have no meaning in v1:
 | AC-6 | The sort control | The owner reverses the direction | The list re-orders oldest-first, and the selection persists for the session (REQ-038) |
 | AC-7 (failure) | A Title whose date-added is missing for any reason | The list renders | It sorts last rather than crashing or being hidden, and its date is rendered as unknown |
 
-**Out of scope for this story:** sorting by runtime (REQ-037, deferred to v1.1); alphabetical sort (not in v1 scope).
+**Out of scope for this story:** alphabetical sort (not in v1 scope). ~~"sorting by runtime (REQ-037, deferred to v1.1)"~~ — **REQ-037 was promoted into scope at `A48`** and is carried by **US-055**. ⚠ It does **not** disturb this story: `dateAdded` remains the **default** sort key and `dir=desc` remains the default direction for both keys, so AC-2 and AC-6 stand unchanged. The runtime key follows AC-7's precedent exactly — a missing value **sorts last rather than being hidden**, in both directions.
 **Open questions:** none.
 
 #### US-021 — Date added is recorded once, never overwritten, and labelled honestly
@@ -1664,16 +1664,32 @@ All 39 stories below are in v1. All are `must` except where noted in the story.
 
 ### 11.2 v1.1 — deferred requirements (explicitly deferred, not dropped)
 
-These four requirements were deferred at the phase 4 lock. They are **not** in v1 and have no v1 story. They are recorded here so they are not lost.
+These four requirements were deferred at the phase 4 lock. They are recorded
+here so they are not lost. ⚠ **Two of them — REQ-035 and REQ-037 — are no
+longer deferred**: their written revisit trigger fired and they were promoted
+at `A48`. The other two remain **not** in v1 and have no v1 story.
 
 | REQ | Requirement | Deferral decision | Revisit trigger |
 |---|---|---|---|
-| REQ-035 | Filter the combined list by runtime | D2 | Once the owner reports that service/type/genre filtering is insufficient to narrow a real list |
-| REQ-037 | Sort the combined list by runtime | D2 | As REQ-035 — the two ship together |
+| ~~REQ-035~~ | ~~Filter the combined list by runtime~~ | ~~D2~~ | ~~Once the owner reports that service/type/genre filtering is insufficient to narrow a real list~~ **→ TRIGGER FIRED. Promoted into scope at `A48`**: the owner asked for runtime on the row, filterable and sortable. Specified in `specs/ui-refresh.md` §5a, carried by US-055 |
+| ~~REQ-037~~ | ~~Sort the combined list by runtime~~ | ~~D2~~ | ~~As REQ-035 — the two ship together~~ **→ Promoted at `A48`, together, as written** |
 | REQ-059 | Edit a title's date-added value | D1 | Once the honest "added to nextup" label (REQ-061) proves insufficient in practice. **Coupling: reinstating REQ-059 invalidates the creates-only batch-undo simplification (D3), because an edited date makes a batch's changeset mixed. REQ-059 and REQ-069 must then be reconsidered together (OQ-023).** |
 | REQ-069 | Undo a batch with a mixed changeset (creations plus modifications or removals) | D3 / A36 | Once the enumerated refusal (REQ-075, US-033) proves too costly in practice, or once REQ-059 lands |
 
-v1's substitutes are deliberate, not accidental: REQ-035/REQ-037 are substituted by service, type and genre filtering (US-019, US-020); REQ-059 by honest date labelling (US-021); REQ-069 by the enumerated refusal (US-033).
+⚠ **The rows above are struck through, not deleted.** §11.2 exists so a
+deferred requirement is not lost, and the record of *why* it was deferred and
+*what* released it is the part that stops the same argument being had twice.
+**Two of the four remain deferred; the D2 pair shipped because its written
+revisit trigger fired**, which is the mechanism working rather than a change of
+mind.
+
+⚠ **D2's recorded blocker was "a decision on TV runtime semantics"** — and it
+is settled, not bypassed: TMDB supplies series a per-episode
+`episode_run_time`, so the stored number is **one episode**, and REQ-119
+requires the label to say so (`45m/ep`). No migration was needed;
+`Title.tmdbRuntimeMinutes` has been stored since v1 for exactly this.
+
+v1's substitutes are deliberate, not accidental: ~~REQ-035/REQ-037 are substituted by service, type and genre filtering (US-019, US-020);~~ **(superseded at `A48` — the substitute proved insufficient, which is precisely the recorded trigger)** REQ-059 by honest date labelling (US-021); REQ-069 by the enumerated refusal (US-033).
 
 ### 11.3 Explicitly out of scope, all releases considered so far
 
@@ -1825,8 +1841,8 @@ Note the one inversion: **US-031 (provenance) must be built early**, with Epic B
 
 | REQ | Status |
 |---|---|
-| REQ-035 | Deferred to v1.1 (D2) — §11.2 |
-| REQ-037 | Deferred to v1.1 (D2) — §11.2 |
+| REQ-035 | **In scope — promoted at `A48`** (was: deferred to v1.1, D2). Carried by US-055; specified in `specs/ui-refresh.md` §5a |
+| REQ-037 | **In scope — promoted at `A48`** (was: deferred to v1.1, D2). Carried by US-055; specified in `specs/ui-refresh.md` §5a |
 | REQ-059 | Deferred to v1.1 (D1) — §11.2 |
 | REQ-069 | Deferred to v1.1 (D3 / A36) — §11.2, substituted by US-033 |
 
@@ -1836,13 +1852,13 @@ REQ-042 … REQ-054 (13 requirements marked `wont-v1`) have no stories by design
 
 ### A.5 Coverage summary
 
-**Uncovered requirements: none.** All 59 functional requirements in v1 scope and all 20 NFRs are covered by at least one story.
+**Uncovered requirements: REQ-119 and the promoted REQ-035 / REQ-037, all three carried by US-055, which is a reserved-not-yet-migrated story** (`specs/ui-refresh.md` §5a and §10). Every other one of the functional requirements in v1 scope and all 20 NFRs are covered by at least one story. ⚠ This line is the honest state, not an oversight: §1 of `ui-refresh.md` requires a story to move into this PRD **with** its `specs/testing.md` rows and its tests, in one change — so recording the gap here is what stops US-055 being quietly forgotten between the two documents.
 
 ### A.6 Discrepancy found in the source documents
 
 `Context/requirements.md` §1.8 and `Context/mvp-definition.md` §18 both state the headline "63 functional requirements, 62 in v1, REQ-069 deferred". That count subtracts only REQ-069. However, **REQ-035, REQ-037 and REQ-059 are each individually marked "DEFERRED TO v1.1" in their own requirement rows and in `mvp-definition.md` §5.1/§5.2**, under decisions D2 and D1 taken at the same phase 4 lock.
 
-The correct v1 functional count is therefore **59, not 62**. This is a bookkeeping error in the headline totals, not a scope ambiguity: the per-requirement rows are unambiguous and are treated as authoritative by this PRD. No requirement's scope status is in doubt; only the summary arithmetic is wrong. Recommendation: correct the headline counts in `requirements.md` §1.8 and `mvp-definition.md` §18 to read "63 functional, 59 in v1, four deferred to v1.1 (REQ-035, REQ-037, REQ-059, REQ-069)".
+The correct v1 functional count is therefore **59, not 62** ~~at the time this discrepancy was recorded~~ — **now 61, following the `A48` promotion of REQ-035 and REQ-037 into scope (§11.2)**. This is a bookkeeping error in the headline totals, not a scope ambiguity: the per-requirement rows are unambiguous and are treated as authoritative by this PRD. No requirement's scope status is in doubt; only the summary arithmetic is wrong. Recommendation: correct the headline counts in `requirements.md` §1.8 and `mvp-definition.md` §18 to read "63 functional, **61** in v1, **two** deferred to v1.1 (REQ-059, REQ-069)".
 
 **Second discrepancy — introduced by A45, and NOT fixable from this document.** `Context/requirements.md` REQ-001 carries the rationale *"Screenshot upload is the sole ingestion mechanism (ASM-012)"*, and **ASM-012/ASM-013** are phrased as *"Screenshot **upload** → OCR/vision → TMDB match → dedup is the ingestion mechanism"*. After **A45** that wording is **wrong as written**: ingestion is now **clipboard paste (primary), file selection, and drag-and-drop**, all converging on one server-side pipeline (US-004 AC-1, AC-12 … AC-17). The *substance* of REQ-001 and ASM-012 is unchanged and still correct — **owner-supplied screen captures are the sole ingestion mechanism; no automated retrieval exists (NFR-009, NFR-010)** — only the word "upload" is now too narrow for the set of input paths. `Context/` is outside this document's ownership, so this is **reported, not edited**. Recommendation to the orchestrator: amend REQ-001's rationale and ASM-012/ASM-013 to read *"owner-supplied screen captures, entered by paste or file upload"*. Until that lands, **this PRD is authoritative on the input paths** and no implementer should read "upload" in `requirements.md` as excluding paste.
 
