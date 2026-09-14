@@ -27,6 +27,7 @@ import {
   assertEveryCandidateRouted,
   buildActiveListingIndex,
   buildReviewResponse,
+  chosenReviewMatch,
   classifyDiscoveryWorkIdentity,
   classifyWorkIdentity,
   computeRemovals,
@@ -224,16 +225,22 @@ export async function loadReviewCandidates(
     .filter((row) => row.resolvedWorkIdentity === null || !suppressed.has(row.resolvedWorkIdentity))
     .map((row) => {
       const alternatives = parseMatchCandidates(row.matchCandidates);
-      const match: ReviewMatch | null =
-        alternatives[0] !== undefined && row.resolvedWorkIdentity?.startsWith('tmdb:') === true
-          ? {
-              ...alternatives[0],
-              uncertain: alternatives[0].score < 1,
-              ambiguous:
-                alternatives[1] !== undefined &&
-                alternatives[0].score - alternatives[1].score < 0.05,
-            }
-          : null;
+      // REQ-109 — the owner's correction wins over the extraction's guess.
+      //
+      // ⚠ The projection lives in the DOMAIN (`chosenReviewMatch`) and is not
+      // re-implemented here. Its corrected branch is the whole requirement:
+      // without it this line serves `alternatives[0]`, the identity the owner
+      // just REJECTED, because `applyCorrection` deliberately never rewrites
+      // `matchCandidates`.
+      const match: ReviewMatch | null = chosenReviewMatch({
+        reviewDisposition: row.reviewDisposition,
+        resolvedWorkIdentity: row.resolvedWorkIdentity,
+        correctedToTmdbId: row.correctedToTmdbId,
+        correctedDisplayName: row.correctedDisplayName,
+        correctedDisplayYear: row.correctedDisplayYear,
+        correctedDisplayPoster: row.correctedDisplayPoster,
+        alternatives,
+      });
       return {
         candidateId: row.id,
         rawText: row.rawText,

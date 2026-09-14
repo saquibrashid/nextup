@@ -288,10 +288,9 @@ exists — so at review time the server holds an identity and, by design, no
 name. **That is the actual shape of REQ-109: not a lost name, but a name the
 server has never had at that point in the flow.**
 
-**The scope question, which is an owner/design call and NOT settled here.**
+**The scope question — three ways out, with different costs.**
 `applyCorrection` is additionally **network-free** on purpose: its header
-states *"a TMDB outage must not stop the owner fixing a wrong match"*. Three
-ways out, with different costs:
+states *"a TMDB outage must not stop the owner fixing a wrong match"*:
 
 1. **Carry the display fields the client already holds** — `TmdbSearchResult`
    has `name`, `releaseYear` and `posterPath` at correction time — in a **new,
@@ -307,12 +306,38 @@ ways out, with different costs:
    `Title` row yet, and that is the common case for the corrections this
    requirement is about.
 
-**Do not pick one silently.** Each gives something up: 1 a migration and a
+**The scope question — ✅ RESOLVED 2026-09-14: the owner chose OPTION 1.**
+
+`applyCorrection` stays **network-free**, and the client carries the display
+fields it already holds — `TmdbSearchResult`'s `name`, `releaseYear` and
+`posterPath`, values **this server itself returned** from `/api/tmdb/search` —
+in three new candidate columns (`0008_corrected_display`). The review read
+projects them through `chosenReviewMatch` (`packages/domain/src/review.ts`).
+
+⚠ **`matchCandidates` is NOT rewritten, and the new columns are not a
+back-door rewrite of it.** They hold the owner's DECISION; `matchCandidates`
+holds the EXTRACTION's guesses. Both facts stay in the row, apart, exactly as
+`services/batchClose.ts` requires.
+
+⚠ **This is the one endpoint that accepts caller-supplied display text, while
+§6.20 manual entry REFUSES it — the asymmetry is deliberate and documented at
+`parseCorrectedDisplay`.** Manual entry fetches from TMDB anyway, so refusing
+costs nothing there; refusing here would cost the requirement. What makes it
+safe is that identity is still derived from `tmdbId` + `mediaType` alone
+(SD-05), and the lazy refresh (REQ-076, NFR-014) replaces these with TMDB's own
+values on first access — they are a review-time placeholder, not a source of
+truth.
+
+⚠ **A fourth option — keeping the corrected name only in client state — was
+rejected outright**, and the test suite is built to keep it rejected: it would
+look correct in the click path and break on exactly the re-render this
+requirement exists to fix, which is the present bug rebuilt. `T-UX-107`
+therefore renders from **server state with no click at all**.
+
+~~**The scope question, which is an owner/design call and NOT settled here.**
+Do not pick one silently. Each gives something up: 1 a migration and a
 published request contract, 2 a decision already written down, 3 correctness in
-the common case. ⚠ A fourth option — **keeping the corrected name only in
-client state** — is the one to reject outright: it would look correct in the
-click path and break on exactly the re-render this requirement exists to fix,
-which is the present bug rebuilt.
+the common case.~~ — settled above.
 
 **What good looks like:** the corrected poster replaces the wrong one, the
 heading shows the corrected name and year, the card is chipped as corrected,
@@ -736,8 +761,13 @@ there **with** their `specs/testing.md` §9 rows and their tests, in one change.
 
 **Reserved ranges** (collision-checked against the whole tree; ceilings at time
 of writing REQ-104, US-048, ADR-0012, `T-UX-099`): **REQ-105 – REQ-119**,
-**US-049 – US-055**, **`T-UX-100` – `T-UX-124`**, **`T-API-019` – `T-API-021`**,
+**US-049 – US-055**, **`T-UX-100` – `T-UX-124`**, **`T-API-019` – `T-API-022`**,
 **`T-UI-029`**, **ADR-0013**.
+⚠ **Consumed so far:** `T-UX-100` – `T-UX-108` and **`T-API-022`** (REQ-105 –
+REQ-109, shipped). `T-API-019` – `T-API-021` remain reserved for the §5a
+runtime work and are not yet implemented. ⚠ `T-API-022` sits **out of numeric
+order** relative to those three deliberately — REQ-109 shipped first — so do
+**not** "correct" the gap by renumbering a live test id.
 ⚠ **`T-API` ids run in the teens, not the sixties.** The `A48` rows were first
 written as `T-API-062`–`064` by analogy with the `T-UX-1xx` range and corrected
 before they reached a test: the whole tree's ceiling is `T-API-018`. An id

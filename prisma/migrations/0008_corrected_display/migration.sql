@@ -1,0 +1,57 @@
+-- REQ-109 — the review screen shows the identity the owner corrected TO.
+--
+-- ── Why ─────────────────────────────────────────────────────────────────────
+--
+-- The owner fixes a wrong match on the review screen and the card keeps
+-- showing the identity they just rejected. The naive readings are both wrong:
+-- the screen DOES refetch after the PATCH, and the correction IS stored. What
+-- is missing is a name.
+--
+-- `routes/batchReview.ts` builds each candidate's `match` from
+-- `parseMatchCandidates(row.match_candidates)` — the EXTRACTION's guesses.
+-- After a correction `resolved_work_identity` starts with `tmdb:`, the guard
+-- passes, and `match` is served from `alternatives[0]`: the original wrong
+-- match. The review screen runs BEFORE any `title` row exists, so there is no
+-- lazily-refreshed display row to read either.
+--
+-- ── Why not rewrite `match_candidates` ──────────────────────────────────────
+--
+-- Because that is the one fix shape that re-opens a bug this codebase has
+-- already paid for. `services/batchClose.ts` records it: "correcting a
+-- candidate deliberately does NOT rewrite matchCandidates (the owner corrected
+-- the decision, not the extraction)". `tmdbFieldsFor` was hardened to choose
+-- metadata BY IDENTITY, NEVER BY POSITION precisely because an earlier version
+-- read `alternatives[0]` at close and stored the film the owner had just
+-- rejected — the row said `tmdb:movie:949` while its name, year and poster all
+-- still said `438631`. The `title_match_coherent` constraint does not catch
+-- that: it checks null-ness, not agreement.
+--
+-- The extraction's guesses and the owner's decision are two different facts,
+-- and the schema keeps them apart on purpose. These columns hold the SECOND
+-- fact. They are additive; `match_candidates` is untouched.
+--
+-- ── Why the client supplies them ────────────────────────────────────────────
+--
+-- `applyCorrection` is network-free by an explicit recorded decision ("a TMDB
+-- outage must not stop the owner fixing a wrong match"). Having the server
+-- fetch TMDB detail during a correction would reverse that decision. The
+-- client already holds the `TmdbSearchResult` it picked FROM — fields this
+-- server itself returned from `GET /api/tmdb/search` — so it echoes them back.
+--
+-- ⚠ DISPLAY ONLY. `resolved_work_identity` is still derived solely from
+-- `tmdbId` + `mediaType`, so no caller-supplied text can reach identity
+-- (SD-05). These columns are a review-time placeholder: the lazy refresh
+-- (REQ-076, NFR-014) fills the real display fields on first access, and
+-- nothing downstream of batch close reads them.
+--
+-- ── Shape ───────────────────────────────────────────────────────────────────
+--
+-- All three are NULLABLE with no default and no backfill. Existing corrected
+-- candidates keep NULL and the review read falls back to today's behaviour for
+-- them; there is no historical name to invent and none is invented. Additive
+-- only — no DROP, no rename (`T-MIG-001`).
+
+ALTER TABLE [dbo].[extraction_candidate]
+  ADD [corrected_display_name] NVARCHAR(500) NULL,
+      [corrected_display_year] INT NULL,
+      [corrected_display_poster] NVARCHAR(500) NULL;

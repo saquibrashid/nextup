@@ -61,7 +61,15 @@ describe('T-REV-011 · parseCandidatePatch · correction', () => {
     });
     expect(result).toEqual({
       ok: true,
-      value: { kind: 'corrected', tmdbId: 41733, mediaType: 'movie', confirmDuplicate: false },
+      value: {
+        kind: 'corrected',
+        tmdbId: 41733,
+        mediaType: 'movie',
+        confirmDuplicate: false,
+        // REQ-109 — absent display fields are `null`, never an error: a client
+        // correcting without a search result in hand is still entitled to.
+        display: null,
+      },
     });
   });
 
@@ -77,7 +85,103 @@ describe('T-REV-011 · parseCandidatePatch · correction', () => {
       tmdbId: 41733,
       mediaType: 'tv',
       confirmDuplicate: true,
+      display: null,
     });
+  });
+
+  /*
+   * REQ-109 — the display fields that let the review card show what the owner
+   * corrected TO. `T-REV-011ba`–`bf`.
+   *
+   * ⚠ **These are accepted here while `parseManualEntry` REFUSES a `name`,
+   * and that asymmetry is deliberate.** The manual-entry route fetches the
+   * work from TMDB anyway, so refusing costs nothing; `applyCorrection` is
+   * network-free by an explicit recorded decision ("a TMDB outage must not
+   * stop the owner fixing a wrong match"), so refusing here would cost the
+   * requirement entirely. Identity is still `tmdbId` + `mediaType`; these
+   * values never reach it.
+   */
+  it('T-REV-011ba: accepts the corrected display fields and carries them through', () => {
+    const result = parseCandidatePatch({
+      disposition: 'corrected',
+      tmdbId: 66732,
+      mediaType: 'tv',
+      correctedName: 'The Haunting of Bly Manor',
+      correctedReleaseYear: 2020,
+      correctedPosterPath: '/bly.jpg',
+    });
+    expect(result.ok && result.value).toEqual({
+      kind: 'corrected',
+      tmdbId: 66732,
+      mediaType: 'tv',
+      confirmDuplicate: false,
+      display: {
+        name: 'The Haunting of Bly Manor',
+        releaseYear: 2020,
+        posterPath: '/bly.jpg',
+      },
+    });
+  });
+
+  it('T-REV-011bb: accepts a null year and poster — not every work has either', () => {
+    const result = parseCandidatePatch({
+      disposition: 'corrected',
+      tmdbId: 66732,
+      mediaType: 'tv',
+      correctedName: 'Some Unreleased Thing',
+      correctedReleaseYear: null,
+      correctedPosterPath: null,
+    });
+    expect(result.ok && result.value).toMatchObject({
+      display: { name: 'Some Unreleased Thing', releaseYear: null, posterPath: null },
+    });
+  });
+
+  it('T-REV-011bc: refuses a PARTIAL display payload rather than half-storing it', () => {
+    // ⚠ A poster with no name renders the corrected artwork under the rejected
+    // title — two facts disagreeing on one card, which is the exact failure
+    // REQ-109 exists to end.
+    const result = parseCandidatePatch({
+      disposition: 'corrected',
+      tmdbId: 66732,
+      mediaType: 'tv',
+      correctedPosterPath: '/bly.jpg',
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('T-REV-011bd: refuses an empty or blank corrected name', () => {
+    for (const correctedName of ['', '   ']) {
+      const result = parseCandidatePatch({
+        disposition: 'corrected',
+        tmdbId: 66732,
+        mediaType: 'tv',
+        correctedName,
+      });
+      expect(result.ok).toBe(false);
+    }
+  });
+
+  it('T-REV-011be: refuses a non-integer corrected year rather than coercing it', () => {
+    const result = parseCandidatePatch({
+      disposition: 'corrected',
+      tmdbId: 66732,
+      mediaType: 'tv',
+      correctedName: 'Bly Manor',
+      correctedReleaseYear: '2020',
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('T-REV-011bf: refuses display fields carried on a NON-corrected disposition', () => {
+    // ⚠ Refused, NOT ignored. Silently dropping them would store a candidate
+    // whose card then shows the rejected identity — the defect itself — while
+    // the request reported success.
+    const result = parseCandidatePatch({
+      disposition: 'confirmed',
+      correctedName: 'Bly Manor',
+    });
+    expect(result.ok).toBe(false);
   });
 
   it('T-REV-011g: refuses a non-integer, zero or negative tmdbId', () => {

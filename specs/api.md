@@ -1322,6 +1322,40 @@ Body (exactly one form):
 { "disposition": "pending" }
 { "reclassifyAsTitle": true }        // rescues a 'chrome-suspected' item; re-runs matching for it
 ```
+
+A correction MAY additionally carry what the owner's chosen match **looks
+like** (REQ-109):
+```jsonc
+{
+  "disposition": "corrected", "tmdbId": 66732, "mediaType": "tv",
+  "correctedName": "The Haunting of Bly Manor",   // required if any of the three is sent
+  "correctedReleaseYear": 2020,                   // integer or null
+  "correctedPosterPath": "/bly.jpg"               // string or null
+}
+```
+**These are DISPLAY ONLY and never enter identity** (SD-05): `workIdentity` is
+derived from `tmdbId` + `mediaType` alone, exactly as before. They are stored
+on the candidate and served back as its `match` on the next review read, so the
+card shows the identity the owner corrected **to**.
+
+⚠ **This is the one place the API accepts caller-supplied display text, and
+§6.20 refuses it — the asymmetry is deliberate.** Manual entry fetches the work
+from TMDB anyway, so refusing a `name` there costs nothing. The correction path
+is **network-free by design** ("a TMDB outage must not stop the owner fixing a
+wrong match"), and the review pass runs **before any `Title` row exists**, so
+the server genuinely has no name for a corrected work at that point in the
+flow. Without these fields the read falls back to `matchCandidates[0]` — the
+identity the owner just **rejected**.
+
+⚠ **All three travel together or not at all.** A partial payload is refused
+(**400**) rather than half-stored: a corrected poster under the rejected title
+is two facts disagreeing on one card. Sending **none** of them is permitted and
+is not an error — an older client, or a correction made with no search result
+in hand, still gets to correct; the card then reports the correction without
+naming it rather than naming it wrongly.
+
+⚠ **Display fields on a non-`corrected` disposition are refused**, not ignored.
+
 **200** returns the updated candidate. A correction re-resolves
 `workIdentity` immediately so the review pass shows the corrected match before
 close (US-007 AC-3). **409 `BATCH_NOT_IN_REVIEW`** otherwise.

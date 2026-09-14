@@ -302,12 +302,37 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
     [patch],
   );
 
+  /*
+   * REQ-109 — the correction carries what the owner's chosen match LOOKS like.
+   *
+   * ⚠ The display fields are not decoration and dropping them re-opens the
+   * defect. `applyCorrection` is network-free on purpose, and the review pass
+   * runs before any `Title` row exists, so if the client does not carry the
+   * name the server has none: the card then falls back to `matchCandidates[0]`
+   * — the identity the owner just rejected — and the owner is left guessing
+   * whether their fix took.
+   *
+   * ⚠ These values came from THIS server's own `/api/tmdb/search`; they are
+   * echoed back, not invented here. Identity is still `tmdbId` + `mediaType`.
+   */
   const matchUnmatched = useCallback(
-    (candidateId: string, result: { tmdbId: number; mediaType: string }) =>
+    (
+      candidateId: string,
+      result: {
+        tmdbId: number;
+        mediaType: string;
+        name: string;
+        releaseYear: number | null;
+        posterPath: string | null;
+      },
+    ) =>
       patch(candidateId, {
         disposition: 'corrected',
         tmdbId: result.tmdbId,
         mediaType: result.mediaType,
+        correctedName: result.name,
+        correctedReleaseYear: result.releaseYear,
+        correctedPosterPath: result.posterPath,
       }),
     [patch],
   );

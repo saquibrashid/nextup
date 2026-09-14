@@ -638,7 +638,27 @@ export interface PatchedCandidate {
 /** The §6.18 body forms, exactly as the spec enumerates them. */
 export type CandidatePatchBody =
   | { disposition: 'confirmed' | 'discarded' | 'pending' }
-  | { disposition: 'corrected'; tmdbId: number; mediaType: string; confirmDuplicate?: boolean }
+  | {
+      disposition: 'corrected';
+      tmdbId: number;
+      mediaType: string;
+      confirmDuplicate?: boolean;
+      /**
+       * REQ-109 — DISPLAY ONLY, and the server treats them that way: identity
+       * is still derived from `tmdbId` + `mediaType` alone.
+       *
+       * ⚠ Sent because `applyCorrection` is network-free on purpose, so the
+       * server has no name for the corrected work at review time — the review
+       * screen runs before any `Title` row exists. Omitting them leaves the
+       * card showing the identity the owner just REJECTED.
+       *
+       * ⚠ All three travel together or not at all; a partial payload is
+       * refused rather than half-stored.
+       */
+      correctedName?: string;
+      correctedReleaseYear?: number | null;
+      correctedPosterPath?: string | null;
+    }
   | { reclassifyAsTitle: true };
 
 export interface ImdbLookupResponse {

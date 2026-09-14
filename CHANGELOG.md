@@ -6,6 +6,37 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- **REQ-109 — a corrected match now shows the title you chose, not the one you
+  rejected.** After correcting a wrong match on the review screen, the card
+  still displayed the extraction's original guess: its poster, its name, its
+  year. The correction had been saved, but nothing on screen said so.
+  - **The bug was not a stale screen.** The review route already refetched
+    after the PATCH; the *refetched payload itself* carried the rejected
+    identity. `applyCorrection` deliberately never rewrites `matchCandidates`
+    (the owner corrected the *decision*, not the *extraction*), so the review
+    read still built `match` from `alternatives[0]` — the rejected guess — and
+    its `tmdb:` guard passed because `resolvedWorkIdentity` had been set.
+  - The client now sends the display fields it already holds from the TMDB
+    search it just used, into three new nullable columns
+    (`0008_corrected_display`, additive only). `chosenReviewMatch()` in
+    `@nextup/domain` projects them on the read.
+  - ⚠ **`matchCandidates` is still never rewritten**, and the new columns are
+    not a back-door rewrite of it: they hold the owner's *decision*, it holds
+    the *extraction's* guesses, and both stay in the row, apart.
+  - ⚠ **Identity is unchanged** — still derived from `tmdbId` + `mediaType`
+    alone (SD-05). The stored text is display-only and the lazy metadata
+    refresh (NFR-014) replaces it with TMDB's own values on first access.
+  - ⚠ `applyCorrection` **stays network-free**: a TMDB outage must not stop the
+    owner fixing a wrong match.
+  - The live region now **names** the corrected title rather than announcing
+    that something unspecified happened.
+  - Guarded by `T-UX-106`/`107`/`108`, `T-API-022` and `T-REV-011ba`–`bf`.
+    `T-UX-107` renders from **server state with no click**, because the
+    original defect was invisible in the click path — local state held the
+    right name — and appeared only on a re-render from the server.
+
 ### Changed
 
 - **The runtime moved to Node 22.** Node 20 reached end of life on 2026-04-30

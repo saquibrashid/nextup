@@ -468,6 +468,26 @@ model ExtractionCandidate {
 
   correctedToTmdbId Int? @map("corrected_to_tmdb_id")
 
+  /// REQ-109 — DISPLAY ONLY, and never identity (SD-05).
+  ///
+  /// The review screen runs BEFORE any `Title` row exists, so at correction
+  /// time the server holds an identity and, by design, no name: `applyCorrection`
+  /// is network-free on purpose ("a TMDB outage must not stop the owner fixing a
+  /// wrong match"). Without these the review read falls back to
+  /// `matchCandidates[0]` — the identity the owner just REJECTED.
+  ///
+  /// ⚠ These are NOT a substitute for rewriting `matchCandidates`, and
+  /// `matchCandidates` must still never be rewritten on correction: the
+  /// extraction's guesses and the owner's decision are two different facts
+  /// (`services/batchClose.ts`). These columns carry the owner's decision only.
+  ///
+  /// ⚠ A review-time PLACEHOLDER, not a source of truth. The lazy refresh
+  /// (REQ-076, NFR-014) fills the real display fields on first access; nothing
+  /// downstream of close reads these.
+  correctedDisplayName   String? @map("corrected_display_name") @db.NVarChar(500)
+  correctedDisplayYear   Int?    @map("corrected_display_year")
+  correctedDisplayPoster String? @map("corrected_display_poster") @db.NVarChar(500)
+
   /// Intra-batch overlap collapse (SD-02, `specs/data-model.md` §7.4).
   ///
   /// ⚠ The losing candidate is NOT deleted. It is written with
