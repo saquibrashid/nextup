@@ -118,16 +118,51 @@ restore, suppress, un-suppress or fix-match.
    stale chip and its conditional "Update now" link are dropped entirely — no
    staleness threshold, no nag, no derived "stale" state. REQ-040 and ASM-038
    are retired.)*
-2. **Filter bar** (`components/FilterBar.tsx`) — service, type, genre; a
-   **"Clear filters"** control; a live result count *"Showing 42 of 187"*
-   (US-019 AC-5); and, co-located in the **same row**, the **sort/direction
-   control** (`components/SortControl.tsx` — US-020 AC-6, REQ-038, `api.md`
-   §6.2). A two-state toggle: **"Newest first"** (default, `dir=desc`) and
-   **"Oldest first"** (`dir=asc`). The label names *nextup*'s own date-added,
+2. **Filter bar** (`components/FilterBar.tsx`) — service, type, genre,
+   **runtime** (REQ-035); a **"Clear filters"** control; a live result count
+   *"Showing 42 of 187"* (US-019 AC-5); and, co-located in the **same row**,
+   the **sort/direction control** (`components/SortControl.tsx` — US-020 AC-6,
+   REQ-038, REQ-037, `api.md` §6.2).
+
+   **The runtime filter is BUCKETED, not a slider.** Buckets are *Under 30m*,
+   *30m–1h*, *1h–2h*, *Over 2h*, and they map to `runtime=` in the query
+   string. A range slider is rejected outright: it is the control this
+   repository's accessibility floor (§9) is worst at — two draggable thumbs,
+   no 44×44 px target at either end, and a value only reachable by pointer
+   precision — and it also invites a meaningless *exact* range over data whose
+   TV values are per-episode.
+   ⚠ **Bucket boundaries are inclusive of the lower bound and exclusive of the
+   upper** (`[30, 60)`), so a 60-minute film appears in exactly one bucket. An
+   overlapping definition makes the result count disagree with the list.
+
+   ⚠ **`runtimeMinutes: null` is the load-bearing case.** While a runtime
+   filter is active, a title with no runtime **cannot** satisfy any bucket, so
+   it disappears — and product invariant 2's rule applies here too: nothing
+   vanishes silently. The bar therefore renders a disclosure beside the result
+   count, *"3 titles have no runtime and are hidden"*, **only while a runtime
+   filter is active**, and the count is a live value, never a fixed string.
+   Without it the owner reads a shortened list as their library, which is the
+   same class of defect as a failed extraction reading as a removal.
+
+   **The sort control carries a KEY and a DIRECTION** (`sort=` and `dir=`).
+   The key is *Date added* (default) or *Runtime*; the direction is a
+   two-state toggle whose **labels change with the key**, because a direction
+   word that does not name the data is unreadable: date reads **"Newest
+   first"** (default, `dir=desc`) / **"Oldest first"** (`dir=asc`), runtime
+   reads **"Shortest first"** (`dir=asc`) / **"Longest first"** (`dir=desc`).
+   ⚠ **`dir=desc` therefore stays the default for BOTH keys** — REQ-038's
+   newest-first default is untouched by REQ-037, and the oldest-first reverse
+   control remains `must` (product invariant 6). ⚠ **Titles with no runtime
+   sort LAST in both directions**, never first: a null sorted as zero puts
+   every unknown at the head of "Shortest first", which reads as a claim that
+   those titles are short.
+
+   The date labels name *nextup*'s own date-added,
    never the streaming service's save date — per REQ-061 it must not read
    "date saved" or imply the Netflix/Max date, only when the title entered
-   *nextup*. Selecting a direction updates `dir` in the query string
-   (`?service=netflix&type=movie&genre=Drama&sort=dateAdded&dir=asc`), so it
+   *nextup*. Selecting a key or direction updates the query string
+   (`?service=netflix&type=movie&genre=Drama&runtime=30-60&sort=runtime&dir=asc`),
+   so it
    is deep-linkable, survives back/forward, and — per US-020 AC-6 —
    **persists for the session** even if the owner navigates away and back
    without a page reload (held in the same client-side view state as the
@@ -136,7 +171,9 @@ restore, suppress, un-suppress or fix-match.
    collapses into the same **"Filters (2)"** button/sheet as the rest of the
    filter bar (§10.1), appearing inside that sheet as its own labelled
    two-option row, so item 3's hard constraint below still holds exactly as
-   stated.
+   stated. **The runtime bucket control collapses into that same sheet** and
+   counts toward the **"Filters (n)"** number; it may not earn a row of its
+   own at 320 px.
 3. **The list** (`components/TitleList.tsx`) — the dominant element. Nothing is
    allowed above it that pushes the first row below the fold at 320 px except
    the freshness strip and the filter bar (sort control included, per item 2
@@ -151,7 +188,7 @@ restore, suppress, un-suppress or fix-match.
 |---|---|---|
 | Poster | `posterPath` → `https://image.tmdb.org/t/p/w154{path}` | `alt=""` (decorative; the name is adjacent text). A missing poster renders a neutral placeholder tile, never a broken image. |
 | Name | `name` | The only element with heading weight in the row |
-| Year · type · genres | `releaseYear`, `mediaType`, `genres` | Genres render as plain text; `genres: []` renders **nothing at all**, never "Unknown" (US-019 AC-6) |
+| Year · type · genres · runtime | `releaseYear`, `mediaType`, `genres`, `runtimeMinutes` | Genres render as plain text; `genres: []` renders **nothing at all**, never "Unknown" (US-019 AC-6). **Runtime (REQ-119) appends LAST and does not disturb the REQ-106 order** — the owner's screenshot defect was type-before-year, and the fix pinned `Year · type · genres`; runtime extends that sequence rather than inserting into it. Film renders `1h 55m`, TV renders `45m/ep`. ⚠ **The `/ep` suffix is the whole TV requirement, not decoration:** TMDB supplies `episode_run_time`, so the stored number is **one episode**, and an unsuffixed `45m` beside a nine-season series is a false statement about the work. A missing runtime renders the WORDS **"Runtime unknown"** — it is **not** omitted the way an empty genre list is, because runtime is filterable (REQ-035): once a runtime filter is active, whether a row has a runtime decides whether it can be shown at all, so its absence is a fact the owner must be able to see. |
 | **Service badges** | `badges[]` | One badge per **active** listing (REQ-026). Badges are text-labelled (`Netflix`, `Max`), not colour-only — colour is never the sole carrier of meaning |
 | Date-added label | `dateAddedLabel` | Rendered **verbatim from the API** (`specs/api.md` §6.2). REQ-061: it always contains "to nextup". The component **must not** construct this string. |
 | Row menu | — | `⋮` button → **Not interested** (US-027), **Fix match** (US-030), **Remove from list** (US-048). 44×44 px hit area. ⚠ **Three items, and Remove was ADDED beside "Not interested", not in place of it.** They read alike — the row disappears either way — and mean opposite things: suppression is a permanent, work-identity decision that survives every future upload (REQ-071), while removal asserts nothing about the work and lets a later capture legitimately bring it back as a new row (product invariant 7). Collapsing them into one item is the defect this row exists to prevent; `T-MANUAL-016` fails if either disappears. |
@@ -656,6 +693,12 @@ change is one diff and a test can assert it.
 | **`DROPZONE_ACTIVE_LABEL`** *(new, A45)* | *Drop screenshots here* | §3.2c |
 | **`SORT_NEWEST_LABEL`** *(new, `A44`)* | *Newest first* | §2.1 item 2 — the default (`dir=desc`); REQ-061 honest wording, never "date saved" |
 | **`SORT_OLDEST_LABEL`** *(new, `A44`)* | *Oldest first* | §2.1 item 2 — `dir=asc`, the accepted mitigation for SUC-003 (old saves surfacing) |
+| **`SORT_SHORTEST_LABEL`** *(new, `A48`)* | *Shortest first* | §2.1 item 2 — `sort=runtime&dir=asc`. ⚠ A direction word that does not name the data is unreadable: "Ascending" beside a runtime tells the owner nothing |
+| **`SORT_LONGEST_LABEL`** *(new, `A48`)* | *Longest first* | §2.1 item 2 — `sort=runtime&dir=desc`, the default direction for the runtime key |
+| **`SORT_KEY_DATE_LABEL`** *(new, `A48`)* | *Date added* | §2.1 item 2 — the default sort key. REQ-061 wording: it names *nextup*'s own date, never the service's |
+| **`SORT_KEY_RUNTIME_LABEL`** *(new, `A48`)* | *Runtime* | §2.1 item 2 — REQ-037 |
+| **`RUNTIME_UNKNOWN_LABEL`** *(new, `A48`)* | *Runtime unknown* | §2.2 — the NAMED absence (REQ-119). Never `0m`, never an empty slot: `0m` is a claim about the work, and an empty slot is indistinguishable from a rendering failure |
+| **`RUNTIME_HIDDEN_DISCLOSURE`** *(new, `A48`)* | *{n} titles have no runtime and are hidden* | §2.1 item 2 — rendered **only** while a runtime filter is active, with a live `n`. The mitigation for the one way REQ-035 can silently shorten the list |
 | **`IMDB_RATING_SOURCE`** *(new, Epic M)* | *IMDb* | §7a — labels the number on the row. The rating is **display-only** (REQ-095): it never sorts or filters |
 | **`IMDB_RATING_ABSENT`** *(new, Epic M)* | *No IMDb rating* | REQ-091 — ⚠ **a rendered state, not an omission.** May be reworded; may **not** become blank, `0`, `0.0` or an empty star row. Without it, "this work has no rating" and "nextup failed to fetch one" look identical |
 | **`IMDB_LOOKUP_TITLE`** *(new, Epic M)* | *Check a rating* | §7a — the `/rating` screen (US-045) |
@@ -727,7 +770,8 @@ Touch targets: minimum **44×44 CSS px** for every interactive element
 | Focus order | DOM order = visual order. Dialogs trap focus, restore it to the trigger on close, and close on `Escape` | `T-A11Y-006` |
 | Contrast | ≥ 4.5:1 body text, ≥ 3:1 large text and UI boundaries | `T-A11Y-007` (`axe-core` `color-contrast`) |
 | Non-colour meaning | Service badges, low-confidence and ticked-removal all carry text or an icon, never colour alone | `T-A11Y-008` |
-| **Sort control** *(new, `A44`)* | `SortControl.tsx` is a real, labelled, keyboard-operable control (same treatment as every other control in this table — reachable via the standard keyboard path, focus ring, 44×44 px target) that renders on the combined list and toggles `dir` | **`T-UI-024`** |
+| **Sort control** *(new, `A44`)* | `SortControl.tsx` is a real, labelled, keyboard-operable control (same treatment as every other control in this table — reachable via the standard keyboard path, focus ring, 44×44 px target) that renders on the combined list and toggles `dir` **and selects `sort` (`A48`)** | **`T-UI-024`** |
+| **Runtime filter** *(new, `A48`)* | The bucket control is a real labelled control on the same terms — standard keyboard path, focus ring, 44×44 px target — and **not a range slider**, which cannot meet any of the three. The hidden-unknowns disclosure is rendered in the same live region as the result count, so a screen-reader user is told the list shortened rather than discovering it by absence | **`T-UI-029`** |
 | Live regions | Filter result count, review counters and toasts in `aria-live="polite"`; errors in `role="alert"` | `T-A11Y-009` |
 | **Paste is never the only way in** *(A45)* | The **"Paste screenshot"** button is a real `<button>` in tab order with a 44×44 px target; the `paste` listener is a **shortcut, not a requirement**, and every image can also be attached with **"Choose files"** by keyboard alone. A clipboard result is announced in the `aria-live="polite"` region (*"Added 1 screenshot — 3 in this batch."*); a clipboard failure renders in `role="alert"`. Drag-and-drop is **never** the only route to any capability | `T-UI-014`, `T-A11Y-005` |
 | Images | Posters `alt=""` (decorative); the TMDB logo `alt="TMDB"`; screenshot thumbnails `alt="Screenshot {n} of {total}"` | `T-A11Y-010` |
@@ -783,7 +827,7 @@ here. What *is* specified is mechanism:
 | Any per-row "delete" or "remove from service" button | Removal happens **only** through a confirmed full-update review group (REQ-020) or "not interested" (REQ-070). A direct delete would be a mutation outside REQ-041's closed enumeration. |
 | Any settings screen with a retention or clean-up control | REQ-028 / data-model §9. There is nothing to configure and offering it would invite the defect. |
 | A "sync now" or "refresh from service" button | There is no service integration and no scheduler (REQ-041, ASM-016). |
-| Runtime filter and sort | v1.1 (REQ-035, REQ-037). `runtimeMinutes` is displayed but not filterable. |
+| ~~Runtime filter and sort~~ | ~~v1.1 (REQ-035, REQ-037). `runtimeMinutes` is displayed but not filterable.~~ **PROMOTED INTO SCOPE at `A48`** — runtime is now displayed (REQ-119), filterable (REQ-035) and sortable (REQ-037); see §2.1 item 2 and §2.2. ⚠ **The struck-through text was also factually wrong while it stood:** `runtimeMinutes` was fetched, stored, returned by `GET /api/titles` and declared on `TitleRow`'s props, but **never rendered** — the row's meta line was `Year · type · genres`. A spec that describes shipped behaviour incorrectly is worse than one that omits it, because it stops anyone from looking. |
 | Date-added editing | v1.1 (REQ-059). The label is displayed, read-only. |
 | Bulk restore in the removed view | Out of scope by the OQ-022 closure (data-model §11). |
 | Analytics, cookie banners, consent dialogs | NFR-005 — nothing is collected. |

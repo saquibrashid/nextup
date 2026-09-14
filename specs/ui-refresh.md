@@ -68,6 +68,7 @@ inference from them:
 | Accent | **Deeper — indigo/violet** |
 | Posters | **Larger and uniform** |
 | Pain points | *"better navigation. improve the filter/ordering ux"* |
+| Runtime *(added at `A48`)* | *"for the list view, I'd like to see run time as well and filter and sort by it"* — a direct request, and the recorded revisit trigger for the deferred REQ-035/REQ-037 pair. Answered in §5a |
 
 Plus five defects the owner hit while using the app, in §3.
 
@@ -464,10 +465,15 @@ toggle — but that is a decision, not a deduction.
 ### REQ-115 (`should`) — the list can be ordered by more than date added
 
 > Available orderings: **date added** (default, newest-first), **name**,
-> **release year**.
+> **release year**, **runtime**.
 
 The row already displays a name and a year that the owner can read and cannot
-order by.
+order by. **Runtime joins that list at `A48`** — it is the same defect in a
+sharper form, because until REQ-119 the owner could not even *read* the
+runtime, and ordering by it is `must`, not `should`, since it is carried by
+**REQ-037**, a requirement that has existed since the phase 4 lock and was
+deferred to v1.1 rather than dropped. Promoting REQ-037 does not widen this
+document's remit; it satisfies a requirement already on the books.
 
 > ### ⚠ RATING IS DELIBERATELY ABSENT FROM THAT LIST, AND ADDING IT WOULD
 > ### CONTRADICT A DECISION THE OWNER ALREADY MADE.
@@ -485,6 +491,12 @@ order by.
 must decide where undated titles go — **not** first by accident of `NULL`
 collation. Ordering must be stable and specified server-side; this needs an API
 change, which is why it is `should` and why §9 asks before it is built.
+**`A48` settles the general rule** rather than leaving each nullable key to
+decide for itself: **`NULL`s sort LAST in BOTH directions**, explicitly in the
+SQL (`specs/api.md` §6.2). SQL Server sorts `NULL` first ascending by default,
+so "Shortest first" would otherwise open with every title whose runtime is
+unknown — an absence of data rendered as a claim about the works. Year follows
+the same rule when it is built.
 
 | Test id | Asserts |
 |---|---|
@@ -493,6 +505,75 @@ change, which is why it is `should` and why §9 asks before it is built.
 | `T-UX-115` | A `localStorage` direction with **no `dir` in the URL** is reconciled into the URL, and the label matches the request that was issued. |
 | `T-UX-116` | Oldest-first is reachable in one action from the default view. |
 | `T-UX-119` | *(REQ-095 regression guard)* **No sort option exposes the IMDb rating.** |
+| `T-UX-120` | *(`A48`)* Selecting the **Runtime** key relabels the direction toggle to *Shortest first* / *Longest first*, and the date labels do not survive the switch. |
+
+---
+
+## 5a. Design — runtime (`A48`, the owner's *"see run time as well and filter and sort by it"*)
+
+### REQ-119 (`must`) — the runtime is on the row, and an unknown runtime says so
+
+> The row's meta line reads `Year · type · genres · runtime`. Film renders
+> `1h 55m`; TV renders `45m/ep`; a title with no runtime renders the words
+> **"Runtime unknown"**.
+
+**This requirement exists because the data was already there and nobody could
+see it.** `runtimeMinutes` is fetched from TMDB, stored on `Title`, returned by
+`GET /api/titles` and **declared on `TitleRow`'s props** — and never rendered.
+`specs/ui.md` §11 asserted the opposite ("`runtimeMinutes` is displayed but not
+filterable") for the whole life of the list, which is why the gap survived: the
+spec told every reader it was done.
+
+⚠ **The `/ep` suffix on TV is the requirement, not a flourish.** TMDB gives
+series an `episode_run_time` array and `tmdbClient.readRuntime` takes its first
+element, so **the stored number is one episode**. Rendered bare beside a
+nine-season series, `45m` is a false statement about the work — and it is
+false in the direction that matters, because the owner is choosing what to
+watch tonight. Total-series runtime is not available without summing every
+season, so per-episode is the only semantic the stored data supports; naming it
+in the label is what makes that honest.
+
+⚠ **The unknown case is NAMED, not omitted** — unlike an empty genre list
+(US-019 AC-6), and like a missing rating (REQ-091). The two precedents differ
+for a reason, and runtime follows the rating one: **runtime is filterable**
+(REQ-035), so whether a row has one decides whether it can appear at all. An
+owner who cannot see that a title has no runtime cannot understand why it
+vanished when they filtered.
+
+### REQ-035 / REQ-037 (`must`, promoted at `A48`) — filter and sort by runtime
+
+Both were deferred to v1.1 under decision **D2** at the phase 4 lock, with the
+revisit trigger *"once the owner reports that service/type/genre filtering is
+insufficient to narrow a real list"*. **The owner reported it.** The blocker
+recorded against D2 — *"a decision on TV runtime semantics"* — is settled by
+REQ-119 above: per-episode, labelled as such.
+
+No migration and no new column: `Title.tmdbRuntimeMinutes` has been stored
+since v1 precisely so this would be additive.
+
+The filter is **bucketed** (*Under 30m*, *30m–1h*, *1h–2h*, *Over 2h*), with
+half-open `[lower, upper)` boundaries, and **not a range slider** — see
+`specs/ui.md` §2.1 item 2 for why a slider fails the accessibility floor.
+
+⚠ **The one way this requirement can silently lose titles**, and the mitigation
+that is part of it: a `null` runtime satisfies no bucket, so activating a
+runtime filter hides every title whose runtime TMDB never supplied. The list
+shortens and nothing says why. `GET /api/titles` therefore returns
+**`runtimeUnknownHidden`**, computed server-side over the whole filtered set
+(never the page, never the client), and the bar renders *"3 titles have no
+runtime and are hidden"* while a runtime filter is active. This is product
+invariant 2's rule — nothing disappears without telling the owner — in a new
+place.
+
+| Test id | Asserts |
+|---|---|
+| `T-UX-121` | The row renders `1h 55m` for film and `45m/ep` for TV; the `/ep` suffix is absent for film and present for every TV row. |
+| `T-UX-122` | A `null` runtime renders the words `Runtime unknown` — never `0m`, never an empty slot. |
+| `T-UX-123` | Selecting a bucket sets `runtime` in the query string, and the bucket boundaries are half-open, so a 60-minute title appears in `60-120` and **not** in `30-60`. |
+| `T-UX-124` | While a runtime filter is active, the hidden-unknown disclosure renders with the server's count; with no runtime filter it does not render at all. |
+| `T-API-019` | `sort=runtime` orders by runtime with `NULL`s last in **both** directions, tie-broken by `title.id`. |
+| `T-API-020` | `runtimeUnknownHidden` counts the whole filtered set rather than the returned page, and is `null` when no runtime filter is active. |
+| `T-API-021` | An unrecognised `runtime` bucket is a **400**, per the §3 enum rule. |
 
 ---
 
@@ -651,10 +732,18 @@ there **with** their `specs/testing.md` §9 rows and their tests, in one change.
 | **US-052** | *As the owner, I can browse my list with artwork at a comfortable density.* → REQ-110, REQ-111, REQ-118 |
 | **US-053** | *As the owner, I can find and order titles without guessing what a control does.* → REQ-113, REQ-114, REQ-115 |
 | **US-054** | *As the owner, I can tell where I am and reach where I'm going.* → REQ-116, REQ-117 |
+| **US-055** *(new, `A48`)* | *As the owner, I can see how long a title is, and narrow my list to what fits the time I have.* → REQ-119, and the promoted **REQ-035** / **REQ-037** |
 
 **Reserved ranges** (collision-checked against the whole tree; ceilings at time
-of writing REQ-104, US-048, ADR-0012, `T-UX-099`): **REQ-105 – REQ-118**,
-**US-049 – US-054**, **`T-UX-100` – `T-UX-119`**, **ADR-0013**.
+of writing REQ-104, US-048, ADR-0012, `T-UX-099`): **REQ-105 – REQ-119**,
+**US-049 – US-055**, **`T-UX-100` – `T-UX-124`**, **`T-API-019` – `T-API-021`**,
+**`T-UI-029`**, **ADR-0013**.
+⚠ **`T-API` ids run in the teens, not the sixties.** The `A48` rows were first
+written as `T-API-062`–`064` by analogy with the `T-UX-1xx` range and corrected
+before they reached a test: the whole tree's ceiling is `T-API-018`. An id
+invented ahead of its sequence is not a harmless label — `T-META-009b` matches
+on the base number, so a plausible-looking id can acquire a defining row and a
+green gate while belonging to no series at all.
 
 ⚠ **Web tests for this work belong in `apps/web/test/`, never `tests/web/`**
 (`specs/testing.md` §11, `T-CI-008`). A `.spec.tsx` outside a collected path

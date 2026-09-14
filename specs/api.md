@@ -767,7 +767,8 @@ dropped**, which is what `T-ATTR-006a` asserts rather than byte equality.
 ### 6.2 `GET /api/titles` — the combined list (US-018, US-019, US-020)
 
 Query: `service` (`netflix|max`, repeatable), `type` (`movie|tv`),
-`genre` (string, repeatable), `sort` (`dateAdded`, default),
+`genre` (string, repeatable), `runtime` (`under30|30-60|60-120|over120`,
+repeatable), `sort` (`dateAdded` default | `runtime`),
 `dir` (`desc` default | `asc`), `limit`, `cursor`.
 
 Semantics:
@@ -782,6 +783,22 @@ Semantics:
 - `genre: []` on a title excludes it from any genre-filtered result and
   includes it when no genre filter is set (US-019 AC-6). **Genres are never
   defaulted.**
+- `runtime` buckets are **`[lower, upper)`** in minutes — `under30` is
+  `< 30`, `30-60` is `[30, 60)`, `60-120` is `[60, 120)`, `over120` is
+  `>= 120` (REQ-035). ⚠ Half-open boundaries are not a detail: an inclusive
+  upper bound puts a 60-minute film in two buckets, and the result count then
+  disagrees with the list it describes. An unknown bucket value → **400**, per
+  §3's enum rule.
+- **`runtimeMinutes: null` never satisfies a `runtime` filter**, and is
+  **never coerced to `0`.** A title with no runtime is excluded while any
+  runtime bucket is selected and included when none is — exactly the `genre:
+  []` rule, applied to a nullable scalar.
+- `sort=runtime` orders by `runtimeMinutes`, **`NULL`s last in BOTH
+  directions**, tie-broken by `title.id` ascending as every other sort is.
+  ⚠ `NULLS LAST` must be explicit in the SQL. SQL Server sorts `NULL`
+  **first** ascending by default, which would open "Shortest first" with every
+  unknown runtime — presenting an absence of data as a claim that those titles
+  are the shortest.
 - Ordering per data-model §5.3, tie-broken by `title.id` ascending.
 - **Lazy TMDB refresh runs here** — §6.4.
 
@@ -809,9 +826,30 @@ Semantics:
     }
   ],
   "nextCursor": null,
-  "limit": 50
+  "limit": 50,
+  "runtimeUnknownHidden": 3
 }
 ```
+
+⚠ **`runtimeUnknownHidden` is server-computed and MUST NOT be derived on the
+client.** It counts the titles that satisfy every *other* active filter but
+carry `runtimeMinutes: null`, and it is therefore the count the owner needs to
+be shown (`RUNTIME_HIDDEN_DISCLOSURE`, `ui.md` §2.1) before they read a
+shortened list as their whole library.
+
+Two ways to get it wrong, both of which look right in a small fixture:
+
+- **Counting over the returned page.** The list is cursor-paginated (§3), so a
+  page-scoped count under-reports — and under-reports *differently* on every
+  page, which is worse than not showing it. The count is over the **whole**
+  filtered set.
+- **Computing it in the browser.** The client has never seen the excluded rows
+  by definition; anything it computes is a count of what it already has.
+
+It is `0` when a runtime filter is active and nothing was hidden, and **`null`
+when no runtime filter is active** — the two are different states and the UI
+renders the disclosure for neither, but a `0` that means "not asked" cannot
+later be told apart from a `0` that means "asked, none hidden".
 
 **`dateAddedLabel` is computed server-side** so the REQ-061 honest-labelling
 rule has exactly one implementation. It **never** reads as a bare "Added" and
