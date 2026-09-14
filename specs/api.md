@@ -822,22 +822,38 @@ Semantics:
   **never coerced to `0`.** A title with no runtime is excluded while any
   runtime bucket is selected and included when none is — exactly the `genre:
   []` rule, applied to a nullable scalar.
-- **A stored `runtimeMinutes <= 0` IS AN UNKNOWN RUNTIME, everywhere.** TMDB
-  returns `runtime: 0` for works it holds no runtime for, so zero reaches the
-  column as an ordinary value, and **`under30` is `[null, 30)` — a naive
-  `< 30` admits it**. All four consumers must therefore agree:
-  - the row **displays** "Runtime unknown" (REQ-119);
-  - it **satisfies no bucket** — the open-ended bucket carries a `> 0` floor;
-  - it is **counted in `runtimeUnknownHidden`**, which is the exact complement
-    of the filter;
-  - it **sorts with the `NULL`s**, not as the shortest title in the library.
+- **A `runtimeMinutes <= 0` CANNOT BE STORED. Unknown is spelled `NULL`.**
+  TMDB returns `runtime: 0` for works it holds no runtime for, so zero used to
+  reach the column as an ordinary value, and **`under30` is `[null, 30)` — a
+  naive `< 30` admits it**. Application code was made to treat it as unknown
+  in three places: the row **displays** "Runtime unknown" (REQ-119), it
+  **satisfies no bucket** (the open-ended bucket carries a `> 0` floor), and it
+  is **counted in `runtimeUnknownHidden`**, the exact complement of the filter.
 
-  ⚠ Disagreement between any two of these is invisible to a test of either
-  one: a zero-runtime row would appear *inside* the Under-30m results while
-  labelled "Runtime unknown", unaccounted for by the disclosure that exists to
-  account for it. The API additionally **normalises `<= 0` to `null` at the
-  TMDB boundary**, so no new row can enter the column in that state.
+  ⚠ **The fourth consumer, ORDERING, could not be made to agree.** `ORDER BY`
+  in SQL Server sees a number; Prisma's `orderBy` has no `CASE`; and rewriting
+  the list query as raw SQL would take it outside `T-SEC-021`'s textual
+  `ownerId` check, trading a display defect for a tenancy one. CI caught the
+  disagreement — a zero-runtime row sorted **first** under "Shortest first"
+  while every other surface called it unknown.
+
+  So the state was **deleted rather than special-cased a fourth time**:
+  `0009_runtime_unknown_is_null` normalises existing rows to `NULL` and adds
+  `ck_title_runtime_positive`. The API **also normalises `<= 0` to `null` at
+  the TMDB boundary**, so the constraint is not expected to fire in normal
+  operation — that is the point: it is the proof the boundary holds, and it
+  turns a silent ordering defect into a loud write failure.
+
+  ⚠ **The `> 0` filter floor and the `<= 0` count predicate STAY**, now as
+  defence in depth. Removing them because "zero cannot happen now" would make
+  the next change that relaxes the constraint silently wrong again.
   `T-API-019e` and `T-API-020d` pin the two database-side halves.
+
+  ~~Superseded: "A stored `runtimeMinutes <= 0` IS AN UNKNOWN RUNTIME,
+  everywhere … all four consumers must therefore agree … it **sorts with the
+  `NULL`s**, not as the shortest title in the library." The fourth bullet was
+  not implementable through Prisma's `orderBy` and was never true; CI proved
+  it.~~
 - `sort=runtime` orders by `runtimeMinutes`, **`NULL`s last in BOTH
   directions**, tie-broken by `title.id` ascending as every other sort is.
   ⚠ `NULLS LAST` must be explicit in the SQL. SQL Server sorts `NULL`

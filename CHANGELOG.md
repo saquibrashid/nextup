@@ -27,13 +27,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
     shorter. The count is the **server's**, over the whole filtered set — the
     excluded rows were never sent, so anything computed in the browser would
     read `0` on every list and look right in every fixture.
-  - ⚠ **A stored `0` is "unknown", everywhere.** TMDB returns `runtime: 0` for
-    works it has no runtime for, so `0` is a real stored value. Display,
-    filtering, counting and ordering all now route through one predicate
-    (`isKnownRuntime`), and `readRuntime` normalises `<= 0` to `null` at the
-    TMDB boundary. Before this, a zero-runtime title appeared *inside*
-    "Under 30m" while labelled "Runtime unknown", was left out of the count of
-    what the filter hid, and sorted first under "Shortest first".
+  - ⚠ **A stored `0` is "unknown" — and since `0009_runtime_unknown_is_null`
+    it cannot be stored at all.** TMDB returns `runtime: 0` for works it has no
+    runtime for, so `0` was a real stored value. Display, filtering and
+    counting were made to route through one predicate (`isKnownRuntime`), and
+    `readRuntime` normalises `<= 0` to `null` at the TMDB boundary. ⚠ **The
+    fourth consumer, ORDERING, could not be**: `ORDER BY` sees a number,
+    Prisma's `orderBy` has no `CASE`, and raw SQL would leave `T-SEC-021`'s
+    textual `ownerId` check. CI caught it — a zero-runtime title sorted *first*
+    under "Shortest first" while every other surface called it unknown. The
+    migration deletes the state instead: existing rows normalised to `NULL`, a
+    `CHECK` constraint against new ones. Before all this, such a row also
+    appeared *inside* "Under 30m" while labelled "Runtime unknown" and was left
+    out of the count of what the filter hid.
   - ⚠ **Bucket boundaries are half-open**, so a 60-minute title is in `60-120`
     and not in `30-60`. An inclusive upper bound puts one title in two buckets,
     and any count over the buckets then contradicts the list it describes.

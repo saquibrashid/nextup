@@ -236,14 +236,35 @@ describe('T-API-019 sort=runtime orders by runtime with NULLs last in BOTH direc
     expect(ids(await list('?sort=runtime&dir=desc'))).toEqual(['r-tie-a', 'r-tie-z']);
   });
 
-  it('T-API-019e: a stored ZERO sorts with the unknowns, not as the shortest title', async () => {
-    // TMDB returns `runtime: 0` for works it has no runtime for. The row
-    // displays "Runtime unknown" and satisfies no bucket, so ordering it ahead
-    // of a 45-minute title would contradict both.
-    await seedTitle('r-zero', 0);
-    await seedTitle('r-045', 45);
+  it('T-API-019e: a ZERO runtime cannot be STORED at all — unknown is spelled NULL', async () => {
+    // ⚠ THIS CASE FAILED IN CI AND THE FIX WAS A MIGRATION, NOT AN ASSERTION.
+    //
+    // TMDB returns `runtime: 0` for works it has no runtime for, so 0 was a
+    // real stored value. The application treated it as unknown when
+    // DISPLAYING, FILTERING and COUNTING — and could not when ORDERING:
+    // `ORDER BY` sees a number, Prisma's `orderBy` has no CASE, and rewriting
+    // this query as raw SQL would take it out of reach of `T-SEC-021`'s
+    // textual `ownerId` check. This test read
+    //   expected [ 'r-zero', 'r-045' ] to deeply equal [ 'r-045', 'r-zero' ]
+    // — the zero-runtime title sorting FIRST under "Shortest first" while
+    // every other surface called it unknown.
+    //
+    // `0009_runtime_unknown_is_null` deletes the state instead of teaching a
+    // fourth consumer about it: existing rows normalised to NULL, and a CHECK
+    // constraint so no new one arrives. Four consumers agreeing by convention
+    // is a rule that holds only while every future reader remembers it; a
+    // constraint holds without being remembered.
+    //
+    // So the strong claim is not "a zero sorts correctly" — it is that a zero
+    // cannot reach the ordering code at all. NULL then sorts last explicitly
+    // (`a`/`b` above) and the whole contradiction is unreachable.
+    await expect(seedTitle('r-zero', 0)).rejects.toThrow();
+    await expect(seedTitle('r-neg', -5)).rejects.toThrow();
 
-    expect(ids(await list('?sort=runtime&dir=asc'))).toEqual(['r-045', 'r-zero']);
+    // NULL is how unknown is spelled, and it is still accepted.
+    await seedTitle('r-null', null);
+    await seedTitle('r-045', 45);
+    expect(ids(await list('?sort=runtime&dir=asc'))).toEqual(['r-045', 'r-null']);
   });
 
   it('T-API-019f: PAGING a runtime-sorted list loses and repeats nothing', async () => {
@@ -341,19 +362,30 @@ describe('T-API-020 runtimeUnknownHidden counts the whole filtered set', () => {
     expect((await list('?runtime=60-120')).runtimeUnknownHidden).toBe(0);
   });
 
-  it('T-API-020d: a stored ZERO is counted as unknown, like a NULL', async () => {
-    // ⚠ THE COUNT IS THE EXACT COMPLEMENT OF THE FILTER. `runtimeFilter` puts
-    // a `gt: 0` floor on the open-ended bucket so a zero-runtime title is
-    // excluded; if the count looked only for `NULL`, that title would be
-    // hidden by the filter AND missing from the number that says how many the
-    // filter hid — the silent shortening the disclosure exists to prevent.
-    await seedTitle('r-zero', 0);
+  it('T-API-020d: the count and the filter stay exact complements of each other', async () => {
+    // ⚠ THE COUNT IS THE EXACT COMPLEMENT OF THE FILTER. Anything the filter
+    // excludes for want of a runtime must appear in the number that says how
+    // many it hid; otherwise the list silently shortens, which is the whole
+    // reason the disclosure exists.
+    //
+    // ⚠ This used to seed a ZERO runtime, because `0` could be stored.
+    // `0009_runtime_unknown_is_null` makes that unrepresentable (see
+    // `T-API-019e`), so the case is asserted where it is now REACHABLE: the
+    // `> 0` floor in `runtimeFilter` and the `<= 0` arm of the count predicate
+    // remain as DEFENCE IN DEPTH, and this pins that they agree. Deleting
+    // either because "zero cannot happen now" would make the next change that
+    // relaxes the constraint silently wrong again.
     await seedTitle('r-null', null);
+    await seedTitle('r-null-2', null);
     await seedTitle('r-020', 20);
 
     const body = await list('?runtime=under30');
     expect(ids(body)).toEqual(['r-020']);
     expect(body.runtimeUnknownHidden).toBe(2);
+
+    // The complement holds: hidden + shown === the unfiltered total.
+    const all = await list();
+    expect(ids(body).length + (body.runtimeUnknownHidden ?? 0)).toBe(ids(all).length);
   });
 
   it('T-API-020e: it respects the OTHER active filters', async () => {
