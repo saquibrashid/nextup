@@ -286,11 +286,11 @@ describe('REQ-035 / REQ-037 - the runtime filter and sort query (`specs/ui-refre
 describe('the cursor is SORT-AWARE (`specs/api.md` §3)', () => {
   const RUNTIME_POSITION = { runtimeMinutes: 115, id: '01J8ZC000000000000000000' };
 
-  it('T-API-021g: a runtime cursor round-trips exactly', () => {
+  it('T-API-019n: a runtime cursor round-trips exactly', () => {
     expect(decodeRuntimeCursor(encodeRuntimeCursor(RUNTIME_POSITION))).toEqual(RUNTIME_POSITION);
   });
 
-  it('T-API-021h: a NULL runtime is a legitimate, encodable position', () => {
+  it('T-API-019o: a NULL runtime is a legitimate, encodable position', () => {
     // ⚠ NOT A DEFENSIVE CASE. Runtime sorts nulls LAST, so the tail of every
     // runtime-ordered list is the unknown block. Refusing to encode it would
     // truncate the list at the first unknown runtime - silently, and exactly
@@ -299,7 +299,7 @@ describe('the cursor is SORT-AWARE (`specs/api.md` §3)', () => {
     expect(decodeRuntimeCursor(encodeRuntimeCursor(atNull))).toEqual(atNull);
   });
 
-  it('T-API-021i: a DATE cursor handed to the runtime decoder is a loud 400, not a wrong page', () => {
+  it('T-API-019p: a DATE cursor handed to the runtime decoder is a loud 400, not a wrong page', () => {
     // ⚠ THIS IS WHY THE TWO SHAPES ARE DISCRIMINATED BY THEIR KEY SET rather
     // than by a `sort` field inside the envelope. With a `sort` field the two
     // would be structurally identical and a cursor cut from one ordering would
@@ -312,7 +312,7 @@ describe('the cursor is SORT-AWARE (`specs/api.md` §3)', () => {
     expect(error.code).toBe('INVALID_CURSOR');
   });
 
-  it('T-API-021j: a RUNTIME cursor handed to the date decoder is a loud 400 too', () => {
+  it('T-API-019q: a RUNTIME cursor handed to the date decoder is a loud 400 too', () => {
     // The same property in the other direction - this is the one the owner
     // actually hits, by switching the sort while a page is loaded.
     const error = thrown(() => decodeCursor(encodeRuntimeCursor(RUNTIME_POSITION)));
@@ -320,7 +320,7 @@ describe('the cursor is SORT-AWARE (`specs/api.md` §3)', () => {
     expect(error.code).toBe('INVALID_CURSOR');
   });
 
-  it('T-API-021k: the query parser decodes the cursor belonging to the ACTIVE sort', () => {
+  it('T-API-019r: the query parser decodes the cursor belonging to the ACTIVE sort', () => {
     expect(
       parseTitleListQuery({ sort: 'runtime', cursor: encodeRuntimeCursor(RUNTIME_POSITION) })
         .cursor,
@@ -328,7 +328,7 @@ describe('the cursor is SORT-AWARE (`specs/api.md` §3)', () => {
     expect(parseTitleListQuery({ cursor: encodeCursor(VALID) }).cursor).toEqual(VALID);
   });
 
-  it('T-API-021l: mixing a cursor with the other sort is rejected by the parser, not by the database', () => {
+  it('T-API-019s: mixing a cursor with the other sort is rejected by the parser, not by the database', () => {
     expect(
       thrown(() => parseTitleListQuery({ sort: 'runtime', cursor: encodeCursor(VALID) })).code,
     ).toBe('INVALID_CURSOR');
