@@ -66,6 +66,21 @@ export function workIdentityForTmdb(mediaType: WorkMediaType, tmdbId: number): s
 }
 
 /**
+ * The media type inside a `tmdb:` work identity, or `null` for anything else.
+ *
+ * ⚠ **Reads the identity; never guesses.** An `unmatched:` identity carries no
+ * media type at all, and returning a default (`'movie'`) would be an invented
+ * fact that looks like a read one. Callers that need a type must handle `null`.
+ */
+export function mediaTypeForWorkIdentity(workIdentity: string | null): WorkMediaType | null {
+  if (workIdentity === null) return null;
+  const parts = workIdentity.split(':');
+  if (parts.length !== 3 || parts[0] !== 'tmdb') return null;
+  const mediaType = parts[1];
+  return mediaType === 'movie' || mediaType === 'tv' ? mediaType : null;
+}
+
+/**
  * `unmatched:<sha256(normalised)[0:16]>` - the fallback identity for a work
  * TMDB could not identify.
  *

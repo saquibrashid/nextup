@@ -63,6 +63,15 @@ interface ReviewSection {
     rawText?: string;
     name?: string;
     ticked?: boolean;
+    resolvedWorkIdentity?: string | null;
+    match?: {
+      tmdbId: number;
+      mediaType: string | null;
+      name: string;
+      releaseYear: number | null;
+      posterPath: string | null;
+    } | null;
+    alternatives?: { tmdbId: number; name: string }[];
     tileCrop?: { imageId: string; x: number; y: number; w: number; h: number } | null;
   }[];
 }
@@ -135,6 +144,11 @@ async function makeCandidate(
     disposition?: string;
     boxSource?: string;
     boundingBoxes?: string | null;
+    matchCandidates?: string | null;
+    correctedToTmdbId?: number | null;
+    correctedDisplayName?: string | null;
+    correctedDisplayYear?: number | null;
+    correctedDisplayPoster?: string | null;
   } = {},
 ): Promise<string> {
   const id = `cand-${++candidateSeq}`;
@@ -155,6 +169,11 @@ async function makeCandidate(
       resolvedWorkIdentity: over.workIdentity === undefined ? DUNE : over.workIdentity,
       reviewDisposition: over.disposition ?? (over.collapsedInto == null ? 'pending' : 'discarded'),
       collapsedIntoCandidateId: over.collapsedInto ?? null,
+      matchCandidates: over.matchCandidates ?? null,
+      correctedToTmdbId: over.correctedToTmdbId ?? null,
+      correctedDisplayName: over.correctedDisplayName ?? null,
+      correctedDisplayYear: over.correctedDisplayYear ?? null,
+      correctedDisplayPoster: over.correctedDisplayPoster ?? null,
     },
   });
   return id;
@@ -322,6 +341,65 @@ describe('T-REV-010 the review pass sorts candidates into sections', () => {
     const body = (await (await getReview(batchId)).json()) as ReviewBody;
     expect(body.sections.additions.count).toBe(1);
     expect(body.sections.additions.items[0]?.candidateId).toBe(winner);
+  });
+});
+
+/*
+ * REQ-109 — the review read must serve the identity the owner CHOSE.
+ *
+ * ⚠ This is the only place the three `corrected_display_*` columns and the
+ * `0008` migration are exercised against a real database. The unit cases prove
+ * the projection; only this proves the columns exist, accept these values and
+ * come back through Prisma.
+ */
+describe('T-API-022 a corrected candidate serves the correction, not the rejected guess', () => {
+  it('T-API-022i: the corrected display columns round-trip and win over alternatives[0]', async () => {
+    const batchId = await makeBatch();
+    // The extraction guessed Dune; the owner corrected it to Heat. The guess
+    // STAYS in matchCandidates — correcting the decision never rewrites the
+    // extraction — which is exactly why the old code re-served it.
+    await makeCandidate(batchId, {
+      rawText: 'Heat',
+      workIdentity: HEAT,
+      disposition: 'corrected',
+      matchCandidates: JSON.stringify([{ tmdbId: 438631, name: 'Dune', releaseYear: 2021 }]),
+      correctedToTmdbId: 949,
+      correctedDisplayName: 'Heat',
+      correctedDisplayYear: 1995,
+      correctedDisplayPoster: '/heat.jpg',
+    });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    const item = body.sections.additions.items[0];
+    expect(item?.match?.tmdbId).toBe(949);
+    expect(item?.match?.mediaType).toBe('movie');
+    expect(item?.match?.name).toBe('Heat');
+    expect(item?.match?.releaseYear).toBe(1995);
+    expect(item?.match?.posterPath).toBe('/heat.jpg');
+    // The rejected guess is still recorded as an alternative — the fact is not
+    // destroyed — but it is no longer what the card shows.
+    expect(item?.alternatives?.[0]?.name).toBe('Dune');
+  });
+
+  it('T-API-022j: a candidate corrected BEFORE these columns existed invents no name', async () => {
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, {
+      rawText: 'Heat',
+      workIdentity: HEAT,
+      disposition: 'corrected',
+      matchCandidates: JSON.stringify([{ tmdbId: 438631, name: 'Dune', releaseYear: 2021 }]),
+      correctedToTmdbId: 949,
+    });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    const item = body.sections.additions.items[0];
+    // No stored display name, so the projection falls through to the PREVIOUS
+    // behaviour rather than inventing a name for a row that never had one.
+    // This is the deliberate legacy path, not the defect: it applies only to
+    // corrections stored before `0008`, and the row still carries its own
+    // corrected identity in `resolvedWorkIdentity`.
+    expect(item?.resolvedWorkIdentity ?? null).toBe(HEAT);
+    expect(item?.match?.name).toBe('Dune');
   });
 });
 

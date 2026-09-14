@@ -1672,6 +1672,9 @@ export async function updateCandidateDisposition(
     | 'cleanupVerdict'
     | 'classification'
     | 'matchCandidates'
+    | 'correctedDisplayName'
+    | 'correctedDisplayYear'
+    | 'correctedDisplayPoster'
   >,
   tx?: Db,
 ) {

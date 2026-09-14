@@ -36,6 +36,22 @@ export type ConfirmableSection = (typeof CONFIRMABLE_SECTIONS)[number];
 export const SETTABLE_DISPOSITIONS = ['confirmed', 'discarded', 'pending'] as const;
 export type SettableDisposition = (typeof SETTABLE_DISPOSITIONS)[number];
 
+/**
+ * REQ-109 — what the owner's chosen match LOOKS like, so the review card can
+ * show the identity they corrected TO instead of the one they rejected.
+ *
+ * ⚠ **Display, never identity.** The stored `resolvedWorkIdentity` is derived
+ * solely from `tmdbId` + `mediaType`; nothing here reaches it (SD-05).
+ */
+export interface CorrectedDisplay {
+  name: string;
+  releaseYear: number | null;
+  posterPath: string | null;
+}
+
+/** The longest display string the correction path will store (schema: 500). */
+const MAX_DISPLAY_LENGTH = 500;
+
 export type CandidatePatch =
   | { kind: 'disposition'; disposition: SettableDisposition }
   | {
@@ -44,6 +60,12 @@ export type CandidatePatch =
       mediaType: MediaType;
       /** US-012 AC-5 — the owner has seen the duplicate warning and meant it. */
       confirmDuplicate: boolean;
+      /**
+       * REQ-109 — DISPLAY ONLY. Never identity; see `parseCorrection`.
+       * `null` when the client did not send them (an older client, or a
+       * correction made with no search result in hand).
+       */
+      display: CorrectedDisplay | null;
     }
   | { kind: 'reclassify' };
 
@@ -121,11 +143,25 @@ export function parseCandidatePatch(body: unknown): ParseResult<CandidatePatch> 
   // fixed the match and I confirm it"; confirming the ORIGINAL match and
   // discarding the tmdbId silently adds the wrong work to the owner's list —
   // the exact failure US-007 exists to prevent, and one that leaves no trace.
-  if ('tmdbId' in record || 'mediaType' in record) {
-    return reject('"tmdbId" and "mediaType" are only valid with "disposition": "corrected".', {
-      field: 'disposition',
-      disposition,
-    });
+  //
+  // ⚠ The REQ-109 display fields are refused here for the same reason and NOT
+  // merely ignored. Silently dropping them would store a candidate whose card
+  // then shows the rejected identity — the very defect REQ-109 exists to fix —
+  // while the request reported success.
+  if (
+    'tmdbId' in record ||
+    'mediaType' in record ||
+    'correctedName' in record ||
+    'correctedReleaseYear' in record ||
+    'correctedPosterPath' in record
+  ) {
+    return reject(
+      '"tmdbId", "mediaType" and the corrected display fields are only valid with "disposition": "corrected".',
+      {
+        field: 'disposition',
+        disposition,
+      },
+    );
   }
 
   return {
@@ -153,6 +189,9 @@ function parseCorrection(record: Record<string, unknown>): ParseResult<Candidate
     return reject('"confirmDuplicate" must be a boolean.', { field: 'confirmDuplicate' });
   }
 
+  const display = parseCorrectedDisplay(record);
+  if (!display.ok) return display;
+
   return {
     ok: true,
     value: {
@@ -160,6 +199,90 @@ function parseCorrection(record: Record<string, unknown>): ParseResult<Candidate
       tmdbId,
       mediaType: mediaType as MediaType,
       confirmDuplicate: confirmDuplicate === true,
+      display: display.value,
+    },
+  };
+}
+
+/**
+ * REQ-109 — the optional display fields that accompany a correction.
+ *
+ * ⚠ **THIS ACCEPTS DISPLAY TEXT WHERE `parseManualEntry` REFUSES IT, AND THAT
+ * INCONSISTENCY IS DELIBERATE — DO NOT "TIDY" IT.** The two endpoints are
+ * under different constraints:
+ *
+ *   - `parseManualEntry` (§6.20) refuses a caller-supplied `name` because its
+ *     route fetches the work from TMDB anyway, so refusing costs nothing and
+ *     guarantees the owner sees what TMDB actually holds.
+ *   - `applyCorrection` (§6.18) is **network-free by an explicit recorded
+ *     decision** — "a TMDB outage must not stop the owner fixing a wrong
+ *     match". The same refusal here would cost REQ-109 entirely: the review
+ *     screen runs before any `Title` row exists, so if the client does not
+ *     carry the name, nothing on the server has one to show.
+ *
+ * What makes that safe is that these values are **display only**. Identity is
+ * still derived solely from `tmdbId` + `mediaType`, and the lazy refresh
+ * (REQ-076, NFR-014) replaces these with TMDB's own values on first access.
+ *
+ * ⚠ Absent is NOT an error. An older client, or a correction made from a path
+ * with no search result in hand, sends none of these; the review read then
+ * falls back to its previous behaviour rather than failing a correction the
+ * owner is entitled to make.
+ *
+ * ⚠ A PARTIAL payload is refused rather than half-stored. `{ posterPath }`
+ * with no `name` would render a corrected poster under the rejected title —
+ * the two-facts-disagreeing failure this requirement exists to end.
+ */
+function parseCorrectedDisplay(
+  record: Record<string, unknown>,
+): ParseResult<CorrectedDisplay | null> {
+  const name = record['correctedName'];
+  const releaseYear = record['correctedReleaseYear'];
+  const posterPath = record['correctedPosterPath'];
+
+  if (name === undefined && releaseYear === undefined && posterPath === undefined) {
+    return { ok: true, value: null };
+  }
+
+  if (typeof name !== 'string' || name.trim() === '') {
+    return reject('"correctedName" is required when any corrected display field is sent.', {
+      field: 'correctedName',
+    });
+  }
+  if (name.length > MAX_DISPLAY_LENGTH) {
+    return reject('"correctedName" is too long.', {
+      field: 'correctedName',
+      maxLength: MAX_DISPLAY_LENGTH,
+    });
+  }
+
+  if (
+    releaseYear !== undefined &&
+    releaseYear !== null &&
+    (typeof releaseYear !== 'number' || !Number.isInteger(releaseYear))
+  ) {
+    return reject('"correctedReleaseYear" must be an integer or null.', {
+      field: 'correctedReleaseYear',
+    });
+  }
+
+  if (
+    posterPath !== undefined &&
+    posterPath !== null &&
+    (typeof posterPath !== 'string' || posterPath.length > MAX_DISPLAY_LENGTH)
+  ) {
+    return reject('"correctedPosterPath" must be a string or null.', {
+      field: 'correctedPosterPath',
+      maxLength: MAX_DISPLAY_LENGTH,
+    });
+  }
+
+  return {
+    ok: true,
+    value: {
+      name,
+      releaseYear: typeof releaseYear === 'number' ? releaseYear : null,
+      posterPath: typeof posterPath === 'string' && posterPath !== '' ? posterPath : null,
     },
   };
 }

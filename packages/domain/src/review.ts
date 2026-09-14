@@ -53,6 +53,7 @@ import type {
   Service,
 } from './enums.js';
 import { CANDIDATE_CLASSIFICATIONS } from './enums.js';
+import { mediaTypeForWorkIdentity } from './identity.js';
 import type { IsoDate } from './types.js';
 import { DEGRADED_EXTRACTION_BANNER, TMDB_UNAVAILABLE_BANNER } from './copy.js';
 
@@ -103,6 +104,75 @@ export interface ReviewMatchRef {
 export interface ReviewMatch extends ReviewMatchRef {
   uncertain: boolean;
   ambiguous: boolean;
+}
+
+/** The stored candidate columns `chosenReviewMatch` reads. */
+export interface ChosenMatchInput {
+  reviewDisposition: string;
+  resolvedWorkIdentity: string | null;
+  correctedToTmdbId: number | null;
+  correctedDisplayName: string | null;
+  correctedDisplayYear: number | null;
+  correctedDisplayPoster: string | null;
+  alternatives: readonly ReviewMatchRef[];
+}
+
+/**
+ * REQ-109 — the match a review card should SHOW: the owner's correction when
+ * there is one, otherwise the extraction's best guess.
+ *
+ * ⚠ **WITHOUT THE CORRECTED BRANCH THIS RETURNS THE IDENTITY THE OWNER JUST
+ * REJECTED.** `applyCorrection` deliberately does not rewrite
+ * `matchCandidates` — the extraction's guesses and the owner's decision are
+ * two different facts (`services/batchClose.ts`) — so after a correction
+ * `resolvedWorkIdentity` starts with `tmdb:`, the fallback guard passes, and
+ * `alternatives[0]` is served: the original wrong match. That was the defect.
+ *
+ * ⚠ **`alternatives` is NOT filtered or reordered here.** US-007 AC-4 shows
+ * what the extraction guessed, and it still guessed exactly that; only the
+ * CHOSEN match reflects the owner's decision.
+ *
+ * ⚠ **`score: 1`, `uncertain: false`, `ambiguous: false` are not computed.**
+ * The owner picked this identity by hand, so there is nothing uncertain about
+ * it — and deriving those flags from the alternatives' scores would describe a
+ * DIFFERENT candidate, chipping the owner's own choice as a doubtful match.
+ *
+ * ⚠ A corrected candidate with no stored display name falls through to the
+ * previous behaviour rather than inventing one. Corrections stored before
+ * those columns existed have no name, and `null` there is honest.
+ */
+export function chosenReviewMatch(input: ChosenMatchInput): ReviewMatch | null {
+  const corrected = correctedReviewMatch(input);
+  if (corrected !== null) return corrected;
+
+  const top = input.alternatives[0];
+  if (top === undefined || input.resolvedWorkIdentity?.startsWith('tmdb:') !== true) return null;
+
+  const second = input.alternatives[1];
+  return {
+    ...top,
+    uncertain: top.score < 1,
+    ambiguous: second !== undefined && top.score - second.score < 0.05,
+  };
+}
+
+function correctedReviewMatch(input: ChosenMatchInput): ReviewMatch | null {
+  if (input.reviewDisposition !== 'corrected') return null;
+  if (input.correctedToTmdbId === null || input.correctedDisplayName === null) return null;
+
+  const mediaType = mediaTypeForWorkIdentity(input.resolvedWorkIdentity);
+  if (mediaType === null) return null;
+
+  return {
+    tmdbId: input.correctedToTmdbId,
+    mediaType,
+    name: input.correctedDisplayName,
+    releaseYear: input.correctedDisplayYear,
+    posterPath: input.correctedDisplayPoster,
+    score: 1,
+    uncertain: false,
+    ambiguous: false,
+  };
 }
 
 /** The candidate shape this module routes. Mirrors `specs/api.md` §6.17. */

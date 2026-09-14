@@ -508,6 +508,7 @@ export function ReviewPage({
                 unmatchedWired ? (
                   <UnmatchedActions
                     candidateId={candidate.candidateId}
+                    correctedName={candidate.match?.name ?? null}
                     disposition={effectiveDisposition(
                       candidate.disposition,
                       local[candidate.candidateId],
@@ -541,6 +542,7 @@ export function ReviewPage({
               unmatchedWired ? (
                 <UnmatchedActions
                   candidateId={candidate.candidateId}
+                  correctedName={candidate.match?.name ?? null}
                   disposition={effectiveDisposition(
                     candidate.disposition,
                     local[candidate.candidateId],

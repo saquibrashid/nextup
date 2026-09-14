@@ -106,6 +106,19 @@ export interface UnmatchedActionsProps {
    * offers actions; the rest report what was decided.
    */
   readonly disposition: string;
+  /**
+   * REQ-109 — the name of the work this candidate was corrected TO, as the
+   * SERVER now reports it (`candidate.match.name` once the disposition is
+   * `'corrected'`).
+   *
+   * ⚠ **This is what makes the correction survive a re-render.** The component
+   * holds the name in local state for the click path only; on any render from
+   * server state that local value is gone, and without this prop the card
+   * falls back to a generic "Matched to the title you chose." — the owner is
+   * told something was matched but not what, which is the defect REQ-109
+   * exists to close.
+   */
+  readonly correctedName?: string | null;
   /** §6.18 `{ disposition: 'confirmed' }` — the keep-anyway path. */
   readonly onKeep: (candidateId: string) => Promise<void>;
   /** §6.18 `{ disposition: 'discarded' }`. */
@@ -125,16 +138,21 @@ type Outcome = { kind: 'kept' } | { kind: 'discarded' } | { kind: 'matched'; nam
  * alone: a reload must keep saying what the server holds, and a card that
  * forgot the owner's decision on refresh would invite them to make it twice.
  *
- * ⚠ `'corrected'` carries NO NAME here, and the copy reflects that rather than
- * interpolating an empty string. After a correction the server re-resolves the
- * identity, so on the next read the row is an addition and never reaches this
- * component at all — the only way to be here holding `'corrected'` is a stale
- * render, and "Matched to ." would read as a bug in the match, not a stale card.
+ * ⚠ `'corrected'` names the work WHEN THE SERVER KNOWS IT (REQ-109). The name
+ * arrives as `correctedName`, projected from the candidate's `match` — which
+ * the review read now builds from the owner's correction rather than from
+ * `matchCandidates[0]`, the identity they rejected.
+ *
+ * ⚠ It can still be absent, and the unnamed copy stays for that case rather
+ * than interpolating an empty string: a correction stored before these display
+ * fields existed, or one made by a client that sent none, has no name on the
+ * server and none is invented. "Matched to ." would read as a bug in the
+ * match.
  */
-function outcomeFor(disposition: string): Outcome | null {
+function outcomeFor(disposition: string, correctedName: string | null): Outcome | null {
   if (disposition === 'confirmed') return { kind: 'kept' };
   if (disposition === 'discarded') return { kind: 'discarded' };
-  if (disposition === 'corrected') return { kind: 'matched', name: null };
+  if (disposition === 'corrected') return { kind: 'matched', name: correctedName };
   return null;
 }
 
@@ -150,6 +168,7 @@ export function UnmatchedActions({
   candidateId,
   variant = 'unmatched',
   disposition,
+  correctedName = null,
   onKeep,
   onDiscard,
   onMatch,
@@ -165,7 +184,11 @@ export function UnmatchedActions({
   const [local, setLocal] = useState<Outcome | null>(null);
 
   const copy = VARIANT_COPY[variant];
-  const outcome = local ?? outcomeFor(disposition);
+  // ⚠ SERVER STATE WINS ON A RE-RENDER. `local` is the click path's optimistic
+  // outcome; once the refetched payload names the correction, the two agree.
+  // Preferring `local` forever would rebuild the REQ-109 defect from the other
+  // side — a name that is right until the component re-mounts.
+  const outcome = local ?? outcomeFor(disposition, correctedName);
 
   const run = (action: () => Promise<void>, next: Outcome): void => {
     if (busy) return;

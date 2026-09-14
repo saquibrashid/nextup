@@ -154,6 +154,21 @@ async function applyCorrection(
     reviewDisposition: 'corrected',
     resolvedWorkIdentity: workIdentity,
     correctedToTmdbId: patch.tmdbId,
+    // REQ-109 — what the owner corrected TO, so the review card can show it.
+    //
+    // ⚠ These are DISPLAY ONLY and never identity (SD-05): `workIdentity`
+    // above is derived solely from `tmdbId` + `mediaType`. They are written
+    // here rather than fetched because this function is network-free on
+    // purpose (see the header) — and `null` when the client sent none, which
+    // leaves the review read on its previous fallback rather than failing a
+    // correction the owner is entitled to make.
+    //
+    // ⚠ `matchCandidates` is still NOT rewritten. See the comment in
+    // `services/batchClose.ts`: the extraction's guesses and the owner's
+    // decision are two different facts.
+    correctedDisplayName: patch.display?.name ?? null,
+    correctedDisplayYear: patch.display?.releaseYear ?? null,
+    correctedDisplayPoster: patch.display?.posterPath ?? null,
     // ⚠ A corrected candidate is a TITLE by definition — the owner just named
     // it. Leaving a `chrome-suspected` or `unreadable-tile` verdict in place
     // would leave the item collapsed behind an expander after the owner fixed
