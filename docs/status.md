@@ -11,18 +11,22 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 0 |
+| ⬜ todo | 11 |
 | 🚧 doing | 0 |
 | ✅ done | 202 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **205** |
+| **total** | **216** |
 
 ## Ready to start
 
 Not done, and every task they depend on is done.
 
-_Nothing is ready: every unfinished task is waiting on a dependency._
+| Task | Size | Section |
+|---|---|---|
+| `TASK-208` | S | 5P. Epic P — the visual refresh (ADR-0013, `specs/ui-refresh.md`, `A53`) |
+| `TASK-214` | M | 5P. Epic P — the visual refresh (ADR-0013, `specs/ui-refresh.md`, `A53`) |
+| `TASK-216` | L | 5P. Epic P — the visual refresh (ADR-0013, `specs/ui-refresh.md`, `A53`) |
 
 ## Waiting on the owner
 
@@ -34,8 +38,18 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 
 ## Blocked by a dependency
 
-0 tasks cannot start yet.
+8 tasks cannot start yet.
 
+| Task | Waiting on |
+|---|---|
+| `TASK-209` | `TASK-208` |
+| `TASK-210` | `TASK-208`, `TASK-209` |
+| `TASK-211` | `TASK-210` |
+| `TASK-212` | `TASK-210` |
+| `TASK-213` | `TASK-212` |
+| `TASK-215` | `TASK-212`, `TASK-214` |
+| `TASK-217` | `TASK-210`, `TASK-216` |
+| `TASK-218` | `TASK-210` |
 
 ## Done
 

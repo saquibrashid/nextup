@@ -4471,3 +4471,111 @@ disagree about who owns an id, the gate follows the backlog and this table
 becomes the misleading one. **They are edited together or not at all.** All 21
 ids are cited across `TASK-183` – `TASK-189`; none is unowned, and none is
 owned twice.
+
+---
+
+## 39. The visual refresh (Epic P, ADR-0013 + `specs/ui-refresh.md`) — the test ids
+
+⚠ **NONE OF THESE TESTS EXISTS YET, AND THAT IS THE POINT OF THIS SECTION.**
+`specs/ui-refresh.md` reserved 45 ids across five families, and
+`check:test-ids` fails on any cited id that is not defined **here**. Until this
+register landed, **no backlog task could cite one**, so Epic P had a complete
+specification and no way to be written down as work. This section closes that
+gap. It defines ids; it does not claim implementations.
+
+⚠ **This register is NOT the `§9` AC mapping.** Per `specs/ui-refresh.md` §1,
+a story moves into `docs/PRD.md` **together with** its §9 rows and its real
+tests, in one change. Defining an id here is the prerequisite for that, never
+a substitute for it.
+
+### 39.1 ⚠ WHERE THESE FILES LIVE — read `§11` before creating one
+
+`T-CI-008` exists because six test files were once pointed at directories no
+Vitest project collects, and a canary asserting `1 === 2` was reported inside a
+fully passing run. **The authoritative layout is §11.**
+
+| Family | Location |
+|---|---|
+| `T-UX-*`, `T-UI-*`, `T-CSS-006/007` | **`apps/web/test/`** — never `tests/web/` |
+| `T-API-*` | `apps/api/test/unit/` for the query/ordering logic, `apps/api/test/integration/` for the route. ⚠ **A route proven only by the integration project scores ~5% against the 90% floor** — the integration project is excluded from coverage. Both halves are required |
+
+Run `npm run check:test-locations` before pushing.
+
+### 39.2 The list surface, navigation and review (`T-UX-*`)
+
+| Id | Level | What it asserts | Source |
+|---|---|---|---|
+| `T-UX-106` | U | After `onMatch` resolves, the card renders the **corrected** name and poster URL, not the extracted one | §3 |
+| `T-UX-107` | U | After a **re-render from server state** (`disposition: 'corrected'`), the card still names the corrected title — the regression `name: null` causes today | §3 |
+| `T-UX-108` | U | The correction is announced in a live region | §3 |
+| `T-UX-110` | U | At 320 px the list layout renders with no horizontal scroll *(extends `T-A11Y-001`)* | §4 |
+| `T-UX-111` | U | At 1280 px the grid layout renders | §4 |
+| `T-UX-112` | U | The row overflow menu offers the **same item set** in both layouts | §4 |
+| `T-UX-113` | U | The bar renders filters and sort in one group | §5 |
+| `T-UX-114` | U | Changing a filter preserves `sort` and `dir` | §5 |
+| `T-UX-115` | U | A `localStorage` direction with **no `dir` in the URL** is reconciled into the URL, and the label matches the request actually issued | §5 |
+| `T-UX-116` | U | Oldest-first is reachable in one action from the default view (invariant 6) | §5 |
+| `T-UX-117` | U | The active destination carries `aria-current="page"` **and a non-colour cue** | §6 |
+| `T-UX-118` | U | The freshness strip still deep-links to `/upload` with the service pre-selected (REQ-039, RSK-007) | §6 |
+| `T-UX-119` | U | ⚠ **REWRITTEN at `A53`, NOT DELETED.** It asserted *"no sort option exposes the IMDb rating"*; it now asserts the sort field selector **does** offer the rating and that selecting it issues `sort=rating` | §7a |
+| `T-UX-120` | U | *(`A48`)* Selecting **Runtime** relabels the direction toggle to *Shortest first* / *Longest first*, and the date labels do not survive the switch | §5a |
+| `T-UX-121` | U | The row renders `1h 55m` for film and `45m/ep` for TV; the `/ep` suffix is absent for film and present for every TV row | §5a |
+| `T-UX-122` | U | A `null` runtime renders the words `Runtime unknown` — never `0m`, never an empty slot | §5a |
+| `T-UX-123` | U | Selecting a bucket sets `runtime` in the query string, and the boundaries are **half-open**: a 60-minute title appears in `60-120` and **not** in `30-60` | §5a |
+| `T-UX-124` | U | While a runtime filter is active the hidden-unknown disclosure renders with the server's count; with no runtime filter it does not render at all | §5a |
+| `T-UX-125` | U | A TV title whose stored genres contain `Action & Adventure` renders the chips `Action` and `Adventure`, and does **not** render `Action & Adventure` | §4.4 |
+| `T-UX-126` | U | The genre filter list contains **no combined TV name** — `Action & Adventure`, `Sci-Fi & Fantasy` and `War & Politics` never appear as options | §4.4 |
+| `T-UX-127` | U | The compact row wraps genres to at most one line with a `+n` overflow, and a genre in the **active filter** is always visible rather than hidden behind `+n` | §4.3 |
+| `T-UX-128` | U | Both direction options are rendered simultaneously with the current one marked — **not** a single toggling button (`A53`, OQ-5) | §5b |
+| `T-UX-129` | U | Direction labels change with the selected field (`Longest first` for runtime, `A–Z` for name), while `SORT_NEWEST_LABEL` / `SORT_OLDEST_LABEL` are **reused unmodified** for the date field | §5b |
+| `T-UX-130` | U | Changing the sort field preserves `dir`; changing either preserves the active filters and **resets `cursor`** | §5b |
+| `T-UX-131` | U | With the default field selected, oldest-first is reachable in exactly **one** interaction (invariant 6) | §5b |
+| `T-UX-132` | U | Below `--bp-sm` the bar renders exactly `/`, `/upload` and `More`; `/removed`, `/not-interested` and `/batches` are reachable only via `More` (`A53`, OQ-2) | §6 |
+| `T-UX-133` | U | A route behind `More` is still marked `aria-current="page"` when open, and is still reachable by direct URL | §6 |
+| `T-UX-134` | U | An addition card and a removal card are distinguishable **by their own rendered content**, with no section heading in the accessible subtree | §6a.1 |
+| `T-UX-135` | U | Each section renders a heading and a count, and the removals section carries a **non-colour** consequential marker | §6a.1 |
+| `T-UX-136` | U | ⚠ **The invariant-2 guard.** A full-update review still renders **all** extracted candidates, including already-correct ones — the section treatment hides nothing | §6a.1 |
+
+### 39.3 Tokens, icons and primitives (`T-CSS-*`, `T-UI-*`)
+
+| Id | Level | What it asserts | Source |
+|---|---|---|---|
+| `T-CSS-006` | U | `:root` declares every type-scale token, and no rule body contains a raw font-size literal *(extends `T-CSS-003`)* | §7b |
+| `T-CSS-007` | U | No rendered primary content computes to a font size below `--text-sm` | §7b |
+| `T-UI-030` | U | Every icon component renders `stroke="currentColor"` and declares **no hard-coded colour** | §7c |
+| `T-UI-031` | U | Every interactive control in `apps/web/src/**` is rendered by a primitive, not by a bare `<button>` or `<fieldset>` | §7d |
+| `T-UI-032` | U | Every primitive variant resolves to a **static** class present in the stylesheet, and no primitive uses a template-literal `className` *(the `T-CSS-001c` form)* | §7d |
+
+⚠ **`T-UI-029` is reserved and deliberately NOT defined here.** `ui-refresh.md`
+§10 reserves `T-UI-029` – `T-UI-032` as a range but uses only `030` – `032`.
+Defining an id nothing cites would put an unowned id into the register, which
+is precisely what `check:orphans` exists to notice. **Leave it vacant.**
+
+### 39.4 The list route (`T-API-*`)
+
+| Id | Level | What it asserts | Source |
+|---|---|---|---|
+| `T-API-019` | U + I | `sort=runtime` orders by runtime with `NULL`s last in **both** directions, tie-broken by `title.id` | §5a, `A48` |
+| `T-API-020` | U + I | `runtimeUnknownHidden` counts the **whole filtered set**, not the returned page, and is `null` when no runtime filter is active | §5a |
+| `T-API-021` | U | An unrecognised `runtime` bucket is a **400**, per the §3 enum rule | §5a |
+| `T-API-022` | I | ⚠ **The filter half of the genre bug.** `?genre=Action` returns **both** a film tagged `Action` **and** a TV title tagged `Action & Adventure`; `?genre=War` returns a title tagged `War & Politics`. A display-only fix makes the owner-reported symptom disappear while this still fails | §4.4 |
+| `T-API-023` | U + I | `sort=rating` orders by rating with `NULL`s **last in both directions**, tie-broken by `title.id` (`A48`, REQ-091) | §7a |
+| `T-API-024` | U | ⚠ **THE REQ-041 GUARD, AND THE MOST IMPORTANT ID IN THIS SECTION.** Under `sort=rating` the rating sweep is **awaited before the `ORDER BY` is applied**, and **no rating write occurs after the response has been sent**. The failure it catches is invisible — the list simply reorders itself between renders — and "move the await out of the hot path" reads like a performance fix | §7a.1, ADR-0011 Rev 1 |
+| `T-API-025` | U | A sweep that exhausts its request cap or time budget still returns **200**; unrefreshed titles keep their cached-or-absent value and are ordered on it | §7a.1 |
+| `T-API-026` | U | An unrecognised `sort` value is **400 `INVALID_QUERY`**, never a silent fall back to `dateAdded` — a mistyped key that returns the default looks like a working sort that does nothing | `api.md` §6.2 |
+| `T-API-027` | U + I | `sort=name` and `sort=releaseYear` order correctly in both directions. ⚠ **The name case must pin case-insensitive human ordering explicitly**: the collation is `Latin1_General_100_BIN2`, which is **binary**, so an unqualified `ORDER BY` sorts `apple` after `Zebra` and still looks alphabetical on a title-cased list | §5b, `A53` |
+
+### 39.5 What is deliberately NOT asserted here
+
+**That the refresh looks good.** Taste is the owner's, recorded in **ADR-0013**,
+and a test that pinned a colour would fail the next time they changed their
+mind. What is asserted is everything a screenshot cannot show: contrast ratios
+computed from the tokens (`T-CSS-004`), reachability (`T-UX-131`), that the
+accessible name survives (`T-UX-133`), and that **nothing was hidden**
+(`T-UX-136`).
+
+⚠ **`T-CSS-001`'s bidirectionality is why the UI shipped unstyled, and it is
+NOT relaxed by this epic.** Every defined rule must still be used. The original
+blocker was never the test — it only inspects **class** names, so an element
+selector always passed — it was §13.1's prose calling the class vocabulary
+"already fixed". **The vocabulary is not fixed; the correspondence is.**
