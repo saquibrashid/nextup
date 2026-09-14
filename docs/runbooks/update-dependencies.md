@@ -194,12 +194,20 @@ outstanding:**
 1. **Done** — the runtime pins (`.nvmrc`, `engines`, the `Dockerfile` digest)
    moved to 22 in a single commit that changed **no lockfile**. That is what
    made it verifiable while the proxy lag in §7 blocks a local `npm ci`.
-2. **Next, once a production deploy on Node 22 has succeeded** — remove the
-   `@types/node`, `jsdom` and `@testing-library/jest-dom` `ignore` entries in
-   `.github/dependabot.yml` and let Dependabot raise those bumps. ⚠ Let
-   **Dependabot** regenerate the lockfile, not a local `npm install`: its runner
-   resolves against `registry.npmjs.org` and writes `sha512-` integrity, and a
-   local install here would write internal-proxy URLs into a public repo (§6).
+2. **Done** — the production deploy on Node 22 succeeded (the staging smoke
+   suite and the new revision's own smoke run both passed before traffic
+   shifted), which was the recorded exit criterion, so the holds in
+   `.github/dependabot.yml` were released: `jsdom` and
+   `@testing-library/jest-dom` outright, and `@types/node` **capped at
+   `>=23`** rather than deleted. ⚠ **Deleting that entry would have been
+   wrong** — an uncapped `@types/node` floats to the newest major, which is
+   ahead of the runtime and is the exact failure the hold existed to prevent.
+   Capping by *version* instead of by *update-type* lets the 20 → 22 bump
+   through while still refusing 23+, and `T-INFRA-018d` fails CI if the cap is
+   ever circumvented. ⚠ Let **Dependabot** regenerate the lockfile, not a local
+   `npm install`: its runner resolves against `registry.npmjs.org` and writes
+   `sha512-` integrity, and a local install here would write internal-proxy
+   URLs into a public repo (§6).
 3. **Then** rebase the held `vitest@5` PR, which installs cleanly once
    `@types/node` is on 22.
 

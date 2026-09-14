@@ -13,7 +13,8 @@
  *   happens in production.
  * - `@types/node` ahead of the runtime is the same defect one level up: code
  *   compiles against APIs the deployed container does not have. That is why
- *   `.github/dependabot.yml` ignores its major, and why the runtime pins moved
+ *   `.github/dependabot.yml` caps it at the running major rather than floating
+ *   it to latest, and why the runtime pins moved
  *   to 22 while the types deliberately stayed on 20 - types BEHIND the runtime
  *   only cost you visibility of new APIs, so it is the safe direction and the
  *   assertion below is one-sided on purpose.
