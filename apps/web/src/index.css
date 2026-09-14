@@ -21,6 +21,12 @@
 :root {
   /* Breakpoints — named so the same width cannot be typed twice differently. */
   --bp-sm: 640px;
+  /*
+   * ADR-0013's list/grid switch (REQ-110). Declared here with the other two so
+   * the three breakpoints are read as one scale; its consumer arrives with the
+   * hybrid list surface in TASK-212.
+   */
+  --bp-md: 768px;
   --bp-lg: 1024px;
 
   --layout-max-width: 56rem;
@@ -61,7 +67,17 @@
    */
   --color-border: #878d99;
 
-  --color-accent: #1d4ed8; /* 6.7:1 on white */
+  /*
+   * ⚠ ADR-0013's deeper indigo, and the owner's choice. 7.90:1 on surface,
+   * 7.56:1 on bg — and WHITE TEXT ON IT is also 7.90:1, which is why one
+   * token serves both the link colour and the filled primary button without
+   * a second value being invented for the button.
+   *
+   * ⚠ `T-CSS-004c` pins this ratio as a literal. Changing the hex without
+   * changing that number fails the suite — deliberately, because the spec
+   * table and the token drifting apart is the exact defect it exists for.
+   */
+  --color-accent: #4338ca; /* 7.9:1 on white */
   --color-danger: #b91c1c; /* 6.5:1 on white — destructive confirmation only */
 
   /* A closed scale. A one-off margin is a token that was not added. */
@@ -79,6 +95,38 @@
    * layout shift while it arrives. The system stack costs neither.
    */
   --font-stack: system-ui, -apple-system, 'Segoe UI', roboto, helvetica, arial, sans-serif;
+
+  /*
+   * REQ-123 — THE TYPE SCALE. ⚠ THERE WAS NO SCALE AT ALL BEFORE THIS: every
+   * screen rendered at one size, which is the loudest single signal that a
+   * page was never designed. Sixteen raw literals in five ad-hoc sizes were
+   * replaced by these, including a `0.85rem` that sat on no scale whatever.
+   *
+   * ⚠ `rem`, never `px`, so the browser's own text-size setting is honoured.
+   * A `px` scale silently overrides an accessibility preference the user has
+   * already expressed, and looks correct in every screenshot.
+   */
+  --text-xs: 0.75rem; /* ⚠ UPPERCASE TRACKED LABELS ONLY — see below */
+  --text-sm: 0.875rem; /* Secondary and helper copy, genre chips */
+  --text-base: 1rem; /* Body. NEVER below this for primary content */
+  --text-lg: 1.125rem; /* The title-row name, card headings */
+  --text-xl: 1.5rem; /* Section headings, the brand mark */
+  --text-2xl: 2rem; /* Page heading */
+
+  /*
+   * ⚠ `--text-xs` IS NOT A DENSITY CONTROL. REQ-112's density is found in
+   * layout and in the compact genre presentation — not by shrinking content
+   * below `--text-sm`, which is what `T-CSS-007` exists to catch. Reaching
+   * for it to fit more in is the failure mode, and it always looks fine to
+   * the person who has just done it.
+   */
+
+  --leading-tight: 1.2; /* Headings */
+  --leading-normal: 1.55; /* Body */
+
+  --weight-normal: 400;
+  --weight-medium: 600;
+  --weight-bold: 700;
 }
 
 /* ---------------------------------------------------------------- reset -- */
@@ -115,8 +163,8 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-stack);
-  font-size: 1rem;
-  line-height: 1.5;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
   margin: 0;
 }
 
@@ -161,8 +209,8 @@ button {
   align-items: center;
   color: var(--color-text);
   display: flex;
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
   gap: var(--space-2);
   text-decoration: none;
 }
@@ -246,7 +294,7 @@ button {
 .dropzone__paste > button {
   border-color: var(--color-accent);
   color: var(--color-accent);
-  font-weight: 600;
+  font-weight: var(--weight-medium);
 }
 
 /*
@@ -348,13 +396,13 @@ button {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   color: var(--color-text-muted);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   text-decoration: none;
 }
 
 .freshness-strip__notice {
   color: var(--color-text-muted);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
 }
 
 /* -------------------------------------------------------------- refusal -- */
@@ -453,7 +501,7 @@ button {
 .title-row__spinner {
   align-self: center;
   color: var(--color-text-muted);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   white-space: nowrap;
 }
 
@@ -496,14 +544,14 @@ button {
 }
 
 .title-row__name {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
 }
 
 .title-row__meta,
 .title-row__date {
   color: var(--color-text-muted);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
 }
 
 /*
@@ -547,7 +595,7 @@ button {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   padding: var(--space-1) var(--space-2);
 }
 
@@ -565,8 +613,8 @@ button {
 
 .title-row__rating {
   color: var(--color-text);
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
 }
 
 /*
@@ -576,12 +624,12 @@ button {
  */
 .title-row__rating--absent {
   color: var(--color-text-muted);
-  font-weight: 400;
+  font-weight: var(--weight-normal);
 }
 
 .title-row__rating-source {
   color: var(--color-text-muted);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
 }
 
 /*
@@ -723,7 +771,7 @@ button {
 
 /* The flag is the one genuinely good-news line on the screen. */
 .waiting-row__flag {
-  font-weight: 600;
+  font-weight: var(--weight-medium);
 }
 
 .title-row--skeleton,
@@ -816,7 +864,7 @@ button {
 }
 
 .removed-row__name {
-  font-weight: 600;
+  font-weight: var(--weight-medium);
 }
 
 .removed-row__service {
@@ -852,7 +900,7 @@ button {
 }
 
 .removed-empty__title {
-  font-weight: 600;
+  font-weight: var(--weight-medium);
 }
 
 .removed-empty__body {
@@ -887,7 +935,7 @@ button {
   color: var(--color-text-muted);
   display: flex;
   flex-wrap: wrap;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   gap: var(--space-2);
   margin-top: var(--space-6);
   padding-top: var(--space-4);
@@ -909,7 +957,7 @@ button {
  */
 .justwatch-attribution {
   color: var(--color-text-muted);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   margin-top: var(--space-4);
 }
 
@@ -951,7 +999,7 @@ button {
  */
 .review-section__summary {
   cursor: pointer;
-  font-weight: 600;
+  font-weight: var(--weight-medium);
   min-height: var(--tap-target-min);
   padding: var(--space-2) 0;
 }
@@ -999,7 +1047,7 @@ button {
 }
 
 .review-empty__title {
-  font-weight: 600;
+  font-weight: var(--weight-medium);
   margin: 0 0 var(--space-1);
 }
 
@@ -1077,13 +1125,13 @@ button {
 }
 
 .candidate-card__name {
-  font-weight: 600;
+  font-weight: var(--weight-medium);
   margin: 0;
 }
 
 .candidate-card__meta {
   color: var(--color-text-muted);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   margin: 0;
 }
 
@@ -1094,7 +1142,7 @@ button {
  */
 .candidate-card__raw {
   color: var(--color-text-muted);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   margin: 0;
   overflow-wrap: anywhere;
 }
@@ -1104,7 +1152,7 @@ button {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   color: var(--color-text-muted);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   padding: var(--space-1) var(--space-2);
 }
 
@@ -1380,7 +1428,7 @@ button {
 }
 
 .batch-status__progress {
-  font-weight: 600;
+  font-weight: var(--weight-medium);
   margin: var(--space-2) 0;
 }
 
@@ -1558,7 +1606,7 @@ button {
 }
 
 .undo-refusal__name {
-  font-weight: 600;
+  font-weight: var(--weight-medium);
 }
 
 .undo-refusal__year {

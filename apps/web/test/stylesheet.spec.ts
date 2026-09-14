@@ -95,6 +95,7 @@ describe('T-CSS-003 — colours and breakpoints come from :root only', () => {
   it('T-CSS-003a: :root declares every token in §13.2', () => {
     for (const token of [
       '--bp-sm',
+      '--bp-md',
       '--bp-lg',
       '--layout-max-width',
       '--tap-target-min',
@@ -232,8 +233,22 @@ describe('T-CSS-004 — contrast is computed from the tokens, not eyeballed', ()
     expect(ratio(token('--color-text'), surface())).toBeCloseTo(17.7, 0);
     expect(ratio(token('--color-text-muted'), surface())).toBeCloseTo(7.6, 0);
     expect(ratio(token('--color-border'), surface())).toBeCloseTo(3.3, 0);
-    expect(ratio(token('--color-accent'), surface())).toBeCloseTo(6.7, 0);
+    // ⚠ 7.9, NOT 6.7. ADR-0013 replaced #1d4ed8 (6.70:1) with the owner's
+    // deeper indigo #4338ca (7.90:1) in TASK-208. This literal is the whole
+    // point of the assertion — DO NOT widen `toBeCloseTo`'s precision to make
+    // both values pass, which would turn a computed-contrast gate into one
+    // that accepts any accent within ±5.
+    expect(ratio(token('--color-accent'), surface())).toBeCloseTo(7.9, 0);
     expect(ratio(token('--color-danger'), surface())).toBeCloseTo(6.5, 0);
+  });
+
+  it('T-CSS-004e: white text on the accent is legible, so one token serves link AND button', () => {
+    // ⚠ THE PAIR THE `textPairs` SWEEP CANNOT SEE. It only checks accent-as-
+    // FOREGROUND on the two surfaces; a filled primary button uses it as the
+    // BACKGROUND, and that pair appears in no other assertion here. An accent
+    // darkened for link contrast can pass everything above while white label
+    // text on the button fails.
+    expect(ratio(token('--color-accent'), '#ffffff')).toBeGreaterThanOrEqual(4.5);
   });
 
   it('T-CSS-004d: the contrast helper itself is correct', () => {
@@ -243,6 +258,124 @@ describe('T-CSS-004 — contrast is computed from the tokens, not eyeballed', ()
     expect(ratio('#000000', '#ffffff')).toBeCloseTo(21, 5);
     expect(ratio('#777777', '#777777')).toBeCloseTo(1, 5);
     expect(ratio('#d1d5db', '#ffffff')).toBeCloseTo(1.47, 1);
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+/* T-CSS-006 / T-CSS-007 — the type scale (REQ-123, ui-refresh.md §7b).     */
+/* ------------------------------------------------------------------------ */
+
+const ROOT_BLOCK = /:root\s*\{([\s\S]*?)\n\}/.exec(cssWithoutComments)?.[1] ?? '';
+const OUTSIDE_ROOT = cssWithoutComments.replace(/:root\s*\{[\s\S]*?\n\}/, '');
+
+/** The rem value of a scale token, for ordering assertions. */
+function remToken(name: string): number {
+  const match = new RegExp(`${name}:\\s*([\\d.]+)rem`).exec(ROOT_BLOCK);
+  if (match?.[1] === undefined) throw new Error(`Token ${name} is not a rem value in :root`);
+  return Number(match[1]);
+}
+
+describe('T-CSS-006 — the scale is declared once, and nothing sizes text off it', () => {
+  const SCALE = [
+    '--text-xs',
+    '--text-sm',
+    '--text-base',
+    '--text-lg',
+    '--text-xl',
+    '--text-2xl',
+    '--leading-tight',
+    '--leading-normal',
+    '--weight-normal',
+    '--weight-medium',
+    '--weight-bold',
+  ] as const;
+
+  it('T-CSS-006a: :root declares every type token in §7b', () => {
+    for (const name of SCALE) expect(ROOT_BLOCK).toContain(`${name}:`);
+  });
+
+  it('T-CSS-006b: no rule body contains a raw font-size literal', () => {
+    // ⚠ THIS IS THE ASSERTION THAT MAKES THE SCALE REAL. Declaring the tokens
+    // changes nothing on its own — the defect being fixed is that sixteen
+    // literals in FIVE ad-hoc sizes were scattered through the rule bodies,
+    // including a `0.85rem` that sat on no scale at all. A single survivor
+    // re-establishes the second scale silently.
+    const raw = [...OUTSIDE_ROOT.matchAll(/font-size:\s*([^;]+);/g)]
+      .map((match) => (match[1] ?? '').trim())
+      .filter((value) => !value.startsWith('var(--text-') && value !== 'inherit');
+    expect(raw).toEqual([]);
+  });
+
+  it('T-CSS-006c: no rule body contains a raw font-weight or line-height literal', () => {
+    // Same failure, different property. Weight tokens that nothing consumes
+    // are decoration: §7b declares three, and eleven bare `600`s meant the
+    // scale was declared and then ignored.
+    const rawWeights = [...OUTSIDE_ROOT.matchAll(/font-weight:\s*([^;]+);/g)]
+      .map((match) => (match[1] ?? '').trim())
+      .filter((value) => !value.startsWith('var(--weight-') && value !== 'inherit');
+    const rawLeading = [...OUTSIDE_ROOT.matchAll(/line-height:\s*([^;]+);/g)]
+      .map((match) => (match[1] ?? '').trim())
+      .filter((value) => !value.startsWith('var(--leading-') && value !== 'inherit');
+    expect({ rawWeights, rawLeading }).toEqual({ rawWeights: [], rawLeading: [] });
+  });
+
+  it('T-CSS-006d: the scale ascends, and is expressed in rem so the user setting is honoured', () => {
+    // ⚠ A `px` SCALE OVERRIDES AN ACCESSIBILITY PREFERENCE THE USER HAS
+    // ALREADY EXPRESSED, and looks perfectly correct in every screenshot.
+    const sizes = ['--text-xs', '--text-sm', '--text-base', '--text-lg', '--text-xl', '--text-2xl'];
+    const values = sizes.map(remToken);
+    expect(values).toEqual([...values].sort((a, b) => a - b));
+    expect(new Set(values).size).toBe(values.length);
+    expect(remToken('--text-base')).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('T-CSS-007 — nothing shrinks content below the --text-sm floor', () => {
+  /**
+   * ⚠ `--text-xs` IS NOT A DENSITY CONTROL, and reaching for it to fit more
+   * in is the failure mode this guards. REQ-112's density comes from layout
+   * and from the compact genre presentation — never from making content
+   * smaller. It always looks fine to the person who has just done it.
+   *
+   * The allow-list is CLOSED on purpose: `--text-xs` is for supplementary
+   * labels that are not content. Adding a selector here is a deliberate,
+   * reviewable act rather than a silent side effect of a density pass.
+   */
+  const XS_ALLOWED = [
+    '.title-row__rating-source',
+    '.tmdb-attribution',
+    '.justwatch-attribution',
+  ] as const;
+
+  /** Selector → the font-size it sets, for every rule in the sheet. */
+  const rules = [...OUTSIDE_ROOT.matchAll(/([^{}]+)\{([^}]*)\}/g)].flatMap((match) => {
+    const size = /font-size:\s*([^;]+);/.exec(match[2] ?? '')?.[1]?.trim();
+    return size === undefined ? [] : [{ selector: (match[1] ?? '').trim(), size }];
+  });
+
+  it('T-CSS-007a: only the declared supplementary labels use --text-xs', () => {
+    const offenders = rules
+      .filter((rule) => rule.size === 'var(--text-xs)')
+      .map((rule) => rule.selector)
+      .filter((selector) => !XS_ALLOWED.includes(selector as (typeof XS_ALLOWED)[number]));
+    expect(offenders).toEqual([]);
+  });
+
+  it('T-CSS-007b: genre chips sit at --text-sm, which §7b names explicitly', () => {
+    // ⚠ BOTH CHIP RULES WERE AT `--text-xs` BEFORE TASK-208 — the precise
+    // "shrink it to win density" case, already present in the sheet. §7b
+    // lists genre chips under `--text-sm`, so this is spec text, not taste.
+    for (const selector of ['.title-row__chip', '.candidate-card__chip']) {
+      const rule = rules.find((entry) => entry.selector === selector);
+      expect({ selector, size: rule?.size }).toEqual({ selector, size: 'var(--text-sm)' });
+    }
+  });
+
+  it('T-CSS-007c: the floor is a real floor — --text-sm is at least 0.875rem', () => {
+    // Without this the allow-list is evadable by redefining the token itself:
+    // every selector would still name `--text-sm` while rendering at 10px.
+    expect(remToken('--text-sm')).toBeGreaterThanOrEqual(0.875);
+    expect(remToken('--text-xs')).toBeGreaterThanOrEqual(0.75);
   });
 });
 
