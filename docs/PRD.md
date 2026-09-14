@@ -1112,7 +1112,7 @@ anything the service still lists. Removing says only *this is not on my list*.
 | # | Given | When | Then |
 |---|---|---|---|
 | AC-1 | The set of operations that mutate user-visible list state | The system is inspected | It is exactly the closed enumeration in §7.4, all of them owner-initiated (REQ-041) |
-| AC-2 | Non-owner-initiated processes | The system is inspected | Exactly **four** exist: the lazy TMDB metadata refresh on access (REQ-076, US-010), the screenshot image purge (NFR-019, US-035), the lazy IMDb rating refresh on access (REQ-093, Epic M), and the lazy watch-availability refresh triggered by opening the waiting view (REQ-086, Epic L). None changes user-visible list state (REQ-041) — the rating in particular is display-only and is never sorted or filtered on (ADR-0011 OQ-A), and the availability refresh writes only `watch_intent` metadata columns, creates no listing and satisfies no intent, so a waiting work still reaches the combined list only by the ordinary capture path (US-042 AC-4, ADR-0010; approved at A52). ~~Superseded (Epic L): "Exactly three exist: the lazy TMDB metadata refresh on access (REQ-076, US-010), the screenshot image purge (NFR-019, US-035), and the lazy IMDb rating refresh on access (REQ-093, Epic M)."~~ ~~Superseded (Epic M): "Exactly two exist: the lazy TMDB metadata refresh on access (REQ-076, US-010) and the screenshot image purge (NFR-019, US-035). Neither changes user-visible list state (REQ-041)."~~ |
+| AC-2 | Non-owner-initiated processes | The system is inspected | Exactly **four** exist: the lazy TMDB metadata refresh on access (REQ-076, US-010), the screenshot image purge (NFR-019, US-035), the lazy IMDb rating refresh on access (REQ-093, Epic M), and the lazy watch-availability refresh triggered by opening the waiting view (REQ-086, Epic L). None changes user-visible list state (REQ-041) — ⚠ **the rating clause here was REVISED at `A53` (2026-09-14):** ~~"the rating in particular is display-only and is never sorted or filtered on (ADR-0011 OQ-A)"~~ the rating **is** now a sort key (ADR-0011 Rev 1), and what keeps it compliant is that under `sort=rating` the refresh is **swept synchronously inside the request, before the ordering** — never after the response; it is still never filtered on — and the availability refresh writes only `watch_intent` metadata columns, creates no listing and satisfies no intent, so a waiting work still reaches the combined list only by the ordinary capture path (US-042 AC-4, ADR-0010; approved at A52). ~~Superseded (Epic L): "Exactly three exist: the lazy TMDB metadata refresh on access (REQ-076, US-010), the screenshot image purge (NFR-019, US-035), and the lazy IMDb rating refresh on access (REQ-093, Epic M)."~~ ~~Superseded (Epic M): "Exactly two exist: the lazy TMDB metadata refresh on access (REQ-076, US-010) and the screenshot image purge (NFR-019, US-035). Neither changes user-visible list state (REQ-041)."~~ |
 | AC-3 | Any operation not in the §7.4 enumeration | It is proposed | It is **forbidden by default**. The enumeration is closed; extending it is an explicit amendment to REQ-041, which has already been widened six times ~~Superseded: "five times."~~ |
 | AC-4 (edge) | A convenience feature that would auto-confirm, auto-restore, auto-merge or auto-clean anything | It is considered | It is prohibited, regardless of how safe it seems |
 | AC-5 (failure) | Any scheduled job, webhook, timer or background worker that writes list state | Automated verification runs | The test fails (NFR-003, NFR-005) |
@@ -1399,6 +1399,13 @@ job. See ADR-0011 for the full comparison.
 from two to three in the same change that added the rating refresh, naming
 `imdb-rating-refresh` explicitly and recording that it is metadata-only,
 access-triggered and display-only. `T-MUT-001f` asserts the three ids.
+⚠ **REVISED at `A53` (2026-09-14): "display-only" no longer holds — the rating
+IS a sort key (ADR-0011 Rev 1).** The other two properties do, and they are the
+ones that matter here: the refresh is still **metadata-only and
+access-triggered**, and under `sort=rating` it runs *synchronously inside the
+request*, which moves it further inside owner-initiated work rather than
+outside it. **The count therefore stays at its current value — do not
+increment it for this revision.**
 
 ~~Superseded (now done): "⚠ US-036 AC-2's non-owner-process count and
 `T-CI-005` must be incremented in the same change… ⚠ Do not write a literal
@@ -1496,7 +1503,7 @@ owner-initiated, synchronous, visible in the removed log, and reversible.
 
 1. Lazy TMDB metadata refresh on access (REQ-076, US-010) — touches TMDB-sourced descriptive fields only (NFR-014).
 2. Screenshot image purge at 30 days (NFR-019, US-035) — touches image bytes only.
-3. Lazy IMDb rating refresh on access (REQ-093, ADR-0011) — touches one display-only numeric field and its timestamp. It is admissible here for the same reason as (1): access-triggered, metadata-only, and — decisively — the rating is **never sorted or filtered on** (ADR-0011 OQ-A), so it cannot change membership, ordering or service badges.
+3. Lazy IMDb rating refresh on access (REQ-093, ADR-0011) — touches one numeric field and its timestamp. It is admissible here for the same reason as (1): access-triggered and metadata-only. ⚠ **REVISED at `A53` (2026-09-14): the third reason given below no longer holds and has been replaced, not merely softened.** ~~"and — decisively — the rating is **never sorted or filtered on** (ADR-0011 OQ-A), so it cannot change membership, ordering or service badges."~~ The rating **is** now a sort key (ADR-0011 Rev 1), so it *could* change ordering — and what prevents that is the refresh's **synchrony**: under `sort=rating` the sweep runs inside the request and before the `ORDER BY`, so no write outside an owner-initiated request ever reorders the list. It is still never *filtered* on. ⚠ **If anyone reverts that sweep to the post-response path, this entry becomes false and REQ-041 is breached** — which is why `T-IMDB-005b` guards the ordering, not the absence of a sort.
 
 ~~Superseded (Epic M): "exactly two, and neither changes user-visible list state," with entries 1 and 2 only.~~
 

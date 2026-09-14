@@ -71,7 +71,7 @@ inference from them:
 | Runtime *(added at `A48`)* | *"for the list view, I'd like to see run time as well and filter and sort by it"* — a direct request, and the recorded revisit trigger for the deferred REQ-035/REQ-037 pair. Answered in §5a |
 | **Genres on the row** *(added 2026-09-14, OQ-7)* | *"keep generes on the row but find a way to minimize how much room it takes. use another ux to make it compact but still list the genres."* Answered in §4.3 |
 | **Genre redundancy** *(added 2026-09-14, OQ-7)* | *"some of the genres are redundant, for example, there is action, action & adventure, and adventure. action & adventure seems extra. would it not be easier just to click action and adventure separately?"* ⚠ **A correctness bug, not a preference** — answered in §4.4 |
-| **Sorting** *(added 2026-09-14, OQ-3 / OQ-3b)* | Name and release year added as orderings; **the IMDb rating sort reversed into existence**, overturning `A51`. Answered in §5b and §7a |
+| **Sorting** *(added 2026-09-14, `A53` / OQ-3 / OQ-3b)* | Name and release year added as orderings; **the IMDb rating sort reversed into existence**, overturning `A51`. Answered in §5b, §7a and §7a.1 |
 | **Navigation** *(added 2026-09-14, OQ-2)* | Phone bar = **List, Upload, More** — two real destinations plus overflow. Answered in REQ-117 |
 | **Review screen** *(added 2026-09-14, OQ-6)* | The confusion was **(d), the three sections looking alike** — not the list's length and not the Apply wording. Answered in §6a.1 |
 | **Design system** *(added 2026-09-14, OQ-8)* | A typographic scale and inline SVG icons, both accepted on the explicit basis of **no web font and no new dependency**. Answered in §7b – §7d |
@@ -600,17 +600,26 @@ runtime, and ordering by it is `must`, not `should`, since it is carried by
 deferred to v1.1 rather than dropped. Promoting REQ-037 does not widen this
 document's remit; it satisfies a requirement already on the books.
 
-> ### ⚠ RATING IS DELIBERATELY ABSENT FROM THAT LIST, AND ADDING IT WOULD
-> ### CONTRADICT A DECISION THE OWNER ALREADY MADE.
+> ### ⚠ THIS BLOCK IS SUPERSEDED — THE OWNER REVERSED IT AT `A53`. IT IS
+> ### RETAINED BECAUSE IT IS *WHY* THE REVERSAL WAS DONE PROPERLY.
 >
 > **REQ-095** — *"The IMDb rating is **display-only**. It is not a sort key,
 > and no sort option for it exists"* — was decided by the owner at **`A51`**,
 > resolving ADR-0011's OQ-A. The rating is the most tempting sort key on the
 > row precisely **because** it is rendered there, so an agent designing a sort
 > menu will reach for it, find it on screen, and add it without ever seeing
-> REQ-095. **It is a standing `must`-shaped negative and this document does not
-> get to reverse it.** If the owner wants it, that is a reversal of `A51` and
-> it belongs in ADR-0011 as a new revision — see §9, OQ-3.
+> REQ-095. ~~**It is a standing `must`-shaped negative and this document does
+> not get to reverse it.**~~ If the owner wants it, that is a reversal of `A51`
+> and it belongs in ADR-0011 as a new revision — see §9, OQ-3.
+>
+> ✅ **That is exactly what happened, and this paragraph is why.** The owner
+> was asked (OQ-3b) rather than the sort being added as a menu item, answered
+> on **2026-09-14 (`A53`)**, and the reversal was written as **ADR-0011
+> Revision 1** — not as a line here. **Rating IS now a sort key.** ⚠ **Read
+> §7a.1 before implementing it:** the reopening found that `specs/api.md` had
+> since made REQ-095 load-bearing for **REQ-041** compliance, so the reversal
+> required the rating refresh to become **synchronous**, not merely a struck
+> sentence.
 
 ⚠ **Year is nullable and the null case is the design problem.** A year sort
 must decide where undated titles go — **not** first by accident of `NULL`
@@ -629,7 +638,7 @@ the same rule when it is built.
 | `T-UX-114` | Changing a filter preserves `sort`, `dir`. |
 | `T-UX-115` | A `localStorage` direction with **no `dir` in the URL** is reconciled into the URL, and the label matches the request that was issued. |
 | `T-UX-116` | Oldest-first is reachable in one action from the default view. |
-| `T-UX-119` | *(REQ-095 regression guard)* **No sort option exposes the IMDb rating.** |
+| `T-UX-119` | ~~*(REQ-095 regression guard)* **No sort option exposes the IMDb rating.**~~ ⚠ **REWRITTEN at `A53` — see §7a.** The sort field selector **does** offer the IMDb rating. |
 | `T-UX-120` | *(`A48`)* Selecting the **Runtime** key relabels the direction toggle to *Shortest first* / *Longest first*, and the date labels do not survive the switch. |
 
 ---
@@ -945,7 +954,7 @@ a line in this document, and that is what it is.
 |---|---|
 | **Was** | **REQ-095** — *"The IMDb rating is **display-only**. It is not a sort key, and no sort option for it exists."* Decided by the owner at `A51`, resolving ADR-0011's OQ-A |
 | **Now** | The IMDb rating **is** an available ordering. REQ-095's prohibition is struck |
-| **Mechanism** | A new **Revision** section in `docs/adr/ADR-0011-imdb-ratings-via-omdb.md`, recording the reversal, its date and its reason. REQ-095 is corrected **in place** wherever it appears — struck, not deleted, per the repository's supersede-in-place rule |
+| **Mechanism** | ✅ **DONE.** `docs/adr/ADR-0011-imdb-ratings-via-omdb.md` **Revision 1** records the reversal, its date, its reason and the REQ-041 mechanism that pays for it. REQ-095 is corrected **in place** everywhere it appears — struck, not deleted — in `ADR-0011`, `adr/README.md`, `specs/api.md` §6.2/§6.2a/§6.11, `specs/ui.md` §7a, `specs/testing.md` §35, and `docs/PRD.md` US-036 AC-2 / §7.4 |
 
 ⚠ **THE RATING IS NULLABLE AND NOT EVERY TITLE HAS ONE.** `A48`'s general rule
 governs and is **not** re-decided here: **`NULL`s sort LAST in BOTH
@@ -970,6 +979,52 @@ behaviour, so the ledger row keeps a live guard rather than an empty cell.
 |---|---|
 | `T-UX-119` | ⚠ **Rewritten.** The sort field selector **does** offer the IMDb rating, and selecting it issues `sort=rating`. |
 | `T-API-023` | `sort=rating` orders by rating with `NULL`s **last in both directions**, tie-broken by `title.id`. |
+| `T-API-024` | ⚠ **The REQ-041 guard.** Under `sort=rating` the rating sweep is **awaited before the `ORDER BY` is applied**, and **no rating write occurs after the response has been sent**. |
+| `T-API-025` | A sweep that exhausts its request cap or time budget still returns **200**; unrefreshed titles keep their cached-or-absent value and are ordered on it. |
+| `T-API-026` | An unrecognised `sort` value is **400 `INVALID_QUERY`**, never a silent fall back to `dateAdded`. |
+| `T-API-027` | `sort=name` and `sort=releaseYear` order correctly in both directions. ⚠ **The name case must pin case-insensitive, human ordering explicitly** — the database collation is `Latin1_General_100_BIN2`, which is **binary**, so an unqualified `ORDER BY` puts every lower-case title after every upper-case one and `apple` sorts after `Zebra`. |
+| `T-IMDB-005` | ⚠ **`b` rewritten.** It asserted the service module exports no sort helper; it now asserts the sweep is awaited before ordering. **Rewritten, not deleted** — see §8. |
+
+### 7a.1 ⚠ Reversing REQ-095 is NOT a one-line strike — RESOLVED at `A53`
+
+The reopening surfaced something neither `A51` nor this section originally
+knew: **`specs/api.md` had since made REQ-095 load-bearing for REQ-041
+compliance**, in terms:
+
+> *"That is precisely what keeps the refresh legal under REQ-041 — a background
+> write that changed the list's ORDER would not be."*
+
+The two lazy refreshes in this repo are **not alike**. The TMDB metadata
+refresh writes *synchronously inside the request* (`specs/api.md` §6.4), which
+is explicitly why it satisfies REQ-041. The **rating** refresh writes *after the
+response* — *"ratings appear on the next render"* — which was legal only
+because a display-only field cannot change ordering. **Striking REQ-095 and
+stopping would therefore have shipped a background write that silently
+reorders the owner's list between renders, breaching product invariant 5.**
+
+**The owner resolved this at `A53`, from four options, with the cost stated:**
+
+| | Decision (`A53`) |
+|---|---|
+| **REQ-041** | Untouched. **Not** reworded, not widened. |
+| **Mechanism** | Under `sort=rating` the rating sweep moves **inside the request, before the ordering** — adopting §6.4's proven shape. |
+| **Scope of sweep** | The **sortable set**, not the page. ⚠ Refreshing only the page renders new values in an order computed from old ones — an `8.4` below a `7.1`. |
+| **Bound** | A **request cap and a time budget**; anything unrefreshed keeps its cached-or-absent value and sorts on it. Mirrors §6.4's existing 5-second budget. |
+| **ADR-0011 D-6** | **Amended**, not contradicted — its *"never for the whole table"* rule gains this one exception and holds everywhere else. |
+| **Process count** | **Unchanged.** Synchrony moves the write *further inside* owner-initiated work; do not increment `T-CI-005`. |
+
+⚠ **Known residual, accepted at `A53`.** Because the sweep covers the whole
+sortable set it is self-limiting — after the first page nothing is stale, so
+later pages write nothing and the ordering cannot drift under the cursor. The
+one exception is a **budget-exhausted** sweep, where a keyset cursor over a
+*mutable* key can step past a row that moved. The recorded remedy, if it is
+ever observed, is to suppress the sweep whenever a `cursor` is present; **it is
+not built in v1**. See ADR-0011 Revision 1 §R1-6.
+
+⚠ **Rating is the ONLY mutable sort key.** Date-added is owner-supplied and
+immutable once captured; name, release year and runtime are properties of the
+work. **Do not generalise this hazard — or its remedy — to the other four
+orderings.**
 
 ---
 
@@ -1101,7 +1156,10 @@ not *placement* — a control moved into a collapsed menu still answers to
 | **REQ-038 oldest-first reverse** | Looks like an optional extra in a menu. It is `must` (A47). | `T-UX-116` |
 | **REQ-039 per-service last-updated** | A tidy header wants to drop it. ⚠ It is the **mandatory** mitigation for RSK-007 and is `must`. **Show the fact; never nag** (`A46`). There is **no** staleness nudge and none may be added. | `T-UX-118` |
 | **`--tap-target-min: 44px`** | REQ-107 narrows the `⋮` box and reads like licence to shrink the target. It is not. | `T-A11Y-001b` |
-| **REQ-095 rating is display-only** | The rating is **rendered on the row**, so a sort menu designed from the screen will include it without ever seeing the requirement that forbids it. ~~Decided by the owner at `A51`.~~ ⚠ **REVERSED by the owner on 2026-09-14 (OQ-3b) — rating IS now a sort key.** The risk **inverts**: the danger is no longer adding the sort, it is **deleting `T-UX-119` instead of rewriting it** when it correctly starts failing. See §7a | ~~`T-UX-119`~~ **`T-UX-119` rewritten, plus `T-API-023`** |
+| **REQ-095 rating is display-only** | The rating is **rendered on the row**, so a sort menu designed from the screen will include it without ever seeing the requirement that forbids it. ~~Decided by the owner at `A51`.~~ ⚠ **REVERSED by the owner on 2026-09-14 (`A53`, OQ-3b) — rating IS now a sort key.** The risk **inverts**: the danger is no longer adding the sort, it is **deleting `T-UX-119` instead of rewriting it** when it correctly starts failing. See §7a | ~~`T-UX-119`~~ **`T-UX-119` rewritten, plus `T-API-023`** |
+| **The rating refresh's SYNCHRONY** *(new, `A53`)* | ⚠ **This is the load-bearing half of the REQ-095 reversal and the easiest to lose.** REQ-090's refresh fires **after the response**; that was legal only while the rating could not change ordering. Under `sort=rating` it must run **inside the request, before the `ORDER BY`**. The failure mode is invisible in a unit test and invisible on screen — the list simply reorders itself between renders — and "move the await out of the hot path" reads like a performance fix. ⚠ **`T-IMDB-005b` asserted the module exports no sort helper; it will fail correctly and must be REWRITTEN, not deleted** | `T-API-024`, `T-IMDB-005` |
+| **The rating sweep's SCOPE** *(new, `A53`)* | Sweeping only the **page** instead of the **sortable set** looks like a faithful reading of ADR-0011 D-6 and produces a page ordered by pre-refresh values but rendered with post-refresh ones — an `8.4` sitting below a `7.1`. It passes any test that checks "ratings were refreshed" | `T-API-024`, `T-API-025` |
+| **`sort=name` under a BINARY collation** *(new, `A53`)* | The database collation is `Latin1_General_100_BIN2`. An unqualified `ORDER BY title` is therefore **byte order**: every lower-case title sorts after every upper-case one, and `apple` follows `Zebra`. It looks alphabetical at a glance on a list that happens to be title-cased | `T-API-027` |
 | **The genre filter's completeness** *(new, 2026-09-14)* | §4.4's normalisation is one-to-many and must be applied to **both** the display and the filter. Doing only one produces a screen that looks fixed while the facet still under-returns — and the symptom the owner reported (redundant chips) **disappears** after a display-only fix, which is exactly what makes it convincing | `T-UX-125`, `T-UX-126`, `T-API-022` |
 | **The review sections' completeness** *(new, 2026-09-14)* | REQ-122 makes three sections distinguishable. The neighbouring idea — collapsing or hiding the already-correct rows to shorten the list — **deletes the product's core safety property** and looks like the same kind of tidy-up | `T-UX-136` |
 | **Oldest-first in one action** *(new, 2026-09-14)* | §5b's field selector makes it tempting to fold direction into a single ten-option list. Every behavioural test still passes, because `click()` still reaches it | `T-UX-131` |
@@ -1130,7 +1188,7 @@ neither is a styling change.
 | **OQ-1** | §4.3 trims the added-date off the compact row, but the **default sort orders by it**. Show it, or accept an unexplained order? | **Keep the added-date on the row.** The density REQ-112 wants is found elsewhere. REQ-112 is amended in place: the added-date is **not** trimmed |
 | **OQ-2** | §6 — **which three destinations** belong in the phone bar? Five candidates for three slots | **List, Upload, More.** Only two real destinations plus overflow; `/removed`, `/not-interested` and `/batches` all sit behind **More** |
 | **OQ-3** | §5 REQ-115 — sort by **name/year** needs an API change. Worth it? | **Yes — add both name and release year.** The API change is accepted. Null ordering is already settled by `A48` (NULLs **last in both directions**) and is not re-decided here |
-| **OQ-3b** | **Sort by IMDb rating is currently forbidden by REQ-095**, decided at `A51` | ⚠ **REVERSED. The owner now wants to sort by IMDb rating.** REQ-095's display-only rule is overturned. **This is a revision to ADR-0011**, written as part of Epic P — see §7a. The rating is nullable, so `A48`'s NULLs-last rule applies and unrated titles never lead "Highest first" |
+| **OQ-3b** | **Sort by IMDb rating is currently forbidden by REQ-095**, decided at `A51` | ⚠ **REVERSED at `A53` (2026-09-14). The owner now wants to sort by IMDb rating.** REQ-095's display-only rule is overturned, and the reversal is written as **ADR-0011 Revision 1** — see §7a and **§7a.1**. ⚠ **It was NOT a one-line strike:** `specs/api.md` had made REQ-095 load-bearing for **REQ-041**, so the rating refresh becomes **synchronous, sweeping the sortable set before the ordering, under a request + time budget**. The rating is nullable, so `A48`'s NULLs-last rule applies and unrated titles never lead "Highest first" |
 | **OQ-4** | ✅ **RESOLVED 2026-09-10 — "ship all five defects now, as their own task, before the visual work."** | ⚠ **SUPERSEDED 2026-09-14 by the owner**, who directed that the defects and the visual refresh ship **together as one Epic P**. §3 remains an independently buildable unit and is built **first within** that epic, so the original property — that a fixed menu is distinguishable from a moved one — is preserved by task ordering rather than by a separate release. ~~See §11.~~ *(There is no §11; the document ends at §10. Dangling reference corrected in place.)* |
 | **OQ-5** | §5 REQ-114 — the sort control's wording and shape | **Show both options with the current one marked** — a segmented control, not a toggle. ⚠ **This answer had to grow to fit OQ-3 and OQ-3b**: with five sort fields a two-option segment cannot express the field choice. See §5b |
 | **OQ-6** | §6a — **what exactly was confusing on the review screen?** | **(d) — the three sections looked alike despite meaning different things.** Not the list length, not the Apply wording. See §6a |

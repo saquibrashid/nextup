@@ -797,8 +797,34 @@ dropped**, which is what `T-ATTR-006a` asserts rather than byte equality.
 
 Query: `service` (`netflix|max`, repeatable), `type` (`movie|tv`),
 `genre` (string, repeatable), `runtime` (`under30|30-60|60-120|over120`,
-repeatable), `sort` (`dateAdded` default | `runtime`),
-`dir` (`desc` default | `asc`), `limit`, `cursor`.
+repeatable), `sort` (`dateAdded` default | `name` | `releaseYear` | `runtime` |
+`rating`), `dir` (`desc` default | `asc`), `limit`, `cursor`.
+
+⚠ **`name`, `releaseYear` and `rating` were added at `A53` (2026-09-14, OQ-3 /
+OQ-3b).** `rating` is the one that carries conditions — read §6.2a and ADR-0011
+Revision 1 before implementing it. An unrecognised `sort` is **400
+`INVALID_QUERY`**, never a silent fall back to `dateAdded`: a mistyped key that
+quietly returns the default ordering looks like a working sort that does
+nothing.
+
+#### 6.2a ⚠ `sort=rating` is not an ordinary sort key (`A53`, ADR-0011 Rev 1)
+
+It is the **only mutable sort key** — date-added is owner-supplied and immutable
+once captured, and name, release year and runtime are properties of the work.
+Three rules follow, and none of them applies to the other four orderings:
+
+1. **Sweep before ordering, synchronously.** Stale ratings across the
+   **sortable set** (the filtered candidate set, not the page) are refreshed
+   *inside the request, before the ORDER BY is applied*. Refreshing only the
+   page would render new values in an order computed from old ones — an `8.4`
+   sitting below a `7.1`.
+2. **Bounded, and degrading rather than failing.** The sweep is capped by both
+   a request count and a time budget. Anything not refreshed in time keeps its
+   cached-or-absent value and is ordered on that, exactly as §6.4's TMDB budget
+   already behaves. The list never fails because of OMDb.
+3. **`NULL`s last in BOTH directions** (`A48`). Unrated titles never lead
+   *"Highest first"*, and they must not lead *"Lowest first"* either — `null`
+   means *unknown*, not *zero* (REQ-091).
 
 Semantics:
 - Returns titles with `state === 'active'` and `visible === true` only.
@@ -924,14 +950,35 @@ date label contains the substring `"to nextup"`.
 served from the cached value on the row and is **never fetched during the
 request** — a lazy refresh of what is stale is fired **after** the response
 (REQ-090, REQ-093), so ratings appear on the *next* render and a first-ever
-load legitimately shows none.
+load legitimately shows none. ⚠ **That is true of every ordering EXCEPT
+`sort=rating`, where §6.2a inverts it and the refresh runs before the
+response.** The two paths differ deliberately; see the revision note below.
 
 ⚠ **`null` is never `0`.** It covers both "not fetched yet" and "IMDb has no
 rating for this work", deliberately indistinguishable — the owner can act on
-neither. `imdbRating` is **display-only**: it is not a sort key and no
-`sort=rating` option exists (REQ-095, ADR-0011 OQ-A). That is precisely what
-keeps the refresh legal under REQ-041 — a background write that changed the
-list's ORDER would not be.
+neither.
+
+⚠ **REVISED at `A53` (2026-09-14): `imdbRating` IS a sort key.** `sort=rating`
+exists (ADR-0011 Revision 1, `specs/ui-refresh.md` §7a). REQ-041 is kept
+satisfied **not** by the field being inert, but by the refresh moving inside
+the request: under `sort=rating` the stale ratings of the sortable set are
+swept **synchronously, before the ordering is computed**, exactly as §6.4's
+TMDB refresh already does — *"synchronous within an owner-initiated request,
+which is precisely why REQ-041 is satisfied."* The sweep is bounded by a
+request cap and a time budget; anything not refreshed in time keeps its
+cached-or-absent value and is ordered on that. `NULL`s sort **last in both
+directions**.
+
+⚠ **Do not "simplify" this back to the post-response refresh for `sort=rating`.**
+A post-response write under a rating ordering reorders the owner's list between
+renders, which product invariant 5 forbids. The asynchrony is the defect, not
+the optimisation.
+
+~~Superseded, and it was true when written — it is retained because it names
+the exact hazard the revision had to pay for: "`imdbRating` is **display-only**:
+it is not a sort key and no `sort=rating` option exists (REQ-095, ADR-0011
+OQ-A). That is precisely what keeps the refresh legal under REQ-041 — a
+background write that changed the list's ORDER would not be."~~
 
 `badges` contains only `active` listings (REQ-026).
 

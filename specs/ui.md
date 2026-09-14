@@ -699,7 +699,7 @@ change is one diff and a test can assert it.
 | **`SORT_KEY_RUNTIME_LABEL`** *(new, `A48`)* | *Runtime* | §2.1 item 2 — REQ-037 |
 | **`RUNTIME_UNKNOWN_LABEL`** *(new, `A48`)* | *Runtime unknown* | §2.2 — the NAMED absence (REQ-119). Never `0m`, never an empty slot: `0m` is a claim about the work, and an empty slot is indistinguishable from a rendering failure |
 | **`RUNTIME_HIDDEN_DISCLOSURE`** *(new, `A48`)* | *{n} titles have no runtime and are hidden* | §2.1 item 2 — rendered **only** while a runtime filter is active, with a live `n`. The mitigation for the one way REQ-035 can silently shorten the list |
-| **`IMDB_RATING_SOURCE`** *(new, Epic M)* | *IMDb* | §7a — labels the number on the row. The rating is **display-only** (REQ-095): it never sorts or filters |
+| **`IMDB_RATING_SOURCE`** *(new, Epic M)* | *IMDb* | §7a — labels the number on the row. ⚠ **REVISED at `A53`: the rating **is** a sort key (`sort=rating`, ADR-0011 Rev 1). It still never *filters*.** ~~"The rating is **display-only** (REQ-095): it never sorts or filters"~~ |
 | **`IMDB_RATING_ABSENT`** *(new, Epic M)* | *No IMDb rating* | REQ-091 — ⚠ **a rendered state, not an omission.** May be reworded; may **not** become blank, `0`, `0.0` or an empty star row. Without it, "this work has no rating" and "nextup failed to fetch one" look identical |
 | **`IMDB_LOOKUP_TITLE`** *(new, Epic M)* | *Check a rating* | §7a — the `/rating` screen (US-045) |
 | **`IMDB_LOOKUP_BODY`** *(new, Epic M)* | *Look up any film or series to see its IMDb rating. Nothing is added to your list.* | US-045 — **the second sentence is load-bearing.** A search box inside a list-building product otherwise reads as "add to list", and the route writes nothing (`T-IMDB-006h`) |

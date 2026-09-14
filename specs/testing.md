@@ -4190,7 +4190,7 @@ mapping, which is the definition of done (NFR-003).
 | `T-IMDB-002` | U | Selection is bounded per request and dedupes by IMDb id | REQ-093 |
 | `T-IMDB-003` | U | Tenths round-trip exactly, and `null` survives both directions | REQ-091 |
 | `T-IMDB-004` | U | The refresh is serial, never throws, and stops the pass on transport failure | REQ-093 |
-| `T-IMDB-005` | U | A write names **only** the two rating columns, and the module exports no sort helper | REQ-095, US-036 AC-2 |
+| `T-IMDB-005` | U | A write names **only** the two rating columns. ⚠ **`b` REVISED at `A53`:** the module now *does* expose an ordering, so `b` asserts the sweep is **awaited before the ordering is computed** under `sort=rating` — not that no sort helper exists | REQ-095, US-036 AC-2 |
 | `T-IMDB-006` | U | `GET /api/imdb/lookup`: the chain, not-found distinct from unrated, no `?t=` fallback, `inList`, and that the module **writes nothing** | US-045 AC-1, US-045 AC-2, US-045 AC-3, US-045 AC-4, US-045 AC-5 |
 | `T-IMDB-007` | U | The access-triggered refresh persists through the narrow writer, never rejects, survives a failing write, and no-ops without a key | REQ-090, REQ-093 |
 | `T-IMDB-008` | U | Display: one decimal place, `8` renders `8.0`, and `null` renders **the words** — never `0` | US-044 AC-3, US-044 AC-4 |
@@ -4208,9 +4208,16 @@ and pinning a live rating in a test would make the suite fail the day a film's
 score moves. What IS asserted is that the number is keyed on `imdb_id`
 (`T-OMDB-004`) — the property that makes it the *right film's* number.
 
-**A rating sort.** There is none, by decision (REQ-095, OQ-A), and its absence
-is what keeps the lazy refresh legal under REQ-041. `T-IMDB-005b` asserts the
-service module exports no sort or rank helper.
+**A rating sort.** ⚠ **REVISED at `A53` (2026-09-14) — there now IS one.**
+`sort=rating` exists (ADR-0011 Revision 1, `specs/api.md` §6.2a). What keeps
+the refresh legal under REQ-041 is no longer the sort's *absence* but the
+refresh's **synchrony**: under `sort=rating` the sweep runs inside the request,
+before the ordering, on §6.4's terms. ⚠ **`T-IMDB-005b` asserted the service
+module exports no sort or rank helper. It will correctly begin to fail. REWRITE
+IT — DO NOT DELETE IT**; deleting the guard that notices the change is how the
+post-response write silently survives into a rating ordering.
+~~Superseded: "There is none, by decision (REQ-095, OQ-A), and its absence is
+what keeps the lazy refresh legal under REQ-041."~~
 
 ---
 
