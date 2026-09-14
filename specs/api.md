@@ -199,16 +199,45 @@ typed data and never re-check it.
 - **Cursor pagination only.** No offsets, no total counts (a total count over
   an ever-growing removed view would violate NFR-018).
 - Query params: `limit` (integer, 1..200, default 50), `cursor` (opaque string).
-  **(R3) The cursor is a base64url-encoded keyset position**
-  (`{sortDateAdded, id}` for the combined list, `{removedAt, listingId}` for
-  the removed view) — see `specs/data-model.md` **§16.6** *(R4: keyset
-  pagination is carried over unchanged from §15.6, but §15 is now
-  superseded — cite §16.6)*. It was a Cosmos
-  continuation token in Revision 1. **Clients MUST treat it as opaque and MUST
-  NOT parse it**; it is echoed back unmodified or not at all. An unparseable or
-  tampered cursor is **400 `INVALID_CURSOR`**, never a silent reset to page 1,
-  because silently restarting a paged scan is how an owner concludes rows have
-  vanished. `T-API-01x` asserts the 400.
+  **(R3) The cursor is a base64url-encoded keyset position.** Its shape is
+  **per `sort` key**, because a keyset predicate that does not mirror its own
+  `ORDER BY` skips and repeats rows at every page boundary:
+
+  | Resource | `sort` | Cursor shape |
+  |---|---|---|
+  | combined list | `dateAdded` (default) | `{sortDateAdded, id}` |
+  | combined list | `runtime` | `{runtimeMinutes, id}` |
+  | removed view | — | `{removedAt, listingId}` |
+
+  See `specs/data-model.md` **§16.6** *(R4: keyset pagination is carried over
+  unchanged from §15.6, but §15 is now superseded — cite §16.6)*. It was a
+  Cosmos continuation token in Revision 1.
+
+  ⚠ **The shapes are discriminated by their KEY SET, never by a `sort` field
+  inside the envelope.** A cursor carrying its own `sort` would be
+  structurally identical across orderings, so one cut from a date-sorted list
+  would be *accepted* by the runtime sort and answer a plausible page of
+  quietly wrong rows. Discriminating on the keys makes that a **400
+  `INVALID_CURSOR`** for free — which is exactly what the owner hits by
+  switching the sort with a page already loaded.
+
+  ⚠ **`runtimeMinutes: null` is a legitimate, encodable position.** Runtime
+  sorts `NULL`s last, so the tail of every runtime-ordered list is the unknown
+  block; refusing to encode it truncates the list at the first unknown runtime
+  — silently, and with no error anywhere.
+
+  **Clients MUST treat the cursor as opaque and MUST NOT parse it**; it is
+  echoed back unmodified or not at all. An unparseable or tampered cursor is
+  **400 `INVALID_CURSOR`**, never a silent reset to page 1, because silently
+  restarting a paged scan is how an owner concludes rows have vanished.
+  `T-API-01x` asserts the 400; `T-API-019h` asserts the cross-sort case.
+
+  ~~Superseded (Revision at `A48`): "**(R3) The cursor is a base64url-encoded
+  keyset position** (`{sortDateAdded, id}` for the combined list,
+  `{removedAt, listingId}` for the removed view)." That text predates
+  `sort=runtime` (§6.2), which the same endpoint accepts alongside `cursor`
+  with no exclusion — so it named ONE combined-list shape for a list that has
+  two orderings.~~
 - Response envelope for every collection:
 
 ```jsonc
@@ -793,12 +822,31 @@ Semantics:
   **never coerced to `0`.** A title with no runtime is excluded while any
   runtime bucket is selected and included when none is — exactly the `genre:
   []` rule, applied to a nullable scalar.
+- **A stored `runtimeMinutes <= 0` IS AN UNKNOWN RUNTIME, everywhere.** TMDB
+  returns `runtime: 0` for works it holds no runtime for, so zero reaches the
+  column as an ordinary value, and **`under30` is `[null, 30)` — a naive
+  `< 30` admits it**. All four consumers must therefore agree:
+  - the row **displays** "Runtime unknown" (REQ-119);
+  - it **satisfies no bucket** — the open-ended bucket carries a `> 0` floor;
+  - it is **counted in `runtimeUnknownHidden`**, which is the exact complement
+    of the filter;
+  - it **sorts with the `NULL`s**, not as the shortest title in the library.
+
+  ⚠ Disagreement between any two of these is invisible to a test of either
+  one: a zero-runtime row would appear *inside* the Under-30m results while
+  labelled "Runtime unknown", unaccounted for by the disclosure that exists to
+  account for it. The API additionally **normalises `<= 0` to `null` at the
+  TMDB boundary**, so no new row can enter the column in that state.
+  `T-API-019e` and `T-API-020d` pin the two database-side halves.
 - `sort=runtime` orders by `runtimeMinutes`, **`NULL`s last in BOTH
   directions**, tie-broken by `title.id` ascending as every other sort is.
   ⚠ `NULLS LAST` must be explicit in the SQL. SQL Server sorts `NULL`
   **first** ascending by default, which would open "Shortest first" with every
   unknown runtime — presenting an absence of data as a claim that those titles
   are the shortest.
+- **Paging a runtime-sorted list uses the `{runtimeMinutes, id}` cursor** —
+  see §3. A date cursor supplied with `sort=runtime` (or the reverse) is a
+  **400 `INVALID_CURSOR`**, never a page of quietly wrong rows.
 - Ordering per data-model §5.3, tie-broken by `title.id` ascending.
 - **Lazy TMDB refresh runs here** — §6.4.
 

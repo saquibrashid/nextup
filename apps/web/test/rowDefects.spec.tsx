@@ -28,6 +28,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ListPage, type ListPageProps } from '../src/pages/ListPage';
+import { RUNTIME_UNKNOWN } from '../src/copy';
 import type { TitleListItem } from '../src/components/TitleRow';
 
 const WEB_ROOT = existsSync(join(process.cwd(), 'apps', 'web', 'src'))
@@ -174,7 +175,7 @@ describe('REQ-106 — independent facts in the metadata line are separated', () 
     const meta = screen.getAllByTestId('title-meta')[0];
     if (meta === undefined) throw new Error('no metadata line rendered');
     const order = Array.from(meta.querySelectorAll('span')).map((s) => s.dataset['testid']);
-    expect(order).toEqual(['release-year', 'media-type', 'genres']);
+    expect(order).toEqual(['release-year', 'media-type', 'genres', 'runtime']);
 
     // The separator is generated, so the RULE is the assertion: jsdom does not
     // render `::before`, so checking the text would prove nothing either way.
@@ -194,7 +195,18 @@ describe('REQ-106 — independent facts in the metadata line are separated', () 
     mount({ items: [{ ...DUNE, genres: [] }], total: 1 });
 
     expect(screen.queryByTestId('genres')).toBeNull();
-    expect(screen.getByTestId('title-meta').textContent).not.toMatch(/unknown/i);
+
+    // ⚠ THE ASSERTION IS THE WHOLE LINE, not a search for the word "unknown".
+    // It used to be `not.toMatch(/unknown/i)`, which was a proxy for "no genre
+    // placeholder" and stopped being one the moment REQ-119 put the words
+    // "Runtime unknown" in the same line — legitimately, because runtime is
+    // filterable and genres are not (see `TitleRow.tsx`).
+    //
+    // Pinning the exact text keeps the original intent and strengthens it: an
+    // "Unknown", a "-" or any other genre placeholder fails here, and so does
+    // anything else quietly appended to the meta line.
+    const meta = screen.getByTestId('title-meta');
+    expect(meta.textContent).toBe(`2021Movie${RUNTIME_UNKNOWN}`);
   });
 });
 

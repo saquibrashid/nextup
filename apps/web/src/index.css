@@ -303,6 +303,20 @@ button {
 /* --------------------------------------------------------- sort control -- */
 
 /*
+ * REQ-037. The sort KEY sits beside the direction toggle, not above it: they
+ * are one decision read left to right — "sort by <key>, <direction> first".
+ * Wrapping is allowed so the pair drops to its own line on a narrow viewport
+ * rather than squeezing the filter fieldsets beside it.
+ */
+.sort-control-group {
+  align-items: flex-end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+/*
  * TASK-166. ⚠ LABEL SHOWS THE CURRENT DIRECTION, not what the next click
  * will produce (`A47`). The button's `aria-pressed` state communicates
  * "oldest-first is currently active" — styling mirrors that: visually distinct

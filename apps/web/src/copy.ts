@@ -19,6 +19,8 @@
  * the owner up-sizes - in the very error whose job is to explain the limit.
  */
 
+import type { RuntimeBucket } from '@nextup/domain';
+
 /* -------------------------------------------------------------------------- */
 /* specs/ui.md §9                                                             */
 /* -------------------------------------------------------------------------- */
@@ -307,6 +309,68 @@ export const FRESHNESS_UNAVAILABLE = 'Last updated dates are unavailable right n
 export const SORT_NEWEST_LABEL = 'Newest first';
 /** `specs/ui.md` §2.1 item 2 - `dir=asc`, the accepted mitigation for SUC-003. */
 export const SORT_OLDEST_LABEL = 'Oldest first';
+
+/* -------------------------------------------------------------------------- */
+/* Runtime - specs/ui-refresh.md §5a (REQ-119 / REQ-035 / REQ-037, `A48`)     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * REQ-119 - the row's runtime when there is none to show (`T-UX-122`).
+ *
+ * ⚠ THE UNKNOWN CASE IS NAMED, NOT OMITTED, and never rendered as `0m` or an
+ * empty slot. Runtime is filterable and a `null` runtime satisfies no bucket,
+ * so an unrenderable runtime is the reason a title vanishes from a filtered
+ * list. `0m` would be worse still: it is a claim that the title is zero
+ * minutes long, filed under "Under 30m" by any reader's arithmetic.
+ *
+ * ⚠ FINDING - INVENTED COPY, PENDING OWNER REVIEW. `specs/ui-refresh.md` §5a
+ * quotes the words "Runtime unknown" inside REQ-119's prose, but §9 of
+ * `specs/ui.md` has no constant row for it yet.
+ */
+export const RUNTIME_UNKNOWN = 'Runtime unknown';
+
+/**
+ * REQ-035 - the runtime filter's bucket labels (`T-UX-123`).
+ *
+ * ⚠ THE LABELS DESCRIBE HALF-OPEN `[lower, upper)` RANGES. "30m – 1h" excludes
+ * a 60-minute title, which appears under "1h – 2h" instead. The boundary lives
+ * once, in `RUNTIME_BUCKET_BOUNDS`; these strings only name it.
+ */
+export const RUNTIME_BUCKET_LABELS: Readonly<Record<RuntimeBucket, string>> = {
+  under30: 'Under 30m',
+  '30-60': '30m – 1h',
+  '60-120': '1h – 2h',
+  over120: 'Over 2h',
+};
+
+/** REQ-037 - the runtime sort's direction labels (`T-UX-120`). */
+export const SORT_SHORTEST_LABEL = 'Shortest first';
+/** REQ-037 - `dir=desc` under `sort=runtime`. */
+export const SORT_LONGEST_LABEL = 'Longest first';
+
+/** REQ-037 - the sort-key options. */
+export const SORT_KEY_DATE_LABEL = 'Date added';
+export const SORT_KEY_RUNTIME_LABEL = 'Runtime';
+export const SORT_KEY_LEGEND = 'Sort by';
+
+/**
+ * REQ-035 - the hidden-unknown disclosure (`T-UX-124`).
+ *
+ * ⚠ THIS IS PRODUCT INVARIANT 2 IN A NEW PLACE: nothing disappears from the
+ * owner's list without telling them. A runtime filter silently drops every
+ * title TMDB never gave a runtime for; without this line the list just gets
+ * shorter and nothing says why. The count comes from the SERVER, computed over
+ * the whole filtered set - the client has not seen the excluded rows and
+ * cannot count them.
+ *
+ * ⚠ FINDING - INVENTED COPY, PENDING OWNER REVIEW. §5a quotes the shape
+ * ("3 titles have no runtime and are hidden"); the singular is mine.
+ */
+export function runtimeUnknownHiddenLabel(count: number): string {
+  return count === 1
+    ? '1 title has no runtime and is hidden.'
+    : `${String(count)} titles have no runtime and are hidden.`;
+}
 
 /* -------------------------------------------------------------------------- */
 /* Refusal and sign-in states - specs/ux-states.md §2.10 / §2.11 (TASK-028)   */

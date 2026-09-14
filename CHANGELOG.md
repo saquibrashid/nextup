@@ -6,6 +6,57 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- **REQ-119 / REQ-035 / REQ-037 — runtime on the row, a runtime filter, and a
+  runtime sort.** The runtime was already fetched from TMDB and stored on every
+  title; nothing ever rendered it. It now sits last in the row's meta line
+  (`Year · type · genres · runtime`) as `1h 55m` for film and `45m/ep` for TV.
+  - ⚠ **The `/ep` suffix is the requirement, not a flourish.** TMDB's
+    `episode_run_time` is *one episode*, so a bare `45m` beside a nine-season
+    series is false in the direction that matters.
+  - A title with no runtime renders the **words** `Runtime unknown`, not an
+    empty slot. ⚠ This deliberately differs from the empty-genre rule directly
+    above it, which renders nothing: runtime is **filterable**, so whether a
+    row has one decides whether it can appear at all, and an owner who cannot
+    see that a title has no runtime cannot understand why it vanished.
+  - **`runtimeUnknownHidden`** — while a runtime filter is active, the list
+    says how many titles it is hiding for want of a runtime. ⚠ This is product
+    invariant 2 in a new place: the filter silently drops every title TMDB
+    never supplied a runtime for, and without this line the list just gets
+    shorter. The count is the **server's**, over the whole filtered set — the
+    excluded rows were never sent, so anything computed in the browser would
+    read `0` on every list and look right in every fixture.
+  - ⚠ **A stored `0` is "unknown", everywhere.** TMDB returns `runtime: 0` for
+    works it has no runtime for, so `0` is a real stored value. Display,
+    filtering, counting and ordering all now route through one predicate
+    (`isKnownRuntime`), and `readRuntime` normalises `<= 0` to `null` at the
+    TMDB boundary. Before this, a zero-runtime title appeared *inside*
+    "Under 30m" while labelled "Runtime unknown", was left out of the count of
+    what the filter hid, and sorted first under "Shortest first".
+  - ⚠ **Bucket boundaries are half-open**, so a 60-minute title is in `60-120`
+    and not in `30-60`. An inclusive upper bound puts one title in two buckets,
+    and any count over the buckets then contradicts the list it describes.
+  - **The pagination cursor is now sort-aware.** `sort=runtime` cuts a
+    `{sortRuntime, id}` cursor; the date sort keeps `{sortDateAdded, id}`.
+    ⚠ They are told apart by **key set**, never by a `sort` field inside the
+    envelope — the pre-existing exact-two-keys check then makes a cursor
+    carried across a sort change a loud `INVALID_CURSOR` for free, which is
+    exactly what the owner hits by switching sort with a page loaded.
+  - ⚠ **`NULL`s sort last in BOTH directions, explicitly.** SQL Server orders
+    `NULL` *first* on `ASC`, so the default alone would have been right until
+    the first click of the reverse control.
+  - ⚠ The keyset over a nullable column needs **three** branches; omitting the
+    one that admits the `NULL` block truncates the list at the first unknown
+    runtime, and only ever on page 2. `T-API-019f`/`g` page the whole list at
+    `limit=1` and `limit=2` in both directions to prove it.
+  - No IMDb-rating sort key exists and none may be added (REQ-095 / `A51`);
+    `T-UX-119` now has a defining row and an implementation.
+  - `T-UX-119` – `T-UX-124`, `T-API-019` – `T-API-021`. `T-API-019` / `020`
+    are **integration-only** — the `NULLS LAST` behaviour and the whole-set
+    count are properties of the SQL, and a comparator asserting them says
+    nothing about a query whose `ORDER BY` omits them.
+
 ### Fixed
 
 - **REQ-109 — a corrected match now shows the title you chose, not the one you

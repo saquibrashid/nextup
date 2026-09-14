@@ -14,14 +14,26 @@
  * read any owner's list.
  */
 
-import { MEDIA_TYPES, SERVICES, type MediaType, type Service } from '@nextup/domain';
+import {
+  MEDIA_TYPES,
+  RUNTIME_BUCKETS,
+  SERVICES,
+  type MediaType,
+  type RuntimeBucket,
+  type Service,
+} from '@nextup/domain';
 import type { Request } from 'express';
 
 import { AppError } from '../errors/AppError.js';
-import { decodeCursor, parseLimit, type ListCursor } from '../pagination.js';
+import {
+  decodeCursor,
+  decodeRuntimeCursor,
+  parseLimit,
+  type AnyListCursor,
+} from '../pagination.js';
 
-/** `specs/api.md` §6.2 — one sort, one default direction. */
-export const TITLE_SORTS = ['dateAdded'] as const;
+/** `specs/api.md` §6.2 — the sort keys, and one default direction. */
+export const TITLE_SORTS = ['dateAdded', 'runtime'] as const;
 export type TitleSort = (typeof TITLE_SORTS)[number];
 
 export const SORT_DIRECTIONS = ['asc', 'desc'] as const;
@@ -64,10 +76,16 @@ export interface TitleListQuery {
   services: Service[];
   mediaType: MediaType | undefined;
   genres: string[];
+  /**
+   * OR within the dimension; `[]` means "no runtime filter", which is a
+   * DIFFERENT state from "every bucket selected" — only the first includes
+   * titles with no runtime at all (`specs/api.md` §6.2).
+   */
+  runtimes: RuntimeBucket[];
   sort: TitleSort;
   dir: SortDirection;
   limit: number;
-  cursor: ListCursor | undefined;
+  cursor: AnyListCursor | undefined;
 }
 
 function fail(field: string, message: string, details: Record<string, unknown> = {}): never {
@@ -143,6 +161,16 @@ export function parseTitleListQuery(query: Request['query']): TitleListQuery {
   // dimension is an OR against itself and only widens the generated predicate.
   const uniqueGenres = [...new Set(genres)];
 
+  // REQ-035. An unrecognised bucket is a 400 (`T-API-021`), per §3's enum
+  // rule — and deliberately NOT dropped. A dropped bucket would silently widen
+  // the list past what the owner asked for, which is the opposite failure to
+  // the one the disclosure count exists to prevent.
+  const runtimes = requireEnumValues(
+    toStringArray(query['runtime'], 'runtime'),
+    'runtime',
+    RUNTIME_BUCKETS,
+  );
+
   const sortRaw = query['sort'];
   if (sortRaw !== undefined && !(TITLE_SORTS as readonly unknown[]).includes(sortRaw)) {
     fail('sort', '"sort" is not a supported sort.', { permitted: [...TITLE_SORTS] });
@@ -162,13 +190,28 @@ export function parseTitleListQuery(query: Request['query']): TitleListQuery {
     });
   }
 
+  const sort = (sortRaw as TitleSort | undefined) ?? 'dateAdded';
+
   return {
     services,
     mediaType: mediaTypes[0],
     genres: uniqueGenres,
-    sort: (sortRaw as TitleSort | undefined) ?? 'dateAdded',
+    runtimes,
+    sort,
     dir: (dirRaw as SortDirection | undefined) ?? DEFAULT_SORT_DIRECTION,
     limit: parseLimit(query['limit']),
-    cursor: cursorRaw === undefined ? undefined : decodeCursor(cursorRaw),
+    // ⚠ THE CURSOR IS DECODED FOR THE SORT IT IS BEING USED WITH. A keyset
+    // predicate must mirror its own `ORDER BY`, so a date position is
+    // meaningless against a runtime-ordered list — paging it would skip or
+    // repeat rows at every boundary, which is indistinguishable from data
+    // loss. `decodeCursor`'s exact-key check turns a mismatched pair into a
+    // loud `INVALID_CURSOR` (the client restarts, §3) rather than a page of
+    // quietly wrong rows, which is why the shapes are not unified.
+    cursor:
+      cursorRaw === undefined
+        ? undefined
+        : sort === 'runtime'
+          ? decodeRuntimeCursor(cursorRaw)
+          : decodeCursor(cursorRaw),
   };
 }

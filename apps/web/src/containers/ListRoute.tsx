@@ -227,6 +227,23 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
   const totalIsLowerBound = allResponse !== null ? allResponse.nextCursor !== null : paged.hasMore;
 
   /**
+   * REQ-035 (`T-UX-124`) — the server's count of titles the runtime filter
+   * hid for having no runtime at all.
+   *
+   * ⚠ READ FROM PAGE 1 OF THE FILTERED REQUEST, and NOT accumulated across
+   * pages like `items` are. It is already a whole-set figure: every page of a
+   * given query answers with the same number, so summing it would multiply
+   * the count by the number of pages the owner happened to scroll through.
+   *
+   * ⚠ `?? null` COLLAPSES ONLY `undefined`, which is a wire-shape concern (an
+   * older replica or a cached response that predates the field). A real `0`
+   * survives, and the disclosure's own `> 0` test — not this one — decides
+   * whether it renders.
+   */
+  const runtimeUnknownHidden =
+    titles.resource.kind === 'ok' ? (titles.resource.value.runtimeUnknownHidden ?? null) : null;
+
+  /**
    * ⚠ `removedCount` is now supplied (see the conditional read above). It is
    * the count of the removal LOG, which by product invariant 7 legitimately
    * holds several rows for the same work over time — that is the right number
@@ -255,6 +272,7 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
       }
       total={unfiltered.length}
       totalIsLowerBound={totalIsLowerBound}
+      runtimeUnknownHidden={runtimeUnknownHidden}
       hasMore={paged.hasMore}
       loadingMore={paged.loadingMore}
       loadMoreFailed={paged.loadMoreFailed}

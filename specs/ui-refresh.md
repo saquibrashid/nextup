@@ -764,10 +764,15 @@ of writing REQ-104, US-048, ADR-0012, `T-UX-099`): **REQ-105 – REQ-119**,
 **US-049 – US-055**, **`T-UX-100` – `T-UX-124`**, **`T-API-019` – `T-API-022`**,
 **`T-UI-029`**, **ADR-0013**.
 ⚠ **Consumed so far:** `T-UX-100` – `T-UX-108` and **`T-API-022`** (REQ-105 –
-REQ-109, shipped). `T-API-019` – `T-API-021` remain reserved for the §5a
-runtime work and are not yet implemented. ⚠ `T-API-022` sits **out of numeric
-order** relative to those three deliberately — REQ-109 shipped first — so do
-**not** "correct" the gap by renumbering a live test id.
+REQ-109, shipped); **`T-UX-120` – `T-UX-124`** and **`T-API-019` – `T-API-021`**
+(REQ-119 / REQ-035 / REQ-037, §5a runtime work, shipped). ⚠ `T-API-022` sits
+**out of numeric order** relative to `T-API-019` – `T-API-021` deliberately —
+REQ-109 shipped first — so do **not** "correct" the gap by renumbering a live
+test id.
+⚠ **`T-UX-109` – `T-UX-119` remain reserved and unimplemented**, except
+`T-UX-119`, which is a REQ-095 regression guard defined in §5.
+~~Superseded: "`T-API-019` – `T-API-021` remain reserved for the §5a runtime
+work and are not yet implemented."~~
 ⚠ **`T-API` ids run in the teens, not the sixties.** The `A48` rows were first
 written as `T-API-062`–`064` by analogy with the `T-UX-1xx` range and corrected
 before they reached a test: the whole tree's ceiling is `T-API-018`. An id
