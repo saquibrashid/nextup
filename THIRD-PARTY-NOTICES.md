@@ -234,7 +234,7 @@ so they do not relicense this work — but their notices must be retained.
 | `on-finished` | 2.4.1 | MIT |
 | `once` | 1.4.0 | ISC |
 | `open` | 10.2.0 | MIT |
-| `openai` | 7.5.0 | Apache-2.0 |
+| `openai` | 7.10.0 | Apache-2.0 |
 | `parseurl` | 1.3.3 | MIT |
 | `path-expression-matcher` | 1.6.2 | MIT |
 | `path-to-regexp` | 8.4.2 | MIT |
