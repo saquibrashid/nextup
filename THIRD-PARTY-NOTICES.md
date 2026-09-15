@@ -101,10 +101,10 @@ so they do not relicense this work — but their notices must be retained.
 | `@prisma/fetch-engine` | 6.19.3 | Apache-2.0 |
 | `@prisma/get-platform` | 6.19.3 | Apache-2.0 |
 | `@standard-schema/spec` | 1.1.0 | MIT |
-| `@tanstack/react-virtual` | 3.14.10 | MIT |
-| `@tanstack/virtual-core` | 3.17.8 | MIT |
+| `@tanstack/react-virtual` | 3.14.11 | MIT |
+| `@tanstack/virtual-core` | 3.17.9 | MIT |
 | `@tediousjs/connection-string` | 0.5.0 | MIT |
-| `@types/node` | 22.20.1 | MIT |
+| `@types/node` | 22.20.2 | MIT |
 | `@types/readable-stream` | 4.0.24 | MIT |
 | `@typespec/ts-http-runtime` | 0.3.8 | MIT |
 | `abort-controller` | 3.0.0 | MIT |
@@ -234,7 +234,7 @@ so they do not relicense this work — but their notices must be retained.
 | `on-finished` | 2.4.1 | MIT |
 | `once` | 1.4.0 | ISC |
 | `open` | 10.2.0 | MIT |
-| `openai` | 7.10.0 | Apache-2.0 |
+| `openai` | 7.15.0 | Apache-2.0 |
 | `parseurl` | 1.3.3 | MIT |
 | `path-expression-matcher` | 1.6.2 | MIT |
 | `path-to-regexp` | 8.4.2 | MIT |
@@ -296,4 +296,4 @@ so they do not relicense this work — but their notices must be retained.
 | `ws` | 8.21.2 | MIT |
 | `wsl-utils` | 0.1.0 | MIT |
 | `xml-naming` | 0.3.0 | MIT |
-| `zod` | 4.5.4 | MIT |
+| `zod` | 4.6.2 | MIT |
