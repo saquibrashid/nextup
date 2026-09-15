@@ -221,6 +221,276 @@ button {
   flex: none;
 }
 
+/* ------------------------------------------------------------ primitives -- */
+
+/*
+ * REQ-125 (§7d) — `Button` and `Field`. ⚠ THIS BLOCK REPLACES NINE PRIVATE
+ * RULES, seven of which were the same border-plus-radius written out again on
+ * a different screen. That duplication is why the screens looked unrelated to
+ * each other even where each was individually correct.
+ */
+.btn {
+  align-items: center;
+  background: var(--color-surface);
+
+  /*
+   * ⚠ A TRANSPARENT BORDER, NOT `none`. Every variant then occupies the same
+   * box, so a filled button and an outlined one beside it line up. With
+   * `border: none` on one variant the two differ by 2 px and the row reads as
+   * slightly broken in a way nobody can name.
+   */
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--color-text);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  gap: var(--space-2);
+  justify-content: center;
+  line-height: var(--leading-tight);
+  padding: var(--space-2) var(--space-4);
+  text-align: center;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    filter 120ms ease;
+}
+
+/*
+ * ⚠ `:focus-visible`, NOT `:focus`. A mouse click would otherwise leave a ring
+ * behind on every button the owner presses, which reads as a bug and is
+ * usually "fixed" by removing the outline altogether — taking the keyboard
+ * user's only position indicator with it.
+ */
+.btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn--primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+
+  /* 7.90:1 — see the `--color-accent` note in `:root`; one token serves both. */
+  color: var(--color-surface);
+}
+
+.btn--secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.btn--ghost {
+  background: none;
+  border-color: transparent;
+  color: var(--color-accent);
+}
+
+.btn--danger {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-surface);
+}
+
+/*
+ * ⚠ DARKEN, NEVER LIGHTEN, A FILLED BUTTON ON HOVER. These carry white text at
+ * a computed ratio; brightening the fill moves that ratio DOWN, so the state
+ * the owner sees most often would be the one least likely to pass §10.2 — and
+ * `T-CSS-004` reads the tokens, not the hover state, so it would never say so.
+ */
+.btn--primary:hover:not(:disabled),
+.btn--danger:hover:not(:disabled) {
+  filter: brightness(0.9);
+}
+
+.btn--secondary:hover:not(:disabled),
+.btn--ghost:hover:not(:disabled) {
+  background: var(--color-bg);
+}
+
+/*
+ * §7d — the group. ⚠ THE SEMANTICS ARE KEPT AND THE CHROME IS NOT: the
+ * browser's default inset groove border was the single most dated thing on
+ * these screens, but `<fieldset>`/`<legend>` is what associates the group name
+ * with every control inside it for a screen reader.
+ */
+.field {
+  border: none;
+  margin: 0;
+  min-inline-size: 0;
+  padding: 0;
+}
+
+.field__legend {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  padding: 0;
+}
+
+.field__description {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.field__error {
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}
+
+.input,
+.select {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font: inherit;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: var(--tap-target-min);
+  padding: var(--space-2);
+}
+
+.input--choice {
+  accent-color: var(--color-accent);
+  min-block-size: 0;
+  flex: none;
+}
+
+.field label:has(.input--choice),
+.segmented > label {
+  align-items: center;
+  display: inline-flex;
+  gap: var(--space-2);
+  min-block-size: var(--tap-target-min);
+  padding: var(--space-2);
+}
+
+.input:focus-visible,
+.select:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.input--file {
+  /* The visible label remains the file-selection affordance on every device. */
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  min-block-size: 0;
+  border: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.card,
+.dialog {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  min-inline-size: 0;
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-inline-size: 100%;
+}
+
+.badge,
+.chip {
+  display: inline-block;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-2);
+}
+
+.segmented {
+  border: none;
+  margin: 0;
+  min-inline-size: 0;
+  padding: 0;
+}
+
+.segmented__legend {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  margin-block-end: var(--space-2);
+}
+
+.segmented > label {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  flex-wrap: wrap;
+  margin-inline-end: var(--space-1);
+  margin-block-end: var(--space-1);
+}
+
+.segmented > label:has(:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-bg);
+  font-weight: var(--weight-bold);
+}
+
+.segmented > label > p {
+  flex-basis: 100%;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+}
+
+.btn[aria-pressed='true'] {
+  background: var(--color-accent);
+  color: var(--color-surface);
+}
+
+.empty-state {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+
+.empty-state__title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+}
+
+.empty-state__icon {
+  color: var(--color-text-muted);
+  font-size: var(--text-xl);
+}
+
+.skeleton {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  margin-block-end: var(--space-2);
+}
+
+.skeleton--line {
+  block-size: 1em;
+}
+
+.skeleton--card {
+  min-block-size: 8rem;
+}
+
+.skeleton--poster {
+  inline-size: 4rem;
+  aspect-ratio: 2 / 3;
+}
+
 /* --------------------------------------------------------------- layout -- */
 
 .app-shell {
@@ -348,21 +618,12 @@ button {
  * has no other way in. Clipping keeps the input focusable and operable while
  * the label is what is seen; the focus ring is put back on the label below.
  */
-.dropzone__file-input {
-  block-size: 1px;
-  clip-path: inset(50%);
-  inline-size: 1px;
-  overflow: hidden;
-  position: absolute;
-  white-space: nowrap;
-}
-
 /*
  * Focus must stay VISIBLE once the input itself is clipped. The label precedes
  * the input, so a sibling combinator cannot reach backwards; `:has()` on the
  * container can.
  */
-.dropzone__target:has(.dropzone__file-input:focus-visible) .dropzone__choose {
+.dropzone__target:has(.input--file:focus-visible) .dropzone__choose {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
@@ -399,14 +660,6 @@ button {
  * "oldest-first is currently active" — styling mirrors that: visually distinct
  * when pressed (oldest-first), plain when default (newest-first).
  */
-.sort-control {
-  background: none;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-size: inherit;
-}
-
 /* ------------------------------------------------------ freshness strip -- */
 
 /*
@@ -691,14 +944,6 @@ button {
 
 .title-row__menu {
   flex: 0 0 auto;
-}
-
-.title-row__action {
-  background: none;
-  border: none;
-  color: var(--color-accent);
-  cursor: pointer;
-  text-align: left;
 }
 
 /* -------------------------------------------------------- not interested -- */
@@ -1062,9 +1307,7 @@ button {
  * it would be one mis-tap away from closing the batch.
  */
 .review-section__confirm-all {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  /* ⚠ LAYOUT ONLY — the look comes from §7d's `Button`. */
   margin: var(--space-2) 0 0;
 }
 
@@ -1285,16 +1528,6 @@ button {
   gap: var(--space-3);
 }
 
-.removal-confirm__cancel {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-}
-
-.removal-confirm__confirm {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-}
-
 /* ------------------------------------------------- batch applied notice -- */
 
 /*
@@ -1324,11 +1557,6 @@ button {
 .applied-notice-actions {
   display: flex;
   gap: var(--space-2);
-}
-
-.applied-notice-undo {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
 }
 
 .applied-notice-link {
@@ -1449,10 +1677,8 @@ button {
 }
 
 .batch-card__undo {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  color: var(--color-text);
+  /* ⚠ LAYOUT ONLY — the look comes from §7d's `Button`. */
+  display: inline-block;
   margin-top: var(--space-2);
 }
 
@@ -1552,13 +1778,6 @@ button {
 .upload-submit__reason {
   color: var(--color-text-muted);
   margin: 0;
-}
-
-.upload-submit__button {
-  background: var(--color-accent);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius);
-  color: var(--color-surface);
 }
 
 .upload-submit__failure {

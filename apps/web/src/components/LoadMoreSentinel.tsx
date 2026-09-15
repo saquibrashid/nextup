@@ -16,6 +16,7 @@
 import { useEffect, useRef, type JSX } from 'react';
 
 import { LOAD_MORE, LOAD_MORE_BUSY, LOAD_MORE_FAILED, LOAD_MORE_RETRY } from '../copy';
+import { Button } from './ui/Button';
 
 export interface LoadMoreSentinelProps {
   readonly hasMore: boolean;
@@ -69,15 +70,14 @@ export function LoadMoreSentinel({
           {LOAD_MORE_FAILED}
         </p>
       )}
-      <button
-        type="button"
-        className="tap-target"
+      <Button
+        variant="secondary"
         data-testid="load-more"
         aria-busy={loadingMore}
         onClick={onLoadMore}
       >
         {loadMoreFailed ? LOAD_MORE_RETRY : LOAD_MORE}
-      </button>
+      </Button>
       {loadingMore && (
         <p role="status" data-testid="load-more-busy">
           {LOAD_MORE_BUSY}

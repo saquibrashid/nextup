@@ -24,6 +24,7 @@ import type { JSX } from 'react';
 
 import { RETRY_LABEL, SLOW_RESPONSE_BODY, SLOW_RESPONSE_STALLED_BODY } from '../copy';
 import type { RequestPhase } from '../lib/useSlowRequest';
+import { Button } from './ui/Button';
 
 export interface SlowResponseNoticeProps {
   readonly phase: RequestPhase;
@@ -51,9 +52,9 @@ export function SlowResponseNotice({
     <div role="alert" className="slow-response slow-response--stalled" data-testid="slow-stalled">
       <p>{SLOW_RESPONSE_STALLED_BODY}</p>
       {onRetry !== undefined && (
-        <button type="button" className="tap-target" onClick={onRetry} data-testid="slow-retry">
+        <Button variant="secondary" onClick={onRetry} data-testid="slow-retry">
           {RETRY_LABEL}
-        </button>
+        </Button>
       )}
     </div>
   );

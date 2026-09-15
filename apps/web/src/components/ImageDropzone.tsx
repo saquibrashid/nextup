@@ -1,3 +1,4 @@
+import { Input } from './ui/Input';
 // The attach area (`specs/ui.md` §3.2, `specs/ux-states.md` §4.3/§4.4,
 // TASK-053).
 //
@@ -37,6 +38,7 @@ import {
 import { useHeldImages } from '../lib/useHeldImages';
 import { PasteButton, type PasteFailure } from './PasteButton';
 import { PasteCapture } from './PasteCapture';
+import { Button } from './ui/Button';
 import {
   RejectionList,
   mergeRejections,
@@ -374,11 +376,11 @@ export function ImageDropzone({
         <label className="dropzone__choose tap-target" htmlFor={inputId}>
           {CHOOSE_FILES_LABEL}
         </label>
-        <input
+        <Input
           id={inputId}
           type="file"
           multiple
-          className="dropzone__file-input"
+
           data-testid="file-input"
           accept={IMAGE_ACCEPT_ATTRIBUTE}
           onChange={(event) => {
@@ -409,15 +411,14 @@ export function ImageDropzone({
                 {isHeic(file) && (
                   <span data-testid="heic-placeholder">{HEIC_PREVIEW_PLACEHOLDER}</span>
                 )}
-                <button
-                  type="button"
-                  className="tap-target"
+                <Button
+                  variant="secondary"
                   onClick={() => {
                     setAccepted((current) => current.filter((candidate) => candidate !== file));
                   }}
                 >
                   {`Remove ${file.name}`}
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

@@ -1228,7 +1228,7 @@ there **with** their `specs/testing.md` §9 rows and their tests, in one change.
 | **US-056** *(new, 2026-09-14)* | *As the owner, I can filter by a genre and trust that I got every title in it.* → REQ-120 |
 | **US-057** *(new, 2026-09-14)* | *As the owner, I can order my list by any fact it shows me.* → REQ-121, and the reversal in §7a |
 | **US-058** *(new, 2026-09-14)* | *As the owner, I can tell an addition from a removal without scrolling back to a heading.* → REQ-122 |
-| **US-059** *(new, 2026-09-14)* | *As the owner, the app looks like it was designed.* → REQ-123, REQ-124, REQ-125 |
+| **US-059** *(promoted by TASK-210)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-123, REQ-124, REQ-125. |
 
 **Reserved ranges** ~~(collision-checked against the whole tree; ceilings at
 time of writing REQ-104, US-048, ADR-0012, `T-UX-099`): **REQ-105 – REQ-119**,

@@ -212,6 +212,7 @@ A title was removed months ago. It shows up again in a new capture. nextup creat
 | K | Platform guarantees | The invariants that make the rest safe. | US-036, US-037, US-038, US-039 |
 | **L** *(v1.1 — specified, not scheduled)* | **Waiting to stream** | Record what I noticed on a rental storefront, and tell me when it reaches a service I have. | US-040, US-041, US-042, US-043 |
 | **M** *(v1.1 — specified, not scheduled)* | **IMDb ratings** | Show me the IMDb rating on my list, and let me look up a rating for anything I haven't saved. | US-044, US-045, US-046 |
+| **P** | **Visual language** | Shared typography, icons and controls; remaining visual-refresh stories are promoted with their owning tasks. | US-059 |
 
 Story order within an epic is dependency order. Epic order A → K is a viable build order; see §12.1. **Epic L is v1.1 and follows the whole of A–K** — it depends on Epics C, D and I being complete. See ADR-0010 and `roadmap.md` §5. **Epic M is v1.1 and depends on Epic F** (the combined list) and on TMDB matching being in place, because a rating is keyed on the `imdb_id` that matching produces. See ADR-0011.
 
@@ -1418,6 +1419,25 @@ describes its increment as three → four. **The reasoning is retained rather
 than deleted because it still governs Epic L.** A lazy, access-triggered
 refresh does **not** escape this count: ADR-0010 set that precedent and
 ADR-0011 followed it.
+
+---
+
+### Epic P — Visual language
+
+#### US-059 — The app looks like it was designed
+
+**As the owner**, I want consistent typography, icons and controls so the
+screens feel like one application and their states remain understandable.
+
+**Requirements:** REQ-123, REQ-124, REQ-125 (`specs/ui-refresh.md` §7b–§7d).
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | Text uses the closed token-based type scale; primary content never drops below `--text-sm`. |
+| AC-2 | The closed inline icon set inherits `currentColor`, adds no package or network request, and exposes a name only when non-decorative. |
+| AC-3 | Form controls use shared primitives. Variants resolve through literal class maps, and every rendered class has a stylesheet rule. |
+| AC-4 | Buttons preserve native submit, disabled and focus behaviour and meet the 44 px tap-target floor at 320 px. |
+| AC-5 | Dialogs trap focus, dismiss on Escape and restore focus to their trigger. Field labels, descriptions and errors remain associated with their controls. |
 
 ---
 

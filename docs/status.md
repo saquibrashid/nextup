@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 7 |
+| ⬜ todo | 6 |
 | 🚧 doing | 0 |
-| ✅ done | 207 |
+| ✅ done | 208 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **217** |
@@ -24,7 +24,10 @@ Not done, and every task they depend on is done.
 
 | Task | Size | Section |
 |---|---|---|
-| `TASK-210` | M | 5P. Epic P — the visual refresh (ADR-0013, `specs/ui-refresh.md`, `A53`) |
+| `TASK-211` | M | 5P. Epic P — the visual refresh (ADR-0013, `specs/ui-refresh.md`, `A53`) |
+| `TASK-212` | M | 5P. Epic P — the visual refresh (ADR-0013, `specs/ui-refresh.md`, `A53`) |
+| `TASK-217` | L | 5P. Epic P — the visual refresh (ADR-0013, `specs/ui-refresh.md`, `A53`) |
+| `TASK-218` | M | 5P. Epic P — the visual refresh (ADR-0013, `specs/ui-refresh.md`, `A53`) |
 | `TASK-219` | M | 5P. Epic P — the visual refresh (ADR-0013, `specs/ui-refresh.md`, `A53`) |
 
 ## Waiting on the owner
@@ -37,15 +40,11 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-5 tasks cannot start yet.
+1 task cannot start yet.
 
 | Task | Waiting on |
 |---|---|
-| `TASK-211` | `TASK-210` |
-| `TASK-212` | `TASK-210` |
 | `TASK-213` | `TASK-212` |
-| `TASK-217` | `TASK-210` |
-| `TASK-218` | `TASK-210` |
 
 ## Done
 
@@ -255,6 +254,7 @@ Not done, and every task they depend on is done.
 | `TASK-207` | **The two list edits the product had no affordance for — a manual ADD and a manual REMOVE, both outside any batch.** Found by the owner curating a real list: a false extraction (`LEVANTE`, a wrapped-caption split of *Sol Levante*) could only be dealt with by suppressing the work for ever or by re-capturing an entire service. Migration `0007_manual_list_edits` (`created_by_batch_id` → NULLABLE); `apps/api/src/routes/manualListEdits.ts` (§6.30/§6.32); `AddTitleDialog` + `RemoveTitleDialog` + a third `RowMenu` item; `TITLE_NOT_ACTIVE` added to the closed error enumeration. 13 integration cases `T-MANUAL-001`–`T-MANUAL-013` and 15 web cases `T-MANUAL-016`–`T-MANUAL-030`, every one driving `ListPage` rather than the dialog in isolation. ⚠ **REQ-041's closed enumeration widened 8 → 10 with an explicit PRD §7.4 amendment** — the three coupled places moved together. ⚠ **No suppression is written by the remove path**, which is the whole distinction from US-027, and no second restore path was added. Also fixed a **pre-existing** `listings.ts` defect: restoring a sibling listing of an already-active title 409'd as `DUPLICATE_WORK_IDENTITY`, which every two-badge undo hits. | `T-INV-012`, `T-MANUAL-001`, `T-MANUAL-013`, `T-MANUAL-014`, `T-MANUAL-015`, `T-MANUAL-016`, `T-MANUAL-030`, `T-MIG-001`, `T-MUT-001e`, `T-REAP-014` |
 | `TASK-208` | `T-CSS-006a-d`, `T-CSS-007a-c` and the updated `T-CSS-004c`/`004e` in `apps/web/test/stylesheet.spec.ts` (28 tests). Accent moved to ADR-0013's `#4338ca` (7.90:1) and the pinned ratio updated with it. 16 raw font-size literals in 5 ad-hoc sizes, 13 raw font-weights and 1 raw line-height replaced by tokens. Both genre-chip rules moved off `--text-xs` to the `--text-sm` §7b names. ⚠ Each new gate was mutation-tested to prove it fails on a regression rather than passing vacuously. | `T-CSS-003`, `T-CSS-004`, `T-CSS-006`, `T-CSS-007` |
 | `TASK-209` | `T-UI-030a–e` and `T-A11Y-016a–f` in `apps/web/test/icons.spec.tsx` (23 tests). 13 icons + `IconBase` + barrel in `apps/web/src/components/icons/`; one `.icon` rule sized in `em` so icons scale with adjacent text. ⚠ **A REAL ID COLLISION WAS FOUND AND FIXED HERE.** §7c/§7d cited `T-A11Y-014`/`015`, both of which `specs/testing.md` L1247–1248 **already defines** (the US-033 refusal enumeration, and 280 px degradation). `check:test-ids` only asks whether a cited id is defined *somewhere*, so the collision passed every gate — this task would have reported **done** off a passing refusal test with no icon assertion in it. The family was enumerated at the point of naming; renumbered to `016`/`017` in place, old ids struck. ⚠ Six mutations, each killed: recolouring the stroke killed 14 cases, a 20-grid viewBox killed `030d`, dropping `aria-hidden` killed `016a`+`016c`, dropping `role="img"` killed `016b`, one `<svg` in `FilterBar.tsx` killed `016d`, a 14th export killed `030b`. ⚠ `T-A11Y-016d` — no `<svg>` outside the icons directory — is the load-bearing one: the entire accessibility contract lives in `IconBase`, and a hand-authored `<svg>` elsewhere draws perfectly while inheriting none of it. | `T-A11Y-016`, `T-CSS-004`, `T-UI-030` |
+| `TASK-210` | `T-UI-031a–h`, `T-UI-032a–f/m/n`, `T-A11Y-017`. Shared Button, Input, Select, Field, SegmentedControl, Card, Badge, Chip, EmptyState, Skeleton and Dialog; all native form controls migrated and existing dialog focus handling centralised without changing outcomes. Static class maps are resolved and validated through the TypeScript AST, including rejection of mutable, missing, escaped and computed maps. Both-direction CSS checks remain mandatory. `T-A11Y-006e` and `T-UI-024l` preserve their contracts after centralisation. US-059 promoted to PRD with its five §9 mappings in the same change. 986 web tests pass; 93.64% coverage with bounded workers; real Chromium/Mobile Safari checks measure every Button variant at 320 px. | `T-A11Y-017`, `T-CSS-001`, `T-CSS-001c`, `T-UI-031`, `T-UI-032` |
 | `TASK-214` | ⚠ **Shipped by someone else in `4137666` while Epic P was being specified, NOT built under this task.** `T-API-019`/`020`/`021` are live in `titleRuntime.spec.ts` and `titlesQuery.spec.ts`. Kept rather than deleted so the ids retain an owner for `check:orphans`. | `T-API-019`, `T-API-020`, `T-API-021` |
 | `TASK-215` | ahead-of:TASK-212 — ⚠ **Shipped by someone else in `4137666`**, same as TASK-214. `T-UX-120` – `T-UX-124` are defined above §39 and live. Kept so those ids retain an owner. ⚠ **It shipped against the CURRENT row, not the refreshed one**, so TASK-212 inherits the duty of carrying the runtime rendering into the new row component — see the warning on that task. | `T-UX-120`, `T-UX-121`, `T-UX-122`, `T-UX-123`, `T-UX-124` |
 | `TASK-216` | `sort=releaseYear` and `sort=rating` on `GET /api/titles`, and the REQ-041 synchronous sweep. The sweep runs **inside the request and before the `ORDER BY`** under `sort=rating` only (`routes/titles.ts`), over the **whole filtered set** via the new `listTitleRatingRows`, bounded by `IMDB_SWEEP_PER_REQUEST` **and** a new wall-clock `deadline` in `refreshRatings`. Unit: `titlesSortRoute.spec.ts` (`T-API-023a/b`, `024a/b/c`, `025a`, `026a/b`, `027a/b/c`), `titlesQuery.spec.ts` (`T-API-023l/m/n`, `026c`, `027l/m`), `ordering.spec.ts` (`T-API-023i/j/k`, `027j/k`). Integration: `titleSorts.spec.ts`, 12 cases against a real SQL Server. `T-IMDB-005b` **rewritten, not deleted** — it now guards the sweep's POSITION rather than the absence of a sort key. ⚠ **`sort=name` was cut to TASK-219**: the `BIN2` collation makes it a migration, not a sort key — see ~~`T-API-029`~~ (TASK-219's test, struck so `check:status` does not read it as a duty of this task). Three defects found on the way and fixed: a sweep failure 500-ing the whole list, `T-API-026` specified against `INVALID_QUERY` (not a member of the closed enum), and `api.md` §6.2 advertising `sort=name` as shippable. Mutation-tested: dropping the third keyset branch fails 2 cases, dropping `nulls: 'last'` fails 7, dropping the `await` fails `T-IMDB-005b`. | `T-API-023`, `T-API-024`, `T-API-025`, `T-API-026`, `T-API-027`, `T-CI-005`, `T-IMDB-005b` |

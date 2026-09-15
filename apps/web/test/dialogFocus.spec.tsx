@@ -174,25 +174,34 @@ describe('T-A11Y-006 dialogs trap focus, restore it, and close on Escape', () =>
       written to end. So the expected set is READ OFF THE SOURCE rather than
       listed here, and cannot drift from it.
     */
-    const modal = readdirSync(COMPONENTS)
+    const consumers = readdirSync(COMPONENTS)
       .filter((file) => file.endsWith('.tsx'))
-      .filter((file) => readFileSync(join(COMPONENTS, file), 'utf8').includes('aria-modal'));
+      .filter((file) => /<Dialog\b/.test(readFileSync(join(COMPONENTS, file), 'utf8')));
+    // TASK-210 centralises the hook rather than deleting the focus contract.
+    expect(consumers.length).toBeGreaterThanOrEqual(5);
+    const primitive = readFileSync(join(COMPONENTS, 'ui', 'Dialog.tsx'), 'utf8');
+    expect(primitive).toContain('useDialogFocus(onDismiss)');
+    expect(primitive).toContain('ref={ref}');
+    expect(primitive).toContain('tabIndex={-1}');
+    expect(primitive).toContain('aria-modal="true"');
 
-    // Non-vacuity floor: if the detector matches nothing, it proves nothing.
-    expect(modal.length).toBeGreaterThanOrEqual(3);
-
-    const unwired = modal.filter((file) => {
-      /*
-        ⚠ `useDialogFocus(` — THE CALL, not the identifier. A mutation that
-        deleted the call from `SuppressDialog` while leaving its import
-        SURVIVED an earlier version of this assertion, which searched for the
-        bare name. An unused import is exactly what a half-finished wiring
-        leaves behind, so the bare name matches precisely the case this is
-        meant to catch.
-      */
-      return !readFileSync(join(COMPONENTS, file), 'utf8').includes('useDialogFocus(');
-    });
-    expect(unwired).toEqual([]);
+    function walk(dir: string): string[] {
+      return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+        entry.isDirectory()
+          ? walk(join(dir, entry.name))
+          : entry.name.endsWith('.tsx')
+            ? [join(dir, entry.name)]
+            : [],
+      );
+    }
+    const bypasses = walk(COMPONENTS)
+      .filter((file) => file !== join(COMPONENTS, 'ui', 'Dialog.tsx'))
+      .filter((file) =>
+        /aria-modal\s*=/.test(
+          readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, ''),
+        ),
+      );
+    expect(bypasses).toEqual([]);
   });
 
   it('T-A11Y-006f: focus never rests on a control disabled mid-close', () => {

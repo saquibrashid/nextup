@@ -1,3 +1,4 @@
+import { Input } from '../components/ui/Input';
 // `/batches/:batchId/review` - the review pass (`specs/ui.md` §5, TASK-069).
 //
 // ⚠ THIS IS THE SAFETY GATE, and it is where the mode contract becomes
@@ -74,6 +75,7 @@ import {
   reviewPendingAdditions,
 } from '../copy';
 import { OFFLINE_DISABLED_REASON } from '../copy';
+import { Button } from '../components/ui/Button';
 
 export interface ReviewPageProps {
   readonly review?: ReviewResponse | null;
@@ -264,14 +266,12 @@ function CandidateSection({
           {`${section.label} (${section.count})`}
         </summary>
         {showConfirmAll && (
-          <button
-            className="tap-target review-section__confirm-all"
-            data-testid="confirm-all-button"
-            onClick={confirmAll}
-            type="button"
-          >
-            {REVIEW_CONFIRM_ALL.replace('{n}', String(remaining))}
-          </button>
+          <p className="review-section__confirm-all">
+            {/* Layout only — the margin belongs to the section, not the button. */}
+            <Button variant="secondary" data-testid="confirm-all-button" onClick={confirmAll}>
+              {REVIEW_CONFIRM_ALL.replace('{n}', String(remaining))}
+            </Button>
+          </p>
         )}
         {section.items.length === 0 ? (
           <p className="review-empty__body" data-testid="review-section-empty">
@@ -383,9 +383,9 @@ export function ReviewPage({
         <div role="alert" data-testid="review-load-error">
           <p>{REVIEW_LOAD_FAILED}</p>
           {onRetry !== undefined && (
-            <button type="button" className="tap-target" onClick={onRetry}>
+            <Button variant="secondary" onClick={onRetry}>
               {REVIEW_RETRY_LABEL}
-            </button>
+            </Button>
           )}
         </div>
       </>
@@ -579,7 +579,7 @@ export function ReviewPage({
                       `T-UI-008`): removals are confirmed as ONE group, so that
                       the owner is never one stray tap from a deletion. */}
                   <label className="removal-card__label">
-                    <input type="checkbox" checked={item.ticked} readOnly />
+                    <Input type="checkbox" checked={item.ticked} readOnly />
                     {item.name}
                   </label>
                 </li>
@@ -661,18 +661,16 @@ export function ReviewPage({
             pendingIn(sections.additions.items) + pendingIn(sections.unmatched.items),
           )}
         </p>
-        <button
-          type="button"
-          className="tap-target"
+        <Button
+          variant="secondary"
           data-testid="discard-batch-button"
           disabled={applying || offline}
           onClick={onDiscard}
         >
           {REVIEW_DISCARD_LABEL}
-        </button>
-        <button
-          type="button"
-          className="tap-target"
+        </Button>
+        <Button
+          variant="primary"
           data-testid="apply-changes-button"
           disabled={applying || offline}
           onClick={() => {
@@ -687,7 +685,7 @@ export function ReviewPage({
           }}
         >
           {applying ? REVIEW_APPLYING : REVIEW_APPLY_LABEL}
-        </button>
+        </Button>
       </div>
 
       {review.service !== null && (confirming || (applying && confirmedFlight)) && (

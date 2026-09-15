@@ -10,6 +10,7 @@
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 // ⚠ NOT `fileURLToPath(import.meta.url)` — the `web` project runs in jsdom,
@@ -37,14 +38,146 @@ function walk(dir: string): string[] {
 
 const sourceFiles = walk(SRC_ROOT);
 
-/** Every class name any component actually renders. */
-const usedClasses = new Set<string>(
-  sourceFiles.flatMap((file) =>
-    [...readFileSync(file, 'utf8').matchAll(/className="([^"]+)"/g)].flatMap((match) =>
-      (match[1] ?? '').split(/\s+/).filter(Boolean),
-    ),
-  ),
+function analyzeClassNames(inputs: readonly { fileName: string; text: string }[]) {
+  const files = new Map(
+    inputs.map(({ fileName, text }) => [
+      fileName.replaceAll('\\', '/'),
+      ts.createSourceFile(fileName.replaceAll('\\', '/'), text, ts.ScriptTarget.Latest, true),
+    ]),
+  );
+  const options: ts.CompilerOptions = { noLib: true, noResolve: true, jsx: ts.JsxEmit.Preserve };
+  const host = ts.createCompilerHost(options);
+  host.getSourceFile = (fileName) => files.get(fileName);
+  const program = ts.createProgram([...files.keys()], options, host);
+  const checker = program.getTypeChecker();
+  const classes = new Set<string>();
+  const offenders: string[] = program.getSyntacticDiagnostics().map((diagnostic) => {
+    const position = diagnostic.file?.getLineAndCharacterOfPosition(diagnostic.start ?? 0);
+    return `${diagnostic.file?.fileName ?? 'source'}:${(position?.line ?? 0) + 1}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`;
+  });
+  const maps = new Map<ts.Symbol, ts.VariableDeclaration>();
+  const approvedReferences = new Set<ts.Identifier>();
+
+  function visit(node: ts.Node, callback: (node: ts.Node) => void) {
+    callback(node);
+    ts.forEachChild(node, (child) => visit(child, callback));
+  }
+
+  function reject(node: ts.Node) {
+    const file = node.getSourceFile();
+    const { line, character } = file.getLineAndCharacterOfPosition(node.getStart());
+    offenders.push(`${file.fileName}:${line + 1}:${character + 1}: ${node.getText()}`);
+  }
+
+  function harvest(value: string) {
+    for (const name of value.split(/\s+/).filter(Boolean)) classes.add(name);
+  }
+
+  function literalMap(identifier: ts.Identifier): ts.StringLiteral[] | undefined {
+    const symbol = checker.getSymbolAtLocation(identifier);
+    const declaration = symbol?.valueDeclaration;
+    if (
+      !symbol ||
+      !declaration ||
+      !ts.isVariableDeclaration(declaration) ||
+      declaration.getSourceFile() !== identifier.getSourceFile() ||
+      !ts.isVariableDeclarationList(declaration.parent) ||
+      !(declaration.parent.flags & ts.NodeFlags.Const) ||
+      !declaration.initializer
+    ) {
+      return undefined;
+    }
+    const statement = declaration.parent.parent;
+    if (
+      ts.isVariableStatement(statement) &&
+      statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+    ) {
+      return undefined;
+    }
+    let initializer = declaration.initializer;
+    while (
+      ts.isParenthesizedExpression(initializer) ||
+      ts.isSatisfiesExpression(initializer) ||
+      (ts.isAsExpression(initializer) && initializer.type.getText() === 'const')
+    ) {
+      initializer = initializer.expression;
+    }
+    if (!ts.isObjectLiteralExpression(initializer)) return undefined;
+    const values: ts.StringLiteral[] = [];
+    const keys = new Set<string>();
+    for (const property of initializer.properties) {
+      if (
+        !ts.isPropertyAssignment(property) ||
+        !(
+          ts.isIdentifier(property.name) ||
+          ts.isStringLiteral(property.name) ||
+          ts.isNumericLiteral(property.name)
+        ) ||
+        !ts.isStringLiteral(property.initializer) ||
+        keys.has(property.name.text) ||
+        property.name.text === '__proto__'
+      ) {
+        return undefined;
+      }
+      keys.add(property.name.text);
+      values.push(property.initializer);
+    }
+    maps.set(symbol, declaration);
+    approvedReferences.add(identifier);
+    return values;
+  }
+
+  for (const file of files.values()) {
+    visit(file, (node) => {
+      if (!ts.isJsxAttribute(node) || node.name.getText() !== 'className') return;
+      const initializer = node.initializer;
+      if (initializer && ts.isStringLiteral(initializer)) {
+        harvest(initializer.text);
+        return;
+      }
+      const expression =
+        initializer && ts.isJsxExpression(initializer) ? initializer.expression : undefined;
+      if (expression && ts.isStringLiteral(expression)) {
+        harvest(expression.text);
+        return;
+      }
+      if (
+        expression &&
+        ts.isElementAccessExpression(expression) &&
+        !expression.questionDotToken &&
+        ts.isIdentifier(expression.expression) &&
+        ts.isIdentifier(expression.argumentExpression)
+      ) {
+        const values = literalMap(expression.expression);
+        if (values) {
+          for (const value of values) harvest(value.text);
+          return;
+        }
+      }
+      reject(node);
+    });
+  }
+
+  // A const binding does not freeze its object: disallow writes and escaping aliases.
+  for (const file of files.values()) {
+    visit(file, (node) => {
+      if (!ts.isIdentifier(node)) return;
+      const symbol = ts.isExportSpecifier(node.parent)
+        ? checker.getExportSpecifierLocalTargetSymbol(node.parent)
+        : ts.isShorthandPropertyAssignment(node.parent)
+          ? checker.getShorthandAssignmentValueSymbol(node.parent)
+          : checker.getSymbolAtLocation(node);
+      const declaration = symbol && maps.get(symbol);
+      if (declaration && node !== declaration.name && !approvedReferences.has(node)) reject(node);
+    });
+  }
+  return { classes, offenders };
+}
+
+const sourceAnalysis = analyzeClassNames(
+  sourceFiles.map((fileName) => ({ fileName, text: readFileSync(fileName, 'utf8') })),
 );
+const usedClasses = sourceAnalysis.classes;
 
 /** Every class name the stylesheet defines a rule for. */
 const definedClasses = new Set<string>(
@@ -66,11 +199,126 @@ describe('T-CSS-001 — the class vocabulary matches in BOTH directions', () => 
     expect(unused).toEqual([]);
   });
 
-  it('T-CSS-001c: no className is computed, so both directions above are exact', () => {
-    // A template-literal or conditional className would make the static scan
-    // above incomplete while still passing — a vacuous green.
-    const computed = sourceFiles.filter((file) => /className=\{/.test(readFileSync(file, 'utf8')));
-    expect(computed).toEqual([]);
+  it('T-CSS-001c: className is literal or a local const literal-map lookup', () => {
+    expect(sourceAnalysis.offenders).toEqual([]);
+  });
+});
+
+describe('T-UI-032 — static class vocabulary analysis', () => {
+  function analyze(text: string) {
+    return analyzeClassNames([{ fileName: 'fixture.tsx', text }]);
+  }
+
+  it('T-UI-032a: harvests all literal attributes and only referenced map values', () => {
+    const result = analyze(`
+      const BUTTON_CLASS: Record<string, string> = {
+        'primary': "btn btn--primary", secondary: 'btn btn--secondary',
+      };
+      const UNUSED_CLASS = { unused: 'not-rendered' };
+      const copy = 'not-a-class';
+      function Button(variant: string) {
+        return <><button className = { BUTTON_CLASS[variant] } />
+          <div className='single quoted' /><span className="double" />
+          <i className={'expression-literal'} /></>;
+      }
+    `);
+    expect(result.offenders).toEqual([]);
+    expect([...result.classes].sort()).toEqual(
+      [
+        'btn',
+        'btn--primary',
+        'btn--secondary',
+        'single',
+        'quoted',
+        'double',
+        'expression-literal',
+      ].sort(),
+    );
+  });
+
+  it('T-UI-032b: ignores comments and string contents, not real JSX', () => {
+    const result = analyze(`
+      // <div className={runtime + 'fake'} />
+      /* const FAKE_CLASS = { fake: 'comment-only' };
+         <div className="comment-class" /> */
+      const prose = '<div className="string-only" />';
+      const element = <div className="real">
+        {/* <span className={MISSING_CLASS[key]} /> */}
+      </div>;
+    `);
+    expect(result.offenders).toEqual([]);
+    expect([...result.classes]).toEqual(['real']);
+  });
+
+  it.each([
+    ['interpolated template', '<div className={`btn ${variant}`} />'],
+    ['plain template', '<div className={`btn`} />'],
+    ['concatenation', '<div className={"btn " + variant} />'],
+    ['conditional', '<div className={active ? "yes" : "no"} />'],
+    ['missing map', '<div className={MISSING_CLASS[variant]} />'],
+    ['dynamic map', 'const MAP = build(); <div className={MAP[key]} />'],
+    ['let map', 'let MAP = { a: "btn" }; <div className={MAP[key]} />'],
+    ['var map', 'var MAP = { a: "btn" }; <div className={MAP[key]} />'],
+    ['spread', 'const MAP = { ...other, a: "btn" }; <div className={MAP[key]} />'],
+    ['call value', 'const MAP = { a: build() }; <div className={MAP[key]} />'],
+    ['computed value', 'const MAP = { a: "btn " + variant }; <div className={MAP[key]} />'],
+    ['template value', 'const MAP = { a: `btn ${variant}` }; <div className={MAP[key]} />'],
+    ['computed property', 'const MAP = { [key]: "btn" }; <div className={MAP[key]} />'],
+    ['shorthand', 'const MAP = { value }; <div className={MAP[key]} />'],
+    ['getter', 'const MAP = { get a() { return "btn"; } }; <div className={MAP[key]} />'],
+    ['duplicate key', 'const MAP = { a: "old", a: "new" }; <div className={MAP[key]} />'],
+    ['prototype setter', 'const MAP = { __proto__: "btn" }; <div className={MAP[key]} />'],
+    ['imported map', 'import { MAP } from "./map"; <div className={MAP[key]} />'],
+    ['exported map', 'export const MAP = { a: "btn" }; <div className={MAP[key]} />'],
+    ['runtime key', 'const MAP = { a: "btn" }; <div className={MAP[getKey()]} />'],
+    ['literal key', 'const MAP = { a: "btn" }; <div className={MAP["a"]} />'],
+    ['property access', 'const MAP = { a: "btn" }; <div className={MAP.a} />'],
+    ['optional lookup', 'const MAP = { a: "btn" }; <div className={MAP?.[key]} />'],
+    ['boolean attribute', '<div className />'],
+  ])('T-UI-032c: rejects %s', (_label, text) => {
+    expect(analyze(text).offenders.length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    'MAP.a = "changed";',
+    'MAP[key] += " changed";',
+    'delete MAP.a;',
+    'Object.assign(MAP, { a: "changed" });',
+    'const alias = MAP; alias.a = "changed";',
+    'const holder = { MAP }; holder.MAP.a = "changed";',
+    'mutate(MAP);',
+    'export { MAP };',
+    'export { MAP as exported };',
+  ])('T-UI-032d: rejects mutable or escaped const maps: %s', (mutation) => {
+    const result = analyze(`
+      const MAP = { a: "btn" };
+      ${mutation}
+      const element = <div className={MAP[key]} />;
+    `);
+    expect(result.offenders.length).toBeGreaterThan(0);
+  });
+
+  it('T-UI-032e: resolves lexical bindings rather than matching map names', () => {
+    const result = analyze(`
+      const MAP = { a: "btn" };
+      const outer = <div className={MAP[key]} />;
+      function Component(MAP: Record<string, string>, key: string) {
+        return <div className={MAP[key]} />;
+      }
+    `);
+    expect(result.offenders).toHaveLength(1);
+    expect([...result.classes]).toEqual(['btn']);
+  });
+
+  it('T-UI-032f: accepts scoped maps with const assertions and satisfies', () => {
+    const result = analyze(`
+      function Component(key: string) {
+        const variants = ({ a: 'local local--a', b: 'local local--b' } as const) satisfies Record<string, string>;
+        return <div className={variants[key]} />;
+      }
+    `);
+    expect(result.offenders).toEqual([]);
+    expect([...result.classes].sort()).toEqual(['local', 'local--a', 'local--b']);
   });
 });
 

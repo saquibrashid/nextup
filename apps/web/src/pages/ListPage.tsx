@@ -39,6 +39,7 @@ import { LoadMoreSentinel } from '../components/LoadMoreSentinel';
 import { SlowResponseNotice } from '../components/SlowResponseNotice';
 import { useSlowRequest } from '../lib/useSlowRequest';
 import type { TitleListItem } from '../components/TitleRow';
+import { Button } from '../components/ui/Button';
 import {
   ADD_TITLE_LABEL,
   LIST_LOADING_BODY,
@@ -272,9 +273,8 @@ export function ListPage({
       */}
       {addWired && (
         <>
-          <button
-            type="button"
-            className="tap-target"
+          <Button
+            variant="secondary"
             data-testid="add-title-open"
             disabled={offline}
             onClick={() => {
@@ -282,7 +282,7 @@ export function ListPage({
             }}
           >
             {ADD_TITLE_LABEL}
-          </button>
+          </Button>
           {offline && (
             <span className="offline-reason" data-testid="add-title-offline-reason">
               {OFFLINE_DISABLED_REASON}

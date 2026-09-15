@@ -1,3 +1,4 @@
+import { Input } from './ui/Input';
 // `components/SortControl.tsx` — the date-added sort direction toggle
 // (`specs/ui.md` §2.1 item 2, US-020 AC-6, TASK-166).
 //
@@ -17,6 +18,8 @@
 
 import { useCallback, useEffect, type JSX } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Button } from './ui/Button';
+import { Field } from './ui/Field';
 
 import {
   SORT_KEY_DATE_LABEL,
@@ -177,11 +180,10 @@ export function SortControl(): JSX.Element {
         is a keyset that does not mirror its own ORDER BY, and the API answers
         `INVALID_CURSOR` rather than a page of quietly wrong rows.
       */}
-      <fieldset data-testid="sort-key">
-        <legend>{SORT_KEY_LEGEND}</legend>
+      <Field legend={SORT_KEY_LEGEND} testId="sort-key">
         {SORT_KEYS.map((key) => (
           <label key={key}>
-            <input
+            <Input
               type="radio"
               name="sort"
               value={key}
@@ -201,17 +203,16 @@ export function SortControl(): JSX.Element {
             {KEY_LABELS[key]}
           </label>
         ))}
-      </fieldset>
+      </Field>
 
-      <button
-        type="button"
-        className="tap-target sort-control"
+      <Button
+        variant="secondary"
         data-testid="sort-control"
         aria-pressed={dir === 'asc'}
         onClick={toggle}
       >
         {label}
-      </button>
+      </Button>
     </div>
   );
 }

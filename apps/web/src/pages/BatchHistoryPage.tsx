@@ -34,6 +34,7 @@ import {
   RETRY_LABEL,
 } from '../copy';
 import type { BatchHistoryItem } from '../lib/apiClient';
+import { Button } from '../components/ui/Button';
 
 export interface BatchHistoryPageProps {
   readonly items?: readonly BatchHistoryItem[];
@@ -125,16 +126,18 @@ function BatchCard({
       </Link>
       {onUndo !== undefined && canOfferUndo(item) && (
         <>
-          <button
-            type="button"
-            className="batch-card__undo tap-target"
-            data-testid="batch-card-undo"
-            disabled={undoing || offline}
-            aria-busy={undoing}
-            onClick={() => onUndo(item.batchId)}
-          >
-            {undoing ? BATCHES_UNDO_SUBMITTING : BATCHES_UNDO_LABEL}
-          </button>
+          <span className="batch-card__undo">
+            {/* Layout only — the margin belongs to the card, the look to §7d. */}
+            <Button
+              variant="secondary"
+              data-testid="batch-card-undo"
+              disabled={undoing || offline}
+              aria-busy={undoing}
+              onClick={() => onUndo(item.batchId)}
+            >
+              {undoing ? BATCHES_UNDO_SUBMITTING : BATCHES_UNDO_LABEL}
+            </Button>
+          </span>
           {offline && (
             <span className="offline-reason" data-testid="batch-card-offline-reason">
               {OFFLINE_DISABLED_REASON}
@@ -163,9 +166,9 @@ export function BatchHistoryPage({
         <div role="alert" data-testid="batches-load-error">
           <p>{BATCHES_LOAD_ERROR}</p>
           {onRetry !== undefined && (
-            <button type="button" className="tap-target" onClick={onRetry}>
+            <Button variant="secondary" onClick={onRetry}>
               {RETRY_LABEL}
-            </button>
+            </Button>
           )}
         </div>
       ) : loading ? (

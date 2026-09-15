@@ -17,6 +17,8 @@
 
 import type { JSX, ReactNode } from 'react';
 import { SERVICE_LABELS, formatRuntime, type Service } from '@nextup/domain';
+import { Button } from './ui/Button';
+import { Badge } from './ui/Badge';
 
 import {
   IMDB_RATING_ABSENT,
@@ -294,7 +296,7 @@ export function TitleRow({
             // Text-labelled, never colour-only (§2.2, ui.md §10.2): colour is
             // never the sole carrier of meaning.
             <li key={badge.listingId} data-testid={`badge-${badge.service}`}>
-              {SERVICE_LABELS[badge.service]}
+              <Badge>{SERVICE_LABELS[badge.service]}</Badge>
             </li>
           ))}
         </ul>
@@ -325,9 +327,8 @@ export function TitleRow({
         */}
         {unmatched
           ? onFixMatch !== undefined && (
-              <button
-                type="button"
-                className="title-row__action tap-target"
+              <Button
+                variant="ghost"
                 // ⚠ DISABLED ON THIS ROW ONLY. A second write against a row
                 // whose first is still in flight is the double-submit §2.13
                 // exists to prevent; disabling the whole LIST instead is the
@@ -338,24 +339,32 @@ export function TitleRow({
                 }}
               >
                 Find a match
-              </button>
+              </Button>
             )
           : onOpenMenu !== undefined && (
-              <button
-                type="button"
-                // `tap-target` carries the §2.2 44x44 px minimum, shared with the
-                // nav so the floor is defined in one place.
-                className="title-row__menu tap-target"
-                aria-haspopup="menu"
-                aria-label={`Actions for ${item.name}`}
-                data-testid="row-menu"
-                disabled={busy}
-                onClick={() => {
-                  onOpenMenu(item);
-                }}
-              >
-                ⋮
-              </button>
+              <span className="title-row__menu">
+                {/*
+                  ⚠ THE CLASS IS ON THIS WRAPPER, NOT ON THE BUTTON. It carries
+                  `flex: 0 0 auto` — layout, which belongs to the parent —
+                  while the button's appearance now comes from the §7d
+                  primitive. Folding a flex rule into a variant is how a fifth
+                  variant appears that differs from the first only in where it
+                  sits. The 44 px floor rides on the primitive via
+                  `.tap-target`, shared with the nav so it is defined once.
+                */}
+                <Button
+                  variant="ghost"
+                  aria-haspopup="menu"
+                  aria-label={`Actions for ${item.name}`}
+                  data-testid="row-menu"
+                  disabled={busy}
+                  onClick={() => {
+                    onOpenMenu(item);
+                  }}
+                >
+                  ⋮
+                </Button>
+              </span>
             )}
         {/*
           REQ-105 — THE OPEN MENU RENDERS HERE, INSIDE THE ROW.

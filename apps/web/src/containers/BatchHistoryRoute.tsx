@@ -38,6 +38,7 @@ import { useResource } from '../lib/useResource';
 import { BatchHistoryPage } from '../pages/BatchHistoryPage';
 import { RefusalPage } from '../pages/RefusalPage';
 import { UndoRefusalPanel } from '../components/UndoRefusalPanel';
+import { Button } from '../components/ui/Button';
 import {
   BATCHES_ALREADY_UNDONE,
   BATCHES_ALREADY_UNDONE_REFRESH_LABEL,
@@ -126,9 +127,8 @@ export function BatchHistoryRoute({
       {undo.kind === 'already-undone' && (
         <div role="alert" data-testid="undo-already-undone">
           <p>{BATCHES_ALREADY_UNDONE}</p>
-          <button
-            type="button"
-            className="tap-target"
+          <Button
+            variant="secondary"
             data-testid="undo-already-undone-refresh"
             onClick={() => {
               setUndo({ kind: 'idle' });
@@ -136,21 +136,20 @@ export function BatchHistoryRoute({
             }}
           >
             {BATCHES_ALREADY_UNDONE_REFRESH_LABEL}
-          </button>
+          </Button>
         </div>
       )}
       {undo.kind === 'failed' && (
         <div role="alert" data-testid="undo-failed">
           <p>{BATCHES_UNDO_FAILED}</p>
-          <button
-            type="button"
-            className="tap-target"
+          <Button
+            variant="secondary"
             data-testid="undo-failed-retry"
             disabled={offline}
             onClick={() => onUndo(undo.batchId)}
           >
             {BATCHES_UNDO_FAILED_RETRY_LABEL}
-          </button>
+          </Button>
           {offline && (
             <span className="offline-reason" data-testid="undo-failed-offline-reason">
               {OFFLINE_DISABLED_REASON}

@@ -1343,6 +1343,18 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 
 ---
 
+### US-059 — The app looks like it was designed
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | `T-CSS-006`, `T-CSS-007` | Closed type scale and minimum primary-content size. |
+| AC-2 | U | `T-UI-030`, `T-A11Y-016` | Closed inline icons, inherited colour, decorative and named modes. |
+| AC-3 | U | `T-UI-031`, `T-UI-032`, `T-CSS-001` | Native form controls live in primitives; static maps are validated through the TypeScript AST, and the class vocabulary agrees in both directions. |
+| AC-4 | U/E | `T-UI-031`, `T-A11Y-017` | Native button behaviour and all four variants measured at 320 px in Chromium and Mobile Safari. |
+| AC-5 | U | `T-UI-031`, `T-A11Y-006` | Shared dialog focus contract and accessible field associations. |
+
+---
+
 ## 9A. Structural tests not owned by a single acceptance criterion
 
 A small number of tests guard structure that **several** acceptance criteria
@@ -4540,7 +4552,7 @@ Run `npm run check:test-locations` before pushing.
 | `T-UI-031` | U | Every interactive control in `apps/web/src/**` is rendered by a primitive, not by a bare `<button>` or `<fieldset>` | §7d |
 | `T-UI-032` | U | Every primitive variant resolves to a **static** class present in the stylesheet, and no primitive uses a template-literal `className` *(the `T-CSS-001c` form)* | §7d |
 | `T-A11Y-016` | U | No `<svg>` is exposed to the accessibility tree without a name, and every icon-only control has a non-empty accessible name | §7c |
-| `T-A11Y-017` | U | Every `Button` meets the `--tap-target-min` floor at 320 px | §7d |
+| `T-A11Y-017` | E | Every `Button` variant meets the `--tap-target-min` floor at 320 px, measured in Chromium and Mobile Safari | §7d |
 
 ⚠ **THESE TWO A11Y IDS WERE RENUMBERED, 2026-09-14 — do not "restore" them.**
 `ui-refresh.md` §7c/§7d originally cited ~~`T-A11Y-014`~~ and ~~`T-A11Y-015`~~,

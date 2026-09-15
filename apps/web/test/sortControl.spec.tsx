@@ -151,12 +151,19 @@ describe('T-UI-024 — SortControl', () => {
     expect(readSortDir(params)).toBe('desc');
   });
 
-  // T-UI-024l: has both tap-target and sort-control classes
-  it('T-UI-024l: button has tap-target and sort-control classes', () => {
+  // T-UI-024l: the control is styled and meets the 44 px floor
+  it('T-UI-024l: button is a §7d primitive and keeps the tap-target floor', () => {
+    // ⚠ REWRITTEN, NOT DELETED, BY TASK-210. This asserted `.sort-control`, a
+    // private rule that was one of seven separate re-statements of the same
+    // border-plus-radius across the app; §7d's `Button` absorbed it and
+    // `T-CSS-001b` correctly reported the rule as dead CSS. The INTENT of the
+    // case — that this control is styled and still reaches 44 px — is what
+    // mattered, and it is preserved here. Deleting it would have removed the
+    // only per-control guard on invariant §8's tap-target floor.
     renderSortControl();
     const btn = screen.getByTestId('sort-control');
     expect(btn).toHaveClass('tap-target');
-    expect(btn).toHaveClass('sort-control');
+    expect(btn).toHaveClass('btn');
   });
 
   // T-UI-024m: keyboard operable — Enter key toggles direction

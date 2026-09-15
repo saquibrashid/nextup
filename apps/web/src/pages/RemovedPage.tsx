@@ -59,6 +59,7 @@ import type { RemovedItem, RestoreResponse } from '../lib/apiClient';
 import { TMDB_IMAGE_BASE } from '../components/TitleRow';
 import { LoadMoreSentinel } from '../components/LoadMoreSentinel';
 import { useOnline } from '../lib/useOnline';
+import { Button } from '../components/ui/Button';
 
 export interface RemovedPageProps {
   readonly items?: readonly RemovedItem[];
@@ -240,15 +241,14 @@ function RestoreControl({
   if (state.phase === 'idle') {
     return (
       <>
-        <button
-          type="button"
-          className="tap-target"
+        <Button
+          variant="secondary"
           data-testid="restore-button"
           disabled={offline}
           onClick={() => void attemptRestore()}
         >
           {RESTORE_LABEL}
-        </button>
+        </Button>
         {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
       </>
     );
@@ -266,24 +266,22 @@ function RestoreControl({
     return (
       <div data-testid="restore-duplicate-dialog" role="alertdialog">
         <p>{withName(RESTORE_DUPLICATE_BODY, item.name)}</p>
-        <button
-          type="button"
-          className="tap-target"
+        <Button
+          variant="secondary"
           data-testid="restore-keep-both"
           disabled={offline}
           onClick={() => void attemptRestore(true)}
         >
           {RESTORE_DUPLICATE_KEEP_BOTH}
-        </button>
+        </Button>
         {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
-        <button
-          type="button"
-          className="tap-target"
+        <Button
+          variant="secondary"
           data-testid="restore-duplicate-cancel"
           onClick={() => setState({ phase: 'idle' })}
         >
           {RESTORE_DUPLICATE_CANCEL}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -292,24 +290,22 @@ function RestoreControl({
     return (
       <div data-testid="restore-suppressed-dialog" role="alertdialog">
         <p>{withName(RESTORE_SUPPRESSED_BODY, item.name)}</p>
-        <button
-          type="button"
-          className="tap-target"
+        <Button
+          variant="secondary"
           data-testid="restore-unsuppress-action"
           disabled={offline}
           onClick={() => void doUnsuppressAndRetry()}
         >
           {RESTORE_SUPPRESSED_ACTION}
-        </button>
+        </Button>
         {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
-        <button
-          type="button"
-          className="tap-target"
+        <Button
+          variant="secondary"
           data-testid="restore-suppressed-cancel"
           onClick={() => setState({ phase: 'idle' })}
         >
           {RESTORE_SUPPRESSED_CANCEL}
-        </button>
+        </Button>
       </div>
     );
   }
@@ -318,15 +314,14 @@ function RestoreControl({
     return (
       <div data-testid="restore-already-active" role="alert">
         <p>{withName(RESTORE_ALREADY_ACTIVE, item.name)}</p>
-        <button
-          type="button"
-          className="tap-target"
+        <Button
+          variant="secondary"
           data-testid="restore-refresh"
           disabled={offline}
           onClick={() => window.location.reload()}
         >
           {RESTORE_ALREADY_ACTIVE_REFRESH}
-        </button>
+        </Button>
         {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
       </div>
     );
@@ -452,9 +447,9 @@ export function RemovedPage({
         <div role="alert" data-testid="removed-load-error">
           <p>{REMOVED_LOAD_ERROR}</p>
           {onRetry !== undefined && (
-            <button type="button" className="tap-target" onClick={onRetry}>
+            <Button variant="secondary" onClick={onRetry}>
               {RETRY_LABEL}
-            </button>
+            </Button>
           )}
         </div>
       ) : loading ? (
@@ -482,9 +477,9 @@ export function RemovedPage({
         <div data-testid="removed-no-matches">
           <p>{REMOVED_NO_MATCHES.replace('{q}', query)}</p>
           {onClearSearch !== undefined && (
-            <button type="button" className="tap-target" onClick={onClearSearch}>
+            <Button variant="secondary" onClick={onClearSearch}>
               {REMOVED_CLEAR_SEARCH_LABEL}
-            </button>
+            </Button>
           )}
         </div>
       ) : (
