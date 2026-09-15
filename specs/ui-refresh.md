@@ -1243,13 +1243,13 @@ there **with** their `specs/testing.md` §9 rows and their tests, in one change.
 
 | Story | Covers |
 |---|---|
-| **US-049** | *As the owner, I can act on a title from the row I'm looking at.* → REQ-105, REQ-107 |
-| **US-050** | *As the owner, I can read a row's facts at a glance.* → REQ-106, REQ-108, REQ-112 |
-| **US-051** | *As the owner, I can see my correction took effect before I apply the batch.* → REQ-109 |
-| **US-052** | *As the owner, I can browse my list with artwork at a comfortable density.* → REQ-110, REQ-111, REQ-118 |
-| **US-053** | *As the owner, I can find and order titles without guessing what a control does.* → REQ-113, REQ-114, REQ-115 |
-| **US-054** | *As the owner, I can tell where I am and reach where I'm going.* → REQ-116, REQ-117 |
-| **US-055** *(new, `A48`)* | *As the owner, I can see how long a title is, and narrow my list to what fits the time I have.* → REQ-119, and the promoted **REQ-035** / **REQ-037** |
+| **US-049** *(promoted by TASK-218)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-105, REQ-107. |
+| **US-050** *(promoted by TASK-218)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-106, REQ-108, REQ-112. |
+| **US-051** *(promoted by TASK-218)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-109. |
+| **US-052** *(promoted by TASK-218)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-110, REQ-111, REQ-118. |
+| ~~**US-053**~~ **superseded by US-057** | ~~*As the owner, I can find and order titles without guessing what a control does.* → REQ-113, REQ-114, REQ-115~~ ⚠ **Not promoted, and must not be.** US-057 (promoted by TASK-217) already owns REQ-113, REQ-114 and REQ-115 in `docs/PRD.md` §6. Promoting this row as well would give the PRD two stories owning the same three requirements, and a coverage table that reads as agreement while nothing decides which one is authoritative when they drift. |
+| **US-054** *(promoted by TASK-218)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-116, REQ-117. |
+| **US-055** *(new, `A48`; promoted by TASK-218)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-119, and the promoted **REQ-035** / **REQ-037**. |
 | **US-056** *(promoted by TASK-213)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-120, REQ-112. |
 | **US-057** *(promoted by TASK-217)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-113, REQ-114, REQ-115, REQ-121, and the reversal in §7a. |
 | **US-058** *(promoted by TASK-218)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-122. |

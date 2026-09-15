@@ -1343,6 +1343,79 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 
 ---
 
+### US-049 — Act on a title from the row I'm looking at
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | **`T-UX-100`** | The opened `role="menu"` is inside that row's `<li>` and is **not** a sibling of the list (`apps/web/test/rowDefects.spec.tsx`). ⚠ **The DOM-ancestry assertion is the whole test** — jsdom performs no layout, so any position assertion would pass vacuously against the page-level mount that caused the reported bug. |
+| AC-2 | U | `T-UX-100` | Opening a second row's menu **moves** the mount rather than leaving two open. |
+| AC-3 | U | `T-UX-101` | `.title-row__actions` is `position: relative` and `.row-menu` is `position: absolute`, read out of `index.css` **as a file**. ⚠ A child that is not positioned is still laid out in flow, which reproduces the reported bug with the correct DOM — so AC-1 alone does not imply this. |
+| AC-4 | U | `T-UX-104` | `.title-row__actions` carries `align-items: flex-start`, so the `⋮` sits level with the title rather than centring itself against a two- or three-line body. |
+| AC-5 | U | `T-A11Y-001b` | `--tap-target-min: 44px` still governs the control. ⚠ REQ-107 narrows the **box** and reads like licence to shrink the **target**; it is not, and this is the case that says so. |
+
+---
+
+### US-050 — Read a row's facts at a glance
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | `T-UX-102` | `.title-row__meta` is a wrapping flex row and a `span + span::before` rule supplies the `·`. ⚠ **Asserted as a CSS rule, not as text**: jsdom does not render `::before`, so the character never reaches `textContent` and a text assertion would pass whether or not the rule exists. |
+| AC-2 | U | `T-UX-103` | The rendered order is year → type → genres → runtime, matching `specs/ui.md` §2.2. ⚠ Read as **direct children** of the meta line, so the case survives the genre chips being nested elements rather than bare spans. |
+| AC-3 | U | `T-UX-105` | The row body uses `--space-2` rather than `--space-1`, and the menu shadow is a `:root` token — which exists because `T-CSS-003c` forbids an `rgb()` literal outside `:root`, and an inline shadow would have evaded the hex rule by changing notation. |
+| AC-4 | U | `T-UX-127` | At most `GENRE_CHIP_LIMIT` chips plus a `+n` control. ⚠ **The owner asked for compact, not fewer** (`A53` OQ-7) — trimming the genres is the obvious reading of "compact" and the wrong one. |
+| AC-5 | U | `T-UX-127` | Active-filter genres are hoisted to the front (`d`) and the limit yields to them via `Math.max` (`e`). ⚠ A filtered-on genre hidden behind `+n` makes the row look like it does not match the filter that returned it. |
+
+---
+
+### US-051 — See my correction took effect before I apply the batch
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | `T-UX-106` | After `onMatch` resolves the card renders the **corrected** name and poster URL, not the extracted one (`apps/web/test/correctedMatchVisible.spec.tsx`). |
+| AC-2 | U | **`T-UX-107`** | The corrected title survives a **re-render from server state** (`disposition: 'corrected'`) — the case renders from server state **with no click at all**. ⚠ **This is the case that rejects the cheap fix.** Keeping the corrected name only in client state looks correct in the click path and breaks on exactly the re-render this requirement exists to fix, which is the present bug rebuilt. |
+| AC-3 | U | `T-UX-108` | The correction is announced in a live region — the same principle as `BatchAppliedNotice`: a mutation the owner cannot see is a mutation they will not trust. |
+| AC-4 | U/I | **`T-API-022`** | The corrected display fields live in their own columns (`0008_corrected_display`), projected through `chosenReviewMatch`; `matchCandidates` is **not** rewritten — `b` proves it by leaving the rejected guess in `alternatives` and requiring the corrected branch to win anyway, so deleting that branch re-serves the rejected film. `i`/`j` are the integration half and the only place the three columns and the `0008` migration meet a real database. ⚠ `tmdbFieldsFor` chooses metadata **by identity, never by position** precisely because an earlier version read `alternatives[0]` at close and stored the film the owner had just rejected — and `title_match_coherent` does not catch that, because it checks null-ness, not agreement. |
+| AC-5 | U | `T-API-022`, `T-UX-106` | The corrected identity is **projected from stored columns**, never re-fetched (`T-API-022a`–`c`), and the card renders it from that projection (`T-UX-106g` exercises the click path). Together they are the assertion that the correction path makes **no network call**: *"a TMDB outage must not stop the owner fixing a wrong match"*. ⚠ This is why the display fields are carried by the client rather than fetched server-side — option 2 in §3 was rejected for reversing exactly this decision, and it would pass AC-1 and AC-2 unchanged. |
+
+---
+
+### US-052 — Browse my list with artwork at a comfortable density
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | `T-UX-110` | The compact list is the **base** rule (`apps/web/test/listSurface.spec.tsx`). ⚠ **Reads `index.css` as a FILE** — jsdom computes no layout, so a rendered-width assertion would pass against any stylesheet at all. |
+| AC-2 | U | `T-UX-111` | The grid is a `min-width` addition, and `T-UX-111a` asserts `--bp-lg ≤ 1280` because the requirement names 1280 px while the rule names the token — the two must be shown to agree. `T-CSS-001d` separately forbids `max-width` anywhere. |
+| AC-3 | U | **`T-UX-112`** | The row overflow menu offers the **same item set** in both layouts. ⚠ **The mechanism is that there is exactly ONE DOM**, restyled — two layouts built as two components become two action sets that drift, and the drift is invisible until an action exists on only one screen size. |
+| AC-4 | U | `T-UX-110`, `T-A11Y-001` | No horizontal scroll at 320 px. |
+| AC-5 | U | `T-CSS-004` | Every pair is **recomputed from the token values**, not compared against documented ratios. ⚠ `indigo-400 #818cf8` is 2.98:1 on white and fails the 3:1 non-text floor; `#a5b4fc` is 1.99:1. It is the exact shade one reaches for for a soft focus ring, and it looks entirely adequate. |
+
+---
+
+### US-054 — Tell where I am and reach where I'm going
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | `T-UX-117` | `aria-current="page"` **and** a non-colour cue, the cue read out of `index.css` — jsdom applies no stylesheet, so a DOM query cannot see that a rule exists. ⚠ `specs/ui.md` §10.2: colour alone is not a signal. |
+| AC-2 | U | `T-UX-132` | Below `--bp-sm` the bar renders exactly `/`, `/upload` and `More`, and **every other nav route** reaches the overflow. ⚠ **Corrected in place at TASK-211**: the row named a closed list written when three routes were the whole overflow, and Epic L and Epic M each added one that the closed reading stranded. ⚠ `d` pins the breakpoint to **one** number across `:root`, the `@media` prelude and TypeScript — three copies that disagree put the JavaScript on a phone while the stylesheet is on a desktop, with no error anywhere. |
+| AC-3 | U | **`T-UX-133`** | An overflow route is still marked when open (`a`) and still reachable by direct URL (`b`). ⚠ **This is why the panel defaults to open when the current route is inside it**: with a plain `useState(false)` a deep link renders a closed disclosure, the marked element does not exist, and the requirement is unsatisfiable rather than merely unmet. `c` keeps the auto-open a **default, not a lock**. |
+| AC-4 | U | `T-UX-133` | Each destination keeps a real `href` rather than a click handler that pushes history (`e`) — a handler breaks middle-click, open-in-new-tab and every assistive technology that reads links. |
+| AC-5 | U | `T-UX-118` | `/upload` stays a first-class slot, and the freshness strip deep-links to it with the service pre-selected **including when the dates are unavailable**. ⚠ REQ-039 is the mandatory mitigation for RSK-007 — the list going out of date without the owner noticing. **Show the fact; never nag about it** (`A46`). |
+
+---
+
+### US-055 — See how long a title is, and narrow to the time I have
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | `T-UX-121` | The row renders the runtime last in `Year · type · genres · runtime`. |
+| AC-2 | U | `T-UX-121` | `1h 55m` for a film, `45m/ep` for a series. ⚠ **The `/ep` suffix is the requirement, not a flourish**: `tmdbClient.readRuntime` takes the first element of TMDB's `episode_run_time`, so the stored number is ONE EPISODE, and a bare `45m` beside a nine-season series is false in the direction that matters. |
+| AC-3 | U | **`T-UX-122`** | A `null` runtime renders the **words** `Runtime unknown` — never `0m`, never an empty slot; a stored `0` is unknown too. ⚠ One case reads `TitleRow.tsx` as a **file** and fails if the wording is inlined rather than imported from `copy.ts` — a literal passes every other assertion here and silently forks the copy. ⚠ `d`–`g` are the domain half: `isKnownRuntime` is the single rule for display, filtering **and** ordering, and they were **not sufficient** — they pass over the in-memory comparator while SQL `ORDER BY`, which they cannot reach, disagreed (`T-API-019e`). |
+| AC-4 | U/I | `T-UX-123`, `T-API-021` | Boundaries are **half-open**, so a 60-minute title is in `60-120` and not in `30-60`. ⚠ **The 60-minute case looks arbitrary and is not**: an inclusive upper bound puts one title in two buckets, and any count over the buckets then contradicts the list it describes. ⚠ An unknown token is dropped client-side — a stale link must not be an error screen — while being a 400 at the API. |
+| AC-5 | U | ⚠⚠ **`T-UX-124`** | The hidden-unknown disclosure renders with the **server's** count while a runtime filter is active, and not at all without one. ⚠ **Product invariant 2 in a new place** — nothing leaves the owner's list without telling them. ⚠ **The count cannot be computed in the browser**: the excluded rows were never sent, so anything derived from `items` counts what *survived* the filter and would read `0` on every list while looking right in every fixture. ⚠ `0` and `null` both render nothing but are different facts, asserted separately. |
+| AC-6 | U | `T-UX-120` | Selecting runtime relabels the direction to *Shortest/Longest first*. ⚠ **The label is the only thing on screen that says what the order means**, so "Newest first" over a runtime-ordered list is a false statement the owner has no way to check — not merely an imprecise one. |
+
+---
+
 ### US-056 — Filter by a genre and get every title in it
 
 | AC | L | Test | Assertion |

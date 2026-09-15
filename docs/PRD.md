@@ -212,7 +212,7 @@ A title was removed months ago. It shows up again in a new capture. nextup creat
 | K | Platform guarantees | The invariants that make the rest safe. | US-036, US-037, US-038, US-039 |
 | **L** *(v1.1 — specified, not scheduled)* | **Waiting to stream** | Record what I noticed on a rental storefront, and tell me when it reaches a service I have. | US-040, US-041, US-042, US-043 |
 | **M** *(v1.1 — specified, not scheduled)* | **IMDb ratings** | Show me the IMDb rating on my list, and let me look up a rating for anything I haven't saved. | US-044, US-045, US-046 |
-| **P** | **Visual language** | Shared typography, icons and controls; remaining visual-refresh stories are promoted with their owning tasks. | US-056, US-057, US-058, US-059 |
+| **P** | **Visual language** | Shared typography, icons and controls; the remaining visual-refresh stories were promoted from `specs/ui-refresh.md` §10 at TASK-218. | US-049, US-050, US-051, US-052, US-054, US-055, US-056, US-057, US-058, US-059 |
 
 Story order within an epic is dependency order. Epic order A → K is a viable build order; see §12.1. **Epic L is v1.1 and follows the whole of A–K** — it depends on Epics C, D and I being complete. See ADR-0010 and `roadmap.md` §5. **Epic M is v1.1 and depends on Epic F** (the combined list) and on TMDB matching being in place, because a rating is keyed on the `imdb_id` that matching produces. See ADR-0011.
 
@@ -1424,6 +1424,194 @@ ADR-0011 followed it.
 
 ### Epic P — Visual language
 
+⚠ **US-049 – US-055 were promoted late, at the close of Epic P.** They were
+reserved in `specs/ui-refresh.md` §10 and the requirements they carry shipped
+across TASK-201 – TASK-218, but the stories themselves stayed behind because
+each owning task promoted only the story it was told to. **No gate checks user
+stories** — `check:orphans` and `check:decisions` police test ids and
+acceptance criteria — so the gap was invisible to CI and was found only by
+reading §A.5 of this document, which had honestly recorded it. They are
+migrated here with their `specs/testing.md` §9 rows, per `ui-refresh.md` §1.
+
+#### US-049 — Act on a title from the row I'm looking at
+
+**As the owner**, I want a title's actions to appear beside the title, so that
+I am never acting on a row I cannot see.
+
+**Requirements:** REQ-105, REQ-107 (`specs/ui-refresh.md` §3.1, §3.3).
+
+⚠ **This is a defect the owner reported, not a preference.** The row menu was
+mounted at page level, so it opened at the bottom of the screen rather than
+beside the title it acts on — and a menu of destructive actions ("not
+interested", "remove") detached from its subject is a mis-click waiting to
+happen.
+
+⚠ **AC-4 reads as licence to shrink the `⋮` and is not.** REQ-107 narrows the
+box; `--tap-target-min: 44px` still governs what the owner has to hit.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | A row's overflow menu is rendered inside that row, never as a sibling of the list. |
+| AC-2 | Opening a second row's menu moves the menu rather than leaving two open. |
+| AC-3 | The menu is positioned against its own trigger rather than laid out in normal flow. |
+| AC-4 | The `⋮` control occupies a button-sized box aligned with the title, not a full-height column. |
+| AC-5 | That control still meets the minimum tap target. |
+
+---
+
+#### US-050 — Read a row's facts at a glance
+
+**As the owner**, I want a row's facts to read as one line in a predictable
+order, so that I can scan my list rather than parse it.
+
+**Requirements:** REQ-106, REQ-108, REQ-112 (`specs/ui-refresh.md` §3.2, §3.4,
+§4.3). ⚠ **REQ-112 is shared with US-056**, which owns the genre *vocabulary*;
+this story owns how many genres fit on a row.
+
+⚠ **The owner asked for genres to take less room — NOT to be removed**
+(`A53` OQ-7: *"use another ux to make it compact but still list the genres"*).
+Trimming them is the obvious reading of "compact" and is the wrong one.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | The row's facts render as a single wrapping line with a separator between fields. |
+| AC-2 | The fields appear in the order year, type, genres, runtime. |
+| AC-3 | The row body has consistent vertical spacing rather than being packed to the minimum. |
+| AC-4 | Genres remain on the row, limited to roughly one line with a count of any overflow. |
+| AC-5 | A genre that is currently being filtered on is always visible, never hidden behind the overflow count. |
+
+---
+
+#### US-051 — See my correction took effect before I apply the batch
+
+**As the owner**, I want a correction to show on the card I corrected, so that
+I never have to apply a batch to find out whether my change took.
+
+**Requirements:** REQ-109 (`specs/ui-refresh.md` §3).
+
+**Observed, in the owner's words:** *"I did a fix match and selected the right
+show. After confirming, the image on the upload page stayed the same. I
+couldn't tell if my change had been applied. I figured it had and went ahead
+with clicking apply."*
+
+⚠⚠ **THE SEVERITY IS NOT OBVIOUS FROM THE SYMPTOM.** The review screen is the
+owner's confirmation step, and the entire safety model of this product is that
+nothing changes the list until the owner has seen what was read and agreed to
+it. A screen that does not show the effect of the owner's own correction has
+broken that contract — it asked for confirmation and withheld the thing being
+confirmed. The owner proceeded on a guess, and the guess happened to be right.
+
+⚠ **AC-4 is load-bearing and looks like an omission.** `matchCandidates` holds
+the *extraction's* guesses; the correction is the *owner's decision*. Rewriting
+the former to carry the corrected name is the one fix shape that looks obvious
+and re-opens a bug this codebase has already paid for — see
+`services/batchClose.ts`.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | After a correction resolves, the card shows the corrected name, year and poster rather than the extracted ones. |
+| AC-2 | The corrected identity survives a re-render from server state, not only the click that made it. |
+| AC-3 | The correction is announced in a live region. |
+| AC-4 | The stored extraction candidates are not rewritten by a correction. |
+| AC-5 | A correction still succeeds while TMDB is unreachable. |
+
+---
+
+#### US-052 — Browse my list with artwork at a comfortable density
+
+**As the owner**, I want my list to suit the screen I am on, so that a phone
+shows me a scannable list and a laptop shows me the artwork.
+
+**Requirements:** REQ-110, REQ-111, REQ-118 (`specs/ui-refresh.md` §4.1, §7).
+
+⚠ **The phone list is the base rule and the grid is a `min-width` addition** —
+not the other way round, and never a `max-width` query.
+
+⚠ **AC-3 is the one a redesign deletes by accident.** Two layouts built as two
+components become two action sets that drift; the requirement is one DOM,
+restyled.
+
+⚠ **`indigo-400 #818cf8` is 2.98:1 on white and fails the 3:1 non-text floor.**
+It is the exact shade one reaches for for a soft border or a gentle focus ring
+and it looks entirely adequate. Borders and focus rings use `--color-border` or
+`--color-accent`.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | Below the large breakpoint the list renders as a compact vertical list. |
+| AC-2 | At and above it the list renders as a poster grid. |
+| AC-3 | Both layouts render the same data and offer the same actions. |
+| AC-4 | At 320 px the list renders with no horizontal scrolling. |
+| AC-5 | Every accent token meets its contrast floor on both surfaces, computed from the token values rather than estimated. |
+
+---
+
+#### US-054 — Tell where I am and reach where I'm going
+
+**As the owner**, I want to see which screen I am on and reach every other one
+from a phone, so that no part of the app is unreachable on the device I use it
+from.
+
+**Requirements:** REQ-116, REQ-117 (`specs/ui-refresh.md` §6).
+
+⚠ **AC-2 was under-specified once already and it cost a destination.** The
+overflow set was written as a closed list when `/batches`, `/removed` and
+`/not-interested` were the whole of it; Epic L added `/waiting` and Epic M
+added `/rating`, and a closed reading left three routes in neither the bar nor
+the overflow. **It is every route that is not one of the three, by
+construction.**
+
+⚠ **AC-3 is why the overflow panel opens by default when the current route is
+inside it.** With a plain closed default, a deep link renders a closed
+disclosure, the marked element does not exist, and the requirement is not
+merely unmet but unsatisfiable.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | The active destination is marked programmatically and carries a cue that is not colour alone. |
+| AC-2 | Below the small breakpoint the bar shows the list, upload and an overflow control; every other route is reachable through the overflow. |
+| AC-3 | A route behind the overflow is still marked as current when open, and is still reachable by direct URL. |
+| AC-4 | Every destination is a real link, not a click handler that pushes history. |
+| AC-5 | Upload remains a first-class destination, and the per-service freshness strip still deep-links to it with that service pre-selected. |
+
+---
+
+#### US-055 — See how long a title is, and narrow to the time I have
+
+**As the owner**, I want to see how long a title is and filter to what fits the
+time I have, so that "what shall we watch" is a question about tonight rather
+than about the whole list.
+
+**Requirements:** REQ-119, and the promoted REQ-035 / REQ-037
+(`specs/ui-refresh.md` §5a; `A48`).
+
+⚠ **AC-2's `/ep` suffix is the requirement, not a flourish.** TMDB's
+`episode_run_time` is per episode, so the stored number is **one episode**, and
+a bare `45m` beside a nine-season series is false in the direction that
+matters.
+
+⚠ **AC-3 deliberately differs from the empty-genre rule** (US-019 AC-6), which
+renders nothing. Runtime is **filterable**, so whether a row has one decides
+whether it can appear at all — an owner who cannot see that a title has no
+runtime cannot understand why it vanished.
+
+⚠⚠ **AC-5 IS PRODUCT INVARIANT 2 IN A NEW PLACE.** A runtime filter silently
+drops every title TMDB never supplied a runtime for; without the disclosure the
+list simply gets shorter. **The count cannot be computed in the browser** — the
+excluded rows were never sent, so anything derived from the returned items
+counts what *survived* the filter and would read zero on every list.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | The row shows the title's runtime, last in its facts line. |
+| AC-2 | A series' runtime is shown as per-episode, distinguishably from a film's. |
+| AC-3 | An unknown runtime renders as words, never as a zero and never as an empty slot. |
+| AC-4 | The list can be filtered to a runtime bucket, with half-open boundaries so no title falls in two buckets. |
+| AC-5 | While a runtime filter is active, the number of titles hidden for having no known runtime is disclosed, from a count the server supplies. |
+| AC-6 | The list can be ordered by runtime, and the direction control says what that ordering means. |
+
+---
+
 #### US-056 — Filter by a genre and get every title in it
 
 **As the owner**, I want to filter by a genre and trust that I got every title
@@ -1981,7 +2169,9 @@ REQ-042 … REQ-054 (13 requirements marked `wont-v1`) have no stories by design
 
 ### A.5 Coverage summary
 
-**Uncovered requirements: REQ-119 and the promoted REQ-035 / REQ-037, all three carried by US-055, which is a reserved-not-yet-migrated story** (`specs/ui-refresh.md` §5a and §10). Every other one of the functional requirements in v1 scope and all 20 NFRs are covered by at least one story. ⚠ This line is the honest state, not an oversight: §1 of `ui-refresh.md` requires a story to move into this PRD **with** its `specs/testing.md` rows and its tests, in one change — so recording the gap here is what stops US-055 being quietly forgotten between the two documents.
+**Uncovered requirements: none.** Every functional requirement in v1 scope and all 20 NFRs are covered by at least one story. REQ-119 and the promoted REQ-035 / REQ-037 are carried by **US-055**, which was promoted into §6, Epic P at TASK-218 together with US-049, US-050, US-051, US-052 and US-054 — the last of the `specs/ui-refresh.md` §10 reservations. ⚠ **US-053 was deliberately not promoted**: US-057 already owns REQ-113, REQ-114 and REQ-115, and two stories owning the same three requirements is a coverage table that reads as agreement while nothing decides which is authoritative when they drift. Its §10 row is struck, not deleted.
+
+~~**Uncovered requirements: REQ-119 and the promoted REQ-035 / REQ-037, all three carried by US-055, which is a reserved-not-yet-migrated story** (`specs/ui-refresh.md` §5a and §10). Every other one of the functional requirements in v1 scope and all 20 NFRs are covered by at least one story. ⚠ This line is the honest state, not an oversight: §1 of `ui-refresh.md` requires a story to move into this PRD **with** its `specs/testing.md` rows and its tests, in one change — so recording the gap here is what stops US-055 being quietly forgotten between the two documents.~~
 
 ### A.6 Discrepancy found in the source documents
 
