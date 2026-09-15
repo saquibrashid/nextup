@@ -44,6 +44,16 @@ import type { RuntimeBucket } from '@nextup/domain';
  */
 export { TMDB_DISCLAIMER } from '@nextup/domain';
 
+/**
+ * REQ-117's overflow destination (`specs/ui-refresh.md` §6, TASK-211).
+ *
+ * ⚠ IT IS A DESTINATION, NOT A HAMBURGER. The word is deliberately "More" and
+ * not "Menu": what sits behind it is six places the owner can go, each with
+ * its own URL, not a tray of commands. Naming it "Menu" invites exactly the
+ * implementation §6 forbids - one that takes the routes out of the router.
+ */
+export const NAV_MORE_LABEL = 'More';
+
 /** US-023 AC-2, US-024 AC-6 - the removed view is a log, not a recycle bin. */
 export const REMOVED_VIEW_SUBTITLE =
   "Everything that's ever left your list is kept here forever. The same title can appear more than once — each row is one removal.";

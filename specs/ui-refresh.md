@@ -785,11 +785,36 @@ tell which page you are on from the navigation.
 ⚠ **Not colour alone** — `specs/ui.md` §10.2. The indicator must carry a
 non-colour cue (weight plus a rule/underline) and `aria-current="page"`.
 
+⚠ **`matchPath` AND `<NavLink>` DISAGREE ABOUT `/` BY DEFAULT** *(finding,
+TASK-211)*. `matchPath({ path: '/', end: false })` compiles to a prefix that
+matches **every** path in the application, while `<NavLink to="/">` requires
+the following character to be a `/` and is therefore already exact. Anything
+deriving the active class from `matchPath` while letting `NavLink` own
+`aria-current` must pass **the same `end` to both**, or the class and the ARIA
+state diverge — the List destination renders highlighted on all eleven routes
+while assistive technology is told nothing. `T-UX-117b` asserts both land on
+the same element; `T-UX-117d` asserts the `/` case directly.
+
 ### REQ-117 (`should`) — the phone gets a primary destination bar
 
 > ⚠ **RESOLVED IN PLACE 2026-09-14 (OQ-2).** Below `--bp-sm`, the bar presents
-> **three slots: the list (`/`), `/upload`, and `More`.** `/removed`,
-> `/not-interested` and `/batches` all move behind **More**.
+> **three slots: the list (`/`), `/upload`, and `More`.** **Everything else
+> moves behind `More`** — at the time of writing that was `/removed`,
+> `/not-interested` and `/batches`; Epic L added `/waiting` and Epic M added
+> `/rating`, and they are behind `More` too.
+>
+> ⚠ **THE OVERFLOW IS DEFINED BY SUBTRACTION, NOT BY A SECOND LIST**
+> *(corrected in place, TASK-211)*. This paragraph named three routes because
+> three was all there were. Read as a closed enumeration it says nothing about
+> `/waiting`, `/about` or `/rating` — and a bar of exactly three slots plus an
+> overflow that omits them leaves those destinations **absent from the phone
+> entirely**, which is the one outcome §6 exists to prevent. `AppShell.tsx`
+> therefore derives the overflow as *every nav route that is not `/` or
+> `/upload`*, and `T-UX-132b` asserts all six.
+>
+> ~~Below `--bp-sm`, the bar presents three slots: the list (`/`), `/upload`,
+> and `More`. `/removed`, `/not-interested` and `/batches` all move behind
+> **More**.~~
 >
 > ~~the three destinations the owner moves between most are presented as a
 > persistent bar; the rest move behind a "More" destination.~~ *(The shape was
@@ -820,7 +845,7 @@ introduce a second, differently-behaved route to upload.
 |---|---|
 | `T-UX-117` | The active destination carries `aria-current="page"` and a non-colour cue. |
 | `T-UX-118` | The freshness strip still deep-links to `/upload` with the service pre-selected. |
-| `T-UX-132` | Below `--bp-sm` the bar renders exactly `/`, `/upload` and `More`; `/removed`, `/not-interested` and `/batches` are reachable only via `More`. |
+| `T-UX-132` | Below `--bp-sm` the bar renders exactly `/`, `/upload` and `More`; **every other nav route** — `/batches`, `/removed`, `/not-interested`, `/waiting`, `/about`, `/rating` — is reachable only via `More`. ⚠ *Corrected in place at TASK-211; this row named only the first three, which were all that existed when it was written.* |
 | `T-UX-133` | A route behind `More` is still marked `aria-current="page"` when it is open, and is still reachable by direct URL. |
 
 ---

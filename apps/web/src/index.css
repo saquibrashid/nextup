@@ -527,6 +527,160 @@ button {
   padding: var(--space-2) var(--space-3);
 }
 
+/* ----------------------------------------------------------- navigation -- */
+
+/*
+ * TASK-211 (REQ-116/REQ-117, `specs/ui-refresh.md` §6).
+ *
+ * ⚠ THE `<nav>`, `<ul>` AND `<li>` HAD NO CLASS AND THEREFORE NO RULE, which
+ * is the single most visible defect of the epic: a wrapped column of blue
+ * browser-default links above every screen. Nothing below is decoration.
+ *
+ * ⚠ MOBILE-FIRST (§13.3). What follows IS the 320 px case — the three-slot
+ * destination bar — and `@media (min-width: 640px)` widens it. Written the
+ * other way up, the floor NFR-006 mandates becomes the case reached by
+ * subtraction, which is the one nobody looks at.
+ */
+
+.app-shell__header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+.nav {
+  flex: 1 1 100%;
+}
+
+.nav__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nav__item {
+  margin: 0;
+}
+
+/*
+ * A text destination: the wide bar, and every row of the `More` panel.
+ *
+ * ⚠ THE TRANSPARENT BOTTOM BORDER IS LOAD-BEARING, NOT A PLACEHOLDER. The
+ * active state swaps its colour, so the inactive and active boxes are the same
+ * height. Adding the border only when active shifts every sibling by 2 px on
+ * navigation — a jitter that reads as a rendering bug, not as a style.
+ */
+.nav__link {
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font-size: var(--text-base);
+  font-weight: var(--weight-normal);
+  text-decoration: none;
+}
+
+.nav__link:hover {
+  background: var(--color-bg);
+}
+
+.nav__link:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/*
+ * ⚠ NEVER COLOUR ALONE (`specs/ui.md` §10.2, `T-UX-117`). THREE channels carry
+ * this state and only one of them is hue: the weight changes, a rule appears
+ * under the label, and `aria-current="page"` states it outright. A colour-only
+ * indicator is invisible to roughly one man in twelve, and to anyone reading a
+ * phone in sunlight — which is the primary device here.
+ */
+.nav__link--active {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: var(--weight-bold);
+}
+
+/*
+ * One slot of the phone destination bar: icon over label (§7c). Three slots
+ * share the width, so each is a flexible column rather than a fixed box.
+ */
+.nav__slot {
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius);
+  color: var(--color-text);
+  flex-direction: column;
+  gap: var(--space-1);
+  text-decoration: none;
+}
+
+.nav__slot:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.nav__slot--active {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: var(--weight-bold);
+}
+
+/*
+ * ⚠ `--text-sm`, NOT `--text-xs` (`T-CSS-007`). A bar label is content — it is
+ * the only thing naming the destination, because §7c forbids the icon standing
+ * alone — so shrinking it to win a few pixels of width is exactly the density
+ * failure that gate exists to catch.
+ */
+.nav__slot-label {
+  font-size: var(--text-sm);
+}
+
+/*
+ * ⚠ `position: relative` SO THE PANEL IS ANCHORED TO `More` ITSELF. The same
+ * lesson as REQ-105's row menu: a panel positioned against the page rather
+ * than against its trigger lands somewhere plausible at one width and
+ * somewhere absurd at another.
+ */
+.nav__more {
+  margin: 0;
+  position: relative;
+}
+
+/*
+ * ⚠ LAYOUT BELONGS TO THE PARENT, NOT TO A BUTTON VARIANT. `Button` refuses a
+ * `className` by design (§7d), so the icon-over-label stacking that makes the
+ * `More` control match its two sibling slots is applied from here. A fifth
+ * button variant differing only in flex direction is the drift that rule
+ * exists to prevent.
+ */
+.nav__more .btn {
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.nav__panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-menu);
+  display: flex;
+  flex-direction: column;
+  inset-inline-end: 0;
+  list-style: none;
+  margin: 0;
+  min-width: 12rem;
+  padding: var(--space-2);
+  position: absolute;
+  top: 100%;
+  z-index: 20;
+}
+
 /* ------------------------------------------------------------- dropzone -- */
 
 .dropzone {
@@ -1472,6 +1626,23 @@ button {
 @media (min-width: 640px) {
   .app-shell {
     padding: var(--space-5);
+  }
+
+  /*
+   * ⚠ ABOVE `--bp-sm` THE NAV SITS BESIDE THE BRAND, NOT UNDER IT. Below it
+   * the nav takes the whole row because three slots need the width; here the
+   * text links fit alongside. `flex: 0 1 auto` is the RESET of the
+   * mobile-first `flex: 1 1 100%` — omitting it leaves a full-width nav
+   * wrapping under the logo on a desktop, which looks like the media query
+   * never applied at all.
+   */
+  .nav {
+    flex: 0 1 auto;
+  }
+
+  .nav__list {
+    gap: var(--space-2);
+    justify-content: flex-end;
   }
 
   .title-row__poster {
