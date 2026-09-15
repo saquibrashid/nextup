@@ -44,6 +44,16 @@ import type { RuntimeBucket } from '@nextup/domain';
  */
 export { TMDB_DISCLAIMER } from '@nextup/domain';
 
+/**
+ * REQ-117's overflow destination (`specs/ui-refresh.md` §6, TASK-211).
+ *
+ * ⚠ IT IS A DESTINATION, NOT A HAMBURGER. The word is deliberately "More" and
+ * not "Menu": what sits behind it is six places the owner can go, each with
+ * its own URL, not a tray of commands. Naming it "Menu" invites exactly the
+ * implementation §6 forbids - one that takes the routes out of the router.
+ */
+export const NAV_MORE_LABEL = 'More';
+
 /** US-023 AC-2, US-024 AC-6 - the removed view is a log, not a recycle bin. */
 export const REMOVED_VIEW_SUBTITLE =
   "Everything that's ever left your list is kept here forever. The same title can appear more than once — each row is one removal.";
@@ -352,6 +362,39 @@ export const SORT_LONGEST_LABEL = 'Longest first';
 export const SORT_KEY_DATE_LABEL = 'Date added';
 export const SORT_KEY_RUNTIME_LABEL = 'Runtime';
 export const SORT_KEY_LEGEND = 'Sort by';
+
+/**
+ * REQ-121 (`specs/ui-refresh.md` §5b) — the sort keys and direction labels
+ * added when OQ-3 / OQ-3b / `A48` widened the orderings from one to five.
+ *
+ * ⚠ **`SORT_NEWEST_LABEL` AND `SORT_OLDEST_LABEL` ARE NOT REWRITTEN.** §5b and
+ * §8 are explicit: they are governed copy (`specs/ui.md` §9) and changing
+ * owner-facing wording is a product decision, not a styling one. Everything
+ * here is an ADDITION for a field that had no ordering before — and the date
+ * pair is REUSED VERBATIM for both date-shaped fields below.
+ *
+ * ⚠ **`A–Z` USES AN EN DASH (U+2013), not a hyphen.** It matches the
+ * `Year · type` separator convention already set in §2.2. A hyphen here is a
+ * different string, and `T-UX-129` compares against these constants rather
+ * than against literals precisely so the two cannot drift apart unnoticed.
+ */
+export const SORT_KEY_NAME_LABEL = 'Name';
+export const SORT_KEY_YEAR_LABEL = 'Release year';
+export const SORT_KEY_RATING_LABEL = 'IMDb rating';
+export const SORT_AZ_LABEL = 'A–Z';
+export const SORT_ZA_LABEL = 'Z–A';
+export const SORT_HIGHEST_LABEL = 'Highest first';
+export const SORT_LOWEST_LABEL = 'Lowest first';
+
+/**
+ * REQ-121 — the direction segment's legend.
+ *
+ * ⚠ The segment needs a name of its own because it is no longer a button whose
+ * label states the whole choice. Two radios reading "Newest first" and "Oldest
+ * first" with no group name are two unexplained options to a screen-reader
+ * user, who meets them one at a time.
+ */
+export const SORT_DIR_LEGEND = 'Direction';
 
 /**
  * REQ-035 - the hidden-unknown disclosure (`T-UX-124`).
@@ -798,6 +841,40 @@ export function reviewPendingAdditions(count: number): string {
  * make the two indistinguishable to the owner.
  */
 export const REVIEW_SECTION_EMPTY = 'Nothing in this group.';
+
+/* ---------------------------------- REQ-122 section differentiation ----- */
+
+/**
+ * REQ-122 (`specs/ui-refresh.md` §6a.1) — the consequence line each candidate
+ * card carries.
+ *
+ * ⚠ **THESE SIT ON THE CARD, NOT ONLY ON THE SECTION HEADING, AND THAT IS THE
+ * WHOLE REQUIREMENT.** A full-update review is long and is scrolled; by the
+ * time a removal card is on screen its heading is off it. The owner's report
+ * was that the three sections *looked alike*, and a heading they cannot see
+ * does not tell them apart. `T-UX-134` asserts a card is identifiable with no
+ * section heading in its accessible subtree.
+ *
+ * ⚠ **WORDS, NOT COLOUR** (`specs/ui.md` §10.2). The surface treatment in
+ * `index.css` is a reinforcement of these strings, never a replacement for
+ * them — a red left rule is invisible to a screen reader and to roughly one
+ * man in twelve.
+ *
+ * ⚠ **EACH NAMES WHAT AGREEING DOES, in the owner's terms ("your list"), not
+ * what the section is called.** "Removals" is a category; "Removes from your
+ * list" is a consequence, and the consequence is the thing that differs.
+ */
+export const REVIEW_CONSEQUENCE_ADDITION = 'Adds to your list';
+export const REVIEW_CONSEQUENCE_UNMATCHED = 'Not added until you identify it';
+export const REVIEW_CONSEQUENCE_REMOVAL = 'Removes from your list';
+
+/**
+ * The section-level consequential marker for removals (REQ-122).
+ *
+ * ⚠ A WORD, deliberately — `specs/ui.md` §10.2 forbids signalling by colour
+ * alone, and this is the one section whose agreement takes something away.
+ */
+export const REVIEW_REMOVALS_MARKER = 'Takes titles off your list';
 
 /* ------------------------------------ §6.10/§6.11 removal confirmation -- */
 

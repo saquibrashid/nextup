@@ -33,6 +33,7 @@ import { withName } from '../components/SuppressDialog';
 import type { SuppressionItem } from '../lib/apiClient';
 import { TMDB_IMAGE_BASE } from '../components/TitleRow';
 import { useOnline } from '../lib/useOnline';
+import { Button } from '../components/ui/Button';
 
 export interface SuppressedPageProps {
   readonly items?: readonly SuppressionItem[];
@@ -104,37 +105,34 @@ function SuppressionRow({
         )}
 
         {rowState.phase === 'idle' && (
-          <button
-            type="button"
-            className="tap-target"
+          <Button
+            variant="secondary"
             data-testid="stop-ignoring-button"
             disabled={offline}
             onClick={() => setRowState({ phase: 'confirming' })}
           >
             Stop ignoring
-          </button>
+          </Button>
         )}
 
         {rowState.phase === 'confirming' && (
           <div data-testid="unsuppress-confirm">
             <p data-testid="unsuppress-confirm-body">{withName(UNSUPPRESS_CONFIRM_BODY, name)}</p>
-            <button
-              type="button"
-              className="tap-target"
+            <Button
+              variant="secondary"
               data-testid="unsuppress-confirm-button"
               disabled={offline}
               onClick={confirm}
             >
               Stop ignoring
-            </button>
-            <button
-              type="button"
-              className="tap-target"
+            </Button>
+            <Button
+              variant="secondary"
               data-testid="unsuppress-cancel-button"
               onClick={() => setRowState({ phase: 'idle' })}
             >
               Cancel
-            </button>
+            </Button>
           </div>
         )}
 
@@ -143,9 +141,9 @@ function SuppressionRow({
         )}
 
         {rowState.phase === 'submitting' && (
-          <button type="button" className="tap-target" data-testid="unsuppress-submitting" disabled>
+          <Button variant="secondary" data-testid="unsuppress-submitting" disabled>
             Removing…
-          </button>
+          </Button>
         )}
 
         {rowState.phase === 'error' && (
@@ -153,14 +151,13 @@ function SuppressionRow({
             <p role="alert" data-testid="unsuppress-error">
               {`Couldn\u2019t remove \u201c${name}\u201d from Not interested. Nothing has changed.`}
             </p>
-            <button
-              type="button"
-              className="tap-target"
+            <Button
+              variant="secondary"
               data-testid="stop-ignoring-button"
               onClick={() => setRowState({ phase: 'confirming' })}
             >
               Try again
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -197,9 +194,9 @@ export function SuppressedPage({
         <div role="alert" data-testid="suppressed-load-error">
           <p>{'Couldn\u2019t load your Not interested list. Nothing has changed.'}</p>
           {onRetry !== undefined && (
-            <button type="button" className="tap-target" onClick={onRetry}>
+            <Button variant="secondary" onClick={onRetry}>
               {RETRY_LABEL}
-            </button>
+            </Button>
           )}
         </div>
       ) : loading ? (

@@ -1,3 +1,4 @@
+import { Input } from '../components/ui/Input';
 // `/batches/:batchId/review` - the review pass (`specs/ui.md` §5, TASK-069).
 //
 // ⚠ THIS IS THE SAFETY GATE, and it is where the mode contract becomes
@@ -61,12 +62,16 @@ import {
   REVIEW_APPLYING,
   REVIEW_APPLY_FAILED,
   REVIEW_CONFIRM_ALL,
+  REVIEW_CONSEQUENCE_ADDITION,
+  REVIEW_CONSEQUENCE_REMOVAL,
+  REVIEW_CONSEQUENCE_UNMATCHED,
   REVIEW_DISCARD_LABEL,
   REVIEW_LOADING,
   REVIEW_NO_TEXT_IN,
   REVIEW_LOAD_FAILED,
   REVIEW_NO_ADDITIONS_BODY,
   REVIEW_NO_ADDITIONS_TITLE,
+  REVIEW_REMOVALS_MARKER,
   REVIEW_RETRY_LABEL,
   REVIEW_SECTION_EMPTY,
   REVIEW_TITLE,
@@ -74,6 +79,7 @@ import {
   reviewPendingAdditions,
 } from '../copy';
 import { OFFLINE_DISABLED_REASON } from '../copy';
+import { Button } from '../components/ui/Button';
 
 export interface ReviewPageProps {
   readonly review?: ReviewResponse | null;
@@ -228,12 +234,35 @@ function thumbnailUrlFor(candidate: ReviewCandidate): string | null {
   return imageId === undefined ? null : `/api/images/${encodeURIComponent(imageId)}`;
 }
 
+/**
+ * REQ-122 — the per-section surface treatments (`specs/ui-refresh.md` §6a.1).
+ *
+ * ⚠ Presentation only, and it must never decide what a section CONTAINS: a
+ * full-update review renders every extracted candidate whatever treatment it
+ * wears (`T-UX-136`, product invariant 2). The words on the cards carry the
+ * distinction; these rules only reinforce it.
+ */
+type SectionVariant = 'plain' | 'additions' | 'unmatched';
+
+/**
+ * ⚠ A PLAIN ANNOTATED CONST, NOT `as const`: `analyzeClassNames`
+ * (`T-UI-032`) reads the initialiser as an object literal, and an `as const`
+ * assertion wraps it in an expression the harvester rejects — which is
+ * `T-CSS-001c` failing on a file whose classes are, in fact, all literal.
+ */
+const SECTION_CLASS: Record<SectionVariant, string> = {
+  plain: 'review-section',
+  additions: 'review-section review-section--additions',
+  unmatched: 'review-section review-section--unmatched',
+};
+
 function CandidateSection({
   section,
   testId,
   confirmAll,
   pendingCount,
   renderCard,
+  variant = 'plain',
 }: {
   readonly section: SectionView;
   readonly testId: string;
@@ -242,6 +271,18 @@ function CandidateSection({
   readonly pendingCount?: number;
   /** Overrides the card rendering — the §6.8 unmatched treatment uses it. */
   readonly renderCard?: (candidate: ReviewCandidate) => JSX.Element;
+  /**
+   * REQ-122 — the section's own surface treatment, as a BEM modifier.
+   *
+   * ⚠ Presentation only. It must never decide what the section contains: a
+   * full-update review renders every extracted candidate whatever the
+   * treatment (`T-UX-136`, product invariant 2).
+   * ⚠ A MAP, NOT A TEMPLATE LITERAL. `T-CSS-001b/c` harvest the class
+   * vocabulary statically, so `review-section--${variant}` would render a
+   * class the stylesheet analysis cannot see — and a stylesheet rule nothing
+   * could be shown to use.
+   */
+  readonly variant?: SectionVariant;
 }): JSX.Element | null {
   // ⚠ ABSENT, not hidden (REQ-022, `T-REM-011`).
   if (section.omitted === true) return null;
@@ -255,7 +296,7 @@ function CandidateSection({
   const showConfirmAll = confirmAll !== undefined && remaining > 0;
 
   return (
-    <section className="review-section" data-testid={testId}>
+    <section className={SECTION_CLASS[variant]} data-testid={testId}>
       <details open={section.collapsedByDefault !== true}>
         <summary className="review-section__summary">
           {/* The count sits INSIDE the summary so it is legible while
@@ -264,14 +305,12 @@ function CandidateSection({
           {`${section.label} (${section.count})`}
         </summary>
         {showConfirmAll && (
-          <button
-            className="tap-target review-section__confirm-all"
-            data-testid="confirm-all-button"
-            onClick={confirmAll}
-            type="button"
-          >
-            {REVIEW_CONFIRM_ALL.replace('{n}', String(remaining))}
-          </button>
+          <p className="review-section__confirm-all">
+            {/* Layout only — the margin belongs to the section, not the button. */}
+            <Button variant="secondary" data-testid="confirm-all-button" onClick={confirmAll}>
+              {REVIEW_CONFIRM_ALL.replace('{n}', String(remaining))}
+            </Button>
+          </p>
         )}
         {section.items.length === 0 ? (
           <p className="review-empty__body" data-testid="review-section-empty">
@@ -383,9 +422,9 @@ export function ReviewPage({
         <div role="alert" data-testid="review-load-error">
           <p>{REVIEW_LOAD_FAILED}</p>
           {onRetry !== undefined && (
-            <button type="button" className="tap-target" onClick={onRetry}>
+            <Button variant="secondary" onClick={onRetry}>
               {REVIEW_RETRY_LABEL}
-            </button>
+            </Button>
           )}
         </div>
       </>
@@ -497,6 +536,7 @@ export function ReviewPage({
             <CandidateCard
               candidate={candidate}
               thumbnailUrl={thumbnailUrlFor(candidate)}
+              consequence={REVIEW_CONSEQUENCE_ADDITION}
               actions={
                 /* ⚠ TASK-200 / `specs/ui.md` §5.3. Before this the additions
                    section had NO per-card control, so one false extra among
@@ -525,6 +565,7 @@ export function ReviewPage({
           )}
           section={sections.additions}
           testId="review-additions"
+          variant="additions"
         />
       )}
 
@@ -538,6 +579,7 @@ export function ReviewPage({
             candidate={candidate}
             thumbnailUrl={thumbnailUrlFor(candidate)}
             unidentified
+            consequence={REVIEW_CONSEQUENCE_UNMATCHED}
             actions={
               unmatchedWired ? (
                 <UnmatchedActions
@@ -558,16 +600,29 @@ export function ReviewPage({
         )}
         section={sections.unmatched}
         testId="review-unmatched"
+        variant="unmatched"
       />
       <CandidateSection section={sections.alreadyOnYourList} testId="review-already-on-list" />
       <CandidateSection section={sections.probablyNotTitles} testId="review-probably-not-titles" />
       <CandidateSection section={sections.unreadableTiles} testId="review-unreadable-tiles" />
 
       {showRemovals && (
-        <section className="review-section" data-testid="review-removals">
+        <section className="review-section review-section--removals" data-testid="review-removals">
           <details open>
             <summary className="review-section__summary">
               {`${sections.removals.label} (${sections.removals.count})`}
+              {/* ⚠ REQ-122's NON-COLOUR consequential marker. The left rule in
+                  `index.css` is a reinforcement of this word, never a
+                  substitute for it (`specs/ui.md` §10.2) — and the word is
+                  also the only half of the treatment a screen reader meets.
+
+                  ⚠ A SIBLING ELEMENT, not appended to the label string:
+                  `getNodeText` reads only direct text-node children, so the
+                  existing `(2)` count assertions (`T-UX-099a/b`) still match
+                  the summary exactly as before. */}
+              <span className="review-section__marker" data-testid="review-section-marker">
+                {REVIEW_REMOVALS_MARKER}
+              </span>
             </summary>
             <ul className="review-section__list">
               {sections.removals.items.map((item) => (
@@ -579,9 +634,16 @@ export function ReviewPage({
                       `T-UI-008`): removals are confirmed as ONE group, so that
                       the owner is never one stray tap from a deletion. */}
                   <label className="removal-card__label">
-                    <input type="checkbox" checked={item.ticked} readOnly />
+                    <Input type="checkbox" checked={item.ticked} readOnly />
                     {item.name}
                   </label>
+                  {/* ⚠ REQ-122 / `T-UX-134`. On the CARD, because a
+                      full-update review is scrolled and the heading above is
+                      off-screen by the time this row is read. Without it a
+                      removal card and an addition card are the same object. */}
+                  <p className="removal-card__consequence" data-testid="candidate-consequence">
+                    {REVIEW_CONSEQUENCE_REMOVAL}
+                  </p>
                 </li>
               ))}
             </ul>
@@ -661,18 +723,16 @@ export function ReviewPage({
             pendingIn(sections.additions.items) + pendingIn(sections.unmatched.items),
           )}
         </p>
-        <button
-          type="button"
-          className="tap-target"
+        <Button
+          variant="secondary"
           data-testid="discard-batch-button"
           disabled={applying || offline}
           onClick={onDiscard}
         >
           {REVIEW_DISCARD_LABEL}
-        </button>
-        <button
-          type="button"
-          className="tap-target"
+        </Button>
+        <Button
+          variant="primary"
           data-testid="apply-changes-button"
           disabled={applying || offline}
           onClick={() => {
@@ -687,7 +747,7 @@ export function ReviewPage({
           }}
         >
           {applying ? REVIEW_APPLYING : REVIEW_APPLY_LABEL}
-        </button>
+        </Button>
       </div>
 
       {review.service !== null && (confirming || (applying && confirmedFlight)) && (

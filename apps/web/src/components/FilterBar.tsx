@@ -1,3 +1,4 @@
+import { Input } from './ui/Input';
 // The combined list's filter bar (`specs/ui.md` §2.1 item 2, `specs/api.md`
 // §6.2, `specs/ux-states.md` §2.4, TASK-039).
 //
@@ -17,6 +18,8 @@
 
 import type { JSX } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Button } from './ui/Button';
+import { Field } from './ui/Field';
 import {
   RUNTIME_BUCKETS,
   SERVICES,
@@ -185,11 +188,10 @@ export function FilterBar({
 
   return (
     <div className="filter-bar" data-testid="filter-bar" role="group" aria-label="Filter the list">
-      <fieldset data-testid="filter-service">
-        <legend>Service</legend>
+      <Field legend="Service" testId="filter-service">
         {SERVICES.map((service) => (
           <label key={service}>
-            <input
+            <Input
               type="checkbox"
               name="service"
               value={service}
@@ -201,13 +203,12 @@ export function FilterBar({
             {service}
           </label>
         ))}
-      </fieldset>
+      </Field>
 
-      <fieldset data-testid="filter-type">
-        <legend>Type</legend>
+      <Field legend="Type" testId="filter-type">
         {MEDIA_TYPES.map((type) => (
           <label key={type}>
-            <input
+            <Input
               type="checkbox"
               name="type"
               value={type}
@@ -219,14 +220,13 @@ export function FilterBar({
             {type}
           </label>
         ))}
-      </fieldset>
+      </Field>
 
       {genres.length > 0 && (
-        <fieldset data-testid="filter-genre">
-          <legend>Genre</legend>
+        <Field legend="Genre" testId="filter-genre">
           {genres.map((genre) => (
             <label key={genre}>
-              <input
+              <Input
                 type="checkbox"
                 name="genre"
                 value={genre}
@@ -238,7 +238,7 @@ export function FilterBar({
               {genre}
             </label>
           ))}
-        </fieldset>
+        </Field>
       )}
 
       {/*
@@ -249,11 +249,10 @@ export function FilterBar({
         runtime would remove the only control that explains why the list is
         the length it is.
       */}
-      <fieldset data-testid="filter-runtime">
-        <legend>Runtime</legend>
+      <Field legend="Runtime" testId="filter-runtime">
         {RUNTIME_BUCKETS.map((bucket) => (
           <label key={bucket}>
-            <input
+            <Input
               type="checkbox"
               name="runtime"
               value={bucket}
@@ -265,7 +264,7 @@ export function FilterBar({
             {RUNTIME_BUCKET_LABELS[bucket]}
           </label>
         ))}
-      </fieldset>
+      </Field>
 
       {/*
         Present only when something is filtered: a permanently-visible "Clear
@@ -273,16 +272,15 @@ export function FilterBar({
         not.
       */}
       {isFiltered(filters) && (
-        <button
-          type="button"
-          className="tap-target"
+        <Button
+          variant="secondary"
           data-testid="clear-filters"
           onClick={() => {
             update(NO_FILTERS);
           }}
         >
           {CLEAR_FILTERS_LABEL}
-        </button>
+        </Button>
       )}
 
       {/*
@@ -345,9 +343,9 @@ export function ZeroMatch({ filters, onClear }: ZeroMatchProps): JSX.Element {
           </li>
         ))}
       </ul>
-      <button type="button" className="tap-target" data-testid="zero-match-clear" onClick={onClear}>
+      <Button variant="secondary" data-testid="zero-match-clear" onClick={onClear}>
         {CLEAR_FILTERS_LABEL}
-      </button>
+      </Button>
     </div>
   );
 }

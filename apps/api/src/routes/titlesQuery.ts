@@ -27,14 +27,48 @@ import type { Request } from 'express';
 import { AppError } from '../errors/AppError.js';
 import {
   decodeCursor,
+  decodeNameCursor,
+  decodeRatingCursor,
+  decodeReleaseYearCursor,
   decodeRuntimeCursor,
   parseLimit,
   type AnyListCursor,
 } from '../pagination.js';
 
-/** `specs/api.md` §6.2 — the sort keys, and one default direction. */
-export const TITLE_SORTS = ['dateAdded', 'runtime'] as const;
+/**
+ * `specs/api.md` §6.2 — the sort keys, and one default direction.
+ *
+ * ⚠ **`rating` IS NOT AN ORDINARY KEY HERE.** It is the only MUTABLE one, and
+ * REQ-095 forbade it outright until the owner reversed that at `A53`. The
+ * reversal is paid for in `titles.ts` by making the rating refresh synchronous
+ * — read ADR-0011 Revision 1 and `api.md` §6.2a before touching this list.
+ *
+ * ⚠ **`name` IS NOT AN ORDINARY KEY EITHER.** It orders by the stored
+ * `sortName` column, which is declared `COLLATE Latin1_General_100_CI_AI` in
+ * migration `0010` to override the BIN2 database default. Ordering by
+ * `tmdbName` instead would be BINARY — `apple` after `Zebra` — and would still
+ * look alphabetical on a title-cased fixture. See TASK-219.
+ */
+export const TITLE_SORTS = ['dateAdded', 'runtime', 'releaseYear', 'rating', 'name'] as const;
 export type TitleSort = (typeof TITLE_SORTS)[number];
+
+/**
+ * One decoder per sort, keyed by the sort itself.
+ *
+ * ⚠ **EXHAUSTIVE BY CONSTRUCTION, ON PURPOSE.** `Record<TitleSort, …>` means
+ * adding a key to `TITLE_SORTS` without a decoder is a COMPILE error. The
+ * previous shape was a ternary chain with a `decodeCursor` fallback, which
+ * would have silently handed a new sort the date-ordered decoder — and since
+ * `decodeCursor` rejects on keys, every page-2 request for that sort would
+ * have failed with `INVALID_CURSOR` long after the change that caused it.
+ */
+const CURSOR_DECODERS: Record<TitleSort, (raw: string) => AnyListCursor> = {
+  dateAdded: decodeCursor,
+  runtime: decodeRuntimeCursor,
+  releaseYear: decodeReleaseYearCursor,
+  rating: decodeRatingCursor,
+  name: decodeNameCursor,
+};
 
 export const SORT_DIRECTIONS = ['asc', 'desc'] as const;
 export type SortDirection = (typeof SORT_DIRECTIONS)[number];
@@ -46,6 +80,36 @@ export type SortDirection = (typeof SORT_DIRECTIONS)[number];
  * SUC-003. Do not "simplify" `dir` away.
  */
 export const DEFAULT_SORT_DIRECTION: SortDirection = 'desc';
+
+/**
+ * The default direction PER SORT, for when the client sends `sort` without
+ * `dir`.
+ *
+ * ⚠ **A SINGLE GLOBAL DEFAULT IS WRONG THE MOMENT A NON-DATE KEY EXISTS.**
+ * `desc` is correct and owner-confirmed for `dateAdded` (newest first, A44),
+ * and it is defensible for `runtime`, `releaseYear` and `rating`, where the
+ * interesting end is the high one. Applied to `name` it means `?sort=name`
+ * opens at **Z**, which no one has ever meant by "sort by name".
+ *
+ * ⚠ **THE FAILURE IS INVISIBLE TO THE OBVIOUS TEST.** The UI always sends an
+ * explicit `dir`, so every test driven through the UI passes; only a bare
+ * `?sort=name` — a bookmark, a shared link, a hand-typed URL — sees it. The
+ * default is therefore asserted directly (`T-API-029f`).
+ *
+ * `DEFAULT_SORT_DIRECTION` remains the value for every other key, so this map
+ * states only the exception and cannot drift from it.
+ */
+const DEFAULT_DIRECTION_BY_SORT: Record<TitleSort, SortDirection> = {
+  dateAdded: DEFAULT_SORT_DIRECTION,
+  runtime: DEFAULT_SORT_DIRECTION,
+  releaseYear: DEFAULT_SORT_DIRECTION,
+  rating: DEFAULT_SORT_DIRECTION,
+  name: 'asc',
+};
+
+export function defaultDirectionFor(sort: TitleSort): SortDirection {
+  return DEFAULT_DIRECTION_BY_SORT[sort];
+}
 
 /** Bounds the repeatable filters so a hostile query cannot build a huge IN(). */
 const MAX_REPEATED_VALUES = 20;
@@ -198,7 +262,7 @@ export function parseTitleListQuery(query: Request['query']): TitleListQuery {
     genres: uniqueGenres,
     runtimes,
     sort,
-    dir: (dirRaw as SortDirection | undefined) ?? DEFAULT_SORT_DIRECTION,
+    dir: (dirRaw as SortDirection | undefined) ?? defaultDirectionFor(sort),
     limit: parseLimit(query['limit']),
     // ⚠ THE CURSOR IS DECODED FOR THE SORT IT IS BEING USED WITH. A keyset
     // predicate must mirror its own `ORDER BY`, so a date position is
@@ -207,11 +271,6 @@ export function parseTitleListQuery(query: Request['query']): TitleListQuery {
     // loss. `decodeCursor`'s exact-key check turns a mismatched pair into a
     // loud `INVALID_CURSOR` (the client restarts, §3) rather than a page of
     // quietly wrong rows, which is why the shapes are not unified.
-    cursor:
-      cursorRaw === undefined
-        ? undefined
-        : sort === 'runtime'
-          ? decodeRuntimeCursor(cursorRaw)
-          : decodeCursor(cursorRaw),
+    cursor: cursorRaw === undefined ? undefined : CURSOR_DECODERS[sort](cursorRaw),
   };
 }

@@ -22,6 +22,7 @@
 import { Component, type ErrorInfo, type JSX, type ReactNode } from 'react';
 
 import { BOUNDARY_BODY, BOUNDARY_RETRY_LABEL, BOUNDARY_TITLE } from '../copy';
+import { Button } from './ui/Button';
 
 export interface ErrorBoundaryProps {
   readonly children: ReactNode;
@@ -86,9 +87,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
       <div className="boundary" role="alert">
         <h1>{BOUNDARY_TITLE}</h1>
         <p>{BOUNDARY_BODY}</p>
-        <button type="button" className="tap-target" onClick={this.retry}>
+        <Button variant="secondary" onClick={this.retry}>
           {BOUNDARY_RETRY_LABEL}
-        </button>
+        </Button>
       </div>
     );
   }

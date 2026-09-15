@@ -1,3 +1,4 @@
+import { Dialog } from './ui/Dialog';
 /**
  * "Not interested" confirmation, with immediate undo and rollback on failure
  * (TASK-102, `T-UX-085`, `T-UX-022`).
@@ -23,10 +24,10 @@
  */
 import { useCallback, useId, useState, type JSX } from 'react';
 
-import { useDialogFocus } from '../lib/useDialogFocus';
 import { useOutcomeFocus } from '../lib/useOutcomeFocus';
 
 import { SUPPRESS_CONFIRM_BODY } from '../copy';
+import { Button } from './ui/Button';
 
 /** What the list should do with the row this dialog is acting on. */
 export type RowState = 'present' | 'pending' | 'suppressed';
@@ -102,7 +103,6 @@ export function SuppressDialog({
   // control's presence and its argument are the same fact and cannot diverge.
   const [undoTarget, setUndoTarget] = useState<string | null>(null);
   const headingId = useId();
-  const dialogRef = useDialogFocus(onClose);
 
   /*
    * `T-A11Y-006` outcome half (`specs/ux-states.md` §1). Suppression is the
@@ -156,7 +156,7 @@ export function SuppressDialog({
   );
 
   return (
-    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={headingId}>
+    <Dialog onDismiss={onClose} aria-labelledby={headingId}>
       <h2 id={headingId}>Not interested</h2>
 
       {(phase === 'confirm' || phase === 'submitting' || phase === 'error') && (
@@ -189,32 +189,32 @@ export function SuppressDialog({
       )}
 
       {(phase === 'confirm' || phase === 'error') && (
-        <button type="button" onClick={confirm}>
+        <Button variant="danger" onClick={confirm}>
           {phase === 'error' ? 'Try again' : 'Not interested'}
-        </button>
+        </Button>
       )}
 
       {phase === 'submitting' && (
-        <button type="button" disabled>
+        <Button variant="danger" disabled>
           Hiding…
-        </button>
+        </Button>
       )}
 
       {undoTarget !== null && (
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           onClick={() => {
             undo(undoTarget);
           }}
           disabled={phase === 'undoing'}
         >
           {phase === 'undoing' ? 'Undoing…' : 'Undo'}
-        </button>
+        </Button>
       )}
 
-      <button type="button" onClick={onClose}>
+      <Button variant="secondary" onClick={onClose}>
         {phase === 'confirm' || phase === 'error' ? 'Cancel' : 'Close'}
-      </button>
-    </div>
+      </Button>
+    </Dialog>
   );
 }

@@ -1,3 +1,4 @@
+import { Input } from './ui/Input';
 /**
  * TASK-067 — the manual-entry panel (`specs/api.md` §6.20, US-006 AC-5,
  * `specs/ui.md` §5). `T-UI-028`.
@@ -36,6 +37,7 @@ import {
   MANUAL_ENTRY_TITLE,
 } from '../copy';
 import type { TmdbSearchResult } from '../lib/apiClient';
+import { Button } from './ui/Button';
 
 export interface ManualEntryPanelProps {
   /** Runs a §6.29 search. Rejects on any failure; the panel says so and stays usable. */
@@ -128,7 +130,7 @@ export function ManualEntryPanel({ onSearch, onAdd }: ManualEntryPanelProps): JS
 
       <form className="manual-entry__form" onSubmit={search}>
         <label htmlFor="manual-entry-query">{MANUAL_ENTRY_SEARCH_LABEL}</label>
-        <input
+        <Input
           id="manual-entry-query"
           type="search"
           value={query}
@@ -136,9 +138,9 @@ export function ManualEntryPanel({ onSearch, onAdd }: ManualEntryPanelProps): JS
             setQuery(event.target.value);
           }}
         />
-        <button type="submit" className="tap-target" disabled={searching}>
+        <Button variant="secondary" type="submit" disabled={searching}>
           {searching ? MANUAL_ENTRY_SEARCHING : MANUAL_ENTRY_SEARCH_BUTTON}
-        </button>
+        </Button>
       </form>
 
       {searchFailed && <p role="alert">{MANUAL_ENTRY_SEARCH_FAILED}</p>}
@@ -152,16 +154,15 @@ export function ManualEntryPanel({ onSearch, onAdd }: ManualEntryPanelProps): JS
               className="manual-entry__result"
             >
               <span>{resultLabel(result)}</span>
-              <button
-                type="button"
-                className="tap-target"
+              <Button
+                variant="secondary"
                 disabled={adding !== null}
                 onClick={() => {
                   add(result);
                 }}
               >
                 {MANUAL_ENTRY_ADD_LABEL.replace('{name}', result.name)}
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

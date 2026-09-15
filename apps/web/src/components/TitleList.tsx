@@ -36,6 +36,12 @@ export interface TitleListProps {
    * only gives the caller a place to put it that is inside the right row.
    */
   readonly renderMenu?: ((item: TitleListItem) => ReactNode) | undefined;
+  /**
+   * REQ-112 — the genres in the active filter, passed to every row so a
+   * filtered-on genre is never collapsed behind `+n`. The list does not read
+   * the query string itself; the container owns that.
+   */
+  readonly activeGenres?: readonly string[] | undefined;
 }
 
 export function TitleList({
@@ -44,6 +50,7 @@ export function TitleList({
   onFixMatch,
   pendingTitleIds,
   renderMenu,
+  activeGenres,
 }: TitleListProps): JSX.Element {
   return (
     <ul className="title-list" data-testid="title-list">
@@ -55,6 +62,7 @@ export function TitleList({
           onFixMatch={onFixMatch}
           pending={pendingTitleIds?.has(item.titleId) ?? false}
           menu={renderMenu?.(item)}
+          activeGenres={activeGenres}
         />
       ))}
     </ul>

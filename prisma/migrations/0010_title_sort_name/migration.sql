@@ -1,0 +1,106 @@
+-- TASK-219 — `sort=name`, and the collation that makes it not a one-line change.
+--
+-- ── Why a new column ────────────────────────────────────────────────────────
+--
+-- The database default collation is `Latin1_General_100_BIN2`
+-- (`specs/data-model.md` §16.2.1). That is not a preference and cannot be
+-- relaxed: Prisma's `create()` emits `DECLARE @generated_keys table([id]
+-- NVARCHAR(200))` and joins it back to the real row, a table variable takes the
+-- DATABASE DEFAULT collation, and any other default makes that join a
+-- collation conflict — `Msg 468`, on every single insert. Measured: 24 of 25
+-- integration tests failed before the default was set to BIN2.
+--
+-- BIN2 is binary, so an unqualified `ORDER BY [tmdb_name]`:
+--
+--   * sorts every lower-case title after every upper-case one — `apple` after
+--     `Zebra`;
+--   * sorts `Amélie` (`0xE9`) after every unaccented word.
+--
+-- ⚠ ON A TITLE-CASED FIXTURE BOTH OF THOSE STILL LOOK ALPHABETICAL. A test
+-- written against `The Matrix` / `Zodiac` passes while the feature is wrong for
+-- the owner, which is why this was split out of TASK-216 rather than shipped
+-- with it.
+--
+-- ── Why not the alternatives ────────────────────────────────────────────────
+--
+-- Prisma can express neither `COLLATE` nor `LOWER()` inside `orderBy`.
+-- Rewriting the list query as raw SQL would work, and `searchRemovedListings`
+-- already does exactly that for the removed-view search — but the list query is
+-- the most-used query in the product, and raw SQL is not seen by
+-- `T-SEC-021`'s AST check over `repository/**`, so its `ownerId` scoping would
+-- become hand-written and hand-reviewed. That trades a display defect for a
+-- TENANCY one.
+--
+-- A column carrying its own collation avoids both. SQL Server applies the
+-- COLUMN's collation to a bare `ORDER BY`, so Prisma's ordinary
+-- `orderBy: { sortName: dir }` produces case- and accent-insensitive human
+-- order with no raw SQL anywhere. Per-column collation overrides are already
+-- the established pattern here — §16.2.1 declares `BIN2` explicitly on every
+-- identity column for the mirror-image reason.
+--
+-- ⚠ `normalised_text` IS NOT A SHORTCUT and was not reused: `fixMatch.ts` sets
+-- it to `NULL` on an owner correction, so every corrected title would sink to
+-- the bottom of an A–Z list, silently and plausibly. `work_identity` is not one
+-- either — it holds `tmdb:movie:438631`.
+--
+-- ── Why there is no backfill UPDATE in this file ────────────────────────────
+--
+-- ⚠ DELIBERATE. `specs/data-model.md` §16 I-4 fixes the rule: derived values
+-- stay in ONE TypeScript function, because a second implementation in T-SQL
+-- drifts from it in silence. The leading-article rule and the whitespace
+-- normalisation would both have to be rewritten here in dialect that cannot be
+-- unit-tested, so the backfill is `npm run backfill:sort-name`, which calls the
+-- same `deriveSortName` every write site calls.
+--
+-- A fresh database (CI, a new environment) has no rows, so the backfill is a
+-- no-op there and nothing is left half-built. `T-INV-025` asserts the stored
+-- column equals `deriveSortName` for every row, so an environment where the
+-- backfill was never run FAILS LOUDLY rather than serving a list quietly
+-- ordered by nothing.
+--
+-- ⚠ ADDITIVE ONLY. No column, index, table or constraint is dropped and no
+-- existing value is rewritten, so `T-MIG-001` is unaffected.
+
+-- 1. The key itself.
+--
+-- ⚠ THE `COLLATE` CLAUSE IS THE ENTIRE FEATURE. Remove it and the column
+-- inherits the BIN2 database default, `ORDER BY` silently reverts to binary
+-- order, and every test written against title-cased data still passes.
+--
+-- NULL means "this title has no readable name" — see `deriveSortName`. Such
+-- rows sort LAST in both directions, exactly as unknown runtime, release year
+-- and rating already do.
+--
+-- ⚠ THE WIDTH IS 400 BECAUSE OF THE INDEX BELOW, NOT BECAUSE OF TITLES.
+-- `sort_name` is the third key column of `title_list_name`, and SQL Server
+-- caps a nonclustered index key at 1700 bytes. `owner_id` (400) + `state`
+-- (32) + `id` (400) already spend 832, so `NVARCHAR(500)` — 1000 bytes —
+-- totals 1832 and OVERRUNS IT.
+--
+-- ⚠ AND SQL SERVER ACCEPTS THAT `CREATE INDEX` WITH ONLY A WARNING. The
+-- migration applies cleanly, the tests pass, and the failure arrives later as
+-- a runtime INSERT error on whichever real title first pushes the combined key
+-- past the limit. Caught here by mutation-testing the migration, not by a
+-- test. 400 chars = 800 bytes = 1632 total, inside the cap with room for the
+-- `id` and `owner_id` columns to grow.
+ALTER TABLE [dbo].[title]
+  ADD [sort_name] NVARCHAR(400) COLLATE Latin1_General_100_CI_AI NULL;
+
+-- 2. The index behind the name-ordered page.
+--
+-- ⚠ It must mirror the `ORDER BY` exactly — `(owner_id, state, sort_name,
+-- id)` — or the keyset seek `T-PERF-001` asserts degrades to a scan of the
+-- owner's whole library on every page.
+--
+-- `sort_name` is ASCENDING here while `title_list_default` uses DESC for the
+-- date. That asymmetry is correct: A–Z is the natural default for a name
+-- (`DEFAULT_DIRECTION_BY_SORT`), newest-first is the natural default for a
+-- date, and SQL Server can walk either index backwards for the reverse
+-- direction.
+--
+-- The index inherits the column's CI_AI collation, so the ordering it stores is
+-- the ordering the query asks for. An index built over a differently-collated
+-- expression would be unusable for this `ORDER BY` and the plan would silently
+-- fall back to a sort.
+CREATE INDEX [title_list_name]
+  ON [dbo].[title] ([owner_id], [state], [sort_name] ASC, [id] ASC);

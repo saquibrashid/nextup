@@ -63,6 +63,7 @@ import {
 } from './FixMatchDialog';
 import { SuppressDialog, type SuppressResult } from './SuppressDialog';
 import { TMDB_IMAGE_BASE } from './TitleRow';
+import { Button } from './ui/Button';
 
 /**
  * ⚠ CLIENT-SIDE ONLY. This is a rendering convenience, never a fetch boundary:
@@ -191,15 +192,14 @@ function RestoreAction({
 
   return (
     <>
-      <button
-        type="button"
-        className="tap-target"
+      <Button
+        variant="secondary"
         data-testid="undo-refusal-restore"
         disabled={phase === 'submitting'}
         onClick={attempt}
       >
         {UNDO_REFUSAL_ACTION_RESTORE}
-      </button>
+      </Button>
       {phase === 'error' && message !== null && (
         <p role="alert" data-testid="undo-refusal-restore-error">
           {message}
@@ -243,14 +243,13 @@ function Group<E>({
         ))}
       </ul>
       {hidden > 0 && (
-        <button
-          type="button"
-          className="tap-target"
+        <Button
+          variant="secondary"
           data-testid={`undo-refusal-show-all-${testId}`}
           onClick={() => setExpanded(true)}
         >
           {`${UNDO_REFUSAL_SHOW_ALL_LABEL} (${entries.length})`}
-        </button>
+        </Button>
       )}
     </section>
   );
@@ -290,14 +289,13 @@ export function UndoRefusalPanel({
         state={stateOf(entry.titleId, entry.currentState)}
         posterPath={entry.posterPath}
       />
-      <button
-        type="button"
-        className="tap-target"
+      <Button
+        variant="secondary"
         data-testid="undo-refusal-not-interested"
         onClick={() => setActive({ kind: 'suppress', titleId: entry.titleId, name: entry.name })}
       >
         {UNDO_REFUSAL_ACTION_NOT_INTERESTED}
-      </button>
+      </Button>
     </>
   );
 
@@ -309,14 +307,13 @@ export function UndoRefusalPanel({
         state={stateOf(entry.titleId, entry.currentState)}
         posterPath={entry.posterPath}
       />
-      <button
-        type="button"
-        className="tap-target"
+      <Button
+        variant="secondary"
         data-testid="undo-refusal-fix-match"
         onClick={() => setActive({ kind: 'fix-match', titleId: entry.titleId, name: entry.name })}
       >
         {UNDO_REFUSAL_ACTION_FIX_MATCH}
-      </button>
+      </Button>
     </>
   );
 
@@ -370,14 +367,9 @@ export function UndoRefusalPanel({
             keyOf={(entry) => entry.listingId}
           />
 
-          <button
-            type="button"
-            className="tap-target"
-            data-testid="undo-refusal-close"
-            onClick={onClose}
-          >
+          <Button variant="secondary" data-testid="undo-refusal-close" onClick={onClose}>
             {UNDO_REFUSAL_CLOSE_LABEL}
-          </button>
+          </Button>
         </section>
       </main>
 

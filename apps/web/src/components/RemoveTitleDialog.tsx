@@ -1,3 +1,4 @@
+import { Dialog } from './ui/Dialog';
 /**
  * "Remove from list" confirmation, with immediate undo (US-048, TASK-207).
  *
@@ -35,9 +36,10 @@ import {
   REMOVE_TITLE_UNDO_LABEL,
   ROW_MENU_REMOVE_LABEL,
 } from '../copy';
-import { useDialogFocus } from '../lib/useDialogFocus';
+
 import { useOutcomeFocus } from '../lib/useOutcomeFocus';
 import { withName, type RowState } from './SuppressDialog';
+import { Button } from './ui/Button';
 
 /** `DELETE /api/titles/:titleId` — `specs/api.md` §6.32. */
 export interface RemoveTitleResult {
@@ -67,7 +69,7 @@ export function RemoveTitleDialog({
   const [phase, setPhase] = useState<Phase>('confirm');
   const [removedListingIds, setRemovedListingIds] = useState<readonly string[]>([]);
   const headingId = useId();
-  const dialogRef = useDialogFocus(onClose);
+
   const outcomeRef = useOutcomeFocus<HTMLParagraphElement>(
     phase === 'removed' || phase === 'undone',
   );
@@ -117,21 +119,20 @@ export function RemoveTitleDialog({
   }, [onRowState, removedListingIds, restoreListing]);
 
   return (
-    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={headingId}>
+    <Dialog onDismiss={onClose} aria-labelledby={headingId}>
       <h2 id={headingId}>{ROW_MENU_REMOVE_LABEL}</h2>
 
       {(phase === 'confirm' || phase === 'submitting') && (
         <>
           <p data-testid="remove-confirm-body">{withName(REMOVE_TITLE_CONFIRM_BODY, name)}</p>
-          <button
-            type="button"
-            className="tap-target"
+          <Button
+            variant="danger"
             data-testid="confirm-remove-title"
             disabled={phase === 'submitting'}
             onClick={submit}
           >
             {phase === 'submitting' ? 'Removing…' : ROW_MENU_REMOVE_LABEL}
-          </button>
+          </Button>
         </>
       )}
 
@@ -140,14 +141,9 @@ export function RemoveTitleDialog({
           <p role="status" data-testid="remove-done" ref={outcomeRef} tabIndex={-1}>
             {withName(REMOVE_TITLE_DONE, name)}
           </p>
-          <button
-            type="button"
-            className="tap-target"
-            data-testid="undo-remove-title"
-            onClick={undo}
-          >
+          <Button variant="secondary" data-testid="undo-remove-title" onClick={undo}>
             {REMOVE_TITLE_UNDO_LABEL}
-          </button>
+          </Button>
         </>
       )}
 
@@ -172,10 +168,10 @@ export function RemoveTitleDialog({
       )}
 
       {phase !== 'submitting' && phase !== 'undoing' && (
-        <button type="button" className="tap-target" onClick={onClose}>
+        <Button variant="secondary" onClick={onClose}>
           {phase === 'confirm' ? 'Cancel' : 'Close'}
-        </button>
+        </Button>
       )}
-    </div>
+    </Dialog>
   );
 }

@@ -329,7 +329,14 @@ describe('REQ-119 - the runtime is on the row (`specs/ui-refresh.md` §5a)', () 
   it('T-UX-121c the runtime is LAST in the meta line, after the genres', () => {
     const row = renderRow({});
     const meta = within(row).getByTestId('title-meta');
-    const order = Array.from(meta.querySelectorAll('span')).map((s) => s.dataset['testid']);
+    // ⚠ `:scope > *`, NOT `querySelectorAll('span')`. Since REQ-120 the genre
+    // slot is a `<span>` wrapping one nested `<span>` per chip, so an unscoped
+    // sweep returns the chips too and this assertion would have to be rewritten
+    // every time the fixture's genre count changed. Direct children keep the
+    // case about ORDER, which is the only thing it is here to prove.
+    const order = Array.from(meta.querySelectorAll<HTMLElement>(':scope > *')).map(
+      (s) => s.dataset['testid'],
+    );
 
     expect(order).toEqual(['release-year', 'media-type', 'genres', 'runtime']);
   });

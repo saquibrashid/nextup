@@ -19,6 +19,8 @@ import { type AppliedBatch } from '../components/BatchAppliedNotice';
 import { isFiltered, parseFilters } from '../components/FilterBar';
 import { apiClient, type ApiClient, type TitleListItem } from '../lib/apiClient';
 import { useResource } from '../lib/useResource';
+import { normaliseGenres } from '@nextup/domain';
+
 import { useCursorPages } from '../lib/useCursorPages';
 import { useOnline } from '../lib/useOnline';
 import { ListPage } from '../pages/ListPage';
@@ -29,9 +31,25 @@ export interface ListRouteProps {
   readonly client?: ApiClient;
 }
 
-/** The genre facet, derived from the rows rather than requested separately. */
+/**
+ * The genre facet, derived from the rows rather than requested separately.
+ *
+ * ⚠ **REQ-120 — NORMALISED, SO NO COMBINED TV NAME CAN EVER BE OFFERED AS AN
+ * OPTION** (`T-UX-126`). The facet is built from the rows' STORED genres, so
+ * without this a TV title tagged `Action & Adventure` would put that name in
+ * the filter bar — and selecting it would send `?genre=Action%20%26%20Adventure`,
+ * which the API expands to nothing because the combined name is a key of the
+ * map, not a value. The owner would then have a chip they can click and that
+ * always returns an empty list.
+ *
+ * This is the SAME `normaliseGenres` the row's chips use, called at a second
+ * site rather than reimplemented — the facet and the chips have to offer the
+ * same vocabulary or the filter bar stops describing the list.
+ */
 export function collectGenres(items: readonly TitleListItem[]): string[] {
-  return [...new Set(items.flatMap((item) => item.genres))].sort((a, b) => a.localeCompare(b));
+  return [...new Set(items.flatMap((item) => normaliseGenres(item.genres)))].sort((a, b) =>
+    a.localeCompare(b),
+  );
 }
 
 /**

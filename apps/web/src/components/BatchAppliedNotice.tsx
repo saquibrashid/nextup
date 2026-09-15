@@ -33,6 +33,7 @@ import { useCallback, useState, type JSX } from 'react';
 
 import { SERVICE_LABELS, type Service } from '@nextup/domain';
 import { useOutcomeFocus } from '../lib/useOutcomeFocus';
+import { Button } from './ui/Button';
 
 /** The §6.22 close response, as much of it as this notice reads. */
 export interface AppliedBatch {
@@ -194,18 +195,13 @@ export function BatchAppliedNotice({
           history while an undo is still one tap away.
         */}
         {offer.kind !== 'none' && !undone ? (
-          <button
-            type="button"
-            className="applied-notice-undo tap-target"
-            onClick={run}
-            disabled={phase === 'undoing'}
-          >
+          <Button variant="secondary" onClick={run} disabled={phase === 'undoing'}>
             {phase === 'undoing'
               ? UNDO_PENDING_LABEL
               : offer.kind === 'removal-group'
                 ? UNDO_REMOVALS_LABEL
                 : UNDO_BATCH_LABEL}
-          </button>
+          </Button>
         ) : (
           <a className="applied-notice-link tap-target" href={`/batches/${applied.batchId}`}>
             {VIEW_CHANGES_LABEL}

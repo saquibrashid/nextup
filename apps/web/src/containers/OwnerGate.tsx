@@ -40,6 +40,7 @@ import { apiClient, type ApiClient } from '../lib/apiClient';
 import { useResource } from '../lib/useResource';
 import { RefusalPage } from '../pages/RefusalPage';
 import { GATE_CHECKING, GATE_FAILED_BODY, GATE_FAILED_TITLE, RETRY_LABEL } from '../copy';
+import { Button } from '../components/ui/Button';
 
 export interface OwnerGateProps {
   /** Injected in tests; the module singleton everywhere else. */
@@ -81,9 +82,9 @@ export function OwnerGate({ client = apiClient }: OwnerGateProps = {}): JSX.Elem
         <main className="owner-gate" role="alert">
           <h1>{GATE_FAILED_TITLE}</h1>
           <p>{GATE_FAILED_BODY}</p>
-          <button type="button" className="tap-target" onClick={me.reload}>
+          <Button variant="secondary" onClick={me.reload}>
             {RETRY_LABEL}
-          </button>
+          </Button>
         </main>
       );
   }

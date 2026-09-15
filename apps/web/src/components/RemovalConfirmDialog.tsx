@@ -1,3 +1,4 @@
+import { Dialog } from './ui/Dialog';
 /**
  * The removal confirmation dialog (TASK-086's deferred web half, `T-UI-008`,
  * `T-REV-007`, `ux-states.md` §6.10 and §6.11).
@@ -35,7 +36,7 @@ import { useId, type JSX } from 'react';
 
 import { SERVICE_LABELS, type ReviewRemovalItem, type Service } from '@nextup/domain';
 
-import { useDialogFocus } from '../lib/useDialogFocus';
+import { Button } from './ui/Button';
 
 import {
   REMOVAL_CANCEL_LABEL,
@@ -76,16 +77,13 @@ export function RemovalConfirmDialog({
     ⚠ Escape maps to CANCEL, never to confirm. This dialog authorises
     deletions; the dismissal gesture must be the safe one.
   */
-  const dialogRef = useDialogFocus(onCancel);
 
   return (
-    <div
-      ref={dialogRef}
-      tabIndex={-1}
-      role="dialog"
-      aria-modal="true"
+    <Dialog
+      onDismiss={onCancel}
+
       aria-labelledby={headingId}
-      className="removal-confirm"
+      variant="removal"
       data-testid="removal-confirm"
     >
       <h2 id={headingId} className="removal-confirm__title">
@@ -111,23 +109,13 @@ export function RemovalConfirmDialog({
           still act. A destructive confirmation whose only reachable control is
           the destructive one is not a confirmation.
         */}
-        <button
-          type="button"
-          className="removal-confirm__cancel tap-target"
-          onClick={onCancel}
-          disabled={submitting}
-        >
+        <Button variant="secondary" onClick={onCancel} disabled={submitting}>
           {REMOVAL_CANCEL_LABEL}
-        </button>
-        <button
-          type="button"
-          className="removal-confirm__confirm tap-target"
-          onClick={onConfirm}
-          disabled={submitting}
-        >
+        </Button>
+        <Button variant="danger" onClick={onConfirm} disabled={submitting}>
           {REMOVAL_CONFIRM_LABEL}
-        </button>
+        </Button>
       </div>
-    </div>
+    </Dialog>
   );
 }

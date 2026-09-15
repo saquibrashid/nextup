@@ -1635,7 +1635,7 @@ document model could not express:**
 | **I-2** | At most one `service_listing` per `(title_id, service)` | **`CREATE UNIQUE INDEX listing_one_per_service ON service_listing (title_id, service);`** | `T-INV-002` |
 | **I-9** | At most one **active** `suppression` per `(owner_id, work_identity)` | **`CREATE UNIQUE INDEX suppression_one_active ON suppression (owner_id, work_identity) WHERE active;`** (ADR-0007's uniqueness requirement, previously carried by a synthetic document id) | `T-INV-015` (new) |
 | **I-3** | Every `title` has at least one listing | Application — a table cannot require a child row without a deferred trigger, and a trigger is more machinery than the rule is worth | `T-INV-003` |
-| **I-4** | `state` and `sort_date_added` equal what `derive.ts` computes | Application (§5) — derived values stay in one TypeScript function; a generated column would split the logic across two languages | `T-INV-010` |
+| **I-4** | `state`, `sort_date_added` and `sort_name` equal what the domain derivers compute (`derive.ts`, `sortName.ts`) | Application (§5) — derived values stay in one TypeScript function; a generated column would split the logic across two languages. ⚠ **This is why migration `0010` does not backfill `sort_name` in T-SQL** (TASK-219): the article rule would become a second, untestable implementation. The backfill runs `deriveSortName` itself — `docs/runbooks/backfill-sort-name.md` | `T-INV-010`, `T-INV-025` |
 | **I-5** | `match_state = 'matched'` ⟺ `tmdb_id IS NOT NULL` ⟺ `work_identity LIKE 'tmdb:%'` | **`CHECK` constraint `title_match_coherent`** (§15.3) | `T-INV-011` |
 | **I-6** | `date_added` never changes after creation | Application + the `T-INV-006` source grep. *(Deliberately not a trigger: the grep names the offending line, a trigger names a row.)* | `T-INV-006` |
 | **I-7** | Nothing is hard-deleted except by creates-only undo (§8.3) | Application — `DELETE` and `deleteMany` appear in **exactly one module**, asserted by grep | `T-INV-012` |
@@ -1943,6 +1943,29 @@ which is what the identity invariants rely on. SQL Server databases are
   that per-query `COLLATE` is **load-bearing rather than cosmetic**:
   without it, search is byte-exact and a lowercase query silently matches
   nothing.
+- **`title.sort_name`** (TASK-219) is the mirror image of the identity
+  columns: a stored `NVARCHAR(400)` declared **`COLLATE
+  Latin1_General_100_CI_AI`** at the column, in migration
+  `0010_title_sort_name`. SQL Server applies the **column's** collation
+  to a bare `ORDER BY`, so `sort=name` gets case- *and* accent-insensitive
+  ordering from Prisma's ordinary `orderBy: { sortName: dir }` — no raw
+  SQL, and the list query stays inside `T-SEC-021`'s `ownerId` gate.
+
+  ⚠ **THE `COLLATE` CLAUSE IS THE ENTIRE FEATURE, AND PRISMA CANNOT
+  EXPRESS IT.** It lives only in the raw migration SQL. Re-introspecting
+  the schema, or regenerating the migration from `schema.prisma`, drops it
+  **silently** — and the symptom is not an error but binary ordering:
+  `apple` after `Zebra`, `Amélie` after `Zodiac`. On a title-cased fixture
+  that still looks alphabetical, which is why `T-API-029`'s fixtures are
+  deliberately lower-case and accented.
+
+  The column is **derived and stored**, not computed: its value comes from
+  `deriveSortName` in `packages/domain/src/sortName.ts` (see I-4 below),
+  maintained at the `withSortName` choke point in
+  `apps/api/src/repository/ownerData.ts`. `T-INV-025` asserts no row has
+  drifted from it. Backfill for existing databases is
+  `docs/runbooks/backfill-sort-name.md`; the migration deliberately does
+  not do it in T-SQL.
 
 ~~Superseded (Revision 5): the database default collation was left
 unspecified, and only individual columns carried `BIN2`. That combination
@@ -2063,6 +2086,11 @@ CREATE TABLE title (
   normalised_text      NVARCHAR(MAX),
   created_by_batch_id  NVARCHAR(200) COLLATE Latin1_General_100_BIN2 NULL REFERENCES upload_batch(id),
   sort_date_added      DATE,
+  -- DERIVED, TASK-219. ⚠ The explicit CI_AI override is the entire feature:
+  -- ORDER BY uses the COLUMN's collation, and the database default is BIN2
+  -- (binary), which sorts `apple` after `Zebra`. Prisma cannot express this
+  -- clause — it lives only in migration 0010. See §16.2.1.
+  sort_name            NVARCHAR(400) COLLATE Latin1_General_100_CI_AI NULL,
   tmdb_id              INT,
   tmdb_media_type      NVARCHAR(16)  CONSTRAINT ck_title_media_type CHECK (tmdb_media_type IN ('movie','tv')),
   tmdb_name            NVARCHAR(500),
@@ -2326,6 +2354,7 @@ shape as §15.5.
 
 ```sql
 CREATE INDEX title_list_default ON title (owner_id, state, sort_date_added DESC, id ASC);
+CREATE INDEX title_list_name    ON title (owner_id, state, sort_name ASC, id ASC);  -- TASK-219
 CREATE INDEX listing_removed_view ON service_listing (owner_id, removed_at DESC, listing_id ASC)
   WHERE state = 'removed';                       -- filtered index, same as PG partial index
 CREATE INDEX listing_by_title ON service_listing (owner_id, title_id);

@@ -1,3 +1,4 @@
+import { Input } from '../components/ui/Input';
 // `/rating` - look up any title's IMDb rating (REQ-092, US-045, ADR-0011).
 //
 // ⚠ THIS SCREEN WRITES NOTHING, AND SAYS SO. That is the entire point of
@@ -17,6 +18,9 @@
 import { useState, type FormEvent, type JSX } from 'react';
 
 import { apiClient } from '../lib/apiClient';
+import { Button } from '../components/ui/Button';
+import { Field } from '../components/ui/Field';
+import { Card } from '../components/ui/Card';
 
 import {
   IMDB_LOOKUP_BODY,
@@ -95,22 +99,25 @@ export function RatingLookupPage({
           void onSubmit(event);
         }}
       >
-        <label htmlFor="rating-lookup-input">{IMDB_LOOKUP_INPUT_LABEL}</label>
-        <input
-          id="rating-lookup-input"
-          data-testid="rating-lookup-input"
-          type="text"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <button
+        <Field label={IMDB_LOOKUP_INPUT_LABEL}>
+          {(props) => (
+            <Input
+              {...props}
+              data-testid="rating-lookup-input"
+              type="text"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          )}
+        </Field>
+        <Button
+          variant="primary"
           type="submit"
-          className="tap-target"
           data-testid="rating-lookup-submit"
           disabled={state.kind === 'loading'}
         >
           {IMDB_LOOKUP_SUBMIT_LABEL}
-        </button>
+        </Button>
       </form>
 
       {state.kind === 'not-found' && (
@@ -123,7 +130,7 @@ export function RatingLookupPage({
       {state.kind === 'failed' && <p data-testid="rating-lookup-failed">{IMDB_LOOKUP_FAILED}</p>}
 
       {state.kind === 'found' && (
-        <div data-testid="rating-lookup-result">
+        <Card data-testid="rating-lookup-result">
           <h2 data-testid="rating-lookup-name">
             {state.result.name}
             {state.result.releaseYear !== null && ` (${state.result.releaseYear})`}
@@ -141,7 +148,7 @@ export function RatingLookupPage({
           {/* US-045 AC-4 - so the owner is not shown a title they already have
               as though it were something new. */}
           {state.result.inList && <p data-testid="rating-lookup-in-list">{IMDB_LOOKUP_IN_LIST}</p>}
-        </div>
+        </Card>
       )}
     </section>
   );

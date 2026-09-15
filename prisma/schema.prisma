@@ -121,6 +121,16 @@ model Title {
   /// stored — the default sort indexes it.
   sortDateAdded DateTime? @map("sort_date_added") @db.Date
 
+  /// DERIVED AND STORED ordering key for `sort=name` (TASK-219, `T-API-029`).
+  /// Computed by `deriveSortName` in `@nextup/domain` and nowhere else.
+  /// ⚠ The COLUMN is declared `COLLATE Latin1_General_100_CI_AI` in migration
+  /// `0010`, overriding the BIN2 database default — Prisma cannot express a
+  /// collation, and that clause IS the feature. Without it `ORDER BY` is
+  /// binary: `apple` after `Zebra`, and still alphabetical-looking on a
+  /// title-cased fixture. Do not regenerate this model from an introspection
+  /// that drops it.
+  sortName String? @map("sort_name") @db.NVarChar(400)
+
   tmdbId             Int?    @map("tmdb_id")
   tmdbMediaType      String? @map("tmdb_media_type") @db.NVarChar(16)
   tmdbName           String? @map("tmdb_name") @db.NVarChar(500)
@@ -167,6 +177,10 @@ model Title {
   /// `title_owner_state_sortdate` above stays because `T-MIG-001` forbids
   /// `DROP INDEX` (§16.8, additive-only).
   @@index([ownerId, state, sortDateAdded(sort: Desc), id(sort: Asc)], map: "title_list_default")
+  /// TASK-219. Mirrors the name-ordered `ORDER BY` exactly. Ascending because
+  /// A–Z is the default direction for a name; SQL Server walks it backwards
+  /// for Z–A.
+  @@index([ownerId, state, sortName(sort: Asc), id(sort: Asc)], map: "title_list_name")
   @@index([createdByBatchId], map: "title_created_by_batch")
   @@map("title")
 }

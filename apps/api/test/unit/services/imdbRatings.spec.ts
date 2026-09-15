@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { readFile } from 'node:fs/promises';
 
 import { IMDB_RATING_MAX_AGE_DAYS } from '../../../src/config.js';
 import {
@@ -343,13 +344,38 @@ describe('T-IMDB-005 · REQ-095 / invariant 5 · the refresh cannot touch list s
     ]);
   });
 
-  it('T-IMDB-005b · the module exports no sort, filter or ranking helper', async () => {
-    // REQ-095: the rating is display-only. A sort key here would let a
-    // background write reorder the list, which invariant 5 forbids outright —
-    // so its absence is asserted rather than assumed.
-    const mod: Record<string, unknown> = await import('../../../src/services/imdbRatings.js');
-    const names = Object.keys(mod).join(' ').toLowerCase();
-    expect(names).not.toMatch(/sort|orderby|compare|rank/);
+  it('T-IMDB-005b · the rating sweep is awaited BEFORE the response, not after it', async () => {
+    // ⚠ REWRITTEN AT `A53`, NOT DELETED. This id used to assert that the
+    // module exported no sort helper, because REQ-095 forbade a rating sort
+    // outright. The owner reversed that (ADR-0011 Revision 1), so the old
+    // assertion is now false by design — but the PROPERTY it was protecting
+    // (REQ-041: no non-owner write ever reorders the owner's list) is not, and
+    // it now rests entirely on WHERE the refresh runs.
+    //
+    // Under `sort=rating` the sweep must be awaited inside the request and
+    // before the `ORDER BY`; under every other sort the lazy refresh still
+    // fires after `res.json`. If someone "optimises" the sweep back out of the
+    // hot path — which reads exactly like a performance fix — the list starts
+    // silently reordering itself between renders, and nothing on screen and no
+    // other test says so.
+    //
+    // Asserted on the SOURCE, like `T-SEC-021`, because the failure is an
+    // ordering of statements rather than a value any call can return.
+    const src = await readFile(new URL('../../../src/routes/titles.ts', import.meta.url), 'utf8');
+
+    const sweep = src.indexOf('runRatingRefresh(');
+    const respond = src.indexOf('res.status(200).json(');
+    const lazy = src.indexOf('beginRatingRefresh(');
+
+    expect(sweep).toBeGreaterThan(-1);
+    expect(respond).toBeGreaterThan(-1);
+    expect(lazy).toBeGreaterThan(-1);
+
+    // The synchronous sweep is awaited, and it precedes the response.
+    expect(src.slice(0, sweep)).toMatch(/await\s*$/);
+    expect(sweep).toBeLessThan(respond);
+    // The fire-and-forget refresh still follows it.
+    expect(lazy).toBeGreaterThan(respond);
   });
 
   it('T-IMDB-005c · the max age is the rating constant, not one of its siblings', () => {

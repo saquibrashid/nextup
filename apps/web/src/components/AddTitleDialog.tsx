@@ -1,3 +1,5 @@
+import { Dialog } from './ui/Dialog';
+import { Input } from './ui/Input';
 /**
  * "Add title" dialog (US-047, TASK-207).
  *
@@ -32,7 +34,7 @@ import {
   ADD_TITLE_SERVICE_LABEL,
   ADD_TITLE_SERVICE_REQUIRED,
 } from '../copy';
-import { useDialogFocus } from '../lib/useDialogFocus';
+
 import { useOutcomeFocus } from '../lib/useOutcomeFocus';
 import {
   TMDB_UNAVAILABLE_MESSAGE,
@@ -40,6 +42,8 @@ import {
   type TmdbSearchResult,
 } from './FixMatchDialog';
 import { withName } from './SuppressDialog';
+import { Button } from './ui/Button';
+import { Field } from './ui/Field';
 
 /** Matches `FixMatchDialog` — one debounce, one poster size, one behaviour. */
 const DEBOUNCE_MS = 300;
@@ -103,7 +107,7 @@ export function AddTitleDialog({
   const [result, setResult] = useState<AddTitleResult | null>(null);
   const headingId = useId();
   const serviceLabelId = useId();
-  const dialogRef = useDialogFocus(onClose);
+
   const outcomeRef = useOutcomeFocus<HTMLParagraphElement>(phase === 'success');
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -192,12 +196,12 @@ export function AddTitleDialog({
     phase === 'search-unavailable';
 
   return (
-    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={headingId}>
+    <Dialog onDismiss={onClose} aria-labelledby={headingId}>
       <h2 id={headingId}>{ADD_TITLE_HEADING}</h2>
 
       {searching && (
         <>
-          <input
+          <Input
             type="search"
             aria-label={ADD_TITLE_SEARCH_LABEL}
             data-testid="add-title-search-input"
@@ -220,9 +224,8 @@ export function AddTitleDialog({
                   <span data-testid="add-result-name">{item.name}</span>
                   {item.releaseYear !== null && <span>{item.releaseYear}</span>}
                   <span>{MEDIA_TYPE_LABELS[item.mediaType] ?? item.mediaType}</span>
-                  <button
-                    type="button"
-                    className="tap-target"
+                  <Button
+                    variant="secondary"
                     data-testid={`add-select-${item.tmdbId}`}
                     onClick={() => {
                       setSelected(item);
@@ -230,7 +233,7 @@ export function AddTitleDialog({
                     }}
                   >
                     Select
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -245,11 +248,10 @@ export function AddTitleDialog({
             {selected.releaseYear !== null && <> ({selected.releaseYear})</>} to your list?
           </p>
 
-          <fieldset>
-            <legend id={serviceLabelId}>{ADD_TITLE_SERVICE_LABEL}</legend>
+          <Field legend={ADD_TITLE_SERVICE_LABEL} legendId={serviceLabelId}>
             {SERVICE_OPTIONS.map((option) => (
               <label key={option.value} className="tap-target">
-                <input
+                <Input
                   type="radio"
                   name="add-title-service"
                   value={option.value}
@@ -263,25 +265,23 @@ export function AddTitleDialog({
                 {option.label}
               </label>
             ))}
-          </fieldset>
+          </Field>
           {serviceError && (
             <p role="alert" data-testid="add-service-required">
               {ADD_TITLE_SERVICE_REQUIRED}
             </p>
           )}
 
-          <button
-            type="button"
-            className="tap-target"
+          <Button
+            variant="primary"
             data-testid="confirm-add-title"
             disabled={phase === 'submitting'}
             onClick={submit}
           >
             {phase === 'submitting' ? 'Adding…' : 'Add to list'}
-          </button>
-          <button
-            type="button"
-            className="tap-target"
+          </Button>
+          <Button
+            variant="secondary"
             disabled={phase === 'submitting'}
             onClick={() => {
               setSelected(null);
@@ -289,7 +289,7 @@ export function AddTitleDialog({
             }}
           >
             Back
-          </button>
+          </Button>
         </>
       )}
 
@@ -336,10 +336,10 @@ export function AddTitleDialog({
       )}
 
       {phase !== 'submitting' && (
-        <button type="button" className="tap-target" onClick={onClose}>
+        <Button variant="secondary" onClick={onClose}>
           {phase === 'success' ? 'Close' : 'Cancel'}
-        </button>
+        </Button>
       )}
-    </div>
+    </Dialog>
   );
 }

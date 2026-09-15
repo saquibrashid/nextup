@@ -77,7 +77,7 @@ export function compareTitlesForList(
  * change to it is a change to one named thing rather than to two expressions
  * that merely happen to match.
  */
-function compareIdAscending(a: OrderableTitle, b: OrderableTitle): number {
+function compareIdAscending(a: { readonly id: string }, b: { readonly id: string }): number {
   if (a.id === b.id) return 0;
   return a.id < b.id ? -1 : 1;
 }
@@ -92,4 +92,108 @@ export function sortTitlesForList<T extends OrderableTitle>(
   dir: SortDirection,
 ): T[] {
   return [...rows].sort((a, b) => compareTitlesForList(a, b, dir));
+}
+
+/** The minimum a row must expose to be ordered by a nullable numeric key. */
+export interface NullableKeyOrderableTitle {
+  readonly key: number | null;
+  readonly id: string;
+}
+
+/**
+ * Total order by a NULLABLE NUMERIC key — release year, or IMDb rating tenths
+ * (`A53`). `dir`, **`NULL`s last in BOTH directions**, ties broken by `id`
+ * ascending in both directions.
+ *
+ * ⚠ **NULLS-LAST IS DECIDED BEFORE DIRECTION**, the same rule as
+ * {@link compareTitlesForList} and `compareTitlesByRuntime`, and for the same
+ * sharp reason. SQL Server sorts `NULL` FIRST on `ASC`, so "Oldest first"
+ * would open with every title whose year is unknown, and "Lowest rated first"
+ * would open with every title nobody has rated — presenting an absence of data
+ * as a claim about the work. The rating case is the worse of the two, because
+ * the list would then read as an opinion the product does not hold.
+ *
+ * ⚠ This comparator does NOT order the list; SQL does. It exists so the
+ * integration suite has something to check the query against rather than a
+ * hand-written expected sequence, which would only ever agree with whatever
+ * its author believed.
+ *
+ * ⚠ **The rating key is TENTHS, the stored integer — never the displayed
+ * float.** `8.4` and `84` order identically among themselves, so a test fed
+ * floats passes; the cursor built from the last row then carries a float into
+ * an integer keyset and the boundary row vanishes.
+ */
+export function compareTitlesByNullableKey(
+  a: NullableKeyOrderableTitle,
+  b: NullableKeyOrderableTitle,
+  dir: SortDirection,
+): number {
+  if (a.key === null || b.key === null) {
+    if (a.key === null && b.key === null) return compareIdAscending(a, b);
+    return a.key === null ? 1 : -1;
+  }
+
+  if (a.key !== b.key) {
+    const ascending = a.key < b.key ? -1 : 1;
+    return dir === 'asc' ? ascending : -ascending;
+  }
+
+  return compareIdAscending(a, b);
+}
+
+/** The minimum a row must expose to be ordered by name (TASK-219). */
+export interface NameOrderableTitle {
+  /** The stored `sortName` — see `deriveSortName`. `null` sorts last. */
+  readonly sortName: string | null;
+  readonly id: string;
+}
+
+/**
+ * Case- and accent-insensitive comparison, mirroring the `sort_name` column's
+ * `Latin1_General_100_CI_AI` collation.
+ *
+ * ⚠ **`sensitivity: 'base'` IS THE POINT, NOT A DETAIL.** It makes `amelie`,
+ * `Amelie` and `Amélie` compare EQUAL, which is what CI_AI does — the second
+ * `I` is accent-INsensitive, and it is easy to read the name as case-only.
+ * A comparator that distinguished accents would disagree with the database on
+ * exactly the rows this feature exists to order correctly, and the integration
+ * suite would then be asserting the wrong sequence with total confidence.
+ *
+ * ⚠ It follows that equal keys are COMMON here, not a corner case, and the
+ * `id` tie-break is what keeps the order total. Without it the keyset boundary
+ * between `Amelie` and `Amélie` is ambiguous and one of them can vanish
+ * between pages.
+ */
+const NAME_COLLATOR = new Intl.Collator('en', { sensitivity: 'base', numeric: false });
+
+/**
+ * Total order by name: `sortName` in `dir`, **`NULL`s last in BOTH
+ * directions**, ties broken by `id` ascending in both directions.
+ *
+ * ⚠ **THIS DOES NOT ORDER THE LIST; SQL DOES** (`ORDER BY [sort_name]`, which
+ * picks up the column's CI_AI collation). It exists so the integration suite
+ * has something to check the query against rather than a hand-written expected
+ * sequence, which would only ever agree with whatever its author believed —
+ * and for a collation-dependent order that is a very easy thing to get wrong.
+ *
+ * ⚠ **NULLS-LAST IS DECIDED BEFORE DIRECTION**, the same rule as every other
+ * key here. SQL Server sorts `NULL` FIRST on `ASC`, so "A–Z" would otherwise
+ * open with every title whose name could not be read from the screenshot.
+ */
+export function compareTitlesByName(
+  a: NameOrderableTitle,
+  b: NameOrderableTitle,
+  dir: SortDirection,
+): number {
+  if (a.sortName === null || b.sortName === null) {
+    if (a.sortName === null && b.sortName === null) return compareIdAscending(a, b);
+    return a.sortName === null ? 1 : -1;
+  }
+
+  const ascending = NAME_COLLATOR.compare(a.sortName, b.sortName);
+  if (ascending !== 0) {
+    return dir === 'asc' ? ascending : -ascending;
+  }
+
+  return compareIdAscending(a, b);
 }

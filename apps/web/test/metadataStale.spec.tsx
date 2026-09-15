@@ -107,7 +107,16 @@ describe('T-UX-017 partial data — TMDB stale', () => {
     renderRow({ metadataStale: true });
 
     expect(screen.getByTestId('title-name')).toHaveTextContent('The Matrix');
-    expect(screen.getByTestId('genres')).toHaveTextContent('Action, Science Fiction');
+    // ⚠ ASSERTED PER CHIP, NOT AS ONE JOINED STRING — rewritten at TASK-213.
+    // It read `'Action, Science Fiction'`, which was the old `genres.join(', ')`
+    // rendering; REQ-112 makes the cell a row of chips, so the comma is gone.
+    // The INTENT of this case is unchanged and is the point: `metadataStale`
+    // never means the data is missing, so every genre must still be there.
+    // Asserting the chips individually says that more directly than matching a
+    // separator that is now a presentation detail.
+    expect(screen.getByTestId('genre-chip-Action')).toBeInTheDocument();
+    expect(screen.getByTestId('genre-chip-Science Fiction')).toBeInTheDocument();
+    expect(screen.queryByTestId('genre-overflow')).toBeNull();
     expect(screen.getByTestId('release-year')).toHaveTextContent('1999');
     expect(screen.getByTestId('poster')).toBeInTheDocument();
     expect(screen.getByTestId('imdb-rating-value')).toHaveTextContent('8.7');

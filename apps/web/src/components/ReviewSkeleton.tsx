@@ -13,6 +13,7 @@
 // sibling `role="status"` paragraph. A screen reader that also walked a row of
 // empty placeholders would hear the wait described twice, once meaninglessly.
 import type { JSX } from 'react';
+import { Skeleton } from './ui/Skeleton';
 
 /**
  * The most placeholders this will ever draw.
@@ -33,7 +34,7 @@ export function ReviewSkeleton({ count }: ReviewSkeletonProps): JSX.Element {
   if (count === null) {
     return (
       <div data-testid="review-skeleton" data-count="unknown" aria-hidden="true">
-        <div data-testid="review-skeleton-block" />
+        <Skeleton data-testid="review-skeleton-block" />
       </div>
     );
   }
@@ -41,7 +42,7 @@ export function ReviewSkeleton({ count }: ReviewSkeletonProps): JSX.Element {
   return (
     <div data-testid="review-skeleton" data-count={String(count)} aria-hidden="true">
       {Array.from({ length: count }, (_unused, index) => (
-        <div key={index} data-testid="review-skeleton-card" />
+        <Skeleton key={index} data-testid="review-skeleton-card" />
       ))}
     </div>
   );

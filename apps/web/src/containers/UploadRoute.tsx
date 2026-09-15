@@ -47,6 +47,7 @@ import {
 } from '../copy';
 import { OFFLINE_DISABLED_REASON } from '../copy';
 import { useOnline } from '../lib/useOnline';
+import { Button } from '../components/ui/Button';
 
 export interface UploadRouteProps {
   /** Injected so the suite can drive every state without a server. */
@@ -238,8 +239,8 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
       {conflict !== null && (
         <section className="upload-conflict" data-testid="open-batch-conflict">
           <p data-testid="open-batch-message">{conflict.message}</p>
-          <button
-            className="tap-target"
+          <Button
+            variant="secondary"
             data-testid="open-batch-go"
             onClick={() => {
               void navigate(`/batches/${conflict.batchId}`);
@@ -247,15 +248,10 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
             type="button"
           >
             {OPEN_BATCH_GO_LABEL}
-          </button>
-          <button
-            className="tap-target"
-            data-testid="open-batch-discard"
-            onClick={discardConflicting}
-            type="button"
-          >
+          </Button>
+          <Button variant="secondary" data-testid="open-batch-discard" onClick={discardConflicting}>
             {OPEN_BATCH_DISCARD_LABEL}
-          </button>
+          </Button>
         </section>
       )}
 
@@ -278,15 +274,14 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
             {blocked}
           </p>
         )}
-        <button
-          className="tap-target upload-submit__button"
+        <Button
+          variant="primary"
           data-testid="submit-button"
           disabled={blocked !== null || busy}
           onClick={submit}
-          type="button"
         >
           {SUBMIT_LABEL}
-        </button>
+        </Button>
         {busy && (
           <p aria-live="polite" data-testid="submit-busy">
             {SUBMIT_IN_FLIGHT}
