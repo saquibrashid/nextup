@@ -20,7 +20,7 @@
  * caused by the fix rather than by the bug, so `g` asserts a row from page 1
  * is still on screen after page 2 lands.
  */
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -354,7 +354,12 @@ describe('T-UX-015 the load-more sentinel reaches the rest of the list', () => {
       expect(screen.getAllByTestId('title-name')).toHaveLength(PAGE_LIMIT + 10);
     });
 
-    await userEvent.click(screen.getByTestId('sort-control'));
+    // ⚠ CARRIED FORWARD BY TASK-217. This clicked `sort-control` when the
+    // direction was a single toggling button; REQ-121 made it a two-option
+    // segment, so the click that changes the query is now the non-current
+    // option. The property under test is unchanged: changing the sort changes
+    // the query string, and the pages fetched under the old one must go.
+    await userEvent.click(within(screen.getByTestId('sort-dir-asc')).getByRole('radio'));
 
     await waitFor(() => {
       expect(screen.getAllByTestId('title-name')).toHaveLength(PAGE_LIMIT);

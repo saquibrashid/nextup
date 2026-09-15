@@ -784,36 +784,51 @@ button {
 
 /* ----------------------------------------------------------- filter bar -- */
 
+/*
+ * REQ-113 (`specs/ui-refresh.md` §5) — the filters and the sort present as ONE
+ * control group. `specs/ui.md` §2.1 item 2 has always co-located them;
+ * `FilterBar.tsx` said so in a comment and did not do it, because `SortControl`
+ * shipped later (TASK-166) and mounted as a second bar with its own bottom
+ * margin — two stacked strips that read as two unrelated decisions.
+ *
+ * ⚠ MERGING THEM VISUALLY MUST NOT MERGE THEM MECHANICALLY. The two have
+ * deliberately opposite persistence models: filters are URL-only, sort is
+ * URL → session → default. This rule is the whole of the merge — it adds a
+ * wrapper and moves the bottom margin onto it. Nothing about state is shared,
+ * and a refactor that "tidies" them into one hook produces a green suite and a
+ * broken back button.
+ */
+.list-controls {
+  align-items: flex-end;
+  column-gap: var(--space-5);
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+  row-gap: var(--space-3);
+}
+
 .filter-bar {
   align-items: flex-end;
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
 }
 
 /* --------------------------------------------------------- sort control -- */
 
 /*
- * REQ-037. The sort KEY sits beside the direction toggle, not above it: they
- * are one decision read left to right — "sort by <key>, <direction> first".
- * Wrapping is allowed so the pair drops to its own line on a narrow viewport
- * rather than squeezing the filter fieldsets beside it.
+ * REQ-121. The sort FIELD selector sits beside the DIRECTION segment, not above
+ * it: they are one decision read left to right — "sort by <field>, <direction>
+ * first". Wrapping is allowed so the pair drops to its own line on a narrow
+ * viewport rather than squeezing the filter fieldsets beside it.
  */
 .sort-control-group {
   align-items: flex-end;
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
 }
 
-/*
- * TASK-166. ⚠ LABEL SHOWS THE CURRENT DIRECTION, not what the next click
- * will produce (`A47`). The button's `aria-pressed` state communicates
- * "oldest-first is currently active" — styling mirrors that: visually distinct
- * when pressed (oldest-first), plain when default (newest-first).
- */
 /* ------------------------------------------------------ freshness strip -- */
 
 /*

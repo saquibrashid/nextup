@@ -364,6 +364,39 @@ export const SORT_KEY_RUNTIME_LABEL = 'Runtime';
 export const SORT_KEY_LEGEND = 'Sort by';
 
 /**
+ * REQ-121 (`specs/ui-refresh.md` §5b) — the sort keys and direction labels
+ * added when OQ-3 / OQ-3b / `A48` widened the orderings from one to five.
+ *
+ * ⚠ **`SORT_NEWEST_LABEL` AND `SORT_OLDEST_LABEL` ARE NOT REWRITTEN.** §5b and
+ * §8 are explicit: they are governed copy (`specs/ui.md` §9) and changing
+ * owner-facing wording is a product decision, not a styling one. Everything
+ * here is an ADDITION for a field that had no ordering before — and the date
+ * pair is REUSED VERBATIM for both date-shaped fields below.
+ *
+ * ⚠ **`A–Z` USES AN EN DASH (U+2013), not a hyphen.** It matches the
+ * `Year · type` separator convention already set in §2.2. A hyphen here is a
+ * different string, and `T-UX-129` compares against these constants rather
+ * than against literals precisely so the two cannot drift apart unnoticed.
+ */
+export const SORT_KEY_NAME_LABEL = 'Name';
+export const SORT_KEY_YEAR_LABEL = 'Release year';
+export const SORT_KEY_RATING_LABEL = 'IMDb rating';
+export const SORT_AZ_LABEL = 'A–Z';
+export const SORT_ZA_LABEL = 'Z–A';
+export const SORT_HIGHEST_LABEL = 'Highest first';
+export const SORT_LOWEST_LABEL = 'Lowest first';
+
+/**
+ * REQ-121 — the direction segment's legend.
+ *
+ * ⚠ The segment needs a name of its own because it is no longer a button whose
+ * label states the whole choice. Two radios reading "Newest first" and "Oldest
+ * first" with no group name are two unexplained options to a screen-reader
+ * user, who meets them one at a time.
+ */
+export const SORT_DIR_LEGEND = 'Direction';
+
+/**
  * REQ-035 - the hidden-unknown disclosure (`T-UX-124`).
  *
  * ⚠ THIS IS PRODUCT INVARIANT 2 IN A NEW PLACE: nothing disappears from the

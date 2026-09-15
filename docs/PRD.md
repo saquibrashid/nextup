@@ -212,7 +212,7 @@ A title was removed months ago. It shows up again in a new capture. nextup creat
 | K | Platform guarantees | The invariants that make the rest safe. | US-036, US-037, US-038, US-039 |
 | **L** *(v1.1 — specified, not scheduled)* | **Waiting to stream** | Record what I noticed on a rental storefront, and tell me when it reaches a service I have. | US-040, US-041, US-042, US-043 |
 | **M** *(v1.1 — specified, not scheduled)* | **IMDb ratings** | Show me the IMDb rating on my list, and let me look up a rating for anything I haven't saved. | US-044, US-045, US-046 |
-| **P** | **Visual language** | Shared typography, icons and controls; remaining visual-refresh stories are promoted with their owning tasks. | US-056, US-059 |
+| **P** | **Visual language** | Shared typography, icons and controls; remaining visual-refresh stories are promoted with their owning tasks. | US-056, US-057, US-059 |
 
 Story order within an epic is dependency order. Epic order A → K is a viable build order; see §12.1. **Epic L is v1.1 and follows the whole of A–K** — it depends on Epics C, D and I being complete. See ADR-0010 and `roadmap.md` §5. **Epic M is v1.1 and depends on Epic F** (the combined list) and on TMDB matching being in place, because a rating is keyed on the `imdb_id` that matching produces. See ADR-0011.
 
@@ -1453,6 +1453,38 @@ the criterion a half-fix fails.
 | AC-4 | Normalisation happens on read. No stored genre value is rewritten and no migration is required. |
 | AC-5 | A row shows at most a single line of genre chips, with a `+n` control for the remainder; a genre in the active filter is always visible rather than hidden behind `+n`. |
 | AC-6 | A title with no genres renders no genre chips and no placeholder, and is excluded whenever a genre filter is active. |
+
+---
+
+#### US-057 — Order the list by any fact it shows me
+
+**As the owner**, I want to order my list by any fact it shows me, and to see
+what the ordering means, so that the control I press and the list I get agree.
+
+**Requirements:** REQ-113, REQ-114, REQ-115, REQ-121, and the REQ-095 reversal
+(`specs/ui-refresh.md` §5, §5b, §7a; ADR-0011 Revision 1).
+
+⚠ **The control used to describe itself ambiguously.** It was one button
+labelled *"Newest first"* **while the list was already newest-first**, and
+pressing it made the list oldest-first. Both readings — "this is the state" and
+"this is what you'll get" — are defensible, which is precisely the defect.
+
+⚠ **AC-5 is a `must` that a redesign can delete while every behavioural test
+still passes.** REQ-038's oldest-first reverse was promoted at `A47` and is the
+sole escape hatch for the knowingly-accepted newest-first-vs-SUC-003 trade-off;
+OQ-029's revisit path depends on it shipping in v1. Collapsing the direction
+into the field list as ten combined options leaves `click()` reaching
+oldest-first while burying it a press deeper.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | The filters and the sort present as a single control group, and remain independent: filter state lives only in the URL, sort direction is remembered across sessions. |
+| AC-2 | The list can be ordered by date added, name, release year, runtime and IMDb rating. |
+| AC-3 | Both direction options are on screen at once with the current one marked; the control never presents the current ordering as its own single label. |
+| AC-4 | The direction labels describe the selected field, and the existing date wording is unchanged. |
+| AC-5 | From the default view, the reverse of the default ordering is reachable in exactly one interaction. |
+| AC-6 | Changing the field preserves the chosen direction; changing either preserves the active filters and starts the list again from its first page. |
+| AC-7 | A remembered direction is reflected in the request that is actually issued, so the marked option and the list always agree. |
 
 ---
 
