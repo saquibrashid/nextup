@@ -842,6 +842,40 @@ export function reviewPendingAdditions(count: number): string {
  */
 export const REVIEW_SECTION_EMPTY = 'Nothing in this group.';
 
+/* ---------------------------------- REQ-122 section differentiation ----- */
+
+/**
+ * REQ-122 (`specs/ui-refresh.md` §6a.1) — the consequence line each candidate
+ * card carries.
+ *
+ * ⚠ **THESE SIT ON THE CARD, NOT ONLY ON THE SECTION HEADING, AND THAT IS THE
+ * WHOLE REQUIREMENT.** A full-update review is long and is scrolled; by the
+ * time a removal card is on screen its heading is off it. The owner's report
+ * was that the three sections *looked alike*, and a heading they cannot see
+ * does not tell them apart. `T-UX-134` asserts a card is identifiable with no
+ * section heading in its accessible subtree.
+ *
+ * ⚠ **WORDS, NOT COLOUR** (`specs/ui.md` §10.2). The surface treatment in
+ * `index.css` is a reinforcement of these strings, never a replacement for
+ * them — a red left rule is invisible to a screen reader and to roughly one
+ * man in twelve.
+ *
+ * ⚠ **EACH NAMES WHAT AGREEING DOES, in the owner's terms ("your list"), not
+ * what the section is called.** "Removals" is a category; "Removes from your
+ * list" is a consequence, and the consequence is the thing that differs.
+ */
+export const REVIEW_CONSEQUENCE_ADDITION = 'Adds to your list';
+export const REVIEW_CONSEQUENCE_UNMATCHED = 'Not added until you identify it';
+export const REVIEW_CONSEQUENCE_REMOVAL = 'Removes from your list';
+
+/**
+ * The section-level consequential marker for removals (REQ-122).
+ *
+ * ⚠ A WORD, deliberately — `specs/ui.md` §10.2 forbids signalling by colour
+ * alone, and this is the one section whose agreement takes something away.
+ */
+export const REVIEW_REMOVALS_MARKER = 'Takes titles off your list';
+
 /* ------------------------------------ §6.10/§6.11 removal confirmation -- */
 
 /**

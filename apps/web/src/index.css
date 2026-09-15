@@ -1518,6 +1518,56 @@ button {
 }
 
 /*
+ * REQ-122 (`specs/ui-refresh.md` §6a.1) — THE THREE CANDIDATE SECTIONS LOOKED
+ * ALIKE, which is what the owner actually reported about this screen.
+ *
+ * ⚠ THIS BLOCK IS A REINFORCEMENT, NOT THE MECHANISM. The words carry the
+ * distinction (`REVIEW_CONSEQUENCE_*` on every card, `REVIEW_REMOVALS_MARKER`
+ * on the heading); `specs/ui.md` §10.2 forbids signalling by colour alone, and
+ * a rule that only existed here would be invisible to a screen reader.
+ *
+ * ⚠ AND IT HIDES NOTHING. Distinct does not mean collapsed, reordered or
+ * filtered — a full-update review still renders every extracted candidate
+ * including the already-correct ones (product invariant 2, `T-UX-136`). That
+ * is the exact change that would make a failed extraction readable as a
+ * removal.
+ */
+.review-section--additions,
+.review-section--unmatched,
+.review-section--removals {
+  border-left: 4px solid var(--color-border);
+  padding-left: var(--space-3);
+}
+
+.review-section--additions {
+  border-left-color: var(--color-accent);
+}
+
+/*
+ * ⚠ THE CONSEQUENTIAL ONE. Agreement here takes titles OUT of the list, and it
+ * is the only section on this screen of which that is true.
+ */
+.review-section--removals {
+  border-left-color: var(--color-danger);
+}
+
+/*
+ * The non-colour half of the removals treatment — a word, beside the heading.
+ * ⚠ Do not restyle this into a bare coloured dot or icon; the string is the
+ * part that survives greyscale, a screen reader and `T-UX-135`.
+ */
+.review-section__marker {
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  margin-left: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  white-space: nowrap;
+}
+
+/*
  * ⚠ THE COUNT LIVES IN THE SUMMARY AND MUST STAY LEGIBLE WHILE COLLAPSED
  * (SD-11b). It is the owner's only check that the batch was read fully.
  */
@@ -1669,6 +1719,24 @@ button {
   overflow-wrap: anywhere;
 }
 
+/*
+ * REQ-122 — the per-card consequence line. ⚠ It is NOT muted like
+ * `__raw`: it names what agreeing to this card does, and it is the property
+ * `T-UX-134` asserts a card keeps when its section heading has scrolled off.
+ */
+.candidate-card__consequence,
+.removal-card__consequence {
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  margin: 0;
+}
+
+.removal-card__consequence {
+  color: var(--color-danger);
+  padding-left: calc(var(--space-2) + 1rem);
+}
+
 .candidate-card__chip {
   align-self: flex-start;
   border: 1px solid var(--color-border);
@@ -1682,6 +1750,7 @@ button {
 
 .removal-card {
   display: flex;
+  flex-direction: column;
 }
 
 /*

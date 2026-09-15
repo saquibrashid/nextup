@@ -68,6 +68,19 @@ export interface CandidateCardProps {
   readonly unidentified?: boolean;
   /** The §6.8 per-card action strip, when the section has one. */
   readonly actions?: JSX.Element | null;
+  /**
+   * REQ-122 — what agreeing to THIS card does, in the owner's terms.
+   *
+   * ⚠ PASSED IN, NEVER DERIVED, for the same reason `unidentified` is: the
+   * card does not know which section it is being rendered in, and guessing
+   * from `match === null` would label a "probably not a title" row as an
+   * addition. Only the caller knows.
+   *
+   * ⚠ This is what makes a card identifiable WITH NO HEADING IN VIEW
+   * (`T-UX-134`). It is not decoration and it is not a duplicate of the
+   * section label — a long review is scrolled, and the heading is gone.
+   */
+  readonly consequence?: string | null;
 }
 
 /**
@@ -91,6 +104,7 @@ export function CandidateCard({
   thumbnailUrl = null,
   unidentified = false,
   actions = null,
+  consequence = null,
 }: CandidateCardProps): JSX.Element {
   const { match } = candidate;
   const unreadable = candidate.verdict === 'unreadable-tile';
@@ -192,6 +206,12 @@ export function CandidateCard({
             {[MEDIA_TYPE_LABELS[match.mediaType] ?? match.mediaType, match.releaseYear]
               .filter((part) => part !== null && part !== undefined)
               .join(' · ')}
+          </p>
+        )}
+
+        {consequence !== null && (
+          <p className="candidate-card__consequence" data-testid="candidate-consequence">
+            {consequence}
           </p>
         )}
 

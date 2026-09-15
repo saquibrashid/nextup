@@ -212,7 +212,7 @@ A title was removed months ago. It shows up again in a new capture. nextup creat
 | K | Platform guarantees | The invariants that make the rest safe. | US-036, US-037, US-038, US-039 |
 | **L** *(v1.1 — specified, not scheduled)* | **Waiting to stream** | Record what I noticed on a rental storefront, and tell me when it reaches a service I have. | US-040, US-041, US-042, US-043 |
 | **M** *(v1.1 — specified, not scheduled)* | **IMDb ratings** | Show me the IMDb rating on my list, and let me look up a rating for anything I haven't saved. | US-044, US-045, US-046 |
-| **P** | **Visual language** | Shared typography, icons and controls; remaining visual-refresh stories are promoted with their owning tasks. | US-056, US-057, US-059 |
+| **P** | **Visual language** | Shared typography, icons and controls; remaining visual-refresh stories are promoted with their owning tasks. | US-056, US-057, US-058, US-059 |
 
 Story order within an epic is dependency order. Epic order A → K is a viable build order; see §12.1. **Epic L is v1.1 and follows the whole of A–K** — it depends on Epics C, D and I being complete. See ADR-0010 and `roadmap.md` §5. **Epic M is v1.1 and depends on Epic F** (the combined list) and on TMDB matching being in place, because a rating is keyed on the `imdb_id` that matching produces. See ADR-0011.
 
@@ -1485,6 +1485,44 @@ oldest-first while burying it a press deeper.
 | AC-5 | From the default view, the reverse of the default ordering is reachable in exactly one interaction. |
 | AC-6 | Changing the field preserves the chosen direction; changing either preserves the active filters and starts the list again from its first page. |
 | AC-7 | A remembered direction is reflected in the request that is actually issued, so the marked option and the list always agree. |
+
+---
+
+#### US-058 — Tell an addition from a removal without scrolling back
+
+**As the owner**, I want to tell an addition from a removal without scrolling
+back to a heading, so that I never agree to take a title off my list thinking I
+was putting one on.
+
+**Requirements:** REQ-122 (`specs/ui-refresh.md` §6a.1; `A53` OQ-6 answer (d)).
+
+⚠ **This is the owner's own report, narrowed.** They said the upload workflow
+was *"not smooth and it was confusing"*; asked what specifically, they chose
+(d): **the three candidate sections look alike despite meaning different
+things.** That is a presentation defect, which is why its fix touches the
+confirmation contract not at all — nothing here changes what reaches the list
+or when.
+
+⚠ **AC-2 is the whole difference between this and restyling the headings.** A
+full-update review is long and is scrolled; by the time a removal card is on
+screen its heading is off it. A card must be identifiable from its **own**
+content.
+
+⚠⚠ **AC-6 IS PRODUCT INVARIANT 2 AND IT IS NOT NEGOTIABLE.** Making the
+sections distinguishable is not licence to hide the boring one. A full-update
+review renders **every** extracted candidate including the already-correct
+ones, because a failed extraction of a known title must never be readable as a
+removal — the single most important safety property in this product.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | Each candidate section carries a persistent heading, a count and its own surface treatment. |
+| AC-2 | An addition card and a removal card are distinguishable from each other by their own rendered content, with no section heading in the accessible subtree. |
+| AC-3 | Every card states what agreeing to it does in the owner's terms, and the three sections' statements differ from one another. |
+| AC-4 | The removals section carries an additional consequential marker. |
+| AC-5 | That marker is a word, never colour alone. |
+| AC-6 | A full-update review still renders all extracted candidates, including the already-correct ones, in their existing order. |
+| AC-7 | The removals section remains last, and remains confirmed as one group. |
 
 ---
 
