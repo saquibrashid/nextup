@@ -60,6 +60,9 @@ export * from './reconcile.js';
 // TASK-085 — the tick/untick body grammar for `PATCH …/removals` (§6.21).
 export * from './removalPatch.js';
 export * from './schemas.js';
+// TASK-219 — the `sort=name` key. Derived in ONE function because the database
+// collation is binary and the column that fixes it is CI_AI; see sortName.ts.
+export * from './sortName.js';
 // TASK-061 — the TMDB storage allow-list POLICY (US-007 AC-6, REQ-029): an
 // unlisted field is rejected, never stripped. Also a Rule A defence.
 export * from './tmdbStorage.js';

@@ -27,6 +27,7 @@ import type { Request } from 'express';
 import { AppError } from '../errors/AppError.js';
 import {
   decodeCursor,
+  decodeNameCursor,
   decodeRatingCursor,
   decodeReleaseYearCursor,
   decodeRuntimeCursor,
@@ -42,14 +43,13 @@ import {
  * reversal is paid for in `titles.ts` by making the rating refresh synchronous
  * — read ADR-0011 Revision 1 and `api.md` §6.2a before touching this list.
  *
- * ⚠ **`name` IS DELIBERATELY ABSENT.** The database default collation is
- * `Latin1_General_100_BIN2`, which is BINARY: an unqualified `ORDER BY
- * tmdb_name` sorts `apple` after `Zebra` and still looks alphabetical on a
- * title-cased list. Shipping it against that collation would be a sort that
- * looks right in every fixture and is wrong for the owner. It needs a stored,
- * case-folded key — see TASK-219.
+ * ⚠ **`name` IS NOT AN ORDINARY KEY EITHER.** It orders by the stored
+ * `sortName` column, which is declared `COLLATE Latin1_General_100_CI_AI` in
+ * migration `0010` to override the BIN2 database default. Ordering by
+ * `tmdbName` instead would be BINARY — `apple` after `Zebra` — and would still
+ * look alphabetical on a title-cased fixture. See TASK-219.
  */
-export const TITLE_SORTS = ['dateAdded', 'runtime', 'releaseYear', 'rating'] as const;
+export const TITLE_SORTS = ['dateAdded', 'runtime', 'releaseYear', 'rating', 'name'] as const;
 export type TitleSort = (typeof TITLE_SORTS)[number];
 
 /**
@@ -67,6 +67,7 @@ const CURSOR_DECODERS: Record<TitleSort, (raw: string) => AnyListCursor> = {
   runtime: decodeRuntimeCursor,
   releaseYear: decodeReleaseYearCursor,
   rating: decodeRatingCursor,
+  name: decodeNameCursor,
 };
 
 export const SORT_DIRECTIONS = ['asc', 'desc'] as const;
@@ -79,6 +80,36 @@ export type SortDirection = (typeof SORT_DIRECTIONS)[number];
  * SUC-003. Do not "simplify" `dir` away.
  */
 export const DEFAULT_SORT_DIRECTION: SortDirection = 'desc';
+
+/**
+ * The default direction PER SORT, for when the client sends `sort` without
+ * `dir`.
+ *
+ * ⚠ **A SINGLE GLOBAL DEFAULT IS WRONG THE MOMENT A NON-DATE KEY EXISTS.**
+ * `desc` is correct and owner-confirmed for `dateAdded` (newest first, A44),
+ * and it is defensible for `runtime`, `releaseYear` and `rating`, where the
+ * interesting end is the high one. Applied to `name` it means `?sort=name`
+ * opens at **Z**, which no one has ever meant by "sort by name".
+ *
+ * ⚠ **THE FAILURE IS INVISIBLE TO THE OBVIOUS TEST.** The UI always sends an
+ * explicit `dir`, so every test driven through the UI passes; only a bare
+ * `?sort=name` — a bookmark, a shared link, a hand-typed URL — sees it. The
+ * default is therefore asserted directly (`T-API-029f`).
+ *
+ * `DEFAULT_SORT_DIRECTION` remains the value for every other key, so this map
+ * states only the exception and cannot drift from it.
+ */
+const DEFAULT_DIRECTION_BY_SORT: Record<TitleSort, SortDirection> = {
+  dateAdded: DEFAULT_SORT_DIRECTION,
+  runtime: DEFAULT_SORT_DIRECTION,
+  releaseYear: DEFAULT_SORT_DIRECTION,
+  rating: DEFAULT_SORT_DIRECTION,
+  name: 'asc',
+};
+
+export function defaultDirectionFor(sort: TitleSort): SortDirection {
+  return DEFAULT_DIRECTION_BY_SORT[sort];
+}
 
 /** Bounds the repeatable filters so a hostile query cannot build a huge IN(). */
 const MAX_REPEATED_VALUES = 20;
@@ -231,7 +262,7 @@ export function parseTitleListQuery(query: Request['query']): TitleListQuery {
     genres: uniqueGenres,
     runtimes,
     sort,
-    dir: (dirRaw as SortDirection | undefined) ?? DEFAULT_SORT_DIRECTION,
+    dir: (dirRaw as SortDirection | undefined) ?? defaultDirectionFor(sort),
     limit: parseLimit(query['limit']),
     // ⚠ THE CURSOR IS DECODED FOR THE SORT IT IS BEING USED WITH. A keyset
     // predicate must mirror its own `ORDER BY`, so a date position is

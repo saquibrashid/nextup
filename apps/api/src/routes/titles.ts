@@ -23,6 +23,7 @@ import { type Router } from 'express';
 
 import {
   encodeCursor,
+  encodeNameCursor,
   encodeRatingCursor,
   encodeReleaseYearCursor,
   encodeRuntimeCursor,
@@ -82,6 +83,8 @@ interface TitleRow {
   matchState: string;
   rawExtractedText: string | null;
   sortDateAdded: Date | null;
+  /** TASK-219 — the stored `sort=name` key. Cursor source, never displayed. */
+  sortName?: string | null;
   tmdbId?: number | null;
   tmdbMediaType: string | null;
   tmdbName: string | null;
@@ -384,9 +387,18 @@ export function registerTitleRoutes(router: Router): void {
                   ratingTenths: lastRow.imdbRatingTenths ?? null,
                   id: lastRow.id,
                 })
-            : last?.sortDateAdded != null
-              ? encodeCursor({ sortDateAdded: toIsoDate(last.sortDateAdded), id: last.id })
-              : null;
+            : query.sort === 'name'
+              ? lastRow === undefined
+                ? null
+                : // ⚠ THE STORED KEY, NOT THE DISPLAYED TITLE. They differ
+                  // whenever a leading article was stripped — the row shown as
+                  // *The Matrix* sits at position `Matrix` — so a cursor built
+                  // from the visible name names the wrong place in the order
+                  // and page two silently starts past the rows in between.
+                  encodeNameCursor({ sortName: lastRow.sortName ?? null, id: lastRow.id })
+              : last?.sortDateAdded != null
+                ? encodeCursor({ sortDateAdded: toIsoDate(last.sortDateAdded), id: last.id })
+                : null;
 
     res.status(200).json({ items, nextCursor, limit: query.limit, runtimeUnknownHidden });
 

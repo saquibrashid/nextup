@@ -56,7 +56,8 @@
     "coverage": "vitest run --project unit --project web --coverage",
     "build:scripts": "tsc --build scripts",
     "test": "npm run test:unit && npm run test:int && npm run test:web",
-    "check:exif": "node tools/scan-exif.mjs"
+    "check:exif": "node tools/scan-exif.mjs",
+    "backfill:sort-name": "npm run build:scripts && node scripts/dist/backfill-sort-name.js"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

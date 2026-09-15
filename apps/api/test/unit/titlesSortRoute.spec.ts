@@ -57,7 +57,8 @@ vi.mock('../../src/jobs/refreshRatings.js', async (importOriginal) => {
 const { createApp } = await import('../../src/app.js');
 const { CLIENT_PRINCIPAL_HEADER } = await import('../../src/auth/principal.js');
 const { resetAllowListWarning } = await import('../../src/middleware/allowList.js');
-const { decodeRatingCursor, decodeReleaseYearCursor } = await import('../../src/pagination.js');
+const { decodeNameCursor, decodeRatingCursor, decodeReleaseYearCursor } =
+  await import('../../src/pagination.js');
 
 const OID = 'http://schemas.microsoft.com/identity/claims/objectidentifier';
 const SUBJECT = 'oid-owner-titles-sort';
@@ -230,16 +231,37 @@ describe('T-API-026 · an unrecognised sort is a 400, never a silent default', (
     expect(((await res.json()) as ErrorBody).error.code).toBe('VALIDATION_FAILED');
     expect(listTitlePage).not.toHaveBeenCalled();
   });
+});
 
-  it('T-API-026b · `sort=name` is rejected too, and that is deliberate', async () => {
-    // ⚠ DEFERRED TO TASK-219, NOT FORGOTTEN. Under `Latin1_General_100_BIN2`
+describe('T-API-029 · `sort=name` reaches the store and pages on the stored key', () => {
+  it('T-API-029x · `sort=name` reaches the store as itself', async () => {
+    // ⚠ THIS REPLACES A DEFERRAL ASSERTION AND KEEPS ITS POINT. The old test
+    // asserted `sort=name` was a 400 because, under `Latin1_General_100_BIN2`,
     // an unqualified `ORDER BY tmdb_name` is BINARY order — `apple` after
-    // `Zebra` — and on a title-cased fixture it still looks alphabetical. A
-    // `name` key that silently fell back to `dateAdded` would be worse again:
-    // a sort that appears to work and does nothing.
-    const res = await get('?sort=name');
-    expect(res.status).toBe(400);
-    expect(listTitlePage).not.toHaveBeenCalled();
+    // `Zebra` — and on a title-cased fixture it still LOOKS alphabetical.
+    // TASK-219 removed that hazard by storing a `sort_name` column with an
+    // explicit `Latin1_General_100_CI_AI` override, so the key is now real.
+    // What must never change is the other half: `name` must arrive at the
+    // repository AS `name`. A silent fall back to `dateAdded` would be a sort
+    // that appears to work and does nothing.
+    await get('?sort=name&dir=asc');
+    expect(listTitlePage.mock.calls[0]?.[1]).toMatchObject({ sort: 'name', dir: 'asc' });
+    await get('?sort=name&dir=desc');
+    expect(listTitlePage.mock.calls[1]?.[1]).toMatchObject({ sort: 'name', dir: 'desc' });
+  });
+
+  it('T-API-029y · the name cursor carries the STORED key, not the displayed title', async () => {
+    // ⚠ THEY DIFFER WHENEVER AN ARTICLE WAS STRIPPED. `The Matrix` occupies
+    // the position `Matrix`; a cursor built from the display name would name a
+    // position further down the alphabet and skip every row between.
+    listTitlePage.mockResolvedValue({
+      rows: [row({ id: 't-9', tmdbName: 'The Matrix', sortName: 'Matrix' })],
+      hasMore: true,
+    });
+    const res = await get('?sort=name&dir=asc&limit=1');
+    const { nextCursor } = (await res.json()) as ListBody;
+    expect(nextCursor).not.toBeNull();
+    expect(decodeNameCursor(nextCursor ?? '')).toEqual({ sortName: 'Matrix', id: 't-9' });
   });
 });
 

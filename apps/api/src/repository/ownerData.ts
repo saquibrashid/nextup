@@ -46,7 +46,12 @@
  */
 
 import { Prisma, type PrismaClient } from '@prisma/client';
-import { RUNTIME_BUCKET_BOUNDS, TERMINAL_BATCH_STATUSES, type RuntimeBucket } from '@nextup/domain';
+import {
+  RUNTIME_BUCKET_BOUNDS,
+  TERMINAL_BATCH_STATUSES,
+  deriveSortName,
+  type RuntimeBucket,
+} from '@nextup/domain';
 
 import { getPrisma } from './client.js';
 
@@ -309,12 +314,58 @@ export async function recordExtractionOutcome(
  * title
  * ------------------------------------------------------------------ */
 
+/**
+ * Attach the derived `sortName` to a title write (TASK-219).
+ *
+ * ⚠ **THIS IS A CHOKE POINT, AND THAT IS THE WHOLE DESIGN.** Five call sites
+ * write a title's name — batch close (twice), fix-match, the manual add and
+ * the lazy TMDB refresh — and a derived column maintained at five call sites
+ * is five chances to forget one. The symptom of forgetting is not an error: it
+ * is one title with a `NULL` key, which sorts silently to the very end of an
+ * A–Z list and is invisible to anyone not looking for it.
+ *
+ * ⚠ **IT IS CORRECT TO DERIVE FROM THE PATCH ALONE, AND ONLY BECAUSE THE
+ * DATABASE GUARANTEES IT.** The `title_match_coherent` CHECK
+ * (`specs/data-model.md` §16.3) makes `matched ⇒ raw_extracted_text IS NULL`
+ * and `unmatched ⇒ tmdb_name IS NULL`, so exactly one of the two is ever
+ * populated. A patch that sets either therefore carries the live value, and
+ * the unset one is `NULL` in the row as well. If that CHECK is ever relaxed
+ * this reasoning fails and the helper must read the row first.
+ */
+export function withSortName<T extends { tmdbName?: unknown; rawExtractedText?: unknown }>(
+  data: T,
+): T {
+  if (!('tmdbName' in data) && !('rawExtractedText' in data)) return data;
+
+  return {
+    ...data,
+    sortName: deriveSortName({
+      tmdbName: plainNameField(data.tmdbName, 'tmdbName'),
+      rawExtractedText: plainNameField(data.rawExtractedText, 'rawExtractedText'),
+    }),
+  };
+}
+
+/**
+ * ⚠ Prisma permits `{ set: value }` wherever a scalar is accepted. Reading one
+ * of those as a name would derive the key from an object and produce the
+ * string `[object Object]` as a sort position — plausible-looking, and wrong
+ * for exactly one row. Refusing it is loud; guessing is not.
+ */
+function plainNameField(value: unknown, field: string): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'string') return value;
+  throw new Error(
+    `${field} must be a plain string or null for sortName to be derived (got ${typeof value})`,
+  );
+}
+
 export async function createTitle(
   ownerId: OwnerId,
   data: Omit<Prisma.TitleUncheckedCreateInput, 'ownerId'>,
   tx?: Db,
 ) {
-  return db(tx).title.create({ data: { ...data, ownerId } });
+  return db(tx).title.create({ data: { ...withSortName(data), ownerId } });
 }
 
 export async function findTitle(ownerId: OwnerId, id: string, tx?: Db) {
@@ -453,13 +504,14 @@ export interface TitlePageOptions {
     | { runtimeMinutes: number | null; id: string }
     | { releaseYear: number | null; id: string }
     | { ratingTenths: number | null; id: string }
+    | { sortName: string | null; id: string }
     | undefined;
   services?: readonly string[];
   mediaType?: string | undefined;
   genres?: readonly string[];
   /** REQ-035. `[]` means no runtime filter — NOT "every bucket". */
   runtimes?: readonly RuntimeBucket[];
-  sort?: 'dateAdded' | 'runtime' | 'releaseYear' | 'rating';
+  sort?: 'dateAdded' | 'runtime' | 'releaseYear' | 'rating' | 'name';
 }
 
 /**
@@ -513,20 +565,26 @@ function runtimeFilter(buckets: readonly RuntimeBucket[]): object {
  */
 const TITLE_ORDER_COLUMN: Record<
   NonNullable<TitlePageOptions['sort']>,
-  'sortDateAdded' | 'tmdbRuntimeMinutes' | 'tmdbReleaseYear' | 'imdbRatingTenths'
+  'sortDateAdded' | 'tmdbRuntimeMinutes' | 'tmdbReleaseYear' | 'imdbRatingTenths' | 'sortName'
 > = {
   dateAdded: 'sortDateAdded',
   runtime: 'tmdbRuntimeMinutes',
   releaseYear: 'tmdbReleaseYear',
   rating: 'imdbRatingTenths',
+  // ⚠ `sortName`, NEVER `tmdbName`. The stored column collates
+  // `Latin1_General_100_CI_AI` (migration `0010`) and SQL Server applies the
+  // COLUMN's collation to a bare `ORDER BY`; `tmdbName` sits in the BIN2
+  // database default, so ordering by it is binary — `apple` after `Zebra`, and
+  // still alphabetical-looking on a title-cased fixture. TASK-219.
+  name: 'sortName',
 };
 
 /**
- * The keyset predicate shared by every NULLABLE-INTEGER order — runtime
- * (REQ-037), release year and rating (both `A53`).
+ * The keyset predicate shared by every NULLABLE order — runtime (REQ-037),
+ * release year, rating (both `A53`) and name (TASK-219).
  *
  * ⚠ **THREE BRANCHES, NOT TWO, AND THE THIRD IS THE ONE THAT LOSES ROWS.**
- * All three keys sort `NULL`s LAST in both directions, so the order is
+ * All four keys sort `NULL`s LAST in both directions, so the order is
  * `[non-null rows in dir] … [null rows by id]`. From a non-null position the
  * remaining rows are therefore *"a further value in `dir`"*, OR *"the same
  * value and a larger id"*, OR **"any row with no value at all"** — and
@@ -542,15 +600,23 @@ const TITLE_ORDER_COLUMN: Record<
  * tie-break — the same asymmetry, and the same reason, as the date keyset
  * above.
  *
- * ⚠ **IT IS ONE FUNCTION BECAUSE IT WAS NEARLY THREE.** Release year and
- * rating were added with the same nullable semantics; copying this predicate
- * per sort is three independent chances to drop the third branch, and the
- * resulting truncation is invisible until a real list has an unrated title
- * near the top.
+ * ⚠ **IT IS ONE FUNCTION BECAUSE IT WAS NEARLY FOUR.** Release year, rating
+ * and name were each added with the same nullable semantics; copying this
+ * predicate per sort is four independent chances to drop the third branch, and
+ * the resulting truncation is invisible until a real list has an unrated or
+ * unreadable title near the top.
+ *
+ * ⚠ **`sortName` IS A STRING KEY AND ITS COMPARISONS ARE CASE-INSENSITIVE.**
+ * The column collates `Latin1_General_100_CI_AI`, and SQL Server resolves a
+ * column-versus-parameter comparison using the COLUMN's collation — so `gt`,
+ * `lt` and the equality branch all match the `ORDER BY`. That is required, not
+ * incidental: an equality branch that compared case-SENSITIVELY would fail to
+ * match its own boundary row, and the second page would start one row late,
+ * every time.
  */
-function nullableIntKeyset(
-  column: 'tmdbRuntimeMinutes' | 'tmdbReleaseYear' | 'imdbRatingTenths',
-  value: number | null,
+function nullableKeyset(
+  column: 'tmdbRuntimeMinutes' | 'tmdbReleaseYear' | 'imdbRatingTenths' | 'sortName',
+  value: number | string | null,
   id: string,
   dir: 'asc' | 'desc',
 ) {
@@ -839,22 +905,26 @@ export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions,
     cursor === undefined
       ? {}
       : 'runtimeMinutes' in cursor
-        ? nullableIntKeyset('tmdbRuntimeMinutes', cursor.runtimeMinutes, cursor.id, dir)
+        ? nullableKeyset('tmdbRuntimeMinutes', cursor.runtimeMinutes, cursor.id, dir)
         : 'releaseYear' in cursor
-          ? nullableIntKeyset('tmdbReleaseYear', cursor.releaseYear, cursor.id, dir)
+          ? nullableKeyset('tmdbReleaseYear', cursor.releaseYear, cursor.id, dir)
           : 'ratingTenths' in cursor
-            ? nullableIntKeyset('imdbRatingTenths', cursor.ratingTenths, cursor.id, dir)
-            : {
-                OR: [
-                  {
-                    sortDateAdded: { [before]: new Date(`${cursor.sortDateAdded}T00:00:00.000Z`) },
-                  },
-                  {
-                    sortDateAdded: new Date(`${cursor.sortDateAdded}T00:00:00.000Z`),
-                    id: { gt: cursor.id },
-                  },
-                ],
-              };
+            ? nullableKeyset('imdbRatingTenths', cursor.ratingTenths, cursor.id, dir)
+            : 'sortName' in cursor
+              ? nullableKeyset('sortName', cursor.sortName, cursor.id, dir)
+              : {
+                  OR: [
+                    {
+                      sortDateAdded: {
+                        [before]: new Date(`${cursor.sortDateAdded}T00:00:00.000Z`),
+                      },
+                    },
+                    {
+                      sortDateAdded: new Date(`${cursor.sortDateAdded}T00:00:00.000Z`),
+                      id: { gt: cursor.id },
+                    },
+                  ],
+                };
 
   const base = baseTitleListWhere(ownerId, {
     suppressedIdentities: suppressed.map((s) => s.workIdentity),
@@ -889,13 +959,18 @@ export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions,
     // ⚠ The runtime order follows the same three rules and for a sharper
     // reason (`compareTitlesByRuntime`): "Shortest first" opening with every
     // unknown runtime would present an absence of data as a claim that those
-    // titles are the shortest.
-    // ⚠ The runtime order follows the same three rules and for a sharper
-    // reason (`compareTitlesByRuntime`): "Shortest first" opening with every
-    // unknown runtime would present an absence of data as a claim that those
     // titles are the shortest. Release year and rating (`A53`) inherit the
     // identical treatment — an unrated title floated to the top of "highest
-    // rated" would be the same lie in a different column.
+    // rated" would be the same lie in a different column, and so does name
+    // (TASK-219), where "A–Z" would otherwise open with every title whose
+    // name could not be read from the screenshot.
+    //
+    // ⚠ THE NAME ORDER IS COLLATION-DEPENDENT AND THE COLUMN CARRIES IT.
+    // `sortName` is declared `COLLATE Latin1_General_100_CI_AI` (migration
+    // `0010`) while the database default is BIN2, and SQL Server applies the
+    // COLUMN's collation to this bare `ORDER BY`. Nothing in the query text
+    // says so — which is exactly why ordering by `tmdbName` instead would
+    // silently revert to binary order and still pass a title-cased fixture.
     orderBy: [{ [TITLE_ORDER_COLUMN[sort]]: { sort: dir, nulls: 'last' } }, { id: 'asc' }],
     take: limit + 1,
     include: {
@@ -953,7 +1028,10 @@ export async function updateTitle(
   data: Prisma.TitleUncheckedUpdateInput,
   tx?: Db,
 ) {
-  return db(tx).title.updateMany({ where: { ownerId, id }, data });
+  // ⚠ `withSortName` is a NO-OP unless the patch touches a name field, so a
+  // rating or state update does not rewrite the key — and, more importantly,
+  // does not null it out by deriving from a patch that never mentioned a name.
+  return db(tx).title.updateMany({ where: { ownerId, id }, data: withSortName(data) });
 }
 /**
  * Titles whose TMDB metadata is older than the lazy-refresh horizon.
@@ -1096,7 +1174,7 @@ export async function updateTitleMetadata(
 ) {
   return db(tx).title.updateMany({
     where: { ownerId, id },
-    data: {
+    data: withSortName({
       tmdbName: metadata.tmdbName,
       tmdbReleaseYear: metadata.tmdbReleaseYear,
       tmdbRuntimeMinutes: metadata.tmdbRuntimeMinutes,
@@ -1111,7 +1189,7 @@ export async function updateTitleMetadata(
       // losing one is not.
       ...(metadata.imdbId === null ? {} : { imdbId: metadata.imdbId }),
       tmdbFetchedAt: metadata.tmdbFetchedAt,
-    },
+    }),
   });
 }
 

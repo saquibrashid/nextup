@@ -29,6 +29,7 @@
  */
 
 import { AppError } from './errors/AppError.js';
+import { SORT_NAME_MAX_LENGTH } from '@nextup/domain';
 
 /** `specs/api.md` §3 — `limit` is 1..200, default 50. */
 export const DEFAULT_PAGE_LIMIT = 50;
@@ -102,6 +103,31 @@ export interface RatingListCursor {
 }
 
 /**
+ * A position in the NAME-ordered list (TASK-219, `T-API-029`).
+ *
+ * ⚠ **THE KEY IS THE STORED `sortName`, NEVER THE DISPLAYED TITLE.** The two
+ * differ whenever a leading article was stripped — the row displayed as
+ * *The Matrix* sits at position `Matrix` — so a cursor built from the visible
+ * name lands in the wrong place in the order, and the rows between the two
+ * positions are skipped. Silently, and only on page two.
+ *
+ * ⚠ **`sortName` IS NULLABLE and `null` is a REAL, ENCODABLE POSITION.** A
+ * title whose name could not be read from the screenshot has no key; those
+ * rows sort LAST in both directions and must be pageable like any other, or
+ * the list truncates at the first unreadable title.
+ *
+ * ⚠ **TIES ARE COMMON HERE, NOT A CORNER CASE.** The column collates
+ * `Latin1_General_100_CI_AI`, so `Amelie` and `Amélie` — and `THE FLY` and
+ * `The Fly` — compare EQUAL. The `id` tie-break is what keeps the keyset a
+ * total order; without it those rows are ambiguous at a page boundary and one
+ * of them can vanish.
+ */
+export interface NameListCursor {
+  sortName: string | null;
+  id: string;
+}
+
+/**
  * The cursor for whichever sort issued it.
  *
  * ⚠ **The shapes are DISCRIMINATED BY KEY SET, not by a `sort` field**, and
@@ -118,7 +144,7 @@ export interface RatingListCursor {
  * list at the wrong boundary.
  */
 export type AnyListCursor =
-  ListCursor | RuntimeListCursor | ReleaseYearListCursor | RatingListCursor;
+  ListCursor | RuntimeListCursor | ReleaseYearListCursor | RatingListCursor | NameListCursor;
 
 export function isRuntimeCursor(cursor: AnyListCursor): cursor is RuntimeListCursor {
   return 'runtimeMinutes' in cursor;
@@ -130,6 +156,10 @@ export function isReleaseYearCursor(cursor: AnyListCursor): cursor is ReleaseYea
 
 export function isRatingCursor(cursor: AnyListCursor): cursor is RatingListCursor {
   return 'ratingTenths' in cursor;
+}
+
+export function isNameCursor(cursor: AnyListCursor): cursor is NameListCursor {
+  return 'sortName' in cursor;
 }
 
 /** Guards against a hostile or corrupt id being echoed into a query. */
@@ -319,6 +349,52 @@ export function encodeRatingCursor(cursor: RatingListCursor): string {
 export function decodeRatingCursor(raw: string): RatingListCursor {
   const { value, id } = decodeNullableIntCursor(raw, 'ratingTenths', 'bad-rating');
   return { ratingTenths: value, id };
+}
+
+/**
+ * The name-ordered cursor (TASK-219).
+ *
+ * ⚠ **NOT `encodeNullableIntCursor` WITH A LOOSER CHECK.** That helper's
+ * `Number.isSafeInteger` guard is the thing that keeps a numeric keyset total;
+ * widening it to accept strings would silently let a numeric sort be paged
+ * with a string boundary. The shapes stay separate so neither can be fed the
+ * other's cursor — `decodeEnvelope`'s exact-key check then makes switching
+ * sort mid-page a loud `INVALID_CURSOR` instead of a page of wrong rows.
+ */
+export function encodeNameCursor(cursor: NameListCursor): string {
+  const json = JSON.stringify({ sortName: cursor.sortName, id: cursor.id });
+  return Buffer.from(json, 'utf8').toString('base64url');
+}
+
+export function decodeNameCursor(raw: string): NameListCursor {
+  const parsed = decodeEnvelope(raw);
+
+  const keys = Object.keys(parsed);
+  if (keys.length !== 2 || !keys.includes('sortName') || !keys.includes('id')) {
+    throw invalidCursor('unexpected-keys');
+  }
+
+  const { sortName, id } = parsed as { sortName: unknown; id: unknown };
+
+  // ⚠ Bounded by the COLUMN width, not by the envelope limit. A longer value
+  // cannot name a position in a `NVARCHAR(400)` column, so accepting it would
+  // build a keyset boundary that matches no row and returns an empty page —
+  // which reads as "the rest of my list is gone".
+  if (
+    sortName !== null &&
+    (typeof sortName !== 'string' ||
+      sortName.length === 0 ||
+      sortName.length > SORT_NAME_MAX_LENGTH)
+  ) {
+    throw invalidCursor('bad-sort-name');
+  }
+  requireCursorId(id);
+
+  const cursor: NameListCursor = { sortName: sortName as string | null, id: id as string };
+  if (encodeNameCursor(cursor) !== raw) {
+    throw invalidCursor('not-canonical');
+  }
+  return cursor;
 }
 
 function requireCursorId(id: unknown): void {

@@ -140,3 +140,60 @@ export function compareTitlesByNullableKey(
 
   return compareIdAscending(a, b);
 }
+
+/** The minimum a row must expose to be ordered by name (TASK-219). */
+export interface NameOrderableTitle {
+  /** The stored `sortName` — see `deriveSortName`. `null` sorts last. */
+  readonly sortName: string | null;
+  readonly id: string;
+}
+
+/**
+ * Case- and accent-insensitive comparison, mirroring the `sort_name` column's
+ * `Latin1_General_100_CI_AI` collation.
+ *
+ * ⚠ **`sensitivity: 'base'` IS THE POINT, NOT A DETAIL.** It makes `amelie`,
+ * `Amelie` and `Amélie` compare EQUAL, which is what CI_AI does — the second
+ * `I` is accent-INsensitive, and it is easy to read the name as case-only.
+ * A comparator that distinguished accents would disagree with the database on
+ * exactly the rows this feature exists to order correctly, and the integration
+ * suite would then be asserting the wrong sequence with total confidence.
+ *
+ * ⚠ It follows that equal keys are COMMON here, not a corner case, and the
+ * `id` tie-break is what keeps the order total. Without it the keyset boundary
+ * between `Amelie` and `Amélie` is ambiguous and one of them can vanish
+ * between pages.
+ */
+const NAME_COLLATOR = new Intl.Collator('en', { sensitivity: 'base', numeric: false });
+
+/**
+ * Total order by name: `sortName` in `dir`, **`NULL`s last in BOTH
+ * directions**, ties broken by `id` ascending in both directions.
+ *
+ * ⚠ **THIS DOES NOT ORDER THE LIST; SQL DOES** (`ORDER BY [sort_name]`, which
+ * picks up the column's CI_AI collation). It exists so the integration suite
+ * has something to check the query against rather than a hand-written expected
+ * sequence, which would only ever agree with whatever its author believed —
+ * and for a collation-dependent order that is a very easy thing to get wrong.
+ *
+ * ⚠ **NULLS-LAST IS DECIDED BEFORE DIRECTION**, the same rule as every other
+ * key here. SQL Server sorts `NULL` FIRST on `ASC`, so "A–Z" would otherwise
+ * open with every title whose name could not be read from the screenshot.
+ */
+export function compareTitlesByName(
+  a: NameOrderableTitle,
+  b: NameOrderableTitle,
+  dir: SortDirection,
+): number {
+  if (a.sortName === null || b.sortName === null) {
+    if (a.sortName === null && b.sortName === null) return compareIdAscending(a, b);
+    return a.sortName === null ? 1 : -1;
+  }
+
+  const ascending = NAME_COLLATOR.compare(a.sortName, b.sortName);
+  if (ascending !== 0) {
+    return dir === 'asc' ? ascending : -ascending;
+  }
+
+  return compareIdAscending(a, b);
+}

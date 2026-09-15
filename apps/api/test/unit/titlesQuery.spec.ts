@@ -16,15 +16,17 @@
 import { describe, expect, it } from 'vitest';
 
 import { AppError } from '../../src/errors/AppError.js';
-import { RUNTIME_BUCKETS } from '@nextup/domain';
+import { RUNTIME_BUCKETS, SORT_NAME_MAX_LENGTH } from '@nextup/domain';
 import {
   DEFAULT_PAGE_LIMIT,
   MAX_PAGE_LIMIT,
   decodeCursor,
+  decodeNameCursor,
   decodeRatingCursor,
   decodeReleaseYearCursor,
   decodeRuntimeCursor,
   encodeCursor,
+  encodeNameCursor,
   encodeRatingCursor,
   encodeReleaseYearCursor,
   encodeRuntimeCursor,
@@ -33,6 +35,7 @@ import {
 import {
   DEFAULT_SORT_DIRECTION,
   TITLE_SORTS,
+  defaultDirectionFor,
   parseTitleListQuery,
 } from '../../src/routes/titlesQuery.js';
 
@@ -180,7 +183,7 @@ describe('T-LIST-029 the list query contract', () => {
   });
 
   it('T-LIST-029c: an unknown sort or dir is a 400', () => {
-    expect(thrown(() => parseTitleListQuery({ sort: 'name' })).details['field']).toBe('sort');
+    expect(thrown(() => parseTitleListQuery({ sort: 'title' })).details['field']).toBe('sort');
     expect(thrown(() => parseTitleListQuery({ dir: 'sideways' })).details['field']).toBe('dir');
   });
 
@@ -282,7 +285,10 @@ describe('REQ-035 / REQ-037 - the runtime filter and sort query (`specs/ui-refre
     // ⚠ INCLUDING `imdbRating` - REQ-095 / `A51`. The rating is display-only;
     // a sort key for it must not exist on either side.
     expect(thrown(() => parseTitleListQuery({ sort: 'imdbRating' })).httpStatus).toBe(400);
-    expect(thrown(() => parseTitleListQuery({ sort: 'name' })).httpStatus).toBe(400);
+    // ⚠ `name` USED TO BE THE SECOND EXAMPLE HERE and is now a real key
+    // (TASK-219). `title` replaces it as the plausible-but-absent one — the
+    // assertion is about unrecognised keys, not about `name` specifically.
+    expect(thrown(() => parseTitleListQuery({ sort: 'title' })).httpStatus).toBe(400);
   });
 
   it('T-API-021f: the sort key defaults to dateAdded when absent', () => {
@@ -400,12 +406,92 @@ describe('the two NEW sort cursors are distinct shapes, not one nullable-int sha
     ).toBe('INVALID_CURSOR');
   });
 
-  it('T-API-026c: `sort=name` is not a supported key, and the rejection names the ones that are', () => {
-    // ⚠ Deferred to TASK-219 by the BIN2 collation, not forgotten. A silent
-    // fall back to `dateAdded` would be a sort that appears to work and does
-    // nothing.
-    const error = thrown(() => parseTitleListQuery({ sort: 'name' }));
-    expect(error.httpStatus).toBe(400);
-    expect(TITLE_SORTS as readonly string[]).not.toContain('name');
+  it('T-API-029ad: `sort=name` is a supported key and routes to the NAME decoder', () => {
+    // ⚠ THIS TEST REPLACES A DEFERRAL ASSERTION, AND ITS ORIGINAL INTENT
+    // SURVIVES INTACT: a `name` key that silently fell back to `dateAdded`
+    // would be a sort that appears to work and does nothing. What changed at
+    // TASK-219 is that `name` is now REAL — backed by a stored `sort_name`
+    // column with an explicit `Latin1_General_100_CI_AI` override — so the
+    // assertion is now that it is accepted AND decoded as itself.
+    expect(TITLE_SORTS as readonly string[]).toContain('name');
+
+    const cursor = { sortName: 'matrix', id: 't-1' };
+    expect(parseTitleListQuery({ sort: 'name', cursor: encodeNameCursor(cursor) }).cursor).toEqual(
+      cursor,
+    );
+
+    // A cursor from another sort must not be quietly reinterpreted.
+    expect(
+      thrown(() => parseTitleListQuery({ sort: 'name', cursor: encodeReleaseYearCursor(YEAR) }))
+        .code,
+    ).toBe('INVALID_CURSOR');
+    expect(
+      thrown(() => parseTitleListQuery({ sort: 'rating', cursor: encodeNameCursor(cursor) })).code,
+    ).toBe('INVALID_CURSOR');
+  });
+
+  it('T-API-029f: a bare `?sort=name` opens at A, not at Z', () => {
+    // ⚠ INVISIBLE TO EVERY UI TEST. The client always sends an explicit `dir`,
+    // so only a bookmark or a hand-typed URL reaches this path — and the
+    // global default is `desc`, which is right for "newest first" and exactly
+    // backwards for an alphabetical list.
+    expect(parseTitleListQuery({ sort: 'name' }).dir).toBe('asc');
+    expect(defaultDirectionFor('name')).toBe('asc');
+    expect(defaultDirectionFor('dateAdded')).toBe(DEFAULT_SORT_DIRECTION);
+    expect(parseTitleListQuery({ sort: 'name', dir: 'desc' }).dir).toBe('desc');
+  });
+
+  it('T-API-029ae: the name cursor round-trips, including the nameless position', () => {
+    for (const cursor of [
+      { sortName: 'matrix', id: 't-1' },
+      { sortName: null, id: 't-2' },
+      { sortName: 'misérables, les'.slice(0, 20), id: 't-3' },
+    ]) {
+      expect(decodeNameCursor(encodeNameCursor(cursor))).toEqual(cursor);
+    }
+  });
+
+  it('T-API-029af: a name cursor longer than the COLUMN is refused', () => {
+    // A value that cannot exist in `NVARCHAR(500)` names no row, so the keyset
+    // boundary would match nothing and the page would come back empty — which
+    // reads as "the rest of my list is gone" rather than as an error.
+    const over = Buffer.from(
+      JSON.stringify({ sortName: 'x'.repeat(SORT_NAME_MAX_LENGTH + 1), id: 't-1' }),
+      'utf8',
+    ).toString('base64url');
+    expect(thrown(() => decodeNameCursor(over)).code).toBe('INVALID_CURSOR');
+
+    const extra = Buffer.from(
+      JSON.stringify({ sortName: 'a', id: 't-1', dir: 'asc' }),
+      'utf8',
+    ).toString('base64url');
+    expect(thrown(() => decodeNameCursor(extra)).code).toBe('INVALID_CURSOR');
+  });
+
+  it('T-API-029ag: a hand-edited name cursor is refused rather than honoured', () => {
+    // ⚠ THE CANONICAL RE-ENCODE IS THE GUARD. Two different byte strings can
+    // decode to the same object — reordered keys, padded base64, whitespace in
+    // the JSON — and accepting them would make a cursor a mutable, forgeable
+    // handle on someone's page position rather than an opaque token.
+    const reordered = Buffer.from(JSON.stringify({ id: 't-1', sortName: 'a' }), 'utf8').toString(
+      'base64url',
+    );
+    expect(thrown(() => decodeNameCursor(reordered)).code).toBe('INVALID_CURSOR');
+
+    const padded = Buffer.from(
+      JSON.stringify({ sortName: 'a', id: 't-1' }, null, 1),
+      'utf8',
+    ).toString('base64url');
+    expect(thrown(() => decodeNameCursor(padded)).code).toBe('INVALID_CURSOR');
+  });
+
+  it('T-API-029ah: a name cursor with no usable id is refused', () => {
+    // The `id` is the tie-break, and ties are COMMON under CI_AI — `Amelie`
+    // and `Amélie` compare equal. Without a usable id the keyset is not total
+    // and a page boundary landing on a tie drops or repeats a row.
+    for (const id of [null, '', 42]) {
+      const bad = Buffer.from(JSON.stringify({ sortName: 'a', id }), 'utf8').toString('base64url');
+      expect(thrown(() => decodeNameCursor(bad)).code).toBe('INVALID_CURSOR');
+    }
   });
 });

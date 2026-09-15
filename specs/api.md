@@ -797,8 +797,16 @@ dropped**, which is what `T-ATTR-006a` asserts rather than byte equality.
 
 Query: `service` (`netflix|max`, repeatable), `type` (`movie|tv`),
 `genre` (string, repeatable), `runtime` (`under30|30-60|60-120|over120`,
-repeatable), `sort` (`dateAdded` default | `releaseYear` | `runtime` |
+repeatable), `sort` (`dateAdded` default | `name` | `releaseYear` | `runtime` |
 `rating`), `dir` (`desc` default | `asc`), `limit`, `cursor`.
+
+⚠ **`dir`'s default is PER SORT KEY, not global.** `name` defaults to **`asc`**;
+every other key defaults to `desc`. "Newest first" and "highest rated first" are
+right for their keys and exactly backwards for an alphabetical list, which would
+otherwise open at Z. See `defaultDirectionFor` in
+`apps/api/src/routes/titlesQuery.ts` and `T-API-029f`. ⚠ This is **invisible to
+UI tests** — the client always sends an explicit `dir`, so only a bookmark or a
+hand-typed URL reaches the default.
 
 ⚠ **`releaseYear` and `rating` were added at `A53` (2026-09-14, OQ-3 / OQ-3b).**
 `rating` is the one that carries conditions — read §6.2a and ADR-0011
@@ -808,20 +816,71 @@ that quietly returns the default ordering looks like a working sort that does
 nothing. ~~"400 `INVALID_QUERY`"~~ — corrected in place: `INVALID_QUERY` is not
 a member of the closed enum in `packages/domain/src/errorCodes.ts`.
 
-⚠ **`name` IS NOT IN THAT LIST, AND ITS ABSENCE IS DELIBERATE — see TASK-219 /
-`T-API-029`.** `A53` accepted it, but the database default collation is
-`Latin1_General_100_BIN2`, which is **binary**: an unqualified
-`ORDER BY tmdb_name` sorts `apple` after `Zebra`, and on a title-cased fixture
-that still looks alphabetical, so the obvious test passes while the feature is
-wrong for the owner. Prisma can express neither `COLLATE` nor `LOWER()` in
-`orderBy`, and rewriting the list query as raw SQL takes it outside
-`T-SEC-021`'s textual `ownerId` check — trading a display defect for a
-**tenancy** one. It needs a derived-and-stored case-folded column plus a
-migration and a backfill. Until then `sort=name` is one of the 400s above,
-which is the honest state; a silent fall back would be a sort that appears to
-work and does nothing.
-~~Superseded: "`sort` (`dateAdded` default | `name` | `releaseYear` | `runtime`
-| `rating`) … `name`, `releaseYear` and `rating` were added at `A53`."~~
+#### 6.2b `sort=name` orders on a STORED, COLLATED column (TASK-219, `T-API-029`)
+
+⚠ **`name` does NOT order on `tmdb_name`, and the difference is the whole
+feature.** The database default collation is `Latin1_General_100_BIN2`, which is
+**binary**: an unqualified `ORDER BY tmdb_name` sorts `apple` after `Zebra` and
+`Amélie` after `Zodiac` — and on a title-cased fixture that still looks
+alphabetical, so an obvious test passes while the list is wrong for the owner.
+The default collation **cannot be relaxed** (ADR-0005, `specs/data-model.md`
+§16.2.1: Prisma's `create()` joins a `DECLARE @generated_keys` table variable,
+which takes the database default, back to the real row — any other default is a
+`Msg 468` collation conflict on **every insert**).
+
+The ordering key is therefore `title.sort_name`, a stored `NVARCHAR(400)`
+declared **`COLLATE Latin1_General_100_CI_AI`** in migration
+`0010_title_sort_name`. SQL Server applies the **column's** collation to a bare
+`ORDER BY`, so Prisma's ordinary `orderBy: { sortName: dir }` is correct with no
+raw SQL — the list query stays inside `T-SEC-021`'s `ownerId` gate. ⚠ **Prisma
+cannot express a collation**, so the clause exists only in the raw migration
+SQL; re-introspecting the schema would drop it silently and revert the feature
+to binary order.
+
+The value is derived by **`deriveSortName` in `packages/domain/src/sortName.ts`
+— the single implementation** (§16 I-4). It is:
+
+1. the **displayed** name, `tmdbName ?? rawExtractedText` (owner decision,
+   2026-09-15) — `tmdbName` is null for unmatched titles, so ordering on it
+   alone would strand every unmatched row;
+2. with whitespace normalised;
+3. with a leading **English** article — `a`, `an`, `the` — removed, so
+   *The Matrix* files under **M**;
+4. truncated to 400 characters (the limit is the **index key**, not the title —
+   see `SORT_NAME_MAX_LENGTH`).
+
+⚠ **Foreign articles are NOT stripped, deliberately.** *Les Misérables* files
+under **L**, *El Camino* under **E**, *Das Boot* under **D** — in an
+English-market Netflix/Max list a foreign article reads as part of the title,
+and both services file them that way. This also dissolves the `Die Hard`
+collision (`die` is a German article and a common English verb, and there is no
+`original_language` column to disambiguate with). `T-API-029c`/`d`/`s` exist
+specifically so that "completing" the article list fails loudly.
+
+Nameless titles sort **last in both directions** — a matched row whose TMDB
+record carries no name is a real state, and SQL Server would otherwise open an
+A–Z list with every title whose name could not be read. The keyset cursor
+carries the **stored** `sortName`, never the displayed title; they differ
+whenever an article was stripped. Ties are common under CI_AI (`Amelie` and
+`Amélie` compare **equal**), and the `id` tie-break is what keeps paging total.
+
+Migration `0010` is additive and does **not** backfill — a T-SQL reimplementation
+of the rule would be a second, untestable implementation of a derived value.
+Existing environments run `npm run backfill:sort-name` once
+(`docs/runbooks/backfill-sort-name.md`); `T-INV-025` fails loudly if that is
+forgotten, rather than serving a list quietly ordered by nothing.
+
+~~Superseded: "`name` IS NOT IN THAT LIST, AND ITS ABSENCE IS DELIBERATE — see
+TASK-219 / `T-API-029`. `A53` accepted it, but the database default collation is
+`Latin1_General_100_BIN2` … It needs a derived-and-stored case-folded column plus
+a migration and a backfill. Until then `sort=name` is one of the 400s above."~~
+⚠ That text also claimed raw SQL "takes the list query outside `T-SEC-021`'s
+textual `ownerId` check". `T-SEC-021` is an **AST gate over Prisma method calls**
+in `apps/api/src/repository/**` (`tools/check-owner-scope.mjs`); it does not model
+`$queryRaw` at all. The conclusion — avoid raw SQL here — stands on its own
+merits; the stated reason was wrong.
+~~Superseded: "`sort` (`dateAdded` default | `releaseYear` | `runtime` |
+`rating`)."~~
 
 #### 6.2a ⚠ `sort=rating` is not an ordinary sort key (`A53`, ADR-0011 Rev 1)
 
