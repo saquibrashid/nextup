@@ -1047,6 +1047,64 @@ button {
 }
 
 /*
+ * REQ-112 (`ui-refresh.md` §4.3) — THE COMPACT GENRE PRESENTATION.
+ *
+ * ⚠ "COMPACT" IS A PRESENTATION CHANGE, NOT A CONTENT CHANGE. Every genre is
+ * still present and still readable; what changes is the room they take. The
+ * owner rejected trimming them — they are one of the three filter dimensions,
+ * so the row's genres are the only on-screen explanation of why a genre filter
+ * returned what it returned.
+ *
+ * ⚠ `display: inline-flex`, NOT `flex`. This renders inside `.title-row__meta`,
+ * which is a `<p>` laid out as a flex row of facts; a block-level child would
+ * take a line of its own and put the genres on a row by themselves, which is
+ * the opposite of compact. The chips are phrasing content for the same reason
+ * (a `<ul>` inside a `<p>` is invalid and browsers silently close the
+ * paragraph around it — a break jsdom never reproduces).
+ *
+ * ⚠ `flex-wrap: nowrap` IS THE "AT MOST ONE LINE" HALF. The `+n` overflow in
+ * `GenreChips.tsx` limits the COUNT; this stops the survivors wrapping anyway
+ * at 320 px. Both are needed: the count alone leaves a long trio of genres
+ * spilling onto a second line, and `nowrap` alone would overflow the row.
+ */
+.genre-chips {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/*
+ * Visually quieter than `.title-row__chip`: a genre is a fact about the work,
+ * not a state of the row, and three of them at badge weight would compete with
+ * the service badges that carry the product's whole point.
+ *
+ * `text-overflow: ellipsis` with `min-width: 0` above so a long genre name
+ * truncates rather than forcing the 320 px row sideways.
+ */
+.genre-chips__chip {
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  overflow: hidden;
+  padding: 0 var(--space-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * The `+n` control. `flex: 0 0 auto` so it is the one thing that never
+ * truncates: it is the only route to the hidden genres, and an ellipsised
+ * `+…` says nothing about how many.
+ */
+.genre-chips .btn {
+  flex: 0 0 auto;
+  font-size: var(--text-sm);
+  min-height: 0;
+  padding: 0 var(--space-1);
+}
+
+/*
  * One badge per service on one row (REQ-013) — the deduplication the whole
  * product exists for is visible here or nowhere.
  */

@@ -20,6 +20,10 @@ export * from './errorCodes.js';
 // without another edit here.
 export * from './extraction/index.js';
 export * from './freshness.js';
+// TASK-213 — the genre vocabulary collision (REQ-120, `specs/ui-refresh.md`
+// §4.4). One closed map, used by the API's filter and the web row's chips, so
+// the two halves of a normalise-on-read cannot drift apart.
+export * from './genres.js';
 export * from './identity.js';
 export * from './ids.js';
 export * from './logEvents.js';

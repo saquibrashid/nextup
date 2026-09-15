@@ -1250,7 +1250,7 @@ there **with** their `specs/testing.md` §9 rows and their tests, in one change.
 | **US-053** | *As the owner, I can find and order titles without guessing what a control does.* → REQ-113, REQ-114, REQ-115 |
 | **US-054** | *As the owner, I can tell where I am and reach where I'm going.* → REQ-116, REQ-117 |
 | **US-055** *(new, `A48`)* | *As the owner, I can see how long a title is, and narrow my list to what fits the time I have.* → REQ-119, and the promoted **REQ-035** / **REQ-037** |
-| **US-056** *(new, 2026-09-14)* | *As the owner, I can filter by a genre and trust that I got every title in it.* → REQ-120 |
+| **US-056** *(promoted by TASK-213)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-120, REQ-112. |
 | **US-057** *(new, 2026-09-14)* | *As the owner, I can order my list by any fact it shows me.* → REQ-121, and the reversal in §7a |
 | **US-058** *(new, 2026-09-14)* | *As the owner, I can tell an addition from a removal without scrolling back to a heading.* → REQ-122 |
 | **US-059** *(promoted by TASK-210)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-123, REQ-124, REQ-125. |

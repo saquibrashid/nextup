@@ -50,6 +50,7 @@ import {
   RUNTIME_BUCKET_BOUNDS,
   TERMINAL_BATCH_STATUSES,
   deriveSortName,
+  storedGenreVariants,
   type RuntimeBucket,
 } from '@nextup/domain';
 
@@ -723,9 +724,27 @@ function baseTitleListWhere(
     // `OR`-shaped, and two `OR` keys in one object literal means the second
     // silently replaces the first. The caller appends the runtime filter and
     // the keyset to this same array for exactly that reason.
+    // ⚠ REQ-120 — EACH REQUESTED GENRE EXPANDS TO EVERY STORED NAME THAT
+    // MEANS IT (`specs/ui-refresh.md` §4.4). TMDB runs two vocabularies and
+    // this filter dimension holds both, so a TV title tagged
+    // `Action & Adventure` shares NO token with `"Action"` — before this
+    // expansion `?genre=Action` silently returned films only, and nothing on
+    // screen said so. `storedGenreVariants` derives the alternatives from the
+    // same closed map the row's chips are normalised with, so the display half
+    // and the filter half cannot drift: §4.4's "both, or neither" in code.
+    //
+    // ⚠ THE EXPANSION IS FLAT-MAPPED INTO THE SAME `OR`, not nested. The
+    // dimension is already `OR`-within / `AND`-across, and a title matching
+    // either the canonical name or a combined one matches the dimension once.
+    // `T-API-028` is the guard; a display-only fix makes the owner's reported
+    // symptom disappear while it still fails.
     AND: [
       genres.length > 0
-        ? { OR: genres.map((genre) => ({ tmdbGenres: { contains: `"${genre}"` } })) }
+        ? {
+            OR: genres
+              .flatMap((genre) => storedGenreVariants(genre))
+              .map((name) => ({ tmdbGenres: { contains: `"${name}"` } })),
+          }
         : {},
     ] as object[],
   };

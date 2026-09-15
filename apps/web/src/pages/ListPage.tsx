@@ -402,6 +402,7 @@ export function ListPage({
           <TitleList
             items={visible}
             pendingTitleIds={pendingTitleIds}
+            activeGenres={filters.genres}
             {...(rowActionsWired
               ? {
                   onOpenMenu: (item: TitleListItem) => {

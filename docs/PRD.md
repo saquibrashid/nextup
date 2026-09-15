@@ -212,7 +212,7 @@ A title was removed months ago. It shows up again in a new capture. nextup creat
 | K | Platform guarantees | The invariants that make the rest safe. | US-036, US-037, US-038, US-039 |
 | **L** *(v1.1 — specified, not scheduled)* | **Waiting to stream** | Record what I noticed on a rental storefront, and tell me when it reaches a service I have. | US-040, US-041, US-042, US-043 |
 | **M** *(v1.1 — specified, not scheduled)* | **IMDb ratings** | Show me the IMDb rating on my list, and let me look up a rating for anything I haven't saved. | US-044, US-045, US-046 |
-| **P** | **Visual language** | Shared typography, icons and controls; remaining visual-refresh stories are promoted with their owning tasks. | US-059 |
+| **P** | **Visual language** | Shared typography, icons and controls; remaining visual-refresh stories are promoted with their owning tasks. | US-056, US-059 |
 
 Story order within an epic is dependency order. Epic order A → K is a viable build order; see §12.1. **Epic L is v1.1 and follows the whole of A–K** — it depends on Epics C, D and I being complete. See ADR-0010 and `roadmap.md` §5. **Epic M is v1.1 and depends on Epic F** (the combined list) and on TMDB matching being in place, because a rating is keyed on the `imdb_id` that matching produces. See ADR-0011.
 
@@ -1423,6 +1423,38 @@ ADR-0011 followed it.
 ---
 
 ### Epic P — Visual language
+
+#### US-056 — Filter by a genre and get every title in it
+
+**As the owner**, I want to filter by a genre and trust that I got every title
+in it, so that a film-and-television list behaves like one list.
+
+**Requirements:** REQ-120, REQ-112 (`specs/ui-refresh.md` §4.3, §4.4).
+
+⚠ **This is a correctness defect, not a cosmetic one.** TMDB runs **two genre
+vocabularies**: film has `Action` (28) and `Adventure` (12), television has the
+single combined `Action & Adventure` (10759). Both are stored verbatim and
+share one filter dimension, so `?genre=Action` silently returns films only —
+and nothing on screen says so. The same collision holds for `Sci-Fi & Fantasy`
+(10765) against `Science Fiction` (878) + `Fantasy` (14), and `War & Politics`
+(10768) against `War` (10752).
+
+⚠ **A display-only fix removes every visible symptom and leaves the bug.** The
+owner's report was redundant chips — `Action`, `Adventure` and
+`Action & Adventure` all offered at once. Normalising the chips answers all
+three complaints, and the filter still misses every television title. AC-3 is
+the criterion a half-fix fails.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | A television title whose stored genres contain a combined name renders its constituent genres as separate chips, and never renders the combined name. |
+| AC-2 | The genre filter offers no combined name as an option. |
+| AC-3 | Filtering by either constituent genre returns **both** the films tagged with it **and** the television titles tagged with the combined name, and filtering by an unrelated genre is not widened. |
+| AC-4 | Normalisation happens on read. No stored genre value is rewritten and no migration is required. |
+| AC-5 | A row shows at most a single line of genre chips, with a `+n` control for the remainder; a genre in the active filter is always visible rather than hidden behind `+n`. |
+| AC-6 | A title with no genres renders no genre chips and no placeholder, and is excluded whenever a genre filter is active. |
+
+---
 
 #### US-059 — The app looks like it was designed
 
