@@ -431,3 +431,170 @@ describe('T-UX-133 · ui-refresh.md §6 · a route behind More keeps its URL and
     ]);
   });
 });
+
+/* ------------------------------------------------------------------------ */
+/* T-UX-137 - REQ-117: the phone bar is fixed to the BOTTOM of the viewport. */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * WHY EVERY CASE HERE READS A FILE RATHER THAN THE DOM
+ * ---------------------------------------------------
+ * jsdom performs no layout and applies no stylesheet. `getComputedStyle` on a
+ * rendered `<nav>` returns the initial value for every property in this
+ * block - `position: static`, `bottom: auto` - whatever `index.css` actually
+ * says. A rendered assertion would therefore pass against the header-mounted
+ * bar this requirement exists to replace, and would go on passing if the rules
+ * were deleted outright. The same reasoning is already recorded for
+ * `T-UX-101`, `T-UX-110` and `T-UX-117`.
+ *
+ * ⚠ THE RESET HALF IS NOT OPTIONAL COVERAGE. The base rules are mobile-first,
+ * so they apply at EVERY width until the `min-width` block overrides them. A
+ * bottom bar that is never undone is a bordered strip welded across the bottom
+ * of every desktop page, and `T-UX-132e` - which only counts links - passes
+ * happily while it happens.
+ */
+
+/**
+ * Declarations only — comments removed.
+ *
+ * ⚠ A RULE BODY INCLUDES ITS COMMENTS, AND THAT MAKES NEGATIVE ASSERTIONS
+ * LIE. `T-UX-137d` asserts the panel does NOT carry `top: 100%`, and the
+ * comment above the rule explains the desktop behaviour by naming
+ * `top: 100%` — so the case failed against correct CSS. Left unstripped, the
+ * alternative is a rule nobody may explain in prose.
+ */
+function declarations(body: string): string {
+  return body.replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
+/**
+ * The existing `ruleBody` returns `string | undefined`; every case below needs
+ * a definite string, and an `undefined` flowing into `toMatch` reports a type
+ * error rather than the missing rule that actually caused it.
+ */
+function baseRuleBody(selector: string): string {
+  const body = ruleBody(selector);
+  expect(body, `no top-level rule for ${selector}`).toBeDefined();
+  return declarations(body ?? '');
+}
+
+/** The body of `selector` as it appears INSIDE the `--bp-sm` media query. */
+function wideRuleBody(selector: string): string {
+  const query = CSS.indexOf(`@media (min-width: ${String(BP_SM)}px)`);
+  expect(query, 'no --bp-sm media query').toBeGreaterThan(-1);
+  const at = CSS.indexOf(`\n  ${selector} {`, query);
+  expect(at, `${selector} is not reset above --bp-sm`).toBeGreaterThan(-1);
+  const open = CSS.indexOf('{', at);
+  const close = CSS.indexOf('}', open);
+  return declarations(CSS.slice(open + 1, close));
+}
+
+describe('T-UX-137 - ui-refresh.md 6 - the phone bar sits on the bottom edge', () => {
+  it('T-UX-137a: the nav is fixed to the bottom of the viewport, above the content', () => {
+    const nav = baseRuleBody('.nav');
+
+    expect(nav).toMatch(/position:\s*fixed/);
+    expect(nav).toMatch(/bottom:\s*0/);
+    // Without a stacking context above the page the bar scrolls *under* long
+    // content instead of over it, which looks like it vanished.
+    expect(nav).toMatch(/z-index:\s*\d+/);
+  });
+
+  it('T-UX-137b: the shell reserves clearance expressed in the SAME token as the bar height', () => {
+    /*
+     * ⚠ THE TOKEN IS THE ASSERTION, NOT THE NUMBER. A fixed bar is out of
+     * flow and reserves nothing, so the shell must pad for it - and if that
+     * padding is a literal it drifts from the bar's own height the first time
+     * either is adjusted. The symptom is the bar covering the last row of a
+     * list, which is the row at the end of the scroll.
+     */
+    expect(CSS).toMatch(/--nav-bar-height:/);
+    expect(baseRuleBody('.nav')).toContain('var(--nav-bar-height)');
+
+    const shell = baseRuleBody('.app-shell');
+    expect(shell).toMatch(/padding-bottom:\s*calc\(/);
+    expect(shell).toContain('var(--nav-bar-height)');
+  });
+
+  it('T-UX-137c: the safe-area inset is honoured by BOTH the bar and the clearance', () => {
+    // On a notched iPhone the home indicator sits below the bar. Padding only
+    // the bar leaves the labels under the indicator; padding only the shell
+    // leaves a gap. Both terms are needed, and `env()` is 0 elsewhere.
+    expect(baseRuleBody('.nav')).toContain('env(safe-area-inset-bottom)');
+    expect(baseRuleBody('.app-shell')).toContain('env(safe-area-inset-bottom)');
+  });
+
+  it('T-UX-137d: the More panel opens UPWARD, not off the bottom of the screen', () => {
+    /*
+     * ⚠ THE DISCLOSURE WOULD STILL REPORT `aria-expanded="true"` - so
+     * `T-UX-132c` and `T-UX-133` keep passing against a panel rendered
+     * entirely below the fold. Nothing else in this file can see it.
+     */
+    const panel = baseRuleBody('.nav__panel');
+
+    expect(panel).toMatch(/bottom:\s*100%/);
+    expect(panel).not.toMatch(/\btop:\s*100%/);
+  });
+
+  it('T-UX-137e: viewport-fit=cover is in the viewport meta tag', () => {
+    /*
+     * ⚠ THIS IS THE HALF THAT CANNOT BE SEEN IN THE CSS. `env(safe-area-inset-*)`
+     * resolves to `0` on every device unless the document opts into the full
+     * viewport, so `T-UX-137c` passes in full while the bar renders underneath
+     * the home indicator on the one device this product is actually used on.
+     */
+    const html = readFileSync(join(WEB_ROOT, 'index.html'), 'utf8');
+    const viewport = /<meta\s+name="viewport"\s+content="([^"]+)"/.exec(html)?.[1];
+
+    expect(viewport).toBeDefined();
+    expect(viewport).toContain('viewport-fit=cover');
+    // The rest of the tag is load-bearing too; a replacement is not an upgrade.
+    expect(viewport).toContain('width=device-width');
+  });
+
+  it('T-UX-137f: above --bp-sm EVERY bar property is reset, not just the position', () => {
+    /*
+     * ⚠ A PARTIAL RESET IS THE UGLY FAILURE. `position: static` alone leaves
+     * the surface colour and the top border behind, producing a stray bordered
+     * strip across the desktop header that reads as a rendering bug rather
+     * than as a missing line of CSS.
+     */
+    const wide = wideRuleBody('.nav');
+
+    expect(wide).toMatch(/position:\s*static/);
+    expect(wide).toMatch(/border-top:\s*none/);
+    expect(wide).toMatch(/background:\s*none/);
+    expect(wide).toMatch(/min-height:\s*0/);
+    expect(wide).toMatch(/padding:\s*0/);
+
+    // And the panel goes back to hanging below its trigger.
+    const panel = wideRuleBody('.nav__panel');
+    expect(panel).toMatch(/top:\s*100%/);
+    expect(panel).toMatch(/bottom:\s*auto/);
+  });
+
+  it('T-UX-137g: the desktop shell padding is the SHORTHAND, which is what drops the clearance', () => {
+    /*
+     * ⚠ SUBTLE, AND EASY TO UNDO WHILE TIDYING. The base `padding-bottom`
+     * reserves a bar's worth of space; above `--bp-sm` there is no bar. The
+     * `padding` shorthand resets all four sides and is therefore the only
+     * thing removing that reservation - rewrite it as `padding-inline` plus
+     * `padding-top` and every desktop page grows dead space at the bottom that
+     * no rule appears to cause.
+     */
+    expect(wideRuleBody('.app-shell')).toMatch(/(^|\s)padding:\s*var\(--space-5\)/);
+  });
+
+  it('T-UX-137h: the bar still contains exactly the three slots it did before', () => {
+    // ⚠ A REGRESSION GUARD ON A MOVE. Repositioning is precisely the kind of
+    // change that quietly loses a child, and `T-UX-132a` would not run here.
+    const nav = atPhoneWidth('/');
+
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toStrictEqual([...BAR_LABELS]);
+    expect(within(nav).getByRole('button', { name: NAV_MORE_LABEL })).toBeTruthy();
+  });
+});

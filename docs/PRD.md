@@ -1566,6 +1566,15 @@ inside it.** With a plain closed default, a deep link renders a closed
 disclosure, the marked element does not exist, and the requirement is not
 merely unmet but unsatisfiable.
 
+⚠ **AC-6 was added 2026-09-15, after the owner saw the built bar.** REQ-117
+said what the bar **contains** and never said where it **is**, so it was first
+built inside the header, where it scrolled away. The bar is now fixed to the
+bottom edge — both real destinations in thumb reach, which matters because the
+owner's primary path is uploading screenshots from a phone. ⚠ **It is still
+exactly one `<nav>`**: a second phone-only `<nav>` is the idiomatic build and
+fails the exactly-once landmark rule on every route at once, so the existing
+one is repositioned rather than duplicated.
+
 | AC | Acceptance criterion |
 |---|---|
 | AC-1 | The active destination is marked programmatically and carries a cue that is not colour alone. |
@@ -1573,6 +1582,7 @@ merely unmet but unsatisfiable.
 | AC-3 | A route behind the overflow is still marked as current when open, and is still reachable by direct URL. |
 | AC-4 | Every destination is a real link, not a click handler that pushes history. |
 | AC-5 | Upload remains a first-class destination, and the per-service freshness strip still deep-links to it with that service pre-selected. |
+| AC-6 | On a phone the bar is fixed to the bottom of the screen and stays visible while the page scrolls, without covering the content beneath it or sitting under the device's home indicator; above the small breakpoint it returns to the header. |
 
 ---
 

@@ -37,6 +37,18 @@
    */
   --tap-target-min: 44px;
   /*
+   * REQ-117 — the height the bottom-fixed phone bar occupies, and therefore
+   * the clearance `.app-shell` must reserve beneath its content.
+   *
+   * ⚠ ONE DEFINITION, TWO CONSUMERS, AND THAT IS THE WHOLE POINT. The bar's
+   * own `min-height` and the shell's bottom padding are the same measurement
+   * stated twice; typed as two literals they drift, and the failure is a bar
+   * that covers the last row of a list — the rows at the end of the scroll,
+   * which is exactly where the eye stops. `T-UX-137b` asserts the padding is
+   * expressed in terms of this token rather than a number.
+   */
+  --nav-bar-height: 3.5rem;
+  /*
    * REQ-105 — the open row menu overlaps the row beneath it, so it needs a
    * shadow to read as a layer rather than as part of that row.
    *
@@ -502,6 +514,21 @@ button {
    * desktop-first makes the floor NFR-006 mandates the case reached by
    * subtraction — the one nobody looks at.
    */
+
+  /*
+   * REQ-117 — clearance for the bottom-fixed bar, which is OUT OF FLOW and
+   * therefore reserves no space of its own.
+   *
+   * ⚠ WITHOUT THIS THE BAR SITS ON TOP OF THE CONTENT, and it looks fine on
+   * every screen that does not scroll to its end. The rows it eats are the
+   * last ones in the list.
+   *
+   * ⚠ THE `env()` TERM IS NOT DECORATION: on a notched iPhone the home
+   * indicator occupies real estate below the bar, so the clearance is the bar
+   * plus that inset, not the bar alone. `env()` resolves to `0` where there is
+   * no inset, so this is correct on every other device too.
+   */
+  padding-bottom: calc(var(--space-4) + var(--nav-bar-height) + env(safe-area-inset-bottom));
 }
 
 .app-shell__logo {
@@ -551,12 +578,45 @@ button {
   margin-bottom: var(--space-4);
 }
 
+/*
+ * REQ-117 — below `--bp-sm` the nav IS the bottom bar.
+ *
+ * ⚠ MOBILE-FIRST, SO THIS IS THE BASE RULE AND THE DESKTOP IS THE OVERRIDE
+ * (§13.3). `T-CSS-001d` forbids `max-width` anywhere, so the phone case
+ * cannot be expressed as a query at all — it has to be the default, and the
+ * `min-width: 640px` block below is what puts the nav back in the header.
+ *
+ * ⚠ IT STAYS INSIDE THE `<header>` IN THE DOM. There is exactly one `<nav>`
+ * per page (`T-A11Y-004`, `T-UI-023c`); a second one rendered only on phones
+ * is the idiomatic build and fails those tests on every route at once. Fixed
+ * positioning takes it out of flow without moving it in the document, so the
+ * landmark count is untouched and the tab order still reaches navigation
+ * before content.
+ *
+ * ⚠ THE `padding-bottom` IS THE SAFE-AREA INSET, NOT A GAP. On a notched
+ * iPhone the home indicator sits below the bar; without it the labels are
+ * under the indicator and the taps land on the wrong thing.
+ */
 .nav {
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  bottom: 0;
   flex: 1 1 100%;
+  inset-inline: 0;
+  min-height: var(--nav-bar-height);
+  padding: var(--space-1) var(--space-3) calc(var(--space-1) + env(safe-area-inset-bottom));
+  position: fixed;
+  z-index: 30;
 }
 
 .nav__list {
   display: flex;
+  /*
+   * ⚠ REQ-117 — the three slots are spread across the bar's full width so each
+   * is its own thumb target. `flex-wrap` stays for the 320 px floor: a bar
+   * that clips its third slot is worse than one that grows a row.
+   */
+  justify-content: space-around;
   flex-wrap: wrap;
   gap: var(--space-1);
   list-style: none;
@@ -666,6 +726,14 @@ button {
 
 .nav__panel {
   background: var(--color-surface);
+  /*
+   * ⚠ REQ-117 — the panel opens UPWARD, because its trigger now sits on the
+   * bottom edge of the screen. Anchored below `More` (the desktop position,
+   * `top: 100%`) every row of it would be off-screen, and the disclosure would
+   * open onto nothing while reporting `aria-expanded="true"`. The
+   * `min-width: 640px` block restores `top: 100%` for the header nav.
+   */
+  bottom: 100%;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-menu);
@@ -673,11 +741,16 @@ button {
   flex-direction: column;
   inset-inline-end: 0;
   list-style: none;
+  /*
+   * ⚠ THE SHORTHAND MUST COME FIRST. Written after `margin-bottom` it resets
+   * it to `0` and the panel sits flush against the bar — silently, because
+   * both declarations are present and look intentional.
+   */
   margin: 0;
+  margin-bottom: var(--space-1);
   min-width: 12rem;
   padding: var(--space-2);
   position: absolute;
-  top: 100%;
   z-index: 20;
 }
 
@@ -1789,6 +1862,14 @@ button {
 /* ---------------------------------------------------------- wider views -- */
 
 @media (min-width: 640px) {
+  /*
+   * ⚠ REQ-117 — THE `padding` SHORTHAND IS ALSO THE CLEARANCE RESET. The base
+   * rule adds a `padding-bottom` reserving room for the bottom-fixed bar;
+   * above `--bp-sm` there is no such bar, and this shorthand is what removes
+   * that reservation. Rewriting it as four longhands, or as `padding-inline` /
+   * `padding-top`, silently leaves a bar's worth of dead space under every
+   * desktop page. `T-UX-137g` asserts the shorthand.
+   */
   .app-shell {
     padding: var(--space-5);
   }
@@ -1800,9 +1881,31 @@ button {
    * mobile-first `flex: 1 1 100%` — omitting it leaves a full-width nav
    * wrapping under the logo on a desktop, which looks like the media query
    * never applied at all.
+   *
+   * ⚠ REQ-117 — AND THIS IS WHERE THE BOTTOM BAR IS UNDONE. Every property
+   * the base rule sets to make the phone bar must be reset here, not merely
+   * the interesting one: a `position: static` that leaves the surface and the
+   * top border behind produces a stray bordered strip across the header that
+   * reads as a rendering bug. `T-UX-137f` asserts the reset names all of
+   * them.
    */
   .nav {
+    background: none;
+    border-top: none;
     flex: 0 1 auto;
+    min-height: 0;
+    padding: 0;
+    position: static;
+  }
+
+  /*
+   * The header nav is in flow with room beneath it, so the panel returns to
+   * hanging below its trigger.
+   */
+  .nav__panel {
+    bottom: auto;
+    margin-bottom: 0;
+    top: 100%;
   }
 
   .nav__list {

@@ -820,6 +820,32 @@ the same element; `T-UX-117d` asserts the `/` case directly.
 > persistent bar; the rest move behind a "More" destination.~~ *(The shape was
 > right; the owner has now named the contents.)*
 
+> ⚠ **THE BAR IS FIXED TO THE BOTTOM OF THE VIEWPORT** *(resolved in place
+> 2026-09-15, owner decision)*. Below `--bp-sm` the nav leaves the top of the
+> page and sits against the bottom edge, always visible, both real
+> destinations in thumb reach. It was first built inside the `<header>`, where
+> it scrolled away with the page — a reading this paragraph permitted, because
+> it said what the bar **contains** and never said where it **is**.
+>
+> ⚠ **THERE IS STILL EXACTLY ONE `<nav>`, AND THAT IS WHY THIS IS A CSS
+> CHANGE.** The idiomatic bottom bar is a second `<nav>` rendered only on
+> phones, and it fails `T-A11Y-004` / `T-UI-023c` — which require `<header>`,
+> `<nav>`, `<main>` and `<footer>` exactly once per page — on every route at
+> once. The single `<nav>` is **repositioned**, never duplicated.
+>
+> ⚠ **THE CONTENT CLEARANCE IS PART OF THE REQUIREMENT, NOT A POLISH STEP.** A
+> fixed bar is out of flow, so without matching bottom padding on the shell it
+> covers the last row of every list — and the rows it hides are the ones at
+> the end of the scroll, which is exactly where the owner stops looking. The
+> `More` panel opens **upward** for the same reason: anchored below its
+> trigger it would open off-screen.
+>
+> ⚠ **`env(safe-area-inset-bottom)` NEEDS `viewport-fit=cover` IN THE VIEWPORT
+> META TAG OR IT IS ALWAYS `0`.** Without it the inset resolves to zero on
+> every device including the ones that need it, so the bar renders *under* the
+> iPhone home indicator while the stylesheet looks entirely correct. This is
+> the half that cannot be seen in the CSS.
+
 Six wrapped links above every page is most of the phone's first screen, at the
 cost of the content.
 
@@ -847,6 +873,7 @@ introduce a second, differently-behaved route to upload.
 | `T-UX-118` | The freshness strip still deep-links to `/upload` with the service pre-selected. |
 | `T-UX-132` | Below `--bp-sm` the bar renders exactly `/`, `/upload` and `More`; **every other nav route** — `/batches`, `/removed`, `/not-interested`, `/waiting`, `/about`, `/rating` — is reachable only via `More`. ⚠ *Corrected in place at TASK-211; this row named only the first three, which were all that existed when it was written.* |
 | `T-UX-133` | A route behind `More` is still marked `aria-current="page"` when it is open, and is still reachable by direct URL. |
+| `T-UX-137` | Below `--bp-sm` the nav is fixed to the bottom of the viewport, the shell reserves matching bottom clearance, the `More` panel opens upward, the safe-area inset is honoured, and **all four are reset at or above `--bp-sm`** so the desktop nav returns to the header. ⚠ Asserted against `index.css` and `index.html` **as files** — jsdom performs no layout and applies no stylesheet, so every rendered assertion about position passes vacuously. |
 
 ---
 
@@ -1267,7 +1294,7 @@ The full reserved set is now:
 |---|---|---|
 | `REQ-` | **REQ-105 – REQ-125** | REQ-120 (§4.4), REQ-121 (§5b), REQ-122 (§6a.1), REQ-123 – REQ-125 (§7b – §7d) |
 | `US-` | **US-049 – US-059** | US-056 – US-059 above |
-| `T-UX-` | **`T-UX-100` – `T-UX-136`** | `T-UX-125` – `T-UX-136` |
+| `T-UX-` | **`T-UX-100` – `T-UX-137`** | `T-UX-125` – `T-UX-136`; **`T-UX-137`** (REQ-117's bottom-fixed placement, resolved 2026-09-15) |
 | `T-API-` | **`T-API-019` – `T-API-028`** | `T-API-023` – `T-API-027` (§7a); `T-API-028` (§4.4). ⚠ The genre test was first written as `T-API-022`, which REQ-109 **already owns** — renumbered to `028`. A reserved range does not stay free while other work merges. |
 | `T-UI-` | **`T-UI-029` – `T-UI-032`** | `T-UI-030` – `T-UI-032` (§7c, §7d) |
 | `T-CSS-` | **`T-CSS-006` – `T-CSS-007`** | §7b |
