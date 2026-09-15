@@ -192,6 +192,35 @@ button {
   color: inherit;
 }
 
+/* ----------------------------------------------------------------- icons -- */
+
+/*
+ * REQ-124 (§7c) — the ONE rule that sizes every icon.
+ *
+ * ⚠ SIZED IN `em`, NOT `rem` OR `px`, so an icon scales with the text it sits
+ * beside. A fixed size looks right next to body copy and wrong everywhere
+ * else — beside `--text-xl` it reads as a bullet, and beside `--text-sm` it
+ * shouts. Because the unit is relative it also honours the browser's own
+ * text-size setting for free, which `--text-*` already guarantees.
+ *
+ * ⚠ NO `color`, `fill` OR `stroke` HERE. `IconBase` renders
+ * `stroke="currentColor"`, so an icon inherits the token of its context and is
+ * therefore covered by `T-CSS-004`'s computed contrast without a token of its
+ * own. Giving `.icon` a colour would put a second, unchecked colour source
+ * beside the one that is checked.
+ */
+.icon {
+  block-size: 1.25em;
+  inline-size: 1.25em;
+
+  /*
+   * Without this an icon is squashed by a long label in a flex row — the
+   * drawing distorts rather than the text wrapping, and it looks like a bad
+   * path rather than a layout bug.
+   */
+  flex: none;
+}
+
 /* --------------------------------------------------------------- layout -- */
 
 .app-shell {

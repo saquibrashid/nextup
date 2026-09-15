@@ -1094,7 +1094,15 @@ change rather than as the accessibility regression it is.
 
 | Test id | Asserts |
 |---|---|
-| `T-A11Y-014` | No `<svg>` is exposed to the accessibility tree without a name, and every icon-only control has a non-empty accessible name. |
+| `T-A11Y-016` | No `<svg>` is exposed to the accessibility tree without a name, and every icon-only control has a non-empty accessible name. |
+
+⚠ **THIS ID WAS CORRECTED IN PLACE, 2026-09-14.** It was written as
+~~`T-A11Y-014`~~, which `specs/testing.md` L1247 **already defines** for the
+US-033 refusal enumeration at 320 px. `check:test-ids` only asks whether a
+cited id is defined *somewhere*, so the collision passes every gate while**
+two unrelated behaviours answer to one name** — and TASK-209 would have
+reported **done** off a passing refusal test with no icon assertion anywhere.
+The family was enumerated at the point of naming; `016` and `017` were free.
 | `T-UI-030` | Every icon component renders `stroke="currentColor"` and declares no hard-coded colour. |
 
 ---
@@ -1138,7 +1146,7 @@ easiest place to lose it for every control at once.
 |---|---|
 | `T-UI-031` | Every interactive control in `apps/web/src/**` is rendered by a primitive, not by a bare `<button>` or `<fieldset>`. |
 | `T-UI-032` | Every primitive variant resolves to a static class present in the stylesheet, and no primitive uses a template-literal `className`. |
-| `T-A11Y-015` | Every `Button` meets the `--tap-target-min` floor at 320 px. |
+| `T-A11Y-017` | Every `Button` meets the `--tap-target-min` floor at 320 px. ~~`T-A11Y-015`~~ — see §7c; `015` is the 280 px degradation test. |
 
 ---
 
@@ -1238,7 +1246,7 @@ The full reserved set is now:
 | `T-API-` | **`T-API-019` – `T-API-028`** | `T-API-023` – `T-API-027` (§7a); `T-API-028` (§4.4). ⚠ The genre test was first written as `T-API-022`, which REQ-109 **already owns** — renumbered to `028`. A reserved range does not stay free while other work merges. |
 | `T-UI-` | **`T-UI-029` – `T-UI-032`** | `T-UI-030` – `T-UI-032` (§7c, §7d) |
 | `T-CSS-` | **`T-CSS-006` – `T-CSS-007`** | §7b |
-| `T-A11Y-` | **`T-A11Y-014` – `T-A11Y-015`** | §7c, §7d |
+| `T-A11Y-` | **`T-A11Y-016` – `T-A11Y-017`** ~~`014` – `015`, both already taken~~ | §7c, §7d |
 | ADR | **ADR-0013**, plus a **revision to ADR-0011** | §7a |
 
 ⚠ **CONSUMED — DO NOT RE-ISSUE THESE.** `T-UX-100` – `T-UX-108` and

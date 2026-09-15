@@ -4539,6 +4539,17 @@ Run `npm run check:test-locations` before pushing.
 | `T-UI-030` | U | Every icon component renders `stroke="currentColor"` and declares **no hard-coded colour** | §7c |
 | `T-UI-031` | U | Every interactive control in `apps/web/src/**` is rendered by a primitive, not by a bare `<button>` or `<fieldset>` | §7d |
 | `T-UI-032` | U | Every primitive variant resolves to a **static** class present in the stylesheet, and no primitive uses a template-literal `className` *(the `T-CSS-001c` form)* | §7d |
+| `T-A11Y-016` | U | No `<svg>` is exposed to the accessibility tree without a name, and every icon-only control has a non-empty accessible name | §7c |
+| `T-A11Y-017` | U | Every `Button` meets the `--tap-target-min` floor at 320 px | §7d |
+
+⚠ **THESE TWO A11Y IDS WERE RENUMBERED, 2026-09-14 — do not "restore" them.**
+`ui-refresh.md` §7c/§7d originally cited ~~`T-A11Y-014`~~ and ~~`T-A11Y-015`~~,
+but **both are already defined at L1247–1248** for the US-033 refusal
+enumeration and the 280 px degradation. `check:test-ids` only asks whether a
+cited id is defined *somewhere*, so a collision passes every gate while two
+unrelated behaviours answer to one name — TASK-209 would have reported **done**
+off a passing refusal test that asserts nothing about icons. The family was
+enumerated at the point of naming and `016`/`017` were the first free numbers.
 
 ⚠ **`T-UI-029` is reserved and deliberately NOT defined here.** `ui-refresh.md`
 §10 reserves `T-UI-029` – `T-UI-032` as a range but uses only `030` – `032`.
