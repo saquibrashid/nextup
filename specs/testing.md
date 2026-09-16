@@ -4717,7 +4717,7 @@ test does not establish computed contrast, dimensions or popup geometry.
 |---|---|---|
 | `T-WATCH-001` | U/I | Mutation validation, owner/work persistence, defaults, retained preferences and correction lifecycle. |
 | `T-WATCH-002` | U/I | Priority/watching filters, Watch priority rank, strict cursor validation and pagination, unknown-runtime counts. |
-| `T-WATCH-003` | U/E | `apps/web/test/watchPreferences.spec.tsx` cases `a`–`h`: defaults, explicit confirmation, cancel/focus, pending, visible failures and manual retry, offline restriction, URL filters/clear, opt-in/reversible sort and real container PATCH/refetch. `tests/e2e/refinedLibrary.spec.ts` case `i`: phone save/reload/filter/sort and axe; `j`: bounded 320/640/1280px filter panels without Genre facets. Existing field geometry and Grid/Compact preservation cases cover the added controls. |
+| `T-WATCH-003` | U/E | `apps/web/test/watchPreferences.spec.tsx` cases `a`–`h`: defaults, explicit confirmation, cancel/focus, pending, visible failures and manual retry, offline restriction, URL filters/clear, opt-in/reversible sort and real container PATCH/refetch. `tests/e2e/refinedLibrary.spec.ts` case `i`: phone save/reload/filter/sort and axe; `j`: bounded 320/640/1280px filter panels without Genre facets; `k`: viewport overlay, unchanged document height/scroll, locked background, keyboard trap and Escape/Cancel focus restoration from a scrolled Grid/Compact list at phone/desktop sizes. Existing field geometry and Grid/Compact preservation cases cover the added controls. |
 
 ### Owner refinement: TV episode-runtime fallback (2026-09-16)
 
