@@ -24,6 +24,7 @@ import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import type { Express } from 'express';
+import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../src/app.js';
@@ -105,6 +106,7 @@ const detailCalls = (): string[] => calls.filter((c) => !c.includes('/search/'))
 
 let seq = 0;
 async function seedTitle(options: {
+  mediaType?: 'movie' | 'tv';
   tmdbId?: number | null;
   matchState?: string;
   fetchedAt?: Date | null;
@@ -128,14 +130,14 @@ async function seedTitle(options: {
   const title = await createTitle(owner, {
     id,
     workIdentity: matched
-      ? `tmdb:movie:${String(options.tmdbId ?? DUNE_TMDB_ID)}`
+      ? `tmdb:${options.mediaType ?? 'movie'}:${String(options.tmdbId ?? DUNE_TMDB_ID)}`
       : `unmatched:${String(seq).padStart(16, '0')}`,
     state: 'active',
     matchState: matched ? 'matched' : 'unmatched',
     ...(matched
       ? {
           tmdbId: options.tmdbId ?? DUNE_TMDB_ID,
-          tmdbMediaType: 'movie',
+          tmdbMediaType: options.mediaType ?? 'movie',
           tmdbName: options.name ?? 'Stale Name',
           tmdbReleaseYear: 1999,
           tmdbRuntimeMinutes: options.runtime === undefined ? 1 : options.runtime,
@@ -215,6 +217,69 @@ afterEach(async () => {
 
 afterAll(async () => {
   await closeTestPrisma();
+});
+
+describe('T-TMDB-022 episode runtime persists through the real metadata pipeline', () => {
+  function startRuntimeTmdb(status = 200): void {
+    startTmdb();
+    if (!msw) throw new Error('TMDB fixture server not started');
+    msw.use(
+      http.get('https://api.themoviedb.org/3/tv/123', () =>
+        HttpResponse.json({
+          name: 'Fixture series',
+          episode_run_time: [],
+          seasons: [{ season_number: 1, air_date: '2020-01-01' }],
+        }),
+      ),
+      http.get('https://api.themoviedb.org/3/tv/123/season/1', () =>
+        HttpResponse.json(
+          {
+            episodes: [41, 42, 43, 44, 90].map((runtime, index) => ({
+              runtime,
+              season_number: 1,
+              episode_number: index + 1,
+              air_date: '2020-01-01',
+            })),
+          },
+          { status },
+        ),
+      ),
+    );
+  }
+
+  it('T-TMDB-022i refresh persists the median, serves it, and uses it in runtime filters without changing membership', async () => {
+    startRuntimeTmdb();
+    const seeded = await seedTitle({ tmdbId: 123, mediaType: 'tv', runtime: null });
+    const before = await storedTitle(seeded.id);
+    const { items } = await list();
+    expect(items[0]?.runtimeMinutes).toBe(43);
+    expect(items[0]?.metadataStale).toBe(false);
+    const after = await storedTitle(seeded.id);
+    expect(after.tmdbRuntimeMinutes).toBe(43);
+    expect(after.workIdentity).toBe(before.workIdentity);
+    expect(after.sortDateAdded).toEqual(before.sortDateAdded);
+    expect(after.state).toBe(before.state);
+    expect(items[0]?.badges).toHaveLength(1);
+    expect(
+      (await list('?runtime=30-60&sort=runtime&dir=asc')).items.map((item) => item.titleId),
+    ).toEqual([seeded.id]);
+    expect((await list('?runtime=60-90')).items).toEqual([]);
+  });
+
+  it('T-TMDB-022j a failed supplemental season read preserves stored runtime and metadata', async () => {
+    startRuntimeTmdb(404);
+    const seeded = await seedTitle({
+      tmdbId: 123,
+      mediaType: 'tv',
+      runtime: 55,
+      fetchedAt: daysAgo(400),
+    });
+    const before = await storedTitle(seeded.id);
+    const { items } = await list();
+    expect(items[0]?.runtimeMinutes).toBe(55);
+    expect(items[0]?.metadataStale).toBe(true);
+    expect(await storedTitle(seeded.id)).toEqual(before);
+  });
 });
 
 describe('T-TMDB-004 · metadata older than 183 days refreshes on display', () => {

@@ -1409,7 +1409,7 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 | AC | L | Test | Assertion |
 |---|---|---|---|
 | AC-1 | U | `T-UX-121` | The row renders runtime before genres in `Year · type · runtime · genres`. |
-| AC-2 | U | `T-UX-121` | `1h 55m` for a film, `45m/ep` for a series. ⚠ **The `/ep` suffix is the requirement, not a flourish**: `tmdbClient.readRuntime` takes the first element of TMDB's `episode_run_time`, so the stored number is ONE EPISODE, and a bare `45m` beside a nine-season series is false in the direction that matters. |
+| AC-2 | U/I | `T-UX-121`, `T-TMDB-022` | `1h 55m` for a film, `45m/ep` for a series. Series-level runtime takes priority; otherwise use the latest aired season's median eligible episode runtime, excluding specials/unaired episodes and rounding to whole minutes. The `/ep` suffix remains mandatory: the value is a typical episode, never the whole series. |
 | AC-3 | U | **`T-UX-122`** | A `null` runtime renders the **words** `Runtime unknown` — never `0m`, never an empty slot; a stored `0` is unknown too. ⚠ One case reads `TitleRow.tsx` as a **file** and fails if the wording is inlined rather than imported from `copy.ts` — a literal passes every other assertion here and silently forks the copy. ⚠ `d`–`g` are the domain half: `isKnownRuntime` is the single rule for display, filtering **and** ordering, and they were **not sufficient** — they pass over the in-memory comparator while SQL `ORDER BY`, which they cannot reach, disagreed (`T-API-019e`). |
 | AC-4 | U/I/E | `T-UX-123`, `T-API-021`, `T-UX-144` | Five half-open choices place 60 in `60-90`, 90 in `90-120`, and 120 in `over120`, never two buckets. Legacy `60-120` selects both new halves without remaining a visible option; removing either chip preserves only the other half. Unknown tokens are dropped client-side but rejected by the API. |
 | AC-5 | U | ⚠⚠ **`T-UX-124`** | The hidden-unknown disclosure renders with the **server's** count while a runtime filter is active, and not at all without one. ⚠ **Product invariant 2 in a new place** — nothing leaves the owner's list without telling them. ⚠ **The count cannot be computed in the browser**: the excluded rows were never sent, so anything derived from `items` counts what *survived* the filter and would read `0` on every list while looking right in every fixture. ⚠ `0` and `null` both render nothing but are different facts, asserted separately. |
@@ -4701,6 +4701,12 @@ test does not establish computed contrast, dimensions or popup geometry.
 | `T-UX-142b` | E | All five sort controls issue their complete API orders in a real browser. This subcase covers order propagation; palette assertions remain `T-UX-142a`, `T-CSS-004` and the axe case above. |
 | `T-UX-143c` | E | Submitted q reaches server paging, preserves honest unfiltered-total semantics, and search-only zero-match clear removes q. |
 | `T-UX-143d` | E | Popup geometry at 320px/1280px, 44px interaction targets and focus behavior are verified from rendered elements. |
+
+### Owner refinement: TV episode-runtime fallback (2026-09-16)
+
+| Test id | Layer | Asserts |
+|---|---|---|
+| `T-TMDB-022` | U/I | **REQ-119/035/037, US-055 AC-2.** `apps/api/test/unit/clients/tmdbClient.spec.ts` cases `a`–`h`: latest aired regular season only, median resistant to a long finale, even-sample rounding, invalid/future/undated/special episode exclusion, series-level precedence, movie isolation, no eligible season/episodes remaining unknown, one extra request, bounded retries and visible malformed/error responses. `apps/api/test/integration/tmdbRefresh.spec.ts` cases `i`/`j`: real SQL persists/serves the median, subsequent runtime filters use it, membership/date/identity stay intact, and season-read failure preserves previously stored metadata with a stale flag. Policy: `specs/ai.md` §4.1. |
 
 ### Owner refinement: labelled filter fields and narrower runtime ranges (2026-09-16)
 

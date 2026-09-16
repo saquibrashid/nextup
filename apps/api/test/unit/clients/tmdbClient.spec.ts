@@ -5,7 +5,7 @@
  * No test calls TMDB (`specs/testing.md` §3.2).
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   TMDB_MAX_CONCURRENCY,
@@ -372,14 +372,179 @@ describe('T-TMDB-010 the client refuses to invent data from a malformed body', (
       }).getWork('tv', 95396),
     ).toMatchObject({ runtimeMinutes: 47, releaseYear: 2022, genres: ['Drama'] });
 
-    // An empty list is a list, not a reason to look elsewhere.
+    // Without any aired season to read, an empty runtime list remains unknown.
     expect(await clientServing({ episode_run_time: [] }).getWork('tv', 1)).toMatchObject({
       runtimeMinutes: null,
     });
+
     // `genres` present but not an array must not throw on `.map`.
     expect(await clientServing({ genres: 'Drama' }).getWork('tv', 1)).toMatchObject({ genres: [] });
   });
 
+  describe('T-TMDB-022 episode-based TV runtime fallback', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-09-16T12:00:00Z'));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    const seasons = [
+      { season_number: 2, air_date: '2026-08-01' },
+      { season_number: 0, air_date: '2026-09-15' },
+      { season_number: 3, air_date: '2026-10-01' },
+      { season_number: 1, air_date: '2025-01-01' },
+    ];
+    const episode = (runtime: unknown, extra: Record<string, unknown> = {}) => ({
+      season_number: 2,
+      episode_number: 1,
+      air_date: '2026-09-01',
+      runtime,
+      ...extra,
+    });
+    function fixture(detail: unknown, body: unknown, status = 200) {
+      const calls: URL[] = [];
+      const slept: number[] = [];
+      const client = new TmdbClient({
+        apiKey: 'fixture-key-not-a-real-secret',
+        sleep: async (ms) => {
+          slept.push(ms);
+        },
+        fetch: async (input) => {
+          const url = new URL(input instanceof Request ? input.url : input.toString());
+          calls.push(url);
+          if (url.pathname === '/3/tv/123' || url.pathname === '/3/movie/123') {
+            return Response.json(detail);
+          }
+          expect(url.pathname).toBe('/3/tv/123/season/2');
+          return Response.json(body, { status });
+        },
+      });
+      return { client, calls, slept };
+    }
+
+    it('T-TMDB-022a uses the latest aired regular season median, not its long finale', async () => {
+      const { client, calls } = fixture(
+        { episode_run_time: [], seasons },
+        {
+          episodes: [episode(90), episode(43), episode(41), episode(44), episode(42)],
+        },
+      );
+      const work = await client.getWork('tv', 123);
+      expect(work.runtimeMinutes).toBe(43);
+      expect(calls.map((url) => url.pathname)).toEqual(['/3/tv/123', '/3/tv/123/season/2']);
+      expect(calls[0]?.searchParams.get('append_to_response')).toBe('external_ids');
+      expect(Object.keys(work).sort()).toEqual([
+        'genres',
+        'imdbId',
+        'mediaType',
+        'name',
+        'posterPath',
+        'releaseYear',
+        'runtimeMinutes',
+        'tmdbId',
+      ]);
+    });
+
+    it('T-TMDB-022b rounds an even-sample median to the nearest whole minute', async () => {
+      const { client } = fixture(
+        { seasons },
+        { episodes: [episode(46), episode(41), episode(44), episode(43)] },
+      );
+      expect((await client.getWork('tv', 123)).runtimeMinutes).toBe(44);
+    });
+
+    it('T-TMDB-022c excludes specials, unaired, undated, malformed and unknown episode runtimes', async () => {
+      const { client } = fixture(
+        { seasons },
+        {
+          episodes: [
+            episode(45, { air_date: '2026-09-16' }),
+            episode(500, { air_date: '2026-09-17' }),
+            episode(500, { air_date: null }),
+            episode(500, { air_date: '2026-02-30' }),
+            episode(500, { season_number: 0 }),
+            episode(500, { season_number: 1 }),
+            episode(500, { episode_number: 0 }),
+            ...[0, -1, null, '40', 2.5].map((runtime) => episode(runtime)),
+            null,
+            'bad',
+          ],
+        },
+      );
+      expect((await client.getWork('tv', 123)).runtimeMinutes).toBe(45);
+    });
+
+    it('T-TMDB-022d preserves known series runtimes and never fetches a season for films', async () => {
+      for (const [type, detail, expected] of [
+        ['tv', { episode_run_time: [22], seasons }, 22],
+        ['movie', { runtime: 115, seasons }, 115],
+        ['movie', { runtime: null, seasons }, null],
+      ] as const) {
+        const { client, calls } = fixture(detail, {});
+        expect((await client.getWork(type, 123)).runtimeMinutes).toBe(expected);
+        expect(calls).toHaveLength(1);
+      }
+    });
+
+    it('T-TMDB-022e no aired regular season means unknown without additional requests', async () => {
+      for (const value of [
+        undefined,
+        [],
+        [
+          { season_number: 0, air_date: '2026-01-01' },
+          { season_number: 2, air_date: '2026-10-01' },
+          { season_number: 4, air_date: null },
+          { season_number: 5, air_date: '2026-02-30' },
+          { season_number: '6', air_date: '2026-01-01' },
+        ],
+      ]) {
+        const { client, calls } = fixture({ seasons: value }, {});
+        expect((await client.getWork('tv', 123)).runtimeMinutes).toBeNull();
+        expect(calls).toHaveLength(1);
+      }
+    });
+
+    it('T-TMDB-022f no usable episodes remains unknown without falling back to older seasons', async () => {
+      const { client, calls } = fixture({ seasons }, { episodes: [episode(null), episode(0)] });
+      expect((await client.getWork('tv', 123)).runtimeMinutes).toBeNull();
+      expect(calls).toHaveLength(2);
+    });
+
+    it('T-TMDB-022g season failures propagate through existing bounded retries, never as unknown', async () => {
+      const { client, calls, slept } = fixture({ seasons }, {}, 503);
+      await expect(client.getWork('tv', 123)).rejects.toMatchObject({
+        name: 'TmdbUnavailableError',
+        httpStatus: 503,
+        retryable: true,
+      });
+      expect(calls).toHaveLength(4);
+      expect(slept.filter((ms) => TMDB_RETRY_BACKOFF_MS.includes(ms))).toEqual([1000, 4000]);
+    });
+
+    it('T-TMDB-022h missing or malformed season responses fail visibly without erasing metadata', async () => {
+      for (const [body, status] of [
+        [{}, 404],
+        [null, 200],
+        [{ episodes: 'bad' }, 200],
+      ] as const) {
+        const { client, calls } = fixture({ seasons }, body, status);
+        await expect(client.getWork('tv', 123)).rejects.toBeInstanceOf(TmdbUnavailableError);
+        expect(calls).toHaveLength(2);
+      }
+    });
+
+    it('T-TMDB-022k unknown series runtime values all reach the shared fallback', async () => {
+      for (const runtime of [undefined, [], [0], [-1], [null], ['45']]) {
+        const { client } = fixture(
+          { seasons, episode_run_time: runtime },
+          {
+            episodes: [episode(50)],
+          },
+        );
+        expect((await client.getWork('tv', 123)).runtimeMinutes).toBe(50);
+      }
+    });
+  });
   it('T-TMDB-010y · an unreadable 200 and an unhandled 404 are failures, NOT empty results', async () => {
     // The whole point: neither may be indistinguishable from "TMDB has never
     // heard of this title", which is how metadata is lost silently.

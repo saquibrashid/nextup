@@ -683,13 +683,39 @@ verdict, the review response contains all of them and the
 ### 4.1 TMDB usage
 
 - Endpoints: `GET /3/search/multi?query=&include_adult=false` and
-  `GET /3/{movie|tv}/{id}` for metadata (REQ-029).
+  `GET /3/{movie|tv}/{id}` for metadata (REQ-029). For a TV series with no
+  usable series-level runtime, additionally read **one**
+  `GET /3/tv/{id}/season/{season_number}` for the episode-runtime fallback.
 - Auth: `TMDB_API_KEY`, a Container Apps **secret**, never logged, never sent
   to the browser.
 - Rate limiting: at most **4 concurrent** requests, minimum 30 ms spacing;
   retry twice on 429/5xx with 1 s / 4 s backoff.
 - Results are cached in-process for the lifetime of a batch keyed on
   `normalisedText` so repeated candidates cost one call.
+
+**TV runtime fallback (owner-approved 2026-09-16, REQ-119/035/037):**
+retain the existing positive series-level `episode_run_time` value when
+available. Otherwise choose the highest positive season number with a valid
+season `air_date` on or before today's UTC date. Season 0 (specials), future
+and undated seasons are excluded. Read that season only; do not traverse the
+catalogue or fall back to older seasons.
+
+Take the median of positive integer runtimes from that season's regular
+episodes whose valid `air_date` is on or before today's UTC date. Exclude
+specials, wrong-season records, nonpositive episode numbers, future/undated
+episodes and unknown/invalid runtimes. For an even sample, average the two
+middle values and round to the nearest whole minute (half up). A single
+eligible episode is usable; no eligible episodes means runtime remains
+unknown. This is a **typical per-episode duration**, not a series total or
+necessarily the duration of the finale.
+
+The season request uses the existing rate limiter, timeout and bounded retry
+policy. Failed or malformed responses propagate `TmdbUnavailableError`;
+they must not become a successful unknown result that erases stored metadata.
+Only the resulting `runtimeMinutes` is retained, not season/episode payloads.
+All `getWork` consumers (new imports, manual additions, corrections and
+metadata refresh) share the policy. No new scheduler, schema field, source
+provider or refresh cadence is introduced. Tests: `T-TMDB-022`.
 
 ### 4.2 Scoring — plain string comparison, no model
 
@@ -1424,4 +1450,3 @@ days loses the retained artefact and forces a re-attach from the phone
 | **NFR-012a (extraction: quality over cost, lowest reasonable price)** | §2.1a model selection + warning, §10 preamble, ADR-0001 R2.8 |
 | NFR-014 (TMDB retention) | `specs/api.md` §6.4 |
 | NFR-015/016/017 (privacy, TMDB terms, no third-party AI training data) | Rule A (+ R2.4 scope clarification), §11 |
-

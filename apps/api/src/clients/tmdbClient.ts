@@ -196,7 +196,8 @@ export class TmdbClient {
    * rating" state and looks like correct behaviour.
    *
    * Appending here rather than calling `/external_ids` separately keeps TMDB
-   * traffic unchanged: one request per work, as before.
+   * traffic unchanged for external IDs. TV runtime fallback may read one
+   * season when the series-level runtime is unknown.
    */
   async getWork(mediaType: MediaType, tmdbId: number): Promise<TmdbWorkDetail> {
     const body = await this.#get<TmdbDetailResponse>(
@@ -207,13 +208,26 @@ export class TmdbClient {
       },
     );
 
+    let runtimeMinutes = readRuntime(body);
+    if (mediaType === 'tv' && runtimeMinutes === null) {
+      const today = new Date().toISOString().slice(0, 10);
+      const seasonNumber = latestAiredSeason(body.seasons, today);
+      if (seasonNumber !== null) {
+        const season = await this.#get<unknown>(`/tv/${tmdbId}/season/${seasonNumber}`, {});
+        if (!isRecord(season) || !Array.isArray(season['episodes'])) {
+          throw new TmdbUnavailableError('TMDB returned an unreadable season body.', 200, false);
+        }
+        runtimeMinutes = medianEpisodeRuntime(season['episodes'], seasonNumber, today);
+      }
+    }
+
     return {
       tmdbId,
       mediaType,
       name: readName(body) ?? '',
       releaseYear: readYear(body),
       posterPath: typeof body.poster_path === 'string' ? body.poster_path : null,
-      runtimeMinutes: readRuntime(body),
+      runtimeMinutes,
       genres: Array.isArray(body.genres)
         ? body.genres.map((g) => (typeof g?.name === 'string' ? g.name : '')).filter(Boolean)
         : [],
@@ -400,6 +414,7 @@ interface TmdbDetailResponse {
   poster_path?: unknown;
   runtime?: unknown;
   episode_run_time?: unknown;
+  seasons?: unknown;
   genres?: Array<{ name?: unknown }>;
   /** Present for a film. **Absent for a series** — see `readImdbId`. */
   imdb_id?: unknown;
@@ -516,6 +531,58 @@ function readRuntime(body: TmdbDetailResponse): number | null {
         : null;
 
   return isKnownRuntime(raw) ? raw : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isPositiveInteger(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
+
+function hasAired(date: unknown, today: string): boolean {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today) return false;
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date;
+}
+
+function latestAiredSeason(seasons: unknown, today: string): number | null {
+  if (!Array.isArray(seasons)) return null;
+  let latest: number | null = null;
+  for (const season of seasons) {
+    if (!isRecord(season)) continue;
+    const number = season['season_number'];
+    if (isPositiveInteger(number) && hasAired(season['air_date'], today)) {
+      latest = Math.max(latest ?? number, number);
+    }
+  }
+  return latest;
+}
+
+function medianEpisodeRuntime(
+  episodes: readonly unknown[],
+  season: number,
+  today: string,
+): number | null {
+  const runtimes: number[] = [];
+  for (const episode of episodes) {
+    if (
+      !isRecord(episode) ||
+      episode['season_number'] !== season ||
+      !isPositiveInteger(episode['episode_number']) ||
+      !hasAired(episode['air_date'], today)
+    )
+      continue;
+    const runtime = episode['runtime'];
+    if (isPositiveInteger(runtime)) runtimes.push(runtime);
+  }
+  runtimes.sort((a, b) => a - b);
+  const middle = Math.floor(runtimes.length / 2);
+  const upper = runtimes[middle];
+  if (upper === undefined) return null;
+  const lower = runtimes.length % 2 === 0 ? runtimes[middle - 1] : upper;
+  return lower === undefined ? null : Math.round(lower / 2 + upper / 2);
 }
 
 /**

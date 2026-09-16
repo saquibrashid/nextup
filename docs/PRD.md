@@ -1625,7 +1625,7 @@ counts what *survived* the filter and would read zero on every list.
 | AC | Acceptance criterion |
 |---|---|
 | AC-1 | The row shows the title's runtime after type and before genres in its facts line. |
-| AC-2 | A series' runtime is shown as per-episode, distinguishably from a film's. |
+| AC-2 | A series' runtime is shown as per-episode, distinguishably from a film's. When TMDB's series-level runtime is unavailable, use the median known runtime of aired regular episodes in the latest aired season, excluding specials and unaired episodes, rounded to the nearest minute. No usable episode data remains unknown. |
 | AC-3 | An unknown runtime renders as words, never as a zero and never as an empty slot. |
 | AC-4 | The labelled Runtime dropdown filters to Under 30m, 30m–1h, 1h–1h 30m, 1h 30m–2h, or the existing 2h+ bucket, with half-open boundaries so no title falls in two buckets. The broad 1h–2h option is replaced by the two narrower choices; saved links retain their meaning. |
 | AC-5 | While a runtime filter is active, the number of titles hidden for having no known runtime is disclosed, from a count the server supplies. |
@@ -2022,8 +2022,9 @@ revisit trigger fired**, which is the mechanism working rather than a change of
 mind.
 
 ⚠ **D2's recorded blocker was "a decision on TV runtime semantics"** — and it
-is settled, not bypassed: TMDB supplies series a per-episode
-`episode_run_time`, so the stored number is **one episode**, and REQ-119
+is settled, not bypassed: use TMDB's per-episode `episode_run_time`, or,
+when missing, the latest aired season's median eligible episode runtime
+(`specs/ai.md` §4.1). The stored number represents **a typical episode**, and REQ-119
 requires the label to say so (`45m/ep`). No migration was needed;
 `Title.tmdbRuntimeMinutes` has been stored since v1 for exactly this.
 

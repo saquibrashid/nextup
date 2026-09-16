@@ -711,7 +711,10 @@ spec told every reader it was done.
 
 ⚠ **The `/ep` suffix on TV is the requirement, not a flourish.** TMDB gives
 series an `episode_run_time` array and `tmdbClient.readRuntime` takes its first
-element, so **the stored number is one episode**. Rendered bare beside a
+element when usable. When absent, the owner-approved 2026-09-16 fallback
+uses the median runtime of aired regular episodes in the latest aired season,
+rounded to whole minutes (`specs/ai.md` §4.1, `T-TMDB-022`).
+Thus **the stored number represents a typical episode**, not a total. Rendered bare beside a
 nine-season series, `45m` is a false statement about the work — and it is
 false in the direction that matters, because the owner is choosing what to
 watch tonight. Total-series runtime is not available without summing every
