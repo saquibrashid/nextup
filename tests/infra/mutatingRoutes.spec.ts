@@ -121,13 +121,13 @@ describe('T-MUT-001 · US-036 AC-1/AC-3 · REQ-041 is a closed enumeration (PRD 
     expect(findings).toEqual([]);
   });
 
-  it('T-MUT-001e · the enumeration holds exactly the ten REQ-041 operations', () => {
+  it('T-MUT-001e · the enumeration holds exactly the eleven REQ-041 operations', () => {
     // ⚠ The count is not the point — the CLOSEDNESS is. Widening REQ-041 is an
     // amendment to PRD §7.4, so this test failing means someone must decide,
     // not that someone must bump a number.
     // ~~Superseded: eight, before US-047/US-048 added the manual add and the
     // manual removal.~~
-    expect(REQ_041_OPERATIONS).toHaveLength(10);
+    expect(REQ_041_OPERATIONS).toHaveLength(11);
     expect(REQ_041_OPERATIONS.map((o: { op: string }) => o.op).sort()).toEqual([
       'add-title',
       'close-batch',
@@ -135,6 +135,7 @@ describe('T-MUT-001 · US-036 AC-1/AC-3 · REQ-041 is a closed enumeration (PRD 
       'fix-match',
       'remove-title',
       'restore-listing',
+      'set-watch-preferences',
       'suppress',
       'undo-batch',
       'undo-removal-group',
@@ -188,7 +189,7 @@ describe('T-MUT-001 · US-036 AC-1/AC-3 · REQ-041 is a closed enumeration (PRD 
     ];
     const findings = checkRegistryAgainstReq041(widened);
     expect(findings.some((f: string) => f.includes('auto-suppress'))).toBe(true);
-    expect(findings.some((f: string) => f.includes('not one of the eight'))).toBe(true);
+    expect(findings.some((f: string) => f.includes('not in REQ-041'))).toBe(true);
   });
 
   it('T-MUT-001i · a REQ-041 operation left unreachable is caught', () => {

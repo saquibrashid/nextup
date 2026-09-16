@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
+import type { WatchPriority } from '@nextup/domain';
 
 const TITLES = [
   'Amber Harbor',
@@ -34,11 +35,16 @@ const PNG = Buffer.from(
 );
 
 type Title = (typeof TITLES)[number];
+type Preferences = { watching: boolean; priority: WatchPriority };
 
-function orderedTitles(params: URLSearchParams): Title[] {
+function orderedTitles(
+  params: URLSearchParams,
+  preferences: ReadonlyMap<string, Preferences> = new Map(),
+): Title[] {
   const q = (params.get('q') ?? '').toLowerCase();
   const sort = params.get('sort') ?? 'dateAdded';
-  const direction = params.get('dir') ?? (sort === 'name' ? 'asc' : 'desc');
+  const direction =
+    params.get('dir') ?? (sort === 'name' || sort === 'watchPriority' ? 'asc' : 'desc');
   const value = (title: Title): string | number => {
     switch (sort) {
       case 'name':
@@ -51,23 +57,45 @@ function orderedTitles(params: URLSearchParams): Title[] {
         return title.imdbRating;
       case 'dateAdded':
         return title.sortDateAdded;
+      case 'watchPriority': {
+        const preference = preferences.get(title.titleId);
+        return preference?.watching
+          ? 0
+          : preference?.priority === 'up-next'
+            ? 1
+            : preference?.priority === 'someday'
+              ? 3
+              : 2;
+      }
       default:
         throw new Error(`Unexpected sort field: ${sort}`);
     }
   };
-  return TITLES.filter((title) => title.name.toLowerCase().includes(q)).sort((a, b) => {
-    const left = value(a);
-    const right = value(b);
-    const comparison = left < right ? -1 : left > right ? 1 : 0;
-    return direction === 'asc' ? comparison : -comparison;
-  });
+  return TITLES.filter((title) => {
+    const preference = preferences.get(title.titleId);
+    return (
+      title.name.toLowerCase().includes(q) &&
+      (!params.has('watching') ||
+        String(preference?.watching ?? false) === params.get('watching')) &&
+      (!params.has('priority') ||
+        params.getAll('priority').includes(preference?.priority ?? 'normal'))
+    );
+  })
+    .map((title) => ({ ...title, ...preferences.get(title.titleId) }))
+    .sort((a, b) => {
+      const left = value(a);
+      const right = value(b);
+      const comparison = left < right ? -1 : left > right ? 1 : 0;
+      return direction === 'asc' ? comparison : -comparison;
+    });
 }
 
 async function mountLibrary(
   page: Page,
-  { width = 1280, url = '/', paged = false } = {},
+  { width = 1280, url = '/', paged = false, withGenres = true } = {},
 ): Promise<URL[]> {
   const requests: URL[] = [];
+  const preferences = new Map<string, Preferences>();
   await page.setViewportSize({ width, height: 900 });
   await page.route('**/*', async (route) => {
     const request = route.request();
@@ -85,6 +113,27 @@ async function mountLibrary(
       return;
     }
     requests.push(target);
+    if (request.method() === 'PATCH' && target.pathname.endsWith('/watch-preferences')) {
+      const id = target.pathname.split('/')[3];
+      const body: unknown = request.postDataJSON();
+      if (
+        !id ||
+        !TITLES.some((title) => title.titleId === id) ||
+        typeof body !== 'object' ||
+        body === null ||
+        !('watching' in body) ||
+        typeof body.watching !== 'boolean' ||
+        !('priority' in body) ||
+        (body.priority !== 'up-next' && body.priority !== 'normal' && body.priority !== 'someday')
+      ) {
+        throw new Error('Invalid watch-preference fixture request');
+      }
+      preferences.set(id, { watching: body.watching, priority: body.priority });
+      await route.fulfill({
+        json: { titleId: id, watching: body.watching, priority: body.priority },
+      });
+      return;
+    }
     expect(request.method()).toBe('GET');
     let body: unknown;
     switch (target.pathname) {
@@ -97,7 +146,9 @@ async function mountLibrary(
         };
         break;
       case '/api/titles': {
-        const matching = orderedTitles(target.searchParams);
+        const matching = orderedTitles(target.searchParams, preferences).map((title) =>
+          withGenres ? title : { ...title, genres: [] },
+        );
         const paginate = paged && !target.searchParams.has('q');
         const secondPage = target.searchParams.has('cursor');
         body = {
@@ -276,18 +327,24 @@ test('T-UX-141f: 320px Grid and Compact retain metadata, actions and query witho
   await compactPreservesList(page, requests, testInfo, true);
 });
 
-test('T-UX-142b: five sort buttons select complete server orders and reverse the current order', async ({
+test('T-UX-142b: six sort buttons select complete server orders and reverse the current order', async ({
   page,
 }) => {
   const requests = await mountLibrary(page);
   const group = page.getByTestId('sort-control');
-  await expect(group.getByRole('button')).toHaveCount(5);
+  await expect(group.getByRole('button')).toHaveCount(6);
   const orders = [
     { label: 'Recently added', reverse: 'Oldest additions', field: 'dateAdded', dir: 'desc' },
     { label: 'Name A-Z', reverse: 'Name Z-A', field: 'name', dir: 'asc' },
     { label: 'Newest releases', reverse: 'Oldest releases', field: 'releaseYear', dir: 'desc' },
     { label: 'Longest runtime', reverse: 'Shortest runtime', field: 'runtime', dir: 'desc' },
     { label: 'Highest rated', reverse: 'Lowest rated', field: 'rating', dir: 'desc' },
+    {
+      label: 'Watch priority',
+      reverse: 'Lower priority first',
+      field: 'watchPriority',
+      dir: 'asc',
+    },
   ];
   for (const order of orders) {
     if (order.field !== 'dateAdded') {
@@ -320,7 +377,7 @@ test('T-UX-142b: five sort buttons select complete server orders and reverse the
     await expect(page.getByTestId('title-name')).toHaveText(
       orderedTitles(request.searchParams).map((title) => title.name),
     );
-    await expect(group.getByRole('button', { pressed: false })).toHaveCount(4);
+    await expect(group.getByRole('button', { pressed: false })).toHaveCount(5);
   }
   const before = requests.filter((request) => request.pathname === '/api/titles').length;
   await group.getByRole('button', { name: 'Recently added', exact: true }).click();
@@ -438,12 +495,19 @@ test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone
     await page.setViewportSize({ width, height: 900 });
     await expect(controls).toBeVisible();
     const fields = controls.locator('.filter-disclosure[data-filter-field]');
-    await expect(fields).toHaveCount(4);
+    await expect(fields).toHaveCount(6);
     const positions = await fields.evaluateAll((elements) =>
       elements.map((element) => element.getBoundingClientRect().x),
     );
-    expect(new Set(positions).size).toBe(width < 640 ? 2 : 4);
-    for (const [index, category] of ['Services', 'Type', 'Genre', 'Runtime'].entries()) {
+    expect(new Set(positions).size).toBe(width < 640 ? 2 : width < 1024 ? 3 : 6);
+    for (const [index, category] of [
+      'Services',
+      'Type',
+      'Genre',
+      'Runtime',
+      'Watching',
+      'Priority',
+    ].entries()) {
       const field = fields.nth(index);
       const trigger = field.getByRole('button', { name: new RegExp(`^${category} `) });
       await usableTarget(page, trigger);
@@ -475,6 +539,71 @@ test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone
     controls.getByRole('button', { name: 'Runtime 1h 30m – 2h', exact: true }),
   ).toBeVisible();
   expect(new URL(page.url()).searchParams.getAll('runtime')).toEqual(['90-120']);
+});
+
+test('T-WATCH-003j: filter panels remain bounded when no titles have genre facets', async ({
+  page,
+}) => {
+  await mountLibrary(page, { withGenres: false });
+  const controls = page.getByRole('group', { name: 'Filter by', exact: true });
+  for (const width of [320, 640, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(controls.locator('.filter-disclosure[data-filter-field]')).toHaveCount(5);
+    for (const category of ['Services', 'Type', 'Runtime', 'Watching', 'Priority']) {
+      const trigger = controls.getByRole('button', { name: new RegExp(`^${category} `) });
+      await usableTarget(page, trigger);
+      await trigger.click();
+      const panel = controls.locator('.filter-disclosure__panel:visible');
+      const box = await bounds(panel);
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
+      await page.keyboard.press('Escape');
+      await expect(trigger).toBeFocused();
+    }
+    await noOverflow(page);
+  }
+});
+
+test('T-WATCH-003i: watch preferences save, survive reload, filter and sort in an accessible phone UI', async ({
+  page,
+}) => {
+  await mountLibrary(page, { width: 320 });
+  const trigger = page.getByRole('button', { name: 'Watch preferences for Amber Harbor: Normal' });
+  await trigger.click();
+  const dialog = page.getByRole('dialog', { name: 'Watch preferences', exact: true });
+  for (const input of await dialog.locator('input').all()) {
+    await usableTarget(page, input.locator('..'));
+  }
+  await dialog.getByRole('checkbox', { name: 'Currently watching' }).check();
+  await dialog.getByRole('radio', { name: 'Someday' }).check();
+  const accessibility = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .analyze();
+  expect(accessibility.violations).toEqual([]);
+  await dialog.getByRole('button', { name: 'Save preferences' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Watch preferences for Amber Harbor: Watching, Someday' }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole('button', { name: 'Watch preferences for Amber Harbor: Watching, Someday' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Watch priority', exact: true }).click();
+  await expect(page.getByTestId('title-name').first()).toHaveText('Amber Harbor');
+  await page.getByRole('button', { name: 'Watching All titles', exact: true }).click();
+  const watching = page.getByRole('radio', { name: 'Watching', exact: true });
+  await watching.click();
+  await expect(watching).toBeChecked();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page.getByTestId('title-name')).toHaveText(['Amber Harbor']);
+  await page.getByRole('button', { name: 'Priority All priorities', exact: true }).click();
+  await page.getByRole('checkbox', { name: 'Up next', exact: true }).click();
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(page.getByTestId('zero-match')).toBeVisible();
+  await page.getByTestId('clear-filters').click();
+  await expect(page.getByTestId('title-name')).toHaveCount(TITLES.length);
+  expect(new URL(page.url()).searchParams.get('sort')).toBe('watchPriority');
+  await noOverflow(page);
 });
 
 test('T-UX-141g: default, popovers and Compact pass axe and honor reduced motion', async ({

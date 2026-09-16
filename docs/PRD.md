@@ -1752,6 +1752,28 @@ screens feel like one application and their states remain understandable.
 
 ---
 
+#### US-060 — Choose what to watch sooner
+
+**As the owner**, I want to mark titles I am currently watching and give
+other titles a watch priority, so ongoing shows and my next choices are easy
+to find without losing the long-term list.
+
+**REQ-126 (`must`, owner-approved 2026-09-16).** Watching is an independent
+boolean; priority is **Up next / Normal / Someday**, default Normal. This is
+manual intent, not episode tracking, completion state or a release reminder.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | Each title shows its Watching marker and priority, with an accessible edit control in both Grid and Compact. New titles default to not watching / Normal. |
+| AC-2 | Saving explicitly persists the owner's chosen values; Cancel changes nothing. Pending saves prevent duplicate submission, failures preserve the draft and show a retryable error, and offline data is read-only. |
+| AC-3 | Watching and priority are independently filterable. Choices are URL-driven, OR within priority and AND across dimensions; chips remove individual filters and Clear preserves sorting and unrelated parameters. |
+| AC-4 | Optional Watch priority order puts Watching first, then Up next, Normal and Someday; a second activation reverses it. Sorting/filtering are server-side before pagination. The existing default order is unchanged. |
+| AC-5 | Preferences belong to the owner and canonical work, shared across service badges and retained through removal, reappearance and screenshot imports. Imports and metadata refresh never overwrite them. |
+| AC-6 | An explicit match correction carries source preferences to a destination with no preference. If the destination already has explicit preferences, those win; historical source preferences remain retained. No cross-owner access, batch visibility bypass or mutation of memberships/dates is introduced. |
+
+No existing title is automatically marked Watching or assigned a nondefault
+priority from the owner's examples. The owner makes those choices in the UI.
+
 ## 7. Functional detail
 
 Everything in this section is normative and does not belong to a single story.
@@ -1819,6 +1841,11 @@ The reason full update shows already-known titles (REQ-057) is the product's mos
 8. Un-suppressing a work (US-029).
 9. Adding a title to the list by hand, outside any upload batch (US-047).
 10. Removing a title from the list by hand, without suppressing the work (US-048).
+11. Saving owner Watching/priority preferences (US-060, REQ-126). This explicit
+    owner-requested amendment permits synchronous preference edits that affect
+    selected watch filters and Watch priority order, not membership, dates,
+    metadata or badges. No automatic preference mutation or background process
+    is introduced. `T-MUT-001` pins the extended closed enumeration.
 
 ~~Superseded: entries 1–8 only, before the manual list edits were added.~~ The
 amendment was made because a **false extraction** — a title the services never

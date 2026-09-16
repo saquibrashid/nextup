@@ -18,10 +18,12 @@ import {
   MEDIA_TYPES,
   RUNTIME_BUCKETS,
   SERVICES,
+  WATCH_PRIORITIES,
   normalizeRuntimeBuckets,
   type MediaType,
   type RuntimeBucket,
   type Service,
+  type WatchPriority,
 } from '@nextup/domain';
 import type { Request } from 'express';
 
@@ -32,6 +34,7 @@ import {
   decodeRatingCursor,
   decodeReleaseYearCursor,
   decodeRuntimeCursor,
+  decodeWatchPriorityCursor,
   parseLimit,
   type AnyListCursor,
 } from '../pagination.js';
@@ -39,7 +42,7 @@ import {
 /**
  * `specs/api.md` §6.2 — the sort keys, and one default direction.
  *
- * ⚠ **`rating` IS NOT AN ORDINARY KEY HERE.** It is the only MUTABLE one, and
+ * ⚠ **`rating` IS NOT AN ORDINARY KEY HERE.** It is externally mutable, and
  * REQ-095 forbade it outright until the owner reversed that at `A53`. The
  * reversal is paid for in `titles.ts` by making the rating refresh synchronous
  * — read ADR-0011 Revision 1 and `api.md` §6.2a before touching this list.
@@ -50,7 +53,14 @@ import {
  * `tmdbName` instead would be BINARY — `apple` after `Zebra` — and would still
  * look alphabetical on a title-cased fixture. See TASK-219.
  */
-export const TITLE_SORTS = ['dateAdded', 'runtime', 'releaseYear', 'rating', 'name'] as const;
+export const TITLE_SORTS = [
+  'dateAdded',
+  'runtime',
+  'releaseYear',
+  'rating',
+  'name',
+  'watchPriority',
+] as const;
 export type TitleSort = (typeof TITLE_SORTS)[number];
 
 /**
@@ -69,6 +79,7 @@ const CURSOR_DECODERS: Record<TitleSort, (raw: string) => AnyListCursor> = {
   releaseYear: decodeReleaseYearCursor,
   rating: decodeRatingCursor,
   name: decodeNameCursor,
+  watchPriority: decodeWatchPriorityCursor,
 };
 
 export const SORT_DIRECTIONS = ['asc', 'desc'] as const;
@@ -106,6 +117,7 @@ const DEFAULT_DIRECTION_BY_SORT: Record<TitleSort, SortDirection> = {
   releaseYear: DEFAULT_SORT_DIRECTION,
   rating: DEFAULT_SORT_DIRECTION,
   name: 'asc',
+  watchPriority: 'asc',
 };
 
 export function defaultDirectionFor(sort: TitleSort): SortDirection {
@@ -138,6 +150,8 @@ const MAX_GENRE_LENGTH = 60;
 const GENRE_FORBIDDEN_CHARS = /[%_[\]"\\]/;
 
 export interface TitleListQuery {
+  watching: boolean | undefined;
+  priorities: WatchPriority[];
   q: string | undefined;
   services: Service[];
   mediaType: MediaType | undefined;
@@ -198,6 +212,15 @@ function requireEnumValues<T extends string>(
 }
 
 export function parseTitleListQuery(query: Request['query']): TitleListQuery {
+  const watchingRaw = query['watching'];
+  if (watchingRaw !== undefined && watchingRaw !== 'true' && watchingRaw !== 'false') {
+    fail('watching', '"watching" must be a single true or false.');
+  }
+  const priorities = requireEnumValues(
+    toStringArray(query['priority'], 'priority'),
+    'priority',
+    WATCH_PRIORITIES,
+  );
   const qRaw = query['q'];
   if (qRaw !== undefined && typeof qRaw !== 'string') {
     fail('q', '"q" must be a single string.');
@@ -265,6 +288,8 @@ export function parseTitleListQuery(query: Request['query']): TitleListQuery {
   const sort = (sortRaw as TitleSort | undefined) ?? 'dateAdded';
 
   return {
+    watching: watchingRaw === undefined ? undefined : watchingRaw === 'true',
+    priorities,
     q,
     services,
     // Both supported types form the whole dimension, so OR means no restriction.

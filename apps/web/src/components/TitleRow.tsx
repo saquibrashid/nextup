@@ -16,7 +16,7 @@
 // `T-LIST-018` asserts the marker on every rendered label.
 
 import type { JSX, ReactNode } from 'react';
-import { SERVICE_LABELS, formatRuntime, type Service } from '@nextup/domain';
+import { SERVICE_LABELS, formatRuntime, type Service, type WatchPriority } from '@nextup/domain';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { MoreIcon } from './icons';
@@ -28,6 +28,7 @@ import {
   METADATA_STALE_CHIP,
   ROW_PENDING_LABEL,
   RUNTIME_UNKNOWN_LABEL,
+  WATCH_PRIORITY_LABELS,
 } from '../copy';
 
 /** `specs/ui.md` §2.2 - the poster size the row requests. */
@@ -42,6 +43,9 @@ export interface TitleBadge {
 
 /** An item of `GET /api/titles` (`specs/api.md` §6.2). */
 export interface TitleListItem {
+  /** Optional for cached responses from before watch preferences shipped. */
+  readonly watching?: boolean;
+  readonly priority?: WatchPriority;
   readonly titleId: string;
   readonly workIdentity: string;
   readonly matchState: 'matched' | 'unmatched';
@@ -85,6 +89,7 @@ export interface TitleListItem {
 }
 
 export interface TitleRowProps {
+  readonly onWatchPreferences?: ((item: TitleListItem) => void) | undefined;
   readonly item: TitleListItem;
   /**
    * Opens the §2.3 row menu (Not interested / Fix match). The MENU ITSELF is
@@ -136,6 +141,7 @@ const MEDIA_TYPE_LABELS: Readonly<Record<TitleListItem['mediaType'], string>> = 
 
 export function TitleRow({
   item,
+  onWatchPreferences,
   onOpenMenu,
   onFixMatch,
   pending,
@@ -186,6 +192,29 @@ export function TitleRow({
         <h2 className="title-row__name" data-testid="title-name">
           {item.name}
         </h2>
+
+        <div
+          className="title-row__watch"
+          data-watching={item.watching === true || undefined}
+          data-priority={item.priority ?? 'normal'}
+        >
+          {onWatchPreferences ? (
+            <Button
+              disabled={busy}
+              aria-label={`Watch preferences for ${item.name}: ${item.watching ? 'Watching, ' : ''}${WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}`}
+              onClick={() => onWatchPreferences(item)}
+            >
+              {item.watching ? 'Watching · ' : 'Priority: '}
+              {WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}
+              <span aria-hidden="true"> ▾</span>
+            </Button>
+          ) : (
+            <span>
+              {item.watching ? 'Watching · ' : ''}
+              {WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}
+            </span>
+          )}
+        </div>
 
         {unmatched && (
           <span className="title-row__chip" data-testid="unidentified-chip">

@@ -2567,6 +2567,31 @@ button {
   min-width: 0;
 }
 
+.title-row__watch {
+  grid-column: 1 / -1;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.watch-preferences .field label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--tap-target-min);
+}
+
+.title-row__watch .btn {
+  font-size: var(--text-sm);
+  background: var(--color-bg);
+}
+
+.title-row__watch[data-watching] .btn,
+.title-row__watch[data-priority='up-next'] .btn {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
 .filter-disclosure__label {
   display: block;
   margin-bottom: var(--space-1);
@@ -2674,7 +2699,7 @@ button {
 
 @media (min-width: 640px) {
   .filter-controls {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .filter-disclosure__panel {
@@ -2687,6 +2712,20 @@ button {
   }
 
   .filter-controls .filter-disclosure__panel {
+    inset-inline: 0 auto;
+  }
+
+  .filter-controls > .filter-disclosure:nth-child(3n) .filter-disclosure__panel {
+    inset-inline: auto 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .filter-controls {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .filter-controls > .filter-disclosure:nth-child(3n) .filter-disclosure__panel {
     inset-inline: 0 auto;
   }
 

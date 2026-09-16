@@ -124,9 +124,9 @@ restore, suppress, un-suppress or fix-match.
    staleness threshold, no nag, no derived "stale" state. REQ-040 and ASM-038
    are retired.)*
 2. **List controls** — a submitted title-search form, the filter bar and
-   five visible complete-order buttons in one visually unified group.
+   six visible complete-order buttons in one visually unified group.
    `components/FilterBar.tsx` presents a **Filter by** group with labelled
-   dropdown fields for **Services, Type, Genre, Runtime** (REQ-035).
+   dropdown fields for **Services, Type, Genre, Runtime, Watching, Priority** (REQ-035/126).
    Each field has an external category label, a current-value trigger and a
    decorative down/up chevron, opening a labelled checkbox disclosure; active removable
    chips; **Clear filters**; and a live result count *"Showing 42 of 187"*,
@@ -140,15 +140,15 @@ restore, suppress, un-suppress or fix-match.
    Selections are **URL-only**, OR within each dimension, AND across them.
    Every selected filter has a visible native 44 px removal button, even
    when results are nonzero. Each chip removes only its dimension/value.
-   **Clear filters removes service/type/genre/runtime and `q`**, preserving
+   **Clear filters removes service/type/genre/runtime/watching/priority and `q`**, preserving
    sort, local view and unrelated query parameters. Picker option search
    never searches title rows. `T-UI-016`, `T-UX-139`.
 
-   Defaults read **All services / All types / All genres / Any runtime**;
+   Defaults read **All services / All types / All genres / Any runtime / All titles / All priorities**;
    one selected value shows its name and multiple distinct values show
    **N selected**, with individual selections still enumerated by the chips.
    The accessible trigger name includes category and value. Fields use two
-   equal columns on phones and four from 640 px; panels stay within the
+   equal columns on phones, three from 640 px and six from 1024 px; panels stay within the
    viewport. Existing 44 px targets, nonmodal keyboard behavior and dismissal
    remain unchanged (`T-UX-144`). This owner-approved 2026-09-16 refinement
    replaces the action-button appearance, not multi-selection semantics.
@@ -185,9 +185,9 @@ restore, suppress, un-suppress or fix-match.
    Without it the owner reads a shortened list as their library, which is the
    same class of defect as a failed extraction reading as a removal.
 
-   **Five native buttons each select a complete KEY/DIRECTION order.**
+   **Six native buttons each select a complete KEY/DIRECTION order.**
    Inactive chooses its field's default; active reverses in one action.
-   Name defaults to `asc`; dateAdded, releaseYear, runtime and rating default
+   Name and Watch priority default to `asc`; dateAdded, releaseYear, runtime and rating default
    to `desc`. Exactly one is `aria-pressed`; its accessible name states the
    current order and next reverse action. **No separate direction segment or
    collapsed selector.** `T-UX-138` plus existing `T-UX-128`–`131`.
@@ -199,8 +199,9 @@ restore, suppress, un-suppress or fix-match.
    | `releaseYear` | Newest releases | Oldest releases |
    | `runtime` | Longest runtime | Shortest runtime |
    | `rating` | Highest rated | Lowest rated |
+   | `watchPriority` | Lower priority first | Watch priority |
 
-   The ten order strings come from **`SORT_ORDER_LABELS`** in
+   The twelve order strings come from **`SORT_ORDER_LABELS`** in
    `apps/web/src/copy.ts`, shared by the control and its assertions.
 
    Oldest additions is one press from the default view (REQ-038, invariant 6).
@@ -256,12 +257,39 @@ slow-request/retry notice. The real service-updates and list controls remain
 mounted; do not add duplicate freshness-strip or filter-bar skeletons.
 Loading is never the never-uploaded or zero-match state.
 
+### 2.1a Watching and watch priority (US-060, REQ-126)
+
+`WatchPreferencesDialog` edits a local draft: an independent **Currently
+watching** checkbox and **Up next / Normal / Someday** radio choices. New
+works default to not watching and Normal. No data changes until **Save
+preferences** succeeds. Cancel/Escape dismiss the draft and restore focus.
+Pending saves disable all inputs, Save and Cancel, ignore dismissal and cannot
+double-submit. Failures show the server message verbatim (generic visible
+fallback for non-API errors), preserve the draft, and require explicit retry.
+Offline disables Save if the dialog is already open.
+
+Success closes the editor and refetches page one from the server; do not
+optimistically reorder, filter or reset list rows. Preserve the URL and local
+Grid/Compact choice. A refetch failure uses the existing list error/retry
+state. The Watching filter is a single All titles / Watching / Not watching
+radio choice. Priority is a multiselect; active chips and Clear filters cover
+both dimensions.
+
+The sixth sort button, **Watch priority**, is opt-in: Watching first,
+then nonwatching Up next, Normal, Someday. Pressing it again selects
+**Lower priority first**. Watching does not overwrite the selected priority.
+Default Recently added and one-press Oldest additions remain unchanged.
+Preferences survive removal/readdition and screenshot imports; no episode
+tracking, reminders, inferred priorities or automatic assignments are added.
+See `api.md` §6.2d and `T-WATCH-003`.
+
 ### 2.2 The row (`components/TitleRow.tsx`)
 
 | Element | Source | Rule |
 |---|---|---|
 | Poster | `posterPath` → `https://image.tmdb.org/t/p/w154{path}` | `alt=""` (decorative; the name is adjacent text). A missing poster renders a neutral placeholder tile, never a broken image. |
 | Name | `name` | The only element with heading weight in the row |
+| Watch preferences (REQ-126) | `watching`, `priority` | A separate native button below the title reads `Priority: Normal` by default, or `Watching · Up next` etc. Its accessible name includes the title, Watching state and priority. Opens the explicit-save editor (§2.1a); offline shows the same facts without an edit affordance. |
 | Year · type · runtime · genres | `releaseYear`, `mediaType`, `runtimeMinutes`, `genres` | Runtime precedes genres in the approved 2026-09-16 layout. Film renders `1h 55m`, TV `45m/ep` (**one episode**, never a whole-series claim); missing runtime says **"Runtime unknown"**. Genres use three chips plus `+n` expansion, with active-filter genres always visible even above that limit. **Names wrap, never truncate**; `genres: []` renders nothing, never "Unknown" or `+0` (US-019 AC-6). All facts, including IMDb rating or its absent state, remain in Grid and Compact. |
 | **Service badges** | `badges[]` | One badge per **active** listing (REQ-026). Badges are text-labelled (`Netflix`, `Max`), not colour-only — colour is never the sole carrier of meaning |
 | Date-added label | `dateAddedLabel` | Rendered **verbatim from the API** (`specs/api.md` §6.2). REQ-061: it always contains "to nextup". The component **must not** construct this string. |
@@ -824,7 +852,7 @@ contains **neither** "memory" nor `MEMORY_REMEDY_PATH` for
 
 | Width | Behaviour |
 |---|---|
-| **320 px (floor)** | Single-column horizontal poster/details rows in both views. Filter disclosures and the five visible sort buttons wrap; panels fit the viewport. **No horizontal page scrolling**, no clipped genre names, no additional step to reverse the current order. `T-A11Y-001` covers every route and the 200-candidate review fixture. |
+| **320 px (floor)** | Single-column horizontal poster/details rows in both views. Filter disclosures and the six visible sort buttons wrap; panels fit the viewport. **No horizontal page scrolling**, no clipped genre names, no additional step to reverse the current order. `T-A11Y-001` covers every route and the 200-candidate review fixture. |
 | 640 px | Navigation returns to the header: **List, Upload, Batches, More**. Below this width the single bottom-fixed nav is **List, Upload, More**, with safe-area clearance. |
 | **1024 px+** | Grid preference gains multiple columns of horizontal cards; Compact stays a single column. Controls remain above the list, not a left rail. Width is bounded by `--layout-max-width` (§13). **No function is available only on desktop** — `T-A11Y-002` runs the journey at 320 px. |
 

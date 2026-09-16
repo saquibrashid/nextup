@@ -91,11 +91,12 @@ export interface ReleaseYearListCursor {
  * matched by neither the "greater" nor the "equal" branch and silently
  * vanishes between pages. Storing the integer keeps the keyset total.
  *
- * ⚠ **THIS IS THE ONLY MUTABLE SORT KEY IN THE PRODUCT.** Every other
+ * ⚠ **THIS IS THE ONLY EXTERNALLY MUTABLE SORT KEY.** Every other
  * ordering is stable between requests: date-added is owner-supplied and
  * immutable once captured; name, year and runtime are properties of the work.
  * A rating can change under the owner's feet, which is the whole reason the
  * refresh had to move inside the request — see `titles.ts` and ADR-0011 Rev 1.
+ * Watch priority changes only when the owner explicitly edits preferences.
  */
 export interface RatingListCursor {
   ratingTenths: number | null;
@@ -127,6 +128,11 @@ export interface NameListCursor {
   id: string;
 }
 
+export interface WatchPriorityListCursor {
+  watchPriorityRank: number;
+  id: string;
+}
+
 /**
  * The cursor for whichever sort issued it.
  *
@@ -144,7 +150,36 @@ export interface NameListCursor {
  * list at the wrong boundary.
  */
 export type AnyListCursor =
-  ListCursor | RuntimeListCursor | ReleaseYearListCursor | RatingListCursor | NameListCursor;
+  | ListCursor
+  | RuntimeListCursor
+  | ReleaseYearListCursor
+  | RatingListCursor
+  | NameListCursor
+  | WatchPriorityListCursor;
+
+export function encodeWatchPriorityCursor(cursor: WatchPriorityListCursor): string {
+  return Buffer.from(
+    JSON.stringify({ watchPriorityRank: cursor.watchPriorityRank, id: cursor.id }),
+    'utf8',
+  ).toString('base64url');
+}
+
+export function decodeWatchPriorityCursor(raw: string): WatchPriorityListCursor {
+  const parsed = decodeEnvelope(raw);
+  const keys = Object.keys(parsed);
+  if (keys.length !== 2 || !keys.includes('watchPriorityRank') || !keys.includes('id')) {
+    throw invalidCursor('unexpected-keys');
+  }
+  const rank = parsed['watchPriorityRank'];
+  const id = parsed['id'];
+  if (typeof rank !== 'number' || !Number.isInteger(rank) || rank < 0 || rank > 3) {
+    throw invalidCursor('bad-watch-priority-rank');
+  }
+  requireCursorId(id);
+  const cursor = { watchPriorityRank: rank, id: id as string };
+  if (encodeWatchPriorityCursor(cursor) !== raw) throw invalidCursor('not-canonical');
+  return cursor;
+}
 
 export function isRuntimeCursor(cursor: AnyListCursor): cursor is RuntimeListCursor {
   return 'runtimeMinutes' in cursor;

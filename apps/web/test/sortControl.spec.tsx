@@ -32,6 +32,7 @@ const DEFAULT_LABELS = [
   'Newest releases',
   'Longest runtime',
   'Highest rated',
+  'Watch priority',
 ];
 
 function sortGroup(): HTMLElement {
@@ -101,7 +102,7 @@ describe('T-UI-024 - SortControl', () => {
   it('T-UI-024a: renders the sort control buttons', () => {
     renderSortControl();
     expect(sortGroup()).toBeInTheDocument();
-    expect(within(sortGroup()).getAllByRole('button')).toHaveLength(5);
+    expect(within(sortGroup()).getAllByRole('button')).toHaveLength(6);
   });
 
   it('T-UI-024b: defaults to recently added', () => {
@@ -129,7 +130,7 @@ describe('T-UI-024 - SortControl', () => {
 
   it('T-UI-024e: inactive orders have aria-pressed false', () => {
     renderSortControl();
-    expect(within(sortGroup()).getAllByRole('button', { pressed: false })).toHaveLength(4);
+    expect(within(sortGroup()).getAllByRole('button', { pressed: false })).toHaveLength(5);
     expect(button('Name A-Z')).toHaveAttribute('aria-pressed', 'false');
   });
 
@@ -259,7 +260,14 @@ describe('T-UX-120 - sort fields', () => {
   });
 
   it('T-UX-119 the sort selector offers the API rating field', () => {
-    expect(SORT_KEYS).toEqual(['dateAdded', 'name', 'releaseYear', 'runtime', 'rating']);
+    expect(SORT_KEYS).toEqual([
+      'dateAdded',
+      'name',
+      'releaseYear',
+      'runtime',
+      'rating',
+      'watchPriority',
+    ]);
     renderWithProbe();
     fireEvent.click(button('Highest rated'));
     expect(query().get('sort')).toBe('rating');
@@ -274,7 +282,7 @@ describe('T-UX-120 - sort fields', () => {
 });
 
 describe('One-click complete orders and stable visible controls', () => {
-  it('T-UX-128a renders all five complete orders simultaneously', () => {
+  it('T-UX-128a renders all six complete orders simultaneously', () => {
     renderSortControl();
     expect(
       within(sortGroup())
@@ -286,12 +294,12 @@ describe('One-click complete orders and stable visible controls', () => {
   it('T-UX-128b marks exactly one option and it is the current order', () => {
     renderSortControl('/?sort=name&dir=desc');
     expect(selectedButton()).toHaveTextContent('Name Z-A');
-    expect(within(sortGroup()).getAllByRole('button', { pressed: false })).toHaveLength(4);
+    expect(within(sortGroup()).getAllByRole('button', { pressed: false })).toHaveLength(5);
   });
 
-  it('T-UX-128c uses five native buttons, not separate direction radios or a menu', () => {
+  it('T-UX-128c uses six native buttons, not separate direction radios or a menu', () => {
     renderSortControl();
-    expect(within(sortGroup()).getAllByRole('button')).toHaveLength(5);
+    expect(within(sortGroup()).getAllByRole('button')).toHaveLength(6);
     expect(within(sortGroup()).queryByRole('radio')).toBeNull();
     expect(within(sortGroup()).queryByRole('combobox')).toBeNull();
   });
@@ -334,7 +342,7 @@ describe('One-click complete orders and stable visible controls', () => {
 
   it('T-UX-129c default direction is per field and name opens at A', () => {
     for (const key of SORT_KEYS) {
-      expect(defaultDirFor(key)).toBe(key === 'name' ? 'asc' : 'desc');
+      expect(defaultDirFor(key)).toBe(key === 'name' || key === 'watchPriority' ? 'asc' : 'desc');
     }
     renderWithProbe('/?sort=name');
     expect(selectedButton()).toHaveTextContent('Name A-Z');

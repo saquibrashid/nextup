@@ -47,6 +47,8 @@ describe('T-LIST-031 the list item is shaped exactly as the contract says', () =
 
     expect(item).toMatchObject({
       titleId: 't-1',
+      watching: false,
+      priority: 'normal',
       workIdentity: 'tmdb:movie:438631',
       matchState: 'matched',
       name: 'Dune',

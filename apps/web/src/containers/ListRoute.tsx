@@ -337,6 +337,7 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
       // US-047 — the standalone add, and the refetch that makes the new row
       // visible without a reload.
       onAddTitle={(body) => client.addTitle(body)}
+      onWatchPreferences={(titleId, body) => client.updateWatchPreferences(titleId, body)}
       onReload={titles.reload}
     />
   );

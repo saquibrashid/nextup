@@ -10,7 +10,14 @@ import { SORT_KEY_LEGEND, SORT_ORDER_LABELS } from '../copy';
 export type SortDir = 'desc' | 'asc';
 
 // These are the API's own spellings, including `rating`, not `imdbRating`.
-export const SORT_KEYS = ['dateAdded', 'name', 'releaseYear', 'runtime', 'rating'] as const;
+export const SORT_KEYS = [
+  'dateAdded',
+  'name',
+  'releaseYear',
+  'runtime',
+  'rating',
+  'watchPriority',
+] as const;
 export type SortKey = (typeof SORT_KEYS)[number];
 
 const SESSION_KEY = 'nextup.sort.dir';
@@ -23,6 +30,7 @@ const DEFAULT_DIR_BY_KEY: Readonly<Record<SortKey, SortDir>> = {
   releaseYear: 'desc',
   runtime: 'desc',
   rating: 'desc',
+  watchPriority: 'asc',
 };
 
 export function defaultDirFor(key: SortKey): SortDir {

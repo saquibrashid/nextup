@@ -56,6 +56,9 @@ async function seedOwner(ownerId: typeof OWNER_A): Promise<{ batchId: string; ti
   await db.uploadBatch.create({ data: { ...batch, ownerId } });
   const title = titleInput();
   await db.title.create({ data: { ...title, ownerId, createdByBatchId: batch.id } });
+  await db.watchPreference.create({
+    data: { ownerId, workIdentity: title.workIdentity, watching: true, priority: 'up-next' },
+  });
   await db.serviceListing.create({
     data: { ...listingInput(title.id, batch.id), ownerId },
   });
@@ -102,17 +105,19 @@ describe('T-EXPORT-001 — every owner row reaches the artefact', () => {
     // above is satisfied by an export of nothing compared against a model list
     // of nothing — both sides derive from the same source, so a DMMF that
     // failed to load would agree with itself.
-    expect(expected.length).toBe(12);
+    expect(expected.length).toBe(13);
     expect(expected).toContain('upload_batch');
     expect(expected).toContain('suppression');
     expect(expected).toContain('removal_decision');
     expect(expected).toContain('service_state');
+    // The work preference table also needs no export-script change.
     // ⚠ Bumped 11 → 12 by TASK-184. `watch_intent` needed NO change to the
     // export script — it is derived from the DMMF, which is the whole claim of
     // `T-EXPORT-001b` — so this pin firing was the only signal that a new model
     // had appeared at all. That is what it is for: a count nobody is forced to
     // update is a count that stops meaning anything.
     expect(expected).toContain('watch_intent');
+    expect(expected).toContain('watch_preference');
   });
 
   it('T-EXPORT-001b: a table added to the schema is exported without touching the script', async () => {
@@ -148,7 +153,13 @@ describe('T-EXPORT-001 — every owner row reaches the artefact', () => {
     expect(data.rowCounts['title']).toBe(1);
     expect(data.rowCounts['service_listing']).toBe(1);
     expect(data.rowCounts['uploaded_image']).toBe(1);
-    expect(data.totalRows).toBe(4);
+    expect(data.rowCounts['watch_preference']).toBe(1);
+    expect(data.tables['watch_preference']?.rows[0]).toMatchObject({
+      ownerId: OWNER_A,
+      watching: true,
+      priority: 'up-next',
+    });
+    expect(data.totalRows).toBe(5);
 
     const batchRow = data.tables['upload_batch']?.rows[0];
     expect(batchRow?.['id']).toBe(seeded.batchId);
@@ -176,7 +187,7 @@ describe('T-EXPORT-001 — every owner row reaches the artefact', () => {
     await seedOwner(OWNER_B);
 
     const data = await exportOwnerData(db, OWNER_A);
-    expect(data.totalRows).toBe(4);
+    expect(data.totalRows).toBe(5);
 
     // Nowhere in the artefact — not in a row, not in a blob path.
     const text = serialiseExport(data);
@@ -201,7 +212,7 @@ describe('T-EXPORT-001 — every owner row reaches the artefact', () => {
     // falling row count is always a defect, never a change the owner made.
     // Unordered output makes that diff useless.
     expect(serialiseExport(second)).toBe(serialiseExport(first));
-    expect(first.totalRows).toBe(12);
+    expect(first.totalRows).toBe(15);
 
     // ⚠ AGREEMENT BETWEEN TWO RUNS IS NOT ENOUGH ON ITS OWN, and the first
     // draft stopped there. Dropping `orderBy` entirely still passed it: SQL

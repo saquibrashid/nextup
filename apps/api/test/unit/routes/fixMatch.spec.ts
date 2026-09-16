@@ -33,6 +33,8 @@ const findActiveSuppression = vi.fn();
 const findActiveTitleByWorkIdentity = vi.fn();
 const migrateSuppression = vi.fn();
 const updateTitle = vi.fn();
+const carryWatchPreference = vi.fn();
+const lockTitleForWatchPreferences = vi.fn();
 const getWork = vi.fn();
 
 vi.mock('../../../src/repository/ownerData.js', async (importOriginal) => {
@@ -45,6 +47,9 @@ vi.mock('../../../src/repository/ownerData.js', async (importOriginal) => {
       findActiveTitleByWorkIdentity(...args) as unknown,
     migrateSuppression: (...args: unknown[]) => migrateSuppression(...args) as unknown,
     updateTitle: (...args: unknown[]) => updateTitle(...args) as unknown,
+    carryWatchPreference: (...args: unknown[]) => carryWatchPreference(...args) as unknown,
+    lockTitleForWatchPreferences: (...args: unknown[]) =>
+      lockTitleForWatchPreferences(...args) as unknown,
     // The transaction is a pass-through here: what is under test is which
     // writes are issued, not that the store groups them.
     runInTransaction: async (work: (tx: unknown) => Promise<unknown>) => work(undefined),
@@ -136,6 +141,8 @@ beforeEach(async () => {
   findActiveTitleByWorkIdentity.mockResolvedValue(null);
   migrateSuppression.mockResolvedValue(undefined);
   updateTitle.mockResolvedValue({ count: 1 });
+  carryWatchPreference.mockResolvedValue(undefined);
+  lockTitleForWatchPreferences.mockResolvedValue(undefined);
   getWork.mockResolvedValue(DETAIL);
 
   await new Promise<void>((resolve) => {

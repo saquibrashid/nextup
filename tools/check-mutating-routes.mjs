@@ -2,9 +2,9 @@
  * Mutating-route registry vs the REQ-041 closed enumeration
  * (TASK-121 — `T-MUT-001`, `T-MUT-002`).
  *
- * **REQ-041 is a CLOSED list.** PRD §7.4 enumerates exactly eight owner-
+ * **REQ-041 is a CLOSED list.** PRD §7.4 enumerates exactly eleven owner-
  * initiated operations that may change user-visible list state, and exactly
- * three non-owner processes that may exist at all — none of which changes
+ * four non-owner processes that may exist at all — none of which changes
  * list state. *"Anything not on these lists is forbidden by default. REQ-041
  * has already been widened five times during requirements work; widening it
  * again is an explicit amendment, not an implementation decision."*
@@ -22,7 +22,7 @@
  * none of them touches the list. Those are declared with
  * `changesListState: false` and a reason. If they were simply omitted, a route
  * that DOES change list state could be smuggled in under the same shape; if
- * they were counted as list mutations, the eight-operation count would be
+ * they were counted as list mutations, the owner-operation count would be
  * meaningless. Both columns are asserted.
  *
  * Usage: `node tools/check-mutating-routes.mjs` → exit 0 clean, exit 1 findings.
@@ -36,7 +36,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * PRD §7.4 — the ten owner-initiated operations that may change
+ * PRD §7.4 — the eleven owner-initiated operations that may change
  * user-visible list state. **This list is closed.**
  *
  * ~~Superseded: "the eight owner-initiated operations."~~ US-047 and US-048
@@ -83,6 +83,12 @@ export const REQ_041_OPERATIONS = [
     op: 'remove-title',
     story: 'US-048',
     what: 'Removing a title from the list by hand, without suppressing the work',
+  },
+  {
+    id: 11,
+    op: 'set-watch-preferences',
+    story: 'US-060',
+    what: 'Saving owner watch preferences, affecting explicit watch filters and priority order',
   },
 ];
 
@@ -180,6 +186,12 @@ export const MUTATING_ROUTE_REGISTRY = [
     path: '/api/titles/:titleId',
     changesListState: true,
     op: 'remove-title',
+  },
+  {
+    method: 'PATCH',
+    path: '/api/titles/:titleId/watch-preferences',
+    changesListState: true,
+    op: 'set-watch-preferences',
   },
   { method: 'POST', path: '/api/titles/:titleId/suppress', changesListState: true, op: 'suppress' },
   {
@@ -408,7 +420,7 @@ export function checkRegistryAgainstReq041(registry = MUTATING_ROUTE_REGISTRY) {
     }
     if (!permitted.has(route.op)) {
       findings.push(
-        `${keyOf(route.method, route.path)} claims operation "${route.op}", which is not one of the eight in REQ-041 §7.4 (T-MUT-001)`,
+        `${keyOf(route.method, route.path)} claims operation "${route.op}", which is not in REQ-041 §7.4 (T-MUT-001)`,
       );
     }
   }
@@ -437,9 +449,9 @@ export function checkRegistryAgainstReq041(registry = MUTATING_ROUTE_REGISTRY) {
   // ⚠ The literal is the CLOSEDNESS, restated where a widening would be made.
   // ~~Superseded: 8, before US-047/US-048 added the manual add and removal.~~
   // Changing it is an amendment to PRD §7.4, not a build fix.
-  if (REQ_041_OPERATIONS.length !== 10) {
+  if (REQ_041_OPERATIONS.length !== 11) {
     findings.push(
-      `REQ-041 §7.4 enumerates 10 owner-initiated operations; this list has ${REQ_041_OPERATIONS.length}. The list is CLOSED (T-MUT-001).`,
+      `REQ-041 §7.4 enumerates 11 owner-initiated operations; this list has ${REQ_041_OPERATIONS.length}. The list is CLOSED (T-MUT-001).`,
     );
   }
 

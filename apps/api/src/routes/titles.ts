@@ -18,7 +18,7 @@
  * `nextCursor` that skips rows.
  */
 
-import { dateAddedLabel } from '@nextup/domain';
+import { dateAddedLabel, watchPriorityRank, type WatchPriority } from '@nextup/domain';
 import { type Router } from 'express';
 
 import {
@@ -27,6 +27,7 @@ import {
   encodeRatingCursor,
   encodeReleaseYearCursor,
   encodeRuntimeCursor,
+  encodeWatchPriorityCursor,
 } from '../pagination.js';
 import { AppError } from '../errors/AppError.js';
 import { beginRatingRefresh, runRatingRefresh } from '../jobs/refreshRatings.js';
@@ -78,6 +79,8 @@ interface ListingRow {
 }
 
 interface TitleRow {
+  watching?: boolean;
+  priority?: WatchPriority;
   id: string;
   workIdentity: string;
   matchState: string;
@@ -158,6 +161,8 @@ export function toListItem(row: TitleRow, metadataStale = false): Record<string,
 
   return {
     titleId: row.id,
+    watching: row.watching ?? false,
+    priority: row.priority ?? 'normal',
     workIdentity: row.workIdentity,
     matchState: row.matchState,
     name: row.tmdbName ?? row.rawExtractedText ?? '',
@@ -262,7 +267,7 @@ export function registerTitleRoutes(router: Router): void {
     // REQ-041 / `A53`, `specs/api.md` §6.2a — THE PRICE OF A RATING SORT.
     //
     // ⚠ **BEFORE THE ORDERED READ, AND OVER THE WHOLE FILTERED SET.** Every
-    // other sort key is immutable while the owner looks at it: the date is
+    // other sort key is stable absent an owner edit: the date is
     // theirs, the year and the runtime are properties of the work. The rating
     // is not — it is fetched from OMDb and it changes. Leaving the refresh
     // where it is for every other sort (AFTER `res.json`, see
@@ -294,6 +299,8 @@ export function registerTitleRoutes(router: Router): void {
       // for the same reason.
       try {
         const sweepRows = await listTitleRatingRows(ownerId, {
+          watching: query.watching,
+          priorities: query.priorities,
           q: query.q,
           services: query.services,
           mediaType: query.mediaType,
@@ -310,6 +317,8 @@ export function registerTitleRoutes(router: Router): void {
     }
 
     const { rows, hasMore } = await listTitlePage(ownerId, {
+      watching: query.watching,
+      priorities: query.priorities,
       q: query.q,
       limit: query.limit,
       dir: query.dir,
@@ -331,6 +340,8 @@ export function registerTitleRoutes(router: Router): void {
       query.runtimes.length === 0
         ? null
         : await countRuntimeUnknown(ownerId, {
+            watching: query.watching,
+            priorities: query.priorities,
             q: query.q,
             services: query.services,
             mediaType: query.mediaType,
@@ -369,39 +380,49 @@ export function registerTitleRoutes(router: Router): void {
     const lastRow = last === undefined ? undefined : (last as unknown as TitleRow);
     const nextCursor = !hasMore
       ? null
-      : query.sort === 'runtime'
+      : query.sort === 'watchPriority'
         ? lastRow === undefined
           ? null
-          : encodeRuntimeCursor({
-              runtimeMinutes: lastRow.tmdbRuntimeMinutes,
+          : encodeWatchPriorityCursor({
+              watchPriorityRank: watchPriorityRank({
+                watching: lastRow.watching ?? false,
+                priority: lastRow.priority ?? 'normal',
+              }),
               id: lastRow.id,
             })
-        : query.sort === 'releaseYear'
+        : query.sort === 'runtime'
           ? lastRow === undefined
             ? null
-            : encodeReleaseYearCursor({
-                releaseYear: lastRow.tmdbReleaseYear,
+            : encodeRuntimeCursor({
+                runtimeMinutes: lastRow.tmdbRuntimeMinutes,
                 id: lastRow.id,
               })
-          : query.sort === 'rating'
+          : query.sort === 'releaseYear'
             ? lastRow === undefined
               ? null
-              : encodeRatingCursor({
-                  ratingTenths: lastRow.imdbRatingTenths ?? null,
+              : encodeReleaseYearCursor({
+                  releaseYear: lastRow.tmdbReleaseYear,
                   id: lastRow.id,
                 })
-            : query.sort === 'name'
+            : query.sort === 'rating'
               ? lastRow === undefined
                 ? null
-                : // ⚠ THE STORED KEY, NOT THE DISPLAYED TITLE. They differ
-                  // whenever a leading article was stripped — the row shown as
-                  // *The Matrix* sits at position `Matrix` — so a cursor built
-                  // from the visible name names the wrong place in the order
-                  // and page two silently starts past the rows in between.
-                  encodeNameCursor({ sortName: lastRow.sortName ?? null, id: lastRow.id })
-              : last?.sortDateAdded != null
-                ? encodeCursor({ sortDateAdded: toIsoDate(last.sortDateAdded), id: last.id })
-                : null;
+                : encodeRatingCursor({
+                    ratingTenths: lastRow.imdbRatingTenths ?? null,
+                    id: lastRow.id,
+                  })
+              : query.sort === 'name'
+                ? lastRow === undefined
+                  ? null
+                  : // ⚠ THE STORED KEY, NOT THE DISPLAYED TITLE. They differ
+                    // whenever a leading article was stripped — the row shown as
+                    // *The Matrix* sits at position `Matrix` — so a cursor built
+                    // from the visible name names the wrong place in the order
+                    // and page two silently starts past the rows in between.
+                    encodeNameCursor({ sortName: lastRow.sortName ?? null, id: lastRow.id })
+                : last?.sortDateAdded != null
+                  ? encodeCursor({ sortDateAdded: toIsoDate(last.sortDateAdded), id: last.id })
+                  : null;
 
     res.status(200).json({ items, nextCursor, limit: query.limit, runtimeUnknownHidden });
 

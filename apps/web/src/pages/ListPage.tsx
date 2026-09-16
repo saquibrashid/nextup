@@ -11,6 +11,8 @@
 
 import type { JSX } from 'react';
 import { useState } from 'react';
+import { WatchPreferencesDialog } from '../components/WatchPreferencesDialog';
+import type { WatchPreferencesRequest, WatchPreferencesResult } from '../lib/apiClient';
 import { useSearchParams } from 'react-router-dom';
 
 import { FilterBar, parseFilters, applyFilters, NO_FILTERS } from '../components/FilterBar';
@@ -49,6 +51,10 @@ import {
 } from '../copy';
 
 export interface ListPageProps {
+  readonly onWatchPreferences?: (
+    titleId: string,
+    body: WatchPreferencesRequest,
+  ) => Promise<WatchPreferencesResult>;
   readonly items?: readonly TitleListItem[];
   /** `null` when `GET /api/service-state` could not be read (`T-FRESH-014`). */
   readonly serviceState?: readonly ServiceFreshness[] | null;
@@ -149,6 +155,7 @@ interface SuppressedResult {
 
 /** Which dialog the row menu opened, and over which row. */
 type OpenDialog =
+  | { readonly kind: 'watch'; readonly item: TitleListItem }
   | { readonly kind: 'suppress'; readonly item: TitleListItem }
   | { readonly kind: 'fix-match'; readonly item: TitleListItem }
   | { readonly kind: 'remove'; readonly item: TitleListItem }
@@ -193,6 +200,7 @@ export function ListPage({
   onRestoreListing,
   onAddTitle,
   onReload,
+  onWatchPreferences,
 }: ListPageProps): JSX.Element {
   const [params, setParams] = useSearchParams();
   const filters = parseFilters(params);
@@ -415,6 +423,11 @@ export function ListPage({
         <>
           <TitleList
             items={visible}
+            onWatchPreferences={
+              onWatchPreferences && !offline
+                ? (item) => setDialog({ kind: 'watch', item })
+                : undefined
+            }
             view={view}
             pendingTitleIds={pendingTitleIds}
             activeGenres={filters.genres}
@@ -485,6 +498,18 @@ export function ListPage({
             DOM ancestry, not screen position, precisely because a floating
             menu that happens to land near the row passes any visual check.
           */}
+          {dialog?.kind === 'watch' && onWatchPreferences !== undefined && (
+            <WatchPreferencesDialog
+              item={dialog.item}
+              offline={offline}
+              save={onWatchPreferences}
+              onClose={closeAll}
+              onSaved={() => {
+                closeAll();
+                onReload?.();
+              }}
+            />
+          )}
           {dialog !== null && suppressFn !== undefined && unsuppressFn !== undefined && (
             <>
               {dialog.kind === 'suppress' && (

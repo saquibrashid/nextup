@@ -88,6 +88,8 @@ describe('T-DATA-003 — every method sends credentials', () => {
     const invocations: Record<string, () => Promise<unknown>> = {
       getMe: () => client.getMe(),
       getTitles: () => client.getTitles('sort=date'),
+      updateWatchPreferences: () =>
+        client.updateWatchPreferences('ttl_1', { watching: true, priority: 'up-next' }),
       getTitle: () => client.getTitle('ttl_1'),
       getServiceState: () => client.getServiceState(),
       getSuppressions: () => client.getSuppressions(),

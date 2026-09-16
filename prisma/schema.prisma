@@ -185,6 +185,17 @@ model Title {
   @@map("title")
 }
 
+/// Owner choices survive removal/reappearance. No title foreign key or expiry.
+model WatchPreference {
+  ownerId      String  @map("owner_id") @db.NVarChar(200)
+  workIdentity String  @map("work_identity") @db.NVarChar(200)
+  watching     Boolean @default(false, map: "df_watch_preference_watching")
+  priority     String  @default("normal", map: "df_watch_preference_priority") @db.NVarChar(16)
+
+  @@id([ownerId, workIdentity], map: "pk_watch_preference")
+  @@map("watch_preference")
+}
+
 /// *"The owner wants this work and it is not on a service they have."*
 /// `specs/data-model.md` §17.1, ADR-0010, migration `0006_watch_intent`.
 ///
