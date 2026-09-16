@@ -221,10 +221,12 @@ describe('T-UX-111 · ui-refresh.md §4.1/§4.2 · at 1280 px the grid layout re
     expect(grid).not.toMatch(/repeat\(\s*\d+\s*,/);
   });
 
-  it('T-UX-111c: the tile stacks the row, and the poster fills the tile width', () => {
+  it('T-UX-111c: the tile pairs artwork and details, and the poster fills its track', () => {
     const block = mediaBlock(GRID_QUERY);
 
-    expect(ruleBody('\\.title-row', block)).toMatch(/flex-direction:\s*column/);
+    expect(ruleBody('\\.title-row', block)).toMatch(
+      /grid-template-columns:\s*minmax\(0,\s*0.8fr\)\s*minmax\(0,\s*1fr\)/,
+    );
     const poster = ruleBody('\\.title-row__poster', block);
     expect(poster).toMatch(/width:\s*100%/);
     // ⚠ `height: auto` is the half that matters: without it the base 6.75rem

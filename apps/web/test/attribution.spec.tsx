@@ -218,8 +218,7 @@ describe('TMDB attribution', () => {
     renderAt('/');
 
     expect(screen.getByText(REQUIRED_WORDING)).toBeVisible();
-    expect(document.querySelector('details')).toBeNull();
-    expect(document.querySelector('[hidden]')).toBeNull();
+    expect(screen.getByText(REQUIRED_WORDING).closest('details, [hidden]')).toBeNull();
   });
 });
 

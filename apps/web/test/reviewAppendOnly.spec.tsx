@@ -201,7 +201,11 @@ describe('T-REM-011 · US-014 AC-2 · append-only: the removals section does not
       /\/\*[\s\S]*?\*\//g,
       '',
     );
-    const reviewBlock = css.slice(css.indexOf('.review-heading'));
+    const reviewBlock = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+      .filter((rule) => /\.review-[\w-]+/.test(rule[1] ?? ''))
+      .map((rule) => rule[2])
+      .join('\n');
+    expect(reviewBlock).not.toBe('');
 
     expect(reviewBlock).not.toMatch(/display:\s*none/);
     expect(reviewBlock).not.toMatch(/visibility:\s*hidden/);

@@ -7,11 +7,12 @@
 // back button and on a deep link — the two ways a filtered list is actually
 // shared and revisited.
 
-import { fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import type { JSX } from 'react';
-import { runtimeInBucket } from '@nextup/domain';
+import { SERVICES, SERVICE_LABELS, runtimeInBucket } from '@nextup/domain';
 
 import {
   FilterBar,
@@ -22,7 +23,7 @@ import {
   isFiltered,
   parseFilters,
 } from '../src/components/FilterBar';
-import { ListPage } from '../src/pages/ListPage';
+import { FilterDisclosure } from '../src/components/FilterDisclosure';
 import {
   CLEAR_FILTERS_LABEL,
   RUNTIME_BUCKET_LABELS,
@@ -33,7 +34,26 @@ import {
 /** Publishes the live URL so a test can assert what the bar actually wrote. */
 function LocationProbe(): JSX.Element {
   const location = useLocation();
-  return <span data-testid="url">{`${location.pathname}${location.search}`}</span>;
+  const navigate = useNavigate();
+  return (
+    <>
+      <span data-testid="url">{`${location.pathname}${location.search}`}</span>
+      <button
+        onClick={() => {
+          void navigate(-1);
+        }}
+      >
+        Back
+      </button>
+      <button
+        onClick={() => {
+          void navigate(1);
+        }}
+      >
+        Forward
+      </button>
+    </>
+  );
 }
 
 function mount(
@@ -42,6 +62,7 @@ function mount(
     genres?: readonly string[];
     shown?: number;
     total?: number;
+    totalIsLowerBound?: boolean;
     runtimeUnknownHidden?: number | null;
   } = {},
 ): void {
@@ -56,6 +77,7 @@ function mount(
                 genres={props.genres ?? ['Drama', 'Comedy']}
                 shown={props.shown ?? 1}
                 total={props.total ?? 10}
+                totalIsLowerBound={props.totalIsLowerBound ?? false}
                 runtimeUnknownHidden={props.runtimeUnknownHidden ?? null}
               />
               <LocationProbe />
@@ -72,6 +94,14 @@ function url(): string {
 }
 
 function box(name: string, value: string): HTMLInputElement {
+  const labels: Record<string, string> = {
+    service: 'Services',
+    type: 'Type',
+    genre: 'Genre',
+    runtime: 'Runtime',
+  };
+  const trigger = screen.getByRole('button', { name: labels[name], exact: true });
+  if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
   // `Array.from`, NOT `.values().find(...)`. Both work now that the runtime is
   // Node 22 (iterator helpers landed in V8 12.2), so this is a readability
   // choice rather than a constraint — but it is the form that cannot diverge
@@ -89,8 +119,11 @@ describe('T-UI-016 - the filter bar syncs to the query string in both directions
   it('T-UI-016a renders the service, type and genre controls', () => {
     mount('/');
 
+    fireEvent.click(screen.getByRole('button', { name: 'Services', exact: true }));
     expect(screen.getByTestId('filter-service')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Type', exact: true }));
     expect(screen.getByTestId('filter-type')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Genre', exact: true }));
     expect(screen.getByTestId('filter-genre')).toBeTruthy();
   });
 
@@ -236,7 +269,7 @@ describe('T-UX-013 - the zero-match state is not the empty state', () => {
     );
 
     const chips = screen.getAllByTestId('zero-match-chip').map((el) => el.textContent);
-    expect(chips).toEqual(['max', 'tv', 'Drama', 'Comedy']);
+    expect(chips).toEqual(['Max', 'TV series', 'Drama', 'Comedy']);
   });
 
   it('T-UX-013d offers the way out', () => {
@@ -255,12 +288,13 @@ describe('T-UX-013 - the zero-match state is not the empty state', () => {
   it('T-UX-013e lists the chips in URL order so they match the controls', () => {
     const filters = parseFilters(new URLSearchParams('service=netflix&genre=Drama&type=movie'));
 
-    expect(activeFilterChips(filters)).toEqual(['netflix', 'movie', 'Drama']);
+    expect(activeFilterChips(filters)).toEqual(['Netflix', 'Movies', 'Drama']);
   });
 });
 
 describe('T-UI-016 - the page wires the bar to the list', () => {
-  it('T-UI-016n clearing from the zero-match state empties the query string', () => {
+  it('T-UI-016n clearing from the zero-match state empties the query string', async () => {
+    const { ListPage } = await import('../src/pages/ListPage');
     render(
       <MemoryRouter initialEntries={['/?service=netflix&type=movie&dir=asc']}>
         <Routes>
@@ -310,8 +344,244 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
     // runtimes would remove the only control that accounts for the list's
     // length.
     mount('/', { genres: [] });
+    fireEvent.click(screen.getByRole('button', { name: 'Runtime', exact: true }));
     expect(screen.getByTestId('filter-runtime')).toBeTruthy();
     expect(screen.queryByTestId('filter-genre')).toBeNull();
+  });
+
+  describe('T-UX-139 - scalable filter pickers and removable active filters', () => {
+    it('T-UX-139a starts compact and offers only registry services, without a phantom All', async () => {
+      const user = userEvent.setup();
+      mount('/');
+      expect(screen.queryByRole('checkbox')).toBeNull();
+      for (const name of ['Services', 'Type', 'Genre', 'Runtime']) {
+        expect(screen.getByRole('button', { name, exact: true })).toHaveAttribute(
+          'aria-expanded',
+          'false',
+        );
+      }
+      await user.click(screen.getByRole('button', { name: 'Services', exact: true }));
+      expect(screen.getAllByRole('checkbox')).toHaveLength(SERVICES.length);
+      expect(SERVICES).toEqual(['netflix', 'max']);
+      for (const service of SERVICES) {
+        expect(screen.getByRole('checkbox', { name: SERVICE_LABELS[service] })).toBeEnabled();
+      }
+      expect(screen.queryByRole('checkbox', { name: /all/i })).toBeNull();
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(document.querySelector('[aria-modal]')).toBeNull();
+    });
+
+    it('T-UX-139b service search filters only picker options, retaining selection and URL state', async () => {
+      const user = userEvent.setup();
+      mount('/?service=netflix&q=Arrival&sort=dateAdded&dir=asc&view=grid');
+      await user.click(screen.getByRole('button', { name: 'Services', exact: true }));
+      const search = screen.getByRole('searchbox', { name: 'Search services' });
+      expect(search).toHaveFocus();
+      const original = url();
+      await user.type(search, '  MAX');
+      expect(screen.queryByRole('checkbox', { name: 'Netflix' })).toBeNull();
+      expect(screen.getByRole('checkbox', { name: 'Max' })).toBeVisible();
+      expect(url()).toBe(original);
+      await user.click(screen.getByRole('checkbox', { name: 'Max' }));
+      expect(new URLSearchParams(url().split('?')[1]).getAll('service')).toEqual([
+        'netflix',
+        'max',
+      ]);
+      const written = new URLSearchParams(url().split('?')[1]);
+      expect(written.get('q')).toBe('Arrival');
+      expect(written.get('sort')).toBe('dateAdded');
+      expect(written.get('dir')).toBe('asc');
+      expect(written.get('view')).toBe('grid');
+      expect(screen.getByRole('button', { name: 'Remove service filter: Netflix' })).toBeVisible();
+      await user.clear(search);
+      expect(screen.getByRole('checkbox', { name: 'Netflix' })).toBeChecked();
+      await user.type(search, 'unavailable provider');
+      expect(screen.queryByRole('checkbox')).toBeNull();
+      expect(screen.getByText('No services match your search.')).toHaveAttribute('role', 'status');
+      expect(screen.getByTestId('filter-count')).toHaveTextContent('Showing 1 of 10');
+    });
+
+    it.each([
+      ['service', 'netflix', 'Netflix'],
+      ['service', 'max', 'Max'],
+      ['type', 'movie', 'Movies'],
+      ['type', 'tv', 'TV series'],
+      ['genre', 'Drama', 'Drama'],
+      ['runtime', 'under30', RUNTIME_BUCKET_LABELS.under30],
+    ])('T-UX-139c removes only %s=%s, with a human-facing %s chip', (dimension, value, label) => {
+      const initial =
+        '/?service=netflix&service=max&type=movie&type=tv&genre=Drama&genre=Comedy&runtime=under30&runtime=over120&q=Arrival&sort=runtime&dir=asc&view=grid&cursor=abc&extra=one&extra=two';
+      mount(initial, { shown: 4, total: 10 });
+      const chips = screen.getByRole('list', { name: 'Active filters' });
+      const chip = within(chips).getByRole('button', {
+        name: `Remove ${dimension} filter: ${label}`,
+      });
+      expect(chip).toHaveClass('tap-target');
+      expect(chip).toHaveAttribute('type', 'button');
+      const expected = new URLSearchParams(initial.split('?')[1]);
+      expected.delete(dimension, value);
+      fireEvent.click(chip);
+      expect(new URLSearchParams(url().split('?')[1]).toString()).toBe(expected.toString());
+      expect(screen.getByTestId('filter-count')).toHaveTextContent('Showing 4 of 10');
+    });
+
+    it('T-UX-139d exposes a search-only chip and removes q without touching other parameters', () => {
+      mount('/?q=Arrival&sort=title&dir=desc&view=grid&extra=keep');
+      expect(screen.getByTestId('clear-filters')).toBeVisible();
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Remove search filter: Search: Arrival' }),
+      );
+      expect(url()).toBe('/?sort=title&dir=desc&view=grid&extra=keep');
+      expect(screen.queryByRole('list', { name: 'Active filters' })).toBeNull();
+      expect(screen.queryByTestId('clear-filters')).toBeNull();
+    });
+
+    it('T-UX-139e Clear filters removes every dimension and q, preserving sort, view and unrelated parameters', () => {
+      mount(
+        '/?service=max&type=tv&genre=Drama&runtime=over120&q=Arrival&sort=title&dir=asc&view=grid&extra=keep',
+      );
+      fireEvent.click(screen.getByTestId('clear-filters'));
+      expect(url()).toBe('/?sort=title&dir=asc&view=grid&extra=keep');
+      expect(screen.queryByRole('list', { name: 'Active filters' })).toBeNull();
+    });
+
+    it('T-UX-139f keyboard opening, Escape and Done restore focus without undoing selected filters', async () => {
+      const user = userEvent.setup();
+      mount('/');
+      const trigger = screen.getByRole('button', { name: 'Type', exact: true });
+      trigger.focus();
+      await user.keyboard('{Enter}');
+      const movies = screen.getByRole('checkbox', { name: 'Movies' });
+      expect(movies).toHaveFocus();
+      await user.keyboard(' ');
+      expect(movies).toBeChecked();
+      await user.keyboard('{Escape}');
+      expect(trigger).toHaveFocus();
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(url()).toContain('type=movie');
+      await user.keyboard(' ');
+      expect(screen.getByRole('checkbox', { name: 'Movies' })).toBeChecked();
+      await user.click(screen.getByRole('button', { name: 'Done' }));
+      expect(trigger).toHaveFocus();
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('T-UX-139g outside click closes and restores focus; Tab leaves without a focus trap', async () => {
+      const user = userEvent.setup();
+      mount('/');
+      const trigger = screen.getByRole('button', { name: 'Type', exact: true });
+      await user.click(trigger);
+      await user.click(screen.getByTestId('filter-count'));
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(trigger).toHaveFocus();
+      await user.click(trigger);
+      await user.tab();
+      expect(screen.getByRole('checkbox', { name: 'TV series' })).toHaveFocus();
+      await user.tab();
+      expect(screen.getByRole('button', { name: 'Done' })).toHaveFocus();
+      await user.tab();
+      expect(screen.getByRole('button', { name: 'Genre', exact: true })).toHaveFocus();
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('T-UX-139h opening another picker closes the first without stealing its focus', async () => {
+      const user = userEvent.setup();
+      mount('/');
+      const services = screen.getByRole('button', { name: 'Services', exact: true });
+      await user.click(services);
+      await user.click(screen.getByRole('button', { name: 'Runtime', exact: true }));
+      expect(services).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.getByRole('checkbox', { name: RUNTIME_BUCKET_LABELS.under30 })).toHaveFocus();
+    });
+
+    it('T-UX-139i generated IDs remain unique across instances and stable across updates', () => {
+      render(
+        <MemoryRouter>
+          <FilterBar shown={1} total={2} />
+          <FilterBar shown={1} total={2} />
+        </MemoryRouter>,
+      );
+      const triggers = screen.getAllByRole('button', { name: 'Services', exact: true });
+      for (const trigger of triggers) {
+        const controls = trigger.getAttribute('aria-controls');
+        expect(controls).toBeTruthy();
+        fireEvent.click(trigger);
+        expect(trigger).toHaveAttribute('aria-controls', controls);
+        expect(document.getElementById(controls ?? '')).toHaveAttribute(
+          'aria-labelledby',
+          trigger.id,
+        );
+        fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+      }
+      const ids = Array.from(document.querySelectorAll('[id]'), (element) => element.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it('T-UX-139j Back and Forward update both chips and reopened checkboxes from the URL', async () => {
+      const user = userEvent.setup();
+      mount('/?service=netflix&q=Arrival');
+      await user.click(screen.getByRole('button', { name: 'Remove service filter: Netflix' }));
+      await user.click(screen.getByRole('button', { name: 'Back' }));
+      expect(screen.getByRole('button', { name: 'Remove service filter: Netflix' })).toBeVisible();
+      expect(box('service', 'netflix')).toBeChecked();
+      await user.click(screen.getByRole('button', { name: 'Forward' }));
+      expect(screen.queryByRole('button', { name: 'Remove service filter: Netflix' })).toBeNull();
+      expect(box('service', 'netflix')).not.toBeChecked();
+      expect(
+        screen.getByRole('button', { name: 'Remove search filter: Search: Arrival' }),
+      ).toBeVisible();
+    });
+
+    it('T-UX-139k identical labels across dimensions remove only the targeted value', () => {
+      mount('/?service=max&genre=Max&genre=Max&type=movie');
+      expect(screen.getAllByRole('button', { name: 'Remove genre filter: Max' })).toHaveLength(1);
+      fireEvent.click(screen.getByRole('button', { name: 'Remove genre filter: Max' }));
+      expect(url()).toBe('/?service=max&type=movie');
+      expect(screen.getByRole('button', { name: 'Remove service filter: Max' })).toBeVisible();
+    });
+
+    it('T-UX-139l keeps the live count honest when the total is a lower bound', () => {
+      mount('/?service=netflix', { shown: 50, total: 50, totalIsLowerBound: true });
+      expect(screen.getByTestId('filter-count')).toHaveTextContent('Showing 50 of at least 50');
+      expect(screen.getByTestId('filter-count')).toHaveAttribute('role', 'status');
+      expect(screen.getByRole('button', { name: 'Remove service filter: Netflix' })).toBeVisible();
+    });
+
+    it('T-UX-139m standalone disclosures retain their control identity when labels change', () => {
+      const { rerender } = render(
+        <FilterDisclosure label="Services (2)">
+          <p>Selected services</p>
+        </FilterDisclosure>,
+      );
+      const trigger = screen.getByRole('button', { name: 'Services (2)' });
+      const id = trigger.id;
+      rerender(
+        <FilterDisclosure label="Services">
+          <p>Selected services</p>
+        </FilterDisclosure>,
+      );
+      expect(screen.getByRole('button', { name: 'Services', exact: true })).toHaveAttribute(
+        'id',
+        id,
+      );
+    });
+
+    it('T-UX-139n standalone factual disclosures focus their first link and restore focus on Done', async () => {
+      const user = userEvent.setup();
+      render(
+        <FilterDisclosure label="Service updates">
+          <a href="/upload?service=netflix">Netflix updated today</a>
+        </FilterDisclosure>,
+      );
+      const trigger = screen.getByRole('button', { name: 'Service updates' });
+      await user.click(trigger);
+      expect(screen.getByRole('link', { name: 'Netflix updated today' })).toHaveFocus();
+      await user.tab();
+      expect(screen.getByRole('button', { name: 'Done' })).toHaveFocus();
+      await user.keyboard('{Enter}');
+      expect(trigger).toHaveFocus();
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    });
   });
 
   it('T-UX-123k buckets are OR-ed within the dimension, like every other filter', () => {

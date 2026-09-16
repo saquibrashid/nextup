@@ -294,6 +294,7 @@ export function registerTitleRoutes(router: Router): void {
       // for the same reason.
       try {
         const sweepRows = await listTitleRatingRows(ownerId, {
+          q: query.q,
           services: query.services,
           mediaType: query.mediaType,
           genres: query.genres,
@@ -309,6 +310,7 @@ export function registerTitleRoutes(router: Router): void {
     }
 
     const { rows, hasMore } = await listTitlePage(ownerId, {
+      q: query.q,
       limit: query.limit,
       dir: query.dir,
       cursor: query.cursor,
@@ -329,6 +331,7 @@ export function registerTitleRoutes(router: Router): void {
       query.runtimes.length === 0
         ? null
         : await countRuntimeUnknown(ownerId, {
+            q: query.q,
             services: query.services,
             mediaType: query.mediaType,
             genres: query.genres,

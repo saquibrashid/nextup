@@ -354,12 +354,11 @@ describe('T-UX-015 the load-more sentinel reaches the rest of the list', () => {
       expect(screen.getAllByTestId('title-name')).toHaveLength(PAGE_LIMIT + 10);
     });
 
-    // ⚠ CARRIED FORWARD BY TASK-217. This clicked `sort-control` when the
-    // direction was a single toggling button; REQ-121 made it a two-option
-    // segment, so the click that changes the query is now the non-current
-    // option. The property under test is unchanged: changing the sort changes
-    // the query string, and the pages fetched under the old one must go.
-    await userEvent.click(within(screen.getByTestId('sort-dir-asc')).getByRole('radio'));
+    // Reversing the selected order changes the query; pages from the old
+    // order must still be discarded under the approved one-click sort UX.
+    await userEvent.click(
+      within(screen.getByTestId('sort-control')).getByRole('button', { pressed: true }),
+    );
 
     await waitFor(() => {
       expect(screen.getAllByTestId('title-name')).toHaveLength(PAGE_LIMIT);

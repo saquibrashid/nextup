@@ -47,7 +47,7 @@ Each state below names: **what the owner sees**, **what they can do**, and the
 
 | State | Owner sees | Can do | Test |
 |---|---|---|---|
-| **2.1 Loading (initial)** | Freshness strip and filter bar as skeletons; 6 row skeletons. Past 1200 ms, the cold-start notice. | Nothing yet; nav is live | `T-UX-010` |
+| **2.1 Loading (initial or changed filters)** | Real search, filter, sort and view controls stay mounted; an open picker and its selections survive the pending read. Result and hidden-runtime counts wait for the response. Six row skeletons; past 1200 ms, the cold-start notice. Service-update facts remain independently available, with visible degradation when unavailable. | Change search/filters/order/view; nav is live | `T-UX-010`, `T-UX-141h`, `T-UX-141i` |
 | **2.2 Loading (next page)** | Existing rows stay; a spinner row at the sentinel | Keep scrolling and reading | `T-UX-011` |
 | **2.3 Empty — never uploaded** | *"Nothing here yet."* + *"Upload screenshots of your saved lists on Netflix or Max and nextup will build one combined list."* Primary button **"Upload screenshots"**. Freshness strip shows both services *never updated*. | Go to `/upload` | `T-UX-012` |
 | **2.4 Empty — filters exclude everything** | *"No titles match these filters."* + the active filter chips + **"Clear filters"**. **Distinct from 2.3** — it must never read as data loss (US-019 AC-5). | Clear or change filters | `T-UX-013` |

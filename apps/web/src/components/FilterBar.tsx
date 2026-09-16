@@ -16,13 +16,15 @@ import { Input } from './ui/Input';
 // opposite rule to filters. Stubbing it here would report it as shipped and
 // bake in the wrong persistence model.
 
-import type { JSX } from 'react';
+import { useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from './ui/Button';
 import { Field } from './ui/Field';
+import { FilterDisclosure } from './FilterDisclosure';
 import {
   RUNTIME_BUCKETS,
   SERVICES,
+  SERVICE_LABELS,
   isRuntimeBucket,
   type RuntimeBucket,
   type Service,
@@ -39,6 +41,7 @@ import {
 /** `api.md` §6.2 — `type` is `movie|tv`. */
 export const MEDIA_TYPES = ['movie', 'tv'] as const;
 export type MediaType = (typeof MEDIA_TYPES)[number];
+const MEDIA_TYPE_LABELS: Record<MediaType, string> = { movie: 'Movies', tv: 'TV series' };
 
 export interface ListFilters {
   /** OR within the dimension (`api.md` §6.2, US-019 AC-4). */
@@ -115,8 +118,8 @@ export function isFiltered(filters: ListFilters): boolean {
 /** The chips §2.4 shows alongside the zero-match message, in URL order. */
 export function activeFilterChips(filters: ListFilters): readonly string[] {
   return [
-    ...filters.services,
-    ...filters.types,
+    ...filters.services.map((service) => SERVICE_LABELS[service]),
+    ...filters.types.map((type) => MEDIA_TYPE_LABELS[type]),
     ...filters.genres,
     // Named, not tokenised: a chip reading `60-120` states the cause of an
     // empty list in a vocabulary the owner never chose it in.
@@ -168,6 +171,7 @@ export interface FilterBarProps {
    * applied.
    */
   readonly runtimeUnknownHidden?: number | null;
+  readonly countPending?: boolean;
 }
 
 export function FilterBar({
@@ -176,9 +180,42 @@ export function FilterBar({
   total,
   totalIsLowerBound = false,
   runtimeUnknownHidden = null,
+  countPending = false,
 }: FilterBarProps): JSX.Element {
   const [params, setParams] = useSearchParams();
   const filters = parseFilters(params);
+  const genreOptions = [...new Set([...genres, ...filters.genres])];
+  const [serviceQuery, setServiceQuery] = useState('');
+  const services = SERVICES.filter((service) =>
+    SERVICE_LABELS[service].toLowerCase().includes(serviceQuery.trim().toLowerCase()),
+  );
+  const query = params.get('q') ?? '';
+  const chips = [
+    ...filters.services.map((value) => ({
+      dimension: 'service',
+      value,
+      label: SERVICE_LABELS[value],
+    })),
+    ...filters.types.map((value) => ({
+      dimension: 'type',
+      value,
+      label: MEDIA_TYPE_LABELS[value],
+    })),
+    ...filters.genres.map((value) => ({ dimension: 'genre', value, label: value })),
+    ...filters.runtimes.map((value) => ({
+      dimension: 'runtime',
+      value,
+      label: RUNTIME_BUCKET_LABELS[value],
+    })),
+    ...(query ? [{ dimension: 'q', value: query, label: `Search: ${query}` }] : []),
+  ];
+
+  function removeChip(dimension: string, value: string): void {
+    const next = new URLSearchParams(params);
+    if (dimension === 'q') next.delete('q');
+    else next.delete(dimension, value);
+    setParams(next);
+  }
 
   function update(next: ListFilters): void {
     // `replace: false` — each filter change is a history entry, so Back undoes
@@ -188,60 +225,80 @@ export function FilterBar({
 
   return (
     <div className="filter-bar" data-testid="filter-bar" role="group" aria-label="Filter the list">
-      <Field legend="Service" testId="filter-service">
-        {SERVICES.map((service) => (
-          <label key={service}>
-            <Input
-              type="checkbox"
-              name="service"
-              value={service}
-              checked={filters.services.includes(service)}
-              onChange={() => {
-                update({ ...filters, services: toggle(filters.services, service) });
-              }}
-            />
-            {service}
-          </label>
-        ))}
-      </Field>
-
-      <Field legend="Type" testId="filter-type">
-        {MEDIA_TYPES.map((type) => (
-          <label key={type}>
-            <Input
-              type="checkbox"
-              name="type"
-              value={type}
-              checked={filters.types.includes(type)}
-              onChange={() => {
-                update({ ...filters, types: toggle(filters.types, type) });
-              }}
-            />
-            {type}
-          </label>
-        ))}
-      </Field>
-
-      {genres.length > 0 && (
-        <Field legend="Genre" testId="filter-genre">
-          {genres.map((genre) => (
-            <label key={genre}>
+      <div className="filter-controls">
+        <FilterDisclosure label="Services">
+          <Field label="Search services">
+            {(control) => (
               <Input
-                type="checkbox"
-                name="genre"
-                value={genre}
-                checked={filters.genres.includes(genre)}
-                onChange={() => {
-                  update({ ...filters, genres: toggle(filters.genres, genre) });
+                {...control}
+                type="search"
+                value={serviceQuery}
+                onChange={(event) => {
+                  setServiceQuery(event.target.value);
                 }}
               />
-              {genre}
-            </label>
-          ))}
-        </Field>
-      )}
+            )}
+          </Field>
+          <Field legend="Services" testId="filter-service">
+            {services.map((service) => (
+              <label key={service}>
+                <Input
+                  type="checkbox"
+                  name="service"
+                  value={service}
+                  checked={filters.services.includes(service)}
+                  onChange={() => {
+                    update({ ...filters, services: toggle(filters.services, service) });
+                  }}
+                />
+                {SERVICE_LABELS[service]}
+              </label>
+            ))}
+          </Field>
+          {services.length === 0 && <p role="status">No services match your search.</p>}
+        </FilterDisclosure>
 
-      {/*
+        <FilterDisclosure label="Type">
+          <Field legend="Type" testId="filter-type">
+            {MEDIA_TYPES.map((type) => (
+              <label key={type}>
+                <Input
+                  type="checkbox"
+                  name="type"
+                  value={type}
+                  checked={filters.types.includes(type)}
+                  onChange={() => {
+                    update({ ...filters, types: toggle(filters.types, type) });
+                  }}
+                />
+                {MEDIA_TYPE_LABELS[type]}
+              </label>
+            ))}
+          </Field>
+        </FilterDisclosure>
+
+        {genreOptions.length > 0 && (
+          <FilterDisclosure label="Genre">
+            <Field legend="Genre" testId="filter-genre">
+              {genreOptions.map((genre) => (
+                <label key={genre}>
+                  <Input
+                    type="checkbox"
+                    name="genre"
+                    value={genre}
+                    checked={filters.genres.includes(genre)}
+                    onChange={() => {
+                      update({ ...filters, genres: toggle(filters.genres, genre) });
+                    }}
+                  />
+                  {genre}
+                </label>
+              ))}
+            </Field>
+          </FilterDisclosure>
+        )}
+
+        {/*
         REQ-035 — the runtime buckets. ALWAYS PRESENT, unlike the genre
         fieldset above, which is conditional on the list actually containing
         genres. The bucket set is fixed by `RUNTIME_BUCKET_BOUNDS` rather than
@@ -249,34 +306,63 @@ export function FilterBar({
         runtime would remove the only control that explains why the list is
         the length it is.
       */}
-      <Field legend="Runtime" testId="filter-runtime">
-        {RUNTIME_BUCKETS.map((bucket) => (
-          <label key={bucket}>
-            <Input
-              type="checkbox"
-              name="runtime"
-              value={bucket}
-              checked={filters.runtimes.includes(bucket)}
-              onChange={() => {
-                update({ ...filters, runtimes: toggle(filters.runtimes, bucket) });
-              }}
-            />
-            {RUNTIME_BUCKET_LABELS[bucket]}
-          </label>
-        ))}
-      </Field>
+        <FilterDisclosure label="Runtime">
+          <Field legend="Runtime" testId="filter-runtime">
+            {RUNTIME_BUCKETS.map((bucket) => (
+              <label key={bucket}>
+                <Input
+                  type="checkbox"
+                  name="runtime"
+                  value={bucket}
+                  checked={filters.runtimes.includes(bucket)}
+                  onChange={() => {
+                    update({ ...filters, runtimes: toggle(filters.runtimes, bucket) });
+                  }}
+                />
+                {RUNTIME_BUCKET_LABELS[bucket]}
+              </label>
+            ))}
+          </Field>
+        </FilterDisclosure>
+      </div>
+
+      {chips.length > 0 && (
+        <ul className="active-filters" aria-label="Active filters">
+          {chips
+            .filter(
+              (chip, index) =>
+                chips.findIndex(
+                  (other) => other.dimension === chip.dimension && other.value === chip.value,
+                ) === index,
+            )
+            .map((chip) => (
+              <li className="active-filter" key={`${chip.dimension}:${chip.value}`}>
+                <Button
+                  aria-label={`Remove ${chip.dimension === 'q' ? 'search' : chip.dimension} filter: ${chip.label}`}
+                  onClick={() => {
+                    removeChip(chip.dimension, chip.value);
+                  }}
+                >
+                  {chip.label} <span aria-hidden="true">×</span>
+                </Button>
+              </li>
+            ))}
+        </ul>
+      )}
 
       {/*
         Present only when something is filtered: a permanently-visible "Clear
         filters" on an unfiltered list implies filters are active when they are
         not.
       */}
-      {isFiltered(filters) && (
+      {(isFiltered(filters) || query !== '') && (
         <Button
           variant="secondary"
           data-testid="clear-filters"
           onClick={() => {
-            update(NO_FILTERS);
+            const next = applyFilters(params, NO_FILTERS);
+            next.delete('q');
+            setParams(next);
           }}
         >
           {CLEAR_FILTERS_LABEL}
@@ -288,9 +374,11 @@ export function FilterBar({
         a sighted owner sees the list shrink, a screen-reader user otherwise
         gets no signal at all.
       */}
-      <p data-testid="filter-count" role="status">
-        {`Showing ${String(shown)} of ${totalIsLowerBound ? AT_LEAST_PREFIX : ''}${String(total)}`}
-      </p>
+      {!countPending && (
+        <p data-testid="filter-count" role="status">
+          {`Showing ${String(shown)} of ${totalIsLowerBound ? AT_LEAST_PREFIX : ''}${String(total)}`}
+        </p>
+      )}
 
       {/*
         REQ-035 (`T-UX-124`) — PRODUCT INVARIANT 2 IN A NEW PLACE: nothing
@@ -307,7 +395,7 @@ export function FilterBar({
         `role="status"` for the same reason the count above has it: a sighted
         owner sees the list shrink, a screen-reader user gets no other signal.
       */}
-      {runtimeUnknownHidden !== null && runtimeUnknownHidden > 0 && (
+      {!countPending && runtimeUnknownHidden !== null && runtimeUnknownHidden > 0 && (
         <p data-testid="runtime-unknown-hidden" role="status">
           {runtimeUnknownHiddenLabel(runtimeUnknownHidden)}
         </p>
@@ -337,8 +425,8 @@ export function ZeroMatch({ filters, onClear }: ZeroMatchProps): JSX.Element {
     <div data-testid="zero-match">
       <p data-testid="zero-match-title">{ZERO_MATCH_TITLE}</p>
       <ul data-testid="zero-match-chips">
-        {chips.map((chip) => (
-          <li key={chip} data-testid="zero-match-chip">
+        {chips.map((chip, index) => (
+          <li key={`${String(index)}:${chip}`} data-testid="zero-match-chip">
             {chip}
           </li>
         ))}

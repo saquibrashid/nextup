@@ -206,8 +206,9 @@ describe('T-UX-010 the list loading state', () => {
 
     expect(screen.getAllByTestId('title-row-skeleton')).toHaveLength(6);
     expect(screen.getByTestId('list-loading-skeletons')).toBeInTheDocument();
-    expect(document.querySelector('.freshness-strip--skeleton')).not.toBeNull();
-    expect(document.querySelector('.filter-bar--skeleton')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Service updates' })).toBeVisible();
+    expect(screen.getByTestId('filter-bar')).toBeVisible();
+    expect(screen.queryByTestId('filter-count')).not.toBeInTheDocument();
   });
 
   it('T-UX-010b: the skeletons are hidden from assistive technology', () => {

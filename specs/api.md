@@ -795,10 +795,18 @@ dropped**, which is what `T-ATTR-006a` asserts rather than byte equality.
 
 ### 6.2 `GET /api/titles` — the combined list (US-018, US-019, US-020)
 
-Query: `service` (`netflix|max`, repeatable), `type` (`movie|tv`),
+Query: `service` (`netflix|max`, repeatable), `type` (`movie|tv`, repeatable, OR),
 `genre` (string, repeatable), `runtime` (`under30|30-60|60-120|over120`,
 repeatable), `sort` (`dateAdded` default | `name` | `releaseYear` | `runtime` |
-`rating`), `dir` (`desc` default | `asc`), `limit`, `cursor`.
+`rating`), `dir` (`asc|desc`, default per key below), **`q`** (optional single
+title-search string, trimmed, at most 500 JavaScript string-length units), `limit`, `cursor`.
+
+**Type selection is OR within the dimension.** Repeated values are
+deduplicated; selecting both supported values, `type=movie&type=tv`,
+normalizes to no type restriction, because those two values exhaust the
+supported set. One selected value restricts to that type. This adds no media
+type; unknown values still produce **400 `VALIDATION_FAILED`**. Other filter,
+search and ordering parameters remain unchanged.
 
 ⚠ **`dir`'s default is PER SORT KEY, not global.** `name` defaults to **`asc`**;
 every other key defaults to `desc`. "Newest first" and "highest rated first" are
@@ -815,6 +823,57 @@ Revision 1 before implementing it. An unrecognised `sort` is **400
 that quietly returns the default ordering looks like a working sort that does
 nothing. ~~"400 `INVALID_QUERY`"~~ — corrected in place: `INVALID_QUERY` is not
 a member of the closed enum in `packages/domain/src/errorCodes.ts`.
+
+#### 6.2c Submitted library title search (approved 2026-09-16)
+
+`q` is a **single string**. Apply JavaScript `trim()`; absent, empty
+or whitespace-only values mean no search. The trimmed nonempty value is at
+most **500 JavaScript string-length units after trimming**, never silently
+truncated. Repeated `q` values, even identical ones, arrays/structured values
+and an over-limit value yield **400 `VALIDATION_FAILED`**, with
+`details.field: 'q'`; oversized input also carries `details.maxLength: 500`.
+Validation precedes any repository read or metadata/rating lookup, and
+rejected values are not echoed in errors.
+
+Matching is **literal substring**, case- and accent-insensitive under
+`Latin1_General_100_CI_AI`, over the full display name:
+`COALESCE(title.tmdb_name, title.raw_extracted_text)`. The unmatched fallback
+is raw extracted text when no TMDB name exists. Do not use `sort_name`:
+article stripping is an alphabetical-order convention, not search semantics.
+Leading articles remain searchable. This is neither `normalised_text`
+matching nor fuzzy, typo-tolerant or token search.
+SQL/LIKE punctuation is literal, not query syntax or wildcard expansion.
+Use bound parameters and the shared LIKE escaping helper; never concatenate
+owner input into SQL.
+
+Search narrows the **authenticated owner's active, unsuppressed title set**
+with active listings, then composes with existing filter dimensions before
+ordering, keyset selection and page limits. Removed titles, other owners and
+work-identity suppressions remain excluded. Service filtering does not narrow
+the returned title's displayed active-service badges. The same predicate scopes
+`runtimeUnknownHidden` over every other filter (not the returned page), and
+the pre-sort rating-refresh candidate set under `sort=rating`. It creates no
+global total count and changes no stored title, listing, suppression or
+metadata model.
+
+The predicate must stay in SQL rather than materializing every matching ID
+as an unbounded `IN` parameter list; a large library must not cross SQL
+Server's 2,100-parameter ceiling. Every sort/direction keeps its existing
+nullable ordering, deterministic tie-breaker and cursor shape. Clients resend
+`q` on subsequent pages and start paging afresh on a new submission/clear.
+**Cursor payloads are not newly bound or fingerprinted to `q`.**
+**The browser must not search only loaded titles.**
+
+`T-API-030a`–`f` cover parser and route propagation/rejection;
+`g`–`l` cover real SQL paging, matching, literal punctuation, owner/suppression/
+runtime-count/rating scope, large libraries and every sort/direction.
+`T-UX-140` covers explicit Enter/button submission, URL history and clear;
+typing alone issues no request. Search submission and **Clear search**
+remove `cursor`; Clear search removes only `q` and `cursor`, preserving all
+other params, and is available whenever the `q` parameter is present.
+URL Back/Forward replaces unfinished input with the committed query.
+A search yielding no rows is a zero-match
+state, never an assertion that the saved library was deleted.
 
 #### 6.2b `sort=name` orders on a STORED, COLLATED column (TASK-219, `T-API-029`)
 
@@ -997,7 +1056,7 @@ Semantics:
 ```
 
 ⚠ **`runtimeUnknownHidden` is server-computed and MUST NOT be derived on the
-client.** It counts the titles that satisfy every *other* active filter but
+client.** It counts the owner's titles that satisfy submitted **`q`** and every *other* active filter but
 carry `runtimeMinutes: null`, and it is therefore the count the owner needs to
 be shown (`RUNTIME_HIDDEN_DISCLOSURE`, `ui.md` §2.1) before they read a
 shortened list as their whole library.

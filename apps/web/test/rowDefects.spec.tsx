@@ -186,7 +186,7 @@ describe('REQ-106 — independent facts in the metadata line are separated', () 
     const order = Array.from(meta.querySelectorAll<HTMLElement>(':scope > *')).map(
       (s) => s.dataset['testid'],
     );
-    expect(order).toEqual(['release-year', 'media-type', 'genres', 'runtime']);
+    expect(order).toEqual(['release-year', 'media-type', 'runtime', 'genres']);
 
     // The separator is generated, so the RULE is the assertion: jsdom does not
     // render `::before`, so checking the text would prove nothing either way.

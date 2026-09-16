@@ -20,6 +20,7 @@ import { Link } from 'react-router-dom';
 import { SERVICES, SERVICE_LABELS, serviceFreshnessLabel, type Service } from '@nextup/domain';
 
 import { FRESHNESS_UNAVAILABLE } from '../copy';
+import { FilterDisclosure } from './FilterDisclosure';
 
 /** One entry of `GET /api/service-state` (`specs/api.md` §6.28). */
 export interface ServiceFreshness {
@@ -82,28 +83,32 @@ export function FreshnessStrip({ services }: FreshnessStripProps): JSX.Element {
           {FRESHNESS_UNAVAILABLE}
         </p>
       )}
-      <ul>
-        {labels.map(({ service, text }) => (
-          <li key={service}>
-            <Link
-              className="freshness-strip__chip tap-target"
-              data-testid={`freshness-chip-${service}`}
-              to={uploadPathFor(service)}
-            >
-              {/*
+      <FilterDisclosure label="Service updates">
+        <ul>
+          {labels.map(({ service, text }) => (
+            <li key={service}>
+              <Link
+                className="freshness-strip__chip tap-target"
+                data-testid={`freshness-chip-${service}`}
+                to={uploadPathFor(service)}
+              >
+                {/*
                 The healthy label already names its service ("Netflix updated
                 today"), so the name is added only in the degraded case - where
                 it keeps the navigation affordance, the whole point of the
                 strip, intact and identifiable.
               */}
-              {text === FRESHNESS_UNAVAILABLE && (
-                <span data-testid={`freshness-service-${service}`}>{SERVICE_LABELS[service]}</span>
-              )}
-              <span data-testid={`freshness-label-${service}`}>{text}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
+                {text === FRESHNESS_UNAVAILABLE && (
+                  <span data-testid={`freshness-service-${service}`}>
+                    {SERVICE_LABELS[service]}
+                  </span>
+                )}
+                <span data-testid={`freshness-label-${service}`}>{text}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </FilterDisclosure>
     </div>
   );
 }

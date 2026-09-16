@@ -28,9 +28,10 @@
  */
 
 import { expect, test, type Page } from '@playwright/test';
+import { join } from 'node:path';
+import { createServer } from 'vite';
 
 import { TMDB_DISCLAIMER, TMDB_LOGO_PATH } from '@nextup/domain';
-import { ROUTES } from '../../apps/web/src/routes';
 
 /** §10.1's floor — the narrowest width NFR-006 mandates. */
 const NARROW = { width: 320, height: 720 };
@@ -40,7 +41,6 @@ const NARROW = { width: 320, height: 720 };
  * conditional on the route being a "real" one: a 404 screen renders the same
  * footer and is as much a page of this product as any other.
  */
-const PATHS = ROUTES.map((route) => route.examplePath);
 
 /**
  * ⚠ THE NINE-ROUTE COUNT IS ASSERTED, NOT ASSUMED. US-011 AC-1 and AC-5 both
@@ -48,7 +48,43 @@ const PATHS = ROUTES.map((route) => route.examplePath);
  * reconsidered, the per-route loop below still passes over whatever it finds —
  * so the shape of the set is pinned here, once.
  */
-const NON_CATCH_ALL = ROUTES.filter((route) => route.path !== '*');
+async function loadRoutes(): Promise<readonly { path: string; examplePath: string }[]> {
+  // The route table imports TSX. Use Vite's React transform, not Playwright's
+  // component-test JSX transform, to enumerate the production route data.
+  const server = await createServer({
+    root: join(process.cwd(), 'apps', 'web'),
+    configFile: false,
+    server: { middlewareMode: true, ws: false },
+    appType: 'custom',
+  });
+  try {
+    const module: unknown = await server.ssrLoadModule('/src/routes.tsx');
+    if (
+      typeof module !== 'object' ||
+      module === null ||
+      !('ROUTES' in module) ||
+      !Array.isArray(module.ROUTES)
+    ) {
+      throw new Error('The production route table was not loaded');
+    }
+    const routes: { path: string; examplePath: string }[] = module.ROUTES.map((route: unknown) => {
+      if (
+        typeof route !== 'object' ||
+        route === null ||
+        !('path' in route) ||
+        !('examplePath' in route) ||
+        typeof route.path !== 'string' ||
+        typeof route.examplePath !== 'string'
+      ) {
+        throw new Error('The production route table contains an invalid route');
+      }
+      return { path: route.path, examplePath: route.examplePath };
+    });
+    return routes;
+  } finally {
+    await server.close();
+  }
+}
 
 /**
  * The screens fetch on mount; without a stub they render their failure state.
@@ -111,15 +147,16 @@ async function expectStyledAndRendered(page: Page): Promise<void> {
   const token = await page.evaluate(() =>
     getComputedStyle(document.documentElement).getPropertyValue('--color-bg').trim(),
   );
-  expect(token).toBe('#f9fafb');
+  expect(token).toBe('#121020');
 }
 
 test.describe('T-ATTR-002 — the disclaimer is visible on every route, without interaction', () => {
-  test('T-ATTR-002a: ROUTES holds exactly ten routes plus the catch-all', () => {
+  test('T-ATTR-002a: ROUTES holds exactly ten routes plus the catch-all', async () => {
     // Pins the set the two per-route loops below iterate. Without this they
     // are self-fulfilling: they cover whatever exists and report success.
-    expect(NON_CATCH_ALL).toHaveLength(10);
-    expect(PATHS).toHaveLength(11);
+    const routes = await loadRoutes();
+    expect(routes.filter((route) => route.path !== '*')).toHaveLength(10);
+    expect(routes).toHaveLength(11);
   });
 
   /**
@@ -134,6 +171,7 @@ test.describe('T-ATTR-002 — the disclaimer is visible on every route, without 
     page,
   }) => {
     await stubApi(page);
+    const PATHS = (await loadRoutes()).map((route) => route.examplePath);
     const seen: { path: string; visible: boolean; text: string | null }[] = [];
 
     for (const path of PATHS) {
@@ -192,6 +230,7 @@ test.describe('T-ATTR-003 — the logo renders with a non-zero box on every rout
   /** One test, looping inside — see the note on `T-ATTR-002b`. */
   test('T-ATTR-003a: the logo has a real, painted box on every route', async ({ page }) => {
     await stubApi(page);
+    const PATHS = (await loadRoutes()).map((route) => route.examplePath);
     const seen: { path: string; ok: boolean }[] = [];
 
     for (const path of PATHS) {

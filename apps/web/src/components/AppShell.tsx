@@ -45,7 +45,7 @@
  * mechanism.
  */
 
-import { useEffect, useState, type ComponentType, type JSX } from 'react';
+import { useEffect, useRef, useState, type ComponentType, type JSX } from 'react';
 import { NavLink, Outlet, matchPath, useLocation } from 'react-router-dom';
 
 import { ErrorBoundary } from './ErrorBoundary';
@@ -53,9 +53,9 @@ import { OfflineBanner } from './OfflineBanner';
 import { TmdbAttribution } from './TmdbAttribution';
 // ⚠ THROUGH THE BARREL, NOT THE INDIVIDUAL FILES. `components/icons/index.ts`
 // is the REGISTER that makes REQ-124's set closed; importing a drawing
-// directly bypasses it, and a fourteenth icon could then ship without ever
+// directly bypasses it, and an unregistered icon could then ship without ever
 // meeting `T-UI-030`'s count.
-import { ListIcon, MoreIcon, UploadIcon } from './icons';
+import { BrandIcon, HistoryIcon, ListIcon, MoreIcon, UploadIcon } from './icons';
 import { Button } from './ui/Button';
 import { useOnline } from '../lib/useOnline';
 import { useWideViewport } from '../lib/useWideViewport';
@@ -84,19 +84,13 @@ const NAV_ITEMS: readonly NavRoute[] = ROUTES.filter(
  * three routes in neither list - silently absent from the phone entirely.
  */
 const PHONE_BAR_PATHS: readonly string[] = ['/', '/upload'];
+const DESKTOP_BAR_PATHS: readonly string[] = ['/', '/upload', '/batches'];
 
-/**
- * ⚠ ICONS ARE ON THE BAR SLOTS ONLY, AND THAT IS WHY THE CLOSED SET FITS.
- * §7c's v1 set of thirteen is CLOSED, and it contains `list`, `upload` and
- * `more` - exactly the three slots REQ-117 names - but nothing that honestly
- * depicts *Waiting to stream*. Decorating the other destinations would need
- * either a fourteenth icon (forbidden) or an approximate one, and an icon that
- * means nearly the right thing is worse than no icon: it is read confidently,
- * and read wrong.
- */
+/** Reuse only icons whose meaning matches the destination; labels remain visible. */
 const BAR_ICONS: Record<string, ComponentType<{ readonly label?: string | undefined }>> = {
   '/': ListIcon,
   '/upload': UploadIcon,
+  '/batches': HistoryIcon,
 };
 
 /**
@@ -180,8 +174,10 @@ function NavTextLink({
   readonly active: boolean;
 }): JSX.Element {
   const key = activeKey(active);
+  const Icon = BAR_ICONS[route.path];
   return (
     <NavLink to={route.path} end={route.path === '/'} className={NAV_LINK_CLASS[key]}>
+      {Icon ? <Icon /> : null}
       {route.navLabel}
     </NavLink>
   );
@@ -217,8 +213,9 @@ export function AppShell(): JSX.Element {
   const location = useLocation();
   const wide = useWideViewport();
 
-  const barItems = NAV_ITEMS.filter((route) => PHONE_BAR_PATHS.includes(route.path));
-  const overflowItems = NAV_ITEMS.filter((route) => !PHONE_BAR_PATHS.includes(route.path));
+  const barPaths = wide ? DESKTOP_BAR_PATHS : PHONE_BAR_PATHS;
+  const barItems = NAV_ITEMS.filter((route) => barPaths.includes(route.path));
+  const overflowItems = NAV_ITEMS.filter((route) => !barPaths.includes(route.path));
   const overflowHoldsCurrent = overflowItems.some((route) =>
     isRouteExact(location.pathname, route.path),
   );
@@ -232,6 +229,8 @@ export function AppShell(): JSX.Element {
    * correct and quietly makes the requirement unsatisfiable.
    */
   const [openOverride, setOpenOverride] = useState<boolean | null>(null);
+  const moreRef = useRef<HTMLLIElement>(null);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
 
   /*
    * ⚠ RESET ON NAVIGATION, so an override never outlives the decision that
@@ -244,17 +243,28 @@ export function AppShell(): JSX.Element {
   }, [location.pathname]);
 
   const expanded = openOverride ?? overflowHoldsCurrent;
+  useEffect(() => {
+    if (!expanded) return;
+    function outside(event: PointerEvent): void {
+      if (event.target instanceof Node && !moreRef.current?.contains(event.target)) {
+        setOpenOverride(false);
+      }
+    }
+    document.addEventListener('pointerdown', outside);
+    return () => document.removeEventListener('pointerdown', outside);
+  }, [expanded]);
 
   return (
     <div className="app-shell">
       <header className="app-shell__header">
         <NavLink to="/" className="app-shell__logo">
+          <BrandIcon />
           nextup
         </NavLink>
         <nav aria-label="Primary" className="nav">
           <ul className="nav__list">
             {wide
-              ? NAV_ITEMS.map((route) => (
+              ? barItems.map((route) => (
                   <li key={route.path} className="nav__item">
                     <NavTextLink
                       route={route}
@@ -271,39 +281,47 @@ export function AppShell(): JSX.Element {
                   </li>
                 ))}
 
-            {wide ? null : (
-              <li className="nav__more">
-                <Button
-                  variant="ghost"
-                  aria-expanded={expanded}
-                  aria-controls="nav-more-panel"
-                  onClick={() => setOpenOverride(!expanded)}
-                >
-                  <MoreIcon />
-                  <span className="nav__slot-label">{NAV_MORE_LABEL}</span>
-                </Button>
-                {/*
-                 * ⚠ NOT RENDERED WHEN CLOSED, rather than hidden with CSS. A
-                 * `display: none` subtree is still in the document, so
-                 * `T-UX-132`'s "reachable ONLY via More" would pass against a
-                 * bar that in fact still exposed every link to anything
-                 * reading the DOM - including a screen reader, on some
-                 * hiding techniques.
-                 */}
-                {expanded ? (
-                  <ul className="nav__panel" id="nav-more-panel">
-                    {overflowItems.map((route) => (
-                      <li key={route.path} className="nav__item">
-                        <NavTextLink
-                          route={route}
-                          active={isRouteActive(location.pathname, route.path)}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </li>
-            )}
+            <li
+              className="nav__more"
+              ref={moreRef}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape' && expanded) {
+                  setOpenOverride(false);
+                  moreButtonRef.current?.focus();
+                }
+              }}
+            >
+              <Button
+                ref={moreButtonRef}
+                variant="ghost"
+                aria-expanded={expanded}
+                aria-controls="nav-more-panel"
+                onClick={() => setOpenOverride(!expanded)}
+              >
+                <MoreIcon />
+                <span className="nav__slot-label">{NAV_MORE_LABEL}</span>
+              </Button>
+              {/*
+               * ⚠ NOT RENDERED WHEN CLOSED, rather than hidden with CSS. A
+               * `display: none` subtree is still in the document, so
+               * `T-UX-132`'s "reachable ONLY via More" would pass against a
+               * bar that in fact still exposed every link to anything
+               * reading the DOM - including a screen reader, on some
+               * hiding techniques.
+               */}
+              {expanded ? (
+                <ul className="nav__panel" id="nav-more-panel">
+                  {overflowItems.map((route) => (
+                    <li key={route.path} className="nav__item">
+                      <NavTextLink
+                        route={route}
+                        active={isRouteActive(location.pathname, route.path)}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </li>
           </ul>
         </nav>
       </header>

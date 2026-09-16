@@ -137,6 +137,7 @@ const MAX_GENRE_LENGTH = 60;
 const GENRE_FORBIDDEN_CHARS = /[%_[\]"\\]/;
 
 export interface TitleListQuery {
+  q: string | undefined;
   services: Service[];
   mediaType: MediaType | undefined;
   genres: string[];
@@ -196,6 +197,14 @@ function requireEnumValues<T extends string>(
 }
 
 export function parseTitleListQuery(query: Request['query']): TitleListQuery {
+  const qRaw = query['q'];
+  if (qRaw !== undefined && typeof qRaw !== 'string') {
+    fail('q', '"q" must be a single string.');
+  }
+  const q = qRaw?.trim() || undefined;
+  if (q !== undefined && q.length > 500) {
+    fail('q', '"q" must be at most 500 characters.', { maxLength: 500 });
+  }
   const services = requireEnumValues(
     toStringArray(query['service'], 'service'),
     'service',
@@ -203,12 +212,6 @@ export function parseTitleListQuery(query: Request['query']): TitleListQuery {
   );
 
   const mediaTypes = requireEnumValues(toStringArray(query['type'], 'type'), 'type', MEDIA_TYPES);
-  if (mediaTypes.length > 1) {
-    // `type` is a single-valued dimension in §6.2. Accepting two would mean
-    // "movie OR tv", which is the same as no filter — a request that looks
-    // like a narrowing and is not.
-    fail('type', '"type" may be given only once.');
-  }
 
   const genres = toStringArray(query['genre'], 'genre').map((genre) => {
     const trimmed = genre.trim();
@@ -257,8 +260,10 @@ export function parseTitleListQuery(query: Request['query']): TitleListQuery {
   const sort = (sortRaw as TitleSort | undefined) ?? 'dateAdded';
 
   return {
+    q,
     services,
-    mediaType: mediaTypes[0],
+    // Both supported types form the whole dimension, so OR means no restriction.
+    mediaType: mediaTypes.length === MEDIA_TYPES.length ? undefined : mediaTypes[0],
     genres: uniqueGenres,
     runtimes,
     sort,

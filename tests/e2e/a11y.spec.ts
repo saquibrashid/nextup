@@ -304,8 +304,8 @@ async function expectStyledAndRendered(page: Page): Promise<void> {
     };
   });
 
-  expect(applied.token).toBe('#f9fafb');
-  expect(applied.background).toBe('rgb(249, 250, 251)');
+  expect(applied.token).toBe('#121020');
+  expect(applied.background).toBe('rgb(18, 16, 32)');
   expect(applied.font).not.toBe('');
 }
 
@@ -784,7 +784,7 @@ test.describe('T-A11Y-012 — axe-core finds no violation', () => {
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
       .analyze();
 
-    expect(results.violations.map((violation) => violation.id)).toEqual([]);
+    expect(results.violations).toEqual([]);
   });
 
   test('T-A11Y-012b: the axe scan actually evaluated colour contrast', async ({ page }) => {

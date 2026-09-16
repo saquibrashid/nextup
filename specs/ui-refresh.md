@@ -1,12 +1,11 @@
 # `specs/ui-refresh.md` — the UI refresh: requirements and design
 
-> ## ⚠ STATUS: SPECIFICATION ONLY. NOT YET IMPLEMENTED. NOT YET SCHEDULED.
+> ## STATUS: EPIC P SHIPPED; REFINED INDIGO LIBRARY APPROVED 2026-09-16.
 >
-> The owner asked for *"the reqs and design for an updated UX"* and said
-> explicitly **"don't need to implement yet."** Nothing in this document is
-> built. There is no backlog task, and **`docs/backlog.md` has deliberately not
-> been touched** — a task row is a scheduling claim and the owner has not made
-> one.
+> Epic P shipped in #275. After reviewing the interactive indigo/violet
+> mockup, the owner approved implementation on 2026-09-16. ADR-0013 Revision 1
+> records that approval. The refined controls replace the original separate
+> sort segments and add an explicit grid/compact preference.
 >
 > **Decisions and rationale live in `docs/adr/ADR-0013-ui-refresh.md`.** This
 > file is the executable detail: what must be true, and what it looks like.
@@ -38,10 +37,10 @@ like success.**
 
 **Therefore the sequencing is fixed:**
 
-1. **Now** — the requirement text lives here, marked *proposed*, with `REQ-1nn`
-   and `US-0nn` ids **reserved** (checked for collisions: the tree's ceilings
-   at time of writing are REQ-104, US-048, NFR-020, ADR-0012).
-2. **When the owner says build** — each story moves into `docs/PRD.md`, its
+1. **Before approval** — new requirement text lives here as *proposed*, with
+   ids reserved only after collision checks. Epic P's original stories have
+   since been promoted; the 2026-09-16 refinement is approved, not proposed.
+2. **On approval to build** — each new story moves into `docs/PRD.md`, its
    states into `specs/ux-states.md`, its `specs/testing.md` §9 rows and its
    **real tests** land **in the same change**. That is what keeps the gate green
    without ever relaxing it.
@@ -63,18 +62,32 @@ inference from them:
 
 | | |
 |---|---|
-| Row layout | **Hybrid** — poster grid on desktop, compact list on phone |
+| Row layout | **Grid / Compact** choice, identical content and actions; responsive grid remains the default (approved 2026-09-16) |
 | Density | **Balanced** — ~6 titles visible on a phone, metadata trimmed |
-| Accent | **Deeper — indigo/violet** |
+| Accent | **Indigo/violet on dark ink surfaces** (approved 2026-09-16; replaces light-only) |
 | Posters | **Larger and uniform** |
 | Pain points | *"better navigation. improve the filter/ordering ux"* |
 | Runtime *(added at `A48`)* | *"for the list view, I'd like to see run time as well and filter and sort by it"* — a direct request, and the recorded revisit trigger for the deferred REQ-035/REQ-037 pair. Answered in §5a |
 | **Genres on the row** *(added 2026-09-14, OQ-7)* | *"keep generes on the row but find a way to minimize how much room it takes. use another ux to make it compact but still list the genres."* Answered in §4.3 |
 | **Genre redundancy** *(added 2026-09-14, OQ-7)* | *"some of the genres are redundant, for example, there is action, action & adventure, and adventure. action & adventure seems extra. would it not be easier just to click action and adventure separately?"* ⚠ **A correctness bug, not a preference** — answered in §4.4 |
-| **Sorting** *(added 2026-09-14, `A53` / OQ-3 / OQ-3b)* | Name and release year added as orderings; **the IMDb rating sort reversed into existence**, overturning `A51`. Answered in §5b, §7a and §7a.1 |
+| **Sorting** *(revised 2026-09-16)* | Five visible complete-order buttons. Selecting another field applies its default direction; activating the current field reverses it in one action. The rating refresh contract in §7a.1 is unchanged. |
 | **Navigation** *(added 2026-09-14, OQ-2)* | Phone bar = **List, Upload, More** — two real destinations plus overflow. Answered in REQ-117 |
 | **Review screen** *(added 2026-09-14, OQ-6)* | The confusion was **(d), the three sections looking alike** — not the list's length and not the Apply wording. Answered in §6a.1 |
-| **Design system** *(added 2026-09-14, OQ-8)* | A typographic scale and inline SVG icons, both accepted on the explicit basis of **no web font and no new dependency**. Answered in §7b – §7d |
+| **Design system** *(revised 2026-09-16)* | A typographic scale, inline SVG icons, play/next brand, removable filter chips, grid/compact selector and reduced-motion-aware feedback. **No web font or new dependency.** |
+
+### 2.1 Refined library acceptance contract — owner-approved 2026-09-16
+
+| Surface | Required behaviour | Named test |
+|---|---|---|
+| Sort | Inactive field selects its complete default order; active field reverses. Oldest-first is one click, with state and next action named. URL/back/forward and session precedence stay intact. | `T-UX-138` |
+| Filters | Searchable service disclosure, URL-driven checkbox dimensions, removable chips, clear-all preserving sort and view. Provider registry remains Netflix/Max. | `T-UX-139` |
+| Search | Explicit search submission updates `q` in the URL; server applies it before paging and runtime-hidden counts. Never search only loaded rows. | `T-UX-140`, `T-API-030` |
+| Layout | Grid/compact switch preserves server ordering, all metadata, service badges, pending/offline restrictions, row actions and view across filtering. Real loading and retry paths remain. | `T-UX-141` |
+| Palette | Dark indigo/violet tokens, body/secondary text >= 4.5:1 and interactive boundaries >= 3:1, no network font or icon dependency. Reduced motion disables animation. | `T-UX-142` |
+| Shell | Compact navigation and play/next identity, one nav landmark, all destinations reachable, factual service-update disclosure with a visible unavailable state. | `T-UX-143` |
+
+The mockup's fabricated title data, loading/error demonstration switches and
+marketing subtitle do not ship. Only the real API lifecycle drives states.
 
 Plus five defects the owner hit while using the app, in §3.
 
@@ -87,8 +100,10 @@ agent asked to fix the "awful" UI drafted a full **dark-theme** palette with an
 **amber** accent, a **self-hosted variable web font**, and a rewrite of
 `specs/ui.md` §13 — computing every contrast ratio correctly along the way. Not
 one line of it cited a row of this table, and all of it contradicted the
-owner's recorded choices above: a **light** theme, a **deeper indigo** accent,
-and no web font. It was reverted before it reached the tree. **The failure mode
+owner's **then-recorded** choices: a light theme, a deeper indigo accent,
+and no web font. That earlier, unapproved draft was reverted; it is historical
+rationale, not a prohibition on the dark indigo design approved 2026-09-16.
+**The failure mode
 is real, it is fast, and it looks exactly like progress.** Read this table
 before writing a `must`.
 
@@ -146,7 +161,7 @@ an inert one invisibly). `T-A11Y-001e` asserts the menu has exactly four items.
 
 ### REQ-106 (`must`) — independent facts in the row are visibly separated
 
-> The metadata line renders as **`Year · type · genres`** with a visible
+> The metadata line renders as **`Year · type · runtime · genres`** with a visible
 > separator between each fact.
 
 **Observed, from the owner's screenshot:** `TV2004Animation, Sci-Fi & Fantasy,
@@ -156,7 +171,7 @@ Action & Adventure, Kids`.
 `<span>`s inside `.title-row__meta`, and `index.css:444–448` sets colour and
 font-size only — no `display: flex`, no `gap`, no `::before`.
 
-⚠ **`specs/ui.md` §2.2 ALREADY SPECIFIES "Year · type · genres".** This is not
+⚠ **The original defect was missing separation in "Year · type · genres".** This is not
 a design decision; it is a specified line that was never implemented. It is a
 `must` and not a style tweak because **`TV2004Animation` is a correctness
 failure, not an aesthetic one** — the owner cannot distinguish a missing
@@ -168,8 +183,8 @@ not announce "middot" between every fact.
 
 | Test id | Asserts |
 |---|---|
-| `T-UX-102` | The rendered metadata line's text content matches `/2004\s*·\s*TV/`-shaped separation — i.e. the facts are not adjacent. |
-| `T-UX-103` | The accessible name of the row does **not** contain the literal `·`. |
+| `T-UX-102` | The wrapping metadata row has CSS-generated separators; decoration is not concatenated into accessible text. |
+| `T-UX-103` | Direct children follow year → type → runtime → genres; absent genres invent no placeholder. |
 
 ### REQ-107 (`must`) — the `⋮` control is a button, not a full-height column
 
@@ -373,18 +388,26 @@ mutation the owner cannot see is a mutation they will not trust.
 
 ### 4.1 Hybrid layout (REQ-110, `must`)
 
-> Below `--bp-lg` the list renders as a **compact vertical list**. At and above
-> `--bp-lg` it renders as a **poster grid**. Both render the same data and
-> offer the same actions.
+> **Grid** is the default local view preference; **Compact** is an explicit
+> alternative. Both use one ordered row tree with identical data and actions.
+> At narrow widths both are a single column; at wider widths Grid uses
+> multiple columns of **horizontal poster-plus-details cards**, while Compact
+> remains one column. No poster-only or vertically stacked artwork tiles.
 
 ⚠ **The phone list is the base rule; the grid is a `min-width` addition.**
 `specs/ui.md` §13.3 mandates mobile-first, and writing it the other way makes
 the 320 px case — the one NFR-006 requires and `T-A11Y-001` tests — the case
 reached by subtraction.
 
-⚠ **The grid and the list are ONE component at two densities, selected by a
-media query.** Not two components chosen in JS: a JS width branch cannot be
-server-consistent, breaks on resize, and would double every list test.
+⚠ **The grid and compact view are ONE component at two densities.**
+`ListViewControl` selects local presentation state, not a new API ordering;
+CSS handles width changes without a JS viewport branch. Filtering, searching
+and sorting preserve the selected view. No local re-sort or title filtering,
+and no promise of cross-session persistence for this local preference.
+
+Wide Compact uses **two metadata columns within the same row body/DOM** to
+reduce each row's height; it does not remove content or violate REQ-108's
+**8px minimum** body spacing.
 
 **Every action available on a list row is available on a grid tile** — remove,
 suppress, restore, `⋮`. A grid that drops actions has made desktop the weaker
@@ -393,8 +416,23 @@ client.
 | Test id | Asserts |
 |---|---|
 | `T-UX-110` | At 320 px the list layout renders and there is no horizontal scroll *(extends `T-A11Y-001`)*. |
-| `T-UX-111` | At 1280 px the grid layout renders. |
+| `T-UX-111` | At 1280 px the default grid uses horizontal poster-plus-details cards. |
 | `T-UX-112` | The `⋮` menu offers the **same item set** in both layouts. |
+| `T-UX-141` | Explicit Grid/Compact changes density only: content, server order, badges, row actions, pending/offline restrictions and preference across query changes remain intact. |
+
+**Loading is not a control remount.** `ListSearch`, `FilterBar`, `SortControl`
+and `ListViewControl` stay mounted while the query is pending, preserving
+open-picker/search/focus/selection state. Selected genres remain available
+even when a pending facet response temporarily supplies no options.
+`FilterBar` receives `countPending={loading}` and hides **both** result and
+runtime-hidden counts until the response arrives. Keep the real service
+updates control too; **only six row skeletons** render, `aria-hidden` beneath
+one loading status, with the existing slow-request/retry affordance.
+Do not duplicate controls with freshness/filter-bar skeletons. Failed online
+reads still hide the filter/control group and show error/retry; no fabricated
+numbers or empty-library claims. Offline behavior remains unchanged.
+`T-UX-141h` / `T-UX-141i` guard picker/selected-genre preservation and absent
+pending counts; `T-UX-010` retains six-row/status/slow-request coverage.
 
 ### 4.2 Posters (REQ-111, `must`)
 
@@ -412,11 +450,10 @@ not better — the empty box grows with them.
 
 ### 4.3 Density and what gets trimmed (REQ-112, `should`)
 
-> ⚠ **AMENDED IN PLACE 2026-09-14 by the owner's answers to OQ-1 and OQ-7.**
-> The compact list shows, per title: **poster, name, `Year · type`, service
-> badge(s), the added-date, and the genres in a compact presentation**. The
-> IMDb rating moves to the expanded/grid presentation. Approximately six titles
-> are visible at 375 × 667 px.
+> **Amended in place by the approved 2026-09-16 refinement.** Grid and Compact
+> both show **poster, name, year, type, runtime, genres, service badges,
+> added-date and IMDb rating (or its honest absent state)**. Density comes
+> from layout, never removing a fact or action.
 >
 > ~~The compact list shows, per title: **poster, name, `Year · type`, service
 > badge(s)**. The genre list and the IMDb rating move to the expanded/grid
@@ -432,9 +469,10 @@ the two warnings below are the reason each was put to them rather than built:
 
 ⚠ **"COMPACT" IS A PRESENTATION CHANGE, NOT A CONTENT CHANGE.** The genres are
 **all** still present and still readable; what changes is the room they take.
-The compact presentation is a single row of small chips that **wraps to at most
-one line**, with any overflow collapsed into a `+n` affordance that reveals the
-rest in place. ⚠ **The `+n` affordance must not be the only way to reach a
+The compact presentation shows **three genre chips plus `+n` expansion**;
+this is a count limit, not a measured one-line limit. **Genre names wrap and
+are never ellipsized or clipped.** Expansion reveals the remainder in place.
+⚠ **The `+n` affordance must not be the only way to reach a
 genre that is currently filtered on** — if a genre is in the active filter, its
 chip is always visible, otherwise the row stops explaining the very filter that
 produced it. ⚠ **`genres: []` still renders NOTHING AT ALL, never "Unknown"
@@ -447,9 +485,8 @@ and never an empty `+0`** (US-019 AC-6 is unchanged and still tested).
 >    PRD acceptance criterion: *"`genres: []` renders **nothing at all**, never
 >    'Unknown' (**US-019 AC-6**)."* Trimming genres would have been a **change
 >    to a tested AC**, not a styling choice. **It is not being made.**
-> 2. **REQ-106 above requires the `Year · type · genres` separators that §2.2
->    already specifies.** With genres retained, REQ-106's rule is unchanged and
->    its test does not move. **Build REQ-106 first regardless.**
+> 2. **REQ-106 retains visible separation between facts.** The approved
+>    refinement puts runtime before genres; it does not remove either fact.
 >
 > ⚠ **And the reason genres looked safe to cut was wrong.** The tempting
 > argument — *"nothing filters or sorts by genre"* — **is false**:
@@ -521,7 +558,7 @@ are the whole map.
 | `T-UX-125` | A TV title whose stored genres contain `Action & Adventure` renders the chips `Action` and `Adventure`, and does **not** render `Action & Adventure`. |
 | `T-UX-126` | The genre filter list contains no combined TV name — `Action & Adventure`, `Sci-Fi & Fantasy` and `War & Politics` never appear as options. |
 | `T-API-028` | `?genre=Action` returns **both** a film tagged `Action` and a TV title tagged `Action & Adventure`; `?genre=War` returns a title tagged `War & Politics`. |
-| `T-UX-127` | The compact row wraps genres to at most one line with a `+n` overflow, and a genre in the **active filter** is always visible rather than hidden behind `+n`. |
+| `T-UX-127` | Three full-name genre chips plus `+n` expansion; names wrap without truncation and active-filter genres stay visible even above the count limit. |
 
 ⚠ **"Trimmed" means moved, not deleted, and one line may not move at all.** The
 added-date is the field the **default sort orders by** (REQ-038, newest-first),
@@ -551,7 +588,7 @@ says so in a comment and does not do it, because `SortControl` shipped later
 > | | Source of truth | Why |
 > |---|---|---|
 > | **Filters** | **URL only.** Render *from* the query string, write *to* it, **no `useState` mirror.** | `FilterBar.tsx` documents this at length: one direction is the only thing that survives the back button, a deep link, and an external `navigate()`. A mirror desynchronises silently. |
-> | **Sort** | **URL → `localStorage` → default `desc`.** | The owner's chosen direction must persist across sessions, and the remembered value must be reconciled **into the URL** or the button label and the API request disagree without any visible symptom. |
+> | **Sort** | **URL → `sessionStorage` → per-field default.** | On entry/history navigation the URL wins; otherwise the session direction is used, then `name=asc` / all other fields `desc`. Reconcile a remembered non-default direction **into the URL** so the label and request agree. Explicit field selection uses §5b's complete-order rule. |
 >
 > A refactor that "tidies" these into one shared hook will produce a green
 > suite and a broken back button. **`T-UI-016` guards the filter side; the sort
@@ -560,9 +597,28 @@ says so in a comment and does not do it, because `SortControl` shipped later
 Also invariant: `applyFilters` must preserve `sort`, `dir` and `cursor`.
 Changing a filter must not silently reset the owner's ordering.
 
+The compact **Services, Type, Genre and Runtime** buttons open labelled,
+nonmodal checkbox disclosures. Genre options come from the real list facets;
+there is no invented genre or provider. Services is searchable over
+`SERVICES` / `SERVICE_LABELS` (**Netflix and Max only**); no phantom "All"
+checkbox. Picker search filters options, never the title rows. OR within each
+dimension and AND across dimensions remain unchanged.
+
+Active filters are always visible as **native 44 px removable buttons**,
+not only in the zero-match state. Each removes only its dimension/value;
+labels use service display names, Movies/TV series and the runtime bucket
+labels. A submitted `q` has its own search chip, removing only `q`.
+**Clear filters removes the four dimensions and `q`, preserving sort, view
+and unrelated parameters.** Escape/Done close the disclosure and restore
+trigger focus; outside clicks dismiss, Tab is not trapped, and generated
+`useId` associations remain unique. `T-UX-139` supplements `T-UI-016` and
+the existing zero-match/count/runtime-hidden tests; counts remain server facts.
+
 ### REQ-114 (`must`) — the sort control states what pressing it does
 
-> The sort control does not present the current ordering as its own label.
+> Each sort button names a **complete order**. The selected button is marked
+> with `aria-pressed` and its accessible name identifies both current state
+> and the reverse action; an inactive button names the order it will apply.
 
 Today it is a button labelled **"Newest first"** *while the list is already
 newest-first*, and pressing it makes the list oldest-first. Both readings —
@@ -576,21 +632,14 @@ shipping. **Whatever shape the new control takes, oldest-first stays reachable
 in one action.** A redesign that buries it in a menu has deleted a `must`
 while every behavioural test still passes.
 
-⚠ **THIS REQUIREMENT CHANGES OWNER-FACING COPY, WHICH §8 SAYS IS A PRODUCT
-DECISION AND NOT A STYLING ONE.** The two strings are real and named —
-`SORT_NEWEST_LABEL = 'Newest first'` and `SORT_OLDEST_LABEL = 'Oldest first'`
-(`apps/web/src/copy.ts:307,309`) — and `specs/ui.md` §9 governs them. This
-document must not silently rewrite them. **The replacement wording is §9 OQ-5,
-for the owner.** Note the plain relabel does not work: swapping the button to
-say what pressing it *does* makes it read "Oldest first" while the list is
-newest-first, which is the same ambiguity mirrored. The likely answer is a
-control that shows **both** options with the current one marked, rather than a
-toggle — but that is a decision, not a deduction.
+**The owner approved the replacement wording and one-click behavior on
+2026-09-16.** §5b defines the five complete-order controls; the former
+separate direction segment is not part of this design.
 
 ### REQ-115 (`should`) — the list can be ordered by more than date added
 
 > Available orderings: **date added** (default, newest-first), **name**,
-> **release year**, **runtime**.
+> **release year**, **runtime**, **IMDb rating**.
 
 The row already displays a name and a year that the owner can read and cannot
 order by. **Runtime joins that list at `A48`** — it is the same defect in a
@@ -636,10 +685,10 @@ the same rule when it is built.
 |---|---|
 | `T-UX-113` | The bar renders filters and sort in one group. |
 | `T-UX-114` | Changing a filter preserves `sort`, `dir`. |
-| `T-UX-115` | A `localStorage` direction with **no `dir` in the URL** is reconciled into the URL, and the label matches the request that was issued. |
+| `T-UX-115` | A session direction with **no `dir` in the URL** is reconciled into the URL when it differs from that field's default, and the label matches the request. |
 | `T-UX-116` | Oldest-first is reachable in one action from the default view. |
-| `T-UX-119` | ~~*(REQ-095 regression guard)* **No sort option exposes the IMDb rating.**~~ ⚠ **REWRITTEN at `A53` — see §7a.** The sort field selector **does** offer the IMDb rating. |
-| `T-UX-120` | *(`A48`)* Selecting the **Runtime** key relabels the direction toggle to *Shortest first* / *Longest first*, and the date labels do not survive the switch. |
+| `T-UX-119` | The complete-order buttons include IMDb rating. ~~Original REQ-095 guard prohibited rating; reversed at A53.~~ The pre-sort refresh contract in §7a remains mandatory. |
+| `T-UX-120` | Runtime uses **Longest runtime / Shortest runtime**, never date-shaped labels; its inactive default is longest-first. |
 
 ---
 
@@ -647,7 +696,7 @@ the same rule when it is built.
 
 ### REQ-119 (`must`) — the runtime is on the row, and an unknown runtime says so
 
-> The row's meta line reads `Year · type · genres · runtime`. Film renders
+> The row's meta line reads `Year · type · runtime · genres`. Film renders
 > `1h 55m`; TV renders `45m/ep`; a title with no runtime renders the words
 > **"Runtime unknown"**.
 
@@ -711,66 +760,64 @@ place.
 
 ---
 
-## 5b. Design — the sort control's actual shape (OQ-5, amended by OQ-3 / OQ-3b)
+## 5b. Design — five one-click complete orders (approved 2026-09-16)
 
-⚠ **THE OWNER'S OQ-5 ANSWER WAS GIVEN BEFORE OQ-3 AND OQ-3b WIDENED THE SORT
-KEYS, AND IT NO LONGER FITS ON ITS OWN.** They chose *"show both options with
-the current one marked"* — a segmented control rather than a toggle. That
-answers the **direction** ambiguity REQ-114 identified. But OQ-3 added **name**
-and **release year**, OQ-3b added **rating**, and `A48` had already added
-**runtime**: there are now **five** sort fields, and a two-option segment
-cannot express a five-way choice.
+> **REQ-121 (`must`) — five visible native buttons, no separate direction segment.**
+> Activating an inactive field applies its default order in one navigation;
+> activating the selected field reverses that field in one action.
 
-**The resolution, which preserves both of the owner's stated properties:**
+| Field | Default | `desc` label | `asc` label |
+|---|---|---|---|
+| Date added *(default field)* | `desc` | Recently added | Oldest additions |
+| Name | `asc` | Name Z-A | Name A-Z |
+| Release year | `desc` | Newest releases | Oldest releases |
+| Runtime | `desc` | Longest runtime | Shortest runtime |
+| IMDb rating | `desc` | Highest rated | Lowest rated |
 
-> **REQ-121 (`must`) — sort is a field selector plus a direction segment**
->
-> The sort control renders as **two adjacent controls**: a **"Sort by" field
-> selector** listing the available orderings, and a **two-option direction
-> segment** whose labels are appropriate to the selected field, with the
-> current option marked.
+These ten strings are centralized in **`SORT_ORDER_LABELS`** in
+`apps/web/src/copy.ts`; `SortControl` imports that map rather than maintaining
+a second literal vocabulary.
 
-| Field | Direction labels (`desc` / `asc`) |
-|---|---|
-| Date added *(default)* | `Newest first` / `Oldest first` |
-| Name | `A–Z` / `Z–A` |
-| Release year | `Newest first` / `Oldest first` |
-| Runtime | `Longest first` / `Shortest first` |
-| IMDb rating | `Highest first` / `Lowest first` |
+Exactly one field is `aria-pressed="true"`. Its accessible name states its
+current complete order, that it is selected, and the reverse order pressing it
+will apply. Inactive fields show their default orders. Button positions never
+reorder. Name defaults to `asc`; the other four default to `desc`, matching
+the API. Date-added labels refer to nextup's earliest active-listing date,
+not the streaming service's save date.
 
-⚠ **`SORT_NEWEST_LABEL` AND `SORT_OLDEST_LABEL` ARE UNCHANGED AND ARE REUSED
-VERBATIM.** They are governed copy (`specs/ui.md` §9, `apps/web/src/copy.ts`),
-and §8 is explicit that changing owner-facing wording is a product decision.
-The new strings are **additions** for fields that had no ordering before, not
-a rewrite of the two that did. The `A–Z` dash is an **en dash**, matching the
-`Year · type` separator convention already in §2.2.
+**Oldest additions is one press on the selected Recently added button from
+the default view**, without opening a menu. Sort controls may wrap at narrow
+widths but must remain visible; no sheet or collapsed selector adds a press.
+The URL owns the field. Direction on entry/history follows URL → session →
+field default; explicit inactive-field clicks deliberately choose the field
+default instead of carrying the previous field's direction. Both `sort` and
+`dir` change atomically while filters, `q` and unrelated parameters survive.
+The route resets its paging state, never locally sorts loaded titles.
 
-⚠ **OLDEST-FIRST STILL REACHES IN ONE ACTION, WHICH IS THE `must`.** With the
-default field selected, the direction segment is on screen and its second
-option is one press away — REQ-038 (promoted at `A47`) is satisfied by the
-segment, **not** by the field selector. ⚠ **A redesign that collapses the
-direction into the field list** — offering ten combined options like
-"Date added, oldest first" — **deletes that property while every behavioural
-test still passes**, because `click()` still reaches it. §8's warning applies
-directly.
-
-⚠ **CHANGING THE FIELD MUST NOT SILENTLY REINTERPRET THE DIRECTION.** `desc`
-means "newest" for a date and "highest" for a rating; the underlying `dir`
-value is preserved across a field change, so the list does not reorder in a way
-the owner did not ask for. What changes is the **label**, because the same
-`dir` means something different per field.
-
-⚠ **THE TWO CONTROLS KEEP THE OPPOSITE PERSISTENCE MODELS REQ-113 DESCRIBES.**
-They render as one group and are **not** one state container: filters are URL
-only, sort is URL → `localStorage` → default. §5 REQ-113's table is the
-authority and a shared hook across the group is the failure it warns about.
+~~Historical OQ-5 shape: field selector plus two direction segments, preserving
+`dir` when changing field. Replaced by the owner-approved complete-order
+buttons above.~~
 
 | Test id | Asserts |
 |---|---|
-| `T-UX-128` | Both direction options are rendered simultaneously with the current one marked — not a single toggling button. |
-| `T-UX-129` | The direction labels change with the selected field (`Longest first` for runtime, `A–Z` for name), while `SORT_NEWEST_LABEL` / `SORT_OLDEST_LABEL` are reused unmodified for the date fields. |
-| `T-UX-130` | Changing the sort field preserves `dir`; changing either preserves the active filters and resets `cursor`. |
+| `T-UX-128` | Five complete-order buttons remain visible in fixed field order with exactly one marked; no separate direction radio segment. |
+| `T-UX-129` | Each field uses the approved complete-order labels; URL/session/default precedence agrees with the API's per-field defaults. |
+| `T-UX-130` | Inactive field selection applies its default, active selection reverses; filters and `q` survive while route paging restarts. |
 | `T-UX-131` | With the default field selected, oldest-first is reachable in exactly **one** interaction. |
+| `T-UX-138` | All five complete-order choices, active reversals, state/next-action accessibility, query preservation and back/forward/session synchronization. |
+
+### 5c. Submitted title search (approved 2026-09-16)
+
+The labelled title-search form submits explicitly (button or Enter) to URL
+`q`. Typing alone changes only the draft, not the request. The server searches
+the owner's eligible titles before filter composition, ordering, paging and
+runtime-hidden counting; `api.md` §6.2c defines validation and matching.
+There is **no client-side search of loaded rows**. Submission preserves
+filters, sort and local Grid/Compact preference and starts paging afresh.
+The `q` chip removes only search; Clear filters also clears `q`.
+The zero-match message explains that the query/filters matched nothing rather
+than implying deleted titles. Real loading, retry and offline states remain.
+Named coverage: `T-UX-140`, `T-API-030`.
 
 ---
 
@@ -796,6 +843,11 @@ while assistive technology is told nothing. `T-UX-117b` asserts both land on
 the same element; `T-UX-117d` asserts the `/` case directly.
 
 ### REQ-117 (`should`) — the phone gets a primary destination bar
+
+**Approved desktop refinement (2026-09-16):** at and above `--bp-sm`, the
+single header navigation contains **List, Upload, Batches, More**. All other
+destinations remain real links in More. Below `--bp-sm`, Batches joins the
+overflow, leaving **List, Upload, More**. Do not duplicate the nav landmark.
 
 > ⚠ **RESOLVED IN PLACE 2026-09-14 (OQ-2).** Below `--bp-sm`, the bar presents
 > **three slots: the list (`/`), `/upload`, and `More`.** **Everything else
@@ -863,14 +915,18 @@ when open (REQ-116). The bar renders **icon over label** (§7c); an icon-only
 bar would fail REQ-116's not-by-colour-alone sibling rule for the same reason.
 
 ⚠ **`/upload` reachability is load-bearing and is not merely a nav item.**
-REQ-039's `FreshnessStrip` is tappable and opens `/upload` **with that service
-pre-selected**. Any nav rework must keep that path intact, and must not
-introduce a second, differently-behaved route to upload.
+REQ-039's `FreshnessStrip` uses a **Service updates** nonmodal disclosure
+containing every service's factual last-updated link to `/upload` **with that
+service pre-selected**. Never-updated remains a named fact. When dates are
+unavailable, the degradation notice stays **visible outside the disclosure**;
+the service-labelled upload links remain inside. No staleness threshold, nag
+or reminder is introduced. Reuse `FilterDisclosure`'s Escape/outside dismissal,
+focus restoration and untrapped Tab behavior.
 
 | Test id | Asserts |
 |---|---|
 | `T-UX-117` | The active destination carries `aria-current="page"` and a non-colour cue. |
-| `T-UX-118` | The freshness strip still deep-links to `/upload` with the service pre-selected. |
+| `T-UX-118` | Opening Service updates exposes every factual service link to `/upload` with that service pre-selected, including when dates are unavailable. |
 | `T-UX-132` | Below `--bp-sm` the bar renders exactly `/`, `/upload` and `More`; **every other nav route** — `/batches`, `/removed`, `/not-interested`, `/waiting`, `/about`, `/rating` — is reachable only via `More`. ⚠ *Corrected in place at TASK-211; this row named only the first three, which were all that existed when it was written.* |
 | `T-UX-133` | A route behind `More` is still marked `aria-current="page"` when it is open, and is still reachable by direct URL. |
 | `T-UX-137` | Below `--bp-sm` the nav is fixed to the bottom of the viewport, the shell reserves matching bottom clearance, the `More` panel opens upward, the safe-area inset is honoured, and **all four are reset at or above `--bp-sm`** so the desktop nav returns to the header. ⚠ Asserted against `index.css` and `index.html` **as files** — jsdom performs no layout and applies no stylesheet, so every rendered assertion about position passes vacuously. |
@@ -961,38 +1017,35 @@ make a failed extraction readable as a removal.
 
 ## 7. Tokens (REQ-118, `must`)
 
-Replaces `--color-accent` in `specs/ui.md` §13.2. **Every ratio below was
-computed from the token values, not estimated.**
+**Owner-approved 2026-09-16 dark indigo palette**, applied in place to
+`specs/ui.md` §13.2. Ratios below are against `--color-surface`.
 
-| Token | Value | On `#ffffff` | On `--color-bg` `#f9fafb` |
-|---|---|---|---|
-| `--color-accent` | `#4338ca` | **7.90:1** | **7.56:1** |
-| `--color-accent-strong` | `#3730a3` | **9.93:1** | 9.51:1 |
-| `--color-accent-subtle` | `#eef2ff` | *background only* | — |
-| `--color-accent` **on** `--color-accent-subtle` | — | **7.07:1** | — |
-| `#ffffff` **on** `--color-accent` | — | **7.90:1** | — |
+| Token | Value | Surface contrast |
+|---|---|---|
+| `--color-bg` | `#121020` | Background |
+| `--color-surface` | `#1e1932` | Surface |
+| `--color-text` | `#f2efff` | **14.97:1** |
+| `--color-text-muted` | `#bcb4d2` | **8.54:1** |
+| `--color-border` | `#77678f` | **3.32:1** |
+| `--color-accent` | `#b3a0ff` | **7.57:1** |
+| `--color-danger` | `#ff9ba8` | **8.47:1** |
 
-⚠ **THE TRAP, COMPUTED AND NAMED SO IT IS NOT REDISCOVERED THE EXPENSIVE WAY:
-`indigo-400 #818cf8` IS 2.98:1 ON WHITE AND FAILS THE 3:1 NON-TEXT FLOOR.** It
-is the exact shade one reaches for for a "soft indigo border" or a gentle focus
-ring, and it looks entirely adequate. `#a5b4fc` is 1.99:1 and `#c7d2fe` is
-1.49:1. This is `specs/ui.md` §13.2's existing `#d1d5db` lesson recurring in a
-new hue. **Borders and focus rings use `--color-border` (3.33:1) or
-`--color-accent`. Never a light indigo.**
-
-`--color-border`, `--color-text`, `--color-text-muted` and `--color-danger` are
-**unchanged** — they pass, and churning passing tokens is how the shade above
-gets substituted in.
+**Primary accent-filled buttons use `--color-surface` as foreground**, not
+white or `--color-text`; that reversed pair is also **7.57:1**. Interactive
+boundaries/focus rings use the contrast-proven border/accent, not a decorative
+soft divider token. `--radius` is **10px**, `--radius-card` is **16px**.
+The font stack is **`'Segoe UI', Aptos, Calibri, -apple-system,
+BlinkMacSystemFont, sans-serif`**; system fonts only.
 
 **`T-CSS-004` recomputes every pair from the token values**, so a substituted
 shade fails CI rather than review. Any new token added by this refresh must be
 added to that test's pair list in the same change.
 
-**No dark mode** (`specs/ui.md` §13.3 — unchanged; the owner asked for a deeper
-accent, not a dark UI). ~~**No web font** (NFR-005; `--font-stack` stays a
-system stack).~~ **No web font — and the type scale in §7b is built on the
-system stack precisely so this stays true** (OQ-8). **No CSS framework**
-(ADR-0004 Rev 2). **No class renamed** (`T-CSS-001`).
+This is the **default dark design**, not a theme toggle or a second palette.
+**No web font, CSS framework, icon dependency or network request** is added.
+`T-UX-142` pins the palette and visual language; `T-CSS-004` retains measured
+contrast floors on both surfaces and `T-CSS-005` retains reduced-motion
+behavior. Static literal class names remain governed by `T-CSS-001`.
 
 ---
 
@@ -1029,7 +1082,7 @@ behaviour, so the ledger row keeps a live guard rather than an empty cell.
 
 | Test id | Asserts |
 |---|---|
-| `T-UX-119` | ⚠ **Rewritten.** The sort field selector **does** offer the IMDb rating, and selecting it issues `sort=rating`. |
+| `T-UX-119` | The rating complete-order button is present and selecting it issues `sort=rating`; its mutable-key refresh rules remain mandatory. |
 | `T-API-023` | `sort=rating` orders by rating with `NULL`s **last in both directions**, tie-broken by `title.id`. |
 | `T-API-024` | ⚠ **The REQ-041 guard.** Under `sort=rating` the rating sweep is **awaited before the `ORDER BY` is applied**, and **no rating write occurs after the response has been sent**. |
 | `T-API-025` | A sweep that exhausts its request cap or time budget still returns **200**; unrefreshed titles keep their cached-or-absent value and are ordered on it. |
@@ -1100,7 +1153,7 @@ loudest signal that a page was never designed.
 | `--leading-normal` | `1.55` | Body |
 | `--weight-normal` / `--weight-medium` / `--weight-bold` | `400` / `600` / `700` | |
 
-⚠ **NO WEB FONT. `--font-stack` REMAINS THE SYSTEM STACK** (NFR-005,
+⚠ **NO WEB FONT. `--font-stack` USES THE SEGOE UI/APTOS SYSTEM STACK IN §7** (NFR-005,
 `T-CI-007`'s egress rule). The owner was offered the scale on the existing
 stack and accepted it on that basis. A scale is about **size, weight and
 rhythm** — none of which needs a downloaded typeface, and all of which is
@@ -1120,10 +1173,8 @@ the floor and `T-CSS-003` already forbids a raw `px` size in a rule body.
 
 ## 7c. Icons — inline SVG, no font, no network, no dependency (OQ-8)
 
-There are **zero** icons in the application today — a search for `<svg`,
-`lucide` and `heroicon` across `apps/web/src/**` returns nothing — while
-`specs/ui.md` prose already refers to an "info icon" and a "document icon" that
-were never built, and REQ-117's destination bar cannot be built without them.
+The shipped inline set is extended by the approved play/next brand and
+Grid/Compact affordances, without importing an icon package.
 
 > **REQ-124 (`must`) — icons are hand-authored inline SVG components**
 
@@ -1135,8 +1186,9 @@ were never built, and REQ-117's destination bar cannot be built without them.
   network request or a runtime dependency; the owner accepted icons explicitly
   on the basis that neither is incurred. NFR-004's small-tree preference and
   `T-CI-007`'s egress rule both stay intact.
-- The v1 set is **closed**: `list`, `upload`, `more`, `history`, `suppressed`,
-  `rating`, `close`, `check`, `chevron`, `info`, `warning`, `search`, `image`.
+- The set is **closed at 16**: `list`, `upload`, `more`, `history`, `suppressed`,
+  `rating`, `close`, `check`, `chevron`, `info`, `warning`, `search`, `image`,
+  **`brand`, `grid`, `compact`** (`BrandIcon`, `GridIcon`, `CompactIcon`).
 
 ⚠ **AN ICON IS NEVER THE SOLE LABEL.** Every icon-only control carries an
 `aria-label`, and REQ-117's bar renders **icon over label**. An undecorated
@@ -1176,11 +1228,19 @@ These live in `apps/web/src/components/ui/`:
 | `Card` | `card` | The default container |
 | `Badge` | `badge` | Service badges and status chips. Tint **plus** label, never colour alone |
 | `Chip` | `chip` | The compact genre presentation of §4.3, including its `+n` overflow |
-| `SegmentedControl` | `segmented` | §5b's direction control, and the mode/service choice on `/upload`. Keeps `role="radiogroup"` semantics |
+| `SegmentedControl` | `segmented` | Exclusive mode/service choices such as `/upload`; **not** the revised sort controls. Keeps `role="radiogroup"` semantics |
 | `Field` | `field` | Label + control + description + error, so the four cannot drift apart |
 | `EmptyState` | `empty-state` | Icon + title + body + optional action |
 | `Skeleton` | `skeleton` | Shaped like the content it replaces, so nothing jumps |
 | `Dialog` | `dialog` | Focus trap, `Esc` to dismiss |
+
+`components/FilterDisclosure.tsx` is reusable outside `FilterBar`, including
+Service updates. Its props are `label: string` and `children`; no unused
+optional configuration is required.
+It uses native `Button` and a labelled nonmodal group, generated IDs,
+first-control/link focus, Escape/Done restoration and outside dismissal.
+It **does not trap Tab or claim `aria-modal`**. Its classes are
+`filter-disclosure` / `filter-disclosure__panel`; `[hidden]` remains hidden.
 
 ⚠ **A VARIANT IS A STATIC CLASS LOOKUP, NOT A COMPUTED STRING.** `T-CSS-001c`
 forbids `className={…}` so that `T-CSS-001`'s two directions remain an exact
@@ -1222,7 +1282,7 @@ not *placement* — a control moved into a collapsed menu still answers to
 | **`sort=name` under a BINARY collation** *(new, `A53`)* | The database collation is `Latin1_General_100_BIN2`. An unqualified `ORDER BY title` is therefore **byte order**: every lower-case title sorts after every upper-case one, and `apple` follows `Zebra`. It looks alphabetical at a glance on a list that happens to be title-cased | `T-API-027` |
 | **The genre filter's completeness** *(new, 2026-09-14)* | §4.4's normalisation is one-to-many and must be applied to **both** the display and the filter. Doing only one produces a screen that looks fixed while the facet still under-returns — and the symptom the owner reported (redundant chips) **disappears** after a display-only fix, which is exactly what makes it convincing | `T-UX-125`, `T-UX-126`, `T-API-028` |
 | **The review sections' completeness** *(new, 2026-09-14)* | REQ-122 makes three sections distinguishable. The neighbouring idea — collapsing or hiding the already-correct rows to shorten the list — **deletes the product's core safety property** and looks like the same kind of tidy-up | `T-UX-136` |
-| **Oldest-first in one action** *(new, 2026-09-14)* | §5b's field selector makes it tempting to fold direction into a single ten-option list. Every behavioural test still passes, because `click()` still reaches it | `T-UX-131` |
+| **Oldest-first in one action** *(revised 2026-09-16)* | Hiding the selected Recently added button behind a menu adds a press and deletes the one-action reverse, even if URL helper tests pass | `T-UX-131`, `T-UX-138` |
 | **Removed/suppressed distinction** | Two similar-looking screens invite a merge. Suppression is keyed on **canonical work identity**, removal on the listing — different mechanisms, different meanings. | REQ-071 |
 
 Everything in `specs/ui.md` §9's copy strings is owner-facing wording; changing
@@ -1250,7 +1310,7 @@ neither is a styling change.
 | **OQ-3** | §5 REQ-115 — sort by **name/year** needs an API change. Worth it? | **Yes — add both name and release year.** The API change is accepted. Null ordering is already settled by `A48` (NULLs **last in both directions**) and is not re-decided here |
 | **OQ-3b** | **Sort by IMDb rating is currently forbidden by REQ-095**, decided at `A51` | ⚠ **REVERSED at `A53` (2026-09-14). The owner now wants to sort by IMDb rating.** REQ-095's display-only rule is overturned, and the reversal is written as **ADR-0011 Revision 1** — see §7a and **§7a.1**. ⚠ **It was NOT a one-line strike:** `specs/api.md` had made REQ-095 load-bearing for **REQ-041**, so the rating refresh becomes **synchronous, sweeping the sortable set before the ordering, under a request + time budget**. The rating is nullable, so `A48`'s NULLs-last rule applies and unrated titles never lead "Highest first" |
 | **OQ-4** | ✅ **RESOLVED 2026-09-10 — "ship all five defects now, as their own task, before the visual work."** | ⚠ **SUPERSEDED 2026-09-14 by the owner**, who directed that the defects and the visual refresh ship **together as one Epic P**. §3 remains an independently buildable unit and is built **first within** that epic, so the original property — that a fixed menu is distinguishable from a moved one — is preserved by task ordering rather than by a separate release. ~~See §11.~~ *(There is no §11; the document ends at §10. Dangling reference corrected in place.)* |
-| **OQ-5** | §5 REQ-114 — the sort control's wording and shape | **Show both options with the current one marked** — a segmented control, not a toggle. ⚠ **This answer had to grow to fit OQ-3 and OQ-3b**: with five sort fields a two-option segment cannot express the field choice. See §5b |
+| **OQ-5** | §5 REQ-114 — the sort control's wording and shape | **Revised 2026-09-16:** five visible complete-order buttons; inactive selects its default and active reverses with state/next action named. ~~Original 2026-09-14 answer: show both directions in a segment.~~ See §5b |
 | **OQ-6** | §6a — **what exactly was confusing on the review screen?** | **(d) — the three sections looked alike despite meaning different things.** Not the list length, not the Apply wording. See §6a |
 | **OQ-7** | §4.3 / REQ-112 — trim genres from the phone row, or keep them? | **Keep the genres on the row, but make them take less room** — *"use another ux to make it compact but still list the genres."* ⚠ **And a second, separate finding:** *"some of the genres are redundant, for example, there is action, action & adventure, and adventure… would it not be easier just to click action and adventure separately?"* — see §4.4 |
 
@@ -1287,15 +1347,15 @@ time of writing REQ-104, US-048, ADR-0012, `T-UX-099`): **REQ-105 – REQ-119**,
 **US-049 – US-055**, **`T-UX-100` – `T-UX-124`**, **`T-API-019` – `T-API-021`**,
 **`T-UI-029`**, **ADR-0013**.~~
 
-⚠ **EXTENDED 2026-09-14** to cover the requirements the owner's answers added.
+⚠ **Extended through 2026-09-16** to cover the requirements the owner's answers added.
 The full reserved set is now:
 
 | Family | Reserved | Added by |
 |---|---|---|
 | `REQ-` | **REQ-105 – REQ-125** | REQ-120 (§4.4), REQ-121 (§5b), REQ-122 (§6a.1), REQ-123 – REQ-125 (§7b – §7d) |
 | `US-` | **US-049 – US-059** | US-056 – US-059 above |
-| `T-UX-` | **`T-UX-100` – `T-UX-137`** | `T-UX-125` – `T-UX-136`; **`T-UX-137`** (REQ-117's bottom-fixed placement, resolved 2026-09-15) |
-| `T-API-` | **`T-API-019` – `T-API-028`** | `T-API-023` – `T-API-027` (§7a); `T-API-028` (§4.4). ⚠ The genre test was first written as `T-API-022`, which REQ-109 **already owns** — renumbered to `028`. A reserved range does not stay free while other work merges. |
+| `T-UX-` | **`T-UX-100` – `T-UX-143`** | `T-UX-138`–`143` map the approved sort, filters, search, layout, palette and shell refinement; existing ids retain their coverage with revised expectations |
+| `T-API-` | **`T-API-019` – `T-API-030`** | `T-API-028` is genre normalization; `T-API-029` is stored-name ordering; `T-API-030` is submitted title search. `T-API-022` remains the corrected-review projection test, not a reusable slot. |
 | `T-UI-` | **`T-UI-029` – `T-UI-032`** | `T-UI-030` – `T-UI-032` (§7c, §7d) |
 | `T-CSS-` | **`T-CSS-006` – `T-CSS-007`** | §7b |
 | `T-A11Y-` | **`T-A11Y-016` – `T-A11Y-017`** ~~`014` – `015`, both already taken~~ | §7c, §7d |
@@ -1308,10 +1368,9 @@ work, shipped in `4137666`). ⚠ `T-API-022` sits **out of numeric order**
 relative to `T-API-019` – `T-API-021` deliberately — REQ-109 shipped first — so
 do **not** "correct" the gap by renumbering a live test id.
 
-⚠ **`T-UX-109` – `T-UX-119` remain reserved and unimplemented**, except
-`T-UX-119`, which is a REQ-095 regression guard defined in §5. ⚠ Note that
-**`T-UX-119` guards a rule REQ-095 no longer states** — the owner reversed it
-at `A53` (§7a). Read §7a.1 before touching it; it is not simply deletable.
+Existing implemented IDs remain owned by their tests; do not reissue them.
+`T-UX-119` now guards the **presence** of rating sort following the A53
+reversal, not its absence. Read §7a.1 before changing the rating contract.
 
 ⚠ **The ids added on 2026-09-14 ARE now registered** in `specs/testing.md` §39,
 in the same commit that wrote their owning tasks (TASK-208 – TASK-218).

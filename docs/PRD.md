@@ -671,12 +671,18 @@ Added at `A48` for **Epic L (v1.1)** — these terms have no meaning in v1:
 | AC-1 | The combined list | The owner filters by service | Only titles with an active listing on the selected service are shown (REQ-032) |
 | AC-2 | The combined list | The owner filters by type | Only films, or only series, are shown according to the selection (REQ-033) |
 | AC-3 | The combined list | The owner filters by genre | Only titles carrying the selected genre are shown (REQ-034) |
-| AC-4 | Several filters | They are applied together | They combine conjunctively (service AND type AND genre) |
-| AC-5 (edge) | A filter combination that matches nothing | It is applied | An empty state explains that the filters matched nothing and offers a one-action clear; it is visually distinct from the "you have no titles" empty state |
+| AC-4 | Several filters | They are applied together | They combine conjunctively across dimensions (service AND type AND genre), with OR within each dimension; URL-driven pickers and removable chips preserve all other selections and ordering |
+| AC-5 (edge) | A filter combination that matches nothing | It is applied | An empty state explains that the filters matched nothing and offers a one-action clear; it is visually distinct from the "you have no titles" empty state. Active chips also remain visible with nonzero results, and each removes only its own dimension/value |
 | AC-6 (edge) | A title whose TMDB record carries no genre | A genre filter is applied | It is excluded from genre-filtered results and is not silently assigned a default genre. It remains visible when no genre filter is active |
 | AC-7 (failure) | Filters applied on a phone at the 320px viewport floor | The list renders | The filter controls remain usable and do not occlude the list (NFR-006) |
 
-**Out of scope for this story:** free-text search of the combined list, filtering the removed view (US-024 covers that separately). ~~"filtering by runtime (REQ-035, deferred to v1.1)"~~ — **REQ-035 was promoted into scope at `A48`** and is carried by **US-055**, not by this story; see `specs/ui-refresh.md` §5a.
+**Related approved contract (2026-09-16):** explicitly submitted title search is
+URL `q`, evaluated server-side before filters/paging/counting, not on loaded
+rows. Its named contract is `specs/ui-refresh.md` §5c / `specs/api.md` §6.2c,
+mapped to `T-UX-140` / `T-API-030`; it adds no untested PRD AC. Clear filters
+clears `q` and the four filter dimensions without resetting sort or view.
+Filtering the removed view stays in US-024; runtime filtering is in US-055
+(REQ-035, promoted at `A48`), not deferred.
 **Open questions:** none.
 
 #### US-020 — Sort by date added, using the earliest listing date
@@ -699,7 +705,12 @@ Added at `A48` for **Epic L (v1.1)** — these terms have no meaning in v1:
 | AC-6 | The sort control | The owner reverses the direction | The list re-orders oldest-first, and the selection persists for the session (REQ-038) |
 | AC-7 (failure) | A Title whose date-added is missing for any reason | The list renders | It sorts last rather than crashing or being hidden, and its date is rendered as unknown |
 
-**Out of scope for this story:** alphabetical sort (not in v1 scope). ~~"sorting by runtime (REQ-037, deferred to v1.1)"~~ — **REQ-037 was promoted into scope at `A48`** and is carried by **US-055**. ⚠ It does **not** disturb this story: `dateAdded` remains the **default** sort key and `dir=desc` remains the default direction for both keys, so AC-2 and AC-6 stand unchanged. The runtime key follows AC-7's precedent exactly — a missing value **sorts last rather than being hidden**, in both directions.
+**Other sort fields:** name, release year and IMDb rating are in US-057;
+runtime is also carried by US-055 (REQ-037, promoted at `A48`).
+`dateAdded` remains the default field, `desc` its default direction; name
+defaults to `asc`, all other fields to `desc`. US-057's approved complete-order
+buttons retain this story's one-action reverse and session persistence.
+Nullable keys sort last in both directions.
 **Open questions:** none.
 
 #### US-021 — Date added is recorded once, never overwritten, and labelled honestly
@@ -740,10 +751,10 @@ Added at `A48` for **Epic L (v1.1)** — these terms have no meaning in v1:
 
 | # | Given | When | Then |
 |---|---|---|---|
-| AC-1 | Batches that have been closed | The owner views the combined list | The date of the most recent **successfully closed** batch is shown per service, for both Netflix and Max (REQ-039) |
-| AC-3 (edge) | A service that has never had a closed batch | The list renders | It shows "never updated" rather than a blank or an epoch date |
+| AC-1 | Batches that have been closed | The owner opens Service updates on the combined list | The date of the most recent **successfully closed** batch is shown per service, for both Netflix and Max, as a link to upload with that service pre-selected (REQ-039) |
+| AC-3 (edge) | A service that has never had a closed batch | Service updates is opened | It shows "never updated" rather than a blank or an epoch date |
 | AC-4 (edge) | A batch that was submitted but abandoned or failed | The list renders | It does not update the last-updated date. Only successfully closed batches count (REQ-039) |
-| AC-5 (failure) | The last-updated dates cannot be computed | The list renders | The list itself still renders; the freshness area shows an unavailable state and does not block the value loop |
+| AC-5 (failure) | The last-updated dates cannot be computed | The list renders | The list itself still renders; the freshness area shows an unavailable state **outside the closed disclosure** and does not block the value loop. Every service's upload link remains reachable inside |
 
 **Out of scope for this story:** any prompt, reminder or notification to update (REQ-051 — notifications are out of v1).
 **Open questions:** none. Note for §10: REQ-039's visible dates are how success metric M7 is observed, at no instrumentation cost.
@@ -1475,9 +1486,9 @@ Trimming them is the obvious reading of "compact" and is the wrong one.
 | AC | Acceptance criterion |
 |---|---|
 | AC-1 | The row's facts render as a single wrapping line with a separator between fields. |
-| AC-2 | The fields appear in the order year, type, genres, runtime. |
+| AC-2 | The fields appear in the order year, type, runtime, genres (approved 2026-09-16). |
 | AC-3 | The row body has consistent vertical spacing rather than being packed to the minimum. |
-| AC-4 | Genres remain on the row, limited to roughly one line with a count of any overflow. |
+| AC-4 | Genres remain on the row: three chips plus a count/expansion for the remainder. Full names wrap and are never truncated; the limit is a count, not a clipped line. |
 | AC-5 | A genre that is currently being filtered on is always visible, never hidden behind the overflow count. |
 
 ---
@@ -1524,23 +1535,23 @@ shows me a scannable list and a laptop shows me the artwork.
 
 **Requirements:** REQ-110, REQ-111, REQ-118 (`specs/ui-refresh.md` §4.1, §7).
 
-⚠ **The phone list is the base rule and the grid is a `min-width` addition** —
-not the other way round, and never a `max-width` query.
+⚠ **The phone single-column layout is the base rule and wider Grid columns
+are a `min-width` addition.** Explicit Grid/Compact is local presentation
+state, independent of the server's order and preserved across query changes.
 
 ⚠ **AC-3 is the one a redesign deletes by accident.** Two layouts built as two
 components become two action sets that drift; the requirement is one DOM,
 restyled.
 
-⚠ **`indigo-400 #818cf8` is 2.98:1 on white and fails the 3:1 non-text floor.**
-It is the exact shade one reaches for for a soft border or a gentle focus ring
-and it looks entirely adequate. Borders and focus rings use `--color-border` or
-`--color-accent`.
+The approved dark indigo palette is in `specs/ui.md` §13.2. Boundaries and
+focus rings use contrast-proven border/accent tokens; primary accent-filled
+buttons use the dark surface foreground, not white.
 
 | AC | Acceptance criterion |
 |---|---|
-| AC-1 | Below the large breakpoint the list renders as a compact vertical list. |
-| AC-2 | At and above it the list renders as a poster grid. |
-| AC-3 | Both layouts render the same data and offer the same actions. |
+| AC-1 | At narrow widths both Grid and Compact render a single column of horizontal poster/details rows. |
+| AC-2 | Grid is the default; at wide widths it uses multiple columns of horizontal poster/details cards. The explicit Compact choice remains one column. |
+| AC-3 | Both layouts render the same data in the same server order and offer the same actions, including pending/offline restrictions; filtering and sorting preserve the local view preference. |
 | AC-4 | At 320 px the list renders with no horizontal scrolling. |
 | AC-5 | Every accent token meets its contrast floor on both surfaces, computed from the token values rather than estimated. |
 
@@ -1578,10 +1589,10 @@ one is repositioned rather than duplicated.
 | AC | Acceptance criterion |
 |---|---|
 | AC-1 | The active destination is marked programmatically and carries a cue that is not colour alone. |
-| AC-2 | Below the small breakpoint the bar shows the list, upload and an overflow control; every other route is reachable through the overflow. |
+| AC-2 | Below the small breakpoint the bar shows List, Upload and More; every other route is reachable through More. Desktop shows List, Upload, Batches and More, with all other destinations in More. |
 | AC-3 | A route behind the overflow is still marked as current when open, and is still reachable by direct URL. |
 | AC-4 | Every destination is a real link, not a click handler that pushes history. |
-| AC-5 | Upload remains a first-class destination, and the per-service freshness strip still deep-links to it with that service pre-selected. |
+| AC-5 | Upload remains a first-class destination; opening Service updates exposes every factual service link to it with the service pre-selected. Unavailable-date degradation remains visible outside the disclosure. |
 | AC-6 | On a phone the bar is fixed to the bottom of the screen and stays visible while the page scrolls, without covering the content beneath it or sitting under the device's home indicator; above the small breakpoint it returns to the header. |
 
 ---
@@ -1613,12 +1624,12 @@ counts what *survived* the filter and would read zero on every list.
 
 | AC | Acceptance criterion |
 |---|---|
-| AC-1 | The row shows the title's runtime, last in its facts line. |
+| AC-1 | The row shows the title's runtime after type and before genres in its facts line. |
 | AC-2 | A series' runtime is shown as per-episode, distinguishably from a film's. |
 | AC-3 | An unknown runtime renders as words, never as a zero and never as an empty slot. |
 | AC-4 | The list can be filtered to a runtime bucket, with half-open boundaries so no title falls in two buckets. |
 | AC-5 | While a runtime filter is active, the number of titles hidden for having no known runtime is disclosed, from a count the server supplies. |
-| AC-6 | The list can be ordered by runtime, and the direction control says what that ordering means. |
+| AC-6 | The list can be ordered by runtime with Longest runtime / Shortest runtime complete-order labels; inactive selects longest-first and active reverses in one action. |
 
 ---
 
@@ -1649,7 +1660,7 @@ the criterion a half-fix fails.
 | AC-2 | The genre filter offers no combined name as an option. |
 | AC-3 | Filtering by either constituent genre returns **both** the films tagged with it **and** the television titles tagged with the combined name, and filtering by an unrelated genre is not widened. |
 | AC-4 | Normalisation happens on read. No stored genre value is rewritten and no migration is required. |
-| AC-5 | A row shows at most a single line of genre chips, with a `+n` control for the remainder; a genre in the active filter is always visible rather than hidden behind `+n`. |
+| AC-5 | A row shows three full-name genre chips with `+n` expansion for the remainder; names wrap without truncation. Active-filter genres are always visible, even when that requires more than three chips. |
 | AC-6 | A title with no genres renders no genre chips and no placeholder, and is excluded whenever a genre filter is active. |
 
 ---
@@ -1676,12 +1687,12 @@ oldest-first while burying it a press deeper.
 
 | AC | Acceptance criterion |
 |---|---|
-| AC-1 | The filters and the sort present as a single control group, and remain independent: filter state lives only in the URL, sort direction is remembered across sessions. |
+| AC-1 | The filters and sort present as a single control group and remain independent: filter state is URL-only; sort direction is remembered for the session. |
 | AC-2 | The list can be ordered by date added, name, release year, runtime and IMDb rating. |
-| AC-3 | Both direction options are on screen at once with the current one marked; the control never presents the current ordering as its own single label. |
-| AC-4 | The direction labels describe the selected field, and the existing date wording is unchanged. |
+| AC-3 | Five complete-order buttons are directly visible, with exactly one marked selected; its accessible name states current order and the next reverse action. There is no separate direction segment. |
+| AC-4 | Labels describe complete orders: Recently added / Oldest additions, Name A-Z / Name Z-A, Newest releases / Oldest releases, Longest runtime / Shortest runtime, Highest rated / Lowest rated. Date-added means when the work entered nextup. |
 | AC-5 | From the default view, the reverse of the default ordering is reachable in exactly one interaction. |
-| AC-6 | Changing the field preserves the chosen direction; changing either preserves the active filters and starts the list again from its first page. |
+| AC-6 | Selecting an inactive field applies its default (`name=asc`, all others `desc`); selecting the active field reverses it. Both preserve filters, submitted search and local view while restarting paging. |
 | AC-7 | A remembered direction is reflected in the request that is actually issued, so the marked option and the list always agree. |
 
 ---
@@ -1733,11 +1744,11 @@ screens feel like one application and their states remain understandable.
 
 | AC | Acceptance criterion |
 |---|---|
-| AC-1 | Text uses the closed token-based type scale; primary content never drops below `--text-sm`. |
-| AC-2 | The closed inline icon set inherits `currentColor`, adds no package or network request, and exposes a name only when non-decorative. |
+| AC-1 | Text uses the closed token-based type scale on the Segoe UI/Aptos system stack; primary content never drops below `--text-sm`. No downloaded font. |
+| AC-2 | The closed set of 16 inline icons (including BrandIcon, GridIcon and CompactIcon) inherits `currentColor`, adds no package or network request, and exposes a name only when non-decorative. |
 | AC-3 | Form controls use shared primitives. Variants resolve through literal class maps, and every rendered class has a stylesheet rule. |
 | AC-4 | Buttons preserve native submit, disabled and focus behaviour and meet the 44 px tap-target floor at 320 px. |
-| AC-5 | Dialogs trap focus, dismiss on Escape and restore focus to their trigger. Field labels, descriptions and errors remain associated with their controls. |
+| AC-5 | Modal dialogs trap focus, dismiss on Escape and restore trigger focus. Nonmodal filter/Service updates disclosures do not trap Tab or claim a modal role; they dismiss on Escape/Done/outside interaction and restore focus appropriately. Field labels, descriptions and errors remain associated with controls. |
 
 ---
 
