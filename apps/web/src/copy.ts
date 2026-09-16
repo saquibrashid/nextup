@@ -304,9 +304,10 @@ export const HEIC_PREVIEW_PLACEHOLDER = 'HEIC — preview after upload';
  * `specs/ui.md` §2.1 - the freshness strip when the dates cannot be computed
  * (`T-FRESH-014`).
  *
- * ⚠ FINDING - INVENTED COPY, PENDING OWNER REVIEW. `T-FRESH-014` requires the
- * strip to "degrade visibly", but no spec supplies the wording: `specs/ui.md`
- * §9 has no constant for it and `specs/ux-states.md` §2 has no row for it.
+ * ⚠ APPROVED BY THE OWNER, 2026-09-16, and recorded in `specs/ui.md` §9. It
+ * was drafted copy: `T-FRESH-014` requires the strip to "degrade visibly" but
+ * no spec supplied the wording. It is now governed there like every other
+ * string in this file, so a reword is one diff and not a judgement call.
  *
  * Worded as an admission about nextup, not a statement about the owner's list:
  * "unavailable right now" cannot be misread as "you have never updated this"
@@ -333,11 +334,14 @@ export const SORT_OLDEST_LABEL = 'Oldest first';
  * list. `0m` would be worse still: it is a claim that the title is zero
  * minutes long, filed under "Under 30m" by any reader's arithmetic.
  *
- * ⚠ FINDING - INVENTED COPY, PENDING OWNER REVIEW. `specs/ui-refresh.md` §5a
- * quotes the words "Runtime unknown" inside REQ-119's prose, but §9 of
- * `specs/ui.md` has no constant row for it yet.
+ * ⚠ THE FINDING THAT STOOD HERE IS RESOLVED, AND WAS ALREADY STALE. It said
+ * `specs/ui.md` §9 had no row for this string; §9 gained one at `A48`, under
+ * the name `RUNTIME_UNKNOWN_LABEL` and with this exact text. The export was
+ * renamed to match, because §9's whole promise is that a governed string can
+ * be found by its name — a constant the spec names and the code does not is
+ * ungoverned in practice however identical the text happens to be.
  */
-export const RUNTIME_UNKNOWN = 'Runtime unknown';
+export const RUNTIME_UNKNOWN_LABEL = 'Runtime unknown';
 
 /**
  * REQ-035 - the runtime filter's bucket labels (`T-UX-123`).
@@ -406,8 +410,11 @@ export const SORT_DIR_LEGEND = 'Direction';
  * the whole filtered set - the client has not seen the excluded rows and
  * cannot count them.
  *
- * ⚠ FINDING - INVENTED COPY, PENDING OWNER REVIEW. §5a quotes the shape
- * ("3 titles have no runtime and are hidden"); the singular is mine.
+ * ⚠ THE SINGULAR FORM AND THE FULL STOP WERE APPROVED BY THE OWNER,
+ * 2026-09-16. §5a and `specs/ui.md` §9's `RUNTIME_HIDDEN_DISCLOSURE` row
+ * quoted only the plural shape ("3 titles have no runtime and are hidden");
+ * §9 now records both forms and names this function as the export that
+ * renders them, since a count-dependent string cannot be a bare constant.
  */
 export function runtimeUnknownHiddenLabel(count: number): string {
   return count === 1
@@ -680,10 +687,11 @@ export const IMDB_RATING_ABSENT = 'No IMDb rating';
 /*
   `specs/ux-states.md` §2.13 **Submitting (row action)** (`T-UX-021`).
 
-  ⚠ FINDING — INVENTED COPY, PENDING OWNER REVIEW. §2.13 specifies the
-  behaviour ("the affected row dims with an inline spinner") but gives no
-  wording, and an unlabelled spinner is silent to a screen reader, so the
-  component needs *some* string. It names the row's state, not the action,
+  ⚠ APPROVED BY THE OWNER, 2026-09-16, and recorded in `specs/ui.md` §9. It
+  was drafted copy: §2.13 specifies the behaviour ("the affected row dims with
+  an inline spinner") but gives no wording, and an unlabelled spinner is
+  silent to a screen reader, so the component needs *some* string. It names
+  the row's state, not the action,
   because the row does not know which of the §2.3 menu actions is in flight —
   claiming "Removing…" when the owner chose *Fix match* would be a confident,
   specific, wrong description of a write they cannot see.
