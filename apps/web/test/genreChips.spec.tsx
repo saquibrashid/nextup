@@ -224,6 +224,10 @@ describe('T-UX-127 · ui-refresh.md §4.3 · compact genres with a `+n` overflow
     // would put the genres on a row of their own, which is the opposite of
     // compact.
     expect(rule('\\.genre-chips')).toMatch(/display:\s*inline-flex/);
-    expect(rule('\\.genre-chips__chip')).toMatch(/text-overflow:\s*ellipsis/);
+    // ⚠ `.chip` IS THE §7d PRIMITIVE, not a private genre class. The chips
+    // moved onto it when `T-INFRA-013d` found the primitive mounted by
+    // nothing; the truncation guarantee is unchanged and now lives in one
+    // place rather than two.
+    expect(rule('\\.chip')).toMatch(/text-overflow:\s*ellipsis/);
   });
 });

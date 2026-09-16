@@ -51,9 +51,11 @@ import { NavLink, Outlet, matchPath, useLocation } from 'react-router-dom';
 import { ErrorBoundary } from './ErrorBoundary';
 import { OfflineBanner } from './OfflineBanner';
 import { TmdbAttribution } from './TmdbAttribution';
-import { ListIcon } from './icons/ListIcon';
-import { MoreIcon } from './icons/MoreIcon';
-import { UploadIcon } from './icons/UploadIcon';
+// ⚠ THROUGH THE BARREL, NOT THE INDIVIDUAL FILES. `components/icons/index.ts`
+// is the REGISTER that makes REQ-124's set closed; importing a drawing
+// directly bypasses it, and a fourteenth icon could then ship without ever
+// meeting `T-UI-030`'s count.
+import { ListIcon, MoreIcon, UploadIcon } from './icons';
 import { Button } from './ui/Button';
 import { useOnline } from '../lib/useOnline';
 import { useWideViewport } from '../lib/useWideViewport';

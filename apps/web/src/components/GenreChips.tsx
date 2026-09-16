@@ -18,6 +18,7 @@ import { useState, type JSX } from 'react';
 import { normaliseGenres } from '@nextup/domain';
 
 import { Button } from './ui/Button';
+import { Chip } from './ui/Chip';
 
 /**
  * How many chips show before the rest collapse behind `+n`.
@@ -80,9 +81,15 @@ export function GenreChips({ genres, activeGenres = [] }: GenreChipsProps): JSX.
   return (
     <span className="genre-chips" data-testid="genres">
       {shown.map((genre) => (
-        <span className="genre-chips__chip" key={genre} data-testid={`genre-chip-${genre}`}>
+        // ⚠ THE `Chip` PRIMITIVE, NOT A LOCAL `<span>` — `specs/ui-refresh.md`
+        // §7d names `chip` as "the compact genre presentation of §4.3,
+        // including its `+n` overflow", so this IS the primitive's one
+        // consumer. A private `genre-chips__chip` alongside it is the
+        // each-screen-re-solves-it duplication REQ-125 exists to end, and it
+        // left the primitive mounted by nothing but its own test.
+        <Chip key={genre} data-testid={`genre-chip-${genre}`}>
           {genre}
-        </span>
+        </Chip>
       ))}
       {hidden > 0 && (
         // ⚠ REVEALS IN PLACE; IT IS NOT A LINK, A TOOLTIP OR A DIALOG. §4.3

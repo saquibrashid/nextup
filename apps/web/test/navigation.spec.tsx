@@ -597,4 +597,25 @@ describe('T-UX-137 - ui-refresh.md 6 - the phone bar sits on the bottom edge', (
     ).toStrictEqual([...BAR_LABELS]);
     expect(within(nav).getByRole('button', { name: NAV_MORE_LABEL })).toBeTruthy();
   });
+
+  it('T-UX-137i: the scroll container reserves the bar height, and gives it back above --bp-sm', () => {
+    /*
+     * ⚠ A SECOND, SEPARATE CLEARANCE - AND THE ONE THAT ACTUALLY BITES.
+     * `T-UX-137b` covers `.app-shell`'s `padding-bottom`, which only means the
+     * owner CAN scroll a control clear of the bar. It says nothing about
+     * scrolls the BROWSER performs: `scrollIntoView` and the scroll that
+     * follows keyboard focus both stop as soon as the element is just inside
+     * the viewport - flush with the bottom edge, under the fixed bar. The
+     * control is then visible and un-tappable, which is how this was found
+     * (Playwright reported `nav__item` intercepting `apply-changes-button`).
+     *
+     * ⚠ AND THE RESET IS HALF THE TEST. Above `--bp-sm` there is no bar, so a
+     * surviving `scroll-padding-bottom` would stop every desktop scroll short
+     * of the real foot of the page for no visible reason.
+     */
+    expect(declarations(baseRuleBody('html'))).toMatch(
+      /scroll-padding-bottom:\s*calc\(\s*var\(--nav-bar-height\)\s*\+\s*env\(safe-area-inset-bottom\)\s*\)/,
+    );
+    expect(declarations(wideRuleBody('html'))).toMatch(/scroll-padding-bottom:\s*0/);
+  });
 });

@@ -169,6 +169,24 @@ ol {
 html {
   /* ⚠ Never a fixed px root size: it overrides the browser's text setting. */
   -webkit-text-size-adjust: 100%;
+
+  /*
+   * REQ-117 — CLEARANCE FOR *BROWSER-DRIVEN* SCROLLING, which is a different
+   * problem from the reader's clearance and needs its own declaration.
+   *
+   * ⚠ `.app-shell`'s `padding-bottom` IS NOT ENOUGH ON ITS OWN. It guarantees
+   * the owner CAN scroll the last control clear of the bar; it does nothing
+   * about scrolls the browser performs itself. `scrollIntoView` and the scroll
+   * that follows keyboard focus both move an element only just inside the
+   * viewport — i.e. flush with the bottom edge, which is exactly where the
+   * fixed bar sits. The control is then on screen and un-tappable.
+   *
+   * ⚠ SO THIS IS AN ACCESSIBILITY FIX, NOT A TEST ACCOMMODATION. It was found
+   * by Playwright reporting `nav__item` and `nav__link` as intercepting
+   * pointer events on `apply-changes-button`, but the owner meets the same
+   * bug whenever they Tab to a control near the foot of a long page.
+   */
+  scroll-padding-bottom: calc(var(--nav-bar-height) + env(safe-area-inset-bottom));
 }
 
 body {
@@ -356,8 +374,7 @@ button {
   font-size: var(--text-sm);
 }
 
-.input,
-.select {
+.input {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -384,8 +401,7 @@ button {
   padding: var(--space-2);
 }
 
-.input:focus-visible,
-.select:focus-visible {
+.input:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
@@ -418,14 +434,32 @@ button {
   max-inline-size: 100%;
 }
 
-.badge,
-.chip {
+.badge {
   display: inline-block;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   font-size: var(--text-sm);
   padding: var(--space-1) var(--space-2);
+}
+
+/*
+ * §7d's `chip` — the compact genre presentation, and deliberately QUIETER
+ * than `.badge`: a genre is a fact about the work, not a state of the row, and
+ * three of them at badge weight would compete with the service badges that
+ * carry the product's whole point. That is why this is a separate rule rather
+ * than a second selector on `.badge`.
+ *
+ * `text-overflow: ellipsis` with the `min-width: 0` on `.genre-chips` so a
+ * long genre name truncates rather than forcing the 320 px row sideways.
+ */
+.chip {
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  overflow: hidden;
+  padding: 0 var(--space-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .segmented {
@@ -1164,23 +1198,6 @@ button {
 }
 
 /*
- * Visually quieter than `.title-row__chip`: a genre is a fact about the work,
- * not a state of the row, and three of them at badge weight would compete with
- * the service badges that carry the product's whole point.
- *
- * `text-overflow: ellipsis` with `min-width: 0` above so a long genre name
- * truncates rather than forcing the 320 px row sideways.
- */
-.genre-chips__chip {
-  background: var(--color-bg);
-  border-radius: var(--radius);
-  overflow: hidden;
-  padding: 0 var(--space-1);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/*
  * The `+n` control. `flex: 0 0 auto` so it is the one thing that never
  * truncates: it is the only route to the hidden genres, and an ellipsised
  * `+…` says nothing about how many.
@@ -1862,6 +1879,16 @@ button {
 /* ---------------------------------------------------------- wider views -- */
 
 @media (min-width: 640px) {
+  /*
+   * ⚠ REQ-117 — THE SCROLL CLEARANCE IS RESET TOO. There is no bottom bar
+   * above `--bp-sm`, so leaving this in place would stop `scrollIntoView` and
+   * focus scrolling short of the true viewport foot on every desktop page.
+   * `T-UX-137i` asserts both halves.
+   */
+  html {
+    scroll-padding-bottom: 0;
+  }
+
   /*
    * ⚠ REQ-117 — THE `padding` SHORTHAND IS ALSO THE CLEARANCE RESET. The base
    * rule adds a `padding-bottom` reserving room for the bottom-fixed bar;

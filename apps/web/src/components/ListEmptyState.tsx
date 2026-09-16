@@ -33,7 +33,7 @@ import {
 import { ZeroMatch, isFiltered, type ListFilters } from './FilterBar';
 import { Button } from './ui/Button';
 import { EmptyState } from './ui/EmptyState';
-import { ListIcon } from './icons/ListIcon';
+import { ListIcon } from './icons';
 
 export type ListEmptyKind = 'never-uploaded' | 'zero-match' | 'all-gone' | null;
 

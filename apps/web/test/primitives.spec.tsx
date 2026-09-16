@@ -8,7 +8,6 @@ import ts from 'typescript';
 import { Button } from '../src/components/ui/Button';
 import { Field } from '../src/components/ui/Field';
 import { Input } from '../src/components/ui/Input';
-import { Select } from '../src/components/ui/Select';
 import { Card } from '../src/components/ui/Card';
 import { Badge } from '../src/components/ui/Badge';
 import { Chip } from '../src/components/ui/Chip';
@@ -195,16 +194,22 @@ describe('T-UI-031 shared control primitives', () => {
     expect(action).toHaveBeenCalledOnce();
   });
 
-  it('T-UI-031h: Select and Input forward their refs and native change events', () => {
+  it('T-UI-031h: Input forwards its ref and native change events', () => {
+    // ⚠ THERE IS NO `Select` PRIMITIVE, AND THAT IS DELIBERATE, NOT AN
+    // OVERSIGHT. `specs/ui-refresh.md` §7d's table does not list one, no
+    // `<select>` exists anywhere in `apps/web/src/**`, and REQ-121 chose
+    // radios over a collapsed list on purpose — `T-UX-131b` exists precisely
+    // because a `<select>` would pass a one-`click()` assertion that the
+    // requirement fails. One was built alongside the others under TASK-210 and
+    // was mounted by nothing but this test, which is what `T-INFRA-013d`
+    // caught. If a `<select>` is ever genuinely needed, `T-UI-031a` forbids a
+    // bare one, so the primitive comes back with its consumer in the same
+    // change.
     const input = createRef<HTMLInputElement>();
-    const select = createRef<HTMLSelectElement>();
     const changed = vi.fn();
     render(
       <>
         <Input ref={input} aria-label="Search" onChange={changed} />
-        <Select ref={select} aria-label="Sort" onChange={changed}>
-          <option value="year">Year</option>
-        </Select>
         <Input
           type="file"
           aria-label="Choose files"
@@ -216,10 +221,7 @@ describe('T-UI-031 shared control primitives', () => {
     input.current?.focus();
     expect(screen.getByRole('textbox')).toHaveFocus();
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Dune' } });
-    select.current?.focus();
-    expect(screen.getByRole('combobox')).toHaveFocus();
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'year' } });
-    expect(changed).toHaveBeenCalledTimes(2);
+    expect(changed).toHaveBeenCalledOnce();
     expect(screen.getByLabelText('Choose files')).toHaveAttribute('multiple');
   });
 });
