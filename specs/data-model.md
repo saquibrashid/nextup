@@ -2586,3 +2586,55 @@ REQ-028 applies unchanged: **nothing is ever hard-deleted.** A satisfied or
 suppressed `WatchIntent` is retained forever. There is no TTL and no scheduled
 deletion, here or anywhere. `T-INV-012` (the sanctioned-hard-delete gate) must
 continue to show exactly one sanctioned hard delete after this epic ships.
+
+---
+
+## 18. Owner watch preferences (REQ-126, US-060)
+
+An additive SQL Server `WatchPreference` relation stores an independent
+`watching` boolean and `priority` (`up-next`, `normal`, `someday`) per
+**owner id + canonical work identity**. It is not a `Title` column or a
+`WatchIntent` (the latter means a work waiting for availability). Use a
+composite primary key, the existing binary collation for work identity,
+SQL Server `bit` for Watching, and a raw migration CHECK constraint for
+the closed priority vocabulary.
+
+Migration `0011_watch_preference` creates `dbo.watch_preference`:
+
+| Prisma field | SQL column | SQL Server storage |
+|---|---|---|
+| `ownerId` | `owner_id` | `NVARCHAR(200) NOT NULL`, BIN2 |
+| `workIdentity` | `work_identity` | `NVARCHAR(200) NOT NULL`, BIN2 |
+| `watching` | `watching` | `BIT NOT NULL DEFAULT 0` |
+| `priority` | `priority` | `NVARCHAR(16) NOT NULL DEFAULT N'normal'`, BIN2 |
+
+The key is `(owner_id, work_identity)`. CHECK constraints validate the owner,
+canonical identity prefixes and exact priority vocabulary. There is no Title
+foreign key: preferences must outlive any particular title row. The migration
+does not prepopulate user choices.
+
+No row means false/normal. Explicitly saved false/normal **is still an
+explicit preference**, particularly during match correction. Partial updates
+preserve omitted fields. An atomic owner/work upsert creates or updates the
+record without touching title metadata, date-added, listing membership,
+visibility, suppression or capture provenance.
+
+Removing a title, suppressing it, restoring it, and screenshot
+reconciliation never delete/reset preferences. A reappearing work receives
+a new Title row under the existing rules and reads the same preference by
+canonical identity. No TTL, cleanup job or background ordering process is
+introduced. Owner-data export includes preference records, including those
+whose title is currently removed.
+
+Fix-match may change canonical identity. Within its existing transaction,
+copy the source preference to the destination only if the destination has no
+explicit record. Otherwise preserve the destination, including explicit
+false/normal. Keep the source record for historical/reappearing work; never
+copy another owner's preference or mutate metadata/import paths to do this.
+
+The list/detail join defaults missing preference records to false/normal.
+The list's Watching/priority predicates apply before pagination and whole-set
+runtime/rating scopes. Watch priority rank is 0 for Watching, otherwise
+1/2/3 for Up next/Normal/Someday, with id ascending as the stable tie-break.
+The default list order does not change. See `api.md` §6.2d and
+`T-WATCH-001`/`T-WATCH-002`.

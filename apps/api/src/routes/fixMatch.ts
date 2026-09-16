@@ -45,6 +45,8 @@ import {
   findActiveSuppression,
   findActiveTitleByWorkIdentity,
   findTitleDetail,
+  carryWatchPreference,
+  lockTitleForWatchPreferences,
   migrateSuppression,
   runInTransaction,
   updateTitle,
@@ -258,6 +260,16 @@ export function registerFixMatchRoutes(router: Router, getClient: () => TmdbClie
       : null;
 
     await runInTransaction(async (tx) => {
+      await lockTitleForWatchPreferences(ownerId, title.id, tx);
+      const current = await findTitleDetail(ownerId, title.id, tx);
+      if (current === null) throw new AppError('NOT_FOUND', 404, 'No such title.');
+      if (current.workIdentity !== previousWorkIdentity) {
+        throw new AppError(
+          'VALIDATION_FAILED',
+          409,
+          'This match changed. Reload the title before correcting it.',
+        );
+      }
       await updateTitle(
         ownerId,
         title.id,
@@ -289,6 +301,10 @@ export function registerFixMatchRoutes(router: Router, getClient: () => TmdbClie
         },
         tx,
       );
+
+      if (identityChanged) {
+        await carryWatchPreference(ownerId, previousWorkIdentity, workIdentity, tx);
+      }
 
       if (carried !== null) {
         await migrateSuppression(

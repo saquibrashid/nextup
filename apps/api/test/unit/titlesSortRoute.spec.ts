@@ -57,7 +57,7 @@ vi.mock('../../src/jobs/refreshRatings.js', async (importOriginal) => {
 const { createApp } = await import('../../src/app.js');
 const { CLIENT_PRINCIPAL_HEADER } = await import('../../src/auth/principal.js');
 const { resetAllowListWarning } = await import('../../src/middleware/allowList.js');
-const { decodeNameCursor, decodeRatingCursor, decodeReleaseYearCursor } =
+const { decodeNameCursor, decodeRatingCursor, decodeReleaseYearCursor, decodeWatchPriorityCursor } =
   await import('../../src/pagination.js');
 
 const OID = 'http://schemas.microsoft.com/identity/claims/objectidentifier';
@@ -115,6 +115,39 @@ const get = (qs: string): Promise<Response> =>
   fetch(`${origin}/api/titles${qs}`, {
     headers: { [CLIENT_PRINCIPAL_HEADER]: principalHeader },
   });
+
+describe('T-WATCH-002 watch priority route integration', () => {
+  it('T-WATCH-002f issues a rank cursor from the last served preference snapshot', async () => {
+    listTitlePage.mockResolvedValue({
+      rows: [row({ watching: true, priority: 'someday' })],
+      hasMore: true,
+    });
+    const response = await get('?sort=watchPriority');
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as ListBody;
+    expect(decodeWatchPriorityCursor(body.nextCursor ?? '')).toEqual({
+      watchPriorityRank: 0,
+      id: 't-1',
+    });
+    expect(body.items[0]).toMatchObject({ watching: true, priority: 'someday' });
+    listTitlePage.mockResolvedValue({ rows: [row()], hasMore: true });
+    const defaults = (await (await get('?sort=watchPriority')).json()) as ListBody;
+    expect(decodeWatchPriorityCursor(defaults.nextCursor ?? '').watchPriorityRank).toBe(2);
+    listTitlePage.mockResolvedValue({ rows: [], hasMore: true });
+    expect(((await (await get('?sort=watchPriority')).json()) as ListBody).nextCursor).toBeNull();
+  });
+
+  it('T-WATCH-002g forwards watch filters into rating scope, SQL paging and unknown counts', async () => {
+    const response = await get(
+      '?sort=rating&watching=false&priority=up-next&priority=someday&runtime=under30',
+    );
+    expect(response.status).toBe(200);
+    const filters = { watching: false, priorities: ['up-next', 'someday'] };
+    for (const query of [listTitlePage, listTitleRatingRows, countRuntimeUnknown]) {
+      expect(query).toHaveBeenCalledWith(expect.any(String), expect.objectContaining(filters));
+    }
+  });
+});
 
 beforeEach(async () => {
   vi.clearAllMocks();

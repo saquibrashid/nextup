@@ -18,6 +18,7 @@ import { TitleRow, type TitleListItem } from './TitleRow';
 import type { ListView } from './ListViewControl';
 
 export interface TitleListProps {
+  readonly onWatchPreferences?: ((item: TitleListItem) => void) | undefined;
   readonly items: readonly TitleListItem[];
   readonly view?: ListView;
   readonly onOpenMenu?: ((item: TitleListItem) => void) | undefined;
@@ -48,6 +49,7 @@ export interface TitleListProps {
 
 export function TitleList({
   items,
+  onWatchPreferences,
   onOpenMenu,
   onFixMatch,
   pendingTitleIds,
@@ -61,6 +63,7 @@ export function TitleList({
         <TitleRow
           key={item.titleId}
           item={item}
+          onWatchPreferences={onWatchPreferences}
           onOpenMenu={onOpenMenu}
           onFixMatch={onFixMatch}
           pending={pendingTitleIds?.has(item.titleId) ?? false}

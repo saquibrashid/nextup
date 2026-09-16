@@ -173,7 +173,7 @@ afterAll(async () => {
 
 describe('T-API-030 server-backed search over the full library', () => {
   it.each(
-    ['dateAdded', 'runtime', 'releaseYear', 'rating', 'name'].flatMap((sort) =>
+    ['dateAdded', 'runtime', 'releaseYear', 'rating', 'name', 'watchPriority'].flatMap((sort) =>
       ['asc', 'desc'].map((dir) => ({ sort, dir })),
     ),
   )('T-API-030l keeps search scoped across every $sort/$dir cursor', async ({ sort, dir }) => {

@@ -19,6 +19,18 @@ import type { TitleListItem as WireTitleListItem } from '../components/TitleRow'
 import type { ServiceFreshness as WireServiceFreshness } from '../components/FreshnessStrip';
 import type { ServerRejection as WireServerRejection } from '../components/RejectionList';
 import type { FixMatchRequest, FixMatchResponse } from '../components/FixMatchDialog';
+import type { WatchPriority } from '@nextup/domain';
+
+export interface WatchPreferencesResult {
+  titleId: string;
+  watching: boolean;
+  priority: WatchPriority;
+}
+
+export interface WatchPreferencesRequest {
+  watching?: boolean;
+  priority?: WatchPriority;
+}
 
 /** The wire shape of a failure (`apps/api/src/middleware/errorEnvelope.ts`). */
 export interface ErrorEnvelope {
@@ -692,6 +704,13 @@ export function createApiClient(deps: ApiClientDeps = {}) {
 
     getTitles: (query: string, signal?: AbortSignal) =>
       request<TitleListResponse>(`/api/titles${query ? `?${query}` : ''}`, { signal }, deps),
+
+    updateWatchPreferences: (titleId: string, body: WatchPreferencesRequest) =>
+      request<WatchPreferencesResult>(
+        `/api/titles/${encodeURIComponent(titleId)}/watch-preferences`,
+        { method: 'PATCH', body },
+        deps,
+      ),
 
     getTitle: (titleId: string, signal?: AbortSignal) =>
       request<WireTitleListItem>(`/api/titles/${encodeURIComponent(titleId)}`, { signal }, deps),

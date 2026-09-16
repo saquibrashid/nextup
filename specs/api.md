@@ -259,6 +259,7 @@ typed data and never re-check it.
 | GET | `/api/titles` | US-018, US-019, US-020 |
 | GET | `/api/titles/:titleId` | US-018 |
 | POST | `/api/titles/:titleId/fix-match` | US-030 |
+| PATCH | `/api/titles/:titleId/watch-preferences` | US-060 |
 | POST | `/api/titles/:titleId/suppress` | US-027 |
 | GET | `/api/suppressions` | US-029 |
 | POST | `/api/suppressions/:suppressionId/unsuppress` | US-029 |
@@ -798,7 +799,8 @@ dropped**, which is what `T-ATTR-006a` asserts rather than byte equality.
 Query: `service` (`netflix|max`, repeatable), `type` (`movie|tv`, repeatable, OR),
 `genre` (string, repeatable), `runtime` (`under30|30-60|60-90|90-120|over120`,
 repeatable), `sort` (`dateAdded` default | `name` | `releaseYear` | `runtime` |
-`rating`), `dir` (`asc|desc`, default per key below), **`q`** (optional single
+`rating` | `watchPriority`), `watching` (single `true|false`, optional),
+`priority` (`up-next|normal|someday`, repeatable), `dir` (`asc|desc`, default per key below), **`q`** (optional single
 title-search string, trimmed, at most 500 JavaScript string-length units), `limit`, `cursor`.
 
 **Type selection is OR within the dimension.** Repeated values are
@@ -808,7 +810,7 @@ supported set. One selected value restricts to that type. This adds no media
 type; unknown values still produce **400 `VALIDATION_FAILED`**. Other filter,
 search and ordering parameters remain unchanged.
 
-⚠ **`dir`'s default is PER SORT KEY, not global.** `name` defaults to **`asc`**;
+⚠ **`dir`'s default is PER SORT KEY, not global.** `name` and `watchPriority` default to **`asc`**;
 every other key defaults to `desc`. "Newest first" and "highest rated first" are
 right for their keys and exactly backwards for an alphabetical list, which would
 otherwise open at Z. See `defaultDirectionFor` in
@@ -1121,6 +1123,46 @@ OQ-A). That is precisely what keeps the refresh legal under REQ-041 — a
 background write that changed the list's ORDER would not be."~~
 
 `badges` contains only `active` listings (REQ-026).
+
+#### 6.2d Watch preferences (REQ-126, US-060)
+
+List and detail items carry `watching: boolean` and
+`priority: 'up-next' | 'normal' | 'someday'`, defaulting to false/normal when
+the owner has no preference for the canonical work. Watching is independent
+of priority. These fields are user intent, never TMDB metadata.
+
+`watching=true` selects watching titles, `false` selects the remainder,
+omission selects both. `priority` values combine with OR; dimensions combine
+with AND, including service/type/genre/runtime/search. Validate repeatable
+priority values with the existing 20-occurrence limit and reject invalid or
+structured values. The same predicates apply before pagination and to the
+whole-set unknown-runtime count and eligible metadata/rating query scope.
+
+`sort=watchPriority&dir=asc` orders by rank: Watching = 0 (independent of
+priority), nonwatching Up next = 1, Normal = 2, Someday = 3. `desc` reverses
+rank, with title id ascending as the stable tie-break in either direction.
+The cursor is unpadded canonical base64url of UTF-8 JSON
+`{watchPriorityRank, id}`, in that key order. Rank is an integer 0–3 and id
+is nonempty with at most 200 characters. Reject extra keys, noncanonical
+encodings and cursors for other sorts.
+No other sort/default changes.
+
+**`PATCH /api/titles/:titleId/watch-preferences`**
+
+Body: `{ watching?: boolean, priority?: 'up-next'|'normal'|'someday' }`.
+At least one field is required; reject unknown fields and invalid types/values.
+The title must belong to the authenticated owner and satisfy the existing
+active, visible, nonsuppressed list-access rules, including an active listing.
+Missing/foreign/hidden/removed titles return 404; active suppressed works
+return 409 `WORK_SUPPRESSED`. Never accept an owner id or
+work identity from the body. Use the standard mutation/CSRF middleware.
+
+Response: `{ titleId, watching, priority }`. Partial updates preserve the
+other preference; the write is an owner/work-scoped upsert, not a title,
+membership, date or TMDB metadata edit. Screenshot imports do not touch it.
+Removal and reappearance retain it. Fix-match carries source preferences only
+when the destination has no explicit preference; an existing destination wins.
+Historical source records remain. See `data-model.md` §18 and `T-WATCH-001`–`003`.
 
 ### 6.3 `GET /api/titles/:titleId`
 

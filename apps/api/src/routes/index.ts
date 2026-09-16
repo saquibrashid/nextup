@@ -46,6 +46,7 @@ import { registerSuppressionRoutes } from './suppressions.js';
 import { registerTitleRoutes } from './titles.js';
 import { registerTmdbRoutes } from './tmdb.js';
 import { registerWaitingRoutes } from './waiting.js';
+import { registerWatchPreferenceRoutes } from './watchPreferences.js';
 import { TmdbClient } from '../clients/tmdbClient.js';
 import { OmdbClient } from '../clients/omdbClient.js';
 
@@ -131,6 +132,7 @@ export function createApiRouter(): Router {
   // §6.27 — the ONE route that serves image bytes. No SAS, no blob URL.
   registerImageRoutes(apiRouter);
   registerTitleRoutes(apiRouter);
+  registerWatchPreferenceRoutes(apiRouter);
   // §6.9 — the removed view. Registered next to the combined list because it
   // is the same read surface seen from the other side, and it shares the
   // list's date and name projections (`toIsoDate`, the raw-text name fallback).

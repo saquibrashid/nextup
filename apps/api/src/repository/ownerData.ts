@@ -51,7 +51,11 @@ import {
   TERMINAL_BATCH_STATUSES,
   deriveSortName,
   storedGenreVariants,
+  isWatchPriority,
   type RuntimeBucket,
+  type WatchPriority,
+  type WatchPreferences,
+  type WatchPreferencesPatch,
 } from '@nextup/domain';
 
 import { getPrisma } from './client.js';
@@ -486,6 +490,8 @@ export async function listActiveTitles(
  * forbids over an ever-growing history.
  */
 export interface TitlePageOptions {
+  watching?: boolean | undefined;
+  priorities?: readonly WatchPriority[];
   q?: string | undefined;
   limit: number;
   dir: 'asc' | 'desc';
@@ -500,13 +506,14 @@ export interface TitlePageOptions {
     | { releaseYear: number | null; id: string }
     | { ratingTenths: number | null; id: string }
     | { sortName: string | null; id: string }
+    | { watchPriorityRank: number; id: string }
     | undefined;
   services?: readonly string[];
   mediaType?: string | undefined;
   genres?: readonly string[];
   /** REQ-035. `[]` means no runtime filter — NOT "every bucket". */
   runtimes?: readonly RuntimeBucket[];
-  sort?: 'dateAdded' | 'runtime' | 'releaseYear' | 'rating' | 'name';
+  sort?: 'dateAdded' | 'runtime' | 'releaseYear' | 'rating' | 'name' | 'watchPriority';
 }
 
 /**
@@ -542,33 +549,30 @@ function runtimeFilter(buckets: readonly RuntimeBucket[]): Prisma.Sql {
   )})`;
 }
 
+const WATCH_PREFERENCE_JOIN = Prisma.sql`
+  LEFT JOIN watch_preference wp ON wp.owner_id = t.owner_id
+    AND wp.work_identity = t.work_identity`;
+
+const WATCH_PRIORITY_RANK = Prisma.sql`CASE WHEN wp.watching = 1 THEN 0
+  WHEN wp.priority = N'up-next' THEN 1
+  WHEN wp.priority = N'someday' THEN 3 ELSE 2 END`;
+
 /**
- * The ordered column for each sort key.
- *
- * ⚠ **THE KEYSET AND THE `ORDER BY` READ THE SAME MAP FOR A REASON.** A keyset
- * predicate that names a different column from its own `ORDER BY` does not
- * error — it returns a page of plausible rows with an arbitrary subset
- * skipped or repeated at each boundary, which is indistinguishable from data
- * loss. Naming the column once makes that divergence unrepresentable.
+ * The keyset and ORDER BY share one expression per sort so page boundaries
+ * cannot disagree with the order, including computed watch-priority ranks.
  */
-const TITLE_ORDER_COLUMN: Record<
-  NonNullable<TitlePageOptions['sort']>,
-  {
-    field:
-      'sortDateAdded' | 'tmdbRuntimeMinutes' | 'tmdbReleaseYear' | 'imdbRatingTenths' | 'sortName';
-    sql: Prisma.Sql;
-  }
-> = {
-  dateAdded: { field: 'sortDateAdded', sql: Prisma.sql`t.sort_date_added` },
-  runtime: { field: 'tmdbRuntimeMinutes', sql: Prisma.sql`t.tmdb_runtime_minutes` },
-  releaseYear: { field: 'tmdbReleaseYear', sql: Prisma.sql`t.tmdb_release_year` },
-  rating: { field: 'imdbRatingTenths', sql: Prisma.sql`t.imdb_rating_tenths` },
+const TITLE_ORDER_COLUMN: Record<NonNullable<TitlePageOptions['sort']>, Prisma.Sql> = {
+  dateAdded: Prisma.sql`t.sort_date_added`,
+  runtime: Prisma.sql`t.tmdb_runtime_minutes`,
+  releaseYear: Prisma.sql`t.tmdb_release_year`,
+  rating: Prisma.sql`t.imdb_rating_tenths`,
   // ⚠ `sortName`, NEVER `tmdbName`. The stored column collates
   // `Latin1_General_100_CI_AI` (migration `0010`) and SQL Server applies the
   // COLUMN's collation to a bare `ORDER BY`; `tmdbName` sits in the BIN2
   // database default, so ordering by it is binary — `apple` after `Zebra`, and
   // still alphabetical-looking on a title-cased fixture. TASK-219.
-  name: { field: 'sortName', sql: Prisma.sql`t.sort_name` },
+  name: Prisma.sql`t.sort_name`,
+  watchPriority: WATCH_PRIORITY_RANK,
 };
 
 /**
@@ -635,11 +639,17 @@ function nullableKeyset(
  */
 function baseTitleListWhere(
   ownerId: OwnerId,
-  { services = [], mediaType, genres = [], q }: TitleFilters,
+  { services = [], mediaType, genres = [], q, watching, priorities = [] }: TitleFilters,
 ): Prisma.Sql {
   const genreNames = genres.flatMap((genre) => storedGenreVariants(genre));
   return Prisma.sql`
     t.owner_id = ${ownerId} AND t.state = 'active'
+    AND (t.created_by_batch_id IS NULL OR EXISTS (
+      SELECT 1 FROM upload_batch b WHERE b.owner_id = ${ownerId}
+        AND b.id = t.created_by_batch_id AND b.status IN ('applied', 'undone')
+    ))
+    ${watching === undefined ? Prisma.empty : Prisma.sql`AND COALESCE(wp.watching, 0) = ${watching}`}
+    ${priorities.length === 0 ? Prisma.empty : Prisma.sql`AND COALESCE(wp.priority, N'normal') IN (${Prisma.join(priorities)})`}
     AND NOT EXISTS (
       SELECT 1 FROM suppression s
       WHERE s.owner_id = ${ownerId} AND s.work_identity = t.work_identity AND s.active = 1
@@ -694,7 +704,7 @@ export async function countRuntimeUnknown(
   tx?: Db,
 ): Promise<number> {
   const [row] = await db(tx).$queryRaw<{ count: number }[]>`
-    SELECT COUNT(*) AS count FROM title t
+    SELECT COUNT(*) AS count FROM title t ${WATCH_PREFERENCE_JOIN}
     WHERE t.owner_id = ${ownerId} AND ${baseTitleListWhere(ownerId, options)}
       AND (t.tmdb_runtime_minutes IS NULL OR t.tmdb_runtime_minutes <= 0)`;
   if (row === undefined) throw new Error('Runtime unknown count returned no row.');
@@ -737,7 +747,7 @@ export async function listTitleRatingRows(
   return db(tx).$queryRaw`
     SELECT t.id, t.imdb_id AS imdbId, t.imdb_rating_tenths AS imdbRatingTenths,
       t.imdb_rating_fetched_at AS imdbRatingFetchedAt
-    FROM title t
+    FROM title t ${WATCH_PREFERENCE_JOIN}
     WHERE t.owner_id = ${ownerId} AND ${baseTitleListWhere(ownerId, options)}
       ${runtimeFilter(options.runtimes ?? [])}
     ORDER BY t.imdb_rating_fetched_at ASC, t.id ASC`;
@@ -754,54 +764,35 @@ export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions,
     cursor === undefined
       ? Prisma.empty
       : 'runtimeMinutes' in cursor
-        ? nullableKeyset(column.sql, cursor.runtimeMinutes, cursor.id, dir)
+        ? nullableKeyset(column, cursor.runtimeMinutes, cursor.id, dir)
         : 'releaseYear' in cursor
-          ? nullableKeyset(column.sql, cursor.releaseYear, cursor.id, dir)
+          ? nullableKeyset(column, cursor.releaseYear, cursor.id, dir)
           : 'ratingTenths' in cursor
-            ? nullableKeyset(column.sql, cursor.ratingTenths, cursor.id, dir)
+            ? nullableKeyset(column, cursor.ratingTenths, cursor.id, dir)
             : 'sortName' in cursor
-              ? nullableKeyset(column.sql, cursor.sortName, cursor.id, dir)
-              : Prisma.sql`AND (
-                  ${column.sql} ${before} ${new Date(`${cursor.sortDateAdded}T00:00:00.000Z`)}
-                  OR (${column.sql} = ${new Date(`${cursor.sortDateAdded}T00:00:00.000Z`)}
+              ? nullableKeyset(column, cursor.sortName, cursor.id, dir)
+              : 'watchPriorityRank' in cursor
+                ? nullableKeyset(column, cursor.watchPriorityRank, cursor.id, dir)
+                : Prisma.sql`AND (
+                  ${column} ${before} ${new Date(`${cursor.sortDateAdded}T00:00:00.000Z`)}
+                  OR (${column} = ${new Date(`${cursor.sortDateAdded}T00:00:00.000Z`)}
                     AND t.id > ${cursor.id})
                 )`;
 
-  const page = await conn.$queryRaw<{ id: string }[]>`
-    SELECT TOP (${limit + 1}) t.id FROM title t
+  const page = await conn.$queryRaw<{ id: string; watching: boolean; priority: string }[]>`
+    SELECT TOP (${limit + 1}) t.id, CAST(COALESCE(wp.watching, 0) AS BIT) AS watching,
+      COALESCE(wp.priority, N'normal') AS priority
+    FROM title t ${WATCH_PREFERENCE_JOIN}
     WHERE t.owner_id = ${ownerId} AND ${baseTitleListWhere(ownerId, options)}
       ${runtimeFilter(runtimes)} ${keyset}
-    ORDER BY CASE WHEN ${column.sql} IS NULL THEN 1 ELSE 0 END ASC,
-      ${column.sql} ${dir === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`}, t.id ASC`;
+    ORDER BY CASE WHEN ${column} IS NULL THEN 1 ELSE 0 END ASC,
+      ${column} ${dir === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`}, t.id ASC`;
 
   const rows = await conn.title.findMany({
     where: {
       ownerId,
       id: { in: page.map((row) => row.id) },
     },
-    // `compareTitlesForList` in `@nextup/domain` is the same order expressed
-    // as a comparator, and the integration suite checks this query against it.
-    // Nulls last is stated EXPLICITLY: SQL Server puts them last on `desc` for
-    // free and first on `asc`, so relying on the default is correct in the
-    // default direction and wrong the moment the owner reverses it
-    // (`T-LIST-027`). `id` is `asc` in both directions (`T-LIST-016`).
-    //
-    // ⚠ The runtime order follows the same three rules and for a sharper
-    // reason (`compareTitlesByRuntime`): "Shortest first" opening with every
-    // unknown runtime would present an absence of data as a claim that those
-    // titles are the shortest. Release year and rating (`A53`) inherit the
-    // identical treatment — an unrated title floated to the top of "highest
-    // rated" would be the same lie in a different column, and so does name
-    // (TASK-219), where "A–Z" would otherwise open with every title whose
-    // name could not be read from the screenshot.
-    //
-    // ⚠ THE NAME ORDER IS COLLATION-DEPENDENT AND THE COLUMN CARRIES IT.
-    // `sortName` is declared `COLLATE Latin1_General_100_CI_AI` (migration
-    // `0010`) while the database default is BIN2, and SQL Server applies the
-    // COLUMN's collation to this bare `ORDER BY`. Nothing in the query text
-    // says so — which is exactly why ordering by `tmdbName` instead would
-    // silently revert to binary order and still pass a title-cased fixture.
-    orderBy: [{ [column.field]: { sort: dir, nulls: 'last' } }, { id: 'asc' }],
     include: {
       listings: {
         where: { ownerId, state: 'active' },
@@ -810,7 +801,14 @@ export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions,
     },
   });
 
-  return { rows: rows.slice(0, limit), hasMore: rows.length > limit };
+  // Hydration must preserve the SQL page order, including computed ranks.
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  const ordered = page.slice(0, limit).map((position) => {
+    const row = byId.get(position.id);
+    if (row === undefined) throw new Error('A selected title was missing during page hydration.');
+    return { ...row, ...readWatchPreferences(position) };
+  });
+  return { rows: ordered, hasMore: page.length > limit };
 }
 
 /**
@@ -840,8 +838,15 @@ export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions,
  * route answer a flat 404 (`T-LIST-028`, `T-SEC-002`).
  */
 export async function findTitleDetail(ownerId: OwnerId, id: string, tx?: Db) {
-  return db(tx).title.findFirst({
-    where: { ownerId, id },
+  const title = await db(tx).title.findFirst({
+    where: {
+      ownerId,
+      id,
+      OR: [
+        { createdByBatchId: null },
+        { createdByBatch: { ownerId, status: { in: ['applied', 'undone'] } } },
+      ],
+    },
     include: {
       listings: {
         where: { ownerId },
@@ -849,6 +854,70 @@ export async function findTitleDetail(ownerId: OwnerId, id: string, tx?: Db) {
       },
     },
   });
+  if (title === null) return null;
+  return {
+    ...title,
+    ...readWatchPreferences(await findWatchPreference(ownerId, title.workIdentity, tx)),
+  };
+}
+
+function readWatchPreferences(
+  row: { watching: boolean; priority: string } | null,
+): WatchPreferences {
+  if (row === null) return { watching: false, priority: 'normal' };
+  if (!isWatchPriority(row.priority)) throw new Error('Invalid stored watch priority.');
+  return { watching: row.watching, priority: row.priority };
+}
+
+export async function findWatchPreference(ownerId: OwnerId, workIdentity: string, tx?: Db) {
+  return db(tx).watchPreference.findFirst({ where: { ownerId, workIdentity } });
+}
+
+/** Serializes preference edits with identity corrections on this title. */
+export async function lockTitleForWatchPreferences(ownerId: OwnerId, id: string, tx: Db) {
+  await db(tx).$queryRaw`
+    SELECT id FROM title WITH (UPDLOCK, HOLDLOCK)
+    WHERE owner_id = ${ownerId} AND id = ${id}`;
+}
+
+export async function setWatchPreference(
+  ownerId: OwnerId,
+  workIdentity: string,
+  patch: WatchPreferencesPatch,
+  tx: Db,
+): Promise<WatchPreferences> {
+  // HOLDLOCK protects the absent-key insert as well as concurrent partial edits.
+  await db(tx).$executeRaw`
+    MERGE watch_preference WITH (HOLDLOCK) AS target
+    USING (SELECT ${ownerId} AS owner_id, ${workIdentity} AS work_identity) AS source
+    ON target.owner_id = source.owner_id AND target.work_identity = source.work_identity
+    WHEN MATCHED THEN UPDATE SET
+      watching = COALESCE(${patch.watching ?? null}, target.watching),
+      priority = COALESCE(${patch.priority ?? null}, target.priority)
+    WHEN NOT MATCHED THEN INSERT (owner_id, work_identity, watching, priority)
+      VALUES (source.owner_id, source.work_identity, ${patch.watching ?? false}, ${patch.priority ?? 'normal'});
+  `;
+  const saved = await findWatchPreference(ownerId, workIdentity, tx);
+  if (saved === null) throw new Error('Watch preference write returned no record.');
+  return readWatchPreferences(saved);
+}
+
+/** Move the choice with a corrected identity; an explicit destination wins. */
+export async function carryWatchPreference(
+  ownerId: OwnerId,
+  from: string,
+  to: string,
+  tx: Db,
+): Promise<void> {
+  if (from === to) return;
+  await db(tx).$executeRaw`
+    UPDATE source SET work_identity = ${to}
+    FROM watch_preference source
+    WHERE source.owner_id = ${ownerId} AND source.work_identity = ${from}
+      AND NOT EXISTS (
+        SELECT 1 FROM watch_preference target WITH (UPDLOCK, HOLDLOCK)
+        WHERE target.owner_id = ${ownerId} AND target.work_identity = ${to}
+      )`;
 }
 
 export async function updateTitle(

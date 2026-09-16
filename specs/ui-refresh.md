@@ -70,7 +70,7 @@ inference from them:
 | Runtime *(added at `A48`)* | *"for the list view, I'd like to see run time as well and filter and sort by it"* — a direct request, and the recorded revisit trigger for the deferred REQ-035/REQ-037 pair. Answered in §5a |
 | **Genres on the row** *(added 2026-09-14, OQ-7)* | *"keep generes on the row but find a way to minimize how much room it takes. use another ux to make it compact but still list the genres."* Answered in §4.3 |
 | **Genre redundancy** *(added 2026-09-14, OQ-7)* | *"some of the genres are redundant, for example, there is action, action & adventure, and adventure. action & adventure seems extra. would it not be easier just to click action and adventure separately?"* ⚠ **A correctness bug, not a preference** — answered in §4.4 |
-| **Sorting** *(revised 2026-09-16)* | Five visible complete-order buttons. Selecting another field applies its default direction; activating the current field reverses it in one action. The rating refresh contract in §7a.1 is unchanged. |
+| **Sorting** *(revised 2026-09-16)* | Six visible complete-order buttons, including owner Watch priority. Selecting another field applies its default direction; activating the current field reverses it in one action. The rating refresh contract in §7a.1 is unchanged. |
 | **Navigation** *(added 2026-09-14, OQ-2)* | Phone bar = **List, Upload, More** — two real destinations plus overflow. Answered in REQ-117 |
 | **Review screen** *(added 2026-09-14, OQ-6)* | The confusion was **(d), the three sections looking alike** — not the list's length and not the Apply wording. Answered in §6a.1 |
 | **Design system** *(revised 2026-09-16)* | A typographic scale, inline SVG icons, play/next brand, removable filter chips, grid/compact selector and reduced-motion-aware feedback. **No web font or new dependency.** |
@@ -635,7 +635,7 @@ in one action.** A redesign that buries it in a menu has deleted a `must`
 while every behavioural test still passes.
 
 **The owner approved the replacement wording and one-click behavior on
-2026-09-16.** §5b defines the five complete-order controls; the former
+2026-09-16.** §5b defines the six complete-order controls; the former
 separate direction segment is not part of this design.
 
 ### REQ-115 (`should`) — the list can be ordered by more than date added
@@ -772,9 +772,9 @@ place.
 
 ---
 
-## 5b. Design — five one-click complete orders (approved 2026-09-16)
+## 5b. Design — six one-click complete orders (approved 2026-09-16)
 
-> **REQ-121 (`must`) — five visible native buttons, no separate direction segment.**
+> **REQ-121 (`must`) — six visible native buttons, no separate direction segment.**
 > Activating an inactive field applies its default order in one navigation;
 > activating the selected field reverses that field in one action.
 
@@ -785,15 +785,16 @@ place.
 | Release year | `desc` | Newest releases | Oldest releases |
 | Runtime | `desc` | Longest runtime | Shortest runtime |
 | IMDb rating | `desc` | Highest rated | Lowest rated |
+| Watch priority (REQ-126) | `asc` | Lower priority first | Watch priority |
 
-These ten strings are centralized in **`SORT_ORDER_LABELS`** in
+These twelve strings are centralized in **`SORT_ORDER_LABELS`** in
 `apps/web/src/copy.ts`; `SortControl` imports that map rather than maintaining
 a second literal vocabulary.
 
 Exactly one field is `aria-pressed="true"`. Its accessible name states its
 current complete order, that it is selected, and the reverse order pressing it
 will apply. Inactive fields show their default orders. Button positions never
-reorder. Name defaults to `asc`; the other four default to `desc`, matching
+reorder. Name and Watch priority default to `asc`; the other four default to `desc`, matching
 the API. Date-added labels refer to nextup's earliest active-listing date,
 not the streaming service's save date.
 
@@ -812,11 +813,11 @@ buttons above.~~
 
 | Test id | Asserts |
 |---|---|
-| `T-UX-128` | Five complete-order buttons remain visible in fixed field order with exactly one marked; no separate direction radio segment. |
+| `T-UX-128` | Six complete-order buttons remain visible in fixed field order with exactly one marked; no separate direction radio segment. |
 | `T-UX-129` | Each field uses the approved complete-order labels; URL/session/default precedence agrees with the API's per-field defaults. |
 | `T-UX-130` | Inactive field selection applies its default, active selection reverses; filters and `q` survive while route paging restarts. |
 | `T-UX-131` | With the default field selected, oldest-first is reachable in exactly **one** interaction. |
-| `T-UX-138` | All five complete-order choices, active reversals, state/next-action accessibility, query preservation and back/forward/session synchronization. |
+| `T-UX-138` | All six complete-order choices, active reversals, state/next-action accessibility, query preservation and back/forward/session synchronization. |
 
 ### 5c. Submitted title search (approved 2026-09-16)
 
@@ -1258,8 +1259,8 @@ It **does not trap Tab or claim `aria-modal`**. Its classes are
 `filter-disclosure` / `filter-disclosure__panel`, with
 `filter-disclosure__label` / `filter-disclosure__value` for fields;
 `[hidden]` remains hidden. **Filter by** groups two columns on phones and
-four from 640 px. Empty values read All services / All types / All genres /
-Any runtime; one selection shows its name, multiple distinct selections
+three from 640 px and six from 1024 px. Empty values read All services / All types / All genres /
+Any runtime / All titles / All priorities; one selection shows its name, multiple distinct selections
 show N selected. Individual removable chips remain (`T-UX-144`).
 
 ⚠ **A VARIANT IS A STATIC CLASS LOOKUP, NOT A COMPUTED STRING.** `T-CSS-001c`

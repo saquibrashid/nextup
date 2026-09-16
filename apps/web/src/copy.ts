@@ -375,7 +375,16 @@ export const SORT_ORDER_LABELS = {
   releaseYear: { desc: 'Newest releases', asc: 'Oldest releases' },
   runtime: { desc: 'Longest runtime', asc: 'Shortest runtime' },
   rating: { desc: 'Highest rated', asc: 'Lowest rated' },
+  watchPriority: { asc: 'Watch priority', desc: 'Lower priority first' },
 } as const;
+
+export const WATCH_PRIORITY_LABELS = {
+  'up-next': 'Up next',
+  normal: 'Normal',
+  someday: 'Someday',
+} as const;
+
+export const WATCH_PREFERENCES_FAILED = 'Could not save your watch preferences. Please try again.';
 
 /**
  * REQ-121 (`specs/ui-refresh.md` §5b) — the sort keys and direction labels

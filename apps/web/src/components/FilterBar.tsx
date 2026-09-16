@@ -23,11 +23,13 @@ import { Field } from './ui/Field';
 import { FilterDisclosure } from './FilterDisclosure';
 import {
   RUNTIME_BUCKETS,
+  WATCH_PRIORITIES,
   SERVICES,
   SERVICE_LABELS,
   normalizeRuntimeBuckets,
   type RuntimeBucket,
   type Service,
+  type WatchPriority,
 } from '@nextup/domain';
 
 import {
@@ -35,6 +37,7 @@ import {
   CLEAR_FILTERS_LABEL,
   RUNTIME_BUCKET_LABELS,
   ZERO_MATCH_TITLE,
+  WATCH_PRIORITY_LABELS,
   runtimeUnknownHiddenLabel,
 } from '../copy';
 
@@ -44,6 +47,8 @@ export type MediaType = (typeof MEDIA_TYPES)[number];
 const MEDIA_TYPE_LABELS: Record<MediaType, string> = { movie: 'Movies', tv: 'TV series' };
 
 export interface ListFilters {
+  readonly watching?: boolean | undefined;
+  readonly priorities?: readonly WatchPriority[] | undefined;
   /** OR within the dimension (`api.md` §6.2, US-019 AC-4). */
   readonly services: readonly Service[];
   readonly types: readonly MediaType[];
@@ -75,7 +80,13 @@ function isMediaType(value: string): value is MediaType {
  * "every genre", never "the genres this title happens to have".
  */
 export function parseFilters(params: URLSearchParams): ListFilters {
+  const watching = params.get('watching');
+  const priorities = [...new Set(params.getAll('priority'))].filter(
+    (value): value is WatchPriority => (WATCH_PRIORITIES as readonly string[]).includes(value),
+  );
   return {
+    ...(watching === 'true' || watching === 'false' ? { watching: watching === 'true' } : {}),
+    ...(priorities.length > 0 ? { priorities } : {}),
     services: params.getAll('service').filter(isService),
     types: params.getAll('type').filter(isMediaType),
     genres: params.getAll('genre').filter((genre) => genre !== ''),
@@ -98,6 +109,10 @@ export function applyFilters(params: URLSearchParams, filters: ListFilters): URL
   next.delete('type');
   next.delete('genre');
   next.delete('runtime');
+  next.delete('watching');
+  next.delete('priority');
+  if (filters.watching !== undefined) next.set('watching', String(filters.watching));
+  for (const priority of filters.priorities ?? []) next.append('priority', priority);
   for (const service of filters.services) next.append('service', service);
   for (const type of filters.types) next.append('type', type);
   for (const genre of filters.genres) next.append('genre', genre);
@@ -107,17 +122,21 @@ export function applyFilters(params: URLSearchParams, filters: ListFilters): URL
 
 export function isFiltered(filters: ListFilters): boolean {
   return (
+    filters.watching !== undefined ||
+    (filters.priorities?.length ?? 0) > 0 ||
     filters.services.length +
       filters.types.length +
       filters.genres.length +
       filters.runtimes.length >
-    0
+      0
   );
 }
 
 /** The chips §2.4 shows alongside the zero-match message, in URL order. */
 export function activeFilterChips(filters: ListFilters): readonly string[] {
   return [
+    ...(filters.watching === undefined ? [] : [filters.watching ? 'Watching' : 'Not watching']),
+    ...(filters.priorities ?? []).map((priority) => WATCH_PRIORITY_LABELS[priority]),
     ...filters.services.map((service) => SERVICE_LABELS[service]),
     ...filters.types.map((type) => MEDIA_TYPE_LABELS[type]),
     ...filters.genres,
@@ -196,6 +215,20 @@ export function FilterBar({
   );
   const query = params.get('q') ?? '';
   const chips = [
+    ...(filters.watching === undefined
+      ? []
+      : [
+          {
+            dimension: 'watching',
+            value: String(filters.watching),
+            label: filters.watching ? 'Watching' : 'Not watching',
+          },
+        ]),
+    ...(filters.priorities ?? []).map((value) => ({
+      dimension: 'priority',
+      value,
+      label: WATCH_PRIORITY_LABELS[value],
+    })),
     ...filters.services.map((value) => ({
       dimension: 'service',
       value,
@@ -350,6 +383,58 @@ export function FilterBar({
                     }}
                   />
                   {RUNTIME_BUCKET_LABELS[bucket]}
+                </label>
+              ))}
+            </Field>
+          </FilterDisclosure>
+          <FilterDisclosure
+            label="Watching"
+            value={
+              filters.watching === undefined
+                ? 'All titles'
+                : filters.watching
+                  ? 'Watching'
+                  : 'Not watching'
+            }
+          >
+            <Field legend="Watching">
+              {[
+                { value: undefined, label: 'All titles' },
+                { value: true, label: 'Watching' },
+                { value: false, label: 'Not watching' },
+              ].map((option) => (
+                <label key={option.label}>
+                  <Input
+                    type="radio"
+                    name="watching"
+                    checked={filters.watching === option.value}
+                    onChange={() => update({ ...filters, watching: option.value })}
+                  />
+                  {option.label}
+                </label>
+              ))}
+            </Field>
+          </FilterDisclosure>
+          <FilterDisclosure
+            label="Priority"
+            value={selectionSummary(
+              (filters.priorities ?? []).map((value) => WATCH_PRIORITY_LABELS[value]),
+              'All priorities',
+            )}
+          >
+            <Field legend="Priority">
+              {WATCH_PRIORITIES.map((value) => (
+                <label key={value}>
+                  <Input
+                    type="checkbox"
+                    name="priority"
+                    value={value}
+                    checked={filters.priorities?.includes(value) ?? false}
+                    onChange={() =>
+                      update({ ...filters, priorities: toggle(filters.priorities ?? [], value) })
+                    }
+                  />
+                  {WATCH_PRIORITY_LABELS[value]}
                 </label>
               ))}
             </Field>

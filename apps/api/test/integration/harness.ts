@@ -78,6 +78,7 @@ export async function resetDatabase(db = testPrisma()): Promise<void> {
     DELETE FROM removal_group;
     DELETE FROM removal_decision;
     DELETE FROM watch_intent;
+    DELETE FROM watch_preference;
     DELETE FROM title;
     DELETE FROM upload_batch;
   `);

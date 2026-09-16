@@ -1435,8 +1435,8 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 | AC | L | Test | Assertion |
 |---|---|---|---|
 | AC-1 | U | `T-UX-113` | Both controls mount inside `.list-controls` on the **real page** (`a`), and merging them visually does not merge them mechanically (`b`) — the direction persists to session storage, a filter never does. ⚠ §5's table calls a shared hook across this group the single most likely way to break working behaviour in the refresh: green suite, broken back button. |
-| AC-2 | U | `T-UX-119`, `T-UX-120` | `SORT_KEYS` is exactly the five API tokens from `TITLE_SORTS`, **including `rating`** — the reversal of REQ-095 at `A53`, guarded pointing the other way so it cannot be quietly undone. ⚠ `T-UX-120f` now guards the **near miss**: `imdbRating` is a plausible-looking spelling the API rejects, which is more dangerous than a forbidden key because it looks right in a URL. |
-| AC-3 | U | **`T-UX-128`**, `T-UX-138` | Five visible native complete-order buttons in fixed field order, exactly one `aria-pressed`; selected accessible name states current order and reverse action. No separate direction segment. |
+| AC-2 | U | `T-UX-119`, `T-UX-120` | `SORT_KEYS` is exactly the six API tokens from `TITLE_SORTS`, **including `rating` and `watchPriority` (REQ-126)** — the reversal of REQ-095 at `A53`, guarded pointing the other way so it cannot be quietly undone. ⚠ `T-UX-120f` now guards the **near miss**: `imdbRating` is a plausible-looking spelling the API rejects, which is more dangerous than a forbidden key because it looks right in a URL. |
+| AC-3 | U | **`T-UX-128`**, `T-UX-138` | Six visible native complete-order buttons in fixed field order, exactly one `aria-pressed`; selected accessible name states current order and reverse action. No separate direction segment. |
 | AC-4 | U | `T-UX-129`, `T-UX-138` | Approved complete-order labels distinguish date-added, name, release year, runtime and rating; name defaults ascending, all others descending. |
 | AC-5 | U | **`T-UX-131`**, `T-UX-116` | One interaction from the control (`T-UX-131a`) and one from the default page (`T-UX-116a`), with the target visible **without opening anything first** (`T-UX-131b`). ⚠ The last is not pedantry: a collapsed `<select>` of combined options passes a one-`click()` assertion because jsdom does not model the press that opens it. |
 | AC-6 | U | `T-UX-130`, `T-UX-114`, `T-UX-138` | Inactive field selects its default; active reverses. The single query update preserves filters/q and local view while route-owned paging restarts; no client-side reorder or fabricated cursor. |
@@ -4647,7 +4647,7 @@ Run `npm run check:test-locations` before pushing.
 | `T-UX-125` | U | A TV title whose stored genres contain `Action & Adventure` renders the chips `Action` and `Adventure`, and does **not** render `Action & Adventure`. `packages/domain/test/genres.spec.ts` (`a`–`e`, the pure map) + `apps/web/test/genreChips.spec.tsx` (`f`–`h`, the render). ⚠ **The map is a closed literal, never a `" & "` split heuristic** — `Sci-Fi & Fantasy` must yield `Science Fiction`, which no split can produce, and a heuristic would also shatter a legitimate single genre containing an ampersand | §4.4 |
 | `T-UX-126` | U | The genre filter list contains **no combined TV name** — `Action & Adventure`, `Sci-Fi & Fantasy` and `War & Politics` never appear as options. ⚠ **The facet is CLIENT-derived**: `collectGenres` in `apps/web/src/containers/ListRoute.tsx` builds the options from the rows' own `genres`, so it must normalise with the same map. Left un-normalised, a combined name becomes a clickable option that always returns nothing, because the API expands map *keys* to nothing | §4.4 |
 | `T-UX-127` | U | `GENRE_CHIP_LIMIT=3` plus `+n` expansion bounds the initial chip count, not a measured line. Full names wrap without ellipsis/clipping. Active-filter genres are hoisted and the limit yields via `Math.max(GENRE_CHIP_LIMIT, active.length)`, so four active genres show four chips. Empty genres render no placeholder | §4.3 |
-| `T-UX-128` | U | Five visible complete-order native buttons, one `aria-pressed`, fixed field order, no direction radios or separate segment. The selected accessible name states current state and reverse action (`apps/web/test/sortControl.spec.tsx`) | §5b, approved 2026-09-16 |
+| `T-UX-128` | U | Six visible complete-order native buttons, one `aria-pressed`, fixed field order, no direction radios or separate segment. The selected accessible name states current state and reverse action (`apps/web/test/sortControl.spec.tsx`) | §5b, approved 2026-09-16 |
 | `T-UX-129` | U | Approved per-field labels distinguish Recently added/Oldest additions, Name A-Z/Z-A, release year, runtime and rating. Defaults match the API: name asc, all others desc. A remembered direction is applied on entry/history, not carried across an explicit inactive-field selection | §5b |
 | `T-UX-130` | U | Inactive field selects its default order; active field reverses. The update preserves filters/q/unrelated params and route-owned paging starts again; no client re-sort or manufactured cursor. A cross-sort cursor is still rejected by the API | §5b |
 | `T-UX-131` | U | With the default field selected, oldest-first is reachable in exactly **one** interaction (invariant 6). ⚠⚠ **This is the case §8's warning was written for.** Collapsing the direction into the field list as ten combined options ("Date added, oldest first" …) leaves `click()` reaching oldest-first, so every other case in the file stays green while REQ-038's `must` — promoted at `A47`, the sole escape hatch for the accepted newest-first-vs-SUC-003 trade-off, and the thing OQ-029's revisit path depends on — is gone. ⚠ `b` guards the jsdom blind spot: a collapsed `<select>` passes a one-`click()` assertion because jsdom does not model the press that opens it, so `b` asserts the target is visible **without** opening anything | §5b |
@@ -4665,7 +4665,7 @@ They introduce no new PRD AC numbers or weakened coverage baselines.
 
 | Id | Level | What it asserts | Source |
 |---|---|---|---|
-| `T-UX-138` | U | Five visible complete-order buttons: inactive selects its default (name asc, others desc), active reverses in one click; state/next action are named; URL/back/forward/session synchronization and unrelated query preservation remain. `apps/web/test/sortControl.spec.tsx` | `ui-refresh.md` §5b; US-057 |
+| `T-UX-138` | U | Six visible complete-order buttons: inactive selects its default (name/watchPriority asc, others desc), active reverses in one click; state/next action are named; URL/back/forward/session synchronization and unrelated query preservation remain. `apps/web/test/sortControl.spec.tsx` | `ui-refresh.md` §5b; US-057 |
 | `T-UX-139` | U | Searchable registry-only service picker (Netflix/Max, no All), labelled checkbox disclosures and always-visible removable chips for each dimension and q. Clear removes filters/q without resetting sort/view. Escape/Done/outside dismissal, focus restoration, normal Tab, unique stable IDs, human labels and honest server counts. Reusable disclosure also supports standalone link content. `apps/web/test/filterBar.spec.tsx` | `ui-refresh.md` §5; US-019, US-059 |
 | `T-UX-140` | U | Explicit submitted URL q, not keystroke fetches or loaded-row search; bounded labelled native form, query/history synchronization, preservation of filters/sort, blank/clear handling and fresh paging. `apps/web/test/listSearch.spec.tsx` | `ui-refresh.md` §5c; `api.md` §6.2c |
 | `T-UX-141` | U | Grid/Compact preserve identical rows, server order, full metadata/genres, badges, actions and pending/offline restrictions. Local view survives filtering/loading/error/retry. Search-only zero matches remain honest and clear q. `apps/web/test/refinedLibrary.spec.tsx`, supplemented by responsive/CSS tests | `ui-refresh.md` §4; US-050, US-052, US-056 |
@@ -4698,9 +4698,26 @@ test does not establish computed contrast, dimensions or popup geometry.
 | `T-UX-141e` | E | Wide Grid/Compact preserve metadata and query state; **each Compact row is shorter** than its Grid counterpart. Total heights of a multicolumn grid and a single-column list are not a density comparison. |
 | `T-UX-141f` | E | At 320px both views are single-column: Compact has a shorter total list height while preserving metadata, actions, query/network behavior and no horizontal overflow. |
 | `T-UX-141g` | E | Axe in default, Services, Service updates and Compact states, plus reduced-motion behavior. |
-| `T-UX-142b` | E | All five sort controls issue their complete API orders in a real browser. This subcase covers order propagation; palette assertions remain `T-UX-142a`, `T-CSS-004` and the axe case above. |
+| `T-UX-142b` | E | All six sort controls issue their complete API orders in a real browser. This subcase covers order propagation; palette assertions remain `T-UX-142a`, `T-CSS-004` and the axe case above. |
 | `T-UX-143c` | E | Submitted q reaches server paging, preserves honest unfiltered-total semantics, and search-only zero-match clear removes q. |
 | `T-UX-143d` | E | Popup geometry at 320px/1280px, 44px interaction targets and focus behavior are verified from rendered elements. |
+
+### US-060 — Owner watch preferences (REQ-126, 2026-09-16)
+
+| AC | Level | Tests | Assertion |
+|---|---|---|---|
+| AC-1 | U/E | `T-WATCH-003` | Default Normal/not-watching and visible editable preference summary in both layouts. |
+| AC-2 | U/I/E | `T-WATCH-001`, `T-WATCH-003` | Explicit save, cancellation, pending/error/retry/offline states and real API wiring. |
+| AC-3 | U/I/E | `T-WATCH-002`, `T-WATCH-003` | URL filters, chips/clear and whole-set server filtering, including hidden runtime counts. |
+| AC-4 | U/I/E | `T-WATCH-002`, `T-WATCH-003` | Rank-based order both directions, stable cursor paging, default order retained. |
+| AC-5 | I | `T-WATCH-001` | Owner/work-scoped persistence survives reappearance and does not overwrite membership/date/metadata. |
+| AC-6 | I | `T-WATCH-001` | Visibility/ownership refusal and correction propagation with existing-destination preference precedence. |
+
+| Test id | Level | Contract |
+|---|---|---|
+| `T-WATCH-001` | U/I | Mutation validation, owner/work persistence, defaults, retained preferences and correction lifecycle. |
+| `T-WATCH-002` | U/I | Priority/watching filters, Watch priority rank, strict cursor validation and pagination, unknown-runtime counts. |
+| `T-WATCH-003` | U/E | `apps/web/test/watchPreferences.spec.tsx` cases `a`–`h`: defaults, explicit confirmation, cancel/focus, pending, visible failures and manual retry, offline restriction, URL filters/clear, opt-in/reversible sort and real container PATCH/refetch. `tests/e2e/refinedLibrary.spec.ts` case `i`: phone save/reload/filter/sort and axe; `j`: bounded 320/640/1280px filter panels without Genre facets. Existing field geometry and Grid/Compact preservation cases cover the added controls. |
 
 ### Owner refinement: TV episode-runtime fallback (2026-09-16)
 
@@ -4712,7 +4729,7 @@ test does not establish computed contrast, dimensions or popup geometry.
 
 | Test id | Layer | Asserts |
 |---|---|---|
-| `T-UX-144` | U/E | **REQ-035, US-019 AC-4 and US-055 AC-4.** `apps/web/test/filterBar.spec.tsx` cases `a`–`f` pin the Filter by group, external category labels, category-plus-value accessible names, decorative chevrons, default/single/deduplicated multiple summaries, stable open pickers, five runtime choices, legacy-link expansion and single-half chip removal, and clearing. `tests/e2e/refinedLibrary.spec.ts` case `g` verifies two/four-column fields, bounded panels, 44px targets and keyboard focus at 320/640/1280px, both new options and canonical URL selection. Existing `T-UX-141g` checks axe/contrast with the new fields. |
+| `T-UX-144` | U/E | **REQ-035, US-019 AC-4 and US-055 AC-4.** `apps/web/test/filterBar.spec.tsx` cases `a`–`f` pin the Filter by group, external category labels, category-plus-value accessible names, decorative chevrons, default/single/deduplicated multiple summaries, stable open pickers, five runtime choices, legacy-link expansion and single-half chip removal, and clearing. `tests/e2e/refinedLibrary.spec.ts` case `g` verifies two/three/six-column fields, bounded panels, 44px targets and keyboard focus at 320/640/1280px, both new options and canonical URL selection. Existing `T-UX-141g` checks axe/contrast with the new fields. |
 
 The domain/API half remains in existing families: `T-API-021g`–`i`
 assert legacy alias expansion, mixed-token deduplication and the raw
