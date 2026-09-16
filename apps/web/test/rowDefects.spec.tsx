@@ -28,7 +28,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 import { ListPage, type ListPageProps } from '../src/pages/ListPage';
-import { RUNTIME_UNKNOWN } from '../src/copy';
+import { RUNTIME_UNKNOWN_LABEL } from '../src/copy';
 import type { TitleListItem } from '../src/components/TitleRow';
 
 const WEB_ROOT = existsSync(join(process.cwd(), 'apps', 'web', 'src'))
@@ -217,7 +217,7 @@ describe('REQ-106 — independent facts in the metadata line are separated', () 
     // "Unknown", a "-" or any other genre placeholder fails here, and so does
     // anything else quietly appended to the meta line.
     const meta = screen.getByTestId('title-meta');
-    expect(meta.textContent).toBe(`2021Movie${RUNTIME_UNKNOWN}`);
+    expect(meta.textContent).toBe(`2021Movie${RUNTIME_UNKNOWN_LABEL}`);
   });
 });
 

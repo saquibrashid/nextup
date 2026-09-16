@@ -19,6 +19,7 @@ import type { JSX, ReactNode } from 'react';
 import { SERVICE_LABELS, formatRuntime, type Service } from '@nextup/domain';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
+import { MoreIcon } from './icons';
 import { GenreChips } from './GenreChips';
 
 import {
@@ -26,7 +27,7 @@ import {
   IMDB_RATING_SOURCE,
   METADATA_STALE_CHIP,
   ROW_PENDING_LABEL,
-  RUNTIME_UNKNOWN,
+  RUNTIME_UNKNOWN_LABEL,
 } from '../copy';
 
 /** `specs/ui.md` §2.2 - the poster size the row requests. */
@@ -257,7 +258,7 @@ export function TitleRow({
             statement rather than a terse one.
           */}
           <span data-testid="runtime">
-            {formatRuntime(item.runtimeMinutes, item.mediaType) ?? RUNTIME_UNKNOWN}
+            {formatRuntime(item.runtimeMinutes, item.mediaType) ?? RUNTIME_UNKNOWN_LABEL}
           </span>
         </p>
 
@@ -374,7 +375,24 @@ export function TitleRow({
                     onOpenMenu(item);
                   }}
                 >
-                  ⋮
+                  {/*
+                    ⚠ THE ICON IS DECORATIVE ON PURPOSE — no `label` prop. The
+                    button above already carries `aria-label`, and §7c's rule is
+                    that an icon is never the SOLE label but must never double
+                    as a second one: naming the glyph here makes a reader
+                    announce "Actions for Dune, More". `MoreIcon` was authored
+                    for this call site as well as REQ-117's overflow (see its
+                    header) and is the only `more` in the closed v1 set, so the
+                    row and the nav cannot drift apart.
+
+                    ⚠ IT REPLACES A LITERAL `⋮` CHARACTER, which was never a
+                    styling detail. A text glyph is announced by screen readers
+                    as whatever the voice makes of U+22EE, renders in whatever
+                    the system font has at that codepoint, and cannot inherit
+                    `stroke-width` — so it was the one control in the product
+                    that visibly predated REQ-124.
+                  */}
+                  <MoreIcon />
                 </Button>
               </span>
             )}

@@ -23,7 +23,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { TitleRow, TMDB_IMAGE_BASE, type TitleListItem } from '../src/components/TitleRow';
 import { ListPage } from '../src/pages/ListPage';
-import { RUNTIME_UNKNOWN } from '../src/copy';
+import { RUNTIME_UNKNOWN_LABEL } from '../src/copy';
 
 /** `ListPage` mounts the freshness strip, whose chips are router `Link`s. */
 function render(ui: ReactElement): ReturnType<typeof rtlRender> {
@@ -184,6 +184,37 @@ describe('T-UI-010 - the row shows poster, name, type, year, date-added label an
     expect(menu).toHaveAccessibleName('Actions for Dune');
     await userEvent.click(menu);
     expect(onOpenMenu).toHaveBeenCalledWith(DUNE);
+  });
+
+  it('T-A11Y-016g the row menu trigger is the shared icon, decorative, and still named', () => {
+    // ⚠ THE SUFFIX BELONGS TO THE ICON FAMILY, NOT `T-UI-010`, because the
+    // rule being asserted is §7c's (an icon is never the sole label and never
+    // a second one) at the call site `T-A11Y-016e`'s comment already names.
+    // `T-UI-010` is also full: a-z are taken, and `T-META-008b` fails on a
+    // reused suffix because a CI failure would then name two different tests.
+    //
+    // ⚠ THE GLYPH WAS THE DEFECT, not the styling. The trigger used to be a
+    // literal `⋮` (U+22EE) — the one control left in the product that predated
+    // REQ-124's closed icon set. A text character renders in whatever the
+    // system font happens to have at that codepoint, inherits none of §7c's
+    // 24px grid or `stroke-width`, and is read aloud as whatever the voice
+    // makes of it.
+    render(
+      <ul>
+        <TitleRow item={DUNE} onOpenMenu={vi.fn()} />
+      </ul>,
+    );
+    const menu = screen.getByTestId('row-menu');
+
+    const svg = menu.querySelector('svg');
+    expect(svg).not.toBeNull();
+    // §7c: an icon inside an already-named control is decorative, or the
+    // reader announces the name twice. `T-A11Y-016f` states the same rule
+    // generally; this is the call site it was written for.
+    expect(svg?.getAttribute('aria-hidden')).toBe('true');
+    expect(menu.textContent).not.toContain('⋮');
+    // The accessible name is unchanged by the swap - the whole point.
+    expect(menu).toHaveAccessibleName('Actions for Dune');
   });
 
   it('T-UI-010k renders without action handlers wired, offering no DEAD affordance', async () => {
@@ -350,7 +381,7 @@ describe('REQ-119 - the runtime is on the row (`specs/ui-refresh.md` §5a)', () 
     renderRow({ runtimeMinutes: null });
 
     const runtime = screen.getByTestId('runtime');
-    expect(runtime.textContent).toBe(RUNTIME_UNKNOWN);
+    expect(runtime.textContent).toBe(RUNTIME_UNKNOWN_LABEL);
     expect(runtime.textContent).not.toMatch(/\b0m\b/);
     expect(runtime.textContent?.trim()).not.toBe('');
   });
@@ -361,18 +392,23 @@ describe('REQ-119 - the runtime is on the row (`specs/ui-refresh.md` §5a)', () 
     // read as a claim that the title is zero minutes long.
     renderRow({ runtimeMinutes: 0 });
 
-    expect(screen.getByTestId('runtime').textContent).toBe(RUNTIME_UNKNOWN);
+    expect(screen.getByTestId('runtime').textContent).toBe(RUNTIME_UNKNOWN_LABEL);
   });
 
   it('T-UX-122c the unknown wording is the shared constant, not a local string', () => {
     // `specs/ui.md` §9: owner-facing copy lives in `copy.ts` so a wording
     // change is one diff. A literal inlined into the component would pass every
     // assertion above and silently fork the wording.
+    //
+    // ⚠ THE NAME IS ASSERTED IN FULL, not as a prefix. `specs/ui.md` §9 governs
+    // this string under the name `RUNTIME_UNKNOWN_LABEL`; a bare
+    // `RUNTIME_UNKNOWN` would satisfy `toContain` while naming a constant the
+    // spec does not have, which is how the code and §9 drifted apart before.
     const source = readFileSync(
       join(process.cwd(), 'apps/web/src/components/TitleRow.tsx'),
       'utf8',
     );
-    expect(source).toContain('RUNTIME_UNKNOWN');
+    expect(source).toContain('RUNTIME_UNKNOWN_LABEL');
     expect(source).not.toContain("'Runtime unknown'");
   });
 });
