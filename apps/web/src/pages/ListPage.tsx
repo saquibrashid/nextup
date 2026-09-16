@@ -1,9 +1,7 @@
 // `/` - the combined list (`specs/ui.md` §2, TASK-038).
 //
 // The filter bar (TASK-039) and the empty/error states (TASK-040) are wired in
-// here. Still absent, deliberately, because a placeholder that renders would
-// report as shipped: the sort control (TASK-166) and the load-more and offline
-// states.
+// here alongside server-owned ordering, pagination and offline states.
 //
 // ⚠ THE EMPTY STATES ARE NOT INTERCHANGEABLE (US-019 AC-5). "Nothing here yet"
 // (never uploaded), "No titles match these filters" and "Nothing on your list
@@ -29,6 +27,8 @@ import {
   type TmdbSearchResponse,
 } from '../components/FixMatchDialog';
 import { TitleList } from '../components/TitleList';
+import { ListViewControl, type ListView } from '../components/ListViewControl';
+import { ListSearch } from '../components/ListSearch';
 import {
   AddTitleDialog,
   type AddTitleRequest,
@@ -201,6 +201,7 @@ export function ListPage({
   const loadingPhase = useSlowRequest(loading);
   const [menuFor, setMenuFor] = useState<TitleListItem | null>(null);
   const [dialog, setDialog] = useState<OpenDialog | null>(null);
+  const [view, setView] = useState<ListView>('grid');
   /**
    * ⚠ ROWS ARE HIDDEN ON `suppressed`, NEVER ON `pending`. `SuppressDialog`
    * reports `pending` while the POST is in flight and `suppressed` only once
@@ -258,8 +259,10 @@ export function ListPage({
 
   return (
     <>
-      <h1>Your list</h1>
-      {/*
+      <div className="library-heading">
+        <h1>Your list</h1>
+        <FreshnessStrip services={serviceState} />
+        {/*
         US-047 — the standalone add, ABOVE the list and outside every
         loading/failure branch.
 
@@ -271,40 +274,41 @@ export function ListPage({
         ⚠ Disabled offline, with the reason stated as text, like every other
         mutating control (§2.12).
       */}
-      {addWired && (
-        <>
-          <Button
-            variant="secondary"
-            data-testid="add-title-open"
-            disabled={offline}
-            onClick={() => {
-              setDialog({ kind: 'add' });
-            }}
-          >
-            {ADD_TITLE_LABEL}
-          </Button>
-          {offline && (
-            <span className="offline-reason" data-testid="add-title-offline-reason">
-              {OFFLINE_DISABLED_REASON}
-            </span>
-          )}
-          {/*
+        {addWired && (
+          <>
+            <Button
+              variant="secondary"
+              data-testid="add-title-open"
+              disabled={offline}
+              onClick={() => {
+                setDialog({ kind: 'add' });
+              }}
+            >
+              {ADD_TITLE_LABEL}
+            </Button>
+            {offline && (
+              <span className="offline-reason" data-testid="add-title-offline-reason">
+                {OFFLINE_DISABLED_REASON}
+              </span>
+            )}
+            {/*
             ⚠ RENDERED HERE, BESIDE ITS BUTTON, AND NOT INSIDE THE LIST BRANCH
             BELOW. The button is outside every loading/failure branch, so a
             dialog rendered inside one would open from a screen where the list
             read failed and then not exist. `onAdded` fires on SUCCESS, not on
             close: closing is not evidence anything was written.
           */}
-          {dialog !== null && dialog.kind === 'add' && (
-            <AddTitleDialog
-              searchTmdb={searchFn}
-              addTitle={addFn}
-              onClose={closeAll}
-              {...(onReload === undefined ? {} : { onAdded: onReload })}
-            />
-          )}
-        </>
-      )}
+            {dialog !== null && dialog.kind === 'add' && (
+              <AddTitleDialog
+                searchTmdb={searchFn}
+                addTitle={addFn}
+                onClose={closeAll}
+                {...(onReload === undefined ? {} : { onAdded: onReload })}
+              />
+            )}
+          </>
+        )}
+      </div>
       {/*
         ⚠ OUTSIDE the loading/failure branches below. The notice reports a
         write that has already happened; hiding it because `GET /api/titles`
@@ -323,7 +327,6 @@ export function ListPage({
         sibling of the list rather than a gate in front of it: whatever it is
         showing, the rows below render unchanged.
       */}
-      <FreshnessStrip services={serviceState} />
 
       {/*
         §2.12 (`T-UX-023`) — the rows the owner is looking at were loaded
@@ -334,6 +337,22 @@ export function ListPage({
         <p className="offline-cached-note" data-testid="list-cached-note">
           {OFFLINE_SHOWING_CACHED}
         </p>
+      )}
+
+      {(!loadFailed || offline) && !(offline && items.length === 0) && (
+        <div className="list-controls" data-testid="list-controls">
+          <ListSearch />
+          <FilterBar
+            genres={genres}
+            shown={shown}
+            total={unfilteredTotal}
+            totalIsLowerBound={totalIsLowerBound}
+            runtimeUnknownHidden={runtimeUnknownHidden}
+            countPending={loading}
+          />
+          <SortControl />
+          <ListViewControl view={view} onChange={setView} />
+        </div>
       )}
 
       {loadFailed && !offline ? (
@@ -356,8 +375,9 @@ export function ListPage({
         </p>
       ) : loading ? (
         /*
-          §2.1 Loading (initial), `T-UX-010`: the freshness strip and filter bar
-          as skeletons, six row skeletons, and past 1200 ms the slow notice.
+          Controls stay mounted while a filter request runs, preserving the
+          open picker and focus. Counts wait for the response; six row
+          skeletons and the slow notice describe the real pending read.
 
           ⚠ SIX ROWS, NOT THREE AND NOT ONE. The skeleton's whole job is to
           claim the shape of what is coming; a single bar promises a list of
@@ -375,9 +395,11 @@ export function ListPage({
           learn it had stalled and nothing to retry.
         */
         <div role="status" data-testid="list-loading" aria-label={LIST_LOADING_BODY}>
-          <div className="freshness-strip freshness-strip--skeleton" aria-hidden="true" />
-          <div className="filter-bar filter-bar--skeleton" aria-hidden="true" />
-          <ul className="title-list title-list--loading" data-testid="list-loading-skeletons">
+          <ul
+            className="title-list title-list--loading"
+            data-testid="list-loading-skeletons"
+            data-view={view}
+          >
             {[0, 1, 2, 3, 4, 5].map((index) => (
               <li
                 key={index}
@@ -391,30 +413,9 @@ export function ListPage({
         </div>
       ) : (
         <>
-          {/*
-            REQ-113 (`specs/ui-refresh.md` §5) — the filters and the sort are
-            ONE control group. They were two stacked bars, which read as two
-            unrelated decisions about the same list.
-
-            ⚠ THE WRAPPER IS PRESENTATION ONLY. `FilterBar` renders from the
-            URL and writes to it with no `useState` mirror; `SortControl` runs
-            URL → session → default. §5's table is explicit that the two
-            persistence models are deliberately opposite, and hoisting either
-            into shared state here is the failure it warns about: the suite
-            stays green and the back button stops working.
-          */}
-          <div className="list-controls" data-testid="list-controls">
-            <FilterBar
-              genres={genres}
-              shown={shown}
-              total={unfilteredTotal}
-              totalIsLowerBound={totalIsLowerBound}
-              runtimeUnknownHidden={runtimeUnknownHidden}
-            />
-            <SortControl />
-          </div>
           <TitleList
             items={visible}
+            view={view}
             pendingTitleIds={pendingTitleIds}
             activeGenres={filters.genres}
             {...(rowActionsWired
@@ -535,9 +536,18 @@ export function ListPage({
             closing the dialog is not evidence anything was written.
           */}
           <ListEmptyState
-            facts={{ shown, total: unfilteredTotal, filters, removedCount, suppressedCount }}
+            facts={{
+              shown,
+              total: unfilteredTotal,
+              filters,
+              query: params.get('q') ?? '',
+              removedCount,
+              suppressedCount,
+            }}
             onClearFilters={() => {
-              setParams(applyFilters(params, NO_FILTERS));
+              const next = applyFilters(params, NO_FILTERS);
+              next.delete('q');
+              setParams(next);
             }}
           />
         </>

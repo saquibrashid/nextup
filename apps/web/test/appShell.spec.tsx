@@ -10,7 +10,7 @@
  * route set itself is the subject.
  */
 
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
@@ -97,6 +97,7 @@ describe('AppShell and routing', () => {
     renderAt('/');
 
     const nav = screen.getByRole('navigation', { name: 'Primary' });
+    fireEvent.click(within(nav).getByRole('button', { name: 'More' }));
     const labels = within(nav)
       .getAllByRole('link')
       .map((link) => link.textContent);

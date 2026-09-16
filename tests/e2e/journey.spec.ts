@@ -1037,7 +1037,9 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
     await expect(row.getByTestId('badge-netflix')).toHaveText(SERVICE_LABELS.netflix);
     await expect(row.getByTestId('date-added-label')).toHaveText(LABEL_B1);
   }
+  await page.getByRole('button', { name: 'Service updates' }).click();
   await expect(page.getByTestId('freshness-label-netflix')).toHaveText('Netflix updated today');
+  await page.getByRole('button', { name: 'Done', exact: true }).click();
   await attribution('/ (populated list, step 4)');
   await axeState('/ (populated list, step 4)');
   await noOverflow('/ (populated list, step 4)');

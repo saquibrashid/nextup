@@ -477,22 +477,16 @@ export async function listActiveTitles(
  *    listing's badge must be absent while the row itself survives.
  * 4. **Keyset pagination, never `OFFSET`** (`specs/data-model.md` §15.6).
  *
- * WHY THE ANTI-JOIN IS TWO QUERIES AND NOT RAW SQL
- * ------------------------------------------------
- * `suppression.work_identity` cannot carry a Prisma relation — it is not
- * unique, deliberately, because deactivated suppressions are retained forever
- * — so a single-statement `NOT EXISTS` would have to be `$queryRaw`. That is
- * the wrong trade here: `T-SEC-021` walks the AST of this directory and proves
- * every Prisma call binds `ownerId`, and it CANNOT see inside a raw SQL
- * string. Buying one round trip's worth of latency to keep the whole file
- * under that guarantee is worth it, and the suppression set is bounded by the
- * single owner's own "not interested" decisions.
+ * Filtering and keyset selection run in parameterised SQL. In particular,
+ * search must not materialise an unbounded ID list into a Prisma IN filter:
+ * SQL Server refuses requests with more than 2,100 parameters.
  *
  * `take` is deliberately fetched as `limit + 1`: the extra row is how the
  * caller learns whether a next page exists without a `COUNT(*)`, which §3
  * forbids over an ever-growing history.
  */
 export interface TitlePageOptions {
+  q?: string | undefined;
   limit: number;
   dir: 'asc' | 'desc';
   /**
@@ -516,11 +510,11 @@ export interface TitlePageOptions {
 }
 
 /**
- * The runtime filter as a Prisma predicate: OR within the dimension, AND
+ * The runtime filter as a SQL predicate: OR within the dimension, AND
  * against every other filter (US-019 AC-4).
  *
  * ⚠ **`null` is excluded by construction, not by a special case.** Every
- * branch below constrains `tmdbRuntimeMinutes` with a comparison, and SQL
+ * branch below constrains runtime with a comparison, and SQL
  * comparisons against `NULL` are never true — so a title with no runtime
  * satisfies no bucket and drops out the moment any bucket is selected. That is
  * the specified behaviour (`specs/api.md` §6.2) and it is also the one that
@@ -531,28 +525,21 @@ export interface TitlePageOptions {
  * boundaries would let the query and the UI disagree by one minute, and a
  * 60-minute title would then appear under a filter chip that excludes it.
  */
-function runtimeFilter(buckets: readonly RuntimeBucket[]): object {
-  if (buckets.length === 0) return {};
-  return {
-    OR: buckets.map((bucket) => {
+function runtimeFilter(buckets: readonly RuntimeBucket[]): Prisma.Sql {
+  if (buckets.length === 0) return Prisma.empty;
+  return Prisma.sql`AND (${Prisma.join(
+    buckets.map((bucket) => {
       const { lower, upper } = RUNTIME_BUCKET_BOUNDS[bucket];
-      return {
-        tmdbRuntimeMinutes: {
-          // ⚠ `gt: 0` IS THE FLOOR WHEN THE BUCKET HAS NONE, and it is not
-          // cosmetic. `under30` is `[null, 30)`, so without it the predicate
-          // is `< 30`, which MATCHES A STORED `0` — and TMDB returns
-          // `runtime: 0` for works it has no runtime for. That row displays
-          // "Runtime unknown" (`isKnownRuntime`), is counted as unknown by
-          // `countRuntimeUnknown`, and would nevertheless appear inside the
-          // Under-30m results: a row labelled unknown inside a bucket that
-          // excludes unknowns, unaccounted for by the disclosure that exists
-          // to account for it.
-          ...(lower === null ? { gt: 0 } : { gte: lower }),
-          ...(upper === null ? {} : { lt: upper }),
-        },
-      };
+      const floor =
+        lower === null
+          ? Prisma.sql`t.tmdb_runtime_minutes > 0`
+          : Prisma.sql`t.tmdb_runtime_minutes >= ${lower}`;
+      return Prisma.sql`(${floor} ${
+        upper === null ? Prisma.empty : Prisma.sql`AND t.tmdb_runtime_minutes < ${upper}`
+      })`;
     }),
-  };
+    ' OR ',
+  )})`;
 }
 
 /**
@@ -566,18 +553,22 @@ function runtimeFilter(buckets: readonly RuntimeBucket[]): object {
  */
 const TITLE_ORDER_COLUMN: Record<
   NonNullable<TitlePageOptions['sort']>,
-  'sortDateAdded' | 'tmdbRuntimeMinutes' | 'tmdbReleaseYear' | 'imdbRatingTenths' | 'sortName'
+  {
+    field:
+      'sortDateAdded' | 'tmdbRuntimeMinutes' | 'tmdbReleaseYear' | 'imdbRatingTenths' | 'sortName';
+    sql: Prisma.Sql;
+  }
 > = {
-  dateAdded: 'sortDateAdded',
-  runtime: 'tmdbRuntimeMinutes',
-  releaseYear: 'tmdbReleaseYear',
-  rating: 'imdbRatingTenths',
+  dateAdded: { field: 'sortDateAdded', sql: Prisma.sql`t.sort_date_added` },
+  runtime: { field: 'tmdbRuntimeMinutes', sql: Prisma.sql`t.tmdb_runtime_minutes` },
+  releaseYear: { field: 'tmdbReleaseYear', sql: Prisma.sql`t.tmdb_release_year` },
+  rating: { field: 'imdbRatingTenths', sql: Prisma.sql`t.imdb_rating_tenths` },
   // ⚠ `sortName`, NEVER `tmdbName`. The stored column collates
   // `Latin1_General_100_CI_AI` (migration `0010`) and SQL Server applies the
   // COLUMN's collation to a bare `ORDER BY`; `tmdbName` sits in the BIN2
   // database default, so ordering by it is binary — `apple` after `Zebra`, and
   // still alphabetical-looking on a title-cased fixture. TASK-219.
-  name: 'sortName',
+  name: { field: 'sortName', sql: Prisma.sql`t.sort_name` },
 };
 
 /**
@@ -616,22 +607,18 @@ const TITLE_ORDER_COLUMN: Record<
  * every time.
  */
 function nullableKeyset(
-  column: 'tmdbRuntimeMinutes' | 'tmdbReleaseYear' | 'imdbRatingTenths' | 'sortName',
+  column: Prisma.Sql,
   value: number | string | null,
   id: string,
   dir: 'asc' | 'desc',
 ) {
   if (value === null) {
-    return { [column]: null, id: { gt: id } };
+    return Prisma.sql`AND (${column} IS NULL AND t.id > ${id})`;
   }
-  const before = dir === 'desc' ? 'lt' : 'gt';
-  return {
-    OR: [
-      { [column]: { [before]: value } },
-      { [column]: value, id: { gt: id } },
-      { [column]: null },
-    ],
-  };
+  const before = dir === 'desc' ? Prisma.sql`<` : Prisma.sql`>`;
+  return Prisma.sql`AND (${column} ${before} ${value}
+    OR (${column} = ${value} AND t.id > ${id})
+    OR ${column} IS NULL)`;
 }
 
 /**
@@ -641,114 +628,48 @@ function nullableKeyset(
  * ⚠ **IT IS SHARED SO THE DISCLOSURE COUNT CANNOT DRIFT FROM THE LIST.**
  * `runtimeUnknownHidden` must count the titles that satisfy every *other*
  * active filter and carry no runtime (`specs/api.md` §6.2). Written as a
- * second `where` literal, the two would agree in every fixture and disagree
+ * second predicate, the two would agree in every fixture and disagree
  * the first time a filter was added to one and not the other — and the symptom
  * is a disclosure that reports a number the list cannot explain, which is
  * worse than no disclosure at all.
  */
 function baseTitleListWhere(
   ownerId: OwnerId,
-  filters: {
-    suppressedIdentities: readonly string[];
-    services: readonly string[];
-    mediaType: string | undefined;
-    genres: readonly string[];
-  },
-) {
-  const { suppressedIdentities, services, mediaType, genres } = filters;
-  return {
-    ownerId,
-    state: 'active',
-    ...(suppressedIdentities.length > 0
-      ? { workIdentity: { notIn: [...suppressedIdentities] } }
-      : {}),
-    ...(mediaType === undefined ? {} : { tmdbMediaType: mediaType }),
-    // A row requires at least one ACTIVE listing (US-018 AC-4). Without it a
-    // work whose only listing was removed stayed in the list as a row with
-    // zero badges — `badges` is derived from active listings, so the row
-    // rendered as a title belonging to no service at all. `T-LIST-013a` is
-    // that guard.
-    //
-    // ⚠ This is deliberately NOT a check on `Title.state`. That flag is set
-    // by the reconciliation pipeline, so relying on it makes the list's
-    // correctness depend on another component remembering to write a field;
-    // requiring a live listing is the same rule the badges already follow
-    // and cannot be bypassed by a pipeline bug. `T-LIST-013c` pins the
-    // discriminating case — one removed and one active listing KEEPS its
-    // row, which is what separates "no active listings" from "has a removed
-    // listing".
-    //
-    // ⚠ The two branches are one `listings` key, not two. A service filter
-    // selects titles holding an active listing on one of the named services,
-    // which already implies the general condition — but writing the general
-    // condition as a SECOND `listings` key would silently replace the first
-    // (the same object-shape hazard as the `OR` keys), and the service filter
-    // would stop filtering.
-    //
-    // It deliberately does not narrow `badges`: filtering by Netflix must not
-    // hide the row's Max badge (REQ-032).
-    ...(services.length > 0
-      ? { listings: { some: { ownerId, state: 'active', service: { in: [...services] } } } }
-      : { listings: { some: { ownerId, state: 'active' } } }),
-    // GENRE — OR within the dimension, AND against every other filter
-    // (US-019 AC-4). Genres live as a JSON array in one `NVARCHAR(MAX)`
-    // column (`specs/data-model.md` §16), so the match is on the QUOTED
-    // token `"Name"` within that text, never on the bare name.
-    //
-    // ⚠ The quotes are what make this exact rather than a prefix match.
-    // Searching for `Drama` would also match a title whose only genre is
-    // `Dramatic Arts`; searching for `"Drama"` cannot, because the stored
-    // text has `"Dramatic Arts"` and the closing quote does not line up.
-    // `T-LIST-022c` is that guard, and it fails if the quotes are dropped.
-    //
-    // A title with `genres: []` stores `"[]"`, which contains no token at
-    // all, so it is excluded from every genre-filtered result and included
-    // when none is set — US-019 AC-6, for free and by construction rather
-    // than by a special case that could be forgotten (`T-LIST-024`).
-    //
-    // ⚠ Matching is CASE- and ACCENT-SENSITIVE, because the column collates
-    // `Latin1_General_100_BIN2`. That is correct here: the values come from
-    // TMDB's fixed genre vocabulary and the filter bar offers them from the
-    // owner's own data, so a near-miss spelling should return nothing rather
-    // than guess. `T-LIST-022d` records the behaviour so it cannot change by
-    // accident.
-    //
-    // The alternative was `EXISTS (SELECT 1 FROM OPENJSON(tmdb_genres) …)`,
-    // which is the more literal reading of the storage. It is not used
-    // because Prisma cannot express a raw fragment inside `where`, so it
-    // would mean hand-writing this entire query — the keyset predicate, the
-    // suppression anti-join and the listings `include` — in raw SQL, and
-    // that is a much larger surface to get wrong than one quoted token.
-    //
-    // ⚠ It lives in the `AND` ARRAY rather than as a sibling key because it is
-    // `OR`-shaped, and two `OR` keys in one object literal means the second
-    // silently replaces the first. The caller appends the runtime filter and
-    // the keyset to this same array for exactly that reason.
-    // ⚠ REQ-120 — EACH REQUESTED GENRE EXPANDS TO EVERY STORED NAME THAT
-    // MEANS IT (`specs/ui-refresh.md` §4.4). TMDB runs two vocabularies and
-    // this filter dimension holds both, so a TV title tagged
-    // `Action & Adventure` shares NO token with `"Action"` — before this
-    // expansion `?genre=Action` silently returned films only, and nothing on
-    // screen said so. `storedGenreVariants` derives the alternatives from the
-    // same closed map the row's chips are normalised with, so the display half
-    // and the filter half cannot drift: §4.4's "both, or neither" in code.
-    //
-    // ⚠ THE EXPANSION IS FLAT-MAPPED INTO THE SAME `OR`, not nested. The
-    // dimension is already `OR`-within / `AND`-across, and a title matching
-    // either the canonical name or a combined one matches the dimension once.
-    // `T-API-028` is the guard; a display-only fix makes the owner's reported
-    // symptom disappear while it still fails.
-    AND: [
-      genres.length > 0
-        ? {
-            OR: genres
-              .flatMap((genre) => storedGenreVariants(genre))
-              .map((name) => ({ tmdbGenres: { contains: `"${name}"` } })),
-          }
-        : {},
-    ] as object[],
-  };
+  { services = [], mediaType, genres = [], q }: TitleFilters,
+): Prisma.Sql {
+  const genreNames = genres.flatMap((genre) => storedGenreVariants(genre));
+  return Prisma.sql`
+    t.owner_id = ${ownerId} AND t.state = 'active'
+    AND NOT EXISTS (
+      SELECT 1 FROM suppression s
+      WHERE s.owner_id = ${ownerId} AND s.work_identity = t.work_identity AND s.active = 1
+    )
+    AND EXISTS (
+      SELECT 1 FROM service_listing l
+      WHERE l.owner_id = ${ownerId} AND l.title_id = t.id AND l.state = 'active'
+      ${services.length === 0 ? Prisma.empty : Prisma.sql`AND l.service IN (${Prisma.join(services)})`}
+    )
+    ${mediaType === undefined ? Prisma.empty : Prisma.sql`AND t.tmdb_media_type = ${mediaType}`}
+    ${
+      genreNames.length === 0
+        ? Prisma.empty
+        : Prisma.sql`AND (${Prisma.join(
+            genreNames.map(
+              (name) =>
+                Prisma.sql`t.tmdb_genres LIKE ${`%"${escapeLikeTerm(name)}"%`} ESCAPE ${LIKE_ESCAPE_CHAR}`,
+            ),
+            ' OR ',
+          )})`
+    }
+    ${
+      q === undefined
+        ? Prisma.empty
+        : Prisma.sql`AND COALESCE(t.tmdb_name, t.raw_extracted_text)
+            COLLATE Latin1_General_100_CI_AI LIKE ${`%${escapeLikeTerm(q)}%`} ESCAPE ${LIKE_ESCAPE_CHAR}`
+    }`;
 }
+
+type TitleFilters = Omit<TitlePageOptions, 'limit' | 'dir' | 'cursor' | 'sort' | 'runtimes'>;
 
 /**
  * REQ-035 — how many titles every *other* active filter admits but a runtime
@@ -765,58 +686,19 @@ function baseTitleListWhere(
  * ⚠ **`COUNT(*)` IS ALLOWED HERE AND `T-PERF-001` STILL HOLDS.** §3 forbids a
  * total count over the ever-growing REMOVED view; this counts active titles
  * for one owner — bounded by the owner's own library — and only when a runtime
- * filter is active, so the default list still costs exactly one query.
+ * filter is active, so the default list performs no count query.
  */
 export async function countRuntimeUnknown(
   ownerId: OwnerId,
   options: Omit<TitlePageOptions, 'limit' | 'dir' | 'cursor' | 'runtimes' | 'sort'>,
   tx?: Db,
 ): Promise<number> {
-  const conn = db(tx);
-  const { services = [], mediaType, genres = [] } = options;
-
-  const suppressed = await conn.suppression.findMany({
-    where: { ownerId, active: true },
-    select: { workIdentity: true },
-  });
-
-  const base = baseTitleListWhere(ownerId, {
-    suppressedIdentities: suppressed.map((s) => s.workIdentity),
-    services,
-    mediaType,
-    genres,
-  });
-
-  return conn.title.count({
-    // ⚠ `ownerId` IS RESTATED HERE EVEN THOUGH `base` ALREADY BINDS IT, and
-    // that is not redundancy to tidy away. `T-SEC-021` (mandatory compensating
-    // control 3, `specs/security.md` §3 R3) reads the source textually and
-    // cannot see an owner binding that arrives through a spread. Leaving it
-    // implicit makes this call indistinguishable from a genuinely un-scoped
-    // one, so the gate is right to refuse it. It is the same value either way;
-    // the explicit key wins because it is written last.
-    //
-    // ⚠ `<= 0` IS COUNTED AS UNKNOWN, NOT ONLY `NULL`. This predicate is the
-    // exact complement of `runtimeFilter`'s: TMDB stores `0` for works with no
-    // runtime, `isKnownRuntime` calls that unknown, and `runtimeFilter` puts a
-    // `gt: 0` floor on the open-ended bucket to exclude it. If this counted
-    // only `NULL`, a zero-runtime title would be hidden by the filter and
-    // missing from the number that says how many the filter hid — which is
-    // precisely the silent shortening the disclosure exists to prevent.
-    // ⚠ IT GOES IN THE `AND` ARRAY, NOT AS A SIBLING `OR` KEY — the rule this
-    // file states everywhere else. `base` happens to carry no top-level `OR`
-    // today, so a sibling key would work and keep working until someone added
-    // one, at which point this predicate would vanish and the disclosure would
-    // quietly count every unfiltered title instead.
-    where: {
-      ...base,
-      ownerId,
-      AND: [
-        ...base.AND,
-        { OR: [{ tmdbRuntimeMinutes: null }, { tmdbRuntimeMinutes: { lte: 0 } }] },
-      ],
-    },
-  });
+  const [row] = await db(tx).$queryRaw<{ count: number }[]>`
+    SELECT COUNT(*) AS count FROM title t
+    WHERE t.owner_id = ${ownerId} AND ${baseTitleListWhere(ownerId, options)}
+      AND (t.tmdb_runtime_minutes IS NULL OR t.tmdb_runtime_minutes <= 0)`;
+  if (row === undefined) throw new Error('Runtime unknown count returned no row.');
+  return row.count;
 }
 
 /**
@@ -852,121 +734,50 @@ export async function listTitleRatingRows(
     imdbRatingFetchedAt: Date | null;
   }[]
 > {
-  const conn = db(tx);
-  const { services = [], mediaType, genres = [], runtimes = [] } = options;
-
-  const suppressed = await conn.suppression.findMany({
-    where: { ownerId, active: true },
-    select: { workIdentity: true },
-  });
-
-  const base = baseTitleListWhere(ownerId, {
-    suppressedIdentities: suppressed.map((s) => s.workIdentity),
-    services,
-    mediaType,
-    genres,
-  });
-
-  return conn.title.findMany({
-    // ⚠ `ownerId` RESTATED for `T-SEC-021`, which reads the source textually
-    // and cannot follow a binding that arrives through a spread. Same value;
-    // the explicit key wins because it is last.
-    where: { ...base, ownerId, AND: [...base.AND, runtimeFilter(runtimes)] },
-    select: {
-      id: true,
-      imdbId: true,
-      imdbRatingTenths: true,
-      imdbRatingFetchedAt: true,
-    },
-    // ⚠ Ordered so the sweep's ceiling bites in a STABLE place. Without an
-    // order the rows arrive in whatever order the engine chooses, so which
-    // rows a truncated sweep refreshed would differ between two identical
-    // requests — and the list would reorder itself on refresh for no reason
-    // the owner could see.
-    orderBy: [{ imdbRatingFetchedAt: { sort: 'asc', nulls: 'first' } }, { id: 'asc' }],
-  });
+  return db(tx).$queryRaw`
+    SELECT t.id, t.imdb_id AS imdbId, t.imdb_rating_tenths AS imdbRatingTenths,
+      t.imdb_rating_fetched_at AS imdbRatingFetchedAt
+    FROM title t
+    WHERE t.owner_id = ${ownerId} AND ${baseTitleListWhere(ownerId, options)}
+      ${runtimeFilter(options.runtimes ?? [])}
+    ORDER BY t.imdb_rating_fetched_at ASC, t.id ASC`;
 }
 
 export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions, tx?: Db) {
   const conn = db(tx);
-  const {
-    limit,
-    dir,
-    cursor,
-    services = [],
-    mediaType,
-    genres = [],
-    runtimes = [],
-    sort = 'dateAdded',
-  } = options;
+  const { limit, dir, cursor, runtimes = [], sort = 'dateAdded' } = options;
+  const column = TITLE_ORDER_COLUMN[sort];
 
-  const suppressed = await conn.suppression.findMany({
-    where: { ownerId, active: true },
-    select: { workIdentity: true },
-  });
-
-  // The keyset predicate, spelled out because SQL Server has no row-value
-  // comparison Prisma can express. `(sortDateAdded, id) < (@d, @id)` becomes
-  // "an earlier date, OR the same date and a smaller id" — and the second
-  // branch is what stops rows sharing a date from being skipped between pages.
-  //
-  // ⚠ The two branches use DIFFERENT operators, and that asymmetry is
-  // deliberate. The date branch follows `dir`; the id branch is always `gt`,
-  // because the tie-breaker is `id` ASCENDING in both directions
-  // (`T-LIST-016`). Writing both as `[before]` reads as symmetric and is what
-  // this function did originally — it makes the tie order flip when the owner
-  // reverses the sort, and, worse, it makes page 2 skip or repeat rows that
-  // share a date, because the keyset would then disagree with the `ORDER BY`.
-  // A keyset predicate must mirror its `ORDER BY` exactly or paging silently
-  // loses rows.
-  const before = dir === 'desc' ? 'lt' : 'gt';
+  // The sort key follows dir; the ID tie-break stays ascending in both directions.
+  const before = dir === 'desc' ? Prisma.sql`<` : Prisma.sql`>`;
   const keyset =
     cursor === undefined
-      ? {}
+      ? Prisma.empty
       : 'runtimeMinutes' in cursor
-        ? nullableKeyset('tmdbRuntimeMinutes', cursor.runtimeMinutes, cursor.id, dir)
+        ? nullableKeyset(column.sql, cursor.runtimeMinutes, cursor.id, dir)
         : 'releaseYear' in cursor
-          ? nullableKeyset('tmdbReleaseYear', cursor.releaseYear, cursor.id, dir)
+          ? nullableKeyset(column.sql, cursor.releaseYear, cursor.id, dir)
           : 'ratingTenths' in cursor
-            ? nullableKeyset('imdbRatingTenths', cursor.ratingTenths, cursor.id, dir)
+            ? nullableKeyset(column.sql, cursor.ratingTenths, cursor.id, dir)
             : 'sortName' in cursor
-              ? nullableKeyset('sortName', cursor.sortName, cursor.id, dir)
-              : {
-                  OR: [
-                    {
-                      sortDateAdded: {
-                        [before]: new Date(`${cursor.sortDateAdded}T00:00:00.000Z`),
-                      },
-                    },
-                    {
-                      sortDateAdded: new Date(`${cursor.sortDateAdded}T00:00:00.000Z`),
-                      id: { gt: cursor.id },
-                    },
-                  ],
-                };
+              ? nullableKeyset(column.sql, cursor.sortName, cursor.id, dir)
+              : Prisma.sql`AND (
+                  ${column.sql} ${before} ${new Date(`${cursor.sortDateAdded}T00:00:00.000Z`)}
+                  OR (${column.sql} = ${new Date(`${cursor.sortDateAdded}T00:00:00.000Z`)}
+                    AND t.id > ${cursor.id})
+                )`;
 
-  const base = baseTitleListWhere(ownerId, {
-    suppressedIdentities: suppressed.map((s) => s.workIdentity),
-    services,
-    mediaType,
-    genres,
-  });
+  const page = await conn.$queryRaw<{ id: string }[]>`
+    SELECT TOP (${limit + 1}) t.id FROM title t
+    WHERE t.owner_id = ${ownerId} AND ${baseTitleListWhere(ownerId, options)}
+      ${runtimeFilter(runtimes)} ${keyset}
+    ORDER BY CASE WHEN ${column.sql} IS NULL THEN 1 ELSE 0 END ASC,
+      ${column.sql} ${dir === 'desc' ? Prisma.sql`DESC` : Prisma.sql`ASC`}, t.id ASC`;
 
   const rows = await conn.title.findMany({
     where: {
-      ...base,
-      // ⚠ RESTATED FOR `T-SEC-021`, which reads the source textually and
-      // cannot follow an owner binding that arrives through a spread. Same
-      // value as the one in `base`; the explicit key wins because it is last.
       ownerId,
-      // ⚠ MERGED INTO THE BASE'S `AND` ARRAY, NEVER ADDED AS A SECOND `AND`
-      // KEY. Two `AND` keys in one object literal means the second silently
-      // REPLACES the first, which would drop the genre filter the moment a
-      // cursor or a runtime bucket was present — page 1 would filter and page
-      // 2 would not, reading as the filter randomly giving up rather than as
-      // an error. The same hazard applies to the `OR`-shaped members, which is
-      // why all three live in the array rather than as sibling keys.
-      AND: [...base.AND, runtimeFilter(runtimes), keyset],
+      id: { in: page.map((row) => row.id) },
     },
     // `compareTitlesForList` in `@nextup/domain` is the same order expressed
     // as a comparator, and the integration suite checks this query against it.
@@ -990,8 +801,7 @@ export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions,
     // COLUMN's collation to this bare `ORDER BY`. Nothing in the query text
     // says so — which is exactly why ordering by `tmdbName` instead would
     // silently revert to binary order and still pass a title-cased fixture.
-    orderBy: [{ [TITLE_ORDER_COLUMN[sort]]: { sort: dir, nulls: 'last' } }, { id: 'asc' }],
-    take: limit + 1,
+    orderBy: [{ [column.field]: { sort: dir, nulls: 'last' } }, { id: 'asc' }],
     include: {
       listings: {
         where: { ownerId, state: 'active' },

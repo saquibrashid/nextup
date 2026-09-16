@@ -357,7 +357,7 @@ describe('REQ-119 - the runtime is on the row (`specs/ui-refresh.md` §5a)', () 
     expect(screen.getByTestId('runtime').textContent).toBe('45m/ep');
   });
 
-  it('T-UX-121c the runtime is LAST in the meta line, after the genres', () => {
+  it('T-UX-121c the runtime precedes the wrapping genre names', () => {
     const row = renderRow({});
     const meta = within(row).getByTestId('title-meta');
     // ⚠ `:scope > *`, NOT `querySelectorAll('span')`. Since REQ-120 the genre
@@ -369,7 +369,7 @@ describe('REQ-119 - the runtime is on the row (`specs/ui-refresh.md` §5a)', () 
       (s) => s.dataset['testid'],
     );
 
-    expect(order).toEqual(['release-year', 'media-type', 'genres', 'runtime']);
+    expect(order).toEqual(['release-year', 'media-type', 'runtime', 'genres']);
   });
 
   it('T-UX-122a a null runtime renders the WORDS, never `0m` and never an empty slot', () => {

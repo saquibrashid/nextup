@@ -223,7 +223,7 @@ export function TitleRow({
 
         <p className="title-row__meta" data-testid="title-meta">
           {/*
-            REQ-106 — ORDER IS `Year · type · genres`, per `specs/ui.md` §2.2.
+            REQ-106 — year and type precede runtime and wrapping genres.
             It previously rendered type-then-year, which is why the owner's
             screenshot read `TV2004Animation`. The separators themselves are
             CSS-generated (`.title-row__meta > span + span::before`) so they
@@ -239,10 +239,8 @@ export function TitleRow({
             compact presentation too, including the `+0` it newly makes
             possible (REQ-112, `T-UX-102b`).
           */}
-          <GenreChips genres={item.genres} activeGenres={activeGenres} />
           {/*
-            REQ-119 - runtime is LAST in `Year · type · genres · runtime`, and
-            the unknown case is NAMED rather than omitted.
+            REQ-119 - runtime precedes genres; unknown runtime is named rather than omitted.
 
             ⚠ THIS DELIBERATELY DIFFERS FROM THE GENRE BRANCH DIRECTLY ABOVE,
             and the difference is the requirement. An empty genre list renders
@@ -257,9 +255,10 @@ export function TitleRow({
             for why a bare `45m` beside a nine-season series is a false
             statement rather than a terse one.
           */}
-          <span data-testid="runtime">
+          <span className="title-row__runtime" data-testid="runtime">
             {formatRuntime(item.runtimeMinutes, item.mediaType) ?? RUNTIME_UNKNOWN_LABEL}
           </span>
+          <GenreChips genres={item.genres} activeGenres={activeGenres} />
         </p>
 
         {/*

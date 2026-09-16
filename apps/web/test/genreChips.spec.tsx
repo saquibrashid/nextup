@@ -210,24 +210,14 @@ describe('T-UX-127 · ui-refresh.md §4.3 · compact genres with a `+n` overflow
     expect(chipTexts()).toStrictEqual(['Drama', 'Thriller']);
   });
 
-  it('T-UX-127g: "at most one line" is held by the stylesheet as well as the count', () => {
-    // ⚠ THE COUNT ALONE IS NOT THE REQUIREMENT. Three long genre names still
-    // wrap at 320 px, and jsdom computes no layout so no render can see it.
-    // `nowrap` plus an ellipsis is the other half; without `min-width: 0` the
-    // ellipsis never engages and the row forces the page sideways instead.
+  it('T-UX-127g: genre names wrap without truncation while the count limit is retained', () => {
     const rule = (selector: string): string =>
       new RegExp(`(?:^|[},])\\s*${selector}\\s*\\{([^}]*)\\}`).exec(CSS_CODE)?.[1] ?? '';
 
-    expect(rule('\\.genre-chips')).toMatch(/flex-wrap:\s*nowrap/);
+    expect(rule('\\.genre-chips')).toMatch(/flex-wrap:\s*wrap/);
     expect(rule('\\.genre-chips')).toMatch(/min-width:\s*0/);
-    // `inline-flex`, not `flex`: a block-level child of the `<p>` metadata line
-    // would put the genres on a row of their own, which is the opposite of
-    // compact.
     expect(rule('\\.genre-chips')).toMatch(/display:\s*inline-flex/);
-    // ⚠ `.chip` IS THE §7d PRIMITIVE, not a private genre class. The chips
-    // moved onto it when `T-INFRA-013d` found the primitive mounted by
-    // nothing; the truncation guarantee is unchanged and now lives in one
-    // place rather than two.
-    expect(rule('\\.chip')).toMatch(/text-overflow:\s*ellipsis/);
+    expect(rule('\\.chip')).not.toMatch(/text-overflow:\s*ellipsis|white-space:\s*nowrap/);
+    expect(rule('\\.chip')).toMatch(/overflow-wrap:\s*anywhere/);
   });
 });

@@ -2,11 +2,39 @@
 
 | | |
 |---|---|
-| **Status** | **Accepted — SPEC ONLY, NOT YET BUILT.** No backlog task exists yet; the owner asked for requirements and design ahead of implementation. |
+| **Status** | **Accepted, Revision 1 (2026-09-16).** Epic P shipped in #275; the owner approved implementation of the refined indigo library preview on 2026-09-16. |
 | **Date** | 2026-09-10 |
 | **Deciders** | the owner (visual direction, given explicitly — see "The direction, and who gave it"), coordinator (mechanics) |
 | **Forced by** | The owner using the running app on 2026-09-10 and reporting six things: a row menu that opens at the bottom of the page, metadata rendered as `Movie2026Action, Crime, Thriller`, a row-menu button rendered as a full-height grey column, row text *"scrunched together"*, a fix-match correction that produced **no visible change on the review screen**, and *"the website looks very bare with no styling whatsoever."* |
-| **Supersedes** | Nothing. **Extends** ADR-0004 Rev 2 and `specs/ui.md` §13. It does **not** reopen the no-Tailwind or no-dark-mode decisions. |
+| **Supersedes** | Revision 1 reopens the light-only decision, the separate field/direction controls, and viewport-only layout selection. No Tailwind, web fonts, icon dependency, provider expansion or background list changes are introduced. |
+
+## Revision 1 — approved indigo library, 2026-09-16
+
+The owner reviewed four working mockup iterations, selected the dark
+indigo/violet direction ("more royal and richer"), approved removable filter
+chips and a grid/compact switch, then directed: "let's move forward with
+implementing." These are product decisions, not inferred styling changes.
+
+- Dark ink surfaces, readable pale text, violet accents and a play/next brand.
+  Use application design tokens and the existing system font stack.
+- One visible button per sort field. An inactive button selects its field and
+  default direction together; activating the selected button reverses direction.
+  Name defaults to A–Z; other fields default descending. Current state and the
+  next action are both named. Oldest-first remains one action away.
+- Search runs over the server's full eligible title set before pagination.
+  Filters and search stay in the URL; sorting retains URL/session precedence.
+- Services become a searchable, multi-select disclosure driven by the existing
+  registry. **Only Netflix and Max are enabled in phase 1.** Update dates move
+  into a compact disclosure; unavailable dates still degrade visibly outside it.
+- Active filter chips remove one constraint without resetting other choices.
+  Grid and compact views render identical data and actions in server order.
+  The view preference is local presentation state, never an API sort/filter.
+- Loading, errors, retry, offline states and mutation confirmation use the real
+  app lifecycle. Mockup fixtures, simulated state switches and promotional copy
+  are not production features. Reduced-motion preferences are respected.
+
+The rationale below describes the original Epic P decisions and defects.
+Revision 1 replaces only the choices explicitly listed above.
 
 ---
 

@@ -367,6 +367,15 @@ export const SORT_KEY_DATE_LABEL = 'Date added';
 export const SORT_KEY_RUNTIME_LABEL = 'Runtime';
 export const SORT_KEY_LEGEND = 'Sort by';
 
+/** Owner-approved complete orders; the active control offers its reverse. */
+export const SORT_ORDER_LABELS = {
+  dateAdded: { desc: 'Recently added', asc: 'Oldest additions' },
+  name: { desc: 'Name Z-A', asc: 'Name A-Z' },
+  releaseYear: { desc: 'Newest releases', asc: 'Oldest releases' },
+  runtime: { desc: 'Longest runtime', asc: 'Shortest runtime' },
+  rating: { desc: 'Highest rated', asc: 'Lowest rated' },
+} as const;
+
 /**
  * REQ-121 (`specs/ui-refresh.md` §5b) — the sort keys and direction labels
  * added when OQ-3 / OQ-3b / `A48` widened the orderings from one to five.

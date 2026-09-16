@@ -52,6 +52,46 @@ function thrown(fn: () => unknown): AppError {
 
 const VALID = { sortDateAdded: '2026-04-02', id: '01J8ZC000000000000000000' };
 
+describe('T-API-030 library title search query', () => {
+  it('T-API-030a trims search and treats absent or blank search as unfiltered', () => {
+    expect(parseTitleListQuery({ q: '  The Matrix  ' }).q).toBe('The Matrix');
+    for (const query of [{}, { q: '' }, { q: ' \t ' }]) {
+      expect(parseTitleListQuery(query).q).toBeUndefined();
+    }
+  });
+
+  it('T-API-030b bounds the trimmed string without truncating it', () => {
+    expect(parseTitleListQuery({ q: ` ${'x'.repeat(500)} ` }).q).toHaveLength(500);
+    const error = thrown(() => parseTitleListQuery({ q: 'x'.repeat(501) }));
+    expect(error.code).toBe('VALIDATION_FAILED');
+    expect(error.httpStatus).toBe(400);
+    expect(error.details).toEqual({ field: 'q', maxLength: 500 });
+  });
+
+  it('T-API-030c refuses repeated or structured search, even identical repeats', () => {
+    for (const q of [['Dune', 'Dune'], { text: 'Dune' }]) {
+      expect(thrown(() => parseTitleListQuery({ q })).details.field).toBe('q');
+    }
+  });
+
+  it('T-API-030d preserves literal punctuation and all other filter and cursor dimensions', () => {
+    const query = {
+      service: ['netflix', 'max'],
+      type: 'movie',
+      genre: 'Drama',
+      runtime: 'under30',
+      sort: 'dateAdded',
+      dir: 'asc',
+      limit: '1',
+      cursor: encodeCursor(VALID),
+    };
+    expect(parseTitleListQuery({ ...query, q: "100%_[!] O'Brien" })).toEqual({
+      ...parseTitleListQuery(query),
+      q: "100%_[!] O'Brien",
+    });
+  });
+});
+
 describe('T-API-017 an unreadable pagination cursor is a loud 400', () => {
   it('T-API-017a: a cursor this server issued round-trips exactly', () => {
     expect(decodeCursor(encodeCursor(VALID))).toEqual(VALID);
@@ -202,13 +242,12 @@ describe('T-LIST-029 the list query contract', () => {
     expect(`${error.message}${JSON.stringify(error.details)}`).not.toContain('onerror');
   });
 
-  it('T-LIST-029f: type is single-valued; repeating it is a 400', () => {
+  it('T-LIST-029f: types OR together, duplicates retain their restriction and invalid values fail', () => {
     expect(parseTitleListQuery({ type: 'movie' }).mediaType).toBe('movie');
-    // "movie OR tv" is the same as no filter — a request that looks like a
-    // narrowing and is not.
-    expect(thrown(() => parseTitleListQuery({ type: ['movie', 'tv'] })).details['field']).toBe(
-      'type',
-    );
+    expect(parseTitleListQuery({ type: 'tv' }).mediaType).toBe('tv');
+    expect(parseTitleListQuery({ type: ['movie', 'movie'] }).mediaType).toBe('movie');
+    expect(parseTitleListQuery({ type: ['movie', 'tv'] }).mediaType).toBeUndefined();
+    expect(parseTitleListQuery({ type: ['tv', 'movie'] }).mediaType).toBeUndefined();
     expect(thrown(() => parseTitleListQuery({ type: 'documentary' })).code).toBe(
       'VALIDATION_FAILED',
     );

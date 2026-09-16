@@ -142,6 +142,29 @@ afterEach(async () => {
 });
 
 describe('T-API-023 · `sort=rating` reaches the store as a rating ordering', () => {
+  it('T-API-030e forwards the same trimmed search to paging, rating scope and hidden count', async () => {
+    const res = await get('?q=%20Dune%20&sort=rating&runtime=under30&genre=Drama&service=max');
+    expect(res.status).toBe(200);
+    for (const read of [listTitlePage, listTitleRatingRows, countRuntimeUnknown]) {
+      expect(read.mock.calls[0]?.[1]).toMatchObject({
+        q: 'Dune',
+        genres: ['Drama'],
+        services: ['max'],
+      });
+    }
+    expect(trace.indexOf('sweep')).toBeLessThan(trace.indexOf('order-by'));
+  });
+
+  it('T-API-030f rejects malformed search before any library or refresh lookup', async () => {
+    const res = await get('?q=Dune&q=Arrival');
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as ErrorBody).error.code).toBe('VALIDATION_FAILED');
+    expect(listTitlePage).not.toHaveBeenCalled();
+    expect(listTitleRatingRows).not.toHaveBeenCalled();
+    expect(countRuntimeUnknown).not.toHaveBeenCalled();
+    expect(runRatingRefresh).not.toHaveBeenCalled();
+  });
+
   it('T-API-023a · the sort is forwarded, not silently dropped', async () => {
     const res = await get('?sort=rating&dir=desc');
     expect(res.status).toBe(200);

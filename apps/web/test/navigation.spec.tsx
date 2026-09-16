@@ -233,6 +233,7 @@ describe('T-UX-118 · ui-refresh.md §6 · the freshness strip still deep-links 
         <FreshnessStrip services={[NETFLIX, MAX_STALE]} />
       </MemoryRouter>,
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Service updates' }));
 
     expect(screen.getByTestId('freshness-chip-netflix')).toHaveAttribute(
       'href',
@@ -251,6 +252,7 @@ describe('T-UX-118 · ui-refresh.md §6 · the freshness strip still deep-links 
         <FreshnessStrip services={null} />
       </MemoryRouter>,
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Service updates' }));
 
     expect(screen.getByTestId('freshness-chip-netflix')).toHaveAttribute(
       'href',
@@ -332,18 +334,23 @@ describe('T-UX-132 · ui-refresh.md §6 · the phone destination bar', () => {
     expect(WIDE_VIEWPORT_QUERY).toBe(`(min-width: ${String(BP_SM)}px)`);
   });
 
-  it('T-UX-132e: at or above --bp-sm every destination is a link in its own right', () => {
-    // The other half of `T-UX-132a`: `More` is a phone affordance, and a
-    // desktop that kept it would be hiding six destinations behind a
-    // disclosure for no reason.
+  it('T-UX-132e: at or above --bp-sm all destinations remain reachable via the compact bar', () => {
     const nav = atWideWidth('/');
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((link) => link.textContent),
+    ).toStrictEqual(['List', 'Upload', 'Batches']);
+    const more = within(nav).getByRole('button', { name: NAV_MORE_LABEL });
+    expect(more).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(more);
 
     expect(
       within(nav)
         .getAllByRole('link')
         .map((link) => link.textContent),
     ).toStrictEqual([...BAR_LABELS, ...OVERFLOW_LABELS]);
-    expect(within(nav).queryByRole('button', { name: NAV_MORE_LABEL })).toBeNull();
+    expect(more).toHaveAttribute('aria-expanded', 'true');
   });
 });
 

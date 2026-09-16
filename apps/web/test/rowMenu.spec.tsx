@@ -199,7 +199,7 @@ describe('T-UX-030 the row menu reaches the suppress and fix-match dialogs', () 
     await openMenu(user, 'Dune');
     await user.click(await screen.findByRole('menuitem', { name: 'Fix match' }));
 
-    await user.type(screen.getByRole('searchbox'), 'dune part two');
+    await user.type(within(screen.getByRole('dialog')).getByRole('searchbox'), 'dune part two');
     await waitFor(
       () => {
         expect(props.onSearchTmdb).toHaveBeenCalled();
@@ -220,7 +220,7 @@ describe('T-UX-030 the row menu reaches the suppress and fix-match dialogs', () 
     await user.click(screen.getByRole('button', { name: 'Find a match' }));
 
     expect(screen.queryByRole('menu')).toBeNull();
-    await user.type(screen.getByRole('searchbox'), 'dune');
+    await user.type(within(screen.getByRole('dialog')).getByRole('searchbox'), 'dune');
     await waitFor(
       () => {
         expect(props.onSearchTmdb).toHaveBeenCalled();
@@ -238,7 +238,7 @@ describe('T-UX-030 the row menu reaches the suppress and fix-match dialogs', () 
     await waitFor(() => {
       expect(screen.queryByRole('menu')).toBeNull();
     });
-    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
     expect(props.onSuppress).not.toHaveBeenCalled();
     expect(props.onFixMatch).not.toHaveBeenCalled();
     expect(screen.getByTestId('title-row-01J8ZC')).toBeTruthy();
@@ -285,7 +285,7 @@ describe('T-UX-030 the row menu reaches the suppress and fix-match dialogs', () 
     await openMenu(user, 'Arrival');
     await user.click(await screen.findByRole('menuitem', { name: 'Fix match' }));
 
-    const search = screen.getByRole('searchbox');
+    const search = within(screen.getByRole('dialog')).getByRole('searchbox');
     expect(search.getAttribute('placeholder')).toContain('Arrival');
 
     await user.type(search, 'dune');

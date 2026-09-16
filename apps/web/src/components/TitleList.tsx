@@ -15,9 +15,11 @@
 import type { JSX, ReactNode } from 'react';
 
 import { TitleRow, type TitleListItem } from './TitleRow';
+import type { ListView } from './ListViewControl';
 
 export interface TitleListProps {
   readonly items: readonly TitleListItem[];
+  readonly view?: ListView;
   readonly onOpenMenu?: ((item: TitleListItem) => void) | undefined;
   readonly onFixMatch?: ((item: TitleListItem) => void) | undefined;
   /**
@@ -51,9 +53,10 @@ export function TitleList({
   pendingTitleIds,
   renderMenu,
   activeGenres,
+  view = 'grid',
 }: TitleListProps): JSX.Element {
   return (
-    <ul className="title-list" data-testid="title-list">
+    <ul className="title-list" data-testid="title-list" data-view={view}>
       {items.map((item) => (
         <TitleRow
           key={item.titleId}

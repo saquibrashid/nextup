@@ -29,6 +29,7 @@ import {
   createTitle,
   createUploadBatch,
   softDeleteServiceListing,
+  listTitleRatingRows,
   type OwnerId,
 } from '../../src/repository/ownerData.js';
 import { closeTestPrisma, resetDatabase, testPrisma } from './harness.js';
@@ -69,6 +70,7 @@ interface ListBody {
   items: Item[];
   nextCursor: string | null;
   limit: number;
+  runtimeUnknownHidden: number | null;
 }
 
 interface ErrorBody {
@@ -102,6 +104,7 @@ async function seedTitle(options: {
   service?: string;
   mediaType?: string;
   genres?: string[];
+  runtime?: number;
 }) {
   seq += 1;
   const id = `t-${String(seq).padStart(4, '0')}`;
@@ -121,6 +124,8 @@ async function seedTitle(options: {
     tmdbMediaType: options.mediaType ?? 'movie',
     tmdbName: options.name ?? `Title ${String(seq)}`,
     tmdbGenres: JSON.stringify(options.genres ?? ['Drama']),
+    tmdbRuntimeMinutes: options.runtime ?? null,
+    tmdbFetchedAt: new Date(),
     sortDateAdded: new Date(`${options.dateAdded ?? '2026-04-02'}T00:00:00.000Z`),
     createdByBatchId: batch.id,
   });
@@ -164,6 +169,156 @@ afterEach(async () => {
 
 afterAll(async () => {
   await closeTestPrisma();
+});
+
+describe('T-API-030 server-backed search over the full library', () => {
+  it.each(
+    ['dateAdded', 'runtime', 'releaseYear', 'rating', 'name'].flatMap((sort) =>
+      ['asc', 'desc'].map((dir) => ({ sort, dir })),
+    ),
+  )('T-API-030l keeps search scoped across every $sort/$dir cursor', async ({ sort, dir }) => {
+    const first = await seedTitle({ name: 'Dune Am\u00e9lie', runtime: 20 });
+    const second = await seedTitle({ name: 'Dune amelie', runtime: 20 });
+    const unknown = await seedTitle({ name: 'Dune Unknown' });
+    await seedTitle({ name: 'Unrelated', runtime: 20 });
+    for (const title of [first.title, second.title]) {
+      await testPrisma().title.updateMany({
+        where: { ownerId: owner, id: title.id },
+        data: { tmdbReleaseYear: 2001, imdbRatingTenths: 80, imdbRatingFetchedAt: new Date() },
+      });
+    }
+    const query = `?q=dune&sort=${sort}&dir=${dir}`;
+    const expected = (await list(query)).items.map((item) => item.titleId);
+    expect(new Set(expected)).toEqual(new Set([first.title.id, second.title.id, unknown.title.id]));
+    const seen: string[] = [];
+    let cursor: string | null = null;
+    do {
+      const page = await list(
+        `${query}&limit=1${cursor === null ? '' : `&cursor=${encodeURIComponent(cursor)}`}`,
+      );
+      seen.push(...page.items.map((item) => item.titleId));
+      cursor = page.nextCursor;
+      expect(seen.length).toBeLessThanOrEqual(expected.length);
+    } while (cursor !== null);
+    expect(seen).toEqual(expected);
+  });
+
+  it('T-API-030g filters before keyset pagination, preserving every filter on later pages', async () => {
+    await seedTitle({ name: 'Newest distraction', dateAdded: '2026-09-01' });
+    const first = await seedTitle({ name: 'The Matrix', dateAdded: '2026-08-01', runtime: 20 });
+    const second = await seedTitle({
+      name: 'Matrix Reloaded',
+      dateAdded: '2026-07-01',
+      runtime: 25,
+    });
+    await seedTitle({ name: 'Matrix wrong genre', genres: ['Comedy'], runtime: 20 });
+    await seedTitle({ name: 'Matrix wrong service', service: 'max', runtime: 20 });
+    await seedTitle({ name: 'Matrix wrong type', mediaType: 'tv', runtime: 20 });
+    await seedTitle({ name: 'Matrix wrong runtime', runtime: 100 });
+    const query = '?q=%20matrix%20&service=netflix&type=movie&genre=Drama&runtime=under30&limit=1';
+    expect((await list('?limit=1')).items[0]?.name).toBe('Newest distraction');
+    const page1 = await list(query);
+    expect(page1.items.map((item) => item.titleId)).toEqual([first.title.id]);
+    expect(page1.nextCursor).not.toBeNull();
+    const page2 = await list(`${query}&cursor=${encodeURIComponent(page1.nextCursor ?? '')}`);
+    expect(page2.items.map((item) => item.titleId)).toEqual([second.title.id]);
+    expect(page2.nextCursor).toBeNull();
+    expect((await list('?q=no-such-title')).items).toEqual([]);
+  });
+
+  it('T-API-030h searches full display names and unmatched text, case/accent insensitively', async () => {
+    await seedTitle({ name: 'The Am\u00e9lie Story' });
+    const unmatched = await seedTitle({});
+    await testPrisma().title.updateMany({
+      where: { ownerId: owner, id: unmatched.title.id },
+      data: {
+        matchState: 'unmatched',
+        workIdentity: 'unmatched:unknown-search-title',
+        tmdbId: null,
+        tmdbName: null,
+        rawExtractedText: 'An Unknown Screenshot',
+        normalisedText: 'an unknown screenshot',
+      },
+    });
+    expect((await list('?q=THE%20AMELIE')).items.map((item) => item.name)).toEqual([
+      'The Am\u00e9lie Story',
+    ]);
+    expect((await list('?q=unknown%20screenshot')).items.map((item) => item.titleId)).toEqual([
+      unmatched.title.id,
+    ]);
+  });
+
+  it('T-API-030i treats SQL and LIKE punctuation literally, never as query syntax', async () => {
+    const literal = "100%_[!] O'Brien";
+    await seedTitle({ name: literal });
+    await seedTitle({ name: '100percentX ordinary' });
+    for (const q of [literal, '%', '_', '[', '!', "O'Brien"]) {
+      expect((await list(`?q=${encodeURIComponent(q)}`)).items.map((item) => item.name)).toEqual([
+        literal,
+      ]);
+    }
+    expect((await list(`?q=${encodeURIComponent("' OR 1=1 --")}`)).items).toEqual([]);
+  });
+
+  it('T-API-030j keeps counts and rating scope searched, owner-scoped and suppression-safe', async () => {
+    const visible = await seedTitle({ name: 'Dune short', runtime: 20 });
+    await seedTitle({ name: 'Dune unknown' });
+    await seedTitle({ name: 'Dune another unknown' });
+    await seedTitle({ name: 'Unrelated unknown' });
+    await seedTitle({ name: 'Dune another service', service: 'max' });
+    await seedTitle({ name: 'Dune foreign', ownerId: asOwnerId('other-search-owner') });
+    const removed = await seedTitle({ name: 'Dune removed' });
+    await softDeleteServiceListing(owner, removed.listing.listingId, {
+      removedAt: new Date(),
+      removedByBatchId: removed.batch.id,
+    });
+    const suppressed = await seedTitle({ name: 'Dune suppressed' });
+    await createSuppression(owner, {
+      id: 'search-suppression',
+      workIdentity: suppressed.title.workIdentity,
+      displayName: 'Dune suppressed',
+      active: true,
+    });
+    const body = await list('?q=dune&runtime=under30&service=netflix&limit=1');
+    expect(body.items.map((item) => item.titleId)).toEqual([visible.title.id]);
+    expect(body.runtimeUnknownHidden).toBe(2);
+    expect(body.nextCursor).toBeNull();
+    expect((await list('?q=nothing&runtime=under30')).runtimeUnknownHidden).toBe(0);
+    expect((await list('?q=dune')).runtimeUnknownHidden).toBeNull();
+    expect(
+      (
+        await listTitleRatingRows(owner, {
+          q: 'dune',
+          services: ['netflix'],
+          runtimes: ['under30'],
+        })
+      ).map((row) => row.id),
+    ).toEqual([visible.title.id]);
+  });
+
+  it('T-API-030k searches libraries beyond SQL Server parameter limits', async () => {
+    const seeded = await seedTitle({ name: 'Needle original' });
+    const rows = Array.from({ length: 2105 }, (_, index) => ({
+      ...seeded.title,
+      id: `search-large-${String(index).padStart(4, '0')}`,
+      workIdentity: `tmdb:movie:large-search-${String(index)}`,
+    }));
+    for (let start = 0; start < rows.length; start += 100) {
+      const chunk = rows.slice(start, start + 100);
+      await testPrisma().title.createMany({ data: chunk });
+      await testPrisma().serviceListing.createMany({
+        data: chunk.map((row) => ({
+          ...seeded.listing,
+          listingId: `listing-${row.id}`,
+          titleId: row.id,
+        })),
+      });
+    }
+    const page = await list('?q=Needle&limit=1');
+    expect(page.items).toHaveLength(1);
+    expect(page.nextCursor).not.toBeNull();
+    expect((await list('?q=Needle&runtime=under30')).runtimeUnknownHidden).toBe(2106);
+  });
 });
 
 describe('T-LIST-010 exactly one row per canonical work', () => {

@@ -34,6 +34,9 @@ const ICONS_ROOT = join(SRC_ROOT, 'components', 'icons');
 
 /** §7c's closed v1 set, transcribed. A fourteenth icon fails `T-UI-030b`. */
 const CLOSED_SET = [
+  'BrandIcon',
+  'CompactIcon',
+  'GridIcon',
   'CheckIcon',
   'ChevronIcon',
   'CloseIcon',

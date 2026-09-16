@@ -113,7 +113,7 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
   const [params] = useSearchParams();
   const location = useLocation();
   const query = params.toString();
-  const filtered = isFiltered(parseFilters(params));
+  const filtered = isFiltered(parseFilters(params)) || (params.get('q') ?? '').trim() !== '';
   const applied = parseAppliedState(location.state);
 
   const titles = useResource((signal) => client.getTitles(query, signal), `titles:${query}`);

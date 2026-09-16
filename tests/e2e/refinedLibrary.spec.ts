@@ -1,0 +1,481 @@
+import AxeBuilder from '@axe-core/playwright';
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
+
+const TITLES = [
+  'Amber Harbor',
+  'The Copper Moon and the Extraordinary Journey Home',
+  'Quiet Orbit',
+  'A Winter Beyond the Northern Mountains',
+  'Paper Lanterns',
+  'The Last Observatory',
+].map((name, index) => ({
+  titleId: `refined-${index}`,
+  workIdentity: `tmdb:movie:${900000 + index}`,
+  matchState: 'matched',
+  name,
+  mediaType: index % 2 === 0 ? 'movie' : 'tv',
+  releaseYear: 2018 + index,
+  genres: index % 2 === 0 ? ['Drama', 'Mystery'] : ['Adventure', 'Science Fiction'],
+  runtimeMinutes: index % 2 === 0 ? 112 + index : 45 + index,
+  posterPath: `/refined-${index}.png`,
+  badges: [
+    { service: 'netflix', listingId: `netflix-${index}`, dateAdded: '2026-09-01' },
+    { service: 'max', listingId: `max-${index}`, dateAdded: '2026-09-02' },
+  ],
+  sortDateAdded: `2026-09-${16 - index}`,
+  dateAddedLabel: `Added to nextup on ${16 - index} Sep 2026`,
+  imdbRating: 7.2 + index / 10,
+  metadataStale: false,
+}));
+
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+  'base64',
+);
+
+type Title = (typeof TITLES)[number];
+
+function orderedTitles(params: URLSearchParams): Title[] {
+  const q = (params.get('q') ?? '').toLowerCase();
+  const sort = params.get('sort') ?? 'dateAdded';
+  const direction = params.get('dir') ?? (sort === 'name' ? 'asc' : 'desc');
+  const value = (title: Title): string | number => {
+    switch (sort) {
+      case 'name':
+        return title.name;
+      case 'releaseYear':
+        return title.releaseYear;
+      case 'runtime':
+        return title.runtimeMinutes;
+      case 'rating':
+        return title.imdbRating;
+      case 'dateAdded':
+        return title.sortDateAdded;
+      default:
+        throw new Error(`Unexpected sort field: ${sort}`);
+    }
+  };
+  return TITLES.filter((title) => title.name.toLowerCase().includes(q)).sort((a, b) => {
+    const left = value(a);
+    const right = value(b);
+    const comparison = left < right ? -1 : left > right ? 1 : 0;
+    return direction === 'asc' ? comparison : -comparison;
+  });
+}
+
+async function mountLibrary(
+  page: Page,
+  { width = 1280, url = '/', paged = false } = {},
+): Promise<URL[]> {
+  const requests: URL[] = [];
+  await page.setViewportSize({ width, height: 900 });
+  await page.route('**/*', async (route) => {
+    const request = route.request();
+    const target = new URL(request.url());
+    if (target.hostname === 'image.tmdb.org') {
+      await route.fulfill({ contentType: 'image/png', body: PNG });
+      return;
+    }
+    if (target.hostname !== 'localhost' && target.hostname !== '127.0.0.1') {
+      await route.abort();
+      throw new Error(`Unexpected external request: ${request.url()}`);
+    }
+    if (!target.pathname.startsWith('/api/')) {
+      await route.continue();
+      return;
+    }
+    requests.push(target);
+    expect(request.method()).toBe('GET');
+    let body: unknown;
+    switch (target.pathname) {
+      case '/api/me':
+        body = {
+          ownerId: 'fixture-owner',
+          displayName: 'Fixture owner',
+          signOutUrl: '/.auth/logout',
+          attribution: {},
+        };
+        break;
+      case '/api/titles': {
+        const matching = orderedTitles(target.searchParams);
+        const paginate = paged && !target.searchParams.has('q');
+        const secondPage = target.searchParams.has('cursor');
+        body = {
+          items: paginate ? matching.slice(secondPage ? 3 : 0, secondPage ? 6 : 3) : matching,
+          nextCursor: paginate && !secondPage ? 'fixture-next-page' : null,
+          limit: 50,
+          runtimeUnknownHidden: 0,
+        };
+        break;
+      }
+      case '/api/suppressions':
+      case '/api/removed':
+        body = { items: [] };
+        break;
+      case '/api/service-state':
+        body = {
+          services: [
+            {
+              service: 'netflix',
+              lastCompletedBatchAt: '2026-09-16T00:00:00.000Z',
+              lastCompletedBatchId: 'fixture-batch',
+              ageDays: 0,
+              label: 'Netflix updated today',
+            },
+            {
+              service: 'max',
+              lastCompletedBatchAt: null,
+              lastCompletedBatchId: null,
+              ageDays: null,
+              label: 'Max has never been updated',
+            },
+          ],
+        };
+        break;
+      default:
+        await route.abort();
+        throw new Error(`Unstubbed API request: ${request.url()}`);
+    }
+    await route.fulfill({ json: body });
+  });
+  await page.goto(url);
+  await expect(page.getByTestId('title-name')).toHaveCount(paged ? 3 : TITLES.length);
+  await expect(page.getByRole('button', { name: 'Service updates', exact: true })).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  await expect
+    .poll(() =>
+      page
+        .getByTestId('poster')
+        .evaluateAll((images) =>
+          images.every(
+            (image) =>
+              image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0,
+          ),
+        ),
+    )
+    .toBe(true);
+  return requests;
+}
+
+async function bounds(locator: Locator) {
+  await expect(locator).toBeVisible();
+  const box = await locator.boundingBox();
+  if (box === null) throw new Error('Visible element has no bounding box');
+  return box;
+}
+
+async function noOverflow(page: Page): Promise<void> {
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+    await page.evaluate(() => window.innerWidth),
+  );
+}
+
+async function usableTarget(page: Page, locator: Locator): Promise<void> {
+  const box = await bounds(locator);
+  expect(box.width).toBeGreaterThanOrEqual(44);
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error('Expected an explicit viewport');
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+  await expect(locator).toBeInViewport({ ratio: 1 });
+}
+
+async function compactPreservesList(
+  page: Page,
+  requests: URL[],
+  testInfo: TestInfo,
+  singleColumn = false,
+): Promise<void> {
+  const list = page.getByTestId('title-list');
+  const beforeHeight = (await bounds(list)).height;
+  const beforeRowHeights = await list
+    .locator('li.title-row')
+    .evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
+  const beforeText = await list.innerText();
+  const beforeNames = await page.getByTestId('title-name').allTextContents();
+  const beforeButtons = await list.getByRole('button').allTextContents();
+  const beforeUrl = page.url();
+  const beforeRequests = requests.map((request) => request.href);
+
+  await page.getByRole('button', { name: 'Compact view', exact: true }).click();
+  await expect(list).toHaveAttribute('data-view', 'compact');
+  await expect(page.getByRole('button', { name: 'Compact view', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await testInfo.attach('layout-geometry', {
+    contentType: 'application/json',
+    body: JSON.stringify({
+      viewport: page.viewportSize(),
+      gridHeight: beforeHeight,
+      compactHeight: (await bounds(list)).height,
+      gridRowHeights: beforeRowHeights,
+      compactRowHeights: await list
+        .locator('li.title-row')
+        .evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height)),
+    }),
+  });
+  if (singleColumn) {
+    expect((await bounds(list)).height, 'Compact must shorten a single-column list').toBeLessThan(
+      beforeHeight,
+    );
+  }
+  expect(await list.innerText()).toBe(beforeText);
+  expect(await page.getByTestId('title-name').allTextContents()).toEqual(beforeNames);
+  expect(await list.getByRole('button').allTextContents()).toEqual(beforeButtons);
+  await expect(list.getByTestId('poster')).toHaveCount(TITLES.length);
+  for (const [index, row] of (await list.locator('li.title-row').all()).entries()) {
+    const beforeRowHeight = beforeRowHeights[index];
+    if (beforeRowHeight === undefined) throw new Error('Compact introduced an unexpected row');
+    expect((await bounds(row)).height, `Compact row ${index} must be shorter`).toBeLessThan(
+      beforeRowHeight,
+    );
+    for (const id of ['title-meta', 'runtime', 'imdb-rating', 'date-added-label', 'badges']) {
+      await expect(row.getByTestId(id)).toBeVisible();
+    }
+    const actions = row.getByRole('button');
+    expect(await actions.count()).toBeGreaterThan(0);
+    for (const action of await actions.all()) await expect(action).toBeVisible();
+  }
+  await page.waitForLoadState('networkidle');
+  expect(page.url()).toBe(beforeUrl);
+  expect(requests.map((request) => request.href)).toEqual(beforeRequests);
+  await noOverflow(page);
+}
+
+test('T-UX-141e: wide artwork/detail grid uses shorter Compact rows without losing list state', async ({
+  page,
+}, testInfo) => {
+  const requests = await mountLibrary(page, { url: '/?sort=runtime&dir=asc&service=netflix' });
+  const list = page.getByTestId('title-list');
+  await expect(list).toHaveAttribute('data-view', 'grid');
+  const rows = list.locator('li.title-row');
+  const first = await bounds(rows.nth(0));
+  const second = await bounds(rows.nth(1));
+  expect(Math.abs(first.y - second.y)).toBeLessThan(2);
+  expect(second.x).toBeGreaterThanOrEqual(first.x + first.width);
+  for (const row of await rows.all()) {
+    const poster = await bounds(row.getByTestId('poster'));
+    const details = await bounds(row.locator('.title-row__body'));
+    expect(details.x).toBeGreaterThanOrEqual(poster.x + poster.width);
+    expect(details.y).toBeLessThan(poster.y + poster.height);
+    expect(poster.y).toBeLessThan(details.y + details.height);
+  }
+  await noOverflow(page);
+  await compactPreservesList(page, requests, testInfo);
+});
+
+test('T-UX-141f: 320px Grid and Compact retain metadata, actions and query without overflow', async ({
+  page,
+}, testInfo) => {
+  const requests = await mountLibrary(page, { width: 320, url: '/?sort=name&dir=asc' });
+  await noOverflow(page);
+  await compactPreservesList(page, requests, testInfo, true);
+});
+
+test('T-UX-142b: five sort buttons select complete server orders and reverse the current order', async ({
+  page,
+}) => {
+  const requests = await mountLibrary(page);
+  const group = page.getByTestId('sort-control');
+  await expect(group.getByRole('button')).toHaveCount(5);
+  const orders = [
+    { label: 'Recently added', reverse: 'Oldest additions', field: 'dateAdded', dir: 'desc' },
+    { label: 'Name A-Z', reverse: 'Name Z-A', field: 'name', dir: 'asc' },
+    { label: 'Newest releases', reverse: 'Oldest releases', field: 'releaseYear', dir: 'desc' },
+    { label: 'Longest runtime', reverse: 'Shortest runtime', field: 'runtime', dir: 'desc' },
+    { label: 'Highest rated', reverse: 'Lowest rated', field: 'rating', dir: 'desc' },
+  ];
+  for (const order of orders) {
+    if (order.field !== 'dateAdded') {
+      const before = requests.filter((request) => request.pathname === '/api/titles').length;
+      await group.getByRole('button', { name: order.label, exact: true }).click();
+      await expect
+        .poll(() => requests.filter((request) => request.pathname === '/api/titles').length)
+        .toBe(before + 1);
+      const request = requests.filter((item) => item.pathname === '/api/titles').at(-1);
+      expect(request?.searchParams.get('sort')).toBe(order.field);
+      expect(request?.searchParams.get('dir')).toBe(order.dir);
+    }
+    const active = group.getByRole('button', { pressed: true });
+    await expect(active).toHaveAccessibleName(
+      `${order.label}. Selected. Change to ${order.reverse}.`,
+    );
+    const before = requests.filter((request) => request.pathname === '/api/titles').length;
+    await active.click();
+    await expect(active).toHaveAccessibleName(
+      `${order.reverse}. Selected. Change to ${order.label}.`,
+    );
+    await expect
+      .poll(() => requests.filter((request) => request.pathname === '/api/titles').length)
+      .toBe(before + 1);
+    const request = requests.filter((item) => item.pathname === '/api/titles').at(-1);
+    if (!request) throw new Error('Sort click did not send a titles request');
+    expect(request.searchParams.get('sort') ?? 'dateAdded').toBe(order.field);
+    expect(request.searchParams.get('dir')).toBe(order.dir === 'desc' ? 'asc' : 'desc');
+    expect(request.searchParams.has('cursor')).toBe(false);
+    await expect(page.getByTestId('title-name')).toHaveText(
+      orderedTitles(request.searchParams).map((title) => title.name),
+    );
+    await expect(group.getByRole('button', { pressed: false })).toHaveCount(4);
+  }
+  const before = requests.filter((request) => request.pathname === '/api/titles').length;
+  await group.getByRole('button', { name: 'Recently added', exact: true }).click();
+  await expect
+    .poll(() => requests.filter((request) => request.pathname === '/api/titles').length)
+    .toBe(before + 1);
+  const returned = requests.filter((request) => request.pathname === '/api/titles').at(-1);
+  expect(returned?.searchParams.get('sort') ?? 'dateAdded').toBe('dateAdded');
+  expect(returned?.searchParams.get('dir')).toBe('desc');
+  await expect(page.getByTestId('title-name')).toHaveText(TITLES.map((title) => title.name));
+});
+
+test('T-UX-143c: submitted URL search resets loaded pages, requests unfiltered totals and clears zero matches', async ({
+  page,
+}) => {
+  const requests = await mountLibrary(page, { paged: true });
+  // The sentinel auto-loads on scroll; clicking it can race its own removal.
+  await page.evaluate(() =>
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' }),
+  );
+  await expect(page.getByTestId('title-name')).toHaveCount(TITLES.length);
+  expect(
+    requests.some((request) => request.searchParams.get('cursor') === 'fixture-next-page'),
+  ).toBe(true);
+  const before = requests.length;
+  const search = page.getByRole('searchbox', { name: 'Search your list', exact: true });
+  await search.fill('Amber');
+  expect(requests.length).toBe(before);
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page).toHaveURL(/\?q=Amber$/);
+  await expect(page.getByTestId('title-name')).toHaveText(['Amber Harbor']);
+  const searchRequests = requests
+    .slice(before)
+    .filter((request) => request.pathname === '/api/titles');
+  expect(searchRequests.some((request) => request.searchParams.get('q') === 'Amber')).toBe(true);
+  expect(searchRequests.some((request) => request.search === '')).toBe(true);
+  expect(searchRequests.every((request) => !request.searchParams.has('cursor'))).toBe(true);
+  await expect(page.getByTestId('load-more')).toBeHidden();
+
+  await search.fill('No matching fixture');
+  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await expect(page.getByTestId('zero-match')).toBeVisible();
+  await expect(page.getByTestId('title-name')).toHaveCount(0);
+  expect(requests.some((request) => request.searchParams.get('q') === 'No matching fixture')).toBe(
+    true,
+  );
+  await page.getByRole('button', { name: 'Clear search', exact: true }).click();
+  await expect(page.getByTestId('title-name')).toHaveCount(3);
+  await expect(page.getByTestId('zero-match')).toBeHidden();
+  expect(new URL(page.url()).searchParams.has('q')).toBe(false);
+  await expect(page.getByTestId('load-more')).toBeVisible();
+});
+
+test('T-UX-143d: Services and service-update popovers are usable at 320px and 1280px', async ({
+  page,
+}) => {
+  await mountLibrary(page);
+  for (const width of [320, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    const trigger = page.getByRole('button', { name: 'Services', exact: true });
+    await trigger.click();
+    const panel = page.locator('.filter-disclosure__panel').filter({
+      has: page.getByRole('searchbox', { name: 'Search services', exact: true }),
+    });
+    const search = panel.getByRole('searchbox', { name: 'Search services', exact: true });
+    await expect(search).toBeFocused();
+    await usableTarget(page, trigger);
+    await usableTarget(page, search);
+    for (const checkbox of await panel.getByRole('checkbox').all()) {
+      await expect(checkbox).toBeVisible();
+      await usableTarget(page, checkbox.locator('..'));
+    }
+    const done = panel.getByRole('button', { name: 'Done', exact: true });
+    await usableTarget(page, done);
+    await search.fill('Net');
+    await expect(panel.getByRole('checkbox', { name: 'Netflix', exact: true })).toBeVisible();
+    await expect(panel.getByRole('checkbox', { name: 'Max', exact: true })).toHaveCount(0);
+    const netflix = panel.getByRole('checkbox', { name: 'Netflix', exact: true });
+    if (!(await netflix.isChecked())) await netflix.click();
+    await expect(netflix).toBeChecked();
+    expect(new URL(page.url()).searchParams.getAll('service')).toContain('netflix');
+    await done.click();
+    await expect(trigger).toBeFocused();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await trigger.click();
+    await page.keyboard.press('Escape');
+    await expect(trigger).toBeFocused();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    const updates = page.getByRole('button', { name: 'Service updates', exact: true });
+    await updates.click();
+    await usableTarget(page, updates);
+    for (const [service, label] of [
+      ['netflix', 'Netflix updated today'],
+      ['max', 'Max has never been updated'],
+    ] as const) {
+      const link = page.getByRole('link', { name: label, exact: true });
+      await usableTarget(page, link);
+      await expect(link).toHaveAttribute('href', `/upload?service=${service}`);
+    }
+    await usableTarget(page, page.getByRole('button', { name: 'Done', exact: true }));
+    await page.keyboard.press('Escape');
+    await expect(updates).toBeFocused();
+    await expect(updates).toHaveAttribute('aria-expanded', 'false');
+    await noOverflow(page);
+  }
+});
+
+test('T-UX-141g: default, popovers and Compact pass axe and honor reduced motion', async ({
+  page,
+}, testInfo) => {
+  testInfo.setTimeout(90_000);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await mountLibrary(page, { width: 320 });
+  for (const state of ['default', 'Services', 'Service updates', 'Compact']) {
+    if (state === 'Compact') {
+      await page.getByRole('button', { name: 'Compact view', exact: true }).click();
+    } else if (state !== 'default') {
+      await page.getByRole('button', { name: state, exact: true }).click();
+    }
+    const results = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .analyze();
+    expect
+      .soft(
+        results.violations.map(({ id, nodes }) => ({
+          id,
+          nodes: nodes.map(({ target, failureSummary }) => ({ target, failureSummary })),
+        })),
+        `${state} accessibility violations`,
+      )
+      .toEqual([]);
+    expect(
+      results.passes.find((rule) => rule.id === 'color-contrast')?.nodes.length ?? 0,
+      `${state} must actually evaluate contrast`,
+    ).toBeGreaterThan(0);
+    const motion = await page.evaluate(() => {
+      const seconds = (value: string) =>
+        value.split(',').map((duration) => {
+          const token = duration.trim();
+          return parseFloat(token) / (token.endsWith('ms') ? 1000 : 1);
+        });
+      return {
+        reduced: matchMedia('(prefers-reduced-motion: reduce)').matches,
+        durations: Array.from(document.querySelectorAll<HTMLElement>('main *')).flatMap(
+          (element) => {
+            const style = getComputedStyle(element);
+            return [...seconds(style.transitionDuration), ...seconds(style.animationDuration)];
+          },
+        ),
+      };
+    });
+    expect(motion.reduced).toBe(true);
+    expect(motion.durations.length).toBeGreaterThan(0);
+    expect(Math.max(...motion.durations)).toBeLessThanOrEqual(0.001);
+    if (state === 'Services' || state === 'Service updates') await page.keyboard.press('Escape');
+  }
+});

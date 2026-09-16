@@ -43,6 +43,7 @@ export interface ListEmptyFacts {
   /** Rows the API would return with no filters at all. */
   readonly total: number;
   readonly filters: ListFilters;
+  readonly query?: string;
   /** Titles in the removal log (`/removed`). */
   readonly removedCount: number;
   /** Suppressed works (`/not-interested`). */
@@ -60,7 +61,7 @@ export interface ListEmptyFacts {
  */
 export function listEmptyKind(facts: ListEmptyFacts): ListEmptyKind {
   if (facts.shown > 0) return null;
-  if (isFiltered(facts.filters)) return 'zero-match';
+  if (isFiltered(facts.filters) || (facts.query ?? '').trim() !== '') return 'zero-match';
   // Nothing has ever been in the list only if nothing is anywhere else either.
   // A single removed or suppressed title makes "nothing here yet" false.
   if (facts.removedCount + facts.suppressedCount > 0 || facts.total > 0) return 'all-gone';

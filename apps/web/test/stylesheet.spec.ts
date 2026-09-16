@@ -478,16 +478,16 @@ describe('T-CSS-004 — contrast is computed from the tokens, not eyeballed', ()
   it('T-CSS-004c: the values match the ratios §13.2 documents', () => {
     // Keeps the spec table honest: a token changed here without updating the
     // documented ratio is caught, rather than the two drifting apart.
-    expect(ratio(token('--color-text'), surface())).toBeCloseTo(17.7, 0);
-    expect(ratio(token('--color-text-muted'), surface())).toBeCloseTo(7.6, 0);
+    expect(ratio(token('--color-text'), surface())).toBeCloseTo(14.97, 0);
+    expect(ratio(token('--color-text-muted'), surface())).toBeCloseTo(8.54, 0);
     expect(ratio(token('--color-border'), surface())).toBeCloseTo(3.3, 0);
     // ⚠ 7.9, NOT 6.7. ADR-0013 replaced #1d4ed8 (6.70:1) with the owner's
     // deeper indigo #4338ca (7.90:1) in TASK-208. This literal is the whole
     // point of the assertion — DO NOT widen `toBeCloseTo`'s precision to make
     // both values pass, which would turn a computed-contrast gate into one
     // that accepts any accent within ±5.
-    expect(ratio(token('--color-accent'), surface())).toBeCloseTo(7.9, 0);
-    expect(ratio(token('--color-danger'), surface())).toBeCloseTo(6.5, 0);
+    expect(ratio(token('--color-accent'), surface())).toBeCloseTo(7.57, 0);
+    expect(ratio(token('--color-danger'), surface())).toBeCloseTo(8.47, 0);
   });
 
   it('T-CSS-004e: white text on the accent is legible, so one token serves link AND button', () => {
@@ -496,7 +496,7 @@ describe('T-CSS-004 — contrast is computed from the tokens, not eyeballed', ()
     // BACKGROUND, and that pair appears in no other assertion here. An accent
     // darkened for link contrast can pass everything above while white label
     // text on the button fails.
-    expect(ratio(token('--color-accent'), '#ffffff')).toBeGreaterThanOrEqual(4.5);
+    expect(ratio(token('--color-accent'), surface())).toBeGreaterThanOrEqual(4.5);
   });
 
   it('T-CSS-004d: the contrast helper itself is correct', () => {

@@ -1,14 +1,11 @@
-// The CLOSED v1 icon set (REQ-124, `specs/ui-refresh.md` §7c, TASK-209).
-//
-// ⚠ THIS BARREL IS THE REGISTER, AND `T-UI-030` PINS IT TO EXACTLY THIRTEEN
-// NAMES. That is deliberate: §7c calls the set *closed*, and a set that grows
-// by one file at a time is not closed — it is a library with extra steps, and
-// the "no icon package" decision at `A53` (OQ-8) quietly becomes untrue.
-// Adding a fourteenth is a spec change in §7c first, then a test change, then
-// a file. In that order.
+// Closed icon register: the original thirteen plus the owner-approved
+// brand and two layout controls (ADR-0013 Revision 1). No external assets.
 
 export { IconBase, type IconProps } from './IconBase';
 
+export { BrandIcon } from './BrandIcon';
+export { CompactIcon } from './CompactIcon';
+export { GridIcon } from './GridIcon';
 export { CheckIcon } from './CheckIcon';
 export { ChevronIcon } from './ChevronIcon';
 export { CloseIcon } from './CloseIcon';

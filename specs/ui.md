@@ -108,21 +108,46 @@ restore, suppress, un-suppress or fix-match.
 
 ### 2.1 Information hierarchy (top → bottom)
 
-1. **Freshness strip** — one chip per service from `GET /api/service-state`
+1. **Service updates disclosure** — one factual link per service from `GET /api/service-state`
    (`components/FreshnessStrip.tsx`): *"Netflix updated today"*,
    *"Max updated 47 days ago"*, *"Max has never been
-   updated"*. Clicking/tapping the strip navigates to `/upload`
+   updated"*. Opening **Service updates** reveals all links; activating one navigates to `/upload`
    pre-selecting that service (REQ-039, US-022) — this is unconditional
    navigation, not a nudge. The strip is
-   informational; it never blocks the list. *(A46: the staleness marker, the
+   informational; it never blocks the list. If the dates are unavailable,
+   the degradation notice remains visible **outside the closed disclosure**,
+   and each service's labelled upload link remains available inside.
+   This is a nonmodal `FilterDisclosure`: Escape/Done/outside dismissal,
+   focus restoration and normal untrapped Tab behavior (`T-UX-143`).
+   *(A46: the staleness marker, the
    stale chip and its conditional "Update now" link are dropped entirely — no
    staleness threshold, no nag, no derived "stale" state. REQ-040 and ASM-038
    are retired.)*
-2. **Filter bar** (`components/FilterBar.tsx`) — service, type, genre,
-   **runtime** (REQ-035); a **"Clear filters"** control; a live result count
-   *"Showing 42 of 187"* (US-019 AC-5); and, co-located in the **same row**,
-   the **sort/direction control** (`components/SortControl.tsx` — US-020 AC-6,
+2. **List controls** — a submitted title-search form, the filter bar and
+   five visible complete-order buttons in one visually unified group.
+   `components/FilterBar.tsx` presents **Services, Type, Genre, Runtime**
+   buttons opening labelled checkbox disclosures (REQ-035); active removable
+   chips; **Clear filters**; and a live result count *"Showing 42 of 187"*,
+   or *"Showing 50 of at least 50"* when only a lower bound is known.
+   The sort control is `components/SortControl.tsx` (US-020 AC-6,
    REQ-038, REQ-037, `api.md` §6.2).
+
+   Services is searchable over `SERVICES` / `SERVICE_LABELS`, currently
+   **Netflix and Max only**, with no "All" checkbox or invented providers.
+   Type labels are Movies / TV series; genre options come from real facets.
+   Selections are **URL-only**, OR within each dimension, AND across them.
+   Every selected filter has a visible native 44 px removal button, even
+   when results are nonzero. Each chip removes only its dimension/value.
+   **Clear filters removes service/type/genre/runtime and `q`**, preserving
+   sort, local view and unrelated query parameters. Picker option search
+   never searches title rows. `T-UI-016`, `T-UX-139`.
+
+   The labelled title-search form submits explicitly by Enter or its Search
+   button to **URL `q`**; typing alone does not fetch. A search chip removes
+   only `q`. The server performs owner-scoped title matching before filters,
+   ordering, paging and runtime-hidden counts (`api.md` §6.2c), never just
+   against titles already loaded in the browser. Query changes reset paging
+   while preserving sort, filters and view. `T-UX-140`, `T-API-030`.
 
    **The runtime filter is BUCKETED, not a slider.** Buckets are *Under 30m*,
    *30m–1h*, *1h–2h*, *Over 2h*, and they map to `runtime=` in the query
@@ -144,18 +169,27 @@ restore, suppress, un-suppress or fix-match.
    Without it the owner reads a shortened list as their library, which is the
    same class of defect as a failed extraction reading as a removal.
 
-   **The sort control carries a KEY and a DIRECTION** (`sort=` and `dir=`).
-   The key is *Date added* (default) or *Runtime*; the direction is a
-   two-state toggle whose **labels change with the key**, because a direction
-   word that does not name the data is unreadable: date reads **"Newest
-   first"** (default, `dir=desc`) / **"Oldest first"** (`dir=asc`), runtime
-   reads **"Shortest first"** (`dir=asc`) / **"Longest first"** (`dir=desc`).
-   ⚠ **`dir=desc` therefore stays the default for BOTH keys** — REQ-038's
-   newest-first default is untouched by REQ-037, and the oldest-first reverse
-   control remains `must` (product invariant 6). ⚠ **Titles with no runtime
-   sort LAST in both directions**, never first: a null sorted as zero puts
-   every unknown at the head of "Shortest first", which reads as a claim that
-   those titles are short.
+   **Five native buttons each select a complete KEY/DIRECTION order.**
+   Inactive chooses its field's default; active reverses in one action.
+   Name defaults to `asc`; dateAdded, releaseYear, runtime and rating default
+   to `desc`. Exactly one is `aria-pressed`; its accessible name states the
+   current order and next reverse action. **No separate direction segment or
+   collapsed selector.** `T-UX-138` plus existing `T-UX-128`–`131`.
+
+   | Key | `desc` label | `asc` label |
+   |---|---|---|
+   | `dateAdded` (default) | Recently added | Oldest additions |
+   | `name` | Name Z-A | Name A-Z |
+   | `releaseYear` | Newest releases | Oldest releases |
+   | `runtime` | Longest runtime | Shortest runtime |
+   | `rating` | Highest rated | Lowest rated |
+
+   The ten order strings come from **`SORT_ORDER_LABELS`** in
+   `apps/web/src/copy.ts`, shared by the control and its assertions.
+
+   Oldest additions is one press from the default view (REQ-038, invariant 6).
+   Nullable keys remain last in both directions; the rating pre-sort refresh
+   contract is unchanged (`api.md` §6.2a).
 
    The date labels name *nextup*'s own date-added,
    never the streaming service's save date — per REQ-061 it must not read
@@ -164,23 +198,47 @@ restore, suppress, un-suppress or fix-match.
    (`?service=netflix&type=movie&genre=Drama&runtime=30-60&sort=runtime&dir=asc`),
    so it
    is deep-linkable, survives back/forward, and — per US-020 AC-6 —
-   **persists for the session** even if the owner navigates away and back
-   without a page reload (held in the same client-side view state as the
-   filters, not re-derived from the URL alone). **320 px consequence:** the
-   sort control does **not** add a second line at the floor width — it
-   collapses into the same **"Filters (2)"** button/sheet as the rest of the
-   filter bar (§10.1), appearing inside that sheet as its own labelled
-   two-option row, so item 3's hard constraint below still holds exactly as
-   stated. **The runtime bucket control collapses into that same sheet** and
-   counts toward the **"Filters (n)"** number; it may not earn a row of its
-   own at 320 px.
+   **persists for the session**. On entry/history navigation direction is
+   URL → `sessionStorage` → per-field default; a remembered non-default
+   direction is reconciled into the URL so the request agrees with the label.
+   Explicit inactive-field selection uses that field's default, not the
+   previous field's direction. Filters never use session storage.
+   **At 320 px controls wrap without horizontal page scrolling.** Sort stays
+   directly visible; filter panels are bounded to the viewport, nonmodal and
+   keyboard-operable, with generated IDs, Escape/Done/outside dismissal and
+   focus restoration. No fullscreen filter sheet is required.
+
+   **Pending reads do not replace these controls.** Keep `ListSearch`,
+   `FilterBar`, `SortControl` and `ListViewControl` mounted across initial
+   loading and query refreshes so an open picker retains its search, focus
+   and selection. Preserve selected genre options while facets are pending,
+   even if the incoming facet array is temporarily empty. Pass
+   **`countPending={loading}`** to suppress both the result count and
+   runtime-hidden count until the response supplies the facts; never display
+   guessed zeros or counts from the previous query (`T-UX-141h`, `T-UX-141i`).
+   A failed online read still hides the filter/control group and shows the
+   real error/retry state, rather than inventing numbers. Existing offline
+   handling, including the no-cached-data state, is unchanged.
 3. **The list** (`components/TitleList.tsx`) — the dominant element. Nothing is
-   allowed above it that pushes the first row below the fold at 320 px except
-   the freshness strip and the filter bar (sort control included, per item 2
-   above), both single-line at that width.
+   added above it beyond the compact service updates and list controls.
+   **Grid / Compact** selects local presentation state: the same ordered rows,
+   metadata, badges and actions in both views. Grid is the default; at wide
+   widths it uses horizontal poster-plus-details cards in multiple columns.
+   Compact remains a single column. At narrow widths both are single-column;
+   query changes preserve the preference and never sort/filter rows locally.
+   Wide Compact lays out the same row body's metadata in two columns, keeping
+   the DOM/content unchanged and at least **8px** body spacing.
+   Loading, retry, pending and offline semantics remain real. `T-UX-141`.
 4. **Load-more sentinel** — cursor pagination (`specs/api.md` §3), an
    IntersectionObserver auto-loading the next page, plus an explicit
    **"Load more"** button as the keyboard/no-JS-observer path.
+
+**Loading presentation (`T-UX-010`).** Only the list rows are skeletonized:
+exactly **six `aria-hidden` row skeletons** in the selected view, under one
+`role="status"` wrapper named by `LIST_LOADING_BODY`, plus the existing
+slow-request/retry notice. The real service-updates and list controls remain
+mounted; do not add duplicate freshness-strip or filter-bar skeletons.
+Loading is never the never-uploaded or zero-match state.
 
 ### 2.2 The row (`components/TitleRow.tsx`)
 
@@ -188,7 +246,7 @@ restore, suppress, un-suppress or fix-match.
 |---|---|---|
 | Poster | `posterPath` → `https://image.tmdb.org/t/p/w154{path}` | `alt=""` (decorative; the name is adjacent text). A missing poster renders a neutral placeholder tile, never a broken image. |
 | Name | `name` | The only element with heading weight in the row |
-| Year · type · genres · runtime | `releaseYear`, `mediaType`, `genres`, `runtimeMinutes` | Genres render as plain text; `genres: []` renders **nothing at all**, never "Unknown" (US-019 AC-6). **Runtime (REQ-119) appends LAST and does not disturb the REQ-106 order** — the owner's screenshot defect was type-before-year, and the fix pinned `Year · type · genres`; runtime extends that sequence rather than inserting into it. Film renders `1h 55m`, TV renders `45m/ep`. ⚠ **The `/ep` suffix is the whole TV requirement, not decoration:** TMDB supplies `episode_run_time`, so the stored number is **one episode**, and an unsuffixed `45m` beside a nine-season series is a false statement about the work. A missing runtime renders the WORDS **"Runtime unknown"** — it is **not** omitted the way an empty genre list is, because runtime is filterable (REQ-035): once a runtime filter is active, whether a row has a runtime decides whether it can be shown at all, so its absence is a fact the owner must be able to see. |
+| Year · type · runtime · genres | `releaseYear`, `mediaType`, `runtimeMinutes`, `genres` | Runtime precedes genres in the approved 2026-09-16 layout. Film renders `1h 55m`, TV `45m/ep` (**one episode**, never a whole-series claim); missing runtime says **"Runtime unknown"**. Genres use three chips plus `+n` expansion, with active-filter genres always visible even above that limit. **Names wrap, never truncate**; `genres: []` renders nothing, never "Unknown" or `+0` (US-019 AC-6). All facts, including IMDb rating or its absent state, remain in Grid and Compact. |
 | **Service badges** | `badges[]` | One badge per **active** listing (REQ-026). Badges are text-labelled (`Netflix`, `Max`), not colour-only — colour is never the sole carrier of meaning |
 | Date-added label | `dateAddedLabel` | Rendered **verbatim from the API** (`specs/api.md` §6.2). REQ-061: it always contains "to nextup". The component **must not** construct this string. |
 | Row menu | — | `⋮` button → **Not interested** (US-027), **Fix match** (US-030), **Remove from list** (US-048). 44×44 px hit area. ⚠ **Three items, and Remove was ADDED beside "Not interested", not in place of it.** They read alike — the row disappears either way — and mean opposite things: suppression is a permanent, work-identity decision that survives every future upload (REQ-071), while removal asserts nothing about the work and lets a later capture legitimately bring it back as a new row (product invariant 7). Collapsing them into one item is the defect this row exists to prevent; `T-MANUAL-016` fails if either disappears. |
@@ -691,12 +749,12 @@ change is one diff and a test can assert it.
 | **`PASTE_DENIED_BODY`** *(new, A45)* | *nextup couldn't read your clipboard. Tap "Paste screenshot" again and choose Paste, or choose a file instead.* | `ux-states.md` §4.13 |
 | **`DROPZONE_IDLE_LABEL`** *(new, A45)* | *Paste a screenshot, choose files, or drag them here — PNG, JPEG or HEIC, up to 10 MB each, 40 per batch.* | `ux-states.md` §4.3 — **all three affordances named in one line.** Supersedes the upload-only phrasing in place |
 | **`DROPZONE_ACTIVE_LABEL`** *(new, A45)* | *Drop screenshots here* | §3.2c |
-| **`SORT_NEWEST_LABEL`** *(new, `A44`)* | *Newest first* | §2.1 item 2 — the default (`dir=desc`); REQ-061 honest wording, never "date saved" |
-| **`SORT_OLDEST_LABEL`** *(new, `A44`)* | *Oldest first* | §2.1 item 2 — `dir=asc`, the accepted mitigation for SUC-003 (old saves surfacing) |
-| **`SORT_SHORTEST_LABEL`** *(new, `A48`)* | *Shortest first* | §2.1 item 2 — `sort=runtime&dir=asc`. ⚠ A direction word that does not name the data is unreadable: "Ascending" beside a runtime tells the owner nothing |
-| **`SORT_LONGEST_LABEL`** *(new, `A48`)* | *Longest first* | §2.1 item 2 — `sort=runtime&dir=desc`, the default direction for the runtime key |
-| **`SORT_KEY_DATE_LABEL`** *(new, `A48`)* | *Date added* | §2.1 item 2 — the default sort key. REQ-061 wording: it names *nextup*'s own date, never the service's |
-| **`SORT_KEY_RUNTIME_LABEL`** *(new, `A48`)* | *Runtime* | §2.1 item 2 — REQ-037 |
+| Date-added complete orders *(approved 2026-09-16)* | *Recently added* / *Oldest additions* | §2.1; `desc` / `asc`, nextup's own earliest active-listing date. ~~Legacy `SORT_NEWEST_LABEL` / `SORT_OLDEST_LABEL`: Newest first / Oldest first~~ |
+| Name complete orders *(approved 2026-09-16)* | *Name A-Z* / *Name Z-A* | §2.1; `asc` default / `desc` |
+| Release-year complete orders *(approved 2026-09-16)* | *Newest releases* / *Oldest releases* | §2.1; `desc` default / `asc` |
+| Runtime complete orders *(approved 2026-09-16)* | *Longest runtime* / *Shortest runtime* | §2.1; `desc` default / `asc`. ~~Legacy SORT_LONGEST_LABEL / SORT_SHORTEST_LABEL: Longest first / Shortest first~~ |
+| Rating complete orders *(approved 2026-09-16)* | *Highest rated* / *Lowest rated* | §2.1; `desc` default / `asc`; pre-sort rating refresh remains mandatory |
+| Selected sort accessible name *(approved 2026-09-16)* | *{current order}. Selected. Change to {reverse order}.* | Marks state and next action without ambiguity (`T-UX-138`) |
 | **`RUNTIME_UNKNOWN_LABEL`** *(new, `A48`)* | *Runtime unknown* | §2.2 — the NAMED absence (REQ-119). Never `0m`, never an empty slot: `0m` is a claim about the work, and an empty slot is indistinguishable from a rendering failure |
 | **`RUNTIME_HIDDEN_DISCLOSURE`** *(new, `A48`; both forms approved by the owner 2026-09-16)* | *{n} titles have no runtime and are hidden.* — singular: *1 title has no runtime and is hidden.* | §2.1 item 2 — rendered **only** while a runtime filter is active, with a live `n`. The mitigation for the one way REQ-035 can silently shorten the list. ⚠ **A count-dependent string cannot be a bare constant**, so the export is the function `runtimeUnknownHiddenLabel(n)`; §9's "one diff" promise is satisfied by the function being the single place both forms are written. The singular and the full stop were drafted by the implementer and are approved here rather than left as a standing finding |
 | **`IMDB_RATING_SOURCE`** *(new, Epic M)* | *IMDb* | §7a — labels the number on the row. ⚠ **REVISED at `A53`: the rating **is** a sort key (`sort=rating`, ADR-0011 Rev 1). It still never *filters*.** ~~"The rating is **display-only** (REQ-095): it never sorts or filters"~~ |
@@ -750,9 +808,9 @@ contains **neither** "memory" nor `MEMORY_REMEDY_PATH` for
 
 | Width | Behaviour |
 |---|---|
-| **320 px (floor)** | Single column. Filter bar collapses into a **"Filters (2)"** button opening a full-screen sheet. Title rows stack: poster left, text right, badges wrapping beneath. **No horizontal scrolling anywhere**, on any screen, in any state. `T-A11Y-001` (Playwright at 320×640: `document.documentElement.scrollWidth <= clientWidth` on **every** route, and on the review page with a 200-candidate fixture). |
-| 640 px | Two-line rows; filter bar inline. |
-| **1024 px+** | Filter bar as a persistent left rail; list in a max-width column (`--layout-max-width`, §13) so lines stay readable. **No function is available only at ≥1024 px** — `T-A11Y-002` runs the full e2e journey at 320 px. ~~`max-w-4xl`~~ *(R2: a Tailwind utility name, and Tailwind is not used — ADR-0004 Rev 2. The token replaces it.)* |
+| **320 px (floor)** | Single-column horizontal poster/details rows in both views. Filter disclosures and the five visible sort buttons wrap; panels fit the viewport. **No horizontal page scrolling**, no clipped genre names, no additional step to reverse the current order. `T-A11Y-001` covers every route and the 200-candidate review fixture. |
+| 640 px | Navigation returns to the header: **List, Upload, Batches, More**. Below this width the single bottom-fixed nav is **List, Upload, More**, with safe-area clearance. |
+| **1024 px+** | Grid preference gains multiple columns of horizontal cards; Compact stays a single column. Controls remain above the list, not a left rail. Width is bounded by `--layout-max-width` (§13). **No function is available only on desktop** — `T-A11Y-002` runs the journey at 320 px. |
 
 Touch targets: minimum **44×44 CSS px** for every interactive element
 (`.tap-target` utility). `T-A11Y-003` asserts it across the review page.
@@ -902,10 +960,12 @@ honest half (*"Nothing has changed."*); `RETRY_LABEL` is the affordance.
 
 ### 12.5 The query string is the request
 
-Filters, sort and pagination are read from `useSearchParams` and nothing
-mirrors them into component state (REQ-101, `T-DATA-007`). A mirrored copy
-desynchronises on the back button, a shared link and reload — silently, showing
-a list that contradicts its own visible controls.
+The request's filters, submitted title search (`q`) and sort come from
+`useSearchParams`; route-owned keyset paging is reset when that base query
+changes (REQ-101, `T-DATA-007`). No component-state mirror may override the
+request. The search form may hold **unsubmitted input** and disclosures/local
+Grid/Compact may hold presentation state; neither filters title data. URL
+navigation refreshes the submitted query and displayed search value.
 
 ### 12.6 Mutations only from event handlers
 
@@ -1012,23 +1072,23 @@ Modifiers use the `--` suffix already in use: `title-row__poster--empty`,
 | Token | Value | Why it is a token |
 |---|---|---|
 | `--bp-sm` | `640px` | §10.1. Named so a breakpoint cannot be typed twice with different values |
-| `--bp-md` | `768px` *(new, Epic P)* | ADR-0013's hybrid switch: list rows below it, grid above (`T-UX-110`, `T-UX-111`) |
+| `--bp-md` | `768px` | Intermediate responsive token; the list grid activates at `--bp-lg` (`T-UX-110`, `T-UX-111`) |
 | `--bp-lg` | `1024px` | §10.1 |
-| `--layout-max-width` | `56rem` | §10.1's readable column. Replaces the stray `max-w-4xl` |
+| `--layout-max-width` | `88rem` | Approved wide grid bounds; individual cards retain readable horizontal poster/details layout |
 | `--tap-target-min` | `44px` | NFR-006. **The one definition**; `.tap-target` is its only consumer |
-| `--color-text` | `#111827` | 17.7:1 on `--color-surface`, 17.0:1 on `--color-bg` |
-| `--color-text-muted` | `#4b5563` | 7.6:1 / 7.2:1. Comfortably over the 4.5:1 floor even on the tinted background |
-| `--color-bg` | `#f9fafb` | |
-| `--color-surface` | `#ffffff` | |
-| `--color-border` | `#878d99` | ⚠ **3.33:1 / 3.19:1 — chosen by calculation, not by eye.** §10.2 requires ≥ 3:1 for UI boundaries, and the conventional light-grey border (`#d1d5db`) is **1.47:1** — it fails by a factor of two while looking entirely normal |
-| `--color-accent` | `#4338ca` *(Epic P, ADR-0013)* | ⚠ **The owner's chosen deeper indigo.** **7.90:1** on `--color-surface`, **7.56:1** on `--color-bg` — and **white text ON it is also 7.90:1**, so the one token serves both the link colour and the filled primary button without a second value. ⚠ **`apps/web/test/stylesheet.spec.ts` asserts `toBeCloseTo(6.7, 0)` for this pair and will fail when the token changes — update the number, do not widen the precision** (TASK-208). ~~`#1d4ed8`, 6.70:1 — superseded by ADR-0013~~ |
-| `--color-danger` | `#b91c1c` | 6.5:1 on white. Destructive confirmation only |
+| `--color-text` | `#f2efff` | **14.97:1** on `--color-surface` |
+| `--color-text-muted` | `#bcb4d2` | **8.54:1** on `--color-surface` |
+| `--color-bg` | `#121020` | Dark ink background |
+| `--color-surface` | `#1e1932` | Dark indigo surface; also the foreground on primary accent-filled buttons |
+| `--color-border` | `#77678f` | **3.32:1** on surface; interactive boundaries, not a soft decorative divider |
+| `--color-accent` | `#b3a0ff` | **7.57:1** on surface, also for **surface-coloured text on accent fill**. White/light foreground on the primary button is not the approved pair |
+| `--color-danger` | `#ff9ba8` | **8.47:1** on surface. Destructive confirmation only |
 | `--space-1` … `--space-6` | `4px` `8px` `12px` `16px` `24px` `32px` | A closed scale |
-| `--radius` | `6px` | |
-| `--font-stack` | system UI stack | ⚠ **No web font — reaffirmed by the owner at `A53` (OQ-8).** No third-party request (NFR-005), no layout shift, **no new dependency**. The typographic hierarchy comes from the scale below, not from a typeface |
-| `--text-xs` … `--text-2xl` *(new, Epic P)* | `0.75rem` `0.875rem` `1rem` `1.125rem` `1.375rem` `1.75rem` | **REQ-123.** ⚠ **There was no scale at all, which is why every screen rendered at one size and nothing read as a heading.** `rem`, never `px`, so the owner's browser text-size setting is honoured. ⚠ **`--text-xs` is for non-primary content only — `T-CSS-007` fails if primary content computes below `--text-sm`** |
-| `--leading-tight` / `--leading-normal` *(new, Epic P)* | `1.25` / `1.5` | Unitless, so they scale with the element's own size instead of inheriting a computed pixel height |
-| `--weight-normal` / `--weight-medium` / `--weight-bold` *(new, Epic P)* | `400` / `500` / `700` | A closed set. The system stack has no reliable intermediate weights beyond these |
+| `--radius` / `--radius-card` | `10px` / `16px` | Controls / cards |
+| `--font-stack` | `'Segoe UI', Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif` | System stack only: no web font, dependency or third-party font request |
+| `--text-xs` … `--text-2xl` *(Epic P)* | `0.75rem` `0.875rem` `1rem` `1.125rem` `1.5rem` `2rem` | REQ-123, matching `ui-refresh.md` §7b. `rem`, never `px`; primary content never below `--text-sm` (`T-CSS-007`) |
+| `--leading-tight` / `--leading-normal` *(Epic P)* | `1.2` / `1.55` | Unitless, matching §7b's heading/body rhythm |
+| `--weight-normal` / `--weight-medium` / `--weight-bold` *(Epic P)* | `400` / `600` / `700` | Closed set from `ui-refresh.md` §7b |
 
 ⚠ **EVERY RATIO ABOVE WAS COMPUTED, AND FOUR DRAFTED VALUES WERE WRONG.** The
 first draft of this table asserted `#d1d5db` was "≥ 3:1" when it is **1.47:1**,
@@ -1043,16 +1103,16 @@ token file is exactly where a "slightly nicer" grey gets substituted, and
 `axe-core` only catches it on a page that happens to render that pair — it
 never checks a token that is momentarily unused.
 
-### 13.3 Mobile-first, and no dark mode in v1
+### 13.3 Mobile-first, default dark indigo design
 
 Base rules are the 320 px layout; `min-width` media queries add the wider ones.
 Writing it desktop-first means the **floor** — the width NFR-006 actually
 mandates and `T-A11Y-001` actually tests — is the case reached by subtraction.
 
-No dark mode: it doubles every contrast obligation in §13.2 for a
-single-owner app that never asked for it. ⚠ **ADR-0013 explicitly declines to
-reopen this**, and a dark-theme draft written during Epic P's specification was
-**reverted** for contradicting it (`specs/ui-refresh.md` §2).
+The owner approved this default dark palette on **2026-09-16**
+(ADR-0013 Revision 1); it replaces the earlier light-only instructions.
+There is no theme toggle or second light palette. Validate each actual
+foreground/background pair, including dark foreground on accent fill.
 `prefers-reduced-motion: reduce` **is** honoured (`T-CSS-005`) because it is
 one rule and an accessibility obligation, not a preference.
 
@@ -1060,9 +1120,10 @@ one rule and an accessibility obligation, not a preference.
 
 ⚠ **Read `docs/adr/ADR-0013-ui-refresh.md` before writing any visual `must`.**
 The tokens in §13.2 are the vocabulary; ADR-0013 is the *taste*, and it was
-chosen by the owner: light theme, **deeper indigo/violet accent**, hybrid
-grid/list, balanced density, larger uniform posters. It does **not** reopen the
-no-Tailwind or no-dark-mode decisions.
+chosen by the owner: **dark indigo/violet**, horizontal poster/details cards,
+explicit Grid/Compact preference, complete-order buttons, removable filters,
+submitted search and compact navigation. The no-Tailwind and no-web-font
+decisions remain unchanged.
 
 Epic P (`docs/backlog.md` §5P, `specs/ui-refresh.md` §7b–§7d) adds three things
 this section did not previously have, each with its own requirement:
@@ -1070,7 +1131,7 @@ this section did not previously have, each with its own requirement:
 | | Where | Requirement |
 |---|---|---|
 | **A typographic scale** | §13.2's `--text-*`, `--leading-*`, `--weight-*` | **REQ-123** — on the system stack, no web font (`A53`, OQ-8) |
-| **An icon set** | `apps/web/src/icons/`, a **closed set of 13 inline SVGs** | **REQ-124** — no library, no dependency. `stroke="currentColor"` and **no hard-coded colour**, so an icon inherits a token `T-CSS-004` has already proved |
+| **An icon set** | `apps/web/src/components/icons/`, a **closed set of 16 inline SVGs**, including BrandIcon/GridIcon/CompactIcon | **REQ-124** — no library, no dependency. `stroke="currentColor"` and **no hard-coded colour**, so an icon inherits a token `T-CSS-004` has already proved |
 | **Component primitives** | `apps/web/src/components/ui/` | **REQ-125** — every interactive control comes from a primitive; a surviving bare `<button>` or `<fieldset>` is the native-widget look the owner reported |
 
 ⚠ **`T-CSS-001c` FORBIDS A COMPUTED `className`, AND THAT SHAPES THE

@@ -19,7 +19,7 @@
  * strip reporting that everything is current.
  */
 
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { serviceFreshnessLabel } from '@nextup/domain';
 import { describe, expect, it } from 'vitest';
@@ -70,6 +70,7 @@ function renderStrip(services: readonly ServiceFreshness[] | null): HTMLElement 
       <FreshnessStrip services={services} />
     </MemoryRouter>,
   );
+  fireEvent.click(screen.getByRole('button', { name: 'Service updates' }));
   return screen.getByTestId('freshness-strip');
 }
 

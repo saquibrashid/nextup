@@ -29,7 +29,7 @@
   --bp-md: 768px;
   --bp-lg: 1024px;
 
-  --layout-max-width: 56rem;
+  --layout-max-width: 88rem;
 
   /*
    * NFR-006. ⚠ THE ONE DEFINITION of the touch floor: `.tap-target` is its
@@ -72,7 +72,7 @@
    * `--color-*`: it is a composite shadow value, not a colour, and the
    * contrast-pair sweep reads colour tokens.
    */
-  --shadow-menu: 0 4px 12px rgb(17 24 39 / 15%);
+  --shadow-menu: 0 8px 24px rgb(0 0 0 / 32%);
 
   /*
    * ⚠ EVERY RATIO BELOW WAS COMPUTED, NOT EYEBALLED, AND `T-CSS-004`
@@ -80,31 +80,27 @@
    * draft of §13.2 were wrong — in both directions — and each was plausible
    * enough to survive review.
    */
-  --color-text: #111827; /* 17.7:1 on surface, 17.0:1 on bg */
-  --color-text-muted: #4b5563; /* 7.6:1 / 7.2:1 */
-  --color-bg: #f9fafb;
-  --color-surface: #ffffff;
+  color-scheme: dark;
+  --color-text: #f2efff; /* 14.97:1 on surface */
+  --color-text-muted: #bcb4d2; /* 8.54:1 on surface */
+  --color-bg: #121020;
+  --color-surface: #1e1932;
+  --color-accent-soft: #302744;
+  --color-border-soft: #3d3455;
+
+  /* Interactive boundaries meet the 3:1 floor; card dividers use the soft token. */
+  --color-border: #77678f; /* 3.32:1 on surface */
 
   /*
-   * ⚠ 3.3:1 / 3.2:1, chosen by calculation. The conventional light grey
-   * border (#d1d5db) is 1.47:1 — it fails §10.2's 3:1 boundary floor by a
-   * factor of two while looking entirely normal. Non-text contrast is the
-   * trap: a border can be obviously visible and still less than half.
-   */
-  --color-border: #878d99;
-
-  /*
-   * ⚠ ADR-0013's deeper indigo, and the owner's choice. 7.90:1 on surface,
-   * 7.56:1 on bg — and WHITE TEXT ON IT is also 7.90:1, which is why one
-   * token serves both the link colour and the filled primary button without
-   * a second value being invented for the button.
+   * ADR-0013 Revision 1: bright violet on dark ink. Filled controls use DARK
+   * surface text on this accent; white text would fail contrast.
    *
    * ⚠ `T-CSS-004c` pins this ratio as a literal. Changing the hex without
    * changing that number fails the suite — deliberately, because the spec
    * table and the token drifting apart is the exact defect it exists for.
    */
-  --color-accent: #4338ca; /* 7.9:1 on white */
-  --color-danger: #b91c1c; /* 6.5:1 on white — destructive confirmation only */
+  --color-accent: #b3a0ff; /* 7.57:1 on surface and for surface text on accent */
+  --color-danger: #ff9ba8; /* 8.47:1 on surface — destructive confirmation only */
 
   /* A closed scale. A one-off margin is a token that was not added. */
   --space-1: 4px;
@@ -114,13 +110,14 @@
   --space-5: 24px;
   --space-6: 32px;
 
-  --radius: 6px;
+  --radius: 10px;
+  --radius-card: 16px;
 
   /*
    * No web font (NFR-005): a third-party request per page load, plus the
    * layout shift while it arrives. The system stack costs neither.
    */
-  --font-stack: system-ui, -apple-system, 'Segoe UI', roboto, helvetica, arial, sans-serif;
+  --font-stack: 'Segoe UI', Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif;
 
   /*
    * REQ-123 — THE TYPE SCALE. ⚠ THERE WAS NO SCALE AT ALL BEFORE THIS: every
@@ -135,7 +132,7 @@
   --text-xs: 0.75rem; /* ⚠ UPPERCASE TRACKED LABELS ONLY — see below */
   --text-sm: 0.875rem; /* Secondary and helper copy, genre chips */
   --text-base: 1rem; /* Body. NEVER below this for primary content */
-  --text-lg: 1.125rem; /* The title-row name, card headings */
+  --text-lg: 1.25rem; /* The title-row name, card headings */
   --text-xl: 1.5rem; /* Section headings, the brand mark */
   --text-2xl: 2rem; /* Page heading */
 
@@ -321,7 +318,7 @@ button {
   background: var(--color-accent);
   border-color: var(--color-accent);
 
-  /* 7.90:1 — see the `--color-accent` note in `:root`; one token serves both. */
+  /* 7.57:1: dark surface text on the bright accent. */
   color: var(--color-surface);
 }
 
@@ -470,10 +467,10 @@ button {
 .chip {
   background: var(--color-bg);
   border-radius: var(--radius);
-  overflow: hidden;
-  padding: 0 var(--space-1);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border: 1px solid var(--color-border-soft);
+  padding: var(--space-1) var(--space-2);
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .segmented {
@@ -589,6 +586,12 @@ button {
   text-decoration: none;
 }
 
+.app-shell__logo .icon {
+  color: var(--color-accent);
+  height: 2.5rem;
+  width: 2.5rem;
+}
+
 /*
  * NFR-006's touch floor. `inline-flex` + centring so the box is the target
  * rather than just the text inside it.
@@ -624,6 +627,8 @@ button {
   gap: var(--space-3);
   justify-content: space-between;
   margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border-soft);
+  padding-bottom: var(--space-4);
 }
 
 /*
@@ -691,6 +696,7 @@ button {
   font-size: var(--text-base);
   font-weight: var(--weight-normal);
   text-decoration: none;
+  gap: var(--space-2);
 }
 
 .nav__link:hover {
@@ -713,6 +719,7 @@ button {
   border-bottom-color: var(--color-accent);
   color: var(--color-accent);
   font-weight: var(--weight-bold);
+  background: var(--color-accent-soft);
 }
 
 /*
@@ -737,6 +744,7 @@ button {
   border-bottom-color: var(--color-accent);
   color: var(--color-accent);
   font-weight: var(--weight-bold);
+  background: var(--color-accent-soft);
 }
 
 /*
@@ -926,6 +934,10 @@ button {
   flex-wrap: wrap;
   margin-bottom: var(--space-4);
   row-gap: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-card);
+  padding: var(--space-3);
 }
 
 .filter-bar {
@@ -933,21 +945,18 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
+  flex: 1 1 100%;
 }
 
 /* --------------------------------------------------------- sort control -- */
 
-/*
- * REQ-121. The sort FIELD selector sits beside the DIRECTION segment, not above
- * it: they are one decision read left to right — "sort by <field>, <direction>
- * first". Wrapping is allowed so the pair drops to its own line on a narrow
- * viewport rather than squeezing the filter fieldsets beside it.
- */
+/* REQ-121, revised: complete-order buttons wrap without separating field and direction. */
 .sort-control-group {
   align-items: flex-end;
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
+  flex: 1 1 auto;
 }
 
 /* ------------------------------------------------------ freshness strip -- */
@@ -1038,9 +1047,10 @@ button {
 
 .title-row {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  display: flex;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-card);
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
   gap: var(--space-3);
   padding: var(--space-3);
 }
@@ -1136,11 +1146,15 @@ button {
   flex-direction: column;
   gap: var(--space-2);
   min-width: 0; /* ⚠ Without this a long title forces horizontal scroll at 320 px. */
+  grid-column: 2;
+  grid-row: 1;
 }
 
 .title-row__name {
   font-size: var(--text-lg);
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-bold);
+  padding-inline-end: var(--tap-target-min);
+  overflow-wrap: anywhere;
 }
 
 .title-row__meta,
@@ -1168,7 +1182,7 @@ button {
 .title-row__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0 var(--space-2);
+  gap: var(--space-1) var(--space-2);
 }
 
 .title-row__meta > span + span::before {
@@ -1206,9 +1220,19 @@ button {
 .genre-chips {
   align-items: center;
   display: inline-flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: var(--space-1);
   min-width: 0;
+  flex-basis: 100%;
+}
+
+.title-row__meta > .genre-chips::before,
+.title-row__meta > .title-row__runtime::before {
+  content: none;
+}
+
+.title-row__runtime {
+  flex-basis: 100%;
 }
 
 /*
@@ -1219,7 +1243,7 @@ button {
 .genre-chips .btn {
   flex: 0 0 auto;
   font-size: var(--text-sm);
-  min-height: 0;
+  min-height: var(--tap-target-min);
   padding: 0 var(--space-1);
 }
 
@@ -1294,6 +1318,10 @@ button {
   flex-wrap: wrap;
   gap: var(--space-2);
   position: relative;
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  align-self: start;
 }
 
 .title-row__menu {
@@ -1422,16 +1450,6 @@ button {
   controls so the list does not jump when data lands — a skeleton that
   reserves the wrong space is a layout shift with extra steps.
 */
-.freshness-strip--skeleton {
-  min-height: 2rem;
-  opacity: 0.55;
-}
-
-.filter-bar--skeleton {
-  min-height: 3rem;
-  opacity: 0.55;
-}
-
 .slow-response {
   color: var(--color-text-muted);
   padding: var(--space-3) 0;
@@ -1949,6 +1967,11 @@ button {
     top: 100%;
   }
 
+  .nav__more .btn {
+    flex-direction: row;
+    align-items: center;
+  }
+
   .nav__list {
     gap: var(--space-2);
     justify-content: flex-end;
@@ -1974,8 +1997,8 @@ button {
    * REQ-110 (`ui-refresh.md` §4.1) — AT AND ABOVE `--bp-lg` THE LIST IS A
    * POSTER GRID. Below it, the compact vertical list above is the base rule.
    *
-   * ⚠ THE GRID AND THE LIST ARE ONE COMPONENT AT TWO DENSITIES, SELECTED BY
-   * THIS MEDIA QUERY — never two components chosen in JS. §4.1 is explicit,
+   * The default grid responds to width; the owner's compact preference below
+   * overrides density without rendering a second component. §4.1 is explicit,
    * and the reason is not tidiness: a JS width branch renders a DIFFERENT DOM
    * at each width, so every action, every label and every a11y property would
    * need asserting twice, and `T-UX-112` — the same `⋮` item set in both
@@ -1997,17 +2020,13 @@ button {
   .title-list {
     display: grid;
     gap: var(--space-4);
-    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(28rem, 1fr));
   }
 
-  /*
-   * The tile: the same row, stacked. `align-items: stretch` is restated rather
-   * than left to the default because the poster below sets `width: 100%`, and
-   * a stretched cross axis is what makes that mean "the tile's width".
-   */
+  /* Artwork and readable details occupy separate tracks in the same row. */
   .title-row {
     align-items: stretch;
-    flex-direction: column;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr);
   }
 
   /*
@@ -2019,6 +2038,7 @@ button {
   .title-row__poster {
     height: auto;
     width: 100%;
+    align-self: start;
   }
 
   /*
@@ -2028,7 +2048,7 @@ button {
    * layouts — moving the actions box here would silently detach it.
    */
   .title-row__actions {
-    align-self: flex-end;
+    align-self: start;
   }
 }
 
@@ -2463,4 +2483,228 @@ button {
 .offline-cached-note {
   color: var(--color-text-muted);
   margin: 0 0 var(--space-3);
+}
+
+/* ADR-0013 Revision 1: shared, responsive library controls. */
+.library-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.library-heading h1 {
+  margin: 0;
+  font-size: var(--text-xl);
+}
+
+.library-heading .freshness-strip {
+  margin: 0 0 0 auto;
+}
+
+.list-view-control {
+  display: flex;
+  gap: var(--space-1);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  padding: var(--space-1);
+}
+
+.list-view-control .btn {
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.list-view-control .btn[aria-pressed='true'] {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  font-weight: var(--weight-bold);
+}
+
+.sort-options,
+.filter-controls,
+.active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sort-option {
+  display: inline-flex;
+}
+
+.sort-option .btn {
+  font-size: var(--text-sm);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
+}
+
+.sort-option .btn[aria-pressed='true'] {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  font-weight: var(--weight-bold);
+}
+
+.filter-disclosure {
+  position: relative;
+}
+
+.filter-disclosure > .btn {
+  font-size: var(--text-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.filter-disclosure > .btn[aria-expanded='true'] {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.filter-disclosure__panel {
+  position: fixed;
+  inset-inline: var(--space-4);
+  bottom: calc(var(--nav-bar-height) + env(safe-area-inset-bottom) + var(--space-2));
+  max-height: 65dvh;
+  overflow-y: auto;
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-menu);
+  z-index: 40;
+}
+
+.filter-disclosure__panel[hidden] {
+  display: none;
+}
+
+.list-controls form[role='search'] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  flex: 1 1 100%;
+  gap: var(--space-2);
+}
+
+.list-controls form[role='search'] .field {
+  flex: 1 1 12rem;
+  margin: 0;
+}
+
+.list-controls form[role='search'] .input {
+  width: 100%;
+}
+
+.filter-disclosure__panel label {
+  display: flex;
+  align-items: center;
+  min-height: var(--tap-target-min);
+  gap: var(--space-2);
+}
+
+.filter-disclosure__panel > .btn {
+  margin-top: var(--space-3);
+}
+
+.active-filters {
+  flex-basis: 100%;
+}
+
+.active-filter {
+  max-width: 100%;
+}
+
+.active-filter .btn {
+  overflow-wrap: anywhere;
+  text-align: start;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border-color: var(--color-border);
+  font-size: var(--text-sm);
+  gap: var(--space-2);
+}
+
+@media (min-width: 640px) {
+  .filter-disclosure__panel {
+    position: absolute;
+    inset-inline: auto 0;
+    bottom: auto;
+    top: calc(100% + var(--space-2));
+    width: 18rem;
+    max-width: calc(100vw - var(--space-6));
+  }
+
+  .filter-controls .filter-disclosure__panel {
+    inset-inline: 0 auto;
+  }
+}
+
+.btn,
+.nav__link,
+.title-row {
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.title-row:hover,
+.title-row:focus-within {
+  border-color: var(--color-border);
+}
+
+.title-list[data-view='compact'] {
+  display: flex;
+  flex-direction: column;
+}
+
+.title-list[data-view='compact'] .title-row {
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+}
+
+.title-list[data-view='compact'] .title-row__poster {
+  width: 4.5rem;
+  height: 6.75rem;
+}
+
+.title-list[data-view='compact'] .title-row__body {
+  gap: var(--space-2);
+}
+
+.title-list[data-view='compact'] .title-row__runtime {
+  flex-basis: auto;
+}
+
+.title-list[data-view='compact'] .title-row__meta > .title-row__runtime::before {
+  content: '·';
+}
+
+@media (min-width: 768px) {
+  .title-list[data-view='compact'] .title-row__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(12rem, 0.5fr);
+    align-content: start;
+    column-gap: var(--space-5);
+  }
+
+  .title-list[data-view='compact'] .title-row__name {
+    grid-column: 1 / -1;
+  }
+
+  .title-list[data-view='compact'] .title-row__chip,
+  .title-list[data-view='compact'] .title-row__meta,
+  .title-list[data-view='compact'] .title-row__date {
+    grid-column: 1;
+  }
+
+  .title-list[data-view='compact'] .title-row__rating,
+  .title-list[data-view='compact'] .title-row__badges {
+    grid-column: 2;
+    align-self: start;
+  }
 }
