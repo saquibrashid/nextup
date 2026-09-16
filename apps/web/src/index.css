@@ -46,8 +46,22 @@
    * that covers the last row of a list — the rows at the end of the scroll,
    * which is exactly where the eye stops. `T-UX-137b` asserts the padding is
    * expressed in terms of this token rather than a number.
+   *
+   * ⚠ IT IS A FLOOR THAT MUST NOT BE UNDERCUT BY THE BAR'S OWN CONTENT, and
+   * that is the whole reason for the value. `.nav` applies it as `min-height`,
+   * so the bar is exactly this tall ONLY WHILE it exceeds what a slot
+   * naturally measures — and a slot is icon over label (§7c), not a single
+   * line: `.tap-target` padding (2 × `--space-2`) + the 1.25em icon + the
+   * `--space-1` gap + a `--text-sm` label at `--leading-normal` + the 2px
+   * active rule, inside `.nav`'s own 2 × `--space-1`. That is ~71 px. At the
+   * original ~56 px the token was BELOW the rendered bar, so the clearance
+   * under-reserved by ~15 px and the last control on a long page stayed
+   * un-tappable while every unit assertion here still passed — `T-E2E-001b`
+   * caught it at 320 px, with the bar intercepting `apply-changes-button`.
+   * Raising this is therefore not cosmetic: it is what makes "the padding
+   * equals the bar height" TRUE rather than merely well-expressed.
    */
-  --nav-bar-height: 3.5rem;
+  --nav-bar-height: 5rem;
   /*
    * REQ-105 — the open row menu overlaps the row beneath it, so it needs a
    * shadow to read as a layer rather than as part of that row.

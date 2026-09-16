@@ -514,6 +514,23 @@ describe('T-UX-137 - ui-refresh.md 6 - the phone bar sits on the bottom edge', (
     const shell = baseRuleBody('.app-shell');
     expect(shell).toMatch(/padding-bottom:\s*calc\(/);
     expect(shell).toContain('var(--nav-bar-height)');
+
+    /*
+     * ⚠ AND THE TOKEN MUST ACTUALLY CLEAR THE BAR, which expressing it well
+     * does not guarantee. `.nav` applies the token as `min-height`, so the bar
+     * is exactly this tall only while the token EXCEEDS what a slot naturally
+     * measures — and a slot is icon over label, not one line: `.tap-target`
+     * padding + a 1.25em icon + the gap + a `--text-sm` label + the 2px active
+     * rule comes to roughly 71 px inside `.nav`'s own padding. At the original
+     * 3.5rem the token sat BELOW that, every assertion above still passed, and
+     * the shell under-reserved by ~15 px — the last control on a long page was
+     * visible and un-tappable until `T-E2E-001b` caught the bar intercepting
+     * `apply-changes-button` at 320 px. jsdom computes no layout, so the floor
+     * is asserted as arithmetic rather than measured.
+     */
+    const rem = /--nav-bar-height:\s*([\d.]+)rem/.exec(CSS)?.[1];
+    expect(rem).toBeDefined();
+    expect(Number(rem) * 16).toBeGreaterThanOrEqual(72);
   });
 
   it('T-UX-137c: the safe-area inset is honoured by BOTH the bar and the clearance', () => {
