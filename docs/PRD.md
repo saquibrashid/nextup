@@ -212,6 +212,7 @@ A title was removed months ago. It shows up again in a new capture. nextup creat
 | K | Platform guarantees | The invariants that make the rest safe. | US-036, US-037, US-038, US-039 |
 | **L** *(v1.1 — specified, not scheduled)* | **Waiting to stream** | Record what I noticed on a rental storefront, and tell me when it reaches a service I have. | US-040, US-041, US-042, US-043 |
 | **M** *(v1.1 — specified, not scheduled)* | **IMDb ratings** | Show me the IMDb rating on my list, and let me look up a rating for anything I haven't saved. | US-044, US-045, US-046 |
+| **P** | **Visual language** | Shared typography, icons and controls; the remaining visual-refresh stories were promoted from `specs/ui-refresh.md` §10 at TASK-218. | US-049, US-050, US-051, US-052, US-054, US-055, US-056, US-057, US-058, US-059 |
 
 Story order within an epic is dependency order. Epic order A → K is a viable build order; see §12.1. **Epic L is v1.1 and follows the whole of A–K** — it depends on Epics C, D and I being complete. See ADR-0010 and `roadmap.md` §5. **Epic M is v1.1 and depends on Epic F** (the combined list) and on TMDB matching being in place, because a rating is keyed on the `imdb_id` that matching produces. See ADR-0011.
 
@@ -1112,7 +1113,7 @@ anything the service still lists. Removing says only *this is not on my list*.
 | # | Given | When | Then |
 |---|---|---|---|
 | AC-1 | The set of operations that mutate user-visible list state | The system is inspected | It is exactly the closed enumeration in §7.4, all of them owner-initiated (REQ-041) |
-| AC-2 | Non-owner-initiated processes | The system is inspected | Exactly **four** exist: the lazy TMDB metadata refresh on access (REQ-076, US-010), the screenshot image purge (NFR-019, US-035), the lazy IMDb rating refresh on access (REQ-093, Epic M), and the lazy watch-availability refresh triggered by opening the waiting view (REQ-086, Epic L). None changes user-visible list state (REQ-041) — the rating in particular is display-only and is never sorted or filtered on (ADR-0011 OQ-A), and the availability refresh writes only `watch_intent` metadata columns, creates no listing and satisfies no intent, so a waiting work still reaches the combined list only by the ordinary capture path (US-042 AC-4, ADR-0010; approved at A52). ~~Superseded (Epic L): "Exactly three exist: the lazy TMDB metadata refresh on access (REQ-076, US-010), the screenshot image purge (NFR-019, US-035), and the lazy IMDb rating refresh on access (REQ-093, Epic M)."~~ ~~Superseded (Epic M): "Exactly two exist: the lazy TMDB metadata refresh on access (REQ-076, US-010) and the screenshot image purge (NFR-019, US-035). Neither changes user-visible list state (REQ-041)."~~ |
+| AC-2 | Non-owner-initiated processes | The system is inspected | Exactly **four** exist: the lazy TMDB metadata refresh on access (REQ-076, US-010), the screenshot image purge (NFR-019, US-035), the lazy IMDb rating refresh on access (REQ-093, Epic M), and the lazy watch-availability refresh triggered by opening the waiting view (REQ-086, Epic L). None changes user-visible list state (REQ-041) — ⚠ **the rating clause here was REVISED at `A53` (2026-09-14):** ~~"the rating in particular is display-only and is never sorted or filtered on (ADR-0011 OQ-A)"~~ the rating **is** now a sort key (ADR-0011 Rev 1), and what keeps it compliant is that under `sort=rating` the refresh is **swept synchronously inside the request, before the ordering** — never after the response; it is still never filtered on — and the availability refresh writes only `watch_intent` metadata columns, creates no listing and satisfies no intent, so a waiting work still reaches the combined list only by the ordinary capture path (US-042 AC-4, ADR-0010; approved at A52). ~~Superseded (Epic L): "Exactly three exist: the lazy TMDB metadata refresh on access (REQ-076, US-010), the screenshot image purge (NFR-019, US-035), and the lazy IMDb rating refresh on access (REQ-093, Epic M)."~~ ~~Superseded (Epic M): "Exactly two exist: the lazy TMDB metadata refresh on access (REQ-076, US-010) and the screenshot image purge (NFR-019, US-035). Neither changes user-visible list state (REQ-041)."~~ |
 | AC-3 | Any operation not in the §7.4 enumeration | It is proposed | It is **forbidden by default**. The enumeration is closed; extending it is an explicit amendment to REQ-041, which has already been widened six times ~~Superseded: "five times."~~ |
 | AC-4 (edge) | A convenience feature that would auto-confirm, auto-restore, auto-merge or auto-clean anything | It is considered | It is prohibited, regardless of how safe it seems |
 | AC-5 (failure) | Any scheduled job, webhook, timer or background worker that writes list state | Automated verification runs | The test fails (NFR-003, NFR-005) |
@@ -1399,6 +1400,13 @@ job. See ADR-0011 for the full comparison.
 from two to three in the same change that added the rating refresh, naming
 `imdb-rating-refresh` explicitly and recording that it is metadata-only,
 access-triggered and display-only. `T-MUT-001f` asserts the three ids.
+⚠ **REVISED at `A53` (2026-09-14): "display-only" no longer holds — the rating
+IS a sort key (ADR-0011 Rev 1).** The other two properties do, and they are the
+ones that matter here: the refresh is still **metadata-only and
+access-triggered**, and under `sort=rating` it runs *synchronously inside the
+request*, which moves it further inside owner-initiated work rather than
+outside it. **The count therefore stays at its current value — do not
+increment it for this revision.**
 
 ~~Superseded (now done): "⚠ US-036 AC-2's non-owner-process count and
 `T-CI-005` must be incremented in the same change… ⚠ Do not write a literal
@@ -1411,6 +1419,325 @@ describes its increment as three → four. **The reasoning is retained rather
 than deleted because it still governs Epic L.** A lazy, access-triggered
 refresh does **not** escape this count: ADR-0010 set that precedent and
 ADR-0011 followed it.
+
+---
+
+### Epic P — Visual language
+
+⚠ **US-049 – US-055 were promoted late, at the close of Epic P.** They were
+reserved in `specs/ui-refresh.md` §10 and the requirements they carry shipped
+across TASK-201 – TASK-218, but the stories themselves stayed behind because
+each owning task promoted only the story it was told to. **No gate checks user
+stories** — `check:orphans` and `check:decisions` police test ids and
+acceptance criteria — so the gap was invisible to CI and was found only by
+reading §A.5 of this document, which had honestly recorded it. They are
+migrated here with their `specs/testing.md` §9 rows, per `ui-refresh.md` §1.
+
+#### US-049 — Act on a title from the row I'm looking at
+
+**As the owner**, I want a title's actions to appear beside the title, so that
+I am never acting on a row I cannot see.
+
+**Requirements:** REQ-105, REQ-107 (`specs/ui-refresh.md` §3.1, §3.3).
+
+⚠ **This is a defect the owner reported, not a preference.** The row menu was
+mounted at page level, so it opened at the bottom of the screen rather than
+beside the title it acts on — and a menu of destructive actions ("not
+interested", "remove") detached from its subject is a mis-click waiting to
+happen.
+
+⚠ **AC-4 reads as licence to shrink the `⋮` and is not.** REQ-107 narrows the
+box; `--tap-target-min: 44px` still governs what the owner has to hit.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | A row's overflow menu is rendered inside that row, never as a sibling of the list. |
+| AC-2 | Opening a second row's menu moves the menu rather than leaving two open. |
+| AC-3 | The menu is positioned against its own trigger rather than laid out in normal flow. |
+| AC-4 | The `⋮` control occupies a button-sized box aligned with the title, not a full-height column. |
+| AC-5 | That control still meets the minimum tap target. |
+
+---
+
+#### US-050 — Read a row's facts at a glance
+
+**As the owner**, I want a row's facts to read as one line in a predictable
+order, so that I can scan my list rather than parse it.
+
+**Requirements:** REQ-106, REQ-108, REQ-112 (`specs/ui-refresh.md` §3.2, §3.4,
+§4.3). ⚠ **REQ-112 is shared with US-056**, which owns the genre *vocabulary*;
+this story owns how many genres fit on a row.
+
+⚠ **The owner asked for genres to take less room — NOT to be removed**
+(`A53` OQ-7: *"use another ux to make it compact but still list the genres"*).
+Trimming them is the obvious reading of "compact" and is the wrong one.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | The row's facts render as a single wrapping line with a separator between fields. |
+| AC-2 | The fields appear in the order year, type, genres, runtime. |
+| AC-3 | The row body has consistent vertical spacing rather than being packed to the minimum. |
+| AC-4 | Genres remain on the row, limited to roughly one line with a count of any overflow. |
+| AC-5 | A genre that is currently being filtered on is always visible, never hidden behind the overflow count. |
+
+---
+
+#### US-051 — See my correction took effect before I apply the batch
+
+**As the owner**, I want a correction to show on the card I corrected, so that
+I never have to apply a batch to find out whether my change took.
+
+**Requirements:** REQ-109 (`specs/ui-refresh.md` §3).
+
+**Observed, in the owner's words:** *"I did a fix match and selected the right
+show. After confirming, the image on the upload page stayed the same. I
+couldn't tell if my change had been applied. I figured it had and went ahead
+with clicking apply."*
+
+⚠⚠ **THE SEVERITY IS NOT OBVIOUS FROM THE SYMPTOM.** The review screen is the
+owner's confirmation step, and the entire safety model of this product is that
+nothing changes the list until the owner has seen what was read and agreed to
+it. A screen that does not show the effect of the owner's own correction has
+broken that contract — it asked for confirmation and withheld the thing being
+confirmed. The owner proceeded on a guess, and the guess happened to be right.
+
+⚠ **AC-4 is load-bearing and looks like an omission.** `matchCandidates` holds
+the *extraction's* guesses; the correction is the *owner's decision*. Rewriting
+the former to carry the corrected name is the one fix shape that looks obvious
+and re-opens a bug this codebase has already paid for — see
+`services/batchClose.ts`.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | After a correction resolves, the card shows the corrected name, year and poster rather than the extracted ones. |
+| AC-2 | The corrected identity survives a re-render from server state, not only the click that made it. |
+| AC-3 | The correction is announced in a live region. |
+| AC-4 | The stored extraction candidates are not rewritten by a correction. |
+| AC-5 | A correction still succeeds while TMDB is unreachable. |
+
+---
+
+#### US-052 — Browse my list with artwork at a comfortable density
+
+**As the owner**, I want my list to suit the screen I am on, so that a phone
+shows me a scannable list and a laptop shows me the artwork.
+
+**Requirements:** REQ-110, REQ-111, REQ-118 (`specs/ui-refresh.md` §4.1, §7).
+
+⚠ **The phone list is the base rule and the grid is a `min-width` addition** —
+not the other way round, and never a `max-width` query.
+
+⚠ **AC-3 is the one a redesign deletes by accident.** Two layouts built as two
+components become two action sets that drift; the requirement is one DOM,
+restyled.
+
+⚠ **`indigo-400 #818cf8` is 2.98:1 on white and fails the 3:1 non-text floor.**
+It is the exact shade one reaches for for a soft border or a gentle focus ring
+and it looks entirely adequate. Borders and focus rings use `--color-border` or
+`--color-accent`.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | Below the large breakpoint the list renders as a compact vertical list. |
+| AC-2 | At and above it the list renders as a poster grid. |
+| AC-3 | Both layouts render the same data and offer the same actions. |
+| AC-4 | At 320 px the list renders with no horizontal scrolling. |
+| AC-5 | Every accent token meets its contrast floor on both surfaces, computed from the token values rather than estimated. |
+
+---
+
+#### US-054 — Tell where I am and reach where I'm going
+
+**As the owner**, I want to see which screen I am on and reach every other one
+from a phone, so that no part of the app is unreachable on the device I use it
+from.
+
+**Requirements:** REQ-116, REQ-117 (`specs/ui-refresh.md` §6).
+
+⚠ **AC-2 was under-specified once already and it cost a destination.** The
+overflow set was written as a closed list when `/batches`, `/removed` and
+`/not-interested` were the whole of it; Epic L added `/waiting` and Epic M
+added `/rating`, and a closed reading left three routes in neither the bar nor
+the overflow. **It is every route that is not one of the three, by
+construction.**
+
+⚠ **AC-3 is why the overflow panel opens by default when the current route is
+inside it.** With a plain closed default, a deep link renders a closed
+disclosure, the marked element does not exist, and the requirement is not
+merely unmet but unsatisfiable.
+
+⚠ **AC-6 was added 2026-09-15, after the owner saw the built bar.** REQ-117
+said what the bar **contains** and never said where it **is**, so it was first
+built inside the header, where it scrolled away. The bar is now fixed to the
+bottom edge — both real destinations in thumb reach, which matters because the
+owner's primary path is uploading screenshots from a phone. ⚠ **It is still
+exactly one `<nav>`**: a second phone-only `<nav>` is the idiomatic build and
+fails the exactly-once landmark rule on every route at once, so the existing
+one is repositioned rather than duplicated.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | The active destination is marked programmatically and carries a cue that is not colour alone. |
+| AC-2 | Below the small breakpoint the bar shows the list, upload and an overflow control; every other route is reachable through the overflow. |
+| AC-3 | A route behind the overflow is still marked as current when open, and is still reachable by direct URL. |
+| AC-4 | Every destination is a real link, not a click handler that pushes history. |
+| AC-5 | Upload remains a first-class destination, and the per-service freshness strip still deep-links to it with that service pre-selected. |
+| AC-6 | On a phone the bar is fixed to the bottom of the screen and stays visible while the page scrolls, without covering the content beneath it or sitting under the device's home indicator; above the small breakpoint it returns to the header. |
+
+---
+
+#### US-055 — See how long a title is, and narrow to the time I have
+
+**As the owner**, I want to see how long a title is and filter to what fits the
+time I have, so that "what shall we watch" is a question about tonight rather
+than about the whole list.
+
+**Requirements:** REQ-119, and the promoted REQ-035 / REQ-037
+(`specs/ui-refresh.md` §5a; `A48`).
+
+⚠ **AC-2's `/ep` suffix is the requirement, not a flourish.** TMDB's
+`episode_run_time` is per episode, so the stored number is **one episode**, and
+a bare `45m` beside a nine-season series is false in the direction that
+matters.
+
+⚠ **AC-3 deliberately differs from the empty-genre rule** (US-019 AC-6), which
+renders nothing. Runtime is **filterable**, so whether a row has one decides
+whether it can appear at all — an owner who cannot see that a title has no
+runtime cannot understand why it vanished.
+
+⚠⚠ **AC-5 IS PRODUCT INVARIANT 2 IN A NEW PLACE.** A runtime filter silently
+drops every title TMDB never supplied a runtime for; without the disclosure the
+list simply gets shorter. **The count cannot be computed in the browser** — the
+excluded rows were never sent, so anything derived from the returned items
+counts what *survived* the filter and would read zero on every list.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | The row shows the title's runtime, last in its facts line. |
+| AC-2 | A series' runtime is shown as per-episode, distinguishably from a film's. |
+| AC-3 | An unknown runtime renders as words, never as a zero and never as an empty slot. |
+| AC-4 | The list can be filtered to a runtime bucket, with half-open boundaries so no title falls in two buckets. |
+| AC-5 | While a runtime filter is active, the number of titles hidden for having no known runtime is disclosed, from a count the server supplies. |
+| AC-6 | The list can be ordered by runtime, and the direction control says what that ordering means. |
+
+---
+
+#### US-056 — Filter by a genre and get every title in it
+
+**As the owner**, I want to filter by a genre and trust that I got every title
+in it, so that a film-and-television list behaves like one list.
+
+**Requirements:** REQ-120, REQ-112 (`specs/ui-refresh.md` §4.3, §4.4).
+
+⚠ **This is a correctness defect, not a cosmetic one.** TMDB runs **two genre
+vocabularies**: film has `Action` (28) and `Adventure` (12), television has the
+single combined `Action & Adventure` (10759). Both are stored verbatim and
+share one filter dimension, so `?genre=Action` silently returns films only —
+and nothing on screen says so. The same collision holds for `Sci-Fi & Fantasy`
+(10765) against `Science Fiction` (878) + `Fantasy` (14), and `War & Politics`
+(10768) against `War` (10752).
+
+⚠ **A display-only fix removes every visible symptom and leaves the bug.** The
+owner's report was redundant chips — `Action`, `Adventure` and
+`Action & Adventure` all offered at once. Normalising the chips answers all
+three complaints, and the filter still misses every television title. AC-3 is
+the criterion a half-fix fails.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | A television title whose stored genres contain a combined name renders its constituent genres as separate chips, and never renders the combined name. |
+| AC-2 | The genre filter offers no combined name as an option. |
+| AC-3 | Filtering by either constituent genre returns **both** the films tagged with it **and** the television titles tagged with the combined name, and filtering by an unrelated genre is not widened. |
+| AC-4 | Normalisation happens on read. No stored genre value is rewritten and no migration is required. |
+| AC-5 | A row shows at most a single line of genre chips, with a `+n` control for the remainder; a genre in the active filter is always visible rather than hidden behind `+n`. |
+| AC-6 | A title with no genres renders no genre chips and no placeholder, and is excluded whenever a genre filter is active. |
+
+---
+
+#### US-057 — Order the list by any fact it shows me
+
+**As the owner**, I want to order my list by any fact it shows me, and to see
+what the ordering means, so that the control I press and the list I get agree.
+
+**Requirements:** REQ-113, REQ-114, REQ-115, REQ-121, and the REQ-095 reversal
+(`specs/ui-refresh.md` §5, §5b, §7a; ADR-0011 Revision 1).
+
+⚠ **The control used to describe itself ambiguously.** It was one button
+labelled *"Newest first"* **while the list was already newest-first**, and
+pressing it made the list oldest-first. Both readings — "this is the state" and
+"this is what you'll get" — are defensible, which is precisely the defect.
+
+⚠ **AC-5 is a `must` that a redesign can delete while every behavioural test
+still passes.** REQ-038's oldest-first reverse was promoted at `A47` and is the
+sole escape hatch for the knowingly-accepted newest-first-vs-SUC-003 trade-off;
+OQ-029's revisit path depends on it shipping in v1. Collapsing the direction
+into the field list as ten combined options leaves `click()` reaching
+oldest-first while burying it a press deeper.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | The filters and the sort present as a single control group, and remain independent: filter state lives only in the URL, sort direction is remembered across sessions. |
+| AC-2 | The list can be ordered by date added, name, release year, runtime and IMDb rating. |
+| AC-3 | Both direction options are on screen at once with the current one marked; the control never presents the current ordering as its own single label. |
+| AC-4 | The direction labels describe the selected field, and the existing date wording is unchanged. |
+| AC-5 | From the default view, the reverse of the default ordering is reachable in exactly one interaction. |
+| AC-6 | Changing the field preserves the chosen direction; changing either preserves the active filters and starts the list again from its first page. |
+| AC-7 | A remembered direction is reflected in the request that is actually issued, so the marked option and the list always agree. |
+
+---
+
+#### US-058 — Tell an addition from a removal without scrolling back
+
+**As the owner**, I want to tell an addition from a removal without scrolling
+back to a heading, so that I never agree to take a title off my list thinking I
+was putting one on.
+
+**Requirements:** REQ-122 (`specs/ui-refresh.md` §6a.1; `A53` OQ-6 answer (d)).
+
+⚠ **This is the owner's own report, narrowed.** They said the upload workflow
+was *"not smooth and it was confusing"*; asked what specifically, they chose
+(d): **the three candidate sections look alike despite meaning different
+things.** That is a presentation defect, which is why its fix touches the
+confirmation contract not at all — nothing here changes what reaches the list
+or when.
+
+⚠ **AC-2 is the whole difference between this and restyling the headings.** A
+full-update review is long and is scrolled; by the time a removal card is on
+screen its heading is off it. A card must be identifiable from its **own**
+content.
+
+⚠⚠ **AC-6 IS PRODUCT INVARIANT 2 AND IT IS NOT NEGOTIABLE.** Making the
+sections distinguishable is not licence to hide the boring one. A full-update
+review renders **every** extracted candidate including the already-correct
+ones, because a failed extraction of a known title must never be readable as a
+removal — the single most important safety property in this product.
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | Each candidate section carries a persistent heading, a count and its own surface treatment. |
+| AC-2 | An addition card and a removal card are distinguishable from each other by their own rendered content, with no section heading in the accessible subtree. |
+| AC-3 | Every card states what agreeing to it does in the owner's terms, and the three sections' statements differ from one another. |
+| AC-4 | The removals section carries an additional consequential marker. |
+| AC-5 | That marker is a word, never colour alone. |
+| AC-6 | A full-update review still renders all extracted candidates, including the already-correct ones, in their existing order. |
+| AC-7 | The removals section remains last, and remains confirmed as one group. |
+
+---
+
+#### US-059 — The app looks like it was designed
+
+**As the owner**, I want consistent typography, icons and controls so the
+screens feel like one application and their states remain understandable.
+
+**Requirements:** REQ-123, REQ-124, REQ-125 (`specs/ui-refresh.md` §7b–§7d).
+
+| AC | Acceptance criterion |
+|---|---|
+| AC-1 | Text uses the closed token-based type scale; primary content never drops below `--text-sm`. |
+| AC-2 | The closed inline icon set inherits `currentColor`, adds no package or network request, and exposes a name only when non-decorative. |
+| AC-3 | Form controls use shared primitives. Variants resolve through literal class maps, and every rendered class has a stylesheet rule. |
+| AC-4 | Buttons preserve native submit, disabled and focus behaviour and meet the 44 px tap-target floor at 320 px. |
+| AC-5 | Dialogs trap focus, dismiss on Escape and restore focus to their trigger. Field labels, descriptions and errors remain associated with their controls. |
 
 ---
 
@@ -1496,7 +1823,7 @@ owner-initiated, synchronous, visible in the removed log, and reversible.
 
 1. Lazy TMDB metadata refresh on access (REQ-076, US-010) — touches TMDB-sourced descriptive fields only (NFR-014).
 2. Screenshot image purge at 30 days (NFR-019, US-035) — touches image bytes only.
-3. Lazy IMDb rating refresh on access (REQ-093, ADR-0011) — touches one display-only numeric field and its timestamp. It is admissible here for the same reason as (1): access-triggered, metadata-only, and — decisively — the rating is **never sorted or filtered on** (ADR-0011 OQ-A), so it cannot change membership, ordering or service badges.
+3. Lazy IMDb rating refresh on access (REQ-093, ADR-0011) — touches one numeric field and its timestamp. It is admissible here for the same reason as (1): access-triggered and metadata-only. ⚠ **REVISED at `A53` (2026-09-14): the third reason given below no longer holds and has been replaced, not merely softened.** ~~"and — decisively — the rating is **never sorted or filtered on** (ADR-0011 OQ-A), so it cannot change membership, ordering or service badges."~~ The rating **is** now a sort key (ADR-0011 Rev 1), so it *could* change ordering — and what prevents that is the refresh's **synchrony**: under `sort=rating` the sweep runs inside the request and before the `ORDER BY`, so no write outside an owner-initiated request ever reorders the list. It is still never *filtered* on. ⚠ **If anyone reverts that sweep to the post-response path, this entry becomes false and REQ-041 is breached** — which is why `T-IMDB-005b` guards the ordering, not the absence of a sort.
 
 ~~Superseded (Epic M): "exactly two, and neither changes user-visible list state," with entries 1 and 2 only.~~
 
@@ -1852,7 +2179,9 @@ REQ-042 … REQ-054 (13 requirements marked `wont-v1`) have no stories by design
 
 ### A.5 Coverage summary
 
-**Uncovered requirements: REQ-119 and the promoted REQ-035 / REQ-037, all three carried by US-055, which is a reserved-not-yet-migrated story** (`specs/ui-refresh.md` §5a and §10). Every other one of the functional requirements in v1 scope and all 20 NFRs are covered by at least one story. ⚠ This line is the honest state, not an oversight: §1 of `ui-refresh.md` requires a story to move into this PRD **with** its `specs/testing.md` rows and its tests, in one change — so recording the gap here is what stops US-055 being quietly forgotten between the two documents.
+**Uncovered requirements: none.** Every functional requirement in v1 scope and all 20 NFRs are covered by at least one story. REQ-119 and the promoted REQ-035 / REQ-037 are carried by **US-055**, which was promoted into §6, Epic P at TASK-218 together with US-049, US-050, US-051, US-052 and US-054 — the last of the `specs/ui-refresh.md` §10 reservations. ⚠ **US-053 was deliberately not promoted**: US-057 already owns REQ-113, REQ-114 and REQ-115, and two stories owning the same three requirements is a coverage table that reads as agreement while nothing decides which is authoritative when they drift. Its §10 row is struck, not deleted.
+
+~~**Uncovered requirements: REQ-119 and the promoted REQ-035 / REQ-037, all three carried by US-055, which is a reserved-not-yet-migrated story** (`specs/ui-refresh.md` §5a and §10). Every other one of the functional requirements in v1 scope and all 20 NFRs are covered by at least one story. ⚠ This line is the honest state, not an oversight: §1 of `ui-refresh.md` requires a story to move into this PRD **with** its `specs/testing.md` rows and its tests, in one change — so recording the gap here is what stops US-055 being quietly forgotten between the two documents.~~
 
 ### A.6 Discrepancy found in the source documents
 

@@ -31,6 +31,9 @@ import {
   UPLOAD_SCREENSHOTS_LABEL,
 } from '../copy';
 import { ZeroMatch, isFiltered, type ListFilters } from './FilterBar';
+import { Button } from './ui/Button';
+import { EmptyState } from './ui/EmptyState';
+import { ListIcon } from './icons';
 
 export type ListEmptyKind = 'never-uploaded' | 'zero-match' | 'all-gone' | null;
 
@@ -102,13 +105,17 @@ export function ListEmptyState({ facts, onClearFilters }: ListEmptyStateProps): 
   }
 
   return (
-    <div data-testid="list-empty-never-uploaded">
-      <p data-testid="list-empty-title">{LIST_EMPTY_NEVER_UPLOADED_TITLE}</p>
-      <p data-testid="list-empty-body">{LIST_EMPTY_NEVER_UPLOADED_BODY}</p>
-      <a href="/upload" className="tap-target" data-testid="list-empty-cta">
-        {UPLOAD_SCREENSHOTS_LABEL}
-      </a>
-    </div>
+    <EmptyState
+      data-testid="list-empty-never-uploaded"
+      icon={<ListIcon />}
+      title={<p data-testid="list-empty-title">{LIST_EMPTY_NEVER_UPLOADED_TITLE}</p>}
+      body={<p data-testid="list-empty-body">{LIST_EMPTY_NEVER_UPLOADED_BODY}</p>}
+      action={
+        <a href="/upload" className="tap-target" data-testid="list-empty-cta">
+          {UPLOAD_SCREENSHOTS_LABEL}
+        </a>
+      }
+    />
   );
 }
 
@@ -123,9 +130,9 @@ export function ListLoadError({ onRetry }: ListLoadErrorProps): JSX.Element {
     // whole message.
     <div data-testid="list-load-error" role="alert">
       <p data-testid="list-load-error-body">{LIST_LOAD_FAILED_BODY}</p>
-      <button type="button" className="tap-target" data-testid="list-retry" onClick={onRetry}>
+      <Button variant="secondary" data-testid="list-retry" onClick={onRetry}>
         {RETRY_LABEL}
-      </button>
+      </Button>
     </div>
   );
 }

@@ -29,6 +29,7 @@
  */
 
 import { AppError } from './errors/AppError.js';
+import { SORT_NAME_MAX_LENGTH } from '@nextup/domain';
 
 /** `specs/api.md` §3 — `limit` is 1..200, default 50. */
 export const DEFAULT_PAGE_LIMIT = 50;
@@ -69,6 +70,64 @@ export interface RuntimeListCursor {
 }
 
 /**
+ * A position in the RELEASE-YEAR-ordered list (`A53`, OQ-3).
+ *
+ * ⚠ Same nullable-key problem as runtime, and the same three-branch keyset.
+ * `tmdbReleaseYear` is `null` for an unmatched title, those rows sort LAST in
+ * both directions, and a cursor sitting inside that block must page within it
+ * by id alone.
+ */
+export interface ReleaseYearListCursor {
+  releaseYear: number | null;
+  id: string;
+}
+
+/**
+ * A position in the RATING-ordered list (`A53`, OQ-3b, ADR-0011 Rev 1).
+ *
+ * ⚠ **THE KEY IS TENTHS, THE STORED INTEGER — NEVER THE DISPLAYED FLOAT.**
+ * `fromTenths` divides by 10 at the display edge, and a cursor carrying `8.4`
+ * would compare a float against an integer column: the boundary row is then
+ * matched by neither the "greater" nor the "equal" branch and silently
+ * vanishes between pages. Storing the integer keeps the keyset total.
+ *
+ * ⚠ **THIS IS THE ONLY MUTABLE SORT KEY IN THE PRODUCT.** Every other
+ * ordering is stable between requests: date-added is owner-supplied and
+ * immutable once captured; name, year and runtime are properties of the work.
+ * A rating can change under the owner's feet, which is the whole reason the
+ * refresh had to move inside the request — see `titles.ts` and ADR-0011 Rev 1.
+ */
+export interface RatingListCursor {
+  ratingTenths: number | null;
+  id: string;
+}
+
+/**
+ * A position in the NAME-ordered list (TASK-219, `T-API-029`).
+ *
+ * ⚠ **THE KEY IS THE STORED `sortName`, NEVER THE DISPLAYED TITLE.** The two
+ * differ whenever a leading article was stripped — the row displayed as
+ * *The Matrix* sits at position `Matrix` — so a cursor built from the visible
+ * name lands in the wrong place in the order, and the rows between the two
+ * positions are skipped. Silently, and only on page two.
+ *
+ * ⚠ **`sortName` IS NULLABLE and `null` is a REAL, ENCODABLE POSITION.** A
+ * title whose name could not be read from the screenshot has no key; those
+ * rows sort LAST in both directions and must be pageable like any other, or
+ * the list truncates at the first unreadable title.
+ *
+ * ⚠ **TIES ARE COMMON HERE, NOT A CORNER CASE.** The column collates
+ * `Latin1_General_100_CI_AI`, so `Amelie` and `Amélie` — and `THE FLY` and
+ * `The Fly` — compare EQUAL. The `id` tie-break is what keeps the keyset a
+ * total order; without it those rows are ambiguous at a page boundary and one
+ * of them can vanish.
+ */
+export interface NameListCursor {
+  sortName: string | null;
+  id: string;
+}
+
+/**
  * The cursor for whichever sort issued it.
  *
  * ⚠ **The shapes are DISCRIMINATED BY KEY SET, not by a `sort` field**, and
@@ -77,11 +136,30 @@ export interface RuntimeListCursor {
  * so switching sort mid-page is a loud `INVALID_CURSOR` rather than a page of
  * quietly wrong rows. Adding a `sort` field would make the two shapes
  * structurally identical and lose that property.
+ *
+ * ⚠ **EVERY SHAPE MUST THEREFORE KEEP A DISTINCT KEY NAME.** `releaseYear`
+ * and `ratingTenths` are named differently for exactly this reason — two
+ * nullable-integer sorts that both called their key `value` would be
+ * indistinguishable, and a year cursor would silently page a rating-ordered
+ * list at the wrong boundary.
  */
-export type AnyListCursor = ListCursor | RuntimeListCursor;
+export type AnyListCursor =
+  ListCursor | RuntimeListCursor | ReleaseYearListCursor | RatingListCursor | NameListCursor;
 
 export function isRuntimeCursor(cursor: AnyListCursor): cursor is RuntimeListCursor {
   return 'runtimeMinutes' in cursor;
+}
+
+export function isReleaseYearCursor(cursor: AnyListCursor): cursor is ReleaseYearListCursor {
+  return 'releaseYear' in cursor;
+}
+
+export function isRatingCursor(cursor: AnyListCursor): cursor is RatingListCursor {
+  return 'ratingTenths' in cursor;
+}
+
+export function isNameCursor(cursor: AnyListCursor): cursor is NameListCursor {
+  return 'sortName' in cursor;
 }
 
 /** Guards against a hostile or corrupt id being echoed into a query. */
@@ -192,6 +270,128 @@ export function decodeRuntimeCursor(raw: string): RuntimeListCursor {
     id: id as string,
   };
   if (encodeRuntimeCursor(cursor) !== raw) {
+    throw invalidCursor('not-canonical');
+  }
+  return cursor;
+}
+
+/**
+ * The shared encode/decode pair for a nullable-integer sort key.
+ *
+ * ⚠ **FACTORED SO A THIRD NULLABLE SORT CANNOT GET THE `null` CASE WRONG.**
+ * Runtime, release year and rating all order `NULL`s last in both directions,
+ * so `null` is a REAL, encodable position at the end of the list — not an
+ * error. Refusing to encode it truncates the list at the first unknown value,
+ * silently, and exactly where the owner is least able to notice. That rule was
+ * previously written out once per sort, which is three chances to omit it.
+ *
+ * Key order is fixed here so a round trip is byte-stable: the decoder
+ * re-encodes and compares, and a different key order would make every cursor
+ * we ourselves issued fail that comparison.
+ */
+function encodeNullableIntCursor(key: string, value: number | null, id: string): string {
+  const json = JSON.stringify({ [key]: value, id });
+  return Buffer.from(json, 'utf8').toString('base64url');
+}
+
+function decodeNullableIntCursor(
+  raw: string,
+  key: string,
+  badValueReason: string,
+): { value: number | null; id: string } {
+  const parsed = decodeEnvelope(raw);
+
+  const keys = Object.keys(parsed);
+  if (keys.length !== 2 || !keys.includes(key) || !keys.includes('id')) {
+    throw invalidCursor('unexpected-keys');
+  }
+
+  const value = parsed[key];
+  const id = parsed['id'];
+
+  // ⚠ A float or a NaN would compare unpredictably against an integer column
+  // and produce a page boundary that MOVES between requests. Refusing it is
+  // what keeps the keyset a total order.
+  if (value !== null && (typeof value !== 'number' || !Number.isSafeInteger(value))) {
+    throw invalidCursor(badValueReason);
+  }
+  requireCursorId(id);
+
+  const cursor = { value: value as number | null, id: id as string };
+  if (encodeNullableIntCursor(key, cursor.value, cursor.id) !== raw) {
+    throw invalidCursor('not-canonical');
+  }
+  return cursor;
+}
+
+/** The release-year-ordered cursor (`A53`, OQ-3). */
+export function encodeReleaseYearCursor(cursor: ReleaseYearListCursor): string {
+  return encodeNullableIntCursor('releaseYear', cursor.releaseYear, cursor.id);
+}
+
+export function decodeReleaseYearCursor(raw: string): ReleaseYearListCursor {
+  const { value, id } = decodeNullableIntCursor(raw, 'releaseYear', 'bad-release-year');
+  return { releaseYear: value, id };
+}
+
+/**
+ * The rating-ordered cursor (`A53`, OQ-3b).
+ *
+ * ⚠ **TENTHS, NOT THE DISPLAYED FLOAT** — see `RatingListCursor`. The integer
+ * check in `decodeNullableIntCursor` is what enforces it: a cursor carrying
+ * `8.4` is rejected as `bad-rating` rather than quietly losing the boundary
+ * row.
+ */
+export function encodeRatingCursor(cursor: RatingListCursor): string {
+  return encodeNullableIntCursor('ratingTenths', cursor.ratingTenths, cursor.id);
+}
+
+export function decodeRatingCursor(raw: string): RatingListCursor {
+  const { value, id } = decodeNullableIntCursor(raw, 'ratingTenths', 'bad-rating');
+  return { ratingTenths: value, id };
+}
+
+/**
+ * The name-ordered cursor (TASK-219).
+ *
+ * ⚠ **NOT `encodeNullableIntCursor` WITH A LOOSER CHECK.** That helper's
+ * `Number.isSafeInteger` guard is the thing that keeps a numeric keyset total;
+ * widening it to accept strings would silently let a numeric sort be paged
+ * with a string boundary. The shapes stay separate so neither can be fed the
+ * other's cursor — `decodeEnvelope`'s exact-key check then makes switching
+ * sort mid-page a loud `INVALID_CURSOR` instead of a page of wrong rows.
+ */
+export function encodeNameCursor(cursor: NameListCursor): string {
+  const json = JSON.stringify({ sortName: cursor.sortName, id: cursor.id });
+  return Buffer.from(json, 'utf8').toString('base64url');
+}
+
+export function decodeNameCursor(raw: string): NameListCursor {
+  const parsed = decodeEnvelope(raw);
+
+  const keys = Object.keys(parsed);
+  if (keys.length !== 2 || !keys.includes('sortName') || !keys.includes('id')) {
+    throw invalidCursor('unexpected-keys');
+  }
+
+  const { sortName, id } = parsed as { sortName: unknown; id: unknown };
+
+  // ⚠ Bounded by the COLUMN width, not by the envelope limit. A longer value
+  // cannot name a position in a `NVARCHAR(400)` column, so accepting it would
+  // build a keyset boundary that matches no row and returns an empty page —
+  // which reads as "the rest of my list is gone".
+  if (
+    sortName !== null &&
+    (typeof sortName !== 'string' ||
+      sortName.length === 0 ||
+      sortName.length > SORT_NAME_MAX_LENGTH)
+  ) {
+    throw invalidCursor('bad-sort-name');
+  }
+  requireCursorId(id);
+
+  const cursor: NameListCursor = { sortName: sortName as string | null, id: id as string };
+  if (encodeNameCursor(cursor) !== raw) {
     throw invalidCursor('not-canonical');
   }
   return cursor;

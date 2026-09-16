@@ -40,6 +40,7 @@ import {
 import type { WaitingItem } from '../lib/apiClient';
 import { TMDB_IMAGE_BASE } from '../components/TitleRow';
 import { useOnline } from '../lib/useOnline';
+import { Button } from '../components/ui/Button';
 
 export interface WaitingPageProps {
   readonly items?: readonly WaitingItem[];
@@ -128,37 +129,31 @@ function WaitingRow({
         )}
 
         {phase === 'idle' && (
-          <button
-            type="button"
-            className="tap-target"
+          <Button
+            variant="secondary"
             data-testid="waiting-not-interested"
             disabled={offline}
             onClick={suppress}
           >
             {WAITING_NOT_INTERESTED}
-          </button>
+          </Button>
         )}
         {offline && phase === 'idle' && (
           <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>
         )}
         {phase === 'submitting' && (
-          <button type="button" className="tap-target" data-testid="waiting-suppressing" disabled>
+          <Button variant="secondary" data-testid="waiting-suppressing" disabled>
             {'Working…'}
-          </button>
+          </Button>
         )}
         {phase === 'error' && (
           <>
             <p role="alert" data-testid="waiting-suppress-error">
               {WAITING_SUPPRESS_FAILED}
             </p>
-            <button
-              type="button"
-              className="tap-target"
-              data-testid="waiting-not-interested"
-              onClick={suppress}
-            >
+            <Button variant="secondary" data-testid="waiting-not-interested" onClick={suppress}>
               {RETRY_LABEL}
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -193,9 +188,9 @@ export function WaitingPage({
         <div role="alert" data-testid="waiting-load-error">
           <p>{'Couldn\u2019t load your waiting list. Nothing has changed.'}</p>
           {onRetry !== undefined && (
-            <button type="button" className="tap-target" onClick={onRetry}>
+            <Button variant="secondary" onClick={onRetry}>
               {RETRY_LABEL}
-            </button>
+            </Button>
           )}
         </div>
       ) : loading ? (

@@ -17,6 +17,9 @@
 
 import type { JSX, ReactNode } from 'react';
 import { SERVICE_LABELS, formatRuntime, type Service } from '@nextup/domain';
+import { Button } from './ui/Button';
+import { Badge } from './ui/Badge';
+import { GenreChips } from './GenreChips';
 
 import {
   IMDB_RATING_ABSENT,
@@ -116,6 +119,13 @@ export interface TitleRowProps {
    * back door.
    */
   readonly pending?: boolean | undefined;
+  /**
+   * REQ-112 (§4.3) — the genres in the ACTIVE filter, passed straight through
+   * to `GenreChips`, which keeps them visible rather than collapsing them
+   * behind `+n`. Optional: a row rendered outside the filtered list (a fixture,
+   * a dialog preview) has no filter to respect.
+   */
+  readonly activeGenres?: readonly string[] | undefined;
 }
 
 const MEDIA_TYPE_LABELS: Readonly<Record<TitleListItem['mediaType'], string>> = {
@@ -129,6 +139,7 @@ export function TitleRow({
   onFixMatch,
   pending,
   menu,
+  activeGenres,
 }: TitleRowProps): JSX.Element {
   const unmatched = item.matchState === 'unmatched';
   const busy = pending === true;
@@ -223,8 +234,11 @@ export function TitleRow({
             US-019 AC-6: an empty genre list renders NOTHING - not "Unknown",
             not "-". A placeholder would read as a fact about the work rather
             than an absence of data, and the owner cannot tell the difference.
+            The `null` return lives in `GenreChips` so the rule holds for the
+            compact presentation too, including the `+0` it newly makes
+            possible (REQ-112, `T-UX-102b`).
           */}
-          {item.genres.length > 0 && <span data-testid="genres">{item.genres.join(', ')}</span>}
+          <GenreChips genres={item.genres} activeGenres={activeGenres} />
           {/*
             REQ-119 - runtime is LAST in `Year · type · genres · runtime`, and
             the unknown case is NAMED rather than omitted.
@@ -294,7 +308,7 @@ export function TitleRow({
             // Text-labelled, never colour-only (§2.2, ui.md §10.2): colour is
             // never the sole carrier of meaning.
             <li key={badge.listingId} data-testid={`badge-${badge.service}`}>
-              {SERVICE_LABELS[badge.service]}
+              <Badge>{SERVICE_LABELS[badge.service]}</Badge>
             </li>
           ))}
         </ul>
@@ -325,9 +339,8 @@ export function TitleRow({
         */}
         {unmatched
           ? onFixMatch !== undefined && (
-              <button
-                type="button"
-                className="title-row__action tap-target"
+              <Button
+                variant="ghost"
                 // ⚠ DISABLED ON THIS ROW ONLY. A second write against a row
                 // whose first is still in flight is the double-submit §2.13
                 // exists to prevent; disabling the whole LIST instead is the
@@ -338,24 +351,32 @@ export function TitleRow({
                 }}
               >
                 Find a match
-              </button>
+              </Button>
             )
           : onOpenMenu !== undefined && (
-              <button
-                type="button"
-                // `tap-target` carries the §2.2 44x44 px minimum, shared with the
-                // nav so the floor is defined in one place.
-                className="title-row__menu tap-target"
-                aria-haspopup="menu"
-                aria-label={`Actions for ${item.name}`}
-                data-testid="row-menu"
-                disabled={busy}
-                onClick={() => {
-                  onOpenMenu(item);
-                }}
-              >
-                ⋮
-              </button>
+              <span className="title-row__menu">
+                {/*
+                  ⚠ THE CLASS IS ON THIS WRAPPER, NOT ON THE BUTTON. It carries
+                  `flex: 0 0 auto` — layout, which belongs to the parent —
+                  while the button's appearance now comes from the §7d
+                  primitive. Folding a flex rule into a variant is how a fifth
+                  variant appears that differs from the first only in where it
+                  sits. The 44 px floor rides on the primitive via
+                  `.tap-target`, shared with the nav so it is defined once.
+                */}
+                <Button
+                  variant="ghost"
+                  aria-haspopup="menu"
+                  aria-label={`Actions for ${item.name}`}
+                  data-testid="row-menu"
+                  disabled={busy}
+                  onClick={() => {
+                    onOpenMenu(item);
+                  }}
+                >
+                  ⋮
+                </Button>
+              </span>
             )}
         {/*
           REQ-105 — THE OPEN MENU RENDERS HERE, INSIDE THE ROW.

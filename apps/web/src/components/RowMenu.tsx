@@ -26,6 +26,7 @@ import { useEffect, useRef, type JSX } from 'react';
 
 import type { TitleListItem } from './TitleRow';
 import { OFFLINE_DISABLED_REASON, ROW_MENU_REMOVE_LABEL } from '../copy';
+import { Button } from './ui/Button';
 
 export type RowMenuChoice = 'suppress' | 'fix-match' | 'remove';
 
@@ -89,11 +90,10 @@ export function RowMenu({
         if (event.key === 'Escape') onDismiss();
       }}
     >
-      <button
-        type="button"
+      <Button
+        variant="secondary"
         ref={firstItem}
         role="menuitem"
-        className="tap-target"
         data-testid="row-menu-suppress"
         disabled={offline}
         onClick={() => {
@@ -101,11 +101,10 @@ export function RowMenu({
         }}
       >
         {ROW_MENU_SUPPRESS_LABEL}
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="secondary"
         role="menuitem"
-        className="tap-target"
         data-testid="row-menu-fix-match"
         disabled={offline}
         onClick={() => {
@@ -113,7 +112,7 @@ export function RowMenu({
         }}
       >
         {ROW_MENU_FIX_MATCH_LABEL}
-      </button>
+      </Button>
       {/*
         US-048 — the third item, and the one the owner reaches for when a
         capture invented a title that was never on the service.
@@ -131,10 +130,9 @@ export function RowMenu({
         disprove.
       */}
       {canRemove && (
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           role="menuitem"
-          className="tap-target"
           data-testid="row-menu-remove"
           disabled={offline}
           onClick={() => {
@@ -142,23 +140,22 @@ export function RowMenu({
           }}
         >
           {ROW_MENU_REMOVE_LABEL}
-        </button>
+        </Button>
       )}
       {offline && (
         <span className="offline-reason" data-testid="row-menu-offline-reason">
           {OFFLINE_DISABLED_REASON}
         </span>
       )}
-      <button
-        type="button"
+      <Button
+        variant="secondary"
         role="menuitem"
         ref={cancelItem}
-        className="tap-target"
         data-testid="row-menu-cancel"
         onClick={onDismiss}
       >
         {ROW_MENU_CANCEL_LABEL}
-      </button>
+      </Button>
     </div>
   );
 }

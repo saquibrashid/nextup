@@ -69,12 +69,28 @@ inference from them:
 | Posters | **Larger and uniform** |
 | Pain points | *"better navigation. improve the filter/ordering ux"* |
 | Runtime *(added at `A48`)* | *"for the list view, I'd like to see run time as well and filter and sort by it"* — a direct request, and the recorded revisit trigger for the deferred REQ-035/REQ-037 pair. Answered in §5a |
+| **Genres on the row** *(added 2026-09-14, OQ-7)* | *"keep generes on the row but find a way to minimize how much room it takes. use another ux to make it compact but still list the genres."* Answered in §4.3 |
+| **Genre redundancy** *(added 2026-09-14, OQ-7)* | *"some of the genres are redundant, for example, there is action, action & adventure, and adventure. action & adventure seems extra. would it not be easier just to click action and adventure separately?"* ⚠ **A correctness bug, not a preference** — answered in §4.4 |
+| **Sorting** *(added 2026-09-14, `A53` / OQ-3 / OQ-3b)* | Name and release year added as orderings; **the IMDb rating sort reversed into existence**, overturning `A51`. Answered in §5b, §7a and §7a.1 |
+| **Navigation** *(added 2026-09-14, OQ-2)* | Phone bar = **List, Upload, More** — two real destinations plus overflow. Answered in REQ-117 |
+| **Review screen** *(added 2026-09-14, OQ-6)* | The confusion was **(d), the three sections looking alike** — not the list's length and not the Apply wording. Answered in §6a.1 |
+| **Design system** *(added 2026-09-14, OQ-8)* | A typographic scale and inline SVG icons, both accepted on the explicit basis of **no web font and no new dependency**. Answered in §7b – §7d |
 
 Plus five defects the owner hit while using the app, in §3.
 
 **Traceability rule for anyone extending this document: every requirement below
 cites either a row of this table or a defect in §3.** One that cites neither is
 an agent's taste wearing a `must`, and it should be deleted.
+
+⚠ **THIS RULE HAS ALREADY CAUGHT ONE VIOLATION, ON THE DAY IT WAS TESTED.** An
+agent asked to fix the "awful" UI drafted a full **dark-theme** palette with an
+**amber** accent, a **self-hosted variable web font**, and a rewrite of
+`specs/ui.md` §13 — computing every contrast ratio correctly along the way. Not
+one line of it cited a row of this table, and all of it contradicted the
+owner's recorded choices above: a **light** theme, a **deeper indigo** accent,
+and no web font. It was reverted before it reached the tree. **The failure mode
+is real, it is fast, and it looks exactly like progress.** Read this table
+before writing a `must`.
 
 ---
 
@@ -396,32 +412,116 @@ not better — the empty box grows with them.
 
 ### 4.3 Density and what gets trimmed (REQ-112, `should`)
 
+> ⚠ **AMENDED IN PLACE 2026-09-14 by the owner's answers to OQ-1 and OQ-7.**
 > The compact list shows, per title: **poster, name, `Year · type`, service
+> badge(s), the added-date, and the genres in a compact presentation**. The
+> IMDb rating moves to the expanded/grid presentation. Approximately six titles
+> are visible at 375 × 667 px.
+>
+> ~~The compact list shows, per title: **poster, name, `Year · type`, service
 > badge(s)**. The genre list and the IMDb rating move to the expanded/grid
-> presentation. Approximately six titles are visible at 375 × 667 px.
+> presentation.~~
 
-> ### ⚠ THIS REQUIREMENT CONTRADICTS TWO THINGS THAT ARE CURRENTLY SPECIFIED,
-> ### AND IT MAY NOT BE BUILT UNTIL THE OWNER RESOLVES BOTH.
+**Both of this requirement's original trims were rejected by the owner**, and
+the two warnings below are the reason each was put to them rather than built:
+
+| Originally trimmed | Owner's answer | Consequence |
+|---|---|---|
+| **The added-date** | **Keep it** (OQ-1) | It is the default sort key; hiding it makes the order inexplicable |
+| **The genres** | **Keep them, but compact** (OQ-7) — *"use another ux to make it compact but still list the genres"* | They are a filter dimension and are tied to US-019 AC-6 |
+
+⚠ **"COMPACT" IS A PRESENTATION CHANGE, NOT A CONTENT CHANGE.** The genres are
+**all** still present and still readable; what changes is the room they take.
+The compact presentation is a single row of small chips that **wraps to at most
+one line**, with any overflow collapsed into a `+n` affordance that reveals the
+rest in place. ⚠ **The `+n` affordance must not be the only way to reach a
+genre that is currently filtered on** — if a genre is in the active filter, its
+chip is always visible, otherwise the row stops explaining the very filter that
+produced it. ⚠ **`genres: []` still renders NOTHING AT ALL, never "Unknown"
+and never an empty `+0`** (US-019 AC-6 is unchanged and still tested).
+
+> ### ⚠ THE ORIGINAL TRIMS CONTRADICTED TWO THINGS THAT ARE CURRENTLY
+> ### SPECIFIED. BOTH WARNINGS STOOD, AND BOTH WERE UPHELD BY THE OWNER.
 >
 > 1. **`specs/ui.md` §2.2 line 154 puts genres ON the row**, and ties it to a
 >    PRD acceptance criterion: *"`genres: []` renders **nothing at all**, never
->    'Unknown' (**US-019 AC-6**)."* Trimming genres is therefore a **change to
->    a tested AC**, not a styling choice.
+>    'Unknown' (**US-019 AC-6**)."* Trimming genres would have been a **change
+>    to a tested AC**, not a styling choice. **It is not being made.**
 > 2. **REQ-106 above requires the `Year · type · genres` separators that §2.2
->    already specifies.** Read together with this section, REQ-106 asks for a
->    separator on a field REQ-112 removes. **That is not an oversight — it is
->    the correct sequencing.** REQ-106 is a defect fix that can ship today
->    against the row as specified; REQ-112 is a proposal that needs the owner.
->    If REQ-112 is accepted, REQ-106's rule becomes `Year · type` and the test
->    changes with it. **Build REQ-106 first and do not wait for REQ-112.**
+>    already specifies.** With genres retained, REQ-106's rule is unchanged and
+>    its test does not move. **Build REQ-106 first regardless.**
 >
-> ⚠ **And the reason genres looked safe to cut is wrong.** The tempting
+> ⚠ **And the reason genres looked safe to cut was wrong.** The tempting
 > argument — *"nothing filters or sorts by genre"* — **is false**:
 > `specs/ui.md` §2.1 item 2 lists **genre as one of the three filter
 > dimensions**, with `?genre=Drama` in the query string. Cutting the row's
 > genres removes the only on-screen explanation of why a genre filter returned
 > what it returned. **Any trim proposal must be checked against the filter
 > dimensions before it is written, not after.**
+
+### 4.4 ⚠ THE GENRE VOCABULARY COLLIDES, AND THE FILTER SILENTLY UNDER-RETURNS
+
+**Raised by the owner at OQ-7, and it is a correctness bug, not clutter:**
+
+> *"some of the genres are redundant, for example, there is action, action &
+> adventure, and adventure. action & adventure seems extra. would it not be
+> easier just to click action and adventure separately?"*
+
+**Verified in the code.** `apps/api/src/clients/tmdbClient.ts` stores TMDB's
+genre **names verbatim** —
+
+```ts
+genres: Array.isArray(body.genres)
+  ? body.genres.map((g) => (typeof g?.name === 'string' ? g.name : '')).filter(Boolean)
+  : [],
+```
+
+— and there is **no normalisation anywhere in the tree** (a search for
+`genreMap`, `normaliseGenre`, `normalizeGenre`, `10759` and the literal
+`'Action & Adventure'` across `apps/**` and `packages/**` returns **zero
+hits**).
+
+**The cause is that TMDB maintains two different genre vocabularies**, and this
+product puts film and TV rows in **one** genre filter dimension:
+
+| Film genre list | TV genre list | Collides as |
+|---|---|---|
+| `Action` (28) + `Adventure` (12) | `Action & Adventure` (10759) | three chips for two concepts |
+| `Science Fiction` (878) + `Fantasy` (14) | `Sci-Fi & Fantasy` (10765) | three chips for two concepts |
+| `War` (10752) | `War & Politics` (10768) | two chips for one concept |
+
+⚠ **THE VISIBLE REDUNDANCY IS THE SYMPTOM; THE BUG IS THAT `?genre=Action`
+MISSES EVERY TV TITLE TAGGED `Action & Adventure`.** The facet under-returns
+and **nothing on screen says so** — which is the same failure shape as every
+other silent-omission defect this project guards against. The owner's instinct
+("click action and adventure separately") is exactly right: **the film
+vocabulary is the canonical one**, and the TV names are mapped onto it.
+
+**REQ-120 (`must`) — the genre vocabulary is normalised to one list on read**
+
+> A TV-only combined genre name is presented and filtered as its constituent
+> film genres. Filtering on a constituent genre returns **both** the film
+> titles tagged with it and the TV titles whose combined genre contains it.
+
+**Normalised on READ, by the owner's answer to OQ-9.** The mapping is applied
+at query and display time; **stored data is not rewritten and there is no
+migration**, so the change is fully reversible and `T-MIG-001` is not engaged.
+
+⚠ **THE MAPPING IS ONE-TO-MANY AND MUST BE APPLIED ON BOTH SIDES.** Expanding
+only the *display* leaves the filter broken; expanding only the *filter* leaves
+the row showing a chip the owner cannot click. Both, or neither.
+
+⚠ **THE MAP IS A CLOSED LITERAL, NOT A STRING HEURISTIC.** Splitting on
+`" & "` would also split a legitimate single genre and would silently invent
+genres from any future TMDB name containing an ampersand. The three rows above
+are the whole map.
+
+| Test id | Asserts |
+|---|---|
+| `T-UX-125` | A TV title whose stored genres contain `Action & Adventure` renders the chips `Action` and `Adventure`, and does **not** render `Action & Adventure`. |
+| `T-UX-126` | The genre filter list contains no combined TV name — `Action & Adventure`, `Sci-Fi & Fantasy` and `War & Politics` never appear as options. |
+| `T-API-028` | `?genre=Action` returns **both** a film tagged `Action` and a TV title tagged `Action & Adventure`; `?genre=War` returns a title tagged `War & Politics`. |
+| `T-UX-127` | The compact row wraps genres to at most one line with a `+n` overflow, and a genre in the **active filter** is always visible rather than hidden behind `+n`. |
 
 ⚠ **"Trimmed" means moved, not deleted, and one line may not move at all.** The
 added-date is the field the **default sort orders by** (REQ-038, newest-first),
@@ -500,17 +600,26 @@ runtime, and ordering by it is `must`, not `should`, since it is carried by
 deferred to v1.1 rather than dropped. Promoting REQ-037 does not widen this
 document's remit; it satisfies a requirement already on the books.
 
-> ### ⚠ RATING IS DELIBERATELY ABSENT FROM THAT LIST, AND ADDING IT WOULD
-> ### CONTRADICT A DECISION THE OWNER ALREADY MADE.
+> ### ⚠ THIS BLOCK IS SUPERSEDED — THE OWNER REVERSED IT AT `A53`. IT IS
+> ### RETAINED BECAUSE IT IS *WHY* THE REVERSAL WAS DONE PROPERLY.
 >
 > **REQ-095** — *"The IMDb rating is **display-only**. It is not a sort key,
 > and no sort option for it exists"* — was decided by the owner at **`A51`**,
 > resolving ADR-0011's OQ-A. The rating is the most tempting sort key on the
 > row precisely **because** it is rendered there, so an agent designing a sort
 > menu will reach for it, find it on screen, and add it without ever seeing
-> REQ-095. **It is a standing `must`-shaped negative and this document does not
-> get to reverse it.** If the owner wants it, that is a reversal of `A51` and
-> it belongs in ADR-0011 as a new revision — see §9, OQ-3.
+> REQ-095. ~~**It is a standing `must`-shaped negative and this document does
+> not get to reverse it.**~~ If the owner wants it, that is a reversal of `A51`
+> and it belongs in ADR-0011 as a new revision — see §9, OQ-3.
+>
+> ✅ **That is exactly what happened, and this paragraph is why.** The owner
+> was asked (OQ-3b) rather than the sort being added as a menu item, answered
+> on **2026-09-14 (`A53`)**, and the reversal was written as **ADR-0011
+> Revision 1** — not as a line here. **Rating IS now a sort key.** ⚠ **Read
+> §7a.1 before implementing it:** the reopening found that `specs/api.md` had
+> since made REQ-095 load-bearing for **REQ-041** compliance, so the reversal
+> required the rating refresh to become **synchronous**, not merely a struck
+> sentence.
 
 ⚠ **Year is nullable and the null case is the design problem.** A year sort
 must decide where undated titles go — **not** first by accident of `NULL`
@@ -529,7 +638,7 @@ the same rule when it is built.
 | `T-UX-114` | Changing a filter preserves `sort`, `dir`. |
 | `T-UX-115` | A `localStorage` direction with **no `dir` in the URL** is reconciled into the URL, and the label matches the request that was issued. |
 | `T-UX-116` | Oldest-first is reachable in one action from the default view. |
-| `T-UX-119` | *(REQ-095 regression guard)* **No sort option exposes the IMDb rating.** |
+| `T-UX-119` | ~~*(REQ-095 regression guard)* **No sort option exposes the IMDb rating.**~~ ⚠ **REWRITTEN at `A53` — see §7a.** The sort field selector **does** offer the IMDb rating. |
 | `T-UX-120` | *(`A48`)* Selecting the **Runtime** key relabels the direction toggle to *Shortest first* / *Longest first*, and the date labels do not survive the switch. |
 
 ---
@@ -602,6 +711,69 @@ place.
 
 ---
 
+## 5b. Design — the sort control's actual shape (OQ-5, amended by OQ-3 / OQ-3b)
+
+⚠ **THE OWNER'S OQ-5 ANSWER WAS GIVEN BEFORE OQ-3 AND OQ-3b WIDENED THE SORT
+KEYS, AND IT NO LONGER FITS ON ITS OWN.** They chose *"show both options with
+the current one marked"* — a segmented control rather than a toggle. That
+answers the **direction** ambiguity REQ-114 identified. But OQ-3 added **name**
+and **release year**, OQ-3b added **rating**, and `A48` had already added
+**runtime**: there are now **five** sort fields, and a two-option segment
+cannot express a five-way choice.
+
+**The resolution, which preserves both of the owner's stated properties:**
+
+> **REQ-121 (`must`) — sort is a field selector plus a direction segment**
+>
+> The sort control renders as **two adjacent controls**: a **"Sort by" field
+> selector** listing the available orderings, and a **two-option direction
+> segment** whose labels are appropriate to the selected field, with the
+> current option marked.
+
+| Field | Direction labels (`desc` / `asc`) |
+|---|---|
+| Date added *(default)* | `Newest first` / `Oldest first` |
+| Name | `A–Z` / `Z–A` |
+| Release year | `Newest first` / `Oldest first` |
+| Runtime | `Longest first` / `Shortest first` |
+| IMDb rating | `Highest first` / `Lowest first` |
+
+⚠ **`SORT_NEWEST_LABEL` AND `SORT_OLDEST_LABEL` ARE UNCHANGED AND ARE REUSED
+VERBATIM.** They are governed copy (`specs/ui.md` §9, `apps/web/src/copy.ts`),
+and §8 is explicit that changing owner-facing wording is a product decision.
+The new strings are **additions** for fields that had no ordering before, not
+a rewrite of the two that did. The `A–Z` dash is an **en dash**, matching the
+`Year · type` separator convention already in §2.2.
+
+⚠ **OLDEST-FIRST STILL REACHES IN ONE ACTION, WHICH IS THE `must`.** With the
+default field selected, the direction segment is on screen and its second
+option is one press away — REQ-038 (promoted at `A47`) is satisfied by the
+segment, **not** by the field selector. ⚠ **A redesign that collapses the
+direction into the field list** — offering ten combined options like
+"Date added, oldest first" — **deletes that property while every behavioural
+test still passes**, because `click()` still reaches it. §8's warning applies
+directly.
+
+⚠ **CHANGING THE FIELD MUST NOT SILENTLY REINTERPRET THE DIRECTION.** `desc`
+means "newest" for a date and "highest" for a rating; the underlying `dir`
+value is preserved across a field change, so the list does not reorder in a way
+the owner did not ask for. What changes is the **label**, because the same
+`dir` means something different per field.
+
+⚠ **THE TWO CONTROLS KEEP THE OPPOSITE PERSISTENCE MODELS REQ-113 DESCRIBES.**
+They render as one group and are **not** one state container: filters are URL
+only, sort is URL → `localStorage` → default. §5 REQ-113's table is the
+authority and a shared hook across the group is the failure it warns about.
+
+| Test id | Asserts |
+|---|---|
+| `T-UX-128` | Both direction options are rendered simultaneously with the current one marked — not a single toggling button. |
+| `T-UX-129` | The direction labels change with the selected field (`Longest first` for runtime, `A–Z` for name), while `SORT_NEWEST_LABEL` / `SORT_OLDEST_LABEL` are reused unmodified for the date fields. |
+| `T-UX-130` | Changing the sort field preserves `dir`; changing either preserves the active filters and resets `cursor`. |
+| `T-UX-131` | With the default field selected, oldest-first is reachable in exactly **one** interaction. |
+
+---
+
 ## 6. Design — navigation (the owner's "better navigation")
 
 ### REQ-116 (`must`) — the current destination is indicated, and not by colour alone
@@ -613,14 +785,82 @@ tell which page you are on from the navigation.
 ⚠ **Not colour alone** — `specs/ui.md` §10.2. The indicator must carry a
 non-colour cue (weight plus a rule/underline) and `aria-current="page"`.
 
+⚠ **`matchPath` AND `<NavLink>` DISAGREE ABOUT `/` BY DEFAULT** *(finding,
+TASK-211)*. `matchPath({ path: '/', end: false })` compiles to a prefix that
+matches **every** path in the application, while `<NavLink to="/">` requires
+the following character to be a `/` and is therefore already exact. Anything
+deriving the active class from `matchPath` while letting `NavLink` own
+`aria-current` must pass **the same `end` to both**, or the class and the ARIA
+state diverge — the List destination renders highlighted on all eleven routes
+while assistive technology is told nothing. `T-UX-117b` asserts both land on
+the same element; `T-UX-117d` asserts the `/` case directly.
+
 ### REQ-117 (`should`) — the phone gets a primary destination bar
 
-> Below `--bp-sm`, the three destinations the owner moves between most are
-> presented as a persistent bar; the rest move behind a "More" destination.
+> ⚠ **RESOLVED IN PLACE 2026-09-14 (OQ-2).** Below `--bp-sm`, the bar presents
+> **three slots: the list (`/`), `/upload`, and `More`.** **Everything else
+> moves behind `More`** — at the time of writing that was `/removed`,
+> `/not-interested` and `/batches`; Epic L added `/waiting` and Epic M added
+> `/rating`, and they are behind `More` too.
+>
+> ⚠ **THE OVERFLOW IS DEFINED BY SUBTRACTION, NOT BY A SECOND LIST**
+> *(corrected in place, TASK-211)*. This paragraph named three routes because
+> three was all there were. Read as a closed enumeration it says nothing about
+> `/waiting`, `/about` or `/rating` — and a bar of exactly three slots plus an
+> overflow that omits them leaves those destinations **absent from the phone
+> entirely**, which is the one outcome §6 exists to prevent. `AppShell.tsx`
+> therefore derives the overflow as *every nav route that is not `/` or
+> `/upload`*, and `T-UX-132b` asserts all six.
+>
+> ~~Below `--bp-sm`, the bar presents three slots: the list (`/`), `/upload`,
+> and `More`. `/removed`, `/not-interested` and `/batches` all move behind
+> **More**.~~
+>
+> ~~the three destinations the owner moves between most are presented as a
+> persistent bar; the rest move behind a "More" destination.~~ *(The shape was
+> right; the owner has now named the contents.)*
+
+> ⚠ **THE BAR IS FIXED TO THE BOTTOM OF THE VIEWPORT** *(resolved in place
+> 2026-09-15, owner decision)*. Below `--bp-sm` the nav leaves the top of the
+> page and sits against the bottom edge, always visible, both real
+> destinations in thumb reach. It was first built inside the `<header>`, where
+> it scrolled away with the page — a reading this paragraph permitted, because
+> it said what the bar **contains** and never said where it **is**.
+>
+> ⚠ **THERE IS STILL EXACTLY ONE `<nav>`, AND THAT IS WHY THIS IS A CSS
+> CHANGE.** The idiomatic bottom bar is a second `<nav>` rendered only on
+> phones, and it fails `T-A11Y-004` / `T-UI-023c` — which require `<header>`,
+> `<nav>`, `<main>` and `<footer>` exactly once per page — on every route at
+> once. The single `<nav>` is **repositioned**, never duplicated.
+>
+> ⚠ **THE CONTENT CLEARANCE IS PART OF THE REQUIREMENT, NOT A POLISH STEP.** A
+> fixed bar is out of flow, so without matching bottom padding on the shell it
+> covers the last row of every list — and the rows it hides are the ones at
+> the end of the scroll, which is exactly where the owner stops looking. The
+> `More` panel opens **upward** for the same reason: anchored below its
+> trigger it would open off-screen.
+>
+> ⚠ **`env(safe-area-inset-bottom)` NEEDS `viewport-fit=cover` IN THE VIEWPORT
+> META TAG OR IT IS ALWAYS `0`.** Without it the inset resolves to zero on
+> every device including the ones that need it, so the bar renders *under* the
+> iPhone home indicator while the stylesheet looks entirely correct. This is
+> the half that cannot be seen in the CSS.
 
 Six wrapped links above every page is most of the phone's first screen, at the
-cost of the content. **Which three is the owner's call** — see §9, OQ-2. This
-document must not quietly pick them.
+cost of the content.
+
+⚠ **THE OWNER CHOSE ONLY TWO REAL DESTINATIONS PLUS OVERFLOW, AND THAT IS NOT
+AN OMISSION TO BE HELPFULLY CORRECTED.** The temptation is to promote
+`/removed` or `/batches` into the spare-looking third slot. Don't: the two
+chosen destinations are the value loop (*see the list*, *feed the list*) and
+everything else is a place the owner visits deliberately, not repeatedly. A bar
+of three where one is `More` is a deliberate choice.
+
+⚠ **`More` IS A DESTINATION, NOT A HAMBURGER MENU.** It is reachable, has a
+focusable control with an accessible name, and the routes behind it keep their
+own URLs — so a deep link to `/removed` still works and is still marked current
+when open (REQ-116). The bar renders **icon over label** (§7c); an icon-only
+bar would fail REQ-116's not-by-colour-alone sibling rule for the same reason.
 
 ⚠ **`/upload` reachability is load-bearing and is not merely a nav item.**
 REQ-039's `FreshnessStrip` is tappable and opens `/upload` **with that service
@@ -631,6 +871,9 @@ introduce a second, differently-behaved route to upload.
 |---|---|
 | `T-UX-117` | The active destination carries `aria-current="page"` and a non-colour cue. |
 | `T-UX-118` | The freshness strip still deep-links to `/upload` with the service pre-selected. |
+| `T-UX-132` | Below `--bp-sm` the bar renders exactly `/`, `/upload` and `More`; **every other nav route** — `/batches`, `/removed`, `/not-interested`, `/waiting`, `/about`, `/rating` — is reachable only via `More`. ⚠ *Corrected in place at TASK-211; this row named only the first three, which were all that existed when it was written.* |
+| `T-UX-133` | A route behind `More` is still marked `aria-current="page"` when it is open, and is still reachable by direct URL. |
+| `T-UX-137` | Below `--bp-sm` the nav is fixed to the bottom of the viewport, the shell reserves matching bottom clearance, the `More` panel opens upward, the safe-area inset is honoured, and **all four are reset at or above `--bp-sm`** so the desktop nav returns to the header. ⚠ Asserted against `index.css` and `index.html` **as files** — jsdom performs no layout and applies no stylesheet, so every rendered assertion about position passes vacuously. |
 
 ---
 
@@ -669,6 +912,51 @@ full-update review, would **delete the product's core safety property** — the
 second one is specifically forbidden, because a failed extraction of a known
 title must never be readable as a removal.
 
+### 6a.1 ✅ THE OWNER ANSWERED: (d) — the three sections looked alike
+
+**OQ-6, resolved 2026-09-14.** Not the list's length, not the Apply wording:
+**the three candidate sections look alike despite meaning different things.**
+
+That is the best possible answer, because it is a **presentation** defect and
+its fix does not touch the confirmation contract at all. The three sections
+mean:
+
+| Section | What agreeing to it does | Reversible? |
+|---|---|---|
+| **Unmatched** | Records a work this product could not identify | Yes — fix match, or discard |
+| **Additions** | Puts a new title **into** the list | Yes — it can be removed later |
+| **Removals** *(full-update only)* | Takes a title **out of** the list | ⚠ **This is the consequential one** |
+
+> **REQ-122 (`must`) — the three review sections are visually distinct, and
+> the removals section is the most distinct of them**
+>
+> Each section carries a persistent heading, its own surface treatment, and a
+> count. The removals section is additionally marked as consequential, and its
+> cards are visually distinguishable from an addition's card **when scrolled to
+> in isolation**, not only when read against the heading above them.
+
+⚠ **THE HEADING ALONE IS WHY THIS FAILED THE FIRST TIME.** A long full-update
+review is scrolled, and by the time a removal card is on screen its heading is
+off it. **A card must be identifiable without the heading in view** — that is
+the specific property `T-UX-134` asserts, and it is the difference between this
+fix and simply restyling the headings.
+
+⚠ **NOT BY COLOUR ALONE** (`specs/ui.md` §10.2). The removal section pairs its
+treatment with the **word** — the section heading and the card both say what
+the action removes.
+
+⚠ **DISTINCT DOES NOT MEAN COLLAPSED, REORDERED, OR FILTERED.** A full-update
+review still shows **every** extracted title including the ones that are
+already correct (`A46`). Making the sections distinguishable is explicitly
+**not** licence to hide the boring one — that is the exact change that would
+make a failed extraction readable as a removal.
+
+| Test id | Asserts |
+|---|---|
+| `T-UX-134` | An addition card and a removal card are distinguishable from each other by their own rendered content, with no section heading in the accessible subtree. |
+| `T-UX-135` | Each section renders a heading and a count, and the removals section carries a non-colour consequential marker. |
+| `T-UX-136` | A full-update review still renders **all** extracted candidates, including already-correct ones — the section treatment hides nothing. |
+
 ---
 
 ## 7. Tokens (REQ-118, `must`)
@@ -701,9 +989,216 @@ shade fails CI rather than review. Any new token added by this refresh must be
 added to that test's pair list in the same change.
 
 **No dark mode** (`specs/ui.md` §13.3 — unchanged; the owner asked for a deeper
-accent, not a dark UI). **No web font** (NFR-005; `--font-stack` stays a system
-stack). **No CSS framework** (ADR-0004 Rev 2). **No class renamed**
-(`T-CSS-001`).
+accent, not a dark UI). ~~**No web font** (NFR-005; `--font-stack` stays a
+system stack).~~ **No web font — and the type scale in §7b is built on the
+system stack precisely so this stays true** (OQ-8). **No CSS framework**
+(ADR-0004 Rev 2). **No class renamed** (`T-CSS-001`).
+
+---
+
+## 7a. ⚠ REQ-095 IS REVERSED — the IMDb rating becomes a sort key (OQ-3b)
+
+**The owner reversed their own `A51` decision on 2026-09-14.** §5 REQ-115's
+warning block said this could only happen as a revision to ADR-0011 rather than
+a line in this document, and that is what it is.
+
+| | |
+|---|---|
+| **Was** | **REQ-095** — *"The IMDb rating is **display-only**. It is not a sort key, and no sort option for it exists."* Decided by the owner at `A51`, resolving ADR-0011's OQ-A |
+| **Now** | The IMDb rating **is** an available ordering. REQ-095's prohibition is struck |
+| **Mechanism** | ✅ **DONE.** `docs/adr/ADR-0011-imdb-ratings-via-omdb.md` **Revision 1** records the reversal, its date, its reason and the REQ-041 mechanism that pays for it. REQ-095 is corrected **in place** everywhere it appears — struck, not deleted — in `ADR-0011`, `adr/README.md`, `specs/api.md` §6.2/§6.2a/§6.11, `specs/ui.md` §7a, `specs/testing.md` §35, and `docs/PRD.md` US-036 AC-2 / §7.4 |
+
+⚠ **THE RATING IS NULLABLE AND NOT EVERY TITLE HAS ONE.** `A48`'s general rule
+governs and is **not** re-decided here: **`NULL`s sort LAST in BOTH
+directions**, written explicitly in the SQL. SQL Server sorts `NULL` first
+ascending by default, so "Lowest first" would otherwise open with every
+unrated title — an **absence of data rendered as a claim about the works**,
+which is the same defect `A48` identified for runtime.
+
+⚠ **THE DISPLAY RULES FOR THE RATING ARE UNCHANGED.** ADR-0011's provenance
+line (`specs/ui.md` §8a) and its absent-rating presentation still apply exactly
+as specified. What was reversed is *sortability*, and nothing else — in
+particular this is **not** licence to render a rating the product does not
+have.
+
+⚠ **`T-UX-119` ASSERTED THE PROHIBITION AND MUST BE REPLACED, NOT DELETED.**
+§8's at-risk table lists REQ-095 with `T-UX-119` as its guard. A test that
+asserts "no rating sort option exists" will now **fail correctly**, and the
+temptation is to delete it quietly. It is rewritten to assert the new
+behaviour, so the ledger row keeps a live guard rather than an empty cell.
+
+| Test id | Asserts |
+|---|---|
+| `T-UX-119` | ⚠ **Rewritten.** The sort field selector **does** offer the IMDb rating, and selecting it issues `sort=rating`. |
+| `T-API-023` | `sort=rating` orders by rating with `NULL`s **last in both directions**, tie-broken by `title.id`. |
+| `T-API-024` | ⚠ **The REQ-041 guard.** Under `sort=rating` the rating sweep is **awaited before the `ORDER BY` is applied**, and **no rating write occurs after the response has been sent**. |
+| `T-API-025` | A sweep that exhausts its request cap or time budget still returns **200**; unrefreshed titles keep their cached-or-absent value and are ordered on it. |
+| `T-API-026` | An unrecognised `sort` value is **400 `INVALID_QUERY`**, never a silent fall back to `dateAdded`. |
+| `T-API-027` | `sort=name` and `sort=releaseYear` order correctly in both directions. ⚠ **The name case must pin case-insensitive, human ordering explicitly** — the database collation is `Latin1_General_100_BIN2`, which is **binary**, so an unqualified `ORDER BY` puts every lower-case title after every upper-case one and `apple` sorts after `Zebra`. |
+| `T-IMDB-005` | ⚠ **`b` rewritten.** It asserted the service module exports no sort helper; it now asserts the sweep is awaited before ordering. **Rewritten, not deleted** — see §8. |
+
+### 7a.1 ⚠ Reversing REQ-095 is NOT a one-line strike — RESOLVED at `A53`
+
+The reopening surfaced something neither `A51` nor this section originally
+knew: **`specs/api.md` had since made REQ-095 load-bearing for REQ-041
+compliance**, in terms:
+
+> *"That is precisely what keeps the refresh legal under REQ-041 — a background
+> write that changed the list's ORDER would not be."*
+
+The two lazy refreshes in this repo are **not alike**. The TMDB metadata
+refresh writes *synchronously inside the request* (`specs/api.md` §6.4), which
+is explicitly why it satisfies REQ-041. The **rating** refresh writes *after the
+response* — *"ratings appear on the next render"* — which was legal only
+because a display-only field cannot change ordering. **Striking REQ-095 and
+stopping would therefore have shipped a background write that silently
+reorders the owner's list between renders, breaching product invariant 5.**
+
+**The owner resolved this at `A53`, from four options, with the cost stated:**
+
+| | Decision (`A53`) |
+|---|---|
+| **REQ-041** | Untouched. **Not** reworded, not widened. |
+| **Mechanism** | Under `sort=rating` the rating sweep moves **inside the request, before the ordering** — adopting §6.4's proven shape. |
+| **Scope of sweep** | The **sortable set**, not the page. ⚠ Refreshing only the page renders new values in an order computed from old ones — an `8.4` below a `7.1`. |
+| **Bound** | A **request cap and a time budget**; anything unrefreshed keeps its cached-or-absent value and sorts on it. Mirrors §6.4's existing 5-second budget. |
+| **ADR-0011 D-6** | **Amended**, not contradicted — its *"never for the whole table"* rule gains this one exception and holds everywhere else. |
+| **Process count** | **Unchanged.** Synchrony moves the write *further inside* owner-initiated work; do not increment `T-CI-005`. |
+
+⚠ **Known residual, accepted at `A53`.** Because the sweep covers the whole
+sortable set it is self-limiting — after the first page nothing is stale, so
+later pages write nothing and the ordering cannot drift under the cursor. The
+one exception is a **budget-exhausted** sweep, where a keyset cursor over a
+*mutable* key can step past a row that moved. The recorded remedy, if it is
+ever observed, is to suppress the sweep whenever a `cursor` is present; **it is
+not built in v1**. See ADR-0011 Revision 1 §R1-6.
+
+⚠ **Rating is the ONLY mutable sort key.** Date-added is owner-supplied and
+immutable once captured; name, release year and runtime are properties of the
+work. **Do not generalise this hazard — or its remedy — to the other four
+orderings.**
+
+---
+
+## 7b. Type — a scale, because "one size" is what unstyled looks like (OQ-8)
+
+This document specified an accent and a radius and **no type scale at all**.
+Every piece of text on every screen renders at one size, which is the single
+loudest signal that a page was never designed.
+
+> **REQ-123 (`must`) — a closed typographic scale, declared in `:root`**
+
+| Token | Value | Used for |
+|---|---|---|
+| `--text-xs` | `0.75rem` | Uppercase, letter-spaced metadata labels **only** |
+| `--text-sm` | `0.875rem` | Secondary and helper copy, genre chips |
+| `--text-base` | `1rem` | Body. **Never below this for primary content** |
+| `--text-lg` | `1.125rem` | The title-row name, card headings |
+| `--text-xl` | `1.5rem` | Section headings |
+| `--text-2xl` | `2rem` | Page heading |
+| `--leading-tight` | `1.2` | Headings |
+| `--leading-normal` | `1.55` | Body |
+| `--weight-normal` / `--weight-medium` / `--weight-bold` | `400` / `600` / `700` | |
+
+⚠ **NO WEB FONT. `--font-stack` REMAINS THE SYSTEM STACK** (NFR-005,
+`T-CI-007`'s egress rule). The owner was offered the scale on the existing
+stack and accepted it on that basis. A scale is about **size, weight and
+rhythm** — none of which needs a downloaded typeface, and all of which is
+missing today.
+
+⚠ **`--text-xs` IS FOR UPPERCASE TRACKED LABELS, NOT FOR SHRINKING BODY COPY
+TO WIN DENSITY.** REQ-112's density is found in layout and in the compact genre
+presentation, **not** by making content smaller than `--text-sm`. NFR-006 is
+the floor and `T-CSS-003` already forbids a raw `px` size in a rule body.
+
+| Test id | Asserts |
+|---|---|
+| `T-CSS-006` | `:root` declares every token above, and no rule body contains a raw font-size literal. |
+| `T-CSS-007` | No rendered primary content computes to a font size below `--text-sm`. |
+
+---
+
+## 7c. Icons — inline SVG, no font, no network, no dependency (OQ-8)
+
+There are **zero** icons in the application today — a search for `<svg`,
+`lucide` and `heroicon` across `apps/web/src/**` returns nothing — while
+`specs/ui.md` prose already refers to an "info icon" and a "document icon" that
+were never built, and REQ-117's destination bar cannot be built without them.
+
+> **REQ-124 (`must`) — icons are hand-authored inline SVG components**
+
+- They live in `apps/web/src/components/icons/`, one component per icon, drawn
+  on a **24 px grid** with `stroke="currentColor"` and `stroke-width="1.5"` —
+  so an icon inherits its colour from context and needs **no token of its
+  own**, and `T-CSS-003` is never tempted.
+- **No icon font, no sprite URL, and no icon package.** Each would add either a
+  network request or a runtime dependency; the owner accepted icons explicitly
+  on the basis that neither is incurred. NFR-004's small-tree preference and
+  `T-CI-007`'s egress rule both stay intact.
+- The v1 set is **closed**: `list`, `upload`, `more`, `history`, `suppressed`,
+  `rating`, `close`, `check`, `chevron`, `info`, `warning`, `search`, `image`.
+
+⚠ **AN ICON IS NEVER THE SOLE LABEL.** Every icon-only control carries an
+`aria-label`, and REQ-117's bar renders **icon over label**. An undecorated
+`<svg>` inside a button produces a control whose accessible name is **empty** —
+`axe-core` reports that as `button-name`, and in a diff it reads as a styling
+change rather than as the accessibility regression it is.
+
+| Test id | Asserts |
+|---|---|
+| `T-A11Y-016` | No `<svg>` is exposed to the accessibility tree without a name, and every icon-only control has a non-empty accessible name. |
+
+⚠ **THIS ID WAS CORRECTED IN PLACE, 2026-09-14.** It was written as
+~~`T-A11Y-014`~~, which `specs/testing.md` L1247 **already defines** for the
+US-033 refusal enumeration at 320 px. `check:test-ids` only asks whether a
+cited id is defined *somewhere*, so the collision passes every gate while**
+two unrelated behaviours answer to one name** — and TASK-209 would have
+reported **done** off a passing refusal test with no icon assertion anywhere.
+The family was enumerated at the point of naming; `016` and `017` were free.
+| `T-UI-030` | Every icon component renders `stroke="currentColor"` and declares no hard-coded colour. |
+
+---
+
+## 7d. Component primitives — build once, then reuse (OQ-8)
+
+There are **no** shared UI primitives: every button is a bare `<button>`, every
+grouping a native `<fieldset>`, and each screen re-solves the same problem
+slightly differently. That is why the screens look unrelated to each other even
+where each is individually correct.
+
+> **REQ-125 (`must`) — controls are built from named primitives**
+
+These live in `apps/web/src/components/ui/`:
+
+| Primitive | Class root | Notes |
+|---|---|---|
+| `Button` | `btn` | `btn--primary` (accent fill), `btn--secondary`, `btn--ghost`, `btn--danger`. Always `.tap-target` |
+| `Card` | `card` | The default container |
+| `Badge` | `badge` | Service badges and status chips. Tint **plus** label, never colour alone |
+| `Chip` | `chip` | The compact genre presentation of §4.3, including its `+n` overflow |
+| `SegmentedControl` | `segmented` | §5b's direction control, and the mode/service choice on `/upload`. Keeps `role="radiogroup"` semantics |
+| `Field` | `field` | Label + control + description + error, so the four cannot drift apart |
+| `EmptyState` | `empty-state` | Icon + title + body + optional action |
+| `Skeleton` | `skeleton` | Shaped like the content it replaces, so nothing jumps |
+| `Dialog` | `dialog` | Focus trap, `Esc` to dismiss |
+
+⚠ **A VARIANT IS A STATIC CLASS LOOKUP, NOT A COMPUTED STRING.** `T-CSS-001c`
+forbids `className={…}` so that `T-CSS-001`'s two directions remain an exact
+static scan. A primitive satisfies this with a **lookup from a literal map**
+keyed by the variant prop, whose values are string literals. A template literal
+stays banned: it makes the vocabulary unscannable, and an unscannable
+vocabulary is how the stylesheet and the components drift apart unnoticed.
+**`T-CSS-001c` is widened to permit that one form and nothing else.**
+
+⚠ **`.tap-target`'s 44 px FLOOR IS NOT RENEGOTIATED BY THESE.** §8 already
+flags REQ-107 as reading like licence to shrink a target. A primitive is the
+easiest place to lose it for every control at once.
+
+| Test id | Asserts |
+|---|---|
+| `T-UI-031` | Every interactive control in `apps/web/src/**` is rendered by a primitive, not by a bare `<button>` or `<fieldset>`. |
+| `T-UI-032` | Every primitive variant resolves to a static class present in the stylesheet, and no primitive uses a template-literal `className`. |
+| `T-A11Y-017` | Every `Button` meets the `--tap-target-min` floor at 320 px. ~~`T-A11Y-015`~~ — see §7c; `015` is the 280 px degradation test. |
 
 ---
 
@@ -721,7 +1216,13 @@ not *placement* — a control moved into a collapsed menu still answers to
 | **REQ-038 oldest-first reverse** | Looks like an optional extra in a menu. It is `must` (A47). | `T-UX-116` |
 | **REQ-039 per-service last-updated** | A tidy header wants to drop it. ⚠ It is the **mandatory** mitigation for RSK-007 and is `must`. **Show the fact; never nag** (`A46`). There is **no** staleness nudge and none may be added. | `T-UX-118` |
 | **`--tap-target-min: 44px`** | REQ-107 narrows the `⋮` box and reads like licence to shrink the target. It is not. | `T-A11Y-001b` |
-| **REQ-095 rating is display-only** | The rating is **rendered on the row**, so a sort menu designed from the screen will include it without ever seeing the requirement that forbids it. Decided by the owner at `A51`. | `T-UX-119` |
+| **REQ-095 rating is display-only** | The rating is **rendered on the row**, so a sort menu designed from the screen will include it without ever seeing the requirement that forbids it. ~~Decided by the owner at `A51`.~~ ⚠ **REVERSED by the owner on 2026-09-14 (`A53`, OQ-3b) — rating IS now a sort key.** The risk **inverts**: the danger is no longer adding the sort, it is **deleting `T-UX-119` instead of rewriting it** when it correctly starts failing. See §7a | ~~`T-UX-119`~~ **`T-UX-119` rewritten, plus `T-API-023`** |
+| **The rating refresh's SYNCHRONY** *(new, `A53`)* | ⚠ **This is the load-bearing half of the REQ-095 reversal and the easiest to lose.** REQ-090's refresh fires **after the response**; that was legal only while the rating could not change ordering. Under `sort=rating` it must run **inside the request, before the `ORDER BY`**. The failure mode is invisible in a unit test and invisible on screen — the list simply reorders itself between renders — and "move the await out of the hot path" reads like a performance fix. ⚠ **`T-IMDB-005b` asserted the module exports no sort helper; it will fail correctly and must be REWRITTEN, not deleted** | `T-API-024`, `T-IMDB-005` |
+| **The rating sweep's SCOPE** *(new, `A53`)* | Sweeping only the **page** instead of the **sortable set** looks like a faithful reading of ADR-0011 D-6 and produces a page ordered by pre-refresh values but rendered with post-refresh ones — an `8.4` sitting below a `7.1`. It passes any test that checks "ratings were refreshed" | `T-API-024`, `T-API-025` |
+| **`sort=name` under a BINARY collation** *(new, `A53`)* | The database collation is `Latin1_General_100_BIN2`. An unqualified `ORDER BY title` is therefore **byte order**: every lower-case title sorts after every upper-case one, and `apple` follows `Zebra`. It looks alphabetical at a glance on a list that happens to be title-cased | `T-API-027` |
+| **The genre filter's completeness** *(new, 2026-09-14)* | §4.4's normalisation is one-to-many and must be applied to **both** the display and the filter. Doing only one produces a screen that looks fixed while the facet still under-returns — and the symptom the owner reported (redundant chips) **disappears** after a display-only fix, which is exactly what makes it convincing | `T-UX-125`, `T-UX-126`, `T-API-028` |
+| **The review sections' completeness** *(new, 2026-09-14)* | REQ-122 makes three sections distinguishable. The neighbouring idea — collapsing or hiding the already-correct rows to shorten the list — **deletes the product's core safety property** and looks like the same kind of tidy-up | `T-UX-136` |
+| **Oldest-first in one action** *(new, 2026-09-14)* | §5b's field selector makes it tempting to fold direction into a single ten-option list. Every behavioural test still passes, because `click()` still reaches it | `T-UX-131` |
 | **Removed/suppressed distinction** | Two similar-looking screens invite a merge. Suppression is keyed on **canonical work identity**, removal on the listing — different mechanisms, different meanings. | REQ-071 |
 
 Everything in `specs/ui.md` §9's copy strings is owner-facing wording; changing
@@ -729,18 +1230,36 @@ one is a product decision, not a styling one.
 
 ---
 
-## 9. Open questions — for the owner, not for an agent to settle
+## 9. Open questions — ✅ ALL RESOLVED BY THE OWNER, 2026-09-14
 
-| | Question |
-|---|---|
-| **OQ-1** | §4.3 trims the added-date off the compact row, but the **default sort orders by it**. Show it, or accept an unexplained order? |
-| **OQ-2** | §6 — **which three destinations** belong in the phone bar? `specs/ui.md` §2 names four navigation-out targets from the list: `/upload`, `/removed`, `/not-interested`, `/batches`. With the list itself that is five for three slots. |
-| **OQ-3** | §5 REQ-115 — sort by **name/year** needs an API change and a decision on where **null years** sort. Worth it, or is date-added enough? |
-| **OQ-3b** | **Sort by IMDb rating is currently forbidden by REQ-095**, which you decided at `A51` (display-only). Do you still want that? If you'd now like to sort by rating, say so and it becomes a **revision to ADR-0011**, not a line in this document. |
-| **OQ-4** | ✅ **RESOLVED 2026-09-10 — the owner chose "ship all five defects now, as their own task, before the visual work."** §3 is therefore a **buildable unit** that does not wait on any remaining question here. See §11. |
-| **OQ-5** | §5 REQ-114 — the sort control's wording. `'Newest first'` / `'Oldest first'` are governed copy (`specs/ui.md` §9). A toggle is ambiguous in either direction; showing both options with the current one marked probably isn't. **Your call on the wording and the shape.** |
-| **OQ-6** | §6a — **what exactly was confusing on the review screen?** Was it (a) not seeing your correction take effect *(REQ-109 fixes this)*, (b) the length of the list, (c) not knowing what "Apply" was about to do, (d) the three sections looking alike, or (e) something else? Everything except (a) needs your answer before anything is designed. |
-| **OQ-7** | §4.3 / REQ-112 — genres are on the row **and** are a filter dimension **and** are tied to US-019 AC-6. Trim them from the phone row anyway, or keep the row as specified and find the density elsewhere? |
+⚠ **EVERY QUESTION IN THIS SECTION IS ANSWERED.** The answers were given by the
+owner directly, one question at a time, and are recorded verbatim below. Nothing
+in §4 – §7 is blocked any longer; **Epic P builds the §3 defects and the visual
+refresh together**, which is a change from OQ-4's original sequencing and is the
+owner's own instruction.
+
+⚠ **TWO ANSWERS DID MORE THAN ANSWER.** OQ-3b **reverses a decision the owner
+previously made at `A51`**, and OQ-7 surfaced a **filter-correctness bug** that
+no question in this document had asked about. Both are called out below and
+neither is a styling change.
+
+| | Question | ✅ The owner's answer |
+|---|---|---|
+| **OQ-1** | §4.3 trims the added-date off the compact row, but the **default sort orders by it**. Show it, or accept an unexplained order? | **Keep the added-date on the row.** The density REQ-112 wants is found elsewhere. REQ-112 is amended in place: the added-date is **not** trimmed |
+| **OQ-2** | §6 — **which three destinations** belong in the phone bar? Five candidates for three slots | **List, Upload, More.** Only two real destinations plus overflow; `/removed`, `/not-interested` and `/batches` all sit behind **More** |
+| **OQ-3** | §5 REQ-115 — sort by **name/year** needs an API change. Worth it? | **Yes — add both name and release year.** The API change is accepted. Null ordering is already settled by `A48` (NULLs **last in both directions**) and is not re-decided here |
+| **OQ-3b** | **Sort by IMDb rating is currently forbidden by REQ-095**, decided at `A51` | ⚠ **REVERSED at `A53` (2026-09-14). The owner now wants to sort by IMDb rating.** REQ-095's display-only rule is overturned, and the reversal is written as **ADR-0011 Revision 1** — see §7a and **§7a.1**. ⚠ **It was NOT a one-line strike:** `specs/api.md` had made REQ-095 load-bearing for **REQ-041**, so the rating refresh becomes **synchronous, sweeping the sortable set before the ordering, under a request + time budget**. The rating is nullable, so `A48`'s NULLs-last rule applies and unrated titles never lead "Highest first" |
+| **OQ-4** | ✅ **RESOLVED 2026-09-10 — "ship all five defects now, as their own task, before the visual work."** | ⚠ **SUPERSEDED 2026-09-14 by the owner**, who directed that the defects and the visual refresh ship **together as one Epic P**. §3 remains an independently buildable unit and is built **first within** that epic, so the original property — that a fixed menu is distinguishable from a moved one — is preserved by task ordering rather than by a separate release. ~~See §11.~~ *(There is no §11; the document ends at §10. Dangling reference corrected in place.)* |
+| **OQ-5** | §5 REQ-114 — the sort control's wording and shape | **Show both options with the current one marked** — a segmented control, not a toggle. ⚠ **This answer had to grow to fit OQ-3 and OQ-3b**: with five sort fields a two-option segment cannot express the field choice. See §5b |
+| **OQ-6** | §6a — **what exactly was confusing on the review screen?** | **(d) — the three sections looked alike despite meaning different things.** Not the list length, not the Apply wording. See §6a |
+| **OQ-7** | §4.3 / REQ-112 — trim genres from the phone row, or keep them? | **Keep the genres on the row, but make them take less room** — *"use another ux to make it compact but still list the genres."* ⚠ **And a second, separate finding:** *"some of the genres are redundant, for example, there is action, action & adventure, and adventure… would it not be easier just to click action and adventure separately?"* — see §4.4 |
+
+### 9.1 Two further answers, not previously asked as an OQ
+
+| | Question put to the owner | ✅ Answer |
+|---|---|---|
+| **OQ-8** | This document specifies **no typographic scale** and **zero icons**, yet REQ-117's phone bar needs icons and a single text size is the loudest signal that a page was never designed. Add both? | **Yes to both.** A type scale on the **existing system font stack** — **no web font**, so NFR-005 and `T-CI-007`'s egress rule are untouched — and **hand-drawn inline SVG** icons, so **no dependency and no network request**. See §7b and §7c |
+| **OQ-9** | §4.4's genre collision — normalise **on read** or **on write**? | **On read.** TV genre names are mapped onto the film vocabulary at query and display time. **No migration, no change to stored data, fully reversible** — which also keeps `T-MIG-001` out of the picture entirely |
 
 ---
 
@@ -751,31 +1270,66 @@ there **with** their `specs/testing.md` §9 rows and their tests, in one change.
 
 | Story | Covers |
 |---|---|
-| **US-049** | *As the owner, I can act on a title from the row I'm looking at.* → REQ-105, REQ-107 |
-| **US-050** | *As the owner, I can read a row's facts at a glance.* → REQ-106, REQ-108, REQ-112 |
-| **US-051** | *As the owner, I can see my correction took effect before I apply the batch.* → REQ-109 |
-| **US-052** | *As the owner, I can browse my list with artwork at a comfortable density.* → REQ-110, REQ-111, REQ-118 |
-| **US-053** | *As the owner, I can find and order titles without guessing what a control does.* → REQ-113, REQ-114, REQ-115 |
-| **US-054** | *As the owner, I can tell where I am and reach where I'm going.* → REQ-116, REQ-117 |
-| **US-055** *(new, `A48`)* | *As the owner, I can see how long a title is, and narrow my list to what fits the time I have.* → REQ-119, and the promoted **REQ-035** / **REQ-037** |
+| **US-049** *(promoted by TASK-218)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-105, REQ-107. |
+| **US-050** *(promoted by TASK-218)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-106, REQ-108, REQ-112. |
+| **US-051** *(promoted by TASK-218)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-109. |
+| **US-052** *(promoted by TASK-218)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-110, REQ-111, REQ-118. |
+| ~~**US-053**~~ **superseded by US-057** | ~~*As the owner, I can find and order titles without guessing what a control does.* → REQ-113, REQ-114, REQ-115~~ ⚠ **Not promoted, and must not be.** US-057 (promoted by TASK-217) already owns REQ-113, REQ-114 and REQ-115 in `docs/PRD.md` §6. Promoting this row as well would give the PRD two stories owning the same three requirements, and a coverage table that reads as agreement while nothing decides which one is authoritative when they drift. |
+| **US-054** *(promoted by TASK-218)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-116, REQ-117. |
+| **US-055** *(new, `A48`; promoted by TASK-218)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-119, and the promoted **REQ-035** / **REQ-037**. |
+| **US-056** *(promoted by TASK-213)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-120, REQ-112. |
+| **US-057** *(promoted by TASK-217)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-113, REQ-114, REQ-115, REQ-121, and the reversal in §7a. |
+| **US-058** *(promoted by TASK-218)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-122. |
+| **US-059** *(promoted by TASK-210)* | See `docs/PRD.md` §6, Epic P, and `specs/testing.md` §9. REQ-123, REQ-124, REQ-125. |
 
-**Reserved ranges** (collision-checked against the whole tree; ceilings at time
-of writing REQ-104, US-048, ADR-0012, `T-UX-099`): **REQ-105 – REQ-119**,
-**US-049 – US-055**, **`T-UX-100` – `T-UX-124`**, **`T-API-019` – `T-API-022`**,
-**`T-UI-029`**, **ADR-0013**.
-⚠ **Consumed so far:** `T-UX-100` – `T-UX-108` and **`T-API-022`** (REQ-105 –
-REQ-109, shipped); **`T-UX-120` – `T-UX-124`** and **`T-API-019` – `T-API-021`**
-(REQ-119 / REQ-035 / REQ-037, §5a runtime work, shipped). ⚠ `T-API-022` sits
-**out of numeric order** relative to `T-API-019` – `T-API-021` deliberately —
-REQ-109 shipped first — so do **not** "correct" the gap by renumbering a live
-test id.
+**Reserved ranges** ~~(collision-checked against the whole tree; ceilings at
+time of writing REQ-104, US-048, ADR-0012, `T-UX-099`): **REQ-105 – REQ-119**,
+**US-049 – US-055**, **`T-UX-100` – `T-UX-124`**, **`T-API-019` – `T-API-021`**,
+**`T-UI-029`**, **ADR-0013**.~~
+
+⚠ **EXTENDED 2026-09-14** to cover the requirements the owner's answers added.
+The full reserved set is now:
+
+| Family | Reserved | Added by |
+|---|---|---|
+| `REQ-` | **REQ-105 – REQ-125** | REQ-120 (§4.4), REQ-121 (§5b), REQ-122 (§6a.1), REQ-123 – REQ-125 (§7b – §7d) |
+| `US-` | **US-049 – US-059** | US-056 – US-059 above |
+| `T-UX-` | **`T-UX-100` – `T-UX-137`** | `T-UX-125` – `T-UX-136`; **`T-UX-137`** (REQ-117's bottom-fixed placement, resolved 2026-09-15) |
+| `T-API-` | **`T-API-019` – `T-API-028`** | `T-API-023` – `T-API-027` (§7a); `T-API-028` (§4.4). ⚠ The genre test was first written as `T-API-022`, which REQ-109 **already owns** — renumbered to `028`. A reserved range does not stay free while other work merges. |
+| `T-UI-` | **`T-UI-029` – `T-UI-032`** | `T-UI-030` – `T-UI-032` (§7c, §7d) |
+| `T-CSS-` | **`T-CSS-006` – `T-CSS-007`** | §7b |
+| `T-A11Y-` | **`T-A11Y-016` – `T-A11Y-017`** ~~`014` – `015`, both already taken~~ | §7c, §7d |
+| ADR | **ADR-0013**, plus a **revision to ADR-0011** | §7a |
+
+⚠ **CONSUMED — DO NOT RE-ISSUE THESE.** `T-UX-100` – `T-UX-108` and
+**`T-API-022`** (REQ-105 – REQ-109, shipped); **`T-UX-120` – `T-UX-124`** and
+**`T-API-019` – `T-API-021`** (REQ-119 / REQ-035 / REQ-037, the §5a runtime
+work, shipped in `4137666`). ⚠ `T-API-022` sits **out of numeric order**
+relative to `T-API-019` – `T-API-021` deliberately — REQ-109 shipped first — so
+do **not** "correct" the gap by renumbering a live test id.
+
 ⚠ **`T-UX-109` – `T-UX-119` remain reserved and unimplemented**, except
-`T-UX-119`, which is a REQ-095 regression guard defined in §5.
-~~Superseded: "`T-API-019` – `T-API-021` remain reserved for the §5a runtime
-work and are not yet implemented."~~
-⚠ **`T-API` ids run in the teens, not the sixties.** The `A48` rows were first
-written as `T-API-062`–`064` by analogy with the `T-UX-1xx` range and corrected
-before they reached a test: the whole tree's ceiling is `T-API-018`. An id
+`T-UX-119`, which is a REQ-095 regression guard defined in §5. ⚠ Note that
+**`T-UX-119` guards a rule REQ-095 no longer states** — the owner reversed it
+at `A53` (§7a). Read §7a.1 before touching it; it is not simply deletable.
+
+⚠ **The ids added on 2026-09-14 ARE now registered** in `specs/testing.md` §39,
+in the same commit that wrote their owning tasks (TASK-208 – TASK-218).
+~~Superseded: "NONE OF THESE IDS IS REGISTERED IN `specs/testing.md` YET… a
+search of `specs/testing.md` for the whole reserved `T-UX-1nn` range returns
+zero rows."~~ That had to be one commit, not two: `check:test-ids` fails on a
+**cited** id that is not defined, and `check:orphans` fails on a **defined** id
+that no task cites — registering the 44 ids alone failed the second gate with
+44 orphans. The two gates are a vice, and §1's sequencing rule is what it is
+because of them.
+⚠ **`T-API` ids run in the teens and twenties, not the sixties.** The `A48` rows
+were first written as `T-API-062`–`064` by analogy with the `T-UX-1xx` range and
+corrected before they reached a test: the whole tree's ceiling is **`T-API-027`**
+as of 2026-09-14. ~~"the whole tree's ceiling is `T-API-018`" — true when
+written, stale once REQ-109 and the runtime work shipped 019–022~~. ⚠ The
+**lesson is not the number** — enumerate the family for a free id every time
+rather than quoting this sentence's ceiling, which goes out of date on every
+merge. An id
 invented ahead of its sequence is not a harmless label — `T-META-009b` matches
 on the base number, so a plausible-looking id can acquire a defining row and a
 green gate while belonging to no series at all.

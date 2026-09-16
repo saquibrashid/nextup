@@ -1,3 +1,4 @@
+import { Input } from './ui/Input';
 /**
  * TASK-068 — the three actions an unmatched candidate carries
  * (`specs/ux-states.md` §6.8, US-008 AC-2/AC-4). `T-UNM-010`, `T-UX-063`.
@@ -50,6 +51,7 @@ import {
 } from '../copy';
 import { resultLabel } from './ManualEntryPanel';
 import type { TmdbSearchResult } from '../lib/apiClient';
+import { Button } from './ui/Button';
 
 export type CandidateActionsVariant = 'unmatched' | 'addition';
 
@@ -242,9 +244,8 @@ export function UnmatchedActions({
     <div className="unmatched-actions" data-testid={`${variant}-actions`}>
       <div className="unmatched-actions__buttons">
         {/* ⚠ FIRST. See the header note — this is the outcome US-008 exists for. */}
-        <button
-          type="button"
-          className="tap-target"
+        <Button
+          variant="secondary"
           data-testid={`${variant}-keep`}
           disabled={busy}
           onClick={() => {
@@ -257,10 +258,9 @@ export function UnmatchedActions({
           }}
         >
           {copy.keepLabel}
-        </button>
-        <button
-          type="button"
-          className="tap-target"
+        </Button>
+        <Button
+          variant="secondary"
           data-testid={`${variant}-find`}
           disabled={busy}
           onClick={() => {
@@ -268,10 +268,9 @@ export function UnmatchedActions({
           }}
         >
           {searchOpen ? UNMATCHED_CANCEL_LABEL : copy.findLabel}
-        </button>
-        <button
-          type="button"
-          className="tap-target"
+        </Button>
+        <Button
+          variant="secondary"
           data-testid={`${variant}-discard`}
           disabled={busy}
           onClick={() => {
@@ -284,14 +283,14 @@ export function UnmatchedActions({
           }}
         >
           {copy.discardLabel}
-        </button>
+        </Button>
       </div>
 
       {searchOpen && (
         <>
           <form className="unmatched-actions__form" onSubmit={search}>
             <label htmlFor={`${variant}-q-${candidateId}`}>{UNMATCHED_SEARCH_LABEL}</label>
-            <input
+            <Input
               id={`${variant}-q-${candidateId}`}
               type="search"
               value={query}
@@ -299,9 +298,9 @@ export function UnmatchedActions({
                 setQuery(event.target.value);
               }}
             />
-            <button type="submit" className="tap-target" disabled={searching}>
+            <Button variant="secondary" type="submit" disabled={searching}>
               {searching ? UNMATCHED_SEARCHING : UNMATCHED_FIND_LABEL}
-            </button>
+            </Button>
           </form>
 
           {searchFailed && <p role="alert">{UNMATCHED_SEARCH_FAILED}</p>}
@@ -314,9 +313,8 @@ export function UnmatchedActions({
                   key={`${result.mediaType}:${String(result.tmdbId)}`}
                 >
                   <span>{resultLabel(result)}</span>
-                  <button
-                    type="button"
-                    className="tap-target"
+                  <Button
+                    variant="secondary"
                     disabled={busy}
                     onClick={() => {
                       run(
@@ -328,7 +326,7 @@ export function UnmatchedActions({
                     }}
                   >
                     {UNMATCHED_MATCH_LABEL.replace('{name}', result.name)}
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>

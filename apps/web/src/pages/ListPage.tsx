@@ -39,6 +39,7 @@ import { LoadMoreSentinel } from '../components/LoadMoreSentinel';
 import { SlowResponseNotice } from '../components/SlowResponseNotice';
 import { useSlowRequest } from '../lib/useSlowRequest';
 import type { TitleListItem } from '../components/TitleRow';
+import { Button } from '../components/ui/Button';
 import {
   ADD_TITLE_LABEL,
   LIST_LOADING_BODY,
@@ -272,9 +273,8 @@ export function ListPage({
       */}
       {addWired && (
         <>
-          <button
-            type="button"
-            className="tap-target"
+          <Button
+            variant="secondary"
             data-testid="add-title-open"
             disabled={offline}
             onClick={() => {
@@ -282,7 +282,7 @@ export function ListPage({
             }}
           >
             {ADD_TITLE_LABEL}
-          </button>
+          </Button>
           {offline && (
             <span className="offline-reason" data-testid="add-title-offline-reason">
               {OFFLINE_DISABLED_REASON}
@@ -391,17 +391,32 @@ export function ListPage({
         </div>
       ) : (
         <>
-          <FilterBar
-            genres={genres}
-            shown={shown}
-            total={unfilteredTotal}
-            totalIsLowerBound={totalIsLowerBound}
-            runtimeUnknownHidden={runtimeUnknownHidden}
-          />
-          <SortControl />
+          {/*
+            REQ-113 (`specs/ui-refresh.md` §5) — the filters and the sort are
+            ONE control group. They were two stacked bars, which read as two
+            unrelated decisions about the same list.
+
+            ⚠ THE WRAPPER IS PRESENTATION ONLY. `FilterBar` renders from the
+            URL and writes to it with no `useState` mirror; `SortControl` runs
+            URL → session → default. §5's table is explicit that the two
+            persistence models are deliberately opposite, and hoisting either
+            into shared state here is the failure it warns about: the suite
+            stays green and the back button stops working.
+          */}
+          <div className="list-controls" data-testid="list-controls">
+            <FilterBar
+              genres={genres}
+              shown={shown}
+              total={unfilteredTotal}
+              totalIsLowerBound={totalIsLowerBound}
+              runtimeUnknownHidden={runtimeUnknownHidden}
+            />
+            <SortControl />
+          </div>
           <TitleList
             items={visible}
             pendingTitleIds={pendingTitleIds}
+            activeGenres={filters.genres}
             {...(rowActionsWired
               ? {
                   onOpenMenu: (item: TitleListItem) => {

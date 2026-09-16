@@ -203,6 +203,20 @@ const BASELINE_UNSUPPLIED = new Set([
   'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.logoPath',
   'apps/web/src/components/TmdbAttribution.tsx TmdbAttribution.omdbDisclaimer',
   'apps/web/src/containers/OwnerGate.tsx OwnerGate.client',
+  // ⚠ THE SECOND MODE OF A TWO-MODE CONTRACT, NOT A DEAD BRANCH — and it
+  // passes the test written three comments above: the DEFAULT is the correct
+  // production behaviour, and the prop only swaps which of two correct
+  // renderings you get. `specs/ui-refresh.md` §7c requires every icon to be
+  // decorative (`aria-hidden`) beside a visible label and NAMED (`role="img"`)
+  // when it stands alone. Every icon in the product today sits either beside
+  // its own text (the phone bar renders icon over label) or inside a control
+  // that carries its own `aria-label` (the `⋮` row menu, which §7c names as
+  // built exactly that way) — so omitting `label` is the RIGHT call at every
+  // current call site, and supplying it would double-name the control.
+  // `T-A11Y-016b`/`c` prove the named mode works for all thirteen icons, and
+  // `T-INFRA-013g` forces this entry out of the baseline the moment a real
+  // standalone icon needs it.
+  'apps/web/src/components/icons/IconBase.tsx Icon.label',
   'apps/web/src/pages/ReviewPage.tsx ReviewPage.storage',
 ]);
 
@@ -472,7 +486,15 @@ describe('T-INFRA-013 nothing finished is left unreachable', () => {
     const modules = FILES.filter((f) => /[\\/](components|pages)[\\/]/.test(f));
     const unmounted = modules.filter((file) => {
       const base = path.basename(file).replace(/\.tsx?$/, '');
-      const imported = new RegExp(`from '[^']*/${base}'`);
+      // ⚠ A BARREL IS IMPORTED BY ITS DIRECTORY, NOT BY ITS FILE NAME.
+      // `components/icons/index.ts` is reached as `from './icons'`; matching
+      // only `/index'` reported the register of REQ-124's closed icon set as
+      // unmounted while every consumer imported through it. Resolving the
+      // specifier the way the bundler does is the fix — naming the barrel
+      // `from './icons/index'` at each call site to satisfy the gate would be
+      // bending the product to the test.
+      const specifier = base === 'index' ? path.basename(path.dirname(file)) : base;
+      const imported = new RegExp(`from '[^']*/${specifier}'`);
       for (const [other, text] of TEXT) {
         if (other === file) continue;
         if (imported.test(text)) return false;

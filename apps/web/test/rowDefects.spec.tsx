@@ -174,7 +174,18 @@ describe('REQ-106 — independent facts in the metadata line are separated', () 
 
     const meta = screen.getAllByTestId('title-meta')[0];
     if (meta === undefined) throw new Error('no metadata line rendered');
-    const order = Array.from(meta.querySelectorAll('span')).map((s) => s.dataset['testid']);
+    // ⚠ `:scope > *`, NOT `querySelectorAll('span')` — widened at TASK-213,
+    // and widening it is what keeps the assertion exact. REQ-112 made the
+    // genre cell a container of chip `<span>`s, so an unscoped span sweep now
+    // returns the chips too and the expected array below would have had to
+    // grow a `undefined` entry per genre — turning a statement about the ORDER
+    // OF THE FOUR FACTS into a statement about how many genres the fixture
+    // happens to carry. Direct children only, and any element type, so the
+    // cell can change shape again without this test either breaking or going
+    // vague.
+    const order = Array.from(meta.querySelectorAll<HTMLElement>(':scope > *')).map(
+      (s) => s.dataset['testid'],
+    );
     expect(order).toEqual(['release-year', 'media-type', 'genres', 'runtime']);
 
     // The separator is generated, so the RULE is the assertion: jsdom does not

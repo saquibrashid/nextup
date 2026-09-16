@@ -1343,6 +1343,133 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 
 ---
 
+### US-049 — Act on a title from the row I'm looking at
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | **`T-UX-100`** | The opened `role="menu"` is inside that row's `<li>` and is **not** a sibling of the list (`apps/web/test/rowDefects.spec.tsx`). ⚠ **The DOM-ancestry assertion is the whole test** — jsdom performs no layout, so any position assertion would pass vacuously against the page-level mount that caused the reported bug. |
+| AC-2 | U | `T-UX-100` | Opening a second row's menu **moves** the mount rather than leaving two open. |
+| AC-3 | U | `T-UX-101` | `.title-row__actions` is `position: relative` and `.row-menu` is `position: absolute`, read out of `index.css` **as a file**. ⚠ A child that is not positioned is still laid out in flow, which reproduces the reported bug with the correct DOM — so AC-1 alone does not imply this. |
+| AC-4 | U | `T-UX-104` | `.title-row__actions` carries `align-items: flex-start`, so the `⋮` sits level with the title rather than centring itself against a two- or three-line body. |
+| AC-5 | U | `T-A11Y-001b` | `--tap-target-min: 44px` still governs the control. ⚠ REQ-107 narrows the **box** and reads like licence to shrink the **target**; it is not, and this is the case that says so. |
+
+---
+
+### US-050 — Read a row's facts at a glance
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | `T-UX-102` | `.title-row__meta` is a wrapping flex row and a `span + span::before` rule supplies the `·`. ⚠ **Asserted as a CSS rule, not as text**: jsdom does not render `::before`, so the character never reaches `textContent` and a text assertion would pass whether or not the rule exists. |
+| AC-2 | U | `T-UX-103` | The rendered order is year → type → genres → runtime, matching `specs/ui.md` §2.2. ⚠ Read as **direct children** of the meta line, so the case survives the genre chips being nested elements rather than bare spans. |
+| AC-3 | U | `T-UX-105` | The row body uses `--space-2` rather than `--space-1`, and the menu shadow is a `:root` token — which exists because `T-CSS-003c` forbids an `rgb()` literal outside `:root`, and an inline shadow would have evaded the hex rule by changing notation. |
+| AC-4 | U | `T-UX-127` | At most `GENRE_CHIP_LIMIT` chips plus a `+n` control. ⚠ **The owner asked for compact, not fewer** (`A53` OQ-7) — trimming the genres is the obvious reading of "compact" and the wrong one. |
+| AC-5 | U | `T-UX-127` | Active-filter genres are hoisted to the front (`d`) and the limit yields to them via `Math.max` (`e`). ⚠ A filtered-on genre hidden behind `+n` makes the row look like it does not match the filter that returned it. |
+
+---
+
+### US-051 — See my correction took effect before I apply the batch
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | `T-UX-106` | After `onMatch` resolves the card renders the **corrected** name and poster URL, not the extracted one (`apps/web/test/correctedMatchVisible.spec.tsx`). |
+| AC-2 | U | **`T-UX-107`** | The corrected title survives a **re-render from server state** (`disposition: 'corrected'`) — the case renders from server state **with no click at all**. ⚠ **This is the case that rejects the cheap fix.** Keeping the corrected name only in client state looks correct in the click path and breaks on exactly the re-render this requirement exists to fix, which is the present bug rebuilt. |
+| AC-3 | U | `T-UX-108` | The correction is announced in a live region — the same principle as `BatchAppliedNotice`: a mutation the owner cannot see is a mutation they will not trust. |
+| AC-4 | U/I | **`T-API-022`** | The corrected display fields live in their own columns (`0008_corrected_display`), projected through `chosenReviewMatch`; `matchCandidates` is **not** rewritten — `b` proves it by leaving the rejected guess in `alternatives` and requiring the corrected branch to win anyway, so deleting that branch re-serves the rejected film. `i`/`j` are the integration half and the only place the three columns and the `0008` migration meet a real database. ⚠ `tmdbFieldsFor` chooses metadata **by identity, never by position** precisely because an earlier version read `alternatives[0]` at close and stored the film the owner had just rejected — and `title_match_coherent` does not catch that, because it checks null-ness, not agreement. |
+| AC-5 | U | `T-API-022`, `T-UX-106` | The corrected identity is **projected from stored columns**, never re-fetched (`T-API-022a`–`c`), and the card renders it from that projection (`T-UX-106g` exercises the click path). Together they are the assertion that the correction path makes **no network call**: *"a TMDB outage must not stop the owner fixing a wrong match"*. ⚠ This is why the display fields are carried by the client rather than fetched server-side — option 2 in §3 was rejected for reversing exactly this decision, and it would pass AC-1 and AC-2 unchanged. |
+
+---
+
+### US-052 — Browse my list with artwork at a comfortable density
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | `T-UX-110` | The compact list is the **base** rule (`apps/web/test/listSurface.spec.tsx`). ⚠ **Reads `index.css` as a FILE** — jsdom computes no layout, so a rendered-width assertion would pass against any stylesheet at all. |
+| AC-2 | U | `T-UX-111` | The grid is a `min-width` addition, and `T-UX-111a` asserts `--bp-lg ≤ 1280` because the requirement names 1280 px while the rule names the token — the two must be shown to agree. `T-CSS-001d` separately forbids `max-width` anywhere. |
+| AC-3 | U | **`T-UX-112`** | The row overflow menu offers the **same item set** in both layouts. ⚠ **The mechanism is that there is exactly ONE DOM**, restyled — two layouts built as two components become two action sets that drift, and the drift is invisible until an action exists on only one screen size. |
+| AC-4 | U | `T-UX-110`, `T-A11Y-001` | No horizontal scroll at 320 px. |
+| AC-5 | U | `T-CSS-004` | Every pair is **recomputed from the token values**, not compared against documented ratios. ⚠ `indigo-400 #818cf8` is 2.98:1 on white and fails the 3:1 non-text floor; `#a5b4fc` is 1.99:1. It is the exact shade one reaches for for a soft focus ring, and it looks entirely adequate. |
+
+---
+
+### US-054 — Tell where I am and reach where I'm going
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | `T-UX-117` | `aria-current="page"` **and** a non-colour cue, the cue read out of `index.css` — jsdom applies no stylesheet, so a DOM query cannot see that a rule exists. ⚠ `specs/ui.md` §10.2: colour alone is not a signal. |
+| AC-2 | U | `T-UX-132` | Below `--bp-sm` the bar renders exactly `/`, `/upload` and `More`, and **every other nav route** reaches the overflow. ⚠ **Corrected in place at TASK-211**: the row named a closed list written when three routes were the whole overflow, and Epic L and Epic M each added one that the closed reading stranded. ⚠ `d` pins the breakpoint to **one** number across `:root`, the `@media` prelude and TypeScript — three copies that disagree put the JavaScript on a phone while the stylesheet is on a desktop, with no error anywhere. |
+| AC-3 | U | **`T-UX-133`** | An overflow route is still marked when open (`a`) and still reachable by direct URL (`b`). ⚠ **This is why the panel defaults to open when the current route is inside it**: with a plain `useState(false)` a deep link renders a closed disclosure, the marked element does not exist, and the requirement is unsatisfiable rather than merely unmet. `c` keeps the auto-open a **default, not a lock**. |
+| AC-4 | U | `T-UX-133` | Each destination keeps a real `href` rather than a click handler that pushes history (`e`) — a handler breaks middle-click, open-in-new-tab and every assistive technology that reads links. |
+| AC-5 | U | `T-UX-118` | `/upload` stays a first-class slot, and the freshness strip deep-links to it with the service pre-selected **including when the dates are unavailable**. ⚠ REQ-039 is the mandatory mitigation for RSK-007 — the list going out of date without the owner noticing. **Show the fact; never nag about it** (`A46`). |
+| AC-6 | U | **`T-UX-137`** | On a phone the bar is **fixed to the bottom edge**, with matching shell clearance, an upward-opening `More` panel, safe-area handling, and a full reset above `--bp-sm`. ⚠ **Asserted against `index.css` and `index.html` as files** — jsdom lays nothing out, so every rendered assertion about position passes vacuously, including against the header-mounted bar this replaces. ⚠ `e` is the half invisible in the CSS: without `viewport-fit=cover` the safe-area insets are `0` everywhere and the bar sits under the iPhone home indicator. |
+
+---
+
+### US-055 — See how long a title is, and narrow to the time I have
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | `T-UX-121` | The row renders the runtime last in `Year · type · genres · runtime`. |
+| AC-2 | U | `T-UX-121` | `1h 55m` for a film, `45m/ep` for a series. ⚠ **The `/ep` suffix is the requirement, not a flourish**: `tmdbClient.readRuntime` takes the first element of TMDB's `episode_run_time`, so the stored number is ONE EPISODE, and a bare `45m` beside a nine-season series is false in the direction that matters. |
+| AC-3 | U | **`T-UX-122`** | A `null` runtime renders the **words** `Runtime unknown` — never `0m`, never an empty slot; a stored `0` is unknown too. ⚠ One case reads `TitleRow.tsx` as a **file** and fails if the wording is inlined rather than imported from `copy.ts` — a literal passes every other assertion here and silently forks the copy. ⚠ `d`–`g` are the domain half: `isKnownRuntime` is the single rule for display, filtering **and** ordering, and they were **not sufficient** — they pass over the in-memory comparator while SQL `ORDER BY`, which they cannot reach, disagreed (`T-API-019e`). |
+| AC-4 | U/I | `T-UX-123`, `T-API-021` | Boundaries are **half-open**, so a 60-minute title is in `60-120` and not in `30-60`. ⚠ **The 60-minute case looks arbitrary and is not**: an inclusive upper bound puts one title in two buckets, and any count over the buckets then contradicts the list it describes. ⚠ An unknown token is dropped client-side — a stale link must not be an error screen — while being a 400 at the API. |
+| AC-5 | U | ⚠⚠ **`T-UX-124`** | The hidden-unknown disclosure renders with the **server's** count while a runtime filter is active, and not at all without one. ⚠ **Product invariant 2 in a new place** — nothing leaves the owner's list without telling them. ⚠ **The count cannot be computed in the browser**: the excluded rows were never sent, so anything derived from `items` counts what *survived* the filter and would read `0` on every list while looking right in every fixture. ⚠ `0` and `null` both render nothing but are different facts, asserted separately. |
+| AC-6 | U | `T-UX-120` | Selecting runtime relabels the direction to *Shortest/Longest first*. ⚠ **The label is the only thing on screen that says what the order means**, so "Newest first" over a runtime-ordered list is a false statement the owner has no way to check — not merely an imprecise one. |
+
+---
+
+### US-056 — Filter by a genre and get every title in it
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | `T-UX-125` | `normaliseGenres` maps each combined name to its constituents and drops the combined name itself (`a`–`e`), and the row renders the result (`f`–`h`). The map is a **closed literal**: `Sci-Fi & Fantasy` must yield `Science Fiction`, which no `" & "` split can produce. |
+| AC-2 | U | `T-UX-126` | No combined name survives into the filter options. ⚠ The facet is **client-derived** from the rows' own genres (`collectGenres`), so it normalises with the same map — otherwise a combined name becomes a clickable option that always returns nothing. |
+| AC-3 | I | **`T-API-028`** | `?genre=Action` returns both the film and the television title (`a`); **both** constituents reach a combined name, so the map is one-to-many (`b`); `War` reaches `War & Politics` (`c`); both halves of `Sci-Fi & Fantasy` resolve (`d`); and the expansion does **not** widen an unrelated genre (`e`) or compose wrongly with another filter dimension (`h`). ⚠ **This is the AC a display-only fix fails while every visible symptom is gone.** |
+| AC-4 | U | `T-UX-125`, `T-API-028` | Both halves derive from one closed map at read time; `storedGenreVariants` is derived from `TV_COMBINED_GENRES` rather than written as a second literal, so display and filter cannot drift. No migration exists to check, which is the point. |
+| AC-5 | U | `T-UX-127` | At most `GENRE_CHIP_LIMIT` chips plus a `+n` control (`a`–`c`); active-filter genres are **hoisted** to the front (`d`) and the limit yields to them via `Math.max` (`e`), so four active genres show four chips. The limit is a **count, not a measurement** — measuring a line needs layout, which needs a browser. |
+| AC-6 | U/I | `T-UX-125`, `T-API-028` | `normaliseGenres([])` returns `[]` with no default and the row renders nothing (`T-UX-125e`); an empty-genre title stays excluded under the widened `OR` (`T-API-028g`). ⚠ The second half is not redundant: widening an `OR` is exactly the change that accidentally starts matching everything. |
+
+---
+
+### US-057 — Order the list by any fact it shows me
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | `T-UX-113` | Both controls mount inside `.list-controls` on the **real page** (`a`), and merging them visually does not merge them mechanically (`b`) — the direction persists to session storage, a filter never does. ⚠ §5's table calls a shared hook across this group the single most likely way to break working behaviour in the refresh: green suite, broken back button. |
+| AC-2 | U | `T-UX-119`, `T-UX-120` | `SORT_KEYS` is exactly the five API tokens from `TITLE_SORTS`, **including `rating`** — the reversal of REQ-095 at `A53`, guarded pointing the other way so it cannot be quietly undone. ⚠ `T-UX-120f` now guards the **near miss**: `imdbRating` is a plausible-looking spelling the API rejects, which is more dangerous than a forbidden key because it looks right in a URL. |
+| AC-3 | U | **`T-UX-128`** | Two options, one marked, no button (`a`–`c`), rendered `desc` then `asc` whatever is current (`d`). ⚠ `c` is the case a toggle fails and **only** a toggle fails — it counts what is on screen, which is the one thing a single control cannot fake. |
+| AC-4 | U | `T-UX-129` | Labels per field (`a`); the date pair reused verbatim for **both** date-shaped fields (`b`). Governed copy under `specs/ui.md` §9 — §8 is explicit that rewriting owner-facing wording is a product decision. |
+| AC-5 | U | **`T-UX-131`**, `T-UX-116` | One interaction from the control (`T-UX-131a`) and one from the default page (`T-UX-116a`), with the target visible **without opening anything first** (`T-UX-131b`). ⚠ The last is not pedantry: a collapsed `<select>` of combined options passes a one-`click()` assertion because jsdom does not model the press that opens it. |
+| AC-6 | U | `T-UX-130`, `T-UX-114` | Field change preserves `dir` (`130a`), both changes preserve the filters (`130b`, `130c`, `T-UX-114a`), and neither writes a `cursor` (`130d`). ⚠ A date cursor sent with `sort=runtime` is a keyset that does not mirror its own `ORDER BY`; the API answers `INVALID_CURSOR` rather than a page of quietly wrong rows. |
+| AC-7 | U | `T-UX-115`, `T-UI-024o`–`q` | The remembered direction reaches the **query string** and the mark agrees (`115a`), survives a field whose default differs (`115b`), and yields to an explicit `dir` in the URL (`115c`). ⚠ **Asserting either half alone passes on the broken version**, which renders the remembered direction without writing it and shows a newest-first list under an oldest-first mark. |
+
+---
+
+### US-058 — Tell an addition from a removal without scrolling back
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | `T-UX-135` | Each section's label and count sit in its `<summary>` (`a`) and the three carry different surface treatments (`e`). ⚠ The treatment is read as a **class**, not a computed style — jsdom applies no stylesheet, and `T-CSS-001b` is what proves the class the page asks for is one the stylesheet actually defines. |
+| AC-2 | U | **`T-UX-134`** | Addition and removal differ by their own text (`a`, `b`) with **no heading in either subtree** (`c`). ⚠ `c` is the case that separates this fix from restyling the headings: a long review is scrolled, and a case that read the heading above the card would pass against the defect the owner reported. |
+| AC-3 | U | `T-UX-134` | All three consequence strings differ (`e`), every removal row carries one rather than the first only (`f`), and no card merely repeats its section label (`d`). ⚠ `d` refuses the near-miss that passes `a`–`c` while re-coupling the card to the heading it is supposed to survive. |
+| AC-4 | U | `T-UX-135` | The removals section carries `review-section-marker` (`b`) and no other section claims it (`d`) — *"most distinct of them"* is a comparison, false the moment the marker becomes decoration applied everywhere. |
+| AC-5 | U | `T-UX-135` | The marker's **rendered text** is non-empty and contains letters (`c`). ⚠ `specs/ui.md` §10.2: the left rule is invisible in greyscale, to roughly one man in twelve, and to every screen reader. A restyle to a bare coloured dot fails here rather than in the field. |
+| AC-6 | U | ⚠⚠ **`T-UX-136`** | Every extracted candidate is in the DOM (`a`), the already-correct section is present by name and count (`b`), it is neither `hidden` nor inside an `aria-hidden` wrapper (`c`), and the order is unchanged (`d`). ⚠ **Product invariant 2.** Hiding the boring section is the most tempting way to make this screen feel shorter and the exact change that makes a failed extraction readable as a removal. |
+| AC-7 | U | `T-UX-136`, `T-UI-008` | Removals stay last (`136d`) and keep no per-row remove affordance (`T-UI-008`, REQ-020) — they are confirmed as one group, so the owner is never one stray tap from a deletion. |
+
+---
+
+### US-059 — The app looks like it was designed
+
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | U | `T-CSS-006`, `T-CSS-007` | Closed type scale and minimum primary-content size. |
+| AC-2 | U | `T-UI-030`, `T-A11Y-016` | Closed inline icons, inherited colour, decorative and named modes. |
+| AC-3 | U | `T-UI-031`, `T-UI-032`, `T-CSS-001` | Native form controls live in primitives; static maps are validated through the TypeScript AST, and the class vocabulary agrees in both directions. |
+| AC-4 | U/E | `T-UI-031`, `T-A11Y-017` | Native button behaviour and all four variants measured at 320 px in Chromium and Mobile Safari. |
+| AC-5 | U | `T-UI-031`, `T-A11Y-006` | Shared dialog focus contract and accessible field associations. |
+
+---
+
 ## 9A. Structural tests not owned by a single acceptance criterion
 
 A small number of tests guard structure that **several** acceptance criteria
@@ -1946,7 +2073,7 @@ owned by their own tasks**.
 | **`T-API-019`** | U+I | **REQ-037 · `sort=runtime` orders by runtime with `NULL`s last in BOTH directions**, tie-broken by `title.id` ascending (`apps/api/test/integration/titleRuntime.spec.ts` for `a`–`i`; `packages/domain/test/titleRuntime.spec.ts` for `j`–`m`). ⚠ **`a`–`i` are INTEGRATION, and they cannot be anything else.** SQL Server sorts `NULL` **first** on `ASC`, so the comparator cases (`j`–`m`) assert nothing about a query whose `ORDER BY` omits `NULLS LAST` — the two disagree only in the reversed direction, which is one click away. **Both halves are required; neither substitutes for the other.** ⚠ **`n`–`s` are the SORT-AWARE CURSOR** (`apps/api/test/unit/titlesQuery.spec.ts`): `sort=runtime` cuts a `{sortRuntime, id}` cursor and the date sort keeps `{sortDateAdded, id}`, told apart by **key set** and never by a `sort` field inside the envelope — a field would make the two shapes structurally identical and destroy the pre-existing exact-two-keys check that turns a cursor carried across a sort change into a loud `INVALID_CURSOR` for free. `o` pins that a **`NULL` runtime is a legitimate encodable position**: refusing to encode one truncates every runtime-sorted list at the first unknown runtime. `p`/`q` are the unit half of `h`, in both directions. ⚠ **`f` and `g` are the load-bearing cases**: `runtimeKeyset` has THREE branches over a nullable column, and the branch admitting the `NULL` block is invisible to any single-page test — the list simply ends at the first unknown runtime and looks complete. `f` walks every page at `limit=2` in both directions and asserts nothing is lost or repeated; `g` forces every boundary to land *inside* the null block. ⚠ **`e` pins that a zero or negative runtime CANNOT BE STORED AT ALL** — it is the case that failed in CI and was fixed by `0009_runtime_unknown_is_null`, not by another assertion. The application treated `0` as unknown when displaying, filtering and counting, and **could not** when ordering: `ORDER BY` sees a number, Prisma's `orderBy` has no `CASE`, and raw SQL here would leave `T-SEC-021`'s textual `ownerId` check. Rather than teach a fourth consumer the convention, the state was deleted — existing rows normalised to `NULL`, a `CHECK` constraint against new ones. Four consumers agreeing by convention holds only while every future reader remembers it; a constraint holds without being remembered. ⚠ `h` pins that a DATE cursor under `sort=runtime` is a **400**, not a plausible page of wrong rows. ⚠ `i` pins that the default sort did not move. |
 | **`T-API-020`** | I | **REQ-035 · `runtimeUnknownHidden` counts the WHOLE filtered set**, never the returned page and never the client (`apps/api/test/integration/titleRuntime.spec.ts`). ⚠ **`b` is the defect case**: a page-scoped count under-reports, and under-reports *differently* on every page, so a disclosure whose number changes as the owner scrolls is worse than none — it asserts `5` while the page holds one row. ⚠ `a` and `c` pin `null` (no runtime filter, "not asked") against `0` (filter active, nothing hidden) as **different states** that must not be collapsed into one falsy check. ⚠ **`d` is the complement case**: what the filter excludes for want of a runtime must appear in the number that says how many it hid, and it asserts the two add back up to the unfiltered total. It used to seed a stored `0`; since `0009_runtime_unknown_is_null` that is unrepresentable (see `T-API-019e`), so `runtimeFilter`'s `> 0` floor and the `<= 0` arm of the count predicate are now **defence in depth** — kept, and pinned as agreeing, because removing either on the grounds that "zero cannot happen now" would make the next change that relaxes the constraint silently wrong again. ⚠ `e` pins that it respects the other active filters, so the two numbers on screen add up. |
 | **`T-API-021`** | U | **REQ-035 · an unrecognised `runtime` bucket is a 400**, per §3's enum rule (`apps/api/test/unit/titlesQuery.spec.ts`). Dropping the token instead would answer an unfiltered list to a request that explicitly asked for a filter — the owner sees *more* titles than they asked for and nothing says why. ⚠ The accepted set is pinned against the domain's `RUNTIME_BUCKETS` rather than a copied list, so a bucket added there and forgotten here is a 400 on a token the UI renders. ⚠ The same block pins **`sort=imdbRating` as a 400** (REQ-095 / `A51`): the rating is display-only and no sort key for it may exist on either side. |
-| **`T-UX-119`** | U | **REQ-095 · NO sort option exposes the IMDb rating, and none ever may** (`apps/web/test/sortControl.spec.tsx`). ⚠ **This is a STANDING NEGATIVE (`A51`), not a not-yet-built feature.** The rating is display-only: the owner decided a rating-ordered list would quietly become the product's opinion of what to watch next, which is the one thing this list must not have. ⚠ It asserts over the **rendered** sort keys rather than the source, so a key added to `SORT_KEYS` and wired up is caught even if no one greps for the word "rating". A regression here looks like a helpful feature in review — the defence has to be a failing test. |
+| **`T-UX-119`** | U | ⚠ **REWRITTEN AT `A53` — REVERSED, NOT DELETED.** It now asserts the sort field selector **does** offer the IMDb rating, and that selecting it issues `sort=rating` (`apps/web/test/sortControl.spec.tsx`). ⚠ **Read ADR-0011 Revision 1 and `ui-refresh.md` §7a.1 before touching it.** The reversal is not a one-line flip of the assertion: REQ-095's display-only rule was **load-bearing for REQ-041**, because the rating refresh writes *after* the response, so an ordering built on it could be silently reordered by a background write between renders. The rating sort is legal **only** because the sweep now runs synchronously inside the request, ahead of the `ORDER BY` — `T-API-024` is the guard for that half, and this id is worthless without it. ~~Superseded (`A51`): "**REQ-095 · NO sort option exposes the IMDb rating, and none ever may.** A STANDING NEGATIVE, not a not-yet-built feature. The rating is display-only: the owner decided a rating-ordered list would quietly become the product's opinion of what to watch next, which is the one thing this list must not have."~~ ⚠ **The `A51` reasoning above was sound and the owner overrode it knowingly** — it is struck because the decision changed, **not** because it was wrong. Keep asserting over the **rendered** sort keys rather than the source, so the inverse regression — the rating key silently disappearing from `SORT_KEYS` — is caught too. |
 | **`T-UX-120`** | U | **REQ-037 · selecting Runtime relabels the direction toggle** to *Shortest/Longest first* (`apps/web/test/sortControl.spec.tsx`). ⚠ **The label is the only thing on screen that says what the order means**, so "Newest first" over a runtime-ordered list is a false statement the owner has no way to check — not merely an imprecise one. ⚠ Changing the key does **not** reset the direction (`desc` is "most of the thing first" under both keys), and returning to `dateAdded` **removes** `sort` rather than writing the default. ⚠ The key is deliberately **not** persisted in session storage, unlike the direction. ⚠ `SORT_NEWEST_LABEL` / `SORT_OLDEST_LABEL` are **not rewritten** — REQ-114's replacement wording is **OQ-5**, still open with the owner. |
 | **`T-UX-121`** | U | **REQ-119 · the row renders the runtime** — `1h 55m` for film, `45m/ep` for TV, last in `Year · type · genres · runtime` (`apps/web/test/titleRow.spec.tsx`, `packages/domain/test/titleRuntime.spec.ts`). ⚠ **The `/ep` suffix is the requirement, not a flourish**: `tmdbClient.readRuntime` takes the first element of TMDB's `episode_run_time` array, so the stored number is ONE EPISODE, and a bare `45m` beside a nine-season series is false in the direction that matters. |
 | **`T-UX-122`** | U | **REQ-119 · a `null` runtime renders the WORDS `Runtime unknown`** — never `0m`, never an empty slot (`apps/web/test/titleRow.spec.tsx`). ⚠ **This deliberately differs from the empty-genre rule** (US-019 AC-6), which renders nothing: runtime is **filterable**, so whether a row has one decides whether it can appear at all, and an owner who cannot see that a title has no runtime cannot understand why it vanished. It follows the missing-rating precedent (REQ-091). ⚠ A stored `0` is unknown too. ⚠ One case reads `TitleRow.tsx` as a FILE and fails if the wording is inlined rather than imported from `copy.ts` — a literal would pass every other assertion here and silently fork the copy. ⚠ **`d`–`g` are the DOMAIN half** (`packages/domain/test/titleRuntime.spec.ts`): `isKnownRuntime` is the single rule for **display, filtering and ordering in application code**, and `d`/`e` assert those three agree about every unknown value. ⚠ **They were NOT sufficient**: they pass over the in-memory comparator while SQL `ORDER BY` — which they cannot reach — disagreed, and CI caught it (`T-API-019e`). The database now refuses a non-positive runtime outright (`0009_runtime_unknown_is_null`), so `isKnownRuntime` guards a state that can only arrive from outside the database. `f`/`g` pin `formatRuntime` returning `null` rather than a string, so no caller can print a placeholder of its own. |
@@ -4191,7 +4318,7 @@ mapping, which is the definition of done (NFR-003).
 | `T-IMDB-002` | U | Selection is bounded per request and dedupes by IMDb id | REQ-093 |
 | `T-IMDB-003` | U | Tenths round-trip exactly, and `null` survives both directions | REQ-091 |
 | `T-IMDB-004` | U | The refresh is serial, never throws, and stops the pass on transport failure | REQ-093 |
-| `T-IMDB-005` | U | A write names **only** the two rating columns, and the module exports no sort helper | REQ-095, US-036 AC-2 |
+| `T-IMDB-005` | U | A write names **only** the two rating columns. ⚠ **`b` REVISED at `A53`:** the module now *does* expose an ordering, so `b` asserts the sweep is **awaited before the ordering is computed** under `sort=rating` — not that no sort helper exists | REQ-095, US-036 AC-2 |
 | `T-IMDB-006` | U | `GET /api/imdb/lookup`: the chain, not-found distinct from unrated, no `?t=` fallback, `inList`, and that the module **writes nothing** | US-045 AC-1, US-045 AC-2, US-045 AC-3, US-045 AC-4, US-045 AC-5 |
 | `T-IMDB-007` | U | The access-triggered refresh persists through the narrow writer, never rejects, survives a failing write, and no-ops without a key | REQ-090, REQ-093 |
 | `T-IMDB-008` | U | Display: one decimal place, `8` renders `8.0`, and `null` renders **the words** — never `0` | US-044 AC-3, US-044 AC-4 |
@@ -4209,9 +4336,16 @@ and pinning a live rating in a test would make the suite fail the day a film's
 score moves. What IS asserted is that the number is keyed on `imdb_id`
 (`T-OMDB-004`) — the property that makes it the *right film's* number.
 
-**A rating sort.** There is none, by decision (REQ-095, OQ-A), and its absence
-is what keeps the lazy refresh legal under REQ-041. `T-IMDB-005b` asserts the
-service module exports no sort or rank helper.
+**A rating sort.** ⚠ **REVISED at `A53` (2026-09-14) — there now IS one.**
+`sort=rating` exists (ADR-0011 Revision 1, `specs/api.md` §6.2a). What keeps
+the refresh legal under REQ-041 is no longer the sort's *absence* but the
+refresh's **synchrony**: under `sort=rating` the sweep runs inside the request,
+before the ordering, on §6.4's terms. ⚠ **`T-IMDB-005b` asserted the service
+module exports no sort or rank helper. It will correctly begin to fail. REWRITE
+IT — DO NOT DELETE IT**; deleting the guard that notices the change is how the
+post-response write silently survives into a rating ordering.
+~~Superseded: "There is none, by decision (REQ-095, OQ-A), and its absence is
+what keeps the lazy refresh legal under REQ-041."~~
 
 ---
 
@@ -4465,3 +4599,130 @@ disagree about who owns an id, the gate follows the backlog and this table
 becomes the misleading one. **They are edited together or not at all.** All 21
 ids are cited across `TASK-183` – `TASK-189`; none is unowned, and none is
 owned twice.
+
+---
+
+## 39. The visual refresh (Epic P, ADR-0013 + `specs/ui-refresh.md`) — the test ids
+
+⚠ **NONE OF THESE TESTS EXISTS YET, AND THAT IS THE POINT OF THIS SECTION.**
+`specs/ui-refresh.md` reserved 45 ids across five families, and
+`check:test-ids` fails on any cited id that is not defined **here**. Until this
+register landed, **no backlog task could cite one**, so Epic P had a complete
+specification and no way to be written down as work. This section closes that
+gap. It defines ids; it does not claim implementations.
+
+⚠ **This register is NOT the `§9` AC mapping.** Per `specs/ui-refresh.md` §1,
+a story moves into `docs/PRD.md` **together with** its §9 rows and its real
+tests, in one change. Defining an id here is the prerequisite for that, never
+a substitute for it.
+
+### 39.1 ⚠ WHERE THESE FILES LIVE — read `§11` before creating one
+
+`T-CI-008` exists because six test files were once pointed at directories no
+Vitest project collects, and a canary asserting `1 === 2` was reported inside a
+fully passing run. **The authoritative layout is §11.**
+
+| Family | Location |
+|---|---|
+| `T-UX-*`, `T-UI-*`, `T-CSS-006/007` | **`apps/web/test/`** — never `tests/web/` |
+| `T-API-*` | `apps/api/test/unit/` for the query/ordering logic, `apps/api/test/integration/` for the route. ⚠ **A route proven only by the integration project scores ~5% against the 90% floor** — the integration project is excluded from coverage. Both halves are required |
+
+Run `npm run check:test-locations` before pushing.
+
+### 39.2 The list surface, navigation and review (`T-UX-*`)
+
+| Id | Level | What it asserts | Source |
+|---|---|---|---|
+| `T-UX-106` | U | After `onMatch` resolves, the card renders the **corrected** name and poster URL, not the extracted one | §3 |
+| `T-UX-107` | U | After a **re-render from server state** (`disposition: 'corrected'`), the card still names the corrected title — the regression `name: null` causes today | §3 |
+| `T-UX-108` | U | The correction is announced in a live region | §3 |
+| `T-UX-110` | U | At 320 px the list layout renders with no horizontal scroll *(extends `T-A11Y-001`)*. `apps/web/test/listSurface.spec.tsx`, 5 cases. ⚠ **Reads `index.css` as a FILE.** jsdom computes no layout, so an overflow check passes *perfectly* on an unstyled document — `T-UX-110a/b` assert instead that the vertical list is the **base** rule and the grid exists only inside a `min-width` query, which is what makes 320 px the designed case rather than the one reached by subtraction. `T-UX-110d` pins `.title-row__body { min-width: 0 }`: one declaration that looks like noise, whose removal forces the page sideways at 320 px and nowhere else. The browser half stays `T-A11Y-001a`/`T-A11Y-001c` | §4.1 |
+| `T-UX-111` | U | At 1280 px the grid layout renders. `apps/web/test/listSurface.spec.tsx`, 5 cases. `T-UX-111a` asserts `--bp-lg ≤ 1280`, because the requirement names 1280 px and the rule names the token — they are only the same claim while that holds. `T-UX-111d/e` carry **REQ-111**: the 2:3 ratio is declared on the **base** poster rule, since the grid sets `height: auto` and the ratio is then the only thing giving `.title-row__poster--empty` (a bare `<div>`, no intrinsic size) a box at all; and no `@media` override may shrink the poster back under 72 × 108 — the `--bp-sm` rule used to set 64 × 96, an *increase* over the old base and a *decrease* against this one | §4.1, §4.2 |
+| `T-UX-112` | U | The row overflow menu offers the **same item set** in both layouts. `apps/web/test/listSurface.spec.tsx`, 5 cases. ⚠ **The mechanism is that there is exactly ONE DOM.** §4.1 requires one component at two densities selected by a media query, so `T-UX-112b` asserts no width branch (`useWideViewport`, `matchMedia`, `innerWidth`, `clientWidth`) exists anywhere in `TitleList`/`TitleRow`/`RowMenu` — with that held, the item set is a fact about one code path rather than a claim about two staying in step. The only remaining way to make an action unreachable at one width is to hide it from the stylesheet, which no render-based test can see (the element is still in the document with its accessible name); `T-UX-112c` reads the grid block and fails on `display: none`, `visibility: hidden` or `content-visibility: hidden`. `T-UX-112d` guards the `position: relative` the open `.row-menu` anchors against | §4.1 |
+| `T-UX-113` | U | The bar renders filters and sort in one group. `apps/web/test/sortControl.spec.tsx`; the wrapper is `.list-controls` in `ListPage.tsx`, asserted against the **real page** rather than a hand-built `<div>`, which would assert the test's own markup. ⚠ **`b` is the half with teeth**: merging them visually must not merge them mechanically. §5's table is explicit that filters are **URL-only** and sort is **URL → session → default**, deliberately opposite — a shared hook across the group produces a green suite and a broken back button, so `b` asserts the observable consequence (the direction persists to session storage, a filter never does) | §5 |
+| `T-UX-114` | U | Changing a filter preserves `sort` and `dir`. Holds by construction — `applyFilters` copies the params and deletes only the four filter keys — which is exactly why it needs a test: that construction is one line away from a `new URLSearchParams()` that starts empty and silently resets the owner's ordering on every filter press | §5 |
+| `T-UX-115` | U | A `localStorage` direction with **no `dir` in the URL** is reconciled into the URL, and the label matches the request actually issued. ⚠ **Both halves together, or neither counts.** `ListRoute` sends `params.toString()` verbatim to `GET /api/titles`, so a control that merely *renders* the remembered direction without writing it shows a newest-first list under an oldest-first mark, silently. ⚠ `b` runs it under `sort=name`, whose default is `asc`: a remembered `desc` there **must** be written, the exact reverse of `T-UX-129d`, and a reconciliation comparing against one global `desc` gets both backwards at once | §5 |
+| `T-UX-116` | U | Oldest-first is reachable in one action from the default view (invariant 6). ⚠ **Measured on the page, not on the control** — `T-UX-131` covers the control in isolation. A segment correct on its own but mounted behind a disclosure on the real page has still deleted the `must` | §5 |
+| `T-UX-117` | U | The active destination carries `aria-current="page"` **and a non-colour cue** — the cue is read out of `index.css`, because jsdom applies no stylesheet and a DOM query cannot see that a rule distinguishes itself by hue alone. ⚠ **Also pins the `/` matcher**: `matchPath({ path: '/', end: false })` matches every path in the application while `<NavLink to="/">` does not, so a nav that derives its class from one and its `aria-current` from the other highlights *List* on all eleven routes while telling assistive technology nothing (`T-UX-117b`, `T-UX-117d`) | §6, TASK-211 |
+| `T-UX-118` | U | The freshness strip still deep-links to `/upload` with the service pre-selected (REQ-039, RSK-007), **including when the dates are unavailable**, and `/upload` stays a first-class slot on the phone bar so the strip is never the only way in | §6 |
+| `T-UX-125` | U | A TV title whose stored genres contain `Action & Adventure` renders the chips `Action` and `Adventure`, and does **not** render `Action & Adventure`. `packages/domain/test/genres.spec.ts` (`a`–`e`, the pure map) + `apps/web/test/genreChips.spec.tsx` (`f`–`h`, the render). ⚠ **The map is a closed literal, never a `" & "` split heuristic** — `Sci-Fi & Fantasy` must yield `Science Fiction`, which no split can produce, and a heuristic would also shatter a legitimate single genre containing an ampersand | §4.4 |
+| `T-UX-126` | U | The genre filter list contains **no combined TV name** — `Action & Adventure`, `Sci-Fi & Fantasy` and `War & Politics` never appear as options. ⚠ **The facet is CLIENT-derived**: `collectGenres` in `apps/web/src/containers/ListRoute.tsx` builds the options from the rows' own `genres`, so it must normalise with the same map. Left un-normalised, a combined name becomes a clickable option that always returns nothing, because the API expands map *keys* to nothing | §4.4 |
+| `T-UX-127` | U | The compact row wraps genres to at most one line with a `+n` overflow, and a genre in the **active filter** is always visible rather than hidden behind `+n`. `apps/web/src/components/GenreChips.tsx`; `GENRE_CHIP_LIMIT` is a **count, not a measurement** — measuring a line needs layout, which needs a browser and costs a visible reflow per row. The active genres are **hoisted to the front**, and the limit yields to them via `Math.max(GENRE_CHIP_LIMIT, active.length)`, so four active genres show four chips | §4.3 |
+| `T-UX-128` | U | Both direction options are rendered simultaneously with the current one marked — **not** a single toggling button (`A53`, OQ-5). `apps/web/test/sortControl.spec.tsx`. ⚠ **`c` is the regression guard and it counts options**: a toggle passes "oldest-first is reachable", passes "the label is correct" and passes every persistence case — it fails only a count of what is on screen. ⚠ `d` pins the order as `desc` then `asc` **whatever is current**: ordering by which is selected would move the owner's target between renders, so the control they just pressed jumps under the pointer. **Radios, not two `aria-pressed` buttons** — two toggles, one of which is always on, describes a state nobody chose | §5b |
+| `T-UX-129` | U | Direction labels change with the selected field (`Longest first` for runtime, `A–Z` for name), while `SORT_NEWEST_LABEL` / `SORT_OLDEST_LABEL` are **reused unmodified** for the date field. ⚠ `b` extends that reuse to **release year**, which is also a date and gets the same two strings: a near-miss retype ("Most recent first") is a copy change nobody approved and looks entirely reasonable in a diff. ⚠⚠ **`c` is the label-lies bug in its second home.** `DEFAULT_DIR_BY_KEY` mirrors `defaultDirectionFor` in `titlesQuery.ts`, where `name` defaults to `asc` because `?sort=name` opening at **Z** is what nobody means by "sort by name". One global `desc` on the web side marks `Z–A` while the API returns A–Z — the mark lies, the list is fine, nothing errors | §5b |
+| `T-UX-130` | U | Changing the sort field preserves `dir`; changing either preserves the active filters and **resets `cursor`**. ⚠ The cursor lives in `useCursorPages` state, never the URL, so `d` pins the **URL** half: a future "remember my place" cannot bolt a cursor onto the address without meeting this case. A date cursor sent with `sort=runtime` is a keyset that does not mirror its own `ORDER BY`, and the API answers `INVALID_CURSOR` rather than a page of quietly wrong rows | §5b |
+| `T-UX-131` | U | With the default field selected, oldest-first is reachable in exactly **one** interaction (invariant 6). ⚠⚠ **This is the case §8's warning was written for.** Collapsing the direction into the field list as ten combined options ("Date added, oldest first" …) leaves `click()` reaching oldest-first, so every other case in the file stays green while REQ-038's `must` — promoted at `A47`, the sole escape hatch for the accepted newest-first-vs-SUC-003 trade-off, and the thing OQ-029's revisit path depends on — is gone. ⚠ `b` guards the jsdom blind spot: a collapsed `<select>` passes a one-`click()` assertion because jsdom does not model the press that opens it, so `b` asserts the target is visible **without** opening anything | §5b |
+| `T-UX-132` | U | Below `--bp-sm` the bar renders exactly `/`, `/upload` and `More`; **every other nav route** — `/batches`, `/removed`, `/not-interested`, `/waiting`, `/about`, `/rating` — is reachable only via `More` (`A53`, OQ-2). ⚠ **Corrected in place at TASK-211**: this row named only `/removed`, `/not-interested` and `/batches`, which were the whole overflow when it was written; Epic L added `/waiting` and Epic M added `/rating`, and a closed reading of the old list left three destinations in neither the bar nor the overflow. ⚠ **Also pins the breakpoint to ONE number** (`T-UX-132d`): a custom property cannot be used in a media query, so `640` is genuinely written in `:root`, in the `@media` prelude and in TypeScript — and three copies that disagree put the JavaScript on a phone while the stylesheet is on a desktop, with no error anywhere | §6, TASK-211 |
+| `T-UX-133` | U | A route behind `More` is still marked `aria-current="page"` when open, and is still reachable by direct URL. ⚠ **This is why the panel defaults to open when the current route is inside it.** With a plain `useState(false)` a deep link renders a closed disclosure, the marked element does not exist, and the requirement is not merely unmet but unsatisfiable. The auto-open is a **default, not a lock** (`T-UX-133c`), and each overflow destination keeps a real `href` rather than a click handler that pushes history (`T-UX-133e`) | §6, TASK-211 |
+| `T-UX-134` | U | An addition card and a removal card are distinguishable **by their own rendered content**, with no section heading in the accessible subtree. `apps/web/test/reviewSections.spec.tsx`; the mechanism is `REVIEW_CONSEQUENCE_ADDITION` / `_UNMATCHED` / `_REMOVAL` rendered **on every card** as `candidate-consequence`. ⚠⚠ **`c` is what separates this fix from restyling the headings.** A full-update review is long and is scrolled, so by the time a removal card is on screen its heading is off it — a case that read the heading above the card would pass against the exact defect the owner reported. `<summary>` counts as a heading here: it *is* the heading on this screen. ⚠ `d` refuses the near-miss of copying the section label onto the card, which passes every other case while re-coupling the card to the section. ⚠ `e` keeps all **three** distinct — the owner's report was about three sections, and differentiating two of them reads as done | §6a.1 |
+| `T-UX-135` | U | Each section renders a heading and a count, and the removals section carries a **non-colour** consequential marker (`REVIEW_REMOVALS_MARKER`, `review-section-marker`). ⚠ **`c` asserts rendered TEXT, deliberately**: `specs/ui.md` §10.2 forbids signalling by colour alone, and the left rules in `index.css` are invisible in greyscale, to roughly one man in twelve, and to every screen reader. ⚠ `d` keeps the marker exclusive — *"most distinct of them"* is a comparison, and it is false the moment the marker becomes decoration applied everywhere. ⚠ **The marker is a SIBLING element inside the `<summary>`, not appended to the label string**, so `getNodeText` — which reads only direct text-node children — still matches `T-UX-099a/b`'s exact `(2)` count assertions | §6a.1 |
+| `T-UX-136` | U | ⚠ **The invariant-2 guard.** A full-update review still renders **all** extracted candidates, including already-correct ones — the section treatment hides nothing. `apps/web/test/reviewSections.spec.tsx`. ⚠⚠ **Hiding the already-on-your-list section is the single most tempting way to make this screen feel shorter**, and it is precisely the change that makes a failed extraction of a known title readable as a removal. ⚠ `c` refuses the tidier variants a naive presence check would miss (`hidden`, an `aria-hidden` wrapper); `d` pins the order, because reordering is the other half of the same shortcut and removals stay **last** — the consequential group is the one the owner should reach having already seen everything that was read | §6a.1 |
+| `T-UX-137` | U | **REQ-117 · the phone bar is fixed to the BOTTOM of the viewport** (`apps/web/test/navigation.spec.tsx`). The nav is `position: fixed; bottom: 0` with a stacking context (`a`), the shell reserves clearance expressed in the **same `--nav-bar-height` token** as the bar's own height (`b`), both honour `env(safe-area-inset-bottom)` (`c`), the `More` panel opens **upward** (`d`), `viewport-fit=cover` is in the viewport meta tag (`e`), and every one of those properties is **reset** above `--bp-sm` (`f`, `g`). ⚠ **Every case reads `index.css` / `index.html` as a FILE.** jsdom performs no layout and applies no stylesheet, so `getComputedStyle` returns the initial value for each of these properties whatever the stylesheet says — a rendered assertion would pass against the header-mounted bar this requirement replaces, and keep passing if the rules were deleted. ⚠ **`e` is the half that cannot be seen in the CSS**: without `viewport-fit=cover` the `env()` insets resolve to `0` on every device, so `c` passes in full while the bar renders underneath the iPhone home indicator. ⚠ **`f` asserts the reset names ALL of them, not just `position`**: a `position: static` that leaves the surface and top border behind draws a stray bordered strip across the desktop header, and `T-UX-132e` — which counts links — passes throughout. ⚠ `g` pins the desktop `padding` **shorthand**, which is the only thing dropping the base clearance; rewritten as longhands every desktop page grows a bar's worth of dead space that no rule appears to cause. ⚠ `h` is a regression guard on a **move** — repositioning is exactly the change that quietly loses a child | §6, TASK-220 |
+
+### 39.3 Tokens, icons and primitives (`T-CSS-*`, `T-UI-*`)
+
+| Id | Level | What it asserts | Source |
+|---|---|---|---|
+| `T-CSS-006` | U | `:root` declares every type-scale token, and no rule body contains a raw font-size literal *(extends `T-CSS-003`)* | §7b |
+| `T-CSS-007` | U | No rendered primary content computes to a font size below `--text-sm` | §7b |
+| `T-UI-030` | U | Every icon component renders `stroke="currentColor"` and declares **no hard-coded colour** | §7c |
+| `T-UI-031` | U | Every interactive control in `apps/web/src/**` is rendered by a primitive, not by a bare `<button>` or `<fieldset>` | §7d |
+| `T-UI-032` | U | Every primitive variant resolves to a **static** class present in the stylesheet, and no primitive uses a template-literal `className` *(the `T-CSS-001c` form)* | §7d |
+| `T-A11Y-016` | U | No `<svg>` is exposed to the accessibility tree without a name, and every icon-only control has a non-empty accessible name | §7c |
+| `T-A11Y-017` | E | Every `Button` variant meets the `--tap-target-min` floor at 320 px, measured in Chromium and Mobile Safari | §7d |
+
+⚠ **THESE TWO A11Y IDS WERE RENUMBERED, 2026-09-14 — do not "restore" them.**
+`ui-refresh.md` §7c/§7d originally cited ~~`T-A11Y-014`~~ and ~~`T-A11Y-015`~~,
+but **both are already defined at L1247–1248** for the US-033 refusal
+enumeration and the 280 px degradation. `check:test-ids` only asks whether a
+cited id is defined *somewhere*, so a collision passes every gate while two
+unrelated behaviours answer to one name — TASK-209 would have reported **done**
+off a passing refusal test that asserts nothing about icons. The family was
+enumerated at the point of naming and `016`/`017` were the first free numbers.
+
+⚠ **`T-UI-029` is reserved and deliberately NOT defined here.** `ui-refresh.md`
+§10 reserves `T-UI-029` – `T-UI-032` as a range but uses only `030` – `032`.
+Defining an id nothing cites would put an unowned id into the register, which
+is precisely what `check:orphans` exists to notice. **Leave it vacant.**
+
+### 39.4 The list route (`T-API-*`)
+
+⚠ **`T-API-019` – `T-API-022` ARE NOT DEFINED HERE — they are already defined
+above**, `019`/`020`/`021` by the §5a runtime work and `022` by REQ-109, both
+shipped. They were briefly duplicated into this section while it was being
+written. **A duplicate definition is not a harmless echo:** `check:test-ids`
+only asks whether a cited id is defined *somewhere*, so a second row passes
+every gate while two unrelated behaviours answer to one name.
+
+⚠ **This is why the genre filter test below is `T-API-028` and not `T-API-022`.**
+It was first written as `022`, which `batchReview.spec.ts` already owns for the
+review defect — so TASK-213 would have reported **done** off a passing test for
+a completely different behaviour, and the genre bug would have shipped unfixed
+behind a green suite. **Enumerate the family before naming a new id; do not
+trust a range reserved earlier in the same document to still be free.**
+
+| Id | Level | What it asserts | Source |
+|---|---|---|---|
+| `T-API-023` | U + I | `sort=rating` orders by rating with `NULL`s **last in both directions**, tie-broken by `title.id` (`A48`, REQ-091) | §7a |
+| `T-API-024` | U | ⚠ **THE REQ-041 GUARD, AND THE MOST IMPORTANT ID IN THIS SECTION.** Under `sort=rating` the rating sweep is **awaited before the `ORDER BY` is applied**, and **no rating write occurs after the response has been sent**. The failure it catches is invisible — the list simply reorders itself between renders — and "move the await out of the hot path" reads like a performance fix | §7a.1, ADR-0011 Rev 1 |
+| `T-API-025` | U | A sweep that exhausts its request cap or time budget still returns **200**; unrefreshed titles keep their cached-or-absent value and are ordered on it | §7a.1 |
+| `T-API-026` | U | An unrecognised `sort` value is **400 `VALIDATION_FAILED`**, never a silent fall back to `dateAdded` — a mistyped key that returns the default looks like a working sort that does nothing. ⚠ **`sort=name` is NO LONGER one of those rejections** — TASK-219 shipped it, so the standing examples are `ratings` and `title`. ~~"`sort=name` is currently one of those rejections and that is deliberate — see TASK-219 / `T-API-029`."~~ ~~"400 `INVALID_QUERY`"~~ — corrected in place: `INVALID_QUERY` is not a member of the closed enum in `packages/domain/src/errorCodes.ts`, so a test written to that row would have failed against a correct implementation | `api.md` §6.2 |
+| `T-API-027` | U + I | `sort=releaseYear` orders correctly in both directions, `NULL`s last, tie-broken by `title.id` | §5b, `A53` |
+| `T-API-029` | U + I | **`sort=name` orders case- AND accent-insensitively**, in both directions, nameless rows last in **both**, tie-broken by `title.id`, and pages across a CI_AI tie without dropping a row. ⚠ **IT CANNOT BE ASSERTED WITH A MOCKED REPOSITORY, AND IT CANNOT BE ASSERTED ON TITLE-CASED FIXTURES.** The defect lives in the engine: the default collation is `Latin1_General_100_BIN2`, which is **binary**, so `apple` sorts after `Zebra` and `Amélie` after `Zodiac` — but on data like `Arrival`/`The Matrix`/`Zodiac` binary and human order are IDENTICAL, so a realistic-looking fixture passes against the broken implementation. Every lower-case and accented row in `titleNameSort.spec.ts` is there for that reason. Sub-ids also pin the two decisions that would otherwise be "tidied" away: the article list is **`a`/`an`/`the` ONLY** (`c`, `d`, `s` — *Les Misérables* files under **L**), and a bare `?sort=name` opens at **A**, not Z (`f` — invisible to UI tests, which always send an explicit `dir`) | §5b, `A53`, TASK-219, `api.md` §6.2b |
+| `T-INV-025` | I | Every stored `title.sort_name` equals `deriveSortName(row)`. ⚠ **This is the drift guard AND the forgotten-backfill guard.** `sort_name` is derived and stored, and migration `0010` deliberately does not backfill (a T-SQL reimplementation of the rule would be a second, untestable implementation). The failure mode of a missed write path or a missed backfill is not an error — it is a `NULL` key sorting silently to the end of an A–Z list | `api.md` §6.2b, §16 I-4 |
+| `T-API-028` | I | ⚠ **The filter half of the genre bug** *(renumbered from `T-API-022`, which REQ-109 already owns — see the warning above)*. `?genre=Action` returns **both** a film tagged `Action` **and** a TV title tagged `Action & Adventure`; `?genre=War` returns a title tagged `War & Politics`. A display-only fix makes the owner-reported symptom disappear while this still fails. `apps/api/test/integration/titleFilters.spec.ts`; the expansion is `storedGenreVariants` in `apps/api/src/repository/ownerData.ts`, **derived from the same closed map the chips normalise with** so the two halves cannot drift. ⚠ **Integration, not unit**: the expanded `OR` sits inside the `AND` array beside the keyset predicate and the suppression anti-join, and the match is a quoted-token search inside a JSON column under a binary collation — none of that survives a mock. `e` and `g` are the anti-widening guards: an implementation that appended every combined name to every request would pass the positive cases and quietly return TV action titles under `?genre=Drama` | §4.4 |
+
+### 39.5 What is deliberately NOT asserted here
+
+**That the refresh looks good.** Taste is the owner's, recorded in **ADR-0013**,
+and a test that pinned a colour would fail the next time they changed their
+mind. What is asserted is everything a screenshot cannot show: contrast ratios
+computed from the tokens (`T-CSS-004`), reachability (`T-UX-131`), that the
+accessible name survives (`T-UX-133`), and that **nothing was hidden**
+(`T-UX-136`).
+
+⚠ **`T-CSS-001`'s bidirectionality is why the UI shipped unstyled, and it is
+NOT relaxed by this epic.** Every defined rule must still be used. The original
+blocker was never the test — it only inspects **class** names, so an element
+selector always passed — it was §13.1's prose calling the class vocabulary
+"already fixed". **The vocabulary is not fixed; the correspondence is.**

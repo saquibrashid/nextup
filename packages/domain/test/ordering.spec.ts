@@ -18,6 +18,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  compareTitlesByNullableKey,
   compareTitlesForList,
   deriveSortDateAdded,
   sortTitlesForList,
@@ -196,5 +197,47 @@ describe('T-LIST-017 a null sortDateAdded sorts LAST and never crashes the compa
     const snapshot = rows.map((r) => r.id);
     sortTitlesForList(rows, 'desc');
     expect(rows.map((r) => r.id)).toEqual(snapshot);
+  });
+});
+
+describe('T-API-023 / T-API-027 · the nullable-key comparator the SQL is checked against', () => {
+  const k = (id: string, key: number | null) => ({ id, key });
+  const order = (rows: { id: string; key: number | null }[], dir: 'asc' | 'desc'): string[] =>
+    [...rows].sort((a, b) => compareTitlesByNullableKey(a, b, dir)).map((r) => r.id);
+
+  const MIXED = [k('b', 84), k('n1', null), k('a', 71), k('n2', null), k('c', 92)];
+
+  it('T-API-023i: nulls are LAST in both directions, not just in the default one', () => {
+    // ⚠ The rule the SQL dialect gets wrong for free. SQL Server sorts NULL
+    // FIRST on ASC, so "lowest rated first" would open with every title nobody
+    // has rated — an absence of data rendered as a claim about the work.
+    expect(order(MIXED, 'asc')).toEqual(['a', 'b', 'c', 'n1', 'n2']);
+    expect(order(MIXED, 'desc')).toEqual(['c', 'b', 'a', 'n1', 'n2']);
+  });
+
+  it('T-API-023j: ties break on id ASCENDING in BOTH directions', () => {
+    // A tie-break written to follow `dir` reads as symmetric and is wrong: it
+    // makes rows that share a rating reshuffle when the owner reverses the
+    // sort, for no reason they can see.
+    const tied = [k('z', 80), k('a', 80)];
+    expect(order(tied, 'asc')).toEqual(['a', 'z']);
+    expect(order(tied, 'desc')).toEqual(['a', 'z']);
+  });
+
+  it('T-API-023k: two nulls also tie-break on id ascending', () => {
+    expect(order([k('n2', null), k('n1', null)], 'desc')).toEqual(['n1', 'n2']);
+  });
+
+  it('T-API-027j: it is a TOTAL order — identical rows compare equal', () => {
+    expect(compareTitlesByNullableKey(k('a', 5), k('a', 5), 'asc')).toBe(0);
+    expect(compareTitlesByNullableKey(k('a', null), k('a', null), 'desc')).toBe(0);
+  });
+
+  it('T-API-027k: ZERO is a value, not an absence', () => {
+    // ⚠ Unlike runtime, where a stored 0 means "unknown" (`isKnownRuntime`), a
+    // release year of 0 or a rating of 0 is simply a number — there is no
+    // sentinel here. Conflating the two would sink real rows into the null
+    // block, where the owner would read them as missing data.
+    expect(order([k('zero', 0), k('n', null), k('five', 5)], 'asc')).toEqual(['zero', 'five', 'n']);
   });
 });

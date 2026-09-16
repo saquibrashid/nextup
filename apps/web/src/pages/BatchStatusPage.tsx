@@ -56,6 +56,7 @@ import {
   STATUS_ZERO_YIELD,
 } from '../copy';
 import type { BatchImage, BatchStatus, BatchTitleRef } from '../lib/apiClient';
+import { Button } from '../components/ui/Button';
 
 export interface BatchStatusPageProps {
   readonly batch?: BatchStatus | null;
@@ -164,9 +165,9 @@ function ExtractionError({
       <div role="alert" data-testid="batch-status-error">
         <p data-testid="batch-status-error-message">{STATUS_ERROR_PURGED}</p>
         {onUploadNew !== undefined && (
-          <button type="button" className="tap-target" onClick={onUploadNew}>
+          <Button variant="secondary" onClick={onUploadNew}>
             {STATUS_PURGED_ACTION_LABEL}
-          </button>
+          </Button>
         )}
       </div>
     );
@@ -180,17 +181,17 @@ function ExtractionError({
       </p>
       <div className="batch-status__actions">
         {onRetry !== undefined && (
-          <button type="button" className="tap-target" onClick={onRetry}>
+          <Button variant="secondary" onClick={onRetry}>
             {STATUS_RETRY_LABEL}
-          </button>
+          </Button>
         )}
         {/* §5.5 offers Discard batch as well as Try again (US-006 AC-4/AC-6);
             §5.6 is transient — the service is merely busy, the batch is still
             good, and offering to destroy it there would be wrong. */}
         {!unavailable && onDiscard !== undefined && (
-          <button type="button" className="tap-target" onClick={onDiscard}>
+          <Button variant="secondary" onClick={onDiscard}>
             {STATUS_DISCARD_BATCH_LABEL}
-          </button>
+          </Button>
         )}
       </div>
     </div>
@@ -304,9 +305,9 @@ export function BatchStatusPage({
           <div role="alert" data-testid="batch-status-load-error">
             <p>{STATUS_ERROR_EXTRACTOR}</p>
             {onRetry !== undefined && (
-              <button type="button" className="tap-target" onClick={onRetry}>
+              <Button variant="secondary" onClick={onRetry}>
                 {STATUS_RETRY_LABEL}
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -376,14 +377,14 @@ export function BatchStatusPage({
 
           <div className="batch-status__actions">
             {inProgress && onDiscard !== undefined && (
-              <button type="button" className="tap-target" onClick={onDiscard}>
+              <Button variant="secondary" onClick={onDiscard}>
                 {STATUS_DISCARD_LABEL}
-              </button>
+              </Button>
             )}
             {!inProgress && onContinue !== undefined && (
-              <button type="button" className="tap-target" onClick={onContinue}>
+              <Button variant="secondary" onClick={onContinue}>
                 {STATUS_CONTINUE_LABEL}
-              </button>
+              </Button>
             )}
           </div>
 

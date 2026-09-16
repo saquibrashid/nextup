@@ -438,3 +438,107 @@ describe('T-LIST-024 a title with genres: [] is excluded when filtering, include
     }
   });
 });
+
+/**
+ * `T-API-028` — REQ-120, `specs/ui-refresh.md` §4.4. THE FILTER HALF OF THE
+ * GENRE VOCABULARY BUG.
+ *
+ * ⚠ **A DISPLAY-ONLY FIX MAKES THE OWNER-REPORTED SYMPTOM DISAPPEAR AND
+ * LEAVES THESE RED.** The owner reported redundant chips — `Action`,
+ * `Adventure` and `Action & Adventure` all in one filter list. Normalising the
+ * chips removes all three complaints from the screen, and `?genre=Action`
+ * still returns films only. That is what makes the half-fix convincing, and it
+ * is why this file, not `genreChips.spec.tsx`, is the one that proves REQ-120.
+ *
+ * ⚠ **INTEGRATION, NOT UNIT, BECAUSE THE PROPERTY IS A PROPERTY OF THE
+ * QUERY.** The expansion widens an `OR` that already sits inside the `AND`
+ * array beside the keyset predicate and the suppression anti-join; the match
+ * itself is a quoted-token search inside a JSON column under a binary
+ * collation. Nothing about that survives a mock.
+ */
+describe('T-API-028 the genre filter spans TMDB two vocabularies (REQ-120)', () => {
+  it('T-API-028a: ?genre=Action returns BOTH a film tagged Action and a TV title tagged Action & Adventure', async () => {
+    await seedTitle({ id: 't-film', mediaType: 'movie', genres: ['Action'] });
+    await seedTitle({ id: 't-tv', mediaType: 'tv', genres: ['Action & Adventure'] });
+    await seedTitle({ id: 't-other', mediaType: 'movie', genres: ['Comedy'] });
+
+    expect(await idSet('?genre=Action')).toEqual(['t-film', 't-tv']);
+  });
+
+  it('T-API-028b: ?genre=Adventure reaches the same TV title — the map is one-to-MANY', async () => {
+    // Both constituents of a combined name must reach it. An implementation
+    // that only expanded the first would pass T-API-028a and silently drop
+    // every TV title from the Adventure facet.
+    await seedTitle({ id: 't-tv', mediaType: 'tv', genres: ['Action & Adventure'] });
+    await seedTitle({ id: 't-film', mediaType: 'movie', genres: ['Adventure'] });
+
+    expect(await idSet('?genre=Adventure')).toEqual(['t-film', 't-tv']);
+  });
+
+  it('T-API-028c: ?genre=War returns a title tagged War & Politics', async () => {
+    await seedTitle({ id: 't-tv', mediaType: 'tv', genres: ['War & Politics'] });
+
+    expect(await idSet('?genre=War')).toEqual(['t-tv']);
+  });
+
+  it('T-API-028d: ?genre=Science Fiction and ?genre=Fantasy both reach Sci-Fi & Fantasy', async () => {
+    await seedTitle({ id: 't-tv', mediaType: 'tv', genres: ['Sci-Fi & Fantasy'] });
+
+    expect(await idSet('?genre=' + encodeURIComponent('Science Fiction'))).toEqual(['t-tv']);
+    expect(await idSet('?genre=Fantasy')).toEqual(['t-tv']);
+  });
+
+  it('T-API-028e: the expansion does NOT widen an unrelated genre', async () => {
+    // ⚠ THE GUARD AGAINST THE LAZY FIX. An implementation that appended every
+    // combined name to every request would pass every case above and quietly
+    // return TV action titles under ?genre=Drama.
+    await seedTitle({ id: 't-tv', mediaType: 'tv', genres: ['Action & Adventure'] });
+    await seedTitle({ id: 't-drama', mediaType: 'movie', genres: ['Drama'] });
+
+    expect(await idSet('?genre=Drama')).toEqual(['t-drama']);
+  });
+
+  it('T-API-028f: the combined name itself is NOT a working filter value', async () => {
+    // It is a key of the map, never a value, so it normalises to nothing the
+    // owner can be offered (T-UX-126) and is not expected to work if hand-typed
+    // into the query string. Recorded so the behaviour cannot change silently:
+    // the contains-match still finds the raw stored token, which is the honest
+    // outcome for a value that reaches the API only by hand.
+    await seedTitle({ id: 't-tv', mediaType: 'tv', genres: ['Action & Adventure'] });
+
+    expect(await idSet('?genre=' + encodeURIComponent('Action & Adventure'))).toEqual(['t-tv']);
+  });
+
+  it('T-API-028g: a title with genres: [] is still excluded — US-019 AC-6 survives the expansion', async () => {
+    // The expansion adds alternatives to an OR. An empty genre list stores
+    // "[]", which contains no token at all, so it matches none of them — but
+    // that is a property worth pinning, because widening an OR is exactly the
+    // kind of change that accidentally starts matching everything.
+    await seedTitle({ id: 't-none', genres: [] });
+    await seedTitle({ id: 't-tv', mediaType: 'tv', genres: ['Action & Adventure'] });
+
+    expect(await idSet('?genre=Action')).toEqual(['t-tv']);
+  });
+
+  it('T-API-028h: the expansion composes with another dimension (AND across, OR within)', async () => {
+    // The expanded OR lives in the same AND array as every other filter. A
+    // second OR key in one object literal silently REPLACES the first, which
+    // is the Prisma-shape hazard this file already exists to guard.
+    await seedTitle({
+      id: 't-tv-nf',
+      mediaType: 'tv',
+      genres: ['Action & Adventure'],
+      services: ['netflix'],
+    });
+    await seedTitle({
+      id: 't-tv-max',
+      mediaType: 'tv',
+      genres: ['Action & Adventure'],
+      services: ['max'],
+    });
+
+    expect(await idSet('?genre=Action&service=max')).toEqual(['t-tv-max']);
+    expect(await idSet('?genre=Action&type=tv')).toEqual(['t-tv-max', 't-tv-nf']);
+    expect(await idSet('?genre=Action&type=movie')).toEqual([]);
+  });
+});

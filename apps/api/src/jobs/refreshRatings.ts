@@ -8,9 +8,15 @@
  *   1. it is triggered by a READ of the rows it refreshes — never by a timer,
  *      a queue, a webhook or a sweep;
  *   2. it writes exactly two columns (`updateTitleRating` enforces that end);
- *   3. the rating is **display-only** (REQ-095) — not a sort key, not a
- *      filter. If that ever changes, a background write here would reorder
- *      the owner's list and this file becomes illegal, not merely impolite.
+ *   3. the rating is **display-only under every sort but one**. REQ-095 used to
+ *      make that unconditional; `A53` reversed it. Under `sort=rating` the
+ *      refresh is NOT this file's job at all — `routes/titles.ts` runs it
+ *      synchronously, over the whole filtered set, before the `ORDER BY`, so
+ *      no background write can reorder a list the owner is looking at.
+ *
+ * ~~Superseded: "the rating is display-only (REQ-095) — not a sort key, not a
+ * filter. If that ever changes, a background write here would reorder the
+ * owner's list and this file becomes illegal, not merely impolite."~~
  *
  * ⚠ **IT RUNS AFTER THE RESPONSE, NOT BEFORE IT.** Eight serial calls to a
  * free-tier API would add seconds to a page whose actual subject is the
@@ -37,6 +43,10 @@ export interface RatingRefreshDeps {
   now?: () => Date;
   /** Overrides the module-scoped daily budget reading. */
   budget?: number;
+  /** The per-pass count ceiling. Defaults to `IMDB_REFRESH_PER_REQUEST`. */
+  limit?: number;
+  /** Wall-clock cut-off, for the synchronous sweep only. */
+  deadline?: Date;
 }
 
 /**
@@ -74,6 +84,8 @@ export async function runRatingRefresh(
       client,
       budget: deps.budget ?? omdbBudgetRemaining(now()),
       now,
+      ...(deps.limit === undefined ? {} : { limit: deps.limit }),
+      ...(deps.deadline === undefined ? {} : { deadline: deps.deadline }),
     });
 
     let written = 0;

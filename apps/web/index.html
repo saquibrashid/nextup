@@ -2,7 +2,14 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      `viewport-fit=cover` is REQUIRED by REQ-117's bottom-fixed phone bar, and
+      it is the half that cannot be seen in the stylesheet: without it
+      `env(safe-area-inset-bottom)` resolves to `0` on every device, so the bar
+      renders underneath the iPhone home indicator while `index.css` looks
+      entirely correct. `T-UX-137e` asserts it here.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>nextup</title>
   </head>
   <body>

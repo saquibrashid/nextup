@@ -1,3 +1,5 @@
+import { Dialog } from './ui/Dialog';
+import { Input } from './ui/Input';
 /**
  * "Fix match" dialog (US-030, TASK-111).
  *
@@ -27,8 +29,9 @@
 import { useCallback, useEffect, useId, useRef, useState, type JSX } from 'react';
 
 import { FIXMATCH_SUPPRESSION_MIGRATED } from '../copy';
-import { useDialogFocus } from '../lib/useDialogFocus';
+
 import { useOutcomeFocus } from '../lib/useOutcomeFocus';
+import { Button } from './ui/Button';
 
 /** 300 ms debounce matches the §2.3 spec. */
 const DEBOUNCE_MS = 300;
@@ -120,7 +123,6 @@ export function FixMatchDialog({
   } | null>(null);
   const [successResult, setSuccessResult] = useState<FixMatchResponse | null>(null);
   const headingId = useId();
-  const dialogRef = useDialogFocus(onClose);
 
   /*
    * `T-A11Y-006` outcome half (`specs/ux-states.md` §1). The dialog stays open
@@ -232,7 +234,7 @@ export function FixMatchDialog({
   }, [submit]);
 
   return (
-    <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={headingId}>
+    <Dialog onDismiss={onClose} aria-labelledby={headingId}>
       <h2 id={headingId}>Fix match</h2>
 
       {/* ── Search phase ─────────────────────────────────────────────────── */}
@@ -242,7 +244,7 @@ export function FixMatchDialog({
         phase === 'no-results' ||
         phase === 'search-unavailable') && (
         <>
-          <input
+          <Input
             type="search"
             aria-label="Search TMDB"
             data-testid="tmdb-search-input"
@@ -275,13 +277,13 @@ export function FixMatchDialog({
                   <span data-testid="result-type">
                     {MEDIA_TYPE_LABELS[result.mediaType] ?? result.mediaType}
                   </span>
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
                     onClick={() => selectResult(result)}
                     data-testid={`select-result-${result.tmdbId}`}
                   >
                     Select
-                  </button>
+                  </Button>
                 </li>
               ))}
             </ul>
@@ -314,16 +316,16 @@ export function FixMatchDialog({
               stay the same.
             </p>
           )}
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={() => submit()}
             disabled={phase === 'submitting'}
             data-testid="confirm-fix-match"
           >
             {phase === 'submitting' ? 'Applying…' : 'Fix match'}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="secondary"
             onClick={() => {
               setSelected(null);
               setPhase(results.length > 0 ? 'results' : 'idle');
@@ -331,7 +333,7 @@ export function FixMatchDialog({
             disabled={phase === 'submitting'}
           >
             Back
-          </button>
+          </Button>
         </>
       )}
 
@@ -341,9 +343,9 @@ export function FixMatchDialog({
           <p role="alert" data-testid="tmdb-unavailable-message">
             {TMDB_UNAVAILABLE_MESSAGE}
           </p>
-          <button type="button" onClick={retryTmdb} data-testid="retry-fix-match">
+          <Button variant="secondary" onClick={retryTmdb} data-testid="retry-fix-match">
             Retry
-          </button>
+          </Button>
         </>
       )}
 
@@ -354,9 +356,9 @@ export function FixMatchDialog({
             You already have &ldquo;{selected.name}&rdquo; on your list. Do you want two rows for
             it?
           </p>
-          <button type="button" onClick={keepBoth} data-testid="keep-both">
+          <Button variant="secondary" onClick={keepBoth} data-testid="keep-both">
             Yes, keep both
-          </button>
+          </Button>
           <a href={`/titles/${duplicateInfo.existingTitleId}`} data-testid="open-existing">
             Open the existing one
           </a>
@@ -389,10 +391,10 @@ export function FixMatchDialog({
 
       {/* ── Cancel / Close ───────────────────────────────────────────────── */}
       {phase !== 'submitting' && (
-        <button type="button" onClick={onClose}>
+        <Button variant="secondary" onClick={onClose}>
           {phase === 'success' ? 'Close' : 'Cancel'}
-        </button>
+        </Button>
       )}
-    </div>
+    </Dialog>
   );
 }

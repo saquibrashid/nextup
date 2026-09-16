@@ -43,6 +43,7 @@ import {
 } from '../copy';
 import { useHeldImages } from '../lib/useHeldImages';
 import { isPasteSupported, isTouchDevice } from './ImageDropzone';
+import { Button } from './ui/Button';
 
 /** Why a `clipboard.read()` did not produce an image. Mapped to copy by TASK-161. */
 export type PasteFailure = 'denied' | 'empty' | 'not-image' | 'abandoned';
@@ -168,15 +169,9 @@ export function PasteButton({
 
   return (
     <div className="dropzone__paste" data-testid="paste-slot">
-      <button
-        type="button"
-        className="tap-target"
-        data-testid="paste-button"
-        disabled={offline}
-        onClick={onClick}
-      >
+      <Button variant="secondary" data-testid="paste-button" disabled={offline} onClick={onClick}>
         {PASTE_BUTTON_LABEL}
-      </button>
+      </Button>
       {/*
         ⚠ §4.11 / `A45` — A PASTE NEEDS A `POST`, so the button is disabled
         offline exactly as submit is, and carries the reason as VISIBLE text.

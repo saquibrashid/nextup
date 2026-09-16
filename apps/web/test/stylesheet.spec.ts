@@ -10,6 +10,7 @@
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 // ⚠ NOT `fileURLToPath(import.meta.url)` — the `web` project runs in jsdom,
@@ -37,14 +38,146 @@ function walk(dir: string): string[] {
 
 const sourceFiles = walk(SRC_ROOT);
 
-/** Every class name any component actually renders. */
-const usedClasses = new Set<string>(
-  sourceFiles.flatMap((file) =>
-    [...readFileSync(file, 'utf8').matchAll(/className="([^"]+)"/g)].flatMap((match) =>
-      (match[1] ?? '').split(/\s+/).filter(Boolean),
-    ),
-  ),
+function analyzeClassNames(inputs: readonly { fileName: string; text: string }[]) {
+  const files = new Map(
+    inputs.map(({ fileName, text }) => [
+      fileName.replaceAll('\\', '/'),
+      ts.createSourceFile(fileName.replaceAll('\\', '/'), text, ts.ScriptTarget.Latest, true),
+    ]),
+  );
+  const options: ts.CompilerOptions = { noLib: true, noResolve: true, jsx: ts.JsxEmit.Preserve };
+  const host = ts.createCompilerHost(options);
+  host.getSourceFile = (fileName) => files.get(fileName);
+  const program = ts.createProgram([...files.keys()], options, host);
+  const checker = program.getTypeChecker();
+  const classes = new Set<string>();
+  const offenders: string[] = program.getSyntacticDiagnostics().map((diagnostic) => {
+    const position = diagnostic.file?.getLineAndCharacterOfPosition(diagnostic.start ?? 0);
+    return `${diagnostic.file?.fileName ?? 'source'}:${(position?.line ?? 0) + 1}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')}`;
+  });
+  const maps = new Map<ts.Symbol, ts.VariableDeclaration>();
+  const approvedReferences = new Set<ts.Identifier>();
+
+  function visit(node: ts.Node, callback: (node: ts.Node) => void) {
+    callback(node);
+    ts.forEachChild(node, (child) => visit(child, callback));
+  }
+
+  function reject(node: ts.Node) {
+    const file = node.getSourceFile();
+    const { line, character } = file.getLineAndCharacterOfPosition(node.getStart());
+    offenders.push(`${file.fileName}:${line + 1}:${character + 1}: ${node.getText()}`);
+  }
+
+  function harvest(value: string) {
+    for (const name of value.split(/\s+/).filter(Boolean)) classes.add(name);
+  }
+
+  function literalMap(identifier: ts.Identifier): ts.StringLiteral[] | undefined {
+    const symbol = checker.getSymbolAtLocation(identifier);
+    const declaration = symbol?.valueDeclaration;
+    if (
+      !symbol ||
+      !declaration ||
+      !ts.isVariableDeclaration(declaration) ||
+      declaration.getSourceFile() !== identifier.getSourceFile() ||
+      !ts.isVariableDeclarationList(declaration.parent) ||
+      !(declaration.parent.flags & ts.NodeFlags.Const) ||
+      !declaration.initializer
+    ) {
+      return undefined;
+    }
+    const statement = declaration.parent.parent;
+    if (
+      ts.isVariableStatement(statement) &&
+      statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword)
+    ) {
+      return undefined;
+    }
+    let initializer = declaration.initializer;
+    while (
+      ts.isParenthesizedExpression(initializer) ||
+      ts.isSatisfiesExpression(initializer) ||
+      (ts.isAsExpression(initializer) && initializer.type.getText() === 'const')
+    ) {
+      initializer = initializer.expression;
+    }
+    if (!ts.isObjectLiteralExpression(initializer)) return undefined;
+    const values: ts.StringLiteral[] = [];
+    const keys = new Set<string>();
+    for (const property of initializer.properties) {
+      if (
+        !ts.isPropertyAssignment(property) ||
+        !(
+          ts.isIdentifier(property.name) ||
+          ts.isStringLiteral(property.name) ||
+          ts.isNumericLiteral(property.name)
+        ) ||
+        !ts.isStringLiteral(property.initializer) ||
+        keys.has(property.name.text) ||
+        property.name.text === '__proto__'
+      ) {
+        return undefined;
+      }
+      keys.add(property.name.text);
+      values.push(property.initializer);
+    }
+    maps.set(symbol, declaration);
+    approvedReferences.add(identifier);
+    return values;
+  }
+
+  for (const file of files.values()) {
+    visit(file, (node) => {
+      if (!ts.isJsxAttribute(node) || node.name.getText() !== 'className') return;
+      const initializer = node.initializer;
+      if (initializer && ts.isStringLiteral(initializer)) {
+        harvest(initializer.text);
+        return;
+      }
+      const expression =
+        initializer && ts.isJsxExpression(initializer) ? initializer.expression : undefined;
+      if (expression && ts.isStringLiteral(expression)) {
+        harvest(expression.text);
+        return;
+      }
+      if (
+        expression &&
+        ts.isElementAccessExpression(expression) &&
+        !expression.questionDotToken &&
+        ts.isIdentifier(expression.expression) &&
+        ts.isIdentifier(expression.argumentExpression)
+      ) {
+        const values = literalMap(expression.expression);
+        if (values) {
+          for (const value of values) harvest(value.text);
+          return;
+        }
+      }
+      reject(node);
+    });
+  }
+
+  // A const binding does not freeze its object: disallow writes and escaping aliases.
+  for (const file of files.values()) {
+    visit(file, (node) => {
+      if (!ts.isIdentifier(node)) return;
+      const symbol = ts.isExportSpecifier(node.parent)
+        ? checker.getExportSpecifierLocalTargetSymbol(node.parent)
+        : ts.isShorthandPropertyAssignment(node.parent)
+          ? checker.getShorthandAssignmentValueSymbol(node.parent)
+          : checker.getSymbolAtLocation(node);
+      const declaration = symbol && maps.get(symbol);
+      if (declaration && node !== declaration.name && !approvedReferences.has(node)) reject(node);
+    });
+  }
+  return { classes, offenders };
+}
+
+const sourceAnalysis = analyzeClassNames(
+  sourceFiles.map((fileName) => ({ fileName, text: readFileSync(fileName, 'utf8') })),
 );
+const usedClasses = sourceAnalysis.classes;
 
 /** Every class name the stylesheet defines a rule for. */
 const definedClasses = new Set<string>(
@@ -66,11 +199,126 @@ describe('T-CSS-001 — the class vocabulary matches in BOTH directions', () => 
     expect(unused).toEqual([]);
   });
 
-  it('T-CSS-001c: no className is computed, so both directions above are exact', () => {
-    // A template-literal or conditional className would make the static scan
-    // above incomplete while still passing — a vacuous green.
-    const computed = sourceFiles.filter((file) => /className=\{/.test(readFileSync(file, 'utf8')));
-    expect(computed).toEqual([]);
+  it('T-CSS-001c: className is literal or a local const literal-map lookup', () => {
+    expect(sourceAnalysis.offenders).toEqual([]);
+  });
+});
+
+describe('T-UI-032 — static class vocabulary analysis', () => {
+  function analyze(text: string) {
+    return analyzeClassNames([{ fileName: 'fixture.tsx', text }]);
+  }
+
+  it('T-UI-032a: harvests all literal attributes and only referenced map values', () => {
+    const result = analyze(`
+      const BUTTON_CLASS: Record<string, string> = {
+        'primary': "btn btn--primary", secondary: 'btn btn--secondary',
+      };
+      const UNUSED_CLASS = { unused: 'not-rendered' };
+      const copy = 'not-a-class';
+      function Button(variant: string) {
+        return <><button className = { BUTTON_CLASS[variant] } />
+          <div className='single quoted' /><span className="double" />
+          <i className={'expression-literal'} /></>;
+      }
+    `);
+    expect(result.offenders).toEqual([]);
+    expect([...result.classes].sort()).toEqual(
+      [
+        'btn',
+        'btn--primary',
+        'btn--secondary',
+        'single',
+        'quoted',
+        'double',
+        'expression-literal',
+      ].sort(),
+    );
+  });
+
+  it('T-UI-032b: ignores comments and string contents, not real JSX', () => {
+    const result = analyze(`
+      // <div className={runtime + 'fake'} />
+      /* const FAKE_CLASS = { fake: 'comment-only' };
+         <div className="comment-class" /> */
+      const prose = '<div className="string-only" />';
+      const element = <div className="real">
+        {/* <span className={MISSING_CLASS[key]} /> */}
+      </div>;
+    `);
+    expect(result.offenders).toEqual([]);
+    expect([...result.classes]).toEqual(['real']);
+  });
+
+  it.each([
+    ['interpolated template', '<div className={`btn ${variant}`} />'],
+    ['plain template', '<div className={`btn`} />'],
+    ['concatenation', '<div className={"btn " + variant} />'],
+    ['conditional', '<div className={active ? "yes" : "no"} />'],
+    ['missing map', '<div className={MISSING_CLASS[variant]} />'],
+    ['dynamic map', 'const MAP = build(); <div className={MAP[key]} />'],
+    ['let map', 'let MAP = { a: "btn" }; <div className={MAP[key]} />'],
+    ['var map', 'var MAP = { a: "btn" }; <div className={MAP[key]} />'],
+    ['spread', 'const MAP = { ...other, a: "btn" }; <div className={MAP[key]} />'],
+    ['call value', 'const MAP = { a: build() }; <div className={MAP[key]} />'],
+    ['computed value', 'const MAP = { a: "btn " + variant }; <div className={MAP[key]} />'],
+    ['template value', 'const MAP = { a: `btn ${variant}` }; <div className={MAP[key]} />'],
+    ['computed property', 'const MAP = { [key]: "btn" }; <div className={MAP[key]} />'],
+    ['shorthand', 'const MAP = { value }; <div className={MAP[key]} />'],
+    ['getter', 'const MAP = { get a() { return "btn"; } }; <div className={MAP[key]} />'],
+    ['duplicate key', 'const MAP = { a: "old", a: "new" }; <div className={MAP[key]} />'],
+    ['prototype setter', 'const MAP = { __proto__: "btn" }; <div className={MAP[key]} />'],
+    ['imported map', 'import { MAP } from "./map"; <div className={MAP[key]} />'],
+    ['exported map', 'export const MAP = { a: "btn" }; <div className={MAP[key]} />'],
+    ['runtime key', 'const MAP = { a: "btn" }; <div className={MAP[getKey()]} />'],
+    ['literal key', 'const MAP = { a: "btn" }; <div className={MAP["a"]} />'],
+    ['property access', 'const MAP = { a: "btn" }; <div className={MAP.a} />'],
+    ['optional lookup', 'const MAP = { a: "btn" }; <div className={MAP?.[key]} />'],
+    ['boolean attribute', '<div className />'],
+  ])('T-UI-032c: rejects %s', (_label, text) => {
+    expect(analyze(text).offenders.length).toBeGreaterThan(0);
+  });
+
+  it.each([
+    'MAP.a = "changed";',
+    'MAP[key] += " changed";',
+    'delete MAP.a;',
+    'Object.assign(MAP, { a: "changed" });',
+    'const alias = MAP; alias.a = "changed";',
+    'const holder = { MAP }; holder.MAP.a = "changed";',
+    'mutate(MAP);',
+    'export { MAP };',
+    'export { MAP as exported };',
+  ])('T-UI-032d: rejects mutable or escaped const maps: %s', (mutation) => {
+    const result = analyze(`
+      const MAP = { a: "btn" };
+      ${mutation}
+      const element = <div className={MAP[key]} />;
+    `);
+    expect(result.offenders.length).toBeGreaterThan(0);
+  });
+
+  it('T-UI-032e: resolves lexical bindings rather than matching map names', () => {
+    const result = analyze(`
+      const MAP = { a: "btn" };
+      const outer = <div className={MAP[key]} />;
+      function Component(MAP: Record<string, string>, key: string) {
+        return <div className={MAP[key]} />;
+      }
+    `);
+    expect(result.offenders).toHaveLength(1);
+    expect([...result.classes]).toEqual(['btn']);
+  });
+
+  it('T-UI-032f: accepts scoped maps with const assertions and satisfies', () => {
+    const result = analyze(`
+      function Component(key: string) {
+        const variants = ({ a: 'local local--a', b: 'local local--b' } as const) satisfies Record<string, string>;
+        return <div className={variants[key]} />;
+      }
+    `);
+    expect(result.offenders).toEqual([]);
+    expect([...result.classes].sort()).toEqual(['local', 'local--a', 'local--b']);
   });
 });
 
@@ -95,6 +343,7 @@ describe('T-CSS-003 — colours and breakpoints come from :root only', () => {
   it('T-CSS-003a: :root declares every token in §13.2', () => {
     for (const token of [
       '--bp-sm',
+      '--bp-md',
       '--bp-lg',
       '--layout-max-width',
       '--tap-target-min',
@@ -232,8 +481,22 @@ describe('T-CSS-004 — contrast is computed from the tokens, not eyeballed', ()
     expect(ratio(token('--color-text'), surface())).toBeCloseTo(17.7, 0);
     expect(ratio(token('--color-text-muted'), surface())).toBeCloseTo(7.6, 0);
     expect(ratio(token('--color-border'), surface())).toBeCloseTo(3.3, 0);
-    expect(ratio(token('--color-accent'), surface())).toBeCloseTo(6.7, 0);
+    // ⚠ 7.9, NOT 6.7. ADR-0013 replaced #1d4ed8 (6.70:1) with the owner's
+    // deeper indigo #4338ca (7.90:1) in TASK-208. This literal is the whole
+    // point of the assertion — DO NOT widen `toBeCloseTo`'s precision to make
+    // both values pass, which would turn a computed-contrast gate into one
+    // that accepts any accent within ±5.
+    expect(ratio(token('--color-accent'), surface())).toBeCloseTo(7.9, 0);
     expect(ratio(token('--color-danger'), surface())).toBeCloseTo(6.5, 0);
+  });
+
+  it('T-CSS-004e: white text on the accent is legible, so one token serves link AND button', () => {
+    // ⚠ THE PAIR THE `textPairs` SWEEP CANNOT SEE. It only checks accent-as-
+    // FOREGROUND on the two surfaces; a filled primary button uses it as the
+    // BACKGROUND, and that pair appears in no other assertion here. An accent
+    // darkened for link contrast can pass everything above while white label
+    // text on the button fails.
+    expect(ratio(token('--color-accent'), '#ffffff')).toBeGreaterThanOrEqual(4.5);
   });
 
   it('T-CSS-004d: the contrast helper itself is correct', () => {
@@ -243,6 +506,124 @@ describe('T-CSS-004 — contrast is computed from the tokens, not eyeballed', ()
     expect(ratio('#000000', '#ffffff')).toBeCloseTo(21, 5);
     expect(ratio('#777777', '#777777')).toBeCloseTo(1, 5);
     expect(ratio('#d1d5db', '#ffffff')).toBeCloseTo(1.47, 1);
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+/* T-CSS-006 / T-CSS-007 — the type scale (REQ-123, ui-refresh.md §7b).     */
+/* ------------------------------------------------------------------------ */
+
+const ROOT_BLOCK = /:root\s*\{([\s\S]*?)\n\}/.exec(cssWithoutComments)?.[1] ?? '';
+const OUTSIDE_ROOT = cssWithoutComments.replace(/:root\s*\{[\s\S]*?\n\}/, '');
+
+/** The rem value of a scale token, for ordering assertions. */
+function remToken(name: string): number {
+  const match = new RegExp(`${name}:\\s*([\\d.]+)rem`).exec(ROOT_BLOCK);
+  if (match?.[1] === undefined) throw new Error(`Token ${name} is not a rem value in :root`);
+  return Number(match[1]);
+}
+
+describe('T-CSS-006 — the scale is declared once, and nothing sizes text off it', () => {
+  const SCALE = [
+    '--text-xs',
+    '--text-sm',
+    '--text-base',
+    '--text-lg',
+    '--text-xl',
+    '--text-2xl',
+    '--leading-tight',
+    '--leading-normal',
+    '--weight-normal',
+    '--weight-medium',
+    '--weight-bold',
+  ] as const;
+
+  it('T-CSS-006a: :root declares every type token in §7b', () => {
+    for (const name of SCALE) expect(ROOT_BLOCK).toContain(`${name}:`);
+  });
+
+  it('T-CSS-006b: no rule body contains a raw font-size literal', () => {
+    // ⚠ THIS IS THE ASSERTION THAT MAKES THE SCALE REAL. Declaring the tokens
+    // changes nothing on its own — the defect being fixed is that sixteen
+    // literals in FIVE ad-hoc sizes were scattered through the rule bodies,
+    // including a `0.85rem` that sat on no scale at all. A single survivor
+    // re-establishes the second scale silently.
+    const raw = [...OUTSIDE_ROOT.matchAll(/font-size:\s*([^;]+);/g)]
+      .map((match) => (match[1] ?? '').trim())
+      .filter((value) => !value.startsWith('var(--text-') && value !== 'inherit');
+    expect(raw).toEqual([]);
+  });
+
+  it('T-CSS-006c: no rule body contains a raw font-weight or line-height literal', () => {
+    // Same failure, different property. Weight tokens that nothing consumes
+    // are decoration: §7b declares three, and eleven bare `600`s meant the
+    // scale was declared and then ignored.
+    const rawWeights = [...OUTSIDE_ROOT.matchAll(/font-weight:\s*([^;]+);/g)]
+      .map((match) => (match[1] ?? '').trim())
+      .filter((value) => !value.startsWith('var(--weight-') && value !== 'inherit');
+    const rawLeading = [...OUTSIDE_ROOT.matchAll(/line-height:\s*([^;]+);/g)]
+      .map((match) => (match[1] ?? '').trim())
+      .filter((value) => !value.startsWith('var(--leading-') && value !== 'inherit');
+    expect({ rawWeights, rawLeading }).toEqual({ rawWeights: [], rawLeading: [] });
+  });
+
+  it('T-CSS-006d: the scale ascends, and is expressed in rem so the user setting is honoured', () => {
+    // ⚠ A `px` SCALE OVERRIDES AN ACCESSIBILITY PREFERENCE THE USER HAS
+    // ALREADY EXPRESSED, and looks perfectly correct in every screenshot.
+    const sizes = ['--text-xs', '--text-sm', '--text-base', '--text-lg', '--text-xl', '--text-2xl'];
+    const values = sizes.map(remToken);
+    expect(values).toEqual([...values].sort((a, b) => a - b));
+    expect(new Set(values).size).toBe(values.length);
+    expect(remToken('--text-base')).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('T-CSS-007 — nothing shrinks content below the --text-sm floor', () => {
+  /**
+   * ⚠ `--text-xs` IS NOT A DENSITY CONTROL, and reaching for it to fit more
+   * in is the failure mode this guards. REQ-112's density comes from layout
+   * and from the compact genre presentation — never from making content
+   * smaller. It always looks fine to the person who has just done it.
+   *
+   * The allow-list is CLOSED on purpose: `--text-xs` is for supplementary
+   * labels that are not content. Adding a selector here is a deliberate,
+   * reviewable act rather than a silent side effect of a density pass.
+   */
+  const XS_ALLOWED = [
+    '.title-row__rating-source',
+    '.tmdb-attribution',
+    '.justwatch-attribution',
+  ] as const;
+
+  /** Selector → the font-size it sets, for every rule in the sheet. */
+  const rules = [...OUTSIDE_ROOT.matchAll(/([^{}]+)\{([^}]*)\}/g)].flatMap((match) => {
+    const size = /font-size:\s*([^;]+);/.exec(match[2] ?? '')?.[1]?.trim();
+    return size === undefined ? [] : [{ selector: (match[1] ?? '').trim(), size }];
+  });
+
+  it('T-CSS-007a: only the declared supplementary labels use --text-xs', () => {
+    const offenders = rules
+      .filter((rule) => rule.size === 'var(--text-xs)')
+      .map((rule) => rule.selector)
+      .filter((selector) => !XS_ALLOWED.includes(selector as (typeof XS_ALLOWED)[number]));
+    expect(offenders).toEqual([]);
+  });
+
+  it('T-CSS-007b: genre chips sit at --text-sm, which §7b names explicitly', () => {
+    // ⚠ BOTH CHIP RULES WERE AT `--text-xs` BEFORE TASK-208 — the precise
+    // "shrink it to win density" case, already present in the sheet. §7b
+    // lists genre chips under `--text-sm`, so this is spec text, not taste.
+    for (const selector of ['.title-row__chip', '.candidate-card__chip']) {
+      const rule = rules.find((entry) => entry.selector === selector);
+      expect({ selector, size: rule?.size }).toEqual({ selector, size: 'var(--text-sm)' });
+    }
+  });
+
+  it('T-CSS-007c: the floor is a real floor — --text-sm is at least 0.875rem', () => {
+    // Without this the allow-list is evadable by redefining the token itself:
+    // every selector would still name `--text-sm` while rendering at 10px.
+    expect(remToken('--text-sm')).toBeGreaterThanOrEqual(0.875);
+    expect(remToken('--text-xs')).toBeGreaterThanOrEqual(0.75);
   });
 });
 

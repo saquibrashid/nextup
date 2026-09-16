@@ -15,7 +15,12 @@ import {
   type Service,
 } from '@nextup/domain';
 
-import { REMOVAL_CONFIRM_LABEL, REVIEW_APPLY_LABEL, SUBMIT_LABEL } from '../../apps/web/src/copy';
+import {
+  REMOVAL_CONFIRM_LABEL,
+  REVIEW_APPLY_LABEL,
+  REVIEW_REMOVALS_MARKER,
+  SUBMIT_LABEL,
+} from '../../apps/web/src/copy';
 // ⚠ TYPE-ONLY, and that is load-bearing (Part 2). These are the SPA's own
 // statement of the response contracts; annotating the stub's builders with them
 // turns a server-side shape change into a typecheck failure in THIS file rather
@@ -1059,7 +1064,18 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
   // heart of step 5.
   const removals2 = page.getByTestId('review-removals');
   await expect(removals2, 'Arrival should be offered for removal').toBeVisible();
-  await expect(removals2.locator('summary')).toHaveText(`${removalsLabel('netflix')} (1)`);
+  // ⚠ THE MARKER IS PART OF THE SUMMARY'S TEXT, and this assertion is exact on
+  // purpose. REQ-122 appends `REVIEW_REMOVALS_MARKER` as a sibling `<span>`
+  // inside the `<summary>`; Testing Library's `getNodeText` reads only direct
+  // text-node children and so never saw it (the `T-UX-099` count assertions
+  // still pass untouched),
+  // but Playwright's `toHaveText` reads the full `textContent` and does. Asserting
+  // the whole string keeps the count check strict AND pins REQ-122's
+  // non-colour marker into the golden journey — weakening this to
+  // `toContainText` would drop both guarantees at once.
+  await expect(removals2.locator('summary')).toHaveText(
+    `${removalsLabel('netflix')} (1)${REVIEW_REMOVALS_MARKER}`,
+  );
   const removalCards = removals2.getByTestId('removal-card');
   await expect(removalCards).toHaveCount(1);
   await expect(removalCards.first()).toContainText('Arrival');

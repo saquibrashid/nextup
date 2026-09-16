@@ -1,3 +1,4 @@
+import { Input } from '../components/ui/Input';
 // `/upload` step 1 - service and mode (specs/ui.md §3.1, TASK-049).
 //
 // Two required choices, NEITHER defaulted (US-003 AC-1/AC-2, REQ-002/REQ-003).
@@ -26,6 +27,7 @@
 // are separate tasks. This step owns the two choices and reports them upward.
 
 import { useId, useState, type JSX } from 'react';
+import { SegmentedControl } from '../components/ui/SegmentedControl';
 import {
   BATCH_MODES,
   SERVICES,
@@ -97,11 +99,10 @@ export function UploadPage({ onSelectionChange }: UploadPageProps = {}): JSX.Ele
       <h1>Upload screenshots</h1>
 
       {/* Native radios: real group semantics and roving focus for free. */}
-      <fieldset data-testid="service-step">
-        <legend>{SERVICE_STEP_LEGEND}</legend>
+      <SegmentedControl legend={SERVICE_STEP_LEGEND} testId="service-step">
         {SERVICES.map((candidate) => (
           <label key={candidate} data-testid={`service-option-${candidate}`}>
-            <input
+            <Input
               type="radio"
               name={serviceGroup}
               value={candidate}
@@ -113,13 +114,12 @@ export function UploadPage({ onSelectionChange }: UploadPageProps = {}): JSX.Ele
             <span>{SERVICE_LABELS[candidate]}</span>
           </label>
         ))}
-      </fieldset>
+      </SegmentedControl>
 
-      <fieldset data-testid="mode-step">
-        <legend>{MODE_STEP_LEGEND}</legend>
+      <SegmentedControl legend={MODE_STEP_LEGEND} testId="mode-step">
         {BATCH_MODES.map((candidate) => (
           <label key={candidate} data-testid={`mode-card-${candidate}`}>
-            <input
+            <Input
               type="radio"
               name={modeGroup}
               value={candidate}
@@ -135,7 +135,7 @@ export function UploadPage({ onSelectionChange }: UploadPageProps = {}): JSX.Ele
             </p>
           </label>
         ))}
-      </fieldset>
+      </SegmentedControl>
     </>
   );
 }

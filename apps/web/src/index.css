@@ -21,6 +21,12 @@
 :root {
   /* Breakpoints — named so the same width cannot be typed twice differently. */
   --bp-sm: 640px;
+  /*
+   * ADR-0013's list/grid switch (REQ-110). Declared here with the other two so
+   * the three breakpoints are read as one scale; its consumer arrives with the
+   * hybrid list surface in TASK-212.
+   */
+  --bp-md: 768px;
   --bp-lg: 1024px;
 
   --layout-max-width: 56rem;
@@ -30,6 +36,32 @@
    * only consumer, so the minimum cannot drift between controls.
    */
   --tap-target-min: 44px;
+  /*
+   * REQ-117 — the height the bottom-fixed phone bar occupies, and therefore
+   * the clearance `.app-shell` must reserve beneath its content.
+   *
+   * ⚠ ONE DEFINITION, TWO CONSUMERS, AND THAT IS THE WHOLE POINT. The bar's
+   * own `min-height` and the shell's bottom padding are the same measurement
+   * stated twice; typed as two literals they drift, and the failure is a bar
+   * that covers the last row of a list — the rows at the end of the scroll,
+   * which is exactly where the eye stops. `T-UX-137b` asserts the padding is
+   * expressed in terms of this token rather than a number.
+   *
+   * ⚠ IT IS A FLOOR THAT MUST NOT BE UNDERCUT BY THE BAR'S OWN CONTENT, and
+   * that is the whole reason for the value. `.nav` applies it as `min-height`,
+   * so the bar is exactly this tall ONLY WHILE it exceeds what a slot
+   * naturally measures — and a slot is icon over label (§7c), not a single
+   * line: `.tap-target` padding (2 × `--space-2`) + the 1.25em icon + the
+   * `--space-1` gap + a `--text-sm` label at `--leading-normal` + the 2px
+   * active rule, inside `.nav`'s own 2 × `--space-1`. That is ~71 px. At the
+   * original ~56 px the token was BELOW the rendered bar, so the clearance
+   * under-reserved by ~15 px and the last control on a long page stayed
+   * un-tappable while every unit assertion here still passed — `T-E2E-001b`
+   * caught it at 320 px, with the bar intercepting `apply-changes-button`.
+   * Raising this is therefore not cosmetic: it is what makes "the padding
+   * equals the bar height" TRUE rather than merely well-expressed.
+   */
+  --nav-bar-height: 5rem;
   /*
    * REQ-105 — the open row menu overlaps the row beneath it, so it needs a
    * shadow to read as a layer rather than as part of that row.
@@ -61,7 +93,17 @@
    */
   --color-border: #878d99;
 
-  --color-accent: #1d4ed8; /* 6.7:1 on white */
+  /*
+   * ⚠ ADR-0013's deeper indigo, and the owner's choice. 7.90:1 on surface,
+   * 7.56:1 on bg — and WHITE TEXT ON IT is also 7.90:1, which is why one
+   * token serves both the link colour and the filled primary button without
+   * a second value being invented for the button.
+   *
+   * ⚠ `T-CSS-004c` pins this ratio as a literal. Changing the hex without
+   * changing that number fails the suite — deliberately, because the spec
+   * table and the token drifting apart is the exact defect it exists for.
+   */
+  --color-accent: #4338ca; /* 7.9:1 on white */
   --color-danger: #b91c1c; /* 6.5:1 on white — destructive confirmation only */
 
   /* A closed scale. A one-off margin is a token that was not added. */
@@ -79,6 +121,38 @@
    * layout shift while it arrives. The system stack costs neither.
    */
   --font-stack: system-ui, -apple-system, 'Segoe UI', roboto, helvetica, arial, sans-serif;
+
+  /*
+   * REQ-123 — THE TYPE SCALE. ⚠ THERE WAS NO SCALE AT ALL BEFORE THIS: every
+   * screen rendered at one size, which is the loudest single signal that a
+   * page was never designed. Sixteen raw literals in five ad-hoc sizes were
+   * replaced by these, including a `0.85rem` that sat on no scale whatever.
+   *
+   * ⚠ `rem`, never `px`, so the browser's own text-size setting is honoured.
+   * A `px` scale silently overrides an accessibility preference the user has
+   * already expressed, and looks correct in every screenshot.
+   */
+  --text-xs: 0.75rem; /* ⚠ UPPERCASE TRACKED LABELS ONLY — see below */
+  --text-sm: 0.875rem; /* Secondary and helper copy, genre chips */
+  --text-base: 1rem; /* Body. NEVER below this for primary content */
+  --text-lg: 1.125rem; /* The title-row name, card headings */
+  --text-xl: 1.5rem; /* Section headings, the brand mark */
+  --text-2xl: 2rem; /* Page heading */
+
+  /*
+   * ⚠ `--text-xs` IS NOT A DENSITY CONTROL. REQ-112's density is found in
+   * layout and in the compact genre presentation — not by shrinking content
+   * below `--text-sm`, which is what `T-CSS-007` exists to catch. Reaching
+   * for it to fit more in is the failure mode, and it always looks fine to
+   * the person who has just done it.
+   */
+
+  --leading-tight: 1.2; /* Headings */
+  --leading-normal: 1.55; /* Body */
+
+  --weight-normal: 400;
+  --weight-medium: 600;
+  --weight-bold: 700;
 }
 
 /* ---------------------------------------------------------------- reset -- */
@@ -109,14 +183,32 @@ ol {
 html {
   /* ⚠ Never a fixed px root size: it overrides the browser's text setting. */
   -webkit-text-size-adjust: 100%;
+
+  /*
+   * REQ-117 — CLEARANCE FOR *BROWSER-DRIVEN* SCROLLING, which is a different
+   * problem from the reader's clearance and needs its own declaration.
+   *
+   * ⚠ `.app-shell`'s `padding-bottom` IS NOT ENOUGH ON ITS OWN. It guarantees
+   * the owner CAN scroll the last control clear of the bar; it does nothing
+   * about scrolls the browser performs itself. `scrollIntoView` and the scroll
+   * that follows keyboard focus both move an element only just inside the
+   * viewport — i.e. flush with the bottom edge, which is exactly where the
+   * fixed bar sits. The control is then on screen and un-tappable.
+   *
+   * ⚠ SO THIS IS AN ACCESSIBILITY FIX, NOT A TEST ACCOMMODATION. It was found
+   * by Playwright reporting `nav__item` and `nav__link` as intercepting
+   * pointer events on `apply-changes-button`, but the owner meets the same
+   * bug whenever they Tab to a control near the foot of a long page.
+   */
+  scroll-padding-bottom: calc(var(--nav-bar-height) + env(safe-area-inset-bottom));
 }
 
 body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-stack);
-  font-size: 1rem;
-  line-height: 1.5;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
   margin: 0;
 }
 
@@ -144,6 +236,321 @@ button {
   color: inherit;
 }
 
+/* ----------------------------------------------------------------- icons -- */
+
+/*
+ * REQ-124 (§7c) — the ONE rule that sizes every icon.
+ *
+ * ⚠ SIZED IN `em`, NOT `rem` OR `px`, so an icon scales with the text it sits
+ * beside. A fixed size looks right next to body copy and wrong everywhere
+ * else — beside `--text-xl` it reads as a bullet, and beside `--text-sm` it
+ * shouts. Because the unit is relative it also honours the browser's own
+ * text-size setting for free, which `--text-*` already guarantees.
+ *
+ * ⚠ NO `color`, `fill` OR `stroke` HERE. `IconBase` renders
+ * `stroke="currentColor"`, so an icon inherits the token of its context and is
+ * therefore covered by `T-CSS-004`'s computed contrast without a token of its
+ * own. Giving `.icon` a colour would put a second, unchecked colour source
+ * beside the one that is checked.
+ */
+.icon {
+  block-size: 1.25em;
+  inline-size: 1.25em;
+
+  /*
+   * Without this an icon is squashed by a long label in a flex row — the
+   * drawing distorts rather than the text wrapping, and it looks like a bad
+   * path rather than a layout bug.
+   */
+  flex: none;
+}
+
+/* ------------------------------------------------------------ primitives -- */
+
+/*
+ * REQ-125 (§7d) — `Button` and `Field`. ⚠ THIS BLOCK REPLACES NINE PRIVATE
+ * RULES, seven of which were the same border-plus-radius written out again on
+ * a different screen. That duplication is why the screens looked unrelated to
+ * each other even where each was individually correct.
+ */
+.btn {
+  align-items: center;
+  background: var(--color-surface);
+
+  /*
+   * ⚠ A TRANSPARENT BORDER, NOT `none`. Every variant then occupies the same
+   * box, so a filled button and an outlined one beside it line up. With
+   * `border: none` on one variant the two differ by 2 px and the row reads as
+   * slightly broken in a way nobody can name.
+   */
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  color: var(--color-text);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  gap: var(--space-2);
+  justify-content: center;
+  line-height: var(--leading-tight);
+  padding: var(--space-2) var(--space-4);
+  text-align: center;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    filter 120ms ease;
+}
+
+/*
+ * ⚠ `:focus-visible`, NOT `:focus`. A mouse click would otherwise leave a ring
+ * behind on every button the owner presses, which reads as a bug and is
+ * usually "fixed" by removing the outline altogether — taking the keyboard
+ * user's only position indicator with it.
+ */
+.btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn--primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+
+  /* 7.90:1 — see the `--color-accent` note in `:root`; one token serves both. */
+  color: var(--color-surface);
+}
+
+.btn--secondary {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.btn--ghost {
+  background: none;
+  border-color: transparent;
+  color: var(--color-accent);
+}
+
+.btn--danger {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: var(--color-surface);
+}
+
+/*
+ * ⚠ DARKEN, NEVER LIGHTEN, A FILLED BUTTON ON HOVER. These carry white text at
+ * a computed ratio; brightening the fill moves that ratio DOWN, so the state
+ * the owner sees most often would be the one least likely to pass §10.2 — and
+ * `T-CSS-004` reads the tokens, not the hover state, so it would never say so.
+ */
+.btn--primary:hover:not(:disabled),
+.btn--danger:hover:not(:disabled) {
+  filter: brightness(0.9);
+}
+
+.btn--secondary:hover:not(:disabled),
+.btn--ghost:hover:not(:disabled) {
+  background: var(--color-bg);
+}
+
+/*
+ * §7d — the group. ⚠ THE SEMANTICS ARE KEPT AND THE CHROME IS NOT: the
+ * browser's default inset groove border was the single most dated thing on
+ * these screens, but `<fieldset>`/`<legend>` is what associates the group name
+ * with every control inside it for a screen reader.
+ */
+.field {
+  border: none;
+  margin: 0;
+  min-inline-size: 0;
+  padding: 0;
+}
+
+.field__legend {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  padding: 0;
+}
+
+.field__description {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.field__error {
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+}
+
+.input {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font: inherit;
+  max-inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: var(--tap-target-min);
+  padding: var(--space-2);
+}
+
+.input--choice {
+  accent-color: var(--color-accent);
+  min-block-size: 0;
+  flex: none;
+}
+
+.field label:has(.input--choice),
+.segmented > label {
+  align-items: center;
+  display: inline-flex;
+  gap: var(--space-2);
+  min-block-size: var(--tap-target-min);
+  padding: var(--space-2);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.input--file {
+  /* The visible label remains the file-selection affordance on every device. */
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  min-block-size: 0;
+  border: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.card,
+.dialog {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-4);
+  min-inline-size: 0;
+}
+
+.dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-inline-size: 100%;
+}
+
+.badge {
+  display: inline-block;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  padding: var(--space-1) var(--space-2);
+}
+
+/*
+ * §7d's `chip` — the compact genre presentation, and deliberately QUIETER
+ * than `.badge`: a genre is a fact about the work, not a state of the row, and
+ * three of them at badge weight would compete with the service badges that
+ * carry the product's whole point. That is why this is a separate rule rather
+ * than a second selector on `.badge`.
+ *
+ * `text-overflow: ellipsis` with the `min-width: 0` on `.genre-chips` so a
+ * long genre name truncates rather than forcing the 320 px row sideways.
+ */
+.chip {
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  overflow: hidden;
+  padding: 0 var(--space-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.segmented {
+  border: none;
+  margin: 0;
+  min-inline-size: 0;
+  padding: 0;
+}
+
+.segmented__legend {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  margin-block-end: var(--space-2);
+}
+
+.segmented > label {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  flex-wrap: wrap;
+  margin-inline-end: var(--space-1);
+  margin-block-end: var(--space-1);
+}
+
+.segmented > label:has(:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-bg);
+  font-weight: var(--weight-bold);
+}
+
+.segmented > label > p {
+  flex-basis: 100%;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+}
+
+.btn[aria-pressed='true'] {
+  background: var(--color-accent);
+  color: var(--color-surface);
+}
+
+.empty-state {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+}
+
+.empty-state__title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+}
+
+.empty-state__icon {
+  color: var(--color-text-muted);
+  font-size: var(--text-xl);
+}
+
+.skeleton {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  margin-block-end: var(--space-2);
+}
+
+.skeleton--line {
+  block-size: 1em;
+}
+
+.skeleton--card {
+  min-block-size: 8rem;
+}
+
+.skeleton--poster {
+  inline-size: 4rem;
+  aspect-ratio: 2 / 3;
+}
+
 /* --------------------------------------------------------------- layout -- */
 
 .app-shell {
@@ -155,14 +562,29 @@ button {
    * desktop-first makes the floor NFR-006 mandates the case reached by
    * subtraction — the one nobody looks at.
    */
+
+  /*
+   * REQ-117 — clearance for the bottom-fixed bar, which is OUT OF FLOW and
+   * therefore reserves no space of its own.
+   *
+   * ⚠ WITHOUT THIS THE BAR SITS ON TOP OF THE CONTENT, and it looks fine on
+   * every screen that does not scroll to its end. The rows it eats are the
+   * last ones in the list.
+   *
+   * ⚠ THE `env()` TERM IS NOT DECORATION: on a notched iPhone the home
+   * indicator occupies real estate below the bar, so the clearance is the bar
+   * plus that inset, not the bar alone. `env()` resolves to `0` where there is
+   * no inset, so this is correct on every other device too.
+   */
+  padding-bottom: calc(var(--space-4) + var(--nav-bar-height) + env(safe-area-inset-bottom));
 }
 
 .app-shell__logo {
   align-items: center;
   color: var(--color-text);
   display: flex;
-  font-size: 1.25rem;
-  font-weight: 700;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
   gap: var(--space-2);
   text-decoration: none;
 }
@@ -178,6 +600,206 @@ button {
   min-height: var(--tap-target-min);
   min-width: var(--tap-target-min);
   padding: var(--space-2) var(--space-3);
+}
+
+/* ----------------------------------------------------------- navigation -- */
+
+/*
+ * TASK-211 (REQ-116/REQ-117, `specs/ui-refresh.md` §6).
+ *
+ * ⚠ THE `<nav>`, `<ul>` AND `<li>` HAD NO CLASS AND THEREFORE NO RULE, which
+ * is the single most visible defect of the epic: a wrapped column of blue
+ * browser-default links above every screen. Nothing below is decoration.
+ *
+ * ⚠ MOBILE-FIRST (§13.3). What follows IS the 320 px case — the three-slot
+ * destination bar — and `@media (min-width: 640px)` widens it. Written the
+ * other way up, the floor NFR-006 mandates becomes the case reached by
+ * subtraction, which is the one nobody looks at.
+ */
+
+.app-shell__header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+
+/*
+ * REQ-117 — below `--bp-sm` the nav IS the bottom bar.
+ *
+ * ⚠ MOBILE-FIRST, SO THIS IS THE BASE RULE AND THE DESKTOP IS THE OVERRIDE
+ * (§13.3). `T-CSS-001d` forbids `max-width` anywhere, so the phone case
+ * cannot be expressed as a query at all — it has to be the default, and the
+ * `min-width: 640px` block below is what puts the nav back in the header.
+ *
+ * ⚠ IT STAYS INSIDE THE `<header>` IN THE DOM. There is exactly one `<nav>`
+ * per page (`T-A11Y-004`, `T-UI-023c`); a second one rendered only on phones
+ * is the idiomatic build and fails those tests on every route at once. Fixed
+ * positioning takes it out of flow without moving it in the document, so the
+ * landmark count is untouched and the tab order still reaches navigation
+ * before content.
+ *
+ * ⚠ THE `padding-bottom` IS THE SAFE-AREA INSET, NOT A GAP. On a notched
+ * iPhone the home indicator sits below the bar; without it the labels are
+ * under the indicator and the taps land on the wrong thing.
+ */
+.nav {
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  bottom: 0;
+  flex: 1 1 100%;
+  inset-inline: 0;
+  min-height: var(--nav-bar-height);
+  padding: var(--space-1) var(--space-3) calc(var(--space-1) + env(safe-area-inset-bottom));
+  position: fixed;
+  z-index: 30;
+}
+
+.nav__list {
+  display: flex;
+  /*
+   * ⚠ REQ-117 — the three slots are spread across the bar's full width so each
+   * is its own thumb target. `flex-wrap` stays for the 320 px floor: a bar
+   * that clips its third slot is worse than one that grows a row.
+   */
+  justify-content: space-around;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nav__item {
+  margin: 0;
+}
+
+/*
+ * A text destination: the wide bar, and every row of the `More` panel.
+ *
+ * ⚠ THE TRANSPARENT BOTTOM BORDER IS LOAD-BEARING, NOT A PLACEHOLDER. The
+ * active state swaps its colour, so the inactive and active boxes are the same
+ * height. Adding the border only when active shifts every sibling by 2 px on
+ * navigation — a jitter that reads as a rendering bug, not as a style.
+ */
+.nav__link {
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font-size: var(--text-base);
+  font-weight: var(--weight-normal);
+  text-decoration: none;
+}
+
+.nav__link:hover {
+  background: var(--color-bg);
+}
+
+.nav__link:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/*
+ * ⚠ NEVER COLOUR ALONE (`specs/ui.md` §10.2, `T-UX-117`). THREE channels carry
+ * this state and only one of them is hue: the weight changes, a rule appears
+ * under the label, and `aria-current="page"` states it outright. A colour-only
+ * indicator is invisible to roughly one man in twelve, and to anyone reading a
+ * phone in sunlight — which is the primary device here.
+ */
+.nav__link--active {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: var(--weight-bold);
+}
+
+/*
+ * One slot of the phone destination bar: icon over label (§7c). Three slots
+ * share the width, so each is a flexible column rather than a fixed box.
+ */
+.nav__slot {
+  border-bottom: 2px solid transparent;
+  border-radius: var(--radius);
+  color: var(--color-text);
+  flex-direction: column;
+  gap: var(--space-1);
+  text-decoration: none;
+}
+
+.nav__slot:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.nav__slot--active {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: var(--weight-bold);
+}
+
+/*
+ * ⚠ `--text-sm`, NOT `--text-xs` (`T-CSS-007`). A bar label is content — it is
+ * the only thing naming the destination, because §7c forbids the icon standing
+ * alone — so shrinking it to win a few pixels of width is exactly the density
+ * failure that gate exists to catch.
+ */
+.nav__slot-label {
+  font-size: var(--text-sm);
+}
+
+/*
+ * ⚠ `position: relative` SO THE PANEL IS ANCHORED TO `More` ITSELF. The same
+ * lesson as REQ-105's row menu: a panel positioned against the page rather
+ * than against its trigger lands somewhere plausible at one width and
+ * somewhere absurd at another.
+ */
+.nav__more {
+  margin: 0;
+  position: relative;
+}
+
+/*
+ * ⚠ LAYOUT BELONGS TO THE PARENT, NOT TO A BUTTON VARIANT. `Button` refuses a
+ * `className` by design (§7d), so the icon-over-label stacking that makes the
+ * `More` control match its two sibling slots is applied from here. A fifth
+ * button variant differing only in flex direction is the drift that rule
+ * exists to prevent.
+ */
+.nav__more .btn {
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.nav__panel {
+  background: var(--color-surface);
+  /*
+   * ⚠ REQ-117 — the panel opens UPWARD, because its trigger now sits on the
+   * bottom edge of the screen. Anchored below `More` (the desktop position,
+   * `top: 100%`) every row of it would be off-screen, and the disclosure would
+   * open onto nothing while reporting `aria-expanded="true"`. The
+   * `min-width: 640px` block restores `top: 100%` for the header nav.
+   */
+  bottom: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-menu);
+  display: flex;
+  flex-direction: column;
+  inset-inline-end: 0;
+  list-style: none;
+  /*
+   * ⚠ THE SHORTHAND MUST COME FIRST. Written after `margin-bottom` it resets
+   * it to `0` and the panel sits flush against the bar — silently, because
+   * both declarations are present and look intentional.
+   */
+  margin: 0;
+  margin-bottom: var(--space-1);
+  min-width: 12rem;
+  padding: var(--space-2);
+  position: absolute;
+  z-index: 20;
 }
 
 /* ------------------------------------------------------------- dropzone -- */
@@ -246,7 +868,7 @@ button {
 .dropzone__paste > button {
   border-color: var(--color-accent);
   color: var(--color-accent);
-  font-weight: 600;
+  font-weight: var(--weight-medium);
 }
 
 /*
@@ -271,63 +893,61 @@ button {
  * has no other way in. Clipping keeps the input focusable and operable while
  * the label is what is seen; the focus ring is put back on the label below.
  */
-.dropzone__file-input {
-  block-size: 1px;
-  clip-path: inset(50%);
-  inline-size: 1px;
-  overflow: hidden;
-  position: absolute;
-  white-space: nowrap;
-}
-
 /*
  * Focus must stay VISIBLE once the input itself is clipped. The label precedes
  * the input, so a sibling combinator cannot reach backwards; `:has()` on the
  * container can.
  */
-.dropzone__target:has(.dropzone__file-input:focus-visible) .dropzone__choose {
+.dropzone__target:has(.input--file:focus-visible) .dropzone__choose {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
 /* ----------------------------------------------------------- filter bar -- */
 
+/*
+ * REQ-113 (`specs/ui-refresh.md` §5) — the filters and the sort present as ONE
+ * control group. `specs/ui.md` §2.1 item 2 has always co-located them;
+ * `FilterBar.tsx` said so in a comment and did not do it, because `SortControl`
+ * shipped later (TASK-166) and mounted as a second bar with its own bottom
+ * margin — two stacked strips that read as two unrelated decisions.
+ *
+ * ⚠ MERGING THEM VISUALLY MUST NOT MERGE THEM MECHANICALLY. The two have
+ * deliberately opposite persistence models: filters are URL-only, sort is
+ * URL → session → default. This rule is the whole of the merge — it adds a
+ * wrapper and moves the bottom margin onto it. Nothing about state is shared,
+ * and a refactor that "tidies" them into one hook produces a green suite and a
+ * broken back button.
+ */
+.list-controls {
+  align-items: flex-end;
+  column-gap: var(--space-5);
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+  row-gap: var(--space-3);
+}
+
 .filter-bar {
   align-items: flex-end;
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
 }
 
 /* --------------------------------------------------------- sort control -- */
 
 /*
- * REQ-037. The sort KEY sits beside the direction toggle, not above it: they
- * are one decision read left to right — "sort by <key>, <direction> first".
- * Wrapping is allowed so the pair drops to its own line on a narrow viewport
- * rather than squeezing the filter fieldsets beside it.
+ * REQ-121. The sort FIELD selector sits beside the DIRECTION segment, not above
+ * it: they are one decision read left to right — "sort by <field>, <direction>
+ * first". Wrapping is allowed so the pair drops to its own line on a narrow
+ * viewport rather than squeezing the filter fieldsets beside it.
  */
 .sort-control-group {
   align-items: flex-end;
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
-}
-
-/*
- * TASK-166. ⚠ LABEL SHOWS THE CURRENT DIRECTION, not what the next click
- * will produce (`A47`). The button's `aria-pressed` state communicates
- * "oldest-first is currently active" — styling mirrors that: visually distinct
- * when pressed (oldest-first), plain when default (newest-first).
- */
-.sort-control {
-  background: none;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  cursor: pointer;
-  font-size: inherit;
 }
 
 /* ------------------------------------------------------ freshness strip -- */
@@ -348,13 +968,13 @@ button {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   color: var(--color-text-muted);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   text-decoration: none;
 }
 
 .freshness-strip__notice {
   color: var(--color-text-muted);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
 }
 
 /* -------------------------------------------------------------- refusal -- */
@@ -453,16 +1073,39 @@ button {
 .title-row__spinner {
   align-self: center;
   color: var(--color-text-muted);
-  font-size: 0.85rem;
+  font-size: var(--text-sm);
   white-space: nowrap;
 }
 
+/*
+ * REQ-111 (`ui-refresh.md` §4.2) — EVERY POSTER IS A UNIFORM 2:3 BOX, AND NO
+ * POSTER IS SMALLER THAN 72 × 108 px IN THE LIST LAYOUT.
+ *
+ * It was `3rem × 4.5rem` — 48 × 72 px. The owner asked for larger and uniform,
+ * and gave the reason: artwork is how they recognise a title.
+ *
+ * ⚠ `aspect-ratio` IS ON THE BASE RULE, NOT ON THE GRID OVERRIDE, AND THAT IS
+ * LOAD-BEARING. The grid tile sets `width: 100%; height: auto`, so the box's
+ * proportions come from here and from nowhere else. Declaring the ratio only
+ * inside the media query would leave the phone poster's shape defined by two
+ * hard-coded lengths that a later edit can drift apart, and — worse — would
+ * leave `.title-row__poster--empty` with NO height at all in the grid, because
+ * a placeholder `<div>` has no intrinsic size to fall back on. The empty box
+ * is a rendered state (see below), so losing its height in one layout is the
+ * row-jumping defect that rule exists to prevent, reintroduced at one width.
+ *
+ * ⚠ THE EXPLICIT `height` STAYS ALONGSIDE THE RATIO. `aspect-ratio` alone is
+ * ignored when both axes are auto-sized, which for an `<img>` means it falls
+ * back to the intrinsic size of whatever TMDB returned — the exact
+ * non-uniformity REQ-111 forbids.
+ */
 .title-row__poster {
+  aspect-ratio: 2 / 3;
   border-radius: var(--radius);
   flex: 0 0 auto;
-  height: 4.5rem;
+  height: 6.75rem;
   object-fit: cover;
-  width: 3rem;
+  width: 4.5rem;
 }
 
 /*
@@ -496,14 +1139,14 @@ button {
 }
 
 .title-row__name {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
 }
 
 .title-row__meta,
 .title-row__date {
   color: var(--color-text-muted);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
 }
 
 /*
@@ -540,6 +1183,47 @@ button {
 }
 
 /*
+ * REQ-112 (`ui-refresh.md` §4.3) — THE COMPACT GENRE PRESENTATION.
+ *
+ * ⚠ "COMPACT" IS A PRESENTATION CHANGE, NOT A CONTENT CHANGE. Every genre is
+ * still present and still readable; what changes is the room they take. The
+ * owner rejected trimming them — they are one of the three filter dimensions,
+ * so the row's genres are the only on-screen explanation of why a genre filter
+ * returned what it returned.
+ *
+ * ⚠ `display: inline-flex`, NOT `flex`. This renders inside `.title-row__meta`,
+ * which is a `<p>` laid out as a flex row of facts; a block-level child would
+ * take a line of its own and put the genres on a row by themselves, which is
+ * the opposite of compact. The chips are phrasing content for the same reason
+ * (a `<ul>` inside a `<p>` is invalid and browsers silently close the
+ * paragraph around it — a break jsdom never reproduces).
+ *
+ * ⚠ `flex-wrap: nowrap` IS THE "AT MOST ONE LINE" HALF. The `+n` overflow in
+ * `GenreChips.tsx` limits the COUNT; this stops the survivors wrapping anyway
+ * at 320 px. Both are needed: the count alone leaves a long trio of genres
+ * spilling onto a second line, and `nowrap` alone would overflow the row.
+ */
+.genre-chips {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+/*
+ * The `+n` control. `flex: 0 0 auto` so it is the one thing that never
+ * truncates: it is the only route to the hidden genres, and an ellipsised
+ * `+…` says nothing about how many.
+ */
+.genre-chips .btn {
+  flex: 0 0 auto;
+  font-size: var(--text-sm);
+  min-height: 0;
+  padding: 0 var(--space-1);
+}
+
+/*
  * One badge per service on one row (REQ-013) — the deduplication the whole
  * product exists for is visible here or nowhere.
  */
@@ -547,7 +1231,7 @@ button {
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   padding: var(--space-1) var(--space-2);
 }
 
@@ -565,8 +1249,8 @@ button {
 
 .title-row__rating {
   color: var(--color-text);
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
 }
 
 /*
@@ -576,12 +1260,12 @@ button {
  */
 .title-row__rating--absent {
   color: var(--color-text-muted);
-  font-weight: 400;
+  font-weight: var(--weight-normal);
 }
 
 .title-row__rating-source {
   color: var(--color-text-muted);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
 }
 
 /*
@@ -614,14 +1298,6 @@ button {
 
 .title-row__menu {
   flex: 0 0 auto;
-}
-
-.title-row__action {
-  background: none;
-  border: none;
-  color: var(--color-accent);
-  cursor: pointer;
-  text-align: left;
 }
 
 /* -------------------------------------------------------- not interested -- */
@@ -723,7 +1399,7 @@ button {
 
 /* The flag is the one genuinely good-news line on the screen. */
 .waiting-row__flag {
-  font-weight: 600;
+  font-weight: var(--weight-medium);
 }
 
 .title-row--skeleton,
@@ -816,7 +1492,7 @@ button {
 }
 
 .removed-row__name {
-  font-weight: 600;
+  font-weight: var(--weight-medium);
 }
 
 .removed-row__service {
@@ -852,7 +1528,7 @@ button {
 }
 
 .removed-empty__title {
-  font-weight: 600;
+  font-weight: var(--weight-medium);
 }
 
 .removed-empty__body {
@@ -887,7 +1563,7 @@ button {
   color: var(--color-text-muted);
   display: flex;
   flex-wrap: wrap;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   gap: var(--space-2);
   margin-top: var(--space-6);
   padding-top: var(--space-4);
@@ -909,7 +1585,7 @@ button {
  */
 .justwatch-attribution {
   color: var(--color-text-muted);
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   margin-top: var(--space-4);
 }
 
@@ -946,12 +1622,62 @@ button {
 }
 
 /*
+ * REQ-122 (`specs/ui-refresh.md` §6a.1) — THE THREE CANDIDATE SECTIONS LOOKED
+ * ALIKE, which is what the owner actually reported about this screen.
+ *
+ * ⚠ THIS BLOCK IS A REINFORCEMENT, NOT THE MECHANISM. The words carry the
+ * distinction (`REVIEW_CONSEQUENCE_*` on every card, `REVIEW_REMOVALS_MARKER`
+ * on the heading); `specs/ui.md` §10.2 forbids signalling by colour alone, and
+ * a rule that only existed here would be invisible to a screen reader.
+ *
+ * ⚠ AND IT HIDES NOTHING. Distinct does not mean collapsed, reordered or
+ * filtered — a full-update review still renders every extracted candidate
+ * including the already-correct ones (product invariant 2, `T-UX-136`). That
+ * is the exact change that would make a failed extraction readable as a
+ * removal.
+ */
+.review-section--additions,
+.review-section--unmatched,
+.review-section--removals {
+  border-left: 4px solid var(--color-border);
+  padding-left: var(--space-3);
+}
+
+.review-section--additions {
+  border-left-color: var(--color-accent);
+}
+
+/*
+ * ⚠ THE CONSEQUENTIAL ONE. Agreement here takes titles OUT of the list, and it
+ * is the only section on this screen of which that is true.
+ */
+.review-section--removals {
+  border-left-color: var(--color-danger);
+}
+
+/*
+ * The non-colour half of the removals treatment — a word, beside the heading.
+ * ⚠ Do not restyle this into a bare coloured dot or icon; the string is the
+ * part that survives greyscale, a screen reader and `T-UX-135`.
+ */
+.review-section__marker {
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  margin-left: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  white-space: nowrap;
+}
+
+/*
  * ⚠ THE COUNT LIVES IN THE SUMMARY AND MUST STAY LEGIBLE WHILE COLLAPSED
  * (SD-11b). It is the owner's only check that the batch was read fully.
  */
 .review-section__summary {
   cursor: pointer;
-  font-weight: 600;
+  font-weight: var(--weight-medium);
   min-height: var(--tap-target-min);
   padding: var(--space-2) 0;
 }
@@ -985,9 +1711,7 @@ button {
  * it would be one mis-tap away from closing the batch.
  */
 .review-section__confirm-all {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  /* ⚠ LAYOUT ONLY — the look comes from §7d's `Button`. */
   margin: var(--space-2) 0 0;
 }
 
@@ -999,7 +1723,7 @@ button {
 }
 
 .review-empty__title {
-  font-weight: 600;
+  font-weight: var(--weight-medium);
   margin: 0 0 var(--space-1);
 }
 
@@ -1077,13 +1801,13 @@ button {
 }
 
 .candidate-card__name {
-  font-weight: 600;
+  font-weight: var(--weight-medium);
   margin: 0;
 }
 
 .candidate-card__meta {
   color: var(--color-text-muted);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   margin: 0;
 }
 
@@ -1094,9 +1818,27 @@ button {
  */
 .candidate-card__raw {
   color: var(--color-text-muted);
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+/*
+ * REQ-122 — the per-card consequence line. ⚠ It is NOT muted like
+ * `__raw`: it names what agreeing to this card does, and it is the property
+ * `T-UX-134` asserts a card keeps when its section heading has scrolled off.
+ */
+.candidate-card__consequence,
+.removal-card__consequence {
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  margin: 0;
+}
+
+.removal-card__consequence {
+  color: var(--color-danger);
+  padding-left: calc(var(--space-2) + 1rem);
 }
 
 .candidate-card__chip {
@@ -1104,7 +1846,7 @@ button {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   color: var(--color-text-muted);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   padding: var(--space-1) var(--space-2);
 }
 
@@ -1112,6 +1854,7 @@ button {
 
 .removal-card {
   display: flex;
+  flex-direction: column;
 }
 
 /*
@@ -1150,19 +1893,142 @@ button {
 /* ---------------------------------------------------------- wider views -- */
 
 @media (min-width: 640px) {
+  /*
+   * ⚠ REQ-117 — THE SCROLL CLEARANCE IS RESET TOO. There is no bottom bar
+   * above `--bp-sm`, so leaving this in place would stop `scrollIntoView` and
+   * focus scrolling short of the true viewport foot on every desktop page.
+   * `T-UX-137i` asserts both halves.
+   */
+  html {
+    scroll-padding-bottom: 0;
+  }
+
+  /*
+   * ⚠ REQ-117 — THE `padding` SHORTHAND IS ALSO THE CLEARANCE RESET. The base
+   * rule adds a `padding-bottom` reserving room for the bottom-fixed bar;
+   * above `--bp-sm` there is no such bar, and this shorthand is what removes
+   * that reservation. Rewriting it as four longhands, or as `padding-inline` /
+   * `padding-top`, silently leaves a bar's worth of dead space under every
+   * desktop page. `T-UX-137g` asserts the shorthand.
+   */
   .app-shell {
     padding: var(--space-5);
   }
 
-  .title-row__poster {
-    height: 6rem;
-    width: 4rem;
+  /*
+   * ⚠ ABOVE `--bp-sm` THE NAV SITS BESIDE THE BRAND, NOT UNDER IT. Below it
+   * the nav takes the whole row because three slots need the width; here the
+   * text links fit alongside. `flex: 0 1 auto` is the RESET of the
+   * mobile-first `flex: 1 1 100%` — omitting it leaves a full-width nav
+   * wrapping under the logo on a desktop, which looks like the media query
+   * never applied at all.
+   *
+   * ⚠ REQ-117 — AND THIS IS WHERE THE BOTTOM BAR IS UNDONE. Every property
+   * the base rule sets to make the phone bar must be reset here, not merely
+   * the interesting one: a `position: static` that leaves the surface and the
+   * top border behind produces a stray bordered strip across the header that
+   * reads as a rendering bug. `T-UX-137f` asserts the reset names all of
+   * them.
+   */
+  .nav {
+    background: none;
+    border-top: none;
+    flex: 0 1 auto;
+    min-height: 0;
+    padding: 0;
+    position: static;
   }
+
+  /*
+   * The header nav is in flow with room beneath it, so the panel returns to
+   * hanging below its trigger.
+   */
+  .nav__panel {
+    bottom: auto;
+    margin-bottom: 0;
+    top: 100%;
+  }
+
+  .nav__list {
+    gap: var(--space-2);
+    justify-content: flex-end;
+  }
+
+  /*
+   * ⚠ THE `--bp-sm` POSTER ENLARGEMENT WAS DELETED BY REQ-111, NOT MISLAID.
+   * It read `height: 6rem; width: 4rem` — 96 × 64 px — which was an increase
+   * over the old 48 × 72 base but is now SMALLER than it. Left in place it
+   * would have shrunk every poster the moment the viewport crossed 640 px,
+   * taking the list back under REQ-111's 72 × 108 floor at the width where
+   * there is the most room. A rule that only ever reduces a size is worse than
+   * no rule, so the base size now carries the list layout at every width.
+   */
 }
 
 @media (min-width: 1024px) {
   .app-shell {
     padding: var(--space-6);
+  }
+
+  /*
+   * REQ-110 (`ui-refresh.md` §4.1) — AT AND ABOVE `--bp-lg` THE LIST IS A
+   * POSTER GRID. Below it, the compact vertical list above is the base rule.
+   *
+   * ⚠ THE GRID AND THE LIST ARE ONE COMPONENT AT TWO DENSITIES, SELECTED BY
+   * THIS MEDIA QUERY — never two components chosen in JS. §4.1 is explicit,
+   * and the reason is not tidiness: a JS width branch renders a DIFFERENT DOM
+   * at each width, so every action, every label and every a11y property would
+   * need asserting twice, and `T-UX-112` — the same `⋮` item set in both
+   * layouts — would become a claim about two code paths staying in step rather
+   * than a fact about one. Here there is exactly one DOM, so the ONLY way to
+   * lose an action in the grid is to hide it from this block. `T-UX-112`
+   * therefore reads this block as a file and fails if anything in it hides a
+   * descendant of the row menu.
+   *
+   * ⚠ MOBILE-FIRST, AND THAT ORDERING IS REQUIRED. `specs/ui.md` §13.3
+   * mandates it, and writing the grid as the base with a `max-width` override
+   * for phones would make the 320 px case — the one NFR-006 requires and
+   * `T-A11Y-001`/`T-UX-110` test — the case reached by subtraction.
+   *
+   * `auto-fill` with a `minmax` floor rather than a fixed column count: a
+   * fixed `repeat(4, 1fr)` would squeeze tiles below the poster's own width on
+   * a 1024 px viewport, which is where this query starts.
+   */
+  .title-list {
+    display: grid;
+    gap: var(--space-4);
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  }
+
+  /*
+   * The tile: the same row, stacked. `align-items: stretch` is restated rather
+   * than left to the default because the poster below sets `width: 100%`, and
+   * a stretched cross axis is what makes that mean "the tile's width".
+   */
+  .title-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  /*
+   * ⚠ `height: auto` IS THE HALF THAT MATTERS. Without it the 6.75rem from the
+   * base rule wins, `width: 100%` stretches the image, and `object-fit: cover`
+   * silently crops the artwork the owner uses to recognise the title. With
+   * both, the 2:3 ratio on the base rule sizes the box.
+   */
+  .title-row__poster {
+    height: auto;
+    width: 100%;
+  }
+
+  /*
+   * The `⋮` sits at the tile's trailing edge rather than stretching across it.
+   * `position: relative` stays on this box in the base rule, so the open
+   * `.row-menu` is still anchored to the row it was opened from in BOTH
+   * layouts — moving the actions box here would silently detach it.
+   */
+  .title-row__actions {
+    align-self: flex-end;
   }
 }
 
@@ -1208,16 +2074,6 @@ button {
   gap: var(--space-3);
 }
 
-.removal-confirm__cancel {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-}
-
-.removal-confirm__confirm {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-}
-
 /* ------------------------------------------------- batch applied notice -- */
 
 /*
@@ -1247,11 +2103,6 @@ button {
 .applied-notice-actions {
   display: flex;
   gap: var(--space-2);
-}
-
-.applied-notice-undo {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
 }
 
 .applied-notice-link {
@@ -1372,15 +2223,13 @@ button {
 }
 
 .batch-card__undo {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  color: var(--color-text);
+  /* ⚠ LAYOUT ONLY — the look comes from §7d's `Button`. */
+  display: inline-block;
   margin-top: var(--space-2);
 }
 
 .batch-status__progress {
-  font-weight: 600;
+  font-weight: var(--weight-medium);
   margin: var(--space-2) 0;
 }
 
@@ -1477,13 +2326,6 @@ button {
   margin: 0;
 }
 
-.upload-submit__button {
-  background: var(--color-accent);
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius);
-  color: var(--color-surface);
-}
-
 .upload-submit__failure {
   color: var(--color-danger);
   margin: 0;
@@ -1558,7 +2400,7 @@ button {
 }
 
 .undo-refusal__name {
-  font-weight: 600;
+  font-weight: var(--weight-medium);
 }
 
 .undo-refusal__year {
