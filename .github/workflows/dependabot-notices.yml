@@ -1,0 +1,134 @@
+# Dependabot notices refresh — the generated file Dependabot cannot regenerate.
+#
+# ── The problem this closes ─────────────────────────────────────────────────
+#
+# `THIRD-PARTY-NOTICES.md` is GENERATED FROM THE LOCKFILE (`tools/
+# check-licences.mjs`). Every Dependabot PR changes the lockfile and therefore
+# invalidates that file, so every Dependabot PR fails two gates — `3 · audit`
+# (`check:licences --check`) and `10 · infra` (`T-LICENSE-001c`) — with a
+# message that has nothing to do with the dependency being bumped:
+#
+#   THIRD-PARTY-NOTICES.md is out of date. Run `npm run notices` and commit.
+#
+# Dependabot cannot run a repo script, so this is not a thing it can ever fix
+# by rebasing. Before this workflow the only remedies were to regenerate by
+# hand on every bump — a commit Dependabot's next auto-rebase DISCARDS — or to
+# batch the open bumps into one branch by hand, which is what #276 did for
+# four of them.
+#
+# ⚠ **THIS IS NOT AN AUTO-MERGE.** It makes a blocked PR truthful, nothing
+# more: the twelve blocking jobs still run, branch protection still applies,
+# and a human still merges. A dependency bump that is genuinely unsafe stays
+# red for its own reasons.
+#
+# ── Why `pull_request_target`, and why that is safe HERE ────────────────────
+#
+# Workflows triggered by Dependabot receive a READ-ONLY token on `pull_request`
+# and `push`, so neither can push the regenerated file. `pull_request_target`
+# runs in the base repository's context and honours the `permissions:` block,
+# which is the only supported way to get write access on a Dependabot PR.
+#
+# `pull_request_target` is normally dangerous precisely because it hands a
+# write token to a workflow that then executes PR-authored code. ⚠ **THE
+# DECISIVE MITIGATION HERE IS THAT THIS WORKFLOW NEVER INSTALLS ANYTHING.**
+# `tools/check-licences.mjs` imports only `node:fs`, `node:path` and
+# `node:url`, and reads `package-lock.json` as DATA. There is no `npm ci`, no
+# `npm install`, and therefore no `postinstall` or other lifecycle script from
+# the newly-bumped dependency ever runs. The bumped package's code is never
+# executed in this job — it is only ever read as a version string.
+#
+# ⚠ **DO NOT ADD AN INSTALL STEP TO THIS FILE.** A single `npm ci` added later
+# "so the script has its dependencies" — it has none — would turn this from a
+# file-copy into arbitrary code execution holding `contents: write`. That is
+# the exact supply-chain escalation `specs/security.md` exists to prevent, and
+# it would be invisible in review because the diff would look like a fix.
+#
+# Four further conditions narrow it:
+#   * the PR author must literally be `dependabot[bot]`;
+#   * the head branch must be IN THIS REPOSITORY, never a fork;
+#   * the regenerated diff must touch `THIRD-PARTY-NOTICES.md` and NOTHING
+#     else, asserted before the push rather than trusted;
+#   * the token may only write repository contents.
+#
+# ── Not a scheduler (`T-CI-005d`) ──────────────────────────────────────────
+#
+# This workflow has no `schedule:` trigger and must never grow one. It runs in
+# response to a pull request and is bounded by it. Product invariant 5 is
+# about processes that change user-visible LIST state without the owner; this
+# one regenerates a licence attribution file in CI and touches no data at all.
+
+name: Dependabot notices
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+# The narrowest token that can push a commit. No `pull-requests: write` — this
+# workflow does not approve, label, comment on or merge anything.
+permissions:
+  contents: write
+
+concurrency:
+  group: dependabot-notices-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  notices:
+    name: Refresh THIRD-PARTY-NOTICES.md
+    runs-on: ubuntu-latest
+    # Both halves matter. The author check is the intent; the same-repository
+    # check is what stops a fork PR that merely NAMES itself after the bot.
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          # Leave the default token in the checkout so the later push carries
+          # `contents: write` from the `permissions:` block above.
+          persist-credentials: true
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          # ⚠ NO `cache: npm`, and no install step. See the header.
+
+      # Runs the generator directly rather than through `npm run notices`, so
+      # that nothing resolves a package manifest or a node_modules tree.
+      - name: Regenerate the notices file from the lockfile
+        run: node tools/check-licences.mjs
+
+      - name: Push it back if, and only if, it changed
+        env:
+          BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- THIRD-PARTY-NOTICES.md; then
+            echo "Notices already match the lockfile; nothing to do."
+            exit 0
+          fi
+
+          # ⚠ THE BLAST-RADIUS ASSERTION. The generator is supposed to write
+          # exactly one file. If anything else is dirty, something other than
+          # what this workflow is for has happened — fail loudly rather than
+          # push a commit nobody predicted. Note this greps the FULL dirty
+          # set, not just the staged one.
+          changed="$(git status --porcelain | awk '{print $2}' | sort)"
+          if [ "$changed" != "THIRD-PARTY-NOTICES.md" ]; then
+            echo "Refusing to push. Expected only THIRD-PARTY-NOTICES.md to change, got:"
+            echo "$changed"
+            exit 1
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add THIRD-PARTY-NOTICES.md
+          # Two -m flags rather than one block scalar: inside a YAML `run: |`
+          # every continuation line would otherwise keep its indentation and
+          # arrive in the commit body as leading whitespace.
+          git commit \
+            -m 'chore: regenerate THIRD-PARTY-NOTICES.md for this bump' \
+            -m 'Generated from the updated lockfile by .github/workflows/dependabot-notices.yml. Dependabot changes the installed tree but cannot run the repo script that regenerates this file, so every bump would otherwise fail check:licences and T-LICENSE-001c for a reason unrelated to the dependency being bumped.'
+          git push origin "HEAD:${BRANCH}"
