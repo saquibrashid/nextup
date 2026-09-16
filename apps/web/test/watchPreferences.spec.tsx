@@ -33,7 +33,7 @@ it('T-WATCH-003a defaults to Normal, opens accessible preferences, and only save
     priority: 'up-next' as const,
   }));
   const reload = vi.fn();
-  render(
+  const { container } = render(
     <MemoryRouter>
       <ListPage items={[item]} onWatchPreferences={save} onReload={reload} />
     </MemoryRouter>,
@@ -41,6 +41,8 @@ it('T-WATCH-003a defaults to Normal, opens accessible preferences, and only save
   const trigger = screen.getByRole('button', { name: 'Watch preferences for Lanterns: Normal' });
   fireEvent.click(trigger);
   const dialog = screen.getByRole('dialog', { name: 'Watch preferences' });
+  expect(container).not.toContainElement(dialog);
+  expect(document.documentElement.style.overflow).toBe('hidden');
   expect(within(dialog).getByRole('radio', { name: 'Normal' })).toBeChecked();
   fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Currently watching' }));
   fireEvent.click(within(dialog).getByRole('radio', { name: 'Up next' }));
@@ -50,6 +52,7 @@ it('T-WATCH-003a defaults to Normal, opens accessible preferences, and only save
   await waitFor(() => expect(reload).toHaveBeenCalledOnce());
   expect(save).toHaveBeenCalledExactlyOnceWith('lanterns', { watching: true, priority: 'up-next' });
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(document.documentElement.style.overflow).not.toBe('hidden');
 });
 
 it('T-WATCH-003b cancelling preserves saved values and restores focus', () => {
@@ -120,6 +123,13 @@ it('T-WATCH-003d pending saves cannot submit twice and do not optimistically cha
     screen.getByRole('button', { name: 'Watch preferences for Lanterns: Normal' }),
   ).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Saving…' }));
+  const dialog = screen.getByRole('dialog', { name: 'Watch preferences' });
+  fireEvent.keyDown(dialog, { key: 'Escape' });
+  const backdrop = dialog.parentElement;
+  expect(backdrop).toHaveClass('dialog-backdrop');
+  if (backdrop === null) throw new Error('Missing overlay backdrop');
+  fireEvent.click(backdrop);
+  expect(dialog).toBeInTheDocument();
   expect(save).toHaveBeenCalledOnce();
   finish?.({ titleId: item.titleId, watching: false, priority: 'up-next' });
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());

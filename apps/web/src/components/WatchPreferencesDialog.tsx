@@ -42,6 +42,7 @@ export function WatchPreferencesDialog({ item, save, onClose, onSaved, offline }
 
   return (
     <Dialog
+      variant="overlay"
       aria-labelledby={headingId}
       onDismiss={() => {
         if (!pending) onClose();
@@ -82,18 +83,20 @@ export function WatchPreferencesDialog({ item, save, onClose, onSaved, offline }
         </p>
         {failure !== null && <p role="alert">{failure}</p>}
         {offline && <p role="status">Reconnect to save your preferences.</p>}
-        <Button
-          variant="primary"
-          disabled={pending || offline}
-          onClick={() => {
-            void submit();
-          }}
-        >
-          {pending ? 'Saving…' : 'Save preferences'}
-        </Button>
-        <Button disabled={pending} onClick={onClose}>
-          Cancel
-        </Button>
+        <div className="watch-preferences__actions">
+          <Button
+            variant="primary"
+            disabled={pending || offline}
+            onClick={() => {
+              void submit();
+            }}
+          >
+            {pending ? 'Saving…' : 'Save preferences'}
+          </Button>
+          <Button disabled={pending} onClick={onClose}>
+            Cancel
+          </Button>
+        </div>
       </div>
     </Dialog>
   );

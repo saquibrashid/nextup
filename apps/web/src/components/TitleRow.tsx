@@ -201,8 +201,12 @@ export function TitleRow({
           {onWatchPreferences ? (
             <Button
               disabled={busy}
+              aria-haspopup="dialog"
               aria-label={`Watch preferences for ${item.name}: ${item.watching ? 'Watching, ' : ''}${WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}`}
-              onClick={() => onWatchPreferences(item)}
+              onClick={(event) => {
+                event.currentTarget.focus({ preventScroll: true });
+                onWatchPreferences(item);
+              }}
             >
               {item.watching ? 'Watching · ' : 'Priority: '}
               {WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}

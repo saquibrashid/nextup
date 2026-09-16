@@ -260,8 +260,16 @@ Loading is never the never-uploaded or zero-match state.
 ### 2.1a Watching and watch priority (US-060, REQ-126)
 
 `WatchPreferencesDialog` edits a local draft: an independent **Currently
-watching** checkbox and **Up next / Normal / Someday** radio choices. New
-works default to not watching and Normal. No data changes until **Save
+watching** checkbox and **Up next / Normal / Someday** radio choices. It opens as a bounded, viewport-centered
+overlay with a dimmed backdrop, never a panel appended beneath the list.
+Opening and dismissing it preserve the list's scroll position. The dialog is
+portaled outside the list, locks background scrolling, scrolls internally on
+short screens, and returns focus to the exact invoking control. This overlay
+presentation is opt-in for watch preferences; other dialog flows are unchanged.
+`T-WATCH-003k` asserts geometry and scroll preservation in Grid/Compact on
+phone and desktop in Chromium/WebKit, not merely `aria-modal` semantics.
+
+New works default to not watching and Normal. No data changes until **Save
 preferences** succeeds. Cancel/Escape dismiss the draft and restore focus.
 Pending saves disable all inputs, Save and Cancel, ignore dismissal and cannot
 double-submit. Failures show the server message verbatim (generic visible

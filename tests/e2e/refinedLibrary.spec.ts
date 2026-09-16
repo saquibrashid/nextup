@@ -564,6 +564,64 @@ test('T-WATCH-003j: filter panels remain bounded when no titles have genre facet
   }
 });
 
+test('T-WATCH-003k: preferences overlay preserves the scrolled list and returns focus on dismissal', async ({
+  page,
+}, testInfo) => {
+  await mountLibrary(page);
+  for (const width of [320, 1280]) {
+    await page.setViewportSize({ width, height: 640 });
+    for (const view of ['Grid', 'Compact']) {
+      await page.getByRole('button', { name: `${view} view`, exact: true }).click();
+      const trigger = page.getByRole('button', {
+        name: 'Watch preferences for Quiet Orbit: Normal',
+        exact: true,
+      });
+      await trigger.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+      const before = await page.evaluate(() => ({
+        scroll: window.scrollY,
+        height: document.documentElement.scrollHeight,
+      }));
+      expect(before.scroll).toBeGreaterThan(0);
+      const triggerBefore = await bounds(trigger);
+      await trigger.click();
+      const dialog = page.getByRole('dialog', { name: 'Watch preferences', exact: true });
+      const box = await bounds(dialog);
+      expect(
+        Math.abs((await page.evaluate(() => window.scrollY)) - before.scroll),
+      ).toBeLessThanOrEqual(1);
+      expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(before.height);
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.y).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width);
+      expect(box.y + box.height).toBeLessThanOrEqual(640);
+      expect(box.width).toBeLessThanOrEqual(544);
+      expect(Math.abs(box.x + box.width / 2 - width / 2)).toBeLessThan(12);
+      await expect(dialog.getByRole('checkbox')).toBeFocused();
+      await page.keyboard.press('Shift+Tab');
+      await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
+      await page.keyboard.press('Tab');
+      await expect(dialog.getByRole('checkbox')).toBeFocused();
+      await expect(page.locator('html')).toHaveCSS('overflow', 'hidden');
+      if (!testInfo.project.use.isMobile) {
+        await page.mouse.move(2, 2);
+        await page.mouse.wheel(0, 450);
+      }
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(before.scroll);
+      await page.keyboard.press('Escape');
+      await expect(dialog).toHaveCount(0);
+      await expect(trigger).toBeFocused();
+      expect(Math.abs((await bounds(trigger)).y - triggerBefore.y)).toBeLessThanOrEqual(1);
+      await trigger.click();
+      await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await expect(trigger).toBeFocused();
+      expect(
+        Math.abs((await page.evaluate(() => window.scrollY)) - before.scroll),
+      ).toBeLessThanOrEqual(1);
+      await noOverflow(page);
+    }
+  }
+});
+
 test('T-WATCH-003i: watch preferences save, survive reload, filter and sort in an accessible phone UI', async ({
   page,
 }) => {
