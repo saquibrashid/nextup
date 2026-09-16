@@ -168,7 +168,7 @@ it('T-UX-142a the approved dark ink and violet palette is centralized with reduc
 
 it('T-UX-141h a service selection keeps its picker mounted across the pending request without fake counts', () => {
   const { rerender } = render(page());
-  const trigger = screen.getByRole('button', { name: 'Services' });
+  const trigger = screen.getByRole('button', { name: /^Services / });
   fireEvent.click(trigger);
   fireEvent.click(screen.getByRole('checkbox', { name: 'Netflix' }));
   rerender(page({ loading: true }));
@@ -184,7 +184,7 @@ it('T-UX-141h a service selection keeps its picker mounted across the pending re
 
 it('T-UX-141i a selected genre remains available while the facet response is pending', () => {
   const { rerender } = render(page({ genres: ['Science Fiction'] }));
-  const trigger = screen.getByRole('button', { name: 'Genre' });
+  const trigger = screen.getByRole('button', { name: /^Genre / });
   fireEvent.click(trigger);
   fireEvent.click(screen.getByRole('checkbox', { name: 'Science Fiction' }));
   rerender(page({ loading: true, genres: [] }));

@@ -407,7 +407,7 @@ describe('One-click complete orders and stable visible controls', () => {
   it('T-UX-113b visual grouping does not merge filter and sort state', () => {
     renderListPage();
     fireEvent.click(selectedButton());
-    fireEvent.click(screen.getByRole('button', { name: 'Services' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Services / }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Netflix' }));
     expect(sessionStorage.getItem('nextup.sort.dir')).toBe('asc');
     expect(Object.values(sessionStorage)).not.toContain('netflix');
@@ -415,7 +415,7 @@ describe('One-click complete orders and stable visible controls', () => {
 
   it('T-UX-114a changing a filter preserves sort and dir', () => {
     renderListPage('/?sort=runtime&dir=asc');
-    fireEvent.click(screen.getByRole('button', { name: 'Services' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Services / }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Netflix' }));
     expect(query().get('sort')).toBe('runtime');
     expect(query().get('dir')).toBe('asc');

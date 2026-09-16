@@ -33,6 +33,14 @@ implementing." These are product decisions, not inferred styling changes.
   app lifecycle. Mockup fixtures, simulated state switches and promotional copy
   are not production features. Reduced-motion preferences are respected.
 
+**Owner follow-up, 2026-09-16:** the filter triggers looked like ordinary
+action buttons. The owner selected labelled dropdown fields: a **Filter by**
+group, external category labels, current/default values and chevrons, with
+the existing accessible multi-select disclosures and removable chips retained.
+The owner also split 1h–2h into 1h–1h 30m and 1h 30m–2h. Half-open bounds and
+server-side filtering stay unchanged; old `60-120` links expand to both new
+buckets. `T-UX-144`, `T-UX-123` and `T-API-021` cover the refinement.
+
 The rationale below describes the original Epic P decisions and defects.
 Revision 1 replaces only the choices explicitly listed above.
 

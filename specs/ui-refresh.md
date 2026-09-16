@@ -597,7 +597,9 @@ says so in a comment and does not do it, because `SortControl` shipped later
 Also invariant: `applyFilters` must preserve `sort`, `dir` and `cursor`.
 Changing a filter must not silently reset the owner's ordering.
 
-The compact **Services, Type, Genre and Runtime** buttons open labelled,
+Under **Filter by**, **Services, Type, Genre and Runtime** dropdown fields
+show external category labels, selected/default values and chevrons. Their
+triggers open labelled,
 nonmodal checkbox disclosures. Genre options come from the real list facets;
 there is no invented genre or provider. Services is searchable over
 `SERVICES` / `SERVICE_LABELS` (**Netflix and Max only**); no phantom "All"
@@ -734,9 +736,16 @@ REQ-119 above: per-episode, labelled as such.
 No migration and no new column: `Title.tmdbRuntimeMinutes` has been stored
 since v1 precisely so this would be additive.
 
-The filter is **bucketed** (*Under 30m*, *30m–1h*, *1h–2h*, *Over 2h*), with
+The filter is **bucketed** (*Under 30m*, *30m–1h*, *1h–1h 30m*,
+*1h 30m–2h*, *Over 2h*), with
 half-open `[lower, upper)` boundaries, and **not a range slider** — see
 `specs/ui.md` §2.1 item 2 for why a slider fails the accessibility floor.
+
+The owner split the old *1h–2h* option on 2026-09-16. Canonical tokens are
+`60-90` and `90-120`; 90 belongs only in the second and 120 remains in
+`over120`. Legacy `60-120` input expands to both replacements without
+remaining a visible option. Removing one derived chip retains only the other
+canonical bucket, rather than allowing the legacy alias to reselect it.
 
 ⚠ **The one way this requirement can silently lose titles**, and the mitigation
 that is part of it: a `null` runtime satisfies no bucket, so activating a
@@ -752,7 +761,7 @@ place.
 |---|---|
 | `T-UX-121` | The row renders `1h 55m` for film and `45m/ep` for TV; the `/ep` suffix is absent for film and present for every TV row. |
 | `T-UX-122` | A `null` runtime renders the words `Runtime unknown` — never `0m`, never an empty slot. |
-| `T-UX-123` | Selecting a bucket sets `runtime` in the query string, and the bucket boundaries are half-open, so a 60-minute title appears in `60-120` and **not** in `30-60`. |
+| `T-UX-123` | Selecting a bucket sets `runtime` in the query string; half-open boundaries place 60 in `60-90`, 90 in `90-120`, and 120 in `over120`. Legacy input expands and deduplicates without becoming a canonical option. |
 | `T-UX-124` | While a runtime filter is active, the hidden-unknown disclosure renders with the server's count; with no runtime filter it does not render at all. |
 | `T-API-019` | `sort=runtime` orders by runtime with `NULL`s last in **both** directions, tie-broken by `title.id`. |
 | `T-API-020` | `runtimeUnknownHidden` counts the whole filtered set rather than the returned page, and is `null` when no runtime filter is active. |
@@ -1235,12 +1244,20 @@ These live in `apps/web/src/components/ui/`:
 | `Dialog` | `dialog` | Focus trap, `Esc` to dismiss |
 
 `components/FilterDisclosure.tsx` is reusable outside `FilterBar`, including
-Service updates. Its props are `label: string` and `children`; no unused
-optional configuration is required.
+Service updates. Its props are `label: string`, `children`, and optional
+`value: string`. All filter pickers supply `value`, rendering an external
+category label, current/default value and decorative chevron; accessible
+names include both category and value. Without `value`, Service updates
+retains its standalone disclosure presentation.
 It uses native `Button` and a labelled nonmodal group, generated IDs,
 first-control/link focus, Escape/Done restoration and outside dismissal.
 It **does not trap Tab or claim `aria-modal`**. Its classes are
-`filter-disclosure` / `filter-disclosure__panel`; `[hidden]` remains hidden.
+`filter-disclosure` / `filter-disclosure__panel`, with
+`filter-disclosure__label` / `filter-disclosure__value` for fields;
+`[hidden]` remains hidden. **Filter by** groups two columns on phones and
+four from 640 px. Empty values read All services / All types / All genres /
+Any runtime; one selection shows its name, multiple distinct selections
+show N selected. Individual removable chips remain (`T-UX-144`).
 
 ⚠ **A VARIANT IS A STATIC CLASS LOOKUP, NOT A COMPUTED STRING.** `T-CSS-001c`
 forbids `className={…}` so that `T-CSS-001`'s two directions remain an exact

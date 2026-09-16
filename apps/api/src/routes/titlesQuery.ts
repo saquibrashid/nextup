@@ -18,6 +18,7 @@ import {
   MEDIA_TYPES,
   RUNTIME_BUCKETS,
   SERVICES,
+  normalizeRuntimeBuckets,
   type MediaType,
   type RuntimeBucket,
   type Service,
@@ -232,11 +233,15 @@ export function parseTitleListQuery(query: Request['query']): TitleListQuery {
   // rule — and deliberately NOT dropped. A dropped bucket would silently widen
   // the list past what the owner asked for, which is the opposite failure to
   // the one the disclosure count exists to prevent.
-  const runtimes = requireEnumValues(
-    toStringArray(query['runtime'], 'runtime'),
-    'runtime',
-    RUNTIME_BUCKETS,
-  );
+  const runtimeValues = toStringArray(query['runtime'], 'runtime');
+  for (const value of runtimeValues) {
+    if (normalizeRuntimeBuckets([value]).length === 0) {
+      fail('runtime', '"runtime" is not one of the supported values.', {
+        permitted: [...RUNTIME_BUCKETS],
+      });
+    }
+  }
+  const runtimes = normalizeRuntimeBuckets(runtimeValues);
 
   const sortRaw = query['sort'];
   if (sortRaw !== undefined && !(TITLE_SORTS as readonly unknown[]).includes(sortRaw)) {

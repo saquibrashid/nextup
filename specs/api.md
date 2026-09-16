@@ -796,7 +796,7 @@ dropped**, which is what `T-ATTR-006a` asserts rather than byte equality.
 ### 6.2 `GET /api/titles` — the combined list (US-018, US-019, US-020)
 
 Query: `service` (`netflix|max`, repeatable), `type` (`movie|tv`, repeatable, OR),
-`genre` (string, repeatable), `runtime` (`under30|30-60|60-120|over120`,
+`genre` (string, repeatable), `runtime` (`under30|30-60|60-90|90-120|over120`,
 repeatable), `sort` (`dateAdded` default | `name` | `releaseYear` | `runtime` |
 `rating`), `dir` (`asc|desc`, default per key below), **`q`** (optional single
 title-search string, trimmed, at most 500 JavaScript string-length units), `limit`, `cursor`.
@@ -973,11 +973,17 @@ Semantics:
   includes it when no genre filter is set (US-019 AC-6). **Genres are never
   defaulted.**
 - `runtime` buckets are **`[lower, upper)`** in minutes — `under30` is
-  `< 30`, `30-60` is `[30, 60)`, `60-120` is `[60, 120)`, `over120` is
+  `< 30`, `30-60` is `[30, 60)`, `60-90` is `[60, 90)`,
+  `90-120` is `[90, 120)`, `over120` is
   `>= 120` (REQ-035). ⚠ Half-open boundaries are not a detail: an inclusive
   upper bound puts a 60-minute film in two buckets, and the result count then
   disagrees with the list it describes. An unknown bucket value → **400**, per
   §3's enum rule.
+- Legacy input `runtime=60-120` remains accepted for saved links and expands
+  to `60-90` plus `90-120`. Normalize and deduplicate in first-occurrence
+  order; the legacy token is not a canonical bucket or picker option.
+  Validate the maximum 20 raw occurrences before expansion/deduplication,
+  and continue rejecting unknown or structured values.
 - **`runtimeMinutes: null` never satisfies a `runtime` filter**, and is
   **never coerced to `0`.** A title with no runtime is excluded while any
   runtime bucket is selected and included when none is — exactly the `genre:

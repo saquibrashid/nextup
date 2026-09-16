@@ -12,17 +12,18 @@ import {
   formatRuntime,
   isKnownRuntime,
   isRuntimeBucket,
+  normalizeRuntimeBuckets,
   runtimeInAnyBucket,
   runtimeInBucket,
 } from '../src/titleRuntime.js';
 
 describe('runtime buckets', () => {
-  it('T-UX-123a: the boundaries are half-open, so 60 minutes is in `60-120` and not in `30-60`', () => {
+  it('T-UX-123a: the boundaries are half-open, so 60 minutes is in `60-90` and not in `30-60`', () => {
     // The one case that looks arbitrary and is not. With an inclusive upper
     // bound a 60-minute title satisfies BOTH buckets, so the same row appears
     // under two filters and any count over the buckets contradicts the list it
     // describes.
-    expect(runtimeInBucket(60, '60-120')).toBe(true);
+    expect(runtimeInBucket(60, '60-90')).toBe(true);
     expect(runtimeInBucket(60, '30-60')).toBe(false);
 
     expect(runtimeInBucket(59, '30-60')).toBe(true);
@@ -31,14 +32,14 @@ describe('runtime buckets', () => {
     expect(runtimeInBucket(30, 'under30')).toBe(false);
     expect(runtimeInBucket(120, 'over120')).toBe(true);
     expect(runtimeInBucket(119, 'over120')).toBe(false);
-    expect(runtimeInBucket(119, '60-120')).toBe(true);
+    expect(runtimeInBucket(119, '90-120')).toBe(true);
   });
 
   it('T-UX-123b: every runtime lands in exactly one bucket', () => {
     // The partition property, checked rather than asserted by inspection: any
     // overlap or gap in the bounds table shows up here as a count that is not
     // 1, whichever pair of adjacent buckets the mistake is in.
-    for (const minutes of [1, 29, 30, 31, 59, 60, 61, 119, 120, 121, 600]) {
+    for (const minutes of [1, 29, 30, 31, 59, 60, 61, 89, 90, 91, 119, 120, 121, 600]) {
       const hits = RUNTIME_BUCKETS.filter((bucket) => runtimeInBucket(minutes, bucket));
       expect(
         hits,
@@ -124,10 +125,44 @@ describe('runtime buckets', () => {
   });
 
   it('T-UX-123g: rejects tokens that are not buckets', () => {
-    expect(isRuntimeBucket('60-120')).toBe(true);
+    expect(isRuntimeBucket('60-90')).toBe(true);
+    expect(isRuntimeBucket('90-120')).toBe(true);
+    expect(isRuntimeBucket('60-120')).toBe(false);
     expect(isRuntimeBucket('120-60')).toBe(false);
     expect(isRuntimeBucket('')).toBe(false);
     expect(isRuntimeBucket('short')).toBe(false);
+  });
+
+  it('T-UX-123o: the split is half-open at 60, 90 and 120 minutes', () => {
+    expect(RUNTIME_BUCKETS).toEqual(['under30', '30-60', '60-90', '90-120', 'over120']);
+    for (const [minutes, expected] of [
+      [59, '30-60'],
+      [60, '60-90'],
+      [89, '60-90'],
+      [90, '90-120'],
+      [119, '90-120'],
+      [120, 'over120'],
+    ] as const) {
+      expect(RUNTIME_BUCKETS.filter((bucket) => runtimeInBucket(minutes, bucket))).toEqual([
+        expected,
+      ]);
+    }
+  });
+
+  it('T-UX-123p: legacy normalization expands both halves without duplicates or unknown tokens', () => {
+    expect(normalizeRuntimeBuckets(['60-120'])).toEqual(['60-90', '90-120']);
+    expect(
+      normalizeRuntimeBuckets(['under30', '90-120', '60-120', '60-90', '60-120', 'over120']),
+    ).toEqual(['under30', '90-120', '60-90', 'over120']);
+    expect(normalizeRuntimeBuckets(['short', '', '120-60'])).toEqual([]);
+    expect(normalizeRuntimeBuckets(['short', '60-120'])).toEqual(['60-90', '90-120']);
+    expect(normalizeRuntimeBuckets([])).toEqual([]);
+    expect(normalizeRuntimeBuckets(RUNTIME_BUCKETS)).toEqual(RUNTIME_BUCKETS);
+    for (const minutes of [null, 0, -1, 59, 60, 89, 90, 119, 120]) {
+      expect(runtimeInAnyBucket(minutes, normalizeRuntimeBuckets(['60-120']))).toBe(
+        minutes !== null && minutes >= 60 && minutes < 120,
+      );
+    }
   });
 });
 

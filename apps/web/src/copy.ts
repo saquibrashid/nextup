@@ -347,13 +347,14 @@ export const RUNTIME_UNKNOWN_LABEL = 'Runtime unknown';
  * REQ-035 - the runtime filter's bucket labels (`T-UX-123`).
  *
  * ⚠ THE LABELS DESCRIBE HALF-OPEN `[lower, upper)` RANGES. "30m – 1h" excludes
- * a 60-minute title, which appears under "1h – 2h" instead. The boundary lives
+ * a 60-minute title, which appears under "1h – 1h 30m" instead. The boundary lives
  * once, in `RUNTIME_BUCKET_BOUNDS`; these strings only name it.
  */
 export const RUNTIME_BUCKET_LABELS: Readonly<Record<RuntimeBucket, string>> = {
   under30: 'Under 30m',
   '30-60': '30m – 1h',
-  '60-120': '1h – 2h',
+  '60-90': '1h – 1h 30m',
+  '90-120': '1h 30m – 2h',
   over120: 'Over 2h',
 };
 

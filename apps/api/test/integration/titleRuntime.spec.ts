@@ -28,7 +28,7 @@
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
-import { compareTitlesByRuntime } from '@nextup/domain';
+import { RUNTIME_BUCKETS, compareTitlesByRuntime } from '@nextup/domain';
 import type { Express } from 'express';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -349,17 +349,34 @@ describe('T-API-020 runtimeUnknownHidden counts the whole filtered set', () => {
     // under-reports DIFFERENTLY on every page — a disclosure whose number
     // changes as the owner scrolls is worse than none at all.
     for (let i = 0; i < 5; i += 1) await seedTitle(`r-null-${String(i)}`, null);
+    await seedTitle('r-060', 60);
+    await seedTitle('r-089', 89);
     await seedTitle('r-090', 90);
+    await seedTitle('r-119', 119);
 
-    const firstPage = await list('?runtime=60-120&limit=1');
-    expect(firstPage.items).toHaveLength(1);
-    expect(firstPage.runtimeUnknownHidden).toBe(5);
+    for (const runtime of [
+      'runtime=60-90',
+      'runtime=90-120',
+      'runtime=60-120',
+      'runtime=60-120&runtime=60-90&runtime=90-120',
+    ]) {
+      const firstPage = await list(`?${runtime}&limit=1`);
+      expect(firstPage.items).toHaveLength(1);
+      expect(firstPage.runtimeUnknownHidden).toBe(5);
+      expect(firstPage.nextCursor).not.toBeNull();
+      const secondPage = await list(
+        `?${runtime}&limit=1&cursor=${encodeURIComponent(firstPage.nextCursor ?? '')}`,
+      );
+      expect(secondPage.items).toHaveLength(1);
+      expect(secondPage.runtimeUnknownHidden).toBe(5);
+      expect(ids(secondPage)).not.toEqual(ids(firstPage));
+    }
   });
 
   it('T-API-020c: zero when the filter is active and nothing was hidden', async () => {
     await seedTitle('r-090', 90);
 
-    expect((await list('?runtime=60-120')).runtimeUnknownHidden).toBe(0);
+    expect((await list('?runtime=90-120')).runtimeUnknownHidden).toBe(0);
   });
 
   it('T-API-020d: the count and the filter stay exact complements of each other', async () => {
@@ -396,20 +413,30 @@ describe('T-API-020 runtimeUnknownHidden counts the whole filtered set', () => {
     await seedTitle('r-null-tv', null, 'tv');
     await seedTitle('r-090', 90);
 
-    expect((await list('?runtime=60-120&type=movie')).runtimeUnknownHidden).toBe(1);
-    expect((await list('?runtime=60-120')).runtimeUnknownHidden).toBe(2);
+    for (const runtime of ['60-90', '90-120', '60-120']) {
+      expect((await list(`?runtime=${runtime}&type=movie`)).runtimeUnknownHidden).toBe(1);
+      expect((await list(`?runtime=${runtime}`)).runtimeUnknownHidden).toBe(2);
+    }
   });
 });
 
 describe('REQ-035 the runtime filter against the database', () => {
   it('T-API-020f: the bucket boundaries are half-open in SQL, exactly as in the domain', async () => {
-    // ⚠ THE 60-MINUTE CASE. The UI and the query must agree or the list
-    // contradicts its own filter chip — and each side passes its own suite
-    // while disagreeing, because neither ever sees the other's boundary.
+    await seedTitle('r-029', 29);
+    await seedTitle('r-030', 30);
+    await seedTitle('r-059', 59);
     await seedTitle('r-060', 60);
+    await seedTitle('r-089', 89);
+    await seedTitle('r-090', 90);
+    await seedTitle('r-119', 119);
+    await seedTitle('r-120', 120);
+    await seedTitle('r-null', null);
 
-    expect(ids(await list('?runtime=60-120'))).toEqual(['r-060']);
-    expect(ids(await list('?runtime=30-60'))).toEqual([]);
+    expect(ids(await list('?runtime=under30'))).toEqual(['r-029']);
+    expect(ids(await list('?runtime=30-60'))).toEqual(['r-030', 'r-059']);
+    expect(ids(await list('?runtime=60-90'))).toEqual(['r-060', 'r-089']);
+    expect(ids(await list('?runtime=90-120'))).toEqual(['r-090', 'r-119']);
+    expect(ids(await list('?runtime=over120'))).toEqual(['r-120']);
   });
 
   it('T-API-020g: buckets are OR-ed within the dimension and AND-ed against other filters', async () => {
@@ -428,8 +455,8 @@ describe('REQ-035 the runtime filter against the database', () => {
     // when both are active at once.
     await seedTitle('r-090', 90);
 
-    expect(ids(await list('?runtime=60-120&genre=Drama'))).toEqual(['r-090']);
-    expect(ids(await list('?runtime=60-120&genre=Comedy'))).toEqual([]);
+    expect(ids(await list('?runtime=90-120&genre=Drama'))).toEqual(['r-090']);
+    expect(ids(await list('?runtime=90-120&genre=Comedy'))).toEqual([]);
     expect(ids(await list('?runtime=under30&genre=Drama'))).toEqual([]);
   });
 
@@ -437,7 +464,35 @@ describe('REQ-035 the runtime filter against the database', () => {
     await seedTitle('r-null', null);
     await seedTitle('r-090', 90);
 
-    expect(ids(await list('?runtime=60-120'))).toEqual(['r-090']);
+    for (const runtime of RUNTIME_BUCKETS) {
+      const filtered = await list(`?runtime=${runtime}`);
+      expect(ids(filtered)).not.toContain('r-null');
+      expect(filtered.runtimeUnknownHidden).toBe(1);
+    }
+    expect(ids(await list('?runtime=90-120'))).toEqual(['r-090']);
     expect(ids(await list()).sort()).toEqual(['r-090', 'r-null']);
+  });
+
+  it('T-API-020j: the legacy alias is exactly both half-open buckets, with repeat-safe OR and paging', async () => {
+    for (const minutes of [29, 59, 60, 89, 90, 119, 120]) {
+      await seedTitle(`r-${String(minutes).padStart(3, '0')}`, minutes);
+    }
+    await seedTitle('r-null', null);
+
+    const expected = ['r-060', 'r-089', 'r-090', 'r-119'];
+    expect(ids(await list('?runtime=60-120'))).toEqual(expected);
+    expect(ids(await list('?runtime=60-90&runtime=90-120'))).toEqual(expected);
+    expect(
+      await walk(
+        '?runtime=60-120&runtime=60-90&runtime=90-120&runtime=60-120&sort=runtime&dir=asc',
+        1,
+      ),
+    ).toEqual(expected);
+    expect(ids(await list('?runtime=60-120&runtime=under30'))).toEqual(['r-029', ...expected]);
+    expect(ids(await list('?runtime=60-120&genre=Drama'))).toEqual(expected);
+    expect(ids(await list('?runtime=60-120&genre=Comedy'))).toEqual([]);
+    expect(ids(await list('?runtime=60-120&type=tv'))).toEqual([]);
+    expect(ids(await list('?runtime=60-120&service=max'))).toEqual([]);
+    expect((await list('?runtime=60-120&genre=Comedy')).runtimeUnknownHidden).toBe(0);
   });
 });
