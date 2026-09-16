@@ -2606,7 +2606,7 @@ Migration `0011_watch_preference` creates `dbo.watch_preference`:
 | `ownerId` | `owner_id` | `NVARCHAR(200) NOT NULL`, BIN2 |
 | `workIdentity` | `work_identity` | `NVARCHAR(200) NOT NULL`, BIN2 |
 | `watching` | `watching` | `BIT NOT NULL DEFAULT 0` |
-| `priority` | `priority` | `NVARCHAR(16) NOT NULL DEFAULT N'normal'`, BIN2 |
+| `priority` | `priority` | `NVARCHAR(16) NOT NULL DEFAULT 'normal'`, BIN2 |
 
 The key is `(owner_id, work_identity)`. CHECK constraints validate the owner,
 canonical identity prefixes and exact priority vocabulary. There is no Title
