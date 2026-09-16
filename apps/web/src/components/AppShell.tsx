@@ -125,6 +125,28 @@ function isRouteActive(pathname: string, routePath: string): boolean {
   return matchPath({ path: routePath, end: routePath === '/' }, pathname) !== null;
 }
 
+/**
+ * Whether `pathname` IS `routePath`, rather than merely inside it.
+ *
+ * ⚠ HIGHLIGHTING AND AUTO-OPENING ARE NOT THE SAME QUESTION, AND SHARING ONE
+ * MATCHER BETWEEN THEM IS A REAL DEFECT. `isRouteActive` is a PREFIX match on
+ * purpose, so *Batches* stays marked while the owner is on
+ * `/batches/:id/review` - correct for a highlight. Feeding that same answer to
+ * the `More` panel's default state opens the panel on every child screen of an
+ * overflow destination, and the panel opens UPWARD over the page: on the
+ * review screen it covered `Apply changes`, so the owner's last action was
+ * visible and un-tappable. `T-E2E-001b` caught it at 320 px with
+ * `nav__link` intercepting the click; nothing in the unit suite could, because
+ * the panel was genuinely open and genuinely correct-looking.
+ *
+ * The panel should default open only where the owner has actually ARRIVED at
+ * an overflow destination - which is what `T-UX-133b` asks for and all it
+ * asks for.
+ */
+function isRouteExact(pathname: string, routePath: string): boolean {
+  return matchPath({ path: routePath, end: true }, pathname) !== null;
+}
+
 /*
  * ⚠ THE LITERAL CLASS MAPS. `T-CSS-001c` permits a `className` that is a
  * string literal, or a lookup from a LOCAL, NON-EXPORTED const object of
@@ -198,7 +220,7 @@ export function AppShell(): JSX.Element {
   const barItems = NAV_ITEMS.filter((route) => PHONE_BAR_PATHS.includes(route.path));
   const overflowItems = NAV_ITEMS.filter((route) => !PHONE_BAR_PATHS.includes(route.path));
   const overflowHoldsCurrent = overflowItems.some((route) =>
-    isRouteActive(location.pathname, route.path),
+    isRouteExact(location.pathname, route.path),
   );
 
   /*

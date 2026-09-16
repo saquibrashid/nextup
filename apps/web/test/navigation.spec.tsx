@@ -430,6 +430,37 @@ describe('T-UX-133 · ui-refresh.md §6 · a route behind More keeps its URL and
       '/rating',
     ]);
   });
+
+  it('T-UX-133f: a CHILD of an overflow destination does not auto-open the panel', () => {
+    /*
+     * ⚠ AUTO-OPEN IS FOR ARRIVAL, NOT FOR THE WHOLE SUBTREE, and conflating
+     * the two is a real defect rather than a nicety. `isRouteActive` is a
+     * PREFIX match so that *Batches* stays highlighted on
+     * `/batches/:id/review` — correct. Reusing that answer as the panel's
+     * default opened the panel on every child screen, and the panel opens
+     * UPWARD over the page: on the review screen it sat on top of
+     * `Apply changes`, which was then visible and un-tappable. `T-E2E-001b`
+     * caught it at 320 px; no unit case could, because the panel was open
+     * exactly as designed.
+     *
+     * ⚠ THE HIGHLIGHT MUST SURVIVE THE FIX, so both halves are asserted here.
+     * Making `isRouteActive` itself exact would close the panel AND unmark
+     * *Batches*, trading one defect for another that `T-UX-117` owns.
+     */
+    const nav = atPhoneWidth('/batches/batch-1/review');
+
+    expect(within(nav).getByRole('button', { name: NAV_MORE_LABEL })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+    expect(document.getElementById('nav-more-panel')).toBeNull();
+
+    fireEvent.click(within(nav).getByRole('button', { name: NAV_MORE_LABEL }));
+    expect(within(nav).getByRole('link', { name: 'Batches' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
 });
 
 /* ------------------------------------------------------------------------ */
