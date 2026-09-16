@@ -2524,12 +2524,24 @@ button {
 }
 
 .sort-options,
-.filter-controls,
 .active-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+}
+
+.filter-bar > .field {
+  flex: 1 1 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+.filter-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  align-items: end;
 }
 
 .sort-option {
@@ -2552,6 +2564,36 @@ button {
 
 .filter-disclosure {
   position: relative;
+  min-width: 0;
+}
+
+.filter-disclosure__label {
+  display: block;
+  margin-bottom: var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.filter-disclosure__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.filter-disclosure[data-filter-field] > .btn {
+  width: 100%;
+  justify-content: space-between;
+  text-align: start;
+  padding-inline: var(--space-2);
+  font-weight: var(--weight-normal);
+}
+
+.filter-disclosure[data-filter-field] > .btn .icon {
+  flex-shrink: 0;
+  transform: rotate(90deg);
+}
+
+.filter-disclosure[data-filter-field] > .btn[aria-expanded='true'] .icon {
+  transform: rotate(-90deg);
 }
 
 .filter-disclosure > .btn {
@@ -2631,6 +2673,10 @@ button {
 }
 
 @media (min-width: 640px) {
+  .filter-controls {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
   .filter-disclosure__panel {
     position: absolute;
     inset-inline: auto 0;
@@ -2642,6 +2688,10 @@ button {
 
   .filter-controls .filter-disclosure__panel {
     inset-inline: 0 auto;
+  }
+
+  .filter-controls > .filter-disclosure:nth-last-child(-n + 2) .filter-disclosure__panel {
+    inset-inline: auto 0;
   }
 }
 

@@ -1,12 +1,14 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Button } from './ui/Button';
+import { ChevronIcon } from './icons';
 
 export interface FilterDisclosureProps {
   readonly label: string;
   readonly children: ReactNode;
+  readonly value?: string;
 }
 
-export function FilterDisclosure({ label, children }: FilterDisclosureProps) {
+export function FilterDisclosure({ label, children, value }: FilterDisclosureProps) {
   const id = useId();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -62,24 +64,43 @@ export function FilterDisclosure({ label, children }: FilterDisclosureProps) {
   }, [open]);
 
   return (
-    <div className="filter-disclosure" ref={root}>
+    <div
+      className="filter-disclosure"
+      ref={root}
+      data-filter-field={value !== undefined || undefined}
+    >
+      {value !== undefined && (
+        <label className="filter-disclosure__label" id={`${id}-label`} htmlFor={`${id}-trigger`}>
+          {label}
+        </label>
+      )}
       <Button
         ref={trigger}
         id={`${id}-trigger`}
         aria-expanded={open}
         aria-controls={`${id}-panel`}
+        aria-labelledby={value === undefined ? undefined : `${id}-label ${id}-value`}
         onClick={() => {
           setOpen(!open);
         }}
       >
-        {label}
+        {value === undefined ? (
+          label
+        ) : (
+          <>
+            <span className="filter-disclosure__value" id={`${id}-value`}>
+              {value}
+            </span>
+            <ChevronIcon />
+          </>
+        )}
       </Button>
       <div
         className="filter-disclosure__panel"
         ref={panel}
         id={`${id}-panel`}
         role="group"
-        aria-labelledby={`${id}-trigger`}
+        aria-labelledby={value === undefined ? `${id}-trigger` : `${id}-label`}
         hidden={!open}
       >
         {open && (

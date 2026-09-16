@@ -1627,7 +1627,7 @@ counts what *survived* the filter and would read zero on every list.
 | AC-1 | The row shows the title's runtime after type and before genres in its facts line. |
 | AC-2 | A series' runtime is shown as per-episode, distinguishably from a film's. |
 | AC-3 | An unknown runtime renders as words, never as a zero and never as an empty slot. |
-| AC-4 | The list can be filtered to a runtime bucket, with half-open boundaries so no title falls in two buckets. |
+| AC-4 | The labelled Runtime dropdown filters to Under 30m, 30m–1h, 1h–1h 30m, 1h 30m–2h, or the existing 2h+ bucket, with half-open boundaries so no title falls in two buckets. The broad 1h–2h option is replaced by the two narrower choices; saved links retain their meaning. |
 | AC-5 | While a runtime filter is active, the number of titles hidden for having no known runtime is disclosed, from a count the server supplies. |
 | AC-6 | The list can be ordered by runtime with Longest runtime / Shortest runtime complete-order labels; inactive selects longest-first and active reverses in one action. |
 

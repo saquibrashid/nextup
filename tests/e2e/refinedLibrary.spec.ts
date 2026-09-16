@@ -380,7 +380,7 @@ test('T-UX-143d: Services and service-update popovers are usable at 320px and 12
   await mountLibrary(page);
   for (const width of [320, 1280]) {
     await page.setViewportSize({ width, height: 900 });
-    const trigger = page.getByRole('button', { name: 'Services', exact: true });
+    const trigger = page.getByRole('button', { name: /^Services / });
     await trigger.click();
     const panel = page.locator('.filter-disclosure__panel').filter({
       has: page.getByRole('searchbox', { name: 'Search services', exact: true }),
@@ -429,6 +429,54 @@ test('T-UX-143d: Services and service-update popovers are usable at 320px and 12
   }
 });
 
+test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone, tablet and desktop', async ({
+  page,
+}) => {
+  await mountLibrary(page);
+  const controls = page.getByRole('group', { name: 'Filter by', exact: true });
+  for (const width of [320, 640, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(controls).toBeVisible();
+    const fields = controls.locator('.filter-disclosure[data-filter-field]');
+    await expect(fields).toHaveCount(4);
+    const positions = await fields.evaluateAll((elements) =>
+      elements.map((element) => element.getBoundingClientRect().x),
+    );
+    expect(new Set(positions).size).toBe(width < 640 ? 2 : 4);
+    for (const [index, category] of ['Services', 'Type', 'Genre', 'Runtime'].entries()) {
+      const field = fields.nth(index);
+      const trigger = field.getByRole('button', { name: new RegExp(`^${category} `) });
+      await usableTarget(page, trigger);
+      await expect(field.locator('label.filter-disclosure__label')).toHaveText(category);
+      await expect(trigger.locator('svg')).toHaveAttribute('aria-hidden', 'true');
+      await trigger.click();
+      const panel = field.locator('.filter-disclosure__panel');
+      const box = await bounds(panel);
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
+      if (category === 'Runtime') {
+        await expect(panel.getByRole('checkbox')).toHaveCount(5);
+        await expect(panel.getByRole('checkbox', { name: '1h – 2h', exact: true })).toHaveCount(0);
+        for (const label of ['1h – 1h 30m', '1h 30m – 2h']) {
+          const option = panel.getByRole('checkbox', { name: label, exact: true });
+          await usableTarget(page, option.locator('..'));
+        }
+      }
+      await page.keyboard.press('Escape');
+      await expect(trigger).toBeFocused();
+    }
+    await noOverflow(page);
+  }
+  await controls.getByRole('button', { name: 'Runtime Any runtime' }).click();
+  const runtime = page.getByRole('checkbox', { name: '1h 30m – 2h', exact: true });
+  await runtime.click();
+  await expect(runtime).toBeChecked();
+  await expect(
+    controls.getByRole('button', { name: 'Runtime 1h 30m – 2h', exact: true }),
+  ).toBeVisible();
+  expect(new URL(page.url()).searchParams.getAll('runtime')).toEqual(['90-120']);
+});
+
 test('T-UX-141g: default, popovers and Compact pass axe and honor reduced motion', async ({
   page,
 }, testInfo) => {
@@ -439,7 +487,9 @@ test('T-UX-141g: default, popovers and Compact pass axe and honor reduced motion
     if (state === 'Compact') {
       await page.getByRole('button', { name: 'Compact view', exact: true }).click();
     } else if (state !== 'default') {
-      await page.getByRole('button', { name: state, exact: true }).click();
+      await page
+        .getByRole('button', { name: state === 'Services' ? /^Services / : state, exact: true })
+        .click();
     }
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])

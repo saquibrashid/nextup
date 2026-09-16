@@ -11,15 +11,15 @@
  * either side alone can see it.
  */
 
-/** `specs/api.md` §6.2 — the four bucket tokens, as they appear in the URL. */
-export const RUNTIME_BUCKETS = ['under30', '30-60', '60-120', 'over120'] as const;
+/** Canonical bucket tokens, in picker order. */
+export const RUNTIME_BUCKETS = ['under30', '30-60', '60-90', '90-120', 'over120'] as const;
 export type RuntimeBucket = (typeof RUNTIME_BUCKETS)[number];
 
 /**
  * Half-open `[lower, upper)` bounds in minutes; `upper: null` is unbounded.
  *
  * ⚠ **Half-open is not a detail (`specs/api.md` §6.2).** With an inclusive
- * upper bound a 60-minute film satisfies both `30-60` and `60-120`, so the
+ * upper bound a 60-minute film satisfies both `30-60` and `60-90`, so the
  * same title appears under two filters and any count taken over the buckets
  * disagrees with the list it describes. `T-UX-123` pins the 60-minute case
  * precisely because it is the one that looks arbitrary and is not.
@@ -29,7 +29,8 @@ export const RUNTIME_BUCKET_BOUNDS: Readonly<
 > = {
   under30: { lower: null, upper: 30 },
   '30-60': { lower: 30, upper: 60 },
-  '60-120': { lower: 60, upper: 120 },
+  '60-90': { lower: 60, upper: 90 },
+  '90-120': { lower: 90, upper: 120 },
   over120: { lower: 120, upper: null },
 };
 
@@ -54,6 +55,24 @@ export function isKnownRuntime(minutes: number | null): minutes is number {
 
 export function isRuntimeBucket(value: string): value is RuntimeBucket {
   return (RUNTIME_BUCKETS as readonly string[]).includes(value);
+}
+
+/**
+ * Expand legacy URLs and deduplicate in first-occurrence order.
+ * Unknown tokens are dropped for the web parser; API callers must reject
+ * any supplied token whose individual normalization is empty.
+ */
+export function normalizeRuntimeBuckets(values: readonly string[]): RuntimeBucket[] {
+  const buckets = new Set<RuntimeBucket>();
+  for (const value of values) {
+    if (value === '60-120') {
+      buckets.add('60-90');
+      buckets.add('90-120');
+    } else if (isRuntimeBucket(value)) {
+      buckets.add(value);
+    }
+  }
+  return [...buckets];
 }
 
 /**

@@ -125,8 +125,10 @@ restore, suppress, un-suppress or fix-match.
    are retired.)*
 2. **List controls** — a submitted title-search form, the filter bar and
    five visible complete-order buttons in one visually unified group.
-   `components/FilterBar.tsx` presents **Services, Type, Genre, Runtime**
-   buttons opening labelled checkbox disclosures (REQ-035); active removable
+   `components/FilterBar.tsx` presents a **Filter by** group with labelled
+   dropdown fields for **Services, Type, Genre, Runtime** (REQ-035).
+   Each field has an external category label, a current-value trigger and a
+   decorative down/up chevron, opening a labelled checkbox disclosure; active removable
    chips; **Clear filters**; and a live result count *"Showing 42 of 187"*,
    or *"Showing 50 of at least 50"* when only a lower bound is known.
    The sort control is `components/SortControl.tsx` (US-020 AC-6,
@@ -142,6 +144,15 @@ restore, suppress, un-suppress or fix-match.
    sort, local view and unrelated query parameters. Picker option search
    never searches title rows. `T-UI-016`, `T-UX-139`.
 
+   Defaults read **All services / All types / All genres / Any runtime**;
+   one selected value shows its name and multiple distinct values show
+   **N selected**, with individual selections still enumerated by the chips.
+   The accessible trigger name includes category and value. Fields use two
+   equal columns on phones and four from 640 px; panels stay within the
+   viewport. Existing 44 px targets, nonmodal keyboard behavior and dismissal
+   remain unchanged (`T-UX-144`). This owner-approved 2026-09-16 refinement
+   replaces the action-button appearance, not multi-selection semantics.
+
    The labelled title-search form submits explicitly by Enter or its Search
    button to **URL `q`**; typing alone does not fetch. A search chip removes
    only `q`. The server performs owner-scoped title matching before filters,
@@ -150,7 +161,7 @@ restore, suppress, un-suppress or fix-match.
    while preserving sort, filters and view. `T-UX-140`, `T-API-030`.
 
    **The runtime filter is BUCKETED, not a slider.** Buckets are *Under 30m*,
-   *30m–1h*, *1h–2h*, *Over 2h*, and they map to `runtime=` in the query
+   *30m–1h*, *1h–1h 30m*, *1h 30m–2h*, *Over 2h*, and they map to `runtime=` in the query
    string. A range slider is rejected outright: it is the control this
    repository's accessibility floor (§9) is worst at — two draggable thumbs,
    no 44×44 px target at either end, and a value only reachable by pointer
@@ -159,6 +170,11 @@ restore, suppress, un-suppress or fix-match.
    ⚠ **Bucket boundaries are inclusive of the lower bound and exclusive of the
    upper** (`[30, 60)`), so a 60-minute film appears in exactly one bucket. An
    overlapping definition makes the result count disagree with the list.
+   The two middle ranges are `[60, 90)` and `[90, 120)`; exactly 120 minutes
+   remains in the existing 2h+ bucket. The old *1h–2h* option is removed.
+   Saved `runtime=60-120` links select both replacements; removing either
+   derived chip rewrites runtime parameters canonically, retaining only the
+   other half and preserving unrelated query parameters.
 
    ⚠ **`runtimeMinutes: null` is the load-bearing case.** While a runtime
    filter is active, a title with no runtime **cannot** satisfy any bucket, so

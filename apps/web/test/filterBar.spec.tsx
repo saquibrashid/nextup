@@ -100,7 +100,7 @@ function box(name: string, value: string): HTMLInputElement {
     genre: 'Genre',
     runtime: 'Runtime',
   };
-  const trigger = screen.getByRole('button', { name: labels[name], exact: true });
+  const trigger = screen.getByRole('button', { name: new RegExp(`^${labels[name] ?? name} `) });
   if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
   // `Array.from`, NOT `.values().find(...)`. Both work now that the runtime is
   // Node 22 (iterator helpers landed in V8 12.2), so this is a readability
@@ -119,11 +119,11 @@ describe('T-UI-016 - the filter bar syncs to the query string in both directions
   it('T-UI-016a renders the service, type and genre controls', () => {
     mount('/');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Services', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: /^Services / }));
     expect(screen.getByTestId('filter-service')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Type', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: /^Type / }));
     expect(screen.getByTestId('filter-type')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Genre', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: /^Genre / }));
     expect(screen.getByTestId('filter-genre')).toBeTruthy();
   });
 
@@ -319,14 +319,113 @@ describe('T-UI-016 - the page wires the bar to the list', () => {
   });
 });
 
+describe('T-UX-144 - labelled filter fields and split runtime options', () => {
+  it('T-UX-144a each field has a visible category, current value and decorative chevron', () => {
+    mount('/');
+    expect(screen.getByRole('group', { name: 'Filter by', exact: true })).toBeVisible();
+    for (const [category, value] of [
+      ['Services', 'All services'],
+      ['Type', 'All types'],
+      ['Genre', 'All genres'],
+      ['Runtime', 'Any runtime'],
+    ]) {
+      const trigger = screen.getByRole('button', { name: `${category} ${value}`, exact: true });
+      expect(trigger).toHaveTextContent(value ?? '');
+      expect(document.querySelector(`label[for="${trigger.id}"]`)).toHaveTextContent(
+        category ?? '',
+      );
+      expect(trigger.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    }
+  });
+
+  it('T-UX-144b field summaries show one named selection or a deduplicated selection count', () => {
+    mount('/?service=netflix&type=movie&genre=Drama&genre=Comedy&genre=Drama&runtime=90-120');
+    expect(screen.getByRole('button', { name: 'Services Netflix' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Type Movies' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Genre 2 selected' })).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: `Runtime ${RUNTIME_BUCKET_LABELS['90-120']}` }),
+    ).toBeVisible();
+  });
+
+  it('T-UX-144c selecting a value updates the same named field while its picker remains open', () => {
+    mount('/');
+    const trigger = screen.getByRole('button', { name: 'Services All services' });
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Netflix' }));
+    expect(trigger).toHaveAccessibleName('Services Netflix');
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Max' }));
+    expect(trigger).toHaveAccessibleName('Services 2 selected');
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(trigger).toHaveFocus();
+  });
+
+  it('T-UX-144d runtime exposes five ranges, replacing the broad one with independent 60-90 and 90-120 choices', () => {
+    mount('/');
+    fireEvent.click(screen.getByRole('button', { name: 'Runtime Any runtime' }));
+    expect(screen.getAllByRole('checkbox').map((input) => input.getAttribute('value'))).toEqual([
+      'under30',
+      '30-60',
+      '60-90',
+      '90-120',
+      'over120',
+    ]);
+    expect(
+      screen.queryByRole('checkbox', { name: '1h – 2h', exact: true }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: '1h – 1h 30m', exact: true }));
+    fireEvent.click(screen.getByRole('checkbox', { name: '1h 30m – 2h', exact: true }));
+    expect(new URLSearchParams(url().split('?')[1]).getAll('runtime')).toEqual(['60-90', '90-120']);
+    expect(screen.getByRole('button', { name: 'Runtime 2 selected' })).toBeVisible();
+  });
+
+  it('T-UX-144e a legacy range selects both replacements and either chip can remove only its half', () => {
+    mount('/?runtime=60-120&runtime=60-90&service=netflix&sort=name&dir=asc&q=Arrival');
+    expect(parseFilters(new URLSearchParams(url().split('?')[1])).runtimes).toEqual([
+      '60-90',
+      '90-120',
+    ]);
+    expect(box('runtime', '60-90')).toBeChecked();
+    expect(box('runtime', '90-120')).toBeChecked();
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: `Remove runtime filter: ${RUNTIME_BUCKET_LABELS['60-90']}`,
+      }),
+    );
+    const remaining = new URLSearchParams(url().split('?')[1]);
+    expect(remaining.getAll('runtime')).toEqual(['90-120']);
+    expect(remaining.get('service')).toBe('netflix');
+    expect(remaining.get('sort')).toBe('name');
+    expect(remaining.get('dir')).toBe('asc');
+    expect(remaining.get('q')).toBe('Arrival');
+    expect(
+      screen.getByRole('button', { name: `Runtime ${RUNTIME_BUCKET_LABELS['90-120']}` }),
+    ).toBeVisible();
+  });
+
+  it('T-UX-144f clearing a legacy filter returns the field to Any runtime without an obsolete option', () => {
+    mount('/?runtime=60-120&dir=asc');
+    fireEvent.click(screen.getByTestId('clear-filters'));
+    expect(url()).toBe('/?dir=asc');
+    fireEvent.click(screen.getByRole('button', { name: 'Runtime Any runtime' }));
+    for (const input of screen.getAllByRole('checkbox')) expect(input).not.toBeChecked();
+    expect(
+      screen.queryByRole('checkbox', { name: '1h – 2h', exact: true }),
+    ).not.toBeInTheDocument();
+  });
+});
+
 describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
   it('T-UX-123h selecting a bucket writes `runtime` to the query string', () => {
     mount('/');
-    fireEvent.click(box('runtime', '60-120'));
+    fireEvent.click(box('runtime', '60-90'));
 
     const written = new URLSearchParams(url().split('?')[1] ?? '');
-    expect(written.getAll('runtime')).toEqual(['60-120']);
-    expect(parseFilters(written).runtimes).toEqual(['60-120']);
+    expect(written.getAll('runtime')).toEqual(['60-90']);
+    expect(parseFilters(written).runtimes).toEqual(['60-90']);
   });
 
   it('T-UX-123i the boundaries the labels name are half-open', () => {
@@ -334,8 +433,14 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
     // contradicts its own chip. Both read `RUNTIME_BUCKET_BOUNDS`; this asserts
     // the shared rule from the UI side so a divergence cannot hide behind the
     // fact that each side was tested alone.
-    expect(runtimeInBucket(60, '60-120')).toBe(true);
+    expect(runtimeInBucket(60, '60-90')).toBe(true);
     expect(runtimeInBucket(60, '30-60')).toBe(false);
+    expect(runtimeInBucket(89, '60-90')).toBe(true);
+    expect(runtimeInBucket(90, '60-90')).toBe(false);
+    expect(runtimeInBucket(90, '90-120')).toBe(true);
+    expect(runtimeInBucket(119, '90-120')).toBe(true);
+    expect(runtimeInBucket(120, '90-120')).toBe(false);
+    expect(runtimeInBucket(120, 'over120')).toBe(true);
   });
 
   it('T-UX-123j the bucket fieldset renders whatever the data contains', () => {
@@ -344,7 +449,7 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
     // runtimes would remove the only control that accounts for the list's
     // length.
     mount('/', { genres: [] });
-    fireEvent.click(screen.getByRole('button', { name: 'Runtime', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: /^Runtime / }));
     expect(screen.getByTestId('filter-runtime')).toBeTruthy();
     expect(screen.queryByTestId('filter-genre')).toBeNull();
   });
@@ -355,12 +460,12 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
       mount('/');
       expect(screen.queryByRole('checkbox')).toBeNull();
       for (const name of ['Services', 'Type', 'Genre', 'Runtime']) {
-        expect(screen.getByRole('button', { name, exact: true })).toHaveAttribute(
+        expect(screen.getByRole('button', { name: new RegExp(`^${name} `) })).toHaveAttribute(
           'aria-expanded',
           'false',
         );
       }
-      await user.click(screen.getByRole('button', { name: 'Services', exact: true }));
+      await user.click(screen.getByRole('button', { name: /^Services / }));
       expect(screen.getAllByRole('checkbox')).toHaveLength(SERVICES.length);
       expect(SERVICES).toEqual(['netflix', 'max']);
       for (const service of SERVICES) {
@@ -374,7 +479,7 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
     it('T-UX-139b service search filters only picker options, retaining selection and URL state', async () => {
       const user = userEvent.setup();
       mount('/?service=netflix&q=Arrival&sort=dateAdded&dir=asc&view=grid');
-      await user.click(screen.getByRole('button', { name: 'Services', exact: true }));
+      await user.click(screen.getByRole('button', { name: /^Services / }));
       const search = screen.getByRole('searchbox', { name: 'Search services' });
       expect(search).toHaveFocus();
       const original = url();
@@ -421,7 +526,10 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
       const expected = new URLSearchParams(initial.split('?')[1]);
       expected.delete(dimension, value);
       fireEvent.click(chip);
-      expect(new URLSearchParams(url().split('?')[1]).toString()).toBe(expected.toString());
+      const actual = new URLSearchParams(url().split('?')[1]);
+      actual.sort();
+      expected.sort();
+      expect(actual.toString()).toBe(expected.toString());
       expect(screen.getByTestId('filter-count')).toHaveTextContent('Showing 4 of 10');
     });
 
@@ -448,7 +556,7 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
     it('T-UX-139f keyboard opening, Escape and Done restore focus without undoing selected filters', async () => {
       const user = userEvent.setup();
       mount('/');
-      const trigger = screen.getByRole('button', { name: 'Type', exact: true });
+      const trigger = screen.getByRole('button', { name: /^Type / });
       trigger.focus();
       await user.keyboard('{Enter}');
       const movies = screen.getByRole('checkbox', { name: 'Movies' });
@@ -469,7 +577,7 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
     it('T-UX-139g outside click closes and restores focus; Tab leaves without a focus trap', async () => {
       const user = userEvent.setup();
       mount('/');
-      const trigger = screen.getByRole('button', { name: 'Type', exact: true });
+      const trigger = screen.getByRole('button', { name: /^Type / });
       await user.click(trigger);
       await user.click(screen.getByTestId('filter-count'));
       expect(trigger).toHaveAttribute('aria-expanded', 'false');
@@ -480,16 +588,16 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
       await user.tab();
       expect(screen.getByRole('button', { name: 'Done' })).toHaveFocus();
       await user.tab();
-      expect(screen.getByRole('button', { name: 'Genre', exact: true })).toHaveFocus();
+      expect(screen.getByRole('button', { name: /^Genre / })).toHaveFocus();
       expect(trigger).toHaveAttribute('aria-expanded', 'false');
     });
 
     it('T-UX-139h opening another picker closes the first without stealing its focus', async () => {
       const user = userEvent.setup();
       mount('/');
-      const services = screen.getByRole('button', { name: 'Services', exact: true });
+      const services = screen.getByRole('button', { name: /^Services / });
       await user.click(services);
-      await user.click(screen.getByRole('button', { name: 'Runtime', exact: true }));
+      await user.click(screen.getByRole('button', { name: /^Runtime / }));
       expect(services).toHaveAttribute('aria-expanded', 'false');
       expect(screen.getByRole('checkbox', { name: RUNTIME_BUCKET_LABELS.under30 })).toHaveFocus();
     });
@@ -501,16 +609,13 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
           <FilterBar shown={1} total={2} />
         </MemoryRouter>,
       );
-      const triggers = screen.getAllByRole('button', { name: 'Services', exact: true });
+      const triggers = screen.getAllByRole('button', { name: /^Services / });
       for (const trigger of triggers) {
         const controls = trigger.getAttribute('aria-controls');
         expect(controls).toBeTruthy();
         fireEvent.click(trigger);
         expect(trigger).toHaveAttribute('aria-controls', controls);
-        expect(document.getElementById(controls ?? '')).toHaveAttribute(
-          'aria-labelledby',
-          trigger.id,
-        );
+        expect(document.getElementById(controls ?? '')).toHaveAccessibleName('Services');
         fireEvent.click(screen.getByRole('button', { name: 'Done' }));
       }
       const ids = Array.from(document.querySelectorAll('[id]'), (element) => element.id);
@@ -622,8 +727,8 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
   it('T-UX-013 the zero-match chip NAMES the bucket rather than showing its token', () => {
     // The chips exist to state the cause of an empty list. `60-120` is the wire
     // vocabulary; the owner ticked a box that said "1h - 2h".
-    const filters = parseFilters(new URLSearchParams('runtime=60-120'));
-    expect(activeFilterChips(filters)).toEqual([RUNTIME_BUCKET_LABELS['60-120']]);
+    const filters = parseFilters(new URLSearchParams('runtime=60-90'));
+    expect(activeFilterChips(filters)).toEqual([RUNTIME_BUCKET_LABELS['60-90']]);
   });
 });
 

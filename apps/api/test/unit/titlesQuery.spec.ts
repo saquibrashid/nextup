@@ -320,6 +320,42 @@ describe('REQ-035 / REQ-037 - the runtime filter and sort query (`specs/ui-refre
     expect(parseTitleListQuery({}).runtimes).toEqual([]);
   });
 
+  it('T-API-021g legacy runtime expands both canonical halves and deduplicates mixed repeats', () => {
+    expect(parseTitleListQuery({ runtime: '60-120' }).runtimes).toEqual(['60-90', '90-120']);
+    expect(
+      parseTitleListQuery({
+        runtime: ['under30', '90-120', '60-120', '60-90', '60-120', 'over120'],
+      }).runtimes,
+    ).toEqual(['under30', '90-120', '60-90', 'over120']);
+  });
+
+  it('T-API-021h runtime repetition is capped before alias expansion and deduplication', () => {
+    const atLimit = Array.from({ length: 20 }, () => '60-120');
+    expect(parseTitleListQuery({ runtime: atLimit }).runtimes).toEqual(['60-90', '90-120']);
+    for (const value of ['60-120', '60-90']) {
+      const error = thrown(() =>
+        parseTitleListQuery({ runtime: Array.from({ length: 21 }, () => value) }),
+      );
+      expect(error.httpStatus).toBe(400);
+      expect(error.code).toBe('VALIDATION_FAILED');
+      expect(error.details).toEqual({ field: 'runtime', max: 20 });
+    }
+  });
+
+  it('T-API-021i unknown or structured runtime tokens remain a 400 beside valid aliases', () => {
+    for (const runtime of [
+      ['60-120', '90min'],
+      ['60-90', ''],
+      ['60-120', { nested: '90-120' }],
+      { nested: '60-120' },
+    ]) {
+      const error = thrown(() => parseTitleListQuery({ runtime }));
+      expect(error.httpStatus).toBe(400);
+      expect(error.code).toBe('VALIDATION_FAILED');
+      expect(error.details.field).toBe('runtime');
+    }
+  });
+
   it('T-API-021e: an unrecognised sort key is a 400', () => {
     // ⚠ INCLUDING `imdbRating` - REQ-095 / `A51`. The rating is display-only;
     // a sort key for it must not exist on either side.
