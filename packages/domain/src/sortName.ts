@@ -50,7 +50,7 @@ export const SORT_NAME_MAX_LENGTH = 400;
  * The articles stripped before ordering.
  *
  * ⚠ **ENGLISH ONLY, AND THE ABSENCE OF THE OTHERS IS THE DECISION** (owner,
- * 2026-09-15). In an English-market Netflix/Max list a foreign article reads
+ * 2026-09-15). In an English-market streaming list a foreign article reads
  * as part of the title, not as grammar: the owner looks for *Les Misérables*
  * under **L**, *El Camino* under **E** and *Das Boot* under **D**, and both
  * services file them that way too.

@@ -89,11 +89,20 @@ describe('/upload step 1 - service and mode', () => {
     expect(screen.getAllByRole('radio')).toHaveLength(SERVICES.length + BATCH_MODES.length);
   });
 
-  it('T-UI-003f · US-003 AC-1 · exactly one service can be chosen, from {Netflix, Max}', async () => {
+  it('T-UI-003f · US-003 AC-1 · exactly one supported service can be chosen', async () => {
     const user = userEvent.setup();
     render(<UploadPage />);
 
-    expect(SERVICES).toStrictEqual(['netflix', 'max']);
+    expect(SERVICES).toStrictEqual([
+      'netflix',
+      'max',
+      'prime-video',
+      'disney-plus',
+      'apple-tv-plus',
+      'paramount-plus',
+      'starz',
+      'peacock',
+    ]);
     await user.click(screen.getByRole('radio', { name: SERVICE_LABELS.netflix }));
     await user.click(screen.getByRole('radio', { name: SERVICE_LABELS.max }));
 

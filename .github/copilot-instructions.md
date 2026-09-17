@@ -10,7 +10,7 @@ acceptance criterion pass its named test.
 
 ## 1. What nextup is
 
-> Sign in as the owner, upload screenshots of your Netflix and Max saved lists
+> Sign in as the owner, upload screenshots of your streaming-service saved lists
 > in append-only or full-update mode, confirm what was read from them, and see
 > one deduplicated combined list — one row per title, a badge per service —
 > that you can filter and sort and that never loses anything without asking you
@@ -20,6 +20,11 @@ Single owner. No credentials to streaming services, no scraping, no automated
 requests to any streaming service — **ever**. The feeder is screenshots the
 owner uploads; an OCR/vision pipeline extracts titles and merges them under the
 owner's review.
+
+**Current scope (US-061 / REQ-127):** Netflix, Max, Prime Video, Disney+,
+Apple TV+, Paramount+, Starz and Peacock. Use the shared `SERVICES` and
+`SERVICE_LABELS` registry; do not recreate two-service unions or local labels.
+Discovery sources remain separate, and Hulu is not a separate supported service.
 
 ## 2. The stack — concrete, fixed where the architecture fixes it
 
@@ -272,6 +277,11 @@ Several documents carry revision banners: the datastore changed twice
   `DROP COLUMN` from a renamed field. `T-MIG-001` greps `prisma/migrations/**`
   and fails on `DROP TABLE`, `ALTER TABLE ... DROP COLUMN`, `DROP INDEX`,
   `DROP CONSTRAINT`, `TRUNCATE`, and `sp_rename` column renames.
+  **US-061 exception (2026-09-17):** the exact hash-pinned
+  `0012_expand_services` migration may atomically replace only the three
+  service allow-list CHECKs with eight-service supersets. No rows are changed;
+  altered/copied migration SQL and every other destructive operation remain
+  blocked. Do not generalize this into an escape flag (`T-SVC-003`).
 - **Every new runtime dependency** must be justified against NFR-004
   (mainstream, well-documented) in the PR. The intended set is small — see
   `specs/security.md`.

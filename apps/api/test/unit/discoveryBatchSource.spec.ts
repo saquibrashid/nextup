@@ -164,7 +164,9 @@ describe('T-WAIT-001 a discovery batch is forced append-only', () => {
     // still answers true, the refusal still fires, and the batch is ALSO a
     // service batch with a badge and a reconciliation path.
     expect(discoverySourcesAreNotServices()).toBe(true);
-    expect(SERVICES).toEqual(['netflix', 'max']);
+    expect(SERVICES).toContain('netflix');
+    expect(SERVICES).toContain('max');
+    expect(SERVICES).toHaveLength(8);
 
     for (const source of DISCOVERY_SOURCES) {
       expect(isDiscoverySource(source)).toBe(true);

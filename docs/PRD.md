@@ -105,7 +105,7 @@ The feeder loop's ergonomics are the single largest adoption risk (M5, OQ-011). 
 | NG-4 | Watched/progress tracking or ratings. | The list is a "want to watch" list only. | REQ-048, REQ-049 |
 | NG-5 | Native mobile applications. | Responsive web only. | REQ-050 |
 | NG-6 | Notifications, background jobs that change list state, telemetry or analytics. | The owner is the only actor on list state. | REQ-041, REQ-051, REQ-052, NFR-005 |
-| NG-7 | Services beyond Netflix and Max. | v1 scope lock. | REQ-053 |
+| NG-7 | Services beyond Netflix, Max, Prime Video, Disney+, Apple TV+, Paramount+, Starz and Peacock. | Owner-expanded closed scope (2026-09-17, US-061); no additional services inferred. | REQ-053, REQ-127 |
 | NG-8 | ~~Runtime-based filtering and sorting;~~ **(promoted into scope at `A48` — see §11.2 and `specs/ui-refresh.md` §5a)** editing the date-added value; undo of mixed-changeset batches. | Deferred to v1.1 — see §11.2. | ~~REQ-035, REQ-037,~~ REQ-059, REQ-069 |
 
 ---
@@ -295,14 +295,14 @@ Added at `A48` for **Epic L (v1.1)** — these terms have no meaning in v1:
 
 | # | Given | When | Then |
 |---|---|---|---|
-| AC-1 | The owner starts a new upload | The batch is being created | They must select exactly one service from {Netflix, Max}; the batch cannot be submitted without it (REQ-002) |
+| AC-1 | The owner starts a new upload | The batch is being created | They must select exactly one supported service (US-061); the batch cannot be submitted without it (REQ-002). A factual service-update link may preselect its explicit service, never the mode |
 | AC-2 | The owner starts a new upload | The batch is being created | They must select exactly one mode from {append-only, full update}; there is no default that could be accepted by inaction, and the meaning of each mode is stated in the UI at the point of choice (REQ-003) |
 | AC-3 | A batch in `full update` mode | It is submitted | Its reconciliation affects only listings for the single selected service (REQ-002) |
 | AC-4 (edge) | Screenshots from two different services attached to one batch | The batch is processed | All extracted candidates are attributed to the one selected service; the owner is expected to discard the foreign ones during review. nextup does not detect or split them |
 | AC-5 (failure) | Any image whose content identifies a service | Extraction runs | The service assignment is taken **only** from the owner's selection. nextup MUST NOT infer, override, or warn-and-change the service based on image content (REQ-058) |
 | AC-6 | A batch already submitted | The owner attempts to change its service or mode | The change is rejected; service and mode are immutable after submission |
 
-**Out of scope for this story:** more than two services (REQ-053), per-image service assignment.
+**Out of scope for this story:** services outside US-061's closed eight-service set (REQ-053), per-image service assignment.
 **Open questions:** none.
 
 #### US-004 — Add multiple screenshots to one batch — by paste, by file upload, or by drag-and-drop
@@ -1774,6 +1774,31 @@ manual intent, not episode tracking, completion state or a release reminder.
 No existing title is automatically marked Watching or assigned a nondefault
 priority from the owner's examples. The owner makes those choices in the UI.
 
+#### US-061 — Import saved lists from the expanded streaming-service set
+
+**REQ-127 (`must`, owner-approved 2026-09-17).** Add Prime Video, Disney+,
+Apple TV+, Paramount+, Starz and Peacock alongside Netflix and Max. This
+supersedes the two-service limit in REQ-053, not the screenshot-only model.
+The owner selected Disney+ rather than a separate Hulu service; do not infer
+subscriptions, bundle entitlements or service membership from title metadata.
+
+| Criterion | Given | When | Then |
+|---|---|---|---|
+| AC-1 | The owner starts a capture or manual addition | They choose a service | All eight services are available with correct names; exactly one is selected and none is guessed. Paste, file selection, drag/drop and both capture modes remain available |
+| AC-2 | Screenshots for any supported service | Extraction and review run | The same service-blind vision/OCR pipeline and explicit review safety rules apply; no credentials, scraping, provider requests or automatic list additions are introduced |
+| AC-3 | A work appears on multiple supported services | Batches are confirmed | One canonical title can have up to eight distinct service badges; earliest active listing date, Watching/priority choices and suppression remain work-scoped |
+| AC-4 | A full-update batch for one service | Removals are confirmed | Only that service's listings change; the other seven services and their dates are untouched. Removal history and restore retain the correct service |
+| AC-5 | The owner browses or filters the library | They select any supported service | Filters, active chips, badges, review/history labels and factual service-update links use the same canonical vocabulary. Links preselect that service for upload without choosing a mode; eight-service controls remain usable on phones |
+| AC-6 | Existing database rows | The service expansion is deployed | Every row is retained. Only the three service allow-list constraints are transactionally replaced and validated; invalid values remain rejected. The migration gate permits only the exact reviewed migration, not arbitrary constraint drops |
+| AC-7 | Subscription availability metadata from TMDB | The waiting view names matching services | All eight supported services are recognized with bounded aliases and correct labels; rental/store-only offers and unrelated providers do not become service matches or list membership |
+
+**Migration decision.** Following the owner's instruction to implement the
+expansion autonomously, `0012_expand_services` is a narrowly scoped, explicit
+exception to the blanket constraint-drop gate: the three service allow-lists
+are replaced atomically with supersets, not removed without replacement.
+Tables, columns, indexes, rows, historical migrations and all other constraints
+remain untouched. `T-SVC-003` pins this exception and rejects altered/copied SQL.
+
 ## 7. Functional detail
 
 Everything in this section is normative and does not belong to a single story.
@@ -1871,7 +1896,7 @@ Anything not on these lists is **forbidden by default**. REQ-041 has already bee
 
 | Input | Rule | On violation |
 |---|---|---|
-| Batch service | Required, exactly one of {Netflix, Max} (REQ-002) | Batch cannot be submitted |
+| Batch service | Required, exactly one supported service from US-061 (REQ-002/127) | Batch cannot be submitted |
 | Batch mode | Required, exactly one of {append-only, full update}, no accept-by-inaction default (REQ-003) | Batch cannot be submitted |
 | Images | At least one; PNG, JPEG or HEIC/HEIF (ASM-058, A42 — was PNG/JPEG only under falsified ASM-034); multiple permitted (REQ-004). HEIC/HEIF is transcoded to PNG server-side on ingest (neither reader accepts it), and EXIF/GPS is stripped on ingest (US-004 AC-7, AC-8) | Non-conforming file rejected at attach time, with the accepted formats named |
 | **Input path** *(new — A45, US-004 AC-1/AC-12/AC-13/AC-14)* | An image may enter a batch by **clipboard paste** (primary), **file selection**, or **drag-and-drop**. All three MUST be available where the platform supports them, MUST be mixable within one batch, and MUST converge on the **same server-side ingest pipeline** (US-004 AC-17). **File selection MUST remain a complete path on its own** — paste is an addition, never a replacement | A paste that yields no image representation is refused with the same named-formats message as a bad file (US-004 AC-4, AC-15); the batch is unchanged |

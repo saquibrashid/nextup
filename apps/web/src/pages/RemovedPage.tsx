@@ -29,7 +29,7 @@
 
 import { useState, type JSX } from 'react';
 
-import { SERVICE_LABELS, dateAddedLabel, removedOnLabel } from '@nextup/domain';
+import { SERVICE_LABELS, dateAddedLabel, removedOnLabel, type Service } from '@nextup/domain';
 
 import {
   OFFLINE_DISABLED_REASON,
@@ -145,11 +145,7 @@ function withName(template: string, name: string): string {
 }
 
 /** Build the §7.7 success announcement with all three substitutions. */
-function restoreSuccessMessage(
-  name: string,
-  service: 'netflix' | 'max',
-  dateAdded: string,
-): string {
+function restoreSuccessMessage(name: string, service: Service, dateAdded: string): string {
   return RESTORE_SUCCESS.replace('{name}', name)
     .replace('{service}', SERVICE_LABELS[service])
     .replace('{date}', formatDateShort(dateAdded));

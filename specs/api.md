@@ -8,6 +8,17 @@ sourceOfTruth: docs/PRD.md, docs/architecture.md, docs/adr/ADR-0002, ADR-0006
 
 # specs/api.md — nextup HTTP API
 
+**Current service vocabulary (US-061 / REQ-127, 2026-09-17).** Every subscription
+service body, query parameter and response field uses the shared `Service`:
+`netflix | max | prime-video | disney-plus | apple-tv-plus | paramount-plus |
+starz | peacock`. This applies to upload batches, manual additions, list filters
+and badges, removed history and restore, service-state responses and waiting
+availability flags. A title can have up to eight distinct service badges.
+Unsupported values remain invalid. Discovery `source` stays separate;
+discovery batches retain their nullable service and append-only semantics.
+Full-update reconciliation and factual update timestamps still affect exactly
+the explicitly selected service. No endpoint connects to streaming accounts.
+
 > ⚠ **REVISION 6 — 2026-08-11 (`A45`) — PASTE IS THE PRIMARY INGEST PATH;
 > FILE UPLOAD REMAINS FULLY SUPPORTED.**
 > The owner corrected the ingestion assumption verbatim: *"for screenshots,
@@ -796,7 +807,7 @@ dropped**, which is what `T-ATTR-006a` asserts rather than byte equality.
 
 ### 6.2 `GET /api/titles` — the combined list (US-018, US-019, US-020)
 
-Query: `service` (`netflix|max`, repeatable), `type` (`movie|tv`, repeatable, OR),
+Query: `service` (`netflix|max|prime-video|disney-plus|apple-tv-plus|paramount-plus|starz|peacock`, repeatable), `type` (`movie|tv`, repeatable, OR),
 `genre` (string, repeatable), `runtime` (`under30|30-60|60-90|90-120|over120`,
 repeatable), `sort` (`dateAdded` default | `name` | `releaseYear` | `runtime` |
 `rating` | `watchPriority`), `watching` (single `true|false`, optional),

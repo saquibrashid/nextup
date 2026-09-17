@@ -9,7 +9,7 @@
  * ------------------------------------------------
  * `extract()` takes bytes and a MIME type. It is never told the service
  * (RULE B / REQ-058 — the reader must not know whether it is looking at
- * Netflix or Max, so it cannot be influenced by, or leak, that fact), the
+ * any particular service, so it cannot be influenced by, or leak, that fact), the
  * batch mode, the owner, the batch id, the image id, or the ingest source
  * (A45 — a pasted PNG and an uploaded, transcoded PNG are byte-equivalent
  * inputs and extraction quality must not depend on how the file arrived).

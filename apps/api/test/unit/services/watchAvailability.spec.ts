@@ -86,7 +86,7 @@ describe('T-AVAIL-005 · US-042 AC-5 · flatrate only — a rentable work is wha
   it('T-AVAIL-005d · a provider that is not one of the owner services is not flagged', () => {
     // Available somewhere on subscription, but not somewhere the owner pays
     // for. `availableOn` still records it — the FLAG is the narrower claim.
-    expect(flaggedProvidersFor(['Hulu', 'Peacock'])).toEqual([]);
+    expect(flaggedProvidersFor(['Hulu', 'Unsupported Service'])).toEqual([]);
   });
 
   it('T-AVAIL-005e · NOT KNOWN and ASKED-AND-NOBODY stay distinguishable end to end', () => {

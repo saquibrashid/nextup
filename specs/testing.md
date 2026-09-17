@@ -4702,6 +4702,29 @@ test does not establish computed contrast, dimensions or popup geometry.
 | `T-UX-143c` | E | Submitted q reaches server paging, preserves honest unfiltered-total semantics, and search-only zero-match clear removes q. |
 | `T-UX-143d` | E | Popup geometry at 320px/1280px, 44px interaction targets and focus behavior are verified from rendered elements. |
 
+### US-061 — Expanded streaming services (REQ-127, 2026-09-17)
+
+| Criterion | Level | Named tests | Evidence |
+|---|---|---|---|
+| AC-1 | U/I/E | `T-SVC-001`, `T-SVC-002` | Eight canonical choices, no default, exclusive selection, manual add and real browser file-upload/review/close paths. |
+| AC-2 | U/I/E | `T-SVC-001`, `T-SVC-002` | Service-blind extraction contract unchanged; existing byte-format and review safety pipeline serves each selected service. |
+| AC-3 | I/U/E | `T-SVC-001`, `T-SVC-002` | One work with eight listings/badges, earliest date and retained owner intent. |
+| AC-4 | I | `T-SVC-001` | Full-update/removal/restore remain scoped to exactly one service and preserve the other seven. |
+| AC-5 | U/I/E | `T-SVC-001`, `T-SVC-002` | Filtering, labels, history, factual update links and phone/desktop layouts across the service vocabulary. |
+| AC-6 | I/S | `T-SVC-001`, `T-SVC-003`, `T-MIG-001` | Exact transactional migration, retained rows, trusted expanded CHECKs, rejection of invalid values and mutated exception SQL. |
+| AC-7 | U/I | `T-SVC-001` | Bounded subscription-provider aliases, unknown/empty distinction and no rental/store inference or list mutations. |
+
+| Test | Level | Definition |
+|---|---|---|
+| `T-SVC-001` | U/I | Domain/API eight-service vocabulary and validation, deduplication, service-scoped lifecycle, queries/freshness and TMDB subscription-provider matching. |
+| `T-SVC-002` | U/E | `apps/web/test/serviceExpansion.spec.tsx`: eight-service upload/manual-add/filter/badge/update-link/post-close contracts. Browser `uploadPathRegression.spec.ts` cases `h`–`o` drive each service from preselected URL through file upload, confirmation and close. `refinedLibrary.spec.ts` case `g` guards phone/desktop controls and eight badge labels. |
+| `T-SVC-003` | S/I | `0012_expand_services` is the only approved constraint replacement: exact file/path/hash, atomic replacement of three service CHECKs with eight-value supersets, preserved data, and a gate that rejects altered/copied/destructive SQL. |
+
+The owner-directed US-061 expansion explicitly amends the otherwise blanket
+`DROP CONSTRAINT` prohibition for this one reviewed migration. Historical
+migrations remain immutable. No general escape flag or comment can bypass
+`tools/check-migrations.ts`; every other destructive operation remains blocked.
+
 ### US-060 — Owner watch preferences (REQ-126, 2026-09-16)
 
 | AC | Level | Tests | Assertion |

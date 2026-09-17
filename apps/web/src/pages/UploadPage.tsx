@@ -52,6 +52,7 @@ export interface BatchDraftSelection {
 }
 
 export interface UploadPageProps {
+  readonly initialService?: Service | null;
   /** Notified on every change so step 2 can enable itself. */
   readonly onSelectionChange?: (selection: BatchDraftSelection) => void;
 }
@@ -81,8 +82,11 @@ export function modeConsequence(mode: BatchMode, service: Service | null): strin
   );
 }
 
-export function UploadPage({ onSelectionChange }: UploadPageProps = {}): JSX.Element {
-  const [service, setService] = useState<Service | null>(null);
+export function UploadPage({
+  onSelectionChange,
+  initialService = null,
+}: UploadPageProps = {}): JSX.Element {
+  const [service, setService] = useState<Service | null>(initialService);
   const [mode, setMode] = useState<BatchMode | null>(null);
   const serviceGroup = useId();
   const modeGroup = useId();

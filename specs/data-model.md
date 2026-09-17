@@ -302,7 +302,7 @@ external payload (OCR, TMDB, HTTP body).
 ### 3.1 Enums — enumerated in full
 
 ```ts
-export const SERVICES = ['netflix', 'max'] as const;             // REQ-002, REQ-053
+export const SERVICES = ['netflix', 'max', 'prime-video', 'disney-plus', 'apple-tv-plus', 'paramount-plus', 'starz', 'peacock'] as const; // REQ-002/053/127
 export type Service = typeof SERVICES[number];
 
 export const BATCH_MODES = ['append-only', 'full-update'] as const;  // REQ-003
@@ -2541,7 +2541,7 @@ Mitigations, none of which fully restores the 35-day window:
 
 ### 17.2 What must NOT change
 
-- ⚠️ **`SERVICES` stays `['netflix','max']`.** A discovery source is not a
+- ⚠️ **`SERVICES` stays the closed subscription-service set (§19, US-061).** A discovery source is not a
   service. `listings` stays capped at `SERVICES.length`.
 - ⚠️ **`ServiceListing` is NOT reused** for the waiting state (ADR-0010 Trap
   3). It asserts membership of a saved list on a service; a `WatchIntent`
@@ -2638,3 +2638,28 @@ runtime/rating scopes. Watch priority rank is 0 for Watching, otherwise
 1/2/3 for Up next/Normal/Someday, with id ascending as the stable tie-break.
 The default list order does not change. See `api.md` §6.2d and
 `T-WATCH-001`/`T-WATCH-002`.
+
+## 19. Expanded service vocabulary (REQ-127, US-061)
+
+The service union is now the closed eight-value set in §3.1. Display labels
+are Netflix, Max, Prime Video, Disney+, Apple TV+, Paramount+, Starz and
+Peacock. Hulu is not a separate source in this expansion. Rental discovery
+sources remain a different union and cannot masquerade as saved-list services.
+All service columns retain `NVARCHAR(16)`; the new tokens fit without a schema
+width change. A work has at most one active listing per service, hence up to
+eight service badges, not duplicate title rows.
+
+`0012_expand_services` transactionally replaces exactly `ck_batch_service`,
+`ck_listing_service` and `ck_state_service` with eight-value allow-lists,
+validating existing data and retaining every row, index, other constraint and
+historical migration. This is the explicit US-061 exception to the blanket
+constraint-drop gate. The exact migration is pinned in `check-migrations.ts`;
+modified SQL, a different file, or any other destructive DDL remains blocked.
+The upload batch's nullable service still supports separate discovery batches;
+source exclusivity and discovery append-only constraints are unchanged.
+`T-SVC-003` and SQL coverage in `T-SVC-001` verify the migration and resulting
+constraints; the CI schema-diff gate must report no Prisma drift.
+
+All eight services use the existing screenshot, review, reconciliation,
+suppression and watch-preference paths. Full-update affects one selected
+service only. No data is imported or reclassified merely by enabling a service.

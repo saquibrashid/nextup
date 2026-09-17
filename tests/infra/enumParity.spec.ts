@@ -4,8 +4,9 @@
  *
  * `packages/domain/src/enums.ts` declares the permitted values in TypeScript;
  * `prisma/migrations/0001_init/migration.sql` declares them again as `CHECK
- * (col IN (...))`. Neither generates the other, so nothing stops one being
- * extended without the other.
+ * (col IN (...))`; only the three service CHECKs are superseded by 0012.
+ * Neither generates the other, so nothing stops one being extended without
+ * the other.
  *
  * Both directions of that drift fail badly and quietly:
  *
@@ -54,6 +55,17 @@ const MIGRATION = fileURLToPath(
 );
 
 const sql = readFileSync(MIGRATION, 'utf8').replace(/\r\n/g, '\n');
+const serviceSql = readFileSync(
+  fileURLToPath(
+    new URL('../../prisma/migrations/0012_expand_services/migration.sql', import.meta.url),
+  ),
+  'utf8',
+).replace(/\r\n/g, '\n');
+const SERVICE_REPLACEMENTS = new Map([
+  ['ck_batch_service', 'upload_batch'],
+  ['ck_listing_service', 'service_listing'],
+  ['ck_state_service', 'service_state'],
+]);
 
 /** Constraint name → the domain enum it must agree with. */
 const PAIRS: ReadonlyArray<readonly [string, readonly string[]]> = [
@@ -101,7 +113,23 @@ const UNMAPPED: Readonly<Record<string, string>> = {
  * Returns `null` when the constraint is absent, so a renamed or deleted
  * constraint fails loudly instead of comparing against an empty list.
  */
-export function checkConstraintValues(name: string): string[] | null {
+export function checkConstraintValues(
+  name: string,
+  latestServiceSql = serviceSql,
+): string[] | null {
+  const table = SERVICE_REPLACEMENTS.get(name);
+  if (table !== undefined) {
+    // Never fall back to 0001: an absent latest CHECK is a lost invariant,
+    // not permission to compare the domain against a historical definition.
+    const executable = latestServiceSql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ');
+    const replacement = new RegExp(
+      `ALTER TABLE \\[dbo\\]\\.\\[${table}\\] WITH CHECK ADD CONSTRAINT \\[${name}_expanded\\]\\s+` +
+        `CHECK \\(\\[service\\] IN \\(([^)]*)\\)\\);`,
+    ).exec(executable);
+    const rename = `EXEC sp_rename N'dbo.${name}_expanded', N'${name}', N'OBJECT';`;
+    if (!replacement?.[1] || !executable.includes(rename)) return null;
+    return [...replacement[1].matchAll(/'([^']*)'/g)].map((m) => m[1] as string);
+  }
   const match = new RegExp(`CONSTRAINT \\[${name}\\] CHECK \\(([^;]*?)\\)\\s*(?:,|\\n)`).exec(sql);
   if (!match?.[1]) return null;
   const inList = /IN \(([^)]*)\)/.exec(match[1]);
@@ -131,6 +159,52 @@ describe('T-INV-024 domain enums match the database CHECK constraints', () => {
     }
 
     expect(problems, problems.join('\n')).toEqual([]);
+  });
+
+  describe('T-SVC-003 latest service CHECK parity', () => {
+    it('T-SVC-003f: resolves exactly the three expanded service CHECKs, retaining all other pairs', () => {
+      expect([...SERVICE_REPLACEMENTS.keys()]).toEqual([
+        'ck_batch_service',
+        'ck_listing_service',
+        'ck_state_service',
+      ]);
+      for (const [name, values] of PAIRS) {
+        expect(checkConstraintValues(name), name).toEqual([...values]);
+        if (!SERVICE_REPLACEMENTS.has(name)) {
+          expect(checkConstraintValues(name, ''), name).toEqual([...values]);
+        }
+      }
+    });
+
+    it('T-SVC-003g: missing latest CHECK, trusted installation, or final rename never uses 0001', () => {
+      for (const [name, table] of SERVICE_REPLACEMENTS) {
+        const add = `ALTER TABLE [dbo].[${table}] WITH CHECK ADD CONSTRAINT [${name}_expanded]`;
+        const rename = `EXEC sp_rename N'dbo.${name}_expanded', N'${name}', N'OBJECT';`;
+        for (const mutated of [
+          '',
+          sql,
+          serviceSql.replace(`[${name}_expanded]`, `[${name}_missing]`),
+          serviceSql.replace(add, add.replace('WITH CHECK', 'WITH NOCHECK')),
+          serviceSql.replace(add, add.replace(`[${table}]`, '[wrong_table]')),
+          serviceSql.replace(add, `-- ${add}`),
+          serviceSql.replace(add, `/* ${add} */`),
+          serviceSql.replace(rename, ''),
+          serviceSql.replace(rename, `-- ${rename}`),
+          serviceSql.replace(rename, rename.replace("N'OBJECT'", "N'COLUMN'")),
+        ]) {
+          expect(checkConstraintValues(name, mutated), name).toBeNull();
+        }
+      }
+    });
+
+    it('T-SVC-003h: changed latest values are compared rather than replaced with the domain values', () => {
+      const mutated = serviceSql.replaceAll("'peacock'", "'hulu'");
+      for (const name of SERVICE_REPLACEMENTS.keys()) {
+        expect(checkConstraintValues(name, mutated)).toContain('hulu');
+        expect(checkConstraintValues(name, mutated)).not.toContain('peacock');
+        expect(checkConstraintValues(name, mutated)).not.toEqual([...SERVICES]);
+      }
+    });
   });
 
   it('T-INV-024b: reports a missing constraint rather than passing vacuously', () => {

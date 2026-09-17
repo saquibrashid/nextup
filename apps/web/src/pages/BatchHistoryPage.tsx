@@ -20,6 +20,7 @@
 
 import type { JSX } from 'react';
 import { Link } from 'react-router-dom';
+import { SERVICE_LABELS } from '@nextup/domain';
 
 import {
   BATCHES_COUNTS,
@@ -72,7 +73,6 @@ export function canOfferUndo(item: BatchHistoryItem): boolean {
   return item.status === 'applied' && item.undoneAt === null;
 }
 
-const SERVICE_LABELS: Record<string, string> = { netflix: 'Netflix', max: 'Max' };
 const MODE_LABELS: Record<string, string> = {
   append: 'Add to list',
   'full-update': 'Full update',

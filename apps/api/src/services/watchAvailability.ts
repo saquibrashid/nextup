@@ -121,7 +121,7 @@ export function selectForAvailabilityRefresh(
 }
 
 /**
- * Normalise a provider name for comparison against a `SERVICES` member.
+ * Normalise a subscription provider name without confusing "+" with a store.
  *
  * ⚠ TMDB's names are JustWatch's, and they carry qualifiers the owner's
  * services do not: "Netflix Standard with Ads", "Max Amazon Channel". Matching
@@ -131,9 +131,51 @@ export function selectForAvailabilityRefresh(
 function normaliseProvider(name: string): string {
   return name
     .toLowerCase()
+    .replace(/\+/g, ' plus ')
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 }
+
+// Exact normalized names, not service prefixes: "Maxwell" is not Max, and
+// Amazon Video / Apple TV storefront offers do not imply a subscription.
+const SUBSCRIPTION_PROVIDER_ALIASES: Readonly<Record<Service, readonly string[]>> = {
+  netflix: ['netflix', 'netflix standard with ads', 'netflix kids'],
+  max: [
+    'max',
+    'max with ads',
+    'max amazon channel',
+    'max apple tv channel',
+    'max roku premium channel',
+    'hbo max',
+    'hbo max with ads',
+    'hbo max amazon channel',
+    'hbo max apple tv channel',
+    'hbo max roku premium channel',
+  ],
+  'prime-video': [
+    'amazon prime video',
+    'amazon prime video with ads',
+    'prime video',
+    'prime video with ads',
+  ],
+  'disney-plus': ['disney plus', 'disney plus with ads', 'disney plus premium'],
+  'apple-tv-plus': ['apple tv plus', 'apple tv plus amazon channel'],
+  'paramount-plus': [
+    'paramount plus',
+    'paramount plus with ads',
+    'paramount plus essential',
+    'paramount plus premium',
+    'paramount plus with showtime',
+    'paramount plus amazon channel',
+    'paramount plus apple tv channel',
+    'paramount plus roku premium channel',
+    'paramount plus with showtime apple tv channel',
+    'paramount plus with showtime amazon channel',
+    'paramount plus with showtime roku premium channel',
+  ],
+  starz: ['starz', 'starz amazon channel', 'starz apple tv channel', 'starz roku premium channel'],
+  peacock: ['peacock', 'peacock premium', 'peacock premium plus'],
+};
 
 /**
  * Which of the owner's services are among these subscription providers.
@@ -149,8 +191,10 @@ function normaliseProvider(name: string): string {
  */
 export function flaggedProvidersFor(availableOn: readonly string[] | null): Service[] | null {
   if (availableOn === null) return null;
-  const seen = availableOn.map(normaliseProvider);
-  return SERVICES.filter((service) => seen.some((name) => name.startsWith(service)));
+  const seen = new Set(availableOn.map(normaliseProvider));
+  return SERVICES.filter((service) =>
+    SUBSCRIPTION_PROVIDER_ALIASES[service].some((name) => seen.has(name)),
+  );
 }
 
 /** The narrow slice of the TMDB client this refresh is allowed to reach. */

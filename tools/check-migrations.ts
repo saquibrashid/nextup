@@ -14,12 +14,22 @@
 // invariant the database was enforcing; `sp_rename` on a column is a rename
 // that orphans every reader of the old name.
 //
-// Escape hatch: NONE, by design. A genuinely necessary destructive migration
-// is an owner decision made in the open, not a flag an autonomous implementer
-// can set. Removing this gate must be a visible diff to this file.
+// No general escape hatch. The owner authorized ONLY 0012's three service
+// CHECK replacements after this gate was raised. Its exact path and full SQL
+// hash are pinned below; changing that approval requires another visible diff.
 
+import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
+
+const SERVICE_EXPANSION_PATH = 'prisma/migrations/0012_expand_services/migration.sql';
+// Normalize CRLF only, not whitespace/comments/literals: none may hide added SQL.
+const SERVICE_EXPANSION_SHA256 = '7c357e70ae71ffa2d703aeb60ae271d6cebfebcd1b322f36fbdcb9eb9312bdb5';
+const SERVICE_CONSTRAINT_DROPS = new Set([
+  'ALTER TABLE [dbo].[upload_batch] DROP CONSTRAINT [ck_batch_service];',
+  'ALTER TABLE [dbo].[service_listing] DROP CONSTRAINT [ck_listing_service];',
+  'ALTER TABLE [dbo].[service_state] DROP CONSTRAINT [ck_state_service];',
+]);
 
 /** Statements that destroy data or repeal an enforced invariant. */
 export const DESTRUCTIVE_PATTERNS = [
@@ -117,23 +127,40 @@ function collectSqlFiles(dir: string): string[] {
 /** Scan one migration's SQL text. Exported so tests can feed it violations. */
 export function scanSql(file: string, sql: string): MigrationViolation[] {
   const violations: MigrationViolation[] = [];
-  const lines = stripComments(sql).split(/\r?\n/);
+  const isServiceExpansion = file.replace(/\\/g, '/') === SERVICE_EXPANSION_PATH;
+  const approvedServiceExpansion =
+    isServiceExpansion &&
+    createHash('sha256').update(sql.replace(/\r\n/g, '\n')).digest('hex') ===
+      SERVICE_EXPANSION_SHA256;
+  if (isServiceExpansion && !approvedServiceExpansion) {
+    violations.push({
+      file,
+      line: 1,
+      statement: 'Unapproved service expansion SQL',
+      text: 'The complete migration must match its owner-authorized SHA-256.',
+      why: 'only the immutable 0012 service CHECK replacement is authorized; no other SQL is exempt',
+    });
+  }
 
-  lines.forEach((line, index) => {
-    for (const { name, pattern, why } of DESTRUCTIVE_PATTERNS) {
-      if (pattern.test(line)) {
-        violations.push({
-          file,
-          line: index + 1,
-          statement: name,
-          text: line.trim(),
-          why,
-        });
+  const uncommented = stripComments(sql);
+  for (const { name, pattern, why } of DESTRUCTIVE_PATTERNS) {
+    // Scan the whole file so splitting DROP and CONSTRAINT across lines
+    // cannot bypass the general prohibition outside the pinned exception.
+    for (const match of uncommented.matchAll(new RegExp(pattern, `${pattern.flags}g`))) {
+      const line = uncommented.slice(0, match.index).split('\n').length;
+      const text = uncommented.split(/\r?\n/)[line - 1]?.trim() ?? '';
+      if (
+        approvedServiceExpansion &&
+        name === 'DROP CONSTRAINT' &&
+        SERVICE_CONSTRAINT_DROPS.has(text)
+      ) {
+        continue;
       }
+      violations.push({ file, line, statement: name, text, why });
     }
-  });
+  }
 
-  return violations;
+  return violations.sort((a, b) => a.line - b.line);
 }
 
 /** Scan every migration under `prisma/migrations/**`. */

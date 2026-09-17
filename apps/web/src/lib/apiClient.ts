@@ -398,7 +398,7 @@ export interface RemovedItem {
   mediaType: string | null;
   releaseYear: number | null;
   posterPath: string | null;
-  service: 'netflix' | 'max';
+  service: Service;
   /** `YYYY-MM-DD` — the ORIGINAL date added, preserved through removal. */
   dateAdded: string;
   /** A timestamp, not a date: two removals on one day stay distinguishable. */
@@ -501,7 +501,7 @@ export interface BatchImage {
  */
 export interface BatchStatus {
   batchId: string;
-  service: 'netflix' | 'max';
+  service: Service;
   mode: string;
   status: string;
   derivedFromBatchId: string | null;
@@ -553,7 +553,7 @@ export interface BatchTitleRef {
  */
 export interface BatchHistoryItem {
   batchId: string;
-  service: 'netflix' | 'max';
+  service: Service;
   mode: string;
   status: string;
   createdAt: string;

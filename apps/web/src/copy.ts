@@ -60,7 +60,7 @@ export const REMOVED_VIEW_SUBTITLE =
 
 /** US-027 AC-2/AC-3. `{name}` is substituted with the work's name. */
 export const SUPPRESS_CONFIRM_BODY =
-  '"{name}" will be hidden from your list and won\'t come back on future uploads, even if it\'s still saved on Netflix or Max. You can undo this from "Not interested".';
+  '"{name}" will be hidden from your list and won\'t come back on future uploads, even if it\'s still saved on your streaming services. You can undo this from "Not interested".';
 
 /** US-029 AC-4. `{name}` is substituted with the work's name. */
 export const UNSUPPRESS_CONFIRM_BODY =
@@ -607,7 +607,7 @@ export const CLEAR_FILTERS_LABEL = 'Clear filters';
 export const ZERO_MATCH_TITLE = 'No titles match these filters.';
 export const LIST_EMPTY_NEVER_UPLOADED_TITLE = 'Nothing here yet.';
 export const LIST_EMPTY_NEVER_UPLOADED_BODY =
-  'Upload screenshots of your saved lists on Netflix or Max and nextup will build one combined list.';
+  'Upload screenshots of your saved lists on your streaming services and nextup will build one combined list.';
 export const UPLOAD_SCREENSHOTS_LABEL = 'Upload screenshots';
 export const LIST_EMPTY_ALL_GONE_TITLE = 'Nothing on your list right now.';
 
@@ -1416,7 +1416,7 @@ export const WAITING_LOADING = 'Loading what you are waiting for…';
 export const WAITING_EMPTY_TITLE = "You aren't waiting on anything yet.";
 export const WAITING_EMPTY_BODY =
   'Upload a screenshot of a rental storefront and keep the titles you want to watch. ' +
-  'They wait here until they reach Netflix or Max.';
+  'They wait here until they reach your streaming services.';
 export const WAITING_EMPTY_ACTION = 'Upload a storefront screenshot';
 
 /**
