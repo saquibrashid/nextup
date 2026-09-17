@@ -30,6 +30,28 @@ import { mountApi } from './routes/index.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const defaultWebRoot = path.resolve(here, '..', '..', 'web', 'dist');
 
+/**
+ * The shell is revalidated on every navigation; the hashed bundles never are.
+ *
+ * ⚠ Exported so `T-API-031` asserts the POLICY rather than a string it also
+ * wrote. The two values are a matched pair: weakening the first silently pins
+ * the owner to an old deploy, and weakening the second costs a round trip per
+ * asset per navigation for no benefit whatever.
+ */
+export const SHELL_CACHE_CONTROL = 'no-cache';
+export const HASHED_ASSET_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+
+/**
+ * ⚠ The `immutable` half is claimed ONLY for `/assets`, because that is the
+ * only directory Vite content-hashes. `favicon.svg`, `robots.txt` and anything
+ * else dropped into `public/` keep their stable names across builds, so an
+ * immutable year would make them unreplaceable for a year.
+ */
+export function cacheControlFor(filePath: string): string {
+  const segments = filePath.split(/[\\/]/);
+  return segments.includes('assets') ? HASHED_ASSET_CACHE_CONTROL : SHELL_CACHE_CONTROL;
+}
+
 export interface CreateAppOptions {
   /**
    * How to read the caller's identity. Defaults to the real Easy Auth header
@@ -64,10 +86,40 @@ export function createApp(options: CreateAppOptions = {}): Express {
   mountApi(app, options.readPrincipal ?? readPrincipal);
 
   // ── SPA ────────────────────────────────────────────────────────────────
-  app.use(express.static(webRoot, { index: false }));
+  /*
+   * ⚠ THE SHELL AND THE HASHED ASSETS NEED OPPOSITE CACHE POLICIES, AND
+   * `express.static`'s DEFAULT GIVES BOTH THE SAME ONE. Out of the box every
+   * response carried `Cache-Control: public, max-age=0`, so the immutable,
+   * content-hashed bundles were revalidated on every single navigation while
+   * `index.html` — the one file whose staleness hides a whole deploy — was
+   * given no stronger instruction than "revalidate if you feel like it".
+   *
+   * ⚠ THIS IS NOT A PERFORMANCE TWEAK. It is why "the fix did not land" is a
+   * question that can be asked at all: the shell names the bundle by hash, so
+   * a shell served from cache pins the owner to the PREVIOUS deploy's CSS and
+   * JS indefinitely, on a URL that never changes and with a server that is
+   * already serving the new bytes. Nothing on screen distinguishes that from a
+   * deploy that silently failed — the owner reported exactly that on
+   * 2026-09-17, minutes after a deploy that had in fact succeeded.
+   *
+   * `no-cache` is NOT `no-store`: the shell is still cached and still served
+   * from disk, it is merely revalidated first, so the normal response is a 304
+   * against the ETag Express already emits. `immutable` on `/assets` is safe
+   * precisely because Vite puts the content hash in the filename — a changed
+   * file is a different URL, so there is nothing to invalidate.
+   */
+  app.use(
+    express.static(webRoot, {
+      index: false,
+      setHeaders: (res, filePath) => {
+        res.setHeader('Cache-Control', cacheControlFor(filePath));
+      },
+    }),
+  );
 
   // Client-side routing: every non-API path renders the shell.
   app.use((_req, res) => {
+    res.setHeader('Cache-Control', SHELL_CACHE_CONTROL);
     res.sendFile(path.join(webRoot, 'index.html'));
   });
 
