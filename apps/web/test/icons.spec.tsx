@@ -31,6 +31,16 @@ const WEB_ROOT = existsSync(join(process.cwd(), 'apps', 'web', 'src'))
   : process.cwd();
 const SRC_ROOT = join(WEB_ROOT, 'src');
 const ICONS_ROOT = join(SRC_ROOT, 'components', 'icons');
+/*
+ * ⚠ THE SECOND REGISTER IS EXCLUDED HERE AND GATED SEPARATELY, NOT WAIVED.
+ * ADR-0014's brand marks are filled glyphs and cannot satisfy `T-UI-030a/d`'s
+ * stroke contract — stroking a logo does not render it, it renders an outline
+ * of it. `brands.spec.tsx` (`T-BRAND-001`) applies an equivalent closed-set,
+ * no-colour, no-package, a11y contract to this directory, so the exclusion
+ * moves the assertions rather than dropping them. Any OTHER `<svg>` in
+ * `apps/web/src` still fails `T-A11Y-016d`.
+ */
+const BRANDS_ROOT = join(SRC_ROOT, 'components', 'brands');
 
 /** §7c's closed Revision 2 set, transcribed. A 22nd icon fails `T-UI-030b`. */
 const CLOSED_SET = [
@@ -182,7 +192,7 @@ describe('T-A11Y-016 — an icon is never the sole label', () => {
     // draws perfectly and inherits none of it, and only a screen reader ever
     // discovers that the control containing it has no name.
     const offenders = walk(SRC_ROOT)
-      .filter((file) => !file.startsWith(ICONS_ROOT))
+      .filter((file) => !file.startsWith(ICONS_ROOT) && !file.startsWith(BRANDS_ROOT))
       .filter((file) => /<svg\b/.test(readFileSync(file, 'utf8')));
     expect(offenders).toEqual([]);
   });
