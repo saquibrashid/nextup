@@ -1992,7 +1992,7 @@ does not work — see `Msg 468` above.~~
 >
 > | Column | Was | Now | Why the old value was wrong |
 > |---|---|---|---|
-> | `service` (×3) | `'netflix','prime'` | `'netflix','max'` | The spine services are Netflix and **Max** (`REQ-002`, `REQ-053`). `BRD.md` names Prime Video as one of the seven **non-spine** services that are out of scope. The old list rejected every Max listing. |
+> | `service` (×3) | `'netflix','prime'` | `'netflix','max'` | Historical spine correction (`REQ-002`): the old list rejected every Max listing. The current expanded service boundary is US-061 / REQ-127; REQ-053 is image-quality gating, not a service-count rule. |
 > | `mode` | `'append_only','full_update'` | `'append-only','full-update'` | Hyphenated everywhere else in the corpus (127 uses vs 7) and in `BATCH_MODES`. §16.2 requires values "byte-identical to the §15.3 unions". |
 > | `status` | 6 values, incl. `'review'`, `'failed'` | 8 values | §3 (ll. 313–319) and the state machine (l. 943) both define **eight**. `'submitted'`, `'extraction-failed'`, `'in-review'` and `'discarded'` are all reachable and were unrepresentable. |
 > | `status` width | `NVARCHAR(16)` | `NVARCHAR(24)` | A consequence of the row above: `'extraction-failed'` is **17 characters** and would not fit. Every other enum column was re-audited against its longest permitted value and is correctly sized. |

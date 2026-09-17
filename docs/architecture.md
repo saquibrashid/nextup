@@ -589,9 +589,13 @@ escalation. See ADR-0005 R3.5 and *Deliberately deferred*.
 
 ## Key flows
 
-### The value loop — open the list, filter, deep-link out
+### The value loop — open the list, filter, choose
 `diagrams/sequence-value-loop.md` · REQ-024, REQ-026, REQ-031–038,
 REQ-076, NFR-013
+
+**Owner decision, 2026-09-17:** nextup provides no service-level or direct-title
+launch links. The owner opens the streaming app independently after choosing;
+internal nextup navigation and required metadata attribution are unchanged.
 
 Browser → API → **PostgreSQL**, and nothing else in the common case. The
 database is always warm (no auto-pause) **and so is the container
@@ -1213,11 +1217,11 @@ live pricing page. **`TASK-010` is extended** to re-verify all of them —
 including **Azure SQL Basic** and the **serverless staging floor**. Treat them
 as ±30 % until `TASK-010` lands."*~~
 
-**Still unverified, deliberately:** item (h), whether `RestartCount` /
-`WorkingSetBytes` exist as alertable metrics and whether any OOM-distinct
-signal exists. Metric definitions can only be listed against a **deployed**
-container app, so that leg is owed the moment staging exists — it is a
-TASK-157 input, not a pricing question.
+**Item (h) was verified on 2026-08-28** against deployed staging:
+`RestartCount` and `WorkingSetBytes` exist, but neither distinguishes OOM from
+other restarts. `RestartCount` uses `Maximum` as its primary aggregation; the
+decode sentinel remains the identifying signal. See `specs/testing.md` §31.6.
+This dated observation is not a fresh inspection of the current deployment.
 
 Volume assumptions are structurally bounded: there is exactly one owner
 (`NFR-017`), so volume cannot grow by user acquisition.
@@ -1231,8 +1235,8 @@ Volume assumptions are structurally bounded: there is exactly one owner
 | ↳ **Known remedy (pre-authorised, reactive — NOT an alternative)** | Same app at **0.5 vCPU / 1.0 GiB**, guard raised to **50 MP** | **~$10.22** *(**+$5.92**, verified 2026-08-17)* | **Taken only when a real OOM occurs.** One `az` command + one Bicep change: **`runbooks/scale-up-memory.md`**. **System total becomes ~$17.69/month.** No re-architecture, no data migration, no downtime. ⚠ **The delta was published as +~$4 and is really +$5.92** — 48 % higher. It is quoted to the owner in the runbook, so it is corrected there too. Still pre-authorised; the decision does not change at this price. |
 | **Database (prod)** | **Azure SQL Database, Basic (5 DTU, 2 GB)**, 7-day PITR | **~$5** | **The product's highest-risk silent defects stay database constraints** via filtered unique indexes (one active title per work; one listing per service; one active suppression per work). Batch close stays one transaction. Still always-warm (Basic does not auto-pause). |
 | **Database (staging)** | **Azure SQL serverless, auto-pause enabled** (~storage only) | **~$0.50** | Staging keeps a *real* Azure database to rehearse RBAC/Easy-Auth/deploy; auto-pause is fine because nobody judges staging's cold start. *(Azure SQL bills per database, so this is ~$0.50, not the literal $0 the shared-PG server gave — ADR-0003 R3.3.)* |
-| **Container registry** | **ghcr.io** | **$0.00** | Free. The trade is the **returning PAT** — a quietly-expiring secret (ADR-0003 R3.1). |
-| **Extraction — primary reader** | Azure OpenAI `gpt-4.1` vision, Standard PAYG (~$0.0094/image) | **~$0.47** | Artwork recognition (`RSK-021` High→Low), tile-grid understanding, de-truncated titles. **Untouched by this revision (`NFR-012a`, ADR-0001 Rev 2).** |
+| **Container registry** | **ghcr.io**, public package | **$0.00** | CI pushes with `GITHUB_TOKEN`; ACA pulls anonymously. No registry credential or PAT is configured (`docs/ghcr-pat.md`, `infra/aca.bicep`). |
+| **Extraction — primary reader** | Azure OpenAI `gpt-4.1` vision, **GlobalStandard PAYG** | **~$0.35** at the 2026-08-17 verification | Artwork recognition, tile-grid understanding and de-truncated titles. `infra/ai.bicep` pins the deployment SKU; quality remains governed by NFR-012a and ADR-0001. |
 | **Extraction — OCR cross-check** | Azure AI Vision Read, **F0** (5,000 tx/mo) | **$0.00** | Makes fabrication visible and silent omission structurally impossible. Fallback S1: *$0.05–$0.23*. |
 | *(allowance)* `REQ-074` re-extraction ×1.5 | — | *+~$0.24* | Headroom for re-running a bad batch. |
 | **Screenshot storage** | Blob Hot LRS, <1 GB, 30-day lifecycle | **~$0.02** | `NFR-019` with no application code and no timer. |
@@ -1429,7 +1433,7 @@ turns an unverified estimate into a monitored one.
 | ~~**A staging environment**~~ | ~~Cosmos free tier is one account per subscription~~ | **NO LONGER DEFERRED (R3).** Staging exists (ADR-0003 R2.4): a second Container App, a second database on the same server, a second blob container. Its only blocker was the free tier, which the datastore change removed. Marginal cost ≈ $0 |
 | ~~**`minReplicas = 1` (always-warm compute)**~~ | ~~Costs $4–6/month against an unmeasured need~~ | **NO LONGER DEFERRED (R3).** Built. The deferral was correct only while spending was gated; `RSK-023` is closed |
 | **Database HA / zone redundancy / read replica** *(new deferral, R3)* | Roughly doubles the database bill to protect a single-user watchlist against an event that would be a few hours of inconvenience. There is no availability requirement (`OQ-014`) and inventing one would violate `NFR-002` | The product stops being single-user, or the owner states an availability expectation |
-| **A user-controlled backup / export** | Not in the locked scope. **R3 narrows this: 35-day point-in-time restore is now included**, which is a real improvement for a store that never deletes — but PITR is not an export the owner controls | **Still recommended for early promotion.** `OQ-025` narrows, it does not close |
+| **Export UI** | Deferred. The manual owner export script is implemented (TASK-131); current Azure SQL Basic PITR is **7 days**, not the historical PostgreSQL 35-day window | Owner-approved 2026-09-17: weekly off-Azure export, at most 7 days of changes lost in backup-only recovery, restoration within 24 hours after recovery work begins. Targets await the `docs/restore.md` rehearsal; JSON restoration remains manual and no scheduled export or paid upgrade is authorized |
 | ~~**A multimodal LLM extractor**~~ | ~~Option E in ADR-0001 is the right *second* decision, not the first — real-world OCR yield is currently unmeasured~~ | **NO LONGER DEFERRED.** `A40`/`NFR-012a` removed the cost gate and ADR-0001 Revision 2 **built it as the primary reader**, with OCR as a mandatory cross-check. Deferring it was correct only while spending was gated |
 | **An ensemble or two-pass vision read** | ADR-0001 R2.8 — doubles the bill to duplicate what the free OCR cross-check already provides | A measured fabrication rate > 0.05 that prompt changes cannot fix |
 | **Runtime filtering of unsupported ("possibly fabricated") titles** | It would silently discard exactly the artwork-read titles the decision was made to obtain, violating `REQ-012`. They are **flagged and shown**, never hidden. `T-AI-042` enforces this | Never — this is a permanent prohibition, not a deferral |
@@ -1682,4 +1686,3 @@ diagram (`.github/instructions/diagramming.instructions.md` §1). draw.io
 and Excalidraw exports were requested as unavailable for this session and
 were not produced; per §6.3 rule 4 that is stated plainly and the Mermaid
 is the deliverable.*
-

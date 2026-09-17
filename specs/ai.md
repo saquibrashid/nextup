@@ -167,7 +167,7 @@ owner will see is computed.
 |---|---|
 | Service | **Azure OpenAI Service**, same region and subscription |
 | Model | **`gpt-4.1`**, version **pinned explicitly** in the Bicep deployment — never `latest` |
-| Deployment | `nextup-extract`, **Standard (pay-as-you-go)**, no PTU, no commitment |
+| Deployment | `NEXTUP_AOAI_DEPLOYMENT`, configured in `infra/ai.bicep`; **GlobalStandard (pay-as-you-go)** for the verified subscription/region, no PTU or commitment |
 | API version | `2024-10-21` or later (Structured Outputs required) |
 | SDK | `openai` npm package with `AzureOpenAI` client |
 | Auth | Container App **system-assigned managed identity**; RBAC role `Cognitive Services OpenAI User`. **No API key exists anywhere.** |
@@ -1290,12 +1290,14 @@ floor (Jaccard ≥ 0.95) is a product requirement.
 | False-title rate | ≤ 0.10 **and** ≤ the incumbent's |
 | Chrome rejection | ≥ 0.80 |
 | Run-to-run stability | Jaccard ≥ 0.95, and ≥ the incumbent's |
-| **Cost** | **Tie-breaker ONLY.** Never a reason to accept a worse reader |
+| **Cost** | **Reported, never decisive.** The owner confirmed on 2026-09-17 that equivalent or inconclusive quality retains the incumbent, even if the challenger is cheaper |
 
-**The challenger replaces the incumbent only if it wins or ties on every row.**
-Better-on-some / worse-on-others means **the incumbent stays** — a mixed result
-is not an upgrade, and defaulting to the incumbent under uncertainty is what
-keeps `NFR-012a` from being eroded one small regression at a time.
+**The challenger replaces the incumbent only if it meets every absolute
+quality floor, wins or ties on every compared quality row, and makes at least
+one measurable improvement under Stage 4.** Better-on-some / worse-on-others,
+equivalent quality, and inconclusive results all mean **the incumbent stays**.
+Cost cannot create a win or excuse a regression. These are the existing
+`chooseReader.ts` rules, now explicitly confirmed by the owner.
 
 **Stage 4 — what counts as a difference.** The corpus is **11 images**
 *(12 until TASK-011 deleted the `dark-mode-01` slot; see §9.1)*. One
@@ -1305,6 +1307,12 @@ per-image counts, not only aggregates, and any conclusion drawn from a
 difference smaller than two titles on any single metric must say so
 explicitly. If the two arms differ only inside that band, the honest finding is
 **"no measured difference"** — which, by Stage 3, means the incumbent stays.
+
+**Owner resolution, 2026-09-17:** retain the incumbent for equivalent or
+inconclusive quality. The contradictory cost tie-break wording is retired;
+no quality floor, noise band, recorded result or production model changes.
+~~Superseded: cost is a tie-breaker, and tying every row is sufficient to replace
+the incumbent.~~ See `docs/current-release.md` and `T-AI-045`.
 
 **Outputs.** A report at `docs/evaluation/model-bakeoff-<date>.md` carrying
 both arms' full metric tables, the per-image deltas, the observed cost of the
@@ -1339,12 +1347,12 @@ cross-check is $0.00 on F0.
 
 | Control | Value | Where |
 |---|---|---|
-| Model deployment | `gpt-4.1`, **Standard pay-as-you-go**, explicit pinned version, **no PTU and no commitment** — `NFR-012` still forbids fixed monthly charges | `infra/aoai.bicep`; `T-INFRA-005` asserts the SKU is `Standard`, never `ProvisionedManaged` |
-| Vision SKU | **F0 free tier** (cross-check) | `infra/vision.bicep`, SKU pinned |
+| Model deployment | `gpt-4.1`, **GlobalStandard pay-as-you-go**, explicit pinned version, **no PTU or commitment**. NFR-012 is a cost-efficiency SHOULD after A41, not a ban on the fixed-cost database/compute already selected. | `infra/ai.bicep`; `T-INFRA-001` |
+| Vision SKU | **F0 free tier** (cross-check); the existing account can be reused rather than provisioned again | `infra/ai.bicep`, `deployVision` / `existingVisionEndpoint`; `docs/runbooks/vision-account-reuse.md` |
 | `max_tokens` | **4096** — bounds output cost per call | `config.ts` |
 | Images per batch | **40** | `specs/api.md` §5; a 41st → 400 `TOO_MANY_IMAGES` |
 | Bytes per image / per batch | **10 MiB / 60 MiB** | 413 `IMAGE_TOO_LARGE` / `BATCH_TOO_LARGE` |
-| Concurrent images in flight | **2** | serialised worker; also keeps the 0.25 vCPU container within budget |
+| Concurrent images in flight | **1** | `EXTRACTION_IMAGE_CONCURRENCY = 1`; the two reader legs for that image run together (§2.2). The pixel guard and memory budget are sized for one image, not two. |
 | Retries | **2**, on transient codes only, never on 4xx | §2.2 |
 | Re-extraction | **manual only**, one at a time, creates a new batch so its cost is visible in `extractionStats` | US-034 |
 | Scheduled/background inference | **none exists** — no scheduler anywhere (REQ-041). *(R3: `minReplicas` is now 1, so the container is always warm; that removed the cold start, NOT the no-scheduler rule. An always-on container makes a background timer easier to add by accident, so `T-CI-005` matters more, not less.)* | `T-CI-005` asserts no cron/timer/`setInterval` in `apps/api/src` |
@@ -1446,7 +1454,7 @@ days loses the retained artefact and forces a re-attach from the phone
 | REQ-076 (lazy TMDB refresh) | `specs/api.md` §6.4 — **there is no scheduler** |
 | NFR-002/003 (agent-implementable, testable) | §9.0 three-tier strategy; the determinism boundary is explicit |
 | NFR-010 (extraction latency is not on the value loop) | §2.2 — extraction is asynchronous; the client polls |
-| **NFR-012 (near-zero cost, everything except extraction)** | §10 — no fixed commitment anywhere; Standard SKU, not PTU |
+| **NFR-012 (cost-efficiency SHOULD after A41)** | §10 — bounded usage and pay-as-you-go extraction, not PTU; fixed-cost compute/database remain the approved architecture |
 | **NFR-012a (extraction: quality over cost, lowest reasonable price)** | §2.1a model selection + warning, §10 preamble, ADR-0001 R2.8 |
 | NFR-014 (TMDB retention) | `specs/api.md` §6.4 |
 | NFR-015/016/017 (privacy, TMDB terms, no third-party AI training data) | Rule A (+ R2.4 scope clarification), §11 |

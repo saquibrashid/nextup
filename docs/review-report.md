@@ -11,6 +11,11 @@ sourceOfTruth: Context/session-state.json, Context/requirements.md, Context/mvp-
 
 # Review Report — nextup (Phase 11 artifact review)
 
+**Historical review of the pre-build Revision-4 artifacts, not a current
+release verdict.** Findings and counts below are preserved as observations at
+that revision. Consult [current-release.md](current-release.md) and the
+[generated task status](status.md) for current scope and outstanding work.
+
 ## Verdict
 
 **fix-blockers-first — one High finding, then build.** This artifact set is,
@@ -287,4 +292,3 @@ consistent with Variant A and reference PostgreSQL only as marked history.
 - `session-state.json`'s machine-readable state was taken as authoritative over
   narrative prose wherever the two diverged (as the brief directs), and
   `mvp-definition.md` §17–§18 over its body.
-

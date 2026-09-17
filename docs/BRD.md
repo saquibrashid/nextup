@@ -283,9 +283,11 @@ addendum** (L1, L2, L3, D3, D6).
 | Agent-executable artifacts, automated verification, mainstream stacks | NFR-002, NFR-003, NFR-004 | OBJ-8 — the delivery model itself |
 | No telemetry; 320px and 1024px viewport floors; no credentials; no automated streaming requests; free-tier Azure | NFR-005, NFR-006, NFR-007, NFR-009, NFR-010, NFR-012 | OBJ-6, OBJ-7, OBJ-9 |
 
-**Services in v1: Netflix and Max only.** Nothing in the requirement set
-is service-specific; adding a service later is a configuration entry plus
-layout tolerance in extraction, not an integration.
+**Current service scope:** Netflix, Max, Prime Video, Disney+, Apple TV+,
+Paramount+, Starz and Peacock (PRD US-061 / REQ-127, approved 2026-09-17).
+This supersedes the original Netflix/Max-only scope. Discovery storefronts
+remain separate and Hulu is not a separate supported service. Adding a service
+does not authorize automated retrieval from it.
 
 ### 6.2 Out of scope — v1.1 / v2
 
@@ -294,8 +296,8 @@ layout tolerance in extraction, not an integration.
 | Editing a listing's date-added | REQ-059 | Serves neither loop; the field is already honest and present. Also avoids testing REQ-036's counter-intuitive consequence in v1 | The list is populated and the owner wants to correct a date more than once. **Reinstating it re-opens D3 and OQ-023** |
 | ~~Filter and sort by runtime~~ **— IN SCOPE at `A48`** | REQ-035, REQ-037 | ~~TV runtime is genuinely ambiguous (episode / season / series) and the record contains no decision — shipping it means the implementer picks one arbitrarily (the ASM-029 defect). REQ-029 still stores runtime, so v1.1 needs no migration~~ **The deferral was correct and its condition is now met.** The ambiguity is resolved by decision rather than by an implementer's guess — which is exactly what ASM-029 asked for: **per-episode**, because that is what TMDB's `episode_run_time` supplies and what the code already stores, **and the label must carry `/ep`** (REQ-119) so the choice is visible to the owner instead of buried in a query | ~~The TV-runtime semantic is decided, ideally alongside OQ-014~~ — **decided at `A48`** |
 | Mixed-changeset batch undo | REQ-069 | **D3/A36 — prohibition relaxed by explicit user decision, not agent interpretation.** Highest complexity per unit of day-one value; the exact state-reconstruction logic an autonomous agent gets 90% right and 10% catastrophically wrong. Removes OQ-023 from the v1 blocking set | v1.1, or immediately if REQ-059 is reinstated |
-| The seven non-spine services (Disney+, Prime Video, Peacock, Apple TV+, Paramount+, Starz, Fandango at Home) | REQ-048 | Netflix + Max are the spine; v1 ships exactly two configured services so the "add a service" path is not built speculatively. ⚠ **"Fandango at Home" here means adding it as a *service* — a saved list you capture and reconcile. That is NOT the v1.1 rental-discovery capability in the row below, which uses the same brand name for the opposite treatment. See ADR-0010 §5 Trap 1 before implementing either** | After Checkpoint 1, if M1/M5 pass |
-| **Waiting to stream — rental-release discovery** *(added `A48`)* | **REQ-082 – REQ-087** | Capture a rental storefront's new-release page as an **append-only discovery source** (not a service), curate it in the existing review pass with discard-suppresses, hold confirmed works as `WatchIntent`s in a **separate waiting view**, and flag them via **TMDB watch-provider data refreshed lazily on access** when they reach Netflix or Max. Deferred because it depends on Epics C, D and I being complete, and because the v1 value loop must be proven first — but **specified in full now** (PRD Epic L, US-040…US-043, ADR-0010) so it is not re-derived later | **v1.1, as the first epic after v1 closes.** Owner-confirmed at `A48` |
+| Additional services beyond the current eight, including Fandango at Home as a saved-list service | REQ-048 (historical expansion); current boundary US-061 / REQ-127 | Prime Video, Disney+, Apple TV+, Paramount+, Starz and Peacock are now in scope. Fandango discovery is not a saved-list service and must not acquire full-update semantics. | Explicit owner approval for another service |
+| **Waiting to stream — promoted to v1 at A52** | **REQ-082 – REQ-087** | No longer deferred. Discovery captures are append-only and create `WatchIntent`s, not service listings; availability is metadata-only and refreshed on access. ADR-0010 and PRD Epic L remain the detailed contract. | Promotion recorded on 2026-09-08; see the backlog for implementation evidence |
 | Multi-account for <20 family and friends | REQ-047, NFR-001 | Non-preclusion only in v1 — an allow-list of identities, not an account system | Owner chooses to share |
 | Merge/split affordance for two unmatched rows of the same work | — (OQ-015, capped at D8) | Would be new UI on the identity path, enlarging v1 materially. **Accepted limitation:** two unmatched captures with differing text will produce two rows and v1 has no merge action | v1.1, once OQ-015's fallback identity is proven in use |
 
@@ -310,10 +312,16 @@ layout tolerance in extraction, not an integration.
 | Upload-time image-quality gating (REQ-053) | Justified only by photographed screens; unnecessary for pixel-perfect input |
 | "What should I watch" picker / recommendations (REQ-042) | The job is *see everything I saved*, not *decide for me* |
 | Watched-state, progress, viewing history (REQ-043) | Declined at intake |
-| Deep links that launch a title in the streaming app (REQ-044) | Declined at intake |
+| Service-level and direct-title launch links (REQ-044) | **Owner-confirmed 2026-09-17: no links; the owner opens the streaming app independently.** PRD US-018 AC-5 and US-038 AC-3 now agree with the existing UI. Internal upload links and required metadata attribution are unaffected. |
 | TV-browser support, D-pad / remote navigation (REQ-045) | Phone first, laptop supported; TV is not a target surface |
 | Native iOS / Android apps (REQ-046) | Web only |
 | Usage analytics, telemetry, event pipeline, usage dashboard (REQ-052) | Success is self-assessed (NFR-005, ASM-033). Also protects the near-zero-cost posture |
+
+**Reference authority, confirmed 2026-09-17:** these explicit definitions and
+section 6.2 define REQ-042 through REQ-054; later approved scope amendments
+still apply. See [requirement-index.md](requirement-index.md). In particular,
+REQ-053 does not define a service limit, and excluding subjective image-quality
+gating does not remove the required format, metadata or memory safety checks.
 
 ---
 
@@ -635,8 +643,6 @@ so that column records the intended story area instead.
 `REQ-042`–`REQ-054` — the 13 `wont-v1` exclusions (§6.3).
 `NFR-001` — a forward-looking non-preclusion constraint, explicitly not
 MVP scope.
-
-
 
 
 

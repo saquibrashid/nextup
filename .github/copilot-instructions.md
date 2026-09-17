@@ -62,14 +62,17 @@ passes.
 | Source                 | Authoritative for                                                                                                                                               |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `docs/backlog.md`      | **The work order.** What to build, in order. Tasks sized in agent-runs + owner-review-minutes, not developer-days. Start at the top.                            |
-| `docs/PRD.md`          | The **acceptance criteria** (230 of them). What "done" looks like from the user's side.                                                                         |
+| `docs/PRD.md`          | The **acceptance criteria** and current release scope (§11). Do not reuse historical AC counts; `T-META-001` checks the current rows.                           |
 | `specs/testing.md`     | **The most important spec (NFR-003).** Carries the full **AC → named-test mapping**. Every AC maps to a named test; **that mapping is the definition of done.** |
 | `specs/*.md`           | Implementation detail — data model, API surface, AI pipeline, UI, UX states, security.                                                                          |
 | `docs/architecture.md` | System design and the cost model.                                                                                                                               |
 | `docs/adr/`            | _Why_ each load-bearing decision is what it is.                                                                                                                 |
 
-**Work is driven by `docs/backlog.md`, in order.** The first task is
-**TASK-001** (npm-workspaces monorepo scaffold). A task with no test ID cannot
+**Work is driven by `docs/backlog.md`, in order, subject to its current status
+ledger and dependencies.** TASK-001 was the first task, not the next task to
+repeat. Read `docs/current-release.md` for current scope and confirmed owner
+decisions, and `docs/requirement-index.md` for requirement-reference authority.
+A task with no test ID cannot
 be machine-verified — the only exceptions are named in `specs/testing.md` §10.
 
 ## 4. Load-bearing invariants — rules you must not violate

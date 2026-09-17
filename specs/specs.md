@@ -88,13 +88,19 @@ still the primary gate.
 > `docs/architecture.md` §Cost summary. Decisions: ADR-0003 Rev 2,
 > ADR-0005 Rev 2.
 
-## Core features (v1 — 59 functional requirements)
+## Core features (current release)
+
+This overview includes the owner-approved promotions. PRD §11 is the release
+table; `docs/current-release.md` identifies unresolved conflicts. Historical
+counts in the revision notes are not current scope.
 
 1. **Sign in as the single owner** through Entra ID, with an allow-list. Zero
    authentication code in the application.
 2. **Get screenshots into a batch three ways — paste (the primary path),
    file upload, or drag-and-drop** — declaring exactly one service
-   (Netflix / Max) and exactly one mode (append-only / full-update).
+   from the shared eight-service `SERVICES` registry (US-061) and exactly one
+   mode (append-only / full-update). Discovery captures are separately typed
+   and append-only, never another streaming service.
    *(A45 — was "Upload a batch of screenshots". **File upload is NOT
    removed**; it is the only path that delivers raw HEIC from iOS Photos.)*
 3. **Extract candidate titles** from the images with a **multimodal vision
@@ -108,8 +114,9 @@ still the primary gate.
    new ones.
 6. **Reconcile removals** only in full-update mode, only for that service —
    ticked by default, individually rescuable, confirmed as one group.
-7. **One combined list**, one row per work, one badge per service, filterable by
-   service/type/genre and sortable by date added.
+7. **One combined list**, one row per work except explicit acknowledged
+   duplicates (US-025/US-030), with one badge per service. It supports
+   service/type/genre/runtime filtering and the sort keys in US-057.
 8. **Soft delete forever.** A removed title goes to a permanent, browsable
    removal history. Nothing is ever purged.
 9. **Restore** anything from the removal history, explicitly, with its original
@@ -122,17 +129,23 @@ still the primary gate.
 13. **Re-extract** a batch's images for 30 days, after which the screenshots —
     and only the screenshots — are automatically purged.
 14. **TMDB attribution** on every surface, verbatim.
+15. **Waiting to stream**, promoted at A52: discovery candidates become
+    watch intents, with lazy availability metadata and JustWatch attribution.
+16. **IMDb ratings and lookup**, promoted at A50 and revised at A53: rating
+    is a sort key, with refresh ordered before rating-sorted queries.
+17. **Manual list repair and visual controls**: manual add/remove, density,
+    card actions and the library controls in PRD US-047 through US-061
+    (US-053 remains a superseded reservation, not a missing implementation).
 
 ## v1.1 and beyond (explicitly out of v1)
 
 | Deferred | Requirement |
 |---|---|
 | Edit a listing's date-added | REQ-059 (D1) — reinstating it reopens D3 and OQ-023 |
-| Filter and sort by runtime | REQ-035, REQ-037 (D2) — TV runtime is ambiguous and undecided |
 | Undo a mixed-changeset batch | REQ-069 (D3) — v1 refuses and enumerates instead |
-| More services than Netflix and Max | REQ-053 |
+| More services than the current closed set | US-061 / REQ-127 fixes eight; further expansion needs approval |
 | Multiple accounts (<20) | NFR-001 — not precluded; the data model is owner-scoped from day one |
-| User-controlled backup / export | **OQ-025 (new)** — no export exists, in a store that never deletes |
+| User-controlled backup / export UI | OQ-025 — the export script and restore runbook exist; a UI remains deferred |
 | Richer removed-view affordances (bulk restore, date-range, per-work grouping) | Out by the OQ-022 closure |
 
 ## Companion specs
@@ -145,7 +158,7 @@ still the primary gate.
 | **[ui.md](./ui.md)** | **REVISED (R5; `A45`).** **`A45`: §3.2 now specifies THREE ingest affordances — paste (§3.2b, both primitives: the desktop `paste` event and the iOS "Paste screenshot" button), file upload (unchanged) and drag-and-drop (§3.2c) — plus nine new copy constants.** Nine screens: purpose, hierarchy, components, navigation, deep links, breakpoints, accessibility, exact copy constants, and what is deliberately absent |
 | **[ux-states.md](./ux-states.md)** | **REVISED (`A43`; `A45`).** **`A45`: states 4.0a and 4.12–4.18 cover paste accepted, permission denied, empty clipboard, non-image clipboard, the silently-abandoned promise, no clipboard API / non-HTTPS, drag-over and ceiling rejection; §4.3's dropzone copy is corrected in place.** Every state of every surface — loading, empty (often two distinct empties), partial, populated, each error class, offline, submitting, success — with what the owner can do in each |
 | **[security.md](./security.md)** | **REVISED (`A45`).** **`A45`: §4.2 documents THE EXIF TRAP — WebKit strips EXIF on clipboard read but NOT on file upload, so REQ-078's explicit strip stays on the upload path — plus STRIDE T4a (paste-listener scoping) and T4b (GPS EXIF surviving via the upload route).** Authentication with zero auth code, the allow-list fail-closed rule, the principal adapter contract, the authorisation matrix, data classification, a STRIDE model, secrets, logging prohibitions, and the supply-chain policy |
-| **[testing.md](./testing.md)** | **ELEVATED, and REVISED (ADR-0001 R2; store R4; R7/`A45`).** **`A45`: `T-PASTE-001`–`T-PASTE-010`, `T-IMG-023`, `T-UI-014`, `T-SEC-033`, `T-RET-014` — including `T-PASTE-010`, the add-not-swap regression guard on the file-upload journey — and a §10 entry naming the iOS Safari native paste callout as NOT automatable in CI, with a compensating manual device check. ⚠ THE AC COUNT IS DELIBERATELY NOT RE-COUNTED IN THIS PASS; the PRD is being revised for `A45` in parallel. Orchestrator reconciles.** The pyramid and why, deterministic fakes for both extraction readers and TMDB, a real **`mcr.microsoft.com/mssql/server:2022-latest`** service container and Azurite for the stores *(R4 — was `postgres:16-alpine` in R3, the Cosmos emulator in R1; §3.3a gives the exact GitHub Actions config)*, golden-image fixtures replayed from **recorded** provider responses, the **manual-only live quality suite** (`golden:live`, band assertions only — never in CI), the first-class end-to-end journey test, CI as the only gate, and **the complete mapping of all **241** acceptance criteria to named tests *(R7 — reconciled by the orchestrator. This figure has drifted four times; `testing.md` carries the **binding** count, its arithmetic and the counting convention. Do not re-derive it here — read it there)***, with the 11 that are not machine-verifiable named explicitly ⚠ **(R5: this figure says 230 while `testing.md` says 232 — the A42 additions were never propagated here. AC COUNT NEEDS RECONCILING by the orchestrator across `PRD.md`, `testing.md` front-matter, `testing.md` §9/§10 and this row; deliberately not guessed in this pass because the PRD is being revised in parallel. `T-META-001` — every AC has a mapped test — is the gate that actually enforces this.)** Plus, **R5/`A43`**, the memory-containment core: `T-IMG-017` (guard refuses before allocating), `T-IMG-018` (one-image blast radius, no partial commit), `T-IMG-019` (the catchable OOM path), `T-IMG-020` (the error names memory and the remedy), `T-IMG-021` (decode sentinel events), `T-IMG-022` (guard default/config), `T-UI-013` (the client shows it verbatim) |
+| **[testing.md](./testing.md)** | The AC-to-test mapping, checked against the current PRD by `T-META-001`; deterministic provider fakes; real SQL Server and Azurite integration stores (§3.3a); recorded golden fixtures; the stub-backed SPA journey and its evidence limits (§5); and manual exceptions (§10), including physical-iOS paste and the paid live quality suite. Memory containment and all three ingest paths retain their named checks. Historical AC counts are revision history, not the current denominator. |
 
 ## Reading order for an implementer
 
@@ -181,7 +194,8 @@ definition of done.
    a failed extraction into an invisible mass removal. This is the single most
    important safety property in the product.
 3. **Nothing is ever hard-deleted or purged** except screenshot *bytes* at 30
-   days and the records reversed by a creates-only batch undo.
+   days. Creates-only batch undo state-changes records; it is not a second
+   hard-deletion exception.
 4. **No scheduler exists anywhere.** TMDB refresh is lazy, on access, scoped to
    what is being rendered.
 5. **No TMDB content may reach any AI service.** Matching is deterministic

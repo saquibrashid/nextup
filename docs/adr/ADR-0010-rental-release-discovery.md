@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Accepted** (scoped to v1.1 — specified now, built after the v1 value loop closes) |
+| **Status** | **Accepted; promoted to v1 at A52 (2026-09-08).** Implementation and remaining acceptance work are tracked in `docs/status.md`. |
 | **Date** | 2026-08-20 |
 | **Deciders** | owner (`A48` — the requirement and both design choices), coordinator |
 | **Forced by** | **`A48`**, REQ-082…REQ-087, REQ-041, REQ-070/071/073, REQ-048, NFR-010, NFR-013, NFR-014, ADR-0007 |
@@ -118,8 +118,10 @@ title never returns no matter how many times the feed shows it again.
    services yet."*
 5. On each open of the waiting view, works whose availability is older than
    `WATCH_PROVIDER_MAX_AGE_DAYS` are refreshed from TMDB (D-3).
-6. A work TMDB reports as `flatrate` on Netflix or Max is flagged **"Now on
-   Netflix — add it to your list"**, with a deep link.
+6. A work TMDB reports as `flatrate` on a supported service is flagged with
+   its availability. **Owner decision, 2026-09-17: no service-level or
+   direct-title launch link.** The owner opens the streaming app independently;
+   required JustWatch attribution remains.
 7. The owner adds it in the real app; the next Netflix capture picks it up and
    it enters the combined list through the ordinary path. The `WatchIntent` is
    then satisfied and drops out of the waiting view.
