@@ -1,14 +1,19 @@
-// Closed icon register: the original thirteen plus the owner-approved
-// brand and two layout controls (ADR-0013 Revision 1). No external assets.
+// Closed icon register: Revision 2 extends the owner-approved inline set to
+// 21 icons with five library sort-category marks. No external assets.
 
 export { IconBase, type IconProps } from './IconBase';
 
+export { AlphabetIcon } from './AlphabetIcon';
+export { BookmarkIcon } from './BookmarkIcon';
 export { BrandIcon } from './BrandIcon';
-export { CompactIcon } from './CompactIcon';
-export { GridIcon } from './GridIcon';
+export { CalendarIcon } from './CalendarIcon';
 export { CheckIcon } from './CheckIcon';
 export { ChevronIcon } from './ChevronIcon';
+export { ClockIcon } from './ClockIcon';
 export { CloseIcon } from './CloseIcon';
+export { CompactIcon } from './CompactIcon';
+export { FlagIcon } from './FlagIcon';
+export { GridIcon } from './GridIcon';
 export { HistoryIcon } from './HistoryIcon';
 export { ImageIcon } from './ImageIcon';
 export { InfoIcon } from './InfoIcon';

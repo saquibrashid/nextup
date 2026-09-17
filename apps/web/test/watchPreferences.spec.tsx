@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
-import { expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { ListPage } from '../src/pages/ListPage';
 import { ListRoute } from '../src/containers/ListRoute';
 import { ApiError, createApiClient, type WatchPreferencesResult } from '../src/lib/apiClient';
@@ -21,6 +22,11 @@ const item: TitleListItem = {
   sortDateAdded: '2026-09-01',
   dateAddedLabel: 'Added to nextup 1 Sep 2026',
 };
+
+afterEach(() => {
+  cleanup();
+  sessionStorage.clear();
+});
 
 function Location() {
   return <output data-testid="watch-query">{useLocation().search}</output>;
@@ -174,18 +180,26 @@ it('T-WATCH-003f preference filters round-trip, clear independently and preserve
   expect(screen.getByTestId('watch-query')).toHaveTextContent('?sort=runtime&dir=asc');
 });
 
-it('T-WATCH-003g Watch priority is opt-in, reverses in one action, and keeps existing filters', () => {
+it('T-WATCH-003g Watch priority is opt-in, reverses in one action, and keeps existing filters', async () => {
+  const user = userEvent.setup();
   render(
     <MemoryRouter initialEntries={['/?service=max&priority=someday']}>
       <ListPage items={[item]} />
       <Location />
     </MemoryRouter>,
   );
-  expect(screen.getByRole('button', { name: /^Recently added.*Selected/ })).toBeVisible();
-  fireEvent.click(screen.getByRole('button', { name: 'Watch priority', exact: true }));
+  expect(screen.getByTestId('sort-trigger')).toHaveAccessibleName(
+    'Sort: Recently added. Change the order.',
+  );
+  await user.click(screen.getByTestId('sort-trigger'));
+  const watchPriority = within(screen.getByTestId('sort-control'))
+    .getAllByRole('button')
+    .find((button) => button.getAttribute('aria-label') === 'Watch priority');
+  if (watchPriority === undefined) throw new Error('Missing Watch priority sort option');
+  await user.click(watchPriority);
   expect(screen.getByTestId('watch-query')).toHaveTextContent('sort=watchPriority');
   expect(screen.getByTestId('watch-query')).toHaveTextContent('dir=asc');
-  fireEvent.click(screen.getByRole('button', { name: /^Watch priority. Selected/ }));
+  await user.click(screen.getByTestId('sort-reverse'));
   expect(screen.getByTestId('watch-query')).toHaveTextContent('dir=desc');
   expect(screen.getByTestId('watch-query')).toHaveTextContent('priority=someday');
 });

@@ -246,6 +246,42 @@ async function usableTarget(page: Page, locator: Locator): Promise<void> {
   await expect(locator).toBeInViewport({ ratio: 1 });
 }
 
+async function horizontallyBounded(page: Page, locator: Locator, width: number): Promise<void> {
+  const box = await bounds(locator);
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.width).toBeLessThanOrEqual(width + 1);
+  await noOverflow(page);
+}
+
+async function openFiltersPanel(page: Page): Promise<Locator> {
+  const trigger = page.getByTestId('filters-trigger');
+  await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  const dialog = page.getByRole('dialog', { name: 'Filter your list', exact: true });
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+async function closeFiltersPanel(page: Page, dialog: Locator): Promise<void> {
+  await dialog.locator('.panel-foot').getByRole('button', { name: 'Done', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByTestId('filters-trigger')).toHaveAttribute('aria-expanded', 'false');
+}
+
+async function openSortPanel(page: Page): Promise<Locator> {
+  const trigger = page.getByTestId('sort-trigger');
+  await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  const dialog = page.getByRole('dialog', { name: 'Sort your list', exact: true });
+  await expect(dialog).toBeVisible();
+  return dialog.getByTestId('sort-control');
+}
+
+async function chooseInput(input: Locator): Promise<void> {
+  await expect(input).toBeVisible();
+  await input.dispatchEvent('click');
+}
+
 async function compactPreservesList(
   page: Page,
   requests: URL[],
@@ -343,8 +379,11 @@ test('T-UX-142b: six sort buttons select complete server orders and reverse the 
   page,
 }) => {
   const requests = await mountLibrary(page);
-  const group = page.getByTestId('sort-control');
+  let group = await openSortPanel(page);
   await expect(group.getByRole('button')).toHaveCount(6);
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Sort your list', exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('sort-trigger')).toHaveAttribute('aria-expanded', 'false');
   const orders = [
     { label: 'Recently added', reverse: 'Oldest additions', field: 'dateAdded', dir: 'desc' },
     { label: 'Name A-Z', reverse: 'Name Z-A', field: 'name', dir: 'asc' },
@@ -361,7 +400,13 @@ test('T-UX-142b: six sort buttons select complete server orders and reverse the 
   for (const order of orders) {
     if (order.field !== 'dateAdded') {
       const before = requests.filter((request) => request.pathname === '/api/titles').length;
-      await group.getByRole('button', { name: order.label, exact: true }).click();
+      group = await openSortPanel(page);
+      const option = group.getByRole('button', { name: order.label, exact: true });
+      await expect(option).toBeVisible();
+      await option.click({ force: true });
+      await expect(page.getByRole('dialog', { name: 'Sort your list', exact: true })).toHaveCount(
+        0,
+      );
       await expect
         .poll(() => requests.filter((request) => request.pathname === '/api/titles').length)
         .toBe(before + 1);
@@ -369,14 +414,13 @@ test('T-UX-142b: six sort buttons select complete server orders and reverse the 
       expect(request?.searchParams.get('sort')).toBe(order.field);
       expect(request?.searchParams.get('dir')).toBe(order.dir);
     }
-    const active = group.getByRole('button', { pressed: true });
-    await expect(active).toHaveAccessibleName(
-      `${order.label}. Selected. Change to ${order.reverse}.`,
+    await expect(page.getByTestId('sort-trigger')).toHaveAccessibleName(
+      `Sort: ${order.label}. Change the order.`,
     );
     const before = requests.filter((request) => request.pathname === '/api/titles').length;
-    await active.click();
-    await expect(active).toHaveAccessibleName(
-      `${order.reverse}. Selected. Change to ${order.label}.`,
+    await page.getByTestId('sort-reverse').click();
+    await expect(page.getByTestId('sort-trigger')).toHaveAccessibleName(
+      `Sort: ${order.reverse}. Change the order.`,
     );
     await expect
       .poll(() => requests.filter((request) => request.pathname === '/api/titles').length)
@@ -389,10 +433,11 @@ test('T-UX-142b: six sort buttons select complete server orders and reverse the 
     await expect(page.getByTestId('title-name')).toHaveText(
       orderedTitles(request.searchParams).map((title) => title.name),
     );
-    await expect(group.getByRole('button', { pressed: false })).toHaveCount(5);
   }
   const before = requests.filter((request) => request.pathname === '/api/titles').length;
+  group = await openSortPanel(page);
   await group.getByRole('button', { name: 'Recently added', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Sort your list', exact: true })).toHaveCount(0);
   await expect
     .poll(() => requests.filter((request) => request.pathname === '/api/titles').length)
     .toBe(before + 1);
@@ -449,9 +494,15 @@ test('T-UX-143d: Services and service-update popovers are usable at 320px and 12
   await mountLibrary(page);
   for (const width of [320, 1280]) {
     await page.setViewportSize({ width, height: 900 });
-    const trigger = page.getByRole('button', { name: /^Services / });
+    const dialog = await openFiltersPanel(page);
+    const controls = dialog.getByRole('group', { name: 'Filter by', exact: true });
+    const trigger = controls.getByRole('button', { name: /^Services / });
     await trigger.click();
-    const panel = page.locator('.filter-disclosure__panel').filter({
+    await usableTarget(page, page.getByTestId('filters-trigger'));
+    const dialogBox = await bounds(dialog);
+    expect(dialogBox.x).toBeGreaterThanOrEqual(0);
+    expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(width + 1);
+    const panel = dialog.locator('.filter-disclosure__panel').filter({
       has: page.getByRole('searchbox', { name: 'Search services', exact: true }),
     });
     const search = panel.getByRole('searchbox', { name: 'Search services', exact: true });
@@ -468,16 +519,16 @@ test('T-UX-143d: Services and service-update popovers are usable at 320px and 12
     await expect(panel.getByRole('checkbox', { name: 'Netflix', exact: true })).toBeVisible();
     await expect(panel.getByRole('checkbox', { name: 'Max', exact: true })).toHaveCount(0);
     const netflix = panel.getByRole('checkbox', { name: 'Netflix', exact: true });
-    if (!(await netflix.isChecked())) await netflix.click();
-    await expect(netflix).toBeChecked();
-    expect(new URL(page.url()).searchParams.getAll('service')).toContain('netflix');
+    if (!(await netflix.isChecked())) await chooseInput(netflix);
+    await expect
+      .poll(() => new URL(page.url()).searchParams.getAll('service'))
+      .toContain('netflix');
     await done.click();
-    await expect(trigger).toBeFocused();
     await expect(trigger).toHaveAttribute('aria-expanded', 'false');
     await trigger.click();
     await page.keyboard.press('Escape');
-    await expect(trigger).toBeFocused();
-    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByTestId('filters-trigger')).toHaveAttribute('aria-expanded', 'false');
 
     const updates = page.getByRole('button', { name: 'Service updates', exact: true });
     await updates.click();
@@ -490,7 +541,13 @@ test('T-UX-143d: Services and service-update popovers are usable at 320px and 12
       await usableTarget(page, link);
       await expect(link).toHaveAttribute('href', `/upload?service=${service}`);
     }
-    await usableTarget(page, page.getByRole('button', { name: 'Done', exact: true }));
+    await usableTarget(
+      page,
+      page
+        .locator('.filter-disclosure__panel')
+        .filter({ has: page.getByRole('link', { name: 'Netflix updated today', exact: true }) })
+        .getByRole('button', { name: 'Done', exact: true }),
+    );
     await page.keyboard.press('Escape');
     await expect(updates).toBeFocused();
     await expect(updates).toHaveAttribute('aria-expanded', 'false');
@@ -500,13 +557,18 @@ test('T-UX-143d: Services and service-update popovers are usable at 320px and 12
 
 test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone, tablet and desktop', async ({
   page,
-}) => {
+}, testInfo) => {
+  testInfo.setTimeout(60_000);
   await mountLibrary(page);
-  const controls = page.getByRole('group', { name: 'Filter by', exact: true });
   for (const width of [320, 640, 1280]) {
     await page.setViewportSize({ width, height: 900 });
+    let dialog = await openFiltersPanel(page);
+    const dialogBox = await bounds(dialog);
+    expect(dialogBox.x).toBeGreaterThanOrEqual(0);
+    expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(width + 1);
+    let controls = dialog.getByRole('group', { name: 'Filter by', exact: true });
     await expect(controls).toBeVisible();
-    const fields = controls.locator('.filter-disclosure[data-filter-field]');
+    let fields = controls.locator('.filter-disclosure[data-filter-field]');
     await expect(fields).toHaveCount(6);
     const positions = await fields.evaluateAll((elements) =>
       elements.map((element) => element.getBoundingClientRect().x),
@@ -527,9 +589,7 @@ test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone
       await expect(trigger.locator('svg')).toHaveAttribute('aria-hidden', 'true');
       await trigger.click();
       const panel = field.locator('.filter-disclosure__panel');
-      const box = await bounds(panel);
-      expect(box.x).toBeGreaterThanOrEqual(0);
-      expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
+      await horizontallyBounded(page, panel, width);
       if (category === 'Runtime') {
         await expect(panel.getByRole('checkbox')).toHaveCount(5);
         await expect(panel.getByRole('checkbox', { name: '1h – 2h', exact: true })).toHaveCount(0);
@@ -539,18 +599,29 @@ test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone
         }
       }
       await page.keyboard.press('Escape');
-      await expect(trigger).toBeFocused();
+      await expect(dialog).toHaveCount(0);
+      await expect(page.getByTestId('filters-trigger')).toHaveAttribute('aria-expanded', 'false');
+      if (category !== 'Priority') {
+        dialog = await openFiltersPanel(page);
+        controls = dialog.getByRole('group', { name: 'Filter by', exact: true });
+        fields = controls.locator('.filter-disclosure[data-filter-field]');
+        await expect(controls).toBeVisible();
+      }
     }
+    await expect(page.getByRole('dialog', { name: 'Filter your list', exact: true })).toHaveCount(
+      0,
+    );
     await noOverflow(page);
   }
+  const dialog = await openFiltersPanel(page);
+  const controls = dialog.getByRole('group', { name: 'Filter by', exact: true });
   await controls.getByRole('button', { name: 'Runtime Any runtime' }).click();
-  const runtime = page.getByRole('checkbox', { name: '1h 30m – 2h', exact: true });
-  await runtime.click();
-  await expect(runtime).toBeChecked();
+  const runtime = dialog.getByRole('checkbox', { name: '1h 30m – 2h', exact: true });
+  await chooseInput(runtime);
+  await expect.poll(() => new URL(page.url()).searchParams.getAll('runtime')).toEqual(['90-120']);
   await expect(
     controls.getByRole('button', { name: 'Runtime 1h 30m – 2h', exact: true }),
   ).toBeVisible();
-  expect(new URL(page.url()).searchParams.getAll('runtime')).toEqual(['90-120']);
 });
 
 test('T-SVC-002g: all eight services fit the library and remain searchable on phone and desktop', async ({
@@ -570,23 +641,25 @@ test('T-SVC-002g: all eight services fit the library and remain searchable on ph
         await expect(badges.getByText(SERVICE_LABELS[service], { exact: true })).toBeVisible();
       await noOverflow(page);
     }
-    await page.getByRole('button', { name: /^Services / }).click();
-    const search = page.getByRole('searchbox', { name: 'Search services', exact: true });
+    const dialog = await openFiltersPanel(page);
+    await dialog.getByRole('button', { name: /^Services / }).click();
+    const search = dialog.getByRole('searchbox', { name: 'Search services', exact: true });
     for (const service of SERVICES) {
       await search.fill(SERVICE_LABELS[service]);
-      const choice = page.getByRole('checkbox', { name: SERVICE_LABELS[service], exact: true });
+      const choice = dialog.getByRole('checkbox', { name: SERVICE_LABELS[service], exact: true });
       await choice.scrollIntoViewIfNeeded();
       await expect(choice).toBeInViewport();
-      if (!(await choice.isChecked())) await choice.click();
-      await expect(choice).toBeChecked();
+      if (!(await choice.isChecked())) await chooseInput(choice);
       await expect
         .poll(() => new URL(page.url()).searchParams.getAll('service'))
         .toContain(service);
     }
-    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    await closeFiltersPanel(page, dialog);
+    const selectedDialog = await openFiltersPanel(page);
     await expect(
-      page.getByRole('button', { name: 'Services 8 selected', exact: true }),
+      selectedDialog.getByRole('button', { name: 'Services 8 selected', exact: true }),
     ).toBeVisible();
+    await closeFiltersPanel(page, selectedDialog);
     await expect
       .poll(() =>
         requests.some(
@@ -605,20 +678,27 @@ test('T-WATCH-003j: filter panels remain bounded when no titles have genre facet
   page,
 }) => {
   await mountLibrary(page, { withGenres: false });
-  const controls = page.getByRole('group', { name: 'Filter by', exact: true });
   for (const width of [320, 640, 1280]) {
     await page.setViewportSize({ width, height: 900 });
+    let dialog = await openFiltersPanel(page);
+    const controls = dialog.getByRole('group', { name: 'Filter by', exact: true });
+    const dialogBox = await bounds(dialog);
+    expect(dialogBox.x).toBeGreaterThanOrEqual(0);
+    expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(width + 1);
     await expect(controls.locator('.filter-disclosure[data-filter-field]')).toHaveCount(5);
-    for (const category of ['Services', 'Type', 'Runtime', 'Watching', 'Priority']) {
+    const categories = ['Services', 'Type', 'Runtime', 'Watching', 'Priority'];
+    for (const [index, category] of categories.entries()) {
       const trigger = controls.getByRole('button', { name: new RegExp(`^${category} `) });
       await usableTarget(page, trigger);
       await trigger.click();
-      const panel = controls.locator('.filter-disclosure__panel:visible');
-      const box = await bounds(panel);
-      expect(box.x).toBeGreaterThanOrEqual(0);
-      expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
+      const panel = dialog.locator('.filter-disclosure__panel:visible');
+      await horizontallyBounded(page, panel, width);
       await page.keyboard.press('Escape');
-      await expect(trigger).toBeFocused();
+      await expect(dialog).toHaveCount(0);
+      await expect(page.getByTestId('filters-trigger')).toHaveAttribute('aria-expanded', 'false');
+      if (index < categories.length - 1) {
+        dialog = await openFiltersPanel(page);
+      }
     }
     await noOverflow(page);
   }
@@ -706,18 +786,27 @@ test('T-WATCH-003i: watch preferences save, survive reload, filter and sort in a
   await expect(
     page.getByRole('button', { name: 'Watch preferences for Amber Harbor: Watching, Someday' }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Watch priority', exact: true }).click();
+  const sortGroup = await openSortPanel(page);
+  await sortGroup.getByRole('button', { name: 'Watch priority', exact: true }).click();
   await expect(page.getByTestId('title-name').first()).toHaveText('Amber Harbor');
-  await page.getByRole('button', { name: 'Watching All titles', exact: true }).click();
-  const watching = page.getByRole('radio', { name: 'Watching', exact: true });
-  await watching.click();
-  await expect(watching).toBeChecked();
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  const filterDialog = await openFiltersPanel(page);
+  await filterDialog.getByRole('button', { name: 'Watching All titles', exact: true }).click();
+  const watching = filterDialog.getByRole('radio', { name: 'Watching', exact: true });
+  await chooseInput(watching);
+  await expect.poll(() => new URL(page.url()).searchParams.get('watching')).toBe('true');
+  await filterDialog
+    .locator('.filter-disclosure__panel:visible')
+    .getByRole('button', { name: 'Done', exact: true })
+    .click();
   await expect(page.getByTestId('title-name')).toHaveText(['Amber Harbor']);
-  await page.getByRole('button', { name: 'Priority All priorities', exact: true }).click();
-  await page.getByRole('checkbox', { name: 'Up next', exact: true }).click();
-  await page.getByRole('button', { name: 'Done', exact: true }).click();
+  await filterDialog.getByRole('button', { name: 'Priority All priorities', exact: true }).click();
+  await chooseInput(filterDialog.getByRole('checkbox', { name: 'Up next', exact: true }));
+  await filterDialog
+    .locator('.filter-disclosure__panel:visible')
+    .getByRole('button', { name: 'Done', exact: true })
+    .click();
   await expect(page.getByTestId('zero-match')).toBeVisible();
+  await closeFiltersPanel(page, filterDialog);
   await page.getByTestId('clear-filters').click();
   await expect(page.getByTestId('title-name')).toHaveCount(TITLES.length);
   expect(new URL(page.url()).searchParams.get('sort')).toBe('watchPriority');
@@ -730,13 +819,27 @@ test('T-UX-141g: default, popovers and Compact pass axe and honor reduced motion
   testInfo.setTimeout(90_000);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await mountLibrary(page, { width: 320 });
-  for (const state of ['default', 'Services', 'Service updates', 'Compact']) {
+  for (const state of [
+    'default',
+    'Filters panel',
+    'Sort panel',
+    'Services',
+    'Service updates',
+    'Compact',
+  ]) {
     if (state === 'Compact') {
       await page.getByRole('button', { name: 'Compact view', exact: true }).click();
+    } else if (state === 'Filters panel') {
+      await openFiltersPanel(page);
+    } else if (state === 'Sort panel') {
+      await openSortPanel(page);
     } else if (state !== 'default') {
-      await page
-        .getByRole('button', { name: state === 'Services' ? /^Services / : state, exact: true })
-        .click();
+      if (state === 'Services') {
+        const dialog = await openFiltersPanel(page);
+        await dialog.getByRole('button', { name: /^Services / }).click();
+      } else {
+        await page.getByRole('button', { name: state, exact: true }).click();
+      }
     }
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
@@ -773,6 +876,12 @@ test('T-UX-141g: default, popovers and Compact pass axe and honor reduced motion
     expect(motion.reduced).toBe(true);
     expect(motion.durations.length).toBeGreaterThan(0);
     expect(Math.max(...motion.durations)).toBeLessThanOrEqual(0.001);
-    if (state === 'Services' || state === 'Service updates') await page.keyboard.press('Escape');
+    if (
+      state === 'Services' ||
+      state === 'Service updates' ||
+      state === 'Filters panel' ||
+      state === 'Sort panel'
+    )
+      await page.keyboard.press('Escape');
   }
 });

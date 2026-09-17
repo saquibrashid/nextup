@@ -465,6 +465,46 @@ button {
   box-shadow: var(--shadow-menu);
 }
 
+/*
+ * Owner-approved 2026-09-17 (`specs/ui.md` §2.1 item 2) — the Filters and Sort
+ * chooser surface.
+ *
+ * ⚠ MOBILE-FIRST: a bottom sheet is the BASE rule and the side panel is the
+ * `--bp-sm` override (`specs/ui.md` §13.3). Written the other way round, the
+ * 320 px case NFR-006 requires would be the one reached by subtraction.
+ *
+ * ⚠ `place-self` RATHER THAN A SECOND BACKDROP CLASS. `.dialog-backdrop` is a
+ * centring grid; a panel is the same backdrop with the sheet parked on an
+ * edge, and a forked backdrop would be a second scroll-lock and dismissal
+ * implementation for `T-UI-031f` to keep in step with.
+ */
+.dialog--panel {
+  inline-size: 100%;
+  place-self: end stretch;
+  max-block-size: calc(100dvh - 2 * var(--space-4));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-shadow: var(--shadow-menu);
+}
+
+.panel-head {
+  align-items: flex-start;
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+}
+
+.panel-help {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.panel-foot {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .badge {
   display: inline-block;
   background: var(--color-bg);
@@ -948,35 +988,69 @@ button {
  * broken back button.
  */
 .list-controls {
-  align-items: flex-end;
-  column-gap: var(--space-5);
+  align-items: center;
+  column-gap: var(--space-3);
   display: flex;
   flex-wrap: wrap;
   margin-bottom: var(--space-4);
-  row-gap: var(--space-3);
+  row-gap: var(--space-2);
   background: var(--color-surface);
   border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-card);
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-3);
 }
 
+/*
+ * Owner-approved 2026-09-17 (`specs/ui.md` §2.1 item 2) — one compact row.
+ *
+ * ⚠ `align-items: center`, NOT `flex-end`. The bar used to align labelled
+ * fields by their baselines; it now carries same-height buttons, and
+ * `flex-end` leaves the search input sitting a few pixels below them.
+ */
 .filter-bar {
-  align-items: flex-end;
+  align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-3);
-  flex: 1 1 100%;
+  gap: var(--space-2);
+}
+
+/* The active-filter count. ⚠ Never the only signal — the chips say which. */
+.filter-bar__count {
+  background: var(--color-accent);
+  border-radius: var(--radius);
+  color: var(--color-surface);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  min-inline-size: 1.5rem;
+  padding: 0 var(--space-1);
+  text-align: center;
 }
 
 /* --------------------------------------------------------- sort control -- */
 
 /* REQ-121, revised: complete-order buttons wrap without separating field and direction. */
 .sort-control-group {
-  align-items: flex-end;
+  align-items: center;
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  flex: 1 1 auto;
+  gap: var(--space-2);
+}
+
+/*
+ * The direction arrow. ⚠ ROTATED, NOT REDRAWN — `ChevronIcon`'s own rule, and
+ * the register is closed (ADR-0013 Rev 2). ⚠ The rotation is NEVER the only
+ * carrier of direction: every arrow has direction text or an accessible name
+ * beside it (`T-A11Y-008`).
+ */
+.sort-arrow {
+  display: inline-flex;
+}
+
+.sort-arrow[data-dir='asc'] {
+  transform: rotate(-90deg);
+}
+
+.sort-arrow[data-dir='desc'] {
+  transform: rotate(90deg);
 }
 
 /* ------------------------------------------------------ freshness strip -- */
@@ -1030,6 +1104,47 @@ button {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+
+/*
+ * Owner-approved 2026-09-17 (`specs/ui.md` §2.1 item 3, §10.1) — ON A PHONE
+ * GRID IS A TWO-COLUMN POSTER GRID and Compact is the single column above.
+ *
+ * ⚠ THE DEFECT THIS FIXES: the grid used to begin at `--bp-lg`, so on the
+ * device the owner actually uses, the two view choices rendered identically. A
+ * preference that changes nothing is not a preference.
+ *
+ * ⚠ ONE DOM, TWO LAYOUTS — unchanged from `--bp-lg`'s block. Nothing here
+ * hides a row action, and `T-UX-112` holds for this layout too: the `⋮` shares
+ * its grid cell with the body exactly as it does in the horizontal row, rather
+ * than being removed at narrow widths.
+ */
+.title-list[data-view='grid'] {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.title-list[data-view='grid'] .title-row {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/*
+ * ⚠ `height: auto` IS THE HALF THAT MATTERS — the base rule's fixed 6.75rem
+ * would otherwise win and `object-fit: cover` would crop the artwork the owner
+ * recognises the title by. The same pairing appears in the `--bp-lg` block.
+ */
+.title-list[data-view='grid'] .title-row__poster {
+  grid-column: 1;
+  grid-row: 1;
+  height: auto;
+  width: 100%;
+}
+
+.title-list[data-view='grid'] .title-row__body,
+.title-list[data-view='grid'] .title-row__actions {
+  grid-column: 1;
+  grid-row: 2;
 }
 
 /* The `⋮` row menu (`specs/ui.md` §2.3). Items stack so each keeps the full
@@ -2043,6 +2158,34 @@ button {
     grid-template-columns: repeat(auto-fill, minmax(28rem, 1fr));
   }
 
+  /*
+   * ⚠ THE RESET OF THE PHONE POSTER GRID, and it must name every property that
+   * rule set. The phone rules are attribute-qualified and therefore outrank the
+   * bare `.title-list` rule above whatever the source order — a reset that
+   * leaves the two-column track or the stacked poster behind produces two
+   * narrow columns of tall cards on a desktop and looks like this query never
+   * applied. Nothing here hides a row action (`T-UX-112`).
+   */
+  .title-list[data-view='grid'] {
+    gap: var(--space-4);
+    grid-template-columns: repeat(auto-fill, minmax(28rem, 1fr));
+  }
+
+  .title-list[data-view='grid'] .title-row {
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr);
+  }
+
+  .title-list[data-view='grid'] .title-row__poster {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .title-list[data-view='grid'] .title-row__body,
+  .title-list[data-view='grid'] .title-row__actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
   /* Artwork and readable details occupy separate tracks in the same row. */
   .title-row {
     align-items: stretch;
@@ -2543,7 +2686,6 @@ button {
   font-weight: var(--weight-bold);
 }
 
-.sort-options,
 .active-filters {
   display: flex;
   flex-wrap: wrap;
@@ -2551,8 +2693,14 @@ button {
   gap: var(--space-2);
 }
 
-.filter-bar > .field {
-  flex: 1 1 100%;
+/* One full-width row per order (owner-approved 2026-09-17). */
+.sort-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.dialog--panel > .field {
   min-width: 0;
   margin: 0;
 }
@@ -2565,14 +2713,41 @@ button {
 }
 
 .sort-option {
-  display: inline-flex;
+  display: flex;
 }
 
 .sort-option .btn {
-  font-size: var(--text-sm);
+  flex: 1 1 auto;
+  justify-content: flex-start;
+  gap: var(--space-3);
+  text-align: start;
   background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-surface);
+}
+
+.sort-option__icon {
+  display: inline-flex;
+  color: var(--color-accent);
+}
+
+.sort-option__name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/*
+ * ⚠ The direction shows on EVERY row, not only the selected one. Shown only
+ * when selected, the chooser answers "what is it sorted by" but not "what will
+ * this one do", which is the question a row is there to answer.
+ */
+.sort-option__dir {
+  align-items: center;
   color: var(--color-text-muted);
-  border-color: var(--color-border);
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: var(--text-sm);
+  gap: var(--space-1);
 }
 
 .sort-option .btn[aria-pressed='true'] {
@@ -2580,6 +2755,10 @@ button {
   border-color: var(--color-accent);
   background: var(--color-accent-soft);
   font-weight: var(--weight-bold);
+}
+
+.sort-option .btn[aria-pressed='true'] .sort-option__dir {
+  color: var(--color-accent);
 }
 
 .filter-disclosure {
@@ -2731,6 +2910,17 @@ button {
 }
 
 @media (min-width: 640px) {
+  /*
+   * The bottom sheet becomes a right-hand panel. ⚠ `end stretch` reversed:
+   * `place-self` is block-then-inline, so this is "stretch the block axis,
+   * park on the inline end".
+   */
+  .dialog--panel {
+    inline-size: min(26rem, 100%);
+    place-self: stretch end;
+    max-block-size: 100%;
+  }
+
   .filter-controls {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -2807,11 +2997,33 @@ button {
 }
 
 @media (min-width: 768px) {
+  /*
+   * Owner-reported 2026-09-17: at desktop widths the compact row was five
+   * stacked lines across the full page, with a large hole between the text and
+   * a rating and badge pinned to the far edge.
+   *
+   * ⚠ BOTH COLUMNS HUG THEIR CONTENT (`max-content`) and the track is packed
+   * to the start. `1fr` for the text column gave the right-hand stack the far
+   * edge of a 1700 px row, so the wider the screen the larger the hole the
+   * owner reported; `0.5fr` for the second column had the same effect from the
+   * other side. The rows are ASSIGNED rather than auto-placed because
+   * auto-placement dropped the badge to whichever row was free, leaving the
+   * gap it was separated by. Naming the rows is what makes the right-hand
+   * stack read as one block instead of two loose items.
+   *
+   * ⚠ Compact is the DENSE view — its whole purpose is more titles per screen.
+   * Anything added here that grows the row height is working against the only
+   * thing that distinguishes it from Grid.
+   */
   .title-list[data-view='compact'] .title-row__body {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(12rem, 0.5fr);
+    grid-template-columns:
+      minmax(0, max-content) minmax(0, max-content)
+      minmax(0, max-content);
+    justify-content: start;
     align-content: start;
     column-gap: var(--space-5);
+    row-gap: var(--space-1);
   }
 
   .title-list[data-view='compact'] .title-row__name {
@@ -2828,5 +3040,25 @@ button {
   .title-list[data-view='compact'] .title-row__badges {
     grid-column: 2;
     align-self: start;
+  }
+
+  .title-list[data-view='compact'] .title-row__rating {
+    grid-row: 2;
+  }
+
+  .title-list[data-view='compact'] .title-row__badges {
+    grid-row: 3;
+  }
+
+  /*
+   * The watch control takes a third column beside the badges rather than a
+   * full-width line of its own. That line was the hole the owner reported, and
+   * removing it takes a whole row off every compact row.
+   */
+  .title-list[data-view='compact'] .title-row__watch {
+    grid-column: 3;
+    grid-row: 2 / 4;
+    align-self: start;
+    justify-self: start;
   }
 }
