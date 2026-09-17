@@ -987,17 +987,127 @@ button {
  * and a refactor that "tidies" them into one hook produces a green suite and a
  * broken back button.
  */
+/*
+ * Owner-reported 2026-09-17: on a phone the Filters trigger, the result count,
+ * the sort chooser and the reverse button each took a line of their own, and
+ * the four of them plus the search field filled half the screen.
+ *
+ * ⚠ A GRID, NOT A WRAPPING FLEX ROW, AND THE PARTS OF THE FILTER BAR ARE
+ * SIBLINGS. A wrapping flex row breaks between whole items: `.filter-bar` and
+ * `.sort-control-group` are each one box, so the moment their natural widths
+ * exceed the line the sort control drops to the next one — shrinking cannot
+ * prevent it, because flexbox line-breaks BEFORE it shrinks. Naming columns
+ * puts the count and the sort control on the same row and lets both shrink
+ * into it (see `.sort-trigger-label` and `.filter-bar__status p`, which
+ * ellipsise rather than wrap). This is why `FilterBar` returns a fragment.
+ */
 .list-controls {
   align-items: center;
-  column-gap: var(--space-3);
-  display: flex;
-  flex-wrap: wrap;
+  column-gap: var(--space-2);
+  display: grid;
+  /*
+   * ⚠ TWO COLUMNS IS THE NARROW FLOOR, NOT THE TARGET. Below ~340 px the
+   * Filters trigger, the count, the order and a 44 px reverse target cannot
+   * share a line without pushing the reverse button off the screen — which is
+   * exactly what it did at the 280 px reflow floor (`T-A11Y-015a`). The sort
+   * control takes its own line here and joins the row at 360 px and up.
+   */
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
   margin-bottom: var(--space-4);
   row-gap: var(--space-2);
   background: var(--color-surface);
   border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-card);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2);
+}
+
+.list-controls form[role='search'],
+.filter-bar__chips,
+.sort-control-group,
+.list-view-control {
+  grid-column: 1 / -1;
+}
+
+.filter-bar {
+  grid-column: 1;
+}
+
+.filter-bar__status {
+  grid-column: 2;
+  min-inline-size: 0;
+}
+
+.sort-control-group {
+  min-inline-size: 0;
+}
+
+.sort-control-group .btn {
+  min-inline-size: 0;
+}
+
+/*
+ * The single-line toolbar the owner asked for. ⚠ `min-width`, never
+ * `max-width` (`T-CSS-001d`): the narrow two-line layout above is the base,
+ * and this joins the sort control to the row once there is room for it and a
+ * 44 px reverse target. 360 px clears every phone the owner uses; a 320 px
+ * viewport overflowed by 3 px, which is how this breakpoint was chosen.
+ */
+@media (min-width: 360px) {
+  .list-controls {
+    grid-template-columns: auto auto minmax(0, 1fr);
+  }
+
+  .sort-control-group {
+    grid-column: 3;
+  }
+}
+
+/*
+ * ⚠ Truncation, not wrapping. The count and the complete-order label are both
+ * full sentences in the DOM — screen readers and tests read all of it — but a
+ * second visual line here would undo the single row above. On a 430 px phone
+ * nothing actually truncates; the rule is the safety valve for a 375 px one.
+ */
+.filter-bar__status p,
+.sort-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * ⚠ THE COUNT IS SIZED TO ITS CONTENT AND THE ORDER LABEL TAKES THE SLACK.
+ * Both can ellipsise, but they do not deserve equal space: "Showing 20 of 20"
+ * is the answer to "why is my list short", and truncating it to "Sh…" is the
+ * one outcome this row must never produce, while the order is also named on
+ * the reverse button's accessible name and inside the chooser. On the owner's
+ * phone nothing truncates at all; this ordering is what keeps the narrowest
+ * phones sane.
+ */
+.sort-trigger-label {
+  min-inline-size: 0;
+}
+
+/*
+ * ⚠ `min-inline-size` IS NOT OPTIONAL HERE. The tighter inline padding is what
+ * buys the single row above, and without a floor it takes the icon-only
+ * reverse button under the 44 px minimum target (`T-A11Y-007`) — a change that
+ * looks purely cosmetic and silently fails an accessibility gate.
+ */
+.list-controls .btn {
+  min-inline-size: 2.75rem;
+  padding-inline: var(--space-2);
+}
+
+.filter-bar__status p {
+  font-size: var(--text-sm);
+}
+
+.filter-bar__chips {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
 /*
@@ -2984,8 +3094,71 @@ button {
   height: 6.75rem;
 }
 
+/*
+ * Owner-reported 2026-09-17: on a phone the compact row stacked six things
+ * vertically down the left with the whole right half of the card empty.
+ *
+ * ⚠ The body FLOWS here (wrapping flex), it does not stack. Compact is the
+ * dense view — its only reason to exist is more titles per screen — so the
+ * rating, the date, the badges and the priority control pack onto shared
+ * lines and only the name is guaranteed a line of its own. The desktop block
+ * further down replaces this with fixed columns; on a phone there is not
+ * enough width for columns, so flowing is what fills the space.
+ */
 .title-list[data-view='compact'] .title-row__body {
-  gap: var(--space-2);
+  align-items: center;
+  column-gap: var(--space-3);
+  display: flex;
+  /* ⚠ `row`, and it is load-bearing: `.title-row__body` is a COLUMN flex by
+     default, and `flex-wrap: wrap` on a column container wraps into new
+     COLUMNS — which silently pushed the priority control and the meta line off
+     the right edge of a phone (552 px of content in a 390 px viewport). */
+  flex-direction: row;
+  flex-wrap: wrap;
+  row-gap: var(--space-1);
+}
+
+.title-list[data-view='compact'] .title-row__name {
+  /* ⚠ `0` shrink, not `1`. With `flex: 1 1 100%` the name shrinks out of its
+     own line and lands beside the priority control, which reads as a caption
+     on the button rather than a heading. */
+  flex: 1 0 100%;
+}
+
+.title-list[data-view='compact'] .title-row__meta {
+  flex: 0 1 auto;
+  margin: 0;
+}
+
+.title-list[data-view='compact'] .title-row__date {
+  margin: 0;
+}
+
+/*
+ * ⚠ VISUAL ORDER ONLY, AND ONLY ON THE FLOWING PHONE LAYOUT. The rating is a
+ * short item that would otherwise sit alone on a line of its own while 190 px
+ * of the priority control's line stays empty; pulling it up removes a whole
+ * line from every compact row. DOM order — and therefore reading order and tab
+ * order — is untouched, which is why only non-interactive text is reordered.
+ */
+.title-list[data-view='compact'] .title-row__watch {
+  order: 1;
+}
+
+.title-list[data-view='compact'] .title-row__rating {
+  order: 2;
+}
+
+.title-list[data-view='compact'] .title-row__meta {
+  order: 3;
+}
+
+.title-list[data-view='compact'] .title-row__date {
+  order: 4;
+}
+
+.title-list[data-view='compact'] .title-row__badges {
+  order: 5;
 }
 
 .title-list[data-view='compact'] .title-row__runtime {
@@ -3002,14 +3175,26 @@ button {
    * stacked lines across the full page, with a large hole between the text and
    * a rating and badge pinned to the far edge.
    *
-   * ⚠ BOTH COLUMNS HUG THEIR CONTENT (`max-content`) and the track is packed
-   * to the start. `1fr` for the text column gave the right-hand stack the far
-   * edge of a 1700 px row, so the wider the screen the larger the hole the
-   * owner reported; `0.5fr` for the second column had the same effect from the
-   * other side. The rows are ASSIGNED rather than auto-placed because
-   * auto-placement dropped the badge to whichever row was free, leaving the
-   * gap it was separated by. Naming the rows is what makes the right-hand
-   * stack read as one block instead of two loose items.
+   * ⚠ THE FIRST TWO TRACKS ARE FIXED WIDTHS, DELIBERATELY, and the track is
+   * packed to the start. `1fr` for the text column gave the right-hand stack
+   * the far edge of a 1700 px row, so the wider the screen the larger the hole
+   * the owner reported; `0.5fr` for the second column had the same effect from
+   * the other side.
+   *
+   * ⚠ `max-content` is NOT a substitute and must not be restored here. Every
+   * row is its OWN grid container — there is no shared track sizing between
+   * cards and no subgrid to inherit one — so a content-sized track makes each
+   * card as wide as its own longest genre chip row. The owner reported exactly
+   * that on 2026-09-17: the rating, the priority picker and the service badge
+   * landed at a different x on every card. Only a fixed track puts column 2 at
+   * the same offset in every row, which is what makes a list of cards scan as
+   * columns. Changing these to `auto`, `max-content` or `fit-content` silently
+   * reintroduces the ragged alignment; `T-UX-147a` fails if it does.
+   *
+   * The rows are ASSIGNED rather than auto-placed because auto-placement
+   * dropped the badge to whichever row was free, leaving the gap it was
+   * separated by. Naming the rows is what makes the right-hand stack read as
+   * one block instead of two loose items.
    *
    * ⚠ Compact is the DENSE view — its whole purpose is more titles per screen.
    * Anything added here that grows the row height is working against the only
@@ -3018,7 +3203,7 @@ button {
   .title-list[data-view='compact'] .title-row__body {
     display: grid;
     grid-template-columns:
-      minmax(0, max-content) minmax(0, max-content)
+      26rem 11rem
       minmax(0, max-content);
     justify-content: start;
     align-content: start;
