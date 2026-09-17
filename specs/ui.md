@@ -135,16 +135,47 @@ restore, suppress, un-suppress or fix-match.
    stale chip and its conditional "Update now" link are dropped entirely — no
    staleness threshold, no nag, no derived "stale" state. REQ-040 and ASM-038
    are retired.)*
-2. **List controls** — a submitted title-search form, the filter bar and
-   six visible complete-order buttons in one visually unified group.
-   `components/FilterBar.tsx` presents a **Filter by** group with labelled
-   dropdown fields for **Services, Type, Genre, Runtime, Watching, Priority** (REQ-035/126).
-   Each field has an external category label, a current-value trigger and a
-   decorative down/up chevron, opening a labelled checkbox disclosure; active removable
-   chips; **Clear filters**; and a live result count *"Showing 42 of 187"*,
-   or *"Showing 50 of at least 50"* when only a lower bound is known.
-   The sort control is `components/SortControl.tsx` (US-020 AC-6,
-   REQ-038, REQ-037, `api.md` §6.2).
+2. **List controls** — one **single-row compact toolbar** (`.list-toolbar`,
+   owner-approved 2026-09-17) carrying, in order: the submitted title-search
+   form, a **Filters** button, a **Sort** button, a **dedicated reverse-order
+   button**, and the view switch. The toolbar is the whole of the controls at
+   rest; the filter fields and the sort orders live behind their two buttons.
+
+   ⚠ **The reverse button is NOT a convenience and must not be folded into the
+   sort chooser.** REQ-038's oldest-first escape hatch is `must` (`A47`), and
+   the §10.1 floor rule forbids an additional step to reverse the current
+   order. The reverse button is what keeps reversal at **one tap with nothing
+   open** now that the six order buttons no longer sit on the page. Deleting it
+   re-breaks the requirement that the chooser was allowed to move.
+
+   **Filters** (`components/FilterBar.tsx`) opens a labelled dialog — a
+   right-side panel from 640 px, a bottom sheet below it — presenting the
+   **Filter by** group with labelled dropdown fields for **Services, Type,
+   Genre, Runtime, Watching, Priority** (REQ-035/126). Each field has an
+   external category label, a current-value trigger and a decorative down/up
+   chevron, opening a labelled checkbox disclosure; active removable chips;
+   **Clear filters**; and a live result count *"Showing 42 of 187"*, or
+   *"Showing 50 of at least 50"* when only a lower bound is known. The button
+   carries the **number of active filters** so the count is legible with the
+   dialog shut, and the live result count **also** renders beside the toolbar,
+   outside the dialog — a count only visible inside the thing that changes it
+   is not a count.
+
+   **Sort** (`components/SortControl.tsx`, US-020 AC-6, REQ-038, REQ-037,
+   `api.md` §6.2) opens a chooser of **six single-row order toggles** — one per
+   key, each showing a category icon, the key's name, a direction arrow and the
+   **direction in words**. Choosing an unselected row sorts by it in that key's
+   default direction; choosing the selected row reverses it. Direction is never
+   conveyed by arrow shape alone. The toolbar button shows the current order
+   and its direction arrow.
+
+   ~~*Superseded 2026-09-17, retained for rationale only:* "a submitted
+   title-search form, the filter bar and six visible complete-order buttons in
+   one visually unified group", with the filter fields and all six order
+   buttons rendered inline and always expanded. At 320 px this consumed
+   roughly half the viewport before a single title was visible, which is the
+   defect this revision fixes. Nothing about state changed: filters remain
+   URL-only and sort remains URL → session → default.~~
 
    Services is searchable over `SERVICES` / `SERVICE_LABELS`, currently
    **Netflix, Max, Prime Video, Disney+, Apple TV+, Paramount+, Starz and Peacock**, with no "All" checkbox or invented providers.
@@ -253,8 +284,12 @@ restore, suppress, un-suppress or fix-match.
    **Grid / Compact** selects local presentation state: the same ordered rows,
    metadata, badges and actions in both views. Grid is the default; at wide
    widths it uses horizontal poster-plus-details cards in multiple columns.
-   Compact remains a single column. At narrow widths both are single-column;
-   query changes preserve the preference and never sort/filter rows locally.
+   Compact remains a single column. **At narrow widths Grid is a two-column
+   poster grid and Compact is a single column** (owner-approved 2026-09-17), so
+   the preference is visibly different on a phone rather than only at 1024 px.
+   ~~*Superseded 2026-09-17:* "At narrow widths both are single-column." Two
+   view choices that render identically on the device the owner actually uses
+   are not a choice.~~   query changes preserve the preference and never sort/filter rows locally.
    Wide Compact lays out the same row body's metadata in two columns, keeping
    the DOM/content unchanged and at least **8px** body spacing.
    Loading, retry, pending and offline semantics remain real. `T-UX-141`.
@@ -872,7 +907,8 @@ contains **neither** "memory" nor `MEMORY_REMEDY_PATH` for
 
 | Width | Behaviour |
 |---|---|
-| **320 px (floor)** | Single-column horizontal poster/details rows in both views. Filter disclosures and the six visible sort buttons wrap; panels fit the viewport. **No horizontal page scrolling**, no clipped genre names, no additional step to reverse the current order. `T-A11Y-001` covers every route and the 200-candidate review fixture. |
+| **320 px (floor)** | Compact rows are single-column; **Grid is a two-column poster grid** (§2.1 item 2, owner-approved 2026-09-17) so the two views are visibly different on a phone. The list toolbar wraps within the viewport and the Filters and Sort dialogs render as bottom sheets that fit it. **No horizontal page scrolling**, no clipped genre names, and **no additional step to reverse the current order** — the dedicated reverse button keeps that at one tap with nothing open. `T-A11Y-001` covers every route and the 200-candidate review fixture. |
+| | ~~*Superseded 2026-09-17:* "Single-column horizontal poster/details rows in both views. Filter disclosures and the six visible sort buttons wrap; panels fit the viewport." The no-horizontal-scrolling and no-additional-step-to-reverse rules were **not** superseded and are restated above.~~ |
 | 640 px | Navigation returns to the header: **List, Upload, Batches, More**. Below this width the single bottom-fixed nav is **List, Upload, More**, with safe-area clearance. |
 | **1024 px+** | Grid preference gains multiple columns of horizontal cards; Compact stays a single column. Controls remain above the list, not a left rail. Width is bounded by `--layout-max-width` (§13). **No function is available only on desktop** — `T-A11Y-002` runs the journey at 320 px. |
 
@@ -894,7 +930,7 @@ Touch targets: minimum **44×44 CSS px** for every interactive element
 | Focus order | DOM order = visual order. Dialogs trap focus, restore it to the trigger on close, and close on `Escape` | `T-A11Y-006` |
 | Contrast | ≥ 4.5:1 body text, ≥ 3:1 large text and UI boundaries | `T-A11Y-007` (`axe-core` `color-contrast`) |
 | Non-colour meaning | Service badges, low-confidence and ticked-removal all carry text or an icon, never colour alone | `T-A11Y-008` |
-| **Sort control** *(new, `A44`)* | `SortControl.tsx` is a real, labelled, keyboard-operable control (same treatment as every other control in this table — reachable via the standard keyboard path, focus ring, 44×44 px target) that renders on the combined list and toggles `dir` **and selects `sort` (`A48`)** | **`T-UI-024`** |
+| **Sort control** *(new, `A44`)* | `SortControl.tsx` is a real, labelled, keyboard-operable control (same treatment as every other control in this table — reachable via the standard keyboard path, focus ring, 44×44 px target) that renders on the combined list and toggles `dir` **and selects `sort` (`A48`)**. From 2026-09-17 the six orders live in a labelled chooser dialog opened from the toolbar, and **a dedicated reverse-order button on the toolbar keeps `dir` reversible in one tap with nothing open** (§2.1 item 2, §10.1) | **`T-UI-024`** |
 | **Runtime filter** *(new, `A48`)* | The bucket control is a real labelled control on the same terms — standard keyboard path, focus ring, 44×44 px target — and **not a range slider**, which cannot meet any of the three. The hidden-unknowns disclosure is rendered in the same live region as the result count, so a screen-reader user is told the list shortened rather than discovering it by absence | **`T-UI-029`** |
 | Live regions | Filter result count, review counters and toasts in `aria-live="polite"`; errors in `role="alert"` | `T-A11Y-009` |
 | **Paste is never the only way in** *(A45)* | The **"Paste screenshot"** button is a real `<button>` in tab order with a 44×44 px target; the `paste` listener is a **shortcut, not a requirement**, and every image can also be attached with **"Choose files"** by keyboard alone. A clipboard result is announced in the `aria-live="polite"` region (*"Added 1 screenshot — 3 in this batch."*); a clipboard failure renders in `role="alert"`. Drag-and-drop is **never** the only route to any capability | `T-UI-014`, `T-A11Y-005` |

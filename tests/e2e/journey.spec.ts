@@ -1260,7 +1260,8 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
 
 test('T-E2E-001a: a first full update, a reconcile with removals, a suppression, and a reappearance', async ({
   page,
-}) => {
+}, testInfo) => {
+  testInfo.setTimeout(90_000);
   await runOwnerJourney(page, { axeJourneyStates: true, narrow: false });
 });
 

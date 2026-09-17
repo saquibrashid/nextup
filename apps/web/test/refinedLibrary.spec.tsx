@@ -168,6 +168,7 @@ it('T-UX-142a the approved dark ink and violet palette is centralized with reduc
 
 it('T-UX-141h a service selection keeps its picker mounted across the pending request without fake counts', () => {
   const { rerender } = render(page());
+  fireEvent.click(screen.getByTestId('filters-trigger'));
   const trigger = screen.getByRole('button', { name: /^Services / });
   fireEvent.click(trigger);
   fireEvent.click(screen.getByRole('checkbox', { name: 'Netflix' }));
@@ -178,12 +179,15 @@ it('T-UX-141h a service selection keeps its picker mounted across the pending re
   expect(screen.queryByTestId('filter-count')).not.toBeInTheDocument();
   rerender(page());
   expect(screen.getByRole('checkbox', { name: 'Netflix' })).toBeChecked();
-  fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+  const panel = document.getElementById(trigger.getAttribute('aria-controls') ?? '');
+  if (panel === null) throw new Error('Missing services disclosure panel');
+  fireEvent.click(within(panel).getByRole('button', { name: 'Done' }));
   expect(trigger).toHaveFocus();
 });
 
 it('T-UX-141i a selected genre remains available while the facet response is pending', () => {
   const { rerender } = render(page({ genres: ['Science Fiction'] }));
+  fireEvent.click(screen.getByTestId('filters-trigger'));
   const trigger = screen.getByRole('button', { name: /^Genre / });
   fireEvent.click(trigger);
   fireEvent.click(screen.getByRole('checkbox', { name: 'Science Fiction' }));

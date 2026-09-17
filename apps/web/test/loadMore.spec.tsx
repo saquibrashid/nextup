@@ -20,7 +20,7 @@
  * caused by the fix rather than by the bug, so `g` asserts a row from page 1
  * is still on screen after page 2 lands.
  */
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -356,9 +356,7 @@ describe('T-UX-015 the load-more sentinel reaches the rest of the list', () => {
 
     // Reversing the selected order changes the query; pages from the old
     // order must still be discarded under the approved one-click sort UX.
-    await userEvent.click(
-      within(screen.getByTestId('sort-control')).getByRole('button', { pressed: true }),
-    );
+    await userEvent.click(screen.getByTestId('sort-reverse'));
 
     await waitFor(() => {
       expect(screen.getAllByTestId('title-name')).toHaveLength(PAGE_LIMIT);

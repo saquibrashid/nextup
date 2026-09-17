@@ -7,8 +7,9 @@
 // back button and on a deep link — the two ways a filtered list is actually
 // shared and revisited.
 
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { UserEvent } from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import type { JSX } from 'react';
@@ -26,6 +27,10 @@ import {
 import { FilterDisclosure } from '../src/components/FilterDisclosure';
 import {
   CLEAR_FILTERS_LABEL,
+  FILTERS_CLOSE_LABEL,
+  FILTERS_DONE_LABEL,
+  FILTERS_PANEL_TITLE,
+  FILTERS_TRIGGER_LABEL,
   RUNTIME_BUCKET_LABELS,
   ZERO_MATCH_TITLE,
   runtimeUnknownHiddenLabel,
@@ -93,6 +98,38 @@ function url(): string {
   return screen.getByTestId('url').textContent ?? '';
 }
 
+function openFilters(): HTMLElement {
+  fireEvent.click(screen.getByTestId('filters-trigger'));
+  return screen.getByRole('dialog', { name: 'Filter your list' });
+}
+
+async function openFiltersWith(user: UserEvent): Promise<HTMLElement> {
+  await user.click(screen.getByTestId('filters-trigger'));
+  return screen.getByRole('dialog', { name: 'Filter your list' });
+}
+
+function disclosurePanel(trigger: HTMLElement): HTMLElement {
+  const panel = document.getElementById(trigger.getAttribute('aria-controls') ?? '');
+  if (panel === null) throw new Error('missing disclosure panel');
+  return panel;
+}
+
+function clickDisclosureDone(trigger: HTMLElement): void {
+  fireEvent.click(within(disclosurePanel(trigger)).getByRole('button', { name: 'Done' }));
+}
+
+function panelDoneButton(): HTMLElement {
+  const buttons = within(screen.getByRole('dialog', { name: FILTERS_PANEL_TITLE })).getAllByRole(
+    'button',
+    {
+      name: FILTERS_DONE_LABEL,
+    },
+  );
+  const button = buttons.at(-1);
+  if (button === undefined) throw new Error('missing panel Done button');
+  return button;
+}
+
 function box(name: string, value: string): HTMLInputElement {
   const labels: Record<string, string> = {
     service: 'Services',
@@ -100,6 +137,7 @@ function box(name: string, value: string): HTMLInputElement {
     genre: 'Genre',
     runtime: 'Runtime',
   };
+  if (screen.queryByRole('dialog', { name: 'Filter your list' }) === null) openFilters();
   const trigger = screen.getByRole('button', { name: new RegExp(`^${labels[name] ?? name} `) });
   if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
   // `Array.from`, NOT `.values().find(...)`. Both work now that the runtime is
@@ -118,6 +156,7 @@ function box(name: string, value: string): HTMLInputElement {
 describe('T-UI-016 - the filter bar syncs to the query string in both directions', () => {
   it('T-UI-016a renders the service, type and genre controls', () => {
     mount('/');
+    openFilters();
 
     fireEvent.click(screen.getByRole('button', { name: /^Services / }));
     expect(screen.getByTestId('filter-service')).toBeTruthy();
@@ -320,8 +359,86 @@ describe('T-UI-016 - the page wires the bar to the list', () => {
 });
 
 describe('T-UX-144 - labelled filter fields and split runtime options', () => {
+  it('T-UX-145a the Filters trigger is a labelled dialog button whose expanded state follows the panel', () => {
+    mount('/');
+    const trigger = screen.getByTestId('filters-trigger');
+    expect(trigger).toHaveAccessibleName(FILTERS_TRIGGER_LABEL);
+    expect(trigger).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('dialog', { name: FILTERS_PANEL_TITLE })).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: FILTERS_CLOSE_LABEL }));
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('T-UX-145b the picker fields are absent until the Filters panel opens', () => {
+    mount('/');
+    expect(screen.queryByRole('group', { name: 'Filter by', exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Services / })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Type / })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Genre / })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Runtime / })).not.toBeInTheDocument();
+
+    openFilters();
+
+    expect(screen.getByRole('group', { name: 'Filter by', exact: true })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Services / })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Type / })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Genre / })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Runtime / })).toBeVisible();
+  });
+
+  it('T-UX-145c the trigger counts active filter values but not the search term', () => {
+    mount('/?q=Arrival');
+    expect(screen.getByTestId('filters-trigger')).toHaveAccessibleName(FILTERS_TRIGGER_LABEL);
+    expect(screen.queryByLabelText(/\d+ active/)).not.toBeInTheDocument();
+
+    cleanup();
+
+    mount('/?q=Arrival&service=netflix&service=max&type=movie&runtime=under30');
+    expect(screen.getByTestId('filters-trigger')).toHaveAccessibleName(
+      `${FILTERS_TRIGGER_LABEL} 4 active`,
+    );
+    expect(screen.getByLabelText('4 active')).toHaveTextContent('4');
+  });
+
+  it('T-UX-145d Done keeps a selected service in the URL and returns focus to the trigger', async () => {
+    const user = userEvent.setup();
+    mount('/?sort=name&dir=asc');
+    const trigger = screen.getByTestId('filters-trigger');
+    await openFiltersWith(user);
+    await user.click(screen.getByRole('button', { name: 'Services All services' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Netflix' }));
+    await user.click(panelDoneButton());
+
+    expect(new URLSearchParams(url().split('?')[1]).getAll('service')).toEqual(['netflix']);
+    expect(url()).toContain('sort=name');
+    expect(url()).toContain('dir=asc');
+    expect(trigger).toHaveFocus();
+    expect(screen.queryByRole('dialog', { name: FILTERS_PANEL_TITLE })).not.toBeInTheDocument();
+  });
+
+  it('T-UX-145e Escape closes the panel without undoing a selected service', async () => {
+    const user = userEvent.setup();
+    mount('/');
+    const trigger = screen.getByTestId('filters-trigger');
+    await openFiltersWith(user);
+    await user.click(screen.getByRole('button', { name: 'Services All services' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Netflix' }));
+    clickDisclosureDone(screen.getByRole('button', { name: 'Services Netflix' }));
+    await user.keyboard('{Escape}');
+
+    expect(new URLSearchParams(url().split('?')[1]).getAll('service')).toEqual(['netflix']);
+    expect(screen.queryByRole('dialog', { name: FILTERS_PANEL_TITLE })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
   it('T-UX-144a each field has a visible category, current value and decorative chevron', () => {
     mount('/');
+    openFilters();
     expect(screen.getByRole('group', { name: 'Filter by', exact: true })).toBeVisible();
     for (const [category, value] of [
       ['Services', 'All services'],
@@ -341,6 +458,7 @@ describe('T-UX-144 - labelled filter fields and split runtime options', () => {
 
   it('T-UX-144b field summaries show one named selection or a deduplicated selection count', () => {
     mount('/?service=netflix&type=movie&genre=Drama&genre=Comedy&genre=Drama&runtime=90-120');
+    openFilters();
     expect(screen.getByRole('button', { name: 'Services Netflix' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Type Movies' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Genre 2 selected' })).toBeVisible();
@@ -351,6 +469,7 @@ describe('T-UX-144 - labelled filter fields and split runtime options', () => {
 
   it('T-UX-144c selecting a value updates the same named field while its picker remains open', () => {
     mount('/');
+    openFilters();
     const trigger = screen.getByRole('button', { name: 'Services All services' });
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole('checkbox', { name: 'Netflix' }));
@@ -358,12 +477,13 @@ describe('T-UX-144 - labelled filter fields and split runtime options', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     fireEvent.click(screen.getByRole('checkbox', { name: 'Max' }));
     expect(trigger).toHaveAccessibleName('Services 2 selected');
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    clickDisclosureDone(trigger);
     expect(trigger).toHaveFocus();
   });
 
   it('T-UX-144d runtime exposes five ranges, replacing the broad one with independent 60-90 and 90-120 choices', () => {
     mount('/');
+    openFilters();
     fireEvent.click(screen.getByRole('button', { name: 'Runtime Any runtime' }));
     expect(screen.getAllByRole('checkbox').map((input) => input.getAttribute('value'))).toEqual([
       'under30',
@@ -389,7 +509,7 @@ describe('T-UX-144 - labelled filter fields and split runtime options', () => {
     ]);
     expect(box('runtime', '60-90')).toBeChecked();
     expect(box('runtime', '90-120')).toBeChecked();
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    clickDisclosureDone(screen.getByRole('button', { name: /^Runtime / }));
     fireEvent.click(
       screen.getByRole('button', {
         name: `Remove runtime filter: ${RUNTIME_BUCKET_LABELS['60-90']}`,
@@ -410,6 +530,7 @@ describe('T-UX-144 - labelled filter fields and split runtime options', () => {
     mount('/?runtime=60-120&dir=asc');
     fireEvent.click(screen.getByTestId('clear-filters'));
     expect(url()).toBe('/?dir=asc');
+    openFilters();
     fireEvent.click(screen.getByRole('button', { name: 'Runtime Any runtime' }));
     for (const input of screen.getAllByRole('checkbox')) expect(input).not.toBeChecked();
     expect(
@@ -449,6 +570,7 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
     // runtimes would remove the only control that accounts for the list's
     // length.
     mount('/', { genres: [] });
+    openFilters();
     fireEvent.click(screen.getByRole('button', { name: /^Runtime / }));
     expect(screen.getByTestId('filter-runtime')).toBeTruthy();
     expect(screen.queryByTestId('filter-genre')).toBeNull();
@@ -458,7 +580,9 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
     it('T-UX-139a starts compact and offers only registry services, without a phantom All', async () => {
       const user = userEvent.setup();
       mount('/');
+      expect(screen.getByTestId('filters-trigger')).toHaveAttribute('aria-expanded', 'false');
       expect(screen.queryByRole('checkbox')).toBeNull();
+      await openFiltersWith(user);
       for (const name of ['Services', 'Type', 'Genre', 'Runtime']) {
         expect(screen.getByRole('button', { name: new RegExp(`^${name} `) })).toHaveAttribute(
           'aria-expanded',
@@ -481,13 +605,13 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
         expect(screen.getByRole('checkbox', { name: SERVICE_LABELS[service] })).toBeEnabled();
       }
       expect(screen.queryByRole('checkbox', { name: /all/i })).toBeNull();
-      expect(screen.queryByRole('dialog')).toBeNull();
-      expect(document.querySelector('[aria-modal]')).toBeNull();
+      expect(screen.getByRole('dialog', { name: 'Filter your list' })).toBeVisible();
     });
 
     it('T-UX-139b service search filters only picker options, retaining selection and URL state', async () => {
       const user = userEvent.setup();
       mount('/?service=netflix&q=Arrival&sort=dateAdded&dir=asc&view=grid');
+      await openFiltersWith(user);
       await user.click(screen.getByRole('button', { name: /^Services / }));
       const search = screen.getByRole('searchbox', { name: 'Search services' });
       expect(search).toHaveFocus();
@@ -562,9 +686,11 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
       expect(screen.queryByRole('list', { name: 'Active filters' })).toBeNull();
     });
 
-    it('T-UX-139f keyboard opening, Escape and Done restore focus without undoing selected filters', async () => {
+    it('T-UX-139f keyboard opening, picker Done and panel Escape keep selected filters', async () => {
       const user = userEvent.setup();
       mount('/');
+      const panelTrigger = screen.getByTestId('filters-trigger');
+      await openFiltersWith(user);
       const trigger = screen.getByRole('button', { name: /^Type / });
       trigger.focus();
       await user.keyboard('{Enter}');
@@ -573,29 +699,36 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
       await user.keyboard(' ');
       expect(movies).toBeChecked();
       await user.keyboard('{Escape}');
-      expect(trigger).toHaveFocus();
-      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(panelTrigger).toHaveFocus();
+      expect(screen.queryByRole('dialog', { name: FILTERS_PANEL_TITLE })).not.toBeInTheDocument();
       expect(url()).toContain('type=movie');
+      await openFiltersWith(user);
+      const updatedTrigger = screen.getByRole('button', { name: /^Type / });
+      updatedTrigger.focus();
       await user.keyboard(' ');
       expect(screen.getByRole('checkbox', { name: 'Movies' })).toBeChecked();
-      await user.click(screen.getByRole('button', { name: 'Done' }));
-      expect(trigger).toHaveFocus();
-      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      await user.click(
+        within(disclosurePanel(updatedTrigger)).getByRole('button', { name: 'Done' }),
+      );
+      expect(updatedTrigger).toHaveFocus();
+      expect(updatedTrigger).toHaveAttribute('aria-expanded', 'false');
     });
 
     it('T-UX-139g outside click closes and restores focus; Tab leaves without a focus trap', async () => {
       const user = userEvent.setup();
       mount('/');
+      await openFiltersWith(user);
       const trigger = screen.getByRole('button', { name: /^Type / });
       await user.click(trigger);
-      await user.click(screen.getByTestId('filter-count'));
+      screen.getByRole('checkbox', { name: 'Movies' }).focus();
+      fireEvent.click(screen.getByRole('heading', { name: 'Filter your list' }));
       expect(trigger).toHaveAttribute('aria-expanded', 'false');
       expect(trigger).toHaveFocus();
       await user.click(trigger);
       await user.tab();
       expect(screen.getByRole('checkbox', { name: 'TV series' })).toHaveFocus();
       await user.tab();
-      expect(screen.getByRole('button', { name: 'Done' })).toHaveFocus();
+      expect(within(disclosurePanel(trigger)).getByRole('button', { name: 'Done' })).toHaveFocus();
       await user.tab();
       expect(screen.getByRole('button', { name: /^Genre / })).toHaveFocus();
       expect(trigger).toHaveAttribute('aria-expanded', 'false');
@@ -604,6 +737,7 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
     it('T-UX-139h opening another picker closes the first without stealing its focus', async () => {
       const user = userEvent.setup();
       mount('/');
+      await openFiltersWith(user);
       const services = screen.getByRole('button', { name: /^Services / });
       await user.click(services);
       await user.click(screen.getByRole('button', { name: /^Runtime / }));
@@ -618,14 +752,17 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
           <FilterBar shown={1} total={2} />
         </MemoryRouter>,
       );
-      const triggers = screen.getAllByRole('button', { name: /^Services / });
-      for (const trigger of triggers) {
+      const filterTriggers = screen.getAllByTestId('filters-trigger');
+      for (const filterTrigger of filterTriggers) {
+        fireEvent.click(filterTrigger);
+        const trigger = screen.getByRole('button', { name: /^Services / });
         const controls = trigger.getAttribute('aria-controls');
         expect(controls).toBeTruthy();
         fireEvent.click(trigger);
         expect(trigger).toHaveAttribute('aria-controls', controls);
         expect(document.getElementById(controls ?? '')).toHaveAccessibleName('Services');
-        fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+        clickDisclosureDone(trigger);
+        fireEvent.click(panelDoneButton());
       }
       const ids = Array.from(document.querySelectorAll('[id]'), (element) => element.id);
       expect(new Set(ids).size).toBe(ids.length);

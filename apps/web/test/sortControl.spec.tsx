@@ -2,6 +2,21 @@
  * Owner-approved 2026-09-16: five complete-order buttons, with one-click
  * reversal of the selected order. Existing IDs retain their behavioral
  * coverage; radio-shape and direction-preservation assertions are superseded.
+ *
+ * Owner-approved 2026-09-17 (`specs/ui.md` §2.1 item 2, §10.1): the six orders
+ * moved into a chooser opened from the toolbar, and a dedicated reverse button
+ * stayed on the toolbar beside it. Two consequences run through this file:
+ *
+ *  1. Anything that asserts "the current order is legible" now asserts it on
+ *     the toolbar trigger (`expectOrder`), which shows the complete order with
+ *     nothing open. That is the same claim the old `toHaveTextContent` on the
+ *     pressed button made; the chooser rows spell the field and the direction
+ *     separately, so their text alone no longer names a complete order.
+ *  2. Anything that means "reverse the current order" now clicks the toolbar
+ *     reverse button. Reversal from inside the chooser still works and is
+ *     still covered, but the reverse button is the control REQ-038 / §10.1
+ *     require to be reachable with nothing open, so it is what the
+ *     one-interaction assertions exercise.
  */
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -26,21 +41,67 @@ import {
 } from '../src/components/SortControl';
 import { ListPage } from '../src/pages/ListPage';
 
-const DEFAULT_LABELS = [
-  'Recently added',
-  'Name A-Z',
-  'Newest releases',
-  'Longest runtime',
-  'Highest rated',
+const FIELD_NAMES = [
+  'Added to list',
+  'Title',
+  'Release date',
+  'Runtime',
+  'Rating',
   'Watch priority',
 ];
 
+/** Both ways round, so a test naming one order need not also name its reverse. */
+const REVERSE_OF: Readonly<Record<string, string>> = {
+  'Recently added': 'Oldest additions',
+  'Oldest additions': 'Recently added',
+  'Name A-Z': 'Name Z-A',
+  'Name Z-A': 'Name A-Z',
+  'Newest releases': 'Oldest releases',
+  'Oldest releases': 'Newest releases',
+  'Longest runtime': 'Shortest runtime',
+  'Shortest runtime': 'Longest runtime',
+  'Highest rated': 'Lowest rated',
+  'Lowest rated': 'Highest rated',
+  'Watch priority': 'Lower priority first',
+  'Lower priority first': 'Watch priority',
+};
+
+function trigger(): HTMLElement {
+  return screen.getByTestId('sort-trigger');
+}
+
+function reverseButton(): HTMLElement {
+  return screen.getByTestId('sort-reverse');
+}
+
+/**
+ * The chooser is a dialog, so it is absent until asked for. Opening it here
+ * keeps every order-selection assertion below about what selecting an order
+ * does, rather than about the disclosure that now precedes it.
+ */
 function sortGroup(): HTMLElement {
+  if (screen.queryByTestId('sort-control') === null) fireEvent.click(trigger());
   return screen.getByTestId('sort-control');
+}
+
+/**
+ * The complete current order, read from the toolbar with nothing open — this
+ * is where the owner reads it now, so it is where the tests read it.
+ */
+function expectOrder(label: string): void {
+  expect(trigger()).toHaveTextContent(label);
+  expect(trigger()).toHaveAccessibleName(`Sort: ${label}. Change the order.`);
 }
 
 function selectedButton(): HTMLElement {
   return within(sortGroup()).getByRole('button', { pressed: true });
+}
+
+/** The selected row still announces its complete order and its reverse. */
+function expectSelectedOrder(label: string): void {
+  expect(selectedButton()).toHaveAccessibleName(
+    `${label}. Selected. Change to ${REVERSE_OF[label]}.`,
+  );
 }
 
 function button(label: string): HTMLElement {
@@ -107,24 +168,22 @@ describe('T-UI-024 - SortControl', () => {
 
   it('T-UI-024b: defaults to recently added', () => {
     renderSortControl();
-    expect(selectedButton()).toHaveTextContent('Recently added');
-    expect(selectedButton()).toHaveAccessibleName(
-      'Recently added. Selected. Change to Oldest additions.',
-    );
+    expectOrder('Recently added');
+    expectSelectedOrder('Recently added');
   });
 
   it('T-UI-024c: click reverses to oldest additions', () => {
     renderSortControl();
-    fireEvent.click(selectedButton());
-    expect(selectedButton()).toHaveTextContent('Oldest additions');
+    fireEvent.click(reverseButton());
+    expectOrder('Oldest additions');
     expect(query().get('dir')).toBe('asc');
   });
 
   it('T-UI-024d: second click reverses back to recently added', () => {
     renderSortControl();
-    fireEvent.click(selectedButton());
-    fireEvent.click(selectedButton());
-    expect(selectedButton()).toHaveTextContent('Recently added');
+    fireEvent.click(reverseButton());
+    fireEvent.click(reverseButton());
+    expectOrder('Recently added');
     expect(query().get('dir')).toBe('desc');
   });
 
@@ -136,8 +195,8 @@ describe('T-UI-024 - SortControl', () => {
 
   it('T-UI-024f: oldest additions remains the sole pressed order', () => {
     renderSortControl();
-    fireEvent.click(selectedButton());
-    expect(selectedButton()).toHaveTextContent('Oldest additions');
+    fireEvent.click(reverseButton());
+    expectSelectedOrder('Oldest additions');
     expect(within(sortGroup()).getAllByRole('button', { pressed: true })).toHaveLength(1);
   });
 
@@ -176,24 +235,26 @@ describe('T-UI-024 - SortControl', () => {
     const user = userEvent.setup();
     renderSortControl();
     await user.tab();
-    expect(selectedButton()).toHaveFocus();
+    expect(trigger()).toHaveFocus();
+    await user.tab();
+    expect(reverseButton()).toHaveFocus();
     await user.keyboard('{Enter}');
     expect(query().get('dir')).toBe('asc');
-    expect(selectedButton()).toHaveFocus();
+    expect(reverseButton()).toHaveFocus();
     await user.keyboard(' ');
     expect(query().get('dir')).toBe('desc');
   });
 
   it('T-UI-024n: dir=asc in URL renders oldest additions', () => {
     renderSortControl('/?dir=asc');
-    expect(selectedButton()).toHaveTextContent('Oldest additions');
+    expectOrder('Oldest additions');
   });
 
   it('T-UI-024o: a session-persisted asc is written into the URL', async () => {
     sessionStorage.setItem('nextup.sort.dir', 'asc');
     renderWithProbe();
     await waitFor(() => expect(query().get('dir')).toBe('asc'));
-    expect(selectedButton()).toHaveTextContent('Oldest additions');
+    expectOrder('Oldest additions');
   });
 
   it('T-UI-024p: reconciliation keeps existing filters', async () => {
@@ -209,7 +270,7 @@ describe('T-UI-024 - SortControl', () => {
     renderWithProbe('/?service=netflix');
     expect(query().has('dir')).toBe(false);
     expect(query().get('service')).toBe('netflix');
-    expect(selectedButton()).toHaveTextContent('Recently added');
+    expectOrder('Recently added');
   });
 });
 
@@ -217,32 +278,28 @@ describe('T-UX-120 - sort fields', () => {
   it('T-UX-120a defaults to date-added with no sort in the URL', () => {
     renderWithProbe();
     expect(readSortKey(query())).toBe('dateAdded');
-    expect(selectedButton()).toHaveTextContent('Recently added');
+    expectOrder('Recently added');
   });
 
   it('T-UX-120b selecting runtime displays its complete order', () => {
     renderWithProbe();
     fireEvent.click(button('Longest runtime'));
-    expect(selectedButton()).toHaveTextContent('Longest runtime');
+    expectOrder('Longest runtime');
     expect(query().get('sort')).toBe('runtime');
   });
 
   it('T-UX-120c runtime describes shortest and longest, not newest and oldest', () => {
     renderWithProbe('/?sort=runtime&dir=asc');
-    expect(selectedButton()).toHaveAccessibleName(
-      'Shortest runtime. Selected. Change to Longest runtime.',
-    );
-    fireEvent.click(selectedButton());
-    expect(selectedButton()).toHaveAccessibleName(
-      'Longest runtime. Selected. Change to Shortest runtime.',
-    );
+    expectSelectedOrder('Shortest runtime');
+    fireEvent.click(reverseButton());
+    expectSelectedOrder('Longest runtime');
   });
 
   it('T-UX-120d changing the key chooses the advertised field default direction', () => {
     renderWithProbe('/?dir=asc');
     fireEvent.click(button('Longest runtime'));
     expect(query().get('dir')).toBe('desc');
-    expect(selectedButton()).toHaveTextContent('Longest runtime');
+    expectOrder('Longest runtime');
   });
 
   it('T-UX-120e returning to date-added removes sort rather than writing the default', () => {
@@ -250,7 +307,7 @@ describe('T-UX-120 - sort fields', () => {
     fireEvent.click(button('Recently added'));
     expect(query().has('sort')).toBe(false);
     expect(query().get('dir')).toBe('desc');
-    expect(selectedButton()).toHaveTextContent('Recently added');
+    expectOrder('Recently added');
   });
 
   it('T-UX-120f an unrecognised sort falls back to date-added', () => {
@@ -284,16 +341,21 @@ describe('T-UX-120 - sort fields', () => {
 describe('One-click complete orders and stable visible controls', () => {
   it('T-UX-128a renders all six complete orders simultaneously', () => {
     renderSortControl();
+    // The chooser spells the field and the direction separately, so the row
+    // text is the field name; the complete order is its accessible name.
     expect(
       within(sortGroup())
         .getAllByRole('button')
-        .map((item) => item.textContent),
-    ).toEqual(DEFAULT_LABELS);
+        .map((item) => item.querySelector('.sort-option__name')?.textContent),
+    ).toEqual(FIELD_NAMES);
+    for (const option of within(sortGroup()).getAllByRole('button')) {
+      expect(option.querySelector('.sort-option__dir')?.textContent).not.toBe('');
+    }
   });
 
   it('T-UX-128b marks exactly one option and it is the current order', () => {
     renderSortControl('/?sort=name&dir=desc');
-    expect(selectedButton()).toHaveTextContent('Name Z-A');
+    expectSelectedOrder('Name Z-A');
     expect(within(sortGroup()).getAllByRole('button', { pressed: false })).toHaveLength(5);
   });
 
@@ -304,13 +366,17 @@ describe('One-click complete orders and stable visible controls', () => {
     expect(within(sortGroup()).queryByRole('combobox')).toBeNull();
   });
 
-  it('T-UX-128d keeps the same button nodes in field order after reversal and selection', () => {
+  it('T-UX-128d keeps the orders in field order after reversal and selection', () => {
     renderSortControl();
-    const original = within(sortGroup()).getAllByRole('button');
-    fireEvent.click(selectedButton());
+    fireEvent.click(reverseButton());
     fireEvent.click(button('Name A-Z'));
-    expect(within(sortGroup()).getAllByRole('button')).toEqual(original);
-    expect(original.map((item) => item.textContent)).toEqual(DEFAULT_LABELS);
+    // Reordering the chooser by recency would move the option under the
+    // owner's finger between one visit and the next.
+    expect(
+      within(sortGroup())
+        .getAllByRole('button')
+        .map((item) => item.querySelector('.sort-option__name')?.textContent),
+    ).toEqual(FIELD_NAMES);
   });
 
   it('T-UX-129a selected labels and next actions describe each field ordering', () => {
@@ -321,23 +387,22 @@ describe('One-click complete orders and stable visible controls', () => {
       ['Highest rated', 'Lowest rated'],
     ] as const) {
       fireEvent.click(button(label));
-      expect(selectedButton()).toHaveAccessibleName(`${label}. Selected. Change to ${reverse}.`);
-      fireEvent.click(selectedButton());
-      expect(selectedButton()).toHaveAccessibleName(`${reverse}. Selected. Change to ${label}.`);
+      expectOrder(label);
+      expectSelectedOrder(label);
+      fireEvent.click(reverseButton());
+      expectOrder(reverse);
+      expectSelectedOrder(reverse);
     }
   });
 
   it('T-UX-129b date-shaped fields distinguish additions from releases', () => {
     renderWithProbe('/?sort=releaseYear');
-    expect(selectedButton()).toHaveAccessibleName(
-      'Newest releases. Selected. Change to Oldest releases.',
-    );
-    fireEvent.click(selectedButton());
-    expect(selectedButton()).toHaveTextContent('Oldest releases');
+    expectSelectedOrder('Newest releases');
+    fireEvent.click(reverseButton());
+    expectOrder('Oldest releases');
     fireEvent.click(button('Recently added'));
-    expect(selectedButton()).toHaveAccessibleName(
-      'Recently added. Selected. Change to Oldest additions.',
-    );
+    expectOrder('Recently added');
+    expectSelectedOrder('Recently added');
   });
 
   it('T-UX-129c default direction is per field and name opens at A', () => {
@@ -345,7 +410,7 @@ describe('One-click complete orders and stable visible controls', () => {
       expect(defaultDirFor(key)).toBe(key === 'name' || key === 'watchPriority' ? 'asc' : 'desc');
     }
     renderWithProbe('/?sort=name');
-    expect(selectedButton()).toHaveTextContent('Name A-Z');
+    expectOrder('Name A-Z');
   });
 
   it('T-UX-129d a field default writes no redundant dir on entry', () => {
@@ -373,7 +438,7 @@ describe('One-click complete orders and stable visible controls', () => {
 
   it('T-UX-130c reversing direction preserves active filters', () => {
     renderWithProbe('/?service=max&runtime=60-120');
-    fireEvent.click(selectedButton());
+    fireEvent.click(reverseButton());
     expect(query().get('service')).toBe('max');
     expect(query().get('runtime')).toBe('60-120');
     expect(query().get('dir')).toBe('asc');
@@ -384,25 +449,31 @@ describe('One-click complete orders and stable visible controls', () => {
     renderWithProbe('/?service=netflix');
     fireEvent.click(button('Longest runtime'));
     expect(query().has('cursor')).toBe(false);
-    fireEvent.click(selectedButton());
+    fireEvent.click(reverseButton());
     expect(query().has('cursor')).toBe(false);
   });
 
   it('T-UX-131a oldest-first is reachable in exactly one interaction from default', () => {
     renderWithProbe();
-    fireEvent.click(selectedButton());
+    fireEvent.click(reverseButton());
     expect(query().get('dir')).toBe('asc');
     expect(readSortKey(query())).toBe('dateAdded');
-    expect(selectedButton()).toHaveTextContent('Oldest additions');
+    expectOrder('Oldest additions');
   });
 
   it('T-UX-131b the oldest-first action is visible without opening anything', () => {
+    // REQ-038 / `specs/ui.md` §10.1: the orders may sit behind a chooser, but
+    // reversing the current one may not. This is the assertion that stops the
+    // reverse button being folded back into the chooser as a duplicate.
     renderSortControl();
-    expect(selectedButton()).toBeVisible();
-    expect(selectedButton()).toHaveAccessibleName(
-      'Recently added. Selected. Change to Oldest additions.',
-    );
-    expect(within(sortGroup()).queryByRole('combobox')).toBeNull();
+    expect(screen.queryByTestId('sort-control')).toBeNull();
+    expect(reverseButton()).toBeVisible();
+    expect(reverseButton()).toHaveAccessibleName('Reverse the order: Oldest additions');
+    fireEvent.click(reverseButton());
+    expect(query().get('dir')).toBe('asc');
+    expect(screen.queryByTestId('sort-control')).toBeNull();
+    expect(reverseButton()).toHaveAccessibleName('Reverse the order: Recently added');
+    expect(screen.queryByRole('combobox')).toBeNull();
   });
 
   it('T-UX-113a filters and sort render inside one group', () => {
@@ -414,7 +485,8 @@ describe('One-click complete orders and stable visible controls', () => {
 
   it('T-UX-113b visual grouping does not merge filter and sort state', () => {
     renderListPage();
-    fireEvent.click(selectedButton());
+    fireEvent.click(reverseButton());
+    fireEvent.click(screen.getByTestId('filters-trigger'));
     fireEvent.click(screen.getByRole('button', { name: /^Services / }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Netflix' }));
     expect(sessionStorage.getItem('nextup.sort.dir')).toBe('asc');
@@ -423,6 +495,7 @@ describe('One-click complete orders and stable visible controls', () => {
 
   it('T-UX-114a changing a filter preserves sort and dir', () => {
     renderListPage('/?sort=runtime&dir=asc');
+    fireEvent.click(screen.getByTestId('filters-trigger'));
     fireEvent.click(screen.getByRole('button', { name: /^Services / }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Netflix' }));
     expect(query().get('sort')).toBe('runtime');
@@ -436,29 +509,29 @@ describe('Persistence and the default-view one-press escape hatch', () => {
     sessionStorage.setItem('nextup.sort.dir', 'asc');
     renderWithProbe();
     await waitFor(() => expect(query().get('dir')).toBe('asc'));
-    expect(selectedButton()).toHaveTextContent('Oldest additions');
+    expectOrder('Oldest additions');
   });
 
   it('T-UX-115b remembered direction survives a field whose default differs', async () => {
     sessionStorage.setItem('nextup.sort.dir', 'desc');
     renderWithProbe('/?sort=name');
     await waitFor(() => expect(query().get('dir')).toBe('desc'));
-    expect(selectedButton()).toHaveTextContent('Name Z-A');
+    expectOrder('Name Z-A');
   });
 
   it('T-UX-115c the URL beats session storage for a deep link', () => {
     sessionStorage.setItem('nextup.sort.dir', 'asc');
     renderWithProbe('/?dir=desc');
     expect(query().get('dir')).toBe('desc');
-    expect(selectedButton()).toHaveTextContent('Recently added');
+    expectOrder('Recently added');
   });
 
   it('T-UX-116a oldest-first is one press away on the default view', () => {
     renderListPage();
-    expect(selectedButton()).toBeVisible();
-    fireEvent.click(selectedButton());
+    expect(reverseButton()).toBeVisible();
+    fireEvent.click(reverseButton());
     expect(query().get('dir')).toBe('asc');
-    expect(selectedButton()).toHaveTextContent('Oldest additions');
+    expectOrder('Oldest additions');
   });
 });
 
@@ -491,7 +564,7 @@ describe('T-UX-138 - atomic complete-order choices and navigation', () => {
       expect(query().get('dir')).toBe(dir);
       expect(sessionStorage.getItem('nextup.sort.dir')).toBe(dir);
       expect(onSearch).toHaveBeenCalledTimes(1);
-      expect(selectedButton()).toHaveTextContent(label);
+      expectOrder(label);
     },
   );
 
@@ -500,19 +573,23 @@ describe('T-UX-138 - atomic complete-order choices and navigation', () => {
     ({ key, label, reverse, dir }) => {
       const onSearch = vi.fn();
       renderWithProbe(`/?sort=${key}&dir=${dir}`, { onSearch });
-      const target = selectedButton();
+      const target = reverseButton();
       onSearch.mockClear();
 
       fireEvent.click(target);
-      expect(selectedButton()).toBe(target);
-      expect(selectedButton()).toHaveAccessibleName(`${reverse}. Selected. Change to ${label}.`);
+      // The reverse control is the same node either way round — reversing does
+      // not swap one button for another under the owner's finger.
+      expect(reverseButton()).toBe(target);
+      expectOrder(reverse);
+      expectSelectedOrder(reverse);
       expect(query().get('dir')).toBe(dir === 'desc' ? 'asc' : 'desc');
       expect(sessionStorage.getItem('nextup.sort.dir')).toBe(dir === 'desc' ? 'asc' : 'desc');
       expect(onSearch).toHaveBeenCalledTimes(1);
 
       onSearch.mockClear();
       fireEvent.click(target);
-      expect(selectedButton()).toHaveAccessibleName(`${label}. Selected. Change to ${reverse}.`);
+      expectOrder(label);
+      expectSelectedOrder(label);
       expect(query().get('dir')).toBe(dir);
       expect(onSearch).toHaveBeenCalledTimes(1);
     },
@@ -521,32 +598,32 @@ describe('T-UX-138 - atomic complete-order choices and navigation', () => {
   it('T-UX-138c back and forward restore explicit URL order despite newer session choices', () => {
     renderWithProbe('/?sort=runtime&dir=asc&service=max');
     fireEvent.click(button('Name A-Z'));
-    fireEvent.click(selectedButton());
+    fireEvent.click(reverseButton());
     expect(sessionStorage.getItem('nextup.sort.dir')).toBe('desc');
 
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-    expect(selectedButton()).toHaveTextContent('Name A-Z');
+    expectOrder('Name A-Z');
     expect(query().get('dir')).toBe('asc');
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-    expect(selectedButton()).toHaveTextContent('Shortest runtime');
+    expectOrder('Shortest runtime');
     expect(query().get('service')).toBe('max');
 
     fireEvent.click(screen.getByRole('button', { name: 'Forward' }));
-    expect(selectedButton()).toHaveTextContent('Name A-Z');
+    expectOrder('Name A-Z');
     fireEvent.click(screen.getByRole('button', { name: 'Forward' }));
-    expect(selectedButton()).toHaveTextContent('Name Z-A');
+    expectOrder('Name Z-A');
   });
 
   it('T-UX-138d session reconciliation replaces history rather than adding an entry', () => {
     sessionStorage.setItem('nextup.sort.dir', 'desc');
     renderWithProbe('/', { entries: ['/?dir=asc', '/?sort=name&service=max'] });
     expect(query().get('dir')).toBe('desc');
-    expect(selectedButton()).toHaveTextContent('Name Z-A');
+    expectOrder('Name Z-A');
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-    expect(selectedButton()).toHaveTextContent('Oldest additions');
+    expectOrder('Oldest additions');
     expect(query().has('sort')).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'Forward' }));
-    expect(selectedButton()).toHaveTextContent('Name Z-A');
+    expectOrder('Name Z-A');
     expect(query().get('service')).toBe('max');
   });
 
@@ -554,10 +631,10 @@ describe('T-UX-138 - atomic complete-order choices and navigation', () => {
     renderWithProbe('/?sort=name');
     fireEvent.click(button('Highest rated'));
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-    expect(selectedButton()).toHaveTextContent('Name Z-A');
+    expectOrder('Name Z-A');
     expect(query().get('dir')).toBe('desc');
     fireEvent.click(screen.getByRole('button', { name: 'Forward' }));
-    expect(selectedButton()).toHaveTextContent('Highest rated');
+    expectOrder('Highest rated');
   });
 
   it('T-UX-138f unavailable session storage leaves field defaults and URL choices functional', () => {
@@ -568,13 +645,13 @@ describe('T-UX-138 - atomic complete-order choices and navigation', () => {
       throw new DOMException('Storage unavailable', 'SecurityError');
     });
     renderWithProbe('/?sort=name&service=max');
-    expect(selectedButton()).toHaveTextContent('Name A-Z');
-    fireEvent.click(selectedButton());
+    expectOrder('Name A-Z');
+    fireEvent.click(reverseButton());
     expect(query().get('dir')).toBe('desc');
-    expect(selectedButton()).toHaveTextContent('Name Z-A');
+    expectOrder('Name Z-A');
     fireEvent.click(button('Recently added'));
-    fireEvent.click(selectedButton());
-    expect(selectedButton()).toHaveTextContent('Oldest additions');
+    fireEvent.click(reverseButton());
+    expectOrder('Oldest additions');
     expect(query().get('dir')).toBe('asc');
     expect(query().get('service')).toBe('max');
   });
@@ -585,6 +662,117 @@ describe('T-UX-138 - atomic complete-order choices and navigation', () => {
     sessionStorage.setItem('nextup.sort.dir', 'desc');
     renderWithProbe('/?sort=name&dir=invalid');
     expect(query().get('dir')).toBe('desc');
-    expect(selectedButton()).toHaveTextContent('Name Z-A');
+    expectOrder('Name Z-A');
+  });
+});
+
+/**
+ * REQ-038, `specs/ui.md` §2.1 item 2 and §10.1 (owner-approved 2026-09-17):
+ * the toolbar must state the current order and offer reversal with nothing
+ * open, and the six orders live in a chooser behind it.
+ */
+describe('T-UX-146 - the sort chooser and the toolbar it hides behind', () => {
+  it('T-UX-146a the toolbar states the complete current order with nothing open', () => {
+    renderSortControl('/?sort=runtime&dir=asc');
+    expect(screen.queryByTestId('sort-control')).toBeNull();
+    expect(trigger()).toBeVisible();
+    expectOrder('Shortest runtime');
+  });
+
+  it('T-UX-146b the trigger is a disclosure for a dialog and reports its state', async () => {
+    const user = userEvent.setup();
+    renderSortControl();
+    expect(trigger()).toHaveAttribute('aria-haspopup', 'dialog');
+    expect(trigger()).toHaveAttribute('aria-expanded', 'false');
+    await user.click(trigger());
+    expect(trigger()).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('dialog', { name: 'Sort your list' })).toBeInTheDocument();
+  });
+
+  it('T-UX-146c every chooser row names its field and spells out its direction', () => {
+    renderSortControl();
+    const rows = within(sortGroup()).getAllByRole('button');
+    const directions = rows.map((row) => row.querySelector('.sort-option__dir')?.textContent);
+    expect(rows.map((row) => row.querySelector('.sort-option__name')?.textContent)).toEqual(
+      FIELD_NAMES,
+    );
+    // T-A11Y-008: the arrow is decorative, so the words must carry direction.
+    expect(directions).toEqual([
+      'Newest first',
+      'A to Z',
+      'Newest first',
+      'Longest first',
+      'Highest first',
+      'Highest first',
+    ]);
+  });
+
+  it('T-UX-146d choosing an order applies it and closes the chooser', async () => {
+    const user = userEvent.setup();
+    renderSortControl();
+    await user.click(trigger());
+    await user.click(button('Highest rated'));
+    await waitFor(() => expect(screen.queryByTestId('sort-control')).toBeNull());
+    expect(query().get('sort')).toBe('rating');
+    expectOrder('Highest rated');
+    expect(trigger()).toHaveFocus();
+  });
+
+  it('T-UX-146e choosing the selected order again reverses it', async () => {
+    const user = userEvent.setup();
+    renderSortControl();
+    await user.click(trigger());
+    await user.click(selectedButton());
+    await waitFor(() => expect(screen.queryByTestId('sort-control')).toBeNull());
+    expect(query().get('dir')).toBe('asc');
+    expectOrder('Oldest additions');
+  });
+
+  it('T-UX-146i choosing a field keeps the field, not just its direction', async () => {
+    // Regression: `chooseOrder` used to write the remembered direction to
+    // session storage before navigating. The chooser's own close-state update
+    // let a render run in between, the reconcile effect saw a dir-less URL
+    // plus a remembered non-default direction, and `replace`d the entry the
+    // pending navigation was about to push — losing the chosen field and
+    // keeping only the direction. The URL leads; session storage follows.
+    const user = userEvent.setup();
+    renderSortControl('/?sort=name');
+    expect(sessionStorage.getItem('nextup.sort.dir')).toBeNull();
+    await user.click(trigger());
+    await user.click(button('Highest rated'));
+    expect(query().get('sort')).toBe('rating');
+    expect(query().get('dir')).toBe('desc');
+    expect(sessionStorage.getItem('nextup.sort.dir')).toBe('desc');
+    expectOrder('Highest rated');
+  });
+
+  it('T-UX-146f Escape closes the chooser without changing the order', async () => {
+    const user = userEvent.setup();
+    renderSortControl('/?sort=runtime');
+    await user.click(trigger());
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByTestId('sort-control')).toBeNull());
+    expect(query().get('sort')).toBe('runtime');
+    expectOrder('Longest runtime');
+    expect(trigger()).toHaveFocus();
+  });
+
+  it('T-UX-146g the close button dismisses the chooser and returns focus', async () => {
+    const user = userEvent.setup();
+    renderSortControl();
+    await user.click(trigger());
+    await user.click(screen.getByRole('button', { name: 'Close sort options' }));
+    await waitFor(() => expect(screen.queryByTestId('sort-control')).toBeNull());
+    expect(trigger()).toHaveFocus();
+    expect(query().has('sort')).toBe(false);
+  });
+
+  it('T-UX-146h the reverse button never opens the chooser', async () => {
+    const user = userEvent.setup();
+    renderSortControl();
+    await user.click(reverseButton());
+    expect(screen.queryByTestId('sort-control')).toBeNull();
+    expect(trigger()).toHaveAttribute('aria-expanded', 'false');
+    expect(query().get('dir')).toBe('asc');
   });
 });

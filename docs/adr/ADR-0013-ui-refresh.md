@@ -2,11 +2,34 @@
 
 | | |
 |---|---|
-| **Status** | **Accepted, Revision 1 (2026-09-16).** Epic P shipped in #275; the owner approved implementation of the refined indigo library preview on 2026-09-16. |
+| **Status** | **Accepted, Revision 2 (2026-09-17).** The owner approved extending the closed icon register for the library-controls sort chooser. <br />~~**Accepted, Revision 1 (2026-09-16).** Epic P shipped in #275; the owner approved implementation of the refined indigo library preview on 2026-09-16.~~ |
 | **Date** | 2026-09-10 |
 | **Deciders** | the owner (visual direction, given explicitly — see "The direction, and who gave it"), coordinator (mechanics) |
 | **Forced by** | The owner using the running app on 2026-09-10 and reporting six things: a row menu that opens at the bottom of the page, metadata rendered as `Movie2026Action, Crime, Thriller`, a row-menu button rendered as a full-height grey column, row text *"scrunched together"*, a fix-match correction that produced **no visible change on the review screen**, and *"the website looks very bare with no styling whatsoever."* |
-| **Supersedes** | Revision 1 reopens the light-only decision, the separate field/direction controls, and viewport-only layout selection. No Tailwind, web fonts, icon dependency, provider expansion or background list changes are introduced. |
+| **Supersedes** | Revision 2 extends the closed hand-authored icon register by five sort-category marks only. Revision 1 reopens the light-only decision, the separate field/direction controls, and viewport-only layout selection. No Tailwind, web fonts, icon dependency, provider expansion or background list changes are introduced. <br />~~Revision 1 reopens the light-only decision, the separate field/direction controls, and viewport-only layout selection. No Tailwind, web fonts, icon dependency, provider expansion or background list changes are introduced.~~ |
+
+## Revision 2 — library-controls sort-category icons, 2026-09-17
+
+The owner approved the library-controls redesign in which the sort chooser
+presents six single-row order toggles. Each row needs a category mark so the
+set of complete orders can be scanned without reintroducing an icon package,
+sprite, font or network request.
+
+The closed inline SVG register is therefore extended by exactly five
+hand-authored icons:
+
+| Icon | Sort key | Meaning |
+|---|---|---|
+| `BookmarkIcon` | `dateAdded` | Saved-list / bookmark marker |
+| `AlphabetIcon` | `name` | Alphabetical order |
+| `CalendarIcon` | `releaseYear` | Release date/year |
+| `ClockIcon` | `runtime` | Runtime |
+| `FlagIcon` | `watchPriority` | Watch priority |
+
+`rating` continues to reuse the existing `RatingIcon`, and sort-direction
+arrows continue to reuse `ChevronIcon` rotated by CSS. The register remains
+closed: adding, removing or substituting an icon requires another ADR revision
+and an update to the strict exported-set test, not a weakened gate.
 
 ## Revision 1 — approved indigo library, 2026-09-16
 

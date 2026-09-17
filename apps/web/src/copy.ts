@@ -368,6 +368,48 @@ export const SORT_KEY_DATE_LABEL = 'Date added';
 export const SORT_KEY_RUNTIME_LABEL = 'Runtime';
 export const SORT_KEY_LEGEND = 'Sort by';
 
+/**
+ * Owner-approved 2026-09-17 (`specs/ui.md` §2.1 item 2) — the chooser shows one
+ * row per key, so the row needs the key's NAME, and the direction is spelled
+ * out beside it in `SORT_DIRECTION_LABELS`.
+ *
+ * ⚠ These are NOT a shorter spelling of `SORT_ORDER_LABELS` and must not be
+ * merged with them. An order label names a complete order ("Recently added")
+ * and is what the toolbar button shows with the chooser shut; a key name names
+ * the field alone and is meaningless without the direction beside it.
+ */
+export const SORT_KEY_NAMES = {
+  dateAdded: 'Added to list',
+  name: 'Title',
+  releaseYear: 'Release date',
+  runtime: 'Runtime',
+  rating: 'Rating',
+  watchPriority: 'Watch priority',
+} as const;
+
+/**
+ * ⚠ DIRECTION IS NEVER CONVEYED BY THE ARROW ALONE (`T-A11Y-008`). The arrow
+ * is decorative; this text is the direction.
+ */
+export const SORT_DIRECTION_LABELS = {
+  dateAdded: { desc: 'Newest first', asc: 'Oldest first' },
+  name: { asc: 'A to Z', desc: 'Z to A' },
+  releaseYear: { desc: 'Newest first', asc: 'Oldest first' },
+  runtime: { asc: 'Shortest first', desc: 'Longest first' },
+  rating: { desc: 'Highest first', asc: 'Lowest first' },
+  watchPriority: { asc: 'Highest first', desc: 'Lowest first' },
+} as const;
+
+export const SORT_PANEL_TITLE = 'Sort your list';
+export const SORT_PANEL_HELP = 'Choose an order. Choose it again to reverse it.';
+export const SORT_TRIGGER_LABEL = 'Sort';
+export const SORT_CLOSE_LABEL = 'Close sort options';
+
+export const FILTERS_TRIGGER_LABEL = 'Filters';
+export const FILTERS_PANEL_TITLE = 'Filter your list';
+export const FILTERS_CLOSE_LABEL = 'Close filters';
+export const FILTERS_DONE_LABEL = 'Done';
+
 /** Owner-approved complete orders; the active control offers its reverse. */
 export const SORT_ORDER_LABELS = {
   dateAdded: { desc: 'Recently added', asc: 'Oldest additions' },
