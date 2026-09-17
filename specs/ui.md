@@ -386,7 +386,7 @@ about what a service looks like.
 
 | | Row badge | `/upload` service chooser |
 |---|---|---|
-| Mark | Yes, where one exists | Yes, where one exists |
+| Mark | Yes — all eight | Yes — all eight |
 | Name | **In the DOM, visually hidden** (`nameHidden`) | **Visible**, beside the mark |
 | Why | Badges repeat up to eight times per row; the mark is what is recognised | Attributing a batch to the wrong service is a destructive mistake in full-update mode — the word stays |
 
@@ -397,20 +397,28 @@ Rules, all of them load-bearing:
    `nameHidden` controls *visibility*, never *presence* — a logo-only badge is
    invisible to a screen reader and to the browser's own find-in-page.
    `T-BRAND-002a/b`.
-2. ⚠ **Three services have no mark, and that is the decision, not a gap.**
-   Prime Video, Disney+ and Peacock render their word mark exactly as all
-   eight did before. The reasons are in ADR-0014 §5. `T-BRAND-002c` asserts
-   the three gaps **remain** gaps, because a "every service renders something"
-   test would stay green while someone helpfully drew the missing three.
-3. **Marks are monochrome `currentColor`.** No brand colour, anywhere. They
+2. ⚠ **Five marks are vendored (CC0) and three are drawn here**, and nothing on
+   screen tells them apart. Prime Video, Disney+ and Peacock are hand-authored
+   approximations, added at the owner's direction (ADR-0014 Revision 2) after
+   the mixed presentation was reviewed live. `T-BRAND-001g` keeps the two
+   origins tellable apart in the source, because "improving" a drawn mark by
+   tracing the real logo changes the legal position and no test would notice.
+   ~~Superseded 2026-09-17: "Three services have no mark, and that is the
+   decision, not a gap. … `T-BRAND-002c` asserts the three gaps remain
+   gaps."~~
+3. ⚠ **The word-mark fallback in `ServiceMark` is still live code**, even
+   though no service reaches it. It is the removal path if a brand objects;
+   `T-BRAND-002c` asserts it with the register mocked empty.
+4. **Marks are monochrome `currentColor`.** No brand colour, anywhere. They
    inherit the badge's colour and therefore its contrast.
-4. **Marks live in `components/brands/`, not the ADR-0013 icon register.**
-   They are filled brand glyphs, not 1.5-weight line art, and they are
-   third-party trademarks. `T-BRAND-001` applies the icon register's closed-set,
-   no-colour, no-package, no-network contract to them separately.
-5. **Nothing is ever fetched.** The marks are bundled. A logo request to a
-   streaming service's CDN would be an automated request to a streaming
-   service, which the product forbids outright.
+5. **Marks live in `components/brands/`, not the ADR-0013 icon register.**
+   They are filled brand glyphs, not 1.5-weight line art, and they depict
+   third-party trademarks. `T-BRAND-001` applies the icon register's
+   closed-set, no-colour, no-package, no-network contract to them separately.
+6. **Nothing is ever fetched, and no artwork is obtained from a brand.** The
+   marks are compiled in. A request to a streaming service's CDN would be an
+   automated request to a streaming service, which the product forbids outright
+   — `T-SEC-001` fails on one of those hosts appearing anywhere in the tree.
 
 ### 2.3 Row menu dialogs
 

@@ -8,23 +8,23 @@
  * exclusion would be a hole rather than a boundary, and the next `<svg>`
  * dropped in would inherit nothing and be caught by nothing.
  *
- * ⚠ **THE THREE MISSING MARKS ARE ASSERTED AS MISSING.** Prime Video, Disney+
- * and Peacock render their word mark by decision, not by omission — see
- * `brands/index.ts`. A test that only checked "every service renders
- * something" would stay green while someone "completed" the set from a press
- * kit, which is the one outcome ADR-0014 exists to prevent.
+ * ⚠ **ORIGIN IS ASSERTED, NOT JUST SHAPE.** Five marks are vendored from a CC0
+ * source and three are drawn here (ADR-0014 Revision 2). Nothing at render
+ * time tells them apart — both are monochrome paths on a 24-grid — so
+ * `T-BRAND-001g` pins the distinction in the source files, and
+ * `T-BRAND-002c` keeps the word-mark fallback (the removal path a brand
+ * objection would use) alive even though no service reaches it today.
  */
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { SERVICES, SERVICE_LABELS, type Service } from '@nextup/domain';
+import { SERVICES, SERVICE_LABELS } from '@nextup/domain';
 
 import * as brands from '../src/components/brands';
-import { SERVICE_MARKS } from '../src/components/brands';
 import { ServiceMark } from '../src/components/ServiceMark';
 
 // ⚠ Not `import.meta.url`: the `web` project runs in jsdom, where that is an
@@ -35,17 +35,36 @@ const WEB_ROOT = existsSync(join(process.cwd(), 'apps', 'web', 'src'))
   : process.cwd();
 const BRANDS_ROOT = join(WEB_ROOT, 'src', 'components', 'brands');
 
-/** ADR-0014's closed set, transcribed. A sixth mark fails `T-BRAND-001b`. */
+/**
+ * ADR-0014's closed set, transcribed. A ninth mark fails `T-BRAND-001b`.
+ *
+ * ⚠ The last three are **drawn here**, not vendored (ADR-0014 Revision 2), and
+ * `T-BRAND-001g` pins that distinction in their source. They are listed in the
+ * same set on purpose: every mark, whatever its origin, owes the same
+ * monochrome, decorative-by-default, no-network contract.
+ */
 const CLOSED_SET = [
   'AppleTvMark',
   'HboMaxMark',
   'NetflixMark',
   'ParamountPlusMark',
   'StarzMark',
+  'PrimeVideoMark',
+  'DisneyPlusMark',
+  'PeacockMark',
 ] as const;
 
-/** The three services that render a word mark by decision, not by accident. */
-const WITHOUT_MARK: readonly Service[] = ['prime-video', 'disney-plus', 'peacock'];
+/** The three the owner directed be drawn rather than left as word marks. */
+const DRAWN = ['PrimeVideoMark', 'DisneyPlusMark', 'PeacockMark'] as const;
+
+/** The five taken verbatim from the CC0 source, which `ATTRIBUTION.md` pins. */
+const VENDORED = [
+  'AppleTvMark',
+  'HboMaxMark',
+  'NetflixMark',
+  'ParamountPlusMark',
+  'StarzMark',
+] as const;
 
 type MarkComponent = (props: { readonly label?: string }) => JSX.Element;
 
@@ -87,7 +106,7 @@ describe('T-BRAND-001 — the bundled marks are monochrome, closed and self-cont
     }
   });
 
-  it('T-BRAND-001b: the exported set is exactly the five ADR-0014 marks', () => {
+  it('T-BRAND-001b: the exported set is exactly the eight ADR-0014 marks', () => {
     const exported = Object.keys(brands)
       .filter((name) => name.endsWith('Mark') && name !== 'BrandMarkBase')
       .sort();
@@ -138,6 +157,27 @@ describe('T-BRAND-001 — the bundled marks are monochrome, closed and self-cont
     for (const name of CLOSED_SET) expect(attribution).toContain(name);
   });
 
+  it('T-BRAND-001g: a drawn mark says so in its own source, and a vendored one does not', () => {
+    /*
+     * ⚠ THE TWO ORIGINS MUST STAY TELLABLE APART IN THE FILE ITSELF. The
+     * difference is invisible at render time — both are monochrome paths on a
+     * 24-grid — but it is the whole of the legal position: five are CC0 and
+     * re-vendorable from a pinned commit, three are approximations the owner
+     * accepted the risk of (ADR-0014 Rev 2). Someone quietly replacing a drawn
+     * mark with a traced press-kit asset reproduces the artwork the drawing
+     * avoids, and nothing else in this suite would notice.
+     */
+    for (const name of DRAWN) {
+      const source = readFileSync(join(BRANDS_ROOT, `${name}.tsx`), 'utf8');
+      expect(source, name).toMatch(/ORIGINALLY DRAWN HERE — NOT VENDORED/);
+    }
+    for (const name of VENDORED) {
+      const source = readFileSync(join(BRANDS_ROOT, `${name}.tsx`), 'utf8');
+      expect(source, name).not.toMatch(/ORIGINALLY DRAWN/);
+      expect(source, name).toMatch(/Slug: /);
+    }
+  });
+
   it('T-BRAND-001f: a mark is decorative unless named, and named marks announce', () => {
     for (const [name, Mark] of markEntries) {
       const decorative = render(<Mark />);
@@ -170,27 +210,37 @@ describe('T-BRAND-002 — a mark never becomes the sole carrier of meaning', () 
     expect(shown.container.textContent).toBe(hiddenText);
   });
 
-  it('T-BRAND-002c: the three services without a mark render their word mark', () => {
+  it('T-BRAND-002c: the word-mark fallback still works when a service has no mark', async () => {
     /*
-     * ⚠ ASSERTED AS ABSENT ON PURPOSE. Prime Video, Disney+ and Peacock have
-     * no mark in the CC0 source — Amazon and Disney are among the brands
-     * removed from it at their own request. "Completing" the set from a press
-     * kit would take on exactly the risk that source declined to carry, so
-     * this test fails if someone helpfully fills the gaps.
+     * ⚠ THIS PATH IS UNREACHABLE IN PRODUCTION AND MUST STAY ALIVE ANYWAY.
+     * All eight services now have a mark (ADR-0014 Rev 2), so `ServiceMark`'s
+     * fallback branch never runs for real data — which makes it look exactly
+     * like dead code to the next person reading it. It is the removal path the
+     * whole trademark position rests on: if a brand objects, deleting its
+     * component and its `SERVICE_MARKS` entry must restore the word mark and
+     * change nothing else. The register is mocked empty to prove that is still
+     * true.
+     *
+     * ~~Superseded 2026-09-17: this case asserted that Prime Video, Disney+
+     * and Peacock had NO mark, to stop the set being "completed" from a press
+     * kit.~~ The owner directed that they be drawn; the guard that replaced it
+     * is `T-BRAND-001g`, which keeps drawn and vendored origins tellable apart.
      */
-    for (const service of WITHOUT_MARK) {
-      expect(SERVICE_MARKS[service]).toBeUndefined();
-      const { container, unmount } = render(<ServiceMark service={service} nameHidden />);
-      expect(container.querySelector('svg')).toBeNull();
-      // The word mark stays VISIBLE — hiding it would leave an empty chip.
-      expect(container.querySelector('.service-mark__name--hidden')).toBeNull();
-      expect(container.textContent).toBe(SERVICE_LABELS[service]);
-      unmount();
-    }
+    vi.resetModules();
+    vi.doMock('../src/components/brands', () => ({ SERVICE_MARKS: {} }));
+    const { ServiceMark: WithoutMarks } = await import('../src/components/ServiceMark');
+    const { container, unmount } = render(<WithoutMarks service="netflix" nameHidden />);
+    expect(container.querySelector('svg')).toBeNull();
+    // The word mark stays VISIBLE — hiding it would leave an empty chip.
+    expect(container.querySelector('.service-mark__name--hidden')).toBeNull();
+    expect(container.textContent).toBe(SERVICE_LABELS.netflix);
+    unmount();
+    vi.doUnmock('../src/components/brands');
+    vi.resetModules();
   });
 
-  it('T-BRAND-002d: the five services with a mark render it beside the hidden name', () => {
-    for (const service of SERVICES.filter((s) => !WITHOUT_MARK.includes(s))) {
+  it('T-BRAND-002d: every service renders its mark beside the hidden name', () => {
+    for (const service of SERVICES) {
       const { container, unmount } = render(<ServiceMark service={service} nameHidden />);
       expect(container.querySelector('svg'), service).not.toBeNull();
       expect(container.querySelector('.service-mark__name--hidden'), service).not.toBeNull();

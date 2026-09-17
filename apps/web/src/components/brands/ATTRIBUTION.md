@@ -1,8 +1,18 @@
 # Bundled service marks — attribution and terms
 
-The five SVG paths in this directory are **vendored**, not authored here, and
-not fetched at runtime. See `docs/adr/ADR-0014-service-marks.md` for the
-decision; this file is the record of _what_ was taken and _from where_.
+The marks in this directory have **two different origins, and the difference
+matters more than anything visible on screen**:
+
+- **Five are vendored** — CC0, copied verbatim, re-derivable from a pinned
+  commit.
+- **Three are drawn here** — Prime Video, Disney+ and Peacock, authored at the
+  owner's direction on 2026-09-17 because no CC0 artwork exists for them.
+
+Nothing is fetched at runtime. See `docs/adr/ADR-0014-service-marks.md` for the
+decision; this file is the record of _what_ was taken, _from where_, and _what
+was not taken_.
+
+## Vendored (five)
 
 ## Source
 
@@ -37,19 +47,45 @@ and, worse, teaches the next reader that the rule has exceptions.
 > The names collide exactly where a careless vendoring would not notice, and
 > the wrong glyph would have shipped looking perfectly deliberate.
 
-## What is deliberately NOT bundled
+## Drawn here (three)
 
-**Prime Video, Disney+ and Peacock have no mark**, and that is a decision.
-Their logos are absent from the CC0 source: Amazon and Disney are among the
-brands removed from it through its published removal process. Re-drawing them
-from a press kit would take on precisely the risk that source declined to
-carry. Those three services render their **word mark**, which is what all eight
-rendered before this change.
+**Owner-directed 2026-09-17.** Having seen the mixed presentation on the live
+list, the owner asked for the three remaining services to get a mark too.
+
+| Component        | Service     | What it is                                            |
+| ---------------- | ----------- | ----------------------------------------------------- |
+| `PrimeVideoMark` | Prime Video | A curved arrow, in the spirit of the Amazon smile     |
+| `DisneyPlusMark` | Disney+     | A `D+` monogram — **not** the Disney script or castle |
+| `PeacockMark`    | Peacock     | A six-feather fan of rotated ellipses                 |
+
+These are **geometric approximations, drawn from scratch to be recognisable at
+16 px** — they are not traces, and no press-kit asset, SVG or image file was
+obtained from any brand to make them. That is deliberate on two counts: the
+artwork is the part carrying the brands' protection, and fetching anything from
+a streaming service's own domain is forbidden outright here (product invariant
+10, enforced by `T-SEC-001`).
+
+⚠ **Their position is weaker than the vendored five, and the owner accepted
+that knowingly.** A CC0 file has an unambiguous copyright story; an
+approximation of a protected mark does not. If tightening this is ever wanted,
+the fix is **deletion**, not improvement — a more faithful drawing is a worse
+position, not a better one.
+
+⚠ **Do not "upgrade" a drawn mark by tracing the real logo.** It reproduces
+precisely what the approximation avoids, and every test in this repository
+would stay green.
+
+~~Superseded 2026-09-17: "**Prime Video, Disney+ and Peacock have no mark**,
+and that is a decision. … Those three services render their **word mark**,
+which is what all eight rendered before this change."~~ Retained because it
+still explains why these three differ in kind from the other five.
 
 ## Terms, stated plainly
 
-- **CC0 covers the SVG files.** It does not, and cannot, transfer any rights in
-  the underlying trademarks.
+- **CC0 covers the SVG files** taken from the vendored source. It does not, and
+  cannot, transfer any rights in the underlying trademarks. It says nothing at
+  all about the three marks drawn here, which are original artwork owned by
+  this project but depict marks that are not.
 - **The marks remain the property of their respective owners.** They are used
   here **nominatively** — to identify which streaming service a title is saved
   on, in a private single-owner watchlist. No affiliation, sponsorship or
