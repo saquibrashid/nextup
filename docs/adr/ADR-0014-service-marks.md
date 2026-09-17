@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Accepted (2026-09-17).** Requested by the owner in issue #288 and expanded by the owner on the same day to cover the upload wizard. |
+| **Status** | **Accepted (2026-09-17). Revised the same day — Revision 2, §5.** Requested by the owner in issue #288, expanded by the owner to cover the upload wizard, then revised after the owner reviewed the result on the live list. |
 | **Date** | 2026-09-17 |
 | **Deciders** | the owner (wants the logos), coordinator (terms, mechanics) |
 | **Forced by** | Issue #288: *"A row can carry several badges. Word marks in identical chips are slow to scan; the logos are what the owner actually recognises at a glance."* ADR-0013 declares a **closed icon register with no external assets**, so service logos could not simply be added to it. |
@@ -81,24 +81,52 @@ Why not the brands' own press kits, which is what issue #288 first proposed:
 > exactly where a careless vendoring would not look twice, and the wrong glyph
 > would have shipped looking entirely deliberate.
 
-## 5. Decision D-3 — Three services get a word mark, and that is the decision
+## 5. Decision D-3 — All eight services get a mark; three of them are drawn here
 
-| Service | Rendering |
-|---|---|
-| Netflix, Max, Apple TV+, Paramount+, Starz | Bundled mark + visually hidden name |
-| **Prime Video, Disney+, Peacock** | **Word mark** (exactly what all eight rendered before) |
+> **Revision 2 — 2026-09-17, owner-directed.** The owner reviewed the mixed
+> presentation on the live list and asked for the missing three to be drawn.
+> This section is corrected **in place**; the superseded decision is struck
+> through beneath it, because its reasoning still explains why those three
+> differ in kind.
 
-Those three have **no mark in the CC0 source**: Amazon and Disney are among the
-brands removed from it through its published removal process. Re-drawing them
-from a press kit would take on precisely the risk that source declined to
-carry, for three logos out of eight, in a private single-owner watchlist.
+| Service | Rendering | Origin |
+|---|---|---|
+| Netflix, Max, Apple TV+, Paramount+, Starz | Mark + visually hidden name | **Vendored**, CC0, verbatim |
+| Prime Video, Disney+, Peacock | Mark + visually hidden name | **Drawn here**, original geometry |
 
-Issue #288's own acceptance criterion already anticipated this — *"a service
-with no usable mark falls back to its word mark rather than rendering
-nothing"* — so the mixed presentation is the accepted outcome, not a gap to
-close later. `T-BRAND-002c` **asserts the three gaps are still gaps**, because
-a test that only checked "every service renders something" would stay green
-while a future contributor helpfully completed the set.
+The three have no CC0 artwork — Amazon and Disney are among the brands removed
+from that source through its published removal process — so they are
+**hand-authored approximations**: a curved arrow for Prime Video, a `D+`
+monogram for Disney+, a six-feather fan for Peacock. They are **not traces**,
+and no press-kit asset was obtained to make them. Two reasons, both binding:
+
+1. The **artwork** is the part carrying a brand's protection. An approximation
+   that identifies the service without reproducing its artwork is a materially
+   different act from copying the logo.
+2. Fetching anything from a streaming service's own domain is forbidden here
+   outright (product invariant 10). `T-SEC-001` already failed this branch once
+   for a brand URL in a code comment, which is the gate doing its job.
+
+⚠ **The owner accepted a weaker position knowingly.** A CC0 file has an
+unambiguous copyright story; an approximation of a protected mark does not.
+The remedy, if one is ever wanted, is **deletion** — a more faithful drawing is
+a worse position, not a better one.
+
+⚠ **`T-BRAND-001g` pins the two origins apart in the source files**, because
+nothing at render time distinguishes them and a future contributor "improving"
+a drawn mark by tracing the real logo would change the legal position without
+changing a single test. `T-BRAND-002c` keeps the word-mark fallback — the
+removal path this whole section depends on — alive and asserted even though no
+service reaches it any more.
+
+~~**Superseded (Revision 1).** "Three services get a word mark, and that is the
+decision. Prime Video, Disney+ and Peacock have no mark in the CC0 source …
+Re-drawing them from a press kit would take on precisely the risk that source
+declined to carry, for three logos out of eight, in a private single-owner
+watchlist. Issue #288's own acceptance criterion already anticipated this — *'a
+service with no usable mark falls back to its word mark rather than rendering
+nothing'* — so the mixed presentation is the accepted outcome, not a gap to
+close later. `T-BRAND-002c` asserts the three gaps are still gaps."~~
 
 ## 6. Decision D-4 — Monochrome, inherited, and never the sole carrier of meaning
 
@@ -116,8 +144,10 @@ while a future contributor helpfully completed the set.
 
 ## 7. Terms, stated plainly
 
-CC0 covers the **SVG files**. It does not, and cannot, transfer any rights in
-the underlying **trademarks**, which remain the property of their owners. The
+CC0 covers the **SVG files** taken from the vendored source. It does not, and
+cannot, transfer any rights in the underlying **trademarks**, which remain the
+property of their owners. It says nothing about the three marks drawn here
+(§5), which are original artwork depicting marks this project does not own. The
 marks are used **nominatively** — to identify which service a title is saved on
 — in a private, single-owner, non-commercial watchlist. No affiliation,
 sponsorship or endorsement is claimed or implied.
@@ -144,12 +174,19 @@ is a deliberate property of D-3's design, not a coincidence.
 
 ## 9. Consequences
 
-- Rows and the upload chooser are faster to scan for five of eight services and
-  unchanged for three. The owner should expect a mixed presentation.
-- Adding a ninth service means checking the CC0 source for a mark, and
-  shipping without one if there is none — never drawing a substitute.
-- Refreshing a mark is a **re-vendor** from a newly pinned commit, recorded in
-  `ATTRIBUTION.md`. Editing path data in place is altering a trademark and is
-  forbidden.
-- The upstream project may remove a brand at its owner's request. That is a
-  feature of this choice: a removal upstream is the signal to remove it here.
+- Rows and the upload chooser are faster to scan for **all eight** services.
+- Adding a ninth service means checking the CC0 source for a mark first, and
+  drawing an approximation only if there is none — never tracing one, and never
+  fetching artwork from the service itself.
+- Refreshing a **vendored** mark is a **re-vendor** from a newly pinned commit,
+  recorded in `ATTRIBUTION.md`. Editing path data in place is altering a
+  trademark and is forbidden. A **drawn** mark may be redrawn for legibility,
+  but never redrawn *closer* to the real logo — see §5.
+- The upstream project may remove a brand at its owner's request. For a
+  vendored mark that is the signal to remove it here.
+
+~~Superseded 2026-09-17: "Rows and the upload chooser are faster to scan for
+five of eight services and unchanged for three. The owner should expect a mixed
+presentation." and "Adding a ninth service means checking the CC0 source for a
+mark, and shipping without one if there is none — never drawing a
+substitute."~~
