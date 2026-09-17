@@ -573,7 +573,15 @@ test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone
     const positions = await fields.evaluateAll((elements) =>
       elements.map((element) => element.getBoundingClientRect().x),
     );
-    expect(new Set(positions).size).toBe(width < 640 ? 2 : width < 1024 ? 3 : 6);
+    /*
+     * ⚠ **TWO COLUMNS AT EVERY WIDTH.** This asserted `2 / 3 / 6` by viewport,
+     * which codified the defect rather than catching it: the controls live in
+     * `.dialog--panel`, capped at `26rem`, so six columns meant six controls
+     * sharing ~400px and every label wrapped to one character per line. The
+     * count is now a property of the panel, which does not change with the
+     * viewport. `T-UX-147e` measures the consequence the owner actually sees.
+     */
+    expect(new Set(positions).size).toBe(2);
     for (const [index, category] of [
       'Services',
       'Type',
@@ -998,4 +1006,58 @@ test('T-UX-147c: a phone compact row flows instead of stacking, and stays inside
   expect(rating.x).toBeGreaterThan(watch.x);
   expect(rating.x + rating.width).toBeLessThanOrEqual(390 + 1);
   await noOverflow(page);
+});
+
+test('T-UX-147e: filter trigger labels stay on one line inside the filters panel at every width', async ({
+  page,
+}) => {
+  /*
+   * ⚠ The filters live inside `.dialog--panel`, which is capped at 26rem, so
+   * the VIEWPORT width says nothing about the room they have. A viewport
+   * media query once widened the grid to six columns at 1024px, which put six
+   * controls into ~400px and wrapped every label to one character per line —
+   * visible only on the big screen, while 320px stayed correct. The wide
+   * widths here are the point of the test.
+   */
+  for (const width of [390, 768, 1280, 1600]) {
+    await mountLibrary(page, { width });
+    const dialog = await openFiltersPanel(page);
+    const fields = dialog.locator('.filter-disclosure[data-filter-field]');
+    const count = await fields.count();
+    expect(count).toBeGreaterThan(1);
+    for (let index = 0; index < count; index += 1) {
+      const field = fields.nth(index);
+      const label = field.locator('.filter-disclosure__label');
+      /* Not wrapped: the label's laid-out width is its full text width. */
+      const overflow = await label.evaluate((el) => el.scrollWidth - el.clientWidth);
+      expect(overflow, `label ${String(index)} at ${String(width)}px`).toBeLessThanOrEqual(1);
+      const box = await bounds(field.locator('.btn'));
+      expect(box.width, `trigger ${String(index)} at ${String(width)}px`).toBeGreaterThanOrEqual(
+        96,
+      );
+    }
+    /*
+     * The popover must open inside the panel, not off its edge — the
+     * column-alignment rule is keyed to the column count and silently points
+     * at the wrong column when that count changes.
+     */
+    const dialogBox = await bounds(dialog);
+    for (const index of [0, 1]) {
+      await fields.nth(index).locator('.btn').click();
+      const popover = dialog.locator('.filter-disclosure__panel:visible');
+      const popoverBox = await bounds(popover);
+      expect(popoverBox.x + popoverBox.width).toBeLessThanOrEqual(width + 1);
+      expect(popoverBox.x).toBeGreaterThanOrEqual(0);
+      if (width >= 640) {
+        expect(popoverBox.x).toBeLessThanOrEqual(dialogBox.x + dialogBox.width + 1);
+      }
+      /*
+       * ⚠ Dismiss with the popover's own Done, not Escape: Escape here closes
+       * the whole filters dialog, not just the disclosure, and the next
+       * iteration would then be measuring nothing.
+       */
+      await popover.getByRole('button', { name: 'Done', exact: true }).click();
+    }
+    await noOverflow(page);
+  }
 });

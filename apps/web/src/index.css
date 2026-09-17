@@ -2999,6 +2999,16 @@ button {
   margin: 0;
 }
 
+/*
+ * ⚠ **TWO COLUMNS AT EVERY WIDTH, AND THE COLUMN COUNT MUST NOT TRACK THE
+ * VIEWPORT.** These controls live inside `.dialog--panel`, which is capped at
+ * `26rem` — so viewport width says nothing about the space they actually have.
+ * The rules below used to widen to three columns at 640px and SIX at 1024px,
+ * written when the filters were a full-width bar; after they moved into the
+ * panel that meant six controls sharing ~400px, and every trigger label
+ * collapsed to one character per line. It looked fine at 320px, where no
+ * override applied, and broke only on the big screen.
+ */
 .filter-controls {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3215,10 +3225,6 @@ button {
     max-block-size: 100%;
   }
 
-  .filter-controls {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .filter-disclosure__panel {
     position: absolute;
     inset-inline: auto 0;
@@ -3232,21 +3238,13 @@ button {
     inset-inline: 0 auto;
   }
 
-  .filter-controls > .filter-disclosure:nth-child(3n) .filter-disclosure__panel {
-    inset-inline: auto 0;
-  }
-}
-
-@media (min-width: 1024px) {
-  .filter-controls {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-  }
-
-  .filter-controls > .filter-disclosure:nth-child(3n) .filter-disclosure__panel {
-    inset-inline: 0 auto;
-  }
-
-  .filter-controls > .filter-disclosure:nth-last-child(-n + 2) .filter-disclosure__panel {
+  /*
+   * The grid is two columns, so the right-hand control is every EVEN child.
+   * ⚠ This was `nth-child(3n)`, which addressed the right-hand column only
+   * while the grid was three wide; against a two-column grid it lands on the
+   * left column on alternate rows and opens those popovers off the panel edge.
+   */
+  .filter-controls > .filter-disclosure:nth-child(2n) .filter-disclosure__panel {
     inset-inline: auto 0;
   }
 }
