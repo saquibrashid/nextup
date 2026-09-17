@@ -1,6 +1,14 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
-import { removalsLabel, type ReviewCandidate, type ReviewResponse } from '@nextup/domain';
+import {
+  SERVICES,
+  SERVICE_LABELS,
+  serviceFreshnessLabel,
+  removalsLabel,
+  type ReviewCandidate,
+  type ReviewResponse,
+  type Service,
+} from '@nextup/domain';
 
 import { IMAGE_ACCEPT_ATTRIBUTE, REVIEW_APPLY_LABEL, SUBMIT_LABEL } from '../../apps/web/src/copy';
 
@@ -92,10 +100,10 @@ function duneCandidate(disposition: ReviewCandidate['disposition']): ReviewCandi
   };
 }
 
-function reviewResponse(confirmed: boolean): ReviewResponse {
+function reviewResponse(confirmed: boolean, service: Service = 'netflix'): ReviewResponse {
   return {
     batchId: BATCH_ID,
-    service: 'netflix',
+    service,
     discoverySource: null,
     mode: 'full-update',
     lowYield: false,
@@ -114,7 +122,7 @@ function reviewResponse(confirmed: boolean): ReviewResponse {
       unmatched: { label: "Couldn't identify these", count: 0, items: [] },
       unreadableTiles: { label: "Couldn't read these", count: 0, items: [] },
       removals: {
-        label: removalsLabel('netflix'),
+        label: removalsLabel(service),
         count: 0,
         items: [],
         omitted: true,
@@ -126,7 +134,11 @@ function reviewResponse(confirmed: boolean): ReviewResponse {
   };
 }
 
-async function stubApi(page: Page, state: UploadState): Promise<void> {
+async function stubApi(
+  page: Page,
+  state: UploadState,
+  service: Service = 'netflix',
+): Promise<void> {
   await page.route('**/api/**', async (route: Route) => {
     const request = route.request();
     const method = request.method();
@@ -140,22 +152,21 @@ async function stubApi(page: Page, state: UploadState): Promise<void> {
     }
 
     if (method === 'GET' && path === '/api/titles') {
-      await route.fulfill(ok({ titles: [], total: 0 }));
+      await route.fulfill(
+        ok({ items: [], nextCursor: null, limit: 50, runtimeUnknownHidden: null }),
+      );
       return;
     }
 
-    if (method === 'GET' && path === '/api/services') {
+    if (method === 'GET' && path === '/api/service-state') {
       await route.fulfill(
         ok({
-          services: (['netflix', 'max'] as const).map((service) => ({
+          services: SERVICES.map((service) => ({
             service,
-            lastUpdatedAt: null,
+            lastCompletedBatchAt: null,
             lastCompletedBatchId: null,
             ageDays: null,
-            label:
-              service === 'netflix'
-                ? 'Netflix has never been updated'
-                : 'Max has never been updated',
+            label: serviceFreshnessLabel(service, null),
           })),
         }),
       );
@@ -169,7 +180,7 @@ async function stubApi(page: Page, state: UploadState): Promise<void> {
         contentType: 'application/json',
         body: JSON.stringify({
           batchId: BATCH_ID,
-          service: 'netflix',
+          service,
           discoverySource: null,
           mode: 'full-update',
           status: 'open',
@@ -212,7 +223,7 @@ async function stubApi(page: Page, state: UploadState): Promise<void> {
       await route.fulfill(
         ok({
           batchId: BATCH_ID,
-          service: 'netflix',
+          service,
           discoverySource: null,
           mode: 'full-update',
           status: inReview ? 'in-review' : 'extracting',
@@ -246,7 +257,7 @@ async function stubApi(page: Page, state: UploadState): Promise<void> {
     }
 
     if (method === 'GET' && path === `/api/batches/${BATCH_ID}/review`) {
-      await route.fulfill(ok(reviewResponse(state.confirmed)));
+      await route.fulfill(ok(reviewResponse(state.confirmed, service)));
       return;
     }
 
@@ -263,7 +274,7 @@ async function stubApi(page: Page, state: UploadState): Promise<void> {
           batchId: BATCH_ID,
           status: 'closed',
           summary: { listingsCreated: 1, listingsRemoved: 0, removalGroupId: null },
-          serviceState: { service: 'netflix' },
+          serviceState: { service },
           undoable: true,
         }),
       );
@@ -296,6 +307,74 @@ function freshState(): UploadState {
     0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63, 0x00, 0x00, 0x00, 0x00,
     0x68, 0x65, 0x69, 0x63, 0x6d, 0x69, 0x66, 0x31,
   ]);
+
+async function expectServiceUpload(page: Page, service: Service): Promise<void> {
+  const state = freshState();
+  await stubApi(page, state, service);
+  await page.goto(`/upload?service=${service}`);
+  await expect(
+    page.getByRole('radio', { name: SERVICE_LABELS[service], exact: true }),
+  ).toBeChecked();
+  await expect(page.getByTestId('mode-step').getByRole('radio', { checked: true })).toHaveCount(0);
+  expect(state.batchCreatedWith).toBeNull();
+  await page.getByRole('radio', { name: /Full update/ }).check();
+  await page
+    .getByTestId('file-input')
+    .setInputFiles([
+      { name: 'saved-list.heic', mimeType: 'application/octet-stream', buffer: HEIC_BYTES },
+    ]);
+  await expect(page.getByTestId('accepted-file')).toHaveCount(1);
+  expect(state.batchCreatedWith).toEqual({ service, mode: 'full-update' });
+  await page.getByRole('button', { name: SUBMIT_LABEL }).click();
+  await expect(page).toHaveURL(`/batches/${BATCH_ID}/review`);
+  await expect(page.getByRole('heading', { name: 'Review this batch' })).toBeVisible();
+  await page.getByRole('button', { name: 'Confirm all 1' }).click();
+  await page.getByRole('button', { name: REVIEW_APPLY_LABEL }).click();
+  await expect(page).toHaveURL('/');
+  await expect(page.getByTestId('applied-notice')).toContainText(SERVICE_LABELS[service]);
+  expect(state.closeBody).toEqual({ confirmRemovals: false });
+}
+
+test('T-SVC-002h: Netflix upload link creates, reviews and closes the selected service', async ({
+  page,
+}) => {
+  await expectServiceUpload(page, 'netflix');
+});
+test('T-SVC-002i: Max upload link creates, reviews and closes the selected service', async ({
+  page,
+}) => {
+  await expectServiceUpload(page, 'max');
+});
+test('T-SVC-002j: Prime Video upload link creates, reviews and closes the selected service', async ({
+  page,
+}) => {
+  await expectServiceUpload(page, 'prime-video');
+});
+test('T-SVC-002k: Disney+ upload link creates, reviews and closes the selected service', async ({
+  page,
+}) => {
+  await expectServiceUpload(page, 'disney-plus');
+});
+test('T-SVC-002l: Apple TV+ upload link creates, reviews and closes the selected service', async ({
+  page,
+}) => {
+  await expectServiceUpload(page, 'apple-tv-plus');
+});
+test('T-SVC-002m: Paramount+ upload link creates, reviews and closes the selected service', async ({
+  page,
+}) => {
+  await expectServiceUpload(page, 'paramount-plus');
+});
+test('T-SVC-002n: Starz upload link creates, reviews and closes the selected service', async ({
+  page,
+}) => {
+  await expectServiceUpload(page, 'starz');
+});
+test('T-SVC-002o: Peacock upload link creates, reviews and closes the selected service', async ({
+  page,
+}) => {
+  await expectServiceUpload(page, 'peacock');
+});
 
 test.describe('T-PASTE-010 — the add-not-swap regression guard', () => {
   test('T-PASTE-010a: the file input still exists on /upload and accepts multiple files', async ({

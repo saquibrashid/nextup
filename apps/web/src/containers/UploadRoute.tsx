@@ -29,8 +29,8 @@
  */
 
 import { useCallback, useRef, useState, type JSX } from 'react';
-import { useNavigate } from 'react-router-dom';
-import type { BatchMode, Service } from '@nextup/domain';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { SERVICES, type BatchMode, type Service } from '@nextup/domain';
 
 import { ImageDropzone, type ServerRejection } from '../components/ImageDropzone';
 import { ApiError, RefusedError, apiClient, type ApiClient } from '../lib/apiClient';
@@ -103,8 +103,14 @@ export function rejectionsFromError(error: unknown): readonly ServerRejection[] 
 export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.Element {
   const navigate = useNavigate();
   const online = useOnline();
+  const [params] = useSearchParams();
+  const requestedService = params.get('service');
+  const initialService = SERVICES.find((service) => service === requestedService) ?? null;
 
-  const [selection, setSelection] = useState<BatchDraftSelection>({ service: null, mode: null });
+  const [selection, setSelection] = useState<BatchDraftSelection>({
+    service: initialService,
+    mode: null,
+  });
   const [batchId, setBatchId] = useState<string | null>(null);
   const [imageCount, setImageCount] = useState(0);
   const [serverRejected, setServerRejected] = useState<readonly ServerRejection[]>([]);
@@ -229,7 +235,7 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
 
   return (
     <>
-      <UploadPage onSelectionChange={setSelection} />
+      <UploadPage initialService={initialService} onSelectionChange={setSelection} />
 
       {/*
         ⚠ Rendered AFTER step 1 and never in place of it. §4.10 offers the

@@ -11,6 +11,7 @@ import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 
 import type { Express } from 'express';
+import { SERVICES, SERVICE_LABELS } from '@nextup/domain';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { toServiceStateItems } from '../../src/routes/serviceState.js';
@@ -88,7 +89,7 @@ describe('GET /api/service-state', () => {
     // service makes its chip vanish, and a missing chip reads as "nothing to
     // report" rather than "never updated" — the precise misreading AC-3
     // exists to prevent.
-    expect(services.map((s) => s.service)).toEqual(['netflix', 'max']);
+    expect(services.map((s) => s.service)).toEqual(SERVICES);
     for (const item of services) {
       expect(item.lastCompletedBatchAt).toBeNull();
       expect(item.ageDays).toBeNull();
@@ -125,7 +126,7 @@ describe('GET /api/service-state', () => {
     // The mixed state is the realistic one and the easiest to get wrong: a
     // handler mapping over the STORE rows rather than the service enumeration
     // returns one entry and passes every single-service assertion.
-    expect(services).toHaveLength(2);
+    expect(services).toHaveLength(SERVICES.length);
     expect(services.find((s) => s.service === 'max')?.label).toBe('Max has never been updated');
   });
 
@@ -160,22 +161,15 @@ describe('toServiceStateItems', () => {
     // Abandoned and failed batches never write `serviceState` — that is the
     // batch-close path's job, asserted there. This function must not invent a
     // date from anything else in scope, so an empty store yields nulls.
-    expect(toServiceStateItems([], new Date('2026-08-13T00:00:00.000Z'))).toEqual([
-      {
-        service: 'netflix',
+    expect(toServiceStateItems([], new Date('2026-08-13T00:00:00.000Z'))).toEqual(
+      SERVICES.map((service) => ({
+        service,
         lastCompletedBatchAt: null,
         lastCompletedBatchId: null,
         ageDays: null,
-        label: 'Netflix has never been updated',
-      },
-      {
-        service: 'max',
-        lastCompletedBatchAt: null,
-        lastCompletedBatchId: null,
-        ageDays: null,
-        label: 'Max has never been updated',
-      },
-    ]);
+        label: `${SERVICE_LABELS[service]} has never been updated`,
+      })),
+    );
   });
 
   it('T-FRESH-010h · `now` is injected, so ageDays is deterministic', () => {
@@ -210,6 +204,6 @@ describe('toServiceStateItems', () => {
       new Date('2026-08-13T00:00:00.000Z'),
     );
 
-    expect(items.map((i) => i.service)).toEqual(['netflix', 'max']);
+    expect(items.map((i) => i.service)).toEqual(SERVICES);
   });
 });

@@ -5,8 +5,21 @@
 // statements narrow against it, and a new member cannot be added without both
 // updating in lockstep.
 
-export const SERVICES = ['netflix', 'max'] as const; // REQ-002, REQ-053
+export const SERVICES = [
+  'netflix',
+  'max',
+  'prime-video',
+  'disney-plus',
+  'apple-tv-plus',
+  'paramount-plus',
+  'starz',
+  'peacock',
+] as const; // REQ-002, REQ-053
 export type Service = (typeof SERVICES)[number];
+
+export function isService(value: unknown): value is Service {
+  return typeof value === 'string' && SERVICES.some((service) => service === value);
+}
 
 export const BATCH_MODES = ['append-only', 'full-update'] as const; // REQ-003
 export type BatchMode = (typeof BATCH_MODES)[number];
@@ -18,7 +31,7 @@ export type BatchMode = (typeof BATCH_MODES)[number];
  *
  * ⚠ **THIS IS NOT A `SERVICES` MEMBER AND MUST NEVER BECOME ONE** (ADR-0010
  * D-1). `SERVICES` means "a subscription service whose saved list the owner
- * captures", and its members stay `['netflix','max']` so that `listings`
+ * captures". Discovery sources stay separate so that `listings`
  * remains capped at `SERVICES.length` and the REQ-025 badge count keeps
  * counting badges. Five assumptions of the service model are false of an
  * editorial feed — see the table in ADR-0010 §Context.

@@ -1,7 +1,7 @@
 // Batch source rules — ADR-0010 D-1/D-2, REQ-082/REQ-083.
 //
 // A batch originates EITHER from a service whose saved list the owner curated
-// (`netflix`, `max`) OR from a rental storefront they browsed
+// (a SERVICES member) OR from a rental storefront they browsed
 // (`fandango-at-home`). The two are not interchangeable, and this module is
 // where that distinction is decided once rather than re-derived per route.
 //

@@ -63,7 +63,7 @@ export interface Title {
   createdByBatchId: string | null;
   /** `false` until the creating batch reaches `'applied'`. */
   visible: boolean;
-  /** 1..2 in v1; at most one per service (`T-INV-002`). */
+  /** 1..SERVICES.length; at most one per service (`T-INV-002`). */
   listings: ServiceListing[];
   /** `null` iff `matchState === 'unmatched'`. */
   tmdb: TmdbMetadata | null;

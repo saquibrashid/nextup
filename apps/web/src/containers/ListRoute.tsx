@@ -19,7 +19,7 @@ import { type AppliedBatch } from '../components/BatchAppliedNotice';
 import { isFiltered, parseFilters } from '../components/FilterBar';
 import { apiClient, type ApiClient, type TitleListItem } from '../lib/apiClient';
 import { useResource } from '../lib/useResource';
-import { normaliseGenres } from '@nextup/domain';
+import { SERVICES, normaliseGenres } from '@nextup/domain';
 
 import { useCursorPages } from '../lib/useCursorPages';
 import { useOnline } from '../lib/useOnline';
@@ -74,7 +74,8 @@ export function parseAppliedState(state: unknown): AppliedBatch | undefined {
 
   const { batchId, service, summary, undoable } = applied as Record<string, unknown>;
   if (typeof batchId !== 'string' || batchId === '') return undefined;
-  if (service !== 'netflix' && service !== 'max') return undefined;
+  const selectedService = SERVICES.find((candidate) => candidate === service);
+  if (selectedService === undefined) return undefined;
   if (typeof undoable !== 'boolean') return undefined;
   if (typeof summary !== 'object' || summary === null) return undefined;
 
@@ -84,7 +85,7 @@ export function parseAppliedState(state: unknown): AppliedBatch | undefined {
 
   return {
     batchId,
-    service,
+    service: selectedService,
     summary: { listingsCreated, listingsRemoved, removalGroupId },
     undoable,
   };

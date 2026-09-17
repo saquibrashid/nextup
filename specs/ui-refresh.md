@@ -602,7 +602,7 @@ show external category labels, selected/default values and chevrons. Their
 triggers open labelled,
 nonmodal checkbox disclosures. Genre options come from the real list facets;
 there is no invented genre or provider. Services is searchable over
-`SERVICES` / `SERVICE_LABELS` (**Netflix and Max only**); no phantom "All"
+`SERVICES` / `SERVICE_LABELS` (**the eight services approved in US-061**); no phantom "All"
 checkbox. Picker search filters options, never the title rows. OR within each
 dimension and AND across dimensions remain unchanged.
 

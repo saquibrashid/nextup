@@ -21,7 +21,7 @@
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { serviceFreshnessLabel } from '@nextup/domain';
+import { SERVICES, serviceFreshnessLabel } from '@nextup/domain';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -76,7 +76,17 @@ function renderStrip(services: readonly ServiceFreshness[] | null): HTMLElement 
 
 describe('T-FRESH-014 - the strip degrades visibly and never takes the list with it', () => {
   it('T-FRESH-014a renders both factual labels verbatim when the dates are available', () => {
-    const strip = renderStrip([NETFLIX_TODAY, MAX_NEVER]);
+    const strip = renderStrip(
+      SERVICES.map((service) =>
+        service === 'netflix'
+          ? NETFLIX_TODAY
+          : {
+              ...MAX_NEVER,
+              service,
+              label: serviceFreshnessLabel(service, null),
+            },
+      ),
+    );
 
     expect(within(strip).getByTestId('freshness-label-netflix').textContent).toBe(
       'Netflix updated today',

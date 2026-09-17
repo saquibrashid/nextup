@@ -1,6 +1,6 @@
 # nextup
 
-> Sign in as the owner, upload screenshots of your Netflix and Max saved lists
+> Sign in as the owner, upload screenshots of your streaming-service saved lists
 > in append-only or full-update mode, confirm what was read from them, and see
 > one deduplicated combined list — one row per title, a badge per service —
 > that you can filter and sort and that never loses anything without asking you
@@ -10,6 +10,10 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## What it does
+
+**Supported services:** Netflix, Max, Prime Video, Disney+, Apple TV+,
+Paramount+, Starz and Peacock. Imports are owner-uploaded screenshots, not
+connections to streaming accounts.
 
 Your saved watchlists are trapped inside separate streaming apps, so answering
 _"what have I saved that I could watch right now?"_ means opening several apps

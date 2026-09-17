@@ -8,6 +8,18 @@ sourceOfTruth: docs/PRD.md §9, docs/architecture.md
 
 # specs/ui.md — nextup screens
 
+**Expanded service contract (US-061 / REQ-127, 2026-09-17).** Upload, manual add,
+filtering, badges, review, batch/removal history, waiting availability and factual
+service-update labels derive from the same eight-service `SERVICES` /
+`SERVICE_LABELS` registry. Upload and manual add require one explicit service.
+Opening `/upload?service=<supported-token>` preselects that service only, never
+the capture mode; selecting choices alone never creates a batch. Unsupported
+query values leave the service unselected. Both upload modes and all three
+ingest affordances remain complete paths. Service-update links cover all eight
+services with factual dates, not nags. At 320px, eight badges wrap within the
+existing Grid/Compact layouts, and the searchable service picker stays bounded
+and scrollable rather than expanding into an eight-button toolbar.
+
 > ⚠ **REVISION 7 — 2026-08-11 (`A44`) — THE COMBINED LIST WAS MISSING A SORT
 > CONTROL; US-020 AC-6 HAD NO UI AFFORDANCE.**
 > Owner answer, verbatim: *"Newest-first — conventional, recent saves on
@@ -100,7 +112,7 @@ the nav, and the **global footer carrying TMDB attribution** (§8).
 
 ## 2. `/` — Combined list (US-018, US-019, US-020, US-022)
 
-**Purpose.** One list of everything the owner has saved across Netflix and Max.
+**Purpose.** One list of everything the owner has saved across the eight supported streaming services (US-061).
 **Entry points.** Sign-in landing; the logo; after closing a batch; after any
 restore, suppress, un-suppress or fix-match.
 **Primary action.** Read. Secondary: filter, sort, open a row's menu.
@@ -135,7 +147,7 @@ restore, suppress, un-suppress or fix-match.
    REQ-038, REQ-037, `api.md` §6.2).
 
    Services is searchable over `SERVICES` / `SERVICE_LABELS`, currently
-   **Netflix and Max only**, with no "All" checkbox or invented providers.
+   **Netflix, Max, Prime Video, Disney+, Apple TV+, Paramount+, Starz and Peacock**, with no "All" checkbox or invented providers.
    Type labels are Movies / TV series; genre options come from real facets.
    Selections are **URL-only**, OR within each dimension, AND across them.
    Every selected filter has a visible native 44 px removal button, even
@@ -299,7 +311,7 @@ See `api.md` §6.2d and `T-WATCH-003`.
 | Name | `name` | The only element with heading weight in the row |
 | Watch preferences (REQ-126) | `watching`, `priority` | A separate native button below the title reads `Priority: Normal` by default, or `Watching · Up next` etc. Its accessible name includes the title, Watching state and priority. Opens the explicit-save editor (§2.1a); offline shows the same facts without an edit affordance. |
 | Year · type · runtime · genres | `releaseYear`, `mediaType`, `runtimeMinutes`, `genres` | Runtime precedes genres in the approved 2026-09-16 layout. Film renders `1h 55m`, TV `45m/ep` (**one episode**, never a whole-series claim); missing runtime says **"Runtime unknown"**. Genres use three chips plus `+n` expansion, with active-filter genres always visible even above that limit. **Names wrap, never truncate**; `genres: []` renders nothing, never "Unknown" or `+0` (US-019 AC-6). All facts, including IMDb rating or its absent state, remain in Grid and Compact. |
-| **Service badges** | `badges[]` | One badge per **active** listing (REQ-026). Badges are text-labelled (`Netflix`, `Max`), not colour-only — colour is never the sole carrier of meaning |
+| **Service badges** | `badges[]` | One badge per **active** listing (REQ-026), up to eight. Badges use the canonical `SERVICE_LABELS` text, not colour-only — colour is never the sole carrier of meaning |
 | Date-added label | `dateAddedLabel` | Rendered **verbatim from the API** (`specs/api.md` §6.2). REQ-061: it always contains "to nextup". The component **must not** construct this string. |
 | Row menu | — | `⋮` button → **Not interested** (US-027), **Fix match** (US-030), **Remove from list** (US-048). 44×44 px hit area. ⚠ **Three items, and Remove was ADDED beside "Not interested", not in place of it.** They read alike — the row disappears either way — and mean opposite things: suppression is a permanent, work-identity decision that survives every future upload (REQ-071), while removal asserts nothing about the work and lets a later capture legitimately bring it back as a new row (product invariant 7). Collapsing them into one item is the defect this row exists to prevent; `T-MANUAL-016` fails if either disappears. |
 
@@ -311,7 +323,7 @@ match"** action opening the fix-match dialog (US-008 AC-5).
 
 - **Not interested** (`components/SuppressDialog.tsx`) — states plainly:
   *"'Dune' will be hidden from your list and won't come back on future
-  uploads, even if it's still saved on Netflix or Max. You can undo this from
+  uploads, even if it's still saved on your streaming services. You can undo this from
   'Not interested'."* (US-027 AC-2/AC-3/AC-5). Confirm → `POST .../suppress`.
 - **Fix match** (`components/FixMatchDialog.tsx`) — a TMDB search box
   (`GET /api/tmdb/search`, debounced 300 ms), results as poster + name + year +
@@ -782,7 +794,7 @@ change is one diff and a test can assert it.
 |---|---|---|
 | `TMDB_DISCLAIMER` | *This product uses the TMDB API but is not endorsed or certified by TMDB.* | US-011 AC-2 — verbatim, compliance |
 | `REMOVED_VIEW_SUBTITLE` | *Everything that's ever left your list is kept here forever. The same title can appear more than once — each row is one removal.* | US-023 AC-2, US-024 AC-6 |
-| `SUPPRESS_CONFIRM_BODY` | *"{name}" will be hidden from your list and won't come back on future uploads, even if it's still saved on Netflix or Max. You can undo this from "Not interested".* | US-027 AC-2/AC-3 |
+| `SUPPRESS_CONFIRM_BODY` | *"{name}" will be hidden from your list and won't come back on future uploads, even if it's still saved on your streaming services. You can undo this from "Not interested".* | US-027 AC-2/AC-3 |
 | `UNSUPPRESS_CONFIRM_BODY` | *"{name}" can be added again by a future upload. This doesn't bring back anything that was removed — check Removal history for that.* | US-029 AC-4 |
 | `UNMATCHED_SUPPRESSION_CAVEAT` | *We couldn't identify this title, so we're matching it on the text we read. If a future screenshot reads slightly differently, it may come back.* | data-model §2.3.3 |
 | `FIXMATCH_SUPPRESSION_MIGRATED` | *We also moved your "not interested" setting across to the corrected title, so it still won't come back.* | data-model SD-06 |

@@ -1,6 +1,11 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
-import type { WatchPriority } from '@nextup/domain';
+import {
+  SERVICES,
+  SERVICE_LABELS,
+  serviceFreshnessLabel,
+  type WatchPriority,
+} from '@nextup/domain';
 
 const TITLES = [
   'Amber Harbor',
@@ -92,7 +97,7 @@ function orderedTitles(
 
 async function mountLibrary(
   page: Page,
-  { width = 1280, url = '/', paged = false, withGenres = true } = {},
+  { width = 1280, url = '/', paged = false, withGenres = true, allServices = false } = {},
 ): Promise<URL[]> {
   const requests: URL[] = [];
   const preferences = new Map<string, Preferences>();
@@ -146,9 +151,25 @@ async function mountLibrary(
         };
         break;
       case '/api/titles': {
-        const matching = orderedTitles(target.searchParams, preferences).map((title) =>
-          withGenres ? title : { ...title, genres: [] },
-        );
+        const matching = orderedTitles(target.searchParams, preferences)
+          .map((title) => ({
+            ...title,
+            genres: withGenres ? title.genres : [],
+            badges: allServices
+              ? SERVICES.map((service) => ({
+                  service,
+                  listingId: `${service}-${title.titleId}`,
+                  dateAdded: '2026-09-01',
+                }))
+              : title.badges,
+          }))
+          .filter(
+            (title) =>
+              !target.searchParams.has('service') ||
+              title.badges.some((badge) =>
+                target.searchParams.getAll('service').includes(badge.service),
+              ),
+          );
         const paginate = paged && !target.searchParams.has('q');
         const secondPage = target.searchParams.has('cursor');
         body = {
@@ -165,22 +186,13 @@ async function mountLibrary(
         break;
       case '/api/service-state':
         body = {
-          services: [
-            {
-              service: 'netflix',
-              lastCompletedBatchAt: '2026-09-16T00:00:00.000Z',
-              lastCompletedBatchId: 'fixture-batch',
-              ageDays: 0,
-              label: 'Netflix updated today',
-            },
-            {
-              service: 'max',
-              lastCompletedBatchAt: null,
-              lastCompletedBatchId: null,
-              ageDays: null,
-              label: 'Max has never been updated',
-            },
-          ],
+          services: SERVICES.map((service) => ({
+            service,
+            lastCompletedBatchAt: service === 'netflix' ? '2026-09-16T00:00:00.000Z' : null,
+            lastCompletedBatchId: service === 'netflix' ? 'fixture-batch' : null,
+            ageDays: service === 'netflix' ? 0 : null,
+            label: serviceFreshnessLabel(service, service === 'netflix' ? 0 : null),
+          })),
         };
         break;
       default:
@@ -539,6 +551,54 @@ test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone
     controls.getByRole('button', { name: 'Runtime 1h 30m – 2h', exact: true }),
   ).toBeVisible();
   expect(new URL(page.url()).searchParams.getAll('runtime')).toEqual(['90-120']);
+});
+
+test('T-SVC-002g: all eight services fit the library and remain searchable on phone and desktop', async ({
+  page,
+}) => {
+  const requests = await mountLibrary(page, { allServices: true });
+  for (const width of [320, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const view of ['Grid', 'Compact']) {
+      await page.getByRole('button', { name: `${view} view`, exact: true }).click();
+      const badges = page
+        .getByTestId('title-list')
+        .locator('li.title-row')
+        .first()
+        .getByTestId('badges');
+      for (const service of SERVICES)
+        await expect(badges.getByText(SERVICE_LABELS[service], { exact: true })).toBeVisible();
+      await noOverflow(page);
+    }
+    await page.getByRole('button', { name: /^Services / }).click();
+    const search = page.getByRole('searchbox', { name: 'Search services', exact: true });
+    for (const service of SERVICES) {
+      await search.fill(SERVICE_LABELS[service]);
+      const choice = page.getByRole('checkbox', { name: SERVICE_LABELS[service], exact: true });
+      await choice.scrollIntoViewIfNeeded();
+      await expect(choice).toBeInViewport();
+      if (!(await choice.isChecked())) await choice.click();
+      await expect(choice).toBeChecked();
+      await expect
+        .poll(() => new URL(page.url()).searchParams.getAll('service'))
+        .toContain(service);
+    }
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    await expect(
+      page.getByRole('button', { name: 'Services 8 selected', exact: true }),
+    ).toBeVisible();
+    await expect
+      .poll(() =>
+        requests.some(
+          (request) =>
+            request.pathname === '/api/titles' &&
+            request.searchParams.getAll('service').length === 8,
+        ),
+      )
+      .toBe(true);
+    await page.getByTestId('clear-filters').click();
+    await noOverflow(page);
+  }
 });
 
 test('T-WATCH-003j: filter panels remain bounded when no titles have genre facets', async ({

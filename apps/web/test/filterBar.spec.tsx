@@ -467,7 +467,16 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
       }
       await user.click(screen.getByRole('button', { name: /^Services / }));
       expect(screen.getAllByRole('checkbox')).toHaveLength(SERVICES.length);
-      expect(SERVICES).toEqual(['netflix', 'max']);
+      expect(SERVICES).toEqual([
+        'netflix',
+        'max',
+        'prime-video',
+        'disney-plus',
+        'apple-tv-plus',
+        'paramount-plus',
+        'starz',
+        'peacock',
+      ]);
       for (const service of SERVICES) {
         expect(screen.getByRole('checkbox', { name: SERVICE_LABELS[service] })).toBeEnabled();
       }

@@ -41,7 +41,7 @@ import { Input } from '../components/ui/Input';
 
 import { useEffect, useState, type JSX } from 'react';
 import type { ReviewCandidate, ReviewResponse, ReviewSection } from '@nextup/domain';
-import { DISCOVERY_SOURCE_LABELS } from '@nextup/domain';
+import { DISCOVERY_SOURCE_LABELS, SERVICE_LABELS } from '@nextup/domain';
 
 import type { TmdbSearchResult } from '../lib/apiClient';
 
@@ -184,7 +184,6 @@ export interface ReviewPageProps {
   readonly storage?: Storage;
 }
 
-const SERVICE_LABELS: Record<string, string> = { netflix: 'Netflix', max: 'Max' };
 const MODE_LABELS: Record<string, string> = {
   'full-update': 'Full update',
   'append-only': 'Append only',

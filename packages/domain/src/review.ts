@@ -55,7 +55,7 @@ import type {
 import { CANDIDATE_CLASSIFICATIONS } from './enums.js';
 import { mediaTypeForWorkIdentity } from './identity.js';
 import type { IsoDate } from './types.js';
-import { DEGRADED_EXTRACTION_BANNER, TMDB_UNAVAILABLE_BANNER } from './copy.js';
+import { DEGRADED_EXTRACTION_BANNER, TMDB_UNAVAILABLE_BANNER, SERVICE_LABELS } from './copy.js';
 
 /**
  * What the review RESPONSE may say about a candidate — a superset of the
@@ -372,7 +372,7 @@ export function removalsLabel(service: Service | null): string {
   // reason beats an empty label that would read as a missing translation if a
   // future change ever did render it.
   if (service === null) return 'Removals do not apply to a discovery capture';
-  return service === 'netflix' ? 'No longer on Netflix' : 'No longer on Max';
+  return `No longer on ${SERVICE_LABELS[service]}`;
 }
 
 // ── Routing ────────────────────────────────────────────────────────────────

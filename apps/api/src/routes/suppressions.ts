@@ -13,7 +13,7 @@
  * title id is used ONCE, to resolve an identity, and is never persisted.
  *
  * This is also why suppressing a two-badge title hides the whole row
- * (US-027 AC-5, `T-SUP-014`): the identity is per work, and both services'
+ * (US-027 AC-5, `T-SUP-014`): the identity is per work, and all services'
  * listings hang off the same work. There is no per-service suppression to get
  * wrong, because there is no per-service key.
  *

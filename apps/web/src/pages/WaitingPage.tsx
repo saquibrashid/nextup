@@ -1,7 +1,7 @@
 // `/waiting` — works the owner is waiting to stream (TASK-188/189, ADR-0010).
 //
 // ⚠ **THIS SCREEN NEVER ADDS ANYTHING TO THE COMBINED LIST** (US-042 AC-3,
-// product invariant 5). A work TMDB reports as `flatrate` on Netflix or Max is
+// product invariant 5). A work TMDB reports as `flatrate` on a supported service is
 // FLAGGED, with an invitation to go and add it — the owner adds it to their
 // real saved list on the service, captures a screenshot, and it enters the
 // combined list by the ordinary path. Anything else would put a row in the
@@ -20,6 +20,7 @@
 
 import { useState, type JSX } from 'react';
 import { Link } from 'react-router-dom';
+import { SERVICES, SERVICE_LABELS } from '@nextup/domain';
 
 import {
   JUSTWATCH_ATTRIBUTION,
@@ -52,9 +53,9 @@ export interface WaitingPageProps {
   readonly onSuppress?: (titleId: string) => Promise<unknown>;
 }
 
-/** Title-case a provider key for display: `netflix` → `Netflix`. */
 function serviceLabel(service: string): string {
-  return service === 'max' ? 'Max' : service.charAt(0).toUpperCase() + service.slice(1);
+  const known = SERVICES.find((candidate) => candidate === service);
+  return known === undefined ? service : SERVICE_LABELS[known];
 }
 
 /**

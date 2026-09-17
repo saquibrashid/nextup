@@ -21,6 +21,12 @@ import type { IsoDate } from './types.js';
 export const SERVICE_LABELS: Readonly<Record<Service, string>> = {
   netflix: 'Netflix',
   max: 'Max',
+  'prime-video': 'Prime Video',
+  'disney-plus': 'Disney+',
+  'apple-tv-plus': 'Apple TV+',
+  'paramount-plus': 'Paramount+',
+  starz: 'Starz',
+  peacock: 'Peacock',
 };
 
 /**
@@ -88,7 +94,7 @@ export const DATE_ADDED_LABEL_MARKER = 'to nextup';
  *
  * ⚠ The words "to nextup" are the REQUIREMENT, not decoration. The date this
  * product knows is the date a title entered *this list* from a screenshot —
- * it is NOT the date the owner saved it on Netflix or Max, and that date is
+ * it is NOT the date the owner saved it on a streaming service, and that date is
  * unknowable because there is no API and no scraping. A bare "Added 2 Apr
  * 2026" would read as the streaming service's date and quietly assert
  * something false about the owner's own history.

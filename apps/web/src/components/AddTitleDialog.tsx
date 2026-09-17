@@ -24,6 +24,7 @@ import { Input } from './ui/Input';
  * `T-DATA-001` forbids calling the browser's fetch outside `apiClient.ts`.
  */
 import { useCallback, useEffect, useId, useRef, useState, type JSX } from 'react';
+import { SERVICES, SERVICE_LABELS } from '@nextup/domain';
 
 import {
   ADD_TITLE_DONE,
@@ -51,11 +52,7 @@ const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w154';
 
 const MEDIA_TYPE_LABELS: Record<string, string> = { movie: 'Movie', tv: 'TV' };
 
-/** The services a title can be added to (REQ-053 — v1 scope lock). */
-const SERVICE_OPTIONS = [
-  { value: 'netflix', label: 'Netflix' },
-  { value: 'max', label: 'Max' },
-] as const;
+const SERVICE_OPTIONS = SERVICES.map((value) => ({ value, label: SERVICE_LABELS[value] }));
 
 export interface AddTitleRequest {
   tmdbId: number;
