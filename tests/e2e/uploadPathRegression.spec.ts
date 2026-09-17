@@ -312,6 +312,10 @@ async function expectServiceUpload(page: Page, service: Service): Promise<void> 
   const state = freshState();
   await stubApi(page, state, service);
   await page.goto(`/upload?service=${service}`);
+  // A deep-linked service arrives ANSWERED, so step 1 is collapsed to its
+  // summary; the preselection is real behind `Change` (`specs/ui.md` §3.0).
+  await expect(page.getByTestId('service-step-panel-answer')).toHaveText(SERVICE_LABELS[service]);
+  await page.getByTestId('service-step-panel-change').click();
   await expect(
     page.getByRole('radio', { name: SERVICE_LABELS[service], exact: true }),
   ).toBeChecked();

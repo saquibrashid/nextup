@@ -2601,6 +2601,122 @@ button {
 }
 
 /*
+ * Issue #287 — the `/upload` progressive-reveal wizard (`specs/ui.md` §3.0).
+ *
+ * ⚠ The dimming of a locked step is PRESENTATION ONLY. `opacity` and
+ * `pointer-events` are paired with a real `disabled` attribute in the markup;
+ * neither is load-bearing on its own, and nothing here uses `display: none` on
+ * a locked step — that would drop the question out of the accessibility tree
+ * and a screen-reader owner would never learn it exists.
+ *
+ * ⚠ `[data-state]` is a STATE attribute, not a test hook. `T-CSS-003e` forbids
+ * selecting `data-testid`, and that rule is about not welding tests to styling;
+ * `data-state` is authored for exactly this.
+ */
+.upload-step {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  margin-block-end: var(--space-3);
+  padding: var(--space-4);
+}
+
+.upload-step[data-state='locked'] {
+  background: var(--color-bg);
+  opacity: 0.55;
+}
+
+/* Belt and braces with the markup's own `disabled`, never a substitute. */
+.upload-step[data-state='locked'] .upload-step__body {
+  pointer-events: none;
+}
+
+.upload-step[data-state='done'] {
+  padding-block: var(--space-3);
+}
+
+.upload-step__head {
+  align-items: start;
+  display: flex;
+  gap: var(--space-3);
+}
+
+.upload-step__index {
+  align-items: center;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  block-size: 1.75rem;
+  display: flex;
+  flex: none;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  inline-size: 1.75rem;
+  justify-content: center;
+}
+
+.upload-step[data-state='done'] .upload-step__index {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-surface);
+}
+
+.upload-step__titles {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.upload-step__legend {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  margin: 0;
+}
+
+.upload-step__answer {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: var(--space-1) 0 0;
+  overflow-wrap: anywhere;
+}
+
+.upload-step__hint {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: var(--space-1) 0 0;
+}
+
+.upload-step__body {
+  margin-block-start: var(--space-3);
+}
+
+/* The legend is the step heading; the fieldset keeps it for screen readers. */
+.segmented__legend--hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+/*
+ * The full-update card's "removes titles" marker. `aria-hidden` in the markup:
+ * the consequence sentence below it already says so in words, and
+ * `T-UI-003j` asserts the radio's accessible name stays exactly the mode name.
+ */
+.mode-card__flag {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  margin-inline-start: var(--space-2);
+  padding: 0 var(--space-2);
+}
+
+/*
  * TASK-178 — step 3 of `/upload` and the §4.10 conflict (`specs/ui.md` §3.3).
  *
  * The reason text is a peer of the button, never a title attribute and never a

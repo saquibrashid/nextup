@@ -581,6 +581,60 @@ export const MODE_FULL_UPDATE_LABEL = 'Full update';
 export const SERVICE_STEP_LEGEND = 'Which service did these screenshots come from?';
 export const MODE_STEP_LEGEND = 'Is this a complete capture of that list?';
 
+/* -------------------------------------------------------------------------- */
+/* /upload - the progressive-reveal wizard (specs/ui.md §3.0, issue #287)      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The third step's heading. Steps 1 and 2 already had one; the ingest area
+ * never did, which is why the screen read as two questions followed by an
+ * unexplained drop target rather than as three steps.
+ */
+export const IMAGES_STEP_LEGEND = 'Add the screenshots';
+
+/**
+ * Reopens an answered step.
+ *
+ * ⚠ An answered step COLLAPSES TO ITS ANSWER, so this control is the only way
+ * back to it. It is a real button with a real label for that reason - an icon
+ * or a click-the-summary affordance would make the two decisions that define
+ * the batch look final when they are not.
+ */
+export const STEP_CHANGE_LABEL = 'Change';
+
+/**
+ * Why a step cannot be answered yet.
+ *
+ * ⚠ A DIMMED STEP STATES ITS OWN PRECONDITION and is never merely grey. The
+ * mode question is unanswerable before a service is chosen because its
+ * consequence sentence NAMES that service, and a locked control with no
+ * explanation is indistinguishable from a broken one.
+ */
+export const MODE_STEP_LOCKED_HINT = 'Choose a service first.';
+
+/**
+ * ⚠ NOT A LOCK, AND THE WORDING IS LOAD-BEARING. Step 3 stays fully
+ * interactive before the two questions are answered, because `ImageDropzone`
+ * and `PasteButton` deliberately HOLD what arrives early (`ux-states.md`
+ * §4.3): the owner's primary path is to paste a screenshot the moment they
+ * have one. This sentence says what will happen to those images - it must not
+ * be reworded into "you cannot do this yet", which is both untrue and the
+ * behaviour that would lose a paste.
+ */
+export const IMAGES_STEP_WAITING_HINT =
+  "Paste or attach them now if you like — they'll be held until the two questions above are answered.";
+
+/**
+ * The short destructive flag on the full-update card.
+ *
+ * ⚠ RENDERED `aria-hidden`, DELIBERATELY. It is visual emphasis for a decision
+ * that is already stated in full by the consequence sentence inside the same
+ * label; leaving it in the accessible name announces "Full update removes Full
+ * update: anything on Netflix that isn't..." - a stutter that makes the one
+ * sentence that matters harder to follow. `T-UI-003j` pins that sentence.
+ */
+export const MODE_FULL_UPDATE_FLAG = 'removes';
+
 /**
  * §3.3 - step 3.
  *

@@ -23,11 +23,14 @@ import { Input } from '../components/ui/Input';
 // there is only one of them. A re-typed literal here would look identical and
 // diverge silently on the next wording change.
 //
-// Step 2 (the three ingest affordances) and step 3 (submit) are NOT here - they
-// are separate tasks. This step owns the two choices and reports them upward.
+// Step 3 (the three ingest affordances and the submit) is composed alongside
+// these two by `containers/UploadRoute.tsx`, which owns the batch. This file
+// owns the two choices, the wizard state that reveals them one at a time, and
+// reports the answers upward.
 
 import { useId, useState, type JSX } from 'react';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
+import { UploadStep, type UploadStepState } from '../components/UploadStep';
 import {
   BATCH_MODES,
   SERVICES,
@@ -39,9 +42,11 @@ import {
 
 import {
   MODE_APPEND_ONLY_LABEL,
+  MODE_FULL_UPDATE_FLAG,
   MODE_FULL_UPDATE_LABEL,
   MODE_FULL_UPDATE_SERVICE_PLACEHOLDER,
   MODE_STEP_LEGEND,
+  MODE_STEP_LOCKED_HINT,
   SERVICE_STEP_LEGEND,
 } from '../copy.js';
 
@@ -88,58 +93,128 @@ export function UploadPage({
 }: UploadPageProps = {}): JSX.Element {
   const [service, setService] = useState<Service | null>(initialService);
   const [mode, setMode] = useState<BatchMode | null>(null);
+  /**
+   * Which answered step the owner has reopened with `Change`, if any.
+   *
+   * ⚠ SEPARATE FROM THE ANSWERS THEMSELVES, deliberately. Reopening a step
+   * must not clear what is already in it: the owner needs to see the current
+   * answer to decide whether to change it, and a `Change` that blanked the
+   * choice would make backing out of the reopen impossible.
+   */
+  const [reopened, setReopened] = useState<'service' | 'mode' | null>(null);
   const serviceGroup = useId();
   const modeGroup = useId();
+  const modeHintId = useId();
 
   function choose(next: Partial<BatchDraftSelection>): void {
-    const selection: BatchDraftSelection = { service, mode, ...next };
-    if (next.service !== undefined) setService(next.service);
-    if (next.mode !== undefined) setMode(next.mode);
-    onSelectionChange?.(selection);
+    /*
+     * ⚠ CHANGING THE SERVICE RE-ASKS THE MODE, AND THAT IS A SAFETY RULE, NOT
+     * TIDINESS. The full-update consequence NAMES the service: the owner
+     * agrees to "anything on Netflix that isn't in these screenshots will be
+     * offered for removal". Carrying that agreement over to Max silently
+     * re-points a destructive choice at a list the owner never agreed to
+     * touch — and because the collapsed summary would still read "Full
+     * update", nothing on screen would show that it had happened.
+     *
+     * ⚠ Only a CHANGE clears it. Re-picking the service already chosen leaves
+     * the mode alone, so backing out of a `Change` costs nothing.
+     */
+    const changedService = next.service !== undefined && next.service !== service;
+    const nextService = next.service !== undefined ? next.service : service;
+    const nextMode = next.mode !== undefined ? next.mode : changedService ? null : mode;
+    setService(nextService);
+    setMode(nextMode);
+    setReopened(null);
+    onSelectionChange?.({ service: nextService, mode: nextMode });
   }
+
+  const serviceState: UploadStepState =
+    service !== null && reopened !== 'service' ? 'done' : 'active';
+  const modeState: UploadStepState =
+    service === null ? 'locked' : mode !== null && reopened !== 'mode' ? 'done' : 'active';
+  const modeLocked = modeState === 'locked';
 
   return (
     <>
       <h1>Upload screenshots</h1>
 
-      {/* Native radios: real group semantics and roving focus for free. */}
-      <SegmentedControl legend={SERVICE_STEP_LEGEND} testId="service-step">
-        {SERVICES.map((candidate) => (
-          <label key={candidate} data-testid={`service-option-${candidate}`}>
-            <Input
-              type="radio"
-              name={serviceGroup}
-              value={candidate}
-              checked={service === candidate}
-              onChange={() => {
-                choose({ service: candidate });
-              }}
-            />
-            <span>{SERVICE_LABELS[candidate]}</span>
-          </label>
-        ))}
-      </SegmentedControl>
+      <UploadStep
+        index={1}
+        legend={SERVICE_STEP_LEGEND}
+        state={serviceState}
+        answer={service === null ? null : SERVICE_LABELS[service]}
+        onChange={() => {
+          setReopened('service');
+        }}
+        testId="service-step-panel"
+      >
+        {/* Native radios: real group semantics and roving focus for free. */}
+        <SegmentedControl legend={SERVICE_STEP_LEGEND} testId="service-step" hideLegend>
+          {SERVICES.map((candidate) => (
+            <label key={candidate} data-testid={`service-option-${candidate}`}>
+              <Input
+                type="radio"
+                name={serviceGroup}
+                value={candidate}
+                checked={service === candidate}
+                onChange={() => {
+                  choose({ service: candidate });
+                }}
+              />
+              <span>{SERVICE_LABELS[candidate]}</span>
+            </label>
+          ))}
+        </SegmentedControl>
+      </UploadStep>
 
-      <SegmentedControl legend={MODE_STEP_LEGEND} testId="mode-step">
-        {BATCH_MODES.map((candidate) => (
-          <label key={candidate} data-testid={`mode-card-${candidate}`}>
-            <Input
-              type="radio"
-              name={modeGroup}
-              value={candidate}
-              checked={mode === candidate}
-              onChange={() => {
-                choose({ mode: candidate });
-              }}
-            />
-            <span data-testid={`mode-card-${candidate}-label`}>{MODE_LABELS[candidate]}</span>
-            {/* Always rendered. Never a tooltip, never a disclosure. */}
-            <p data-testid={`mode-card-${candidate}-consequence`}>
-              {modeConsequence(candidate, service)}
-            </p>
-          </label>
-        ))}
-      </SegmentedControl>
+      <UploadStep
+        index={2}
+        legend={MODE_STEP_LEGEND}
+        state={modeState}
+        answer={mode === null || service === null ? null : modeConsequence(mode, service)}
+        hint={modeLocked ? MODE_STEP_LOCKED_HINT : null}
+        hintId={modeHintId}
+        onChange={() => {
+          setReopened('mode');
+        }}
+        testId="mode-step-panel"
+      >
+        <SegmentedControl legend={MODE_STEP_LEGEND} testId="mode-step" hideLegend>
+          {BATCH_MODES.map((candidate) => (
+            <label key={candidate} data-testid={`mode-card-${candidate}`}>
+              <Input
+                type="radio"
+                name={modeGroup}
+                value={candidate}
+                checked={mode === candidate}
+                disabled={modeLocked}
+                aria-describedby={modeLocked ? modeHintId : undefined}
+                onChange={() => {
+                  choose({ mode: candidate });
+                }}
+              />
+              <span data-testid={`mode-card-${candidate}-label`}>
+                {MODE_LABELS[candidate]}
+                {/*
+                  ⚠ `aria-hidden` — visual emphasis only. The consequence
+                  sentence below already says it in full and is part of the
+                  radio's accessible name (`T-UI-003j`); repeating "removes"
+                  there only makes that sentence harder to follow.
+                */}
+                {candidate === 'full-update' && (
+                  <span className="mode-card__flag" aria-hidden="true">
+                    {MODE_FULL_UPDATE_FLAG}
+                  </span>
+                )}
+              </span>
+              {/* Always rendered. Never a tooltip, never a disclosure. */}
+              <p data-testid={`mode-card-${candidate}-consequence`}>
+                {modeConsequence(candidate, service)}
+              </p>
+            </label>
+          ))}
+        </SegmentedControl>
+      </UploadStep>
     </>
   );
 }

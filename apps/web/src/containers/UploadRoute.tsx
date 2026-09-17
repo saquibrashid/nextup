@@ -38,6 +38,8 @@ import { RefusalPage } from '../pages/RefusalPage';
 import { UploadPage, type BatchDraftSelection } from '../pages/UploadPage';
 import {
   BATCH_LOCKED_NOTE,
+  IMAGES_STEP_LEGEND,
+  IMAGES_STEP_WAITING_HINT,
   OPEN_BATCH_DISCARD_LABEL,
   OPEN_BATCH_GO_LABEL,
   SUBMIT_IN_FLIGHT,
@@ -48,6 +50,7 @@ import {
 import { OFFLINE_DISABLED_REASON } from '../copy';
 import { useOnline } from '../lib/useOnline';
 import { Button } from '../components/ui/Button';
+import { UploadStep } from '../components/UploadStep';
 
 export interface UploadRouteProps {
   /** Injected so the suite can drive every state without a server. */
@@ -261,45 +264,62 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
         </section>
       )}
 
-      <ImageDropzone
-        batchReady={ready}
-        offline={!online}
-        onFilesAccepted={attach}
-        serverRejected={serverRejected}
-      />
+      <UploadStep
+        index={3}
+        legend={IMAGES_STEP_LEGEND}
+        /*
+         * ⚠ ALWAYS `active`, NEVER LOCKED — and that is deliberate, not an
+         * oversight of the progressive reveal. `ImageDropzone` and
+         * `PasteButton` HOLD what arrives before the two questions are
+         * answered (`ux-states.md` §4.3), because the owner's primary path is
+         * pasting the moment they have a screenshot. Dimming or disabling this
+         * step would advertise the opposite of what it does and would lose
+         * exactly that paste.
+         */
+        state="active"
+        hint={ready ? null : IMAGES_STEP_WAITING_HINT}
+        testId="images-step-panel"
+      >
+        <ImageDropzone
+          batchReady={ready}
+          offline={!online}
+          onFilesAccepted={attach}
+          serverRejected={serverRejected}
+        />
 
-      <section className="upload-submit" data-testid="submit-step">
-        {/*
-          ⚠ THE REASON IS TEXT, ALWAYS, AND SITS BESIDE THE CONTROL (§3.3). A
-          disabled button with no reason is indistinguishable from a broken
-          one, and this is the last step before the owner's screenshots leave
-          the device.
-        */}
-        {blocked !== null && (
-          <p className="upload-submit__reason" data-testid="submit-reason">
-            {blocked}
-          </p>
-        )}
-        <Button
-          variant="primary"
-          data-testid="submit-button"
-          disabled={blocked !== null || busy}
-          onClick={submit}
-        >
-          {SUBMIT_LABEL}
-        </Button>
-        {busy && (
-          <p aria-live="polite" data-testid="submit-busy">
-            {SUBMIT_IN_FLIGHT}
-          </p>
-        )}
-        {submitted && <p data-testid="batch-locked">{BATCH_LOCKED_NOTE}</p>}
-        {failure !== null && (
-          <p className="upload-submit__failure" data-testid="submit-failure" role="alert">
-            {failure}
-          </p>
-        )}
-      </section>
+        <section className="upload-submit" data-testid="submit-step">
+          {/*
+            ⚠ THE REASON IS TEXT, ALWAYS, AND SITS BESIDE THE CONTROL (§3.3). A
+            disabled button with no reason is indistinguishable from a broken
+            one, and this is the last step before the owner's screenshots leave
+            the device.
+          */}
+          {blocked !== null && (
+            <p className="upload-submit__reason" data-testid="submit-reason">
+              {blocked}
+            </p>
+          )}
+          <Button
+            variant="primary"
+            data-testid="submit-button"
+            disabled={blocked !== null || busy}
+            onClick={submit}
+          >
+            {SUBMIT_LABEL}
+          </Button>
+          {busy && (
+            <p aria-live="polite" data-testid="submit-busy">
+              {SUBMIT_IN_FLIGHT}
+            </p>
+          )}
+          {submitted && <p data-testid="batch-locked">{BATCH_LOCKED_NOTE}</p>}
+          {failure !== null && (
+            <p className="upload-submit__failure" data-testid="submit-failure" role="alert">
+              {failure}
+            </p>
+          )}
+        </section>
+      </UploadStep>
 
       {/* Present only so a test can prove the batch was created once. */}
       <span data-testid="draft-batch-id" hidden>
