@@ -506,12 +506,52 @@ button {
 }
 
 .badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   font-size: var(--text-sm);
   padding: var(--space-1) var(--space-2);
+}
+
+/*
+ * ADR-0014 — a bundled service mark.
+ *
+ * ⚠ NO COLOUR HERE, EVER. The mark inherits `currentColor` from the chip, so
+ * it is legible in both themes by construction. A brand colour would be a
+ * literal outside `:root` (`T-CSS-003b/c`) and, on the dark theme's surface,
+ * a real contrast failure rather than a hypothetical one.
+ *
+ * Sized in `em` so a mark tracks the text it sits beside instead of needing a
+ * second size scale of its own.
+ */
+.brand-mark {
+  block-size: 1.6em;
+  inline-size: 1.6em;
+  flex: none;
+}
+
+.service-mark__name {
+  overflow-wrap: anywhere;
+}
+
+/*
+ * ⚠ HIDDEN FROM SIGHT, NEVER FROM THE DOM. A logo-only badge is unreadable to
+ * a screen reader AND unfindable by the browser's own in-page text search —
+ * neither failure appears in a screenshot, which is why the name is clipped
+ * rather than removed.
+ */
+.service-mark__name--hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /*

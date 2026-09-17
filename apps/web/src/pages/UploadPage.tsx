@@ -31,6 +31,7 @@ import { Input } from '../components/ui/Input';
 import { useId, useState, type JSX } from 'react';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
 import { UploadStep, type UploadStepState } from '../components/UploadStep';
+import { ServiceMark } from '../components/ServiceMark';
 import {
   BATCH_MODES,
   SERVICES,
@@ -161,7 +162,13 @@ export function UploadPage({
                   choose({ service: candidate });
                 }}
               />
-              <span>{SERVICE_LABELS[candidate]}</span>
+              {/*
+                ⚠ The name stays VISIBLE here. This is the screen where
+                picking the wrong service attributes a whole capture to the
+                wrong list, so the mark assists recognition and never replaces
+                the word — and three of the eight have no mark at all.
+              */}
+              <ServiceMark service={candidate} />
             </label>
           ))}
         </SegmentedControl>

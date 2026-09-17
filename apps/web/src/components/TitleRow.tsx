@@ -16,9 +16,10 @@
 // `T-LIST-018` asserts the marker on every rendered label.
 
 import type { JSX, ReactNode } from 'react';
-import { SERVICE_LABELS, formatRuntime, type Service, type WatchPriority } from '@nextup/domain';
+import { formatRuntime, type Service, type WatchPriority } from '@nextup/domain';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
+import { ServiceMark } from './ServiceMark';
 import { MoreIcon } from './icons';
 import { GenreChips } from './GenreChips';
 
@@ -338,10 +339,14 @@ export function TitleRow({
 
         <ul className="title-row__badges" data-testid="badges">
           {item.badges.map((badge) => (
-            // Text-labelled, never colour-only (§2.2, ui.md §10.2): colour is
-            // never the sole carrier of meaning.
+            // The mark carries recognition on screen; the service name is
+            // still in the DOM, visually hidden, so the badge keeps its
+            // accessible name and stays findable by in-page text search
+            // (§2.2a, ADR-0014). Colour is never the sole carrier of meaning.
             <li key={badge.listingId} data-testid={`badge-${badge.service}`}>
-              <Badge>{SERVICE_LABELS[badge.service]}</Badge>
+              <Badge>
+                <ServiceMark service={badge.service} nameHidden />
+              </Badge>
             </li>
           ))}
         </ul>

@@ -370,13 +370,47 @@ See `api.md` §6.2d and `T-WATCH-003`.
 | Name | `name` | The only element with heading weight in the row |
 | Watch preferences (REQ-126) | `watching`, `priority` | A separate native button below the title reads `Priority: Normal` by default, or `Watching · Up next` etc. Its accessible name includes the title, Watching state and priority. Opens the explicit-save editor (§2.1a); offline shows the same facts without an edit affordance. |
 | Year · type · runtime · genres | `releaseYear`, `mediaType`, `runtimeMinutes`, `genres` | Runtime precedes genres in the approved 2026-09-16 layout. Film renders `1h 55m`, TV `45m/ep` (**one episode**, never a whole-series claim); missing runtime says **"Runtime unknown"**. Genres use three chips plus `+n` expansion, with active-filter genres always visible even above that limit. **Names wrap, never truncate**; `genres: []` renders nothing, never "Unknown" or `+0` (US-019 AC-6). All facts, including IMDb rating or its absent state, remain in Grid and Compact. |
-| **Service badges** | `badges[]` | One badge per **active** listing (REQ-026), up to eight. Badges use the canonical `SERVICE_LABELS` text, not colour-only — colour is never the sole carrier of meaning |
+| **Service badges** | `badges[]` | One badge per **active** listing (REQ-026), up to eight. Each badge renders through `components/ServiceMark.tsx` (§2.2a): a bundled monochrome mark where one exists, with the canonical `SERVICE_LABELS` text **always present** and visually hidden; a plain word mark where none exists. Never colour-only — colour is never the sole carrier of meaning, and the marks carry no brand colour at all |
 | Date-added label | `dateAddedLabel` | Rendered **verbatim from the API** (`specs/api.md` §6.2). REQ-061: it always contains "to nextup". The component **must not** construct this string. |
 | Row menu | — | `⋮` button → **Not interested** (US-027), **Fix match** (US-030), **Remove from list** (US-048). 44×44 px hit area. ⚠ **Three items, and Remove was ADDED beside "Not interested", not in place of it.** They read alike — the row disappears either way — and mean opposite things: suppression is a permanent, work-identity decision that survives every future upload (REQ-071), while removal asserts nothing about the work and lets a later capture legitimately bring it back as a new row (product invariant 7). Collapsing them into one item is the defect this row exists to prevent; `T-MANUAL-016` fails if either disappears. |
 
 A row for an **unmatched** title (`matchState === 'unmatched'`) shows the raw
 extracted text as its name, an **"Unidentified"** chip, and a **"Find a
 match"** action opening the fix-match dialog (US-008 AC-5).
+
+### 2.2a Service marks (`components/ServiceMark.tsx`, ADR-0014)
+
+Both surfaces that name a service — the row badge and the `/upload` service
+step (§3.0) — resolve it through one component, so they can never disagree
+about what a service looks like.
+
+| | Row badge | `/upload` service chooser |
+|---|---|---|
+| Mark | Yes, where one exists | Yes, where one exists |
+| Name | **In the DOM, visually hidden** (`nameHidden`) | **Visible**, beside the mark |
+| Why | Badges repeat up to eight times per row; the mark is what is recognised | Attributing a batch to the wrong service is a destructive mistake in full-update mode — the word stays |
+
+Rules, all of them load-bearing:
+
+1. **The accessible name is the same in both branches and for all eight
+   services.** It is `SERVICE_LABELS[service]`, never derived from the mark.
+   `nameHidden` controls *visibility*, never *presence* — a logo-only badge is
+   invisible to a screen reader and to the browser's own find-in-page.
+   `T-BRAND-002a/b`.
+2. ⚠ **Three services have no mark, and that is the decision, not a gap.**
+   Prime Video, Disney+ and Peacock render their word mark exactly as all
+   eight did before. The reasons are in ADR-0014 §5. `T-BRAND-002c` asserts
+   the three gaps **remain** gaps, because a "every service renders something"
+   test would stay green while someone helpfully drew the missing three.
+3. **Marks are monochrome `currentColor`.** No brand colour, anywhere. They
+   inherit the badge's colour and therefore its contrast.
+4. **Marks live in `components/brands/`, not the ADR-0013 icon register.**
+   They are filled brand glyphs, not 1.5-weight line art, and they are
+   third-party trademarks. `T-BRAND-001` applies the icon register's closed-set,
+   no-colour, no-package, no-network contract to them separately.
+5. **Nothing is ever fetched.** The marks are bundled. A logo request to a
+   streaming service's CDN would be an automated request to a streaming
+   service, which the product forbids outright.
 
 ### 2.3 Row menu dialogs
 
@@ -413,6 +447,9 @@ is otherwise only fixable by re-capturing an entire service.
 **Primary action.** Choose service and mode, attach screenshots, submit.
 
 ### 3.0 Progressive reveal *(added in place, issue #287)*
+
+Step 1's service options render their marks through `ServiceMark` with the name
+**visible** — see §2.2a.
 
 The three steps render as numbered panels in one column. Each is in exactly one
 state, and the state changes **only** in response to the owner answering:
