@@ -104,7 +104,13 @@ describe('/upload step 1 - service and mode', () => {
       'peacock',
     ]);
     await user.click(screen.getByRole('radio', { name: SERVICE_LABELS.netflix }));
+    // ⚠ The answered step collapses, so the second choice goes through the
+    // `Change` affordance — exactly as the owner must. Reaching the radio any
+    // other way would test a screen that does not exist.
+    await user.click(screen.getByTestId('service-step-panel-change'));
+    expect(screen.getByRole('radio', { name: SERVICE_LABELS.netflix })).toBeChecked();
     await user.click(screen.getByRole('radio', { name: SERVICE_LABELS.max }));
+    await user.click(screen.getByTestId('service-step-panel-change'));
 
     expect(screen.getByRole('radio', { name: SERVICE_LABELS.max })).toBeChecked();
     // Radios are one group, so choosing Max must have cleared Netflix. Two

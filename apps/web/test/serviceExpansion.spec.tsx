@@ -47,11 +47,18 @@ it('T-SVC-002a all eight services use correct labels and exclusive nondefault up
     fireEvent.click(
       within(group).getByRole('radio', { name: SERVICE_LABELS[service], exact: true }),
     );
-    expect(within(group).getAllByRole('radio', { checked: true })).toHaveLength(1);
     expect(choose).toHaveBeenLastCalledWith({ service, mode: null });
+    expect(screen.getByTestId('service-step-panel-answer')).toHaveTextContent(
+      SERVICE_LABELS[service],
+    );
     expect(screen.getByTestId('mode-card-full-update-consequence')).toHaveTextContent(
       SERVICE_LABELS[service],
     );
+    // ⚠ The answered step collapses, so the next service must be reached the
+    // way the owner reaches it — through `Change`. Clicking a hidden radio
+    // directly would keep this loop green over a screen nobody can use.
+    fireEvent.click(screen.getByTestId('service-step-panel-change'));
+    expect(within(group).getAllByRole('radio', { checked: true })).toHaveLength(1);
   }
 });
 
@@ -63,6 +70,13 @@ it.each(SERVICES)(
         <UploadRoute />
       </MemoryRouter>,
     );
+    // A deep-linked service arrives ANSWERED, so step 1 is collapsed to its
+    // summary. The preselection is still real: reopen it and the radio is
+    // checked — and the mode is still unanswered, which is the point.
+    expect(screen.getByTestId('service-step-panel-answer')).toHaveTextContent(
+      SERVICE_LABELS[service],
+    );
+    fireEvent.click(screen.getByTestId('service-step-panel-change'));
     expect(screen.getByRole('radio', { name: SERVICE_LABELS[service], exact: true })).toBeChecked();
     expect(
       within(screen.getByTestId('mode-step')).queryAllByRole('radio', { checked: true }),

@@ -412,6 +412,46 @@ is otherwise only fixable by re-capturing an entire service.
 
 **Primary action.** Choose service and mode, attach screenshots, submit.
 
+### 3.0 Progressive reveal *(added in place, issue #287)*
+
+The three steps render as numbered panels in one column. Each is in exactly one
+state, and the state changes **only** in response to the owner answering:
+
+| State | Rendered as | Interactive? |
+|---|---|---|
+| `locked` | Dimmed, with a hint saying what to answer first | **No** — `disabled`, and `aria-describedby` points at the hint |
+| `active` | Full panel, controls live | Yes |
+| `done` | Collapsed to the **answer** plus a `Change` button | The body is `hidden`; `Change` reopens it |
+
+Rules, each of which a named test pins:
+
+1. **Revealing a step never answers it.** US-003 AC-1/AC-2 and
+   REQ-002/REQ-003 forbid a default that can be accepted by inaction, and the
+   step that matters proposes removals. Unlocking step 2 leaves both radios
+   unchecked (`T-UX-148c`).
+2. **A locked step is dimmed and disabled, never removed.** `hidden`,
+   `display: none` or an unmounted branch takes the question out of the
+   accessibility tree, so a screen-reader owner never learns the step exists or
+   why it cannot be answered (`T-UX-148a`).
+3. **`hidden` is used in exactly one place: the body of an ANSWERED step**,
+   whose answer and a labelled `Change` control are both on screen
+   (`T-UX-148b`).
+4. **Changing the service clears the mode** (`T-UX-148d`). The full-update
+   consequence *names* the service; carrying the agreement to another service
+   silently re-points a destructive choice while the collapsed summary still
+   reads "Full update". Re-choosing the service already chosen keeps the mode,
+   so backing out of a `Change` costs nothing (`T-UX-148e`).
+5. **Step 3 is always `active`, never locked** (`T-UX-148f`) — a deliberate
+   deviation from the reveal. `ImageDropzone`/`PasteButton` *hold* images that
+   arrive before the questions are answered (`ux-states.md` §4.3) and the
+   owner's primary path is pasting immediately, so a dimmed step would
+   advertise the opposite of what it does and lose exactly that paste. It
+   carries a waiting hint instead of a lock.
+
+Each step's heading is the question, so the underlying `fieldset` legend is
+rendered **visually hidden rather than dropped** — the radio group keeps its
+accessible name and the sighted reader sees the question once.
+
 ### 3.1 Step 1 — service and mode
 
 Two required choices, **no default for either** (US-003 AC-5). The mode control
