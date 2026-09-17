@@ -132,6 +132,33 @@ app.use('/api', errorEnvelope);      // 5. the ONLY place an error becomes a res
 **Order is a requirement, not an implementation detail** (`specs/security.md`
 §3). `T-SEC-005` asserts a request that skips step 2 cannot reach any handler.
 
+### 1.0a Static cache policy — the shell and the bundles are opposites *(new, 2026-09-17)*
+
+| Response | `Cache-Control` |
+| --- | --- |
+| `index.html` — both the direct hit and the client-routing fallback | `no-cache` |
+| Anything under `/assets` (Vite content-hashed) | `public, max-age=31536000, immutable` |
+| Any other static file (`robots.txt`, `tmdb-logo.svg`, …) | `no-cache` |
+
+⚠ **This is a correctness requirement, not a performance one.** `express.static`'s
+default gives every response `public, max-age=0`, which is exactly backwards:
+the immutable bundles get revalidated on every navigation, while the shell —
+the one file whose staleness hides an entire deploy — gets no stronger
+instruction than "revalidate if you like". The shell names the bundle **by
+content hash**, so a shell answered from cache pins the browser to the previous
+build's CSS and JS on a URL that never changes, and the server serves those old
+bytes correctly. Nothing on screen distinguishes it from a deploy that silently
+failed, and nothing expires it. This was reported as a lost fix on 2026-09-17
+against a revision that provably contained the fix.
+
+⚠ `no-cache` is **not** `no-store`: the shell is still stored and still carries
+its validator, so a revisit is a conditional request rather than a fresh
+download. ⚠ `immutable` is claimed for `/assets` **only** — that is the one
+directory Vite content-hashes, so a changed file is a different URL. Applying
+it to a stable-named file makes that file unreplaceable for a year.
+
+`T-API-031` asserts all four rows over real HTTP.
+
 ### 1.1 Owner scoping (NFR-008)
 
 Handlers **never** read `ownerId` from a body, a query string or a path. They
