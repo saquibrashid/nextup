@@ -885,3 +885,117 @@ test('T-UX-141g: default, popovers and Compact pass axe and honor reduced motion
       await page.keyboard.press('Escape');
   }
 });
+
+/*
+ * Owner-reported 2026-09-17, after the Filters/Sort panels shipped. Three
+ * separate complaints, three separate claims — and every one of them is a
+ * LAYOUT fact that only a real browser can answer, which is why they live here
+ * and not in the jsdom suite.
+ */
+test('T-UX-147a: compact rows line their ratings, badges and priority controls up as columns', async ({
+  page,
+}) => {
+  await mountLibrary(page, { width: 1280 });
+  await page.getByRole('button', { name: 'Compact view' }).click();
+  await expect(page.getByTestId('title-list')).toHaveAttribute('data-view', 'compact');
+  /*
+   * ⚠ EVERY ROW IS ITS OWN GRID CONTAINER. There is no shared track sizing
+   * between cards, so a content-sized column lands at a different offset in
+   * every row — which is exactly what the owner saw. Reading the left edge of
+   * the same part of each row is the only way to prove the columns are real.
+   */
+  for (const part of ['.title-row__rating', '.title-row__badges', '.title-row__watch']) {
+    const lefts = await page
+      .locator(`li.title-row ${part}`)
+      .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().left)));
+    expect(lefts.length).toBeGreaterThan(1);
+    expect(new Set(lefts).size).toBe(1);
+  }
+  await noOverflow(page);
+});
+
+test('T-UX-147b: Filters, the result count, the order and reverse share one phone line', async ({
+  page,
+}) => {
+  for (const width of [360, 390, 430]) {
+    await mountLibrary(page, { width });
+    const parts = [
+      page.getByTestId('filters-trigger'),
+      page.getByTestId('filter-count'),
+      page.getByTestId('sort-trigger'),
+      page.getByTestId('sort-reverse'),
+    ];
+    const boxes = [];
+    for (const part of parts) boxes.push(await bounds(part));
+    /*
+     * One line = every part's vertical midpoint falls inside every other
+     * part's box. ⚠ NOT equal `y`: the count is text and the others are
+     * buttons, so their tops legitimately differ by a few pixels.
+     */
+    for (const box of boxes) {
+      const middle = box.y + box.height / 2;
+      for (const other of boxes) {
+        expect(middle).toBeGreaterThanOrEqual(other.y - 1);
+        expect(middle).toBeLessThanOrEqual(other.y + other.height + 1);
+      }
+      expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
+    }
+    /* The count is the answer to "why is my list short" — it is never cut. */
+    await expect(page.getByTestId('filter-count')).toHaveText(/^Showing \d+ of \d+$/);
+    expect(
+      await page.getByTestId('filter-count').evaluate((el) => el.scrollWidth - el.clientWidth),
+    ).toBeLessThanOrEqual(1);
+    /* Tighter padding bought the row — it must not cost the 44px target. */
+    await usableTarget(page, page.getByTestId('sort-reverse'));
+    await noOverflow(page);
+  }
+});
+
+test('T-UX-147d: below the one-line width the toolbar reflows instead of overflowing', async ({
+  page,
+}) => {
+  /*
+   * ⚠ THE FLOOR IS A REQUIREMENT, NOT A ROUNDING ERROR. Four controls plus a
+   * 44 px reverse target do not fit one line at 320 px — the first attempt
+   * pushed the reverse button 11 px off a 280 px screen (`T-A11Y-015a`). The
+   * single line is therefore a `min-width` enhancement, and this case pins the
+   * behaviour underneath it: everything stays on screen and reachable.
+   */
+  for (const width of [280, 320]) {
+    await mountLibrary(page, { width });
+    await noOverflow(page);
+    await usableTarget(page, page.getByTestId('sort-reverse'));
+    await expect(page.getByTestId('filter-count')).toHaveText(/^Showing \d+ of \d+$/);
+    for (const id of ['filters-trigger', 'sort-trigger', 'sort-reverse']) {
+      const box = await bounds(page.getByTestId(id));
+      expect(box.x).toBeGreaterThanOrEqual(0);
+      expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
+    }
+  }
+});
+
+test('T-UX-147c: a phone compact row flows instead of stacking, and stays inside the screen', async ({
+  page,
+}) => {
+  await mountLibrary(page, { width: 390 });
+  const rows = page.locator('li.title-row');
+  const grid = await rows.first().boundingBox();
+  await page.getByRole('button', { name: 'Compact view' }).click();
+  await expect(page.getByTestId('title-list')).toHaveAttribute('data-view', 'compact');
+  const compact = await rows.first().boundingBox();
+  if (grid === null || compact === null) throw new Error('Expected measurable rows');
+  expect(compact.height).toBeLessThan(grid.height);
+  /*
+   * ⚠ `.title-row__body` is a COLUMN flex by default, and wrapping a column
+   * flex wraps into new COLUMNS — which pushed the priority control and the
+   * meta line off the right of the screen while every jsdom test stayed green.
+   * The rating sharing the priority control's line is what proves the row
+   * flows across, and the overflow check is what proves it flows the right way.
+   */
+  const rating = await bounds(rows.first().locator('.title-row__rating'));
+  const watch = await bounds(rows.first().locator('.title-row__watch'));
+  expect(rating.y).toBeLessThan(watch.y + watch.height);
+  expect(rating.x).toBeGreaterThan(watch.x);
+  expect(rating.x + rating.width).toBeLessThanOrEqual(390 + 1);
+  await noOverflow(page);
+});

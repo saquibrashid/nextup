@@ -141,6 +141,20 @@ restore, suppress, un-suppress or fix-match.
    button**, and the view switch. The toolbar is the whole of the controls at
    rest; the filter fields and the sort orders live behind their two buttons.
 
+   The **Filters button, the live result count, the Sort button and the reverse
+   button share ONE line from 360 px upward** (owner refinement 2026-09-17,
+   `T-UX-147b`); the search field and the view switch take the lines above and
+   below it. ⚠ **Below 360 px the sort control takes its own line** — four
+   controls plus a 44 px reverse target do not fit, and forcing them pushed the
+   reverse button off the 280 px reflow floor (`T-UX-147d`, `T-A11Y-015a`). To
+   make the single line possible the toolbar is a **grid** and `FilterBar`
+   renders the trigger, the chips and the count as **three siblings** — a
+   wrapping flex row breaks between whole boxes, so while the count lived
+   inside the filter bar no layout could put it beside the sort control. The
+   count is sized to its content and the order label takes the slack:
+   *"Showing 20 of 20"* is the answer to *"why is my list short"* and is never
+   the thing that gets truncated.
+
    ⚠ **The reverse button is NOT a convenience and must not be folded into the
    sort chooser.** REQ-038's oldest-first escape hatch is `must` (`A47`), and
    the §10.1 floor rule forbids an additional step to reverse the current
@@ -290,8 +304,18 @@ restore, suppress, un-suppress or fix-match.
    ~~*Superseded 2026-09-17:* "At narrow widths both are single-column." Two
    view choices that render identically on the device the owner actually uses
    are not a choice.~~   query changes preserve the preference and never sort/filter rows locally.
-   Wide Compact lays out the same row body's metadata in two columns, keeping
-   the DOM/content unchanged and at least **8px** body spacing.
+   Wide Compact lays out the same row body's metadata in **three fixed-width
+   columns, packed to the start**, and the rating, the badges and the priority
+   control of **every** row therefore share one left edge (owner refinement
+   2026-09-17, `T-UX-147a`). ⚠ Content-sized tracks are not an alternative:
+   each row is its own grid container, so they land at a different offset in
+   every row and the list stops reading as columns. **Phone Compact flows
+   instead** — a wrapping *row* flex in which the rating shares the priority
+   control's line — because at 390 px there is no width for columns
+   (`T-UX-147c`). Both keep the DOM/content unchanged and at least **8px** body
+   spacing.
+   ~~Superseded 2026-09-17: "Wide Compact lays out the same row body's metadata
+   in two columns."~~
    Loading, retry, pending and offline semantics remain real. `T-UX-141`.
 4. **Load-more sentinel** — cursor pagination (`specs/api.md` §3), an
    IntersectionObserver auto-loading the next page, plus an explicit

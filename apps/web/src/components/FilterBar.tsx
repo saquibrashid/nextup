@@ -289,8 +289,30 @@ export function FilterBar({
   }
 
   return (
-    <div className="filter-bar" data-testid="filter-bar" role="group" aria-label="Filter the list">
-      {/*
+    /*
+      Owner-reported 2026-09-17: on a phone the trigger, the result count, the
+      sort chooser and the reverse button each took a line of their own.
+      ⚠ THREE SIBLINGS, NOT ONE WRAPPER, AND THAT IS THE WHOLE POINT. The
+      toolbar is a grid owned by `.list-controls`, and a grid can only place
+      ITS OWN children — while the count lived inside `.filter-bar` no CSS
+      could put it on the same line as the sort control, and no amount of
+      flex-shrink helped because the two were separate flex items that wrap as
+      whole boxes. Splitting the count and the chips out makes them grid items
+      in their own right: the count shares the toolbar line, the chips take a
+      full-width line below it.
+      ⚠ The `role="group"` and the `filter-bar` test id stay on the TRIGGER,
+      which is the control the group names. The chips and the count are not
+      controls of the filter — they are the report of what it did — and they
+      deliberately stay OUTSIDE the panel (see below).
+    */
+    <>
+      <div
+        className="filter-bar"
+        data-testid="filter-bar"
+        role="group"
+        aria-label="Filter the list"
+      >
+        {/*
         Owner-approved 2026-09-17 (`specs/ui.md` §2.1 item 2) — the six fields
         moved into a panel. ⚠ THE COUNT ON THE TRIGGER IS NOT DECORATION: with
         the panel shut it is the only thing that says the list is filtered at
@@ -299,119 +321,119 @@ export function FilterBar({
         the same reason — a count you can only see inside the control that
         changes it is not a count.
       */}
-      <Button
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        data-testid="filters-trigger"
-        onClick={() => {
-          setOpen(true);
-        }}
-      >
-        <span>{FILTERS_TRIGGER_LABEL}</span>
-        {activeCount > 0 && (
-          <span className="filter-bar__count" aria-label={`${String(activeCount)} active`}>
-            {activeCount}
-          </span>
-        )}
-      </Button>
-      {open && (
-        <Dialog variant="panel" aria-labelledby={headingId} onDismiss={close}>
-          <div className="panel-head">
-            <h2 id={headingId}>{FILTERS_PANEL_TITLE}</h2>
-            <Button variant="ghost" aria-label={FILTERS_CLOSE_LABEL} onClick={close}>
-              <CloseIcon />
-            </Button>
-          </div>
-          <Field legend="Filter by">
-            <div className="filter-controls">
-              <FilterDisclosure
-                label="Services"
-                value={selectionSummary(
-                  filters.services.map((service) => SERVICE_LABELS[service]),
-                  'All services',
-                )}
-              >
-                <Field label="Search services">
-                  {(control) => (
-                    <Input
-                      {...control}
-                      type="search"
-                      value={serviceQuery}
-                      onChange={(event) => {
-                        setServiceQuery(event.target.value);
-                      }}
-                    />
-                  )}
-                </Field>
-                <Field legend="Services" testId="filter-service">
-                  {services.map((service) => (
-                    <label key={service}>
-                      <Input
-                        type="checkbox"
-                        name="service"
-                        value={service}
-                        checked={filters.services.includes(service)}
-                        onChange={() => {
-                          update({ ...filters, services: toggle(filters.services, service) });
-                        }}
-                      />
-                      {SERVICE_LABELS[service]}
-                    </label>
-                  ))}
-                </Field>
-                {services.length === 0 && <p role="status">No services match your search.</p>}
-              </FilterDisclosure>
-
-              <FilterDisclosure
-                label="Type"
-                value={selectionSummary(
-                  filters.types.map((type) => MEDIA_TYPE_LABELS[type]),
-                  'All types',
-                )}
-              >
-                <Field legend="Type" testId="filter-type">
-                  {MEDIA_TYPES.map((type) => (
-                    <label key={type}>
-                      <Input
-                        type="checkbox"
-                        name="type"
-                        value={type}
-                        checked={filters.types.includes(type)}
-                        onChange={() => {
-                          update({ ...filters, types: toggle(filters.types, type) });
-                        }}
-                      />
-                      {MEDIA_TYPE_LABELS[type]}
-                    </label>
-                  ))}
-                </Field>
-              </FilterDisclosure>
-
-              {genreOptions.length > 0 && (
+        <Button
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          data-testid="filters-trigger"
+          onClick={() => {
+            setOpen(true);
+          }}
+        >
+          <span>{FILTERS_TRIGGER_LABEL}</span>
+          {activeCount > 0 && (
+            <span className="filter-bar__count" aria-label={`${String(activeCount)} active`}>
+              {activeCount}
+            </span>
+          )}
+        </Button>
+        {open && (
+          <Dialog variant="panel" aria-labelledby={headingId} onDismiss={close}>
+            <div className="panel-head">
+              <h2 id={headingId}>{FILTERS_PANEL_TITLE}</h2>
+              <Button variant="ghost" aria-label={FILTERS_CLOSE_LABEL} onClick={close}>
+                <CloseIcon />
+              </Button>
+            </div>
+            <Field legend="Filter by">
+              <div className="filter-controls">
                 <FilterDisclosure
-                  label="Genre"
-                  value={selectionSummary(filters.genres, 'All genres')}
+                  label="Services"
+                  value={selectionSummary(
+                    filters.services.map((service) => SERVICE_LABELS[service]),
+                    'All services',
+                  )}
                 >
-                  <Field legend="Genre" testId="filter-genre">
-                    {genreOptions.map((genre) => (
-                      <label key={genre}>
+                  <Field label="Search services">
+                    {(control) => (
+                      <Input
+                        {...control}
+                        type="search"
+                        value={serviceQuery}
+                        onChange={(event) => {
+                          setServiceQuery(event.target.value);
+                        }}
+                      />
+                    )}
+                  </Field>
+                  <Field legend="Services" testId="filter-service">
+                    {services.map((service) => (
+                      <label key={service}>
                         <Input
                           type="checkbox"
-                          name="genre"
-                          value={genre}
-                          checked={filters.genres.includes(genre)}
+                          name="service"
+                          value={service}
+                          checked={filters.services.includes(service)}
                           onChange={() => {
-                            update({ ...filters, genres: toggle(filters.genres, genre) });
+                            update({ ...filters, services: toggle(filters.services, service) });
                           }}
                         />
-                        {genre}
+                        {SERVICE_LABELS[service]}
+                      </label>
+                    ))}
+                  </Field>
+                  {services.length === 0 && <p role="status">No services match your search.</p>}
+                </FilterDisclosure>
+
+                <FilterDisclosure
+                  label="Type"
+                  value={selectionSummary(
+                    filters.types.map((type) => MEDIA_TYPE_LABELS[type]),
+                    'All types',
+                  )}
+                >
+                  <Field legend="Type" testId="filter-type">
+                    {MEDIA_TYPES.map((type) => (
+                      <label key={type}>
+                        <Input
+                          type="checkbox"
+                          name="type"
+                          value={type}
+                          checked={filters.types.includes(type)}
+                          onChange={() => {
+                            update({ ...filters, types: toggle(filters.types, type) });
+                          }}
+                        />
+                        {MEDIA_TYPE_LABELS[type]}
                       </label>
                     ))}
                   </Field>
                 </FilterDisclosure>
-              )}
 
-              {/*
+                {genreOptions.length > 0 && (
+                  <FilterDisclosure
+                    label="Genre"
+                    value={selectionSummary(filters.genres, 'All genres')}
+                  >
+                    <Field legend="Genre" testId="filter-genre">
+                      {genreOptions.map((genre) => (
+                        <label key={genre}>
+                          <Input
+                            type="checkbox"
+                            name="genre"
+                            value={genre}
+                            checked={filters.genres.includes(genre)}
+                            onChange={() => {
+                              update({ ...filters, genres: toggle(filters.genres, genre) });
+                            }}
+                          />
+                          {genre}
+                        </label>
+                      ))}
+                    </Field>
+                  </FilterDisclosure>
+                )}
+
+                {/*
         REQ-035 — the runtime buckets. ALWAYS PRESENT, unlike the genre
         fieldset above, which is conditional on the list actually containing
         genres. The bucket set is fixed by `RUNTIME_BUCKET_BOUNDS` rather than
@@ -419,150 +441,155 @@ export function FilterBar({
         runtime would remove the only control that explains why the list is
         the length it is.
       */}
-              <FilterDisclosure
-                label="Runtime"
-                value={selectionSummary(
-                  filters.runtimes.map((bucket) => RUNTIME_BUCKET_LABELS[bucket]),
-                  'Any runtime',
-                )}
-              >
-                <Field legend="Runtime" testId="filter-runtime">
-                  {RUNTIME_BUCKETS.map((bucket) => (
-                    <label key={bucket}>
-                      <Input
-                        type="checkbox"
-                        name="runtime"
-                        value={bucket}
-                        checked={filters.runtimes.includes(bucket)}
-                        onChange={() => {
-                          update({ ...filters, runtimes: toggle(filters.runtimes, bucket) });
-                        }}
-                      />
-                      {RUNTIME_BUCKET_LABELS[bucket]}
-                    </label>
-                  ))}
-                </Field>
-              </FilterDisclosure>
-              <FilterDisclosure
-                label="Watching"
-                value={
-                  filters.watching === undefined
-                    ? 'All titles'
-                    : filters.watching
-                      ? 'Watching'
-                      : 'Not watching'
-                }
-              >
-                <Field legend="Watching">
-                  {[
-                    { value: undefined, label: 'All titles' },
-                    { value: true, label: 'Watching' },
-                    { value: false, label: 'Not watching' },
-                  ].map((option) => (
-                    <label key={option.label}>
-                      <Input
-                        type="radio"
-                        name="watching"
-                        checked={filters.watching === option.value}
-                        onChange={() => update({ ...filters, watching: option.value })}
-                      />
-                      {option.label}
-                    </label>
-                  ))}
-                </Field>
-              </FilterDisclosure>
-              <FilterDisclosure
-                label="Priority"
-                value={selectionSummary(
-                  (filters.priorities ?? []).map((value) => WATCH_PRIORITY_LABELS[value]),
-                  'All priorities',
-                )}
-              >
-                <Field legend="Priority">
-                  {WATCH_PRIORITIES.map((value) => (
-                    <label key={value}>
-                      <Input
-                        type="checkbox"
-                        name="priority"
-                        value={value}
-                        checked={filters.priorities?.includes(value) ?? false}
-                        onChange={() =>
-                          update({
-                            ...filters,
-                            priorities: toggle(filters.priorities ?? [], value),
-                          })
-                        }
-                      />
-                      {WATCH_PRIORITY_LABELS[value]}
-                    </label>
-                  ))}
-                </Field>
-              </FilterDisclosure>
-            </div>
-          </Field>
-          <div className="panel-foot">
-            <Button variant="primary" onClick={close}>
-              {FILTERS_DONE_LABEL}
-            </Button>
-          </div>
-        </Dialog>
-      )}
-
-      {chips.length > 0 && (
-        <ul className="active-filters" aria-label="Active filters">
-          {chips
-            .filter(
-              (chip, index) =>
-                chips.findIndex(
-                  (other) => other.dimension === chip.dimension && other.value === chip.value,
-                ) === index,
-            )
-            .map((chip) => (
-              <li className="active-filter" key={`${chip.dimension}:${chip.value}`}>
-                <Button
-                  aria-label={`Remove ${chip.dimension === 'q' ? 'search' : chip.dimension} filter: ${chip.label}`}
-                  onClick={() => {
-                    removeChip(chip.dimension, chip.value);
-                  }}
+                <FilterDisclosure
+                  label="Runtime"
+                  value={selectionSummary(
+                    filters.runtimes.map((bucket) => RUNTIME_BUCKET_LABELS[bucket]),
+                    'Any runtime',
+                  )}
                 >
-                  {chip.label} <span aria-hidden="true">×</span>
-                </Button>
-              </li>
-            ))}
-        </ul>
-      )}
+                  <Field legend="Runtime" testId="filter-runtime">
+                    {RUNTIME_BUCKETS.map((bucket) => (
+                      <label key={bucket}>
+                        <Input
+                          type="checkbox"
+                          name="runtime"
+                          value={bucket}
+                          checked={filters.runtimes.includes(bucket)}
+                          onChange={() => {
+                            update({ ...filters, runtimes: toggle(filters.runtimes, bucket) });
+                          }}
+                        />
+                        {RUNTIME_BUCKET_LABELS[bucket]}
+                      </label>
+                    ))}
+                  </Field>
+                </FilterDisclosure>
+                <FilterDisclosure
+                  label="Watching"
+                  value={
+                    filters.watching === undefined
+                      ? 'All titles'
+                      : filters.watching
+                        ? 'Watching'
+                        : 'Not watching'
+                  }
+                >
+                  <Field legend="Watching">
+                    {[
+                      { value: undefined, label: 'All titles' },
+                      { value: true, label: 'Watching' },
+                      { value: false, label: 'Not watching' },
+                    ].map((option) => (
+                      <label key={option.label}>
+                        <Input
+                          type="radio"
+                          name="watching"
+                          checked={filters.watching === option.value}
+                          onChange={() => update({ ...filters, watching: option.value })}
+                        />
+                        {option.label}
+                      </label>
+                    ))}
+                  </Field>
+                </FilterDisclosure>
+                <FilterDisclosure
+                  label="Priority"
+                  value={selectionSummary(
+                    (filters.priorities ?? []).map((value) => WATCH_PRIORITY_LABELS[value]),
+                    'All priorities',
+                  )}
+                >
+                  <Field legend="Priority">
+                    {WATCH_PRIORITIES.map((value) => (
+                      <label key={value}>
+                        <Input
+                          type="checkbox"
+                          name="priority"
+                          value={value}
+                          checked={filters.priorities?.includes(value) ?? false}
+                          onChange={() =>
+                            update({
+                              ...filters,
+                              priorities: toggle(filters.priorities ?? [], value),
+                            })
+                          }
+                        />
+                        {WATCH_PRIORITY_LABELS[value]}
+                      </label>
+                    ))}
+                  </Field>
+                </FilterDisclosure>
+              </div>
+            </Field>
+            <div className="panel-foot">
+              <Button variant="primary" onClick={close}>
+                {FILTERS_DONE_LABEL}
+              </Button>
+            </div>
+          </Dialog>
+        )}
+      </div>
 
-      {/*
+      {(chips.length > 0 || isFiltered(filters) || query !== '') && (
+        <div className="filter-bar__chips">
+          {chips.length > 0 && (
+            <ul className="active-filters" aria-label="Active filters">
+              {chips
+                .filter(
+                  (chip, index) =>
+                    chips.findIndex(
+                      (other) => other.dimension === chip.dimension && other.value === chip.value,
+                    ) === index,
+                )
+                .map((chip) => (
+                  <li className="active-filter" key={`${chip.dimension}:${chip.value}`}>
+                    <Button
+                      aria-label={`Remove ${chip.dimension === 'q' ? 'search' : chip.dimension} filter: ${chip.label}`}
+                      onClick={() => {
+                        removeChip(chip.dimension, chip.value);
+                      }}
+                    >
+                      {chip.label} <span aria-hidden="true">×</span>
+                    </Button>
+                  </li>
+                ))}
+            </ul>
+          )}
+
+          {/*
         Present only when something is filtered: a permanently-visible "Clear
         filters" on an unfiltered list implies filters are active when they are
         not.
       */}
-      {(isFiltered(filters) || query !== '') && (
-        <Button
-          variant="secondary"
-          data-testid="clear-filters"
-          onClick={() => {
-            const next = applyFilters(params, NO_FILTERS);
-            next.delete('q');
-            setParams(next);
-          }}
-        >
-          {CLEAR_FILTERS_LABEL}
-        </Button>
+          {(isFiltered(filters) || query !== '') && (
+            <Button
+              variant="secondary"
+              data-testid="clear-filters"
+              onClick={() => {
+                const next = applyFilters(params, NO_FILTERS);
+                next.delete('q');
+                setParams(next);
+              }}
+            >
+              {CLEAR_FILTERS_LABEL}
+            </Button>
+          )}
+        </div>
       )}
 
-      {/*
+      {!countPending && (
+        <div className="filter-bar__status">
+          {/*
         `role="status"` so the count is announced when filtering changes it -
         a sighted owner sees the list shrink, a screen-reader user otherwise
         gets no signal at all.
       */}
-      {!countPending && (
-        <p data-testid="filter-count" role="status">
-          {`Showing ${String(shown)} of ${totalIsLowerBound ? AT_LEAST_PREFIX : ''}${String(total)}`}
-        </p>
-      )}
+          <p data-testid="filter-count" role="status">
+            {`Showing ${String(shown)} of ${totalIsLowerBound ? AT_LEAST_PREFIX : ''}${String(total)}`}
+          </p>
 
-      {/*
+          {/*
         REQ-035 (`T-UX-124`) — PRODUCT INVARIANT 2 IN A NEW PLACE: nothing
         leaves the owner's list without telling them. A runtime filter drops
         every title TMDB never supplied a runtime for; without this line the
@@ -577,12 +604,14 @@ export function FilterBar({
         `role="status"` for the same reason the count above has it: a sighted
         owner sees the list shrink, a screen-reader user gets no other signal.
       */}
-      {!countPending && runtimeUnknownHidden !== null && runtimeUnknownHidden > 0 && (
-        <p data-testid="runtime-unknown-hidden" role="status">
-          {runtimeUnknownHiddenLabel(runtimeUnknownHidden)}
-        </p>
+          {!countPending && runtimeUnknownHidden !== null && runtimeUnknownHidden > 0 && (
+            <p data-testid="runtime-unknown-hidden" role="status">
+              {runtimeUnknownHiddenLabel(runtimeUnknownHidden)}
+            </p>
+          )}
+        </div>
       )}
-    </div>
+    </>
   );
 }
 

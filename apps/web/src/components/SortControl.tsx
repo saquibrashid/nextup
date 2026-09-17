@@ -189,7 +189,7 @@ export function SortControl(): JSX.Element {
         <span className="sort-arrow" data-dir={dir}>
           <ChevronIcon />
         </span>
-        <span>{label}</span>
+        <span className="sort-trigger-label">{label}</span>
       </Button>
       {/*
         ⚠ The reverse button is the §10.1 floor rule, not decoration — see the
