@@ -478,6 +478,28 @@ export function ReviewPage({
         effectiveDisposition(candidate.disposition, local[candidate.candidateId]) === 'pending',
     ).length;
 
+  /**
+   * How many rows a close would actually WRITE from these items.
+   *
+   * ⚠ **NOT `sections.additions.count`, which is the section's LENGTH.** The
+   * owner reported deciding four cards and then reading "11 to add" — the bar
+   * was counting every row in the section, including the seven they had just
+   * discarded and any still pending. `applicableCandidates`
+   * (`packages/domain/src/close.ts`) applies `confirmed` and `corrected` only;
+   * a discard writes nothing, and a pending row does not survive the close's
+   * own gate. A count that disagrees with the close is worse than no count:
+   * it is the only number the owner has to check a destructive action against.
+   *
+   * ⚠ Reads through `effectiveDisposition` for the same reason `pendingIn`
+   * does — the press just made must be in the number before the refetch lands,
+   * or the bar appears to ignore the decision for a beat.
+   */
+  const applicableIn = (items: readonly ReviewCandidate[]): number =>
+    items.filter((candidate) => {
+      const disposition = effectiveDisposition(candidate.disposition, local[candidate.candidateId]);
+      return disposition === 'confirmed' || disposition === 'corrected';
+    }).length;
+
   // ⚠ ALL FOUR OR NONE. See `onKeepUnmatched` above: a partly-wired card is a
   // control that silently does nothing, which on the review screen reads as a
   // decision the owner has made.
@@ -717,7 +739,7 @@ export function ReviewPage({
         )}
         <p className="review-action-bar__counts" data-testid="review-counts">
           {reviewCounts(
-            sections.additions.count,
+            applicableIn(sections.additions.items) + applicableIn(sections.unmatched.items),
             sections.removals.count,
             pendingIn(sections.additions.items) + pendingIn(sections.unmatched.items),
           )}

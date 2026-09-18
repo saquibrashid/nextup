@@ -170,8 +170,15 @@ describe('T-REM-011 · US-014 AC-2 · append-only: the removals section does not
     // The bar reads its number from the section it is describing. ⚠ THE
     // FIXTURE HAS A NON-ZERO ADDITIONS COUNT ON PURPOSE: with both numbers
     // zero, a bar that printed the additions count in the removals slot would
-    // read correctly and this case would be vacuous.
-    render(<ReviewPage review={review({ mode: 'append-only', candidates: [candidate()] })} />);
+    // read correctly and this case would be vacuous. ⚠ And the candidate is
+    // CONFIRMED, because "N to add" counts what a close would write rather
+    // than the section's length (`T-UX-150`) — a pending row would put the
+    // fixture straight back into the vacuous state this note warns about.
+    render(
+      <ReviewPage
+        review={review({ mode: 'append-only', candidates: [candidate({ disposition: 'confirmed' })] })}
+      />,
+    );
 
     const counts = screen.getByTestId('review-counts');
     expect(counts).toHaveTextContent('1 to add');
