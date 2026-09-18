@@ -127,3 +127,39 @@ describe('T-UX-151 · a decidable card shows what it is asking about', () => {
     expect(card.getByTestId('candidate-thumb')).toBeInTheDocument();
   });
 });
+
+/**
+ * `T-UX-154` — the web half of the crop fix. `T-UX-151b` established that an
+ * unmatched card shows its source tile; this pins that what it shows is the
+ * TILE and not the whole screenshot.
+ *
+ * ⚠ **This test cannot fail on the defect, and that is stated deliberately
+ * rather than hidden.** The gate lived server-side in `tileCropFor`, and a
+ * component fixture supplies `tileCrop` directly, so on the pre-fix code this
+ * case passes while the product is broken. The failing evidence is
+ * `T-AI-041i` (domain) and `T-UX-154a` (integration, over a real review
+ * response). What this adds is the guarantee that a crop which reaches the
+ * client is actually rendered as a crop — without it, `T-UX-151b`'s fixture
+ * (`tileCrop: null`) would remain the only unmatched-card render ever
+ * exercised, i.e. a payload shape the server can no longer produce.
+ */
+describe('T-UX-154 · a decidable card shows the TILE, not the whole screenshot', () => {
+  it('T-UX-154b: an unmatched card whose payload carries a crop renders it cropped', () => {
+    render(
+      <ReviewPage
+        review={review([
+          unmatchedCandidate({
+            tileCrop: { imageId: 'img_1', x: 0.25, y: 0.5, w: 0.2, h: 0.25 },
+          }),
+        ])}
+      />,
+    );
+
+    const section = within(screen.getByTestId('review-unmatched'));
+
+    // The clipping wrapper IS the crop — see `CandidateCard`. Its absence is
+    // the owner's report: the bare `<img>` branch paints the whole screenshot.
+    expect(section.getByTestId('candidate-thumb-crop')).toBeInTheDocument();
+    expect(section.getByTestId('candidate-thumb')).toHaveAttribute('src', '/api/images/img_1');
+  });
+});

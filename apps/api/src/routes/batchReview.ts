@@ -258,8 +258,13 @@ export async function loadReviewCandidates(
         // value degrades to "no crop" (the whole image) rather than taking the
         // review page out: an unverifiable candidate the owner can still SEE
         // is recoverable, a 500 on the review pass is not.
+        //
+        // ⚠ No `verdict` is passed — `tileCropFor` no longer gates on it, and
+        // must not start again. See the ledger on that function: the crop is
+        // offered to every candidate with a tile box, because `CandidateCard`
+        // already shows a thumbnail for every card with no poster, and an
+        // uncropped one shows the whole screenshot (`T-UX-154`).
         tileCrop: tileCropFor({
-          verdict: row.cleanupVerdict as CleanupVerdict,
           boxSource: row.boxSource,
           boundingBoxes: parseBoundingBoxes(row.boundingBoxes),
         }),
