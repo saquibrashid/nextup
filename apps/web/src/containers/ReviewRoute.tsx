@@ -13,8 +13,10 @@
  * re-reading afterwards would be a request whose result is thrown away.
  */
 
-import { useCallback, useEffect, useState, type JSX } from 'react';
+import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
+
+import type { ReviewResponse } from '@nextup/domain';
 
 import {
   apiClient,
@@ -144,6 +146,41 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
     (signal) => client.getReview(batchId, signal),
     `review:${batchId}:${String(generation)}`,
   );
+
+  /*
+   * ⚠ THE PREVIOUS REVIEW IS HELD ACROSS A REFETCH, AND THAT IS THE WHOLE FIX
+   *   FOR THE SCROLL JUMP (TASK-291, reported from the owner's phone).
+   *
+   * Every decision on a card — confirm, correct, discard — bumps `generation`,
+   * which is `useResource`'s key, and the hook returns to `loading` on every
+   * key change. `ReviewPage` renders the skeleton in that state, so the entire
+   * list unmounted and the page collapsed to skeleton height on EVERY action.
+   * The browser has nowhere to keep the scroll offset, so the owner was thrown
+   * back to the top of a long review and had to find their place again after
+   * each of ~19 rows. Focus went with it.
+   *
+   * Holding the last good value keeps the list mounted while the refetch is in
+   * flight, so the scroll position and focus survive because nothing moved.
+   * The §6.1 skeleton still renders on the FIRST load, where there is nothing
+   * to preserve and the owner is waiting on content rather than looking at it.
+   *
+   * ⚠ Reset on `batchId`, not just held. Without that, navigating to a second
+   * batch would show the first batch's rows under the new URL until its load
+   * landed — a wrong list the owner could act on.
+   *
+   * ⚠ Declared HERE, with the other hooks, and not beside the JSX that uses
+   * it: the screen early-returns for a dead session and for a refusal, and a
+   * hook below those runs conditionally. React counts hooks per render, so
+   * that is not a style point — it throws the moment a 401 arrives.
+   */
+  const previous = useRef<{ batchId: string; value: ReviewResponse } | null>(null);
+  if (review.resource.kind === 'ok') {
+    previous.current = { batchId, value: review.resource.value };
+  } else if (previous.current !== null && previous.current.batchId !== batchId) {
+    previous.current = null;
+  }
+  const held = previous.current?.batchId === batchId ? previous.current.value : null;
+  const shown = review.resource.kind === 'ok' ? review.resource.value : held;
 
   const confirmAll = useCallback(
     (section: ConfirmableSection): void => {
@@ -353,11 +390,10 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
   }
 
   if (review.resource.kind === 'refused') return <RefusalPage reason="not-allowed" />;
-
   return (
     <ReviewPage
-      review={review.resource.kind === 'ok' ? review.resource.value : null}
-      loading={review.resource.kind === 'loading'}
+      review={shown}
+      loading={review.resource.kind === 'loading' && shown === null}
       skeletonCount={skeletonCount}
       loadFailed={review.resource.kind === 'failed'}
       applyFailed={applyFailed}
