@@ -193,7 +193,7 @@ const CHROME_REJECTION_MEASURED = 0.8481012658227848;
  *
  * ⚠ THE FOURTH METRIC TO LEAVE `KNOWN_SHORTFALLS` BY CLEARING §9.2, and the
  * one the ledger below repeatedly predicted was unreachable. It was 0.2500
- * when first measured and is **0.0877** now, against a ceiling of
+ * when first measured and is **0.0545** now, against a ceiling of
  * {@link AGGREGATE_FALSE_TITLE_CEILING}. The full history is retained
  * verbatim below, INCLUDING the two paragraphs that called the last four
  * survivors out of reach, because being wrong about that is the useful part:
@@ -209,13 +209,49 @@ const CHROME_REJECTION_MEASURED = 0.8481012658227848;
  * produces `stranger things vhs special edition`, which is an EXPECTED title
  * in both answer keys. Numerator 9 → 5, denominator 59 → 57.
  *
- * ⚠ THE FIVE SURVIVORS ARE NAMED, so this gate is not mistaken for perfection:
- * `in the shadow of dante` and `true detective night country` are reader
- * misreads already counted against recall; `2026 the drama` and `2026 normal`
- * on `rotated-01` are LEADING-year fusions, and §3.2 step 5 lifts only
- * TRAILING years — a leading-year strip would break real titles such as
- * *2046*; and `og studios` sits on the one image whose recording contains no
- * off-list header to anchor step 3b to.
+ * ⚠ AND DOWN AGAIN AT THE TILE-BOUNDARY FIX — 0.0877 to **0.0545**, numerator
+ * 5 → 3, denominator 57 → 55 — and it removed EXACTLY THE TWO SURVIVORS THE
+ * PARAGRAPH BELOW SAYS ARE OUT OF REACH. `2026 the drama` and `2026 normal`
+ * on `rotated-01` were never leading-year fusions needing a leading-year
+ * strip: they were CONFLATIONS of two adjacent tiles, produced by a missing
+ * guard in §3.2 step 1. `mergeable()` tested `gap < OCR_MERGE_GAP` without
+ * ever testing that `next` is to the RIGHT of `prev`, so a gap of -0.87 read
+ * as the most mergeable value available — and the row-bucket sort manufactures
+ * exactly that whenever a bucket edge falls mid-row, pairing one bucket's
+ * last item (large x) with the next bucket's first (small x). Adding
+ * `gap >= 0`, plus the height-comparability test `wrapsUnder` already had,
+ * removed 13 of the corpus's 14 horizontal conflations —
+ * `HAMNET | STRANGER THINGS`, `HIS & HERS | TALES FROM 85`,
+ * `SOL | MAN ON FIRE`, `Wicked: For Good | WICKED`, `WHISPER | HAMNET` and
+ * the rest — while keeping every legitimate merge: the truncation marker, the
+ * §3.2 step 1b caption wrap and the trailing-year badges.
+ *
+ * ⚠ **THE PARAGRAPH BELOW IS RETAINED BECAUSE IT WAS WRONG, AND THE WAY IT WAS
+ * WRONG IS THE LESSON.** It diagnosed the two `2026 …` rows from their TEXT —
+ * a year in front of a title looks like a year-handling problem — and
+ * concluded, reasonably, that fixing them would require a leading-year strip
+ * that breaks real titles like *2046*. The geometry said something else
+ * entirely. Read the boxes before theorising about the strings.
+ *
+ * ⚠ ONE CONFLATION SURVIVES AND IS NOT BOUGHT BY TUNING:
+ * `GREENLAND 2 | TRUE DETECTIVE` on `max-saved-desktop-01` has a POSITIVE gap
+ * (0.0167, 0.37 of the taller box — a word space) and a 0.69 height ratio,
+ * which is above the truncation marker's 0.68. There is no local OCR signal
+ * separating it from a legitimate two-fragment caption; it is artwork
+ * lettering in two adjacent tiles at similar scale. Separating it needs the
+ * TILE rectangle, and the model's tile boxes are not trustworthy on these
+ * captures (they arrive as a synthetic uniform grid with zero vertical overlap
+ * with OCR's measured lines). Left alone on purpose.
+ *
+ * ⚠ THE THREE SURVIVORS ARE NAMED, so this gate is not mistaken for
+ * perfection: `in the shadow of dante` and `true detective night country` are
+ * reader misreads already counted against recall, and `og studios` sits on the
+ * one image whose recording contains no off-list header to anchor step 3b to.
+ *
+ * ~~Superseded — `2026 the drama` and `2026 normal` are no longer produced:~~
+ * ~~"`2026 the drama` and `2026 normal` on `rotated-01` are LEADING-year~~
+ * ~~fusions, and §3.2 step 5 lifts only TRAILING years — a leading-year strip~~
+ * ~~would break real titles such as *2046*."~~
  *
  * ⚠ THE HISTORY BELOW IS RETAINED VERBATIM.
  *
@@ -289,7 +325,7 @@ const CHROME_REJECTION_MEASURED = 0.8481012658227848;
  * hull instead of assumed. It excludes nothing there, and per-image recall is
  * unchanged.
  */
-const FALSE_TITLE_MEASURED = 0.08771929824561403;
+const FALSE_TITLE_MEASURED = 0.05454545454545454;
 /**
  * Match accuracy — **A GATE, NOT A PIN, SINCE TASK-197.** 23 of 24.
  *
