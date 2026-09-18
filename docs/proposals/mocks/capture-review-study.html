@@ -1,0 +1,713 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'" />
+    <title>nextup — a calmer capture and review</title>
+    <script>
+      (() => {
+        const param = new URLSearchParams(window.location.search).get("scoutTheme");
+        const theme =
+          param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
+    <style>
+      :root {
+        color-scheme: light;
+        --cp-bg: #f6f5fb;
+        --cp-bg-elevated: #fbfaff;
+        --cp-surface: #ffffff;
+        --cp-surface-soft: #f0edf8;
+        --cp-surface-raised: #f8f7fc;
+        --cp-border: #ded8eb;
+        --cp-border-strong: #837691;
+        --cp-text: #211b35;
+        --cp-text-muted: #615771;
+        --cp-text-soft: #6b617a;
+        --cp-accent: #5542b8;
+        --cp-accent-hover: #49369c;
+        --cp-accent-soft: rgba(85, 66, 184, 0.08);
+        --cp-accent-fg: #ffffff;
+        --cp-secondary: #405da8;
+        --cp-secondary-soft: rgba(64, 93, 168, 0.08);
+        --cp-success: #18734c;
+        --cp-success-soft: rgba(24, 115, 76, 0.1);
+        --cp-danger: #b4233c;
+        --cp-danger-soft: rgba(180, 35, 60, 0.06);
+        --cp-warning: #925b12;
+        --cp-warning-soft: rgba(146, 91, 18, 0.08);
+        --cp-link: #4338ca;
+        --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+        --cp-shadow-card: 0 1px 2px rgba(18, 16, 32, 0.06), 0 8px 24px rgba(18, 16, 32, 0.05);
+        --cp-overlay: rgba(18, 16, 32, 0.6);
+        --cp-panel: rgba(255, 255, 255, 0.86);
+        --cp-panel-strong: rgba(255, 255, 255, 0.98);
+        --cp-sheen: rgba(255, 255, 255, 0.55);
+        --cp-highlight: rgba(85, 66, 184, 0.12);
+      }
+      html[data-theme="dark"] {
+        color-scheme: dark;
+        --cp-bg: #121020;
+        --cp-bg-elevated: #181429;
+        --cp-surface: #1e1932;
+        --cp-surface-soft: #262039;
+        --cp-surface-raised: #2c2542;
+        --cp-border: #3d3455;
+        --cp-border-strong: #77678f;
+        --cp-text: #f2efff;
+        --cp-text-muted: #bcb4d2;
+        --cp-text-soft: #bcb4d2;
+        --cp-accent: #b3a0ff;
+        --cp-accent-hover: #c4b5ff;
+        --cp-accent-soft: rgba(179, 160, 255, 0.14);
+        --cp-accent-fg: #1e1932;
+        --cp-secondary: #adc5f7;
+        --cp-secondary-soft: rgba(173, 197, 247, 0.1);
+        --cp-success: #7adcb0;
+        --cp-success-soft: rgba(122, 220, 176, 0.12);
+        --cp-danger: #ff9ba8;
+        --cp-danger-soft: rgba(255, 155, 168, 0.07);
+        --cp-warning: #e4c17f;
+        --cp-warning-soft: rgba(228, 193, 127, 0.08);
+        --cp-link: #c4b5ff;
+        --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+        --cp-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.16);
+        --cp-overlay: rgba(18, 16, 32, 0.8);
+        --cp-panel: rgba(30, 25, 50, 0.72);
+        --cp-panel-strong: rgba(30, 25, 50, 0.98);
+        --cp-sheen: rgba(242, 239, 255, 0.04);
+        --cp-highlight: rgba(179, 160, 255, 0.12);
+      }
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+      html { scroll-padding-bottom: 180px; }
+      body { margin: 0; background: linear-gradient(180deg, var(--cp-bg), var(--cp-bg-elevated) 44rem); color: var(--cp-text); font: 14px/1.5 "Segoe UI", Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif; font-kerning: normal; }
+      h1, h2, h3, p { margin: 0; }
+      h1 { font-size: 34px; line-height: 1.18; letter-spacing: -1px; font-weight: 650; }
+      h2 { font-size: 19px; line-height: 1.3; letter-spacing: -0.35px; font-weight: 650; }
+      h3 { font-size: 17px; line-height: 1.35; letter-spacing: -0.2px; font-weight: 650; }
+      button, input, select { font: inherit; }
+      button, .button { min-height: 44px; padding: 8px 14px; border: 1px solid var(--cp-border-strong); border-radius: 10px; background: var(--cp-surface); color: var(--cp-text); cursor: pointer; font-size: 13px; font-weight: 600; line-height: 1.35; text-align: center; transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 120ms ease; }
+      button:hover:not(:disabled), .button:hover { background: var(--cp-surface-raised); border-color: var(--cp-accent); }
+      button:active:not(:disabled) { transform: scale(0.985); }
+      button:disabled { cursor: not-allowed; color: var(--cp-text-soft); background: var(--cp-surface-soft); border-color: var(--cp-border); }
+      .primary { color: var(--cp-accent-fg); background: var(--cp-accent); border-color: var(--cp-accent); box-shadow: inset 0 1px var(--cp-sheen); }
+      .primary:hover:not(:disabled) { background: var(--cp-accent-hover); }
+      .quiet { background: var(--cp-bg-elevated); border-color: var(--cp-border); }
+      .danger-text { color: var(--cp-danger); }
+      :focus-visible { outline: 2px solid var(--cp-accent); outline-offset: 3px; }
+      a { color: var(--cp-link); text-underline-offset: 3px; }
+      input[type="search"] { min-width: 0; min-height: 44px; width: 100%; padding: 10px 12px; color: var(--cp-text); background: var(--cp-bg); border: 1px solid var(--cp-border-strong); border-radius: 10px; }
+      input::placeholder { color: var(--cp-text-soft); opacity: 1; }
+      input[type="checkbox"], input[type="radio"] { width: 18px; height: 18px; margin: 0; accent-color: var(--cp-accent); flex-shrink: 0; }
+      fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+      .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+      .skip { position: absolute; top: -80px; left: 12px; z-index: 10; padding: 12px; background: var(--cp-surface); }
+      .skip:focus { top: 12px; }
+      .muted { color: var(--cp-text-soft); }
+      .small { font-size: 12px; }
+      .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--cp-text-soft); }
+      .stack { display: grid; gap: 16px; }
+      .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .spread { justify-content: space-between; }
+      .study-bar { background: var(--cp-bg-elevated); border-bottom: 1px solid var(--cp-border); }
+      .study-inner { max-width: 1152px; margin: auto; padding: 8px 24px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+      .study-inner p { font-size: 12px; color: var(--cp-text-soft); }
+      .study-inner button { min-width: 44px; }
+      .frame { max-width: 1152px; padding: 0 24px; margin: auto; }
+      .brand-bar { display: flex; justify-content: space-between; align-items: center; min-height: 88px; gap: 16px; }
+      .brand { font-size: 25px; font-weight: 750; letter-spacing: -1.3px; }
+      .brand span { color: var(--cp-accent); }
+      .brand-bar a { font-size: 13px; padding: 12px 0; }
+      .progress { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; list-style: none; padding: 0; margin: 0 0 36px; }
+      .progress li { display: flex; align-items: center; gap: 8px; color: var(--cp-text-soft); font-size: 12px; border-top: 2px solid var(--cp-border); padding-top: 12px; }
+      .progress .number { display: grid; place-items: center; width: 24px; height: 24px; flex-shrink: 0; border-radius: 8px; background: var(--cp-surface-soft); font-variant-numeric: tabular-nums; font-size: 11px; }
+      .progress li[aria-current="step"] { border-color: var(--cp-accent); color: var(--cp-text); font-weight: 600; }
+      .progress li[aria-current="step"] .number { color: var(--cp-accent-fg); background: var(--cp-accent); }
+      .progress .done { border-color: var(--cp-secondary); }
+      .progress .done .number { color: var(--cp-secondary); background: var(--cp-secondary-soft); }
+      main { padding-bottom: 48px; }
+      .intro { margin-bottom: 28px; }
+      .intro .eyebrow { color: var(--cp-accent); margin-bottom: 10px; }
+      .intro > p:not(.eyebrow) { color: var(--cp-text-soft); margin-top: 12px; max-width: 64ch; font-size: 15px; }
+      .fixture-note { font-size: 12px; color: var(--cp-text-soft); margin-bottom: 20px; }
+      .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 276px; align-items: start; gap: 24px; }
+      .panel { border: 1px solid var(--cp-border); background: linear-gradient(135deg, var(--cp-surface), var(--cp-surface-raised)); border-radius: 16px; box-shadow: var(--cp-shadow-card); overflow: clip; }
+      .step { padding: 24px; }
+      .step.active { border-color: var(--cp-border-strong); }
+      .step-header { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+      .step-index { width: 36px; height: 36px; border-radius: 10px; background: var(--cp-accent-soft); color: var(--cp-accent); display: grid; place-items: center; font-size: 12px; font-weight: 700; }
+      .step-header p { color: var(--cp-text-soft); margin-top: 4px; font-size: 13px; }
+      .step-body { margin-top: 20px; }
+      .choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .choice { display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 12px 16px; border: 1px solid var(--cp-border-strong); border-radius: 10px; background: var(--cp-surface); cursor: pointer; transition: background-color 160ms ease, border-color 160ms ease; }
+      .choice:hover { background: var(--cp-surface-raised); border-color: var(--cp-accent); }
+      .choice:has(input:checked) { border-color: var(--cp-accent); background: var(--cp-accent-soft); }
+      .choice:has(input:focus-visible) { outline: 2px solid var(--cp-accent); outline-offset: 3px; }
+      .service-name { flex: 1; font-weight: 600; }
+      .service-mark { display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px; background: var(--cp-secondary-soft); color: var(--cp-secondary); font-size: 12px; font-weight: 750; }
+      .mode-choice { align-items: flex-start; padding: 16px; min-height: 132px; }
+      .mode-choice input { margin-top: 3px; }
+      .mode-choice strong { display: block; margin-bottom: 8px; }
+      .mode-choice p { font-size: 13px; color: var(--cp-text-soft); }
+      fieldset:disabled .choice { cursor: not-allowed; border-color: var(--cp-border); }
+      .hint { margin-top: 12px; color: var(--cp-text-soft); font-size: 12px; }
+      .drop-area { border: 1px dashed var(--cp-border-strong); border-radius: 12px; padding: 24px; text-align: center; background: var(--cp-bg-elevated); transition: background-color 160ms ease, border-color 160ms ease; }
+      .drop-area.dragging { background: var(--cp-accent-soft); border-color: var(--cp-accent); }
+      .drop-icon { margin: 0 auto 12px; width: 44px; height: 44px; display: grid; place-items: center; color: var(--cp-accent); background: var(--cp-accent-soft); border-radius: 12px; }
+      .drop-icon svg { width: 24px; height: 24px; }
+      .ingest-actions { display: flex; justify-content: center; gap: 8px; margin: 16px 0 12px; flex-wrap: wrap; }
+      .file-list { display: grid; gap: 8px; list-style: none; padding: 0; margin: 16px 0 0; }
+      .file { display: grid; grid-template-columns: 36px minmax(0, 1fr) 44px; gap: 12px; align-items: center; padding: 8px 12px; background: var(--cp-bg-elevated); border: 1px solid var(--cp-border); border-radius: 10px; }
+      .file p { overflow-wrap: anywhere; font-size: 13px; }
+      .file button { padding: 8px; width: 44px; font-size: 18px; }
+      .file-symbol { color: var(--cp-secondary); background: var(--cp-secondary-soft); display: grid; place-items: center; height: 36px; border-radius: 8px; font-size: 11px; font-weight: 700; }
+      .aside { position: sticky; top: 24px; padding: 24px; }
+      .aside h2 { font-size: 16px; }
+      .ledger { display: grid; gap: 16px; margin: 24px 0; }
+      .ledger div { display: grid; gap: 4px; }
+      .ledger dt { color: var(--cp-text-soft); font-size: 12px; }
+      .ledger dd { margin: 0; font-weight: 600; }
+      .aside .primary { width: 100%; }
+      .reassurance { border-top: 1px solid var(--cp-border); padding-top: 16px; margin-top: 20px; color: var(--cp-text-soft); font-size: 12px; }
+      .notice { padding: 12px 16px; border: 1px solid var(--cp-border); border-radius: 10px; color: var(--cp-text-soft); background: var(--cp-bg-elevated); font-size: 13px; }
+      .notice.warning { color: var(--cp-warning); background: var(--cp-warning-soft); border-color: var(--cp-warning); }
+      .notice.error { color: var(--cp-danger); border-color: var(--cp-danger); background: var(--cp-danger-soft); }
+      #announcement:not(:empty) { margin-bottom: 20px; }
+      .batch-context { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+      .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--cp-secondary-soft); color: var(--cp-secondary); font-size: 11px; font-weight: 600; }
+      .badge.success { background: var(--cp-success-soft); color: var(--cp-success); }
+      .badge.warning { background: var(--cp-warning-soft); color: var(--cp-warning); }
+      .badge.neutral { background: var(--cp-surface-soft); color: var(--cp-text-soft); }
+      .review-section { scroll-margin-top: 24px; }
+      .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 24px; border-bottom: 1px solid var(--cp-border); }
+      .section-heading p { margin-top: 6px; color: var(--cp-text-soft); font-size: 13px; }
+      .count { display: inline-grid; place-items: center; min-width: 24px; height: 24px; margin-left: 6px; padding: 0 6px; border-radius: 6px; background: var(--cp-surface-soft); color: var(--cp-text-soft); font-size: 12px; vertical-align: 2px; font-variant-numeric: tabular-nums; }
+      .candidate { padding: 24px; border-bottom: 1px solid var(--cp-border); }
+      .candidate:last-child { border-bottom: 0; }
+      .candidate-core { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 20px; }
+      .evidence { width: 104px; height: 104px; padding: 10px; border-radius: 10px; border: 1px solid var(--cp-border-strong); background: linear-gradient(155deg, var(--cp-surface-raised), var(--cp-bg)); display: flex; flex-direction: column; justify-content: space-between; align-items: flex-start; text-align: left; color: var(--cp-secondary); }
+      .evidence .crop-text { font-size: 13px; line-height: 1.15; letter-spacing: 1px; font-weight: 750; color: var(--cp-text); overflow-wrap: anywhere; }
+      .evidence .crop-label { font-size: 9px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; }
+      .candidate-meta { margin-top: 4px; font-size: 12px; color: var(--cp-text-soft); }
+      .raw { margin-top: 12px; font-size: 12px; color: var(--cp-text-soft); }
+      .raw strong { color: var(--cp-text); font-weight: 500; }
+      .candidate .badge { margin-top: 10px; }
+      .row-actions { margin: 16px 0 0 124px; display: grid; grid-template-columns: 1fr 1.25fr 1fr; gap: 8px; }
+      .row-actions button { height: 44px; padding: 4px 8px; font-size: 12px; line-height: 16px; }
+      .decision { margin: 16px 0 0 124px; min-height: 44px; display: flex; align-items: center; color: var(--cp-success); font-size: 13px; }
+      .decision.discarded { color: var(--cp-text-soft); }
+      .alternatives { margin: 16px 0 0 124px; border-left: 2px solid var(--cp-warning); padding-left: 12px; }
+      .alternatives p { color: var(--cp-warning); font-size: 12px; margin-bottom: 8px; }
+      .alternatives button { font-size: 12px; margin: 0 4px 4px 0; }
+      .section-summary { padding: 20px 24px; display: flex; align-items: center; gap: 8px; cursor: pointer; min-height: 64px; list-style: none; }
+      .section-summary::-webkit-details-marker { display: none; }
+      .section-summary::before { content: "+"; font-size: 18px; width: 16px; color: var(--cp-secondary); flex-shrink: 0; }
+      details[open] > .section-summary::before { content: "−"; }
+      .section-summary h2 { font-size: 16px; flex: 1; }
+      details[open] > .section-summary { border-bottom: 1px solid var(--cp-border); }
+      .existing-row { padding: 16px 24px; border-bottom: 1px solid var(--cp-border); }
+      .existing-row:last-child { border: 0; }
+      .existing-row .raw { margin-top: 4px; }
+      .other-content { padding: 24px; display: grid; gap: 24px; }
+      .other-item { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 20px; }
+      .other-item button:not(.evidence) { margin-top: 12px; }
+      .removal-heading { border-top: 3px solid var(--cp-danger); }
+      .removal-row { display: flex; align-items: center; gap: 12px; min-height: 76px; padding: 16px 24px; border-bottom: 1px solid var(--cp-border); cursor: pointer; }
+      .removal-row:last-child { border-bottom: 0; }
+      .removal-row span { flex: 1; }
+      .removal-row strong { display: block; font-size: 14px; }
+      .removal-row small { display: block; font-size: 12px; color: var(--cp-text-soft); margin-top: 4px; }
+      .removal-row:has(input:checked) small { color: var(--cp-danger); }
+      .review-nav { display: grid; gap: 4px; margin: 20px 0; }
+      .review-nav a { display: flex; justify-content: space-between; gap: 12px; padding: 12px 8px; border-radius: 8px; text-decoration: none; color: var(--cp-text-soft); font-size: 13px; min-height: 44px; }
+      .review-nav a:hover { background: var(--cp-surface-soft); color: var(--cp-text); }
+      .review-nav strong { color: var(--cp-text); font-variant-numeric: tabular-nums; }
+      .pending-total { font-size: 34px; font-weight: 650; line-height: 1.2; letter-spacing: -1px; margin: 16px 0 4px; }
+      .aside .next { width: 100%; margin-top: 16px; }
+      .action-bar { position: sticky; bottom: 12px; z-index: 2; margin-top: 24px; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; border: 1px solid var(--cp-border-strong); border-radius: 14px; background: var(--cp-panel-strong); box-shadow: var(--cp-shadow-card); }
+      .action-bar p { font-size: 13px; }
+      .action-bar .counts { font-weight: 600; }
+      .action-bar .row { gap: 8px; }
+      .action-bar .offline { flex-basis: 100%; color: var(--cp-warning); }
+      .confirm-sheet { padding: 28px; }
+      .effect { padding: 24px 0; border-bottom: 1px solid var(--cp-border); }
+      .effect:first-child { padding-top: 0; }
+      .effect:last-child { border: 0; padding-bottom: 0; }
+      .effect h2 { display: flex; align-items: center; gap: 12px; font-size: 17px; }
+      .effect .effect-sign { width: 32px; height: 32px; display: grid; place-items: center; background: var(--cp-success-soft); color: var(--cp-success); border-radius: 8px; }
+      .effect.removing .effect-sign { background: var(--cp-danger-soft); color: var(--cp-danger); }
+      .effect ul { padding-left: 44px; margin: 16px 0 0; list-style: none; display: grid; gap: 12px; }
+      .effect li span { display: block; color: var(--cp-text-soft); font-size: 12px; margin-top: 2px; }
+      .effect > p { margin: 12px 0 0 44px; color: var(--cp-text-soft); font-size: 13px; }
+      .receipt { max-width: 620px; margin: 48px auto; text-align: center; padding: 40px; }
+      .receipt .drop-icon { width: 56px; height: 56px; background: var(--cp-success-soft); color: var(--cp-success); font-size: 28px; }
+      .receipt p { margin: 16px 0 24px; color: var(--cp-text-soft); }
+      dialog { padding: 0; width: min(560px, calc(100% - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; border: 1px solid var(--cp-border-strong); border-radius: 16px; background: var(--cp-surface); color: var(--cp-text); box-shadow: var(--cp-shadow); }
+      dialog::backdrop { background: var(--cp-overlay); }
+      dialog[open] { animation: appear 160ms ease-out; }
+      .dialog-body { padding: 24px; }
+      .dialog-body > p { margin-top: 12px; color: var(--cp-text-soft); }
+      .dialog-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+      .dialog-head button { width: 44px; padding: 8px; flex-shrink: 0; }
+      .dialog-actions { margin-top: 24px; display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+      .settings { display: grid; gap: 12px; margin-top: 20px; }
+      .settings label { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 8px 0; }
+      .search-label { display: block; margin: 20px 0 8px; font-size: 13px; font-weight: 600; }
+      .match-result { padding: 16px 0; display: flex; gap: 12px; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--cp-border); }
+      .match-result button { flex-shrink: 0; }
+      .match-result p { font-size: 12px; color: var(--cp-text-soft); }
+      .sample-sheet { margin-top: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+      .sample-sheet div { min-height: 120px; padding: 16px; background: var(--cp-bg); border: 1px solid var(--cp-border); border-radius: 10px; display: grid; align-content: end; font-size: 15px; color: var(--cp-secondary); font-weight: 650; }
+      @keyframes appear { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+      @media (max-width: 900px) {
+        .workspace { grid-template-columns: minmax(0, 1fr); }
+        .aside { position: static; }
+        #review-aside { display: none; }
+        .upload-aside .ledger { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .upload-aside .primary { width: auto; min-width: 200px; }
+      }
+      @media (max-width: 540px) {
+        .frame { padding: 0 16px; }
+        .study-inner { padding: 8px 16px; }
+        .study-inner p { font-size: 11px; }
+        .study-inner .study-long { display: none; }
+        .brand-bar { min-height: 64px; }
+        .progress { gap: 6px; margin-bottom: 20px; }
+        .progress li { flex-direction: column; align-items: flex-start; gap: 6px; font-size: 10px; }
+        h1 { font-size: 28px; letter-spacing: -0.7px; }
+        .intro { margin-bottom: 24px; }
+        .intro > p:not(.eyebrow) { font-size: 14px; }
+        .step, .aside, .candidate, .other-content, .confirm-sheet { padding: 20px; }
+        .step-header { grid-template-columns: 32px minmax(0, 1fr) auto; gap: 10px; }
+        .step-index { width: 32px; height: 32px; }
+        .step-header h2 { font-size: 17px; }
+        .choices { gap: 8px; }
+        .choice { min-height: 64px; padding: 10px; gap: 8px; }
+        .service-mark { display: none; }
+        .service-name { font-size: 13px; }
+        .mode-choices { grid-template-columns: minmax(0, 1fr); }
+        .mode-choice { min-height: 108px; padding: 16px; }
+        .drop-area { padding: 20px 12px; }
+        .ingest-actions { flex-direction: column; }
+        .file { gap: 8px; padding: 8px; }
+        .upload-aside .ledger { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+        .upload-aside .ledger div { grid-template-columns: 1fr 1fr; align-items: baseline; }
+        .upload-aside .primary { width: 100%; min-width: 0; }
+        .section-heading { padding: 20px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 12px; }
+        .section-heading > div:only-child { grid-column: 1 / -1; }
+        .candidate-core, .other-item { gap: 12px; }
+        .candidate h3 { font-size: 16px; }
+        .row-actions, .decision, .alternatives { margin-left: 0; }
+        .section-summary { padding: 16px 20px; }
+        .section-summary h2 { font-size: 15px; }
+        .existing-row, .removal-row { padding: 16px 20px; }
+        .action-bar { padding: 12px; gap: 12px; bottom: 8px; }
+        .action-bar > .row { width: 100%; display: grid; grid-template-columns: 1fr 1.4fr; }
+        .action-bar button { padding: 8px; }
+        .effect ul { padding-left: 0; }
+        .effect > p { margin-left: 0; }
+        .receipt { padding: 28px 20px; }
+        .dialog-body { padding: 20px; }
+      }
+      @media (max-width: 340px) {
+        .frame { padding: 0 12px; }
+        .step, .aside, .candidate, .other-content, .confirm-sheet { padding: 16px; }
+        .step-header { grid-template-columns: 28px minmax(0, 1fr); }
+        .step-header > button { grid-column: 2; justify-self: start; }
+        .step-index { width: 28px; height: 28px; }
+        .candidate-core, .other-item { grid-template-columns: minmax(0, 1fr); }
+        .choices:not(.mode-choices) { grid-template-columns: minmax(0, 1fr); }
+        .service-mark { display: grid; }
+        .section-heading { padding: 16px; }
+        .row-actions { gap: 6px; }
+        .match-result { align-items: flex-start; flex-direction: column; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+        button:active:not(:disabled) { transform: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <div class="study-bar">
+      <div class="study-inner">
+        <p><strong>Study 04</strong><span class="study-long"> · Capture &amp; review</span> · Sample data only</p>
+        <button id="tools-button" class="quiet">Prototype tools</button>
+      </div>
+    </div>
+    <div class="frame">
+      <header class="brand-bar"><div class="brand">next<span>up</span></div><a href="layout-alternatives.html?layout=compare">Library studies</a></header>
+      <ol class="progress" aria-label="Update progress">
+        <li data-progress="1"><span class="number">1</span>Service</li>
+        <li data-progress="2"><span class="number">2</span>Mode</li>
+        <li data-progress="3"><span class="number">3</span>Images</li>
+        <li data-progress="4"><span class="number">4</span>Review</li>
+        <li data-progress="5"><span class="number">5</span>Confirm</li>
+      </ol>
+      <main id="main">
+        <div id="announcement" role="alert" hidden></div>
+        <div id="upload">
+          <div class="intro">
+            <p class="eyebrow">Your list, brought together</p>
+            <h1 id="upload-heading" tabindex="-1">Update your saved list</h1>
+            <p>Start with one service. Add screenshots, check the titles, then decide what changes.</p>
+          </div>
+          <div class="workspace">
+            <div class="stack">
+              <section class="step panel" id="service-step" aria-labelledby="service-heading">
+                <div class="step-header"><span class="step-index" aria-hidden="true">01</span><div><h2 id="service-heading" tabindex="-1">Choose a service</h2><p id="service-answer">Which saved list are these from?</p></div><button id="change-service" class="quiet" hidden>Change<span class="sr-only"> service</span></button></div>
+                <div class="step-body" id="service-body"><fieldset><legend class="sr-only">Service</legend><div class="choices" id="service-choices"></div></fieldset></div>
+              </section>
+              <section class="step panel" id="mode-step" aria-labelledby="mode-heading">
+                <div class="step-header"><span class="step-index" aria-hidden="true">02</span><div><h2 id="mode-heading" tabindex="-1">Choose an update mode</h2><p id="mode-answer">How much of your list is in these screenshots?</p></div><button id="change-mode" class="quiet" hidden>Change<span class="sr-only"> update mode</span></button></div>
+                <div class="step-body" id="mode-body">
+                  <fieldset id="mode-fieldset" aria-describedby="mode-hint" disabled><legend class="sr-only">Update mode</legend>
+                    <div class="choices mode-choices">
+                      <label class="choice mode-choice"><input type="radio" name="mode" value="append" /><span><strong>Add only</strong><span id="append-copy">Only adds what's in these screenshots. Nothing will be removed.</span></span></label>
+                      <label class="choice mode-choice"><input type="radio" name="mode" value="full" /><span><strong>Full update</strong><span id="full-copy">Anything on the chosen service that isn't in these screenshots will be offered for removal.</span></span></label>
+                    </div>
+                  </fieldset>
+                  <p id="mode-hint" class="hint">Choose a service to answer this step.</p>
+                </div>
+              </section>
+              <section class="step panel" id="images-step" aria-labelledby="images-heading">
+                <div class="step-header"><span class="step-index" aria-hidden="true">03</span><div><h2 id="images-heading" tabindex="-1">Add screenshots</h2><p>Paste, choose files, or drop them here.</p></div></div>
+                <div class="step-body">
+                  <div class="drop-area" id="drop-area">
+                    <div class="drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m-4 4 4-4 4 4M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg></div>
+                    <strong>A little of your list, or all of it</strong>
+                    <p class="muted small">PNG, JPEG, HEIC or HEIF</p>
+                    <div class="ingest-actions"><button class="primary" id="paste-button">Paste screenshot</button><button id="choose-files">Choose files</button></div>
+                    <p class="small muted">Ctrl / Cmd + V works here too.</p>
+                    <input class="sr-only" id="file-input" type="file" multiple accept=".png,.jpg,.jpeg,.heic,.heif,image/png,image/jpeg,image/heic,image/heif" tabindex="-1" aria-label="Choose screenshot files" />
+                  </div>
+                  <div class="row spread" style="margin-top: 12px"><p class="small muted">Just exploring the design?</p><button id="sample-images" class="quiet">Use sample screenshots</button></div>
+                  <ul class="file-list" id="file-list" aria-label="Screenshots in this sample batch"></ul>
+                  <p class="hint" id="images-hint">You can add screenshots now; we'll hold them while you choose the service and mode.</p>
+                </div>
+              </section>
+            </div>
+            <aside class="panel aside upload-aside" aria-labelledby="batch-summary-heading">
+              <p class="eyebrow">At a glance</p><h2 id="batch-summary-heading" style="margin-top: 8px">Your update</h2>
+              <dl class="ledger"><div><dt>Service</dt><dd id="summary-service">Not chosen</dd></div><div><dt>Update mode</dt><dd id="summary-mode">Not chosen</dd></div><div><dt>Screenshots</dt><dd id="summary-images">0 added</dd></div></dl>
+              <button class="primary" id="extract" disabled aria-describedby="extract-reason">Preview extracted titles</button>
+              <p class="hint" id="extract-reason"></p>
+              <p class="reassurance">Nothing changes until you apply.<br /><br />Offline design study: files stay local. This preview uses fixed sample results, not OCR of your files.</p>
+            </aside>
+          </div>
+        </div>
+        <div id="review" hidden></div>
+        <div id="confirm" hidden></div>
+        <div id="receipt" hidden></div>
+      </main>
+    </div>
+    <dialog id="dialog" aria-labelledby="dialog-title"><div class="dialog-body" id="dialog-content"></div></dialog>
+    <script>
+      const $ = (selector) => document.querySelector(selector);
+      const $$ = (selector) => [...document.querySelectorAll(selector)];
+      const esc = (value) => String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
+      const services = ["Netflix", "Max", "Prime Video", "Disney+", "Hulu", "Apple TV+", "Peacock", "Paramount+"];
+      const marks = ["N", "M", "P", "D+", "H", "A", "Pe", "P+"];
+      const catalog = [
+        { id: "arrival", name: "Arrival", year: "2016", type: "Movie" },
+        { id: "dune21", name: "Dune", year: "2021", type: "Movie" },
+        { id: "dune84", name: "Dune", year: "1984", type: "Movie" },
+        { id: "quiet", name: "The Quiet Earth", year: "1985", type: "Movie" },
+        { id: "oa", name: "The OA", year: "2016", type: "Series" },
+        { id: "dark", name: "Dark", year: "2017", type: "Series", existing: true },
+        { id: "good", name: "The Good Place", year: "2016", type: "Series", existing: true },
+      ];
+      let state;
+      let fileSequence = 0;
+      let returnFocus = null;
+      let matchTarget = null;
+      function reset() {
+        state = { view: "upload", service: null, mode: null, edit: null, images: [], candidates: [], removals: [], open: new Set(), offline: false, withheld: false, failNext: false, applyCount: 0 };
+        $$('input[name="service"], input[name="mode"]').forEach((input) => { input.checked = false; });
+        clearNotice();
+        showView("upload");
+        updateUpload();
+      }
+      function modeName() { return state.mode === "full" ? "Full update" : state.mode === "append" ? "Add only" : "Not chosen"; }
+      function consequence() { return state.mode === "full" ? `Anything on ${state.service} that isn't in these screenshots will be offered for removal.` : "Only adds what's in these screenshots. Nothing will be removed."; }
+      function notice(message) { const element = $("#announcement"); element.textContent = message; element.className = "notice error"; element.hidden = false; }
+      function clearNotice() { $("#announcement").textContent = ""; $("#announcement").hidden = true; }
+      function progress(step) {
+        $$("[data-progress]").forEach((element, index) => {
+          element.classList.toggle("done", index + 1 < step);
+          if (index + 1 === step) element.setAttribute("aria-current", "step"); else element.removeAttribute("aria-current");
+        });
+      }
+      function showView(view) {
+        state.view = view;
+        for (const name of ["upload", "review", "confirm", "receipt"]) $(`#${name}`).hidden = view !== name;
+        progress(view === "review" ? 4 : view === "confirm" || view === "receipt" ? 5 : !state.service ? 1 : !state.mode ? 2 : 3);
+        window.scrollTo(0, 0);
+      }
+      function updateUpload() {
+        const serviceOpen = !state.service || state.edit === "service";
+        const modeOpen = !state.mode || state.edit === "mode";
+        $("#service-body").hidden = !serviceOpen;
+        $("#mode-body").hidden = !modeOpen;
+        $("#change-service").hidden = !state.service;
+        $("#change-mode").hidden = !state.mode;
+        $("#change-service").textContent = serviceOpen ? "Done" : "Change";
+        $("#change-mode").textContent = modeOpen ? "Done" : "Change";
+        $("#change-service").setAttribute("aria-label", `${serviceOpen ? "Finish choosing" : "Change"} service`);
+        $("#change-mode").setAttribute("aria-label", `${modeOpen ? "Finish choosing" : "Change"} update mode`);
+        $("#service-answer").textContent = state.service || "Which saved list are these from?";
+        $("#mode-answer").textContent = state.mode ? `${modeName()} · ${consequence()}` : "How much of your list is in these screenshots?";
+        $("#full-copy").textContent = `Anything on ${state.service || "the chosen service"} that isn't in these screenshots will be offered for removal.`;
+        $("#mode-fieldset").disabled = !state.service;
+        $("#mode-hint").textContent = state.service ? "Choose deliberately: neither option is selected for you." : "Choose a service to answer this step.";
+        $("#summary-service").textContent = state.service || "Not chosen";
+        $("#summary-mode").textContent = modeName();
+        $("#summary-images").textContent = `${state.images.length} added`;
+        const missing = [!state.service && "choose a service", !state.mode && "choose an update mode", !state.images.length && "add screenshots"].filter(Boolean);
+        $("#extract").disabled = missing.length > 0;
+        $("#extract-reason").textContent = missing.length ? `First, ${missing.join(", ")}.` : "Ready to preview. You'll decide every addition before applying.";
+        $("#images-hint").textContent = state.images.length ? "All attachments stay in this batch. Local files are listed by name only; their contents are not analyzed." : "You can add screenshots now; we'll hold them while you choose the service and mode.";
+        $("#file-list").innerHTML = state.images.map((file) => `<li class="file"><span class="file-symbol" aria-hidden="true">${file.sample ? "DEMO" : "FILE"}</span><div><p>${esc(file.name)}</p><p class="muted small">${file.sample ? "Synthetic screenshot" : "Local file · not uploaded"} · ${esc(file.source)}</p></div><button data-remove-file="${file.id}" class="quiet" aria-label="Remove ${esc(file.name)} from this sample batch">×</button></li>`).join("");
+        $("#service-step").classList.toggle("active", serviceOpen);
+        $("#mode-step").classList.toggle("active", Boolean(state.service && modeOpen && !serviceOpen));
+        $("#images-step").classList.toggle("active", Boolean(state.service && state.mode && !state.edit));
+        progress(!state.service || state.edit === "service" ? 1 : !state.mode || state.edit === "mode" ? 2 : 3);
+      }
+      function addFiles(files, source, sample = false) {
+        if (state.view !== "upload") return;
+        for (const file of files) state.images.push({ id: ++fileSequence, name: file.name, source, sample });
+        clearNotice();
+        updateUpload();
+      }
+      function seedReview() {
+        state.candidates = [
+          { id: "a1", kind: "new", raw: "ARRIVAL", match: "arrival", status: "pending", crop: "01" },
+          { id: "a2", kind: "new", raw: "DUNE", match: "dune21", status: "pending", crop: "01", warning: "Check the year", alternatives: ["dune21", "dune84"] },
+          { id: "a3", kind: "new", raw: "", match: "quiet", status: "pending", crop: "02", warning: "Read from the artwork — check this" },
+          { id: "u1", kind: "unidentified", raw: "THE OA?", match: null, status: "pending", crop: "02", warning: "The text reader saw this, the tile reader did not" },
+          { id: "n1", kind: "noise", raw: "CONTINUE WATCHING", match: null, status: "ignored", crop: "01" },
+          { id: "t1", kind: "unreadable", raw: "", match: null, status: "ignored", crop: "02", unreadable: true },
+        ];
+        state.removals = [{ id: "r1", name: "The Matrix", year: "1999", selected: true }, { id: "r2", name: "Russian Doll", year: "2019", selected: true }];
+        state.open = new Set();
+        clearNotice();
+        showView("review");
+        renderReview();
+        $("#review-heading").focus();
+      }
+      function pending() { return state.candidates.filter((candidate) => ["new", "unidentified"].includes(candidate.kind) && candidate.status === "pending"); }
+      function matched(candidate) { return catalog.find((item) => item.id === candidate.match); }
+      function candidateName(candidate) { return matched(candidate)?.name || candidate.raw || "Unreadable tile"; }
+      function accepted() { return state.candidates.filter((candidate) => ["confirmed", "corrected", "unidentified"].includes(candidate.status)); }
+      function additions() {
+        const seen = new Set();
+        return accepted().filter((candidate) => {
+          const identity = candidate.match || `unmatched:${candidate.id}`;
+          if (matched(candidate)?.existing || seen.has(identity)) return false;
+          seen.add(identity);
+          return true;
+        });
+      }
+      function selectedRemovals() { return state.mode === "full" && !state.withheld ? state.removals.filter((item) => item.selected) : []; }
+      function context() { return `<div class="batch-context"><span class="badge">${esc(state.service)}</span><span class="badge neutral">${modeName()}</span><span class="small muted">Locked for this batch · discard to change</span></div>`; }
+      function crop(candidate) {
+        if (candidate.manual) return '<div class="evidence"><span class="crop-label">Manual entry</span><span class="crop-text">Added by you</span><span class="crop-label">No source image</span></div>';
+        return `<button class="evidence" data-evidence="${candidate.crop}" aria-label="View synthetic screenshot ${candidate.crop} evidence for ${esc(candidateName(candidate))}"><span class="crop-label">Sample crop ${candidate.crop}</span><span class="crop-text">${esc(candidate.unreadable ? "···" : candidate.raw || "QUIET EARTH")}</span><span class="crop-label">Open evidence</span></button>`;
+      }
+      function candidateCard(candidate) {
+        const item = matched(candidate);
+        const decided = candidate.status !== "pending";
+        let outcome = candidate.status === "discarded" ? "Discarded from this batch. Your list won't change." : candidate.status === "unidentified" ? "Kept as unidentified. Adds the extracted text as its own entry." : item?.existing ? `Matched to ${item.name} (${item.year}). Already on ${state.service}; no duplicate addition.` : `${candidate.status === "corrected" ? "Match corrected" : "Confirmed"} · Adds to ${state.service}`;
+        return `<article class="candidate" id="candidate-${candidate.id}" tabindex="-1" aria-label="${esc(candidateName(candidate))}">
+          <div class="candidate-core">${crop(candidate)}<div><h3>${esc(candidateName(candidate))}</h3><p class="candidate-meta">${item ? `${item.year} · ${item.type}` : "Not identified · metadata unknown"}</p><p class="raw">${candidate.manual ? "Source: <strong>Owner-selected catalog entry</strong>" : `Extracted text: <strong>${esc(candidate.raw || "No supporting text")}</strong>`}</p>${candidate.warning && !decided ? `<span class="badge warning">${esc(candidate.warning)}</span>` : ""}${!decided && !candidate.warning ? `<span class="badge neutral">Proposed match</span>` : ""}</div></div>
+          ${!decided && candidate.alternatives ? `<div class="alternatives"><p>Two versions share this title. Check the screenshot.</p>${candidate.alternatives.map((id) => { const alternative = catalog.find((entry) => entry.id === id); return `<button data-correct="${candidate.id}" data-match="${id}">Use ${esc(alternative.name)} (${alternative.year})</button>`; }).join("")}</div>` : ""}
+          ${decided ? `<p class="decision ${candidate.status === "discarded" ? "discarded" : ""}" tabindex="-1">${esc(outcome)}</p>` : `<div class="row-actions"><button class="primary" data-decide="${candidate.id}" data-status="${candidate.kind === "unidentified" ? "unidentified" : "confirmed"}">${candidate.kind === "unidentified" ? "Keep unidentified" : "Confirm"}</button><button data-search="${candidate.id}">${candidate.kind === "unidentified" ? "Find a match" : "Change match"}</button><button class="quiet" data-decide="${candidate.id}" data-status="discarded">Discard</button></div>`}
+        </article>`;
+      }
+      function renderReview(focusCandidate = null) {
+        if (state.view !== "review") return;
+        const y = window.scrollY;
+        $$("#review details").forEach((detail) => { if (detail.open) state.open.add(detail.id); else state.open.delete(detail.id); });
+        const newTitles = state.candidates.filter((item) => item.kind === "new");
+        const unidentified = state.candidates.filter((item) => item.kind === "unidentified");
+        const other = state.candidates.filter((item) => ["noise", "unreadable"].includes(item.kind));
+        const count = pending().length;
+        const full = state.mode === "full";
+        $("#review").innerHTML = `
+          <div class="intro"><p class="eyebrow">04 · Check what was read</p><h1 id="review-heading" tabindex="-1">Review your update</h1><p>Check the matches, then confirm what changes.</p>${context()}</div>
+          <p class="fixture-note">Synthetic results · Your attached files were not analyzed.</p>
+          ${state.withheld ? `<div class="notice warning" style="margin-bottom: 24px"><strong>Sample extraction incomplete.</strong> sample-02.png could not be fully read. ${full ? "Removals are withheld; confirmed additions can still proceed." : "Add only still cannot remove anything."} <button class="quiet" data-evidence="02">View affected sample</button></div>` : ""}
+          <div class="workspace"><div class="stack">
+            <section class="panel review-section" id="new-titles" aria-labelledby="new-heading"><header class="section-heading"><div><h2 id="new-heading">New titles <span class="count">${newTitles.length}</span></h2><p>Check each match before it joins your list.</p></div><button class="quiet" id="confirm-new" aria-label="Confirm all pending new titles">Confirm all</button></header>${newTitles.map(candidateCard).join("") || '<p class="candidate muted">No new titles found. Your existing list stays intact.</p>'}</section>
+            <section class="panel review-section" id="unidentified" aria-labelledby="unidentified-heading"><header class="section-heading"><div><h2 id="unidentified-heading">Unidentified items <span class="count">${unidentified.length}</span></h2><p>Keep the text, find the right match, or discard it.</p></div><button class="quiet" id="keep-unidentified" aria-label="Keep all pending unidentified items">Keep all</button></header>${unidentified.map(candidateCard).join("") || '<p class="candidate muted">Nothing unidentified to review.</p>'}</section>
+            ${full ? `<section class="panel review-section" id="existing"><details id="existing-detail" ${state.open.has("existing-detail") ? "open" : ""}><summary class="section-summary"><h2>Existing matches</h2><span class="count">2</span><span class="badge success">Stay on list</span></summary>${catalog.filter((item) => item.existing).map((item) => `<div class="existing-row"><strong>${esc(item.name)}</strong><p class="candidate-meta">${item.year} · ${item.type} · Already on ${esc(state.service)}</p><p class="raw">Extracted text: <strong>${esc(item.name.toUpperCase())}</strong> · Sample 02</p><button class="quiet" data-evidence="02">View evidence</button></div>`).join("")}</details></section>` : ""}
+            <section class="panel review-section" id="other"><details id="other-detail" ${state.open.has("other-detail") ? "open" : ""}><summary class="section-summary"><h2>Other extracted items</h2><span class="count">${other.length}</span></summary><div class="other-content">${other.map((candidate) => `<div class="other-item">${crop(candidate)}<div><h3>${candidate.kind === "noise" ? "Probably not a title" : "Unreadable tile"}</h3><p class="raw">${candidate.kind === "noise" ? `Extracted text: <strong>${esc(candidate.raw)}</strong>` : "No title has been invented for this crop."}</p><button ${candidate.kind === "noise" ? `data-rescue="${candidate.id}"` : `data-search="${candidate.id}"`}>${candidate.kind === "noise" ? "This is a title" : "Search for this"}</button></div></div>`).join("") || '<p class="muted">All other reads have been moved into your review.</p>'}</div></details></section>
+            ${full && !state.withheld ? `<section class="panel review-section" id="removals" aria-labelledby="removals-heading"><header class="section-heading removal-heading"><div><h2 id="removals-heading">Proposed removals <span class="count">${state.removals.length}</span></h2><p>Not seen in these screenshots. Uncheck anything you want to keep on ${esc(state.service)}.</p></div></header>${state.removals.map((item) => `<label class="removal-row"><input type="checkbox" data-removal="${item.id}" ${item.selected ? "checked" : ""} /><span><strong>${esc(item.name)} <span class="muted small">(${item.year})</span></strong><small>${item.selected ? `Will leave your ${esc(state.service)} list` : `Keep on ${esc(state.service)}`}</small></span></label>`).join("")}<p class="notice">They'll be kept in Removal history and you can restore them any time. Other services are not affected.</p></section>` : ""}
+            <div class="row spread"><p class="small muted">Something missing from the extraction?</p><button id="manual-title" class="quiet">Add a missed title</button></div>
+          </div><aside class="panel aside" id="review-aside" aria-labelledby="review-summary-heading"><p class="eyebrow">Your review</p><h2 id="review-summary-heading" style="margin-top: 8px">A few deliberate decisions</h2><p class="pending-total">${count}</p><p class="muted small">${count === 1 ? "item still needs a decision" : "items still need a decision"}</p><nav class="review-nav" aria-label="Review sections"><a href="#new-titles">New titles <strong>${newTitles.length}</strong></a><a href="#unidentified">Unidentified <strong>${unidentified.length}</strong></a>${full ? '<a href="#existing">Existing matches <strong>2</strong></a>' : ""}<a href="#other">Other reads <strong>${other.length}</strong></a>${full && !state.withheld ? `<a href="#removals">Removals selected <strong>${selectedRemovals().length}</strong></a>` : ""}</nav><button class="quiet next" id="next-pending">${count ? "Go to next undecided" : "All required decisions made"}</button><p class="reassurance">${full ? state.withheld ? "Removals are withheld because extraction is incomplete." : "A missing title is a proposal, never an automatic removal." : "Add only never proposes removals."}</p></aside></div>
+          <div class="action-bar">${state.offline ? '<p class="offline">Offline example: reviewing stays available. Applying and discarding are disabled.</p>' : ""}<div><p class="counts">${additions().length} to add · ${selectedRemovals().length} to remove</p><p class="small muted">${count ? `${count} decisions remaining` : "Ready to check the final summary"}</p></div><div class="row"><button id="discard-batch" class="quiet" ${state.offline ? "disabled" : ""}>Discard batch</button><button id="review-changes" class="primary">Review changes →</button></div></div>`;
+        $("#next-pending").disabled = count === 0;
+        $("#confirm-new").disabled = !newTitles.some((candidate) => candidate.status === "pending");
+        $("#keep-unidentified").disabled = !unidentified.some((candidate) => candidate.status === "pending");
+        window.scrollTo(0, y);
+        if (focusCandidate) $(`#candidate-${focusCandidate} .decision`)?.focus({ preventScroll: true });
+      }
+      function firstPending(showError = false) {
+        const first = pending()[0];
+        if (!first) return false;
+        if (showError) notice(`${pending().length} items still need a decision. Nothing has been applied.`);
+        $(`#candidate-${first.id}`).focus();
+        return true;
+      }
+      function renderConfirm() {
+        const adds = additions();
+        const removes = selectedRemovals();
+        const existingCorrections = accepted().filter((candidate) => matched(candidate)?.existing);
+        $("#confirm").innerHTML = `<div class="intro"><p class="eyebrow">05 · One last look</p><h1 id="confirm-heading" tabindex="-1">Here's what will change</h1><p>Only this ${esc(state.service)} update. Nothing on another service will be removed.</p>${context()}</div><div class="workspace"><section class="panel confirm-sheet" aria-label="Exact changes in this sample">
+          <div class="effect"><h2><span class="effect-sign" aria-hidden="true">+</span>Add to ${esc(state.service)} <span class="count">${adds.length}</span></h2>${adds.length ? `<ul id="final-additions">${adds.map((candidate) => `<li>${esc(candidateName(candidate))}<span>${matched(candidate) ? `${matched(candidate).year} · ${matched(candidate).type}` : "Kept as unidentified · original extracted text"}${candidate.status === "corrected" ? " · Owner-selected match" : ""}</span></li>`).join("")}</ul>` : "<p>No additions selected.</p>"}</div>
+          ${state.mode === "full" ? `<div class="effect removing"><h2><span class="effect-sign" aria-hidden="true">−</span>Remove from ${esc(state.service)} <span class="count">${removes.length}</span></h2>${removes.length ? `<ul id="final-removals">${removes.map((item) => `<li>${esc(item.name)}<span>${item.year} · Moves to Removal history</span></li>`).join("")}</ul><p>They'll be kept in Removal history and you can restore them any time.</p>` : `<p>${state.withheld ? "Removals withheld: the sample extraction is incomplete." : "No removals selected. Nothing will be removed."}</p>`}</div>` : ""}
+          <div class="effect"><h2><span class="effect-sign" aria-hidden="true">=</span>What stays unchanged</h2><p>${state.mode === "append" ? "Everything already on your list. Add only cannot remove titles." : "Existing matches and any proposed removals you unchecked."}</p>${existingCorrections.length ? `<ul>${existingCorrections.map((candidate) => `<li>${esc(candidateName(candidate))}<span>Corrected to an existing match · no duplicate addition</span></li>`).join("")}</ul>` : ""}<p>${state.candidates.filter((candidate) => candidate.status === "discarded").length} discarded extraction items won't be added. Other reads remain excluded unless you explicitly rescued them.</p></div>
+          </section><aside class="panel aside" aria-labelledby="confirmation-summary-heading"><p class="eyebrow">Your decision</p><h2 id="confirmation-summary-heading" style="margin-top: 8px">${adds.length} additions. ${removes.length} removals.</h2><p class="hint">This is the final confirmation, not another layer of dialogs.</p><p class="reassurance">Prototype only. Applying changes updates this sample in memory; it never changes your real nextup library or a streaming account.</p></aside></div>
+          <div class="action-bar">${state.offline ? '<p class="offline">Offline example: reconnect in Prototype tools before applying.</p>' : ""}<p class="counts">${adds.length} to add · ${removes.length} to remove</p><div class="row"><button class="quiet" id="back-review">Back to review</button><button class="primary" id="apply" ${state.offline ? "disabled" : ""}>Apply changes</button></div></div>`;
+      }
+      function openDialog(title, body) {
+        returnFocus = document.activeElement;
+        $("#dialog-content").innerHTML = `<div class="dialog-head"><h2 id="dialog-title">${esc(title)}</h2><button class="quiet" data-close aria-label="Close dialog">×</button></div>${body}`;
+        $("#dialog").showModal();
+      }
+      function tools() {
+        openDialog("Prototype tools", `<p>Offline, mock-only study. Nothing is uploaded, stored across reloads, or sent to a streaming service. All review titles, crops and service memberships are illustrative.</p><div class="settings"><button id="demo-review">Load full-update review example</button><button id="demo-append">Load add-only review example</button><button id="theme-toggle">Switch to ${document.documentElement.dataset.theme === "dark" ? "light" : "dark"} preview</button><label><input id="offline-setting" type="checkbox" ${state.offline ? "checked" : ""} />Offline example</label><label><input id="withheld-setting" type="checkbox" ${state.withheld ? "checked" : ""} />Incomplete extraction: withhold removals</label><label><input id="failure-setting" type="checkbox" ${state.failNext ? "checked" : ""} />Fail the next apply attempt</label><button id="reset-demo" class="quiet">Reset to empty upload</button></div><p class="small">Loading an example or resetting replaces this sample batch. Local file input illustrates attachment only: no magic-byte validation, metadata stripping, image decoding or HEIC conversion runs here.</p><div class="dialog-actions"><button class="primary" data-close>Done</button></div>`);
+      }
+      function searchDialog(target) {
+        matchTarget = target;
+        openDialog(target === "manual" ? "Add a missed title" : "Choose the right match", `<p>Select an identity explicitly. This is a small sample catalog, not a live search.</p><label class="search-label" for="match-query">Search sample titles</label><input id="match-query" type="search" placeholder="Try Dune, The OA, or Dark" /><div id="match-results"></div><div class="dialog-actions"><button data-close class="quiet">Cancel</button></div>`);
+        renderMatches("");
+        $("#match-query").focus();
+      }
+      function renderMatches(query) {
+        const results = catalog.filter((item) => `${item.name} ${item.year}`.toLowerCase().includes(query.toLowerCase().trim()));
+        $("#match-results").innerHTML = results.map((item) => `<div class="match-result"><div><strong>${esc(item.name)}</strong><p>${item.year} · ${item.type}${item.existing ? ` · Already on ${esc(state.service)}` : ""}</p></div><button data-use-match="${item.id}">Use this match<span class="sr-only">: ${esc(item.name)} ${item.year}</span></button></div>`).join("") || '<p class="hint">No sample matches. Production search and manual-entry error states are outside this offline catalog.</p>';
+      }
+      function correct(id, match) {
+        const candidate = state.candidates.find((item) => item.id === id);
+        if (!candidate || !catalog.some((item) => item.id === match)) return;
+        candidate.match = match;
+        candidate.status = "corrected";
+        if (candidate.kind === "unreadable") candidate.kind = "unidentified";
+        clearNotice();
+        renderReview(id);
+      }
+      $("#service-choices").innerHTML = services.map((service, index) => `<label class="choice"><span class="service-mark" aria-hidden="true">${marks[index]}</span><span class="service-name">${service}</span><input type="radio" name="service" value="${service}" /></label>`).join("");
+      $("#service-choices").addEventListener("change", (event) => {
+        if (event.target.value !== state.service) { state.mode = null; $$('input[name="mode"]').forEach((input) => { input.checked = false; }); }
+        state.service = event.target.value; state.edit = null; clearNotice(); updateUpload(); $(state.mode ? "#images-heading" : "#mode-heading").focus();
+      });
+      $("#mode-fieldset").addEventListener("change", (event) => { state.mode = event.target.value; state.edit = null; clearNotice(); updateUpload(); $("#images-heading").focus(); });
+      $("#change-service").onclick = () => { state.edit = state.edit === "service" ? null : "service"; updateUpload(); $(state.edit ? 'input[name="service"]:checked' : "#service-heading").focus(); };
+      $("#change-mode").onclick = () => { state.edit = state.edit === "mode" ? null : "mode"; updateUpload(); $(state.edit ? 'input[name="mode"]:checked' : "#mode-heading").focus(); };
+      $("#sample-images").onclick = () => addFiles([{ name: "sample-01.png" }, { name: "sample-02.png" }], "sample", true);
+      $("#choose-files").onclick = () => $("#file-input").click();
+      $("#file-input").onchange = (event) => { addFiles(event.target.files, "file selection"); event.target.value = ""; };
+      $("#extract").onclick = () => { if (state.service && state.mode && state.images.length) seedReview(); };
+      $("#tools-button").onclick = tools;
+      $("#paste-button").onclick = () => {
+        if (!navigator.clipboard?.read) { notice("Clipboard reading isn't available here. Use Ctrl/Cmd+V, choose files, or load samples. The production paste button requires HTTPS."); return; }
+        navigator.clipboard.read().then(async (items) => {
+          const files = [];
+          for (const item of items) {
+            const type = item.types.find((value) => value.startsWith("image/"));
+            if (type) files.push(new File([await item.getType(type)], `clipboard-${files.length + 1}`, { type }));
+          }
+          if (files.length) addFiles(files, "clipboard button"); else notice("No image was found on the clipboard. Copy a screenshot or choose files.");
+        }).catch((error) => notice(`Clipboard could not be read (${error.name}). Use keyboard paste or choose files instead.`));
+      };
+      document.addEventListener("paste", (event) => {
+        if (state.view !== "upload" || $("#dialog").open || event.target.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]')) return;
+        const files = [...(event.clipboardData?.files || [])];
+        if (files.length) { event.preventDefault(); addFiles(files, "keyboard paste"); }
+      });
+      $("#drop-area").addEventListener("dragover", (event) => { event.preventDefault(); $("#drop-area").classList.add("dragging"); });
+      $("#drop-area").addEventListener("dragleave", () => $("#drop-area").classList.remove("dragging"));
+      $("#drop-area").addEventListener("drop", (event) => { event.preventDefault(); $("#drop-area").classList.remove("dragging"); addFiles(event.dataTransfer.files, "drag and drop"); });
+      $("#dialog").addEventListener("close", () => { if (returnFocus?.isConnected) returnFocus.focus({ preventScroll: true }); });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !$("#dialog").open && state.view === "confirm") { clearNotice(); showView("review"); renderReview(); $("#review-changes").focus(); }
+      });
+      document.addEventListener("input", (event) => { if (event.target.id === "match-query") renderMatches(event.target.value); });
+      document.addEventListener("change", (event) => {
+        if (event.target.dataset.removal) {
+          const item = state.removals.find((entry) => entry.id === event.target.dataset.removal);
+          item.selected = event.target.checked;
+          const id = item.id;
+          renderReview();
+          $(`[data-removal="${id}"]`).focus({ preventScroll: true });
+        }
+        const settings = { "offline-setting": "offline", "withheld-setting": "withheld", "failure-setting": "failNext" };
+        if (settings[event.target.id]) {
+          state[settings[event.target.id]] = event.target.checked;
+          if (state.view === "review") renderReview();
+          if (state.view === "confirm") renderConfirm();
+        }
+      });
+      document.addEventListener("click", (event) => {
+        const button = event.target.closest("button");
+        if (!button || button.disabled) return;
+        if (button.hasAttribute("data-close")) { $("#dialog").close(); return; }
+        if (button.dataset.removeFile) { state.images = state.images.filter((file) => file.id !== Number(button.dataset.removeFile)); updateUpload(); $("#sample-images").focus({ preventScroll: true }); }
+        if (button.dataset.decide) {
+          const candidate = state.candidates.find((item) => item.id === button.dataset.decide);
+          candidate.status = button.dataset.status;
+          clearNotice(); renderReview(candidate.id);
+        }
+        if (button.dataset.correct) correct(button.dataset.correct, button.dataset.match);
+        if (button.dataset.search) searchDialog(button.dataset.search);
+        if (button.dataset.rescue) {
+          const candidate = state.candidates.find((item) => item.id === button.dataset.rescue);
+          candidate.kind = "unidentified"; candidate.status = "pending";
+          renderReview(); $(`#candidate-${candidate.id}`).focus();
+        }
+        if (button.dataset.evidence) openDialog(`Synthetic screenshot ${button.dataset.evidence}`, `<p>Illustrative evidence only. This is not an uploaded image and contains no real OCR output.</p><div class="sample-sheet">${(button.dataset.evidence === "01" ? ["ARRIVAL", "DUNE", "CONTINUE WATCHING"] : ["QUIET EARTH", "THE OA?", "DARK", "THE GOOD PLACE", "Unreadable tile"]).map((text) => `<div>${text}</div>`).join("")}</div><div class="dialog-actions"><button class="primary" data-close>Back to review</button></div>`);
+        if (button.dataset.useMatch) {
+          const match = button.dataset.useMatch;
+          $("#dialog").close();
+          if (matchTarget === "manual") {
+            const item = catalog.find((entry) => entry.id === match);
+            if (item.existing || accepted().some((candidate) => candidate.match === match)) { notice("That identity is already represented in the sample. No duplicate will be added."); return; }
+            const id = `manual${state.candidates.length}`;
+            state.candidates.push({ id, kind: "new", raw: "", match, status: "corrected", manual: true });
+            renderReview(id);
+          } else correct(matchTarget, match);
+        }
+        switch (button.id) {
+          case "demo-review": case "demo-append":
+            $("#dialog").close(); reset(); state.service = "Netflix"; state.mode = button.id === "demo-review" ? "full" : "append"; state.images = [{ id: ++fileSequence, name: "sample-01.png", sample: true, source: "sample" }, { id: ++fileSequence, name: "sample-02.png", sample: true, source: "sample" }]; seedReview(); break;
+          case "reset-demo": $("#dialog").close(); reset(); $("#upload-heading").focus(); break;
+          case "theme-toggle": document.documentElement.dataset.theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark"; button.textContent = `Switch to ${document.documentElement.dataset.theme === "dark" ? "light" : "dark"} preview`; break;
+          case "confirm-new":
+            state.candidates.forEach((candidate) => { if (candidate.kind === "new" && candidate.status === "pending") candidate.status = "confirmed"; }); clearNotice(); renderReview(); $("#new-heading").setAttribute("tabindex", "-1"); $("#new-heading").focus({ preventScroll: true }); break;
+          case "keep-unidentified":
+            state.candidates.forEach((candidate) => { if (candidate.kind === "unidentified" && candidate.status === "pending") candidate.status = "unidentified"; }); clearNotice(); renderReview(); $("#unidentified-heading").setAttribute("tabindex", "-1"); $("#unidentified-heading").focus({ preventScroll: true }); break;
+          case "next-pending": firstPending(); break;
+          case "manual-title": searchDialog("manual"); break;
+          case "review-changes":
+            clearNotice(); if (firstPending(true)) break; showView("confirm"); renderConfirm(); $("#confirm-heading").focus(); break;
+          case "back-review": clearNotice(); showView("review"); renderReview(); $("#review-heading").focus(); break;
+          case "discard-batch":
+            if (!state.offline) openDialog("Discard this sample batch?", '<p>Your review decisions and attachments will be cleared from this prototype. Your real library is never changed.</p><div class="dialog-actions"><button class="quiet" data-close>Cancel</button><button id="confirm-discard" class="danger-text">Discard sample batch</button></div>'); break;
+          case "confirm-discard": if (!state.offline) { $("#dialog").close(); reset(); $("#upload-heading").focus(); } break;
+          case "apply":
+            if (state.view !== "confirm" || state.offline || pending().length || state.applyCount) break;
+            if (state.failNext) { state.failNext = false; notice("Example save failed. Nothing was applied. Your decisions are intact. Review this summary and press Apply changes to retry."); break; }
+            button.disabled = true; state.applyCount++; clearNotice(); showView("receipt");
+            $("#receipt").innerHTML = `<section class="panel receipt"><div class="drop-icon" aria-hidden="true">✓</div><p class="eyebrow">Sample flow complete</p><h1 id="receipt-heading" tabindex="-1">Your decisions, made clear.</h1><p>${additions().length} additions · ${selectedRemovals().length} removals in this in-memory example.<br /><strong>Your real list has not changed.</strong></p><button id="restart" class="primary">Try another sample update</button></section>`; $("#receipt-heading").focus(); break;
+          case "restart": reset(); $("#upload-heading").focus(); break;
+        }
+      });
+      reset();
+    </script>
+  </body>
+</html>

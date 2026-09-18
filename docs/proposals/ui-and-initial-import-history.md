@@ -2,6 +2,12 @@
 
 **Status:** Draft for owner review. Documentation and isolated mocks only; not approved for product implementation.
 
+**2026-09-18 follow-up:** The owner reviewed the visual direction and merged
+the mockups in PR #313. [The design handoff](library-design-handoff.md) records
+the reviewed styling, remaining decisions and proposed next steps.
+Production implementation remains explicitly on hold; initial-history product
+decisions below remain open.
+
 **Date:** 2026-09-17.
 
 **Isolation:** Prepared on `docs/ui-initial-import-proposal` in a separate Git

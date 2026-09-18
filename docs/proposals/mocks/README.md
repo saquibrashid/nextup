@@ -1,4 +1,11 @@
-# Library layout studies
+# UI design studies
+
+**Handoff:** [Reviewed design, open decisions and proposed next steps](../library-design-handoff.md).
+The library mockups were merged in PR #313; production implementation is explicitly on hold.
+
+**New workstream:** [Guided capture/review proposal](../capture-review-design.md).
+Study 04 extends the visual direction to screenshot upload and batch review.
+It is a new, mock-only proposal, not part of the earlier library merge.
 
 All studies are standalone HTML files. Open them directly in a browser; no
 server or build is needed. The first study is retained unchanged so the
@@ -9,6 +16,27 @@ alternatives can be compared against it.
 | **01: Compact library** | [Original interactive mock](library-study.html) | A refinement of the existing row layout, including the initial-collection confirmation flow. | Balanced density and artwork; controls still occupy several lines on a phone. |
 | **02: Cover browser** | [Additional layouts](layout-alternatives.html?layout=browse) | Larger portrait covers for recognition, with service badges and practical facts beneath them. | More visual browsing, less desktop density. On phones covers move beside the metadata. |
 | **03: Comparison desk** | [Additional layouts](layout-alternatives.html?layout=compare) | Aligned service/runtime/rating/priority columns and a persistent wide-screen filter rail. | Easier factual comparison, but more administrative in appearance. On phones columns become labelled fields. |
+| **04: Guided capture and review** | [Connected workflow](capture-review-study.html) | Service → mode → screenshots → grouped review → exact change summary, in the refined indigo theme. | Proposes a final summary for both modes; that interaction and production parity still need approval. |
+
+## Capture/review previews
+
+| Stage | Desktop | Phone |
+| --- | --- | --- |
+| Upload | [Preview](capture-upload-desktop.png) | [Preview](capture-upload-phone.png) |
+| Review | [Preview](capture-review-desktop.png) | [Preview](capture-review-phone.png) |
+| Final summary | [Preview](capture-confirm-desktop.png) | [Preview](capture-confirm-phone.png) |
+
+For study 04, choose a service and mode, use **sample screenshots**, then preview
+the extraction. **Prototype tools** can jump to either review mode and demonstrate
+offline, incomplete-extraction and failed-apply states. All review data and
+evidence are synthetic; actual local attachments are not analyzed or uploaded.
+Upload previews show the answered setup and sample queue; the HTML starts
+unanswered. Full-page overviews place the action bar at the document end to avoid
+obscuring rows; it remains sticky in the interactive file.
+See the [capture/review note](../capture-review-design.md) for preserved safeguards,
+intentional interaction changes, limitations and proposed next steps.
+
+## Library alternatives
 
 Studies 02 and 03 share one sample dataset and in-memory state. Switch between
 them using the buttons above the app: search, filters, order and sample
