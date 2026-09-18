@@ -29,6 +29,7 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   buildReviewResponse,
+  applicableCandidates,
   pendingAdditionIds,
   DEGRADED_EXTRACTION_BANNER,
   type BuildReviewInput,
@@ -246,7 +247,14 @@ describe('T-UX-011 · specs/ui.md §5.4 SD-11d · the action bar is STICKY', () 
   it('T-UX-011d: the bar carries the running counts', () => {
     // SD-11d — the counts are what tell the owner what confirming will do,
     // at the moment they are about to confirm it.
-    render(<ReviewPage review={review()} />);
+    //
+    // ⚠ CONFIRMED ON PURPOSE. "N to add" counts what a close would WRITE, not
+    // the length of the section (`T-UX-150`), so a pending fixture here would
+    // correctly read "0 to add · 0 to remove" and leave the case unable to
+    // tell a working bar from one that prints zeroes.
+    render(
+      <ReviewPage review={review({ candidates: [candidate({ disposition: 'confirmed' })] })} />,
+    );
 
     expect(screen.getByTestId('review-counts')).toHaveTextContent('1 to add');
     expect(screen.getByTestId('review-counts')).toHaveTextContent('0 to remove');
@@ -387,6 +395,104 @@ describe('T-UX-062 · specs/ux-states.md §6.7 · the bar reports what is still 
     // The gate's own answer, not a literal — see the block note above.
     expect(expected).toBeGreaterThan(0);
     expect(screen.getByTestId('review-counts')).toHaveTextContent(`${expected} still to review`);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `T-UX-150` — "N to add" counts what a close would WRITE.
+ *
+ * ⚠ **REPORTED FROM A REAL PASS.** The owner decided four cards and the bar
+ * read *"11 to add"*. It was printing `sections.additions.count`, which is the
+ * section's LENGTH: every row the extractor produced, including the ones just
+ * discarded and the ones still undecided.
+ *
+ * That number is the only check the owner has on a destructive action, sitting
+ * directly above the button that performs it. A count that disagrees with the
+ * close is worse than no count — it reads as authoritative and is wrong in the
+ * direction that matters, overstating what is about to be written.
+ *
+ * ⚠ The expectations below are derived from `applicableCandidates` — the
+ * close's OWN function — rather than written as literals, so if the set of
+ * applied dispositions ever changes, this file fails instead of quietly
+ * continuing to agree with a rule that has moved.
+ */
+describe('T-UX-150 · US-012 AC-3 · the "to add" count is what the close would apply', () => {
+  function mixed(dispositions: {
+    readonly first: ReviewCandidate['disposition'];
+    readonly second: ReviewCandidate['disposition'];
+    readonly unmatched: ReviewCandidate['disposition'];
+  }) {
+    return {
+      candidates: [
+        candidate({ candidateId: 'cand_1', disposition: dispositions.first }),
+        candidate({
+          candidateId: 'cand_2',
+          rawText: 'ARRIVAL',
+          inferredTitle: 'Arrival',
+          resolvedWorkIdentity: 'tmdb:movie:329865',
+          match: match({ tmdbId: 329865, name: 'Arrival', releaseYear: 2016 }),
+          disposition: dispositions.second,
+        }),
+        candidate({
+          candidateId: 'cand_3',
+          rawText: 'SOME UNREADABLE THING',
+          inferredTitle: 'Some unreadable thing',
+          resolvedWorkIdentity: null,
+          match: null,
+          disposition: dispositions.unmatched,
+        }),
+      ],
+    } satisfies Partial<BuildReviewInput>;
+  }
+
+  it('T-UX-150a: a DISCARDED row is not counted — a discard writes nothing', () => {
+    const input = mixed({ first: 'confirmed', second: 'discarded', unmatched: 'pending' });
+    const expected = applicableCandidates(input.candidates).length;
+
+    render(<ReviewPage review={review(input)} />);
+
+    // ⚠ The negative is the point: three rows are on screen, two of them are
+    // additions, and the bar must say ONE.
+    expect(expected).toBe(1);
+    expect(screen.getByTestId('review-counts')).toHaveTextContent(`${expected} to add`);
+    expect(screen.getByTestId('review-counts').textContent).not.toContain('2 to add');
+  });
+
+  it('T-UX-150b: a PENDING row is not counted either — the close would refuse it', () => {
+    const input = mixed({ first: 'pending', second: 'pending', unmatched: 'confirmed' });
+    const expected = applicableCandidates(input.candidates).length;
+
+    render(<ReviewPage review={review(input)} />);
+
+    const counts = screen.getByTestId('review-counts');
+    // The one confirmed row is the UNMATCHED one, which a close writes as an
+    // unresolved row — so it counts, and the two pending additions do not.
+    expect(expected).toBe(1);
+    expect(counts).toHaveTextContent(`${expected} to add`);
+    expect(counts).toHaveTextContent('2 still to review');
+  });
+
+  it('T-UX-150c: a local (SD-11e) decision moves the number before the server has it', () => {
+    // The same reason `T-UX-062d` exists: the container refetches after every
+    // press, and a count read from the server `disposition` alone would sit at
+    // its old value across exactly the moment the owner is looking at it.
+    const storage = new Map<string, string>();
+    const view = review(mixed({ first: 'pending', second: 'pending', unmatched: 'pending' }));
+    storage.set(reviewStorageKey(view.batchId), JSON.stringify({ cand_1: 'confirmed' }));
+
+    render(
+      <ReviewPage
+        review={view}
+        storage={{
+          getItem: (key) => storage.get(key) ?? null,
+          setItem: (key, value) => storage.set(key, value),
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('review-counts')).toHaveTextContent('1 to add');
   });
 });
 
