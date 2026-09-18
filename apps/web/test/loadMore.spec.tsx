@@ -174,6 +174,41 @@ class FakeObserver {
   }
 }
 
+/**
+ * {@link FakeObserver.live}, awaited.
+ *
+ * ⚠ THIS EXISTS BECAUSE `T-UX-015q` WAS FLAKY AND FAILED ON `main` — a green
+ * PR run, then `expected undefined to be defined` on the merge commit, with no
+ * code between them. The race is real and is in the test, not the component.
+ *
+ * `mountList()` resolves as soon as the first row is on screen. The sentinel's
+ * `observer.observe(element)` runs in an effect AFTER that render, once the ref
+ * is attached, so there is a window in which rows exist and no observer is
+ * watching anything yet. Reading `live()` synchronously samples that window on
+ * whichever run happens to be slow — which on a loaded CI runner is a different
+ * run each time. A synchronous read of a value produced by an effect is a
+ * coin toss, and it lands heads often enough to look deterministic locally.
+ *
+ * ⚠ IT STILL FAILS IF THE COMPONENT NEVER OBSERVES, WHICH IS THE WHOLE POINT
+ * OF `live()`. Polling is not the same as tolerating absence: `waitFor` gives
+ * up and fails if the observer never appears, so deleting
+ * `observer.observe(element)` — which stops the auto-loader in every real
+ * browser — still fails this, exactly as the comment on `observed` demands.
+ * The wait removes a timing assumption, not an assertion.
+ */
+async function liveObserver(): Promise<FakeObserver> {
+  let found: FakeObserver | undefined;
+  await waitFor(() => {
+    found = FakeObserver.live();
+    expect(found).toBeDefined();
+  });
+  // Non-null by construction: `waitFor` above throws rather than returning
+  // while `found` is undefined. Asserted rather than cast so a future edit to
+  // the wait cannot quietly hand callers an undefined.
+  if (found === undefined) throw new Error('liveObserver resolved without an observer');
+  return found;
+}
+
 function stubObserver(): void {
   FakeObserver.instances = [];
   vi.stubGlobal('IntersectionObserver', FakeObserver);
@@ -405,10 +440,9 @@ describe('T-UX-015 the load-more sentinel reaches the rest of the list', () => {
     stubObserver();
     await mountList();
 
-    const observer = FakeObserver.live();
-    expect(observer).toBeDefined();
+    const observer = await liveObserver();
     await act(async () => {
-      observer?.fire();
+      observer.fire();
       await Promise.resolve();
     });
 
@@ -430,8 +464,17 @@ describe('T-UX-015 the load-more sentinel reaches the rest of the list', () => {
     stubObserver();
     await mountList();
 
+    // ⚠ AWAITED, AND THE CLOSING ASSERTION DEPENDS ON IT. This was
+    // `FakeObserver.live()?.fire()`, which does NOTHING when the observer has
+    // not attached yet — and then `expect(live()).toBeUndefined()` below is
+    // satisfied by that same absence. The test would have reported PASS having
+    // never fired anything and never exercised the disconnect: an observer
+    // that was never attached is trivially "not attached afterwards". Waiting
+    // for it first is what makes the final line mean *it stopped* rather than
+    // *it never started*.
+    const observer = await liveObserver();
     await act(async () => {
-      FakeObserver.live()?.fire();
+      observer.fire();
       await Promise.resolve();
     });
     await waitFor(() => {
