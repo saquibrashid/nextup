@@ -199,3 +199,76 @@ describe('T-SEC-035 · Azure SQL connection settings (TASK-141)', () => {
     expect(() => createSqlAdapter('sqlserver://host;encrypt=true')).toThrow(/no database/);
   });
 });
+
+/**
+ * `T-AVAIL-012` — a database that is WAKING UP must not be reported as a
+ * database that is BROKEN.
+ *
+ * ⚠ THIS IS A REGRESSION TEST FOR A LIVE INCIDENT, NOT A HYPOTHETICAL.
+ * The staging database is Azure SQL serverless with `autoPauseDelay = 60`; it
+ * is auto-paused ON PURPOSE (ADR-0003 Rev 3) so that an idle deployment bills
+ * nothing. The first request after a pause TRIGGERS a resume that takes
+ * roughly 30-60 seconds, and everything arriving during that window is
+ * refused. `mssql` defaults `connectionTimeout` to 15000 ms, which is shorter
+ * than the resume — so the pool gave up before the database was ever ready,
+ * every time, and the owner saw "Couldn't load your list. Nothing has changed."
+ * above a Retry button that could not work, because each retry hit the same
+ * 15-second wall.
+ *
+ * Observed 2026-09-18: `resumedDate` 12:54:34Z; `titles`, `serviceState` and
+ * `suppressions` all failing "Failed to connect ... in 15000ms" from 12:54:36
+ * until 12:55:44, then recovering with no intervention.
+ *
+ * ⚠ "Nothing has changed" IS INDISTINGUISHABLE FROM DATA LOSS to the person
+ * reading it. That is why a cold-start false alarm is not a cosmetic problem
+ * in this product specifically.
+ */
+describe('T-AVAIL-012 a resuming serverless database is waited for, not failed', () => {
+  it('T-AVAIL-012a · the connect timeout outlasts an Azure SQL serverless resume', () => {
+    const config = buildMssqlConfig(parseSqlServerUrl(PROD_URL));
+
+    // 15000 is the `mssql` default and the measured failure. Asserting
+    // "greater than the default" rather than an exact number keeps this a test
+    // of the PROPERTY — outlasting a resume — instead of a restatement of the
+    // constant, which would pass for any value including a worse one.
+    expect(config.connectionTimeout).toBeGreaterThan(15_000);
+
+    // A published Azure SQL serverless resume is typically 30-60s, so anything
+    // at or under 30s would still lose the race it was raised to win.
+    expect(config.connectionTimeout).toBeGreaterThanOrEqual(60_000);
+  });
+
+  it('T-AVAIL-012b · the pool waits LONGER than a single connection may take', () => {
+    // ⚠ WITHOUT THIS ORDERING, 012a BUYS NOTHING. `mssql` defaults the pool's
+    // acquire timeout to 60000 ms — the same value the connect timeout is
+    // raised to — so a connection still being established near the limit races
+    // the pool giving up on waiting for it, and the caller gets a pool timeout
+    // that says nothing about a resuming database. The inner timeout must
+    // always be the one that reports.
+    const config = buildMssqlConfig(parseSqlServerUrl(PROD_URL));
+
+    expect(config.pool?.acquireTimeoutMillis).toBeGreaterThan(config.connectionTimeout as number);
+  });
+
+  it('T-AVAIL-012c · the timeouts apply on the managed-identity path too', () => {
+    // The managed-identity branch returns EARLY from `buildMssqlConfig` on the
+    // SQL-login path, so a timeout added to only one branch is a live
+    // possibility rather than a contrived one — and staging, the database that
+    // actually pauses, is the managed-identity one.
+    const mi = buildMssqlConfig(parseSqlServerUrl(PROD_URL));
+    const login = buildMssqlConfig(parseSqlServerUrl(CI_URL));
+
+    expect(mi.authentication?.type).toBe('azure-active-directory-default');
+    expect(login.authentication).toBeUndefined();
+
+    // ⚠ ASSERTED AS DEFINED FIRST. An equality check alone is satisfied by
+    // `undefined === undefined`, so with the timeouts removed entirely this
+    // test would report PASS while 012a and 012b failed — a parity test that
+    // agrees the two paths are equally broken.
+    expect(login.connectionTimeout).toBeTypeOf('number');
+    expect(login.pool?.acquireTimeoutMillis).toBeTypeOf('number');
+
+    expect(login.connectionTimeout).toBe(mi.connectionTimeout);
+    expect(login.pool?.acquireTimeoutMillis).toBe(mi.pool?.acquireTimeoutMillis);
+  });
+});
