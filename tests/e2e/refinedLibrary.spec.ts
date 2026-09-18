@@ -34,8 +34,32 @@ const TITLES = [
   metadataStale: false,
 }));
 
+/**
+ * The stand-in TMDB poster, **16 x 24**, not 1 x 1.
+ *
+ * ⚠ THE SIZE IS LOAD-BEARING AND A 1 x 1 PNG SILENTLY BREAKS `mountLibrary`.
+ * The poster now ships a `srcset` (`w342` at `1x`, `w500` at `2x`,
+ * `T-UX-153`). `naturalWidth` is **density-corrected**: for a candidate chosen
+ * at `2x` the browser divides the intrinsic width by 2, and the IDL attribute
+ * is an `unsigned long`, so a 1 px-wide source becomes 0.5 and **rounds to 0**.
+ * `mountLibrary`'s readiness poll asserts `naturalWidth > 0`, which is then
+ * false forever, and every test in this file times out in `mountLibrary`
+ * before reaching its own assertions.
+ *
+ * ⚠ IT FAILED ON `mobile-safari` ONLY, AND THAT IS THE CLUE, NOT A WEBKIT BUG.
+ * The desktop Chromium project runs at a device pixel ratio of 1 and picks the
+ * `1x` candidate, where the correction is a no-op and a 1 px image measures 1.
+ * Only the emulated phone, at 2x, selects the `2x` candidate and triggers the
+ * rounding. Anything that changes `srcset`, the descriptors, or a project's
+ * `deviceScaleFactor` can re-enter this, so the fixture is sized well clear of
+ * the boundary rather than tuned to just clear it.
+ *
+ * The poll is deliberately NOT relaxed to `image.complete` alone: that is true
+ * for a broken image too, so it would report the posters ready in exactly the
+ * case the check exists to catch.
+ */
 const PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=',
+  'iVBORw0KGgoAAAANSUhEUgAAABAAAAAYCAIAAAB8wupbAAAAGklEQVR4nGMwcEggCTGMahjVMKphVANtNQAAhow4EORXJhAAAAAASUVORK5CYII=',
   'base64',
 );
 
