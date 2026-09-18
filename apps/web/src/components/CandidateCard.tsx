@@ -110,8 +110,23 @@ export function CandidateCard({
   const unreadable = candidate.verdict === 'unreadable-tile';
   // §5.3a: the tile must be rendered for both fabrication-adjacent verdicts,
   // and it is the ONLY content an unreadable tile has.
-  const needsThumbnail = unreadable || candidate.verdict === 'inferred-unverified';
+  //
+  // ⚠ That is a FLOOR, not a ceiling. A card with no TMDB match has no poster
+  // either, so before this the only other branch was the empty grey
+  // placeholder — the owner reported an unmatched card as having "no title and
+  // no image" and asked "what am I confirming?". When there is no poster the
+  // tile is the only evidence the card can carry, so show it (`T-UX-151b`).
+  const hasPoster = match?.posterPath !== undefined && match?.posterPath !== null;
+  const needsThumbnail = unreadable || candidate.verdict === 'inferred-unverified' || !hasPoster;
   const displayName = match?.name ?? candidate.inferredTitle;
+  // ⚠ "No title read from this tile" is a claim about the READER, not about
+  // matching, and it is false whenever the tile produced text. An unmatched
+  // candidate has no `match` and usually no `inferredTitle`, so the old
+  // `displayName === null` test printed that line directly above the text the
+  // reader had in fact read — the card contradicted itself. Say what was read;
+  // the consequence line below already says it will not be added (`T-UX-151a`).
+  const readText = candidate.rawText !== '' ? candidate.rawText : null;
+  const headline = displayName ?? readText;
   // ⚠ `?? null`, not `=== null`. `tileCrop` was added to the review payload
   // after this component shipped, so a response from an older API — or from
   // the previous revision during a Container Apps rolling deploy — carries no
@@ -191,13 +206,13 @@ export function CandidateCard({
       )}
 
       <div className="candidate-card__body">
-        {unreadable || displayName === null ? (
+        {headline === null ? (
           <p className="candidate-card__name" data-testid="candidate-no-title">
             {CANDIDATE_UNREADABLE_NO_TITLE}
           </p>
         ) : (
           <p className="candidate-card__name" data-testid="candidate-name">
-            {displayName}
+            {headline}
           </p>
         )}
 
@@ -217,8 +232,10 @@ export function CandidateCard({
 
         {/* ⚠ ALWAYS RENDERED when there is text - this is what the owner
             checks the match against. Suppressed only when empty, where the
-            thumbnail above carries the evidence instead. */}
-        {candidate.rawText !== '' && (
+            thumbnail above carries the evidence instead, or when the headline
+            IS that text (an unmatched row), where repeating it verbatim one
+            line down reads as two separate findings. */}
+        {candidate.rawText !== '' && headline !== candidate.rawText && (
           <p className="candidate-card__raw" data-testid="candidate-raw-text">
             {candidate.rawText}
           </p>

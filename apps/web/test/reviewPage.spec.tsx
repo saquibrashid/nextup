@@ -147,6 +147,10 @@ describe('T-REV-013 · specs/ui.md §5.3 · an addition card shows poster, name,
   });
 
   it('T-REV-013f: a missing poster degrades to a placeholder, never to a broken image', () => {
+    // The degradation ladder is poster → source tile → placeholder. The tile
+    // rung was added for `T-UX-151b`: a card with no poster used to fall
+    // straight to the grey box, which is what made the owner ask "what am I
+    // confirming?" of a row that had a screenshot behind it all along.
     render(
       <ReviewPage
         review={review({ candidates: [candidate({ match: match({ posterPath: null }) })] })}
@@ -154,6 +158,22 @@ describe('T-REV-013 · specs/ui.md §5.3 · an addition card shows poster, name,
     );
 
     expect(screen.queryByTestId('candidate-poster')).not.toBeInTheDocument();
+    expect(screen.getByTestId('candidate-thumb')).toBeInTheDocument();
+  });
+
+  it('T-REV-013j: and with no source image either it degrades to the placeholder', () => {
+    // No source image at all — `thumbnailUrlFor` yields null, so there is
+    // nothing to crop and the placeholder is the only honest render.
+    render(
+      <ReviewPage
+        review={review({
+          candidates: [candidate({ match: match({ posterPath: null }), sourceImageIds: [] })],
+        })}
+      />,
+    );
+
+    expect(screen.queryByTestId('candidate-poster')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('candidate-thumb')).not.toBeInTheDocument();
     expect(screen.getByTestId('candidate-poster-placeholder')).toBeInTheDocument();
   });
 });
