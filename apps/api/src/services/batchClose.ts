@@ -708,9 +708,40 @@ export async function closeBatch(
     const resolvedTitleLinks: { candidateId: string; titleId: string }[] = [];
     /** Works this close put on a service — the graduation set (TASK-189). */
     const listedWorkIdentities: string[] = [];
+    /**
+     * Works this close has already listed, and the title each resolved to.
+     *
+     * ⚠ THIS IS NOT BELT-AND-BRACES FOR SD-02 — IT GUARDS A CASE SD-02 CANNOT
+     * SEE, AND THE OWNER HIT IT (TASK-289).
+     *
+     * SD-02 collapses candidates that name the same work, but it runs at
+     * EXTRACTION time, on the identity the pipeline resolved. A `corrected`
+     * disposition rewrites that identity AFTERWARDS, from the owner's own
+     * "fix this match" choice, and nothing re-collapses the batch afterwards.
+     * So two applicable candidates CAN name one work: the owner's real Disney+
+     * batch held a confirmed `GOOD LUCK HAVE FUN DON'T DIE` and a separate OCR
+     * fragment reading `GOOD LUCK` that they corrected onto the very same
+     * film. The second `createServiceListing` then hit
+     * `listing_one_per_service`, the whole transaction rolled back, and an
+     * entire reviewed batch was refused with nothing applied and no way
+     * forward — the close is all-or-nothing, so one duplicate costs every
+     * other decision in the batch.
+     *
+     * Skipping the repeat is not a silent drop: both candidates asked for the
+     * SAME title on the SAME service, so the one listing already written is
+     * exactly what they asked for, and the loser is still linked to that title
+     * below so its provenance survives in full.
+     */
+    const listedTitleByIdentity = new Map<string, string>();
 
     for (const { candidate, kind } of applicable) {
       const workIdentity = identityFor(candidate);
+
+      const alreadyListed = listedTitleByIdentity.get(workIdentity);
+      if (alreadyListed !== undefined) {
+        resolvedTitleLinks.push({ candidateId: candidate.candidateId, titleId: alreadyListed });
+        continue;
+      }
 
       // Property 3. Re-checked here because review and close are separate
       // requests and the store is the only thing that has seen both.
@@ -803,6 +834,7 @@ export async function closeBatch(
       );
       listingsCreated += 1;
       listedWorkIdentities.push(workIdentity);
+      listedTitleByIdentity.set(workIdentity, titleId);
       // §8.1: a listing added to an existing title is `created` with
       // `titleWasCreated: false`; a listing on a title this batch created
       // folds together with the row above into ONE §3.7 entry carrying both
@@ -824,9 +856,16 @@ export async function closeBatch(
     //
     // ⚠ ONE STATEMENT PER CANDIDATE, NOT PER TITLE. Two applied candidates for
     // one work would need two listings on one service, which
-    // listing_one_per_service refuses — SD-02 collapses them at review so it
+    // listing_one_per_service refuses. ~~SD-02 collapses them at review so it
     // never reaches close. Grouping was therefore a branch nothing legitimate
-    // could exercise; the statement count is identical either way.
+    // could exercise; the statement count is identical either way.~~
+    // ⚠ **THAT WAS WRONG, AND THE OWNER HIT IT — SEE `listedTitleByIdentity`
+    // ABOVE (TASK-289).** SD-02 runs on the PIPELINE's identity at extraction
+    // time; a `corrected` disposition rewrites the identity afterwards and
+    // nothing re-collapses. Two applicable candidates therefore can and do
+    // name one work, which is why the loop now skips the repeat. The
+    // per-candidate statement is what makes that skip expressible: both
+    // candidates still link to the single title that was written.
     //
     // ⚠ SD-02-COLLAPSED CANDIDATES ARE DELIBERATELY NOT LINKED. They are
     // absent from `applicable` by construction, and their

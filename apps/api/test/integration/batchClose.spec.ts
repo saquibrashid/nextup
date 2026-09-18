@@ -632,6 +632,56 @@ describe('T-REV-012 · US-012 AC-3 · close applies confirmed work and refuses p
     expect(res.status).toBe(200);
     expect(await countListings()).toBe(0);
   });
+
+  /**
+   * The owner's real Disney+ batch, reduced. The tile reader produced one row
+   * for `GOOD LUCK HAVE FUN DON'T DIE`; the text reader produced a separate
+   * fragment reading `GOOD LUCK`, which the owner then CORRECTED onto the very
+   * same film. SD-02 could not have collapsed them — it runs at extraction
+   * time, and the correction happened afterwards — so both reached close
+   * naming one work, `listing_one_per_service` fired, and the ENTIRE batch was
+   * refused with nothing applied.
+   *
+   * ⚠ The failure surfaces as a **500 `INTERNAL_ERROR`**, not the 409
+   * `DUPLICATE_WORK_IDENTITY` of `T-REV-014`: `mapConstraintViolation` does not
+   * recognise the driver error Prisma raises from inside the transaction here.
+   * The owner therefore saw `REVIEW_APPLY_FAILED` — *"Couldn't apply these
+   * changes"* — with no hint of which title was at fault or what to do next.
+   *
+   * ⚠ The assertion that matters most is `status === 200`: the close is
+   * all-or-nothing, so before this fix one duplicate discarded every other
+   * decision in the batch too.
+   */
+  it('T-REV-012ai: two applicable candidates naming ONE work apply once, not 409', async () => {
+    const batchId = await makeBatch();
+    const survivor = await makeCandidate(batchId, {
+      rawText: "Good Luck Have Fun Don't Die",
+      disposition: 'confirmed',
+    });
+    const correctedFragment = await makeCandidate(batchId, {
+      rawText: 'GOOD LUCK',
+      disposition: 'corrected',
+      originalTmdbId: null,
+    });
+
+    const res = await closeBatchRequest(batchId);
+    expect(res.status).toBe(200);
+
+    const body = (await res.json()) as CloseBody;
+    expect(body.summary.titlesCreated).toBe(1);
+    expect(body.summary.listingsCreated).toBe(1);
+    expect(await countListings()).toBe(1);
+
+    // Not a silent drop: the skipped candidate still records which title it
+    // became, so its provenance survives in full.
+    const title = await testPrisma().title.findFirstOrThrow({ where: { workIdentity: DUNE } });
+    const linked = await testPrisma().extractionCandidate.findMany({
+      where: { id: { in: [survivor, correctedFragment] } },
+      select: { id: true, resolvedTitleId: true },
+      orderBy: { id: 'asc' },
+    });
+    expect(linked.map((row) => row.resolvedTitleId)).toEqual([title.id, title.id]);
+  });
 });
 
 describe('T-REV-012 · close is ONE transaction (product invariant 3)', () => {
