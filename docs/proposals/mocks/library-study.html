@@ -1,0 +1,665 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <title>nextup — library layout study</title>
+    <script>
+      (() => {
+        const param = new URLSearchParams(window.location.search).get("scoutTheme");
+        const theme =
+          param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-theme", theme);
+      })();
+    </script>
+    <style>
+      :root {
+        color-scheme: light;
+        --cp-bg: #f7f4ef;
+        --cp-bg-elevated: #fcfbf8;
+        --cp-surface: #ffffff;
+        --cp-surface-soft: #f5f5f5;
+        --cp-border: #dedede;
+        --cp-border-strong: #919191;
+        --cp-text: #242424;
+        --cp-text-muted: #5c5c5c;
+        --cp-text-soft: #6f6f6f;
+        --cp-accent: #b11f4b;
+        --cp-accent-hover: #9a1a41;
+        --cp-accent-soft: rgba(177, 31, 75, 0.08);
+        --cp-accent-fg: #ffffff;
+        --cp-success: #16a34a;
+        --cp-danger: #dc2626;
+        --cp-warning: #f59e0b;
+        --cp-link: #0078d4;
+        --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+        --cp-overlay: rgba(255, 255, 255, 0.8);
+        --cp-panel: rgba(255, 255, 255, 0.86);
+        --cp-panel-strong: rgba(255, 255, 255, 0.96);
+        --cp-sheen: rgba(255, 255, 255, 0.55);
+        --cp-highlight: rgba(177, 31, 75, 0.12);
+      }
+      html[data-theme="dark"] {
+        color-scheme: dark;
+        --cp-bg: #3d3b3a;
+        --cp-bg-elevated: #343231;
+        --cp-surface: #292929;
+        --cp-surface-soft: #2e2e2e;
+        --cp-border: #474747;
+        --cp-border-strong: #5f5f5f;
+        --cp-text: #dedede;
+        --cp-text-muted: #919191;
+        --cp-text-soft: #b0b0b0;
+        --cp-accent: #fd8ea1;
+        --cp-accent-hover: #fb7b91;
+        --cp-accent-soft: rgba(253, 142, 161, 0.14);
+        --cp-accent-fg: #1a1a1a;
+        --cp-success: #4ade80;
+        --cp-danger: #f87171;
+        --cp-warning: #fbbf24;
+        --cp-link: #4da6ff;
+        --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+        --cp-overlay: rgba(41, 41, 41, 0.88);
+        --cp-panel: rgba(41, 41, 41, 0.72);
+        --cp-panel-strong: rgba(41, 41, 41, 0.96);
+        --cp-sheen: rgba(255, 255, 255, 0.04);
+        --cp-highlight: rgba(253, 142, 161, 0.12);
+      }
+      * { box-sizing: border-box; }
+      [hidden] { display: none !important; }
+      body {
+        margin: 0;
+        background: var(--cp-bg);
+        color: var(--cp-text);
+        font: 16px/1.5 "Segoe UI", Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif;
+      }
+      button, input, select { font: inherit; }
+      button, select, input[type="checkbox"], input[type="radio"] { cursor: pointer; }
+      button, select, input[type="search"] {
+        min-height: 44px;
+        border: 1px solid var(--cp-border-strong);
+        border-radius: 0.625rem;
+        background: var(--cp-surface);
+        color: var(--cp-text);
+      }
+      button { padding: 8px 12px; }
+      button:hover { background: var(--cp-surface-soft); }
+      button:disabled { cursor: not-allowed; color: var(--cp-text-muted); }
+      :focus-visible { outline: 3px solid var(--cp-accent); outline-offset: 3px; }
+      a { color: var(--cp-link); }
+      h1, h2, h3, p { margin: 0; }
+      h1 { font-size: 28px; line-height: 1.2; letter-spacing: -0.7px; }
+      h2 { font-size: 20px; line-height: 1.3; }
+      h3 { font-size: 16px; }
+      svg { width: 18px; height: 18px; flex-shrink: 0; }
+      .icon-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+      .quiet { border-color: var(--cp-border); background: var(--cp-bg-elevated); }
+      .primary { background: var(--cp-accent); border-color: var(--cp-accent); color: var(--cp-accent-fg); font-weight: 600; }
+      .primary:hover { background: var(--cp-accent-hover); }
+      .primary:disabled { background: var(--cp-surface-soft); color: var(--cp-text-soft); border-color: var(--cp-border); }
+      .muted { color: var(--cp-text-soft); }
+      .small { font-size: 14px; }
+      .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; }
+      .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+      .skip { position: absolute; left: 12px; top: -100px; z-index: 10; padding: 12px; background: var(--cp-surface); }
+      .skip:focus { top: 12px; }
+      .study-bar { background: var(--cp-bg-elevated); border-bottom: 1px solid var(--cp-border); }
+      .study-inner { max-width: 1328px; margin: auto; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0 24px; }
+      .study-label { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--cp-text-soft); }
+      .study-label strong { color: var(--cp-accent); }
+      .study-actions { display: flex; gap: 4px; }
+      .study-actions button { font-size: 12px; border: 0; background: var(--cp-bg-elevated); white-space: nowrap; }
+      .shell { max-width: 1280px; margin: auto; padding: 0 24px 40px; }
+      .app-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 64px; border-bottom: 1px solid var(--cp-border); }
+      .brand { display: flex; gap: 10px; align-items: center; font-size: 24px; letter-spacing: -0.6px; font-weight: 750; }
+      .brand svg { width: 30px; height: 30px; color: var(--cp-accent); }
+      .app-nav { display: flex; gap: 16px; align-items: center; }
+      .app-nav a { color: var(--cp-text); padding: 12px; text-decoration: none; border-bottom: 2px solid var(--cp-accent); font-weight: 600; }
+      .app-nav button { border: 0; background: var(--cp-bg); }
+      .page-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 0 12px; }
+      .page-heading p { margin-top: 4px; font-size: 12px; }
+      .quick-views { display: flex; gap: 8px; flex-wrap: wrap; }
+      .mobile-quick { display: none; width: 100%; padding: 8px 12px; }
+      .quick-views button { border-color: var(--cp-border); background: var(--cp-bg-elevated); display: inline-flex; gap: 8px; align-items: center; }
+      .quick-views button[aria-pressed="true"] { background: var(--cp-accent-soft); border-color: var(--cp-accent); color: var(--cp-text); font-weight: 600; }
+      .counter { font-size: 12px; min-width: 20px; padding: 0 4px; border-radius: 4px; background: var(--cp-surface); color: var(--cp-text-soft); }
+      .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 12px 0 8px; }
+      .search { display: flex; align-items: center; gap: 4px; flex: 1 1 220px; max-width: 320px; }
+      .search input { width: 100%; min-width: 0; padding: 8px 12px; background: var(--cp-bg-elevated); }
+      .search button { min-width: 44px; padding: 8px; }
+      .runtime-select { padding: 8px 28px 8px 12px; max-width: 185px; }
+      .sort-group { margin-left: auto; display: flex; gap: 0; }
+      .sort-group select { border-radius: 10px 0 0 10px; padding: 8px 28px 8px 12px; max-width: 220px; }
+      .sort-group button { border-radius: 0 10px 10px 0; border-left: 0; font-size: 14px; }
+      .view-switch { display: flex; }
+      .view-switch button { border-radius: 0; padding: 8px 10px; min-width: 44px; }
+      .view-switch button:first-child { border-radius: 10px 0 0 10px; }
+      .view-switch button:last-child { border-radius: 0 10px 10px 0; border-left: 0; }
+      .view-switch [aria-pressed="true"] { background: var(--cp-accent-soft); color: var(--cp-accent); }
+      .result-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; font-size: 13px; color: var(--cp-text-soft); }
+      .active-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+      .active-filters button { font-size: 14px; color: var(--cp-text); background: var(--cp-accent-soft); border-color: var(--cp-border-strong); }
+      .collection-note { display: flex; justify-content: space-between; align-items: center; gap: 16px; border-left: 3px solid var(--cp-accent); background: var(--cp-bg-elevated); padding: 12px 16px; margin: 12px 0 0; font-size: 14px; }
+      .collection-note p + p { margin-top: 4px; }
+      .title-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+      .title-card { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 16px 12px 12px; border: 1px solid var(--cp-border); border-radius: 16px; background: var(--cp-surface); }
+      .art { width: 56px; height: 84px; border-radius: 8px; background: var(--cp-accent-soft); color: var(--cp-accent); display: flex; flex-direction: column; justify-content: space-between; padding: 8px; overflow: hidden; position: relative; isolation: isolate; }
+      .art::after { content: ""; position: absolute; width: 64px; height: 64px; border: 1px solid var(--cp-accent); border-radius: 50%; top: 24px; left: 20px; z-index: -1; }
+      .art[data-art="1"] { background: var(--cp-bg-elevated); color: var(--cp-text-soft); }
+      .art[data-art="1"]::after { border-radius: 0; transform: rotate(35deg); border-color: var(--cp-border-strong); }
+      .art[data-art="2"] { background: var(--cp-surface-soft); color: var(--cp-text); }
+      .art[data-art="2"]::after { border-radius: 0; width: 22px; top: -4px; left: 24px; height: 100px; transform: rotate(25deg); border-color: var(--cp-text-muted); }
+      .art small { font-size: 9px; letter-spacing: 1px; }
+      .art strong { font-size: 22px; font-weight: 400; letter-spacing: -1px; }
+      .title-body { min-width: 0; }
+      .title-heading { display: flex; align-items: baseline; gap: 8px 14px; flex-wrap: wrap; }
+      .title-heading h2 { font-size: 18px; font-weight: 650; overflow-wrap: anywhere; }
+      .services { display: flex; gap: 4px 8px; flex-wrap: wrap; font-size: 12px; }
+      .service { background: var(--cp-surface-soft); border: 1px solid var(--cp-border); padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+      .facts { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 10px; font-size: 14px; margin-top: 4px; color: var(--cp-text-soft); }
+      .facts > span + span::before { content: "·"; margin-right: 10px; color: var(--cp-text-muted); }
+      .facts .rating { color: var(--cp-text); }
+      .facts .rating strong { font-weight: 650; }
+      .genres { font-size: 13px; color: var(--cp-text-soft); margin-top: 2px; overflow-wrap: anywhere; }
+      .date-line { display: flex; gap: 4px 12px; flex-wrap: wrap; font-size: 12px; margin-top: 4px; color: var(--cp-text-soft); }
+      .collection-marker { color: var(--cp-text); display: inline-flex; align-items: center; gap: 4px; }
+      .collection-marker svg { width: 12px; height: 12px; }
+      .row-actions { display: flex; gap: 4px; align-items: center; }
+      .preference { display: flex; gap: 8px; align-items: center; font-size: 13px; background: var(--cp-surface); border-color: var(--cp-border); text-align: left; }
+      .preference[data-priority="up-next"], .preference[data-watching="true"] { background: var(--cp-accent-soft); color: var(--cp-accent); border-color: var(--cp-accent); }
+      .preference span { display: block; }
+      .preference .watching { font-size: 11px; font-weight: 650; }
+      .details-button { border: 0; background: var(--cp-surface); min-width: 44px; }
+      .title-list[data-view="grid"] { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+      .title-list[data-view="grid"] .title-card { grid-template-columns: 72px minmax(0, 1fr); align-items: start; gap: 12px; padding: 16px; }
+      .title-list[data-view="grid"] .art { width: 72px; height: 108px; }
+      .title-list[data-view="grid"] .title-heading { flex-direction: column; gap: 8px; }
+      .title-list[data-view="grid"] .row-actions { grid-column: 1 / -1; justify-content: space-between; border-top: 1px solid var(--cp-border); padding-top: 12px; }
+      .title-list[data-view="grid"] .date-line { margin-top: 8px; }
+      .empty { padding: 48px 24px; text-align: center; background: var(--cp-surface); border: 1px solid var(--cp-border); border-radius: 16px; }
+      .empty p { margin: 8px 0 16px; }
+      .footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 24px 0 0; font-size: 12px; color: var(--cp-text-soft); }
+      dialog { width: min(640px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid var(--cp-border-strong); border-radius: 16px; background: var(--cp-surface); color: var(--cp-text); }
+      dialog::backdrop { background: var(--cp-overlay); }
+      .dialog-head { display: flex; gap: 12px; justify-content: space-between; align-items: start; padding: 24px 24px 16px; }
+      .dialog-head .eyebrow { color: var(--cp-accent); margin-bottom: 8px; }
+      .dialog-head button { min-width: 44px; padding: 8px; }
+      .dialog-body { padding: 0 24px 24px; }
+      .dialog-body > p + p { margin-top: 12px; }
+      .dialog-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 16px 24px; border-top: 1px solid var(--cp-border); background: var(--cp-bg-elevated); }
+      .dialog-foot .buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+      .callout { border: 1px solid var(--cp-border); background: var(--cp-bg-elevated); padding: 12px 16px; border-radius: 10px; font-size: 14px; margin: 16px 0; }
+      .callout p + p { margin-top: 4px; }
+      .choice-list { list-style: none; padding: 0; margin: 12px 0 0; }
+      .choice-list li + li { border-top: 1px solid var(--cp-border); }
+      .choice { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 4px; cursor: pointer; }
+      .choice input { width: 20px; height: 20px; accent-color: var(--cp-accent); flex-shrink: 0; }
+      .choice span { min-width: 0; overflow-wrap: anywhere; }
+      .choice small { display: block; color: var(--cp-text-soft); font-size: 12px; }
+      .field { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+      .field select { width: 100%; padding: 8px 12px; }
+      fieldset { border: 1px solid var(--cp-border); border-radius: 10px; padding: 8px 12px; margin: 16px 0; min-width: 0; }
+      legend { font-size: 14px; padding: 0 4px; font-weight: 600; }
+      .service-options { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+      .changes { list-style: none; margin: 16px 0; padding: 0; }
+      .changes li { border-bottom: 1px solid var(--cp-border); padding: 12px 0; }
+      .changes strong, .changes span { display: block; }
+      .detail-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+      .detail-facts dt { color: var(--cp-text-soft); font-size: 13px; }
+      .detail-facts dd { margin: 4px 0 0; font-weight: 600; }
+      .status { min-height: 24px; padding-top: 8px; color: var(--cp-text-soft); font-size: 13px; }
+      .about-list { padding-left: 20px; font-size: 14px; }
+      .about-list li { margin-bottom: 8px; }
+      @media (max-width: 1100px) {
+        .search { max-width: none; }
+        .sort-group { margin-left: 0; }
+        .title-list[data-view="grid"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+      @media (max-width: 700px) {
+        .shell { padding: 0 16px 24px; }
+        .study-inner { padding: 0 16px; gap: 4px; }
+        .study-label .study-extra { display: none; }
+        .study-actions { gap: 0; }
+        .study-actions button { padding: 8px; }
+        .app-header { min-height: 64px; }
+        .app-nav { gap: 4px; }
+        .app-nav a { padding: 12px 8px; }
+        .app-nav button { font-size: 13px; padding: 8px; }
+        .brand { font-size: 22px; }
+        .page-heading { align-items: start; gap: 8px; }
+        h1 { font-size: 24px; }
+        .page-heading p { font-size: 12px; }
+        .page-heading > button { font-size: 12px; max-width: 144px; text-align: left; }
+        .quick-views { display: none; }
+        .mobile-quick { display: block; }
+        .toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+        .search { min-width: 0; }
+        .runtime-select { display: none; }
+        .sort-group { min-width: 0; }
+        .sort-group select { flex: 1; max-width: none; min-width: 0; font-size: 13px; padding-right: 20px; }
+        .sort-group button { min-width: 104px; font-size: 13px; }
+        .view-switch { margin-left: 0; }
+        .result-line .membership-note { display: none; }
+        .collection-note { align-items: start; flex-direction: column; }
+        .title-card { grid-template-columns: 48px minmax(0, 1fr); gap: 8px 12px; padding: 12px; }
+        .art { width: 48px; height: 72px; }
+        .title-heading { flex-direction: column; gap: 4px; }
+        .title-heading h2 { font-size: 17px; }
+        .title-card .row-actions { grid-column: 2; justify-content: space-between; }
+        .facts { font-size: 13px; gap: 0 8px; }
+        .facts > span + span::before { margin-right: 8px; }
+        .date-line { font-size: 12px; }
+        .title-list[data-view="grid"] { grid-template-columns: 1fr; }
+        .title-list[data-view="grid"] .title-card { grid-template-columns: 80px minmax(0, 1fr); padding: 16px; }
+        .title-list[data-view="grid"] .art { width: 80px; height: 120px; }
+        .dialog-head { padding: 16px 16px 12px; }
+        .dialog-body { padding: 0 16px 16px; }
+        .dialog-foot { padding: 12px 16px; }
+      }
+      @media (max-width: 360px) {
+        .shell { padding-inline: 12px; }
+        .brand svg { display: none; }
+        .study-label { font-size: 10px; }
+        .sort-group { grid-column: 1 / -1; }
+        .view-switch { grid-column: 2; justify-self: end; }
+        .service-options, .detail-facts { grid-template-columns: 1fr; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+      }
+    </style>
+  </head>
+  <body>
+    <a class="skip" href="#library">Skip to your list</a>
+    <div class="study-bar" aria-label="Prototype controls">
+      <div class="study-inner">
+        <div class="study-label"><strong>LAYOUT STUDY 01</strong><span class="study-extra">Sample data · nothing is saved to nextup</span></div>
+        <div class="study-actions">
+          <button id="theme-toggle" type="button">Switch theme</button>
+          <button id="about-open" type="button">About this mock</button>
+        </div>
+      </div>
+    </div>
+    <div class="shell">
+      <header class="app-header">
+        <div class="brand">
+          <svg viewBox="0 0 32 32" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="28" height="28" rx="9"/><path d="m12 10 9 6-9 6Z" fill="currentColor" stroke="none"/><path d="M23 10v12"/></svg>
+          nextup
+        </div>
+        <nav class="app-nav" aria-label="Mock navigation">
+          <a href="#library" aria-current="page">Your list</a>
+          <button type="button" id="dates-open">Service dates</button>
+        </nav>
+      </header>
+      <main id="library" tabindex="-1">
+        <div class="page-heading">
+          <div><h1>Your list</h1><p class="muted small" id="library-summary"></p></div>
+          <button class="quiet icon-button" type="button" id="collection-open">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 7h16v14H4zM3 3h18v4H3zM9 11h6"/></svg>
+            Review initial collection
+          </button>
+        </div>
+        <div class="quick-views" role="group" aria-label="Quick views" id="quick-views"></div>
+        <label for="quick-mobile" class="sr-only">Show collection</label>
+        <select id="quick-mobile" class="mobile-quick"></select>
+        <aside class="collection-note" id="collection-note" hidden>
+          <div><p><strong>Old saves. A new home.</strong></p><p class="muted">These sample titles were marked as part of the initial collection. Their original save dates are unknown; the dates below are when nextup first saw them.</p></div>
+        </aside>
+        <div class="toolbar">
+          <form class="search" id="search-form" role="search">
+            <label for="search" class="sr-only">Search your list</label>
+            <input id="search" type="search" placeholder="Search your list" autocomplete="off" />
+            <button type="submit" class="icon-button" aria-label="Search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></svg>
+            </button>
+          </form>
+          <button type="button" id="filters-open" class="icon-button" aria-haspopup="dialog">Filters</button>
+          <label class="sr-only" for="runtime">Time available</label>
+          <select id="runtime" class="runtime-select">
+            <option value="any">Any runtime</option>
+            <option value="60">Under 1 hour</option>
+            <option value="90">Under 1h 30m</option>
+            <option value="120">Under 2 hours</option>
+          </select>
+          <div class="sort-group">
+            <label class="sr-only" for="sort">Sort your list</label>
+            <select id="sort">
+              <option value="added">Newest in nextup</option>
+              <option value="name">Title: A–Z</option>
+              <option value="rating">IMDb: highest first</option>
+              <option value="runtime">Runtime: shortest first</option>
+            </select>
+            <button id="reverse" type="button">Oldest first</button>
+          </div>
+          <div class="view-switch" role="group" aria-label="List presentation">
+            <button type="button" data-view="compact" aria-pressed="true" class="icon-button" aria-label="Compact view">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M8 5h13M8 12h13M8 19h13M3 5h1M3 12h1M3 19h1"/></svg>
+            </button>
+            <button type="button" data-view="grid" aria-pressed="false" class="icon-button" aria-label="Grid view">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="active-filters" id="active-filters" aria-label="Active filters" hidden></div>
+        <div class="result-line"><p id="result-count" role="status" aria-live="polite"></p><span class="membership-note">Service badges show saved-list membership</span></div>
+        <ul class="title-list" id="titles" data-view="compact" aria-label="Your saved titles"></ul>
+        <div class="empty" id="empty" hidden>
+          <h2>No titles match this view</h2>
+          <p class="muted">Your sample collection is still here. Try fewer filters or a different search.</p>
+          <button type="button" id="clear-empty">Show all titles</button>
+        </div>
+        <p class="status" id="notice" role="status" aria-live="polite"></p>
+      </main>
+      <footer class="footer"><span>Prototype only · illustrative metadata and placeholder artwork</span><span>No streaming-service requests · no account or storage</span></footer>
+    </div>
+    <dialog id="modal" aria-labelledby="modal-title">
+      <div class="dialog-head"><div><p class="eyebrow" id="modal-kicker"></p><h2 id="modal-title" tabindex="-1"></h2></div><button type="button" id="modal-close" aria-label="Close dialog">✕</button></div>
+      <div class="dialog-body" id="modal-body"></div>
+      <div class="dialog-foot" id="modal-foot"></div>
+    </dialog>
+    <script>
+      (() => {
+        "use strict";
+        const services = ["Netflix", "Max", "Prime Video", "Disney+", "Apple TV+", "Paramount+", "Starz", "Peacock"];
+        const seed = [
+          { id: 1, name: "Mustache", year: 2023, type: "Movie", runtime: 83, rating: 8.4, genres: ["Comedy", "Drama"], services: ["Prime Video"], added: "2026-09-17", initial: true, priority: "normal", watching: false },
+          { id: 2, name: "A Separation", year: 2011, type: "Movie", runtime: 123, rating: 8.3, genres: ["Drama"], services: ["Prime Video"], added: "2026-09-17", initial: true, priority: "someday", watching: false },
+          { id: 3, name: "Mayday", year: 2003, type: "TV", runtime: 46, rating: 8.8, genres: ["Documentary", "Drama", "Crime"], services: ["Apple TV+"], added: "2026-09-17", initial: true, priority: "someday", watching: false },
+          { id: 4, name: "Ted Lasso", year: 2020, type: "TV", runtime: 47, rating: 8.7, genres: ["Comedy", "Drama"], services: ["Apple TV+"], added: "2026-09-17", initial: true, priority: "up-next", watching: true },
+          { id: 5, name: "The Bear", year: 2022, type: "TV", runtime: 31, rating: 8.6, genres: ["Drama", "Comedy"], services: ["Disney+"], added: "2026-09-18", initial: false, priority: "normal", watching: true },
+          { id: 6, name: "Andor", year: 2022, type: "TV", runtime: 45, rating: 8.4, genres: ["Science Fiction", "Adventure"], services: ["Disney+"], added: "2026-09-18", initial: false, priority: "up-next", watching: false },
+          { id: 7, name: "Dune", year: 2021, type: "Movie", runtime: 155, rating: 8.0, genres: ["Science Fiction", "Adventure"], services: ["Netflix", "Max"], added: "2026-09-18", initial: false, priority: "normal", watching: false },
+          { id: 8, name: "Arrival", year: 2016, type: "Movie", runtime: 116, rating: 7.9, genres: ["Science Fiction", "Drama"], services: ["Netflix", "Prime Video"], added: "2026-09-17", initial: true, priority: "up-next", watching: false },
+          { id: 9, name: "Severance", year: 2022, type: "TV", runtime: 50, rating: 8.7, genres: ["Drama", "Mystery"], services: ["Apple TV+"], added: "2026-09-17", initial: true, priority: "normal", watching: false },
+          { id: 10, name: "Past Lives", year: 2023, type: "Movie", runtime: 106, rating: 7.9, genres: ["Drama", "Romance"], services: ["Max"], added: "2026-09-17", initial: true, priority: "someday", watching: false },
+          { id: 11, name: "Slow Horses", year: 2022, type: "TV", runtime: 45, rating: 8.2, genres: ["Drama", "Thriller"], services: ["Apple TV+"], added: "2026-09-18", initial: false, priority: "normal", watching: false },
+          { id: 12, name: "The Good Place", year: 2016, type: "TV", runtime: 22, rating: 8.2, genres: ["Comedy", "Fantasy"], services: ["Netflix"], added: "2026-09-17", initial: true, priority: "normal", watching: false },
+        ];
+        const edgeCases = [
+          { id: 13, name: "The Remarkably Long Title of a Completely Imaginary Series: An Eight-Service Layout Test", year: 2026, type: "TV", runtime: 55, rating: 8.0, genres: ["Drama", "Adventure", "Science Fiction", "Mystery", "Comedy"], services: [...services], added: "2026-09-18", initial: false, priority: "someday", watching: false },
+          { id: 14, name: "An Unidentified Film", year: null, type: "Movie", runtime: null, rating: null, genres: [], services: ["Peacock"], added: "2026-09-17", initial: false, priority: "normal", watching: false },
+        ];
+        const $ = (id) => document.getElementById(id);
+        const esc = (value) => String(value).replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
+        const priorityLabel = { "up-next": "Up next", normal: "Normal", someday: "Someday" };
+        const archiveIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M4 7h16v14H4zM3 3h18v4H3zM9 11h6"/></svg>';
+        let items = structuredClone(seed);
+        let state = { quick: "all", q: "", services: [], type: "all", genre: "all", runtime: "any", sort: "added", dir: "desc", view: "compact" };
+        let showEdges = false;
+        let opener = null;
+        let selection = new Set();
+        const dateLabel = (value) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(value + "T12:00:00Z"));
+        const runtimeLabel = (item) => item.runtime === null ? "Runtime unknown" : item.type === "TV" ? `${item.runtime}m/ep` : `${Math.floor(item.runtime / 60) ? Math.floor(item.runtime / 60) + "h " : ""}${item.runtime % 60 ? item.runtime % 60 + "m" : ""}`.trim();
+        function resetConstraints() {
+          Object.assign(state, { quick: "all", q: "", services: [], type: "all", genre: "all", runtime: "any" });
+          $("search").value = "";
+        }
+        function selectedItems() {
+          const filtered = items.filter((item) =>
+            (state.quick === "all" || (state.quick === "watching" && item.watching) || (state.quick === "up-next" && item.priority === "up-next") || (state.quick === "initial" && item.initial)) &&
+            (!state.q || item.name.toLocaleLowerCase().includes(state.q.toLocaleLowerCase())) &&
+            (!state.services.length || item.services.some((service) => state.services.includes(service))) &&
+            (state.type === "all" || item.type === state.type) &&
+            (state.genre === "all" || item.genres.includes(state.genre)) &&
+            (state.runtime === "any" || (item.runtime !== null && item.runtime < Number(state.runtime)))
+          );
+          return filtered.sort((a, b) => {
+            const key = state.sort;
+            if (a[key] === null || b[key] === null) {
+              if (a[key] === b[key]) return a.id - b.id;
+              return a[key] === null ? 1 : -1;
+            }
+            const cmp = typeof a[key] === "number" ? a[key] - b[key] : a[key].localeCompare(b[key]);
+            return cmp * (state.dir === "asc" ? 1 : -1) || a.id - b.id;
+          });
+        }
+        function render() {
+          const visible = selectedItems();
+          const serviceCount = new Set(items.flatMap((item) => item.services)).size;
+          $("library-summary").textContent = `${items.length} titles · ${serviceCount} services · one list`;
+          const quickViews = [
+            ["all", "All titles", items.length],
+            ["watching", "Watching", items.filter((item) => item.watching).length],
+            ["up-next", "Up next", items.filter((item) => item.priority === "up-next").length],
+            ["initial", "Initial collection", items.filter((item) => item.initial).length],
+          ];
+          $("quick-views").innerHTML = quickViews.map(([key, label, count]) => `<button type="button" data-quick="${key}" aria-pressed="${state.quick === key}"><span>${label}</span><span class="counter">${count}</span></button>`).join("");
+          $("quick-mobile").innerHTML = quickViews.map(([key, label, count]) => `<option value="${key}" ${state.quick === key ? "selected" : ""}>${label} (${count})</option>`).join("");
+          $("collection-note").hidden = state.quick !== "initial";
+          $("runtime").value = state.runtime;
+          $("sort").value = state.sort;
+          const orders = {
+            added: { desc: "Newest in nextup", asc: "Oldest in nextup", reverse: state.dir === "desc" ? "Oldest first" : "Newest first" },
+            name: { asc: "Title: A–Z", desc: "Title: Z–A", reverse: state.dir === "asc" ? "Z–A" : "A–Z" },
+            rating: { desc: "IMDb: highest first", asc: "IMDb: lowest first", reverse: state.dir === "desc" ? "Lowest first" : "Highest first" },
+            runtime: { asc: "Runtime: shortest first", desc: "Runtime: longest first", reverse: state.dir === "asc" ? "Longest first" : "Shortest first" },
+          };
+          for (const option of $("sort").options) {
+            const defaultDir = ["name", "runtime"].includes(option.value) ? "asc" : "desc";
+            option.textContent = orders[option.value][option.value === state.sort ? state.dir : defaultDir];
+          }
+          $("reverse").textContent = orders[state.sort].reverse;
+          $("reverse").setAttribute("aria-label", `Reverse order: ${orders[state.sort].reverse}`);
+          const filterCount = state.services.length + Number(state.type !== "all") + Number(state.genre !== "all") + Number(state.runtime !== "any");
+          $("filters-open").textContent = filterCount ? `Filters (${filterCount})` : "Filters";
+          const filters = [
+            ...(state.q ? [["q", `Search: ${state.q}`]] : []),
+            ...state.services.map((service) => ["service", service]),
+            ...(state.type !== "all" ? [["type", state.type === "TV" ? "TV series" : "Movies"]] : []),
+            ...(state.genre !== "all" ? [["genre", state.genre]] : []),
+            ...(state.runtime !== "any" ? [["runtime", $("runtime").selectedOptions[0].textContent]] : []),
+          ];
+          $("active-filters").hidden = filters.length === 0;
+          $("active-filters").innerHTML = filters.map(([key, label]) => `<button type="button" data-remove="${key}" data-value="${esc(label)}" aria-label="Remove ${esc(label)} filter">${esc(label)} <span aria-hidden="true">×</span></button>`).join("") + (filters.length ? '<button type="button" id="clear-filters">Clear filters</button>' : "");
+          $("result-count").textContent = `Showing ${visible.length} of ${items.length} titles`;
+          $("titles").dataset.view = state.view;
+          document.querySelectorAll("button[data-view]").forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.view === state.view)));
+          $("titles").innerHTML = visible.map((item) => {
+            const initials = item.name.split(" ").filter((word) => !["The", "A", "An"].includes(word)).slice(0, 2).map((word) => word[0]).join("");
+            return `<li class="title-card" data-id="${item.id}">
+              <div class="art" data-art="${item.id % 3}" aria-hidden="true"><small>${item.type === "TV" ? "SERIES" : "FILM"}</small><strong>${esc(initials)}</strong></div>
+              <div class="title-body">
+                <div class="title-heading"><h2>${esc(item.name)}</h2><div class="services" aria-label="Saved on">${item.services.map((service) => `<span class="service">${esc(service)}</span>`).join("")}</div></div>
+                <div class="facts">${item.year === null ? "" : `<span>${item.year}</span>`}<span>${item.type === "TV" ? "TV series" : "Movie"}</span><span>${runtimeLabel(item)}</span><span class="rating">${item.rating === null ? "No IMDb rating" : `IMDb <strong>${item.rating.toFixed(1)}</strong>`}</span></div>
+                ${item.genres.length ? `<p class="genres">${item.genres.map(esc).join(" · ")}</p>` : ""}
+                <div class="date-line"><span>Added to nextup ${dateLabel(item.added)}</span>${item.initial ? `<span class="collection-marker">${archiveIcon}Initial collection</span>` : ""}</div>
+              </div>
+              <div class="row-actions">
+                <button type="button" class="preference" data-preferences="${item.id}" data-priority="${item.priority}" data-watching="${item.watching}" aria-haspopup="dialog" aria-label="Watch preferences for ${esc(item.name)}: ${item.watching ? "Watching, " : ""}${priorityLabel[item.priority]}"><span>${item.watching ? '<span class="watching">WATCHING</span>' : ""}<span>${priorityLabel[item.priority]}</span></span><span aria-hidden="true">⌄</span></button>
+                <button type="button" class="details-button" data-details="${item.id}" aria-label="Details for ${esc(item.name)}" aria-haspopup="dialog">···</button>
+              </div>
+            </li>`;
+          }).join("");
+          $("empty").hidden = visible.length !== 0;
+        }
+        function openDialog(title, kicker, body, foot) {
+          const alreadyOpen = $("modal").open;
+          if (!alreadyOpen) opener = document.activeElement;
+          $("modal-title").textContent = title;
+          $("modal-kicker").textContent = kicker;
+          $("modal-body").innerHTML = body;
+          $("modal-foot").innerHTML = foot;
+          if (!alreadyOpen) $("modal").showModal();
+          $("modal-title").focus();
+        }
+        function closeDialog() {
+          $("modal").close();
+        }
+        $("modal").addEventListener("close", () => {
+          if (opener?.isConnected) opener.focus();
+          else $("library").focus();
+        });
+        $("modal-close").addEventListener("click", closeDialog);
+        function tell(message) { $("notice").textContent = message; }
+        function openFilters() {
+          const genres = [...new Set(items.flatMap((item) => item.genres))].sort();
+          openDialog("Filter your list", "Narrow the choices",
+            `<p class="muted small">Services match any selection. Other categories combine with it. Changes apply when you choose Show titles.</p>
+            <fieldset><legend>Services</legend><div class="service-options">${services.map((service, index) => `<label class="choice"><input type="checkbox" name="service" value="${index}" ${state.services.includes(service) ? "checked" : ""}/><span>${esc(service)}</span></label>`).join("")}</div></fieldset>
+            <label class="field">Type<select id="filter-type"><option value="all">All types</option><option value="Movie" ${state.type === "Movie" ? "selected" : ""}>Movies</option><option value="TV" ${state.type === "TV" ? "selected" : ""}>TV series</option></select></label>
+            <label class="field">Genre<select id="filter-genre"><option value="all">All genres</option>${genres.map((genre) => `<option ${state.genre === genre ? "selected" : ""}>${esc(genre)}</option>`).join("")}</select></label>
+            <label class="field">Time available<select id="filter-runtime">${[["any", "Any runtime"], ["60", "Under 1 hour"], ["90", "Under 1h 30m"], ["120", "Under 2 hours"]].map(([value, label]) => `<option value="${value}" ${state.runtime === value ? "selected" : ""}>${label}</option>`).join("")}</select></label>`,
+            '<button type="button" data-close>Cancel</button><button type="button" class="primary" id="apply-filters">Show titles</button>');
+          $("apply-filters").onclick = () => {
+            state.services = [...$("modal-body").querySelectorAll('input[name="service"]:checked')].map((input) => services[Number(input.value)]);
+            state.type = $("filter-type").value;
+            state.genre = $("filter-genre").value;
+            state.runtime = $("filter-runtime").value;
+            render();
+            closeDialog();
+          };
+        }
+        function showCollectionSelection() {
+          openDialog("Which titles were already in your collection?", "Initial collection · 1 of 2",
+            `<p class="muted small">Mark the titles you had saved before starting nextup. This can span multiple imports and services.</p>
+            <div class="callout"><strong>A label, not a historical date.</strong><p>Import dates stay unchanged. No title is removed or reordered.</p></div>
+            <p class="small muted">Checked titles already have this label in the sample. Other titles are never selected automatically.</p>
+            <ul class="choice-list">${items.map((item) => `<li><label class="choice"><input type="checkbox" data-initial="${item.id}" ${selection.has(item.id) ? "checked" : ""}/><span>${esc(item.name)}<small>${item.services.map(esc).join(", ")} · Added to nextup ${dateLabel(item.added)}${item.initial ? " · Already marked" : ""}</small></span></label></li>`).join("")}</ul>`,
+            '<span class="small muted" id="selection-count" role="status"></span><div class="buttons"><button type="button" data-close>Cancel</button><button type="button" class="primary" id="review-labels">Review changes</button></div>');
+          const updateCount = () => {
+            const changes = items.filter((item) => item.initial !== selection.has(item.id)).length;
+            $("selection-count").textContent = `${selection.size} marked · ${changes} changes`;
+            $("review-labels").disabled = changes === 0;
+          };
+          $("modal-body").querySelectorAll("[data-initial]").forEach((input) => input.addEventListener("change", () => {
+            if (input.checked) selection.add(Number(input.dataset.initial));
+            else selection.delete(Number(input.dataset.initial));
+            updateCount();
+          }));
+          $("review-labels").onclick = showCollectionConfirmation;
+          updateCount();
+        }
+        function showCollectionConfirmation() {
+          const changes = items.filter((item) => item.initial !== selection.has(item.id));
+          openDialog("Confirm collection labels", "Initial collection · 2 of 2",
+            `<p class="muted">Only ${changes.length === 1 ? "this label will change" : `these ${changes.length} labels will change`}. Your titles, dates and service badges stay as they are.</p>
+            <ul class="changes">${changes.map((item) => `<li><strong>${esc(item.name)}</strong><span class="small muted">${selection.has(item.id) ? "Mark as initial collection" : "Remove initial-collection label"} · original save date remains unknown</span></li>`).join("")}</ul>
+            <div class="callout">This does not put titles in historical save order. It distinguishes your initial collection from later additions.</div>`,
+            '<button type="button" id="selection-back">Back to selection</button><button type="button" class="primary" id="confirm-labels">Confirm labels in mock</button>');
+          $("selection-back").onclick = showCollectionSelection;
+          $("confirm-labels").onclick = () => {
+            items.forEach((item) => { item.initial = selection.has(item.id); });
+            render();
+            closeDialog();
+            tell(`${changes.length} collection ${changes.length === 1 ? "label" : "labels"} changed in this mock only. Import dates and ordering are unchanged.`);
+          };
+        }
+        function openPreferences(id) {
+          const item = items.find((entry) => entry.id === id);
+          openDialog(item.name, "Watch preferences",
+            `<label class="choice"><input type="checkbox" id="watching" ${item.watching ? "checked" : ""}/><span>I'm watching this<small>Independent of priority. No episode tracking.</small></span></label>
+            <fieldset><legend>Watch priority</legend>${Object.entries(priorityLabel).map(([key, label]) => `<label class="choice"><input type="radio" name="priority" value="${key}" ${item.priority === key ? "checked" : ""}/><span>${label}</span></label>`).join("")}</fieldset><p class="small muted">This changes sample data only, until you reload or reset.</p>`,
+            '<button type="button" data-close>Cancel</button><button type="button" class="primary" id="save-preferences">Save in mock</button>');
+          $("save-preferences").onclick = () => {
+            item.watching = $("watching").checked;
+            item.priority = $("modal-body").querySelector('input[name="priority"]:checked').value;
+            render();
+            closeDialog();
+            document.querySelector(`[data-preferences="${id}"]`)?.focus();
+            tell(`Watch preferences for ${item.name} changed in this mock only.`);
+          };
+        }
+        function openDetails(id) {
+          const item = items.find((entry) => entry.id === id);
+          openDialog(item.name, "Dates tell different stories",
+            `<dl class="detail-facts"><div><dt>Added to nextup</dt><dd>${dateLabel(item.added)}</dd></div><div><dt>Originally saved on a service</dt><dd>Unknown</dd></div><div><dt>Collection</dt><dd>${item.initial ? "Initial collection" : "Not classified"}</dd></div><div><dt>Recorded services</dt><dd>${item.services.map(esc).join(", ")}</dd></div></dl>
+            <div class="callout">${item.initial ? "The owner marked this as an existing save in the sample. Its original service save date was not recovered." : "An import date does not tell us how long you had this saved. We do not guess."}</div>
+            <p class="small muted">Approximate historical dates are a separate, undecided extension. No date editing or service-launch links are included here.</p>`,
+            '<span class="small muted">Illustrative metadata, not verified availability</span><button type="button" data-close>Done</button>');
+        }
+        $("quick-views").addEventListener("click", (event) => {
+          const button = event.target.closest("[data-quick]");
+          if (!button) return;
+          state.quick = button.dataset.quick;
+          render();
+          $("quick-views").querySelector(`[data-quick="${state.quick}"]`).focus();
+        });
+        $("search-form").addEventListener("submit", (event) => {
+          event.preventDefault();
+          state.q = $("search").value.trim();
+          render();
+        });
+        $("quick-mobile").addEventListener("change", () => { state.quick = $("quick-mobile").value; render(); });
+        $("runtime").addEventListener("change", () => { state.runtime = $("runtime").value; render(); });
+        $("sort").addEventListener("change", () => {
+          state.sort = $("sort").value;
+          state.dir = ["name", "runtime"].includes(state.sort) ? "asc" : "desc";
+          render();
+        });
+        $("reverse").addEventListener("click", () => { state.dir = state.dir === "asc" ? "desc" : "asc"; render(); });
+        document.querySelectorAll("button[data-view]").forEach((button) => button.addEventListener("click", () => { state.view = button.dataset.view; render(); }));
+        $("active-filters").addEventListener("click", (event) => {
+          const button = event.target.closest("button");
+          if (!button) return;
+          if (button.id === "clear-filters") {
+            const quick = state.quick;
+            resetConstraints();
+            state.quick = quick;
+          } else {
+            const key = button.dataset.remove;
+            if (key === "service") state.services = state.services.filter((service) => service !== button.dataset.value);
+            else state[key] = key === "q" ? "" : key === "runtime" ? "any" : "all";
+            if (key === "q") $("search").value = "";
+          }
+          render();
+          $("filters-open").focus();
+        });
+        $("clear-empty").addEventListener("click", () => { resetConstraints(); render(); $("search").focus(); });
+        $("filters-open").addEventListener("click", openFilters);
+        $("collection-open").addEventListener("click", () => {
+          selection = new Set(items.filter((item) => item.initial).map((item) => item.id));
+          showCollectionSelection();
+        });
+        $("titles").addEventListener("click", (event) => {
+          const preferences = event.target.closest("[data-preferences]");
+          const details = event.target.closest("[data-details]");
+          if (preferences) openPreferences(Number(preferences.dataset.preferences));
+          else if (details) openDetails(Number(details.dataset.details));
+        });
+        $("modal-foot").addEventListener("click", (event) => { if (event.target.closest("[data-close]")) closeDialog(); });
+        $("dates-open").addEventListener("click", () => {
+          openDialog("Last updated by service", "Sample capture history",
+            `<p class="small muted">These are sample capture dates, not live service availability. They never trigger a reminder.</p><ul class="changes">${services.map((service, index) => `<li><strong>${esc(service)}</strong><span class="small muted">${index < 5 ? `Updated ${index === 3 ? "18" : "17"} Sep 2026` : "Never updated"}</span></li>`).join("")}</ul>`,
+            '<span class="small muted">Import navigation is outside this mock.</span><button type="button" data-close>Done</button>');
+        });
+        $("about-open").addEventListener("click", () => {
+          openDialog("A layout study, not a product change", "Prototype notes",
+            `<p>Try Compact and Grid, narrow the list, reverse the order, edit a sample priority, or review the initial collection.</p>
+            <ul class="about-list"><li>All titles, ratings, dates and service memberships are illustrative. Abstract tiles stand in for posters.</li><li>The artifact uses the Clawpilot charcoal/rose presentation palette. It does not propose replacing nextup's approved indigo/violet theme.</li><li>Text service labels study proximity; the production service marks are not being replaced.</li><li>The initial-collection selector illustrates title-level choices. Storage scope and undo semantics remain undecided.</li><li>Filter selections apply on confirmation here. URL persistence, production multi-select categories, networking, pagination, upload and destructive actions are intentionally outside this bounded mock.</li><li>Everything stays in memory. Reload or Reset clears all sample edits. No telemetry or external requests.</li></ul>
+            <label class="choice"><input type="checkbox" id="edge-cases" ${showEdges ? "checked" : ""}/><span>Include edge-case samples<small>A long title with eight badges, and missing metadata.</small></span></label>`,
+            '<button type="button" id="reset-mock">Reset sample</button><button type="button" class="primary" id="apply-study">Back to the mock</button>');
+          $("apply-study").onclick = () => {
+            const nextEdges = $("edge-cases").checked;
+            if (nextEdges && !showEdges) items.push(...structuredClone(edgeCases));
+            if (!nextEdges) items = items.filter((item) => item.id < 13);
+            showEdges = nextEdges;
+            render();
+            closeDialog();
+          };
+          $("reset-mock").onclick = () => {
+            items = structuredClone(seed);
+            showEdges = false;
+            resetConstraints();
+            Object.assign(state, { sort: "added", dir: "desc", view: "compact" });
+            tell("Sample reset. Nothing in nextup was changed.");
+            render();
+            closeDialog();
+          };
+        });
+        function themeLabel() {
+          $("theme-toggle").textContent = document.documentElement.dataset.theme === "dark" ? "Light preview" : "Dark preview";
+        }
+        $("theme-toggle").addEventListener("click", () => {
+          document.documentElement.dataset.theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+          themeLabel();
+        });
+        themeLabel();
+        render();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,17 +1,27 @@
 # Proposal: decision-focused UI and initial-import history
 
-**Status:** Draft for owner review. Documentation only; not approved for implementation.
+**Status:** Draft for owner review. Documentation and isolated mocks only; not approved for product implementation.
 
 **Date:** 2026-09-17.
 
 **Isolation:** Prepared on `docs/ui-initial-import-proposal` in a separate Git
-worktree, based on `d40e367`. Only this proposal is in scope. No changes to
+worktree, based on `d40e367`. This proposal and its standalone mock files are in scope. No changes to
 application code, migrations, authoritative specifications, backlog, generated
 status, or another instance's checkout are authorized by this document.
 
 **Evidence:** The owner's supplied screenshot and assessment against `3820528`.
 Subsequent changes through `d40e367` are distinguished below. No live-browser
 interaction or accessibility audit was performed for this assessment.
+
+**Mock study added 2026-09-18:** [Open the standalone library mock](mocks/library-study.html)
+or read its [walkthrough and limitations](mocks/README.md). This uses local sample data
+only. Its presentation palette is not a change to the approved product theme,
+and its illustrative interactions do not resolve the product decisions below.
+
+**Additional mock directions, 2026-09-18:** [Cover browser and Comparison desk](mocks/layout-alternatives.html)
+explore artwork-led recognition versus column-based comparison. They share
+sample data and state for a direct comparison; the first mock remains unchanged.
+These are alternatives for review, not a decision to add more production layouts.
 
 ## 1. Purpose and authority
 
@@ -275,7 +285,8 @@ Do not introduce background list mutations.
 Authoritative specifications, acceptance mappings and real tests should change
 together through the normal backlog process when implementation is authorized.
 Do not add invented IDs or broaden coverage baselines to make a proposal appear
-implemented. This branch deliberately adds only this document.
+implemented. This branch is limited to proposal documentation and standalone
+mock artifacts, not application changes.
 
 ## 7. Sources
 
