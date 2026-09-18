@@ -364,6 +364,13 @@ See `api.md` §6.2d and `T-WATCH-003`.
 
 ### 2.2 The row (`components/TitleRow.tsx`)
 
+**Owner decision, 2026-09-17 (REQ-044):** rows and service badges provide
+**no service-level or direct-title launch links**. The owner opens the
+streaming app independently. Do not invent a service URL field or navigation
+handler. Internal nextup links, including service-preselected `/upload`, and
+required TMDB/JustWatch attribution remain unchanged. `T-UI-010` and
+`T-UI-012` cover the row facts and absence of streaming-service URLs.
+
 | Element | Source | Rule |
 |---|---|---|
 | Poster | `posterPath` → `https://image.tmdb.org/t/p/w154{path}` | `alt=""` (decorative; the name is adjacent text). A missing poster renders a neutral placeholder tile, never a broken image. |

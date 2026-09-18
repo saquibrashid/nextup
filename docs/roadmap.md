@@ -126,7 +126,8 @@ is expensive later — hence the table test `T-DM-001`.
 
 ### M2 — Value loop on seeded data
 **Goal:** **the entire payoff, early.** Open the app → filter and sort → pick
-something → deep-link out to the service. Built against deterministic seed
+something → open the streaming app independently (no launch links, owner-confirmed
+2026-09-17). Built against deterministic seed
 fixtures, *before* a single line of the extraction pipeline exists.
 
 **Done when:**
@@ -348,22 +349,22 @@ hats.
 
 Ordered by the trigger that promotes each, not by preference.
 
-### v1.1 — deferrals already decided
+### Promotions and remaining deferrals
 
 | Item | Requirement | Promotion trigger |
 |---|---|---|
-| ~~**Waiting to stream — rental-release discovery**~~ **→ PROMOTED TO v1 at `A52` (2026-09-08)** | **REQ-082 – REQ-087** | ✅ **NO LONGER DEFERRED. The trigger fired: the owner promoted it on 2026-09-08 (`A52`).** It now has a backlog — **`TASK-183` – `TASK-189`** (`docs/backlog.md` §4, Epic L) — its 21 test ids are defined in **`specs/testing.md` §38** (moved out of ADR-0010 §6 in the same change), and the `DO NOT BUILD THIS IN v1` banner on `data-model.md` §17 has been **lifted**. ⚠️ **Read ADR-0010 §5 before starting.** "Fandango at Home" also appears in `BRD.md` §6.2 under REQ-048 as a deferred *service*; building this as a service inverts it and makes the first full-update capture propose deleting the entire waiting list. ⚠️ **CORRECTED IN PLACE: this row used to say the invariant goes "from two non-owner processes to three". It is now THREE → FOUR** — Epic M was promoted first and took the increment to three, exactly the ordering hazard the IMDb row below warned about. The amendment is owned by **`TASK-187`** and lands in that one commit; `T-CI-005` is deliberately left at three and is red-by-design until then (`specs/testing.md` §33.1). |
+| **Waiting to stream — promoted to v1 at A52 (2026-09-08)** | **REQ-082 – REQ-087** | No longer deferred. TASK-183–TASK-189 and the discovery pipeline are implemented; tests are catalogued in `specs/testing.md` §38. TASK-187 completed the increase from three to **four** permitted non-owner processes. Do not repeat that increment. Fandango discovery remains separate from a saved-list service; see ADR-0010 §5. |
 | ~~**IMDb ratings**~~ **→ PROMOTED AND SHIPPED (`A50`)** | **REQ-088 – REQ-093** | ✅ **NO LONGER DEFERRED — Epic M is built** (`TASK-169` – `TASK-174`, all `done`). Kept in this table only to record the outcome of the ordering hazard it flagged. ⚠️ **That hazard was real and it resolved this way:** this row told the reader to "read the current count rather than writing a literal, since Epic L claims an increment too and the right value depends on which is promoted first". Epic M went first and raised the count **two → three**; Epic L's availability refresh is therefore the **fourth**, not the third — and both ADR-0010 §6.3 and the Epic L row above had to be corrected in place because they still said "third". Specified in full: PRD Epic M / US-044…US-046 and **ADR-0011**. ⚠️ **IMDb has no free API** — the official one is ~$150k/year, and the free bulk dataset was rejected because ingesting it needs a scheduled job. The source is **OMDb**, owner-chosen over TMDB's own `vote_average`. ⚠️ Ratings are looked up by **`imdb_id` only, never by title text** (ADR-0011 D-2); a title-text fallback attaches a plausible rating to the wrong film. |
 | Owner-controlled backup/export **UI** | OQ-025 | The owner runs `scripts/export-owner-data.ts` (TASK-131) more than twice. REQ-028 forbids the store from ever deleting anything, but provides no owner-controlled way to get the data *out* — the script closes that gap at MVP; a UI is the follow-up. |
-| Bulk edit in the review pass | **REQ-037** | Checkpoint 1 shows the review pass is intolerable **and** the diagnosed cause is per-row editing. If the cause is something else, this is the wrong fix. |
-| Multi-user / sharing | **REQ-035** | A second real user exists. Until then it only adds an authorisation surface. |
-| **Batch undo across later owner edits** | **REQ-059** | ⚠️ **Reinstating REQ-059 reopens decision D3 and OQ-023.** Both were closed *on the basis that REQ-059 stays out of v1*. Do not reinstate REQ-059 without formally reopening D3 and OQ-023 first — the current refusal semantics (TASK-113, TASK-114) are correct **only** under the v1 scope. |
+| Bulk edit beyond the existing review controls | No requirement allocated by this roadmap | Checkpoint 1 shows review is intolerable and per-row editing is the diagnosed cause. REQ-037 is runtime sorting, not bulk editing; define any new scope before implementation. |
+| Multi-user / sharing | PRD US-001/US-002 define the current single-owner boundary | A second real user exists and the owner explicitly approves expansion. REQ-035 is runtime filtering, not multi-user access. |
+| **Date-added editing and mixed-changeset batch undo** | **REQ-059 / REQ-069** | PRD §11.2 remains authoritative: date editing is REQ-059 and mixed undo is REQ-069. Reinstating date editing reopens D3/OQ-023 and requires reconsidering the pair together. Current later-edit refusal is intentional, not missing mixed undo. |
 
 ### v2 — capability expansion
 
 | Item | Requirement | Promotion trigger |
 |---|---|---|
-| **The seven additional streaming services** | **REQ-069** | Checkpoint 1 passes **and** a third service is genuinely used. Each new service is a new capture surface with its own OQ-024-shaped unknown: the extraction pipeline is not automatically portable, and each addition needs its own golden fixture set. |
+| **Services beyond the current eight-service registry** | **US-061 / REQ-127** | Six services have already been added to Netflix/Max. Additional expansion needs owner approval and capture-surface evidence. REQ-069 is mixed-changeset undo, not service expansion; Fandango discovery remains separate. |
 
 ### Never (structural, not deferred)
 

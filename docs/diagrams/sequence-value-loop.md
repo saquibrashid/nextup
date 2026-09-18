@@ -1,7 +1,10 @@
-# Sequence — the value loop: open the list → filter → deep-link out
+# Sequence — the value loop: open the list → filter → choose
 
 **Type:** Sequence diagram
 **Shows:** `J-1`, the reason the product exists and the path that must feel fast.
+**Owner clarification, 2026-09-17:** no service-level or direct-title launch
+links. The owner-to-service step below is independent of nextup, not a link
+or navigation initiated by the application.
 **Traces to:** REQ-024, REQ-026, REQ-031, REQ-032, REQ-033, REQ-034, REQ-036, REQ-038, REQ-039, REQ-076, NFR-005, NFR-006, NFR-007, NFR-013, NFR-014
 > ⚠ **REVISION 4 (A40, Variant A):** the datastore participant `DB` is now **Azure SQL Database Basic** (was PostgreSQL in R3, Cosmos in R1); registry is **ghcr.io**; compute is **0.25 vCPU / 0.5 GiB**. The flow itself is unchanged — only the store, registry and compute labels move. See ADR-0005 Rev 3 / ADR-0003 Rev 3, `specs/data-model.md` §16.
 
@@ -132,9 +135,9 @@ self-assessment.
   keyset cursor** over an indexed sort column *(R3 — was a Cosmos
   continuation token)*, which is what makes `NFR-018`'s
   scale-invariance claim true for the removed view.
-- Deep-linking is the owner opening the service themselves. Launching
-  titles inside a streaming app is out of scope in every release
-  considered so far.
+- The owner opens the streaming app independently. Neither service-home
+  links nor direct-title launch links are provided by nextup (REQ-044).
+  Internal nextup links and required metadata attribution remain.
 - The removed view, suppressed view and freshness detail are separate
   surfaces reached from this one and are not drawn.
 - Sorting and filtering by runtime (REQ-035, REQ-037) are deferred to

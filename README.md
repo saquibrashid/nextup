@@ -1,6 +1,6 @@
 # nextup
 
-> Sign in as the owner, upload screenshots of your streaming-service saved lists
+> Sign in as the owner, paste or upload screenshots of your streaming saved lists
 > in append-only or full-update mode, confirm what was read from them, and see
 > one deduplicated combined list — one row per title, a badge per service —
 > that you can filter and sort and that never loses anything without asking you
@@ -30,24 +30,23 @@ one row per title, a badge per service** — with every change passing through
 your review before it is applied. The list **never loses anything without
 asking you first**.
 
-v1 is single-user, mobile-first responsive web, federated sign-in, **Netflix
-and Max only**, hosted on Azure at ≈$11–14/month, with **no credentials, no
+The current release is single-user, mobile-first responsive web with federated
+sign-in. It supports **Netflix, Max, Prime Video, Disney+, Apple TV+, Paramount+,
+Starz and Peacock**, plus a separate rental-discovery waiting list and IMDb
+ratings. It is hosted on Azure, with a dated baseline estimate of ≈$11–14/month
+([cost assumptions](docs/current-release.md#cost-baseline)), with **no streaming credentials, no
 scraping, no scheduled jobs, and no telemetry**. It's a personal,
 non-commercial project; it exists to test one premise: that a combined list is
 worth the price of feeding it by hand.
 
 ## Status
 
-🚧 **Pre-alpha** — scaffolding and CI complete; feature work not yet started.
-
-Done: `TASK-001` monorepo scaffold, `TASK-002` test harness, `TASK-003` the
-twelve blocking CI jobs, `TASK-004` supply-chain gates, `TASK-005` the
-production container image, `TASK-009` offline getting-started, `TASK-144`
-the `T-MIG-001` destructive-migration gate.
-
-**Next up:** `TASK-006` — _Bicep infrastructure_ (Azure SQL Basic + serverless
-staging database, Container Apps at `0.25 vCPU / 0.5 GiB`, ghcr.io). See
-[docs/backlog.md](docs/backlog.md).
+Feature implementation is recorded in the **[generated task status](docs/status.md)**,
+including the remaining owner-dependent acceptance work. Read the
+**[current release and recorded owner decisions](docs/current-release.md)** and
+the **[requirement index](docs/requirement-index.md)** before using older
+planning or review documents. Task completion is not a declaration
+that live quality, device checks or release acceptance are complete.
 
 ## Quick start
 
@@ -69,14 +68,15 @@ staging database, Container Apps at `0.25 vCPU / 0.5 GiB`, ghcr.io). See
 
 ```bash
 npm ci
+npx prisma generate --schema prisma/schema.prisma
 cp .env.example .env   # then fill in the placeholders
 ```
 
 ### Run
 
-```bash
-npm run dev            # Vite dev server (apps/web), proxying /api to the API
-```
+Follow [getting-started section 5](docs/getting-started.md#5-run-the-app-locally)
+to configure and start the API **and** the SPA in separate terminals.
+`npm run dev` starts only Vite; it does not start or authenticate the API.
 
 ### Test
 
@@ -86,6 +86,7 @@ npm run db:test        # create nextup_test with the REQUIRED collation, then mi
 npm run test:unit      # Vitest — pure domain logic
 npm run test:int       # Vitest — API surface against the mssql + Azurite containers
 npm run test:web       # Vitest + Testing Library — component/screen states
+npm run build --workspace apps/web
 npm run test:e2e       # Playwright — the value loop and the irreversible paths
 ```
 
@@ -110,7 +111,10 @@ npm run test:e2e       # Playwright — the value loop and the irreversible path
 >
 > See [specs/testing.md](specs/testing.md) §17.
 
-After a one-time `npm ci` and image pull, the whole suite runs **offline** —
+Prepare the database environment and install Playwright browsers as described
+in [getting-started](docs/getting-started.md) before these commands.
+After the one-time dependency/browser downloads, Prisma generation and image
+pulls, the deterministic suites run **offline** —
 `NFR-003` makes CI the only feedback loop, so the loop must not depend on a
 network. CI wires the same two containers as services (see
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) and
@@ -132,7 +136,7 @@ nextup/
 │   └── web/            React + Vite single-page app
 ├── packages/
 │   └── domain/         Shared, pure TypeScript domain (types, identity, rules)
-├── infra/              Bicep skeletons — Azure SQL, Blob, Container Apps (ghcr.io)
+├── infra/              Bicep infrastructure — Azure SQL, Blob, Container Apps (ghcr.io)
 ├── tests/              Cross-cutting unit / integration / e2e / infra tests + fixtures
 ├── docs/               BRD, PRD, architecture, backlog, roadmap, ADRs, diagrams
 └── specs/              Implementation specs incl. the AC → named-test mapping
@@ -143,7 +147,8 @@ nextup/
 | Document                                              | What's in it                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [Getting started](docs/getting-started.md)            | Clone → install → run the whole suite offline; the HTTPS/clipboard trap                                                                                                                                                                                                                                                                                                                                                      |
-| [PRD](docs/PRD.md)                                    | User stories and the 230 acceptance criteria                                                                                                                                                                                                                                                                                                                                                                                 |
+| [Current release](docs/current-release.md)            | Current scope, evidence boundaries, unresolved decisions and dated cost baseline                                                                                                                                                                                                                                                                                                                                             |
+| [PRD](docs/PRD.md)                                    | User stories and acceptance criteria; current scope is in section 11                                                                                                                                                                                                                                                                                                                                                         |
 | [Architecture](docs/architecture.md)                  | System design, the locked stack, and the cost model                                                                                                                                                                                                                                                                                                                                                                          |
 | [Specs](specs/specs.md)                               | Implementation detail; [testing.md](specs/testing.md) carries the AC → named-test mapping                                                                                                                                                                                                                                                                                                                                    |
 | [Backlog](docs/backlog.md)                            | What to build, in order (the work order)                                                                                                                                                                                                                                                                                                                                                                                     |
@@ -152,7 +157,7 @@ nextup/
 | [ADRs](docs/adr/)                                     | Why the load-bearing decisions are what they are                                                                                                                                                                                                                                                                                                                                                                             |
 | [Runbooks](docs/runbooks/)                            | Operational procedures — start at the [incident playbook](docs/runbooks/incident-playbook.md), which routes by symptom. Includes the [config checklist](docs/runbooks/config-checklist.md), [rollback](docs/runbooks/rollback.md), the pre-authorised [memory up-size](docs/runbooks/scale-up-memory.md) and the [re-used Vision account](docs/runbooks/vision-account-reuse.md) — one live grant that exists in no template |
 | [BRD](docs/BRD.md)                                    | The (personal, non-commercial) business case                                                                                                                                                                                                                                                                                                                                                                                 |
-| [Review report](docs/review-report.md)                | Known open items from the pre-build review                                                                                                                                                                                                                                                                                                                                                                                   |
+| [Review report](docs/review-report.md)                | Historical pre-build review, not current task status                                                                                                                                                                                                                                                                                                                                                                         |
 
 If you are a coding agent, start with
 [`.github/copilot-instructions.md`](.github/copilot-instructions.md).

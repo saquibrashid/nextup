@@ -1,6 +1,17 @@
 # Runbook — backup and restore (TASK-131, OQ-025)
 
-**Who runs this:** the owner. The export is a **weekly, five-minute** habit.
+**Recovery boundary:** soft deletion prevents destructive application actions,
+not corruption or infrastructure loss. The seven-day PITR window is a retention
+window, not an RPO or a promise of zero loss. Manual export recovery is limited
+by the most recent usable copy. **Owner-approved targets, 2026-09-17:** in the
+backup-only disaster case, accept at most **7 days of lost changes**, supported
+by a usable **weekly off-Azure export**; restore service within **24 hours
+after recovery work begins**. These are targets, not measured guarantees.
+Section 3.6 defines the required rehearsal. No scheduled job, paid upgrade or
+automatic LTR change is authorized.
+See [current release decisions](current-release.md#owner-decisions-applied-on-2026-09-17).
+
+**Who runs this:** the owner. Keep a usable **weekly off-Azure export**.
 The restore half is read only when something has already gone wrong.
 
 **Why this runbook exists at all:** REQ-028 is soft-delete forever — nothing in
@@ -8,7 +19,8 @@ this application is ever hard deleted, there is no TTL, and there is no sweep.
 That is a deliberate safety property, and it has a consequence: the database is
 **append-mostly and irreplaceable**. A title's row cannot be re-derived from
 anything, because the screenshot it came from is purged 30 days after upload
-(NFR-019). There is no second copy anywhere unless you make one.
+(NFR-019). Azure PITR is not an independent off-Azure copy; you must make that
+copy yourself.
 
 ---
 
@@ -19,6 +31,12 @@ anything, because the screenshot it came from is purged 30 days after upload
 | **Azure SQL PITR** (automatic) | **7 days** | No | **No** |
 | **BACPAC export to blob** (manual, §2) | As long as you keep it | Yes | Yes, if copied off Azure |
 | **JSON owner export** (manual, §1) | As long as you keep it | Yes | Yes |
+
+**The two clocks are different.** Seven-day PITR is how far back Azure can
+restore this database, not its recovery-point objective. The owner's accepted
+**7-day loss** applies when PITR is unavailable and recovery must use an
+off-Azure export. The **24-hour restoration** clock starts when recovery work
+begins, not at the original incident; record detection delay separately.
 
 > ⚠ **The PITR window is 7 days, not 35.** An earlier revision of the plan
 > assumed PostgreSQL Flexible Server, which gives 35. We run **Azure SQL
@@ -31,9 +49,9 @@ anything, because the screenshot it came from is purged 30 days after upload
 > That is why the manual export in §1 is the **primary** line of defence and
 > not a belt-and-braces extra.
 
-> ⚠ **None of this is scheduled, and none of it may become scheduled.** Product
-> invariant 5 permits exactly three non-owner processes and `T-CI-005` fails
-> the build if a fourth appears. A weekly Azure SQL Agent job or Elastic Job
+> ⚠ **The manual exports are not scheduled and must not become scheduled.**
+> Product invariant 5 permits four named non-owner processes after Epic L;
+> export is not one of them. A weekly Azure SQL Agent job or Elastic Job
 > would be a REQ-041 violation, not an improvement — the *absence* of such a
 > mechanism **is** REQ-028. The weekly cadence below belongs in **your calendar**,
 > which is the right place for a habit a machine must not own.
@@ -66,6 +84,15 @@ change you made.
 > `/exports/` as a backstop for the run that uses `--out .` out of habit, but
 > the backstop only catches those three shapes. Keep backups in
 > `$HOME\nextup-backups\` or a private cloud folder.
+
+**Off-Azure is part of the target, not optional storage advice.** At least once
+every seven days, verify a complete export is available on owner-controlled
+storage that remains accessible without the affected Azure subscription or
+tenant. A blob in that subscription alone does not qualify. Verify the
+`exportedAt`, owner and row counts and retain the last known usable copy; do
+not replace it with an unverified export. Missing a week or discovering an
+unusable copy means the target is **not being met**, not that the acceptable
+loss silently increases.
 
 **Finding your owner id.** It is the `ownerId` on any of your rows, and it is
 derived — `'o_' + sha256(issuer + '|' + subject).slice(0, 16)`
@@ -123,6 +150,10 @@ az sql db export \
 
 > ⚠ **Export runs against the live database and costs DTUs.** Basic is 5 DTU.
 > Run it when you are not using the app.
+
+If relying on the BACPAC for backup-only recovery, copy it off Azure too and
+verify that the copy is readable. Leaving it only at the export blob URI does
+not cover loss of that subscription or tenant.
 
 ---
 
@@ -202,6 +233,30 @@ database before you repoint** — `docs/runbooks/database-access.md` §1;
 does not inherit it. Skipping it presents as the container being *Healthy*
 while every request that touches data fails.
 
+### 3.6 Demonstrate the approved recovery targets
+
+**Status: rehearsal pending.** `T-EXPORT-001` verifies export behavior and the
+presence of the recovery procedures; it does not prove recoverability from a
+real owner's backup or the 24-hour target.
+
+1. Choose a verified off-Azure backup no more than seven days old and record
+   its timestamp, format, owner and row counts. Record the assumed incident
+   time and any detection delay separately from the recovery start.
+2. Restore into a **new, isolated database**, using BACPAC import or the manual
+   JSON reconstruction path. Do not overwrite or repoint production for the
+   rehearsal. Obtain separate approval before provisioning paid resources.
+3. Compare all exported tables, ownership, field types and row counts.
+   Check active, removed and suppressed views, service badges, date ordering,
+   waiting intents and preferences. Screenshot bytes are not part of this
+   backup and may already have expired.
+4. Verify that the recovered app can serve the owner's list. Record the end
+   time and any missing changes, and determine whether the maximum **7-day
+   backup-only loss** and **24 hours from recovery start** were met.
+5. Keep the evidence privately outside this public repository; record only a
+   sanitized outcome here. If either target fails, report it and propose the
+   specific remedy for owner approval. Do not claim a pass from export-only
+   tests or silently relax a target.
+
 ---
 
 ## 4. Escalation — long-term retention
@@ -211,8 +266,11 @@ Azure SQL **long-term retention** (weekly/monthly/yearly backups kept for up to
 invariant 5. It is not enabled: it adds storage cost for a protection the
 manual export already gives, and this is a single-owner application.
 
-Enable it if the manual habit lapses — a backup you have to remember is worth
-less than one you do not.
+If the manual habit lapses, report that the backup-only target is not being
+met and seek a separate owner decision about the remedy. **LTR is not
+authorized by the 2026-09-17 recovery targets** and does not replace an
+off-Azure copy for loss of subscription access. The command below is an
+escalation procedure **only after separate approval**, not a scheduled action.
 
 ```bash
 az sql db ltr-policy set \

@@ -1,9 +1,9 @@
 # Product Requirements Document — nextup
 
 **Project:** nextup
-**Version:** 1.0 (v1 scope, plus a clearly-marked v1.1 section)
-**Status:** Approved MVP scope — locked at the phase 4 lock (`Context/mvp-definition.md` §17–§18)
-**Authoritative inputs:** `docs/BRD.md`, `Context/mvp-definition.md` (§17 lock addendum and §18 lock status override the body; §16 is historical/superseded), `Context/requirements.md`, `Context/assumptions.md`, `Context/open-questions.md`, `Context/research-summary.md`
+**Version:** Current v1 scope, including subsequent owner-approved promotions; remaining deferrals are in §11.2.
+**Status:** Approved scope with recorded amendments through US-061 / REQ-127. Implementation status is in `docs/status.md`; it does not replace release acceptance.
+**Inputs:** `docs/BRD.md`, the recorded owner decisions in the ADRs, and the original authoring-tree `Context/` documents. **The `Context/` tree is not supplied in this repository.** Its citations preserve provenance, not an instruction to invent missing source text. See `docs/current-release.md` for the owner decisions applied on 2026-09-17 and `docs/requirement-index.md` for reconciled reference authority.
 **Audience:** the implementer. Implementation will be performed by GitHub Copilot in autopilot mode (ASM-028, ASM-029, NFR-002, NFR-003, NFR-004). This document, together with the specs, IS the implementation input. Acceptance criteria are written to be executable and verifiable without asking a question.
 **No timeline.** Per A19 / ASM-027 this document contains no dates, durations, or sequencing commitments beyond dependency order.
 
@@ -16,7 +16,7 @@
 > | | |
 > |---|---|
 > | **Compute stays** | 0.25 vCPU / 0.5 GiB, `NEXTUP_MAX_DECODE_PIXELS=25000000` — **≈$11–14/month** (Variant A, chosen at A40). **This is what ships.** |
-> | **Remedy (pre-authorised, trigger-gated)** | 0.5 vCPU / 1.0 GiB, guard → 50 MP — **+~$4/month → ≈$15–18/month**. `docs/runbooks/scale-up-memory.md`. **Approval is already given; it is applied reactively on a real failure and MUST NOT be taken pre-emptively.** |
+> | **Remedy (pre-authorised, trigger-gated)** | 0.5 vCPU / 1.0 GiB, guard → 50 MP — **+$5.92/month → $17.69/month** at the 2026-08-17 price verification (`docs/architecture.md`, Cost summary; `docs/runbooks/scale-up-memory.md`). The original A43 estimate was +~$4/month; it is historical, not a current quote. **Approval is already given; it is applied reactively on a real failure and MUST NOT be taken pre-emptively.** |
 >
 > **Changed in this document — instructions corrected in place, not superseded by banner:**
 >
@@ -66,14 +66,28 @@
 
 ## 1. Overview
 
-nextup is a single-user, mobile-first responsive web application that gives one owner a single combined view of the titles they have saved across more than one streaming service. Streaming services do not expose saved lists to third parties and credentialed sync is non-viable (`Context/research-summary.md`), so nextup is fed by the owner: they screenshot each service's own saved list from the native phone app or the laptop web app, **get those images into nextup — normally by pasting the screen grab straight in, and equally validly by selecting or dragging the saved file (A45, US-004 AC-12 … AC-17)** — and nextup extracts the titles by OCR/vision, matches them against TMDB, and merges them into one row per work with a badge for each service that holds it. Every extraction passes through a human review pass before it changes any list state. Sign-in is federated, and the application serves exactly one allow-listed owner. v1 covers Netflix and Max.
+nextup is a single-user, mobile-first responsive web application that gives one owner a combined view of their saved titles. The owner supplies screenshots by **paste, file selection or drag-and-drop**; the extraction pipeline reads and matches candidates to TMDB, and every extracted change passes through review before changing list state. The current closed service set is **Netflix, Max, Prime Video, Disney+, Apple TV+, Paramount+, Starz and Peacock** (US-061). Rental discovery feeds a separate waiting view (Epic L); IMDb ratings and lookup are in scope (Epic M, as revised by A53). Sign-in remains federated and single-owner.
 
-**One-sentence MVP:** A private, mobile-first web app where the owner gets screenshots of their Netflix and Max saved lists into nextup — pasting them straight in, or uploading the files — and gets back one deduplicated, filterable, sortable combined watchlist, with every change reviewed before it lands, and nothing ever silently deleted.
+**One-sentence MVP:** A private, mobile-first web app where the owner pastes or uploads screenshots of their supported streaming saved lists, reviews the results, and gets a combined, filterable and sortable watchlist without silent destructive changes.
+
+The normal one-row-per-work rule has explicit, owner-confirmed duplicate
+exceptions in US-025 AC-5 and US-030 AC-4. Soft deletion protects against
+destructive application actions; recovery from corruption or infrastructure
+loss is bounded by `docs/restore.md`, not an unlimited zero-data-loss guarantee.
+The owner-approved backup-only targets are up to seven days of lost changes
+with a weekly off-Azure export, and restoration within 24 hours after recovery
+work begins. They remain to be demonstrated in a restore rehearsal; no
+scheduled export or paid upgrade is authorized by these targets.
 
 The product contains two loops that must not be confused:
 
-- **The value loop** (frequent, the reason the product exists): open nextup → filter/sort → pick something → deep-link out to the service.
+- **The value loop** (frequent, the reason the product exists): open nextup → filter/sort → pick something → independently open the streaming app.
 - **The feeder loop** (infrequent, the cost the owner pays): screenshot → **paste it in (primary) or upload the saved file** → review → confirm.
+
+**Owner decision, 2026-09-17:** no service-level or direct-title launch links.
+The owner opens the streaming app independently. US-018 AC-5 and US-038 AC-3
+retain their IDs and now state that contract. Internal nextup links (including
+service-preselected `/upload`) and required metadata attribution are unchanged.
 
 The feeder loop's ergonomics are the single largest adoption risk (M5, OQ-011). Every design decision below that looks conservative — showing already-known titles during a full update, ticking removals by default but requiring an explicit group confirm, never hard-deleting — exists because the owner is the only source of truth and a silent data loss is unrecoverable and undetectable.
 
@@ -85,7 +99,7 @@ The feeder loop's ergonomics are the single largest adoption risk (M5, OQ-011). 
 
 | # | Goal | Traces to |
 |---|---|---|
-| G-1 | Give the owner one combined, deduplicated view of everything they have saved across Netflix and Max, one row per work with a badge per service. | OBJ-1, REQ-024, REQ-025, REQ-026 |
+| G-1 | Give the owner one combined, deduplicated view of everything they have saved across the supported services (US-061), one row per work with a badge per service, subject to explicit duplicate confirmation in US-025/US-030. | OBJ-1, REQ-024, REQ-025, REQ-026, REQ-127 |
 | G-2 | Make the combined list actually decidable: filter by service, type and genre, sort by when the title entered nextup. | OBJ-2, REQ-032, REQ-033, REQ-034, REQ-036 |
 | G-3 *(amended by **A45**)* | Make feeding the list cheap enough to keep doing: **get the capture in by the shortest path the platform allows — clipboard paste as the primary interaction, with file selection and drag-and-drop equally supported** — then multi-image batching, batch review, group confirmation. ⚠ The capture-entry saving is real but **small and honest: roughly one tap per image** (§7.8 KL-2). **The dominant cost in this goal remains the review pass, and paste does not reduce it** — so this goal is still measured by M5, and M5's kill criterion is untouched by A45. | OBJ-3, M5, REQ-004, REQ-020 |
 | G-4 | Never mutate list state without the owner seeing and approving the change first. | OBJ-4, REQ-013, REQ-020, REQ-041 |
@@ -99,13 +113,13 @@ The feeder loop's ergonomics are the single largest adoption risk (M5, OQ-011). 
 
 | # | Non-goal | Why | Traces to |
 |---|---|---|---|
-| NG-1 | Any automated retrieval of saved lists from a streaming service — no credentials, no scraping, no headless browsing, no unofficial APIs. | Non-viable and hostile to the services' terms; established in research. | NFR-009, NFR-010, REQ-042 |
-| NG-2 | Multi-user accounts, sharing, household profiles, or any social feature. | Single-owner product. | REQ-043, REQ-044 |
-| NG-3 | Availability/"where can I stream this" data, price tracking, or recommendations. | Out of the problem being solved. | REQ-046, REQ-047 |
-| NG-4 | Watched/progress tracking or ratings. | The list is a "want to watch" list only. | REQ-048, REQ-049 |
-| NG-5 | Native mobile applications. | Responsive web only. | REQ-050 |
-| NG-6 | Notifications, background jobs that change list state, telemetry or analytics. | The owner is the only actor on list state. | REQ-041, REQ-051, REQ-052, NFR-005 |
-| NG-7 | Services beyond Netflix, Max, Prime Video, Disney+, Apple TV+, Paramount+, Starz and Peacock. | Owner-expanded closed scope (2026-09-17, US-061); no additional services inferred. | REQ-053, REQ-127 |
+| NG-1 | Any automated retrieval of saved lists from a streaming service — no credentials, no scraping, no headless browsing, no unofficial APIs. | The app never authenticates to or retrieves a streaming saved list. | NFR-009, NFR-010, US-038 |
+| NG-2 | Multi-user accounts, sharing, household profiles, or any social feature. | Single-owner product. | US-001, US-002 |
+| NG-3 | Price tracking, recommendations and availability features beyond the approved waiting-view contract. | Epic L's metadata-only availability is in scope; this does not authorize a general catalogue or recommendation product. | US-040 through US-043 |
+| NG-4 | Watched/progress tracking or owner-authored ratings. | IMDb ratings and lookup are in scope, including the A53 rating sort. | US-044 through US-046, US-057; ADR-0011 Revision 1 |
+| NG-5 | Native mobile applications. | Responsive web only. | US-037 |
+| NG-6 | Notifications, background jobs that change list state, telemetry or analytics. | The owner is the only actor on list state; the four permitted non-owner processes remain narrowly scoped. | REQ-041, REQ-052, NFR-005, US-036 |
+| NG-7 | Services beyond Netflix, Max, Prime Video, Disney+, Apple TV+, Paramount+, Starz and Peacock. | Owner-expanded closed scope (2026-09-17, US-061); no additional services inferred. | REQ-127 |
 | NG-8 | ~~Runtime-based filtering and sorting;~~ **(promoted into scope at `A48` — see §11.2 and `specs/ui-refresh.md` §5a)** editing the date-added value; undo of mixed-changeset batches. | Deferred to v1.1 — see §11.2. | ~~REQ-035, REQ-037,~~ REQ-059, REQ-069 |
 
 ---
@@ -145,9 +159,9 @@ There is no third persona. There is no administrator: the owner is the administr
 2. The combined list loads: one row per work, each row showing the title, type, year, poster, the date it was added to nextup, and one badge per service that currently holds it.
 3. Owner narrows down — by service (only what is on Max tonight), by type (film, not a series), by genre.
 4. Owner sorts or scans; default order is most-recently-added first.
-5. Owner picks a title and follows the deep link out to the service that holds it, then watches it there.
+5. Owner picks a title, independently opens the streaming app that holds it, and watches it there.
 
-nextup's job ends at the deep link. It never plays anything and never tracks that anything was watched.
+nextup's job ends at helping the owner choose. It provides no streaming-service launch link, never plays anything, and never tracks that anything was watched.
 
 ### J-2 — First-run bulk import (one-time, front-loaded volume)
 
@@ -210,11 +224,15 @@ A title was removed months ago. It shows up again in a new capture. nextup creat
 | I | Suppression | Not-interested that survives reappearance. | US-027, US-028, US-029 |
 | J | Recovery | Fix match, batch undo, undo refusal, re-extraction, image retention, and the manual list edits that repair a false extraction. | US-030, US-031, US-032, US-033, US-034, US-035, US-047, US-048 |
 | K | Platform guarantees | The invariants that make the rest safe. | US-036, US-037, US-038, US-039 |
-| **L** *(v1.1 — specified, not scheduled)* | **Waiting to stream** | Record what I noticed on a rental storefront, and tell me when it reaches a service I have. | US-040, US-041, US-042, US-043 |
-| **M** *(v1.1 — specified, not scheduled)* | **IMDb ratings** | Show me the IMDb rating on my list, and let me look up a rating for anything I haven't saved. | US-044, US-045, US-046 |
+| **L** *(v1, promoted at A52)* | **Waiting to stream** | Record what I noticed on a rental storefront, and tell me when it reaches a service I have. | US-040, US-041, US-042, US-043 |
+| **M** *(v1, promoted at A50; revised at A53)* | **IMDb ratings** | Show me the IMDb rating on my list, and let me look up a rating for anything I haven't saved. | US-044, US-045, US-046 |
 | **P** | **Visual language** | Shared typography, icons and controls; the remaining visual-refresh stories were promoted from `specs/ui-refresh.md` §10 at TASK-218. | US-049, US-050, US-051, US-052, US-054, US-055, US-056, US-057, US-058, US-059 |
 
-Story order within an epic is dependency order. Epic order A → K is a viable build order; see §12.1. **Epic L is v1.1 and follows the whole of A–K** — it depends on Epics C, D and I being complete. See ADR-0010 and `roadmap.md` §5. **Epic M is v1.1 and depends on Epic F** (the combined list) and on TMDB matching being in place, because a rating is keyed on the `imdb_id` that matching produces. See ADR-0011.
+Story order within an epic is dependency order. The original A–K build order
+is historical sequencing, not a reason to rebuild completed tasks. Epic L
+depends on extraction, matching and suppression; Epic M depends on matching
+and the list. Both have been promoted and implemented. Use `docs/status.md`
+for remaining work and §11 for release scope.
 
 ---
 
@@ -302,7 +320,7 @@ Added at `A48` for **Epic L (v1.1)** — these terms have no meaning in v1:
 | AC-5 (failure) | Any image whose content identifies a service | Extraction runs | The service assignment is taken **only** from the owner's selection. nextup MUST NOT infer, override, or warn-and-change the service based on image content (REQ-058) |
 | AC-6 | A batch already submitted | The owner attempts to change its service or mode | The change is rejected; service and mode are immutable after submission |
 
-**Out of scope for this story:** services outside US-061's closed eight-service set (REQ-053), per-image service assignment.
+**Out of scope for this story:** services outside US-061's closed eight-service set (REQ-127), per-image service assignment.
 **Open questions:** none.
 
 #### US-004 — Add multiple screenshots to one batch — by paste, by file upload, or by drag-and-drop
@@ -406,7 +424,7 @@ Added at `A48` for **Epic L (v1.1)** — these terms have no meaning in v1:
 | AC-5 (failure) | TMDB is unreachable or rate-limits the request | Matching runs | Affected candidates are marked unmatched rather than discarded (US-008), the batch does not fail, and the owner is told matching was incomplete and can retry |
 | AC-6 | Any TMDB response | It is stored | Only the fields in AC-2 plus the TMDB identifier are stored; nextup does not mirror or bulk-cache the TMDB catalogue |
 
-**Out of scope for this story:** availability data, ratings, cast, recommendations (REQ-046, REQ-047, REQ-049).
+**Out of scope for this story:** availability data, ratings and cast in this matching step. Availability and ratings have their own contracts in Epics L and M; recommendations remain excluded (REQ-042). REQ-046, REQ-047 and REQ-049 refer to different exclusions in `docs/requirement-index.md`.
 **Open questions:** none for matched candidates. Unmatched candidates are US-008.
 
 #### US-008 — Unmatched candidates are surfaced, never silently discarded
@@ -648,12 +666,12 @@ Added at `A48` for **Epic L (v1.1)** — these terms have no meaning in v1:
 | AC-2 | A work with active listings on both services | Its row renders | It shows a badge for Netflix and a badge for Max (REQ-025) |
 | AC-3 | A work whose listing on one service is `removed` | Its row renders | Only the remaining active service's badge is shown (REQ-025, US-016) |
 | AC-4 | A work with no active listings | The combined list renders | The row is absent from the combined list (REQ-031) and appears in the removed view (US-023) |
-| AC-5 | A row | It renders | It shows poster, title, type, year, the date added to nextup, and the service badges, and offers a deep link out to each service holding it (REQ-024) |
+| AC-5 | A row | It renders | It shows poster, title, type, year, the date added to nextup, and the service badges. It offers no service-level or direct-title launch link; the owner opens the streaming app independently (REQ-024, REQ-044; owner decision 2026-09-17) |
 | AC-6 (edge) | The same work confirmed in two separate batches for two different services | The second batch closes | No second Title is created; the existing Title gains the second badge |
 | AC-7 (edge) | The owner has no active titles at all (first run, or everything removed) | The combined list renders | An explicit empty state is shown that distinguishes "you haven't uploaded anything yet" from "everything you had has been removed", with the relevant next action |
 | AC-8 (failure) | The list fails to load | The owner opens the app | An error state with retry is shown. The app does not render an empty list, which would be indistinguishable from data loss |
 
-**Out of scope for this story:** availability information about where else a work can be streamed (REQ-046); the deep-link target format, which belongs to `specs/ui.md`.
+**Out of scope for this story:** availability information about where else a work can be streamed (the separate Epic L waiting-view contract); service-level and direct-title launch links (REQ-044). No streaming-service URL format is required in the API or UI.
 **Open questions:** none.
 
 #### US-019 — Filter the combined list by service, type and genre
@@ -756,7 +774,7 @@ Nullable keys sort last in both directions.
 | AC-4 (edge) | A batch that was submitted but abandoned or failed | The list renders | It does not update the last-updated date. Only successfully closed batches count (REQ-039) |
 | AC-5 (failure) | The last-updated dates cannot be computed | The list renders | The list itself still renders; the freshness area shows an unavailable state **outside the closed disclosure** and does not block the value loop. Every service's upload link remains reachable inside |
 
-**Out of scope for this story:** any prompt, reminder or notification to update (REQ-051 — notifications are out of v1).
+**Out of scope for this story:** any prompt, reminder or notification to update (A46; the factual last-updated date remains required).
 **Open questions:** none. Note for §10: REQ-039's visible dates are how success metric M7 is observed, at no instrumentation cost.
 
 ### Epic H — Removed view and history
@@ -1069,7 +1087,7 @@ Nullable keys sort last in both directions.
 |---|---|---|---|
 | AC-1 | A work found on TMDB, and a service | The owner confirms the add | A row appears on the combined list carrying that service's badge, dated today (`T-MANUAL-001`) |
 | AC-2 (failure) | A work already on the list for that service | The owner adds it again | It is refused and named as already present. No second listing and no orphaned title are written (`T-MANUAL-002`) |
-| AC-3 | A work already on the list for a **different** service | The owner adds it on the second service | The existing row gains a **badge**. A second row is never created — REQ-005 is one row per work, and the owner has no way to merge two (`T-MANUAL-003`) |
+| AC-3 | A work already on the list for a **different** service | The owner adds it on the second service | The existing row gains a **badge**. A second row is never created — REQ-024 is one row per work, and the owner has no way to merge two (`T-MANUAL-003`) |
 | AC-4 (failure) | A work the owner has marked not interested | The owner tries to add it | It is refused, and the message names un-suppressing as the way forward. TMDB is **not** consulted — suppression needs no network, so an outage must not stop this answering (REQ-071, `T-MANUAL-004`) |
 | AC-5 (failure) | TMDB has no such work, or TMDB is unreachable | The owner tries to add it | It is refused and **nothing at all is written**. A work with no name would sit on the list permanently blank (`T-MANUAL-005`) |
 | AC-6 | Any manual add | It succeeds | Its date-added is **today**, always. A `dateAdded` supplied in the request cannot override it: `date_added` is write-once (`T-INV-006`) and editing it stays deferred to v1.1 (NG-8, REQ-059, `T-MANUAL-006`) |
@@ -1151,7 +1169,7 @@ anything the service still lists. Removing says only *this is not on my list*.
 | AC-4 (edge) | The refusal enumeration of US-033 on a 320px viewport | It renders | The full enumeration remains readable and its per-title remedies remain tappable |
 | AC-5 (failure) | A viewport narrower than 320px | It is used | Graceful degradation is acceptable; 320px is the supported floor, not the absolute minimum |
 
-**Out of scope for this story:** native applications (REQ-050); offline support beyond the offline states in §9.
+**Out of scope for this story:** native applications (REQ-046); offline support beyond the offline states in §9.
 **Open questions:** **OQ-014** — accessibility, usability, performance, availability and internationalisation targets are undecided. v1 states no numeric target for these; the implementer MUST NOT invent thresholds and MUST NOT treat their absence as permission to ignore them. `specs/ux-states.md` records what is decided.
 
 #### US-038 — Never hold streaming credentials or talk to a streaming service
@@ -1168,8 +1186,8 @@ anything the service still lists. Removing says only *this is not on my list*.
 |---|---|---|---|
 | AC-1 | The application's storage and configuration | They are inspected | No streaming-service credential, cookie, token or session is stored or requested at any point (NFR-009) |
 | AC-2 | The application's outbound network calls | They are inspected | nextup makes no automated request of any kind to a streaming service — no API, no scraping, no headless browsing (NFR-010) |
-| AC-3 | The deep links out to a service from a title row | The owner follows one | It is a plain user-initiated navigation in the owner's browser or app, not a programmatic request made by nextup (NFR-010) |
-| AC-4 (edge) | A feature proposal that would automate any part of capture | It is considered | It is out of scope by construction (REQ-042); the manual screenshot loop is the product's premise, not a limitation to be engineered away |
+| AC-3 | A title row and its service badges | They render | They provide no service-level or direct-title launch links. The owner opens the streaming app independently; nextup initiates no streaming-service navigation (REQ-044, NFR-010; owner decision 2026-09-17) |
+| AC-4 (edge) | A feature proposal that would automate any part of capture | It is considered | It is out of scope by construction (REQ-049, NFR-010); the manual screenshot loop is the product's premise, not a limitation to be engineered away |
 | AC-5 (failure) | Any outbound call to a streaming-service domain from server-side code | Automated verification runs | The test fails (NFR-003) |
 
 **Out of scope for this story:** TMDB calls, which are permitted and governed by US-007, US-010 and US-011.
@@ -1199,13 +1217,13 @@ anything the service still lists. Removing says only *this is not on my list*.
 
 ---
 
-### Epic L — Waiting to stream (rental-release discovery) — **v1.1**
+### Epic L — Waiting to stream (rental-release discovery) — **v1**
 
-**Status: specified, not scheduled for v1.** Promotion trigger and rationale
+**Status: promoted to v1 at A52 (2026-09-08).** Promotion history and rationale
 in `roadmap.md` §5; the load-bearing decisions and their traps in
 **ADR-0010**. This epic depends on the review pass (Epic D), suppression
-(Epic I) and TMDB matching (Epic C) all being complete, which is why it
-follows v1 rather than joining it.
+(Epic I) and TMDB matching (Epic C) all being complete. Those were its original
+deferral dependencies; A52 promoted it into v1 rather than leaving it deferred.
 
 **The problem, in the owner's words (`A48`):** *"I'd also like to track movies
 / shows that are just released for rent… I wait for them to be available via
@@ -1320,27 +1338,16 @@ building this as that is a data-loss defect, not a shortcut.
 **Out of scope for this story:** sorting and filtering beyond date; promote from `roadmap.md` if the list grows past roughly fifty rows.
 **Open questions:** none.
 
-#### Required amendment to Epic K when this epic is promoted
+#### Required amendment to Epic K — completed at TASK-187
 
-⚠ **US-036 AC-2 reads "exactly three" non-owner-initiated processes, and
-`T-CI-005` asserts that count.** The availability refresh is a **fourth**.
-Promoting Epic L therefore **requires amending US-036 AC-2 and `T-CI-005` to
-four, in the same change**, naming the availability refresh explicitly and
-recording that it is metadata-only and access-triggered. This is part of the
-epic, not a follow-up: discovering it as a red `T-CI-005` at the end of the
-build is the predictable failure. The amendment must be made **in place**, per
-the editing convention in `.github/copilot-instructions.md` §5.
-
-~~Superseded (Epic M): "US-036 AC-2 currently reads 'exactly two' … The
-availability refresh is a third … amending US-036 AC-2 and `T-CI-005` to
-three."~~ Epic M was promoted first and took the increment from two to three,
-so Epic L's is now the increment from three to four. The instruction remains
-**read the current count and raise it by one** — the number above is a
-statement of the count at the time of writing, not a literal to copy.
+US-036 AC-2 and the closed process enumeration now permit **four** processes,
+including the waiting-view availability refresh. Do not increment the count
+again for this already-approved feature. Epic M historically raised it from
+two to three; Epic L raised it from three to four.
 
 ---
 
-### Epic M — IMDb ratings — **v1.1**
+### Epic M — IMDb ratings — **v1**
 
 **Why this epic exists.** The owner stated the need at `A50`:
 
@@ -1778,7 +1785,9 @@ priority from the owner's examples. The owner makes those choices in the UI.
 
 **REQ-127 (`must`, owner-approved 2026-09-17).** Add Prime Video, Disney+,
 Apple TV+, Paramount+, Starz and Peacock alongside Netflix and Max. This
-supersedes the two-service limit in REQ-053, not the screenshot-only model.
+supersedes the original two-service boundary and part of REQ-048's expansion
+deferral, not the screenshot-only model. REQ-053 is image-quality gating,
+not a service-count requirement (`docs/requirement-index.md`).
 The owner selected Disney+ rather than a separate Hulu service; do not infer
 subscriptions, bundle entitlements or service membership from title metadata.
 
@@ -1882,12 +1891,15 @@ all; and closing a batch (1) cannot delete anything the service still lists.
 The two new operations carry the same properties as the eight they join:
 owner-initiated, synchronous, visible in the removed log, and reversible.
 
-**Non-owner-initiated processes permitted to exist — exactly three, and none changes user-visible list state:**
+**Non-owner-initiated processes permitted to exist — exactly four, subject to US-036 AC-2's ordering and mutation restrictions:**
 
 1. Lazy TMDB metadata refresh on access (REQ-076, US-010) — touches TMDB-sourced descriptive fields only (NFR-014).
 2. Screenshot image purge at 30 days (NFR-019, US-035) — touches image bytes only.
 3. Lazy IMDb rating refresh on access (REQ-093, ADR-0011) — touches one numeric field and its timestamp. It is admissible here for the same reason as (1): access-triggered and metadata-only. ⚠ **REVISED at `A53` (2026-09-14): the third reason given below no longer holds and has been replaced, not merely softened.** ~~"and — decisively — the rating is **never sorted or filtered on** (ADR-0011 OQ-A), so it cannot change membership, ordering or service badges."~~ The rating **is** now a sort key (ADR-0011 Rev 1), so it *could* change ordering — and what prevents that is the refresh's **synchrony**: under `sort=rating` the sweep runs inside the request and before the `ORDER BY`, so no write outside an owner-initiated request ever reorders the list. It is still never *filtered* on. ⚠ **If anyone reverts that sweep to the post-response path, this entry becomes false and REQ-041 is breached** — which is why `T-IMDB-005b` guards the ordering, not the absence of a sort.
 
+4. Lazy waiting-view availability refresh (REQ-086, Epic L, approved at A52) — updates watch-intent availability metadata only, on access. It creates no service listing and satisfies no watch intent. Satisfaction follows the ordinary owner-initiated capture path.
+
+~~Superseded before Epic L: exactly three processes, with entries 1–3 only.~~
 ~~Superseded (Epic M): "exactly two, and neither changes user-visible list state," with entries 1 and 2 only.~~
 
 Anything not on these lists is **forbidden by default**. REQ-041 has already been widened six times during requirements work; widening it again is an explicit amendment, not an implementation decision. ~~Superseded: "widened five times."~~
@@ -2000,7 +2012,7 @@ Detail belongs to `specs/ux-states.md`; this is the required minimum set.
 
 | Surface | Loading | Empty | Error | Offline | Success |
 |---|---|---|---|---|---|
-| Combined list | Skeleton rows; never a bare blank | Two distinct empties: "nothing uploaded yet" (with the upload call to action) and "everything has been removed" (with a link to the removed view) | Explicit load failure with retry — **never** rendered as an empty list | Last-rendered content with an offline indicator; deep links still attempted | List rendered with badges and freshness dates |
+| Combined list | Skeleton rows; never a bare blank | Two distinct empties: "nothing uploaded yet" (with the upload call to action) and "everything has been removed" (with a link to the removed view) | Explicit load failure with retry — **never** rendered as an empty list | Last-rendered content with an offline indicator; no streaming-service launch links | List rendered with badges and freshness dates |
 | Upload / batch setup | n/a | No images added yet, with **both input affordances present — the "Paste screenshot" button and the file-selection control (A45, US-004 AC-13/AC-16)** — and format guidance naming PNG, JPEG and HEIC/HEIF (ASM-058, A42), plus the "tap Copy on the screenshot preview" hint (§7.6) | Attach or submit failure, batch remains open and re-submittable. **Per-file rejections are rendered per file, not as a batch-level error** — an image refused by the pixel guard names its megapixels, the limit, the cause and the remedy, while the accepted images continue (US-004 AC-9/AC-10/AC-11, A43). **A rejected or empty paste is its own bounded state**: pending exits, the outcome is stated, and both paste and upload are re-offered — never an indefinite spinner (US-004 AC-15). Where clipboard read is unavailable (http://, iOS < 13.4, permission denied) the paste affordance is hidden or disabled **with a stated reason** and upload alone remains fully sufficient (US-004 AC-16) | Submission blocked with a clear "you are offline" state; nothing is lost | Batch submitted, extraction in progress. **A partially-rejected batch is a success state with a per-file rejection list, not an error state.** A successful paste is a success state that shows the newly appended image in the batch's image list alongside any uploaded ones (US-004 AC-14) |
 | Extraction in progress | Progress state naming the batch | n/a | `extraction failed` state with retry / re-extract (US-006 AC-4) | Progress preserved; resumable on reconnect | Review pass ready |
 | Review — additions | Loading candidates | "Nothing new in this capture" (US-012 AC-6) | Match failure banner; unmatched section populated (US-008) | Review is read-only offline; confirmations blocked, not queued | Additions confirmed |
@@ -2036,7 +2048,11 @@ Operational logging sufficient to diagnose failures is permitted, provided it co
 
 ### 11.1 v1
 
-All 39 stories below are in v1. All are `must` except where noted in the story.
+The stories below are in the current release, including the subsequent
+owner-approved promotions. Priorities and exceptions are stated in each story.
+US-053 remains a superseded reservation in `specs/ui-refresh.md`, not an omitted
+story to implement. The AC mapping is checked by `T-META-001`; do not treat the
+original 39-story count as the current scope.
 
 | Epic | Stories |
 |---|---|
@@ -2049,8 +2065,12 @@ All 39 stories below are in v1. All are `must` except where noted in the story.
 | G — Freshness | US-022 |
 | H — Removed view and history | US-023, US-024, US-025, US-026 |
 | I — Suppression | US-027, US-028, US-029 |
-| J — Recovery | US-030, US-031, US-032, US-033, US-034, US-035 |
+| J — Recovery and manual repair | US-030, US-031, US-032, US-033, US-034, US-035, US-047, US-048 |
 | K — Platform guarantees | US-036, US-037, US-038, US-039 |
+| L — Waiting to stream | US-040, US-041, US-042, US-043 |
+| M — IMDb ratings and lookup | US-044, US-045, US-046 |
+| P — Visual language and library controls | US-049, US-050, US-051, US-052, US-054, US-055, US-056, US-057, US-058, US-059 |
+| Faster selection and expanded services | US-060, US-061 |
 
 ### 11.2 v1.1 — deferred requirements (explicitly deferred, not dropped)
 
@@ -2084,7 +2104,13 @@ v1's substitutes are deliberate, not accidental: ~~REQ-035/REQ-037 are substitut
 
 ### 11.3 Explicitly out of scope, all releases considered so far
 
-REQ-042 to REQ-054 (`wont-v1`): automated list retrieval, multi-user, sharing, availability data, price tracking, recommendations, watched/progress tracking, ratings, native apps, notifications, background list-changing jobs, telemetry, and services beyond Netflix and Max.
+The current exclusions are §2.2, not a blanket REQ-042–REQ-054 range:
+availability for waiting titles, IMDb ratings and the eight-service set have
+been explicitly approved. Older summaries assign inconsistent meanings to some
+IDs in that range; `docs/current-release.md` records that provenance problem.
+The owner resolved the service-link conflict on 2026-09-17: no service-level
+or direct-title launch links. The BRD's explicit legacy definitions and later
+amendments are indexed in `docs/requirement-index.md`.
 
 ---
 
@@ -2139,7 +2165,11 @@ Note the one inversion: **US-031 (provenance) must be built early**, with Epic B
 
 ## Appendix A — Traceability matrix
 
-### A.1 Functional requirements in v1 scope (59)
+### A.1 Original functional requirement-to-story mapping
+
+This table covers the original requirement block, not the complete current
+release denominator. See [requirement-index.md](requirement-index.md) for the
+legacy exclusions, later IDs through REQ-127 and their definition sources.
 
 | REQ | Covered by | Status |
 |---|---|---|
@@ -2239,7 +2269,12 @@ Note the one inversion: **US-031 (provenance) must be built early**, with Epic B
 
 ### A.4 Out of scope
 
-REQ-042 … REQ-054 (13 requirements marked `wont-v1`) have no stories by design. See §11.3.
+Use the BRD's explicit definitions for REQ-042 through REQ-054, as confirmed
+by the owner on 2026-09-17 and indexed in `docs/requirement-index.md`.
+They are not a blanket unimplemented range: exclusions are enforced by
+existing stories (including US-038), and REQ-048's service-expansion deferral
+has been partly superseded by REQ-127. REQ-044 now explicitly excludes both
+service-level and direct-title launch links. See §11.3.
 
 ### A.5 Coverage summary
 

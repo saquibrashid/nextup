@@ -36,6 +36,12 @@ in order to save money is explicit non-compliance*.
 
 ## R2.2 The honest framing — what this constraint change does and does **not** do
 
+**Owner clarification, 2026-09-17:** when extraction quality is equivalent or
+inconclusive, retain the incumbent. Lower cost does not break that tie.
+`specs/ai.md` section 9.7 and `T-AI-045` state the existing quality-floor and
+meaningful-improvement requirements. This clarification changes no deployed
+reader and authorizes no paid evaluation.
+
 **Revision 1 was not a cost decision.** This must be stated plainly
 before anything else, because the lazy reading of A40 is "cost is
 allowed now, therefore switch to the LLM", and that reading is wrong.

@@ -7,10 +7,18 @@ revision: 2
 phase: 8
 status: complete
 elevated: true
-sourceOfTruth: docs/PRD.md (all 39 stories, 241 acceptance criteria)
+sourceOfTruth: docs/PRD.md (current story/AC rows, checked by T-META-001)
 ---
 
 # specs/testing.md — nextup
+
+**Current mapping, reconciled 2026-09-17:** 367 distinct story/AC keys across
+60 PRD stories, with 367 mapped keys. The original 39-story / 241-AC counts in
+dated revision history describe that revision, not the current release.
+`T-META-001` checks the current rows; both its unmapped and phantom-citation
+baselines are empty. A mapped name is not proof of sufficient assertions or
+completed manual acceptance. See `docs/current-release.md` for the evidence
+boundaries and owner-dependent work.
 
 > ### ⚠ REVISION 7 (2026-08-11) — `A45`: clipboard paste is the primary ingest path
 >
@@ -566,8 +574,11 @@ is judged, so a failing run still produces the artefact.
 
 ## 5. The end-to-end journey test — a first-class deliverable
 
-`tests/e2e/journey.spec.ts` — **`T-E2E-001`**, the single most valuable test in
-the suite. It is not a smoke test; it is the product's specification executed.
+`tests/e2e/journey.spec.ts` — **`T-E2E-001`**, the browser journey through the
+real built SPA with a **stateful replacement backend**. It checks frontend
+behavior across the following sequence. The backend below is not the real
+Express API or SQL Server; database and server guarantees require the
+integration evidence in §6.
 
 ```
 GIVEN a signed-in, allow-listed owner with an empty list
@@ -614,10 +625,12 @@ GIVEN a signed-in, allow-listed owner with an empty list
 10  VIEWPORT    → the whole journey re-runs at 320x640 with no horizontal scroll
 ```
 
-Steps 5 and 7 together are the product's core risk surface: mode-dependent
-review scope, ticked-by-default removals, reappearance-as-new-row, and
-identity-keyed suppression. If `T-E2E-001` passes, the four defects most likely
-to destroy the owner's trust are absent.
+Steps 5 and 7 exercise the product's core risk surface: mode-dependent review,
+removal confirmation, reappearance and suppression. A passing browser journey
+does **not** establish that the real server implements those rules: the stub
+can continue to enforce them when the API is broken. Pair it with §6's real
+API/database tests. Live provider quality and physical-iOS clipboard behavior
+are separate manual evidence; neither is established by the stubbed journey.
 
 ---
 
@@ -994,7 +1007,7 @@ ends up unmapped.
 | AC-2 | I | `T-LIST-011` | Two active listings → two badges on one row |
 | AC-3 | I | `T-LIST-012` | A removed listing's badge is absent |
 | AC-4 | I | `T-LIST-013` | A work with no active listings has no row |
-| AC-5 | C | `T-UI-010` | The row shows poster, name, type, year, date-added label and badges |
+| AC-5 | C | `T-UI-010`, `T-UI-012` | The row shows poster, name, type, year, date-added label and badges, with no service-level or direct-title launch links (owner decision 2026-09-17). `T-UI-012b` rejects streaming URLs and `d` permits only the TMDB poster as a remote row URL. |
 | AC-6 | I | `T-LIST-019` | The same work confirmed in two batches for two services yields one row, two badges |
 | AC-7 | C | `T-UX-012`/`T-UX-014` | Two distinct empty states: never-uploaded vs everything-removed |
 | AC-8 | C | `T-UX-018` | Load failure renders an error that states nothing has changed, with Retry |
@@ -1252,7 +1265,7 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 |---|---|---|---|
 | AC-1 | S | **`T-SEC-001`** | No credential field, cookie jar or secret named for a streaming service in code, schema or config |
 | AC-2 | I | **`T-SEC-031`** | Outbound calls during the full journey are only to the vision endpoint and TMDB; a request to any streaming domain fails the test |
-| AC-3 | C | `T-UI-012` | Service deep links are plain `target="_blank" rel="noopener noreferrer"` anchors, carrying no credential or token |
+| AC-3 | C | `T-UI-012` | The row provides no service-level or direct-title launch links; the owner opens the streaming app independently. Cases `b` and `d` assert no streaming URL and only the TMDB poster remote URL; the conditional anchor-safety assertion in `a` is not evidence that a service link exists. |
 | AC-4 | S | `T-SEC-001` | No automation dependency (`puppeteer`, `playwright` in runtime deps, HTTP client targeting a service domain) is present |
 | AC-5 | I | `T-SEC-031` | Any server-side call to a streaming-service domain fails the suite |
 
@@ -1560,11 +1573,19 @@ would have let a mistyped trailing digit resolve to a different criterion.
 
 ## 10. Acceptance criteria that are NOT fully machine-verifiable
 
-Named explicitly, as required, rather than quietly skipped. **Twelve of 241**,
-plus the two `(R2)` rows and the `(R5)` hard-OOM row below, **plus the `(A45)`
-iOS-paste row added at the end of this section.**
+The exceptions below are named explicitly rather than quietly skipped,
+including the provider-quality, hard-OOM and physical-iOS paste checks.
 
-✅ **(R8) COUNT RECONCILED BY THE ORCHESTRATOR — `241`.** R5 and the A45 pass
+**Owner recovery targets (2026-09-17; OQ-025):** backup-only recovery accepts
+at most seven days of lost changes with a usable weekly off-Azure export, and
+targets restoration within 24 hours after recovery work begins.
+`docs/restore.md` section 3.6 defines the manual rehearsal and its evidence.
+`T-EXPORT-001` checks export behavior and recovery instructions, **not** those
+elapsed-time or recoverability targets. The rehearsal remains pending; no
+new passing test or acceptance ID is invented for it.
+
+**Historical count reconciliation (R8/A46), not the current denominator:**
+the orchestrator reconciled **241** criteria at that revision. R5 and the A45 pass
 both correctly **refused to guess** while the PRD was being revised in
 parallel; that was the right call and it is why this note existed. The PRD's
 six new `A45` criteria (US-004 `AC-12`…`AC-17`) landed and were
@@ -1920,7 +1941,7 @@ check what "done" means.
 | **`T-AI-010`** | S | `azureVisionExtractor.ts` is the **only** file permitted to import the Vision SDK (`specs/ai.md` §305). Confining the SDK to one adapter is what keeps `packages/domain` pure and the matcher deterministic (`NFR-012a`, ADR-0001). | `specs/ai.md` |
 | **`T-AI-033`** | I | The stage-1 provider-contract suite: the **real** `LlmVisionExtractor` and `AzureVisionExtractor` driven offline against committed HTTP recordings (§3.1a) — schema parsing, strict-schema rejection, 429/5xx retry timing, timeouts, content-filter refusals and both degraded paths. Offline, so it runs in CI without a key and without cost.  **Landing in two halves. The `AzureVisionExtractor` half is TASK-056** (`apps/api/test/unit/extraction/azureVisionExtractor.spec.ts`, recordings in `tests/fixtures/msw/vision/`): valid-result parsing, box normalisation and edge clamping, the mean-of-words line confidence, 429/5xx/transport retry timing at 1 s/4 s, non-retry of 4xx, the timeout kind, and the two **"a response we cannot use is never an empty one"** cases — a 200 with no `readResult` and a 200 with no image dimensions both reject, because an unread image reported as "no text" is, in full-update mode, a wave of removals. **The `LlmVisionExtractor` half is TASK-056b** — strict-schema rejection, the service-field rejection, `finish_reason: 'length'` and content-filter refusals all belong to a reader that does not exist yet, and squatting them earlier would make the suite green for behaviour nothing implements. | §3.1a prose |
 | **`T-CI-004`** | S | Neither `golden:live` nor `golden:record` is referenced by **any** workflow file (§4A). Both spend real money against real providers; a well-meaning "run the golden set in CI" would bill the owner per push and, worse, re-record the baseline the gates are measured against. | §4A prose |
-| **`T-AI-045` (new, TASK-168)** | S | The **primary-reader bake-off protocol** of `specs/ai.md` §9.7 is enforced as structure, not as good intentions. `a` the two arms differ **only** in deployment name — prompt, schema, `detail`, `max_tokens`, `temperature` and `seed` are byte-identical, because a prompt tuned for one arm turns a model comparison into a prompt comparison and nothing in the numbers would reveal it. `b` both arms score against the **same** `expected/` and the same `ocr/`; a per-model answer key would let a challenger be graded on an easier exam. `c` `llm/` recordings are model-scoped, so recording a challenger cannot overwrite the incumbent's evidence — the failure mode is silent and irreversible, and it destroys the only baseline the comparison needs. `d` the decision function is **pure and total** over the §9.7 table, defaults to the incumbent on any mixed result, and treats cost strictly as a tie-breaker (`NFR-012a`); mutation-proven by feeding it a challenger that is cheaper and worse and requiring the incumbent to survive. `e` a sub-two-title delta is reported as **"no measured difference"** on an 11-image corpus, not as a win. `f` neither the bake-off script nor its recorder is referenced by any workflow file — same reason as `T-CI-004`, which it extends. | `specs/ai.md` §9.7 |
+| **`T-AI-045` (TASK-168)** | S/U | The **primary-reader bake-off protocol** in `specs/ai.md` §9.7: `a` arms differ only in deployment name, with the same prompt, schema, `detail`, `max_completion_tokens`, `temperature` and `seed`; `b` shared expected answers and OCR; `c` model-scoped recordings cannot overwrite the incumbent's evidence. `d` the pure, total decision function retains the incumbent on a mixed, equivalent or inconclusive result; **cost is reported, never decisive**, confirmed by the owner on 2026-09-17. A challenger must meet every floor, be no worse on every compared quality metric, and show a measurable improvement. `e` a sub-two-title delta on the 11-image corpus is **"no measured difference"**, not a win. `f` neither recorder nor bake-off runs in a workflow. | `specs/ai.md` §9.7 |
 | **`T-AI-046` (new, TASK-078)** | S | **The golden fixture manifest agrees with the golden corpus.** TASK-078 commits two artefacts describing the same thing — the images under `tests/fixtures/golden/images/` and `manifest.json` (`specs/ai.md` §9.1) — and nothing connected them, so a fixture could be added, renamed or deleted while the manifest went on describing a corpus that no longer existed. ⚠ **The failure is silent and it makes the suite GREENER:** `expectedTitleCount` is the denominator of recall, so an orphaned entry drops out of the score and an unlisted image is never scored at all. `a` non-vacuity floor on both collections, because every other case is a set difference that passes perfectly over an empty scan. `b` bijection between files and entries, plus no two entries claiming one file. `c` **the case worth reading:** `BAKEOFF_CORPUS_IMAGES` decides whether a measured bake-off delta is signal or noise (§9.7), and until now it was only ever compared against a **literal** in `bakeoff.spec.ts` — two hand-written numbers that could agree with each other while matching nothing on disk. `c` binds it to the real file count, so a twelfth fixture fails the build instead of quietly widening the noise band. `d` every entry carries usable ground truth (id is the basename, count is a non-negative integer, `captureNotes` says something). `e` `provenance` is `owner-capture`, `synthetic` or `derived:<id>`, and a derivation resolves to a real, different entry. `f` **no fixture carries GPS coordinates.** ⚠ **Not hypothetical, and it fired on its first run:** both monitor-photograph fixtures carried a fully-populated Apple GPS IFD plus `Make`, `Model` and MakerNote, and the commit that added them (`4a3da2c`) is titled *"add owner golden screenshots with metadata stripped"*. The claim was false and nothing ran it, so it stood from 2026-08-18 in a **public** repository. Asserted as "no GPS" rather than "no metadata" deliberately — several captures carry benign EXIF (an iOS screenshot's `ImageDescription` and timestamp), and a rule that is red on arrival gets loosened rather than obeyed. `g` the positive control: `b` and `e` are satisfied by a detector that returns nothing at all, so `g` drives the reconciliation over synthetic inputs and asserts it **fires** on a corpus that disagrees and **stays quiet** on one that agrees. `h` **binds the remediation tool to this gate.** `tools/scan-exif.mjs --strip` is what the repository documents for cleaning a file, and it blanked GPS *values* while leaving the `GPSLatitude`/`GPSLongitude` entries in place — so a file "stripped" with the documented tool **still failed `f`**. Two disagreeing definitions of "stripped", which would have been discovered at the exact moment someone urgently needed the tool to work. `h` drives the real tool over a **copy** of `heic-with-gps.heic` (the original must keep its GPS IFD — coping with a real, fully-populated Apple layout is why that fixture exists), asserts the copy starts dirty, and asserts the gate accepts the output at unchanged length. Mutation-proven: reverting the tool to values-only leaves `h` red. ⚠ **`tools/scan-exif.mjs` was referenced by no npm script and no workflow**, which is why a hand-run tool written for precisely this job never ran; it is now `npm run check:exif`, and `f` is the guard that does not need remembering. | `specs/ai.md` §9.1, TASK-078 |
 | **`T-AI-047` (new, TASK-079)** | S | **The committed recordings are PAIRED with the images they were taken from.** `goldenRecordingStore` keys on the sha256 of the bytes `extract()` is handed; if that key is absent or wrong the store returns `undefined`, the stub reports the ZERO-YIELD path, and every §9.2 metric is computed over an empty reader response — recall 0, false-title rate 0, fabrication rate 0. ⚠ **Two of those three read as a PASS.** Not hypothetical: `GoldenManifest` was declared `Record<sha256, name>` while the committed manifest is §9.1's `{ corpusSize, images: [...] }`, so the lookup missed for all eleven images and nothing said so. `a` every manifest entry carries the sha256 of its own image bytes. `b` the store resolves every image to a recording — asserting the **LLM leg separately from the OCR leg**, which is not belt and braces: `ocr/` is deliberately not model-scoped, so an OCR-only assertion survives a wrong `llm/<modelId>/` directory unchanged. **Mutation-proven both ways:** pointing `DEFAULT_RECORDING_MODEL_ID` at a non-existent deployment left all 31 cases green until the LLM assertion was added, because `readJson` degrades a missing recording to `[]` **on purpose** (a forgotten fixture must surface as the low-yield banner, not as a crash) — right for production, fatal for a metric suite. The tile assertion is skipped for `expectedTitleCount === 0`, because `blank-no-content-01` legitimately records zero tiles. `c` the negative control: an unrecorded hash resolves to nothing rather than to a neighbour, which a store that ignored its key would fail. | `specs/ai.md` §9.1, §9.6, TASK-079 |
 | **`T-AI-051` (new, TASK-079b)** | S | **The §4A live quality suite (`npm run golden:live`, `tests/extraction/goldenLive.spec.ts`) — MANUAL, and it spends real money.** Three live runs over the eleven golden images against the live `gpt-4.1` deployment and the live Vision endpoint, asserting the §4A bands and nothing else: `a` L1 per-image recall ≥ that image’s `minRecall` in 3 of 3; `b` L2 pairwise Jaccard of the normalised accepted-title sets ≥ 0.95; `c` L3 unstable titles ≤ 5 % of expected, **each printed by name** in both the report and the failure message; `d` L4 fabrication rate ≤ 0.05 per run; `e` L5 false-title rate ≤ 0.10 per run; `f` L6 artwork-only recall ≥ 0.80 in 3 of 3; `g` L7 whole-run cost ≤ $0.50 from reported token usage. ⚠ **`i` IS ASSERTED FIRST AND EVERY OTHER NUMBER DEPENDS ON IT.** A run that reached no provider scores recall 0 — but *also* false-title 0 and fabrication 0, so `d` and `e` **pass**. Two bands agreeing on an empty run is not evidence, it is the shape of a broken harness, so `i` requires one LLM call and one OCR call per image, non-zero prompt tokens and a non-empty accepted set before anything else is believed. ⚠ **`h` EXISTS BECAUSE THE REPORT IS WRITTEN BEFORE ANY BAND IS JUDGED.** A run that fails a band is the run whose numbers matter most; a report emitted only on success would discard exactly those, and a drop between two reports is the only early warning of model drift this product has. ⚠ **`j` KEEPS `MIN_RECALL` HONEST.** The floors are hand-declared bands, not the offline measurements — the reader is sampled, so pinning them would fail on the model’s own variance and teach the owner to ignore the suite. `j` replays the committed recordings (free) and fails if any floor exceeds what they already achieve, so the table cannot drift into aspiration and turn L1 red on a good day; it also asserts the table covers exactly the corpus, and that at least eight floors are above zero so a table of zeroes cannot pass vacuously. ⚠ **`netflix-continue-watching-01`’s floor is 0 ON PURPOSE** — `T-AI-030b` records `found: 0` for its single expected title, and a floor above a known offline shortfall would fail every live run for something that is not drift. ⚠ **THE SUITE IS A VITEST PROJECT (`live`) SO THAT IT IS NOT INVISIBLE, NOT SO THAT IT RUNS.** `T-CI-008` fails a spec no runner collects, and a silently dead `goldenLive.spec.ts` is this product’s model-drift alarm disconnected while every gate stays green. `T-CI-007l` therefore asserts the property that actually matters — that `golden:live` is the **only** script selecting the `live` project, that no script reaches it transitively through `npm run`, and that no script runs a bare `vitest run` with no `--project` (which would collect every project, including this one). | §4A, `specs/ai.md` §9.5, TASK-079b |
@@ -1991,7 +2012,7 @@ rather than renumbering the work order for no benefit.
 |---|---|---|
 | **`T-BATCH-007`** | I | The inline extraction runner honours its operational ceilings: image concurrency **2**, a **15-minute** batch ceiling, and `estimatedCostUsd` recorded in `extractionStats`. `T-EXT-010` covers progress and `T-AI-036` the degraded path; nothing asserted the limits that stop a runaway batch from exhausting the 0.5 GiB container (`RSK-016`). |
 | **`T-PERF-003`** | I | The `batch_change_by_batch` and `candidate_by_batch` queries resolve by **index seek, not scan**, under the §16.6 indexes, and pagination is **keyset** — no `OFFSET`. `T-PERF-001` covers only the list and removed views. On Azure SQL Basic (5 DTU) a scan that is invisible at 50 rows is a timeout at 5,000. |
-| **`T-EXPORT-001`** | I | `scripts/export-owner-data.ts` writes every owner row to a restorable artefact, is **never scheduled** and **never deletes** — and `docs/restore.md` documents the 7-day PITR and BACPAC paths. ⚠ Must not become a background job: product invariant 5 permits exactly three non-owner processes (Epic M raised it from two), and `T-CI-005` fails if a fourth appears. `REQ-028` forbids deletion but gives the owner no backup of their own, which is what this closes (`OQ-025`). |
+| **`T-EXPORT-001`** | I | `scripts/export-owner-data.ts` writes the owner's rows and is **never scheduled** and **never deletes**. `docs/restore.md` distinguishes 7-day PITR, BACPAC restoration and manual JSON reconstruction. Product invariant 5 permits four named non-owner processes after Epic L; scheduled export is not one of them. Export correctness alone does not establish a recovery-time or zero-data-loss guarantee. |
 
 ---
 

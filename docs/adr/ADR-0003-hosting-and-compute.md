@@ -1,5 +1,11 @@
 # ADR-0003 — Hosting and compute: one Azure Container App on the Consumption plan
 
+**Value-loop terminology clarification, 2026-09-17:** the historical
+"deep-link out" wording retained in older rationale below does not authorize
+streaming-service links. The owner confirmed no service-home or direct-title
+launch links; nextup helps choose, and the owner opens the app independently.
+This changes no hosting decision. See [current-release.md](../current-release.md).
+
 > ## ⚠ REVISION 4 — 2026-08-11T10:50 — `OQ-028` closed: **compute STAYS at 0.25 vCPU / 0.5 GiB; 1.0 GiB becomes the pre-authorised reactive remedy**
 >
 > **Revisions 3, 2 and 1 are retained verbatim below.** Revision 3
