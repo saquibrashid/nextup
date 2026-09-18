@@ -176,7 +176,10 @@ describe('T-REM-011 · US-014 AC-2 · append-only: the removals section does not
     // fixture straight back into the vacuous state this note warns about.
     render(
       <ReviewPage
-        review={review({ mode: 'append-only', candidates: [candidate({ disposition: 'confirmed' })] })}
+        review={review({
+          mode: 'append-only',
+          candidates: [candidate({ disposition: 'confirmed' })],
+        })}
       />,
     );
 

@@ -252,7 +252,9 @@ describe('T-UX-011 · specs/ui.md §5.4 SD-11d · the action bar is STICKY', () 
     // the length of the section (`T-UX-150`), so a pending fixture here would
     // correctly read "0 to add · 0 to remove" and leave the case unable to
     // tell a working bar from one that prints zeroes.
-    render(<ReviewPage review={review({ candidates: [candidate({ disposition: 'confirmed' })] })} />);
+    render(
+      <ReviewPage review={review({ candidates: [candidate({ disposition: 'confirmed' })] })} />,
+    );
 
     expect(screen.getByTestId('review-counts')).toHaveTextContent('1 to add');
     expect(screen.getByTestId('review-counts')).toHaveTextContent('0 to remove');
