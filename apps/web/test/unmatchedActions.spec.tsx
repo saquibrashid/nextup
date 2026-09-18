@@ -119,9 +119,13 @@ describe('T-UX-063 · unmatched candidates render in their own section with raw 
   it('T-UX-063e: the raw extracted text is rendered inside the unmatched section', () => {
     render(<ReviewPage review={reviewWithUnmatched()} {...wired()} />);
 
-    expect(unmatchedSection().getByTestId('candidate-raw-text')).toHaveTextContent(
-      'THE HAUNTNG OF BLY MANR',
-    );
+    // ⚠ Asserted BY TEXT, not by the `candidate-raw-text` test id. An
+    // unmatched row has no match and no inferred title, so the text the reader
+    // saw is now the card's HEADLINE (`T-UX-151a`) and the separate evidence
+    // line below it is suppressed as a verbatim duplicate. What this case
+    // protects is that the owner can read what was extracted — not which
+    // element carries it.
+    expect(unmatchedSection().getByText('THE HAUNTNG OF BLY MANR')).toBeInTheDocument();
   });
 
   it('T-UX-063f: and the row is NOT in the additions section', () => {
