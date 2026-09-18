@@ -53,7 +53,7 @@ describe('T-REV-011 · parseCandidatePatch · the three simple dispositions', ()
 });
 
 describe('T-REV-011 · parseCandidatePatch · correction', () => {
-  it('T-REV-011e: accepts a well-formed correction and defaults confirmDuplicate to false', () => {
+  it('T-REV-011e: accepts a well-formed correction', () => {
     const result = parseCandidatePatch({
       disposition: 'corrected',
       tmdbId: 41733,
@@ -65,7 +65,6 @@ describe('T-REV-011 · parseCandidatePatch · correction', () => {
         kind: 'corrected',
         tmdbId: 41733,
         mediaType: 'movie',
-        confirmDuplicate: false,
         // REQ-109 — absent display fields are `null`, never an error: a client
         // correcting without a search result in hand is still entitled to.
         display: null,
@@ -73,7 +72,23 @@ describe('T-REV-011 · parseCandidatePatch · correction', () => {
     });
   });
 
-  it('T-REV-011f: carries confirmDuplicate through when the owner sets it', () => {
+  it('T-REV-011f: an older client sending confirmDuplicate is neither obeyed nor refused', () => {
+    /*
+     * ⚠ This case is INVERTED from what it used to assert, and the inversion
+     * is the point.
+     *
+     * `confirmDuplicate` existed only to escape a duplicate gate in
+     * `applyCorrection` that contradicted US-012 AC-5 — see `T-REV-014`. With
+     * the gate gone the flag confirms nothing, so it is dropped from the
+     * parsed value entirely.
+     *
+     * It is deliberately IGNORED rather than refused. Refusing would 400 a
+     * correction an older client is entitled to make, over a field whose
+     * presence or absence no longer changes a single byte of the outcome —
+     * turning a harmless stale parameter into a hard failure on the exact
+     * screen this whole fix exists to unblock. Obeying it would be worse: it
+     * would imply the server still makes a decision it does not.
+     */
     const result = parseCandidatePatch({
       disposition: 'corrected',
       tmdbId: 41733,
@@ -84,7 +99,6 @@ describe('T-REV-011 · parseCandidatePatch · correction', () => {
       kind: 'corrected',
       tmdbId: 41733,
       mediaType: 'tv',
-      confirmDuplicate: true,
       display: null,
     });
   });
@@ -114,7 +128,6 @@ describe('T-REV-011 · parseCandidatePatch · correction', () => {
       kind: 'corrected',
       tmdbId: 66732,
       mediaType: 'tv',
-      confirmDuplicate: false,
       display: {
         name: 'The Haunting of Bly Manor',
         releaseYear: 2020,
@@ -202,18 +215,24 @@ describe('T-REV-011 · parseCandidatePatch · correction', () => {
     expect(result.details['permitted']).toEqual(['movie', 'tv']);
   });
 
-  it('T-REV-011i: refuses a non-boolean confirmDuplicate rather than coercing it', () => {
-    // `'false'` is truthy. Coercing it would confirm a duplicate the owner
-    // was never shown a warning about.
+  it('T-REV-011i: an ill-typed confirmDuplicate is ignored like any other unknown key', () => {
+    // Previously refused with `field: 'confirmDuplicate'`. The flag no longer
+    // reaches a decision, so validating its type would be the parser refusing
+    // a request over a value it does not read — and `'false'` being truthy,
+    // the original hazard, cannot matter where nothing consumes it.
     const result = parseCandidatePatch({
       disposition: 'corrected',
       tmdbId: 41733,
       mediaType: 'movie',
       confirmDuplicate: 'false',
     });
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.details['field']).toBe('confirmDuplicate');
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.value).toEqual({
+      kind: 'corrected',
+      tmdbId: 41733,
+      mediaType: 'movie',
+      display: null,
+    });
   });
 });
 

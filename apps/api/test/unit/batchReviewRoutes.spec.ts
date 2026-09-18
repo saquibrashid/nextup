@@ -651,32 +651,39 @@ describe('T-REV-011 · PATCH a candidate without a store', () => {
     expect(store.writes).toEqual([]);
   });
 
-  it('T-REV-014d: a duplicate is refused, and confirmDuplicate overrides it', async () => {
+  it('T-REV-014d: the correction is applied against an existing active listing, and writes', async () => {
+    /*
+     * ⚠ INVERTED. This used to read *"a duplicate is refused, and
+     * confirmDuplicate overrides it"* and asserted a 409 that PRD US-012 AC-5
+     * explicitly forbids — see the long note on `T-REV-014` in
+     * `apps/api/test/integration/batchCandidates.spec.ts`.
+     *
+     * The route-level case is kept alongside the integration one because they
+     * fail to different mutations: this pins the WRITE (`applyCorrection`
+     * reaching `updateCandidateDisposition` with the corrected identity and a
+     * cleared classification), where the integration case pins the visible
+     * consequence in `GET /review`.
+     */
     makeCandidate({ id: 'c-1' });
     store.listings = [makeListing('l-1', 'tmdb:movie:603', 'The Matrix')];
 
-    const refused = await patchCandidate('batch-1', 'c-1', {
+    const res = await patchCandidate('batch-1', 'c-1', {
       disposition: 'corrected',
       tmdbId: 603,
       mediaType: 'movie',
     });
-    expect(refused.status).toBe(409);
-    expect(((await refused.json()) as { error: { code: string } }).error.code).toBe(
-      'DUPLICATE_WORK_IDENTITY',
-    );
 
-    const forced = await patchCandidate('batch-1', 'c-1', {
-      disposition: 'corrected',
-      tmdbId: 603,
-      mediaType: 'movie',
-      confirmDuplicate: true,
-    });
-    expect(forced.status).toBe(200);
+    expect(res.status).toBe(200);
     expect(store.writes.at(-1)?.data).toMatchObject({
       reviewDisposition: 'corrected',
       resolvedWorkIdentity: 'tmdb:movie:603',
       // Reset so a rescued item does not stay collapsed behind the expander.
       cleanupVerdict: 'title-candidate',
+      // ⚠ Load-bearing for AC-5's second clause. The next review read derives
+      // "already present" from the NEW identity only because the stale
+      // classification is cleared here; left in place the card would keep
+      // reporting the section it belonged to under the identity the owner
+      // just corrected away from.
       classification: null,
     });
   });

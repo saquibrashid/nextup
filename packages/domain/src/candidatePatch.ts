@@ -58,8 +58,6 @@ export type CandidatePatch =
       kind: 'corrected';
       tmdbId: number;
       mediaType: MediaType;
-      /** US-012 AC-5 — the owner has seen the duplicate warning and meant it. */
-      confirmDuplicate: boolean;
       /**
        * REQ-109 — DISPLAY ONLY. Never identity; see `parseCorrection`.
        * `null` when the client did not send them (an older client, or a
@@ -184,10 +182,15 @@ function parseCorrection(record: Record<string, unknown>): ParseResult<Candidate
     });
   }
 
-  const confirmDuplicate = record['confirmDuplicate'];
-  if (confirmDuplicate !== undefined && typeof confirmDuplicate !== 'boolean') {
-    return reject('"confirmDuplicate" must be a boolean.', { field: 'confirmDuplicate' });
-  }
+  // ⚠ `confirmDuplicate` IS DELIBERATELY NOT PARSED, and it is not rejected
+  // either. It existed solely to escape a duplicate gate in `applyCorrection`
+  // that contradicted US-012 AC-5 and has been removed — see the long note on
+  // that function. With no gate there is nothing to confirm, so the field is
+  // meaningless in both directions: accepting it would imply a decision the
+  // server no longer makes, and refusing it would 400 a correction an older
+  // client is entitled to make over a field that changes nothing. It is
+  // therefore ignored like any other unknown key, and `specs/api.md` §6.18
+  // never documented it.
 
   const display = parseCorrectedDisplay(record);
   if (!display.ok) return display;
@@ -198,7 +201,6 @@ function parseCorrection(record: Record<string, unknown>): ParseResult<Candidate
       kind: 'corrected',
       tmdbId,
       mediaType: mediaType as MediaType,
-      confirmDuplicate: confirmDuplicate === true,
       display: display.value,
     },
   };

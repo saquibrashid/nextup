@@ -1691,6 +1691,36 @@ naming it rather than naming it wrongly.
 `workIdentity` immediately so the review pass shows the corrected match before
 close (US-007 AC-3). **409 `BATCH_NOT_IN_REVIEW`** otherwise.
 
+⚠ **A correction onto a work that ALREADY has an active listing for this
+service is APPLIED — it is not a duplicate and must not be refused** (US-012
+AC-5; the item is then re-classified as already-present and leaves
+`additions`). This paragraph exists because the section's silence was read as
+permission to invent a gate: the route once answered 409
+`DUPLICATE_WORK_IDENTITY` here unless the caller sent `confirmDuplicate`. That
+code is legitimate at **§6.5** (fix-match), **§6.10** (restore) and **§6.31**
+(manual add) because each of those can create a second **`Title`** row. This
+endpoint cannot — close resolves every confirmed candidate through
+`findTitleByWorkIdentity` and re-uses the existing row — so there is no
+duplicate for the owner to confirm.
+
+⚠ **And refusing it caused REMOVALS.** §6.17's removal set is every active
+listing *outside* the union of the surviving candidates' `resolvedWorkIdentity`
+(REQ-006). A refused correction leaves the candidate on the **misread**
+identity, so the real work never enters that union and its listing is proposed
+for removal — a failed extraction of a known title read as a removal, which
+product invariant 2 forbids outright. The condition is also the **normal** one
+in `full-update`, where the capture is a re-shoot of a list whose titles are
+already listed by definition.
+
+⚠ **`confirmDuplicate` is not part of this request.** It was only ever the
+escape hatch from that gate. It is **ignored, not refused**: refusing would
+400 a correction an older client is entitled to make over a field that changes
+nothing. `T-REV-014`.
+
+The only refusal this endpoint makes beyond the list above is **409
+`TARGET_WORK_SUPPRESSED`** — correcting *onto* a suppressed work is REQ-071's
+back door (`T-SUP-002b`).
+
 ### 6.19 `POST /api/batches/:batchId/candidates/confirm-all`
 
 Body: `{ "section": "additions" | "unmatched" | "alreadyOnYourList" }`

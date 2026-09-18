@@ -4,9 +4,10 @@
  * §6.19).
  *
  * `T-REV-011` (confirm / correct / discard, all supported per item),
- * `T-REV-014` (correcting onto a work with an existing active listing → 409
- * `DUPLICATE_WORK_IDENTITY` unless confirmed), `T-REV-010` (the corrected
- * match is visible in the review pass BEFORE close).
+ * `T-REV-014` (correcting onto a work with an existing active listing is
+ * APPLIED — US-012 AC-5 — and withdraws the removal that the uncorrected
+ * misread was proposing), `T-REV-010` (the corrected match is visible in the
+ * review pass BEFORE close).
  *
  * Integration, not unit: the body grammar is already covered by
  * `packages/domain/test/candidatePatch.spec.ts`. What this file proves is that
@@ -86,6 +87,11 @@ interface ReviewBody {
       items: { candidateId: string; rawText: string; resolvedWorkIdentity: string | null }[];
     };
   };
+}
+
+/** The reconciliation half of `GET /review` — `T-REV-014e`. */
+interface RemovalsBody {
+  sections: { removals: { withheld: boolean; items: { titleId: string }[] } };
 }
 
 function startTmdb(options: ReplayOptions = {}): void {
@@ -446,28 +452,42 @@ describe('T-REV-011 · correction re-resolves identity immediately (US-007 AC-3)
 });
 
 describe('T-REV-014 · correcting onto a work already on this list', () => {
-  it('T-REV-014a: 409 DUPLICATE_WORK_IDENTITY when an active listing already holds that work', async () => {
-    const batchId = await makeBatch();
-    const candidateId = await makeCandidate(batchId, { rawText: 'Heat' });
-    const titleId = await makeActiveListing(HEAT, 'Heat');
+  /*
+   * ⚠ **THIS ID USED TO ASSERT THE EXACT OPPOSITE OF THE AC IT CITES, AND THAT
+   * IS HOW THE DEFECT SHIPPED GREEN.**
+   *
+   * PRD US-012 AC-5 reads: *"The owner corrects a match to a work that already
+   * has an active listing for this service → **the correction is applied**,
+   * the item is re-classified as already present, moves out of Additions, and
+   * closing the batch does not create a duplicate Title."* The route answered
+   * 409 `DUPLICATE_WORK_IDENTITY` instead, and `specs/testing.md` recorded
+   * that refusal as AC-5's test — so the mapping agreed with the code and both
+   * disagreed with the requirement.
+   *
+   * Three independent facts say the refusal was wrong, not merely stricter:
+   *
+   *   1. `specs/api.md` §6.18 lists 200, 400 and `BATCH_NOT_IN_REVIEW` as this
+   *      endpoint's whole outcome set. `DUPLICATE_WORK_IDENTITY` appears three
+   *      times in that spec — §6.5 fix-match, §6.10 restore, §6.31 manual add
+   *      — and every one is a path that would create a second **Title row**.
+   *      This one cannot: `batchClose` resolves through
+   *      `findTitleByWorkIdentity` and re-uses the existing row.
+   *   2. In a full update the condition is the NORMAL state. A full update is
+   *      a re-capture of the whole list, so nearly every title in it already
+   *      has an active listing. The gate treated the mode's defining property
+   *      as an anomaly.
+   *   3. It was inescapable. `ReviewRoute.matchUnmatched` never sent
+   *      `confirmDuplicate` and `UnmatchedActions` had no branch for the code,
+   *      so the owner saw only *"Couldn't save that. Nothing has changed."*
+   *
+   * `T-REV-014e` is the case that matters most and the reason this is filed as
+   * data loss rather than friction: the refusal left the candidate pointing at
+   * the MISREAD identity, so reconciliation never saw the real work and
+   * proposed **removing** it. Product invariant 2 / REQ-006 — a failed
+   * extraction of a known title must never be read as a removal.
+   */
 
-    const res = await patchCandidate(batchId, candidateId, {
-      disposition: 'corrected',
-      tmdbId: 949,
-      mediaType: 'movie',
-    });
-
-    expect(res.status).toBe(409);
-    const body = (await res.json()) as ErrorBody;
-    expect(body.error.code).toBe('DUPLICATE_WORK_IDENTITY');
-    expect(body.error.details['titleId']).toBe(titleId);
-
-    const row = await testPrisma().extractionCandidate.findFirst({ where: { id: candidateId } });
-    expect(row?.reviewDisposition).toBe('pending');
-    expect(row?.resolvedWorkIdentity).toBe(DUNE);
-  });
-
-  it('T-REV-014b: confirmDuplicate: true lets the owner through', async () => {
+  it('T-REV-014a: the correction is APPLIED, not refused (US-012 AC-5)', async () => {
     const batchId = await makeBatch();
     const candidateId = await makeCandidate(batchId, { rawText: 'Heat' });
     await makeActiveListing(HEAT, 'Heat');
@@ -476,7 +496,32 @@ describe('T-REV-014 · correcting onto a work already on this list', () => {
       disposition: 'corrected',
       tmdbId: 949,
       mediaType: 'movie',
-      confirmDuplicate: true,
+    });
+
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as PatchedCandidate).resolvedWorkIdentity).toBe(HEAT);
+
+    // ⚠ The STORED row, not just the response. The defect was that nothing was
+    // written, so a response-only assertion is the one shape that would pass
+    // against a handler that answered 200 and persisted nothing.
+    const row = await testPrisma().extractionCandidate.findFirst({ where: { id: candidateId } });
+    expect(row?.reviewDisposition).toBe('corrected');
+    expect(row?.resolvedWorkIdentity).toBe(HEAT);
+  });
+
+  it('T-REV-014b: no confirmation flag is required — or accepted as a gate', async () => {
+    // `confirmDuplicate` was the escape hatch from the deleted gate. An older
+    // client may still send it; it must neither be required nor change the
+    // outcome, because there is no longer a decision for it to confirm.
+    const batchId = await makeBatch();
+    const candidateId = await makeCandidate(batchId, { rawText: 'Heat' });
+    await makeActiveListing(HEAT, 'Heat');
+
+    const res = await patchCandidate(batchId, candidateId, {
+      disposition: 'corrected',
+      tmdbId: 949,
+      mediaType: 'movie',
+      confirmDuplicate: false,
     });
 
     expect(res.status).toBe(200);
@@ -499,6 +544,48 @@ describe('T-REV-014 · correcting onto a work already on this list', () => {
     });
 
     expect(res.status).toBe(200);
+  });
+
+  it('T-REV-014e: correcting a misread title WITHDRAWS the removal it was proposing (invariant 2)', async () => {
+    /*
+     * The live defect, end to end, on the mode it occurs in.
+     *
+     * `Heat` is on the list. The capture misread its tile, so the candidate
+     * resolved to `Dune`. Reconciliation unions the surviving candidates'
+     * identities and proposes removing every active listing outside that
+     * union — so before the correction, `Heat` is up for removal. That is
+     * correct behaviour given a wrong input, and it is exactly why the
+     * correction has to be possible.
+     */
+    const batchId = await makeBatch({ mode: 'full-update' });
+    const candidateId = await makeCandidate(batchId, { rawText: 'Heat' });
+    const titleId = await makeActiveListing(HEAT, 'Heat');
+
+    const before = (await (await getReview(batchId)).json()) as RemovalsBody;
+    // ⚠ Asserted, not assumed. A review that withheld its removals (low yield,
+    // degraded extraction) would give an empty `items` for a reason unrelated
+    // to the correction, and the "after" assertion would then pass vacuously.
+    expect(before.sections.removals.withheld).toBe(false);
+    expect(before.sections.removals.items.map((i) => i.titleId)).toContain(titleId);
+
+    const res = await patchCandidate(batchId, candidateId, {
+      disposition: 'corrected',
+      tmdbId: 949,
+      mediaType: 'movie',
+    });
+    expect(res.status).toBe(200);
+
+    const after = (await (await getReview(batchId)).json()) as RemovalsBody;
+    expect(after.sections.removals.items.map((i) => i.titleId)).not.toContain(titleId);
+
+    // AC-5's other two clauses, asserted here rather than taken on trust: the
+    // item re-classifies and leaves Additions. Checking only the removal would
+    // pass against a fix that withdrew the proposal while stranding the card
+    // in the wrong section.
+    const additions = (await (await getReview(batchId)).json()) as {
+      sections: { additions: { items: { candidateId: string }[] } };
+    };
+    expect(additions.sections.additions.items.map((i) => i.candidateId)).not.toContain(candidateId);
   });
 });
 
@@ -526,8 +613,20 @@ describe('T-SUP-002 · correcting ONTO a suppressed work is refused', () => {
     expect(((await res.json()) as ErrorBody).error.code).toBe('TARGET_WORK_SUPPRESSED');
   });
 
-  it('T-SUP-002c: the suppression gate fires BEFORE the duplicate gate', async () => {
-    // Both apply. The owner needs to be told the reason they can act on.
+  it('T-SUP-002c: the suppression gate survives the duplicate gate being deleted', async () => {
+    /*
+     * ⚠ This case used to read *"the suppression gate fires BEFORE the
+     * duplicate gate"* — an ordering between two gates, one of which no longer
+     * exists (see `T-REV-014`). Ordering is no longer the question; SURVIVAL
+     * is. The suppressed work here also has an active listing, which is the
+     * arrangement that used to make the duplicate gate the first to fire.
+     *
+     * It is kept rather than deleted because the deletion that removed the
+     * duplicate gate ran through the same function, and "the other gate came
+     * out with it" is precisely the mistake this pins. Correcting onto a
+     * suppressed work is REQ-071's back door (product invariant 1) and is the
+     * one refusal this endpoint must still make.
+     */
     const batchId = await makeBatch();
     const candidateId = await makeCandidate(batchId, { rawText: 'Heat' });
     await makeActiveListing(HEAT, 'Heat');
@@ -547,7 +646,12 @@ describe('T-SUP-002 · correcting ONTO a suppressed work is refused', () => {
       mediaType: 'movie',
     });
 
+    expect(res.status).toBe(409);
     expect(((await res.json()) as ErrorBody).error.code).toBe('TARGET_WORK_SUPPRESSED');
+
+    const row = await testPrisma().extractionCandidate.findFirst({ where: { id: candidateId } });
+    expect(row?.reviewDisposition).toBe('pending');
+    expect(row?.resolvedWorkIdentity).toBe(DUNE);
   });
 });
 
