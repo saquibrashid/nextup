@@ -96,6 +96,21 @@ export const CHROME_TERMS: ReadonlySet<string> = new Set([
   'hbo',
   'hbo original',
   'new',
+  // ── Added R5 (owner report, live Disney+ capture). Disney+ titles its
+  // saved-list shelf **"My Watchlist"**, and the owner was shown it as a row
+  // in "Couldn't identify these", chipped *"The text reader saw this, the
+  // tile reader did not"*.
+  //
+  // ⚠ `watchlist` WAS ALREADY HERE AND DID NOT MATCH — that is the whole
+  // lesson of this entry. Step 3 is an EXACT line match by design (see the
+  // header: a substring test would delete every work whose name contains a UI
+  // word), so a bare `watchlist` term cannot cover a shelf header that ships
+  // the possessive in the same OCR line. The possessive forms are enumerated
+  // ONE BY ONE — `my list`, `my netflix`, `my stuff`, `my purchases` and now
+  // `my watchlist` — and a generic `my <chrome term>` rule is deliberately
+  // NOT written: it would fold `my home` onto `home` and suppress any work
+  // actually called *My Home*.
+  'my watchlist',
 ]);
 
 /**

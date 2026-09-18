@@ -35,6 +35,7 @@ import {
   digitSymbolRatio,
   extractYear,
   groupReadingOrder,
+  isChromeLine,
   isChromeTerm,
 } from '../src/extraction/index.js';
 import type { ExtractedTextItem, NormalisedBox } from '../src/extraction/TitleExtractor.js';
@@ -154,6 +155,48 @@ describe('cleanup — classify and surface, never drop (T-AI-004)', () => {
     // `normaliseTitleText` maps `&` to a space, so a normalised comparison
     // would never match this entry.
     expect(isChromeTerm('New & Popular')).toBe(true);
+  });
+
+  // ── T-AI-053 · the possessive shelf header ──────────────────────────────
+  //
+  // Reported by the owner from a live Disney+ capture: **"My Watchlist"** —
+  // the shelf header of the very list being captured — reached the review
+  // pass as a row in "Couldn't identify these", chipped *"The text reader saw
+  // this, the tile reader did not"*.
+  //
+  // ⚠ `watchlist` WAS ALREADY IN THE VOCABULARY. That is what makes this
+  // worth a named test rather than a one-word commit: the term was present,
+  // looked like coverage, and could never fire, because step 3 is an EXACT
+  // line match (`T-AI-004g`) and Disney+ ships the possessive inside the same
+  // OCR line. Every service spells its saved list differently — `my list`,
+  // `my netflix`, `my stuff`, `my purchases` are all separately enumerated
+  // for the same reason — so the vocabulary must carry each surface form.
+  //
+  // ⚠ `b` IS THE LIMIT AND THE REASON THIS IS NOT A `my <term>` RULE. A
+  // generic possessive rule would fold `my home` onto `home` and suppress a
+  // work genuinely called *My Home*; exact enumeration cannot.
+  describe('T-AI-053 · a possessive shelf header is chrome', () => {
+    it('T-AI-053a: an OCR-only "My Watchlist" line is chrome, not a title candidate', () => {
+      expect(isChromeTerm('My Watchlist')).toBe(true);
+      expect(isChromeLine('My Watchlist')).toBe(true);
+      // The verdict is what the owner actually sees — pinning only the
+      // predicate would leave `cleanup` free to stop consulting it.
+      expect(verdicts([ocr({ rawText: 'My Watchlist' })])).toEqual(['chrome-suspected']);
+    });
+
+    it('T-AI-053b: a real work whose name merely starts with "My" is untouched', () => {
+      expect(isChromeTerm('My Home')).toBe(false);
+      expect(isChromeTerm('My Cousin Vinny')).toBe(false);
+      expect(verdicts([ocr({ rawText: 'My Cousin Vinny' })])).toEqual(['title-candidate']);
+    });
+
+    it('T-AI-053c: and the primary reader is still exempt — the vocabulary is OCR-scoped', () => {
+      // §3.2 step 3 applies to `ocr-only` items only. If the tile reader
+      // genuinely reports a work by this name it is not the owner's shelf.
+      expect(verdicts([llm({ rawText: 'My Watchlist', inferredTitle: 'My Watchlist' })])).toEqual([
+        'title-candidate',
+      ]);
+    });
   });
 
   it('T-AI-004i flags a below-floor confidence and leaves the boundary alone', () => {
