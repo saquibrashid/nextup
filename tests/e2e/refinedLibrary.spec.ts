@@ -1137,3 +1137,72 @@ test('T-UX-147f: tapping a filter checkbox ticks it and leaves the popover open'
     });
   await expect(dialog.locator('.filter-disclosure__panel:visible')).toHaveCount(0);
 });
+
+/**
+ * `T-UX-147g` — the toolbar does not waste rows when a filter is active.
+ *
+ * The owner, with one service filter on a phone: *"this is what the home page
+ * looks like when a filter is selected. so much wasted space."* The screenshot
+ * showed five toolbar rows, three of them more than half empty, ending 641 px
+ * down an 844 px screen.
+ *
+ * Two independent causes, both measured before the fix:
+ *
+ *  1. A duplicate `.active-filters { flex-basis: 100% }` made the chip list
+ *     claim the whole line (`w=340` for one ~110 px chip), so `Clear filters`
+ *     wrapped under it — one active filter cost two rows.
+ *  2. The toolbar parts were placed by COLUMN with the row left to grid
+ *     auto-placement. The cursor only moves forward, so the full-width chips
+ *     row — which exists ONLY when a filter is active — pushed the count and
+ *     the sort control off the Filters trigger's line for good.
+ *
+ * ⚠ **THE FILTERED CASE IS THE CASE.** Cause 2 is invisible without a chip
+ * row, so a measurement of the default toolbar passes on the broken build.
+ * `T-UX-147b` does exactly that, which is why it never caught this.
+ *
+ * ⚠ Rows are derived from measured geometry, not from a height total. A single
+ * height assertion would pass again the moment some unrelated control got
+ * shorter, while the empty half-rows stayed.
+ */
+test('T-UX-147g: with a filter active the toolbar rows are full, not half empty', async ({
+  page,
+}) => {
+  await mountLibrary(page, { width: 390, url: '/?service=netflix' });
+
+  const chip = page.locator('.active-filter');
+  await expect(chip).toHaveCount(1);
+
+  const trigger = await bounds(page.getByTestId('filters-trigger'));
+  const count = await bounds(page.getByTestId('filter-count'));
+  const sort = await bounds(page.locator('.sort-control-group'));
+  const chipBox = await bounds(chip);
+  const clear = await bounds(page.getByTestId('clear-filters'));
+  const view = await bounds(page.locator('.list-view-control'));
+
+  /** Two boxes share a visual row when their vertical spans overlap. */
+  const sameRow = (a: typeof trigger, b: typeof trigger): boolean =>
+    a.y < b.y + b.height && b.y < a.y + a.height;
+
+  // The controls row is ONE row: Filters, the count and the order together.
+  expect(sameRow(trigger, count)).toBe(true);
+  expect(sameRow(trigger, sort)).toBe(true);
+
+  // The chips row is ONE row: the chip and the control that clears it.
+  expect(sameRow(chipBox, clear)).toBe(true);
+
+  // ...and they are genuinely different rows, so the assertions above are not
+  // passing because everything happens to overlap everything.
+  expect(sameRow(trigger, chipBox)).toBe(false);
+  expect(sameRow(chipBox, view)).toBe(false);
+
+  /*
+   * ⚠ THE BUDGET IS A CEILING ON A MEASUREMENT, NOT A PIN. Before the fix this
+   * was 357 px; it is 253 px now. The margin is deliberately loose — the point
+   * is that a regression to five rows (~100 px more) fails, while a font or
+   * padding tweak of a few pixels does not.
+   */
+  const toolbar = await bounds(page.getByTestId('list-controls'));
+  expect(toolbar.height).toBeLessThan(300);
+
+  await noOverflow(page);
+});
