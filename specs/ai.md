@@ -255,7 +255,9 @@ prompt carries the negative instruction below as belt-and-braces.
 
 **Prompt (committed as constants in
 `apps/api/src/extraction/prompts.ts`; changing them requires a golden
-re-run — `T-AI-038`):**
+re-run — `T-AI-038`, `tests/extraction/promptPin.spec.ts`, which pins a
+SHA-256 over this prompt **and `TILE_SCHEMA`** and fails on any edit until
+the recordings are re-made and the pin moved in the SAME commit):**
 
 ```
 SYSTEM:

@@ -10,6 +10,16 @@
  * measuring a different program from the one running. Changing anything in
  * this file requires a golden re-run (`T-AI-038`).
  *
+ * ⚠ `T-AI-038` IS REAL NOW AND IT WILL STOP YOU — WHICH IS THE POINT.
+ * `tests/extraction/promptPin.spec.ts` pins a SHA-256 over
+ * `EXTRACTION_SYSTEM_PROMPT`, `EXTRACTION_USER_PROMPT` and `TILE_SCHEMA`. Edit
+ * any of them and it fails. The correct response is to re-record with
+ * `npm run golden:record` (LIVE, COSTS REAL MONEY, MANUAL) and move the pin in
+ * the SAME commit — never to move the pin on its own, which would restore
+ * exactly the silent desync the gate exists to end. This header promised that
+ * gate for months while it was defined nowhere; the offline suites replay
+ * recordings, so a prompt edit changed the product and moved no number.
+ *
  * RULE B / REQ-058 IS ENFORCED STRUCTURALLY HERE
  * ----------------------------------------------
  * The reader must never know, infer, name or leak which streaming service a
