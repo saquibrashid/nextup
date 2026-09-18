@@ -490,7 +490,7 @@ test('T-UX-143c: submitted URL search resets loaded pages, requests unfiltered t
 
 test('T-UX-143d: Services and service-update popovers are usable at 320px and 1280px', async ({
   page,
-}) => {
+}, testInfo) => {
   await mountLibrary(page);
   for (const width of [320, 1280]) {
     await page.setViewportSize({ width, height: 900 });
@@ -506,7 +506,18 @@ test('T-UX-143d: Services and service-update popovers are usable at 320px and 12
       has: page.getByRole('searchbox', { name: 'Search services', exact: true }),
     });
     const search = panel.getByRole('searchbox', { name: 'Search services', exact: true });
-    await expect(search).toBeFocused();
+    /*
+     * ⚠ THE SEARCH BOX IS AUTOFOCUSED ONLY ON A FINE POINTER (TASK-289).
+     *
+     * On a touch device, focusing it raises the on-screen keyboard over the
+     * checkboxes this very case then goes on to measure. The popover still
+     * takes focus, so the case still proves focus is contained.
+     */
+    if (testInfo.project.name === 'mobile-safari') {
+      await expect(panel).toBeFocused();
+    } else {
+      await expect(search).toBeFocused();
+    }
     await usableTarget(page, trigger);
     await usableTarget(page, search);
     for (const checkbox of await panel.getByRole('checkbox').all()) {
@@ -1060,4 +1071,69 @@ test('T-UX-147e: filter trigger labels stay on one line inside the filters panel
     }
     await noOverflow(page);
   }
+});
+
+test('T-UX-147f: tapping a filter checkbox ticks it and leaves the popover open', async ({
+  page,
+}, testInfo) => {
+  /*
+   * ⚠ THIS CASE ONLY FAILS UNDER A REAL TAP, WHICH IS WHY IT SURVIVED SO LONG.
+   *
+   * WebKit does not focus a checkbox, radio or button when it is TAPPED —
+   * focus drops onto `div.dialog--panel`, the dialog's `tabIndex={-1}` focus
+   * container. `FilterDisclosure` read any focus outside itself as the owner
+   * tabbing away and closed, so on a phone every filter shut on the very tap
+   * that ticked a box and behaved as though Done had been pressed. The
+   * existing helpers use `dispatchEvent('click')`, which never moves focus at
+   * all and so can never see this.
+   */
+  await mountLibrary(page, { width: 390, allServices: true });
+  const touch = testInfo.project.name === 'mobile-safari';
+  const dialog = await openFiltersPanel(page);
+  const field = dialog.locator('.filter-disclosure[data-filter-field]').first();
+  const openTrigger = field.locator('.btn');
+  if (touch) await openTrigger.tap();
+  else await openTrigger.click();
+
+  const popover = dialog.locator('.filter-disclosure__panel:visible');
+  await expect(popover).toBeVisible();
+
+  /*
+   * On a touch device the popover must NOT open with a text field focused:
+   * that raises the on-screen keyboard over the very checkboxes it contains.
+   * On a desktop pointer, focusing the search box is free and is kept.
+   */
+  const focusedTag = await page.evaluate(() => document.activeElement?.tagName ?? '');
+  if (touch) expect(focusedTag).not.toBe('INPUT');
+
+  const box = popover.locator('input[type="checkbox"]').first();
+  if (touch) await box.tap();
+  else await box.click();
+
+  await expect(popover).toBeVisible();
+  await expect(box).toBeChecked();
+
+  /*
+   * The second half of the fix, exercised directly. Focus parking on a
+   * `tabIndex={-1}` container OUTSIDE the picker — which is precisely where
+   * WebKit put it before the panel became focusable — must not read as the
+   * owner navigating away.
+   */
+  await dialog.evaluate((el: HTMLElement) => {
+    el.focus();
+  });
+  await expect(popover).toBeVisible();
+
+  /*
+   * Moving focus to a genuinely tabbable control OUTSIDE the picker still
+   * closes it — the guard narrows the rule to `tabIndex >= 0`, it does not
+   * remove it. The panel's own Done button is such a control.
+   */
+  await dialog
+    .locator('.panel-foot')
+    .getByRole('button', { name: 'Done', exact: true })
+    .evaluate((el: HTMLElement) => {
+      el.focus();
+    });
+  await expect(dialog.locator('.filter-disclosure__panel:visible')).toHaveCount(0);
 });
