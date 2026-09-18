@@ -42,6 +42,7 @@ import {
   UNMATCHED_KEEP_LABEL,
   UNMATCHED_KEPT,
   UNMATCHED_MATCH_LABEL,
+  UNMATCHED_MATCH_SHORT,
   UNMATCHED_MATCHED,
   UNMATCHED_MATCHED_UNNAMED,
   UNMATCHED_NO_RESULTS,
@@ -312,10 +313,11 @@ export function UnmatchedActions({
                   className="unmatched-actions__result"
                   key={`${result.mediaType}:${String(result.tmdbId)}`}
                 >
-                  <span>{resultLabel(result)}</span>
+                  <span className="unmatched-actions__result-label">{resultLabel(result)}</span>
                   <Button
                     variant="secondary"
                     disabled={busy}
+                    aria-label={UNMATCHED_MATCH_LABEL.replace('{name}', result.name)}
                     onClick={() => {
                       run(
                         async () => {
@@ -325,7 +327,7 @@ export function UnmatchedActions({
                       );
                     }}
                   >
-                    {UNMATCHED_MATCH_LABEL.replace('{name}', result.name)}
+                    {UNMATCHED_MATCH_SHORT}
                   </Button>
                 </li>
               ))}
