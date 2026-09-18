@@ -199,6 +199,55 @@ const MAX_POOL_CONNECTIONS = 5;
 const MIN_POOL_CONNECTIONS = 0;
 
 /**
+ * How long to wait for a connection to be ESTABLISHED.
+ *
+ * ⚠ THIS EXISTS BECAUSE THE DEFAULT IS SHORTER THAN AN AZURE SQL SERVERLESS
+ * RESUME, WHICH MAKES A HEALTHY DATABASE LOOK LIKE A BROKEN ONE.
+ *
+ * The staging database is serverless with `autoPauseDelay = 60` (ADR-0003
+ * Rev 3 — it is auto-paused ON PURPOSE, to bill nothing while idle). The first
+ * request after a pause does not fail and does not wait politely: it TRIGGERS A
+ * RESUME that takes roughly 30-60 seconds, and every request arriving during
+ * that window is refused. `mssql` defaults `connectionTimeout` to 15000 ms —
+ * comfortably shorter than the resume — so the pool gives up long before the
+ * database is ready, every single time.
+ *
+ * Observed live on 2026-09-18: the database recorded `resumedDate`
+ * 12:54:34Z; `titles`, `serviceState` and `suppressions` all failed with
+ * "Failed to connect ... in 15000ms" from 12:54:36 to 12:55:44, and then
+ * recovered with no intervention. The owner saw "Couldn't load your list.
+ * Nothing has changed." with a Retry button that appeared to do nothing —
+ * because every retry inside the window hit the same 15-second wall.
+ *
+ * ⚠ THE TRADE-OFF IS DELIBERATE AND IT IS NOT FREE: a database that is
+ * genuinely unreachable now takes ~60 s to say so instead of ~15 s. That is
+ * the right way round here. A paused database is the EXPECTED, BILLED-FOR
+ * state of staging, so the 15-second answer was wrong far more often than it
+ * was right — and it was wrong in the worse direction, reporting failure for a
+ * database that was merely waking up. "Nothing has changed" is indistinguishable
+ * from data loss to someone reading it, which is precisely the anxiety REQ-028
+ * and the no-silent-loss rules exist to prevent.
+ *
+ * ⚠ DO NOT "OPTIMISE" THIS BACK DOWN because prod does not need it. Prod is
+ * Azure SQL Basic (provisioned, never pauses) and will only ever reach this
+ * timeout if the database is actually unreachable, in which case the extra
+ * wait costs one slow error page on a day that is already broken.
+ */
+const SQL_CONNECT_TIMEOUT_MS = 60_000;
+
+/**
+ * How long to wait for a pooled connection to become available.
+ *
+ * ⚠ MUST EXCEED {@link SQL_CONNECT_TIMEOUT_MS}, or raising that one achieves
+ * nothing. `mssql` defaults the pool's acquire timeout to 60000 ms — the same
+ * value — so a connection still being established at 59 s would race the pool
+ * giving up on waiting for it, and the caller would see a pool timeout that
+ * names nothing about a resuming database. The two timeouts are ordered so the
+ * inner one always reports first.
+ */
+const SQL_POOL_ACQUIRE_TIMEOUT_MS = SQL_CONNECT_TIMEOUT_MS + 10_000;
+
+/**
  * Build the `mssql` configuration for these settings.
  *
  * On the managed-identity path this sets `azure-active-directory-default`,
@@ -220,6 +269,7 @@ export function buildMssqlConfig(settings: SqlConnectionSettings): MssqlConfig {
     server: settings.server,
     port: settings.port,
     database: settings.database,
+    connectionTimeout: SQL_CONNECT_TIMEOUT_MS,
     options: {
       encrypt: settings.encrypt,
       trustServerCertificate: settings.trustServerCertificate,
@@ -227,6 +277,7 @@ export function buildMssqlConfig(settings: SqlConnectionSettings): MssqlConfig {
     pool: {
       max: MAX_POOL_CONNECTIONS,
       min: MIN_POOL_CONNECTIONS,
+      acquireTimeoutMillis: SQL_POOL_ACQUIRE_TIMEOUT_MS,
     },
   };
 
