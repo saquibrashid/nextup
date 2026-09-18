@@ -32,8 +32,51 @@ import {
   WATCH_PRIORITY_LABELS,
 } from '../copy';
 
-/** `specs/ui.md` §2.2 - the poster size the row requests. */
-export const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w154';
+/**
+ * `specs/ui.md` §2.2 - the poster size the row requests.
+ *
+ * ⚠ THIS IS A RENDERED-RESOLUTION SETTING, NOT A URL DETAIL, AND `w154` WAS
+ * VISIBLY WRONG. TMDB serves fixed-width renditions; the path segment IS the
+ * pixel width. `w154` means the browser is handed a 154 px-wide image whatever
+ * it intends to paint it at.
+ *
+ * In `data-view='grid'` the tile track is `repeat(auto-fill, minmax(28rem,
+ * 1fr))` and the poster takes `grid-column: 1` of a `0.8fr 1fr` split at
+ * `width: 100%` — so it paints at roughly 200 CSS px and upward, on a desktop
+ * often more. That is already a ~1.4× upscale of a 154 px source in CSS pixels
+ * alone, and every mainstream display the owner uses is 2× or 3× device pixel
+ * ratio, which takes it past 4×. The owner reported it plainly: the artwork is
+ * soft. Upscaling is not a rendering nicety here — the poster is how a title is
+ * recognised at a glance (REQ-111), so a blurred poster degrades the one job
+ * the image has.
+ *
+ * ⚠ THE FLOOR IS NOT THE PROBLEM AND MUST NOT BE "FIXED" BY SHRINKING THE BOX.
+ * REQ-111 sets a 72 × 108 minimum and the compact view sits exactly on it
+ * (`4.5rem`/`6.75rem`). `w154` is ample there. The defect is confined to the
+ * views that render LARGER than the source, so the answer is a bigger source,
+ * not a smaller box.
+ *
+ * `srcSet` rather than a single larger URL: the compact and list views still
+ * paint at 72 px, where `w500` would be ~10× the bytes for no visible gain on
+ * a 1× display. Handing the browser both lets it spend the bytes only where
+ * the pixels are actually used. `w342` stays the `src` so a browser that
+ * ignores `srcSet` still gets a better image than it does today.
+ *
+ * ~~Superseded: a single `w154` base for every view.~~
+ */
+export const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w342';
+
+/**
+ * The high-density rendition offered alongside {@link TMDB_IMAGE_BASE}.
+ *
+ * ⚠ KEEP THE DESCRIPTOR AND THE WIDTH IN AGREEMENT. `w500` is offered as `2x`
+ * against a `w342` `1x`; the true ratio is 1.46, and a browser told `2x` will
+ * happily use it on a 2× display where the CSS box is up to 250 px. That is
+ * the intended trade — 500 px of real data beats 342 px stretched — but if
+ * either width is ever changed, the descriptor has to be re-derived rather
+ * than carried over.
+ */
+export const TMDB_IMAGE_BASE_2X = 'https://image.tmdb.org/t/p/w500';
 
 /** One active listing (`specs/api.md` §6.2 `badges[]`). */
 export interface TitleBadge {
@@ -183,6 +226,7 @@ export function TitleRow({
           className="title-row__poster"
           data-testid="poster"
           src={`${TMDB_IMAGE_BASE}${item.posterPath}`}
+          srcSet={`${TMDB_IMAGE_BASE}${item.posterPath} 1x, ${TMDB_IMAGE_BASE_2X}${item.posterPath} 2x`}
           // Decorative: the name sits next to it as real text, so announcing
           // the poster too would make a screen reader say the title twice.
           alt=""

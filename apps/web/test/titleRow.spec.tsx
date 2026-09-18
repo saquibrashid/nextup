@@ -21,7 +21,12 @@ import { DATE_ADDED_LABEL_MARKER } from '@nextup/domain';
 import type { ReactElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { TitleRow, TMDB_IMAGE_BASE, type TitleListItem } from '../src/components/TitleRow';
+import {
+  TitleRow,
+  TMDB_IMAGE_BASE,
+  TMDB_IMAGE_BASE_2X,
+  type TitleListItem,
+} from '../src/components/TitleRow';
 import { ListPage } from '../src/pages/ListPage';
 import { RUNTIME_UNKNOWN_LABEL } from '../src/copy';
 
@@ -328,10 +333,68 @@ describe('T-UI-012 - the row makes no automated or credentialed approach to a st
   it('T-UI-012d the only remote asset a row fetches is the TMDB poster', () => {
     render(<ListPage items={[DUNE]} />);
 
-    const remote = urlAttributes(screen.getByTestId('title-list')).filter((url) =>
-      /^https?:/i.test(url),
-    );
-    expect(remote).toEqual([`${TMDB_IMAGE_BASE}/d5NXSklXo0qyIYkgV94XAgMIckC.jpg`]);
+    // ⚠ `srcset` IS A LIST, AND FLATTENING IT WOULD WEAKEN THIS TEST.
+    // `urlAttributes` returns the raw attribute, so a `srcset` arrives as one
+    // string holding several URLs and their density descriptors. Comparing
+    // that string to an expected literal would have turned this NFR-010/009
+    // assertion into a spelling test that a second, unrelated host could be
+    // appended to without failing. Each candidate is split out and checked on
+    // its own, so every remote URL a row can fetch is asserted individually.
+    const remote = urlAttributes(screen.getByTestId('title-list'))
+      .flatMap((value) => value.split(','))
+      .map((candidate) => candidate.trim().split(/\s+/)[0] ?? '')
+      .filter((url) => /^https?:/i.test(url));
+
+    expect(remote).toEqual([
+      `${TMDB_IMAGE_BASE}/d5NXSklXo0qyIYkgV94XAgMIckC.jpg`,
+      `${TMDB_IMAGE_BASE}/d5NXSklXo0qyIYkgV94XAgMIckC.jpg`,
+      `${TMDB_IMAGE_BASE_2X}/d5NXSklXo0qyIYkgV94XAgMIckC.jpg`,
+    ]);
+  });
+
+  it('T-UX-153a the poster is requested at a resolution it is actually painted at', () => {
+    // ⚠ PINS THE RENDITION WIDTH, WHICH THE OTHER POSTER TESTS DO NOT.
+    // Every existing assertion interpolates `TMDB_IMAGE_BASE`, so it agrees
+    // with whatever the constant happens to say — setting it back to `w154`,
+    // or to `w92`, keeps them all green. That is exactly how the soft artwork
+    // the owner reported survived: nothing in the suite ever looked at the
+    // number. The literal widths are written out here on purpose.
+    //
+    // TMDB's path segment IS the pixel width, so `w342` is a 342 px-wide
+    // source. The grid tile paints the poster at ~200 CSS px and up, which on
+    // any 2x display needs ~400+ real pixels — hence the `w500` candidate.
+    render(<ListPage items={[DUNE]} />);
+    const poster = screen.getByTestId('poster');
+
+    expect(poster.getAttribute('src')).toContain('/t/p/w342/');
+    expect(poster.getAttribute('srcset')).toContain('/t/p/w342/');
+    expect(poster.getAttribute('srcset')).toContain('/t/p/w500/');
+    // The descriptors, without which a browser cannot choose between them and
+    // simply takes the first — leaving high-density displays on the 1x image.
+    expect(poster.getAttribute('srcset')).toMatch(/w342\/[^\s]+ 1x/);
+    expect(poster.getAttribute('srcset')).toMatch(/w500\/[^\s]+ 2x/);
+  });
+
+  it('T-UX-153b every rendition clears the REQ-111 poster box, so none is upscaled at the floor', () => {
+    // REQ-111 puts a 72 x 108 floor on the rendered box and the compact view
+    // sits exactly on it. A source narrower than the box is upscaled by
+    // definition, so the smallest rendition offered must still exceed 72 px —
+    // asserted as a property rather than by restating 342, so shrinking the
+    // constant toward the floor fails here even if the literals above are
+    // updated to match it.
+    render(<ListPage items={[DUNE]} />);
+    const poster = screen.getByTestId('poster');
+
+    const widths = [
+      ...`${poster.getAttribute('src')} ${poster.getAttribute('srcset')}`.matchAll(
+        /\/t\/p\/w(\d+)\//g,
+      ),
+    ].map((match) => Number(match[1]));
+
+    expect(widths.length).toBeGreaterThanOrEqual(3);
+    for (const width of widths) {
+      expect(width).toBeGreaterThan(72);
+    }
   });
 });
 
