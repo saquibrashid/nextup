@@ -36,7 +36,12 @@
  * instead of gone. `T-AI-039` guards it.
  */
 
-import { OCR_BOX_OVERLAP_MIN, OCR_SUPPORT_EXACT, OCR_SUPPORT_PARTIAL } from './thresholds.js';
+import {
+  OCR_BOX_OVERLAP_MIN,
+  OCR_LINE_STACK_GAP_MAX,
+  OCR_SUPPORT_EXACT,
+  OCR_SUPPORT_PARTIAL,
+} from './thresholds.js';
 import { compareExtractedItems } from './degraded.js';
 import { jaroWinkler } from './jaroWinkler.js';
 import { normaliseTitleText } from '../identity.js';
@@ -68,6 +73,49 @@ function supportFor(score: number): OcrSupport {
   return 'none';
 }
 
+/** Normalised text with its spaces removed, so a word-split difference between the two readers stops mattering. */
+function squash(normalised: string): string {
+  return normalised.replace(/ /g, '');
+}
+
+/**
+ * Do these two OCR boxes read as consecutive lines of ONE stacked caption?
+ *
+ * Vertically within {@link OCR_LINE_STACK_GAP_MAX} line-heights of each other
+ * and horizontally overlapping at all. Both conditions are needed: a caption
+ * two rows down the grid is vertically distant, and a caption in the next
+ * column is horizontally disjoint.
+ */
+function stacked(a: NormalisedBox, b: NormalisedBox): boolean {
+  if (Math.min(a.x + a.w, b.x + b.w) <= Math.max(a.x, b.x)) return false;
+  const gap = Math.max(a.y, b.y) - Math.min(a.y + a.h, b.y + b.h);
+  return gap <= Math.max(a.h, b.h) * OCR_LINE_STACK_GAP_MAX;
+}
+
+/**
+ * Every contiguous run of words in `normalised`, squashed.
+ *
+ * ⚠ RUNS OF WHOLE WORDS, NOT ARBITRARY SUBSTRINGS, AND THAT IS PART OF THE
+ * SAFETY PROPERTY. A raw substring test would absorb an OCR line reading `UP`
+ * — a real, short, real-world title — into a neighbouring tile captioned
+ * `UPLOAD`. No run of `UPLOAD`'s words joins to `UP`, so the word-run form
+ * cannot. Because the runs are squashed it still matches `THE XFILES` against
+ * a tile the model transcribed as `THE X FILES I WANT TO BELIEVE`, which is
+ * the case where the two readers disagree only about where a space goes.
+ */
+function transcribedWordRuns(normalised: string): Set<string> {
+  const words = normalised.split(' ').filter((word) => word !== '');
+  const runs = new Set<string>();
+  for (let start = 0; start < words.length; start += 1) {
+    let run = '';
+    for (let end = start; end < words.length; end += 1) {
+      run += words[end] ?? '';
+      runs.add(run);
+    }
+  }
+  return runs;
+}
+
 /**
  * Merge the two readers' output into stage-1 items.
  *
@@ -86,6 +134,47 @@ export function crossCheck(llm: readonly LlmTile[], ocr: readonly OcrLine[]): Ex
   // one-to-one assignment.
   const consumed = new Set<number>();
   const items: ExtractedTextItem[] = [];
+
+  /*
+   * ⚠ WHAT THE MODEL ALREADY TRANSCRIBED, INDEPENDENT OF WHERE IT SAID IT WAS
+   *   (TASK-290, from the owner's Disney+ capture).
+   *
+   * Consumption above is geometry-first, and geometry is the model's weakest
+   * output. On that capture the model emitted a plainly synthetic uniform grid
+   * of tile boxes — x correct, y shifted down and stretched — so it had ZERO
+   * vertical overlap with the caption lines OCR had measured. Not one line was
+   * consumed, and every fragment of captions the model had ALREADY READ came
+   * back as its own review row: `GOOD LUCK`, `HAVE FUN`, `DEVIL`, `WEARS`,
+   * `PRADA`, `THE`, `THE XFILES`. The owner saw one film split into three, and
+   * correcting two of those fragments onto one work is what then made the
+   * batch fail to apply.
+   *
+   * Orphan recovery exists to catch what the model OMITTED (REQ-012 applied to
+   * the model itself — see the header). If the line's glyphs already appear in
+   * glyphs the model transcribed, nothing was omitted, so there is nothing to
+   * recover and emitting it can only duplicate. That argument is about TEXT,
+   * so the rule is about text and asks nothing of the boxes.
+   *
+   * ⚠ ONLY TILES THAT ACTUALLY READ GLYPHS CONTRIBUTE. An `artwork` basis is
+   * the model saying on the record that it did NOT read the printed caption,
+   * so its `identifiedTitle` is not evidence about glyphs and must not consume
+   * one — the same reasoning that narrows the geometric rule below.
+   *
+   * ⚠ KNOWN, ACCEPTED LOSS. A title the model MISSED ENTIRELY whose whole name
+   * is also a word-run of a neighbouring caption — `Chuck` beside a tile
+   * captioned `The Life of Chuck` — is absorbed here. It needs both failures at
+   * once, and the review screen's "Add a title the reader missed" control is
+   * the recovery path. The duplicate flood this replaces made the review screen
+   * unusable on the owner's first real capture.
+   */
+  const transcribedRuns: Set<string>[] = [];
+  for (const tile of llm) {
+    transcribedRuns.push(
+      tile.basis === 'artwork'
+        ? new Set<string>()
+        : transcribedWordRuns(normaliseTitleText(tile.visibleText ?? '')),
+    );
+  }
 
   for (const tile of llm) {
     // ⚠ `visibleText ?? identifiedTitle`, in that order, per §2.1c step 1.
@@ -174,6 +263,114 @@ export function crossCheck(llm: readonly LlmTile[], ocr: readonly OcrLine[]): Ex
       boxSource: corroborating ? 'ocr' : 'llm',
       confidence: tile.confidence,
     });
+  }
+
+  // Step 1b — TEXT-CONTAINMENT CONSUMPTION, which deliberately has no
+  // geometry condition ON THE MODEL'S BOXES. See the block comment above.
+  const absorbedByStack: { index: number; tile: number }[] = [];
+  for (const [index, entry] of normalisedOcr.entries()) {
+    if (consumed.has(index)) continue;
+    const text = squash(entry.normalised);
+    if (text === '') continue;
+
+    const absorbed = transcribedRuns.findIndex(
+      (runs) =>
+        runs.has(text) &&
+        // ⚠ THE SIBLING CONDITION, AND WITHOUT IT THIS RULE DELETES REAL
+        //   TITLES — measured, not feared.
+        //
+        // A word-run match alone absorbed `True Detective` in
+        // `max-saved-desktop-01`, where the owner has saved BOTH that and
+        // `True Detective: Night Country`. The shorter title is a word-run of
+        // the longer one, the model missed its tile entirely, and the OCR line
+        // that was its only recovery was eaten by its own sequel. Golden
+        // recall fell to 0.9403, under the §9.2 floor. Franchise and
+        // season naming makes that shape ordinary in a watchlist, not exotic.
+        //
+        // The ONLY thing this step exists to undo is OCR splitting one caption
+        // across several lines, so it now requires evidence that a split
+        // happened: another unconsumed line, holding a DIFFERENT part of the
+        // SAME transcription, stacked directly against this one. Fragments of
+        // one caption are consecutive lines; a shorter title elsewhere on the
+        // grid has no such neighbour and survives.
+        normalisedOcr.some((other, otherIndex) => {
+          if (otherIndex === index || consumed.has(otherIndex)) return false;
+          const otherText = squash(other.normalised);
+          if (otherText === '' || otherText === text || !runs.has(otherText)) return false;
+          return stacked(entry.line.box, other.line.box);
+        }),
+    );
+    if (absorbed !== -1) absorbedByStack.push({ index, tile: absorbed });
+  }
+  /*
+   * ⚠ DECIDED AGAINST THE SNAPSHOT, APPLIED AFTERWARDS. Consuming inside the
+   * loop would let the two halves of one split cancel each other: `GOOD LUCK`
+   * is absorbed on the evidence of `HAVE FUN`, and `HAVE FUN` then finds its
+   * only sibling already consumed and survives as an orphan — the very
+   * duplicate this step removes, kept by the removal of its twin, and
+   * dependent on the reader's arbitrary line order.
+   */
+  for (const { index } of absorbedByStack) consumed.add(index);
+
+  /*
+   * ⚠ AN ABSORBED FRAGMENT IS CORROBORATION, AND MUST BE RECORDED AS SUCH.
+   *
+   * Consuming a line silently would leave the tile at `ocrSupport: 'none'`,
+   * and `cleanup.ts` step 7a turns that into `inferred-unverified` — the
+   * fabrication mitigation, which obliges the owner to check a thumbnail
+   * before the title can be used (RSK-028, `T-AI-041`). That verdict would
+   * then be reached for a title BOTH readers read correctly, purely because
+   * the model misplaced its boxes. It is the wrong claim about the evidence
+   * and it is pure added review work — measured on the golden corpus, where
+   * the `Stranger Things: VHS Special Edition` row in two images flipped to
+   * `inferred-unverified` until this block was added.
+   *
+   * The fragments are re-joined in reading order and scored by the same
+   * comparison the geometric path uses, so support means one thing in this
+   * module and not two.
+   */
+  const byTile = new Map<number, number[]>();
+  for (const { index, tile } of absorbedByStack) {
+    const lines = byTile.get(tile);
+    if (lines) lines.push(index);
+    else byTile.set(tile, [index]);
+  }
+  for (const [tileIndex, lineIndexes] of byTile) {
+    const item = items[tileIndex];
+    const tile = llm[tileIndex];
+    if (!item || !tile || item.ocrSupport !== 'none') continue;
+
+    const ordered = [...lineIndexes].sort((a, b) => {
+      const boxA = normalisedOcr[a]?.line.box;
+      const boxB = normalisedOcr[b]?.line.box;
+      if (!boxA || !boxB) return a - b;
+      return boxA.y !== boxB.y ? boxA.y - boxB.y : boxA.x - boxB.x;
+    });
+    const subject = squash(normaliseTitleText(tile.visibleText ?? ''));
+    const joined = ordered.map((i) => squash(normalisedOcr[i]?.normalised ?? '')).join('');
+    const score = subject === joined ? 1 : jaroWinkler(subject, joined);
+    const support = supportFor(score);
+    if (support === 'none') continue;
+
+    item.ocrSupport = support;
+    // The same rule as the geometric path: where OCR corroborated, ITS
+    // measured geometry wins over the model's estimate. The union of the
+    // fragments is the caption, so it is the box the caption was read from.
+    item.boundingBox =
+      ordered.reduce<NormalisedBox | null>((acc, i) => {
+        const box = normalisedOcr[i]?.line.box;
+        if (!box) return acc;
+        if (!acc) return { ...box };
+        const x = Math.min(acc.x, box.x);
+        const y = Math.min(acc.y, box.y);
+        return {
+          x,
+          y,
+          w: Math.max(acc.x + acc.w, box.x + box.w) - x,
+          h: Math.max(acc.y + acc.h, box.y + box.h) - y,
+        };
+      }, null) ?? item.boundingBox;
+    item.boxSource = 'ocr';
   }
 
   // Step 2 — orphan recovery. See the header: NO GATES ARE APPLIED HERE.

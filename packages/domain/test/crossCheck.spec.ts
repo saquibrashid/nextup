@@ -196,6 +196,113 @@ describe('crossCheck (T-AI-034)', () => {
     expect(find(items, 'The Bear')?.ocrSupport).toBe('exact');
   });
 
+  it('T-AI-039f - a caption OCR split across lines does not come back as duplicate rows', () => {
+    /*
+     * ⚠ THE OWNER'S DISNEY+ CAPTURE, REDUCED (TASK-290). The model emitted a
+     * synthetic uniform grid of tile boxes — x roughly right, y shifted down
+     * and stretched — so NOTHING overlapped the caption lines OCR measured.
+     * Every fragment of a caption the model had already transcribed came back
+     * as its own review row, and the owner saw one film split into three.
+     * Correcting two of those fragments onto one work is then what made the
+     * whole batch fail to apply (`T-REV-012bi`).
+     *
+     * Note the boxes: the tile claims y 0.41, the caption sits at y 0.10.
+     * There is no overlap at all, which is the entire point — this must be
+     * decided on the text.
+     */
+    const tiles = [
+      tile(
+        "Good Luck Have Fun Don't Die",
+        { x: 0.06, y: 0.41, w: 0.29, h: 0.23 },
+        {
+          visibleText: "GOOD LUCK HAVE FUN DON'T DIE",
+        },
+      ),
+    ];
+    const split = [
+      line('GOOD LUCK', { x: 0.07, y: 0.1, w: 0.12, h: 0.02 }),
+      line('HAVE FUN', { x: 0.07, y: 0.125, w: 0.11, h: 0.02 }),
+      line("DON'T DIE", { x: 0.07, y: 0.15, w: 0.11, h: 0.02 }),
+    ];
+    const items = crossCheck(tiles, split);
+
+    expect(items.filter((i) => i.provider === 'ocr-only')).toHaveLength(0);
+    expect(items).toHaveLength(1);
+    // ⚠ AND THE TILE IS CORROBORATED, NOT MERELY LEFT ALONE. Consuming the
+    // fragments silently would leave `ocrSupport: 'none'`, which `cleanup.ts`
+    // step 7a turns into `inferred-unverified` — obliging the owner to check
+    // a thumbnail for a title BOTH readers read correctly.
+    expect(items[0]?.ocrSupport).toBe('exact');
+    expect(items[0]?.boxSource).toBe('ocr');
+    // The union of the fragments, i.e. the caption — not the model's estimate.
+    expect(items[0]?.boundingBox.y).toBeCloseTo(0.1, 5);
+  });
+
+  it('T-AI-039g - a SHORTER real title is not absorbed by a longer one that contains it', () => {
+    /*
+     * ⚠ THE MEASURED LIMIT ON `f`, AND IT COST A REAL TITLE BEFORE IT EXISTED.
+     *
+     * `max-saved-desktop-01` holds BOTH `True Detective` and `True Detective:
+     * Night Country`. Absorbing on a word-run match alone ate the shorter
+     * one — the model had missed its tile, so the OCR line was its only
+     * recovery — and golden recall fell to 0.9403, under the §9.2 floor.
+     * Franchise and season naming makes that shape ordinary in a watchlist.
+     *
+     * The discriminator is that OCR line-splitting produces STACKED
+     * consecutive lines. The two lines of the long caption sit against each
+     * other; the separate short title is a row away with no sibling.
+     *
+     * ⚠ This case also passes on the code as it stood BEFORE `f` existed,
+     * because that code absorbed nothing at all. It is not redundant: what it
+     * guards is the obvious-looking wider rule, which was written, measured
+     * against the golden corpus, and rejected on this exact title.
+     */
+    const tiles = [
+      tile(
+        'True Detective: Night Country',
+        { x: 0.26, y: 0.51, w: 0.23, h: 0.24 },
+        {
+          visibleText: 'TRUE DETECTIVE NIGHT COUNTRY',
+        },
+      ),
+    ];
+    const lines = [
+      line('TRUE DETECTIVE', { x: 0.294, y: 0.654, w: 0.109, h: 0.031 }),
+      line('NIGHT COUNTRY', { x: 0.3, y: 0.68, w: 0.086, h: 0.02 }),
+      line('True Detective', { x: 0.292, y: 0.788, w: 0.063, h: 0.016 }),
+    ];
+    const items = crossCheck(tiles, lines);
+
+    const orphans = items.filter((i) => i.provider === 'ocr-only');
+    expect(orphans).toHaveLength(1);
+    expect(orphans[0]?.rawText).toBe('True Detective');
+  });
+
+  it('T-AI-039h - absorption is independent of the reader arbitrary line order', () => {
+    // ⚠ THE TWO HALVES OF ONE SPLIT MUST NOT CANCEL EACH OTHER. Consuming as
+    // the loop walks would absorb `GOOD LUCK` on the evidence of `HAVE FUN`,
+    // and `HAVE FUN` would then find its only sibling already consumed and
+    // survive — a duplicate kept by the removal of its twin.
+    const tiles = [
+      tile(
+        'Good Luck Have Fun',
+        { x: 0.06, y: 0.41, w: 0.29, h: 0.23 },
+        {
+          visibleText: 'GOOD LUCK HAVE FUN',
+        },
+      ),
+    ];
+    const split = [
+      line('GOOD LUCK', { x: 0.07, y: 0.1, w: 0.12, h: 0.02 }),
+      line('HAVE FUN', { x: 0.07, y: 0.125, w: 0.11, h: 0.02 }),
+    ];
+    const forward = crossCheck(tiles, split);
+    const reversed = crossCheck(tiles, [...split].reverse());
+
+    expect(forward.filter((i) => i.provider === 'ocr-only')).toHaveLength(0);
+    expect(JSON.stringify(reversed)).toBe(JSON.stringify(forward));
+  });
+
   it('T-AI-034k - handles both empty legs without throwing', () => {
     expect(crossCheck([], [])).toEqual([]);
     expect(crossCheck(tiles, []).every((i) => i.ocrSupport === 'none')).toBe(true);
