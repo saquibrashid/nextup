@@ -97,6 +97,19 @@ export const OCR_ROW_BUCKETS = 40;
 export const OCR_MERGE_CENTRE_RATIO = 0.4;
 /** Horizontal gap below this fraction of image width may merge. */
 export const OCR_MERGE_GAP = 0.03;
+/**
+ * Fragments of one caption share one font, so the shorter box may not be
+ * squat. Deliberately the same 0.6 as `CAPTION_WRAP_HEIGHT_RATIO` — it is the
+ * same claim about the same property, on the other axis.
+ *
+ * ⚠ **CALIBRATED, unlike the three constants above it.** The ceiling is fixed
+ * by a merge that must survive — the truncation marker on
+ * `truncated-titles-01` (`The Hitchhiker's Guide to the | ..`) at 0.68 — and
+ * the floor by the conflations it must remove, `WHISPER | HAMNET` at 0.41 and
+ * `2026 | The Drama` at 0.38. Raising it past ~0.68 costs de-truncation its
+ * input.
+ */
+export const OCR_MERGE_HEIGHT_RATIO = 0.6;
 
 /**
  * Step 1b constants — the WRAPPED CAPTION continuation (`specs/ai.md` §3.2
@@ -318,6 +331,45 @@ function mergeable(prev: ExtractedTextItem, next: ExtractedTextItem): boolean {
     Math.abs(centreY(prev.boundingBox) - centreY(next.boundingBox)) <
     OCR_MERGE_CENTRE_RATIO * taller;
   const gap = next.boundingBox.x - (prev.boundingBox.x + prev.boundingBox.w);
+
+  // ⚠ **A NEGATIVE GAP IS NOT A SMALL GAP.** `gap < OCR_MERGE_GAP` alone reads
+  // -0.87 as the most mergeable value there is, and -0.87 means `next` starts
+  // 87% of the image width to the LEFT of where `prev` ended — the two are not
+  // side by side at all. This happens constantly, because the sort buckets
+  // rows at `Math.round(y * OCR_ROW_BUCKETS)` and the bucket edges fall
+  // wherever they fall: the LAST item of one bucket (large x) is followed by
+  // the FIRST item of the next (small x), and `sameLine` is a centre-distance
+  // test that does not care which bucket either came from.
+  //
+  // Measured across the golden OCR corpus, this one missing test produced
+  // `HAMNET | STRANGER THINGS` (-0.59), `HIS & HERS | TALES FROM 85` (-0.80),
+  // `SOL | MAN ON FIRE` (-0.49), `Wicked: For Good | WICKED` (-0.43/-0.45),
+  // `LANTERNS | EMMY' NOMINEE !` (-0.40) and `My Purchases | C` (-0.87) —
+  // nine of the fourteen conflations in the corpus, and the shape the owner
+  // reported from their own capture: *"when ocr is executed, the results
+  // should be bound by the box - rectangle its in."*
+  //
+  // `wrapsUnder` has refused a negative gap on the vertical axis since it was
+  // written, for exactly this reason. The horizontal axis simply never got the
+  // same guard.
+  if (gap < 0) return false;
+
+  // Fragments of ONE caption are set in ONE font. A box less than 60% the
+  // height of its neighbour is a different element — artwork lettering, a
+  // badge, a metadata line — not the rest of the same line. This is the same
+  // reasoning, and the same threshold, that `wrapsUnder` already applies via
+  // `CAPTION_WRAP_HEIGHT_RATIO`.
+  //
+  // ⚠ The ceiling is set by a merge that MUST survive: the truncation marker
+  // on `truncated-titles-01`, `The Hitchhiker's Guide to the | ..`, measures
+  // 0.68 — losing it would cost `TRUNCATION_MARKER` its input and with it the
+  // de-truncation path. The conflations it removes measure 0.41
+  // (`WHISPER | HAMNET`) and 0.38 (`2026 | The Drama`).
+  if (taller <= 0) return false;
+  if (Math.min(prev.boundingBox.h, next.boundingBox.h) / taller < OCR_MERGE_HEIGHT_RATIO) {
+    return false;
+  }
+
   return sameLine && gap < OCR_MERGE_GAP;
 }
 

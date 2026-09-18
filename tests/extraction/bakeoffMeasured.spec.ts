@@ -198,7 +198,22 @@ describe('T-AI-045 the bake-off is measured, and the pre-committed rule decides 
     // so it applies to BOTH arms and the comparison stays like-for-like.
     // ⚠ THEN 0.1935 → 0.1525 AT TASK-204, the off-list region (§3.2 step 3b).
     // Again a pipeline rule, not an answer-key change, so both arms see it.
-    expect(inc.falseTitleRate).toBe(0.08771929824561403);
+    //
+    // ⚠ THEN DOWN TO 0.0877 WITHOUT A LEDGER ENTRY, AND THAT GAP IS LEFT
+    // VISIBLE RATHER THAN QUIETLY BACK-FILLED. The pin was updated and this
+    // comment was not; the run that moved it is no longer identifiable from
+    // here. Record the entry in the same commit as the pin, always.
+    //
+    // ⚠ THEN 0.0877 → 0.0545 AT THE TILE-BOUNDARY FIX: `mergeable()` in §3.2
+    // step 1 merged two OCR boxes on a `gap < OCR_MERGE_GAP` test that never
+    // checked `next` is to the RIGHT of `prev`, so a gap of -0.87 scored as
+    // maximally mergeable. The row-bucket sort manufactures that pairing every
+    // time a bucket edge falls mid-row. A `gap >= 0` guard plus the
+    // height-comparability test `wrapsUnder` already had removed 13 of the
+    // corpus's 14 horizontal conflations. A PIPELINE rule again, not an
+    // answer-key change, so both arms see it and the comparison stays
+    // like-for-like.
+    expect(inc.falseTitleRate).toBe(0.05454545454545454);
     // ⚠ The fabrication rate moved with it — 0.011494 → 0.011765 — and it went
     // UP while the pipeline got BETTER. Same single fabrication, divided by a
     // denominator two candidates smaller because the two fragments collapsed.
@@ -224,7 +239,17 @@ describe('T-AI-045 the bake-off is measured, and the pre-committed rule decides 
     // it emits more readings per caption, so it had more duplicate fragments
     // to absorb. The incumbent's rate did not move at all, because on these
     // recordings its absorbed fragments were all already being collapsed.
-    expect(chal.falseTitleRate).toBe(0.2463768115942029);
+    //
+    // ⚠ THEN 0.2464 → 0.2239 AT THE TILE-BOUNDARY FIX, and the challenger
+    // moving here is the EVIDENCE that the guard is a pipeline rule rather
+    // than an answer-key edit: both arms are grouped by the same
+    // `mergeable()`, so both shed cross-tile conflations. This time the
+    // challenger moved LESS than the incumbent (2.2 points against 3.3), the
+    // reverse of TASK-203 and TASK-290, because the defect was geometric
+    // rather than textual — it depended on where OCR's row buckets fell, not
+    // on how many readings per caption an arm emits. The incumbent's lead
+    // widened from 15.9 points to 16.9.
+    expect(chal.falseTitleRate).toBe(0.22388059701492538);
     // Same denominator artefact as the incumbent's: 0.035 → 0.036649. Then
     // 0.036649 → 0.037234 at TASK-206, as R3 handed a handful of challenger
     // captions back to their printed text too. ⚠ THEN 0.037234 → 0.038462 AT
@@ -233,7 +258,13 @@ describe('T-AI-045 the bake-off is measured, and the pre-committed rule decides 
     // denominator artefact, exactly like the two before it; do not read it as
     // a regression. It stays an order of magnitude above the incumbent's
     // zero, which is the point of scoring both.
-    expect(chal.fabricationRate).toBe(0.038461538461538464);
+    //
+    // ⚠ AND AGAIN, 0.038462 → 0.038889, AT THE TILE-BOUNDARY FIX — for the
+    // FOURTH time, and for the same reason every time: the numerator is
+    // unchanged and the denominator shrank. Four consecutive entries here say
+    // "went up, got better". Check the numerator before reacting to this
+    // number at all.
+    expect(chal.fabricationRate).toBe(0.03888888888888889);
 
     // ⚠ THE SHAPE OF THE RESULT, STATED AS AN ASSERTION SO IT CANNOT BE
     // MISREAD FROM THE NUMBERS ALONE: the challenger reads MORE, and much of
