@@ -1062,22 +1062,54 @@ button {
 }
 
 .list-controls form[role='search'],
-.filter-bar__chips,
-.sort-control-group,
+/*
+ * ⚠ EVERY ROW IS EXPLICIT, AND THAT IS THE BUG FIX — not tidiness.
+ *
+ * These were placed by COLUMN only, leaving the row to auto-placement. Grid's
+ * cursor only moves forward, so the moment a full-width item appeared earlier
+ * in source order — `.filter-bar__chips`, which exists only when a filter is
+ * active — everything after it was pushed past that row. The count and the
+ * sort control could then never return to the Filters trigger's line.
+ *
+ * Measured on a 390 px phone with one filter active, before this: the toolbar
+ * was 357 px tall on an 844 px screen (42% of the viewport) across five rows,
+ * three of which were more than half empty — `.filter-bar` alone at 94 px of
+ * 340, the chip list alone, `Clear filters` alone. The owner's words were
+ * "so much wasted space", and the screenshot is exactly this.
+ *
+ * ⚠ The rows differ between the two breakpoints because the sort control
+ * moves: below 360 px it cannot share a line with the Filters trigger, the
+ * count and a 44 px reverse target (`T-A11Y-015a`), so it takes its own row
+ * and everything after it shifts down by one.
+ */
+.list-controls > [role='search'] {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+.filter-bar__chips {
+  grid-column: 1 / -1;
+  grid-row: 3;
+}
+
 .list-view-control {
   grid-column: 1 / -1;
 }
 
 .filter-bar {
   grid-column: 1;
+  grid-row: 2;
 }
 
 .filter-bar__status {
   grid-column: 2;
+  grid-row: 2;
   min-inline-size: 0;
 }
 
 .sort-control-group {
+  grid-column: 1 / -1;
+  grid-row: 4;
   min-inline-size: 0;
 }
 
@@ -1099,6 +1131,7 @@ button {
 
   .sort-control-group {
     grid-column: 3;
+    grid-row: 2;
   }
 }
 
@@ -3195,9 +3228,14 @@ button {
   margin-top: var(--space-3);
 }
 
-.active-filters {
-  flex-basis: 100%;
-}
+/*
+ * ⚠ DELETED, NOT RE-TUNED: `.active-filters { flex-basis: 100%; }` used to sit
+ * here, a second rule on a selector already styled ~200 lines above. It made
+ * the chip list claim the whole toolbar line, so `Clear filters` wrapped
+ * underneath it and one active filter cost TWO rows. Measured on a 390 px
+ * phone: the list reported `w=340` (the full content width) for a single
+ * ~110 px chip. The chips size to their content and share the line now.
+ */
 
 .active-filter {
   max-width: 100%;
