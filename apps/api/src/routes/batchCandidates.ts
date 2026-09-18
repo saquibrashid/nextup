@@ -30,7 +30,6 @@ import {
   type CandidatePatch,
   type ManualEntry,
   type ReviewCandidate,
-  type Service,
   requireServiceOf,
 } from '@nextup/domain';
 import { type Router } from 'express';
@@ -43,7 +42,6 @@ import {
   createExtractionCandidate,
   findExtractionCandidate,
   findUploadBatch,
-  listActiveListingsForService,
   listActiveSuppressions,
   listCandidatesForBatch,
   updateCandidateDisposition,
@@ -103,26 +101,63 @@ function toPatchedCandidate(row: {
 /**
  * Applies a correction: `disposition: 'corrected'` + a TMDB target.
  *
- * Three things happen here and the ORDER matters:
+ * Two things happen here and the ORDER matters:
  *
  *   1. the target identity is composed — deterministically, with no network
  *      call, because `tmdb:<mediaType>:<id>` is fully determined by the body
  *      and a TMDB outage must not stop the owner fixing a wrong match;
  *   2. the SUPPRESSION gate — correcting ONTO a work the owner has said they
  *      are not interested in would re-admit it through the back door
- *      (REQ-071), so it is refused with `TARGET_WORK_SUPPRESSED`;
- *   3. the DUPLICATE gate (US-012 AC-5, `T-REV-014`) — an active listing for
- *      that work on this service already exists, so applying the correction
- *      would add the same work twice. Refused with `DUPLICATE_WORK_IDENTITY`
- *      unless the owner explicitly sends `confirmDuplicate: true`.
+ *      (REQ-071), so it is refused with `TARGET_WORK_SUPPRESSED`.
  *
- * Reversing 2 and 3 would tell an owner who corrected onto a suppressed work
- * that it was a duplicate, which is true but not the reason they cannot do it.
+ * ⚠ **THERE IS NO DUPLICATE GATE HERE, AND REINTRODUCING ONE IS A DATA-LOSS
+ * DEFECT.** An earlier version refused this correction with 409
+ * `DUPLICATE_WORK_IDENTITY` whenever the target work already held an active
+ * listing on this service, unless the caller sent `confirmDuplicate: true`.
+ * It was measured live and every part of it was wrong:
+ *
+ *   - **The PRD mandates the opposite.** US-012 AC-5 reads: *"The owner
+ *     corrects a match to a work that already has an active listing for this
+ *     service → **the correction is applied**, the item is re-classified as
+ *     already present, moves out of Additions, and closing the batch does not
+ *     create a duplicate Title."* The refusal was not a stricter reading of
+ *     AC-5; it was its inverse. `specs/api.md` §6.18 lists only 200, 400 and
+ *     `BATCH_NOT_IN_REVIEW` for this endpoint — the code was answering with an
+ *     error the endpoint's own contract does not contain.
+ *   - **The premise is false.** Close cannot create a duplicate Title here:
+ *     `services/batchClose.ts` resolves every confirmed candidate through
+ *     `findTitleByWorkIdentity` and re-uses the existing row, attaching a
+ *     listing only where the service lacks one. The gate was defending
+ *     against an outcome that the write path already makes unreachable.
+ *   - **It fired on the NORMAL case.** A full update is a re-capture of the
+ *     whole list, so *almost every title in it is already on the list by
+ *     definition*. The condition the gate treats as an anomaly is the
+ *     expected state of the mode.
+ *   - **It was unreachable to escape.** `ReviewRoute.matchUnmatched` never
+ *     sends `confirmDuplicate`, and `UnmatchedActions` has no branch for the
+ *     code, so the 409 surfaced as the generic *"Couldn't save that. Nothing
+ *     has changed."* The owner was not told it was a duplicate and was given
+ *     no way to insist. The correction was not merely awkward — it was
+ *     impossible.
+ *
+ * ⚠ **And the refusal then proposed DELETING the title it had just refused to
+ * let the owner identify** — product invariant 2, REQ-006. Reconciliation
+ * unions the `resolvedWorkIdentity` of every surviving candidate
+ * (`reconcile.ts`) and proposes removing each active listing outside that
+ * union. A refused correction leaves the candidate pointing at the work the
+ * extraction *mis*-read, so the real work never joins the union, so its
+ * listing is offered for removal. A misread title being read as a removal is
+ * the single failure mode this product is built to prevent, and the gate
+ * manufactured it.
+ *
+ * Applying the correction closes all of it at once: the candidate's identity
+ * becomes the real work, `classification: null` makes the next review read
+ * re-derive it as already-present (AC-5's second clause), and that same
+ * identity enters the reconciliation union, withdrawing the removal.
  */
 async function applyCorrection(
   ownerId: ReturnType<typeof requireOwnerId>,
   candidateId: string,
-  service: Service,
   patch: Extract<CandidatePatch, { kind: 'corrected' }>,
 ): Promise<void> {
   const workIdentity = workIdentityForTmdb(patch.mediaType, patch.tmdbId);
@@ -135,19 +170,6 @@ async function applyCorrection(
       "You marked that title as not interested. Un-suppress it first if you'd like it back.",
       { workIdentity },
     );
-  }
-
-  if (!patch.confirmDuplicate) {
-    const listings = await listActiveListingsForService(ownerId, service);
-    const existing = listings.find((listing) => listing.title.workIdentity === workIdentity);
-    if (existing !== undefined) {
-      throw new AppError(
-        'DUPLICATE_WORK_IDENTITY',
-        409,
-        'That title is already on this list. Send confirmDuplicate to add it anyway.',
-        { workIdentity, titleId: existing.titleId },
-      );
-    }
   }
 
   await updateCandidateDisposition(ownerId, candidateId, {
@@ -273,7 +295,15 @@ export function registerBatchCandidateRoutes(
           reviewDisposition: patch.disposition,
         });
       } else if (patch.kind === 'corrected') {
-        await applyCorrection(ownerId, candidateId, requireServiceOf(batch), patch);
+        // ⚠ `requireServiceOf(batch)` used to be evaluated here to feed the
+        // deleted duplicate gate, and it THROWS for a discovery batch
+        // (ADR-0010 D-1 — a discovery capture has no service). Correcting a
+        // mis-read title is exactly as necessary in a discovery review as in
+        // a service one, so the gate's removal also removes a call that would
+        // have refused the whole correction on the one batch kind that has no
+        // service to be a duplicate within. The correction itself never needed
+        // one: `workIdentity` comes from `tmdbId` + `mediaType` alone.
+        await applyCorrection(ownerId, candidateId, patch);
       } else {
         await applyReclassify(ownerId, candidateId, row, getTmdbClient);
       }
