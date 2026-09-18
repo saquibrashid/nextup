@@ -27,7 +27,8 @@ import {
   type CandidatePatchBody,
   type CloseBatchResult,
 } from '../lib/apiClient';
-import { SESSION_ENDED_REVIEW_BODY } from '../copy';import { type AppliedBatch } from '../components/BatchAppliedNotice';
+import { SESSION_ENDED_REVIEW_BODY } from '../copy';
+import { type AppliedBatch } from '../components/BatchAppliedNotice';
 import { parseSkeletonCount } from '../components/ReviewSkeleton';
 import { useResource } from '../lib/useResource';
 import { useOnline } from '../lib/useOnline';

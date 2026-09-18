@@ -117,7 +117,9 @@ describe('T-UX-149 — a decision does not tear down the review list', () => {
         <Routes>
           <Route
             path="/batches/:batchId/review"
-            element={<ReviewRoute client={createApiClient({ fetchImpl: fetchImpl as typeof fetch })} />}
+            element={
+              <ReviewRoute client={createApiClient({ fetchImpl: fetchImpl as typeof fetch })} />
+            }
           />
         </Routes>
       </MemoryRouter>,
@@ -155,7 +157,9 @@ describe('T-UX-149 — a decision does not tear down the review list', () => {
         <Routes>
           <Route
             path="/batches/:batchId/review"
-            element={<ReviewRoute client={createApiClient({ fetchImpl: fetchImpl as typeof fetch })} />}
+            element={
+              <ReviewRoute client={createApiClient({ fetchImpl: fetchImpl as typeof fetch })} />
+            }
           />
         </Routes>
       </MemoryRouter>,
