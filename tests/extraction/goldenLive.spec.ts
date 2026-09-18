@@ -286,6 +286,60 @@ function reportMarkdown(runs: readonly LiveRun[], cost: number): string {
   }
   lines.push('');
 
+  // ── L1's MISSES, BY NAME ─────────────────────────────────────────────────
+  //
+  // ⚠ §4A requires L3's unstable titles to be "printed by name", for a reason
+  // that applies with equal force here: a recall ratio says the reader wobbled
+  // but not on WHAT, and the name is the only part anyone can act on. L1 was
+  // shipped without it, and the cost showed up the first time the suite ran in
+  // anger — `netflix-mylist-desktop-01` sat at 0.800 against a 0.900 floor in
+  // all three runs, an obviously REPRODUCIBLE shortfall rather than sampling
+  // noise, and the report could not say which two titles were lost. That is
+  // the difference between a number to argue about and a defect to fix.
+  //
+  // ⚠ Reported per IMAGE and only where non-empty. A flat list across the
+  // corpus would lose the one fact that makes a miss diagnosable — which
+  // capture, and therefore which layout, lost it.
+  const missed = missedTitles(runs);
+  lines.push('## L1 — expected titles NOT found, by image');
+  lines.push('');
+  if (missed.length === 0) {
+    lines.push('None. Every expected title in the corpus was found in every run.');
+  } else {
+    for (const entry of missed) {
+      const runLabel =
+        entry.runs === RUNS
+          ? 'every run'
+          : `${String(entry.runs)} of ${String(RUNS)} runs — INTERMITTENT`;
+      lines.push(`- \`${entry.image}\` · \`${entry.title}\` — missed in ${runLabel}`);
+    }
+  }
+  lines.push('');
+
+  // ── L5's FALSE TITLES, BY NAME ───────────────────────────────────────────
+  //
+  // ⚠ THE PRECISION HALF, AND IT IS WHERE THE INSTABILITY LIVES. L3 reported
+  // "no unstable titles" in the same run whose L2 Jaccard fell to 0.7692 —
+  // those two facts are only compatible if the sets differ in text that is NOT
+  // an expected title, i.e. the junk varies run to run while the real titles
+  // hold steady. Naming the junk is what turns "precision is down" into a
+  // deterministic rule someone can write (§3.2), which is how every chrome and
+  // merge fix in this product has been found.
+  const falses = falseTitlesByName(runs);
+  lines.push('## L5 — false titles, by name');
+  lines.push('');
+  if (falses.length === 0) {
+    lines.push('None.');
+  } else {
+    for (const entry of falses) {
+      lines.push(
+        `- \`${entry.image}\` · \`${entry.title}\` — in ${String(entry.runs)} of ` +
+          `${String(RUNS)} runs`,
+      );
+    }
+  }
+  lines.push('');
+
   lines.push('## L7 — cost');
   lines.push('');
   const prompt = runs.reduce((n, r) => n + r.usage.promptTokens, 0);
@@ -319,6 +373,73 @@ function unstableTitles(runs: readonly LiveRun[]): { title: string; runs: number
     if (hits > 0 && hits < runs.length) out.push({ title, runs: hits });
   }
   return out;
+}
+
+/**
+ * Expected titles that were NOT accepted, per image, with how many runs missed
+ * them — the naming half of L1.
+ *
+ * ⚠ The run count separates a REPRODUCIBLE shortfall from sampling noise, and
+ * they want opposite responses. A title missed in every run is a deterministic
+ * failure against a fixed image and is a defect to fix; one missed
+ * intermittently is the reader wobbling and belongs to L2/L3's stability
+ * story. Collapsing the two into a bare list would merge them.
+ */
+function missedTitles(runs: readonly LiveRun[]): { image: string; title: string; runs: number }[] {
+  const out: { image: string; title: string; runs: number }[] = [];
+  for (const image of manifest.images) {
+    const first = runs[0]?.scored.find((s) => s.image.id === image.id);
+    if (first === undefined) continue;
+    for (const expected of [...first.expected.expectedCandidates]
+      .map((c) => c.normalisedText)
+      .sort()) {
+      const misses = runs.filter((run) => {
+        const s = run.scored.find((x) => x.image.id === image.id);
+        if (s === undefined) return false;
+        return !s.candidates.some(
+          (c) => c.normalisedText === expected && RECALL_VERDICTS.has(c.cleanupVerdict),
+        );
+      }).length;
+      if (misses > 0) out.push({ image: image.id, title: expected, runs: misses });
+    }
+  }
+  return out;
+}
+
+/**
+ * Accepted `title-candidate` texts that are neither expected nor chrome — L5's
+ * numerator, named.
+ *
+ * ⚠ The chrome exclusion is copied from `scoreWithStore` deliberately rather
+ * than relaxed "to show more". Chrome that leaked through is measured by the
+ * chrome-rejection metric; listing it here would send the reader after a
+ * vocabulary gap while reporting it as a precision defect, and one leak would
+ * appear in two unrelated sections of the same report.
+ */
+function falseTitlesByName(
+  runs: readonly LiveRun[],
+): { image: string; title: string; runs: number }[] {
+  const seen = new Map<string, { image: string; title: string; runs: number }>();
+  for (const run of runs) {
+    for (const s of run.scored) {
+      const expected = new Set(s.expected.expectedCandidates.map((c) => c.normalisedText));
+      const chrome = new Set(s.expected.expectedChrome);
+      for (const c of s.candidates) {
+        if (c.cleanupVerdict !== 'title-candidate') continue;
+        if (expected.has(c.normalisedText) || chrome.has(c.normalisedText)) continue;
+        const key = `${s.image.id}\u0000${c.normalisedText}`;
+        const entry = seen.get(key);
+        if (entry === undefined) {
+          seen.set(key, { image: s.image.id, title: c.normalisedText, runs: 1 });
+        } else {
+          entry.runs += 1;
+        }
+      }
+    }
+  }
+  return [...seen.values()].sort(
+    (a, b) => b.runs - a.runs || a.image.localeCompare(b.image) || a.title.localeCompare(b.title),
+  );
 }
 
 describe('T-AI-051 · §4A the live quality suite — MANUAL, COSTS MONEY', () => {
