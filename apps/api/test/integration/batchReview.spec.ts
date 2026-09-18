@@ -1022,11 +1022,45 @@ describe('T-AI-041 · the review response carries the tile crop for the client t
     expect(((await res.json()) as ReviewBody).sections.additions.items[0]?.tileCrop).toBeNull();
   });
 
-  it('T-AI-041z: a plain title-candidate carries no crop', async () => {
+  // ── T-UX-154 · the inversion of the former `T-AI-041z` ──────────────────
+  //
+  // `T-AI-041z` used to read *"a plain title-candidate carries no crop"* and
+  // expect `null`. It pinned a verdict allow-list in `tileCropFor` that read
+  // §5.3a's two-row table as a CEILING; it is a FLOOR. The two verdicts named
+  // there MUST carry a thumbnail — nothing says they are the only ones that
+  // MAY.
+  //
+  // The gate turned into a live defect the moment `T-UX-151b` widened the
+  // client: `CandidateCard` renders the source tile for **any** card with no
+  // TMDB poster, which is every unmatched card. Those cards asked for a crop,
+  // got `null`, and fell through to the uncropped `<img>` — so the owner was
+  // shown the ENTIRE pasted screenshot beside "is this the right match?".
+  // Reported from a phone: *"the image shown is the entire screenshot that I
+  // pasted — that's not useful… if there are other titles that overlap or are
+  // too similar, I won't know which tile I'm actually addressing."* With ~20
+  // tiles to a screenshot, an uncropped thumbnail identifies the BATCH, not
+  // the ROW.
+  //
+  // ⚠ This case is an UNMATCHED `title-candidate`, not merely a
+  // title-candidate, because that is the row the owner was actually looking
+  // at and the one the widened client branch is for. `T-AI-041x` still pins
+  // the real limit — an OCR caption strip is refused whatever the verdict.
+  it('T-UX-154a: an unmatched title-candidate IS served its crop, not the whole screenshot', async () => {
     const batchId = await makeBatch();
-    await makeCandidate(batchId, { boxSource: 'llm', boundingBoxes: boxes() });
+    await makeCandidate(batchId, {
+      workIdentity: 'unmatched:0123456789abcdef',
+      boxSource: 'llm',
+      boundingBoxes: boxes(),
+    });
 
-    const body = (await (await getReview(batchId)).json()) as ReviewBody;
-    expect(body.sections.additions.items[0]?.tileCrop).toBeNull();
+    const crop = ((await (await getReview(batchId)).json()) as ReviewBody).sections.unmatched
+      .items[0]?.tileCrop;
+
+    expect(crop).toBeTruthy();
+    expect(crop?.imageId).toBe('img_tile');
+    // The tile, not the page: a crop that spans the whole image is the defect
+    // wearing the fix's clothes.
+    expect(crop?.w).toBeLessThan(1);
+    expect(crop?.h).toBeLessThan(1);
   });
 });

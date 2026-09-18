@@ -416,9 +416,6 @@ export function sectionForCandidate(candidate: ReviewCandidate): ReviewSectionNa
 
 // ── The §5.3a tile crop ────────────────────────────────────────────────────
 
-/** The two verdicts §5.3a gives a MANDATORY thumbnail presentation. */
-const TILE_THUMBNAIL_VERDICTS = new Set<CleanupVerdict>(['inferred-unverified', 'unreadable-tile']);
-
 /**
  * How much of the surrounding image to keep around the tile, as a fraction of
  * the tile's own size on each axis.
@@ -442,18 +439,49 @@ export const TILE_CROP_PADDING = 0.08;
  * artwork that is the entire reason the thumbnail is mandatory. That failure
  * is invisible in a test that only asserts "a crop was produced".
  *
+ * ⚠ **NO VERDICT GATE — and one must not be re-added (`T-UX-154`).** This
+ * function used to refuse every verdict outside `inferred-unverified` and
+ * `unreadable-tile`, the two §5.3a singles out. That reads §5.3a's table as a
+ * *ceiling*; it is a **floor**. §5.3a says those two verdicts MUST carry a
+ * thumbnail. It nowhere says they are the only ones that MAY.
+ *
+ * The gate became a live defect the moment `T-UX-151b` widened the client:
+ * `CandidateCard` now renders the source tile for **any** card with no TMDB
+ * poster, because a card the owner is asked to decide must show what it is
+ * asking about. Those cards reached the crop branch, got `null` here, and fell
+ * through to the uncropped `<img>` — so the owner was shown the **entire
+ * pasted screenshot** beside the question "is this the right match?". Reported
+ * from a phone: *"it's asking me to confirm the match but the image shown is
+ * the entire screenshot that I pasted — that's not useful… if there are other
+ * titles that overlap or are too similar, I won't know which tile I'm actually
+ * addressing."* That is the failure whole: with ~20 tiles on one screenshot,
+ * an uncropped thumbnail identifies the *batch*, not the *row*, and the owner
+ * is answering a question about a tile they cannot locate.
+ *
+ * ⚠ Widening this is safe **because the crop is inert unless rendered.**
+ * `CandidateCard` reads `tileCrop` only inside `needsThumbnail &&
+ * thumbnailUrl !== null`; a matched card with a poster takes the poster branch
+ * and never looks at it. So the verdicts newly granted a crop here are exactly
+ * the ones already showing a thumbnail — the change cannot introduce a
+ * thumbnail where there was none, only replace a whole screenshot with the
+ * tile it was supposed to be.
+ *
  * ⚠ Returns `null` rather than a whole-image `{0,0,1,1}` box for the no-crop
  * case, so the client renders its existing uncropped `<img>` path instead of a
  * crop that happens to be the identity. A degenerate rectangle is refused for
  * the same reason: a zero-width box scaled to fill a thumbnail is an infinite
  * magnification of one column of pixels.
+ *
+ * ⚠ `verdict` is deliberately **not** a parameter. Keeping it "in case the
+ * rule comes back" would leave the defect one uncommented line away, and a
+ * caller passing it would imply it is consulted. The two mandatory-thumbnail
+ * verdicts are enforced where they belong — in `CandidateCard`'s
+ * `needsThumbnail`, which is the thing §5.3a actually constrains.
  */
 export function tileCropFor(input: {
-  verdict: CleanupVerdict;
   boxSource: string;
   boundingBoxes: readonly { imageId: string; x: number; y: number; w: number; h: number }[];
 }): ReviewTileCrop | null {
-  if (!TILE_THUMBNAIL_VERDICTS.has(input.verdict)) return null;
   if (input.boxSource !== 'llm') return null;
 
   const first = input.boundingBoxes[0];

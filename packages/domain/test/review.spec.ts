@@ -500,7 +500,6 @@ describe('T-AI-041 - tileCropFor selects the tile region, or refuses', () => {
 
   it('T-AI-041f: an inferred-unverified candidate with an LLM tile box gets a padded crop', () => {
     const crop = tileCropFor({
-      verdict: 'inferred-unverified',
       boxSource: 'llm',
       boundingBoxes: [box()],
     });
@@ -517,9 +516,7 @@ describe('T-AI-041 - tileCropFor selects the tile region, or refuses', () => {
   });
 
   it('T-AI-041g: an unreadable-tile candidate is cropped too - the tile is all it has', () => {
-    expect(
-      tileCropFor({ verdict: 'unreadable-tile', boxSource: 'llm', boundingBoxes: [box()] }),
-    ).not.toBeNull();
+    expect(tileCropFor({ boxSource: 'llm', boundingBoxes: [box()] })).not.toBeNull();
   });
 
   // ⚠ THE LOAD-BEARING CASE. An OCR box is a text-LINE strip, not artwork.
@@ -530,28 +527,30 @@ describe('T-AI-041 - tileCropFor selects the tile region, or refuses', () => {
   it('T-AI-041h: an OCR box yields NO crop - it is a text line, not the artwork', () => {
     expect(
       tileCropFor({
-        verdict: 'inferred-unverified',
         boxSource: 'ocr',
         boundingBoxes: [box({ h: 0.02 })],
       }),
     ).toBeNull();
   });
 
-  it('T-AI-041i: a verdict with no mandatory thumbnail gets no crop', () => {
-    expect(
-      tileCropFor({ verdict: 'title-candidate', boxSource: 'llm', boundingBoxes: [box()] }),
-    ).toBeNull();
+  it('T-AI-041i: a verdict outside the two mandatory ones is STILL cropped', () => {
+    // ⚠ THIS ASSERTION IS THE INVERSION OF ITS OWN FORMER SELF, and the
+    // inversion is the fix. It used to read "a verdict with no mandatory
+    // thumbnail gets no crop" and expect `null` — encoding §5.3a's table as
+    // an exhaustive list of verdicts allowed a crop. §5.3a states a FLOOR
+    // ("these two MUST"), not a ceiling, and the difference became visible
+    // once `T-UX-151b` made `CandidateCard` render a thumbnail for every
+    // card with no poster: those cards got no crop and showed the WHOLE
+    // pasted screenshot beside "is this the right match?". See `T-UX-154`.
+    expect(tileCropFor({ boxSource: 'llm', boundingBoxes: [box()] })).not.toBeNull();
   });
 
   it('T-AI-041j: no boxes at all degrades to the whole image, not a throw', () => {
-    expect(
-      tileCropFor({ verdict: 'unreadable-tile', boxSource: 'llm', boundingBoxes: [] }),
-    ).toBeNull();
+    expect(tileCropFor({ boxSource: 'llm', boundingBoxes: [] })).toBeNull();
   });
 
   it('T-AI-041k: boxes are unioned, but only those on the SAME image as the first', () => {
     const crop = tileCropFor({
-      verdict: 'inferred-unverified',
       boxSource: 'llm',
       boundingBoxes: [
         box({ x: 0.2, y: 0.4, w: 0.1, h: 0.1 }),
@@ -571,7 +570,6 @@ describe('T-AI-041 - tileCropFor selects the tile region, or refuses', () => {
 
   it('T-AI-041l: a crop is clamped into the image, never negative or past the edge', () => {
     const crop = tileCropFor({
-      verdict: 'inferred-unverified',
       boxSource: 'llm',
       boundingBoxes: [box({ x: 0, y: 0, w: 1, h: 1 })],
     });
@@ -587,7 +585,6 @@ describe('T-AI-041 - tileCropFor selects the tile region, or refuses', () => {
   it('T-AI-041m: a degenerate box is refused rather than magnified infinitely', () => {
     expect(
       tileCropFor({
-        verdict: 'unreadable-tile',
         boxSource: 'llm',
         boundingBoxes: [box({ w: 0, h: 0 })],
       }),
@@ -597,7 +594,6 @@ describe('T-AI-041 - tileCropFor selects the tile region, or refuses', () => {
   it('T-AI-041n: a non-finite coordinate degrades to the whole image', () => {
     expect(
       tileCropFor({
-        verdict: 'unreadable-tile',
         boxSource: 'llm',
         boundingBoxes: [box({ x: Number.NaN })],
       }),
