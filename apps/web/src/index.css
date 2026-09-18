@@ -2593,6 +2593,25 @@ button {
   gap: var(--space-2);
   align-items: center;
   justify-content: space-between;
+  /* At 390 px a long title squeezed the button into a 158 px column and both
+     sides reflowed to four lines, so the row read as two blocks of prose with
+     no control in it. Wrapping drops the button to its own line instead
+     (`T-UX-152`). */
+  flex-wrap: wrap;
+}
+
+.unmatched-actions__result-label {
+  /* ⚠ `min-width: 0` is what lets a long title wrap INSIDE its own box rather
+     than forcing the row wider than the card. */
+  min-width: 0;
+  flex: 1 1 12rem;
+  overflow-wrap: anywhere;
+}
+
+.unmatched-actions__result button {
+  /* Never squeezed: the control keeps its own width and moves to a new line
+     when there is not room for it beside the title. */
+  flex: 0 0 auto;
 }
 
 .unmatched-actions__outcome {

@@ -1366,7 +1366,20 @@ export const UNMATCHED_SEARCHING = 'Searching…';
 export const UNMATCHED_NO_RESULTS = 'TMDB has nothing under that name.';
 export const UNMATCHED_SEARCH_FAILED = "Couldn't reach TMDB. Try again in a moment.";
 export const UNMATCHED_SEARCH_LABEL = 'Search TMDB for this title';
+/**
+ * ⚠ `UNMATCHED_MATCH_LABEL` is the ACCESSIBLE name and is no longer rendered
+ * as the visible text. It still names the specific result, so a screen-reader
+ * owner moving button to button hears which title each one applies to.
+ *
+ * `UNMATCHED_MATCH_SHORT` is what the eye reads, and it is short on purpose.
+ * The full interpolated label reflowed to four lines at 390 px, directly
+ * beside the identical title text it was interpolated from — the owner
+ * reported that row as *"the text was covering the button… I guessed at the
+ * confirm button"*. The title is already on the same line; repeating it inside
+ * the control turned the control into prose (`T-UX-152`).
+ */
 export const UNMATCHED_MATCH_LABEL = 'Use {name}';
+export const UNMATCHED_MATCH_SHORT = 'Use this';
 export const UNMATCHED_ACTION_FAILED = "Couldn't save that. Nothing has changed.";
 export const UNMATCHED_CANCEL_LABEL = 'Cancel';
 
