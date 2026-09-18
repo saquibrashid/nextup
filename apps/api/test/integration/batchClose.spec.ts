@@ -652,7 +652,7 @@ describe('T-REV-012 · US-012 AC-3 · close applies confirmed work and refuses p
    * all-or-nothing, so before this fix one duplicate discarded every other
    * decision in the batch too.
    */
-  it('T-REV-012ai: two applicable candidates naming ONE work apply once, not 409', async () => {
+  it('T-REV-012bi: two applicable candidates naming ONE work apply once, not 409', async () => {
     const batchId = await makeBatch();
     const survivor = await makeCandidate(batchId, {
       rawText: "Good Luck Have Fun Don't Die",
