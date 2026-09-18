@@ -42,3 +42,18 @@ export const OCR_BOX_OVERLAP_MIN = 0.2;
  * single failure class this product exists to avoid.
  */
 export const EXTRACT_CONFIDENCE_FLOOR = 0.55;
+
+/**
+ * Maximum vertical gap between two OCR lines for them to read as consecutive
+ * lines of ONE stacked caption, expressed in line-heights of the taller line.
+ *
+ * Used only by the step that absorbs OCR fragments back into a caption the
+ * model already transcribed. Measured against `max-saved-desktop-01`, which
+ * contains both halves of the discrimination: the two lines of the
+ * `True Detective: Night Country` caption sit at a gap of −0.005 (they
+ * slightly overlap), while the separate `True Detective` tile's caption is
+ * 0.088 away — about 2.8 line-heights. Anything from roughly 0.2 to 2.5
+ * separates them; the midpoint is taken so that neither a tight leading nor a
+ * generous one lands on the boundary.
+ */
+export const OCR_LINE_STACK_GAP_MAX = 1.5;

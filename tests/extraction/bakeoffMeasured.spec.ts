@@ -218,12 +218,22 @@ describe('T-AI-045 the bake-off is measured, and the pre-committed rule decides 
     // 0.3472 — and that is expected, not suspicious: it emits MORE readings of
     // each caption, so it had more fragments to lose. Its lead-gap narrowed
     // and the incumbent still wins by 15.4 points.
-    expect(chal.falseTitleRate).toBe(0.3);
+    // ⚠ THEN 0.3472 → 0.2464 AT TASK-290, the stacked-fragment absorption
+    // (§2.1c step 1b). A pipeline rule again, so both arms see it — and the
+    // challenger moves further again, for the same reason it did at TASK-203:
+    // it emits more readings per caption, so it had more duplicate fragments
+    // to absorb. The incumbent's rate did not move at all, because on these
+    // recordings its absorbed fragments were all already being collapsed.
+    expect(chal.falseTitleRate).toBe(0.2463768115942029);
     // Same denominator artefact as the incumbent's: 0.035 → 0.036649. Then
     // 0.036649 → 0.037234 at TASK-206, as R3 handed a handful of challenger
-    // captions back to their printed text too. It stays an order of magnitude
-    // above the incumbent's zero, which is the point of scoring both.
-    expect(chal.fabricationRate).toBe(0.03723404255319149);
+    // captions back to their printed text too. ⚠ THEN 0.037234 → 0.038462 AT
+    // TASK-290, AND IT WENT UP WHILE THE PIPELINE GOT BETTER — the same
+    // fabrications over a denominator shrunk by the absorbed fragments. A
+    // denominator artefact, exactly like the two before it; do not read it as
+    // a regression. It stays an order of magnitude above the incumbent's
+    // zero, which is the point of scoring both.
+    expect(chal.fabricationRate).toBe(0.038461538461538464);
 
     // ⚠ THE SHAPE OF THE RESULT, STATED AS AN ASSERTION SO IT CANNOT BE
     // MISREAD FROM THE NUMBERS ALONE: the challenger reads MORE, and much of
