@@ -10,7 +10,12 @@ import {
   type Service,
 } from '@nextup/domain';
 
-import { IMAGE_ACCEPT_ATTRIBUTE, REVIEW_APPLY_LABEL, SUBMIT_LABEL } from '../../apps/web/src/copy';
+import {
+  IMAGE_ACCEPT_ATTRIBUTE,
+  REMOVAL_CONFIRM_LABEL,
+  REVIEW_APPLY_LABEL,
+  SUBMIT_LABEL,
+} from '../../apps/web/src/copy';
 
 /**
  * `T-PASTE-010` — TASK-164. **THE ADD-NOT-SWAP REGRESSION GUARD.**
@@ -336,6 +341,7 @@ async function expectServiceUpload(page: Page, service: Service): Promise<void> 
   await expect(page.getByRole('heading', { name: 'Review this batch' })).toBeVisible();
   await page.getByRole('button', { name: 'Confirm all 1' }).click();
   await page.getByRole('button', { name: REVIEW_APPLY_LABEL }).click();
+  await page.getByRole('dialog').getByRole('button', { name: REMOVAL_CONFIRM_LABEL }).click();
   await expect(page).toHaveURL('/');
   await expect(page.getByTestId('applied-notice')).toContainText(SERVICE_LABELS[service]);
   expect(state.closeBody).toEqual({ confirmRemovals: false });
@@ -509,6 +515,7 @@ test.describe('T-PASTE-010 — the add-not-swap regression guard', () => {
     await page.getByRole('button', { name: 'Confirm all 1' }).click();
 
     await page.getByRole('button', { name: REVIEW_APPLY_LABEL }).click();
+    await page.getByRole('dialog').getByRole('button', { name: REMOVAL_CONFIRM_LABEL }).click();
     await expect(page).toHaveURL('/');
     await expect.poll(() => state.closeBody).toEqual({ confirmRemovals: false });
   });

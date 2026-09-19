@@ -771,7 +771,7 @@ shows the failure states in `specs/ux-states.md` §5.
 
 ┌ Sticky action bar ────────────────────────────────────────┐
 │ 9 to add · 3 to remove · 2 still to review                 │
-│                        [Apply changes]                    │
+│                        [Review changes]                   │
 └───────────────────────────────────────────────────────────┘
 ```
 
@@ -782,9 +782,10 @@ shows the failure states in `specs/ux-states.md` §5.
 | Full update shows **all** extracted titles (REQ-057) | The **"Already on your list (N)"** section is rendered whenever `mode === 'full-update'`. It is **collapsible but never omitted**, and its **count is visible while collapsed** so the owner can sanity-check it against what they expect. `T-REV-006`, `T-UI-005`. |
 | Append-only shows only new (REQ-022) | The section, and the entire removals section, are **absent from the DOM**. `T-UI-006`. |
 | Removals ticked by default (REQ-055) | Every removal checkbox is `checked` on first render. `T-UI-007`. |
-| Removals individually rescuable (REQ-021) | Each removal card has its own checkbox with a label naming the title. |
-| Removals confirmed as one group (REQ-020) | **"Apply changes"** opens `components/RemovalConfirmDialog.tsx` naming the count and listing every ticked title, with one confirm. There is no per-row "remove" button anywhere. `T-UI-008`. |
-| No accept-by-inaction (REQ-014) | **"Apply changes"** is enabled but produces the `PENDING_ADDITIONS` inline error when anything is still pending, scrolling to and focusing the first pending card. Never a silent skip. |
+| Removals individually rescuable (REQ-021) | Each labelled checkbox calls `PATCH /api/batches/:id/removals` and rereads the review. A failed write is visible; no optimistic removal consent. |
+| One final summary in both modes (owner-approved, 2026-09-18) | **"Review changes"** refreshes authoritative decisions and opens the single final summary in `components/RemovalConfirmDialog.tsx`. It lists effective additions and only selected removals. **"Apply changes"** closes once; **"Back to review"** or Escape preserves decisions. The summary replaces the removal-only dialog, never precedes a second dialog. `T-UX-159`, `T-UI-008`. |
+| Removals confirmed as one group (REQ-020) | The final summary names every selected removal and explicitly states when nothing will be removed. The consent flag is true only after this confirmation when proposals exist, including zero selected. No per-row destructive action. `T-REV-007`. |
+| No accept-by-inaction (REQ-014) | **"Review changes"** reports pending decisions and focuses the first pending card instead of presenting an incomplete summary. The server's `PENDING_ADDITIONS` gate remains authoritative at close. |
 
 ### 5.3 Candidate card (`components/CandidateCard.tsx`)
 

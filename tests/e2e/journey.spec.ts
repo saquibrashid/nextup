@@ -1027,6 +1027,7 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
   await expect.poll(() => be.confirmAllBodies[0]).toEqual({ section: 'additions' });
 
   await page.getByRole('button', { name: REVIEW_APPLY_LABEL }).click();
+  await page.getByRole('dialog').getByRole('button', { name: REMOVAL_CONFIRM_LABEL }).click();
   await expect(page).toHaveURL('/');
   await expect.poll(() => be.closeBodies[0]).toEqual({ confirmRemovals: false });
 
@@ -1198,6 +1199,7 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
 
   await page.getByRole('button', { name: 'Confirm all 1' }).click();
   await page.getByTestId('apply-changes-button').click();
+  await page.getByRole('dialog').getByRole('button', { name: REMOVAL_CONFIRM_LABEL }).click();
   await expect(page).toHaveURL('/');
   await expect.poll(() => be.closeBodies[2]).toEqual({ confirmRemovals: false });
 

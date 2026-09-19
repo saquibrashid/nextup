@@ -102,6 +102,23 @@ reachable disclosures, bounded long titles and accessibility. Existing
 | `T-UX-158a`–`c` | Web | Retained secondary/known evidence, mode-specific visibility, and withheld-removal explanation. `apps/web/test/groupedReview.spec.tsx`. |
 | `T-UX-158d` | E2E | Consistent evidence/control geometry, phone navigation clearance, accessible disclosures, long titles and no overflow at phone/desktop widths. `tests/e2e/groupedReview.spec.ts`. |
 
+### Single final confirmation, 2026-09-19
+
+`TASK-225` implements the owner-approved final summary in both modes.
+Existing `T-UI-008i/j` now require a summary without removal consent for append
+and withheld-removal batches; they no longer require a direct close. Existing
+close, undo and upload-journey tests press the final Apply explicitly.
+
+| Test ID | Level | Assertion |
+| --- | --- | --- |
+| `T-UX-159a`–`b` | Web | One summary in both modes; exact effective additions/current corrected identity; Back/Escape preserve review; pending decisions block and receive focus. `apps/web/test/finalReviewSummary.spec.tsx`. |
+| `T-UX-159c`–`e` | Web | Real removal PATCH and authoritative reread, zero-selected consent, retained failed summary, explicit retry, unavailable preflight refusal, rapid-press guard and in-flight Escape protection. Same file. |
+| `T-UX-159f` | E2E | At 280/390/1440px in Chromium/WebKit: named additions, zero selected removals, Escape, offline restrictions, explicit retry, no overflow and no serious/critical accessibility findings. `tests/e2e/finalReviewSummary.spec.ts`. |
+
+`T-REV-005h` additionally proves a server reconfirmation refusal refreshes the
+actual proposal names before another explicit Apply. `T-UX-149` continues to
+prove decision writes do not unmount the underlying review while rereading.
+
 > ### ⚠ REVISION 7 (2026-08-11) — `A45`: clipboard paste is the primary ingest path
 >
 > Owner correction, verbatim: *"for screenshots, I'm generally expecting that

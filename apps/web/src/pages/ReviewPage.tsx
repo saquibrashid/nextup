@@ -80,6 +80,7 @@ import {
 } from '../copy';
 import { OFFLINE_DISABLED_REASON } from '../copy';
 import { Button } from '../components/ui/Button';
+import { Fieldset } from '../components/ui/Fieldset';
 
 export interface ReviewPageProps {
   readonly review?: ReviewResponse | null;
@@ -113,6 +114,10 @@ export interface ReviewPageProps {
    * terminal state the batch ends in, not merely a wasted request.
    */
   readonly applying?: boolean;
+  readonly saving?: boolean;
+  readonly decisionError?: string | null;
+  readonly onPrepare?: () => Promise<ReviewResponse>;
+  readonly onToggleRemoval?: (listingId: string, ticked: boolean) => Promise<void>;
   /**
    * §6.17 — the connection is gone. **Apply changes** and **Discard** are
    * disabled with the reason as visible text; everything else on the page
@@ -153,7 +158,7 @@ export interface ReviewPageProps {
    * bulk-confirmed; the container sends it to
    * `POST /api/batches/:id/candidates/confirm-all`.
    */
-  readonly onConfirmAll?: (section: ConfirmableSection) => void;
+  readonly onConfirmAll?: (section: ConfirmableSection) => Promise<void> | void;
   /**
    * TASK-067 — the §6.29 search behind the manual-entry panel. Optional, and
    * the panel renders ONLY when both halves are supplied: a search box with no
@@ -356,6 +361,10 @@ export function ReviewPage({
   loadFailed = false,
   applyFailed = false,
   applying = false,
+  saving = false,
+  decisionError = null,
+  onPrepare,
+  onToggleRemoval,
   offline = false,
   pendingAdditionIds = null,
   reconfirmSignal = 0,
@@ -374,18 +383,12 @@ export function ReviewPage({
   // the loading and failure branches below both return.
   const [confirmAllOverride, setConfirmAllOverride] = useState<LocalDispositionMap | null>(null);
   const [confirming, setConfirming] = useState(false);
-  /*
-   * ⚠ WHY THE DIALOG IS NOT CLOSED BY AN EFFECT WHEN THE CLOSE FINISHES.
-   * §6.12 disables every control while the close is in flight, and the
-   * dialog's own Confirm is one of them — so it has to stay mounted for the
-   * duration rather than unmounting the instant it is pressed. Closing it
-   * again from a `useEffect` on `applying` would race the §6.15 effect below:
-   * a 409 `REMOVALS_NOT_CONFIRMED` clears `applying` and bumps the nonce in
-   * the SAME render, and the later-declared effect would win and shut the
-   * dialog the refusal exists to re-open. Deriving the open state from
-   * `applying` instead needs no effect and cannot be ordered wrongly.
-   */
-  const [confirmedFlight, setConfirmedFlight] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const [prepareError, setPrepareError] = useState<string | null>(null);
+  const [localPending, setLocalPending] = useState<readonly string[] | null>(null);
+  const pendingIds = pendingAdditionIds ?? localPending;
+  // Keep the summary mounted through Apply and refusals so failures retain
+  // their context and a retry always requires another explicit press.
 
   // §6.14. When the server refuses the close with 409 `PENDING_ADDITIONS`, move
   // focus (and scroll) to the first pending card the owner still has to decide.
@@ -396,23 +399,26 @@ export function ReviewPage({
   // does not implement it, and a hard call would throw in every component test
   // that touches this path.
   useEffect(() => {
-    if (pendingAdditionIds === null) return;
-    for (const candidateId of pendingAdditionIds) {
+    if (pendingIds === null) return;
+    setConfirming(false);
+    for (const candidateId of pendingIds) {
       const card = document.getElementById(reviewCandidateDomId(candidateId));
       if (card === null) continue;
+      for (let parent = card.parentElement; parent !== null; parent = parent.parentElement) {
+        if (parent instanceof HTMLDetailsElement) parent.open = true;
+      }
       if (typeof card.scrollIntoView === 'function') card.scrollIntoView({ block: 'center' });
       card.focus();
       break;
     }
-  }, [pendingAdditionIds]);
+  }, [pendingIds]);
 
-  // §6.15. A bump of the nonce re-opens the removal dialog: the server refused
+  // §6.15. A bump of the nonce re-opens the refreshed summary: the server refused
   // with 409 `REMOVALS_NOT_CONFIRMED`, so the owner must confirm the group
   // before the close is retried. `reconfirmSignal` starts at 0 and only the
   // container increments it, so this never fires on first render.
   useEffect(() => {
     if (reconfirmSignal > 0) {
-      setConfirmedFlight(false);
       setConfirming(true);
     }
   }, [reconfirmSignal]);
@@ -528,8 +534,49 @@ export function ReviewPage({
     }
     writeLocalDispositions(review.batchId, next, storage);
     setConfirmAllOverride(next);
-    onConfirmAll?.(key);
+    void Promise.resolve(onConfirmAll?.(key)).catch(() => {
+      writeLocalDispositions(review.batchId, local, storage);
+      setConfirmAllOverride(local);
+      setPrepareError('Could not save those decisions. Check the titles and try again.');
+    });
   };
+
+  const prepare = async (): Promise<void> => {
+    if (preparing || saving || applying || offline) return;
+    setPreparing(true);
+    setPrepareError(null);
+    setLocalPending(null);
+    try {
+      const latest = onPrepare === undefined ? review : await onPrepare();
+      if (onPrepare !== undefined) {
+        writeLocalDispositions(review.batchId, {}, storage);
+        setConfirmAllOverride({});
+      }
+      const undecided = [...latest.sections.additions.items, ...latest.sections.unmatched.items]
+        .filter(
+          (item) =>
+            (onPrepare === undefined
+              ? effectiveDisposition(item.disposition, local[item.candidateId])
+              : item.disposition) === 'pending',
+        )
+        .map((item) => item.candidateId);
+      if (undecided.length > 0) {
+        setLocalPending(undecided);
+        return;
+      }
+      setConfirming(true);
+    } catch {
+      setPrepareError(
+        'Could not refresh this review. Nothing was applied. Try again when connected.',
+      );
+    } finally {
+      setPreparing(false);
+    }
+  };
+  const additions = [...sections.additions.items, ...sections.unmatched.items].filter((item) => {
+    const disposition = effectiveDisposition(item.disposition, local[item.candidateId]);
+    return disposition === 'confirmed' || disposition === 'corrected';
+  });
 
   return (
     <div className="review-flow">
@@ -545,35 +592,73 @@ export function ReviewPage({
         </p>
       )}
 
-      {sections.additions.count === 0 ? (
-        <section className="review-section" data-testid="review-additions">
-          {/* ⚠ `T-UX-061`. A BLANK PANEL READS AS A FAILED RENDER, and the
+      <Fieldset legend="Review decisions" hideLegend disabled={applying || saving || preparing}>
+        {sections.additions.count === 0 ? (
+          <section className="review-section" data-testid="review-additions">
+            {/* ⚠ `T-UX-061`. A BLANK PANEL READS AS A FAILED RENDER, and the
               owner's next move is to upload the same screenshots again. */}
-          <div className="review-empty" data-testid="review-additions-empty">
-            <p className="review-empty__title">{REVIEW_NO_ADDITIONS_TITLE}</p>
-            <p className="review-empty__body">{REVIEW_NO_ADDITIONS_BODY}</p>
-          </div>
-        </section>
-      ) : (
-        <CandidateSection
-          description="Check each proposed match against the screenshot text. Confirm only the titles you want to keep."
-          confirmAll={() => {
-            confirmAll('additions');
-          }}
-          pendingCount={pendingIn(sections.additions.items)}
-          renderCard={(candidate) => (
-            <CandidateCard
-              candidate={candidate}
-              thumbnailUrl={thumbnailUrlFor(candidate)}
-              consequence={REVIEW_CONSEQUENCE_ADDITION}
-              actions={
-                /* ⚠ TASK-200 / `specs/ui.md` §5.3. Before this the additions
+            <div className="review-empty" data-testid="review-additions-empty">
+              <p className="review-empty__title">{REVIEW_NO_ADDITIONS_TITLE}</p>
+              <p className="review-empty__body">{REVIEW_NO_ADDITIONS_BODY}</p>
+            </div>
+          </section>
+        ) : (
+          <CandidateSection
+            description="Check each proposed match against the screenshot text. Confirm only the titles you want to keep."
+            confirmAll={() => {
+              confirmAll('additions');
+            }}
+            pendingCount={pendingIn(sections.additions.items)}
+            renderCard={(candidate) => (
+              <CandidateCard
+                candidate={candidate}
+                thumbnailUrl={thumbnailUrlFor(candidate)}
+                consequence={REVIEW_CONSEQUENCE_ADDITION}
+                actions={
+                  /* ⚠ TASK-200 / `specs/ui.md` §5.3. Before this the additions
                    section had NO per-card control, so one false extra among
                    ten good rows — a fragment like "LEVANTE" split off
                    "SOL LEVANTE" — could only be rejected by abandoning the
                    whole batch. `unmatchedWired` is reused deliberately: the
                    same four handlers serve both sections, and all-four-or-none
                    still applies. */
+                  unmatchedWired ? (
+                    <UnmatchedActions
+                      candidateId={candidate.candidateId}
+                      correctedName={candidate.match?.name ?? null}
+                      disposition={effectiveDisposition(
+                        candidate.disposition,
+                        local[candidate.candidateId],
+                      )}
+                      onDiscard={onDiscardU}
+                      onKeep={onKeepU}
+                      onMatch={onMatchU}
+                      onSearch={onSearchU}
+                      variant="addition"
+                    />
+                  ) : null
+                }
+              />
+            )}
+            section={sections.additions}
+            testId="review-additions"
+            variant="additions"
+          />
+        )}
+
+        <CandidateSection
+          description="These readings need your help. Keep the text as an unidentified title, find a match, or discard it."
+          confirmAll={() => {
+            confirmAll('unmatched');
+          }}
+          pendingCount={pendingIn(sections.unmatched.items)}
+          renderCard={(candidate) => (
+            <CandidateCard
+              candidate={candidate}
+              thumbnailUrl={thumbnailUrlFor(candidate)}
+              unidentified
+              consequence={REVIEW_CONSEQUENCE_UNMATCHED}
+              actions={
                 unmatchedWired ? (
                   <UnmatchedActions
                     candidateId={candidate.candidateId}
@@ -586,96 +671,62 @@ export function ReviewPage({
                     onKeep={onKeepU}
                     onMatch={onMatchU}
                     onSearch={onSearchU}
-                    variant="addition"
                   />
                 ) : null
               }
             />
           )}
-          section={sections.additions}
-          testId="review-additions"
-          variant="additions"
+          section={sections.unmatched}
+          testId="review-unmatched"
+          variant="unmatched"
         />
-      )}
-
-      <CandidateSection
-        description="These readings need your help. Keep the text as an unidentified title, find a match, or discard it."
-        confirmAll={() => {
-          confirmAll('unmatched');
-        }}
-        pendingCount={pendingIn(sections.unmatched.items)}
-        renderCard={(candidate) => (
-          <CandidateCard
-            candidate={candidate}
-            thumbnailUrl={thumbnailUrlFor(candidate)}
-            unidentified
-            consequence={REVIEW_CONSEQUENCE_UNMATCHED}
-            actions={
-              unmatchedWired ? (
-                <UnmatchedActions
-                  candidateId={candidate.candidateId}
-                  correctedName={candidate.match?.name ?? null}
-                  disposition={effectiveDisposition(
-                    candidate.disposition,
-                    local[candidate.candidateId],
-                  )}
-                  onDiscard={onDiscardU}
-                  onKeep={onKeepU}
-                  onMatch={onMatchU}
-                  onSearch={onSearchU}
-                />
-              ) : null
-            }
-          />
-        )}
-        section={sections.unmatched}
-        testId="review-unmatched"
-        variant="unmatched"
-      />
-      <CandidateSection
-        section={sections.alreadyOnYourList}
-        testId="review-already-on-list"
-        description="These extracted titles are already on your list. Open this group to check the matches."
-        renderCard={(candidate) => (
-          <CandidateCard
-            candidate={candidate}
-            thumbnailUrl={thumbnailUrlFor(candidate)}
-            consequence="Stays on your list"
-          />
-        )}
-      />
-      <details
-        className="review-secondary"
-        data-testid="review-secondary"
-        open={sections.unreadableTiles.count > 0}
-      >
-        <summary className="review-section__summary">
-          {`Other extracted items (${sections.probablyNotTitles.count + sections.unreadableTiles.count})`}
-        </summary>
-        <p className="review-section__description">
-          Nothing here is silently added. Inspect the evidence; use manual entry below if a title
-          was missed.
-        </p>
         <CandidateSection
-          section={sections.probablyNotTitles}
-          testId="review-probably-not-titles"
+          section={sections.alreadyOnYourList}
+          testId="review-already-on-list"
+          description="These extracted titles are already on your list. Open this group to check the matches."
+          renderCard={(candidate) => (
+            <CandidateCard
+              candidate={candidate}
+              thumbnailUrl={thumbnailUrlFor(candidate)}
+              consequence="Stays on your list"
+            />
+          )}
         />
-        <CandidateSection section={sections.unreadableTiles} testId="review-unreadable-tiles" />
-      </details>
+        <details
+          className="review-secondary"
+          data-testid="review-secondary"
+          open={sections.unreadableTiles.count > 0}
+        >
+          <summary className="review-section__summary">
+            {`Other extracted items (${sections.probablyNotTitles.count + sections.unreadableTiles.count})`}
+          </summary>
+          <p className="review-section__description">
+            Nothing here is silently added. Inspect the evidence; use manual entry below if a title
+            was missed.
+          </p>
+          <CandidateSection
+            section={sections.probablyNotTitles}
+            testId="review-probably-not-titles"
+          />
+          <CandidateSection section={sections.unreadableTiles} testId="review-unreadable-tiles" />
+        </details>
 
-      {sections.removals.withheld && (
-        <p className="review-banner" role="status" data-testid="review-removals-withheld">
-          Removals are withheld because this extraction is incomplete. You can still review
-          additions; nothing will be removed from your list.
-        </p>
-      )}
+        {sections.removals.withheld && (
+          <p className="review-banner" role="status" data-testid="review-removals-withheld">
+            Removals are withheld because this extraction is incomplete. You can still review
+            additions; nothing will be removed from your list.
+          </p>
+        )}
 
-      {showRemovals && (
-        <section className="review-section review-section--removals" data-testid="review-removals">
-          <details open>
-            <summary className="review-section__summary">
-              {`${sections.removals.label} (${sections.removals.count})`}
-              {/* ⚠ REQ-122's NON-COLOUR consequential marker. The left rule in
+        {showRemovals && (
+          <section
+            className="review-section review-section--removals"
+            data-testid="review-removals"
+          >
+            <details open>
+              <summary className="review-section__summary">
+                {`${sections.removals.label} (${sections.removals.count})`}
+                {/* ⚠ REQ-122's NON-COLOUR consequential marker. The left rule in
                   `index.css` is a reinforcement of this word, never a
                   substitute for it (`specs/ui.md` §10.2) — and the word is
                   also the only half of the treatment a screen reader meets.
@@ -684,160 +735,172 @@ export function ReviewPage({
                   `getNodeText` reads only direct text-node children, so the
                   existing `(2)` count assertions (`T-UX-099a/b`) still match
                   the summary exactly as before. */}
-              <span className="review-section__marker" data-testid="review-section-marker">
-                {REVIEW_REMOVALS_MARKER}
-              </span>
-            </summary>
-            <p className="review-section__description">
-              {sections.removals.count === 0
-                ? 'No removals are proposed for this batch.'
-                : 'These titles were not found in this capture. Check the screenshots before agreeing to remove them from this service.'}
-            </p>
-            <ul className="review-section__list">
-              {sections.removals.items.map((item) => (
-                <li className="removal-card" data-testid="removal-card" key={item.listingId}>
-                  {/* ⚠ TICKED ON ARRIVAL (REQ-055) AND THE DEFAULT COMES FROM
+                <span className="review-section__marker" data-testid="review-section-marker">
+                  {REVIEW_REMOVALS_MARKER}
+                </span>
+              </summary>
+              <p className="review-section__description">
+                {sections.removals.count === 0
+                  ? 'No removals are proposed for this batch.'
+                  : 'These titles were not found in this capture. Check the screenshots before agreeing to remove them from this service.'}
+              </p>
+              <ul className="review-section__list">
+                {sections.removals.items.map((item) => (
+                  <li className="removal-card" data-testid="removal-card" key={item.listingId}>
+                    {/* ⚠ TICKED ON ARRIVAL (REQ-055) AND THE DEFAULT COMES FROM
                       THE SERVER - re-deriving it here would silently empty a
                       removal group the owner had already seen ticked. There is
                       deliberately NO per-row remove affordance (REQ-020,
                       `T-UI-008`): removals are confirmed as ONE group, so that
                       the owner is never one stray tap from a deletion. */}
-                  <label className="removal-card__label">
-                    <Input type="checkbox" checked={item.ticked} readOnly />
-                    {item.name}
-                  </label>
-                  {/* ⚠ REQ-122 / `T-UX-134`. On the CARD, because a
+                    <label className="removal-card__label">
+                      <Input
+                        type="checkbox"
+                        checked={item.ticked}
+                        readOnly={onToggleRemoval === undefined}
+                        disabled={offline}
+                        onChange={(event) => {
+                          void onToggleRemoval?.(item.listingId, event.currentTarget.checked).catch(
+                            () => {
+                              setPrepareError(
+                                'Could not verify the removal choice. Review it before applying.',
+                              );
+                            },
+                          );
+                        }}
+                      />
+                      {item.name}
+                    </label>
+                    {/* ⚠ REQ-122 / `T-UX-134`. On the CARD, because a
                       full-update review is scrolled and the heading above is
                       off-screen by the time this row is read. Without it a
                       removal card and an addition card are the same object. */}
-                  <p className="removal-card__consequence" data-testid="candidate-consequence">
-                    {REVIEW_CONSEQUENCE_REMOVAL}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          </details>
-        </section>
-      )}
+                    <p className="removal-card__consequence" data-testid="candidate-consequence">
+                      {REVIEW_CONSEQUENCE_REMOVAL}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          </section>
+        )}
 
-      {review.imagesWithNoText.length > 0 && (
-        <section className="review-section" data-testid="images-with-no-text">
-          <ul className="review-section__list">
-            {/* ⚠ `T-AI-020`, US-006 AC-3, `specs/ai.md` §8.2: "the image
+        {review.imagesWithNoText.length > 0 && (
+          <section className="review-section" data-testid="images-with-no-text">
+            <ul className="review-section__list">
+              {/* ⚠ `T-AI-020`, US-006 AC-3, `specs/ai.md` §8.2: "the image
                 thumbnail is shown. NEVER A SILENT SKIP." Both halves matter —
                 a bare file name will not pick one screenshot out of twenty
                 near-identical ones in a camera roll, and picking the right one
                 to retake is the entire action this section exists to enable. */}
-            {review.imagesWithNoText.map((image) => (
-              <li className="review-no-text" key={image.imageId}>
-                <img
-                  className="review-no-text__thumb"
-                  src={image.href}
-                  alt=""
-                  data-testid="no-text-thumb"
-                />
-                <span className="review-empty__body" data-testid="no-text-name">
-                  {REVIEW_NO_TEXT_IN.replace('{file}', image.fileName)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+              {review.imagesWithNoText.map((image) => (
+                <li className="review-no-text" key={image.imageId}>
+                  <img
+                    className="review-no-text__thumb"
+                    src={image.href}
+                    alt=""
+                    data-testid="no-text-thumb"
+                  />
+                  <span className="review-empty__body" data-testid="no-text-name">
+                    {REVIEW_NO_TEXT_IN.replace('{file}', image.fileName)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
-      {onSearchTmdb !== undefined && onManualEntry !== undefined && (
-        <ManualEntryPanel onAdd={onManualEntry} onSearch={onSearchTmdb} />
-      )}
+        {onSearchTmdb !== undefined && onManualEntry !== undefined && (
+          <ManualEntryPanel onAdd={onManualEntry} onSearch={onSearchTmdb} />
+        )}
 
-      {/* ⚠ SD-11d / `T-UX-011`. Sticky, so the primary action and the running
+        {/* ⚠ SD-11d / `T-UX-011`. Sticky, so the primary action and the running
           counts stay reachable through a 200-candidate pass on a phone. */}
-      <div className="review-action-bar" data-testid="review-action-bar">
-        {/* ⚠ `specs/ux-states.md` §6.16 (`T-UX-067`). The review above is left
+        <div className="review-action-bar" data-testid="review-action-bar">
+          {/* ⚠ `specs/ux-states.md` §6.16 (`T-UX-067`). The review above is left
             fully intact — this is not the load-failure state. The message sits
             beside the apply control because **Apply changes** IS the retry: it
             is never disabled here, and re-pressing it re-runs the exact same
             flow, re-opening the §6.10 removal dialog when there are removals so
             `confirmRemovals` is never silently re-applied without the owner. */}
-        {applyFailed && (
-          <p role="alert" data-testid="review-apply-error">
-            {REVIEW_APPLY_FAILED}
-          </p>
-        )}
-        {/* ⚠ `specs/ux-states.md` §6.14 (`T-UX-066`). A 409 `PENDING_ADDITIONS`:
+          {applyFailed && !confirming && (
+            <p role="alert" data-testid="review-apply-error">
+              {REVIEW_APPLY_FAILED}
+            </p>
+          )}
+          {/* ⚠ `specs/ux-states.md` §6.14 (`T-UX-066`). A 409 `PENDING_ADDITIONS`:
             the close was refused and NOTHING was applied. The count is the
             number of cards the owner still has to decide, and the effect above
             has already moved focus to the first of them. **Apply changes** is
             the retry once the decisions are made. */}
-        {pendingAdditionIds !== null && pendingAdditionIds.length > 0 && (
-          <p role="alert" data-testid="review-pending-error">
-            {reviewPendingAdditions(pendingAdditionIds.length)}
-          </p>
-        )}
-        {/* ⚠ `specs/ux-states.md` §6.17 (`T-UX-023`). Offline disables the
+          {pendingIds !== null && pendingIds.length > 0 && (
+            <p role="alert" data-testid="review-pending-error">
+              {reviewPendingAdditions(pendingIds.length)}
+            </p>
+          )}
+          {/* ⚠ `specs/ux-states.md` §6.17 (`T-UX-023`). Offline disables the
             close — it is a `POST` — and states why, as visible text. What it
             deliberately does NOT do is unmount, reset or discard anything: the
             dispositions above keep working locally, exactly as §6.17 requires,
             and are still there on reconnect. An offline state that recovers by
             throwing away a half-finished review is the data-loss bug
             `T-UX-024` exists to catch. */}
-        {offline && (
-          <p className="offline-reason" data-testid="review-offline-reason">
-            {OFFLINE_DISABLED_REASON}
-          </p>
-        )}
-        <p className="review-action-bar__counts" data-testid="review-counts">
-          {reviewCounts(
-            applicableIn(sections.additions.items) + applicableIn(sections.unmatched.items),
-            sections.removals.count,
-            pendingIn(sections.additions.items) + pendingIn(sections.unmatched.items),
+          {offline && (
+            <p className="offline-reason" data-testid="review-offline-reason">
+              {OFFLINE_DISABLED_REASON}
+            </p>
           )}
-        </p>
-        <Button
-          variant="secondary"
-          data-testid="discard-batch-button"
-          disabled={applying || offline}
-          onClick={onDiscard}
-        >
-          {REVIEW_DISCARD_LABEL}
-        </Button>
-        <Button
-          variant="primary"
-          data-testid="apply-changes-button"
-          disabled={applying || offline}
-          onClick={() => {
-            // ⚠ The dialog is not a formality that can be skipped: without
-            // removals there is nothing to confirm and the close goes straight
-            // through, but with them the owner must see the names first.
-            if (needsConfirmation) {
-              setConfirming(true);
-              return;
-            }
-            onApply?.(false);
-          }}
-        >
-          {applying ? REVIEW_APPLYING : REVIEW_APPLY_LABEL}
-        </Button>
-      </div>
+          {(prepareError ?? decisionError) !== null && (
+            <p role="alert">{prepareError ?? decisionError}</p>
+          )}
+          <p className="review-action-bar__counts" data-testid="review-counts">
+            {reviewCounts(
+              applicableIn(sections.additions.items) + applicableIn(sections.unmatched.items),
+              sections.removals.items.filter((item) => item.ticked).length,
+              pendingIn(sections.additions.items) + pendingIn(sections.unmatched.items),
+            )}
+          </p>
+          <Button
+            variant="secondary"
+            data-testid="discard-batch-button"
+            disabled={applying || offline}
+            onClick={onDiscard}
+          >
+            {REVIEW_DISCARD_LABEL}
+          </Button>
+          <Button
+            variant="primary"
+            data-testid="apply-changes-button"
+            disabled={applying || offline}
+            onClick={() => {
+              void prepare();
+            }}
+          >
+            {preparing ? 'Refreshing review...' : applying ? REVIEW_APPLYING : REVIEW_APPLY_LABEL}
+          </Button>
+        </div>
+      </Fieldset>
 
-      {review.service !== null && (confirming || (applying && confirmedFlight)) && (
+      {confirming && (
         <RemovalConfirmDialog
           service={review.service}
           items={sections.removals.items}
+          additions={additions}
           submitting={applying}
+          disabled={offline || saving || decisionError !== null}
+          error={applyFailed ? REVIEW_APPLY_FAILED : decisionError}
+          offline={offline}
           onCancel={() => {
             // ⚠ Cancel returns to the review with everything intact. It must
             // never fall through to `onApply` — a cancelled confirmation that
             // still closed the batch is the worst outcome this screen has.
-            setConfirmedFlight(false);
-            setConfirming(false);
+            if (!applying) setConfirming(false);
           }}
           onConfirm={() => {
             // Handed to the derived open state above, so the dialog survives
             // the close it just issued and shows §6.12's disabled controls
             // instead of vanishing under the owner's finger.
-            setConfirming(false);
-            setConfirmedFlight(true);
-            onApply?.(true);
+            if (!applying && !offline && !saving) onApply?.(needsConfirmation);
           }}
         />
       )}

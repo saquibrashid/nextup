@@ -6,11 +6,8 @@
  * endpoints have existed since TASK-066 and TASK-071 and were unreachable from
  * the SPA, so the owner could complete a whole review pass and close nothing.
  *
- * ⚠ **THE REVIEW IS RE-READ AFTER A BULK CONFIRM, AND ONLY THEN.** The server
- * is the record of what a close will act on, and a confirm-all changes rows
- * the owner cannot see individually — an optimistic local count would diverge
- * from the batch silently. Every other mutation here NAVIGATES AWAY, so
- * re-reading afterwards would be a request whose result is thrown away.
+ * Every decision write and final preflight re-reads the authoritative review.
+ * Preserve the mounted page during these reads so focus and scroll survive.
  */
 
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
@@ -99,10 +96,6 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
    */
   const online = useOnline();
 
-  // Bumped to force a re-read after a bulk confirm. `useResource` keys on a
-  // string, so the counter IS the declared identity of "the review, again".
-  const [generation, setGeneration] = useState(0);
-
   // `specs/ux-states.md` §6.16. `true` when the last close attempt failed with
   // a 5xx or a network error; cleared the instant a new attempt starts, so a
   // subsequent success never leaves a stale error on screen during navigation.
@@ -120,6 +113,42 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
   // to re-open the §6.10 removal dialog. Monotonic so a second identical
   // refusal still re-opens it (a boolean would latch after the first).
   const [reconfirmSignal, setReconfirmSignal] = useState(0);
+  const [freshReview, setFreshReview] = useState<ReviewResponse | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const writing = useRef(false);
+  const closing = useRef(false);
+
+  const refresh = useCallback(async () => {
+    const next = await client.getReview(batchId);
+    setFreshReview(next);
+    setDecisionError(null);
+    return next;
+  }, [batchId, client]);
+
+  const decide = useCallback(
+    async (action: () => Promise<unknown>): Promise<void> => {
+      if (writing.current || closing.current || !online) {
+        throw new Error('Wait for the current action or reconnect before making this decision.');
+      }
+      writing.current = true;
+      setSaving(true);
+      setDecisionError(null);
+      try {
+        await action();
+        await refresh();
+      } catch (error) {
+        setDecisionError(
+          'The decision could not be verified. Review your choices before continuing.',
+        );
+        throw error;
+      } finally {
+        writing.current = false;
+        setSaving(false);
+      }
+    },
+    [online, refresh],
+  );
 
   /*
    * `specs/ux-states.md` §6.18 (`T-UX-069`) — the sign-in URL a 401 produced,
@@ -142,18 +171,14 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
     return () => setUnauthorizedHandler(null);
   }, []);
 
-  const review = useResource(
-    (signal) => client.getReview(batchId, signal),
-    `review:${batchId}:${String(generation)}`,
-  );
+  const review = useResource((signal) => client.getReview(batchId, signal), `review:${batchId}`);
 
   /*
    * ⚠ THE PREVIOUS REVIEW IS HELD ACROSS A REFETCH, AND THAT IS THE WHOLE FIX
    *   FOR THE SCROLL JUMP (TASK-291, reported from the owner's phone).
    *
-   * Every decision on a card — confirm, correct, discard — bumps `generation`,
-   * which is `useResource`'s key, and the hook returns to `loading` on every
-   * key change. `ReviewPage` renders the skeleton in that state, so the entire
+   * Before TASK-291, every decision on a card bumped the resource key,
+   * returning the hook to `loading`. `ReviewPage` rendered the skeleton, so the entire
    * list unmounted and the page collapsed to skeleton height on EVERY action.
    * The browser has nowhere to keep the scroll offset, so the owner was thrown
    * back to the top of a long review and had to find their place again after
@@ -180,28 +205,22 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
     previous.current = null;
   }
   const held = previous.current?.batchId === batchId ? previous.current.value : null;
-  const shown = review.resource.kind === 'ok' ? review.resource.value : held;
+  const shown =
+    freshReview?.batchId === batchId
+      ? freshReview
+      : review.resource.kind === 'ok'
+        ? review.resource.value
+        : held;
 
   const confirmAll = useCallback(
-    (section: ConfirmableSection): void => {
-      void client.confirmAllCandidates(batchId, section).then(
-        () => {
-          setGeneration((n) => n + 1);
-        },
-        () => {
-          // ⚠ Deliberately silent about the count and deliberately NOT a
-          // local tick-through. A failed bulk confirm that optimistically
-          // marked the rows would show the owner a screen claiming decisions
-          // the close will not make.
-          setGeneration((n) => n + 1);
-        },
-      );
-    },
-    [batchId, client],
+    (section: ConfirmableSection) => decide(() => client.confirmAllCandidates(batchId, section)),
+    [batchId, client, decide],
   );
 
   const apply = useCallback(
     (confirmRemovals: boolean): void => {
+      if (closing.current || writing.current || !online) return;
+      closing.current = true;
       // `confirmRemovals` is carried through EXACTLY as the page computed it:
       // it is `true` only once the owner has been through the §6.10 dialog.
       //
@@ -262,28 +281,47 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
           // owner with a permanently dead **Apply changes** button and no way
           // to retry the close.
           setApplying(false);
+          closing.current = false;
           if (error instanceof ApiError) {
             if (error.code === 'PENDING_ADDITIONS') {
               setPendingAdditionIds(pendingCandidateIdsFrom(error.details));
               return;
             }
             if (error.code === 'REMOVALS_NOT_CONFIRMED') {
-              setReconfirmSignal((n) => n + 1);
+              setSaving(true);
+              void refresh()
+                .then(
+                  () => setReconfirmSignal((n) => n + 1),
+                  () =>
+                    setDecisionError(
+                      'Could not refresh the removal proposals. Go back and try again.',
+                    ),
+                )
+                .finally(() => setSaving(false));
               return;
             }
-            if (error.status < 500) return;
           }
           if (error instanceof RefusedError) return;
           setApplyFailed(true);
         },
       );
     },
-    [batchId, client, navigate],
+    [batchId, client, navigate, online, refresh],
   );
 
   const discard = useCallback((): void => {
-    void client.discardBatch(batchId).then(() => navigate('/'));
-  }, [batchId, client, navigate]);
+    if (writing.current || closing.current || !online) return;
+    writing.current = true;
+    setSaving(true);
+    void client.discardBatch(batchId).then(
+      () => navigate('/'),
+      () => {
+        writing.current = false;
+        setSaving(false);
+        setDecisionError('Could not verify the discard. Your review is still here.');
+      },
+    );
+  }, [batchId, client, navigate, online]);
 
   const searchTmdb = useCallback(
     async (query: string) => (await client.searchTmdb(query)).items,
@@ -302,10 +340,9 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
    */
   const manualEntry = useCallback(
     async (result: { tmdbId: number; mediaType: string }): Promise<void> => {
-      await client.addManualEntry(batchId, result.tmdbId, result.mediaType);
-      setGeneration((n) => n + 1);
+      await decide(() => client.addManualEntry(batchId, result.tmdbId, result.mediaType));
     },
-    [batchId, client],
+    [batchId, client, decide],
   );
 
   /**
@@ -323,10 +360,9 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
    */
   const patch = useCallback(
     async (candidateId: string, body: CandidatePatchBody): Promise<void> => {
-      await client.patchCandidate(batchId, candidateId, body);
-      setGeneration((n) => n + 1);
+      await decide(() => client.patchCandidate(batchId, candidateId, body));
     },
-    [batchId, client],
+    [batchId, client, decide],
   );
 
   const keepUnmatched = useCallback(
@@ -398,6 +434,8 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
       loadFailed={review.resource.kind === 'failed'}
       applyFailed={applyFailed}
       applying={applying}
+      saving={saving}
+      decisionError={decisionError}
       offline={!online}
       pendingAdditionIds={pendingAdditionIds}
       reconfirmSignal={reconfirmSignal}
@@ -405,6 +443,10 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
       onApply={apply}
       onDiscard={discard}
       onConfirmAll={confirmAll}
+      onPrepare={refresh}
+      onToggleRemoval={(listingId, ticked) =>
+        decide(() => client.setBatchRemoval(batchId, listingId, ticked))
+      }
       onSearchTmdb={searchTmdb}
       onManualEntry={manualEntry}
       onKeepUnmatched={keepUnmatched}

@@ -146,13 +146,13 @@ Each state below names: **what the owner sees**, **what they can do**, and the
 | **6.7 Partial review** | Action bar: *"9 to add · 3 to remove · 2 still to review"* | Keep going | `T-UX-062` |
 | **6.8 Unmatched item** | Raw extracted text, an **"Unidentified"** chip, an inline TMDB search, and **"Keep as unidentified"** — which is a real, supported outcome, not a failure (US-008 AC-4) | Match, keep, discard | `T-UX-063` |
 | **6.9 TMDB unreachable during extraction** | Banner: *"Couldn't reach TMDB — nothing was matched. You can still confirm these as unidentified titles, or discard the batch and try again later."* (US-007 AC-6) | Confirm as unidentified, discard | `T-AI-017` |
-| **6.10 Removal confirmation dialog** | *"Remove 3 titles from Netflix?"* + every ticked title named + *"They'll be kept in Removal history and you can restore them any time."* | Confirm / Cancel | `T-UI-008` |
+| **6.10 Final confirmation, both modes** | **Review changes** refreshes the review, then **Confirm changes** names exact effective additions and every selected removal. Removal-history reassurance remains. This replaces the removal-only dialog. | Apply changes / Back to review; Escape preserves decisions | `T-UI-008`, `T-UX-159` |
 | **6.11 Zero removals ticked** | The dialog reads *"No removals selected. Nothing will be removed."* and the close proceeds (US-015 AC-5) | Confirm | `T-REV-007` |
 | **6.12 Submitting (close)** | Sticky bar shows *"Applying…"*; all controls disabled | Wait | `T-UX-064` |
 | **6.13 Success** | Navigates to `/` with `role="status"`: *"Added 9 titles, removed 3 from Netflix."* + **Undo this batch** when `undoable === true`, or **"View what changed"** when not | Undo, view, continue | `T-UX-065` |
 | **6.14 Error — 409 `PENDING_ADDITIONS`** | Inline: *"2 titles still need a decision."* Focus and scroll to the first pending card. **Nothing was applied.** | Decide, retry | `T-UX-066` |
-| **6.15 Error — 409 `REMOVALS_NOT_CONFIRMED`** | The confirmation dialog opens. Nothing was applied. | Confirm / cancel | `T-REV-005` |
-| **6.16 Error — 5xx on close** | *"Couldn't apply these changes. Nothing was changed — your review is still here."* + **Try again**. Local dispositions are preserved (SD-11e) | Retry | `T-UX-067` |
+| **6.15 Error — 409 `REMOVALS_NOT_CONFIRMED`** | Refresh the proposals and show the updated final summary. Never auto-retry or confirm unseen names. | Apply changes / Back to review | `T-REV-005` |
+| **6.16 Error — 5xx on close** | *"Couldn't apply these changes. Nothing was changed — your review is still here."* inside the retained summary. Decisions are preserved (SD-11e). | Explicit Apply changes retry or Back to review | `T-UX-067` |
 | **6.17 Offline mid-review** | Banner; dispositions keep working locally; **Apply changes** disabled with the reason | Keep reviewing | `T-UX-068` |
 | **6.18 Session expired mid-review (401)** | *"Your session ended. Sign in again — your review is still here."* + **Sign in**, returning to this URL. Local dispositions preserved | Sign in | `T-UX-069` |
 

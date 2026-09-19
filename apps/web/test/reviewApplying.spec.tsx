@@ -174,6 +174,7 @@ describe('T-UX-064 — §6.12 the close is in flight', () => {
     expect(apply).toHaveTextContent(REVIEW_APPLY_LABEL);
 
     fireEvent.click(apply);
+    fireEvent.click(await screen.findByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
 
     // ⚠ The label REPLACES "Apply changes". A disabled button still offering
     // to apply is indistinguishable from one that has stopped working.
@@ -188,6 +189,7 @@ describe('T-UX-064 — §6.12 the close is in flight', () => {
     renderReview(client);
 
     fireEvent.click(await screen.findByTestId('apply-changes-button'));
+    fireEvent.click(await screen.findByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
 
     // Not tidiness: a discard racing an in-flight close is a genuine contest
     // over which terminal state the batch ends in.
@@ -203,6 +205,7 @@ describe('T-UX-064 — §6.12 the close is in flight', () => {
 
     const apply = await screen.findByTestId('apply-changes-button');
     fireEvent.click(apply);
+    fireEvent.click(await screen.findByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
     await waitFor(() => {
       expect(applyButton()).toBeDisabled();
     });
@@ -225,6 +228,7 @@ describe('T-UX-064 — §6.12 the close is in flight', () => {
     renderReview(client);
 
     fireEvent.click(await screen.findByTestId('apply-changes-button'));
+    fireEvent.click(await screen.findByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
 
     expect(await screen.findByTestId('review-apply-error')).toHaveTextContent(REVIEW_APPLY_FAILED);
     expect(applyButton()).toBeEnabled();

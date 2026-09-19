@@ -72,7 +72,10 @@ function reviewWithTwoPending() {
     lowYield: false,
     degradedExtraction: false,
     crossCheck: 'agreed',
-    candidates: [candidate('cnd_1', 'Dune', 'pending'), candidate('cnd_2', 'Arrival', 'pending')],
+    candidates: [
+      candidate('cnd_1', 'Dune', 'confirmed'),
+      candidate('cnd_2', 'Arrival', 'confirmed'),
+    ],
     disappearedListings: [],
     imagesWithNoText: [],
   });
@@ -166,6 +169,11 @@ const pendingAdditions = (ids: string[]) =>
 const removalsNotConfirmed = () =>
   Promise.reject(new ApiError('REMOVALS_NOT_CONFIRMED', 409, 'confirm first', {}));
 
+async function applySummary() {
+  fireEvent.click(await screen.findByRole('button', { name: REVIEW_APPLY_LABEL }));
+  fireEvent.click(await screen.findByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
+}
+
 // jsdom implements no `scrollIntoView`; install a spy so §6.14 can both call it
 // and assert it, and restore it so no other suite inherits a stray global.
 beforeEach(() => {
@@ -182,7 +190,7 @@ describe('T-UX-066 — §6.14 409 PENDING_ADDITIONS', () => {
     });
     renderReview(client);
 
-    fireEvent.click(await screen.findByRole('button', { name: REVIEW_APPLY_LABEL }));
+    await applySummary();
 
     const alert = await screen.findByTestId('review-pending-error');
     // Against the exported helper, never a substring literal, so the noun/verb
@@ -197,7 +205,7 @@ describe('T-UX-066 — §6.14 409 PENDING_ADDITIONS', () => {
     });
     renderReview(client);
 
-    fireEvent.click(await screen.findByRole('button', { name: REVIEW_APPLY_LABEL }));
+    await applySummary();
     await screen.findByTestId('review-pending-error');
 
     expect(screen.queryByTestId('list-screen')).not.toBeInTheDocument();
@@ -215,7 +223,7 @@ describe('T-UX-066 — §6.14 409 PENDING_ADDITIONS', () => {
     });
     renderReview(client);
 
-    fireEvent.click(await screen.findByRole('button', { name: REVIEW_APPLY_LABEL }));
+    await applySummary();
     await screen.findByTestId('review-pending-error');
 
     const firstCard = document.getElementById(reviewCandidateDomId('cnd_1'));
@@ -240,7 +248,7 @@ describe('T-UX-066 — §6.14 409 PENDING_ADDITIONS', () => {
     });
     renderReview(client);
 
-    fireEvent.click(await screen.findByRole('button', { name: REVIEW_APPLY_LABEL }));
+    await applySummary();
     await screen.findByTestId('review-pending-error');
 
     // §6.16's "nothing was changed" wording is wrong here — the owner has work
@@ -266,12 +274,13 @@ describe('T-UX-066 — §6.14 409 PENDING_ADDITIONS', () => {
     });
     renderReview(client);
 
-    fireEvent.click(await screen.findByRole('button', { name: REVIEW_APPLY_LABEL }));
+    await applySummary();
     await screen.findByTestId('review-pending-error');
 
     // The owner is not stuck — Apply is still pressable (the retry).
     expect(screen.getByRole('button', { name: REVIEW_APPLY_LABEL })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: REVIEW_APPLY_LABEL }));
+    fireEvent.click(await screen.findByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
 
     // Cleared immediately, before the in-flight close resolves.
     await waitFor(() =>
@@ -298,7 +307,7 @@ describe('T-REV-005 (client half) — §6.15 409 REMOVALS_NOT_CONFIRMED', () => 
     renderReview(client);
 
     expect(screen.queryByTestId('removal-confirm')).not.toBeInTheDocument();
-    fireEvent.click(await screen.findByRole('button', { name: REVIEW_APPLY_LABEL }));
+    await applySummary();
 
     // The dialog appears only because the 409 was routed to §6.15.
     expect(await screen.findByTestId('removal-confirm')).toBeInTheDocument();
@@ -309,7 +318,25 @@ describe('T-REV-005 (client half) — §6.15 409 REMOVALS_NOT_CONFIRMED', () => 
 
   it('T-REV-005h: confirming the re-opened dialog retries the close with confirmRemovals TRUE', async () => {
     let attempts = 0;
+    const updated = reviewReadyToClose();
+    updated.sections.removals = {
+      ...updated.sections.removals,
+      count: 1,
+      items: [
+        {
+          listingId: 'lst_new',
+          titleId: 'ttl_new',
+          name: 'New proposal',
+          releaseYear: 2020,
+          posterPath: null,
+          service: 'netflix',
+          dateAdded: '2024-01-01',
+          ticked: true,
+        },
+      ],
+    };
     const { client, calls } = stubClient(reviewReadyToClose(), {
+      getReview: () => Promise.resolve(attempts === 0 ? reviewReadyToClose() : updated),
       closeBatch: () => {
         attempts += 1;
         return attempts === 1 ? removalsNotConfirmed() : Promise.resolve(closeResult());
@@ -317,7 +344,8 @@ describe('T-REV-005 (client half) — §6.15 409 REMOVALS_NOT_CONFIRMED', () => 
     });
     renderReview(client);
 
-    fireEvent.click(await screen.findByRole('button', { name: REVIEW_APPLY_LABEL }));
+    await applySummary();
+    await screen.findByText('New proposal', { selector: '.removal-confirm__item' });
     fireEvent.click(await screen.findByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
 
     expect(await screen.findByTestId('list-screen')).toHaveTextContent('list screen: bat_1');
