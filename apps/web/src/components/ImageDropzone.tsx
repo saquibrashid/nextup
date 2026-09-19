@@ -35,7 +35,6 @@ import {
   IMAGE_ACCEPT_ATTRIBUTE,
   UNSUPPORTED_FORMAT_REJECTION,
 } from '../copy';
-import { useHeldImages } from '../lib/useHeldImages';
 import { PasteButton, type PasteFailure } from './PasteButton';
 import { PasteCapture } from './PasteCapture';
 import { Button } from './ui/Button';
@@ -179,8 +178,6 @@ export interface ImageDropzoneProps {
   readonly disabled?: boolean;
   /** Local preparation: report the complete queue without uploading it. */
   readonly onQueueChange?: (images: readonly QueuedImage[]) => void;
-  /** Every affordance funnels here - the single submit path (`api.md` §5.3.1). */
-  readonly onFilesAccepted?: (files: readonly File[], source: IngestSource) => void;
   /** Whether service and mode are chosen, so a batch exists (`ux-states.md` §4.0a). */
   readonly batchReady?: boolean;
   /**
@@ -215,15 +212,7 @@ export interface ImageDropzoneProps {
  * A hold that flattened to a bare `File[]` would have to guess an ingest source
  * when it replayed, and `ADR-0009` exists precisely to tell the three apart.
  */
-interface HeldAttach {
-  readonly files: readonly File[];
-  readonly source: IngestSource;
-}
-
-const heldAttachFiles = (payload: HeldAttach): readonly File[] => payload.files;
-
 export function ImageDropzone({
-  onFilesAccepted,
   onQueueChange,
   disabled = false,
   batchReady = false,
@@ -239,18 +228,6 @@ export function ImageDropzone({
   const [rejected, setRejected] = useState<readonly RejectedFile[]>([]);
   const [dragging, setDragging] = useState(false);
   const inputId = useId();
-
-  const deliverAccepted = useCallback(
-    (payload: HeldAttach): void => {
-      onFilesAccepted?.(payload.files, payload.source);
-    },
-    [onFilesAccepted],
-  );
-  const { deliver, heldCount } = useHeldImages<HeldAttach>(
-    batchReady,
-    deliverAccepted,
-    heldAttachFiles,
-  );
 
   const addFiles = useCallback(
     (
@@ -272,24 +249,10 @@ export function ImageDropzone({
       if (review.accepted.length > 0) {
         queue.current = [...queue.current, ...review.accepted.map((file) => ({ file, source }))];
         setAccepted(queue.current.map((item) => item.file));
-        /*
-         * ⚠ THROUGH THE HOLD, NEVER STRAIGHT TO THE CONSUMER. This is the one
-         * choke point every affordance passes through - listener paste, button
-         * paste, drop and the file chooser - so it is the only place the hold
-         * can be applied once and cannot be forgotten on a new path.
-         *
-         * It used to call `onFilesAccepted` directly here, and only the paste
-         * primitives held. Choosing a file before picking a service therefore
-         * lost it silently: `UploadRoute.attach` returns without a word when
-         * the selection is unset, so the owner saw "1 screenshots · 1.3 MB"
-         * and "Attach at least one screenshot first." at the same time, with
-         * no error to explain either. `T-PASTE-011` is the regression guard.
-         */
-        if (onQueueChange !== undefined) onQueueChange(queue.current);
-        else deliver({ files: review.accepted, source });
+        onQueueChange?.(queue.current);
       }
     },
-    [deliver, onQueueChange],
+    [onQueueChange],
   );
 
   const pastedByListener = useCallback(
@@ -377,7 +340,7 @@ export function ImageDropzone({
           is simply not there and the other two affordances carry the load.
         */}
         <PasteButton
-          batchReady={onQueueChange !== undefined || batchReady}
+          batchReady
           offline={offline}
           onImagesPasted={(files) => {
             addFiles(files, 'paste');
@@ -408,7 +371,7 @@ export function ImageDropzone({
         />
       </div>
 
-      {(heldCount > 0 || (onQueueChange !== undefined && !batchReady && accepted.length > 0)) && (
+      {!batchReady && accepted.length > 0 && (
         <p role="status" data-testid="dropzone-held">
           {DROPZONE_HELD_BODY}
         </p>

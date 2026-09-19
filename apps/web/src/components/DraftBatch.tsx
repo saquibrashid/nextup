@@ -82,6 +82,7 @@ export function DraftBatch({
 
   return (
     <section className="upload-flow">
+      <RejectionList entries={mergeRejections([], rejected)} />
       <h1>Check your saved screenshots</h1>
       <p>
         {SERVICE_LABELS[batch.service]} ·{' '}
@@ -124,7 +125,6 @@ export function DraftBatch({
       </p>
       {offline && <p role="status">{OFFLINE_DISABLED_REASON}</p>}
       {failure !== null && <p role="alert">{failure}</p>}
-      <RejectionList entries={mergeRejections([], rejected)} />
       <ul className="draft-images" aria-label="Saved screenshots">
         {batch.images.map((image) => (
           <li key={image.imageId}>

@@ -83,8 +83,8 @@ describe('T-UI-004 - PNG, JPEG and HEIC, all three, in accept and in the copy', 
   });
 
   it('T-UI-004d accepts an unknown or empty type rather than hard-filtering on File.type', async () => {
-    const onFilesAccepted = vi.fn();
-    render(<ImageDropzone batchReady onFilesAccepted={onFilesAccepted} />);
+    const onQueueChange = vi.fn();
+    render(<ImageDropzone batchReady onQueueChange={onQueueChange} />);
 
     // iOS routinely reports HEIC as `application/octet-stream` or as nothing at
     // all. Refusing it here reintroduces exactly the defect A42 fixed; the
@@ -129,8 +129,8 @@ describe('T-UX-041 - the empty dropzone shows all three ingest affordances', () 
   });
 
   it('T-UX-041b keeps file selection fully working when navigator.clipboard is absent', async () => {
-    const onFilesAccepted = vi.fn();
-    render(<ImageDropzone batchReady onFilesAccepted={onFilesAccepted} />);
+    const onQueueChange = vi.fn();
+    render(<ImageDropzone batchReady onQueueChange={onQueueChange} />);
 
     // Product invariant 19: `navigator.clipboard` does not exist over plain
     // `http://`. The file input is an equal path, not a fallback, so it must be
@@ -141,10 +141,9 @@ describe('T-UX-041 - the empty dropzone shows all three ingest affordances', () 
     await userEvent.upload(screen.getByTestId('file-input'), [file('shot.png', 'image/png')], {
       applyAccept: false,
     });
-    expect(onFilesAccepted).toHaveBeenCalledWith(
-      [expect.objectContaining({ name: 'shot.png' })],
-      'upload',
-    );
+    expect(onQueueChange).toHaveBeenCalledWith([
+      { file: expect.objectContaining({ name: 'shot.png' }), source: 'upload' },
+    ]);
     expect(screen.getByTestId('accepted-name')).toHaveTextContent('shot.png');
   });
 
@@ -159,8 +158,8 @@ describe('T-UX-041 - the empty dropzone shows all three ingest affordances', () 
 
   it('T-UX-041d all three affordances end in the same path, none branching on source', async () => {
     withClipboard();
-    const onFilesAccepted = vi.fn();
-    render(<ImageDropzone batchReady onFilesAccepted={onFilesAccepted} />);
+    const onQueueChange = vi.fn();
+    render(<ImageDropzone batchReady onQueueChange={onQueueChange} />);
 
     await userEvent.upload(screen.getByTestId('file-input'), [file('a.png', 'image/png')], {
       applyAccept: false,
@@ -171,7 +170,10 @@ describe('T-UX-041 - the empty dropzone shows all three ingest affordances', () 
     // Same accepted list, same ceilings, same rejection rules - only the
     // reported source differs. A per-source branch is how "works dragged, not
     // pasted" bugs start.
-    expect(onFilesAccepted.mock.calls.map(([, source]) => source)).toEqual(['upload', 'drop']);
+    expect(onQueueChange).toHaveBeenLastCalledWith([
+      { file: expect.objectContaining({ name: 'a.png' }), source: 'upload' },
+      { file: dropped, source: 'drop' },
+    ]);
     expect(screen.getAllByTestId('accepted-file')).toHaveLength(2);
   });
 

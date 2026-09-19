@@ -48,7 +48,7 @@ import { useOnline } from '../lib/useOnline';
 import { Button } from '../components/ui/Button';
 import { Fieldset } from '../components/ui/Fieldset';
 import { UploadStep } from '../components/UploadStep';
-import { RejectionList, mergeRejections, rejectionsFromError } from '../components/RejectionList';
+import { rejectionsFromError } from '../components/RejectionList';
 export { rejectionsFromError } from '../components/RejectionList';
 
 export interface UploadRouteProps {
@@ -280,6 +280,7 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
               batchReady={ready}
               offline={!online}
               disabled={busy || batchId !== null}
+              serverRejected={serverRejected}
               onQueueChange={setQueue}
             />
             {busy && <p role="status">{SUBMIT_IN_FLIGHT}</p>}
@@ -336,7 +337,6 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
                 {failure}
               </p>
             )}
-            <RejectionList entries={mergeRejections([], serverRejected)} />
             {batchId !== null && !busy && (
               <Button
                 variant="secondary"
