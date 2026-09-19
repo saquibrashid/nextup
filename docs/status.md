@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 218 |
+| ✅ done | 219 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **221** |
+| **total** | **222** |
 
 ## Ready to start
 
@@ -259,3 +259,4 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-221` | First library composition slice: Comparison desk as Compact, Cover browser as Grid; 78rem frame, semantic indigo surfaces, uniform priority controls and separate Watching status. Default Grid, one title tree, metadata, API/filter/sort state and actions preserved. Heading clearance and separate unmatched/pending action rows prevent menu overlap. `T-UX-155a`/`b`/`c`, `T-UX-141`, `T-UX-147`; 1,227 web tests pass. Library/accessibility browser cases pass across Chromium and WebKit; two resource-sensitive WebKit cases were rerun without concurrent web tests. Full unit/web coverage passed with two workers and a local 30s cold-import hook allowance, without changing repository timeouts or coverage thresholds. Existing filter/sort dialogs retained; sidebar/column headers, history, light theme and upload/review implementation remain outside this slice. Ready for owner review, not deployed. | `T-UX-141`, `T-UX-147`, `T-UX-155a`, `T-UX-155b`, `T-UX-155c` |
 | `TASK-222` | Guided capture layout, local editable queue until Extract, explicit unchanged-choice Done controls, source-preserving serial uploads, and saved-draft recovery with server-backed removal/submit. `T-UX-156a`–`i`, `T-UX-148`, `T-UI-013j`, `T-DATA-008f`, `T-PASTE-011`, `T-A11Y-002a`. No backend, schema, infrastructure or initial-history changes. Each subsequent capture/review step remains separately scoped. | `T-A11Y-002a`, `T-DATA-008f`, `T-PASTE-011`, `T-UI-013j`, `T-UX-148`, `T-UX-156a` |
 | `TASK-223` | Measured per-image counts, persistent failure evidence, same-batch retry with an atomic error/progress reset, and explicit busy/offline-safe recovery. No running discard, no automatic mutation replay, and no candidate hard deletion. `T-UX-157a`–`g`, `T-BATCH-026a`–`h`; existing status, extraction, owner-scope and lifecycle guards retained. No schema or infrastructure changes. | `T-BATCH-026a`, `T-UX-157a` |
+| `TASK-224` | Grouped review with consistent 104px evidence wells, equal decision controls, counted secondary evidence, inert known matches and explicit withheld-removal copy. Server classification, virtualized large lists and existing actions retained. `T-UX-158a`–`d`; review, responsive, stylesheet and performance regressions. | `T-PERF-002`, `T-UX-158a` |

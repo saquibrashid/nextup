@@ -261,6 +261,7 @@ function CandidateSection({
   confirmAll,
   pendingCount,
   renderCard,
+  description,
   variant = 'plain',
 }: {
   readonly section: SectionView;
@@ -270,6 +271,7 @@ function CandidateSection({
   readonly pendingCount?: number;
   /** Overrides the card rendering — the §6.8 unmatched treatment uses it. */
   readonly renderCard?: (candidate: ReviewCandidate) => JSX.Element;
+  readonly description?: string;
   /**
    * REQ-122 — the section's own surface treatment, as a BEM modifier.
    *
@@ -303,6 +305,7 @@ function CandidateSection({
               a silently under-read batch. */}
           {`${section.label} (${section.count})`}
         </summary>
+        {description !== undefined && <p className="review-section__description">{description}</p>}
         {showConfirmAll && (
           <p className="review-section__confirm-all">
             {/* Layout only — the margin belongs to the section, not the button. */}
@@ -529,8 +532,12 @@ export function ReviewPage({
   };
 
   return (
-    <>
+    <div className="review-flow">
       <ReviewHeading subtitle={`${service} · ${mode}`} />
+      <p className="review-guidance">
+        Decide the new titles first, then check the remaining evidence. Nothing changes until you
+        apply this batch.
+      </p>
 
       {review.banner !== null && (
         <p className="review-banner" role="status" data-testid="review-banner">
@@ -549,6 +556,7 @@ export function ReviewPage({
         </section>
       ) : (
         <CandidateSection
+          description="Check each proposed match against the screenshot text. Confirm only the titles you want to keep."
           confirmAll={() => {
             confirmAll('additions');
           }}
@@ -591,6 +599,7 @@ export function ReviewPage({
       )}
 
       <CandidateSection
+        description="These readings need your help. Keep the text as an unidentified title, find a match, or discard it."
         confirmAll={() => {
           confirmAll('unmatched');
         }}
@@ -623,9 +632,43 @@ export function ReviewPage({
         testId="review-unmatched"
         variant="unmatched"
       />
-      <CandidateSection section={sections.alreadyOnYourList} testId="review-already-on-list" />
-      <CandidateSection section={sections.probablyNotTitles} testId="review-probably-not-titles" />
-      <CandidateSection section={sections.unreadableTiles} testId="review-unreadable-tiles" />
+      <CandidateSection
+        section={sections.alreadyOnYourList}
+        testId="review-already-on-list"
+        description="These extracted titles are already on your list. Open this group to check the matches."
+        renderCard={(candidate) => (
+          <CandidateCard
+            candidate={candidate}
+            thumbnailUrl={thumbnailUrlFor(candidate)}
+            consequence="Stays on your list"
+          />
+        )}
+      />
+      <details
+        className="review-secondary"
+        data-testid="review-secondary"
+        open={sections.unreadableTiles.count > 0}
+      >
+        <summary className="review-section__summary">
+          {`Other extracted items (${sections.probablyNotTitles.count + sections.unreadableTiles.count})`}
+        </summary>
+        <p className="review-section__description">
+          Nothing here is silently added. Inspect the evidence; use manual entry below if a title
+          was missed.
+        </p>
+        <CandidateSection
+          section={sections.probablyNotTitles}
+          testId="review-probably-not-titles"
+        />
+        <CandidateSection section={sections.unreadableTiles} testId="review-unreadable-tiles" />
+      </details>
+
+      {sections.removals.withheld && (
+        <p className="review-banner" role="status" data-testid="review-removals-withheld">
+          Removals are withheld because this extraction is incomplete. You can still review
+          additions; nothing will be removed from your list.
+        </p>
+      )}
 
       {showRemovals && (
         <section className="review-section review-section--removals" data-testid="review-removals">
@@ -645,6 +688,11 @@ export function ReviewPage({
                 {REVIEW_REMOVALS_MARKER}
               </span>
             </summary>
+            <p className="review-section__description">
+              {sections.removals.count === 0
+                ? 'No removals are proposed for this batch.'
+                : 'These titles were not found in this capture. Check the screenshots before agreeing to remove them from this service.'}
+            </p>
             <ul className="review-section__list">
               {sections.removals.items.map((item) => (
                 <li className="removal-card" data-testid="removal-card" key={item.listingId}>
@@ -793,6 +841,6 @@ export function ReviewPage({
           }}
         />
       )}
-    </>
+    </div>
   );
 }

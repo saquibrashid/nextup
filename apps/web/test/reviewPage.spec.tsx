@@ -251,7 +251,9 @@ describe('T-UX-011 · specs/ui.md §5.4 SD-11d · the action bar is STICKY', () 
     // other assertion in this suite.
     const rule = /\.review-action-bar\s*\{([^}]*)\}/.exec(CSS)?.[1] ?? '';
     expect(rule).toMatch(/position:\s*sticky/);
-    expect(rule).toMatch(/bottom:\s*0/);
+    expect(rule).toMatch(
+      /bottom:\s*calc\(var\(--nav-bar-height\) \+ env\(safe-area-inset-bottom\)\)/,
+    );
   });
 
   it('T-UX-011c: the primary action lives inside the bar, not above the fold', () => {

@@ -4,8 +4,17 @@
 The owner approved proceeding through guided upload, extraction recovery,
 grouped review and the single final summary, with a PR, CI-gated merge and
 deployment after each step. `TASK-222` implements guided upload; `TASK-223`
-implements extraction progress and recovery. Grouped review and the final
-summary remain separate implementation slices.
+implements extraction progress and recovery. `TASK-224` implements grouped
+review; the final summary remains a separate implementation slice.
+
+**Grouped review reconciliation:** production retains the server's section
+labels and classification. New/unidentified decisions remain primary, known
+matches are inert with an explicit stay-on-list consequence, and secondary
+readings share a counted disclosure. Unreadable evidence opens that disclosure
+by default. Consistent 104px evidence wells and equal decision controls adapt
+mobile-first. Existing virtualized large-list behavior is preserved; no
+candidate is truncated. Secondary rescue still uses the existing manual-entry
+path rather than inventing a new disposition contract.
 
 **Production reconciliation:** the current API has no draft service/mode edit.
 To keep the approved pre-submit editing truthful, preparation now holds files
