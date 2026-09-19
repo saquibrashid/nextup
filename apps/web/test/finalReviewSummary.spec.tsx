@@ -153,6 +153,9 @@ describe('T-UX-159 single final confirmation', () => {
     mount(client);
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Keep this title' }));
     await waitFor(() => expect(screen.getByRole('checkbox')).not.toBeChecked());
+    expect(
+      within(screen.getByTestId('removal-card')).getByTestId('candidate-consequence'),
+    ).toHaveTextContent('Stays on your list');
     expect(writes).toEqual([{ tick: [], untick: ['remove'] }]);
     await userEvent.click(screen.getByRole('button', { name: 'Review changes' }));
     expect(await screen.findByRole('dialog')).toHaveTextContent('Nothing will be removed');

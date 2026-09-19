@@ -776,7 +776,7 @@ export function ReviewPage({
                       off-screen by the time this row is read. Without it a
                       removal card and an addition card are the same object. */}
                     <p className="removal-card__consequence" data-testid="candidate-consequence">
-                      {REVIEW_CONSEQUENCE_REMOVAL}
+                      {item.ticked ? REVIEW_CONSEQUENCE_REMOVAL : 'Stays on your list'}
                     </p>
                   </li>
                 ))}
