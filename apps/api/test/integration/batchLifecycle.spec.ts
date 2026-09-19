@@ -194,7 +194,11 @@ describe('POST /api/batches/:batchId/submit (§6.14)', () => {
     await seedImage('b-retry', 'i-retry', new Date('2099-01-01'));
     await testPrisma().uploadBatch.updateMany({
       where: { ownerId: owner, id: 'b-retry' },
-      data: { extractionErrorCode: 'EXTRACTOR_ERROR', extractionErrorMessage: 'Old failure' },
+      data: {
+        extractionErrorCode: 'EXTRACTOR_ERROR',
+        extractionErrorMessage: 'Old failure',
+        extractionErrorAt: new Date(),
+      },
     });
     const before = await listSnapshot();
     expect((await post('/api/batches/b-retry/retry-extraction', OTHER_SUBJECT)).status).toBe(404);
@@ -208,6 +212,7 @@ describe('POST /api/batches/:batchId/submit (§6.14)', () => {
       status: 'submitted',
       extractionErrorCode: null,
       extractionErrorMessage: null,
+      extractionErrorAt: null,
     });
     expect(await listImagesForBatch(owner, 'b-retry')).toHaveLength(1);
     expect(await listSnapshot()).toBe(before);
