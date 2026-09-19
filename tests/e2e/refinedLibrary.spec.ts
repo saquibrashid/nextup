@@ -1010,13 +1010,19 @@ test('T-UX-155c: library frame, priority geometry and portrait artwork stay inte
       const geometry = await buttons.evaluateAll((elements) =>
         elements.map((element) => {
           const box = element.getBoundingClientRect();
-          return { width: box.width, height: box.height };
+          return {
+            width: box.width,
+            height: box.height,
+            clientWidth: element.clientWidth,
+            scrollWidth: element.scrollWidth,
+          };
         }),
       );
       expect(new Set(geometry.map((box) => box.width)).size).toBe(1);
       for (const box of geometry) {
-        expect(box.height).toBe(44);
+        expect(box.height, `${view} ${width}: priority control height`).toBe(44);
         expect(box.width).toBeGreaterThanOrEqual(44);
+        expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth);
       }
       for (const row of await list.locator('li.title-row').all()) {
         const poster = await bounds(row.locator('.title-row__poster'));
