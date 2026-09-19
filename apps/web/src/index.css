@@ -2000,8 +2000,20 @@ button {
  * distinction invisible to review while leaving it present to a screen reader.
  */
 
+.review-flow {
+  max-width: 68rem;
+  margin-inline: auto;
+  padding-block: var(--space-4);
+}
+
 .review-heading {
   margin-bottom: var(--space-4);
+}
+
+.review-guidance {
+  color: var(--color-text-muted);
+  max-width: 52rem;
+  margin-block: 0 var(--space-5);
 }
 
 .review-heading__context {
@@ -2018,8 +2030,26 @@ button {
 }
 
 .review-section {
-  border-top: 1px solid var(--color-border);
-  padding: var(--space-3) 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-card);
+  margin-block: var(--space-4);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-card);
+}
+
+.review-secondary {
+  border-block: 1px solid var(--color-border-soft);
+  margin-block: var(--space-5);
+  padding-block: var(--space-2);
+}
+
+.review-section__description {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  margin: 0 0 var(--space-3);
+  max-width: 52rem;
 }
 
 /*
@@ -2136,8 +2166,19 @@ button {
 /* -------------------------------------------------- the candidate card -- */
 
 .candidate-card {
-  display: flex;
-  gap: var(--space-3);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-3) var(--space-4);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+}
+
+.candidate-card__actions {
+  grid-column: 1 / -1;
+  min-width: 0;
 }
 
 /*
@@ -2149,6 +2190,8 @@ button {
 .candidate-card__thumb {
   border-radius: var(--radius);
   min-width: 96px;
+  width: 104px;
+  height: 104px;
   object-fit: cover;
 }
 
@@ -2169,12 +2212,12 @@ button {
 .candidate-card__thumb--cropped {
   display: block;
   flex: 0 0 auto;
-  height: 96px;
+  height: 104px;
   min-height: 96px;
   min-width: 96px;
   overflow: hidden;
   position: relative;
-  width: 96px;
+  width: 104px;
 }
 
 .candidate-card__thumb--cropped img {
@@ -2184,9 +2227,10 @@ button {
 
 .candidate-card__poster {
   border-radius: var(--radius);
-  height: 4.5rem;
-  object-fit: cover;
-  width: 3rem;
+  height: 104px;
+  object-fit: contain;
+  background: var(--color-surface);
+  width: 104px;
 }
 
 .candidate-card__poster--empty {
@@ -2202,8 +2246,9 @@ button {
 }
 
 .candidate-card__name {
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-bold);
   margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .candidate-card__meta {
@@ -2256,6 +2301,9 @@ button {
 .removal-card {
   display: flex;
   flex-direction: column;
+  border-top: 1px solid var(--color-border-soft);
+  padding-block: var(--space-2);
+  overflow-wrap: anywhere;
 }
 
 /*
@@ -2279,8 +2327,9 @@ button {
   align-items: center;
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
-  bottom: 0;
+  bottom: calc(var(--nav-bar-height) + env(safe-area-inset-bottom));
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-3);
   justify-content: space-between;
   padding: var(--space-3);
@@ -2289,6 +2338,23 @@ button {
 
 .review-action-bar__counts {
   margin: 0;
+  flex: 1 1 18rem;
+}
+
+@media (min-width: 360px) {
+  .candidate-card {
+    grid-template-columns: 104px minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 640px) {
+  .candidate-card__actions {
+    grid-column: 2;
+  }
+
+  .review-action-bar {
+    bottom: 0;
+  }
 }
 
 /* ---------------------------------------------------------- wider views -- */
@@ -2547,11 +2613,21 @@ button {
 }
 
 .unmatched-actions__buttons {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
 }
 
+.unmatched-actions__buttons button {
+  white-space: normal;
+  min-width: 0;
+}
+
+@media (min-width: 360px) {
+  .unmatched-actions__buttons {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 .unmatched-actions__form {
   display: flex;
   flex-wrap: wrap;

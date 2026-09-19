@@ -87,6 +87,21 @@ the existing overlap collapse deduplicates repeated readings before review.
 `T-UX-007l/q` intentionally replace the old running-discard and hidden-evidence
 assumptions. The authoritative lifecycle never permits discard while extracting.
 
+### Grouped review, 2026-09-19
+
+`TASK-224` preserves server partitioning while refining review hierarchy.
+`apps/web/test/groupedReview.spec.tsx` maps `T-UX-158a` to retained evidence and
+inert known matches, `b` to full-update zero counts/append-only omission, and
+`c` to explicit withheld-removal explanation. `tests/e2e/groupedReview.spec.ts`
+maps `T-UX-158d` to 280/390/1440px equal decision controls, 104px evidence,
+reachable disclosures, bounded long titles and accessibility. Existing
+`T-PERF-002` continues to guard the complete virtualized 500-item review.
+
+| Test ID | Level | Assertion |
+| --- | --- | --- |
+| `T-UX-158a`–`c` | Web | Retained secondary/known evidence, mode-specific visibility, and withheld-removal explanation. `apps/web/test/groupedReview.spec.tsx`. |
+| `T-UX-158d` | E2E | Consistent evidence/control geometry, phone navigation clearance, accessible disclosures, long titles and no overflow at phone/desktop widths. `tests/e2e/groupedReview.spec.ts`. |
+
 > ### ⚠ REVISION 7 (2026-08-11) — `A45`: clipboard paste is the primary ingest path
 >
 > Owner correction, verbatim: *"for screenshots, I'm generally expecting that

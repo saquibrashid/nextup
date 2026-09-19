@@ -246,9 +246,8 @@ export function CandidateCard({
             {chip}
           </span>
         ))}
-
-        {actions}
       </div>
+      {actions !== null && <div className="candidate-card__actions">{actions}</div>}
     </div>
   );
 }
