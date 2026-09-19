@@ -346,4 +346,72 @@ describe('T-CI-007 · specs/testing.md §3 · the suite runs offline', () => {
     // And the sanctioned caller must actually exist, or this passes vacuously.
     expect(callers.some((c) => c.startsWith('tests/fixtures/msw/'))).toBe(true);
   });
+
+  it('T-CI-007s · every money-spending script is unreachable from CI and absent from all workflows', () => {
+    // ⚠ `T-CI-007l` GUARDS ONE SCRIPT BY GUARDING ONE VITEST PROJECT, AND THAT
+    // SHAPE DOES NOT GENERALISE. Its whole mechanism is "which script selects
+    // `--project live`", so it is blind to any billable entry point that is
+    // not a Vitest project at all. `golden:record` and `probe:stage0` are both
+    // plain `node tools/*.mjs`: they call Azure OpenAI directly, they cost
+    // money, and nothing in this repository stopped a workflow from invoking
+    // one. That is not a hypothetical — `tools/stage0-probe.mjs` was added for
+    // the §9.7 bake-off precisely so a live probe would stop being an ad-hoc
+    // uncommitted script, and committing it is what put a third billable
+    // entry point one `run:` line away from CI.
+    //
+    // The failure mode is silent in the worst way: a scheduled workflow that
+    // burns quota produces a GREEN run and a bill nobody reads until the
+    // budget alert fires.
+    const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as {
+      scripts: Record<string, string>;
+    };
+    const billable = ['golden:live', 'golden:record', 'probe:stage0'];
+
+    // Non-vacuity: each name must really be a script, or a typo disarms this.
+    for (const name of billable) expect(Object.keys(pkg.scripts)).toContain(name);
+
+    // ── Half one: unreachable from anything CI runs. Transitive, because
+    // `npm run test` is a chain and a billable script added three links down
+    // is invisible to a direct grep of the entry points.
+    const reachable = new Set<string>();
+    const walk = (name: string): void => {
+      if (reachable.has(name)) return;
+      reachable.add(name);
+      for (const match of (pkg.scripts[name] ?? '').matchAll(/npm run ([\w:-]+)/g)) {
+        walk(match[1] as string);
+      }
+    };
+    for (const entry of [
+      'test',
+      'coverage',
+      'golden',
+      'test:infra',
+      'test:meta',
+      'test:e2e',
+      'lint',
+      'typecheck',
+      'build',
+    ]) {
+      walk(entry);
+    }
+    expect(billable.filter((s) => reachable.has(s))).toEqual([]);
+
+    // ── Half two: named in no workflow. A workflow can invoke `npm run` or
+    // shell the tool directly, so BOTH spellings are checked — a gate that
+    // only looked for the script name would wave `node tools/stage0-probe.mjs`
+    // straight through.
+    const workflowDir = path.join(ROOT, '.github', 'workflows');
+    const workflows = readdirSync(workflowDir).filter((f) => /\.ya?ml$/.test(f));
+    expect(workflows.length).toBeGreaterThan(0); // non-vacuity
+
+    const tools = ['tools/golden-record.mjs', 'tools/stage0-probe.mjs'];
+    const offenders: string[] = [];
+    for (const file of workflows) {
+      const body = readFileSync(path.join(workflowDir, file), 'utf8');
+      for (const needle of [...billable, ...tools]) {
+        if (body.includes(needle)) offenders.push(`${file}: ${needle}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
 });

@@ -1225,6 +1225,32 @@ false` honoured, per §2.1a), `temperature: 0`, `seed`, and availability in the
 deployment region. Any of these missing changes the *contract*, not the
 quality, and §2.1a's guarantees stop holding.
 
+⚠ **STAGE 0 IS RUN BY A COMMITTED TOOL: `npm run probe:stage0 -- <deployment>
+[<deployment> ...]`** (`tools/stage0-probe.mjs`), with `NEXTUP_AOAI_ENDPOINT`
+set and an `az login` identity holding `Cognitive Services OpenAI User`. It
+exits non-zero unless **every** probed deployment is admissible, so it can gate
+a bake-off rather than merely inform one. It is billable — a handful of vision
+calls per deployment — so `T-CI-007s` asserts it is unreachable from CI and
+named in no workflow.
+
+**The tool exists because the 2026-09-08 probe below was run ad hoc and left no
+artefact.** The result was recorded as prose in this file and in
+`infra/ai.bicep`, and was therefore unreproducible: nobody could re-check it,
+and nobody could re-run it against a new candidate without rewriting the script
+from scratch. Two properties make the committed version worth more than a
+shell history entry:
+
+- **It drives the real `EXTRACTION_SYSTEM_PROMPT`, the real `TILE_SCHEMA`, the
+  real `detail: 'high'` and the real parameters, imported from source rather
+  than copied.** Stage 0 asks whether a candidate can honour §2.1a's
+  *contract*; a hand-rolled `{"type":"json_object"}` probe with a toy prompt
+  answers an easier question, passes a model that cannot do strict Structured
+  Outputs over `TILE_SCHEMA`, and spends a full bake-off before anyone notices.
+- **It distinguishes a parameter-*spelling* rejection from a real
+  disqualification**, which is exactly the distinction the `max_tokens`
+  obstacle below turns on. Collapsing a 400 to a boolean would have
+  disqualified `gpt-5-4-mini`, which was in fact admissible.
+
 **✅ STAGE 0 DISCHARGED for `gpt-5.4-mini` — measured live 2026-09-08 against
 the real `oai-nextup-hriut4gw7lgg4` account, deployment `gpt-5-4-mini`.**
 The `infra/ai.bicep` comment warning that "several GPT-5-family reasoning
@@ -1262,6 +1288,44 @@ But note the consequence for §9.7's decision rule: **if the challenger ever
 wins, promoting it is not only an `ADR-0001` revision and a deployment-name
 change — it also forces `config.ts` from `max_tokens` to
 `max_completion_tokens`.** That is a real promotion cost; count it.
+
+**✅ STAGE 0 SWEEP of the frontier candidates — measured live 2026-09-18 with
+`npm run probe:stage0`, against the same account and the same probe image.**
+Prompted by the owner's observation that `gpt-4.1` (April 2025) is old and
+newer models ought to read screenshots better. Four candidates were deployed
+temporarily to `oai-nextup-hriut4gw7lgg4` and probed alongside the incumbent;
+the three disqualified deployments were deleted immediately afterwards.
+
+| Deployment | Vision | Strict SO | `temperature: 0` | `seed` | Token param | Tiles | Admissible |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `gpt-4.1` (incumbent) | ✅ | ✅ | ✅ | ✅ | `max_tokens` | 6 | **YES** |
+| `gpt-6-astra` (2026-09-03) | ✅ | ✅ | ❌ | ✅ | `max_completion_tokens` | — | **NO** |
+| `gpt-5.6-sol` (2026-07-09) | ✅ | ✅ | ❌ | ✅ | `max_completion_tokens` | — | **NO** |
+| `gpt-5.5` (2026-04-24) | ✅ | ✅ | ❌ | ✅ | `max_completion_tokens` | — | **NO** |
+| `gpt-5.4` (2026-03-05) | ✅ | ✅ | ✅ | ✅ | `max_completion_tokens` | 10 | **YES** |
+
+The three rejects fail on one gate and give the same verbatim reason:
+`unsupported_value` on `'temperature'` — *"Unsupported value: 'temperature'
+does not support 0.0 with this model. Only the default (1) value is
+supported."* They are otherwise fully admissible.
+
+⚠ **THIS MAKES THE `temperature: 0` DISQUALIFIER THE BINDING CONSTRAINT ON
+EVERY FUTURE MODEL CHOICE, AND IT DESERVES SCRUTINY RATHER THAN DEFERENCE.**
+Read the trend: the newer the model, the likelier it fixes its sampling
+temperature at 1. On current evidence `gpt-5.4` is the **last** model this
+product can adopt without revisiting the rule. A gate that permanently excludes
+every future candidate is a decision about the product's ceiling, not a
+formality — see §9.7a.
+
+⚠ **The `10` in the incumbent-vs-`gpt-5.4` row is a signal, not a result.**
+`max-saved-mobile-01.jpg` has exactly **six** expected titles, and `gpt-4.1`
+returns six and scores recall 1.000 against it in every live run. `gpt-5.4`
+returning ten tiles on that image is the same over-reading signature that made
+`gpt-5.4-mini` lose on precision (false-title rate 0.2239 against the
+incumbent's 0.0545). Stage 4 is explicit that a single image is not evidence,
+and raw tiles are not accepted titles — the pipeline rejects chrome — so this
+is a prior to test, not a conclusion. It is recorded here so that the bake-off
+result can be read against what was expected beforehand.
 
 **Stage 1 — identical inputs.** Both models are recorded against the **same**
 `images/`, scored against the **same** `expected/`, and cross-checked against
