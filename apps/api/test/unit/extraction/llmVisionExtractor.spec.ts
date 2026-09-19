@@ -15,6 +15,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { SetupServer } from 'msw/node';
 
+import { readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+
 import { ExtractorError, isExtractorError } from '@nextup/domain';
 
 import {
@@ -30,6 +33,7 @@ import {
   readAoaiConfig,
   toTiles,
   type LlmLogEvent,
+  type LlmVisionExtractorOptions,
 } from '../../../src/extraction/llmVisionExtractor.js';
 import {
   EXTRACTION_SYSTEM_PROMPT,
@@ -76,7 +80,11 @@ interface Harness {
  * retry and timeout paths are asserted by their SCHEDULE rather than by really
  * waiting 2 × 60 s. A suite that waits is a suite someone eventually deletes.
  */
-function makeHarness(options: ReplayOptions = {}, timeoutMs = 50): Harness {
+function makeHarness(
+  options: ReplayOptions = {},
+  timeoutMs = 50,
+  extractorOptions: Partial<LlmVisionExtractorOptions> = {},
+): Harness {
   const calls: RecordedRequest[] = [];
   const sleeps: number[] = [];
   const logs: LlmLogEvent[] = [];
@@ -95,6 +103,7 @@ function makeHarness(options: ReplayOptions = {}, timeoutMs = 50): Harness {
     },
     newCorrelationId: () => CORRELATION_ID,
     log: (event) => logs.push(event),
+    ...extractorOptions,
   });
 
   return { extractor, calls, sleeps, logs };
@@ -138,6 +147,73 @@ describe('T-AI-009 the request the primary reader actually sends', () => {
     expect(body['max_tokens']).toBe(AOAI_MAX_TOKENS);
     expect(h.calls[0]?.apiVersion).toBe(AOAI_API_VERSION);
     expect(h.calls[0]?.correlationId).toBe(CORRELATION_ID);
+  });
+
+  it('T-AI-009s · the bake-off escape hatches reach the wire, and no production file sets them', async () => {
+    // ⚠ TWO ESCAPE HATCHES EXIST ON THIS EXTRACTOR AND BOTH ARE DOCUMENTED
+    // "production must not set this". Until now that was a comment, and a
+    // comment is not a gate. `tokenParam` has carried the instruction since
+    // the §9.7 bake-off landed and had NO test of any kind; `temperature`
+    // joins it, for measuring what the Stage 0 `temperature: 0` disqualifier
+    // actually buys. Both change §2.1a's contract, and §9.5's entire golden
+    // apparatus rests on that contract holding in production.
+    //
+    // Asserting the default alone (T-AI-009k) is not enough: it stays green
+    // while a production caller passes an override explicitly, which is the
+    // only way the hatch can actually do harm. So both halves are here.
+
+    // ── Half one: an override really reaches the request body. A seam that
+    // silently did nothing would be worse than no seam — the temperature
+    // investigation would report `gpt-4.1`-at-0 numbers under another arm's
+    // name and "prove" whatever was already believed.
+    const h = makeHarness({}, 50, { temperature: 1, tokenParam: 'max_completion_tokens' });
+    await h.extractor.readTiles(PNG_BYTES, 'image/png');
+    const body = h.calls[0]?.body as Record<string, unknown>;
+    expect(body['temperature']).toBe(1);
+    expect(body['max_completion_tokens']).toBe(AOAI_MAX_TOKENS);
+    expect(body['max_tokens']).toBeUndefined();
+    // The rest of the contract is untouched by an override — only the named
+    // parameter moves.
+    expect(body['seed']).toBe(AOAI_SEED);
+    expect(body['top_p']).toBe(AOAI_TOP_P);
+
+    // ── Half two: nothing under `apps/api/src/**` passes either one. This is
+    // the half that makes the instruction enforceable. The extractor is
+    // constructed from exactly one place in production (`factory.ts` via
+    // `configFromEnv.ts`), so the search is cheap and total.
+    const srcRoot = path.resolve(__dirname, '../../../src');
+    const sources: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.name.endsWith('.ts')) sources.push(full);
+      }
+    };
+    walk(srcRoot);
+    expect(sources.length).toBeGreaterThan(10); // non-vacuity
+
+    const offenders: string[] = [];
+    for (const file of sources) {
+      // The declaration site is the option bag itself; everywhere else a
+      // `temperature:` or `tokenParam:` key is a caller setting it.
+      if (file.endsWith(path.join('extraction', 'llmVisionExtractor.ts'))) continue;
+      // ⚠ COMMENTS ARE STRIPPED FIRST, AND THE KEY IS NOT ANCHORED TO A LINE
+      // START. Both were learnt from mutation: the first version of this
+      // matched `/^\s*(temperature|tokenParam)\s*:/m`, which finds the key
+      // only in a multi-line object literal — and `configFromEnv.ts` builds
+      // its config on ONE line, so `{ endpoint, deployment, temperature: 1,
+      // credential: credential() }` sailed straight through the gate that
+      // existed to stop exactly that. Un-anchoring needs the comment strip,
+      // because this file's own prose would otherwise match.
+      const text = readFileSync(file, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/\/\/[^\n]*/g, '');
+      if (/\b(temperature|tokenParam)\s*:/.test(text)) {
+        offenders.push(path.relative(srcRoot, file));
+      }
+    }
+    expect(offenders, 'production code must not set the §9.7 bake-off overrides').toEqual([]);
   });
 
   it('T-AI-009l · requests strict Structured Outputs against the committed schema', async () => {
