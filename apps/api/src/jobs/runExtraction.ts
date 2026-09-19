@@ -444,11 +444,12 @@ export async function runExtraction(input: RunExtractionInput): Promise<RunExtra
     // §2.2a — the LLM leg was missing, so this batch was read by OCR alone.
     // Carried as STATE, never recomputed on read: it forces
     // `computeRemovals: false` at review (`T-AI-036`).
-    degradedExtraction: crossCheck === 'llm-unavailable' || imageFailures.length > 0,
+    degradedExtraction: crossCheck === 'llm-unavailable',
     // §8.1 — the read was too thin to reason about removals from. Independent
     // of `degradedExtraction`: a fully corroborated read of five blank
     // screenshots is not degraded and is still low yield.
-    lowYield: isLowYield(stats),
+    // An unread image makes absence unsafe even when other images yielded many titles.
+    lowYield: isLowYield(stats) || imageFailures.length > 0,
     crossCheck,
     imageFailures,
     progress: progress(),
