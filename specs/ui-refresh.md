@@ -82,7 +82,7 @@ inference from them:
 | Sort | Inactive field selects its complete default order; active field reverses. Oldest-first is one click, with state and next action named. URL/back/forward and session precedence stay intact. | `T-UX-138` |
 | Filters | Searchable service disclosure, URL-driven checkbox dimensions, removable chips, clear-all preserving sort and view. Provider registry remains Netflix/Max. | `T-UX-139` |
 | Search | Explicit search submission updates `q` in the URL; server applies it before paging and runtime-hidden counts. Never search only loaded rows. | `T-UX-140`, `T-API-030` |
-| Layout | Grid/compact switch preserves server ordering, all metadata, service badges, pending/offline restrictions, row actions and view across filtering. Real loading and retry paths remain. | `T-UX-141` |
+| Layout | Grid/compact switch preserves server ordering, all metadata, service badges, pending/offline restrictions, row actions and view across filtering. Owner-approved 2026-09-18 composition maps Cover browser to Grid and Comparison desk to Compact; `specs/ui.md` §2.1 defines the current geometry and separate Watching status. Real loading and retry paths remain. | `T-UX-141`, `T-UX-155` |
 | Palette | Dark indigo/violet tokens, body/secondary text >= 4.5:1 and interactive boundaries >= 3:1, no network font or icon dependency. Reduced motion disables animation. | `T-UX-142` |
 | Shell | Compact navigation and play/next identity, one nav landmark, all destinations reachable, factual service-update disclosure with a visible unavailable state. | `T-UX-143` |
 
@@ -390,9 +390,15 @@ mutation the owner cannot see is a mutation they will not trust.
 
 > **Grid** is the default local view preference; **Compact** is an explicit
 > alternative. Both use one ordered row tree with identical data and actions.
-> At narrow widths both are a single column; at wider widths Grid uses
-> multiple columns of **horizontal poster-plus-details cards**, while Compact
-> remains one column. No poster-only or vertically stacked artwork tiles.
+> Owner-approved refinement, 2026-09-18: **Cover browser maps to Grid** and
+> **Comparison desk maps to Compact**. Both are single-column on phones;
+> Grid uses two portrait-led columns from 640px and three from 1024px.
+> Compact remains one column, with aligned comparison facts from 1200px.
+> Artwork never replaces metadata or actions. `specs/ui.md` §2.1 defines
+> current sizes and the separate Watching status.
+
+~~Superseded: horizontal poster-plus-details desktop Grid only; no vertically
+stacked artwork tiles.~~
 
 ⚠ **The phone list is the base rule; the grid is a `min-width` addition.**
 `specs/ui.md` §13.3 mandates mobile-first, and writing it the other way makes
@@ -405,9 +411,10 @@ CSS handles width changes without a JS viewport branch. Filtering, searching
 and sorting preserve the selected view. No local re-sort or title filtering,
 and no promise of cross-session persistence for this local preference.
 
-Wide Compact uses **two metadata columns within the same row body/DOM** to
-reduce each row's height; it does not remove content or violate REQ-108's
-**8px minimum** body spacing.
+Wide Compact uses five aligned tracks within the same row body/DOM: identity,
+services, IMDb, priority and the verbatim date label, separated by 12px.
+Narrow Compact wraps complete facts, with an 8px column gap and 4px line gap.
+Neither view removes content to gain density.
 
 **Every action available on a list row is available on a grid tile** — remove,
 suppress, restore, `⋮`. A grid that drops actions has made desktop the weaker
@@ -416,7 +423,7 @@ client.
 | Test id | Asserts |
 |---|---|
 | `T-UX-110` | At 320 px the list layout renders and there is no horizontal scroll *(extends `T-A11Y-001`)*. |
-| `T-UX-111` | At 1280 px the default grid uses horizontal poster-plus-details cards. |
+| `T-UX-111` | At 1280 px the default grid has three columns with bounded portrait artwork above complete details. |
 | `T-UX-112` | The `⋮` menu offers the **same item set** in both layouts. |
 | `T-UX-141` | Explicit Grid/Compact changes density only: content, server order, badges, row actions, pending/offline restrictions and preference across query changes remain intact. |
 

@@ -475,6 +475,28 @@ describe('T-CSS-004 — contrast is computed from the tokens, not eyeballed', ()
     expect(failures).toEqual([]);
   });
 
+  it('T-UX-155b library semantic text and control boundaries retain contrast on elevated surfaces', () => {
+    for (const foreground of [
+      '--color-text',
+      '--color-text-muted',
+      '--color-secondary',
+      '--color-rating',
+      '--color-success',
+      '--color-accent',
+    ]) {
+      for (const background of ['--color-bg', '--color-surface', '--color-surface-raised']) {
+        expect(
+          ratio(token(foreground), token(background)),
+          `${foreground} on ${background}`,
+        ).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+    // Controls use the base surface/background, not the lighter card endpoint.
+    for (const background of ['--color-bg', '--color-surface']) {
+      expect(ratio(token('--color-border'), token(background))).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   it('T-CSS-004c: the values match the ratios §13.2 documents', () => {
     // Keeps the spec table honest: a token changed here without updating the
     // documented ratio is caught, rather than the two drifting apart.

@@ -1,7 +1,8 @@
 # Library design handoff and proposed next steps
 
-**Status:** Reviewed visual direction; production implementation explicitly on
-hold. This document is a proposal and decision checklist, not a work order.
+**Status:** Library-first implementation authorized 2026-09-18. `TASK-221` in
+`docs/backlog.md` is the work order for the first composition slice; remaining
+decisions below retain their explicit boundaries.
 
 **Date:** 2026-09-18.
 
@@ -20,7 +21,10 @@ data fields, navigation defaults, historical-date behavior or a deployment.
 upload/review study and requested publishing its documentation, mock and
 previews. The [capture/review design record](capture-review-design.md) preserves
 that feedback, the proposed guided sequence, safeguards, open decisions and
-non-building next steps. Production implementation remains on hold.
+the original non-building next steps. The owner subsequently authorized
+**Library first: Comparison desk as Compact
+and Cover browser as Grid**, and approved a single final-summary step for both
+update modes. The latter is reserved for subsequent upload/review work.
 
 ## 1. What is available
 
@@ -30,9 +34,9 @@ non-building next steps. Production implementation remains on hold.
 | [Mock gallery and design notes](mocks/README.md) | Canonical inventory, dimensions, color roles, previews, walkthrough and prototype evidence. | This handoff links to those details rather than maintaining a second geometry specification. |
 | [Study 01](mocks/library-study.html) | Original Compact/Grid composition and the initial-collection selection/review/confirmation concept. | Retained comparison reference, including the earlier charcoal/rose palette. |
 | [Studies 02/03](mocks/layout-alternatives.html) | Cover browser and Comparison desk, with the final indigo styling and shared sample-state interactions. | Primary visual direction; not wired into the real app. |
-| [Capture/review proposal](capture-review-design.md) and [study 04](mocks/capture-review-study.html) | A connected service/mode/capture/review/confirmation exploration using the same visual direction. | Separate mock-only workstream; final-summary interaction and remaining extraction/recovery designs need review before building. |
+| [Capture/review proposal](capture-review-design.md) and [study 04](mocks/capture-review-study.html) | A connected service/mode/capture/review/confirmation exploration using the same visual direction. | Final-summary interaction approved; production work follows library. Remaining extraction/recovery designs still need review. |
 | [Dark desk](mocks/comparison-desk-desktop.png), [light desk](mocks/comparison-desk-light.png), [phone](mocks/comparison-desk-phone.png) | Review snapshots of the refined composition. | Screenshots cannot demonstrate interaction, assistive-technology behavior or API parity. |
-| [Cover browser](mocks/cover-browser-desktop.png) | Artwork-led alternative using the same collection. | Its lower information density is a deliberate tradeoff to review, not an accepted production target. |
+| [Cover browser](mocks/cover-browser-desktop.png) | Approved artwork-led direction for Grid. | Prototype density is not a production acceptance target; first-slice cards use bounded 160px artwork on desktop. |
 
 The HTML files run locally without a server. Search, filtering, sorting and
 preference edits use in-memory sample data; reload/reset discards them. Memberships,
@@ -59,11 +63,11 @@ production theme switch. The style tokens in standalone HTML are not a second
 production design system: future application work should use or deliberately
 extend the existing tokens in `apps/web/src/index.css`.
 
-## 3. Decisions still needed before building
+## 3. Decision record and remaining boundaries
 
 | Decision | Proposed starting position | Required resolution |
 | --- | --- | --- |
-| Layout mapping | Explore Comparison desk as Compact and Cover browser as Grid. | Confirm that mapping. It was suggested, not approved for implementation; do not add a third production layout. |
+| Layout mapping | Comparison desk as Compact and Cover browser as Grid. | Approved 2026-09-18. No third production layout. |
 | Default and persistence | Preserve the current Grid default and existing preference lifetime. | Any new default or persistence mechanism requires explicit approval. |
 | Phone composition and density | Keep the complete, labelled information while reducing wasted space. | Agree on viewport/zoom, first-title position, complete visible choices and task-based success criteria. Do not infer a density waiver from positive feedback on styling. |
 | Artwork-led desktop density | Retain recognition benefits without hiding practical choices below the fold. | Decide whether the current tradeoff is acceptable on shorter laptop screens, or needs another mock revision first. |
@@ -141,19 +145,20 @@ No schema, migration, API, background work or automatic classification is
 authorized here. A visual-only implementation should omit unsupported history
 controls rather than ship sample state or nonfunctional placeholders.
 
-## 6. Proposed sequence, with explicit stop points
+## 6. Implementation sequence and remaining stop points
 
-These are candidate work packages, **not allocated TASK IDs or additions to the
-active backlog**. Every build phase remains unstarted.
+The first library composition slice is now allocated as `TASK-221`. Remaining
+work packages below are not blanket authorization for data, defaults or other
+page changes.
 
 | Phase | Activity / deliverable | Exit condition |
 | --- | --- | --- |
-| Documentation now | Preserve the merged artifacts, visual rationale, parity gaps and unresolved decisions in this handoff. | Documents only; no application changes. |
-| Owner decision review | Resolve section 3, especially mode mapping, mobile density and the short-laptop artwork tradeoff. | Written decisions distinguish styling approval from behavioral amendments. If another mock is needed, authorize that bounded mock work separately. |
+| Documentation | Completed and merged in #316. Preserve artifacts, visual rationale, parity gaps and unresolved decisions. | Original documents-only boundary subsequently superseded for the approved library slice. |
+| Owner decision review | Library-first and mode mapping approved; remaining section 3 choices stay bounded. | Further changes to data, defaults or filter navigation need their own decisions. |
 | Current-main reconciliation | Inspect the then-current UI/state ownership, resolve the summary drift above and coordinate with other active work. | Agreed component/file ownership and a complete capability-parity checklist. No unrelated route or backend rewrites. |
-| Approval and traceability | Obtain explicit permission to build; promote only agreed changes through the existing backlog/spec/test process. | Allocated, collision-checked test IDs and named acceptance coverage; no fictional tests or widened baselines. Follow the sequencing in `specs/ui-refresh.md` section 1. |
-| Future visual foundation | Adapt approved semantic colors, elevation, type and interaction states using existing CSS tokens/primitives. | Existing contrast, class-vocabulary and accessibility contracts preserved; owner review before further composition changes. |
-| Future composition and controls | Adapt the shared title presentation and approved mode mapping, then toolbar/filter presentation without changing query/state ownership. | Same real content/actions/order in each layout, with the complete parity checklist exercised. Independently reviewable changes, not one monolithic replacement. |
+| Approval and traceability | Library build authorized; `TASK-221` and `T-UX-155a`–`c` allocated. | Current geometry is promoted in `specs/ui.md` and acceptance in `specs/testing.md`; no weakened coverage thresholds. |
+| Library visual foundation | Adapt semantic colors, elevation, type and interaction states using existing CSS tokens/primitives. | Existing contrast, class-vocabulary and accessibility contracts preserved; owner review before further composition changes. |
+| Library composition and controls | Adapt the shared title presentation and approved mode mapping, retaining current filter/sort dialogs. | Same real content/actions/order in each layout; persistent filter rail and column headers remain outside this first slice. |
 | Future release review | Review realistic long lists, device/zoom/accessibility cases and actual API lifecycle states; compare against the old production UI. | Named CI gates plus owner visual/interaction acceptance. Deployment remains a separately authorized action. |
 
 If a new PRD story or UX state is needed, its mapping and genuinely collected
@@ -166,11 +171,13 @@ History support, if approved, follows its own product/data/undo design sequence.
 It is not a dependency of the presentational refresh unless the owner explicitly
 chooses to couple them.
 
-## 7. Evidence required for a future build
+## 7. Evidence for implementation and release review
 
-Reuse the named existing tests above for regression protection. Proposed new
-visual measurements still need owner-approved thresholds and allocated test IDs;
-the references here do not prove that an unbuilt redesign passes.
+Reuse the named existing tests above for regression protection. `T-UX-155a`–`c`
+now cover separate Watching/priority semantics, color contrast, five viewport
+widths, equal controls, artwork bounds and row-action clearance. Further
+composition changes need their own agreed measurements; these tests do not
+prove that deferred features have been built.
 
 The review matrix should cover both preferences, real poster aspect ratios and
 failures, long titles, eight service marks, expanded/active genres, missing
@@ -186,6 +193,8 @@ focus evidence must supplement DOM/CSS-source assertions. Session-local mock
 scripts and screenshots are useful design evidence, not a replacement for
 production acceptance tests or real-device review.
 
-**Current stopping point:** the mockups are merged and this handoff documents
-the next decisions. No production implementation, backlog promotion, migration,
-dependency installation or deployment is part of this documentation pass.
+**Current implementation boundary:** `TASK-221` adapts the shared title tree,
+semantic colors, equal priority controls, bounded comparison columns and
+portrait-led cards. It retains existing filters/sort dialogs and their real
+URL/API ownership. Sidebar composition, historical-import features and
+upload/review implementation are not included. No deployment is authorized.

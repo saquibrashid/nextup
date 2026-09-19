@@ -1,7 +1,9 @@
 # UI design studies
 
 **Handoff:** [Reviewed design, open decisions and proposed next steps](../library-design-handoff.md).
-The library mockups were merged in PR #313; production implementation is explicitly on hold.
+The library mockups were merged in PR #313 and the guided-flow handoff in #316.
+The owner subsequently authorized library-first implementation (`TASK-221`);
+the HTML files remain offline design studies, not the running application.
 
 **New workstream:** [Guided capture/review proposal](../capture-review-design.md).
 Study 04 extends the visual direction to screenshot upload and batch review.

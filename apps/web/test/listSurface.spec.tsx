@@ -45,7 +45,7 @@ const CSS = readFileSync(join(WEB_ROOT, 'src', 'index.css'), 'utf8');
 const CSS_CODE = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
 
 /**
- * The body of an `@media` block, by its exact condition text.
+ * All `@media` blocks with the exact condition, in source order.
  *
  * ⚠ **Brace-counted, not regex-matched.** A media block contains nested rules,
  * so the `[^}]*` shape used for a flat rule stops at the FIRST inner `}` and
@@ -55,17 +55,21 @@ const CSS_CODE = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
  */
 function mediaBlock(condition: string): string {
   const head = `@media ${condition} {`;
-  const start = CSS_CODE.indexOf(head);
+  let start = CSS_CODE.indexOf(head);
   expect(start, `no \`@media ${condition}\` block in index.css`).toBeGreaterThanOrEqual(0);
-  let depth = 0;
-  for (let i = start + head.length - 1; i < CSS_CODE.length; i += 1) {
-    if (CSS_CODE[i] === '{') depth += 1;
-    else if (CSS_CODE[i] === '}') {
-      depth -= 1;
-      if (depth === 0) return CSS_CODE.slice(start + head.length, i);
+  const blocks: string[] = [];
+  while (start !== -1) {
+    let depth = 1;
+    let end = start + head.length;
+    for (; end < CSS_CODE.length && depth > 0; end += 1) {
+      if (CSS_CODE[end] === '{') depth += 1;
+      else if (CSS_CODE[end] === '}') depth -= 1;
     }
+    if (depth !== 0) throw new Error(`unbalanced braces in \`@media ${condition}\``);
+    blocks.push(CSS_CODE.slice(start + head.length, end - 1));
+    start = CSS_CODE.indexOf(head, end);
   }
-  throw new Error(`unbalanced braces in \`@media ${condition}\``);
+  return blocks.join('\n');
 }
 
 /** The declarations of a rule, searched in `scope` (default: the whole file). */
@@ -214,25 +218,17 @@ describe('T-UX-111 · ui-refresh.md §4.1/§4.2 · at 1280 px the grid layout re
   it('T-UX-111b: the grid is a real multi-column track list, not a one-column fallback', () => {
     const grid = ruleBody('\\.title-list', mediaBlock(GRID_QUERY));
 
-    expect(grid).toMatch(/grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(/);
-    // `auto-fill` with a floor rather than a fixed column count: `repeat(4,
-    // 1fr)` squeezes tiles below the poster's own width at 1024 px, which is
-    // where this query starts.
-    expect(grid).not.toMatch(/repeat\(\s*\d+\s*,/);
+    expect(grid).toMatch(/grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
   });
 
-  it('T-UX-111c: the tile pairs artwork and details, and the poster fills its track', () => {
-    const block = mediaBlock(GRID_QUERY);
-
-    expect(ruleBody('\\.title-row', block)).toMatch(
-      /grid-template-columns:\s*minmax\(0,\s*0.8fr\)\s*minmax\(0,\s*1fr\)/,
+  it('T-UX-111c: Cover browser stacks bounded portrait artwork above details', () => {
+    const block = mediaBlock('(min-width: 640px)');
+    const gridSelector = "\\.title-list\\[data-view='grid'\\]";
+    expect(ruleBody(`${gridSelector} \\.title-row`, block)).toMatch(
+      /grid-template-columns:\s*minmax\(0,\s*1fr\)/,
     );
-    const poster = ruleBody('\\.title-row__poster', block);
-    expect(poster).toMatch(/width:\s*100%/);
-    // ⚠ `height: auto` is the half that matters: without it the base 6.75rem
-    // wins, `width: 100%` stretches the box and `object-fit: cover` silently
-    // CROPS the artwork the owner uses to recognise a title.
-    expect(poster).toMatch(/height:\s*auto/);
+    expect(ruleBody(`${gridSelector} \\.title-row__poster`, block)).toMatch(/width:\s*10rem/);
+    expect(ruleBody(`${gridSelector} \\.title-row__poster`, BASE_CSS)).toMatch(/height:\s*auto/);
   });
 
   it('T-UX-111d: REQ-111 — the poster box is a uniform 2:3 declared on the BASE rule', () => {

@@ -20,6 +20,31 @@ baselines are empty. A mapped name is not proof of sufficient assertions or
 completed manual acceptance. See `docs/current-release.md` for the evidence
 boundaries and owner-dependent work.
 
+### Library composition refinement, approved 2026-09-18
+
+These extend the existing library presentation contracts; no data/ordering or
+history semantics change. The owner selected Library first, Comparison desk as
+Compact and Cover browser as Grid. `TASK-221` is the first implementation slice.
+
+| Test ID | Level | Assertion |
+| --- | --- | --- |
+| `T-UX-155a` | Web | `apps/web/test/refinedLibrary.spec.tsx`: Watching stays outside the priority label, accessible preference state remains complete, and switching layouts changes neither row DOM nor saved state. |
+| `T-UX-155b` | Web | `apps/web/test/stylesheet.spec.ts`: semantic text colors meet 4.5:1 on the library background and both card endpoints; controls retain 3:1 boundaries on their own surfaces. |
+| `T-UX-155c` | E2E | `tests/e2e/refinedLibrary.spec.ts`: both layouts at 280/390/900/1280/1600px retain uniform 44px priority controls, all eight service marks, 2:3 posters at least 72px wide, bounded metadata and no page overflow. Varied priority, Watching and unidentified/unknown-artwork states cannot overlap row actions. |
+
+Existing `T-UX-141e` now measures portrait-above-details Cover browser rather
+than the superseded horizontal desktop Grid. Its same-content/order/query and
+shorter-Compact assertions stay intact. `T-UX-111b`/`c` pin the new three-column
+desktop grid and bounded portrait artwork instead of the former auto-fill,
+side-by-side tracks. `T-UX-143c` verifies the
+unfiltered first-page response after clearing search and eventual pagination,
+rather than racing a Load more button that a visible sentinel can retire.
+`T-WATCH-003e` asserts the separate
+Watching/priority text offline instead of their former combined string.
+`T-UX-147a`/`c` continue measuring aligned desktop columns and compact phone
+facts. Existing sort, filter, search, loading, menu and accessibility cases
+remain regression obligations, not replaced by these new cases.
+
 > ### ⚠ REVISION 7 (2026-08-11) — `A45`: clipboard paste is the primary ingest path
 >
 > Owner correction, verbatim: *"for screenshots, I'm generally expecting that

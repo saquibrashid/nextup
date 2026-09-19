@@ -152,7 +152,9 @@ it('T-WATCH-003e offline rows display preferences without an editable control', 
     </MemoryRouter>,
   );
   expect(screen.queryByRole('button', { name: /Watch preferences for/ })).not.toBeInTheDocument();
-  expect(screen.getByTestId('title-row-lanterns')).toHaveTextContent('Watching · Up next');
+  const row = screen.getByTestId('title-row-lanterns');
+  expect(within(row).getByText('Watching', { exact: true })).toBeVisible();
+  expect(within(row).getByText('Up next', { exact: true })).toBeVisible();
 });
 
 it('T-WATCH-003f preference filters round-trip, clear independently and preserve unrelated URL state', () => {

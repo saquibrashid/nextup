@@ -121,10 +121,25 @@ function orderedTitles(
 
 async function mountLibrary(
   page: Page,
-  { width = 1280, url = '/', paged = false, withGenres = true, allServices = false } = {},
+  {
+    width = 1280,
+    url = '/',
+    paged = false,
+    withGenres = true,
+    allServices = false,
+    varied = false,
+  } = {},
 ): Promise<URL[]> {
   const requests: URL[] = [];
   const preferences = new Map<string, Preferences>();
+  if (varied) {
+    TITLES.forEach((title, index) =>
+      preferences.set(title.titleId, {
+        watching: index === 2,
+        priority: index === 0 ? 'up-next' : index === 1 ? 'someday' : 'normal',
+      }),
+    );
+  }
   await page.setViewportSize({ width, height: 900 });
   await page.route('**/*', async (route) => {
     const request = route.request();
@@ -176,8 +191,16 @@ async function mountLibrary(
         break;
       case '/api/titles': {
         const matching = orderedTitles(target.searchParams, preferences)
-          .map((title) => ({
+          .map((title, index) => ({
             ...title,
+            ...(varied && index === 4
+              ? {
+                  runtimeMinutes: null,
+                  imdbRating: null,
+                  posterPath: null,
+                  matchState: 'unmatched',
+                }
+              : {}),
             genres: withGenres ? title.genres : [],
             badges: allServices
               ? SERVICES.map((service) => ({
@@ -226,7 +249,12 @@ async function mountLibrary(
     await route.fulfill({ json: body });
   });
   await page.goto(url);
-  await expect(page.getByTestId('title-name')).toHaveCount(paged ? 3 : TITLES.length);
+  if (paged) {
+    // The first three are stable even if a visible sentinel has loaded page two.
+    await expect(page.getByTestId('title-name').nth(2)).toBeVisible();
+  } else {
+    await expect(page.getByTestId('title-name')).toHaveCount(TITLES.length);
+  }
   await expect(page.getByRole('button', { name: 'Service updates', exact: true })).toBeVisible();
   await page.waitForLoadState('networkidle');
   await expect
@@ -369,7 +397,7 @@ async function compactPreservesList(
   await noOverflow(page);
 }
 
-test('T-UX-141e: wide artwork/detail grid uses shorter Compact rows without losing list state', async ({
+test('T-UX-141e: wide Cover browser uses shorter Comparison desk rows without losing list state', async ({
   page,
 }, testInfo) => {
   const requests = await mountLibrary(page, { url: '/?sort=runtime&dir=asc&service=netflix' });
@@ -383,9 +411,9 @@ test('T-UX-141e: wide artwork/detail grid uses shorter Compact rows without losi
   for (const row of await rows.all()) {
     const poster = await bounds(row.getByTestId('poster'));
     const details = await bounds(row.locator('.title-row__body'));
-    expect(details.x).toBeGreaterThanOrEqual(poster.x + poster.width);
-    expect(details.y).toBeLessThan(poster.y + poster.height);
-    expect(poster.y).toBeLessThan(details.y + details.height);
+    expect(details.y).toBeGreaterThanOrEqual(poster.y + poster.height);
+    expect(poster.x).toBeGreaterThanOrEqual(first.x);
+    expect(poster.height / poster.width).toBeCloseTo(1.5, 1);
   }
   await noOverflow(page);
   await compactPreservesList(page, requests, testInfo);
@@ -505,11 +533,22 @@ test('T-UX-143c: submitted URL search resets loaded pages, requests unfiltered t
   expect(requests.some((request) => request.searchParams.get('q') === 'No matching fixture')).toBe(
     true,
   );
+  const firstPage = page.waitForResponse((response) => {
+    const target = new URL(response.url());
+    return (
+      target.pathname === '/api/titles' &&
+      !target.searchParams.has('q') &&
+      !target.searchParams.has('cursor')
+    );
+  });
   await page.getByRole('button', { name: 'Clear search', exact: true }).click();
-  await expect(page.getByTestId('title-name')).toHaveCount(3);
+  expect((await (await firstPage).json()).items).toHaveLength(3);
   await expect(page.getByTestId('zero-match')).toBeHidden();
   expect(new URL(page.url()).searchParams.has('q')).toBe(false);
-  await expect(page.getByTestId('load-more')).toBeVisible();
+  // Shorter cards may already bring the sentinel into view. Verify pagination
+  // completes instead of racing the transient Load more button's removal.
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await expect(page.getByTestId('title-name')).toHaveCount(TITLES.length);
 });
 
 test('T-UX-143d: Services and service-update popovers are usable at 320px and 1280px', async ({
@@ -955,6 +994,78 @@ test('T-UX-147a: compact rows line their ratings, badges and priority controls u
     expect(new Set(lefts).size).toBe(1);
   }
   await noOverflow(page);
+});
+
+test('T-UX-155c: library frame, priority geometry and portrait artwork stay intentional across widths', async ({
+  page,
+}, testInfo) => {
+  await mountLibrary(page, { allServices: true, varied: true });
+  for (const width of [280, 390, 900, 1280, 1600]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const view of ['Grid', 'Compact']) {
+      await page.getByRole('button', { name: `${view} view`, exact: true }).click();
+      const list = page.getByTestId('title-list');
+      expect((await bounds(list)).width).toBeLessThanOrEqual(1248);
+      const buttons = list.getByRole('button', { name: /^Watch preferences for/ });
+      const geometry = await buttons.evaluateAll((elements) =>
+        elements.map((element) => {
+          const box = element.getBoundingClientRect();
+          return { width: box.width, height: box.height };
+        }),
+      );
+      expect(new Set(geometry.map((box) => box.width)).size).toBe(1);
+      for (const box of geometry) {
+        expect(box.height).toBe(44);
+        expect(box.width).toBeGreaterThanOrEqual(44);
+      }
+      for (const row of await list.locator('li.title-row').all()) {
+        const poster = await bounds(row.locator('.title-row__poster'));
+        expect(poster.width).toBeGreaterThanOrEqual(72);
+        expect(poster.height / poster.width).toBeCloseTo(1.5, 1);
+        const box = await bounds(row);
+        for (const part of [
+          '.title-row__identity',
+          '.title-row__watch',
+          '.title-row__badges',
+          '.title-row__date',
+        ]) {
+          const child = await bounds(row.locator(part));
+          expect(child.x).toBeGreaterThanOrEqual(box.x);
+          expect(child.x + child.width).toBeLessThanOrEqual(box.x + box.width);
+        }
+      }
+      const overlaps = await list.locator('li.title-row').evaluateAll((rows) =>
+        rows.flatMap((row) => {
+          const button = row.querySelector('.title-row__actions button');
+          if (!button) throw new Error('Missing row action');
+          const action = button.getBoundingClientRect();
+          return [
+            ...row.querySelectorAll(
+              '.title-row__heading > *, .title-row__meta, .title-row__watch, .title-row__badges, .title-row__date',
+            ),
+          ]
+            .filter((content) => {
+              const child = content.getBoundingClientRect();
+              return (
+                child.left < action.right &&
+                child.right > action.left &&
+                child.top < action.bottom &&
+                child.bottom > action.top
+              );
+            })
+            .map((content) => content.textContent);
+        }),
+      );
+      expect(overlaps, `${view} ${width}: content overlaps row action`).toEqual([]);
+      await noOverflow(page);
+      if ([390, 1280].includes(width)) {
+        await testInfo.attach(`library-${view}-${width}`, {
+          body: await page.screenshot({ fullPage: true }),
+          contentType: 'image/png',
+        });
+      }
+    }
+  }
 });
 
 test('T-UX-147b: Filters, the result count, the order and reverse share one phone line', async ({
