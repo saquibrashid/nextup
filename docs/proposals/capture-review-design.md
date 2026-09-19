@@ -1,9 +1,17 @@
 # Guided capture and review design
 
-**Status:** Owner-reviewed design direction; upload/review remains a prototype.
-On 2026-09-18 the owner approved the single final-summary step for both modes
-and selected **library first** for production implementation. Upload/review
-implementation is a subsequent workstream; no deployment is authorized.
+**Status:** Implementation authorized 2026-09-18 after the library release.
+The owner approved proceeding through guided upload, extraction recovery,
+grouped review and the single final summary, with a PR, CI-gated merge and
+deployment after each step. `TASK-222` begins guided upload. Remaining steps
+are not claimed as implemented by this first slice.
+
+**Production reconciliation:** the current API has no draft service/mode edit.
+To keep the approved pre-submit editing truthful, preparation now holds files
+locally until Extract titles. Leaving/reloading clears this local selection.
+After upload starts, failures are recovered against the actual saved draft;
+there is no automatic replay after an uncertain response. Server-saved drafts
+fix service/mode and offer explicit discard-and-start-over.
 
 **Owner review, 2026-09-18:** The owner responded, "Yes! so much better!" to the
 connected upload/review study, then requested documenting, committing and

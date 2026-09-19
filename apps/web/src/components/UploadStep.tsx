@@ -25,7 +25,7 @@
 import type { JSX, ReactNode } from 'react';
 
 import { Button } from './ui/Button';
-import { STEP_CHANGE_LABEL } from '../copy';
+import { STEP_CHANGE_LABEL, STEP_DONE_LABEL } from '../copy';
 
 /**
  * `locked` — cannot be answered yet; `active` — being answered; `done` —
@@ -51,6 +51,7 @@ export interface UploadStepProps {
   /** The id a locked step's controls point at with `aria-describedby`. */
   readonly hintId?: string;
   readonly onChange?: (() => void) | undefined;
+  readonly onDone?: (() => void) | undefined;
   readonly testId: string;
   readonly children: ReactNode;
 }
@@ -63,12 +64,13 @@ export function UploadStep({
   hint = null,
   hintId,
   onChange,
+  onDone,
   testId,
   children,
 }: UploadStepProps): JSX.Element {
   const done = state === 'done';
   return (
-    <section className="upload-step" data-state={state} data-testid={testId}>
+    <section className="upload-step" data-step={index} data-state={state} data-testid={testId}>
       <div className="upload-step__head">
         {/*
           ⚠ `aria-hidden`: the number is a visual landmark, and announcing
@@ -98,6 +100,17 @@ export function UploadStep({
             type="button"
           >
             {STEP_CHANGE_LABEL}
+          </Button>
+        )}
+        {!done && onDone !== undefined && (
+          <Button
+            variant="secondary"
+            type="button"
+            onClick={onDone}
+            data-testid={`${testId}-done`}
+            aria-label={`Done: ${legend}`}
+          >
+            {STEP_DONE_LABEL}
           </Button>
         )}
       </div>

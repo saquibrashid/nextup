@@ -45,6 +45,30 @@ Watching/priority text offline instead of their former combined string.
 facts. Existing sort, filter, search, loading, menu and accessibility cases
 remain regression obligations, not replaced by these new cases.
 
+### Guided upload, approved 2026-09-18
+
+`TASK-222` implements the first capture/review slice. `T-UX-156a`–`h` live in
+`apps/web/test/guidedUpload.spec.tsx`; `i` lives in
+`tests/e2e/guidedCapture.spec.ts`.
+
+| Test ID | Level | Assertion |
+| --- | --- | --- |
+| `T-UX-156a` | Web | Early screenshots stay local; removing one prevents its upload; final service/mode consent is the batch that is created. |
+| `T-UX-156b` | Web | Done closes either reopened choice without clearing its answer or consent. |
+| `T-UX-156c` | Web | A lost upload response does not replay files or submit automatically; remaining images are attempted and recovery opens the saved batch. |
+| `T-UX-156d` | Web | Failed creation preserves the editable queue for explicit retry. |
+| `T-UX-156e` | Web | Local file/drop/paste arrivals retain their individual source and removal changes the complete queue. |
+| `T-UX-156f` | Web | Saved-draft removal calls the server image deletion, refreshes authoritative state, and an empty draft cannot submit. |
+| `T-UX-156g` | Web | Failed saved-draft upload keeps memory diagnostics/runbook links, never replays automatically, and leaves good saved images submittable. |
+| `T-UX-156h` | Web | Offline blocks draft mutations; discard requires a separate explicit confirmation, with cancellation preserving the batch. |
+| `T-UX-156i` | E2E | Guided upload at phone and desktop widths has equal service-card geometry, bounded controls, visible file/paste affordances, no page overflow and no serious/critical accessibility findings before and after setup. |
+
+`T-DATA-008f` now asserts one batch across rapid Extract presses, not automatic
+creation on attachment. `T-UI-013j` proves the saved draft remains submittable
+after a per-image refusal. `T-A11Y-002a` proves no batch exists before the
+explicit action. These intentionally replace upload-timing assumptions, not
+the underlying no-duplicate, per-image containment or file-selection guarantees.
+
 > ### ⚠ REVISION 7 (2026-08-11) — `A45`: clipboard paste is the primary ingest path
 >
 > Owner correction, verbatim: *"for screenshots, I'm generally expecting that
