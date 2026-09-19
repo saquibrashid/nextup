@@ -1,15 +1,16 @@
 # Guided capture and review design
 
-**Status:** Owner-reviewed design direction; interactive proposal only. No
-production implementation, API change, backlog change or deployment is
-authorized by this document.
+**Status:** Owner-reviewed design direction; upload/review remains a prototype.
+On 2026-09-18 the owner approved the single final-summary step for both modes
+and selected **library first** for production implementation. Upload/review
+implementation is a subsequent workstream; no deployment is authorized.
 
 **Owner review, 2026-09-18:** The owner responded, "Yes! so much better!" to the
 connected upload/review study, then requested documenting, committing and
 pushing it. This records endorsement of the visual and guided-flow direction,
 not blanket approval of every implementation decision. The final-summary
-interaction and remaining production-parity questions below must be resolved
-before building.
+interaction was subsequently approved explicitly; remaining production-parity
+questions below must still be resolved before implementing this workstream.
 
 This work extends the [library design handoff](library-design-handoff.md) in the
 isolated proposal worktree. Application contracts were inspected at the same
@@ -72,7 +73,7 @@ only those removals, preserves the zero-selected case and requires the final
 Apply action. Add-only gains a reviewable preflight step, not removal controls.
 
 This is an intentional interaction change, **not a claim of pixel-for-pixel
-parity with the current app**. It needs owner approval before implementation.
+parity with the current app**. The owner approved it on 2026-09-18.
 The close transaction, pending gate, one-service scope and explicit consent
 must remain unchanged. Back/Escape preserves decisions; retry requires another
 explicit Apply on the visible summary.
@@ -171,7 +172,8 @@ service-save dates. Those decisions remain separate.
 
 1. Review the connected desktop/phone flow with realistic owner tasks: early
    paste, ambiguous match, unidentified keep, rescue, complete update and
-   zero-removal confirmation. Approve or revise the final-summary interaction.
+   zero-removal confirmation. The final-summary interaction is approved;
+   reconcile remaining recovery states before implementation.
 2. Resolve the phone grouping and density tradeoff with real long titles,
    screenshots and a large batch. Decide whether a compact phone section
    navigator is needed; do not assume a small fixture proves 200-item usability.

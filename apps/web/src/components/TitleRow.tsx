@@ -20,7 +20,7 @@ import { formatRuntime, type Service, type WatchPriority } from '@nextup/domain'
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { ServiceMark } from './ServiceMark';
-import { MoreIcon } from './icons';
+import { ChevronIcon, MoreIcon } from './icons';
 import { GenreChips } from './GenreChips';
 
 import {
@@ -204,6 +204,7 @@ export function TitleRow({
       className="title-row"
       id={`title-${item.titleId}`}
       data-testid={`title-row-${item.titleId}`}
+      data-match-state={item.matchState}
       // ⚠ `aria-busy` IS THE WHOLE §2.13 ROW STATE, VISUAL HALF INCLUDED. The
       // dim is applied by `.title-row[aria-busy='true']` in `index.css` rather
       // than by a `--pending` modifier class, for two reasons: `T-CSS-001c`
@@ -234,44 +235,20 @@ export function TitleRow({
       )}
 
       <div className="title-row__body">
-        <h2 className="title-row__name" data-testid="title-name">
-          {item.name}
-        </h2>
+        <div className="title-row__identity">
+          <div className="title-row__heading">
+            <h2 className="title-row__name" data-testid="title-name">
+              {item.name}
+            </h2>
+            {item.watching === true && <span className="title-row__watching">Watching</span>}
 
-        <div
-          className="title-row__watch"
-          data-watching={item.watching === true || undefined}
-          data-priority={item.priority ?? 'normal'}
-        >
-          {onWatchPreferences ? (
-            <Button
-              disabled={busy}
-              aria-haspopup="dialog"
-              aria-label={`Watch preferences for ${item.name}: ${item.watching ? 'Watching, ' : ''}${WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}`}
-              onClick={(event) => {
-                event.currentTarget.focus({ preventScroll: true });
-                onWatchPreferences(item);
-              }}
-            >
-              {item.watching ? 'Watching · ' : 'Priority: '}
-              {WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}
-              <span aria-hidden="true"> ▾</span>
-            </Button>
-          ) : (
-            <span>
-              {item.watching ? 'Watching · ' : ''}
-              {WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}
-            </span>
-          )}
-        </div>
+            {unmatched && (
+              <span className="title-row__chip" data-testid="unidentified-chip">
+                Unidentified
+              </span>
+            )}
 
-        {unmatched && (
-          <span className="title-row__chip" data-testid="unidentified-chip">
-            Unidentified
-          </span>
-        )}
-
-        {/*
+            {/*
           `specs/ux-states.md` §2.8 (`T-UX-017`). Rendered PER ROW, from the
           per-item flag, because the refresh is per item: one title can miss
           the 5 s budget on a page where every other title refreshed fine, and
@@ -290,26 +267,29 @@ export function TitleRow({
           it would be noise. It is ordinary text, present in the accessibility
           tree in reading order, which is what "subtle" means here.
         */}
-        {item.metadataStale === true && (
-          <span
-            className="title-row__chip title-row__chip--stale"
-            data-testid="metadata-stale-chip"
-          >
-            {METADATA_STALE_CHIP}
-          </span>
-        )}
+            {item.metadataStale === true && (
+              <span
+                className="title-row__chip title-row__chip--stale"
+                data-testid="metadata-stale-chip"
+              >
+                {METADATA_STALE_CHIP}
+              </span>
+            )}
+          </div>
 
-        <p className="title-row__meta" data-testid="title-meta">
-          {/*
+          <p className="title-row__meta" data-testid="title-meta">
+            {/*
             REQ-106 — year and type precede runtime and wrapping genres.
             It previously rendered type-then-year, which is why the owner's
             screenshot read `TV2004Animation`. The separators themselves are
             CSS-generated (`.title-row__meta > span + span::before`) so they
             stay out of the row's accessible name.
           */}
-          {item.releaseYear !== null && <span data-testid="release-year">{item.releaseYear}</span>}
-          <span data-testid="media-type">{MEDIA_TYPE_LABELS[item.mediaType]}</span>
-          {/*
+            {item.releaseYear !== null && (
+              <span data-testid="release-year">{item.releaseYear}</span>
+            )}
+            <span data-testid="media-type">{MEDIA_TYPE_LABELS[item.mediaType]}</span>
+            {/*
             US-019 AC-6: an empty genre list renders NOTHING - not "Unknown",
             not "-". A placeholder would read as a fact about the work rather
             than an absence of data, and the owner cannot tell the difference.
@@ -317,7 +297,7 @@ export function TitleRow({
             compact presentation too, including the `+0` it newly makes
             possible (REQ-112, `T-UX-102b`).
           */}
-          {/*
+            {/*
             REQ-119 - runtime precedes genres; unknown runtime is named rather than omitted.
 
             ⚠ THIS DELIBERATELY DIFFERS FROM THE GENRE BRANCH DIRECTLY ABOVE,
@@ -333,11 +313,35 @@ export function TitleRow({
             for why a bare `45m` beside a nine-season series is a false
             statement rather than a terse one.
           */}
-          <span className="title-row__runtime" data-testid="runtime">
-            {formatRuntime(item.runtimeMinutes, item.mediaType) ?? RUNTIME_UNKNOWN_LABEL}
-          </span>
-          <GenreChips genres={item.genres} activeGenres={activeGenres} />
-        </p>
+            <span className="title-row__runtime" data-testid="runtime">
+              {formatRuntime(item.runtimeMinutes, item.mediaType) ?? RUNTIME_UNKNOWN_LABEL}
+            </span>
+            <GenreChips genres={item.genres} activeGenres={activeGenres} />
+          </p>
+        </div>
+
+        <div
+          className="title-row__watch"
+          data-watching={item.watching === true || undefined}
+          data-priority={item.priority ?? 'normal'}
+        >
+          {onWatchPreferences ? (
+            <Button
+              disabled={busy}
+              aria-haspopup="dialog"
+              aria-label={`Watch preferences for ${item.name}: ${item.watching ? 'Watching, ' : ''}${WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}`}
+              onClick={(event) => {
+                event.currentTarget.focus({ preventScroll: true });
+                onWatchPreferences(item);
+              }}
+            >
+              {WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}
+              <ChevronIcon />
+            </Button>
+          ) : (
+            <span>{WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}</span>
+          )}
+        </div>
 
         {/*
           REQ-091 - "no rating" is a FIRST-CLASS RENDERED STATE, and the two

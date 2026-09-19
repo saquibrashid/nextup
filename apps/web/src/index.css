@@ -29,7 +29,7 @@
   --bp-md: 768px;
   --bp-lg: 1024px;
 
-  --layout-max-width: 88rem;
+  --layout-max-width: 78rem;
 
   /*
    * NFR-006. ⚠ THE ONE DEFINITION of the touch floor: `.tap-target` is its
@@ -88,6 +88,11 @@
   --color-surface: #1e1932;
   --color-accent-soft: #302744;
   --color-border-soft: #3d3455;
+  --color-surface-raised: #262039;
+  --color-secondary: #adc5f7;
+  --color-rating: #e8c88f;
+  --color-success: #7adcb0;
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.16);
 
   /* Interactive boundaries meet the 3:1 floor; card dividers use the soft token. */
   --color-border: #77678f; /* 3.32:1 on surface */
@@ -1317,45 +1322,24 @@ button {
   gap: var(--space-3);
 }
 
-/*
- * Owner-approved 2026-09-17 (`specs/ui.md` §2.1 item 3, §10.1) — ON A PHONE
- * GRID IS A TWO-COLUMN POSTER GRID and Compact is the single column above.
- *
- * ⚠ THE DEFECT THIS FIXES: the grid used to begin at `--bp-lg`, so on the
- * device the owner actually uses, the two view choices rendered identically. A
- * preference that changes nothing is not a preference.
- *
- * ⚠ ONE DOM, TWO LAYOUTS — unchanged from `--bp-lg`'s block. Nothing here
- * hides a row action, and `T-UX-112` holds for this layout too: the `⋮` shares
- * its grid cell with the body exactly as it does in the horizontal row, rather
- * than being removed at narrow widths.
- */
+/* Cover browser: horizontal phone cards, portrait-led tiles on wider screens. */
 .title-list[data-view='grid'] {
   display: grid;
-  gap: var(--space-3);
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.title-list[data-view='grid'] .title-row {
+  gap: var(--space-4);
   grid-template-columns: minmax(0, 1fr);
 }
 
-/*
- * ⚠ `height: auto` IS THE HALF THAT MATTERS — the base rule's fixed 6.75rem
- * would otherwise win and `object-fit: cover` would crop the artwork the owner
- * recognises the title by. The same pairing appears in the `--bp-lg` block.
- */
+.title-list[data-view='grid'] .title-row {
+  grid-template-columns: 6rem minmax(0, 1fr);
+  padding: var(--space-4);
+}
+
 .title-list[data-view='grid'] .title-row__poster {
   grid-column: 1;
   grid-row: 1;
   height: auto;
   width: 100%;
-}
-
-.title-list[data-view='grid'] .title-row__body,
-.title-list[data-view='grid'] .title-row__actions {
-  grid-column: 1;
-  grid-row: 2;
+  align-self: start;
 }
 
 /* The `⋮` row menu (`specs/ui.md` §2.3). Items stack so each keeps the full
@@ -1392,13 +1376,14 @@ button {
 }
 
 .title-row {
-  background: var(--color-surface);
+  background: linear-gradient(135deg, var(--color-surface), var(--color-surface-raised));
   border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-card);
   display: grid;
   grid-template-columns: 4.5rem minmax(0, 1fr);
   gap: var(--space-3);
   padding: var(--space-3);
+  box-shadow: var(--shadow-card);
 }
 
 /*
@@ -1496,10 +1481,44 @@ button {
   grid-row: 1;
 }
 
+.title-row__identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+}
+
+.title-row__identity > .title-row__meta {
+  flex-basis: 100%;
+}
+
+.title-row__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  width: 100%;
+  min-width: 0;
+  min-height: var(--tap-target-min);
+  padding-inline-end: var(--tap-target-min);
+  overflow-wrap: anywhere;
+}
+
+.title-row[data-match-state='unmatched'] .title-row__heading,
+.title-row[aria-busy='true'] .title-row__heading {
+  padding-inline-end: 0;
+}
+
+.title-row__watching {
+  color: var(--color-success);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
 .title-row__name {
   font-size: var(--text-lg);
   font-weight: var(--weight-bold);
-  padding-inline-end: var(--tap-target-min);
   overflow-wrap: anywhere;
 }
 
@@ -1540,6 +1559,12 @@ button {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
+  align-content: start;
+}
+
+.title-row__badges .badge {
+  color: var(--color-secondary);
+  background: var(--color-bg);
 }
 
 /*
@@ -1578,7 +1603,7 @@ button {
 }
 
 .title-row__runtime {
-  flex-basis: 100%;
+  flex-basis: auto;
 }
 
 /*
@@ -1618,9 +1643,10 @@ button {
 }
 
 .title-row__rating {
-  color: var(--color-text);
+  color: var(--color-rating);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
 }
 
 /*
@@ -1670,8 +1696,19 @@ button {
   align-self: start;
 }
 
+.title-row[data-match-state='unmatched'] .title-row__actions,
+.title-row[aria-busy='true'] .title-row__actions {
+  grid-row: 2;
+  justify-self: start;
+}
+
 .title-row__menu {
   flex: 0 0 auto;
+}
+
+.title-row__menu > .btn {
+  width: var(--tap-target-min);
+  padding: 0;
 }
 
 /* -------------------------------------------------------- not interested -- */
@@ -2339,68 +2376,11 @@ button {
     padding: var(--space-6);
   }
 
-  /*
-   * REQ-110 (`ui-refresh.md` §4.1) — AT AND ABOVE `--bp-lg` THE LIST IS A
-   * POSTER GRID. Below it, the compact vertical list above is the base rule.
-   *
-   * The default grid responds to width; the owner's compact preference below
-   * overrides density without rendering a second component. §4.1 is explicit,
-   * and the reason is not tidiness: a JS width branch renders a DIFFERENT DOM
-   * at each width, so every action, every label and every a11y property would
-   * need asserting twice, and `T-UX-112` — the same `⋮` item set in both
-   * layouts — would become a claim about two code paths staying in step rather
-   * than a fact about one. Here there is exactly one DOM, so the ONLY way to
-   * lose an action in the grid is to hide it from this block. `T-UX-112`
-   * therefore reads this block as a file and fails if anything in it hides a
-   * descendant of the row menu.
-   *
-   * ⚠ MOBILE-FIRST, AND THAT ORDERING IS REQUIRED. `specs/ui.md` §13.3
-   * mandates it, and writing the grid as the base with a `max-width` override
-   * for phones would make the 320 px case — the one NFR-006 requires and
-   * `T-A11Y-001`/`T-UX-110` test — the case reached by subtraction.
-   *
-   * `auto-fill` with a `minmax` floor rather than a fixed column count: a
-   * fixed `repeat(4, 1fr)` would squeeze tiles below the poster's own width on
-   * a 1024 px viewport, which is where this query starts.
-   */
+  /* Layout preference overrides these defaults without a second row tree. */
   .title-list {
     display: grid;
     gap: var(--space-4);
-    grid-template-columns: repeat(auto-fill, minmax(28rem, 1fr));
-  }
-
-  /*
-   * ⚠ THE RESET OF THE PHONE POSTER GRID, and it must name every property that
-   * rule set. The phone rules are attribute-qualified and therefore outrank the
-   * bare `.title-list` rule above whatever the source order — a reset that
-   * leaves the two-column track or the stacked poster behind produces two
-   * narrow columns of tall cards on a desktop and looks like this query never
-   * applied. Nothing here hides a row action (`T-UX-112`).
-   */
-  .title-list[data-view='grid'] {
-    gap: var(--space-4);
-    grid-template-columns: repeat(auto-fill, minmax(28rem, 1fr));
-  }
-
-  .title-list[data-view='grid'] .title-row {
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr);
-  }
-
-  .title-list[data-view='grid'] .title-row__poster {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .title-list[data-view='grid'] .title-row__body,
-  .title-list[data-view='grid'] .title-row__actions {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  /* Artwork and readable details occupy separate tracks in the same row. */
-  .title-row {
-    align-items: stretch;
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   /*
@@ -3151,9 +3131,20 @@ button {
 .title-row__watch .btn {
   font-size: var(--text-sm);
   background: var(--color-bg);
+  width: 8rem;
+  min-height: var(--tap-target-min);
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  white-space: nowrap;
 }
 
-.title-row__watch[data-watching] .btn,
+.title-row__watch .btn .icon {
+  width: 1rem;
+  height: 1rem;
+  transform: rotate(90deg);
+}
+
 .title-row__watch[data-priority='up-next'] .btn {
   background: var(--color-accent-soft);
   border-color: var(--color-accent);
@@ -3333,156 +3324,183 @@ button {
   height: 6.75rem;
 }
 
-/*
- * Owner-reported 2026-09-17: on a phone the compact row stacked six things
- * vertically down the left with the whole right half of the card empty.
- *
- * ⚠ The body FLOWS here (wrapping flex), it does not stack. Compact is the
- * dense view — its only reason to exist is more titles per screen — so the
- * rating, the date, the badges and the priority control pack onto shared
- * lines and only the name is guaranteed a line of its own. The desktop block
- * further down replaces this with fixed columns; on a phone there is not
- * enough width for columns, so flowing is what fills the space.
- */
+/* Comparison desk keeps one row tree: wrapping phone facts, aligned desktop columns. */
 .title-list[data-view='compact'] .title-row__body {
   align-items: center;
-  column-gap: var(--space-3);
+  column-gap: var(--space-2);
   display: flex;
-  /* ⚠ `row`, and it is load-bearing: `.title-row__body` is a COLUMN flex by
-     default, and `flex-wrap: wrap` on a column container wraps into new
-     COLUMNS — which silently pushed the priority control and the meta line off
-     the right edge of a phone (552 px of content in a 390 px viewport). */
   flex-direction: row;
   flex-wrap: wrap;
   row-gap: var(--space-1);
 }
 
-.title-list[data-view='compact'] .title-row__name {
-  /* ⚠ `0` shrink, not `1`. With `flex: 1 1 100%` the name shrinks out of its
-     own line and lands beside the priority control, which reads as a caption
-     on the button rather than a heading. */
+.title-list[data-view='compact'] .title-row__identity {
   flex: 1 0 100%;
+  margin-bottom: var(--space-2);
 }
 
 .title-list[data-view='compact'] .title-row__meta {
-  flex: 0 1 auto;
   margin: 0;
 }
 
 .title-list[data-view='compact'] .title-row__date {
   margin: 0;
+  flex-basis: 100%;
 }
 
-/*
- * ⚠ VISUAL ORDER ONLY, AND ONLY ON THE FLOWING PHONE LAYOUT. The rating is a
- * short item that would otherwise sit alone on a line of its own while 190 px
- * of the priority control's line stays empty; pulling it up removes a whole
- * line from every compact row. DOM order — and therefore reading order and tab
- * order — is untouched, which is why only non-interactive text is reordered.
- */
-.title-list[data-view='compact'] .title-row__watch {
-  order: 1;
+.title-list[data-view='grid'] .title-row__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
 }
 
-.title-list[data-view='compact'] .title-row__rating {
-  order: 2;
+.title-list[data-view='grid'] .title-row__badges {
+  border-top: 1px solid var(--color-border-soft);
+  padding-top: var(--space-3);
 }
 
-.title-list[data-view='compact'] .title-row__meta {
-  order: 3;
+.title-list[data-view='grid'] .title-row__identity {
+  gap: var(--space-2);
 }
 
-.title-list[data-view='compact'] .title-row__date {
-  order: 4;
+.title-row__watch {
+  max-width: 100%;
 }
 
-.title-list[data-view='compact'] .title-row__badges {
-  order: 5;
+.title-row__watch .btn {
+  max-width: 100%;
 }
 
-.title-list[data-view='compact'] .title-row__runtime {
-  flex-basis: auto;
-}
+@media (min-width: 640px) {
+  .list-controls {
+    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    padding: var(--space-3);
+  }
 
-.title-list[data-view='compact'] .title-row__meta > .title-row__runtime::before {
-  content: '·';
-}
+  .list-controls > .list-view-control {
+    grid-column: 4;
+    grid-row: 2;
+    justify-self: end;
+  }
 
-@media (min-width: 768px) {
-  /*
-   * Owner-reported 2026-09-17: at desktop widths the compact row was five
-   * stacked lines across the full page, with a large hole between the text and
-   * a rating and badge pinned to the far edge.
-   *
-   * ⚠ THE FIRST TWO TRACKS ARE FIXED WIDTHS, DELIBERATELY, and the track is
-   * packed to the start. `1fr` for the text column gave the right-hand stack
-   * the far edge of a 1700 px row, so the wider the screen the larger the hole
-   * the owner reported; `0.5fr` for the second column had the same effect from
-   * the other side.
-   *
-   * ⚠ `max-content` is NOT a substitute and must not be restored here. Every
-   * row is its OWN grid container — there is no shared track sizing between
-   * cards and no subgrid to inherit one — so a content-sized track makes each
-   * card as wide as its own longest genre chip row. The owner reported exactly
-   * that on 2026-09-17: the rating, the priority picker and the service badge
-   * landed at a different x on every card. Only a fixed track puts column 2 at
-   * the same offset in every row, which is what makes a list of cards scan as
-   * columns. Changing these to `auto`, `max-content` or `fit-content` silently
-   * reintroduces the ragged alignment; `T-UX-147a` fails if it does.
-   *
-   * The rows are ASSIGNED rather than auto-placed because auto-placement
-   * dropped the badge to whichever row was free, leaving the gap it was
-   * separated by. Naming the rows is what makes the right-hand stack read as
-   * one block instead of two loose items.
-   *
-   * ⚠ Compact is the DENSE view — its whole purpose is more titles per screen.
-   * Anything added here that grows the row height is working against the only
-   * thing that distinguishes it from Grid.
-   */
-  .title-list[data-view='compact'] .title-row__body {
-    display: grid;
-    grid-template-columns:
-      26rem 11rem
-      minmax(0, max-content);
-    justify-content: start;
+  .sort-control-group {
+    justify-self: start;
+  }
+
+  .title-list[data-view='grid'] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .title-list[data-view='grid'] .title-row {
+    grid-template-columns: minmax(0, 1fr);
     align-content: start;
-    column-gap: var(--space-5);
-    row-gap: var(--space-1);
   }
 
-  .title-list[data-view='compact'] .title-row__name {
-    grid-column: 1 / -1;
+  .title-list[data-view='grid'] .title-row__poster {
+    width: 10rem;
+    justify-self: center;
   }
 
-  .title-list[data-view='compact'] .title-row__chip,
-  .title-list[data-view='compact'] .title-row__meta,
-  .title-list[data-view='compact'] .title-row__date {
+  .title-list[data-view='grid'] .title-row__body,
+  .title-list[data-view='grid'] .title-row__actions {
     grid-column: 1;
-  }
-
-  .title-list[data-view='compact'] .title-row__rating,
-  .title-list[data-view='compact'] .title-row__badges {
-    grid-column: 2;
-    align-self: start;
-  }
-
-  .title-list[data-view='compact'] .title-row__rating {
     grid-row: 2;
   }
 
-  .title-list[data-view='compact'] .title-row__badges {
+  .title-list[data-view='grid'] .title-row[data-match-state='unmatched'] .title-row__actions,
+  .title-list[data-view='grid'] .title-row[aria-busy='true'] .title-row__actions {
     grid-row: 3;
   }
 
-  /*
-   * The watch control takes a third column beside the badges rather than a
-   * full-width line of its own. That line was the hole the owner reported, and
-   * removing it takes a whole row off every compact row.
-   */
-  .title-list[data-view='compact'] .title-row__watch {
+  .title-list[data-view='grid'] .title-row__body {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .title-list[data-view='grid'] .title-row__identity,
+  .title-list[data-view='grid'] .title-row__date,
+  .title-list[data-view='grid'] .title-row__badges {
+    grid-column: 1 / -1;
+  }
+
+  .title-list[data-view='grid'] .title-row__watch {
+    grid-column: 1;
+  }
+
+  .title-list[data-view='grid'] .title-row__rating {
+    grid-column: 2;
+    justify-self: end;
+  }
+}
+
+@media (min-width: 1024px) {
+  .title-list[data-view='grid'] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .title-list[data-view='compact'] .title-row {
+    grid-template-columns: 4.5rem minmax(0, 1fr) var(--tap-target-min);
+    align-items: center;
+    padding: var(--space-4);
+  }
+
+  .title-list[data-view='compact'] .title-row__actions {
     grid-column: 3;
-    grid-row: 2 / 4;
-    align-self: start;
+    align-self: center;
+  }
+
+  .title-list[data-view='compact'] .title-row[data-match-state='unmatched'] .title-row__actions,
+  .title-list[data-view='compact'] .title-row[aria-busy='true'] .title-row__actions {
+    grid-column: 2 / -1;
+    grid-row: 2;
     justify-self: start;
+  }
+
+  .title-list[data-view='compact'] .title-row__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 8rem 5rem 8rem 10rem;
+    gap: var(--space-3);
+    align-items: center;
+  }
+
+  .title-list[data-view='compact'] .title-row__identity {
+    grid-column: 1;
+    grid-row: 1;
+    margin: 0;
+  }
+
+  .title-list[data-view='compact'] .title-row__heading {
+    padding-inline-end: 0;
+  }
+
+  .title-list[data-view='compact'] .title-row__name {
+    font-size: var(--text-base);
+  }
+
+  .title-list[data-view='compact'] .title-row__rating {
+    grid-column: 3;
+    grid-row: 1;
+    font-size: var(--text-lg);
+  }
+
+  .title-list[data-view='compact'] .title-row__badges {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .title-list[data-view='compact'] .title-row__watch {
+    grid-column: 4;
+    grid-row: 1;
+  }
+
+  .title-list[data-view='compact'] .title-row__date {
+    grid-column: 5;
+    grid-row: 1;
+  }
+
+  .title-list[data-view='compact'] .title-row__rating--absent {
+    font-size: var(--text-sm);
   }
 }

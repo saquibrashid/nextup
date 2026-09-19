@@ -296,26 +296,28 @@ restore, suppress, un-suppress or fix-match.
 3. **The list** (`components/TitleList.tsx`) — the dominant element. Nothing is
    added above it beyond the compact service updates and list controls.
    **Grid / Compact** selects local presentation state: the same ordered rows,
-   metadata, badges and actions in both views. Grid is the default; at wide
-   widths it uses horizontal poster-plus-details cards in multiple columns.
-   Compact remains a single column. **At narrow widths Grid is a two-column
-   poster grid and Compact is a single column** (owner-approved 2026-09-17), so
-   the preference is visibly different on a phone rather than only at 1024 px.
-   ~~*Superseded 2026-09-17:* "At narrow widths both are single-column." Two
-   view choices that render identically on the device the owner actually uses
-   are not a choice.~~   query changes preserve the preference and never sort/filter rows locally.
-   Wide Compact lays out the same row body's metadata in **three fixed-width
-   columns, packed to the start**, and the rating, the badges and the priority
-   control of **every** row therefore share one left edge (owner refinement
-   2026-09-17, `T-UX-147a`). ⚠ Content-sized tracks are not an alternative:
-   each row is its own grid container, so they land at a different offset in
-   every row and the list stops reading as columns. **Phone Compact flows
-   instead** — a wrapping *row* flex in which the rating shares the priority
-   control's line — because at 390 px there is no width for columns
-   (`T-UX-147c`). Both keep the DOM/content unchanged and at least **8px** body
-   spacing.
-   ~~Superseded 2026-09-17: "Wide Compact lays out the same row body's metadata
-   in two columns."~~
+   metadata, badges and actions in both views. **Owner-approved 2026-09-18:
+   Cover browser maps to Grid; Comparison desk maps to Compact.** Grid stays
+   the default and uses portrait-led cards in two columns from 640px and three
+   from 1024px. On phones it uses one horizontal card per row, with a 96px-wide
+   poster and more generous spacing than Compact's 72px poster.
+   Compact stays single-column: wrapping facts below 1200px, then a flexible
+   title/metadata column with fixed-width service, rating, priority and date
+   columns. Each fact column aligns across titles (`T-UX-147a`); content-sized
+   tracks must not reintroduce ragged offsets. At 390px rating and priority
+   share a line (`T-UX-147c`). The frame is bounded to 78rem.
+   Both layouts retain the same DOM, query/state ownership, all metadata and
+   actions. Watching is a separate textual status beside title information,
+   not part of the priority button's visible label. Priority buttons use the
+   same 8rem width and 44px minimum target; at tested viewports they remain
+   44px high for all three priorities. Accessible names still include Watching
+   and priority. Semantic colors distinguish services, rating and Watching
+   without replacing text. `T-UX-155a`/`b`/`c` cover these refinements.
+   The heading reserves the 44px row-menu target; status text and metadata
+   cannot overlap it. Unidentified and pending rows place their wider action
+   group on its own line instead of squeezing it into the menu slot.
+   ~~Superseded 2026-09-18: two-column phone poster Grid; wide horizontal Grid
+   cards; Compact's three fixed-width text stacks.~~
    Loading, retry, pending and offline semantics remain real. `T-UX-141`.
 4. **Load-more sentinel** — cursor pagination (`specs/api.md` §3), an
    IntersectionObserver auto-loading the next page, plus an explicit
@@ -373,7 +375,7 @@ required TMDB/JustWatch attribution remain unchanged. `T-UI-010` and
 
 | Element | Source | Rule |
 |---|---|---|
-| Poster | `posterPath` → `src` = `https://image.tmdb.org/t/p/w342{path}`, plus `srcset` offering `w342` as `1x` and `https://image.tmdb.org/t/p/w500{path}` as `2x` | `alt=""` (decorative; the name is adjacent text). A missing poster renders a neutral placeholder tile, never a broken image. ⚠ **The path segment IS the pixel width, so this is a rendered-resolution setting.** In Grid the tile track is `minmax(28rem, 1fr)` and the poster paints at ~200 CSS px and up, which on a 2x display needs 400+ real pixels; the previous single `w154` was therefore upscaled roughly 4x and the owner reported the artwork as soft. The poster is how a title is recognised at a glance (REQ-111), so blur is a functional defect, not a cosmetic one. Compact sits exactly on REQ-111's 72 x 108 floor, which is why `srcset` is used rather than simply raising every view to `w500` — the browser spends the bytes only where the pixels are used. `T-UX-153a` pins the literal widths (every other poster assertion interpolates the constant and so agrees with whatever it says); `T-UX-153b` asserts every rendition exceeds the 72 px floor. ~~Superseded: a single `w154` rendition for every view.~~ |
+| Poster | `posterPath` → `src` = `https://image.tmdb.org/t/p/w342{path}`, plus `srcset` offering `w342` as `1x` and `https://image.tmdb.org/t/p/w500{path}` as `2x` | `alt=""` (decorative; the name is adjacent text). A missing poster renders the same 2:3 neutral tile, never a broken image. Current Grid posters are 96 CSS px wide on phones and 160 CSS px from 640px; Compact retains REQ-111's 72 x 108 floor. The existing w342/w500 renditions are retained: the previous w154 image was visibly soft when enlarged, and artwork is how a title is recognised (REQ-111). Density descriptors select by display density, not by card width. `T-UX-153a` pins the literal source widths; `T-UX-153b` asserts every rendition exceeds the 72 px floor. `T-UX-155c` measures the rendered aspect ratio and floor, including missing artwork. ~~Superseded: horizontal desktop Grid with approximately 200px-or-larger artwork; a single w154 rendition.~~ |
 | Name | `name` | The only element with heading weight in the row |
 | Watch preferences (REQ-126) | `watching`, `priority` | A separate native button below the title reads `Priority: Normal` by default, or `Watching · Up next` etc. Its accessible name includes the title, Watching state and priority. Opens the explicit-save editor (§2.1a); offline shows the same facts without an edit affordance. |
 | Year · type · runtime · genres | `releaseYear`, `mediaType`, `runtimeMinutes`, `genres` | Runtime precedes genres in the approved 2026-09-16 layout. Film renders `1h 55m`, TV `45m/ep` (**one episode**, never a whole-series claim); missing runtime says **"Runtime unknown"**. Genres use three chips plus `+n` expansion, with active-filter genres always visible even above that limit. **Names wrap, never truncate**; `genres: []` renders nothing, never "Unknown" or `+0` (US-019 AC-6). All facts, including IMDb rating or its absent state, remain in Grid and Compact. |
@@ -1023,10 +1025,10 @@ contains **neither** "memory" nor `MEMORY_REMEDY_PATH` for
 
 | Width | Behaviour |
 |---|---|
-| **320 px (floor)** | Compact rows are single-column; **Grid is a two-column poster grid** (§2.1 item 2, owner-approved 2026-09-17) so the two views are visibly different on a phone. The list toolbar wraps within the viewport and the Filters and Sort dialogs render as bottom sheets that fit it. **No horizontal page scrolling**, no clipped genre names, and **no additional step to reverse the current order** — the dedicated reverse button keeps that at one tap with nothing open. `T-A11Y-001` covers every route and the 200-candidate review fixture. |
+| **320 px (floor)** | Compact and Cover-browser Grid both use one card per row, with different artwork sizes and density (§2.1, owner-approved 2026-09-18). The list toolbar wraps within the viewport and the Filters and Sort dialogs render as bottom sheets that fit it. **No horizontal page scrolling**, no clipped genre names, and **no additional step to reverse the current order** — the dedicated reverse button keeps that at one tap with nothing open. `T-A11Y-001` covers every route and the 200-candidate review fixture. |
 | | ~~*Superseded 2026-09-17:* "Single-column horizontal poster/details rows in both views. Filter disclosures and the six visible sort buttons wrap; panels fit the viewport." The no-horizontal-scrolling and no-additional-step-to-reverse rules were **not** superseded and are restated above.~~ |
 | 640 px | Navigation returns to the header: **List, Upload, Batches, More**. Below this width the single bottom-fixed nav is **List, Upload, More**, with safe-area clearance. |
-| **1024 px+** | Grid preference gains multiple columns of horizontal cards; Compact stays a single column. Controls remain above the list, not a left rail. Width is bounded by `--layout-max-width` (§13). **No function is available only on desktop** — `T-A11Y-002` runs the journey at 320 px. |
+| **1024 px+** | Grid has three portrait-led card columns; Compact stays a single column and gains aligned comparison facts at 1200px. Controls remain above the list, not a left rail. Width is bounded by `--layout-max-width` (§13). **No function is available only on desktop** — `T-A11Y-002` runs the journey at 320 px. |
 
 Touch targets: minimum **44×44 CSS px** for every interactive element
 (`.tap-target` utility). `T-A11Y-003` asserts it across the review page.
@@ -1290,12 +1292,16 @@ Modifiers use the `--` suffix already in use: `title-row__poster--empty`,
 | `--bp-sm` | `640px` | §10.1. Named so a breakpoint cannot be typed twice with different values |
 | `--bp-md` | `768px` | Intermediate responsive token; the list grid activates at `--bp-lg` (`T-UX-110`, `T-UX-111`) |
 | `--bp-lg` | `1024px` | §10.1 |
-| `--layout-max-width` | `88rem` | Approved wide grid bounds; individual cards retain readable horizontal poster/details layout |
+| `--layout-max-width` | `78rem` | Bounded Cover browser and Comparison desk; three Grid columns and aligned Compact facts |
 | `--tap-target-min` | `44px` | NFR-006. **The one definition**; `.tap-target` is its only consumer |
 | `--color-text` | `#f2efff` | **14.97:1** on `--color-surface` |
 | `--color-text-muted` | `#bcb4d2` | **8.54:1** on `--color-surface` |
 | `--color-bg` | `#121020` | Dark ink background |
 | `--color-surface` | `#1e1932` | Dark indigo surface; also the foreground on primary accent-filled buttons |
+| `--color-surface-raised` | `#262039` | Subtle card-gradient endpoint |
+| `--color-secondary` | `#adc5f7` | Secondary metadata, never a provider brand |
+| `--color-rating` | `#e8c88f` | IMDb scores, not recommendations |
+| `--color-success` | `#7adcb0` | Watching text, independently of priority |
 | `--color-border` | `#77678f` | **3.32:1** on surface; interactive boundaries, not a soft decorative divider |
 | `--color-accent` | `#b3a0ff` | **7.57:1** on surface, also for **surface-coloured text on accent fill**. White/light foreground on the primary button is not the approved pair |
 | `--color-danger` | `#ff9ba8` | **8.47:1** on surface. Destructive confirmation only |
@@ -1336,7 +1342,8 @@ one rule and an accessibility obligation, not a preference.
 
 ⚠ **Read `docs/adr/ADR-0013-ui-refresh.md` before writing any visual `must`.**
 The tokens in §13.2 are the vocabulary; ADR-0013 is the *taste*, and it was
-chosen by the owner: **dark indigo/violet**, horizontal poster/details cards,
+chosen by the owner: **dark indigo/violet**, portrait-led Grid and aligned
+Compact cards (composition refined by the owner on 2026-09-18, §2.1),
 explicit Grid/Compact preference, complete-order buttons, removable filters,
 submitted search and compact navigation. The no-Tailwind and no-web-font
 decisions remain unchanged.

@@ -74,6 +74,29 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
+it('T-UX-155a Watching is independent of the priority control and both survive layout changes', () => {
+  const save = vi.fn(async () => {
+    throw new Error('Layout must not save preferences');
+  });
+  const item = ITEMS[0];
+  if (!item) throw new Error('Missing title fixture');
+  render(
+    page({ items: [{ ...item, watching: true, priority: 'up-next' }], onWatchPreferences: save }),
+  );
+  const list = screen.getByTestId('title-list');
+  const trigger = within(list).getByRole('button', {
+    name: /Watch preferences for.*Watching, Up next/,
+  });
+  expect(trigger).toHaveTextContent('Up next');
+  expect(trigger).not.toHaveTextContent('Watching');
+  expect(within(list).getByText('Watching', { exact: true })).toBeVisible();
+  expect(trigger.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+  const contents = list.innerHTML;
+  fireEvent.click(screen.getByRole('button', { name: 'Compact view' }));
+  expect(list.innerHTML).toBe(contents);
+  expect(save).not.toHaveBeenCalled();
+});
+
 it('T-UX-141a grid and compact use the identical rows, metadata, actions and server order', async () => {
   const user = userEvent.setup();
   const remove = vi.fn(async () => {
