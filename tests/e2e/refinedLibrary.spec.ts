@@ -706,85 +706,85 @@ test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone
   ).toBeVisible();
 });
 
-test('T-SVC-002g: all eight services fit the library and remain searchable on phone and desktop', async ({
-  page,
-}) => {
-  const requests = await mountLibrary(page, { allServices: true });
-  for (const width of [320, 1280]) {
-    await page.setViewportSize({ width, height: 900 });
-    for (const view of ['Grid', 'Compact']) {
-      await page.getByRole('button', { name: `${view} view`, exact: true }).click();
-      const badges = page
-        .getByTestId('title-list')
-        .locator('li.title-row')
-        .first()
-        .getByTestId('badges');
-      for (const service of SERVICES)
-        await expect(badges.getByText(SERVICE_LABELS[service], { exact: true })).toBeVisible();
-      await noOverflow(page);
-    }
-    const dialog = await openFiltersPanel(page);
-    await dialog.getByRole('button', { name: /^Services / }).click();
-    const search = dialog.getByRole('searchbox', { name: 'Search services', exact: true });
-    for (const service of SERVICES) {
-      await search.fill(SERVICE_LABELS[service]);
-      const choice = dialog.getByRole('checkbox', { name: SERVICE_LABELS[service], exact: true });
-      await choice.scrollIntoViewIfNeeded();
-      await expect(choice).toBeInViewport();
-      if (!(await choice.isChecked())) await chooseInput(choice);
-      await expect
-        .poll(() => new URL(page.url()).searchParams.getAll('service'))
-        .toContain(service);
-    }
-    await closeFiltersPanel(page, dialog);
-    const selectedDialog = await openFiltersPanel(page);
-    await expect(
-      selectedDialog.getByRole('button', { name: 'Services 8 selected', exact: true }),
-    ).toBeVisible();
-    await closeFiltersPanel(page, selectedDialog);
-    await expect
-      .poll(() =>
-        requests.some(
-          (request) =>
-            request.pathname === '/api/titles' &&
-            request.searchParams.getAll('service').length === 8,
-        ),
-      )
-      .toBe(true);
-    await page.getByTestId('clear-filters').click();
-    await noOverflow(page);
-  }
-});
+const { describe } = test;
 
-test('T-WATCH-003j: filter panels remain bounded when no titles have genre facets', async ({
-  page,
-}) => {
-  await mountLibrary(page, { withGenres: false });
-  for (const width of [320, 640, 1280]) {
-    await page.setViewportSize({ width, height: 900 });
-    let dialog = await openFiltersPanel(page);
-    const controls = dialog.getByRole('group', { name: 'Filter by', exact: true });
-    const dialogBox = await bounds(dialog);
-    expect(dialogBox.x).toBeGreaterThanOrEqual(0);
-    expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(width + 1);
-    await expect(controls.locator('.filter-disclosure[data-filter-field]')).toHaveCount(5);
-    const categories = ['Services', 'Type', 'Runtime', 'Watching', 'Priority'];
-    for (const [index, category] of categories.entries()) {
-      const trigger = controls.getByRole('button', { name: new RegExp(`^${category} `) });
-      await usableTarget(page, trigger);
-      await trigger.click();
-      const panel = dialog.locator('.filter-disclosure__panel:visible');
-      await horizontallyBounded(page, panel, width);
-      await page.keyboard.press('Escape');
-      await expect(dialog).toHaveCount(0);
-      await expect(page.getByTestId('filters-trigger')).toHaveAttribute('aria-expanded', 'false');
-      if (index < categories.length - 1) {
-        dialog = await openFiltersPanel(page);
+for (const width of [320, 1280]) {
+  describe(`Service filters at ${width}px`, () => {
+    test('T-SVC-002g: all eight services fit and remain searchable', async ({ page }) => {
+      const requests = await mountLibrary(page, { width, allServices: true });
+      for (const view of ['Grid', 'Compact']) {
+        await page.getByRole('button', { name: `${view} view`, exact: true }).click();
+        const badges = page
+          .getByTestId('title-list')
+          .locator('li.title-row')
+          .first()
+          .getByTestId('badges');
+        for (const service of SERVICES)
+          await expect(badges.getByText(SERVICE_LABELS[service], { exact: true })).toBeVisible();
+        await noOverflow(page);
       }
-    }
-    await noOverflow(page);
-  }
-});
+      const dialog = await openFiltersPanel(page);
+      await dialog.getByRole('button', { name: /^Services / }).click();
+      const search = dialog.getByRole('searchbox', { name: 'Search services', exact: true });
+      for (const service of SERVICES) {
+        await search.fill(SERVICE_LABELS[service]);
+        const choice = dialog.getByRole('checkbox', { name: SERVICE_LABELS[service], exact: true });
+        await choice.scrollIntoViewIfNeeded();
+        await expect(choice).toBeInViewport();
+        if (!(await choice.isChecked())) await chooseInput(choice);
+        await expect
+          .poll(() => new URL(page.url()).searchParams.getAll('service'))
+          .toContain(service);
+      }
+      await closeFiltersPanel(page, dialog);
+      const selectedDialog = await openFiltersPanel(page);
+      await expect(
+        selectedDialog.getByRole('button', { name: 'Services 8 selected', exact: true }),
+      ).toBeVisible();
+      await closeFiltersPanel(page, selectedDialog);
+      await expect
+        .poll(() =>
+          requests.some(
+            (request) =>
+              request.pathname === '/api/titles' &&
+              request.searchParams.getAll('service').length === 8,
+          ),
+        )
+        .toBe(true);
+      await page.getByTestId('clear-filters').click();
+      await noOverflow(page);
+    });
+  });
+}
+
+for (const width of [320, 640, 1280]) {
+  describe(`Empty genre facets at ${width}px`, () => {
+    test('T-WATCH-003j: filter panels remain bounded without genre facets', async ({ page }) => {
+      await mountLibrary(page, { width, withGenres: false });
+      let dialog = await openFiltersPanel(page);
+      const controls = dialog.getByRole('group', { name: 'Filter by', exact: true });
+      const dialogBox = await bounds(dialog);
+      expect(dialogBox.x).toBeGreaterThanOrEqual(0);
+      expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(width + 1);
+      await expect(controls.locator('.filter-disclosure[data-filter-field]')).toHaveCount(5);
+      const categories = ['Services', 'Type', 'Runtime', 'Watching', 'Priority'];
+      for (const [index, category] of categories.entries()) {
+        const trigger = controls.getByRole('button', { name: new RegExp(`^${category} `) });
+        await usableTarget(page, trigger);
+        await trigger.click();
+        const panel = dialog.locator('.filter-disclosure__panel:visible');
+        await horizontallyBounded(page, panel, width);
+        await page.keyboard.press('Escape');
+        await expect(dialog).toHaveCount(0);
+        await expect(page.getByTestId('filters-trigger')).toHaveAttribute('aria-expanded', 'false');
+        if (index < categories.length - 1) {
+          dialog = await openFiltersPanel(page);
+        }
+      }
+      await noOverflow(page);
+    });
+  });
+}
 
 test('T-WATCH-003k: preferences overlay preserves the scrolled list and returns focus on dismissal', async ({
   page,
