@@ -78,7 +78,7 @@ function batch(overrides: Partial<BatchStatus> = {}): BatchStatus {
     batchId: 'b-1',
     service: 'netflix',
     mode: 'full-update',
-    status: 'extracting',
+    status: overrides.extractionError ? 'extraction-failed' : 'extracting',
     derivedFromBatchId: null,
     createdAt: '2026-08-01T10:00:00.000Z',
     submittedAt: '2026-08-01T10:01:00.000Z',
@@ -187,12 +187,12 @@ describe('T-UX-007 — per-image progress without navigating away', () => {
     expect(screen.queryByTestId('batch-status-zero-yield')).not.toBeInTheDocument();
   });
 
-  it('T-UX-007l: an in-progress batch offers Discard and NOT Continue', async () => {
+  it('T-UX-007l: a running batch offers neither an illegal discard nor Continue', () => {
     const onDiscard = vi.fn();
     render(<BatchStatusPage batch={batch()} onDiscard={onDiscard} onContinue={vi.fn()} />);
     expect(screen.queryByRole('button', { name: STATUS_CONTINUE_LABEL })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: STATUS_DISCARD_LABEL }));
-    expect(onDiscard).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: STATUS_DISCARD_LABEL })).not.toBeInTheDocument();
+    expect(onDiscard).not.toHaveBeenCalled();
   });
 
   it('T-UX-007m: a finished batch offers Continue and NOT Discard', () => {
@@ -223,6 +223,8 @@ describe('T-UX-007 — per-image progress without navigating away', () => {
     );
     await userEvent.click(within(alert).getByRole('button', { name: STATUS_RETRY_LABEL }));
     await userEvent.click(within(alert).getByRole('button', { name: STATUS_DISCARD_BATCH_LABEL }));
+    expect(onDiscard).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Discard batch and continue' }));
     expect(onRetry).toHaveBeenCalledOnce();
     expect(onDiscard).toHaveBeenCalledOnce();
   });
@@ -258,13 +260,15 @@ describe('T-UX-007 — per-image progress without navigating away', () => {
     // ⚠ The blobs are gone under the 30-day purge; a retry could only loop.
     expect(screen.queryByRole('button', { name: STATUS_RETRY_LABEL })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: STATUS_PURGED_ACTION_LABEL }));
+    expect(onUploadNew).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Discard batch and continue' }));
     expect(onUploadNew).toHaveBeenCalledOnce();
   });
 
-  it('T-UX-007q: an error replaces the progress view, not sits beside it', () => {
+  it('T-UX-007q: an error replaces live progress but preserves the screenshot evidence', () => {
     render(<BatchStatusPage batch={batch({ extractionError: 'EXTRACTOR_ERROR' })} />);
     expect(screen.queryByTestId('batch-status-headline')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('batch-status-images')).not.toBeInTheDocument();
+    expect(screen.getByTestId('batch-status-images')).toBeInTheDocument();
   });
 
   it('T-UX-007r: §5.8 offline shows a banner and invents no error', () => {

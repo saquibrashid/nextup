@@ -123,7 +123,11 @@ async function seedBatch(id: string, status: string, service = 'netflix') {
 }
 
 /** One image on a batch, so a submit is not refused for being empty. */
-async function seedImage(batchId: string, id: string) {
+async function seedImage(
+  batchId: string,
+  id: string,
+  retainUntil = new Date('2026-09-09T00:00:00.000Z'),
+) {
   return createUploadedImage(owner, {
     id,
     batchId,
@@ -134,7 +138,7 @@ async function seedImage(batchId: string, id: string) {
     format: 'png',
     byteSize: BigInt(1024),
     uploadedByteSize: BigInt(1088),
-    retainUntil: new Date('2026-09-09T00:00:00.000Z'),
+    retainUntil,
   });
 }
 
@@ -184,6 +188,32 @@ afterAll(async () => {
 });
 
 describe('POST /api/batches/:batchId/submit (§6.14)', () => {
+  it('T-BATCH-026g: retry is owner-scoped, concurrency-safe and leaves list and evidence intact', async () => {
+    extraction.suppressed = true;
+    await seedBatch('b-retry', 'extraction-failed');
+    await seedImage('b-retry', 'i-retry', new Date('2099-01-01'));
+    await testPrisma().uploadBatch.updateMany({
+      where: { ownerId: owner, id: 'b-retry' },
+      data: { extractionErrorCode: 'EXTRACTOR_ERROR', extractionErrorMessage: 'Old failure' },
+    });
+    const before = await listSnapshot();
+    expect((await post('/api/batches/b-retry/retry-extraction', OTHER_SUBJECT)).status).toBe(404);
+    const replies = await Promise.all([
+      post('/api/batches/b-retry/retry-extraction'),
+      post('/api/batches/b-retry/retry-extraction'),
+    ]);
+    expect(replies.map((reply) => reply.status).sort()).toEqual([202, 409]);
+    expect(await findUploadBatch(owner, 'b-retry')).toMatchObject({
+      id: 'b-retry',
+      status: 'submitted',
+      extractionErrorCode: null,
+      extractionErrorMessage: null,
+    });
+    expect(await listImagesForBatch(owner, 'b-retry')).toHaveLength(1);
+    expect(await listSnapshot()).toBe(before);
+    expect(await testPrisma().uploadBatch.count()).toBe(1);
+  });
+
   it('T-BATCH-019a: accepts a draft with images and answers 202', async () => {
     await seedBatch('b-submit', 'draft');
     await seedImage('b-submit', 'i-1');

@@ -46,7 +46,7 @@ vi.mock('../../../src/repository/ownerData.js', async (importOriginal) => {
 const { createApp } = await import('../../../src/app.js');
 const { CLIENT_PRINCIPAL_HEADER } = await import('../../../src/auth/principal.js');
 const { resetAllowListWarning } = await import('../../../src/middleware/allowList.js');
-const { readProgress, changedNothing, provenanceTitleIds, IN_FLIGHT_STATUSES } =
+const { readProgress, readImageFailures, changedNothing, provenanceTitleIds, IN_FLIGHT_STATUSES } =
   await import('../../../src/routes/batchDetail.js');
 
 const OID = 'http://schemas.microsoft.com/identity/claims/objectidentifier';
@@ -64,6 +64,20 @@ const principalHeader = Buffer.from(
 ).toString('base64');
 
 const BATCH_ID = 'b-001';
+it('T-BATCH-026h: image failure diagnostics are read without inventing missing entries', () => {
+  const failure = {
+    imageId: 'i1',
+    fileName: 'one.png',
+    code: 'IMAGE_DECODE_OOM',
+    message: 'Memory limit.',
+  };
+  expect(
+    readImageFailures(JSON.stringify({ imageFailures: [failure, null, { imageId: 1 }] })),
+  ).toEqual([failure]);
+  for (const input of [null, '{', 'null', '{}', '{"imageFailures":false}']) {
+    expect(readImageFailures(input)).toEqual([]);
+  }
+});
 const TITLE_ID = 't-001';
 
 const batchRow = (over: Record<string, unknown> = {}) => ({

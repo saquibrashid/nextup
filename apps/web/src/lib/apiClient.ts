@@ -510,6 +510,12 @@ export interface BatchStatus {
   completedAt: string | null;
   images: BatchImage[];
   extractionError: string | null;
+  imageFailures?: readonly {
+    imageId: string;
+    fileName: string;
+    code: string;
+    message: string;
+  }[];
   lowYield: boolean;
   /** Present only while `status` is `submitted` or `extracting` (US-006 AC-1). */
   progress?: { imagesDone: number; imagesTotal: number };
@@ -919,6 +925,13 @@ export function createApiClient(deps: ApiClientDeps = {}) {
     submitBatch: (batchId: string) =>
       request<unknown>(
         `/api/batches/${encodeURIComponent(batchId)}/submit`,
+        { method: 'POST', body: {} },
+        deps,
+      ),
+
+    retryExtraction: (batchId: string) =>
+      request<unknown>(
+        `/api/batches/${encodeURIComponent(batchId)}/retry-extraction`,
         { method: 'POST', body: {} },
         deps,
       ),

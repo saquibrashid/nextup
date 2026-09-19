@@ -69,6 +69,24 @@ after a per-image refusal. `T-A11Y-002a` proves no batch exists before the
 explicit action. These intentionally replace upload-timing assumptions, not
 the underlying no-duplicate, per-image containment or file-selection guarantees.
 
+### Extraction progress and recovery, 2026-09-19
+
+`TASK-223` supplies measured image counts and a real same-batch retry, not a
+status refresh disguised as retry. It preserves earlier candidate evidence;
+the existing overlap collapse deduplicates repeated readings before review.
+
+| Test ID | Level | Assertion |
+| --- | --- | --- |
+| `T-UX-157a`–`f` | Web | Same-batch retry is one explicit POST, guarded while busy/offline; uncertainty is surfaced without replay. Failures retain all screenshots, distinguish unknown/zero/expired, and preserve memory remedy links. Discard needs confirmation. The real client calls the specified endpoint. `apps/web/test/extractionRecovery.spec.tsx`. |
+| `T-UX-157g` | E2E | At 280/390/1440px, progress is measured, running discard is absent, failed-image evidence stays visible, long filenames fit, retry works, and accessibility has no serious/critical findings. `tests/e2e/extractionRecovery.spec.ts`. |
+| `T-BATCH-026a`–`d` | Unit | Retry clears old error/progress in the conditional transition, refuses nonfailed/empty/purged/other-owner batches and a lost race; the existing submit retry remains backward compatible. `apps/api/test/unit/batchLifecycle.spec.ts`. |
+| `T-BATCH-026e`–`f` | Unit | Every extraction resets and persists measured per-image counts, with null distinct from zero; all-memory-failed runs retain the image diagnosis. `apps/api/test/unit/startExtraction.spec.ts`. |
+| `T-BATCH-026g` | Integration | The real retry endpoint is owner-scoped, concurrent requests yield one transition, no derived batch is created, and images/list state are retained. `apps/api/test/integration/batchLifecycle.spec.ts`. |
+| `T-BATCH-026h` | Unit | Stored image failures are read without inventing missing diagnostics. `apps/api/test/unit/routes/batchDetailRoute.spec.ts`. |
+
+`T-UX-007l/q` intentionally replace the old running-discard and hidden-evidence
+assumptions. The authoritative lifecycle never permits discard while extracting.
+
 > ### ⚠ REVISION 7 (2026-08-11) — `A45`: clipboard paste is the primary ingest path
 >
 > Owner correction, verbatim: *"for screenshots, I'm generally expecting that

@@ -269,7 +269,15 @@ export async function transitionUploadBatchStatus(
   from: string,
   data: Pick<
     Prisma.UploadBatchUncheckedUpdateInput,
-    'status' | 'submittedAt' | 'extractionStartedAt' | 'completedAt' | 'undoneAt'
+    | 'status'
+    | 'submittedAt'
+    | 'extractionStartedAt'
+    | 'completedAt'
+    | 'undoneAt'
+    | 'extractionStats'
+    | 'extractionErrorCode'
+    | 'extractionErrorMessage'
+    | 'extractionErrorAt'
   >,
   tx?: Db,
 ): Promise<number> {
@@ -313,6 +321,20 @@ export async function recordExtractionOutcome(
   tx?: Db,
 ) {
   return db(tx).uploadBatch.updateMany({ where: { ownerId, id }, data });
+}
+
+export async function resetImageCandidateCounts(ownerId: OwnerId, batchId: string) {
+  return db().uploadedImage.updateMany({
+    where: { ownerId, batchId },
+    data: { candidateCount: null },
+  });
+}
+
+export async function recordImageCandidateCount(ownerId: OwnerId, id: string, count: number) {
+  return db().uploadedImage.updateMany({
+    where: { ownerId, id },
+    data: { candidateCount: count },
+  });
 }
 
 /* ------------------------------------------------------------------ *

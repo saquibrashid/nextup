@@ -23,14 +23,13 @@
  * **completes**, and rendering it as an error would throw away a good read.
  *
  * ⚠ **NO POLLING LIVES HERE.** `T-UX-007`/`T-UX-008` are level `C` component
- * tests, `GET /api/batches/:batchId` is not implemented yet (see the ledger),
- * and every other page in this app (`ReviewPage`, `RemovedPage`,
+ * tests, and every other page in this app (`ReviewPage`, `RemovedPage`,
  * `SuppressedPage`) is props-driven with the fetching in a container. The
  * poll interval, its pause on `offline`, and §5.4's auto-navigation are the
  * container's job; this file renders a state and nothing else.
  */
 
-import type { JSX } from 'react';
+import { useState, type JSX } from 'react';
 import { Link } from 'react-router-dom';
 
 import { DEGRADED_EXTRACTION_BANNER } from '@nextup/domain';
@@ -43,7 +42,6 @@ import {
   BATCH_PROVENANCE_TITLE,
   STATUS_CONTINUE_LABEL,
   STATUS_DISCARD_BATCH_LABEL,
-  STATUS_DISCARD_LABEL,
   STATUS_ERROR_EXTRACTOR,
   STATUS_ERROR_PURGED,
   STATUS_ERROR_UNAVAILABLE,
@@ -57,11 +55,15 @@ import {
 } from '../copy';
 import type { BatchImage, BatchStatus, BatchTitleRef } from '../lib/apiClient';
 import { Button } from '../components/ui/Button';
+import { Fieldset } from '../components/ui/Fieldset';
+import { RejectionList, mergeRejections } from '../components/RejectionList';
 
 export interface BatchStatusPageProps {
   readonly batch?: BatchStatus | null;
   readonly loadFailed?: boolean;
   readonly offline?: boolean;
+  readonly busy?: boolean;
+  readonly actionError?: string | null;
   readonly onDiscard?: () => void;
   readonly onRetry?: () => void;
   readonly onContinue?: () => void;
@@ -115,7 +117,19 @@ export function zeroYieldImages(images: readonly BatchImage[]): BatchImage[] {
   return images.filter((image) => image.candidateCount === 0);
 }
 
-function ImageTile({ image }: { image: BatchImage }): JSX.Element {
+function ImageTile({ image, batch }: { image: BatchImage; batch: BatchStatus }): JSX.Element {
+  const failure = batch.imageFailures?.find((entry) => entry.imageId === image.imageId);
+  const state = !image.available
+    ? 'Screenshot expired'
+    : failure !== undefined
+      ? 'Needs attention'
+      : image.candidateCount === null
+        ? batch.status === 'extraction-failed'
+          ? 'Not completed'
+          : 'Waiting for a result'
+        : image.candidateCount === 0
+          ? 'No titles found'
+          : `${image.candidateCount} ${image.candidateCount === 1 ? 'title' : 'titles'} found`;
   // ⚠ NAMED as well as thumbnailed (US-006 AC-3). A thumbnail alone is not
   // enough to find the file again in a camera roll of near-identical
   // screenshots, which is the action this state exists to enable.
@@ -134,14 +148,13 @@ function ImageTile({ image }: { image: BatchImage }): JSX.Element {
           data-testid="batch-status-thumb-missing"
         />
       )}
-      <span className="batch-status__filename" data-testid="batch-status-filename">
-        {image.fileName}
-      </span>
-      {image.candidateCount !== null && (
-        <span className="batch-status__count" data-testid="batch-status-count">
-          {image.candidateCount}
+      <div className="batch-status__image-body">
+        <span className="batch-status__filename" data-testid="batch-status-filename">
+          {image.fileName}
         </span>
-      )}
+        <span className="batch-status__image-state">{state}</span>
+        {failure !== undefined && <RejectionList entries={mergeRejections([], [failure])} />}
+      </div>
     </li>
   );
 }
@@ -165,7 +178,7 @@ function ExtractionError({
       <div role="alert" data-testid="batch-status-error">
         <p data-testid="batch-status-error-message">{STATUS_ERROR_PURGED}</p>
         {onUploadNew !== undefined && (
-          <Button variant="secondary" onClick={onUploadNew}>
+          <Button variant="primary" onClick={onUploadNew}>
             {STATUS_PURGED_ACTION_LABEL}
           </Button>
         )}
@@ -181,7 +194,7 @@ function ExtractionError({
       </p>
       <div className="batch-status__actions">
         {onRetry !== undefined && (
-          <Button variant="secondary" onClick={onRetry}>
+          <Button variant="primary" onClick={onRetry}>
             {STATUS_RETRY_LABEL}
           </Button>
         )}
@@ -292,11 +305,14 @@ export function BatchStatusPage({
   batch = null,
   loadFailed = false,
   offline = false,
+  busy = false,
+  actionError = null,
   onDiscard,
   onRetry,
   onContinue,
   onUploadNew,
 }: BatchStatusPageProps): JSX.Element {
+  const [confirmAction, setConfirmAction] = useState<'discard' | 'replace' | null>(null);
   if (loadFailed || batch === null) {
     return (
       <>
@@ -324,8 +340,16 @@ export function BatchStatusPage({
   const inProgress = batch.status === 'submitted' || batch.status === 'extracting';
 
   return (
-    <>
-      <h1>{STATUS_TITLE}</h1>
+    <section className="capture-status">
+      <header className="capture-status__header">
+        <p className="capture-status__eyebrow">Capture / Read screenshots</p>
+        <h1>
+          {batch.status === 'extraction-failed' ? 'Screenshots need attention' : STATUS_TITLE}
+        </h1>
+        {(inProgress || batch.status === 'extraction-failed') && (
+          <p>Your list stays unchanged until you review and confirm the titles.</p>
+        )}
+      </header>
 
       {/* ⚠ ABOVE the error branch, and deliberately so. Offline is not a
           failure of the batch — §5.8 says polling pauses and "no error is
@@ -345,52 +369,89 @@ export function BatchStatusPage({
         </p>
       )}
 
-      {batch.extractionError !== null ? (
-        <ExtractionError
-          code={batch.extractionError}
-          {...(onRetry === undefined ? {} : { onRetry })}
-          {...(onDiscard === undefined ? {} : { onDiscard })}
-          {...(onUploadNew === undefined ? {} : { onUploadNew })}
-        />
-      ) : (
-        <>
-          {headline !== null && (
-            <p className="batch-status__progress" role="status" data-testid="batch-status-headline">
-              {headline}
-            </p>
-          )}
+      {actionError !== null && <p role="alert">{actionError}</p>}
+      <Fieldset legend="Extraction actions" hideLegend disabled={busy || offline}>
+        {batch.status === 'extraction-failed' && batch.extractionError !== null ? (
+          <ExtractionError
+            code={batch.extractionError}
+            {...(onRetry === undefined ? {} : { onRetry })}
+            {...(onDiscard === undefined ? {} : { onDiscard: () => setConfirmAction('discard') })}
+            {...(onUploadNew === undefined
+              ? {}
+              : { onUploadNew: () => setConfirmAction('replace') })}
+          />
+        ) : (
+          <>
+            {headline !== null && (
+              <p
+                className="batch-status__progress"
+                role="status"
+                data-testid="batch-status-headline"
+              >
+                {headline}
+              </p>
+            )}
 
-          {zeroYield.length > 0 && (
-            <p className="batch-status__zero-yield" data-testid="batch-status-zero-yield">
-              {STATUS_ZERO_YIELD.replace('{count}', String(zeroYield.length)).replace(
-                '{total}',
-                String(batch.images.length),
+            {zeroYield.length > 0 && (
+              <p className="batch-status__zero-yield" data-testid="batch-status-zero-yield">
+                {STATUS_ZERO_YIELD.replace('{count}', String(zeroYield.length)).replace(
+                  '{total}',
+                  String(batch.images.length),
+                )}
+              </p>
+            )}
+
+            <div className="batch-status__actions">
+              {batch.status === 'in-review' && onContinue !== undefined && (
+                <Button variant="secondary" onClick={onContinue}>
+                  {STATUS_CONTINUE_LABEL}
+                </Button>
               )}
-            </p>
-          )}
+            </div>
 
-          <ul className="batch-status__images" data-testid="batch-status-images">
-            {batch.images.map((image) => (
-              <ImageTile key={image.imageId} image={image} />
-            ))}
-          </ul>
-
-          <div className="batch-status__actions">
-            {inProgress && onDiscard !== undefined && (
-              <Button variant="secondary" onClick={onDiscard}>
-                {STATUS_DISCARD_LABEL}
+            {showsProvenance(batch) && <ProvenancePanels batch={batch} />}
+          </>
+        )}
+        {confirmAction !== null && (
+          <div className="batch-status__banner">
+            <p>Discard this batch? Your list will not change.</p>
+            <div className="batch-status__actions">
+              <Button variant="secondary" onClick={() => setConfirmAction(null)}>
+                Keep batch
               </Button>
-            )}
-            {!inProgress && onContinue !== undefined && (
-              <Button variant="secondary" onClick={onContinue}>
-                {STATUS_CONTINUE_LABEL}
+              <Button
+                variant="primary"
+                onClick={() => {
+                  if (confirmAction === 'replace') onUploadNew?.();
+                  else onDiscard?.();
+                  setConfirmAction(null);
+                }}
+              >
+                Discard batch and continue
               </Button>
-            )}
+            </div>
           </div>
-
-          {showsProvenance(batch) && <ProvenancePanels batch={batch} />}
-        </>
+        )}
+      </Fieldset>
+      {busy && <p role="status">Saving your request…</p>}
+      {inProgress && batch.progress !== undefined && batch.progress.imagesTotal > 0 && (
+        <progress
+          className="capture-status__meter"
+          aria-label="Screenshots processed"
+          value={batch.progress.imagesDone}
+          max={batch.progress.imagesTotal}
+        />
       )}
-    </>
+      {inProgress && (
+        <p className="batch-status__zero-yield">
+          Reading can take a few minutes. You can leave this page and return to the saved batch.
+        </p>
+      )}
+      <ul className="batch-status__images" data-testid="batch-status-images">
+        {batch.images.map((image) => (
+          <ImageTile key={image.imageId} image={image} batch={batch} />
+        ))}
+      </ul>
+    </section>
   );
 }

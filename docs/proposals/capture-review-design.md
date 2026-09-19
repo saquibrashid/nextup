@@ -3,8 +3,9 @@
 **Status:** Implementation authorized 2026-09-18 after the library release.
 The owner approved proceeding through guided upload, extraction recovery,
 grouped review and the single final summary, with a PR, CI-gated merge and
-deployment after each step. `TASK-222` begins guided upload. Remaining steps
-are not claimed as implemented by this first slice.
+deployment after each step. `TASK-222` implements guided upload; `TASK-223`
+implements extraction progress and recovery. Grouped review and the final
+summary remain separate implementation slices.
 
 **Production reconciliation:** the current API has no draft service/mode edit.
 To keep the approved pre-submit editing truthful, preparation now holds files
@@ -12,6 +13,15 @@ locally until Extract titles. Leaving/reloading clears this local selection.
 After upload starts, failures are recovered against the actual saved draft;
 there is no automatic replay after an uncertain response. Server-saved drafts
 fix service/mode and offer explicit discard-and-start-over.
+
+**Extraction reconciliation, 2026-09-19:** retry now calls the specified
+same-batch endpoint rather than only reloading status. It retains all earlier
+candidate evidence and uses the existing overlap collapse before review.
+Counts are written after each image's results, not guessed from progress.
+Unknown, empty, failed and expired images are distinct; failures retain the
+image list and memory remedies. Discard is offered only after extraction
+stops, with a separate confirmation. Partial image failures cannot enable
+full-update removals. No new background work, schema or infrastructure.
 
 **Owner review, 2026-09-18:** The owner responded, "Yes! so much better!" to the
 connected upload/review study, then requested documenting, committing and

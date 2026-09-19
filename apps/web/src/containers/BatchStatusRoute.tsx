@@ -79,6 +79,10 @@ export function BatchStatusRoute({
   const [batch, setBatch] = useState<BatchStatus | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [refused, setRefused] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const inFlight = useRef(false);
+  const readVersion = useRef(0);
 
   const isOnline = useCallback(
     (): boolean => typeof navigator === 'undefined' || navigator.onLine !== false,
@@ -110,13 +114,15 @@ export function BatchStatusRoute({
 
   const load = useCallback(
     async (signal?: AbortSignal): Promise<void> => {
+      const version = ++readVersion.current;
       try {
         const next = await client.getBatch(batchId, signal);
+        if (signal?.aborted === true || version !== readVersion.current) return;
         statusRef.current = next.status;
         setBatch(next);
         setLoadFailed(false);
       } catch (error) {
-        if (signal?.aborted === true) return;
+        if (signal?.aborted === true || version !== readVersion.current) return;
         if (error instanceof RefusedError) {
           setRefused(true);
           return;
@@ -143,6 +149,7 @@ export function BatchStatusRoute({
       // Checked on every tick, not once at set-up: the owner switches tabs
       // mid-extraction, which is the whole case this exists for.
       if (isHidden()) return;
+      if (inFlight.current) return;
       // §5.8 — the poll PAUSES rather than firing into a dead network. A tick
       // that fires offline costs a rejected request and, without the guard in
       // `load`, an invented error.
@@ -202,6 +209,31 @@ export function BatchStatusRoute({
       void navigate(`/batches/${batchId}/review`, { state: skeletonState(batch) });
   }, [batch, batchId, navigate]);
 
+  function mutate(action: () => Promise<unknown>, destination?: string): void {
+    if (inFlight.current || offline || loadFailed) return;
+    inFlight.current = true;
+    readVersion.current += 1;
+    setBusy(true);
+    setActionError(null);
+    void (async () => {
+      try {
+        await action();
+        if (destination !== undefined) void navigate(destination);
+      } catch (error) {
+        if (error instanceof RefusedError) setRefused(true);
+        else
+          setActionError(
+            `${error instanceof Error ? error.message : 'The request failed.'} ` +
+              'Check the saved status before trying again. Nothing was automatically retried.',
+          );
+      } finally {
+        await load();
+        inFlight.current = false;
+        setBusy(false);
+      }
+    })();
+  }
+
   if (refused) return <RefusalPage reason="not-allowed" />;
   if (batch?.status === 'draft' && !loadFailed) {
     return (
@@ -223,18 +255,22 @@ export function BatchStatusRoute({
       batch={batch}
       loadFailed={loadFailed}
       offline={offline}
+      busy={busy}
+      actionError={actionError}
       onRetry={() => {
-        void load();
+        if (batch?.status === 'extraction-failed' && !loadFailed)
+          mutate(() => client.retryExtraction(batchId));
+        else void load();
       }}
       onDiscard={() => {
         // A MUTATION, and therefore in a handler (REQ-102).
-        void client.discardBatch(batchId).then(() => navigate('/'));
+        mutate(() => client.discardBatch(batchId), '/');
       }}
       onContinue={() => {
         void navigate(`/batches/${batchId}/review`, { state: skeletonState(batch) });
       }}
       onUploadNew={() => {
-        void navigate('/upload');
+        mutate(() => client.discardBatch(batchId), '/upload');
       }}
     />
   );

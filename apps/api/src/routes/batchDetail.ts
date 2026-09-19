@@ -57,6 +57,33 @@ export const IN_FLIGHT_STATUSES = new Set(['submitted', 'extracting']);
 
 interface PersistedStatsShape {
   progress?: { imagesDone?: unknown; imagesTotal?: unknown };
+  imageFailures?: unknown;
+}
+
+export function readImageFailures(extractionStats: string | null): {
+  imageId: string;
+  fileName: string;
+  code: string;
+  message: string;
+}[] {
+  if (extractionStats === null) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(extractionStats);
+  } catch {
+    return [];
+  }
+  const failures = (parsed as PersistedStatsShape | null)?.imageFailures;
+  if (!Array.isArray(failures)) return [];
+  return failures.filter(
+    (entry): entry is { imageId: string; fileName: string; code: string; message: string } =>
+      typeof entry === 'object' &&
+      entry !== null &&
+      typeof entry.imageId === 'string' &&
+      typeof entry.fileName === 'string' &&
+      typeof entry.code === 'string' &&
+      typeof entry.message === 'string',
+  );
 }
 
 /**
@@ -209,6 +236,7 @@ export function registerBatchDetailRoutes(router: Router): void {
       // for every code (`ux-states.md` §5.5-§5.7) and rendering a server
       // sentence instead would give the same failure two different voices.
       extractionError: batch.extractionErrorCode,
+      imageFailures: readImageFailures(batch.extractionStats),
       lowYield: batch.lowYield,
       // SAFETY STATE, carried because the status page renders the degraded
       // banner from it (`T-UX-008`) and had no way to know it until now.
