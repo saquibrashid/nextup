@@ -111,6 +111,7 @@ describe('T-DATA-003 — every method sends credentials', () => {
       addBatchImages: () => client.addBatchImages('bat_1', form),
       removeBatchImage: () => client.removeBatchImage('bat_1', 'img_1'),
       submitBatch: () => client.submitBatch('bat_1'),
+      retryExtraction: () => client.retryExtraction('bat_1'),
       discardBatch: () => client.discardBatch('bat_1'),
       undoBatch: () => client.undoBatch('bat_1'),
       undoRemovalGroup: () => client.undoRemovalGroup('grp_1'),

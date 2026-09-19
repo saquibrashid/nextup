@@ -48,7 +48,7 @@ import {
 
 import { AppError } from '../errors/AppError.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
-import { discardBatch, submitBatch } from '../services/batchLifecycle.js';
+import { discardBatch, retryExtraction, submitBatch } from '../services/batchLifecycle.js';
 import { reextractBatch } from '../services/batchReextract.js';
 import { beginExtraction } from '../jobs/startExtraction.js';
 import { createUploadBatch, findOpenUploadBatch } from '../repository/ownerData.js';
@@ -176,6 +176,14 @@ export function registerBatchRoutes(router: Router): void {
     // make the "client polls" contract above a lie. `beginExtraction` neither
     // awaits nor rejects; it only records the promise so a test can await
     // the settled state instead of racing it.
+    beginExtraction(ownerId, batchId);
+  });
+
+  router.post('/batches/:batchId/retry-extraction', async (req, res) => {
+    const ownerId = requireOwnerId(req);
+    const batchId = req.params.batchId ?? '';
+    const result = await retryExtraction(ownerId, batchId);
+    res.status(202).json(result);
     beginExtraction(ownerId, batchId);
   });
 

@@ -30,6 +30,8 @@ import {
   listImagesForBatch,
   listCandidatesForReview,
   recordExtractionOutcome,
+  recordImageCandidateCount,
+  resetImageCandidateCounts,
   updateCandidateDisposition,
   transitionUploadBatchStatus,
   type OwnerId,
@@ -44,6 +46,8 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
     updateCandidateDisposition: vi.fn(),
     listImagesForBatch: vi.fn(),
     recordExtractionOutcome: vi.fn(),
+    recordImageCandidateCount: vi.fn(),
+    resetImageCandidateCounts: vi.fn(),
     transitionUploadBatchStatus: vi.fn(),
   };
 });
@@ -133,6 +137,27 @@ beforeEach(() => {
 });
 
 describe('startExtraction', () => {
+  it('T-BATCH-026e: each run resets displayed counts and records measured zero separately from unknown', async () => {
+    await startExtraction(OWNER, BATCH, {
+      blobStore,
+      extractor: extractorReturning({ items: [] }),
+    });
+    expect(resetImageCandidateCounts).toHaveBeenCalledExactlyOnceWith(OWNER, BATCH);
+    expect(recordImageCandidateCount).toHaveBeenCalledExactlyOnceWith(OWNER, 'img-1', 0);
+  });
+
+  it('T-BATCH-026f: an all-memory-failed run retains its per-image diagnosis', async () => {
+    const extractor: TitleExtractor = {
+      name: 'hybrid',
+      extract: vi.fn().mockRejectedValue(new RangeError('out of memory')),
+    };
+    await startExtraction(OWNER, BATCH, { blobStore, extractor });
+    expect(lastStatus()).toBe('extraction-failed');
+    expect(lastStats()['imageFailures']).toEqual([
+      expect.objectContaining({ imageId: 'img-1', code: 'IMAGE_DECODE_OOM' }),
+    ]);
+    expect(recordImageCandidateCount).not.toHaveBeenCalled();
+  });
   it('T-EXT-010f claims the batch with a conditional submitted -> extracting move', async () => {
     await startExtraction(OWNER, BATCH, { blobStore, extractor: extractorReturning() });
 

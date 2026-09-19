@@ -169,7 +169,10 @@ export interface RunExtractionPorts {
    */
   recordItems(image: ExtractionImageRef, items: readonly ExtractedTextItem[]): Promise<number>;
   /** Persist `progress` so `GET /api/batches/:batchId` can report it. */
-  reportProgress(progress: ExtractionProgress): Promise<void> | void;
+  reportProgress(
+    progress: ExtractionProgress,
+    imageFailures?: readonly ExtractionImageFailure[],
+  ): Promise<void> | void;
   now(): number;
   /**
    * The `A43-M5` decode sentinel (`docs/architecture.md` S1). A `begin` with
@@ -212,6 +215,7 @@ export interface ExtractionFailed {
   readonly errorMessage: string;
   readonly stats: ExtractionStats;
   readonly progress: ExtractionProgress;
+  readonly imageFailures: readonly ExtractionImageFailure[];
 }
 
 export type RunExtractionResult = ExtractionSucceeded | ExtractionFailed;
@@ -334,6 +338,7 @@ export async function runExtraction(input: RunExtractionInput): Promise<RunExtra
     errorMessage,
     stats,
     progress: progress(),
+    imageFailures,
   });
 
   for (const image of images) {
@@ -391,7 +396,7 @@ export async function runExtraction(input: RunExtractionInput): Promise<RunExtra
           message: scoped.message,
         });
         imagesDone += 1;
-        await ports.reportProgress(progress());
+        await ports.reportProgress(progress(), imageFailures);
         continue;
       }
 
@@ -420,7 +425,7 @@ export async function runExtraction(input: RunExtractionInput): Promise<RunExtra
     stats.candidatesAfterCleanup += await ports.recordItems(image, result.items);
 
     imagesDone += 1;
-    await ports.reportProgress(progress());
+    await ports.reportProgress(progress(), imageFailures);
   }
 
   // Every image failed on memory: there is nothing to review, and reporting
@@ -443,7 +448,8 @@ export async function runExtraction(input: RunExtractionInput): Promise<RunExtra
     // §8.1 — the read was too thin to reason about removals from. Independent
     // of `degradedExtraction`: a fully corroborated read of five blank
     // screenshots is not degraded and is still low yield.
-    lowYield: isLowYield(stats),
+    // An unread image makes absence unsafe even when other images yielded many titles.
+    lowYield: isLowYield(stats) || imageFailures.length > 0,
     crossCheck,
     imageFailures,
     progress: progress(),

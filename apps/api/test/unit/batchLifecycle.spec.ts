@@ -35,6 +35,7 @@ import {
   openStatuses,
   statusesWithNoOutgoingTransitions,
   submitBatch,
+  retryExtraction,
   transitionBatch,
 } from '../../src/services/batchLifecycle.js';
 import {
@@ -89,6 +90,88 @@ function enumerateRoutes(layers: unknown): { method: string; path: string }[] {
   }
   return out;
 }
+
+describe('T-BATCH-026 failed-batch retry', () => {
+  const image = (
+    retainUntil = new Date('2099-01-01'),
+  ): Awaited<ReturnType<typeof listImagesForBatch>>[number] => ({
+    id: 'i1',
+    ownerId: OWNER,
+    batchId: 'b-1',
+    blobPath: 'o/b/i1.png',
+    fileName: 'i1.png',
+    ingestSource: 'upload',
+    uploadedFormat: 'png',
+    format: 'png',
+    byteSize: 1n,
+    uploadedByteSize: 1n,
+    width: 1,
+    height: 1,
+    uploadedAt: new Date('2026-09-19'),
+    retainUntil,
+    candidateCount: 3,
+  });
+
+  it('T-BATCH-026a: same-batch retry atomically clears the old error and resets progress', async () => {
+    mockFind.mockResolvedValue(batchRow('extraction-failed'));
+    mockImages.mockResolvedValue([image()]);
+    mockTransition.mockResolvedValue(1);
+    expect(await retryExtraction(OWNER, 'b-1')).toMatchObject({
+      batchId: 'b-1',
+      status: 'submitted',
+      imageCount: 1,
+      pollAfterMs: 2000,
+    });
+    expect(mockTransition).toHaveBeenCalledWith(
+      OWNER,
+      'b-1',
+      'extraction-failed',
+      expect.objectContaining({
+        extractionErrorCode: null,
+        extractionErrorMessage: null,
+        extractionErrorAt: null,
+        extractionStats: JSON.stringify({ progress: { imagesDone: 0, imagesTotal: 1 } }),
+      }),
+      undefined,
+    );
+  });
+
+  it('T-BATCH-026b: nonfailed states and a lost conditional transition never start a retry', async () => {
+    for (const status of BATCH_STATUSES.filter((status) => status !== 'extraction-failed')) {
+      mockFind.mockResolvedValue(batchRow(status));
+      await expect(retryExtraction(OWNER, 'b-1')).rejects.toMatchObject({
+        code: 'BATCH_NOT_FAILED',
+      });
+    }
+    expect(mockTransition).not.toHaveBeenCalled();
+    mockFind.mockResolvedValue(batchRow('extraction-failed'));
+    mockImages.mockResolvedValue([image()]);
+    mockTransition.mockResolvedValue(0);
+    await expect(retryExtraction(OWNER, 'b-1')).rejects.toMatchObject({ code: 'BATCH_NOT_FAILED' });
+  });
+
+  it('T-BATCH-026c: empty, purged and other-owner batches refuse without mutation', async () => {
+    mockFind.mockResolvedValue(batchRow('extraction-failed'));
+    mockImages.mockResolvedValue([]);
+    await expect(retryExtraction(OWNER, 'b-1')).rejects.toMatchObject({ code: 'NO_IMAGES' });
+    mockImages.mockResolvedValue([image(new Date('2000-01-01'))]);
+    await expect(retryExtraction(OWNER, 'b-1')).rejects.toMatchObject({ code: 'IMAGES_PURGED' });
+    mockFind.mockResolvedValue(null);
+    await expect(retryExtraction(OWNER, 'b-1')).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockTransition).not.toHaveBeenCalled();
+  });
+
+  it('T-BATCH-026d: the existing submit retry remains backward compatible', async () => {
+    mockFind.mockResolvedValue(batchRow('extraction-failed'));
+    mockImages.mockResolvedValue([image()]);
+    mockTransition.mockResolvedValue(1);
+    await expect(submitBatch(OWNER, 'b-1')).resolves.toMatchObject({
+      batchId: 'b-1',
+      status: 'submitted',
+    });
+    expect(mockTransition).toHaveBeenCalledOnce();
+  });
+});
 
 describe('T-BATCH-017 — the transition table (TASK-054)', () => {
   it('T-BATCH-017a: is total over BATCH_STATUSES', () => {

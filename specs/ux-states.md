@@ -119,8 +119,8 @@ Each state below names: **what the owner sees**, **what they can do**, and the
 
 | State | Owner sees | Can do | Test |
 |---|---|---|---|
-| **5.1 Queued (`submitted`)** | *"Queued — 0 of 7 screenshots read."* | Discard | `T-UX-050` |
-| **5.2 Running (`extracting`)** | *"Reading 4 of 7…"* + thumbnails ticking green | Discard | `T-UX-051` |
+| **5.1 Queued (`submitted`)** | Actual reported counts, when available; no invented percentage. Saved screenshot names remain visible. | Leave and return; no discard until a discardable state (`api.md` §6.23). | `T-UX-050`, `T-UX-157` |
+| **5.2 Running (`extracting`)** | *"Reading 4 of 7…"* with a measured progress bar and per-image waiting / titles found / no titles / failed / expired labels. | Leave and return; no discard while the runner owns the batch. | `T-UX-051`, `T-UX-157` |
 | **5.3 Partial — some images yielded nothing** | *"No text was found in 1 of 7 screenshots"*, the image **named and thumbnailed** (US-006 AC-3) | Continue to review | `T-AI-020` |
 | **5.4 Success** | Auto-navigates to the review page | — | `T-UX-052` |
 | **5.5 Error — `EXTRACTOR_ERROR`** | *"Couldn't read your screenshots. Nothing has changed and your screenshots are safe."* + **Try again** / **Discard batch** (US-006 AC-4/AC-6) | Both | `T-UX-053` |

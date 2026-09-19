@@ -148,7 +148,15 @@ export async function transitionBatch(
   to: BatchStatus,
   illegalCode: ErrorCode,
   message: string,
-  fields: { submittedAt?: Date; completedAt?: Date; undoneAt?: Date } = {},
+  fields: {
+    submittedAt?: Date;
+    completedAt?: Date;
+    undoneAt?: Date;
+    extractionStats?: string;
+    extractionErrorCode?: null;
+    extractionErrorMessage?: null;
+    extractionErrorAt?: null;
+  } = {},
   /**
    * Optional transaction handle. Close threads its own through so the status
    * flip and the list writes commit or roll back together (product invariant
@@ -220,7 +228,6 @@ export async function submitBatch(
   now: Date = new Date(),
 ): Promise<SubmitResult> {
   const batch = await loadOwnedBatch(ownerId, batchId);
-
   const images = await listImagesForBatch(ownerId, batchId);
   if (images.length === 0 && batch.status === 'draft') {
     throw new AppError('NO_IMAGES', 400, 'Add at least one screenshot before submitting.', {
@@ -250,6 +257,49 @@ export interface DiscardResult {
   batchId: string;
   status: BatchStatus;
   listStateChanged: boolean;
+}
+
+/** Retry retains all earlier evidence; stage 3 collapses equivalent readings. */
+export async function retryExtraction(
+  ownerId: OwnerId,
+  batchId: string,
+  now: Date = new Date(),
+): Promise<SubmitResult> {
+  const batch = await loadOwnedBatch(ownerId, batchId);
+  if (batch.status !== 'extraction-failed') {
+    throw new AppError('BATCH_NOT_FAILED', 409, 'Only a failed extraction can be retried.', {
+      batchId,
+      status: batch.status,
+    });
+  }
+  const images = await listImagesForBatch(ownerId, batchId);
+  if (images.length === 0) {
+    throw new AppError('NO_IMAGES', 400, 'This batch has no screenshots to read again.');
+  }
+  if (images.some((image) => image.retainUntil.getTime() <= now.getTime())) {
+    throw new AppError('IMAGES_PURGED', 410, 'These screenshots have expired. Upload new ones.');
+  }
+  await transitionBatch(
+    ownerId,
+    batch,
+    'submitted',
+    'BATCH_NOT_FAILED',
+    'This batch is no longer awaiting a retry.',
+    {
+      submittedAt: now,
+      extractionStats: JSON.stringify({ progress: { imagesDone: 0, imagesTotal: images.length } }),
+      extractionErrorCode: null,
+      extractionErrorMessage: null,
+      extractionErrorAt: null,
+    },
+  );
+  return {
+    batchId,
+    status: 'submitted',
+    imageCount: images.length,
+    submittedAt: now.toISOString(),
+    pollAfterMs: SUBMIT_POLL_AFTER_MS,
+  };
 }
 
 /**

@@ -39,6 +39,8 @@ import {
   listCandidatesForReview,
   listImagesForBatch,
   recordExtractionOutcome,
+  recordImageCandidateCount,
+  resetImageCandidateCounts,
   transitionUploadBatchStatus,
   updateCandidateDisposition,
   type OwnerId,
@@ -171,18 +173,19 @@ export function extractionPorts(
       // HERE, after `cleanup`, rather than counted from `items` upstream: stage
       // 2 merges fragments, so the two numbers differ on exactly the messy
       // reads the low-yield check exists to catch.
+      await recordImageCandidateCount(ownerId, image.imageId, cleaned.length);
       return cleaned.length;
     },
 
-    async reportProgress(progress) {
+    async reportProgress(progress, imageFailures = []) {
       // Swallowed on purpose. Progress is observability; a transient write
       // failure here must not fail an image, and certainly not the batch. The
       // authoritative counts are written once at the end regardless.
       try {
         await recordExtractionOutcome(ownerId, batchId, {
-          extractionStats: JSON.stringify({ progress } satisfies Pick<
+          extractionStats: JSON.stringify({ progress, imageFailures } satisfies Pick<
             PersistedExtractionStats,
-            'progress'
+            'progress' | 'imageFailures'
           >),
         });
       } catch (error) {
@@ -291,6 +294,7 @@ export async function startExtraction(
       return;
     }
 
+    await resetImageCandidateCounts(ownerId, batchId);
     const rows = await listImagesForBatch(ownerId, batchId);
     const images: ExtractionImageRef[] = rows.map((row) => ({
       imageId: row.id,
@@ -329,9 +333,7 @@ export async function startExtraction(
     const stats: PersistedExtractionStats = {
       stage1: result.stats,
       progress: result.progress,
-      ...(result.status === 'in-review' && result.imageFailures.length > 0
-        ? { imageFailures: result.imageFailures }
-        : {}),
+      ...(result.imageFailures.length > 0 ? { imageFailures: result.imageFailures } : {}),
     };
 
     if (result.status === 'in-review') {

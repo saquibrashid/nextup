@@ -1459,6 +1459,7 @@ history (data-model I-7 exempts pre-submit draft images).
                 "available": true, "retainUntil": "2026-09-09T20:03:00.000Z",
                 "candidateCount": 14, "href": "/api/images/01J8ZG..." } ],
   "extractionError": null,
+  "imageFailures": [],
   "lowYield": false,
   "degradedExtraction": false,
   "crossCheck": "ok",
@@ -1537,6 +1538,15 @@ than an unbounded read on a 5-DTU database.
 **202**, same body as submit. Valid only from `extraction-failed`; otherwise
 **409 `BATCH_NOT_FAILED`**. Re-runs the **same** batch; does not create a new
 one (contrast §6.21).
+
+The conditional transition clears the previous extraction error and resets
+reported progress. Earlier extracted candidates remain evidence; the existing
+overlap collapse deduplicates equivalent readings before review. Per-image
+counts reset to unknown and are written only after the new read is persisted.
+Empty batches return `NO_IMAGES`; expired screenshots return `IMAGES_PURGED`.
+The detail response includes `imageFailures` with `imageId`, `fileName`, `code`
+and `message`, including when every image failed. Partial memory/decode failures
+withhold full-update removals rather than treating unread screenshots as absence.
 
 ### 6.17 `GET /api/batches/:batchId/review` (US-012, US-013, US-014)
 

@@ -27,6 +27,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   ExtractorError,
+  removalWithheldReason,
   type ExtractedTextItem,
   type ExtractionResult,
   type TitleExtractor,
@@ -521,7 +522,7 @@ describe('T-BATCH-007 a memory failure fails ONE image, never the batch', () => 
       batchId: 'batch-1',
       images: [image(1), image(2), image(3)],
       extractor: scripted([
-        result(),
+        result({ items: Array.from({ length: 12 }, (_, i) => item(`Title ${i}`)) }),
         new AppError(
           'IMAGE_DECODE_OOM',
           503,
@@ -537,6 +538,9 @@ describe('T-BATCH-007 a memory failure fails ONE image, never the batch', () => 
     if (outcome.status !== 'in-review') throw new Error('unreachable');
     expect(outcome.imageFailures).toHaveLength(1);
     expect(outcome.imageFailures[0]?.imageId).toBe('img-2');
+    expect(outcome.stats.candidatesAfterCleanup).toBeGreaterThanOrEqual(12);
+    expect(outcome.lowYield).toBe(true);
+    expect(removalWithheldReason(outcome)).toBe('low-yield');
     expect(h.recorded.map((r) => r.imageId)).toEqual(['img-1', 'img-3']);
     // Progress still reaches the total: the owner is not left at 2/3 forever.
     expect(outcome.progress).toEqual({ imagesDone: 3, imagesTotal: 3 });

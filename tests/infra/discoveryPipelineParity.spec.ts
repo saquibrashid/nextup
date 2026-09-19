@@ -128,8 +128,8 @@ describe('T-WAIT-012 — US-040 AC-2: one pipeline, blind to the batch kind', ()
       .map((line, index) => ({ line: line.trim(), index }))
       .filter(({ line }) => line.startsWith('beginExtraction('));
 
-    // Both are real and both matter: submit (§6.14) and re-extract (§6.24).
-    expect(callSites).toHaveLength(2);
+    // Submit (§6.14), same-batch retry (§6.16) and derived re-extract (§6.24).
+    expect(callSites).toHaveLength(3);
 
     for (const { line, index } of callSites) {
       // A guarded call would either be an `if (...) beginExtraction(...)` on

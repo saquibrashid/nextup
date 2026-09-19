@@ -2621,6 +2621,42 @@ button {
   margin-top: var(--space-2);
 }
 
+.capture-status {
+  max-width: 52rem;
+  margin-inline: auto;
+  padding-block: var(--space-5);
+}
+
+.capture-status__header {
+  border-bottom: 1px solid var(--color-border-soft);
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+}
+
+.capture-status__header h1 {
+  margin-block: var(--space-2);
+}
+
+.capture-status > .field-group {
+  margin-bottom: var(--space-5);
+}
+
+.capture-status__eyebrow {
+  color: var(--color-accent);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.capture-status__meter {
+  accent-color: var(--color-accent);
+  border: 0;
+  height: 0.5rem;
+  margin-block: var(--space-3);
+  width: 100%;
+}
+
 .batch-status__progress {
   font-weight: var(--weight-medium);
   margin: var(--space-2) 0;
@@ -2628,8 +2664,8 @@ button {
 
 .batch-status__banner {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-card);
   margin: var(--space-2) 0;
   padding: var(--space-3);
 }
@@ -2651,11 +2687,23 @@ button {
 .batch-status__image {
   align-items: center;
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-card);
   display: flex;
   gap: var(--space-3);
-  padding: var(--space-2);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-card);
+}
+
+.batch-status__image-body {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.batch-status__image-state {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }
 
 .batch-status__thumb {
@@ -2672,16 +2720,13 @@ button {
 }
 
 .batch-status__filename {
+  font-weight: var(--weight-medium);
   overflow-wrap: anywhere;
-}
-
-.batch-status__count {
-  color: var(--color-text-muted);
-  margin-left: auto;
 }
 
 .batch-status__actions {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-3);
 }
