@@ -888,7 +888,7 @@ export const REVIEW_NO_ADDITIONS_BODY =
   'Everything nextup could read is already on your list. Nothing has been added.';
 
 /** §5.1 - the sticky action bar's running counts. */
-export const REVIEW_APPLY_LABEL = 'Apply changes';
+export const REVIEW_APPLY_LABEL = 'Review changes';
 export const REVIEW_DISCARD_LABEL = 'Discard batch';
 
 /**
@@ -1027,8 +1027,8 @@ export const REMOVAL_CONFIRM_REASSURANCE =
  */
 export const REMOVAL_CONFIRM_NONE = 'No removals selected. Nothing will be removed.';
 
-export const REMOVAL_CONFIRM_LABEL = 'Confirm';
-export const REMOVAL_CANCEL_LABEL = 'Cancel';
+export const REMOVAL_CONFIRM_LABEL = 'Apply changes';
+export const REMOVAL_CANCEL_LABEL = 'Back to review';
 
 /* ------------------------------------------- §7 removal history (log) --- */
 

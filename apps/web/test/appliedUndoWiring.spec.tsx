@@ -36,7 +36,7 @@ import {
 } from '../src/components/BatchAppliedNotice';
 import { ListRoute, parseAppliedState } from '../src/containers/ListRoute';
 import { ReviewRoute } from '../src/containers/ReviewRoute';
-import { REVIEW_APPLY_LABEL } from '../src/copy';
+import { REMOVAL_CONFIRM_LABEL, REVIEW_APPLY_LABEL } from '../src/copy';
 import type { ApiClient, CloseBatchResult } from '../src/lib/apiClient';
 
 /** The §6.22 body, shaped exactly as the server sends it. */
@@ -143,6 +143,7 @@ describe('T-DATA-011 — the close carries its summary to the list', () => {
     renderReviewThenList(client);
 
     fireEvent.click(await screen.findByRole('button', { name: REVIEW_APPLY_LABEL }));
+    fireEvent.click(await screen.findByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
 
     // The notice is the assertion, not the navigation: arriving at `/` was
     // never the broken part. The SENTENCE is asserted, not just the box: a
@@ -169,6 +170,7 @@ describe('T-DATA-011 — the close carries its summary to the list', () => {
     renderReviewThenList(client);
 
     fireEvent.click(await screen.findByRole('button', { name: REVIEW_APPLY_LABEL }));
+    fireEvent.click(await screen.findByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
 
     // Still on the review screen. Landing on an unchanged list would read as a
     // successful close that changed nothing.

@@ -108,6 +108,7 @@ describe('T-DATA-003 — every method sends credentials', () => {
         client.fixMatch('ttl_1', { tmdbId: 438631, mediaType: 'movie', confirmDuplicate: false }),
       addManualEntry: () => client.addManualEntry('bat_1', 438631, 'movie'),
       closeBatch: () => client.closeBatch('bat_1', false),
+      setBatchRemoval: () => client.setBatchRemoval('bat_1', 'listing_1', false),
       addBatchImages: () => client.addBatchImages('bat_1', form),
       removeBatchImage: () => client.removeBatchImage('bat_1', 'img_1'),
       submitBatch: () => client.submitBatch('bat_1'),

@@ -5,7 +5,16 @@ The owner approved proceeding through guided upload, extraction recovery,
 grouped review and the single final summary, with a PR, CI-gated merge and
 deployment after each step. `TASK-222` implements guided upload; `TASK-223`
 implements extraction progress and recovery. `TASK-224` implements grouped
-review; the final summary remains a separate implementation slice.
+review; `TASK-225` implements the single final confirmation.
+
+**Final-confirmation reconciliation:** the existing confirmation component now
+hosts one scrollable, focus-managed summary for both modes. Review changes
+refreshes authoritative decisions before showing additions/current corrected
+identities and selected removals. Removal checkboxes call the existing PATCH
+endpoint and reread the review; writes are guarded and failures stay visible.
+Back/Escape preserves review; an in-flight Apply cannot be dismissed. Server
+reconfirmation refreshes proposal names, and retry remains explicit. No second
+removal dialog, new backend transaction, schema or infrastructure is introduced.
 
 **Grouped review reconciliation:** production retains the server's section
 labels and classification. New/unidentified decisions remain primary, known
@@ -87,14 +96,13 @@ or retaining the same service does not clear consent.
 After entering review, service/mode are immutable. Discarding the batch is the
 explicit route back to those choices. Cancel/Escape never discards or applies.
 
-### Deliberate proposal: the final summary
+### Approved and implemented: the final summary
 
-The current `ReviewPage` applies directly when there are no removal proposals.
-With proposals, it opens `RemovalConfirmDialog`, including when every proposal
-is unchecked.
+`ReviewPage` now requires one final summary even when there are no removal
+proposals, including when every proposal is unchecked.
 
-The study proposes **one final summary page for both modes**. In full update,
-this page replaces the removal dialog; it must not be implemented as a summary
+The implemented flow uses **one final summary for both modes**. In full update,
+this summary replaces the removal dialog; it must not be implemented as a summary
 followed by a second removal confirmation. It names every selected removal and
 only those removals, preserves the zero-selected case and requires the final
 Apply action. Add-only gains a reviewable preflight step, not removal controls.

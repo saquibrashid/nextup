@@ -901,6 +901,16 @@ export function createApiClient(deps: ApiClientDeps = {}) {
      * strictly, so a client that always sent `true` would turn REQ-020's group
      * confirmation into a formality.
      */
+    setBatchRemoval: (batchId: string, listingId: string, ticked: boolean) =>
+      request<{ batchId: string; tickedCount: number; untickedCount: number }>(
+        `/api/batches/${encodeURIComponent(batchId)}/removals`,
+        {
+          method: 'PATCH',
+          body: { tick: ticked ? [listingId] : [], untick: ticked ? [] : [listingId] },
+        },
+        deps,
+      ),
+
     closeBatch: (batchId: string, confirmRemovals: boolean) =>
       request<CloseBatchResult>(
         `/api/batches/${encodeURIComponent(batchId)}/close`,

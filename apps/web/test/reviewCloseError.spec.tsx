@@ -34,7 +34,7 @@ import { describe, expect, it } from 'vitest';
 import { buildReviewResponse } from '@nextup/domain';
 
 import { ReviewRoute } from '../src/containers/ReviewRoute';
-import { REVIEW_APPLY_FAILED, REVIEW_APPLY_LABEL } from '../src/copy';
+import { REMOVAL_CONFIRM_LABEL, REVIEW_APPLY_FAILED, REVIEW_APPLY_LABEL } from '../src/copy';
 import { ApiError, type ApiClient, type CloseBatchResult } from '../src/lib/apiClient';
 
 /** A full-update review with one addition and NO removals, so the close sends
@@ -70,7 +70,7 @@ function reviewWithOneAddition() {
         },
         alternatives: [],
         sourceImageIds: ['img_1'],
-        disposition: 'pending',
+        disposition: 'confirmed',
         collapsedIntoCandidateId: null,
         classification: 'new',
       },
@@ -152,6 +152,7 @@ describe('T-UX-067 — §6.16 5xx on close', () => {
     renderReview(client);
 
     fireEvent.click(await screen.findByRole('button', { name: REVIEW_APPLY_LABEL }));
+    fireEvent.click(await screen.findByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
 
     const alert = await screen.findByTestId('review-apply-error');
     // ⚠ Asserted against the exported constant, never a substring literal, so
@@ -165,6 +166,7 @@ describe('T-UX-067 — §6.16 5xx on close', () => {
     renderReview(client);
 
     fireEvent.click(await screen.findByRole('button', { name: REVIEW_APPLY_LABEL }));
+    fireEvent.click(await screen.findByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
     await screen.findByTestId('review-apply-error');
 
     // Still on the review. Landing on an unchanged list would read as a
@@ -178,6 +180,7 @@ describe('T-UX-067 — §6.16 5xx on close', () => {
     renderReview(client);
 
     fireEvent.click(await screen.findByRole('button', { name: REVIEW_APPLY_LABEL }));
+    fireEvent.click(await screen.findByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
     await screen.findByTestId('review-apply-error');
 
     // The sections and the owner's candidate are still on screen — this is the
@@ -203,11 +206,12 @@ describe('T-UX-067 — §6.16 5xx on close', () => {
 
     const apply = await screen.findByRole('button', { name: REVIEW_APPLY_LABEL });
     fireEvent.click(apply);
+    fireEvent.click(await screen.findByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
     await screen.findByTestId('review-apply-error');
 
     // The control is enabled again — the owner is not stuck.
     expect(screen.getByRole('button', { name: REVIEW_APPLY_LABEL })).toBeEnabled();
-    fireEvent.click(screen.getByRole('button', { name: REVIEW_APPLY_LABEL }));
+    fireEvent.click(screen.getByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
 
     const closes = () => calls.filter((c) => c.name === 'closeBatch');
     await waitFor(() => expect(closes()).toHaveLength(2));
@@ -237,10 +241,11 @@ describe('T-UX-067 — §6.16 5xx on close', () => {
     renderReview(client);
 
     fireEvent.click(await screen.findByRole('button', { name: REVIEW_APPLY_LABEL }));
+    fireEvent.click(await screen.findByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
     await screen.findByTestId('review-apply-error');
 
     // Retry: the error clears immediately, before the in-flight close resolves.
-    fireEvent.click(screen.getByRole('button', { name: REVIEW_APPLY_LABEL }));
+    fireEvent.click(screen.getByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
     await waitFor(() => expect(screen.queryByTestId('review-apply-error')).not.toBeInTheDocument());
     // Still on the review — the second close has not resolved yet.
     expect(screen.queryByTestId('list-screen')).not.toBeInTheDocument();
@@ -263,6 +268,7 @@ describe('T-UX-067 — §6.16 5xx on close', () => {
     renderReview(client);
 
     fireEvent.click(await screen.findByRole('button', { name: REVIEW_APPLY_LABEL }));
+    fireEvent.click(await screen.findByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
 
     // Give any rejected promise time to settle, then assert §6.16 never fired
     // and the review is intact and un-navigated.

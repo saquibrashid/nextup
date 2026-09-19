@@ -61,7 +61,7 @@ function candidate(overrides: Partial<ReviewCandidate> = {}): ReviewCandidate {
     },
     alternatives: [],
     sourceImageIds: ['img_1'],
-    disposition: 'pending',
+    disposition: 'confirmed',
     collapsedIntoCandidateId: null,
     classification: 'new-for-this-service',
     ...overrides,
@@ -126,9 +126,7 @@ describe('RemovalConfirmDialog — T-UI-008 (component leg)', () => {
     for (const name of ['The Irishman', 'Marriage Story', 'Roma']) {
       expect(within(list).getByText(name)).toBeInTheDocument();
     }
-    expect(within(screen.getByRole('dialog')).getByRole('heading')).toHaveTextContent(
-      'Remove 3 titles from Netflix?',
-    );
+    expect(screen.getByRole('dialog')).toHaveTextContent('Remove 3 titles from Netflix?');
     expect(screen.getByText(REMOVAL_CONFIRM_REASSURANCE)).toBeInTheDocument();
   });
 
@@ -144,9 +142,7 @@ describe('RemovalConfirmDialog — T-UI-008 (component leg)', () => {
     const list = screen.getByTestId('removal-confirm-list');
     expect(within(list).queryByText('Marriage Story')).toBeNull();
     expect(within(list).getAllByRole('listitem')).toHaveLength(2);
-    expect(within(screen.getByRole('dialog')).getByRole('heading')).toHaveTextContent(
-      'Remove 2 titles from Netflix?',
-    );
+    expect(screen.getByRole('dialog')).toHaveTextContent('Remove 2 titles from Netflix?');
   });
 
   it('T-UI-008g: Confirm closes the batch once, with confirmRemovals true', async () => {
@@ -156,7 +152,7 @@ describe('RemovalConfirmDialog — T-UI-008 (component leg)', () => {
 
     expect(onApply).toHaveBeenCalledTimes(1);
     expect(onApply).toHaveBeenCalledWith(true);
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
   it('T-UI-008h: Cancel closes nothing and leaves the review intact', async () => {
@@ -171,19 +167,21 @@ describe('RemovalConfirmDialog — T-UI-008 (component leg)', () => {
     expect(screen.getByTestId('review-removals')).toBeInTheDocument();
   });
 
-  it('T-UI-008i: with nothing proposed there is nothing to confirm, and the close goes straight through', async () => {
+  it('T-UI-008i: append-only also requires the final summary, without removal consent', async () => {
     const onApply = vi.fn();
     render(<ReviewPage review={review({ mode: 'append-only' })} onApply={onApply} />);
 
     await userEvent.click(screen.getByTestId('apply-changes-button'));
 
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('dialog')).toHaveTextContent(REMOVAL_CONFIRM_NONE);
+    expect(onApply).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
     // ⚠ `false`, explicitly. A page that always sent `true` would make REQ-020
     // a formality on the one request that enforces it.
     expect(onApply).toHaveBeenCalledWith(false);
   });
 
-  it('T-UI-008j: a WITHHELD removals section raises no confirmation', async () => {
+  it('T-UI-008j: withheld removals still allow a zero-removal final summary', async () => {
     // The owner was shown nothing, so there is nothing to confirm; requiring
     // it would make a low-yield full update unclosable.
     const onApply = vi.fn();
@@ -191,7 +189,9 @@ describe('RemovalConfirmDialog — T-UI-008 (component leg)', () => {
 
     await userEvent.click(screen.getByTestId('apply-changes-button'));
 
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('dialog')).toHaveTextContent(REMOVAL_CONFIRM_NONE);
+    expect(onApply).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
     expect(onApply).toHaveBeenCalledWith(false);
   });
 
@@ -200,7 +200,7 @@ describe('RemovalConfirmDialog — T-UI-008 (component leg)', () => {
 
     const dialog = screen.getByRole('dialog');
     expect(dialog).toHaveAttribute('aria-modal', 'true');
-    expect(dialog).toHaveAccessibleName('Remove 3 titles from Netflix?');
+    expect(dialog).toHaveAccessibleName('Confirm changes');
   });
 
   it('T-UI-008l: the dialog offers no per-title control of its own', async () => {
@@ -226,7 +226,7 @@ describe('RemovalConfirmDialog — T-UI-008 (component leg)', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: REMOVAL_CONFIRM_LABEL })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Applying...' })).toBeDisabled();
     expect(screen.getByRole('button', { name: REMOVAL_CANCEL_LABEL })).toBeDisabled();
   });
 
@@ -239,9 +239,7 @@ describe('RemovalConfirmDialog — T-UI-008 (component leg)', () => {
     );
     await userEvent.click(screen.getByTestId('apply-changes-button'));
 
-    expect(within(screen.getByRole('dialog')).getByRole('heading')).toHaveTextContent(
-      'Remove 1 title from Netflix?',
-    );
+    expect(screen.getByRole('dialog')).toHaveTextContent('Remove 1 title from Netflix?');
   });
 });
 
