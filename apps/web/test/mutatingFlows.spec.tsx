@@ -277,11 +277,7 @@ describe('T-DATA-008 — no mutation on mount, including under StrictMode', () =
     expect(calls.filter((call) => MUTATING.includes(call))).toEqual([]);
   });
 
-  it('T-DATA-008f: two deliveries racing before the first response create one batch', async () => {
-    // ⚠ THE RACE HAS TO BE REAL. Two files in ONE drop is a single `attach`
-    // call and passes with no guard at all — the mutant survives. The actual
-    // failure is two SEPARATE ingest events (a paste then a drop, or an
-    // impatient second drop) landing before the create resolves.
+  it('T-DATA-008f: rapid extraction presses create one batch for both queued arrivals', async () => {
     let release: ((value: { batchId: string }) => void) | null = null;
     const created = new Promise<{ batchId: string }>((resolve) => {
       release = resolve;
@@ -293,10 +289,9 @@ describe('T-DATA-008 — no mutation on mount, including under StrictMode', () =
     dropFiles([png('a.png')]);
     dropFiles([png('b.png')]);
 
-    // ⚠ A BOOLEAN GUARD FAILS HERE. Both deliveries see `batchId === null`
-    // and the flag is only set after the first `await`, so only the in-flight
-    // PROMISE deduplicates them — and two batches means the owner's second
-    // upload is refused by their own first one with 409 OPEN_BATCH_EXISTS.
+    expect(calls).not.toContain('createBatch');
+    fireEvent.click(screen.getByTestId('submit-button'));
+    fireEvent.click(screen.getByTestId('submit-button'));
     expect(calls.filter((call) => call === 'createBatch')).toHaveLength(1);
 
     await act(async () => {
@@ -756,6 +751,7 @@ describe('T-UX-048 — the 409 offers both ways out', () => {
 
     // ⚠ VERBATIM (REQ-104, §12.8). A client table keyed on the code is a
     // second source of truth that goes stale exactly where it hurts most.
+    fireEvent.click(screen.getByTestId('submit-button'));
     expect(await screen.findByTestId('open-batch-message')).toHaveTextContent(conflict.message);
     expect(screen.getByTestId('open-batch-go')).toHaveTextContent(OPEN_BATCH_GO_LABEL);
     expect(screen.getByTestId('open-batch-discard')).toHaveTextContent(OPEN_BATCH_DISCARD_LABEL);
@@ -767,6 +763,7 @@ describe('T-UX-048 — the 409 offers both ways out', () => {
 
     chooseServiceAndMode();
     dropFiles([png()]);
+    fireEvent.click(screen.getByTestId('submit-button'));
     fireEvent.click(await screen.findByTestId('open-batch-go'));
 
     expect(await screen.findByText('status screen')).toBeInTheDocument();
@@ -785,6 +782,7 @@ describe('T-UX-048 — the 409 offers both ways out', () => {
 
     chooseServiceAndMode();
     dropFiles([png()]);
+    fireEvent.click(screen.getByTestId('submit-button'));
     fireEvent.click(await screen.findByTestId('open-batch-discard'));
 
     // ⚠ The id comes from the ENVELOPE, not from anything this screen holds:
@@ -801,6 +799,7 @@ describe('T-UX-048 — the 409 offers both ways out', () => {
 
     chooseServiceAndMode();
     dropFiles([png()]);
+    fireEvent.click(screen.getByTestId('submit-button'));
     await screen.findByTestId('open-batch-conflict');
 
     // Taking the whole screen away would remove the third way out — changing
@@ -811,41 +810,65 @@ describe('T-UX-048 — the 409 offers both ways out', () => {
 });
 
 describe('T-UI-013 — a decode rejection never takes the batch down', () => {
-  it('T-UI-013j: the accepted list and the ENABLED "Extract titles" button both survive', async () => {
+  it('T-UI-013j: a decode refusal preserves good images and extraction through the saved draft', async () => {
     // ⚠ US-004 AC-11's second half, and the reason it is asserted at the ROUTE
     // and not on the card: the diagnostic is only half the containment. The
     // other half is that the owner can still ship the images that worked. A
     // client that clears the grid, closes the batch or disables submit on a
     // per-file refusal turns one bad screenshot into a lost upload — and the
     // card-level tests in `decodeDiagnostic.spec.tsx` would all still pass.
-    const { client } = stubClient({
-      addBatchImages: () =>
+    const { client, calls } = stubClient({
+      getBatch: async () => ({
+        ...batch('draft'),
+        images: [
+          {
+            imageId: 'img_1',
+            fileName: 'a.png',
+            available: true,
+            href: '/api/images/img_1',
+            candidateCount: null,
+          },
+        ],
+      }),
+      addBatchImages: (_id: unknown, form: unknown) =>
         Promise.resolve(
-          attachResult(1, [
-            {
-              fileName: 'beach-list-03.heic',
-              code: 'IMAGE_TOO_LARGE_TO_DECODE',
-              message: 'beach-list-03.heic is 48.0 MP (8064 × 5952). … memory limit …',
-              details: { width: 8064, height: 5952, megapixels: 48, maxMegapixels: 25 },
-            },
-          ]),
+          attachResult(
+            1,
+            (form as FormData)
+              .getAll('files')
+              .some((file) => file instanceof File && file.name.endsWith('.heic'))
+              ? [
+                  {
+                    fileName: 'beach-list-03.heic',
+                    code: 'IMAGE_TOO_LARGE_TO_DECODE',
+                    message: 'beach-list-03.heic is 48.0 MP (8064 × 5952). … memory limit …',
+                    details: { width: 8064, height: 5952, megapixels: 48, maxMegapixels: 25 },
+                  },
+                ]
+              : [],
+          ),
         ),
     });
-    renderAt('/upload', <UploadRoute client={client} />, '/upload');
+    render(
+      <MemoryRouter initialEntries={['/upload']}>
+        <Routes>
+          <Route path="/upload" element={<UploadRoute client={client} />} />
+          <Route path="/batches/:batchId" element={<BatchStatusRoute client={client} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
 
     chooseServiceAndMode();
     dropFiles([png('a.png'), png('beach-list-03.heic')]);
+    fireEvent.click(screen.getByTestId('submit-button'));
 
     expect(await screen.findByTestId('rejected-name')).toHaveTextContent('beach-list-03.heic');
     // The refusal is per-file: the good image is still attached…
     expect(screen.getAllByTestId('accepted-file').length).toBeGreaterThan(0);
-    // …and the batch is still submittable (`ui.md` §3.2a, "The batch remains
-    // usable"). `api.md` §5.2.5: the remedy is a re-attach later, not a
-    // re-start now.
-    await waitFor(() => {
-      expect(screen.getByTestId('submit-button')).toBeEnabled();
-    });
-    expect(screen.queryByTestId('submit-reason')).not.toBeInTheDocument();
+    expect(calls).not.toContain('submitBatch');
+    fireEvent.click(screen.getByRole('button', { name: 'Open saved batch' }));
+    expect(await screen.findByTestId('draft-submit')).toBeEnabled();
+    expect(screen.getByRole('list', { name: 'Saved screenshots' })).toHaveTextContent('a.png');
   });
 });
 
@@ -881,6 +904,7 @@ describe('T-UX-043 — every file rejected', () => {
 
     chooseServiceAndMode();
     dropFiles([png('notes.png')]);
+    fireEvent.click(screen.getByTestId('submit-button'));
 
     expect(await screen.findByTestId('rejected-name')).toHaveTextContent('notes.pdf');
     // §4.5 — nothing landed, so there is nothing to extract.

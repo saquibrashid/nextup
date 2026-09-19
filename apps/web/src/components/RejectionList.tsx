@@ -21,6 +21,7 @@
 // tell two pasted screenshots apart.
 
 import type { JSX } from 'react';
+import { ApiError } from '../lib/apiClient';
 
 import { DECODE_BATCH_UNAFFECTED, DECODE_REMEDY_LINK_LABEL, MEMORY_REMEDY_PATH } from '../copy';
 
@@ -41,6 +42,20 @@ export interface ServerRejection {
   readonly code: string;
   readonly message: string;
   readonly details?: Readonly<Record<string, unknown>>;
+}
+
+export function rejectionsFromError(error: unknown): readonly ServerRejection[] {
+  if (!(error instanceof ApiError)) return [];
+  const rejected = error.details['rejected'];
+  if (!Array.isArray(rejected)) return [];
+  return rejected.filter(
+    (entry): entry is ServerRejection =>
+      typeof entry === 'object' &&
+      entry !== null &&
+      typeof entry.fileName === 'string' &&
+      typeof entry.code === 'string' &&
+      typeof entry.message === 'string',
+  );
 }
 
 export interface RejectionEntry {

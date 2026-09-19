@@ -505,7 +505,7 @@ test.describe('T-A11Y-002 — the 1024 px journey is not desktop-only', () => {
       buffer: ONE_BY_ONE_PNG,
     });
 
-    await expect(page.getByTestId('draft-batch-id')).toHaveText('01J0000000000000000000BTCH');
+    await expect(page.getByTestId('draft-batch-id')).toHaveText('');
     await page.getByTestId('submit-button').click();
     await expect(page).toHaveURL(/\/batches\/01J0000000000000000000BTCH$/);
     await expectNoHorizontalOverflow(page);

@@ -22,7 +22,7 @@ import { Input } from './ui/Input';
 // This task owns the attach area and its slots. `PasteCapture` (TASK-160) and
 // the drop target's full behaviour (TASK-162, `T-UI-014`) fill them in.
 
-import { useCallback, useId, useState, type DragEvent, type JSX } from 'react';
+import { useCallback, useId, useRef, useState, type DragEvent, type JSX } from 'react';
 import { MAX_IMAGES_PER_BATCH, MAX_IMAGE_BYTES } from '@nextup/domain';
 
 import {
@@ -35,7 +35,6 @@ import {
   IMAGE_ACCEPT_ATTRIBUTE,
   UNSUPPORTED_FORMAT_REJECTION,
 } from '../copy';
-import { useHeldImages } from '../lib/useHeldImages';
 import { PasteButton, type PasteFailure } from './PasteButton';
 import { PasteCapture } from './PasteCapture';
 import { Button } from './ui/Button';
@@ -48,6 +47,11 @@ import {
 
 /** Where a file entered from. Reported to the server, never branched on here. */
 export type IngestSource = 'paste' | 'upload' | 'drop';
+
+export interface QueuedImage {
+  readonly file: File;
+  readonly source: IngestSource;
+}
 
 export type { RejectedFile, ServerRejection };
 
@@ -171,8 +175,9 @@ export function isTouchDevice(): boolean {
 }
 
 export interface ImageDropzoneProps {
-  /** Every affordance funnels here - the single submit path (`api.md` §5.3.1). */
-  readonly onFilesAccepted?: (files: readonly File[], source: IngestSource) => void;
+  readonly disabled?: boolean;
+  /** Local preparation: report the complete queue without uploading it. */
+  readonly onQueueChange?: (images: readonly QueuedImage[]) => void;
   /** Whether service and mode are chosen, so a batch exists (`ux-states.md` §4.0a). */
   readonly batchReady?: boolean;
   /**
@@ -207,15 +212,9 @@ export interface ImageDropzoneProps {
  * A hold that flattened to a bare `File[]` would have to guess an ingest source
  * when it replayed, and `ADR-0009` exists precisely to tell the three apart.
  */
-interface HeldAttach {
-  readonly files: readonly File[];
-  readonly source: IngestSource;
-}
-
-const heldAttachFiles = (payload: HeldAttach): readonly File[] => payload.files;
-
 export function ImageDropzone({
-  onFilesAccepted,
+  onQueueChange,
+  disabled = false,
   batchReady = false,
   offline = false,
   onPasteFailed,
@@ -223,21 +222,12 @@ export function ImageDropzone({
   touch,
 }: ImageDropzoneProps = {}): JSX.Element {
   const [accepted, setAccepted] = useState<readonly File[]>([]);
+  const queue = useRef<readonly QueuedImage[]>([]);
+  const disabledRef = useRef(disabled);
+  disabledRef.current = disabled;
   const [rejected, setRejected] = useState<readonly RejectedFile[]>([]);
   const [dragging, setDragging] = useState(false);
   const inputId = useId();
-
-  const deliverAccepted = useCallback(
-    (payload: HeldAttach): void => {
-      onFilesAccepted?.(payload.files, payload.source);
-    },
-    [onFilesAccepted],
-  );
-  const { deliver, heldCount } = useHeldImages<HeldAttach>(
-    batchReady,
-    deliverAccepted,
-    heldAttachFiles,
-  );
 
   const addFiles = useCallback(
     (
@@ -245,33 +235,24 @@ export function ImageDropzone({
       source: IngestSource,
       extraRejections?: readonly RejectedFile[],
     ): void => {
+      if (disabledRef.current) return;
       if (files.length === 0 && (extraRejections === undefined || extraRejections.length === 0))
         return;
       const review =
-        files.length > 0 ? reviewFiles(files, accepted.length) : { accepted: [], rejected: [] };
+        files.length > 0
+          ? reviewFiles(files, queue.current.length)
+          : { accepted: [], rejected: [] };
       // Rejections REPLACE the previous batch's rejections but never the
       // accepted list (§4.4): both are visible at once, because a rejection
       // that clears the grid reads as "everything failed".
       setRejected([...(extraRejections ?? []), ...review.rejected]);
       if (review.accepted.length > 0) {
-        setAccepted([...accepted, ...review.accepted]);
-        /*
-         * ⚠ THROUGH THE HOLD, NEVER STRAIGHT TO THE CONSUMER. This is the one
-         * choke point every affordance passes through - listener paste, button
-         * paste, drop and the file chooser - so it is the only place the hold
-         * can be applied once and cannot be forgotten on a new path.
-         *
-         * It used to call `onFilesAccepted` directly here, and only the paste
-         * primitives held. Choosing a file before picking a service therefore
-         * lost it silently: `UploadRoute.attach` returns without a word when
-         * the selection is unset, so the owner saw "1 screenshots · 1.3 MB"
-         * and "Attach at least one screenshot first." at the same time, with
-         * no error to explain either. `T-PASTE-011` is the regression guard.
-         */
-        deliver({ files: review.accepted, source });
+        queue.current = [...queue.current, ...review.accepted.map((file) => ({ file, source }))];
+        setAccepted(queue.current.map((item) => item.file));
+        onQueueChange?.(queue.current);
       }
     },
-    [accepted, deliver],
+    [onQueueChange],
   );
 
   const pastedByListener = useCallback(
@@ -334,7 +315,7 @@ export function ImageDropzone({
         open-draft view alike — and it cannot outlive the page and swallow a
         paste meant for the fix-match search box.
       */}
-      <PasteCapture onImagesPasted={pastedByListener} />
+      {!disabled && <PasteCapture onImagesPasted={pastedByListener} />}
 
       <div
         className="dropzone__target"
@@ -359,7 +340,7 @@ export function ImageDropzone({
           is simply not there and the other two affordances carry the load.
         */}
         <PasteButton
-          batchReady={batchReady}
+          batchReady
           offline={offline}
           onImagesPasted={(files) => {
             addFiles(files, 'paste');
@@ -379,6 +360,7 @@ export function ImageDropzone({
         <Input
           id={inputId}
           type="file"
+          disabled={disabled}
           multiple
 
           data-testid="file-input"
@@ -389,7 +371,7 @@ export function ImageDropzone({
         />
       </div>
 
-      {heldCount > 0 && (
+      {!batchReady && accepted.length > 0 && (
         <p role="status" data-testid="dropzone-held">
           {DROPZONE_HELD_BODY}
         </p>
@@ -401,8 +383,8 @@ export function ImageDropzone({
             {`${String(accepted.length)} screenshots · ${(totalBytes / MEGABYTE).toFixed(1)} MB`}
           </p>
           <ul data-testid="accepted-list">
-            {accepted.map((file) => (
-              <li key={`${file.name}:${String(file.size)}`} data-testid="accepted-file">
+            {accepted.map((file, index) => (
+              <li key={index} data-testid="accepted-file">
                 <span data-testid="accepted-name">{file.name}</span>
                 {/*
                   No client preview of HEIC: only Safari can render it, so every
@@ -414,7 +396,9 @@ export function ImageDropzone({
                 <Button
                   variant="secondary"
                   onClick={() => {
-                    setAccepted((current) => current.filter((candidate) => candidate !== file));
+                    queue.current = queue.current.filter((item) => item.file !== file);
+                    setAccepted(queue.current.map((item) => item.file));
+                    onQueueChange?.(queue.current);
                   }}
                 >
                   {`Remove ${file.name}`}

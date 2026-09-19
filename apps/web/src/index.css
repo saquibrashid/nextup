@@ -2723,7 +2723,6 @@ button {
 
 .upload-step[data-state='locked'] {
   background: var(--color-bg);
-  opacity: 0.55;
 }
 
 /* Belt and braces with the markup's own `disabled`, never a substitute. */
@@ -2787,6 +2786,190 @@ button {
 
 .upload-step__body {
   margin-block-start: var(--space-3);
+}
+
+.upload-flow {
+  max-inline-size: 72rem;
+  margin-inline: auto;
+}
+
+.upload-flow__layout {
+  display: grid;
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.field-group {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+
+.upload-flow__intro,
+.upload-flow__note {
+  color: var(--color-text-muted);
+  line-height: var(--leading-normal);
+}
+
+.upload-flow__intro {
+  margin-block: var(--space-2) var(--space-5);
+  max-inline-size: 56ch;
+}
+
+.upload-flow__note {
+  font-size: var(--text-sm);
+  margin-block-end: 0;
+}
+
+.upload-summary {
+  background: linear-gradient(145deg, var(--color-surface-raised), var(--color-surface));
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-card);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-card);
+  min-inline-size: 0;
+}
+
+.upload-summary h2 {
+  margin-block-start: 0;
+}
+
+.upload-summary dl {
+  display: grid;
+  gap: var(--space-1);
+  margin-block: var(--space-4);
+}
+
+.upload-summary dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.upload-summary dd {
+  margin: 0 0 var(--space-3);
+  color: var(--color-secondary);
+  overflow-wrap: anywhere;
+}
+
+.upload-summary > p {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.upload-flow .upload-step {
+  border-color: var(--color-border-soft);
+  box-shadow: var(--shadow-card);
+}
+
+.upload-flow .segmented {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.upload-flow .segmented > label {
+  margin: 0;
+  padding: var(--space-3);
+  min-inline-size: 0;
+  align-content: start;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.upload-flow .upload-step[data-step='1'] .segmented {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+}
+
+.upload-flow .upload-step[data-step='1'] .segmented > label {
+  min-block-size: 4.5rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: 1.75rem auto;
+  align-items: center;
+}
+
+.upload-flow .upload-step[data-step='1'] .segmented > label > .service-mark__name {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.upload-flow .upload-step[data-step='2'] .segmented > label > span {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.upload-flow .segmented > label:hover {
+  background: var(--color-surface-raised);
+}
+
+.upload-flow .segmented > label:has(:checked) {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+}
+
+.upload-flow .segmented > label:has(:focus-visible) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.upload-flow .mode-card__flag {
+  display: inline-block;
+  margin-inline-start: 0;
+}
+
+.upload-flow .dropzone > ul,
+.draft-images {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.upload-flow .dropzone > ul > li,
+.draft-images > li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  overflow-wrap: anywhere;
+}
+
+.upload-flow .dropzone > ul > li > span,
+.draft-images > li > span {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+@media (min-width: 56.25rem) {
+  .upload-flow__layout {
+    grid-template-columns: minmax(0, 1fr) 17.25rem;
+  }
+
+  .upload-summary {
+    position: sticky;
+    top: var(--space-5);
+  }
+
+  .upload-flow .upload-step {
+    padding: var(--space-5);
+  }
+
+  .upload-flow .upload-step[data-step='2'] .segmented {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 64rem) {
+  .upload-flow .upload-step[data-step='1'] .segmented {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 /* The legend is the step heading; the fieldset keeps it for screen readers. */

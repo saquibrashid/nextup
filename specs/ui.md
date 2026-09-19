@@ -468,14 +468,15 @@ is otherwise only fixable by re-capturing an entire service.
 Step 1's service options render their marks through `ServiceMark` with the name
 **visible** — see §2.2a.
 
-The three steps render as numbered panels in one column. Each is in exactly one
+The three steps render as numbered panels, beside a 276px capture summary from
+900px and with that summary below the form on phones (`TASK-222`). Each is in exactly one
 state, and the state changes **only** in response to the owner answering:
 
 | State | Rendered as | Interactive? |
 |---|---|---|
 | `locked` | Dimmed, with a hint saying what to answer first | **No** — `disabled`, and `aria-describedby` points at the hint |
 | `active` | Full panel, controls live | Yes |
-| `done` | Collapsed to the **answer** plus a `Change` button | The body is `hidden`; `Change` reopens it |
+| `done` | Collapsed to the **answer** plus a `Change` button | The body is `hidden`; `Change` reopens it; Done closes an unchanged choice without clearing consent |
 
 Rules, each of which a named test pins:
 
@@ -505,6 +506,23 @@ Rules, each of which a named test pins:
 Each step's heading is the question, so the underlying `fieldset` legend is
 rendered **visually hidden rather than dropped** — the radio group keeps its
 accessible name and the sighted reader sees the question once.
+
+**Upload timing (TASK-222):** `/upload` keeps all selected screenshots local
+until the explicit Extract titles action. Changing service re-asks mode consent
+without losing the queue; removing a local file guarantees it is not uploaded.
+The page states that leaving/reloading clears the unsubmitted selection.
+The action freezes setup, creates one batch, uploads images serially with their
+individual ingest source, then submits only if every upload succeeded.
+
+An upload or submit failure never automatically replays a request whose response
+may have been lost. It preserves per-file diagnostics and opens a recovery path
+to the server-re-read draft. That view lists actual saved files, deletes actual
+server image IDs, allows explicit attachment of missing files, and enables
+Extract only for a nonempty saved batch with no unsent local selection. A failed
+image does not remove successful ones. Saved drafts keep service/mode fixed;
+discard-and-start-over is explicit and confirmed. Offline disables mutations.
+The capture summary and disabled-action reasons distinguish local preparation
+from saved recovery rather than claiming an attachment already reached Azure.
 
 ### 3.1 Step 1 — service and mode
 

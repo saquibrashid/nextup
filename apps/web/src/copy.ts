@@ -601,6 +601,16 @@ export const IMAGES_STEP_LEGEND = 'Add the screenshots';
  * the batch look final when they are not.
  */
 export const STEP_CHANGE_LABEL = 'Change';
+export const STEP_DONE_LABEL = 'Done';
+export const UPLOAD_INTRO =
+  'Bring your saved lists together. You will review every change before it reaches your library.';
+export const UPLOAD_LOCAL_NOTE =
+  'Screenshots stay on this device until you choose Extract titles. Leaving or reloading this page clears the selection.';
+export const UPLOAD_SUMMARY_TITLE = 'Your capture';
+export const UPLOAD_NEXT_NOTE =
+  'Next: review the extracted titles, then confirm exactly what changes. Nothing is removed without your approval.';
+export const UPLOAD_RECOVERY_NOTE =
+  'Your batch is saved. Open it to check which screenshots arrived before continuing. Uploads will not be repeated automatically.';
 
 /**
  * Why a step cannot be answered yet.
@@ -622,7 +632,7 @@ export const MODE_STEP_LOCKED_HINT = 'Choose a service first.';
  * behaviour that would lose a paste.
  */
 export const IMAGES_STEP_WAITING_HINT =
-  "Paste or attach them now if you like — they'll be held until the two questions above are answered.";
+  'Paste or attach them now. They stay here while you choose a service and an update mode.';
 
 /**
  * The short destructive flag on the full-update card.

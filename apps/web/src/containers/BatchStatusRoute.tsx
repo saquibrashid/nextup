@@ -22,6 +22,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { RefusedError, apiClient, type ApiClient, type BatchStatus } from '../lib/apiClient';
 import { BatchStatusPage } from '../pages/BatchStatusPage';
 import { RefusalPage } from '../pages/RefusalPage';
+import { DraftBatch } from '../components/DraftBatch';
 
 /** §4 — "every 2 s while `submitted`/`extracting`". */
 export const POLL_INTERVAL_MS = 2_000;
@@ -202,6 +203,20 @@ export function BatchStatusRoute({
   }, [batch, batchId, navigate]);
 
   if (refused) return <RefusalPage reason="not-allowed" />;
+  if (batch?.status === 'draft' && !loadFailed) {
+    return (
+      <DraftBatch
+        batch={batch}
+        client={client}
+        offline={offline}
+        onRefresh={load}
+        onRefused={() => setRefused(true)}
+        onDiscarded={() => {
+          void navigate('/upload');
+        }}
+      />
+    );
+  }
 
   return (
     <BatchStatusPage

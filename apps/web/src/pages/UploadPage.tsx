@@ -49,6 +49,7 @@ import {
   MODE_STEP_LEGEND,
   MODE_STEP_LOCKED_HINT,
   SERVICE_STEP_LEGEND,
+  UPLOAD_INTRO,
 } from '../copy.js';
 
 /** The step-1 answer. `null` means "not yet chosen" - never a default. */
@@ -138,6 +139,7 @@ export function UploadPage({
   return (
     <>
       <h1>Upload screenshots</h1>
+      <p className="upload-flow__intro">{UPLOAD_INTRO}</p>
 
       <UploadStep
         index={1}
@@ -147,6 +149,7 @@ export function UploadPage({
         onChange={() => {
           setReopened('service');
         }}
+        onDone={reopened === 'service' ? () => setReopened(null) : undefined}
         testId="service-step-panel"
       >
         {/* Native radios: real group semantics and roving focus for free. */}
@@ -184,6 +187,7 @@ export function UploadPage({
         onChange={() => {
           setReopened('mode');
         }}
+        onDone={reopened === 'mode' ? () => setReopened(null) : undefined}
         testId="mode-step-panel"
       >
         <SegmentedControl legend={MODE_STEP_LEGEND} testId="mode-step" hideLegend>

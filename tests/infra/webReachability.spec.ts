@@ -93,8 +93,7 @@ const CLIENT = path.join(SRC, 'lib', 'apiClient.ts');
  * - `getTitle` — `GET /api/titles/:titleId`. The `/#title-<titleId>` deep-link
  *   target (TASK-076) resolves against the already-loaded list, so nothing
  *   fetches a single title yet.
- * - `removeBatchImage` — `DELETE /api/batches/:batchId/images/:imageId`. The
- *   upload screen's per-image remove control is not built.
+ * `removeBatchImage` was discharged by TASK-222's saved-draft removal control.
  *
  * ~~`restoreListing` — the restore UI is TASK-099 and the removed view it
  * hangs off is unbuilt.~~ **DISCHARGED.** The gate was right and the diagnosis
@@ -102,7 +101,7 @@ const CLIENT = path.join(SRC, 'lib', 'apiClient.ts');
  * mounted bare by `routes.tsx`, so nothing could reach it. `RemovedRoute` now
  * wires it (`T-DATA-002z`).
  */
-const BASELINE_UNREACHED = new Set(['getTitle', 'removeBatchImage']);
+const BASELINE_UNREACHED = new Set(['getTitle']);
 
 /**
  * A CALL, not a mention.

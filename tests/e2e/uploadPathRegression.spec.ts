@@ -328,9 +328,11 @@ async function expectServiceUpload(page: Page, service: Service): Promise<void> 
       { name: 'saved-list.heic', mimeType: 'application/octet-stream', buffer: HEIC_BYTES },
     ]);
   await expect(page.getByTestId('accepted-file')).toHaveCount(1);
-  expect(state.batchCreatedWith).toEqual({ service, mode: 'full-update' });
+  expect(state.batchCreatedWith).toBeNull();
+  expect(state.uploadedFileNames).toEqual([]);
   await page.getByRole('button', { name: SUBMIT_LABEL }).click();
   await expect(page).toHaveURL(`/batches/${BATCH_ID}/review`);
+  expect(state.batchCreatedWith).toEqual({ service, mode: 'full-update' });
   await expect(page.getByRole('heading', { name: 'Review this batch' })).toBeVisible();
   await page.getByRole('button', { name: 'Confirm all 1' }).click();
   await page.getByRole('button', { name: REVIEW_APPLY_LABEL }).click();
@@ -475,6 +477,8 @@ test.describe('T-PASTE-010 — the add-not-swap regression guard', () => {
     ]);
 
     await expect(page.getByTestId('accepted-file')).toHaveCount(1);
+    expect(state.uploadedFileNames).toEqual([]);
+    await page.getByRole('button', { name: SUBMIT_LABEL }).click();
     // The HEIC really left the browser — not merely rendered locally.
     await expect.poll(() => state.uploadedFileNames).toEqual(['ios-photo.heic']);
   });
@@ -494,10 +498,11 @@ test.describe('T-PASTE-010 — the add-not-swap regression guard', () => {
         { name: 'ios-photo.heic', mimeType: 'application/octet-stream', buffer: HEIC_BYTES },
       ]);
     await expect(page.getByTestId('accepted-file')).toHaveCount(1);
-    await expect.poll(() => state.batchCreatedWith).not.toBeNull();
+    expect(state.batchCreatedWith).toBeNull();
 
     await page.getByRole('button', { name: SUBMIT_LABEL }).click();
     await expect(page).toHaveURL(`/batches/${BATCH_ID}/review`);
+    expect(state.batchCreatedWith).toEqual({ service: 'netflix', mode: 'full-update' });
     expect(state.submitted).toBe(true);
 
     await expect(page.getByRole('heading', { name: 'Review this batch' })).toBeVisible();
