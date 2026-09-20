@@ -29,6 +29,7 @@ for (const width of [280, 390, 1440]) {
     }, testInfo) => {
       let ticked = true;
       let closes = 0;
+      let statusReads = 0;
       await page.route('**/api/**', async (route) => {
         const path = new URL(route.request().url()).pathname;
         if (path === '/api/me') {
@@ -40,6 +41,10 @@ for (const width of [280, 390, 1440]) {
               attribution: {},
             },
           });
+        } else if (path === '/api/batches/final') {
+          expect(route.request().method()).toBe('GET');
+          statusReads += 1;
+          await route.fulfill({ json: { batchId: 'final', status: 'in-review' } });
         } else if (path.endsWith('/review')) {
           await route.fulfill({
             json: buildReviewResponse({
@@ -121,6 +126,8 @@ for (const width of [280, 390, 1440]) {
       await dialog.getByRole('button', { name: 'Apply changes' }).click();
       await expect(dialog.getByTestId('review-apply-error')).toBeVisible();
       expect(closes).toBe(1);
+      expect(statusReads).toBe(1);
+      await expect(dialog).toContainText('The saved batch is still in review');
       await dialog.getByRole('button', { name: 'Apply changes' }).click();
       await expect(page).toHaveURL('/');
       expect(closes).toBe(2);
