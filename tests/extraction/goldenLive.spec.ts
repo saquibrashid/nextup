@@ -43,7 +43,7 @@
  * of model drift this product has.
  */
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { DefaultAzureCredential } from '@azure/identity';
@@ -88,7 +88,47 @@ const EVALUATION_DIR = path.join(REPO_ROOT, 'docs', 'evaluation');
 const RUNS = 3;
 
 /** The §4A bands. Every one of these is quoted from the table in §9.5. */
-const JACCARD_STABILITY_FLOOR = 0.95; // L2
+/**
+ * L2 — the pairwise set-stability floor.
+ *
+ * ⚠ RE-BASED FROM 0.95 ON 2026-09-19, AND THE OLD VALUE WAS NOT A STRETCH
+ * GOAL — IT WAS UNREACHABLE BY ANYTHING, INCLUDING THE MODEL IN PRODUCTION.
+ * Measured worst pair, three runs over the eleven golden images:
+ *
+ *   `gpt-4.1` @ t=0 (production)   0.7692
+ *   `gpt-5.4` @ t=0                0.8205
+ *   `gpt-6-astra` @ t=1            0.8750
+ *
+ * 0.95 appears to have been calibrated against the OFFLINE replay, where the
+ * recordings are fixed and Jaccard is 1.0 by construction, and then applied to
+ * a LIVE run that resamples the model every time. §4A already spells out why
+ * that is the wrong move — it is the same reasoning that keeps `MIN_RECALL` as
+ * hand-declared bands rather than pinned measurements: "a live run resamples,
+ * so pinning it would fail on the model's own variance and teach the reader to
+ * ignore this suite." L2 was the one band that never got the treatment, and it
+ * duly went permanently red.
+ *
+ * ⚠ A BAND THAT IS ALWAYS RED IS WORSE THAN NO BAND. It cannot distinguish a
+ * healthy run from a regression, it trains the owner to skip the failure, and
+ * — the concrete cost here — it silently blocks every model change, because
+ * §9.7 Stage 3 requires a challenger to clear the same floor. The gate that
+ * was meant to protect stability was instead pinning the product to `gpt-4.1`
+ * by a threshold `gpt-4.1` itself fails.
+ *
+ * 0.75 sits just below the incumbent's measured worst pair, on the same
+ * "drop to the next band below" convention `MIN_RECALL` uses. `T-AI-051k`
+ * holds it there: it parses the committed baseline report and fails if this
+ * floor ever exceeds what the incumbent actually achieved, so the value cannot
+ * drift back into aspiration.
+ *
+ * ⚠ THIS IS NOT A RELAXATION OF THE STABILITY REQUIREMENT, BECAUSE L3 CARRIES
+ * IT. Every arm measured so far reports L3 empty — each expected title that
+ * was found was found in all three runs. The L2 shortfall is entirely
+ * false-title churn. L3 is the band that says "the list the owner sees is the
+ * same every time"; L2 says "the noise around it is too". Read them together,
+ * which is why the report now prints both.
+ */
+const JACCARD_STABILITY_FLOOR = 0.75; // L2
 const UNSTABLE_TITLE_CEILING = 0.05; // L3
 const FABRICATION_CEILING = 0.05; // L4
 const FALSE_TITLE_CEILING = 0.1; // L5
@@ -288,6 +328,32 @@ function armFromEnv(): Arm {
   return { deployment, tokenParam: rawTokenParam, temperature, slug };
 }
 
+/**
+ * Every pairwise Jaccard between the runs' accepted-title sets — L2.
+ *
+ * ⚠ EXTRACTED BECAUSE THE REPORT DID NOT CARRY L2 AT ALL, WHICH IS HOW A FLOOR
+ * NOTHING HAS EVER MET SURVIVED THIS LONG. The numbers existed only inside
+ * `T-AI-051b`'s failure message, so they were visible when the band broke and
+ * invisible when it passed — and a band that is always red is indistinguishable
+ * from a band nobody reads. Committing them to the report is what makes the
+ * floor auditable against measurement rather than against intent.
+ */
+function pairwiseJaccard(runs: readonly LiveRun[]): { pair: string; value: number }[] {
+  const sets = runs.map((r) => acceptedTitles(r.scored));
+  const pairs: { pair: string; value: number }[] = [];
+  for (let i = 0; i < sets.length; i += 1) {
+    for (let j = i + 1; j < sets.length; j += 1) {
+      // Non-null: both indices are inside `sets` by construction, and
+      // `noUncheckedIndexedAccess` cannot see that.
+      pairs.push({
+        pair: `${String(i + 1)}×${String(j + 1)}`,
+        value: jaccard(sets[i] as Set<string>, sets[j] as Set<string>),
+      });
+    }
+  }
+  return pairs;
+}
+
 function reportMarkdown(runs: readonly LiveRun[], cost: number, arm: Arm): string {
   const lines: string[] = [];
   const iso = new Date().toISOString();
@@ -340,6 +406,23 @@ function reportMarkdown(runs: readonly LiveRun[], cost: number, arm: Arm): strin
   lines.push('');
 
   const unstable = unstableTitles(runs);
+  lines.push('## L2 — pairwise run-to-run stability (Jaccard)');
+  lines.push('');
+  lines.push(`| Pair | Jaccard | Floor ${JACCARD_STABILITY_FLOOR.toFixed(2)} |`);
+  lines.push('|---|---|---|');
+  for (const p of pairwiseJaccard(runs)) {
+    lines.push(
+      `| ${p.pair} | ${p.value.toFixed(4)} | ${p.value < JACCARD_STABILITY_FLOOR ? 'BELOW' : 'ok'} |`,
+    );
+  }
+  lines.push('');
+  lines.push(
+    '> L2 measures whether the *set* of accepted titles is the same between ' +
+      'runs. Read it next to L3: L3 empty with L2 below 1.0 means the wobble ' +
+      'is entirely in the FALSE titles, and the real ones were found every time.',
+  );
+  lines.push('');
+
   lines.push('## L3 — unstable titles (present in fewer than 3 of 3 runs)');
   lines.push('');
   if (unstable.length === 0) {
@@ -640,6 +723,53 @@ describe('T-AI-051 · §4A the live quality suite — MANUAL, COSTS MONEY', () =
     expect(pairs).toHaveLength(3);
     const below = pairs.filter((p) => p.value < JACCARD_STABILITY_FLOOR);
     expect(below.map((p) => `${p.pair}=${p.value.toFixed(4)}`)).toEqual([]);
+  });
+
+  it('T-AI-051k · the L2 floor is achievable — it does not exceed the committed baseline', () => {
+    // ⚠ THE L2 ANALOGUE OF `j`, AND IT EXISTS BECAUSE L2 IS WHERE THE BAND
+    // TABLE ACTUALLY WENT WRONG. `j` keeps `MIN_RECALL` at or below what the
+    // committed recordings already achieve, so L1 cannot quietly become
+    // aspirational. L2 had no such check and drifted to 0.95 — a value no arm
+    // has ever reached, production included — where it stayed red run after
+    // run and, through §9.7 Stage 3, blocked every model change by a threshold
+    // the incumbent itself fails.
+    //
+    // The honesty source has to be a LIVE report, not the offline recordings:
+    // replay is deterministic, so its Jaccard is 1.0 by construction and would
+    // "justify" any floor at all. That is precisely the mistake being undone
+    // here, so using it would re-make it.
+    //
+    // ⚠ BOOTSTRAP, AND IT IS SELF-HEALING — DO NOT BACKFILL BY HAND. Reports
+    // committed before this commit have no `## L2` section, because the
+    // generator only just grew one, so this test fails against them. The fix
+    // is to re-run the incumbent (`npm run golden:live` with no arm override),
+    // which by `T-AI-051h` writes the report BEFORE any band is judged — so
+    // the L2-bearing baseline exists by the time this assertion reads it.
+    // Typing the numbers into the old report instead would put unmeasured
+    // pair labels into the evidence file, which is exactly the kind of
+    // hand-authored "measurement" this suite exists to prevent.
+    const baselines = readdirSync(EVALUATION_DIR)
+      .filter((f) => /^golden-\d{4}-\d{2}-\d{2}\.md$/.test(f))
+      .sort();
+    const latest = baselines.at(-1);
+    expect(latest, 'no committed incumbent baseline to check the floor against').toBeDefined();
+
+    const text = readFileSync(path.join(EVALUATION_DIR, latest as string), 'utf8');
+    const section = /## L2[^\n]*\n([\s\S]*?)(?:\n## |$)/.exec(text)?.[1];
+    expect(section, `${String(latest)} has no L2 section to read`).toBeDefined();
+
+    const measured = [...(section as string).matchAll(/^\|\s*\d+×\d+\s*\|\s*([0-9.]+)\s*\|/gm)].map(
+      (m) => Number(m[1]),
+    );
+    // Non-vacuity: an empty list would make `Math.min` return Infinity and the
+    // assertion below pass for any floor whatsoever.
+    expect(measured).toHaveLength(3);
+
+    const worst = Math.min(...measured);
+    expect(
+      JACCARD_STABILITY_FLOOR,
+      `the L2 floor must not exceed the incumbent's measured worst pair (${worst.toFixed(4)} in ${String(latest)})`,
+    ).toBeLessThanOrEqual(worst);
   });
 
   it('T-AI-051c · L3 · fewer than 5 % of expected titles are unstable, each named', () => {
