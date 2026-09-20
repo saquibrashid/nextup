@@ -682,7 +682,29 @@ finished, so the exception cannot outlive its reason.
 | `TASK-223` | `done` | Measured per-image counts, persistent failure evidence, same-batch retry with an atomic error/progress reset, and explicit busy/offline-safe recovery. No running discard, no automatic mutation replay, and no candidate hard deletion. `T-UX-157a`–`g`, `T-BATCH-026a`–`h`; existing status, extraction, owner-scope and lifecycle guards retained. No schema or infrastructure changes. |
 | `TASK-224` | `done` | Grouped review with consistent 104px evidence wells, equal decision controls, counted secondary evidence, inert known matches and explicit withheld-removal copy. Server classification, virtualized large lists and existing actions retained. `T-UX-158a`–`d`; review, responsive, stylesheet and performance regressions. |
 | `TASK-225` | `done` | Single final summary for both modes with authoritative preflight, exact additions/selected removals, real removal PATCH, guarded decision writes and close, retained failed summary and explicit retry. Back/Escape preserves review, in-flight Apply cannot be dismissed, and server reconfirmation refreshes names. `T-UX-159a`–`f`; close/undo/upload-journey regressions updated for the intentional confirmation step. |
+| `TASK-226` | `done` | Authoritative owner-scoped entry checkpoint bypasses the history cap; state-aware reread/resume, confirmed legal discard, retained early paste and create-time conflict recovery. No automatic upload/replay. `T-UX-160a`–`n`; existing upload, focus, failure-copy, responsive Chromium/WebKit and paste/file-selection regressions. |
+| `TASK-227` | `todo` | Local/saved input continuity follows TASK-226. |
+| `TASK-228` | `todo` | Reversible review and recovery follow TASK-227. |
+| `TASK-229` | `todo` | Authoritative Apply outcomes follow TASK-228. |
+| `TASK-230` | `todo` | Capture completeness requires the reviewed server persistence contract. |
+| `TASK-231` | `todo` | Cross-route continuity and full journey coverage follow TASK-230. |
 <!-- STATUS-LEDGER:END -->
+
+### Approved capture lifecycle improvements, 2026-09-19
+
+The owner requested design, documentation and implementation after the complete
+flow assessment. The work order is [capture-lifecycle.md](proposals/capture-lifecycle.md).
+Library requests #326, #328, #327 and #325 were recorded first and remain separate.
+Implement the slices below in order; preserve existing list-safety invariants.
+
+| Task | Work | Size | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| TASK-226 | Entry checkpoint before a new upload; state-aware resume, explicit legal discard, early-paste retention, check failure/offline handling and create-time race recovery. | 1 agent-run + 20 owner-review-minutes | TASK-225 | `T-UX-160`; upload/paste/status/accessibility regressions |
+| TASK-227 | Unify local and saved screenshot states, unsaved navigation protection, upload-response recovery and combined batch limits. | 1 agent-run + 20 owner-review-minutes | TASK-226 | `T-UX-161`; upload/draft/authentication regressions |
+| TASK-228 | Editable review decisions, truthful empty states, offline intent and legal correction/re-extraction recovery. | 1 agent-run + 30 owner-review-minutes | TASK-227 | `T-UX-162`; review/classification regressions |
+| TASK-229 | Resolve unknown Apply outcomes against saved status; explicit retry, concurrency, terminal routing and durable success/undo. | 1 agent-run + 20 owner-review-minutes | TASK-228 | `T-UX-163`; close/undo/transaction regressions |
+| TASK-230 | Persist capture incompleteness across ingest failures and reloads; resolve replacements before full-update removal eligibility. Review the server persistence contract before implementation. | 2 agent-runs + 30 owner-review-minutes | TASK-229 | `T-UX-164`; ingest/extraction/full-update removal regressions |
+| TASK-231 | Surface unfinished work throughout navigation, normalize resume/terminal routes and slow-read recovery, and exercise the whole responsive journey. | 1 agent-run + 20 owner-review-minutes | TASK-230 | `T-UX-165`; navigation/large-review/accessibility regressions |
 
 ### Approved guided capture implementation, 2026-09-18
 

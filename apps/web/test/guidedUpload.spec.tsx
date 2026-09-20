@@ -42,6 +42,7 @@ const saved: BatchStatus = {
 function client() {
   return {
     ...apiClient,
+    listBatches: vi.fn(async () => ({ batches: [] })),
     createBatch: vi.fn(async (service: string, mode: string): Promise<CreatedBatch> => ({
       batchId: 'bat_1',
       service,
@@ -67,8 +68,8 @@ function add(name: string): File {
   return file;
 }
 
-function choose(): void {
-  fireEvent.click(screen.getByRole('radio', { name: 'Netflix' }));
+async function choose(): Promise<void> {
+  fireEvent.click(await screen.findByRole('radio', { name: 'Netflix' }));
   fireEvent.click(within(screen.getByTestId('mode-card-full-update')).getByRole('radio'));
 }
 
@@ -89,8 +90,8 @@ describe('T-UX-156 — guided capture and authoritative saved drafts', () => {
     const stub = upload();
     add('removed.png');
     add('kept.png');
-    fireEvent.click(screen.getByRole('button', { name: 'Remove removed.png' }));
-    choose();
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove removed.png' }));
+    await choose();
     fireEvent.click(screen.getByTestId('service-step-panel-change'));
     fireEvent.click(screen.getByRole('radio', { name: 'Max' }));
     expect(screen.getByTestId('submit-button')).toBeDisabled();
@@ -106,9 +107,9 @@ describe('T-UX-156 — guided capture and authoritative saved drafts', () => {
     expect(stub.submitBatch).toHaveBeenCalledExactlyOnceWith('bat_1');
   });
 
-  it('T-UX-156b: Done closes an unchanged choice without clearing consent', () => {
+  it('T-UX-156b: Done closes an unchanged choice without clearing consent', async () => {
     upload();
-    choose();
+    await choose();
     fireEvent.click(screen.getByTestId('service-step-panel-change'));
     fireEvent.click(screen.getByTestId('service-step-panel-done'));
     expect(screen.getByTestId('service-step-panel')).toHaveAttribute('data-state', 'done');
@@ -122,7 +123,7 @@ describe('T-UX-156 — guided capture and authoritative saved drafts', () => {
     const stub = client();
     stub.addBatchImages.mockRejectedValueOnce(new Error('Connection lost'));
     upload(stub);
-    choose();
+    await choose();
     add('first.png');
     add('second.png');
     fireEvent.click(screen.getByTestId('submit-button'));
@@ -140,7 +141,7 @@ describe('T-UX-156 — guided capture and authoritative saved drafts', () => {
     const stub = client();
     stub.createBatch.mockRejectedValueOnce(new Error('Unavailable'));
     upload(stub);
-    choose();
+    await choose();
     add('kept.png');
     fireEvent.click(screen.getByTestId('submit-button'));
     expect(await screen.findByRole('alert')).toHaveTextContent('Unavailable');

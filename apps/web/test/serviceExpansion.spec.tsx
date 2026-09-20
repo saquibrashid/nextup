@@ -5,6 +5,7 @@ import { SERVICES, SERVICE_LABELS, serviceFreshnessLabel } from '@nextup/domain'
 import { ListPage } from '../src/pages/ListPage';
 import { UploadPage } from '../src/pages/UploadPage';
 import { UploadRoute } from '../src/containers/UploadRoute';
+import { apiClient } from '../src/lib/apiClient';
 import { parseAppliedState } from '../src/containers/ListRoute';
 import { parseFilters, applyFilters } from '../src/components/FilterBar';
 import { FreshnessStrip } from '../src/components/FreshnessStrip';
@@ -64,12 +65,13 @@ it('T-SVC-002a all eight services use correct labels and exclusive nondefault up
 
 it.each(SERVICES)(
   'T-SVC-002b upload links preselect %s without selecting a mode or writing a batch',
-  (service) => {
+  async (service) => {
     render(
       <MemoryRouter initialEntries={[`/upload?service=${service}`]}>
-        <UploadRoute />
+        <UploadRoute client={{ ...apiClient, listBatches: async () => ({ batches: [] }) }} />
       </MemoryRouter>,
     );
+    await waitFor(() => expect(screen.getByTestId('service-step-panel')).toBeVisible());
     // A deep-linked service arrives ANSWERED, so step 1 is collapsed to its
     // summary. The preselection is still real: reopen it and the radio is
     // checked — and the mode is still unanswered, which is the point.

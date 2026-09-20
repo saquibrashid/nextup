@@ -229,6 +229,10 @@ async function stubApi(page: Page): Promise<void> {
   await page.route('**/api/**', async (route) => {
     const url = route.request().url();
     const method = route.request().method();
+    if (url.includes('/api/batches?open=true') && method === 'GET') {
+      await route.fulfill({ json: { batches: [] } });
+      return;
+    }
     const body = url.includes('/me')
       ? ME
       : url.includes('/titles') && !url.includes('/fix-match')

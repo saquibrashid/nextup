@@ -1514,6 +1514,12 @@ yet.
 
 The owner's batch history across **every** service, newest first, capped at 50.
 
+Optional `?open=true` returns the owner's current nonterminal batch (or an empty
+`batches` array) with the same response shape. It uses the same owner-scoped
+lookup as create-time conflict detection, **not** the capped history result.
+Any other supplied `open` value returns 400 `VALIDATION_FAILED`. This is a
+read-only preflight; POST creation still enforces the open-batch invariant.
+
 **200**
 ```jsonc
 { "batches": [ { "batchId": "01J8ZF...", "service": "netflix",

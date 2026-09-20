@@ -10,7 +10,7 @@
  * list.
  */
 
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
@@ -19,6 +19,7 @@ import { BATCH_MODES, SERVICE_LABELS } from '@nextup/domain';
 
 import { UploadPage } from '../src/pages/UploadPage';
 import { UploadRoute } from '../src/containers/UploadRoute';
+import { apiClient } from '../src/lib/apiClient';
 import { IMAGES_STEP_WAITING_HINT, MODE_STEP_LOCKED_HINT, STEP_CHANGE_LABEL } from '../src/copy';
 
 function modeRadio(mode: string): HTMLElement {
@@ -132,12 +133,13 @@ describe('T-UX-148 — /upload progressive reveal', () => {
     );
   });
 
-  it('T-UX-148f: step 3 is never locked, because it holds images pasted before the questions are answered', () => {
+  it('T-UX-148f: step 3 is never locked, because it holds images pasted before the questions are answered', async () => {
     render(
       <MemoryRouter initialEntries={['/upload']}>
-        <UploadRoute />
+        <UploadRoute client={{ ...apiClient, listBatches: async () => ({ batches: [] }) }} />
       </MemoryRouter>,
     );
+    await waitFor(() => expect(screen.getByTestId('dropzone')).toBeVisible());
 
     /*
      * ⚠ A DOCUMENTED DEVIATION from the progressive reveal, and it must stay

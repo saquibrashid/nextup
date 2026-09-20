@@ -124,6 +124,10 @@ const BATCH_HISTORY = { items: [ONE_BATCH] };
 async function stubApi(page: Page): Promise<void> {
   await page.route('**/api/**', async (route) => {
     const url = route.request().url();
+    if (url.includes('/api/batches?open=true')) {
+      await route.fulfill({ json: { batches: [] } });
+      return;
+    }
     const body = url.includes('/me')
       ? { ownerId: 'o_test', displayName: 'Owner' }
       : url.includes('/service-state')

@@ -30,8 +30,6 @@ import {
 } from '../src/containers/UploadRoute';
 import { ApiError, type ApiClient } from '../src/lib/apiClient';
 import {
-  OPEN_BATCH_DISCARD_LABEL,
-  OPEN_BATCH_GO_LABEL,
   STATUS_OFFLINE,
   SUBMIT_IN_FLIGHT,
   SUBMIT_NEEDS_IMAGES,
@@ -159,6 +157,7 @@ function stubClient(overrides: Record<string, unknown> = {}) {
     getServiceState: record('getServiceState', { services: [] }),
     getSuppressions: record('getSuppressions', { items: [] }),
     getBatch: record('getBatch', batch('extracting')),
+    listBatches: record('listBatches', { batches: [] }),
     getReview: record('getReview', emptyReview()),
     createBatch: record('createBatch', {
       batchId: 'bat_1',
@@ -220,7 +219,8 @@ function png(name = 'a.png'): File {
 }
 
 /** Chooses Netflix + full update, which is what makes the batch attachable. */
-function chooseServiceAndMode(): void {
+async function chooseServiceAndMode(): Promise<void> {
+  await waitFor(() => expect(screen.getByTestId('service-step')).toBeVisible());
   fireEvent.click(screen.getByTestId('service-option-netflix').querySelector('input')!);
   fireEvent.click(screen.getByTestId('mode-card-full-update').querySelector('input')!);
 }
@@ -285,7 +285,7 @@ describe('T-DATA-008 — no mutation on mount, including under StrictMode', () =
     const { client, calls } = stubClient({ createBatch: async () => created });
     renderAt('/upload', <UploadRoute client={client} />, '/upload', true);
 
-    chooseServiceAndMode();
+    await chooseServiceAndMode();
     dropFiles([png('a.png')]);
     dropFiles([png('b.png')]);
 
@@ -309,7 +309,7 @@ describe('T-DATA-008 — no mutation on mount, including under StrictMode', () =
     const { client, calls } = stubClient();
     renderAt('/upload', <UploadRoute client={client} />, '/upload', true);
 
-    chooseServiceAndMode();
+    await chooseServiceAndMode();
 
     // Creating on the selection is legal under REQ-102 — it IS an event
     // handler — and still wrong: every idle change of the radios would leave
@@ -672,7 +672,7 @@ describe('T-UX-045 — submit states its reason rather than sitting grey', () =>
     const { client } = stubClient();
     renderAt('/upload', <UploadRoute client={client} />, '/upload');
 
-    chooseServiceAndMode();
+    await chooseServiceAndMode();
     dropFiles([png()]);
 
     await waitFor(() => {
@@ -695,7 +695,7 @@ describe('T-UX-046 — submitting says so', () => {
     });
     renderAt('/upload', <UploadRoute client={client} />, '/upload');
 
-    chooseServiceAndMode();
+    await chooseServiceAndMode();
     dropFiles([png()]);
     await waitFor(() => {
       expect(screen.getByTestId('submit-button')).toBeEnabled();
@@ -717,7 +717,7 @@ describe('T-UX-047 — a successful submit navigates to the status screen', () =
     const { client, calls } = stubClient();
     renderAt('/upload', <UploadRoute client={client} />, '/upload');
 
-    chooseServiceAndMode();
+    await chooseServiceAndMode();
     dropFiles([png()]);
     await waitFor(() => {
       expect(screen.getByTestId('submit-button')).toBeEnabled();
@@ -732,7 +732,7 @@ describe('T-UX-047 — a successful submit navigates to the status screen', () =
   });
 });
 
-describe('T-UX-048 — the 409 offers both ways out', () => {
+describe('T-UX-048 — the 409 opens a state-aware checkpoint', () => {
   const conflict = new ApiError(
     'OPEN_BATCH_EXISTS',
     409,
@@ -743,28 +743,32 @@ describe('T-UX-048 — the 409 offers both ways out', () => {
   it('T-UX-048a: the server message is rendered verbatim with both actions', async () => {
     const { client } = stubClient({
       createBatch: () => Promise.reject(conflict),
+      getBatch: async () => ({ ...batch('draft'), batchId: 'bat_old' }),
     });
     renderAt('/upload', <UploadRoute client={client} />, '/upload');
 
-    chooseServiceAndMode();
+    await chooseServiceAndMode();
     dropFiles([png()]);
 
     // ⚠ VERBATIM (REQ-104, §12.8). A client table keyed on the code is a
     // second source of truth that goes stale exactly where it hurts most.
     fireEvent.click(screen.getByTestId('submit-button'));
     expect(await screen.findByTestId('open-batch-message')).toHaveTextContent(conflict.message);
-    expect(screen.getByTestId('open-batch-go')).toHaveTextContent(OPEN_BATCH_GO_LABEL);
-    expect(screen.getByTestId('open-batch-discard')).toHaveTextContent(OPEN_BATCH_DISCARD_LABEL);
+    expect(await screen.findByTestId('open-batch-go')).toHaveTextContent(
+      'Continue adding screenshots',
+    );
+    expect(screen.getByTestId('open-batch-discard')).toHaveTextContent('Discard this batch...');
   });
 
   it('T-UX-048b: "Go to it" opens the batch named in the envelope details', async () => {
     const { client } = stubClient({ createBatch: () => Promise.reject(conflict) });
     renderAt('/upload', <UploadRoute client={client} />, '/upload');
 
-    chooseServiceAndMode();
+    await chooseServiceAndMode();
     dropFiles([png()]);
     fireEvent.click(screen.getByTestId('submit-button'));
     fireEvent.click(await screen.findByTestId('open-batch-go'));
+    fireEvent.click(screen.getByRole('button', { name: 'Leave and continue' }));
 
     expect(await screen.findByText('status screen')).toBeInTheDocument();
   });
@@ -773,6 +777,7 @@ describe('T-UX-048 — the 409 offers both ways out', () => {
     const discarded: string[] = [];
     const { client } = stubClient({
       createBatch: () => Promise.reject(conflict),
+      getBatch: async () => ({ ...batch('draft'), batchId: 'bat_old' }),
       discardBatch: (id: unknown) => {
         discarded.push(id as string);
         return Promise.resolve({});
@@ -780,10 +785,12 @@ describe('T-UX-048 — the 409 offers both ways out', () => {
     });
     renderAt('/upload', <UploadRoute client={client} />, '/upload');
 
-    chooseServiceAndMode();
+    await chooseServiceAndMode();
     dropFiles([png()]);
     fireEvent.click(screen.getByTestId('submit-button'));
     fireEvent.click(await screen.findByTestId('open-batch-discard'));
+    expect(discarded).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Discard saved batch' }));
 
     // ⚠ The id comes from the ENVELOPE, not from anything this screen holds:
     // the conflicting batch is one the owner started elsewhere, so a
@@ -793,19 +800,18 @@ describe('T-UX-048 — the 409 offers both ways out', () => {
     });
   });
 
-  it('T-UX-048d: the conflict does not replace the screen', async () => {
+  it('T-UX-048d: the conflict hides preparation but retains the local queue', async () => {
     const { client } = stubClient({ createBatch: () => Promise.reject(conflict) });
     renderAt('/upload', <UploadRoute client={client} />, '/upload');
 
-    chooseServiceAndMode();
+    await chooseServiceAndMode();
     dropFiles([png()]);
     fireEvent.click(screen.getByTestId('submit-button'));
-    await screen.findByTestId('open-batch-conflict');
-
-    // Taking the whole screen away would remove the third way out — changing
-    // their mind and going somewhere else.
-    expect(screen.getByTestId('service-step')).toBeInTheDocument();
-    expect(screen.getByTestId('dropzone')).toBeInTheDocument();
+    await screen.findByTestId('open-batch-go');
+    expect(screen.getByTestId('service-step')).not.toBeVisible();
+    expect(screen.getByTestId('dropzone')).not.toBeVisible();
+    expect(screen.getByTestId('submit-button')).toBeDisabled();
+    expect(screen.getByTestId('upload-checkpoint')).toHaveTextContent('1 screenshot is held');
   });
 });
 
@@ -858,7 +864,7 @@ describe('T-UI-013 — a decode rejection never takes the batch down', () => {
       </MemoryRouter>,
     );
 
-    chooseServiceAndMode();
+    await chooseServiceAndMode();
     dropFiles([png('a.png'), png('beach-list-03.heic')]);
     fireEvent.click(screen.getByTestId('submit-button'));
 
@@ -902,7 +908,7 @@ describe('T-UX-043 — every file rejected', () => {
     });
     renderAt('/upload', <UploadRoute client={client} />, '/upload');
 
-    chooseServiceAndMode();
+    await chooseServiceAndMode();
     dropFiles([png('notes.png')]);
     fireEvent.click(screen.getByTestId('submit-button'));
 

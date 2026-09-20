@@ -25,6 +25,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SERVICES, SERVICE_LABELS } from '@nextup/domain';
 
 import { ImageDropzone, type QueuedImage, type ServerRejection } from '../components/ImageDropzone';
+import { UploadCheckpoint } from '../components/UploadCheckpoint';
+import { resumeAction, useUploadCheckpoint } from '../lib/useUploadCheckpoint';
 import { ApiError, RefusedError, apiClient, type ApiClient } from '../lib/apiClient';
 import { RefusalPage } from '../pages/RefusalPage';
 import { UploadPage, type BatchDraftSelection } from '../pages/UploadPage';
@@ -32,8 +34,6 @@ import {
   BATCH_LOCKED_NOTE,
   IMAGES_STEP_LEGEND,
   IMAGES_STEP_WAITING_HINT,
-  OPEN_BATCH_DISCARD_LABEL,
-  OPEN_BATCH_GO_LABEL,
   SUBMIT_IN_FLIGHT,
   SUBMIT_LABEL,
   SUBMIT_NEEDS_IMAGES,
@@ -54,12 +54,6 @@ export { rejectionsFromError } from '../components/RejectionList';
 export interface UploadRouteProps {
   /** Injected so the suite can drive every state without a server. */
   readonly client?: ApiClient;
-}
-
-/** The 409 the owner can act on, kept apart from ordinary failures (§4.10). */
-interface OpenBatchConflict {
-  readonly batchId: string;
-  readonly message: string;
 }
 
 /**
@@ -112,34 +106,43 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
   const [serverRejected, setServerRejected] = useState<readonly ServerRejection[]>([]);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
-  const [conflict, setConflict] = useState<OpenBatchConflict | null>(null);
+  const [conflictMessage, setConflictMessage] = useState<string | null>(null);
+  const [checkpointError, setCheckpointError] = useState<string | null>(null);
   const [refused, setRefused] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   const inFlight = useRef(false);
+  const checkpoint = useUploadCheckpoint(client, online, batchId === null);
+  const { check } = checkpoint;
+  const entryReady = checkpoint.state.kind === 'ready';
 
-  const report = useCallback((error: unknown): void => {
-    if (error instanceof RefusedError) {
-      setRefused(true);
-      return;
-    }
-    if (error instanceof ApiError && error.code === 'OPEN_BATCH_EXISTS') {
-      const existing = error.details['batchId'];
-      if (typeof existing === 'string') {
-        setConflict({ batchId: existing, message: error.message });
+  const report = useCallback(
+    (error: unknown): void => {
+      if (error instanceof RefusedError) {
+        setRefused(true);
         return;
       }
-    }
-    // ⚠ The server's own sentence, verbatim (REQ-104, §12.8). No table keyed
-    // on `code` here: it would state yesterday's decode limit in the very
-    // message whose job is to state the limit after an up-size.
-    setFailure(error instanceof Error ? error.message : 'Something went wrong.');
-  }, []);
+      if (error instanceof ApiError && error.code === 'OPEN_BATCH_EXISTS') {
+        const existing = error.details['batchId'];
+        if (typeof existing === 'string') {
+          setConflictMessage(error.message);
+          void check(existing);
+          return;
+        }
+      }
+      // ⚠ The server's own sentence, verbatim (REQ-104, §12.8). No table keyed
+      // on `code` here: it would state yesterday's decode limit in the very
+      // message whose job is to state the limit after an up-size.
+      setFailure(error instanceof Error ? error.message : 'Something went wrong.');
+    },
+    [check],
+  );
 
   const submit = useCallback((): void => {
     const { service, mode } = selection;
     if (
       inFlight.current ||
+      !entryReady ||
       batchId !== null ||
       !online ||
       service === null ||
@@ -203,153 +206,181 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
         setBusy(false);
       }
     })();
-  }, [batchId, client, navigate, online, queue, report, selection]);
+  }, [batchId, client, entryReady, navigate, online, queue, report, selection]);
 
-  const discardConflicting = useCallback((): void => {
-    if (conflict === null) return;
-    const doomed = conflict.batchId;
+  const resolveExisting = async (discard: boolean): Promise<void> => {
+    if (checkpoint.state.kind !== 'open' || inFlight.current || !online) return;
+    const id = checkpoint.state.batch.batchId;
+    inFlight.current = true;
     setBusy(true);
-    void (async () => {
-      try {
-        await client.discardBatch(doomed);
-        setConflict(null);
-      } catch (error) {
-        report(error);
-      } finally {
-        setBusy(false);
+    setCheckpointError(null);
+    try {
+      const latest = await client.getBatch(id);
+      const action = resumeAction(latest.status);
+      if (action === null) {
+        await check();
+        setConflictMessage('That upload is already finished. The saved status has been refreshed.');
+        return;
       }
-    })();
-  }, [client, conflict, report]);
+      if (!discard) {
+        void navigate(latest.status === 'in-review' ? `/batches/${id}/review` : `/batches/${id}`);
+        return;
+      }
+      if (!action.discardable) {
+        await check(id);
+        setCheckpointError(
+          'Reading has started. This upload cannot be discarded while it is running.',
+        );
+        return;
+      }
+      await client.discardBatch(id);
+      await check();
+      setConflictMessage(
+        'The saved batch was discarded. Your library is unchanged. No new upload was started.',
+      );
+    } catch (error) {
+      if (error instanceof RefusedError) setRefused(true);
+      else {
+        setCheckpointError(
+          `${error instanceof Error ? error.message : 'The request failed.'} The saved status is being checked. Nothing was automatically retried.`,
+        );
+        await check();
+      }
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
+  };
 
-  if (refused) return <RefusalPage reason="not-allowed" />;
+  if (refused || checkpoint.state.kind === 'refused') return <RefusalPage reason="not-allowed" />;
 
   const blocked = submitBlockedReason(selection, queue.length, !online);
   const ready = selection.service !== null && selection.mode !== null;
+  const showCheckpoint = batchId === null && !entryReady;
 
   return (
     <div className="upload-flow">
-      <div className="upload-flow__layout">
-        <Fieldset legend="Prepare screenshots" hideLegend disabled={busy || batchId !== null}>
-          <UploadPage initialService={initialService} onSelectionChange={setSelection} />
-
-          {/*
-        ⚠ Rendered AFTER step 1 and never in place of it. §4.10 offers the
-        owner two ways out of the conflict; replacing the whole screen with the
-        message would take away the third — changing their mind and leaving.
-      */}
-          {conflict !== null && (
-            <section className="upload-conflict" data-testid="open-batch-conflict">
-              <p data-testid="open-batch-message">{conflict.message}</p>
-              <Button
-                variant="secondary"
-                data-testid="open-batch-go"
-                onClick={() => {
-                  void navigate(`/batches/${conflict.batchId}`);
-                }}
-                type="button"
-              >
-                {OPEN_BATCH_GO_LABEL}
-              </Button>
-              <Button
-                variant="secondary"
-                data-testid="open-batch-discard"
-                onClick={discardConflicting}
-              >
-                {OPEN_BATCH_DISCARD_LABEL}
-              </Button>
-            </section>
-          )}
-
-          <UploadStep
-            index={3}
-            legend={IMAGES_STEP_LEGEND}
-            /*
-             * ⚠ ALWAYS `active`, NEVER LOCKED — and that is deliberate, not an
-             * oversight of the progressive reveal. `ImageDropzone` and
-             * `PasteButton` HOLD what arrives before the two questions are
-             * answered (`ux-states.md` §4.3), because the owner's primary path is
-             * pasting the moment they have a screenshot. Dimming or disabling this
-             * step would advertise the opposite of what it does and would lose
-             * exactly that paste.
-             */
-            state="active"
-            hint={ready ? null : IMAGES_STEP_WAITING_HINT}
-            testId="images-step-panel"
+      {showCheckpoint && (
+        <UploadCheckpoint
+          key={checkpoint.state.kind === 'checking' ? checkpoint.state.attempt : 'resolved'}
+          state={checkpoint.state}
+          online={online}
+          busy={busy}
+          heldCount={queue.length}
+          message={conflictMessage}
+          error={checkpointError}
+          onRetry={() => {
+            setCheckpointError(null);
+            void check();
+          }}
+          onResume={() => resolveExisting(false)}
+          onDiscard={() => resolveExisting(true)}
+        />
+      )}
+      {!showCheckpoint && conflictMessage !== null && <p role="status">{conflictMessage}</p>}
+      {!showCheckpoint && checkpointError !== null && <p role="alert">{checkpointError}</p>}
+      <div hidden={showCheckpoint}>
+        <div className="upload-flow__layout">
+          <Fieldset
+            legend="Prepare screenshots"
+            hideLegend
+            disabled={busy || batchId !== null || !entryReady}
           >
-            <ImageDropzone
-              batchReady={ready}
-              offline={!online}
-              disabled={busy || batchId !== null}
-              serverRejected={serverRejected}
-              onQueueChange={setQueue}
-            />
-            {busy && <p role="status">{SUBMIT_IN_FLIGHT}</p>}
-            <p className="upload-flow__note">{UPLOAD_LOCAL_NOTE}</p>
-          </UploadStep>
-        </Fieldset>
-        <aside className="upload-summary" aria-label={UPLOAD_SUMMARY_TITLE}>
-          <h2>{UPLOAD_SUMMARY_TITLE}</h2>
-          <dl>
-            <dt>Service</dt>
-            <dd>
-              {selection.service === null ? 'Choose a service' : SERVICE_LABELS[selection.service]}
-            </dd>
-            <dt>Update mode</dt>
-            <dd>
-              {selection.mode === null
-                ? 'Choose an update mode'
-                : selection.mode === 'append-only'
-                  ? 'Add only'
-                  : 'Full update'}
-            </dd>
-            <dt>Screenshots</dt>
-            <dd>{queue.length}</dd>
-          </dl>
-          <p>{UPLOAD_NEXT_NOTE}</p>
-          <section className="upload-submit" data-testid="submit-step">
-            {/*
+            <UploadPage initialService={initialService} onSelectionChange={setSelection} />
+
+            <UploadStep
+              index={3}
+              legend={IMAGES_STEP_LEGEND}
+              /*
+               * ⚠ ALWAYS `active`, NEVER LOCKED — and that is deliberate, not an
+               * oversight of the progressive reveal. `ImageDropzone` and
+               * `PasteButton` HOLD what arrives before the two questions are
+               * answered (`ux-states.md` §4.3), because the owner's primary path is
+               * pasting the moment they have a screenshot. Dimming or disabling this
+               * step would advertise the opposite of what it does and would lose
+               * exactly that paste.
+               */
+              state="active"
+              hint={ready ? null : IMAGES_STEP_WAITING_HINT}
+              testId="images-step-panel"
+            >
+              <ImageDropzone
+                batchReady={ready}
+                offline={!online}
+                disabled={busy || batchId !== null}
+                serverRejected={serverRejected}
+                onQueueChange={setQueue}
+              />
+              {busy && <p role="status">{SUBMIT_IN_FLIGHT}</p>}
+              <p className="upload-flow__note">{UPLOAD_LOCAL_NOTE}</p>
+            </UploadStep>
+          </Fieldset>
+          <aside className="upload-summary" aria-label={UPLOAD_SUMMARY_TITLE}>
+            <h2>{UPLOAD_SUMMARY_TITLE}</h2>
+            <dl>
+              <dt>Service</dt>
+              <dd>
+                {selection.service === null
+                  ? 'Choose a service'
+                  : SERVICE_LABELS[selection.service]}
+              </dd>
+              <dt>Update mode</dt>
+              <dd>
+                {selection.mode === null
+                  ? 'Choose an update mode'
+                  : selection.mode === 'append-only'
+                    ? 'Add only'
+                    : 'Full update'}
+              </dd>
+              <dt>Screenshots</dt>
+              <dd>{queue.length}</dd>
+            </dl>
+            <p>{UPLOAD_NEXT_NOTE}</p>
+            <section className="upload-submit" data-testid="submit-step">
+              {/*
             ⚠ THE REASON IS TEXT, ALWAYS, AND SITS BESIDE THE CONTROL (§3.3). A
             disabled button with no reason is indistinguishable from a broken
             one, and this is the last step before the owner's screenshots leave
             the device.
           */}
-            {blocked !== null && (
-              <p className="upload-submit__reason" data-testid="submit-reason">
-                {blocked}
-              </p>
-            )}
-            <Button
-              variant="primary"
-              data-testid="submit-button"
-              disabled={blocked !== null || busy || batchId !== null}
-              onClick={submit}
-            >
-              {SUBMIT_LABEL}
-            </Button>
-            {busy && (
-              <p aria-live="polite" data-testid="submit-busy">
-                {SUBMIT_IN_FLIGHT}
-              </p>
-            )}
-            {submitted && <p data-testid="batch-locked">{BATCH_LOCKED_NOTE}</p>}
-            {failure !== null && (
-              <p className="upload-submit__failure" data-testid="submit-failure" role="alert">
-                {failure}
-              </p>
-            )}
-            {batchId !== null && !busy && (
+              {blocked !== null && (
+                <p className="upload-submit__reason" data-testid="submit-reason">
+                  {blocked}
+                </p>
+              )}
               <Button
-                variant="secondary"
-                type="button"
-                onClick={() => {
-                  void navigate(`/batches/${batchId}`);
-                }}
+                variant="primary"
+                data-testid="submit-button"
+                disabled={blocked !== null || busy || batchId !== null || !entryReady}
+                onClick={submit}
               >
-                Open saved batch
+                {SUBMIT_LABEL}
               </Button>
-            )}
-          </section>
-        </aside>
+              {busy && (
+                <p aria-live="polite" data-testid="submit-busy">
+                  {SUBMIT_IN_FLIGHT}
+                </p>
+              )}
+              {submitted && <p data-testid="batch-locked">{BATCH_LOCKED_NOTE}</p>}
+              {failure !== null && (
+                <p className="upload-submit__failure" data-testid="submit-failure" role="alert">
+                  {failure}
+                </p>
+              )}
+              {batchId !== null && !busy && (
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => {
+                    void navigate(`/batches/${batchId}`);
+                  }}
+                >
+                  Open saved batch
+                </Button>
+              )}
+            </section>
+          </aside>
+        </div>
       </div>
 
       {/* Present only so a test can prove the batch was created once. */}

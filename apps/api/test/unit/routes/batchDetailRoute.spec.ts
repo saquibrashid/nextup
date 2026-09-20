@@ -24,6 +24,7 @@ import type { Express } from 'express';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const listBatchHistory = vi.fn();
+const findOpenUploadBatch = vi.fn();
 const countBatchChangeKinds = vi.fn();
 const findUploadBatch = vi.fn();
 const listImagesForBatch = vi.fn();
@@ -35,6 +36,7 @@ vi.mock('../../../src/repository/ownerData.js', async (importOriginal) => {
   return {
     ...actual,
     listBatchHistory: (...args: unknown[]) => listBatchHistory(...args) as unknown,
+    findOpenUploadBatch: (...args: unknown[]) => findOpenUploadBatch(...args) as unknown,
     countBatchChangeKinds: (...args: unknown[]) => countBatchChangeKinds(...args) as unknown,
     findUploadBatch: (...args: unknown[]) => findUploadBatch(...args) as unknown,
     listImagesForBatch: (...args: unknown[]) => listImagesForBatch(...args) as unknown,
@@ -140,6 +142,28 @@ afterEach(() => {
 });
 
 describe('GET /api/batches — history (T-BATCH-016)', () => {
+  it('T-UX-160i: unfinished lookup is owner-scoped, independent of capped history, and validates the query', async () => {
+    listBatchHistory.mockResolvedValue(
+      Array.from({ length: 50 }, (_, i) => batchRow({ id: `new-${i}` })),
+    );
+    findOpenUploadBatch.mockResolvedValue(batchRow({ id: 'old-draft', status: 'draft' }));
+    const found = await get('/api/batches?open=true');
+    expect(found.status).toBe(200);
+    expect(await found.json()).toMatchObject({
+      batches: [{ batchId: 'old-draft', status: 'draft' }],
+    });
+    expect(listBatchHistory).not.toHaveBeenCalled();
+    expect(findOpenUploadBatch).toHaveBeenCalledExactlyOnceWith(expect.stringMatching(/^o_/));
+    expect(countBatchChangeKinds).toHaveBeenCalledWith(findOpenUploadBatch.mock.calls[0]?.[0], [
+      'old-draft',
+    ]);
+    findOpenUploadBatch.mockResolvedValue(null);
+    expect(await (await get('/api/batches?open=true')).json()).toEqual({ batches: [] });
+    for (const query of ['open=false', 'open=invalid', 'open=true&open=true']) {
+      expect((await get(`/api/batches?${query}`)).status).toBe(400);
+    }
+    expect(findOpenUploadBatch).toHaveBeenCalledTimes(2);
+  });
   it('T-BATCH-016: returns the owner batches newest-first with their change counts', async () => {
     listBatchHistory.mockResolvedValue([
       batchRow({ id: 'b-new', createdAt: new Date('2026-02-01T00:00:00.000Z') }),

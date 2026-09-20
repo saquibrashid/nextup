@@ -787,8 +787,12 @@ export function createApiClient(deps: ApiClientDeps = {}) {
       request<CreatedBatch>('/api/batches', { method: 'POST', body: { service, mode } }, deps),
 
     /** §6.15a — the batch history `/batches` renders. */
-    listBatches: (signal?: AbortSignal) =>
-      request<BatchHistoryResponse>('/api/batches', { signal }, deps),
+    listBatches: (signal?: AbortSignal, openOnly = false) =>
+      request<BatchHistoryResponse>(
+        openOnly ? '/api/batches?open=true' : '/api/batches',
+        { signal },
+        deps,
+      ),
 
     /**
      * §6.15 — the batch the status page polls.

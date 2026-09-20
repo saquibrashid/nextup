@@ -119,6 +119,28 @@ close, undo and upload-journey tests press the final Apply explicitly.
 actual proposal names before another explicit Apply. `T-UX-149` continues to
 prove decision writes do not unmount the underlying review while rereading.
 
+### Unfinished-upload checkpoint, 2026-09-19
+
+`TASK-226` introduces a read-only entry gate. `T-UX-048` now requires a
+state-aware checkpoint and confirmation rather than immediate conflict discard.
+
+| Test ID | Level | Assertion |
+| --- | --- | --- |
+| `T-UX-160a`–`h`, `T-UX-160k`–`n` | Web | Empty/terminal/open states; fail-closed lookup; early-paste retention; live-state resume/discard; local-input confirmation; duplicate/offline/uncertain-response protection; stale-read cancellation. `apps/web/test/uploadCheckpoint.spec.tsx`. |
+| `T-UX-160i` | Unit | Owner-scoped open lookup bypasses capped history, returns empty when none, and rejects malformed query values. `apps/api/test/unit/routes/batchDetailRoute.spec.ts`. |
+| `T-UX-160j` | E2E | Responsive checkpoint, legal actions, dialog focus/Escape, early paste and accessible layout at 280/390/1440px in Chromium/WebKit. `tests/e2e/uploadCheckpoint.spec.ts`. |
+
+TASK-227 through TASK-231 and their T-UX-161 through T-UX-165 suites remain
+planned in the lifecycle proposal, not delivered coverage.
+
+| Test ID | Planned level | Required assertion (not yet implemented) |
+| --- | --- | --- |
+| `T-UX-161` | Web/E2E | Distinguish local and saved inputs, preserve partial success, and protect navigation without replaying uncertain uploads. |
+| `T-UX-162` | Web/E2E | Edit prior review decisions, distinguish empty-state causes, retain offline intent, and provide legal correction/re-extraction recovery. |
+| `T-UX-163` | Web/E2E | Resolve uncertain Apply against saved status, preserve explicit retry, and route terminal outcomes to durable success/undo. |
+| `T-UX-164` | Integration/Web | Persist rejected-ingest completeness evidence and withhold removals after an incomplete full capture across reloads. |
+| `T-UX-165` | Web/E2E | Provide unfinished-work navigation, correct terminal routing, and complete lifecycle continuity across both update modes. |
+
 > ### ⚠ REVISION 7 (2026-08-11) — `A45`: clipboard paste is the primary ingest path
 >
 > Owner correction, verbatim: *"for screenshots, I'm generally expecting that

@@ -18,6 +18,9 @@ for (const width of [280, 390, 900, 1440]) {
           },
         }),
       );
+      await page.route('**/api/batches?open=true', (route) =>
+        route.fulfill({ json: { batches: [] } }),
+      );
       await page.addInitScript(() => {
         Object.defineProperty(navigator, 'clipboard', {
           configurable: true,
