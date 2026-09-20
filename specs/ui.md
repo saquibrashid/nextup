@@ -461,7 +461,13 @@ is otherwise only fixable by re-capturing an entire service.
 
 ## 3. `/upload` — Create a batch (US-003, US-004)
 
-**Primary action.** Choose service and mode, attach screenshots, submit.
+**Primary action.** First resolve any unfinished upload; otherwise choose service
+and mode, attach screenshots, and submit. Read `GET /api/batches?open=true` before
+exposing preparation. The checkpoint has service/mode/date, state-specific
+resume, and confirmed discard only in legal states. Failed/offline checks block
+creation with an explicit recovery action. Early desktop paste stays local.
+Re-read status on resume/discard; preserve the queue through create-time races.
+See `docs/proposals/capture-lifecycle.md` and `ux-states.md` §4.
 
 ### 3.0 Progressive reveal *(added in place, issue #287)*
 

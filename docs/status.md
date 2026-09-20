@@ -11,18 +11,20 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 0 |
+| ⬜ todo | 5 |
 | 🚧 doing | 0 |
-| ✅ done | 220 |
+| ✅ done | 221 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **223** |
+| **total** | **229** |
 
 ## Ready to start
 
 Not done, and every task they depend on is done.
 
-_Nothing is ready: every unfinished task is waiting on a dependency._
+| Task | Size | Section |
+|---|---|---|
+| `TASK-227` | 1 agent-run + 20 owner-review-minutes | Approved capture lifecycle improvements, 2026-09-19 |
 
 ## Waiting on the owner
 
@@ -34,8 +36,14 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 
 ## Blocked by a dependency
 
-0 tasks cannot start yet.
+4 tasks cannot start yet.
 
+| Task | Waiting on |
+|---|---|
+| `TASK-228` | `TASK-227` |
+| `TASK-229` | `TASK-228` |
+| `TASK-230` | `TASK-229` |
+| `TASK-231` | `TASK-230` |
 
 ## Done
 
@@ -261,3 +269,4 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-223` | Measured per-image counts, persistent failure evidence, same-batch retry with an atomic error/progress reset, and explicit busy/offline-safe recovery. No running discard, no automatic mutation replay, and no candidate hard deletion. `T-UX-157a`–`g`, `T-BATCH-026a`–`h`; existing status, extraction, owner-scope and lifecycle guards retained. No schema or infrastructure changes. | `T-BATCH-026a`, `T-UX-157a` |
 | `TASK-224` | Grouped review with consistent 104px evidence wells, equal decision controls, counted secondary evidence, inert known matches and explicit withheld-removal copy. Server classification, virtualized large lists and existing actions retained. `T-UX-158a`–`d`; review, responsive, stylesheet and performance regressions. | `T-PERF-002`, `T-UX-158a` |
 | `TASK-225` | Single final summary for both modes with authoritative preflight, exact additions/selected removals, real removal PATCH, guarded decision writes and close, retained failed summary and explicit retry. Back/Escape preserves review, in-flight Apply cannot be dismissed, and server reconfirmation refreshes names. `T-UX-159a`–`f`; close/undo/upload-journey regressions updated for the intentional confirmation step. | `T-DATA-011`, `T-REV-005`, `T-REV-007`, `T-UI-008`, `T-UX-064`, `T-UX-067`, `T-UX-159a` |
+| `TASK-226` | Authoritative owner-scoped entry checkpoint bypasses the history cap; state-aware reread/resume, confirmed legal discard, retained early paste and create-time conflict recovery. No automatic upload/replay. `T-UX-160a`–`n`; existing upload, focus, failure-copy, responsive Chromium/WebKit and paste/file-selection regressions. | `T-UX-160` |

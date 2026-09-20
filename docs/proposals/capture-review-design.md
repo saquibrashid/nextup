@@ -1,5 +1,9 @@
 # Guided capture and review design
 
+The [capture lifecycle work order](capture-lifecycle.md), approved 2026-09-19,
+extends this design with entry checks, safe resumption and interruption recovery.
+Its ordered slices distinguish implementation from remaining design work.
+
 **Status:** Implementation authorized 2026-09-18 after the library release.
 The owner approved proceeding through guided upload, extraction recovery,
 grouped review and the single final summary, with a PR, CI-gated merge and

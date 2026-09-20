@@ -33,6 +33,7 @@ import { AppError } from '../errors/AppError.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import {
   countBatchChangeKinds,
+  findOpenUploadBatch,
   findUploadBatch,
   listBatchChanges,
   listBatchHistory,
@@ -147,7 +148,18 @@ export function registerBatchDetailRoutes(router: Router): void {
   // module and cannot drift apart.
   router.get('/batches', async (req, res) => {
     const ownerId = requireOwnerId(req);
-    const batches = await listBatchHistory(ownerId, BATCH_HISTORY_LIMIT);
+    if (req.query['open'] !== undefined && req.query['open'] !== 'true') {
+      throw new AppError('VALIDATION_FAILED', 400, '"open" must be "true" when provided.', {
+        field: 'open',
+      });
+    }
+    const openOnly = req.query['open'] === 'true';
+    const open = openOnly ? await findOpenUploadBatch(ownerId) : null;
+    const batches = openOnly
+      ? open === null
+        ? []
+        : [open]
+      : await listBatchHistory(ownerId, BATCH_HISTORY_LIMIT);
     const counts = await countBatchChangeKinds(
       ownerId,
       batches.map((batch) => batch.id),

@@ -89,6 +89,17 @@ Each state below names: **what the owner sees**, **what they can do**, and the
 
 ## 4. `/upload` — Create a batch
 
+**Entry contract (TASK-226):** before the new-upload form is exposed, read the
+owner's unfinished batch. Checking, failed and offline lookup states cannot
+create an upload. An open batch replaces the visible form with its service,
+mode, date and state-specific resume action. Draft/review/failed batches permit
+confirmed discard; submitted/extracting batches do not. Resume and discard
+reread the selected batch. An early desktop paste remains local while checking;
+resuming another batch requires confirmation before leaving that local input.
+The form stays mounted but hidden so a create-time race does not lose the queue.
+`T-UX-040` and `T-UX-148` initial-form expectations apply after a successful
+no-open-batch check, not before it. Full contract: the capture lifecycle proposal.
+
 | State | Owner sees | Can do | Test |
 |---|---|---|---|
 | **4.0a Paste with no open batch** *(new — A45)* | A paste (or a "Paste screenshot" tap) arriving before service and mode are chosen. The image is **held client-side, not discarded**, and the service/mode step is highlighted: *"Got your screenshot — choose a service and a mode and it'll be attached."* Nothing is sent to the server (a batch must exist first — `api.md` §5.3.1) | Choose service and mode; the held image attaches automatically | `T-PASTE-002` |
@@ -103,7 +114,7 @@ Each state below names: **what the owner sees**, **what they can do**, and the
 | **4.7 Populated** | Thumbnail grid + running totals; submit enabled | Submit | `T-UX-045` |
 | **4.8 Submitting** | Per-file progress bars; the whole form disabled; **"Don't close this tab"** | Wait | `T-UX-046` |
 | **4.9 Success** | Navigates to `/batches/:batchId` | — | `T-UX-047` |
-| **4.10 Error — 409 `OPEN_BATCH_EXISTS`** | *"You already have an upload in progress."* + **"Go to it"** / **"Discard it and start again"** | Both | `T-UX-048` |
+| **4.10 Error — 409 `OPEN_BATCH_EXISTS`** | Retain local selection, disable Extract, and return to the entry checkpoint. Preserve the server message; reread the conflicting batch for current state and legal actions. | Resume; confirmed discard only when permitted; explicit status refresh | `T-UX-048`, `T-UX-160` |
 | **4.11 Offline** | Banner; submit disabled with the reason. **The "Paste screenshot" button is also disabled with the same visible reason** (A45) — a paste needs a `POST` | Wait | `T-UX-003` |
 | **4.12 Paste accepted** *(new — A45)* | The pasted image appears in the same thumbnail grid as any attached file, named with the **server-synthesised** name (`pasted-20260811-154233-03.png`, `data-model.md` §3.8.1); running totals update; `role="status"`: *"Added 1 screenshot — 3 in this batch."* **A second paste APPENDS to the same batch** — no new batch, no replacement | Paste again, choose files, drag more, submit | `T-PASTE-003` |
 | **4.13 Paste error — permission denied** *(new — A45)* | `PASTE_DENIED_BODY` — *"nextup couldn't read your clipboard. Tap 'Paste screenshot' again and choose Paste, or choose a file instead."* The button stays enabled and is **re-offered**. **The upload path is named in the copy**, because it always works | Retry the paste, or choose a file | `T-PASTE-008` |

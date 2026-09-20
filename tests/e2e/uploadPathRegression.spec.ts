@@ -178,6 +178,10 @@ async function stubApi(
       return;
     }
 
+    if (method === 'GET' && path === '/api/batches') {
+      await route.fulfill(ok({ batches: [] }));
+      return;
+    }
     if (method === 'POST' && path === '/api/batches') {
       state.batchCreatedWith = request.postDataJSON();
       await route.fulfill({

@@ -17,36 +17,38 @@
  * before picking a service, and the screenshot is often no longer on the
  * clipboard to paste again.
  */
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { SUBMIT_NEEDS_SELECTION } from '../src/copy';
 import { UploadRoute } from '../src/containers/UploadRoute';
+import { apiClient } from '../src/lib/apiClient';
 
 afterEach(cleanup);
 
-function mountInitial(): void {
+async function mountInitial(): Promise<void> {
   render(
     <MemoryRouter initialEntries={['/upload']}>
-      <UploadRoute />
+      <UploadRoute client={{ ...apiClient, listBatches: async () => ({ batches: [] }) }} />
     </MemoryRouter>,
   );
+  await waitFor(() => expect(screen.getByTestId('dropzone')).toBeVisible());
 }
 
 describe('T-UX-040 /upload initial state', () => {
-  it('T-UX-040a: the attach area is enabled before a service and mode are chosen', () => {
-    mountInitial();
+  it('T-UX-040a: the attach area is enabled before a service and mode are chosen', async () => {
+    await mountInitial();
 
     const chooser = screen.getByTestId('file-input');
     expect(chooser).not.toBeDisabled();
   });
 
-  it('T-UX-040b: no attach control is disabled and no fieldset is disabled', () => {
+  it('T-UX-040b: no attach control is disabled and no fieldset is disabled', async () => {
     // Broader than 040a on purpose. The old wording would most naturally be
     // re-implemented by disabling the surrounding fieldset or the drop target
     // rather than the file input itself, and 040a alone would not notice.
-    mountInitial();
+    await mountInitial();
 
     const dropzone = screen.getByTestId('dropzone');
     const disabled = dropzone.querySelectorAll(
@@ -59,12 +61,12 @@ describe('T-UX-040 /upload initial state', () => {
     ).toEqual([]);
   });
 
-  it('T-UX-040c: the reason is visible, and it sits on submit', () => {
+  it('T-UX-040c: the reason is visible, and it sits on submit', async () => {
     // §3.3 forbids a silently disabled control. The sentence itself survived
     // the correction unchanged — only what it explains moved from attach to
     // submit — so asserting the sentence alone would pass under BOTH the old
     // and the new wording. Its location is the whole point.
-    mountInitial();
+    await mountInitial();
 
     const reason = screen.getByTestId('submit-reason');
     expect(reason).toHaveTextContent(SUBMIT_NEEDS_SELECTION);
@@ -72,8 +74,8 @@ describe('T-UX-040 /upload initial state', () => {
     expect(screen.getByTestId('dropzone')).not.toContainElement(reason);
   });
 
-  it('T-UX-040d: submit is the control that is blocked', () => {
-    mountInitial();
+  it('T-UX-040d: submit is the control that is blocked', async () => {
+    await mountInitial();
 
     expect(screen.getByTestId('submit-button')).toBeDisabled();
   });

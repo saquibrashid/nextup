@@ -435,6 +435,7 @@ describe('T-A11Y-006 action outcomes take focus, ambient regions do not', () => 
       'FixMatchDialog.tsx',
       'RemoveTitleDialog.tsx',
       'SuppressDialog.tsx',
+      'UploadCheckpoint.tsx',
     ]);
   });
 

@@ -747,6 +747,10 @@ async function stubBackend(page: Page, be: Backend): Promise<void> {
       return;
     }
 
+    if (method === 'GET' && path === '/api/batches') {
+      await route.fulfill(ok({ batches: [] }));
+      return;
+    }
     if (method === 'POST' && path === '/api/batches') {
       be.createdBatchCount += 1;
       const plan = BATCH_PLANS[be.createdBatchCount - 1];

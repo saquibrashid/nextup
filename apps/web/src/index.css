@@ -3162,12 +3162,48 @@ button {
   margin: 0;
 }
 
-.upload-conflict {
+.upload-checkpoint {
+  max-inline-size: 48rem;
+  margin-inline: auto;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  margin-top: var(--space-4);
-  padding: var(--space-3);
+  padding: var(--space-5);
+  overflow-wrap: anywhere;
+}
+
+.upload-checkpoint__eyebrow,
+.upload-checkpoint__facts dt {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.upload-checkpoint__state {
+  font-weight: var(--weight-bold);
+  color: var(--color-accent);
+}
+
+.upload-checkpoint__facts {
+  display: grid;
+  gap: var(--space-4);
+  margin-block: var(--space-5);
+}
+
+.upload-checkpoint__facts dd {
+  margin: var(--space-1) 0 0;
+}
+
+.upload-checkpoint__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-block-start: var(--space-4);
+}
+
+@media (min-width: 640px) {
+  .upload-checkpoint__facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 /* §2.10/§2.11 — the owner gate. Chrome-free by construction: no shell wraps

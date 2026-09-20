@@ -107,6 +107,10 @@ async function loadRoutes(): Promise<readonly { path: string; examplePath: strin
 async function stubApi(page: Page): Promise<void> {
   await page.route('**/api/**', async (route) => {
     const url = route.request().url();
+    if (url.includes('/api/batches?open=true')) {
+      await route.fulfill({ json: { batches: [] } });
+      return;
+    }
     if (url.includes('/api/batches/')) {
       await route.fulfill({
         status: 404,
