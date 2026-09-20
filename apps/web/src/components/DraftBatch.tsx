@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type JSX } from 'react';
 import { SERVICE_LABELS, MAX_IMAGES_PER_BATCH, MAX_BATCH_UPLOAD_BYTES } from '@nextup/domain';
 import { RefusedError, type ApiClient, type BatchStatus } from '../lib/apiClient';
 import { ImageDropzone, type QueuedImage, type ServerRejection } from './ImageDropzone';
@@ -9,7 +9,8 @@ import { useCaptureNavigation } from './CaptureNavigation';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import { Button } from './ui/Button';
 import { Fieldset } from './ui/Fieldset';
-import { OFFLINE_DISABLED_REASON, SUBMIT_LABEL, UPLOAD_RECOVERY_NOTE } from '../copy';
+import { Dialog } from './ui/Dialog';
+import { OFFLINE_DISABLED_REASON, SUBMIT_LABEL } from '../copy';
 
 interface DraftBatchProps {
   readonly batch: BatchStatus;
@@ -49,6 +50,7 @@ export function DraftBatch({
   const [failure, setFailure] = useState<string | null>(initialFailure);
   const [rejected, setRejected] = useState<readonly ServerRejection[]>(initialRejected);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const discardTitle = useId();
   const inFlight = useRef(false);
   const offlineRef = useRef(offline);
   offlineRef.current = offline;
@@ -130,13 +132,12 @@ export function DraftBatch({
       if (!isActive()) return;
       setRejected(result.rejected);
       changeQueue(result.remaining);
-      if (result.problems.length > 0)
-        setFailure(`${UPLOAD_RECOVERY_NOTE} ${result.problems.join(' ')}`);
+      if (result.problems.length > 0) setFailure(result.problems.join(' '));
     });
   }
 
   return (
-    <section className="upload-flow">
+    <section className="upload-flow saved-capture">
       <RejectionList entries={mergeRejections([], rejected)} />
       <h1>Check your saved screenshots</h1>
       <p>
@@ -149,16 +150,16 @@ export function DraftBatch({
           local selection before leaving.
         </p>
       )}
-      <Button
-        variant="secondary"
-        disabled={busy || offline || needsCheck || !editable}
-        onClick={() => setConfirmDiscard(true)}
-      >
-        Discard batch and start again
-      </Button>
       {confirmDiscard && (
-        <section aria-label="Discard this draft">
-          <p>Discard this saved batch? Your library will not change.</p>
+        <Dialog
+          variant="overlay"
+          aria-labelledby={discardTitle}
+          onDismiss={() => {
+            if (!busy) setConfirmDiscard(false);
+          }}
+        >
+          <h2 id={discardTitle}>Discard this saved batch?</h2>
+          <p>Your library will not change.</p>
           {queue.length > 0 && (
             <p>The {queue.length} screenshots selected only on this device will also be cleared.</p>
           )}
@@ -186,7 +187,7 @@ export function DraftBatch({
           >
             Discard batch
           </Button>
-        </section>
+        </Dialog>
       )}
       <p>
         These screenshots are saved in this batch. Remove any you do not want, or attach a missing
@@ -299,6 +300,13 @@ export function DraftBatch({
         }}
       >
         {SUBMIT_LABEL}
+      </Button>
+      <Button
+        variant="secondary"
+        disabled={busy || offline || needsCheck || !editable}
+        onClick={() => setConfirmDiscard(true)}
+      >
+        Discard batch and start again
       </Button>
       {busy && <p role="status">Saving your changes…</p>}
     </section>

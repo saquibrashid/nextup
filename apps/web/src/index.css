@@ -3900,3 +3900,15 @@ button {
     font-size: var(--text-sm);
   }
 }
+.saved-capture {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.saved-capture > .btn {
+  justify-self: start;
+}
+
+.saved-capture > p {
+  max-width: 70ch;
+}

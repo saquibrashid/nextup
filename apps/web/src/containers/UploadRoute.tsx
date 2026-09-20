@@ -292,7 +292,7 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
         initialQueue={queue}
         initialStates={uploadStates}
         initialRejected={serverRejected}
-        initialFailure={failure}
+        initialFailure={failure?.replace(UPLOAD_RECOVERY_NOTE, '').trim() || null}
         onPendingChange={setDraftPending}
         client={client}
         offline={!online}
