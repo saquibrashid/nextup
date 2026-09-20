@@ -100,6 +100,7 @@ describe('T-DATA-003 — every method sends credentials', () => {
       createBatch: () => client.createBatch('netflix', 'append'),
       listBatches: () => client.listBatches(),
       getBatch: () => client.getBatch('bat_1'),
+      reextractBatch: () => client.reextractBatch('bat_1'),
       getReview: () => client.getReview('bat_1'),
       confirmAllCandidates: () => client.confirmAllCandidates('bat_1', 'additions'),
       patchCandidate: () => client.patchCandidate('bat_1', 'cand_1', { disposition: 'confirmed' }),

@@ -143,9 +143,7 @@ export function CandidateCard({
     //
     // ⚠ `id` + `tabIndex={-1}` make the card a PROGRAMMATIC focus target for
     // the §6.14 pending-additions error, and nothing more. `-1` keeps it out
-    // of the tab order (it is not a control), so `T-REV-016b`'s keyboard-
-    // reachability check — which excludes `[tabindex="-1"]` — still reads the
-    // "Already on your list" cards as inert.
+    // of the tab order; any supplied correction controls have their own stops.
     <div
       className="candidate-card"
       id={reviewCandidateDomId(candidate.candidateId)}

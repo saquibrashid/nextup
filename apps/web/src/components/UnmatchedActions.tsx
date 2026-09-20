@@ -54,7 +54,7 @@ import { resultLabel } from './ManualEntryPanel';
 import type { TmdbSearchResult } from '../lib/apiClient';
 import { Button } from './ui/Button';
 
-export type CandidateActionsVariant = 'unmatched' | 'addition';
+export type CandidateActionsVariant = 'unmatched' | 'addition' | 'correction';
 
 interface VariantCopy {
   readonly keepLabel: string;
@@ -72,6 +72,13 @@ interface VariantCopy {
  * was unidentified.
  */
 const VARIANT_COPY: Record<CandidateActionsVariant, VariantCopy> = {
+  correction: {
+    keepLabel: ADDITION_CONFIRM_LABEL,
+    findLabel: 'Find the right title',
+    discardLabel: ADDITION_DISCARD_LABEL,
+    keptText: ADDITION_CONFIRMED,
+    discardedText: ADDITION_DISCARDED,
+  },
   unmatched: {
     keepLabel: UNMATCHED_KEEP_LABEL,
     findLabel: UNMATCHED_FIND_LABEL,
@@ -104,11 +111,11 @@ export interface UnmatchedActionsProps {
    */
   readonly variant?: CandidateActionsVariant;
   /**
-   * The disposition as the owner last left it — server value merged with the
-   * local override, decided by the caller. `'pending'` is the only state that
-   * offers actions; the rest report what was decided.
+   * Controlled cards report the saved decision. Decided cards offer an
+   * explicit edit, never an automatic reversal of the saved choice.
    */
   readonly disposition: string;
+  readonly controlled?: boolean;
   /**
    * REQ-109 — the name of the work this candidate was corrected TO, as the
    * SERVER now reports it (`candidate.match.name` once the disposition is
@@ -171,6 +178,7 @@ export function UnmatchedActions({
   candidateId,
   variant = 'unmatched',
   disposition,
+  controlled = false,
   correctedName = null,
   onKeep,
   onDiscard,
@@ -185,13 +193,16 @@ export function UnmatchedActions({
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [local, setLocal] = useState<Outcome | null>(null);
+  const [editing, setEditing] = useState(false);
 
   const copy = VARIANT_COPY[variant];
   // ⚠ SERVER STATE WINS ON A RE-RENDER. `local` is the click path's optimistic
   // outcome; once the refetched payload names the correction, the two agree.
   // Preferring `local` forever would rebuild the REQ-109 defect from the other
   // side — a name that is right until the component re-mounts.
-  const outcome = local ?? outcomeFor(disposition, correctedName);
+  const outcome = controlled
+    ? outcomeFor(disposition, correctedName)
+    : (local ?? outcomeFor(disposition, correctedName));
 
   const run = (action: () => Promise<void>, next: Outcome): void => {
     if (busy) return;
@@ -202,6 +213,7 @@ export function UnmatchedActions({
         setLocal(next);
         setBusy(false);
         setSearchOpen(false);
+        setEditing(false);
       },
       () => {
         // ⚠ NO `setLocal` HERE. The refusal must leave the card exactly as the
@@ -233,33 +245,48 @@ export function UnmatchedActions({
     );
   };
 
-  if (outcome !== null) {
+  if (outcome !== null && !editing) {
     return (
-      <p className="unmatched-actions__outcome" data-testid={`${variant}-outcome`} role="status">
-        {outcomeText(outcome, copy)}
-      </p>
+      <div className="unmatched-actions">
+        <p className="unmatched-actions__outcome" data-testid={`${variant}-outcome`} role="status">
+          {outcomeText(outcome, copy)}
+        </p>
+        <Button variant="ghost" onClick={() => setEditing(true)}>
+          Change decision
+        </Button>
+      </div>
     );
   }
 
   return (
     <div className="unmatched-actions" data-testid={`${variant}-actions`}>
+      {outcome !== null && (
+        <p className="unmatched-actions__outcome">
+          {outcomeText(outcome, copy)}{' '}
+          <Button variant="ghost" disabled={busy} onClick={() => setEditing(false)}>
+            Keep current decision
+          </Button>
+        </p>
+      )}
       <div className="unmatched-actions__buttons">
         {/* ⚠ FIRST. See the header note — this is the outcome US-008 exists for. */}
-        <Button
-          variant="secondary"
-          data-testid={`${variant}-keep`}
-          disabled={busy}
-          onClick={() => {
-            run(
-              async () => {
-                await onKeep(candidateId);
-              },
-              { kind: 'kept' },
-            );
-          }}
-        >
-          {copy.keepLabel}
-        </Button>
+        {variant !== 'correction' && (
+          <Button
+            variant="secondary"
+            data-testid={`${variant}-keep`}
+            disabled={busy}
+            onClick={() => {
+              run(
+                async () => {
+                  await onKeep(candidateId);
+                },
+                { kind: 'kept' },
+              );
+            }}
+          >
+            {copy.keepLabel}
+          </Button>
+        )}
         <Button
           variant="secondary"
           data-testid={`${variant}-find`}
@@ -270,21 +297,23 @@ export function UnmatchedActions({
         >
           {searchOpen ? UNMATCHED_CANCEL_LABEL : copy.findLabel}
         </Button>
-        <Button
-          variant="secondary"
-          data-testid={`${variant}-discard`}
-          disabled={busy}
-          onClick={() => {
-            run(
-              async () => {
-                await onDiscard(candidateId);
-              },
-              { kind: 'discarded' },
-            );
-          }}
-        >
-          {copy.discardLabel}
-        </Button>
+        {variant !== 'correction' && (
+          <Button
+            variant="secondary"
+            data-testid={`${variant}-discard`}
+            disabled={busy}
+            onClick={() => {
+              run(
+                async () => {
+                  await onDiscard(candidateId);
+                },
+                { kind: 'discarded' },
+              );
+            }}
+          >
+            {copy.discardLabel}
+          </Button>
+        )}
       </div>
 
       {searchOpen && (

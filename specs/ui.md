@@ -789,7 +789,7 @@ shows the failure states in `specs/ux-states.md` §5.
       … unmatched cards with a "Find a match" search …
 
   ▾ Already on your list (54)          ← FULL UPDATE ONLY, collapsed, NEVER omitted
-      … read-only cards …
+      … saved matches with a deliberate identity-correction action …
 
   ▾ Probably not titles (25)                   collapsed
       … cards with a "This is a title" rescue …
@@ -809,6 +809,7 @@ shows the failure states in `specs/ux-states.md` §5.
 |---|---|
 | Full update shows **all** extracted titles (REQ-057) | The **"Already on your list (N)"** section is rendered whenever `mode === 'full-update'`. It is **collapsible but never omitted**, and its **count is visible while collapsed** so the owner can sanity-check it against what they expect. `T-REV-006`, `T-UI-005`. |
 | Append-only shows only new (REQ-022) | The section, and the entire removals section, are **absent from the DOM**. `T-UI-006`. |
+| Known matches are not additions | No confirm, discard or bulk-add controls in the known section. **Find the right title** corrects mistaken identity through the existing candidate API; the server determines the new section. `T-REV-016`, `T-UX-162g`. |
 | Removals ticked by default (REQ-055) | Every removal checkbox is `checked` on first render. `T-UI-007`. |
 | Removals individually rescuable (REQ-021) | Each labelled checkbox calls `PATCH /api/batches/:id/removals` and rereads the review. A failed write is visible; no optimistic removal consent. |
 | One final summary in both modes (owner-approved, 2026-09-18) | **"Review changes"** refreshes authoritative decisions and opens the single final summary in `components/RemovalConfirmDialog.tsx`. It lists effective additions and only selected removals. **"Apply changes"** closes once; **"Back to review"** or Escape preserves decisions. The summary replaces the removal-only dialog, never precedes a second dialog. `T-UX-159`, `T-UI-008`. |
@@ -856,7 +857,22 @@ anywhere in the record.
 | SD-11b | **"Already on your list" is collapsed by default with its count visible.** Expanded, it would bury the additions; omitted, it would break REQ-057. |
 | SD-11c | **The list is virtualised** (`@tanstack/react-virtual`) above 100 items in a section, so a 500-candidate batch stays responsive on a phone. |
 | SD-11d | **A sticky action bar** carries the running counts and the single primary action, so the owner is never scrolling to find out where they are. |
-| SD-11e | **Dispositions are optimistic and locally persisted** (TanStack Query cache + `sessionStorage` under `nextup.review.<batchId>`), so an accidental refresh mid-review does not lose an hour of work. The server is the source of truth on reload. |
+| SD-11e | **Saved decisions remain authoritative; unsaved intent is separate.** Session storage under `nextup.review.intents.<batchId>` retains candidate/removal intent. Offline decisions are labelled **Not saved** and block Apply. **Check and save choices** rereads first; satisfied writes are not replayed, conflicts require an explicit choice, and changed identities cannot be overwritten. Reconnect never saves automatically. Unavailable storage is reported rather than promising persistence. `T-UX-162c`–`f`, `T-UX-162l`, `T-UX-162o`. |
+
+**TASK-228:** confirmed, corrected and discarded additions/unidentified cards
+retain **Change decision** until Apply. Bulk confirmation remains one atomic
+request; its results can be reversed individually, not through a new bulk-undo
+operation. A correction's chosen identity survives later decision changes.
+Secondary evidence supports deliberate rescue/correction. Distinct messages
+describe no candidates, known-only, unidentified, secondary-only and deliberately
+discarded additions; an empty additions section alone never proves "already known".
+
+**Read screenshots again** checks saved status and screenshot availability,
+then separately confirms **Discard this review** and **Read saved screenshots**.
+There is no automatic discard/read chain. An uncertain result requires a
+read-only status check; a derived open batch can be resumed rather than
+duplicated. Expired images require new input. The derived batch keeps the
+original expiry and locked service/mode.
 
 **Still open in OQ-011:** whether the resulting effort is *acceptable to the
 owner*. That is the M5 kill criterion and can only be answered by the owner

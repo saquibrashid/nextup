@@ -157,7 +157,7 @@ export function chosenReviewMatch(input: ChosenMatchInput): ReviewMatch | null {
 }
 
 function correctedReviewMatch(input: ChosenMatchInput): ReviewMatch | null {
-  if (input.reviewDisposition !== 'corrected') return null;
+  // A later discard/confirmation changes the decision, not the chosen identity.
   if (input.correctedToTmdbId === null || input.correctedDisplayName === null) return null;
 
   const mediaType = mediaTypeForWorkIdentity(input.resolvedWorkIdentity);
@@ -332,6 +332,7 @@ export interface RemovalSection extends ReviewSection<ReviewRemovalItem> {
 export type RemovalWithheldReason = 'low-yield' | 'degraded-extraction';
 
 export interface ReviewResponse {
+  candidateSummary?: { total: number; alreadyKnown: number };
   batchId: string;
   /** `null` for a discovery capture — see `BuildReviewInput.service`. */
   service: Service | null;
@@ -652,6 +653,7 @@ export function buildReviewResponse(input: BuildReviewInput): ReviewResponse {
 
   return {
     batchId: input.batchId,
+    candidateSummary: { total: visible.length, alreadyKnown: buckets.alreadyOnYourList.length },
     service: input.service,
     discoverySource: input.discoverySource ?? null,
     mode: input.mode,

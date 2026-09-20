@@ -52,6 +52,14 @@ function input(overrides: Partial<ChosenMatchInput> = {}): ChosenMatchInput {
 }
 
 describe('T-API-022 · the review read serves the owner\u2019s correction, not the rejected guess', () => {
+  it('T-UX-162m: reversing a corrected decision never restores the rejected extraction identity', () => {
+    for (const reviewDisposition of ['confirmed', 'discarded', 'pending']) {
+      expect(chosenReviewMatch(input({ reviewDisposition }))?.tmdbId).toBe(66732);
+      expect(chosenReviewMatch(input({ reviewDisposition }))?.name).toBe(
+        'The Haunting of Bly Manor',
+      );
+    }
+  });
   it('T-API-022a: a corrected candidate resolves to the corrected identity', () => {
     expect(chosenReviewMatch(input())).toMatchObject({
       tmdbId: 66732,

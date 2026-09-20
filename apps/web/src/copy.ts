@@ -1390,7 +1390,8 @@ export const UNMATCHED_SEARCH_LABEL = 'Search TMDB for this title';
  */
 export const UNMATCHED_MATCH_LABEL = 'Use {name}';
 export const UNMATCHED_MATCH_SHORT = 'Use this';
-export const UNMATCHED_ACTION_FAILED = "Couldn't save that. Nothing has changed.";
+export const UNMATCHED_ACTION_FAILED =
+  "The decision couldn't be verified. Check the saved review before trying again.";
 export const UNMATCHED_CANCEL_LABEL = 'Cancel';
 
 /* ------------------------------------------------------------------ *

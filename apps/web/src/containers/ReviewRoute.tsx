@@ -31,6 +31,9 @@ import { useResource } from '../lib/useResource';
 import { useOnline } from '../lib/useOnline';
 import { RefusalPage } from '../pages/RefusalPage';
 import { ReviewPage, type ConfirmableSection } from '../pages/ReviewPage';
+import { useReviewDecisions, intentLabel } from '../lib/useReviewDecisions';
+import { Button } from '../components/ui/Button';
+import { ReviewRecovery } from '../components/ReviewRecovery';
 
 export interface ReviewRouteProps {
   readonly client?: ApiClient;
@@ -71,7 +74,12 @@ export function pendingCandidateIdsFrom(details: Record<string, unknown>): reado
   return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : [];
 }
 
-export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.Element {
+export function ReviewRoute(props: ReviewRouteProps = {}): JSX.Element {
+  const { batchId } = useParams();
+  return <ReviewContent key={batchId} {...props} />;
+}
+
+function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
   const params = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -211,15 +219,26 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
       : review.resource.kind === 'ok'
         ? review.resource.value
         : held;
+  const decisions = useReviewDecisions({
+    batchId,
+    client,
+    online,
+    review: shown,
+    writing,
+    closing,
+    refresh,
+    setSaving,
+    setError: setDecisionError,
+  });
 
   const confirmAll = useCallback(
-    (section: ConfirmableSection) => decide(() => client.confirmAllCandidates(batchId, section)),
-    [batchId, client, decide],
+    (section: ConfirmableSection) => decisions.confirmAll(section),
+    [decisions],
   );
 
   const apply = useCallback(
     (confirmRemovals: boolean): void => {
-      if (closing.current || writing.current || !online) return;
+      if (closing.current || writing.current || !online || decisions.intents.length > 0) return;
       closing.current = true;
       // `confirmRemovals` is carried through EXACTLY as the page computed it:
       // it is `true` only once the owner has been through the §6.10 dialog.
@@ -306,7 +325,7 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
         },
       );
     },
-    [batchId, client, navigate, online, refresh],
+    [batchId, client, navigate, online, refresh, decisions.intents.length],
   );
 
   const discard = useCallback((): void => {
@@ -324,8 +343,11 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
   }, [batchId, client, navigate, online]);
 
   const searchTmdb = useCallback(
-    async (query: string) => (await client.searchTmdb(query)).items,
-    [client],
+    async (query: string) => {
+      if (!online) throw new Error('Reconnect to search for another title.');
+      return (await client.searchTmdb(query)).items;
+    },
+    [client, online],
   );
 
   /**
@@ -360,9 +382,9 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
    */
   const patch = useCallback(
     async (candidateId: string, body: CandidatePatchBody): Promise<void> => {
-      await decide(() => client.patchCandidate(batchId, candidateId, body));
+      await decisions.candidate(candidateId, body);
     },
-    [batchId, client, decide],
+    [decisions],
   );
 
   const keepUnmatched = useCallback(
@@ -428,6 +450,106 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
   if (review.resource.kind === 'refused') return <RefusalPage reason="not-allowed" />;
   return (
     <ReviewPage
+      controlled
+      hasUnsaved={decisions.intents.length > 0}
+      reviewTools={
+        <section className="review-recovery" aria-label="Review recovery">
+          <ReviewRecovery
+            batchId={batchId}
+            client={client}
+            offline={!online}
+            busy={saving || applying}
+            onDiscarded={decisions.clear}
+            onNavigate={(path) => {
+              void navigate(path);
+            }}
+            begin={() => {
+              if (writing.current || closing.current) return false;
+              writing.current = true;
+              setSaving(true);
+              return true;
+            }}
+            end={() => {
+              writing.current = false;
+              setSaving(false);
+            }}
+          />
+          {decisions.storageFailed && (
+            <p role="alert">
+              Local decision recovery is unavailable. Keep this tab open until your choices are
+              saved.
+            </p>
+          )}
+          {decisions.intents.length > 0 && decisions.showIntents && (
+            <section
+              className="upload-checkpoint review-unsaved"
+              aria-label="Unsaved review choices"
+            >
+              <h2>
+                {decisions.intents.length}{' '}
+                {decisions.intents.length === 1 ? 'choice is' : 'choices are'} not saved or verified
+              </h2>
+              <p>
+                The cards show saved decisions. Your local choices remain below; reconnecting never
+                submits them automatically.
+              </p>
+              <ul>
+                {decisions.intents.map((intent) => (
+                  <li className="review-unsaved__choice" key={`${intent.kind}:${intent.id}`}>
+                    <p>
+                      <strong>{intent.label}</strong>: {intentLabel(intent)} —{' '}
+                      {intent.state === 'conflict'
+                        ? 'Saved review changed; check the current card'
+                        : intent.state === 'unknown'
+                          ? 'Outcome unverified'
+                          : 'Not saved'}
+                    </p>
+                    <Button
+                      variant="secondary"
+                      disabled={saving || applying}
+                      onClick={() => decisions.useSaved(intent)}
+                    >
+                      Use saved decision
+                    </Button>
+                    {intent.state === 'conflict' && (
+                      <Button
+                        variant="secondary"
+                        disabled={saving || applying || !online}
+                        onClick={() => {
+                          void decisions
+                            .useMine(intent)
+                            .catch(() =>
+                              setDecisionError(
+                                'Your choice was not verified. Check the current review before continuing.',
+                              ),
+                            );
+                        }}
+                      >
+                        Use my choice
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <Button
+                variant="primary"
+                disabled={saving || applying || !online}
+                onClick={() => {
+                  void decisions
+                    .save()
+                    .catch(() =>
+                      setDecisionError(
+                        'Some choices remain unverified. Nothing was automatically retried.',
+                      ),
+                    );
+                }}
+              >
+                Check and save choices
+              </Button>
+            </section>
+          )}
+        </section>
+      }
       review={shown}
       loading={review.resource.kind === 'loading' && shown === null}
       skeletonCount={skeletonCount}
@@ -444,9 +566,8 @@ export function ReviewRoute({ client = apiClient }: ReviewRouteProps = {}): JSX.
       onDiscard={discard}
       onConfirmAll={confirmAll}
       onPrepare={refresh}
-      onToggleRemoval={(listingId, ticked) =>
-        decide(() => client.setBatchRemoval(batchId, listingId, ticked))
-      }
+      onToggleRemoval={decisions.removal}
+      onRescueCandidate={(candidateId) => patch(candidateId, { reclassifyAsTitle: true })}
       onSearchTmdb={searchTmdb}
       onManualEntry={manualEntry}
       onKeepUnmatched={keepUnmatched}

@@ -1563,6 +1563,11 @@ withhold full-update removals rather than treating unread screenshots as absence
 
 **409 `BATCH_NOT_IN_REVIEW`** unless `status === 'in-review'`.
 
+`candidateSummary` counts visible (non-collapsed) candidates before section
+omission: `total` and `alreadyKnown`. It distinguishes known-only append
+captures without exposing the omitted known section. Clients accept its absence
+during rolling deployment and must not infer "all known" from empty additions.
+
 **200**
 ```jsonc
 {
@@ -1572,6 +1577,7 @@ withhold full-update removals rather than treating unread screenshots as absence
   "crossCheck": "ok",
   "tmdbUnavailable": false,
   "banner": null,
+  "candidateSummary": { "total": 91, "alreadyKnown": 54 },
   "sections": {
     "additions": {
       "label": "New to your list",
