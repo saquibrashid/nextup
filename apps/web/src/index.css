@@ -3216,6 +3216,20 @@ button {
   font-size: var(--text-sm);
 }
 
+.review-recovery,
+.review-unsaved,
+.review-unsaved ul,
+.review-unsaved__choice {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.review-recovery > button,
+.review-unsaved > button,
+.review-unsaved__choice > button {
+  justify-self: start;
+}
+
 .upload-checkpoint__state {
   font-weight: var(--weight-bold);
   color: var(--color-accent);

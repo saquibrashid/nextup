@@ -164,8 +164,10 @@ no-open-batch check, not before it. Full contract: the capture lifecycle proposa
 | **6.14 Error — 409 `PENDING_ADDITIONS`** | Inline: *"2 titles still need a decision."* Focus and scroll to the first pending card. **Nothing was applied.** | Decide, retry | `T-UX-066` |
 | **6.15 Error — 409 `REMOVALS_NOT_CONFIRMED`** | Refresh the proposals and show the updated final summary. Never auto-retry or confirm unseen names. | Apply changes / Back to review | `T-REV-005` |
 | **6.16 Error — 5xx on close** | *"Couldn't apply these changes. Nothing was changed — your review is still here."* inside the retained summary. Decisions are preserved (SD-11e). | Explicit Apply changes retry or Back to review | `T-UX-067` |
-| **6.17 Offline mid-review** | Banner; dispositions keep working locally; **Apply changes** disabled with the reason | Keep reviewing | `T-UX-068` |
+| **6.17 Offline mid-review** | Saved cards remain authoritative; new choices appear separately as **Not saved**, including removal intent. Apply is blocked. Reconnect never replays writes. Storage failure is explicit. | Keep reviewing; online **Check and save choices** rereads first and surfaces conflicts | `T-UX-068`, `T-UX-162c`–`f`, `T-UX-162l`, `T-UX-162o` |
 | **6.18 Session expired mid-review (401)** | *"Your session ended. Sign in again — your review is still here."* + **Sign in**, returning to this URL. Local dispositions preserved | Sign in | `T-UX-069` |
+| **6.19 Previously decided** | Confirmed/corrected/discarded outcome with **Change decision**; bulk results remain individually editable | Change or keep current decision | `T-UX-162a`–`b`, `T-UX-162m`, `T-UX-162p` |
+| **6.20 Review recovery** | Focused dialog checks saved status/expiry; explains locked service/mode and unchanged source expiry | Separately **Discard this review**, then **Read saved screenshots**; uncertain result allows read-only check, expired input requires fresh screenshots | `T-UX-162j`–`k`, `T-UX-162n` |
 
 > **6.1, corrected.** The row above previously read *"Section skeletons with
 > their counts already shown from `GET /api/batches/:batchId`"*. That was not

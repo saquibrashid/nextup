@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 4 |
+| ⬜ todo | 3 |
 | 🚧 doing | 0 |
-| ✅ done | 222 |
+| ✅ done | 223 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **229** |
@@ -24,7 +24,7 @@ Not done, and every task they depend on is done.
 
 | Task | Size | Section |
 |---|---|---|
-| `TASK-228` | 1 agent-run + 30 owner-review-minutes | Approved capture lifecycle improvements, 2026-09-19 |
+| `TASK-229` | 1 agent-run + 20 owner-review-minutes | Approved capture lifecycle improvements, 2026-09-19 |
 
 ## Waiting on the owner
 
@@ -36,11 +36,10 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-3 tasks cannot start yet.
+2 tasks cannot start yet.
 
 | Task | Waiting on |
 |---|---|
-| `TASK-229` | `TASK-228` |
 | `TASK-230` | `TASK-229` |
 | `TASK-231` | `TASK-230` |
 
@@ -270,3 +269,4 @@ Not done, and every task they depend on is done.
 | `TASK-225` | Single final summary for both modes with authoritative preflight, exact additions/selected removals, real removal PATCH, guarded decision writes and close, retained failed summary and explicit retry. Back/Escape preserves review, in-flight Apply cannot be dismissed, and server reconfirmation refreshes names. `T-UX-159a`–`f`; close/undo/upload-journey regressions updated for the intentional confirmation step. | `T-DATA-011`, `T-REV-005`, `T-REV-007`, `T-UI-008`, `T-UX-064`, `T-UX-067`, `T-UX-159a` |
 | `TASK-226` | Authoritative owner-scoped entry checkpoint bypasses the history cap; state-aware reread/resume, confirmed legal discard, retained early paste and create-time conflict recovery. No automatic upload/replay. `T-UX-160a`–`n`; existing upload, focus, failure-copy, responsive Chromium/WebKit and paste/file-selection regressions. | `T-UX-160` |
 | `TASK-227` | Local/saved previews and upload-byte totals, retained rejected/uncertain inputs, verified saved recovery, route/unload protection, in-place discard reset and no subsequent writes after leaving. `T-UX-161a`–`l`; responsive Chromium/WebKit and existing upload regressions. | `T-UX-161` |
+| `TASK-228` | Authoritative saved decisions with editable outcomes, individually reversible atomic bulk results, separately persisted offline intent, explicit conflict reconciliation and no reconnect replay. Known-match correction, secondary rescue, truthful empty/discarded states and separate discard/re-extract consent preserve server sectioning and original image expiry. `T-UX-162a`–`r`; responsive Chromium/WebKit and full owner-journey regressions. No schema or infrastructure changes. | `T-UX-162` |

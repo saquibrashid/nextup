@@ -810,6 +810,13 @@ export function createApiClient(deps: ApiClientDeps = {}) {
     getBatch: (batchId: string, signal?: AbortSignal) =>
       request<BatchStatus>(`/api/batches/${encodeURIComponent(batchId)}`, { signal }, deps),
 
+    reextractBatch: (batchId: string) =>
+      request<{ batchId: string; derivedFromBatchId: string; status: string }>(
+        `/api/batches/${encodeURIComponent(batchId)}/re-extract`,
+        { method: 'POST' },
+        deps,
+      ),
+
     /** §6.17 — the review pass. */
     getReview: (batchId: string, signal?: AbortSignal) =>
       request<ReviewResponse>(

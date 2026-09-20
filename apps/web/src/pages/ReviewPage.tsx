@@ -39,7 +39,7 @@ import { Input } from '../components/ui/Input';
 // identifies each route by its unique level-1 heading, so a state without one
 // reads as a route that fell through to the catch-all.
 
-import { useEffect, useState, type JSX } from 'react';
+import { useEffect, useState, type JSX, type ReactNode } from 'react';
 import type { ReviewCandidate, ReviewResponse, ReviewSection } from '@nextup/domain';
 import { DISCOVERY_SOURCE_LABELS, SERVICE_LABELS } from '@nextup/domain';
 
@@ -83,6 +83,10 @@ import { Button } from '../components/ui/Button';
 import { Fieldset } from '../components/ui/Fieldset';
 
 export interface ReviewPageProps {
+  readonly controlled?: boolean;
+  readonly hasUnsaved?: boolean;
+  readonly reviewTools?: ReactNode;
+  readonly onRescueCandidate?: (candidateId: string) => Promise<void>;
   readonly review?: ReviewResponse | null;
   readonly loading?: boolean;
   /**
@@ -264,6 +268,7 @@ function CandidateSection({
   section,
   testId,
   confirmAll,
+  confirmDisabled = false,
   pendingCount,
   renderCard,
   description,
@@ -273,6 +278,7 @@ function CandidateSection({
   readonly testId: string;
   /** Omitted ⇒ the section carries no bulk control at all (see above). */
   readonly confirmAll?: () => void;
+  readonly confirmDisabled?: boolean;
   readonly pendingCount?: number;
   /** Overrides the card rendering — the §6.8 unmatched treatment uses it. */
   readonly renderCard?: (candidate: ReviewCandidate) => JSX.Element;
@@ -314,7 +320,12 @@ function CandidateSection({
         {showConfirmAll && (
           <p className="review-section__confirm-all">
             {/* Layout only — the margin belongs to the section, not the button. */}
-            <Button variant="secondary" data-testid="confirm-all-button" onClick={confirmAll}>
+            <Button
+              variant="secondary"
+              data-testid="confirm-all-button"
+              disabled={confirmDisabled}
+              onClick={confirmAll}
+            >
               {REVIEW_CONFIRM_ALL.replace('{n}', String(remaining))}
             </Button>
           </p>
@@ -355,6 +366,10 @@ function ReviewHeading({ subtitle }: { readonly subtitle: string | null }): JSX.
 }
 
 export function ReviewPage({
+  controlled = false,
+  hasUnsaved = false,
+  reviewTools,
+  onRescueCandidate,
   review = null,
   loading = false,
   skeletonCount = null,
@@ -478,8 +493,9 @@ export function ReviewPage({
   // dispositions and the cache only ever speaks for rows the server still
   // reports `pending`. The override exists solely so the press the owner just
   // made is visible before the container refetches.
-  const local: LocalDispositionMap =
-    confirmAllOverride ?? readLocalDispositions(review.batchId, storage);
+  const local: LocalDispositionMap = controlled
+    ? {}
+    : (confirmAllOverride ?? readLocalDispositions(review.batchId, storage));
 
   const pendingIn = (items: readonly ReviewCandidate[]): number =>
     items.filter(
@@ -523,6 +539,14 @@ export function ReviewPage({
     onSearchU !== undefined;
 
   const confirmAll = (key: ConfirmableSection): void => {
+    if (controlled) {
+      void Promise.resolve(onConfirmAll?.(key)).catch(() => {
+        setPrepareError(
+          'Some decisions were not verified. Check the unsaved choices before continuing.',
+        );
+      });
+      return;
+    }
     const next: Record<string, 'confirmed' | 'discarded'> = { ...local };
     for (const candidate of sections[key].items) {
       // ⚠ Only the pending ones. Overwriting a `discarded` row here would turn
@@ -542,7 +566,7 @@ export function ReviewPage({
   };
 
   const prepare = async (): Promise<void> => {
-    if (preparing || saving || applying || offline) return;
+    if (preparing || saving || applying || offline || hasUnsaved) return;
     setPreparing(true);
     setPrepareError(null);
     setLocalPending(null);
@@ -577,6 +601,31 @@ export function ReviewPage({
     const disposition = effectiveDisposition(item.disposition, local[item.candidateId]);
     return disposition === 'confirmed' || disposition === 'corrected';
   });
+  const correctionActions = (candidate: ReviewCandidate) =>
+    unmatchedWired ? (
+      <UnmatchedActions
+        candidateId={candidate.candidateId}
+        correctedName={candidate.match?.name ?? null}
+        disposition={candidate.disposition}
+        controlled={controlled}
+        variant="correction"
+        onKeep={onKeepU}
+        onDiscard={onDiscardU}
+        onMatch={onMatchU}
+        onSearch={onSearchU}
+      />
+    ) : null;
+  const extracted =
+    review.candidateSummary?.total ??
+    sections.additions.count +
+      sections.unmatched.count +
+      sections.alreadyOnYourList.count +
+      sections.probablyNotTitles.count +
+      sections.unreadableTiles.count;
+  const knownCount = review.candidateSummary?.alreadyKnown ?? sections.alreadyOnYourList.count;
+  const allDiscarded =
+    sections.additions.items.length > 0 &&
+    sections.additions.items.every((candidate) => candidate.disposition === 'discarded');
 
   return (
     <div className="review-flow">
@@ -591,6 +640,12 @@ export function ReviewPage({
           {review.banner}
         </p>
       )}
+      {reviewTools}
+      {allDiscarded && (
+        <p role="status">
+          You discarded every proposed new title. You can change those decisions before applying.
+        </p>
+      )}
 
       <Fieldset legend="Review decisions" hideLegend disabled={applying || saving || preparing}>
         {sections.additions.count === 0 ? (
@@ -598,8 +653,20 @@ export function ReviewPage({
             {/* ⚠ `T-UX-061`. A BLANK PANEL READS AS A FAILED RENDER, and the
               owner's next move is to upload the same screenshots again. */}
             <div className="review-empty" data-testid="review-additions-empty">
-              <p className="review-empty__title">{REVIEW_NO_ADDITIONS_TITLE}</p>
-              <p className="review-empty__body">{REVIEW_NO_ADDITIONS_BODY}</p>
+              <p className="review-empty__title">
+                {extracted === 0
+                  ? 'No extracted titles are available to review'
+                  : sections.unmatched.count > 0
+                    ? 'Some titles still need identification'
+                    : knownCount === extracted
+                      ? REVIEW_NO_ADDITIONS_TITLE
+                      : 'No new titles are ready to add'}
+              </p>
+              <p className="review-empty__body">
+                {extracted > 0 && knownCount === extracted
+                  ? REVIEW_NO_ADDITIONS_BODY
+                  : 'Check the screenshots and remaining evidence below. You can identify a title manually or read the screenshots again.'}
+              </p>
             </div>
           </section>
         ) : (
@@ -609,11 +676,17 @@ export function ReviewPage({
               confirmAll('additions');
             }}
             pendingCount={pendingIn(sections.additions.items)}
+            confirmDisabled={hasUnsaved}
             renderCard={(candidate) => (
               <CandidateCard
                 candidate={candidate}
                 thumbnailUrl={thumbnailUrlFor(candidate)}
-                consequence={REVIEW_CONSEQUENCE_ADDITION}
+                consequence={
+                  effectiveDisposition(candidate.disposition, local[candidate.candidateId]) ===
+                  'discarded'
+                    ? 'Not included in these changes'
+                    : REVIEW_CONSEQUENCE_ADDITION
+                }
                 actions={
                   /* ⚠ TASK-200 / `specs/ui.md` §5.3. Before this the additions
                    section had NO per-card control, so one false extra among
@@ -624,6 +697,7 @@ export function ReviewPage({
                    still applies. */
                   unmatchedWired ? (
                     <UnmatchedActions
+                      controlled={controlled}
                       candidateId={candidate.candidateId}
                       correctedName={candidate.match?.name ?? null}
                       disposition={effectiveDisposition(
@@ -652,15 +726,22 @@ export function ReviewPage({
             confirmAll('unmatched');
           }}
           pendingCount={pendingIn(sections.unmatched.items)}
+          confirmDisabled={hasUnsaved}
           renderCard={(candidate) => (
             <CandidateCard
               candidate={candidate}
               thumbnailUrl={thumbnailUrlFor(candidate)}
               unidentified
-              consequence={REVIEW_CONSEQUENCE_UNMATCHED}
+              consequence={
+                effectiveDisposition(candidate.disposition, local[candidate.candidateId]) ===
+                'discarded'
+                  ? 'Not included in these changes'
+                  : REVIEW_CONSEQUENCE_UNMATCHED
+              }
               actions={
                 unmatchedWired ? (
                   <UnmatchedActions
+                    controlled={controlled}
                     candidateId={candidate.candidateId}
                     correctedName={candidate.match?.name ?? null}
                     disposition={effectiveDisposition(
@@ -689,6 +770,7 @@ export function ReviewPage({
               candidate={candidate}
               thumbnailUrl={thumbnailUrlFor(candidate)}
               consequence="Stays on your list"
+              actions={correctionActions(candidate)}
             />
           )}
         />
@@ -707,8 +789,43 @@ export function ReviewPage({
           <CandidateSection
             section={sections.probablyNotTitles}
             testId="review-probably-not-titles"
+            renderCard={(candidate) => (
+              <CandidateCard
+                candidate={candidate}
+                thumbnailUrl={thumbnailUrlFor(candidate)}
+                actions={
+                  <>
+                    {correctionActions(candidate)}
+                    {onRescueCandidate !== undefined && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          void onRescueCandidate(candidate.candidateId).catch(() =>
+                            setPrepareError(
+                              'The rescue was not verified. Check the saved review before trying again.',
+                            ),
+                          );
+                        }}
+                      >
+                        This is a title
+                      </Button>
+                    )}
+                  </>
+                }
+              />
+            )}
           />
-          <CandidateSection section={sections.unreadableTiles} testId="review-unreadable-tiles" />
+          <CandidateSection
+            section={sections.unreadableTiles}
+            testId="review-unreadable-tiles"
+            renderCard={(candidate) => (
+              <CandidateCard
+                candidate={candidate}
+                thumbnailUrl={thumbnailUrlFor(candidate)}
+                actions={correctionActions(candidate)}
+              />
+            )}
+          />
         </details>
 
         {sections.removals.withheld && (
@@ -758,7 +875,7 @@ export function ReviewPage({
                         type="checkbox"
                         checked={item.ticked}
                         readOnly={onToggleRemoval === undefined}
-                        disabled={offline}
+                        disabled={offline && !controlled}
                         onChange={(event) => {
                           void onToggleRemoval?.(item.listingId, event.currentTarget.checked).catch(
                             () => {
@@ -871,7 +988,7 @@ export function ReviewPage({
           <Button
             variant="primary"
             data-testid="apply-changes-button"
-            disabled={applying || offline}
+            disabled={applying || offline || hasUnsaved}
             onClick={() => {
               void prepare();
             }}

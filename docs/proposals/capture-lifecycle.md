@@ -118,6 +118,13 @@ review-time recovery must explain and confirm how the current review is
 resolved first; merely wiring a Re-extract button would create a dead end.
 Expired screenshots require new input, not a retry that cannot succeed.
 
+TASK-228 implements this as authoritative saved cards plus a separate,
+session-persisted unsaved-intent panel. Atomic bulk confirmation remains;
+reversal is per card, not a new bulk-undo operation. Known-match corrections
+and secondary rescue use existing endpoints and server sectioning. Re-extraction
+requires two separate confirmations: discard review, then create the derived
+read. Lost responses require read-only checks; original image expiry is kept.
+
 ## 5. Confirmation and outcomes
 
 One refreshed summary remains mandatory for both modes. Names and counts must

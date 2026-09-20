@@ -1,5 +1,5 @@
 /**
- * `T-REV-016` — "Already on your list" is a READ-ONLY section (TASK-082,
+ * `T-REV-016` — known titles are not actionable as additions (TASK-082,
  * US-013 AC-2, `specs/ui.md` §5.2).
  *
  * ⚠ **THE BACKLOG CITED `T-UI-014` FOR THIS TASK AND THAT ID BELONGS TO
@@ -11,18 +11,13 @@
  * actually names this AC is `T-REV-016`, and it had no implementation.
  * Reported as a finding; the epic row is corrected in place.
  *
- * ⚠ **READ-ONLY IS A SAFETY PROPERTY, NOT A STYLING CHOICE.** These titles are
- * already on the owner's list. Every control this section could offer is
- * either a no-op (confirm what is already confirmed) or destructive (discard a
- * title the owner never asked to lose) — and an addition affordance here would
- * let one tap re-add a work that is already present, which is the
- * duplicate-identity path `T-REV-014` exists to refuse server-side. The
- * section's entire job is to be **seen**: it is the visible proof that a
- * failed extraction of a known title is not a removal (product invariant 2).
+ * TASK-228 adds deliberate identity correction, not accept/discard controls.
+ * Known evidence stays visible; the server reclassifies a correction.
  */
 
 import { render, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it, vi } from 'vitest';
 import { buildReviewResponse, type BuildReviewInput, type ReviewCandidate } from '@nextup/domain';
 
 import { ReviewPage } from '../src/pages/ReviewPage';
@@ -94,21 +89,33 @@ const knownSection = () => screen.getByTestId('review-already-on-list');
 
 /* -------------------------------------------------------------------------- */
 
-describe('T-REV-016 · US-013 AC-2 · the known-titles section is read-only', () => {
-  it('T-REV-016a: it offers no control of any kind', () => {
-    // ⚠ EVERY CONTROL HERE IS EITHER A NO-OP OR DESTRUCTIVE. Asserted across
-    // all three interactive roles rather than "no buttons", because the
-    // cheapest way to reintroduce an action is a link or a checkbox, and a
-    // button-only check would pass on both.
-    render(<ReviewPage review={review()} />);
+describe('T-REV-016 · US-013 AC-2 · known titles are not additions', () => {
+  it('T-REV-016a: it offers deliberate identity correction, never addition/discard controls', async () => {
+    const mutation = vi.fn(async () => undefined);
+    render(
+      <ReviewPage
+        review={review()}
+        onKeepUnmatched={mutation}
+        onDiscardUnmatched={mutation}
+        onMatchUnmatched={mutation}
+        onSearchTmdb={async () => []}
+      />,
+    );
+    await userEvent.click(screen.getByText('Already on your list (2)'));
 
     const section = knownSection();
-    expect(within(section).queryAllByRole('button')).toHaveLength(0);
+    expect(within(section).getAllByRole('button', { name: 'Find the right title' })).toHaveLength(
+      2,
+    );
+    expect(
+      within(section).queryByRole('button', { name: /Confirm|Discard|Keep/ }),
+    ).not.toBeInTheDocument();
     expect(within(section).queryAllByRole('checkbox')).toHaveLength(0);
     expect(within(section).queryAllByRole('link')).toHaveLength(0);
+    expect(mutation).not.toHaveBeenCalled();
   });
 
-  it('T-REV-016b: nothing in it is focusable, so it cannot be actioned by keyboard either', () => {
+  it('T-REV-016b: without correction handlers, known cards remain inert', () => {
     // A control removed from the accessibility tree but left in the tab order
     // still fires on Enter. The `<summary>` is the one legitimate stop —
     // collapsing the section is not an action on its contents.
