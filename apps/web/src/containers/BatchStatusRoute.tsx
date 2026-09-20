@@ -23,6 +23,7 @@ import { RefusedError, apiClient, type ApiClient, type BatchStatus } from '../li
 import { BatchStatusPage } from '../pages/BatchStatusPage';
 import { RefusalPage } from '../pages/RefusalPage';
 import { DraftBatch } from '../components/DraftBatch';
+import { BatchAppliedNotice } from '../components/BatchAppliedNotice';
 
 /** §4 — "every 2 s while `submitted`/`extracting`". */
 export const POLL_INTERVAL_MS = 2_000;
@@ -255,6 +256,27 @@ export function BatchStatusRoute({
 
   return (
     <BatchStatusPage
+      outcome={
+        batch?.status === 'applied' && batch.application != null ? (
+          <>
+            {batch.application.summary.listingsCreated + batch.application.summary.listingsRemoved >
+              0 || batch.changedNothing ? (
+              <BatchAppliedNotice
+                key={batch.batchId}
+                applied={{ batchId: batch.batchId, service: batch.service, ...batch.application }}
+                undoBatch={(id) => client.undoBatch(id)}
+                undoRemovalGroup={(id) => client.undoRemovalGroup(id)}
+                offline={offline}
+              />
+            ) : (
+              <p role="status">This capture applied the changes recorded below.</p>
+            )}
+            {batch.application.removalsUndone && (
+              <p role="status">The removals from this capture have already been undone.</p>
+            )}
+          </>
+        ) : null
+      }
       batch={batch}
       loadFailed={loadFailed}
       offline={offline}

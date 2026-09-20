@@ -27,13 +27,14 @@
  */
 
 import { type Router } from 'express';
-import { toBatchProvenance, type BatchProvenance } from '@nextup/domain';
+import { isCreatesOnly, toBatchProvenance, type BatchProvenance } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import {
   countBatchChangeKinds,
   findOpenUploadBatch,
+  findBatchRemovalGroup,
   findUploadBatch,
   listBatchChanges,
   listBatchHistory,
@@ -223,6 +224,8 @@ export function registerBatchDetailRoutes(router: Router): void {
     const provenance = toBatchProvenance(changes);
     const titles = await listTitleNames(ownerId, provenanceTitleIds(provenance));
     const progress = readProgress(batch.extractionStats);
+    const settled = batch.status === 'applied' || batch.status === 'undone';
+    const removalGroup = settled ? await findBatchRemovalGroup(ownerId, batchId) : null;
 
     res.status(200).json({
       batchId: batch.id,
@@ -233,6 +236,19 @@ export function registerBatchDetailRoutes(router: Router): void {
       createdAt: batch.createdAt.toISOString(),
       submittedAt: batch.submittedAt?.toISOString() ?? null,
       completedAt: batch.completedAt?.toISOString() ?? null,
+      application:
+        settled && batch.service !== null
+          ? {
+              summary: {
+                listingsCreated: changes.filter((change) => change.kind === 'listing_added').length,
+                listingsRemoved: changes.filter((change) => change.kind === 'listing_removed')
+                  .length,
+                removalGroupId: removalGroup?.undoneAt === null ? removalGroup.id : null,
+              },
+              undoable: batch.status === 'applied' && isCreatesOnly(provenance),
+              removalsUndone: removalGroup != null && removalGroup.undoneAt !== null,
+            }
+          : null,
       batchTotals: {
         imageCount: images.length,
         uploadedByteSize: images.reduce((sum, image) => sum + Number(image.uploadedByteSize), 0),

@@ -141,6 +141,12 @@ Success has actual counts, appropriate undo, durable history and a route to
 start another upload. Terminal review links resolve to outcomes rather than
 an endless generic Retry page.
 
+TASK-229 resolves close uncertainty by reading saved status and refreshing an
+in-review summary before allowing explicit retry. Saved batch detail now
+projects a durable application receipt from existing change/group records;
+there is no new migration or guessed client count. Terminal review links open
+that detail, and unavailable reads never claim nothing changed.
+
 ## 6. Completeness is a separate safety decision
 
 Rejected ingest input is not the same as an extraction failure for a saved

@@ -16,15 +16,9 @@
  * anyone "simplifies" this into the load-failure state, which swaps the review
  * body out for an error.
  *
- * Retry design: the existing **Apply changes** control is the "Try again". The
- * §6.12 in-flight state (`T-UX-064`) disables it only WHILE a close is in
- * flight and clears the flag on every failure arm, so by the time this
- * message is on screen the button is re-pressable again — `T-UX-064d` is the
- * case that fails if that guard ever latches on. Re-pressing it re-runs the
- * EXACT same flow — re-opening the §6.10 removal dialog whenever there are
- * removals — so `confirmRemovals` can never be silently re-applied without the
- * owner. A distinct control remembering `confirmRemovals` would risk exactly
- * that.
+ * TASK-229: these fixtures prove a saved in-review outcome and refresh it
+ * before enabling explicit retry. Unreadable or committed outcomes are
+ * covered separately by T-UX-163; a lost response alone proves neither.
  */
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -112,6 +106,7 @@ function stubClient(overrides: Record<string, (...args: unknown[]) => unknown> =
 
   const client = {
     getReview: record('getReview', reviewWithOneAddition()),
+    getBatch: record('getBatch', { batchId: 'bat_1', status: 'in-review' }),
     closeBatch: record('closeBatch', closeResult()),
     discardBatch: record('discardBatch', {}),
     confirmAllCandidates: record('confirmAllCandidates', { section: 'additions', confirmed: 0 }),
@@ -147,7 +142,7 @@ function renderReview(client: ApiClient) {
 const fail = () => Promise.reject(new ApiError('INTERNAL', 500, 'boom', {}));
 
 describe('T-UX-067 — §6.16 5xx on close', () => {
-  it('T-UX-067a: a failed close renders the exact §6.16 message', async () => {
+  it('T-UX-067a: a verified in-review failure renders the exact §6.16 message', async () => {
     const { client } = stubClient({ closeBatch: fail });
     renderReview(client);
 
@@ -155,8 +150,6 @@ describe('T-UX-067 — §6.16 5xx on close', () => {
     fireEvent.click(await screen.findByRole('button', { name: REMOVAL_CONFIRM_LABEL }));
 
     const alert = await screen.findByTestId('review-apply-error');
-    // ⚠ Asserted against the exported constant, never a substring literal, so
-    // the em dash in the copy is part of the contract this test defends.
     expect(alert).toHaveTextContent(REVIEW_APPLY_FAILED);
     expect(alert).toHaveAttribute('role', 'alert');
   });

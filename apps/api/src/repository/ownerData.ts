@@ -2193,6 +2193,10 @@ export async function findRemovalGroup(ownerId: OwnerId, id: string, tx?: Db) {
   return db(tx).removalGroup.findFirst({ where: { ownerId, id } });
 }
 
+export async function findBatchRemovalGroup(ownerId: OwnerId, batchId: string, tx?: Db) {
+  return db(tx).removalGroup.findFirst({ where: { ownerId, batchId } });
+}
+
 /**
  * Every listing this removal group removed, with the identity its undo needs.
  *

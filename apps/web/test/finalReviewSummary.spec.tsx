@@ -123,10 +123,16 @@ describe('T-UX-159 single final confirmation', () => {
   it('T-UX-159c: the real removal PATCH is reread; zero-selected confirmation survives failure and retries explicitly', async () => {
     let unticked = false;
     let closes = 0;
+    let statusReads = 0;
     const writes: unknown[] = [];
     const client = createApiClient({
       fetchImpl: async (input, init) => {
         const url = String(input);
+        if (url.endsWith('/batches/final')) {
+          statusReads += 1;
+          expect(init?.method ?? 'GET').toBe('GET');
+          return json({ batchId: 'final', status: 'in-review' });
+        }
         if (url.endsWith('/review'))
           return json(review({ untickedListingIds: new Set(unticked ? ['remove'] : []) }));
         if (url.endsWith('/removals')) {
@@ -167,6 +173,7 @@ describe('T-UX-159 single final confirmation', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Apply changes' }));
     await screen.findByText('Applied successfully');
     expect(closes).toBe(2);
+    expect(statusReads).toBe(1);
     expect(writes).toHaveLength(1);
   });
 

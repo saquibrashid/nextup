@@ -64,6 +64,7 @@ export interface BatchStatusPageProps {
   readonly offline?: boolean;
   readonly busy?: boolean;
   readonly actionError?: string | null;
+  readonly outcome?: JSX.Element | null;
   readonly onDiscard?: () => void;
   readonly onRetry?: () => void;
   readonly onContinue?: () => void;
@@ -307,6 +308,7 @@ export function BatchStatusPage({
   offline = false,
   busy = false,
   actionError = null,
+  outcome = null,
   onDiscard,
   onRetry,
   onContinue,
@@ -338,18 +340,43 @@ export function BatchStatusPage({
   const headline = statusHeadline(batch);
   const zeroYield = zeroYieldImages(batch.images);
   const inProgress = batch.status === 'submitted' || batch.status === 'extracting';
+  const terminal = ['applied', 'undone', 'discarded'].includes(batch.status);
 
   return (
     <section className="capture-status">
       <header className="capture-status__header">
-        <p className="capture-status__eyebrow">Capture / Read screenshots</p>
+        <p className="capture-status__eyebrow">
+          {terminal ? 'Capture / Saved status' : 'Capture / Read screenshots'}
+        </p>
         <h1>
-          {batch.status === 'extraction-failed' ? 'Screenshots need attention' : STATUS_TITLE}
+          {batch.status === 'applied'
+            ? 'Capture applied'
+            : batch.status === 'undone'
+              ? 'This capture was undone'
+              : batch.status === 'discarded'
+                ? 'This capture was discarded'
+                : batch.status === 'extraction-failed'
+                  ? 'Screenshots need attention'
+                  : STATUS_TITLE}
         </h1>
         {(inProgress || batch.status === 'extraction-failed') && (
           <p>Your list stays unchanged until you review and confirm the titles.</p>
         )}
       </header>
+      {outcome}
+      {terminal && (
+        <div className="upload-checkpoint__actions">
+          <Link to="/" className="tap-target">
+            Your list
+          </Link>
+          <Link to="/upload" className="tap-target">
+            Start another capture
+          </Link>
+          <Link to="/batches" className="tap-target">
+            Capture history
+          </Link>
+        </div>
+      )}
 
       {/* ⚠ ABOVE the error branch, and deliberately so. Offline is not a
           failure of the batch — §5.8 says polling pauses and "no error is

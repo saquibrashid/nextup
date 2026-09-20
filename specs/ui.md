@@ -818,6 +818,20 @@ shows the failure states in `specs/ux-states.md` §5.
 
 ### 5.3 Candidate card (`components/CandidateCard.tsx`)
 
+**TASK-229 outcome recovery:** a failed Apply response does not prove failure.
+Check saved batch status before enabling another write. Applied, undone,
+discarded and other non-review states open their saved batch page; `in-review`
+requires a refreshed summary and explicit Apply retry. Unreadable status keeps
+Apply/decision mutations disabled and offers **Check saved status** inside the
+retained confirmation or on the review after Back. Reconnect never replays
+Apply. Leaving the route stops subsequent reads/navigation, not an accepted
+server transaction. Old terminal review links resolve to saved status.
+
+The saved applied page exposes the persisted receipt, appropriate undo and
+provenance, with routes to the list, history and another capture. Zero-member
+removal groups never offer removal undo. Already-undone groups are identified
+and not offered again; no-change batches explicitly say nothing changed.
+
 Poster, matched name + year + type, **the raw extracted text always visible in
 small type** (so the owner can see what was read), the source-screenshot
 thumbnail, and three controls: **Confirm** / **Change match** / **Discard**.

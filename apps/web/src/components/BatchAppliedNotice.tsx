@@ -122,6 +122,7 @@ export const UNDO_BATCH_DONE = 'That batch has been undone. Nothing it added is 
 export const UNDO_FAILED_BODY = 'Couldn\u2019t undo that. The changes are still applied.';
 
 export interface BatchAppliedNoticeProps {
+  readonly offline?: boolean;
   readonly applied: AppliedBatch;
   readonly undoRemovalGroup: (groupId: string) => Promise<unknown>;
   readonly undoBatch: (batchId: string) => Promise<unknown>;
@@ -133,6 +134,7 @@ export function BatchAppliedNotice({
   applied,
   undoRemovalGroup,
   undoBatch,
+  offline = false,
 }: BatchAppliedNoticeProps): JSX.Element {
   const [phase, setPhase] = useState<Phase>('applied');
   const offer = undoOffer(applied);
@@ -141,7 +143,7 @@ export function BatchAppliedNotice({
   // double-invokes effects under `<StrictMode>`, and a second undo of the same
   // group is a 409 the owner would see as a failure of the first.
   const run = useCallback(() => {
-    if (offer.kind === 'none') return;
+    if (offer.kind === 'none' || offline || phase === 'undoing') return;
     setPhase('undoing');
     const request =
       offer.kind === 'removal-group' ? undoRemovalGroup(offer.groupId) : undoBatch(offer.batchId);
@@ -155,7 +157,7 @@ export function BatchAppliedNotice({
         setPhase('failed');
       },
     );
-  }, [offer, undoBatch, undoRemovalGroup]);
+  }, [offer, undoBatch, undoRemovalGroup, offline, phase]);
 
   const undone = phase === 'undone';
 
@@ -195,7 +197,7 @@ export function BatchAppliedNotice({
           history while an undo is still one tap away.
         */}
         {offer.kind !== 'none' && !undone ? (
-          <Button variant="secondary" onClick={run} disabled={phase === 'undoing'}>
+          <Button variant="secondary" onClick={run} disabled={phase === 'undoing' || offline}>
             {phase === 'undoing'
               ? UNDO_PENDING_LABEL
               : offer.kind === 'removal-group'

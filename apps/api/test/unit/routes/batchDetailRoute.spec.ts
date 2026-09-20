@@ -25,6 +25,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const listBatchHistory = vi.fn();
 const findOpenUploadBatch = vi.fn();
+const findBatchRemovalGroup = vi.fn();
 const countBatchChangeKinds = vi.fn();
 const findUploadBatch = vi.fn();
 const listImagesForBatch = vi.fn();
@@ -37,6 +38,7 @@ vi.mock('../../../src/repository/ownerData.js', async (importOriginal) => {
     ...actual,
     listBatchHistory: (...args: unknown[]) => listBatchHistory(...args) as unknown,
     findOpenUploadBatch: (...args: unknown[]) => findOpenUploadBatch(...args) as unknown,
+    findBatchRemovalGroup: (...args: unknown[]) => findBatchRemovalGroup(...args) as unknown,
     countBatchChangeKinds: (...args: unknown[]) => countBatchChangeKinds(...args) as unknown,
     findUploadBatch: (...args: unknown[]) => findUploadBatch(...args) as unknown,
     listImagesForBatch: (...args: unknown[]) => listImagesForBatch(...args) as unknown,
@@ -131,6 +133,7 @@ beforeEach(async () => {
   listImagesForBatch.mockResolvedValue([]);
   listBatchChanges.mockResolvedValue([]);
   countBatchChangeKinds.mockResolvedValue([]);
+  findBatchRemovalGroup.mockResolvedValue(null);
   if (server === undefined) {
     app = createApp();
     server = app.listen(0);
@@ -212,6 +215,40 @@ describe('GET /api/batches — history (T-BATCH-016)', () => {
 });
 
 describe('GET /api/batches/:batchId — detail (§6.15)', () => {
+  it('T-UX-163h: durable receipts count listing changes, scope the removal group, and stop offering an undone group', async () => {
+    findUploadBatch.mockResolvedValue(batchRow());
+    listBatchChanges.mockResolvedValue([
+      { kind: 'title_created', titleId: 'added', listingId: null },
+      { kind: 'listing_added', titleId: 'added', listingId: 'listing-added' },
+      { kind: 'listing_removed', titleId: 'removed', listingId: 'listing-removed' },
+    ]);
+    findBatchRemovalGroup.mockResolvedValue({ id: 'group', undoneAt: null });
+    expect(await (await get(`/api/batches/${BATCH_ID}`)).json()).toMatchObject({
+      application: {
+        summary: { listingsCreated: 1, listingsRemoved: 1, removalGroupId: 'group' },
+        undoable: false,
+        removalsUndone: false,
+      },
+    });
+    expect(findBatchRemovalGroup).toHaveBeenCalledWith(expect.stringMatching(/^o_/), BATCH_ID);
+    findBatchRemovalGroup.mockResolvedValue({ id: 'group', undoneAt: new Date() });
+    expect(await (await get(`/api/batches/${BATCH_ID}`)).json()).toMatchObject({
+      application: {
+        summary: { listingsRemoved: 1, removalGroupId: null },
+        undoable: false,
+        removalsUndone: true,
+      },
+    });
+    findUploadBatch.mockResolvedValue(batchRow({ status: 'undone' }));
+    listBatchChanges.mockResolvedValue([]);
+    expect(await (await get(`/api/batches/${BATCH_ID}`)).json()).toMatchObject({
+      application: { undoable: false },
+    });
+    findUploadBatch.mockResolvedValue(batchRow({ status: 'in-review' }));
+    expect(await (await get(`/api/batches/${BATCH_ID}`)).json()).toMatchObject({
+      application: null,
+    });
+  });
   it('T-UX-161i: saved batch totals distinguish uploaded bytes from transcoded storage bytes', async () => {
     findUploadBatch.mockResolvedValue(batchRow({ status: 'draft' }));
     listImagesForBatch.mockResolvedValue([

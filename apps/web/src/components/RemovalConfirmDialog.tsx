@@ -54,6 +54,7 @@ export interface RemovalConfirmDialogProps {
   readonly disabled?: boolean;
   readonly offline?: boolean;
   readonly error?: string | null;
+  readonly recovery?: JSX.Element | null;
   /** The whole proposed section. Filtering to the ticked rows happens here. */
   readonly items: readonly ReviewRemovalItem[];
   readonly onConfirm: () => void;
@@ -81,6 +82,7 @@ export function RemovalConfirmDialog({
   disabled = false,
   offline = false,
   error = null,
+  recovery = null,
 }: RemovalConfirmDialogProps): JSX.Element {
   const headingId = useId();
   const ticked = items.filter((item) => item.ticked);
@@ -152,6 +154,7 @@ export function RemovalConfirmDialog({
           </p>
         )}
         {offline && <p className="offline-reason">{OFFLINE_DISABLED_REASON}</p>}
+        {recovery}
 
         <div className="removal-confirm__actions">
           {/*
