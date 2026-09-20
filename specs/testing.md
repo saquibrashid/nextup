@@ -131,7 +131,8 @@ state-aware checkpoint and confirmation rather than immediate conflict discard.
 | `T-UX-160j` | E2E | Responsive checkpoint, legal actions, dialog focus/Escape, early paste and accessible layout at 280/390/1440px in Chromium/WebKit. `tests/e2e/uploadCheckpoint.spec.ts`. |
 
 TASK-227 through TASK-229 add T-UX-161 through T-UX-163 coverage below.
-TASK-230/TASK-231 and T-UX-164/T-UX-165 remain planned coverage.
+TASK-230 has pure intake-policy coverage only; its persistence, API, browser
+and transactional close coverage remains planned. TASK-231/T-UX-165 remains planned.
 
 | Test ID | Level | Assertion or remaining work |
 | --- | --- | --- |
@@ -148,6 +149,7 @@ TASK-230/TASK-231 and T-UX-164/T-UX-165 remain planned coverage.
 | `T-UX-163h` | Unit | Durable receipt counts actual listing changes, owner-scopes the group lookup, and suppresses already-undone group offers. `apps/api/test/unit/routes/batchDetailRoute.spec.ts`. |
 | `T-UX-163i` | E2E | Lost response/read failure locks Apply; explicit status check reaches a reload-persistent receipt with no mutation replay. Chromium/WebKit at 280/390/1440px, axe and overflow. `tests/e2e/applyOutcome.spec.ts`. |
 | `T-UX-164` | Integration/Web | Persist rejected-ingest completeness evidence and withhold removals after an incomplete full capture across reloads. |
+| `T-UX-164a`–`g` | Unit | Pure intake policy: interruption/rejection survives successful input; unrelated uploads never resolve it; explicit existing/new replacements affect only the associated issue; empty or removed replacements invalidate resolution; legacy/derived uncertainty persists; intake and extraction gates remain separate; reassessment preserves evidence without a clock. `packages/domain/test/captureIntake.spec.ts`. This does not yet verify persistence or production removal withholding. |
 | `T-UX-165` | Web/E2E | Provide unfinished-work navigation, correct terminal routing, and complete lifecycle continuity across both update modes. |
 
 > ### ⚠ REVISION 7 (2026-08-11) — `A45`: clipboard paste is the primary ingest path

@@ -159,6 +159,74 @@ cannot enable removals. This requires a reviewed server persistence contract,
 not a client-only flag or a new meaning silently assigned to an old flag.
 Add-only work may remain available; it must not silently change mode.
 
+### 6.1 TASK-230 persistence contract
+
+Implementation status: the pure intake assessment and its `T-UX-164a`–`g`
+unit coverage are present. The database ledger, request admission, replacement
+endpoint, upload UI and review/close integration are **not implemented yet**.
+This slice must remain a draft until those surfaces and their integration
+tests are complete; the helper alone changes no production behavior.
+
+The current image route runs multipart parsing before recording anything and
+only inserts accepted images after ingest. A parser rejection, interrupted
+request, process death or rejected file therefore leaves no durable negative
+evidence. Extraction statistics cannot reconstruct those missing inputs.
+
+Use an additive `capture_ingest_attempt` ledger and an explicit capture-origin
+field on `UploadBatch`; do not overload `lowYield`, `degradedExtraction` or
+`extractionStats`.
+
+| Record | Contract |
+| --- | --- |
+| Batch capture origin | New tracked captures explicitly opt into tracking. Existing/older-writer batches default to unverified. Derived captures inherit an incomplete origin when the source cannot prove complete intake. |
+| Attempt | Owner/batch-scoped ID, kind (upload, local selection refusal), started/completed times, state, display-only failure evidence, accepted image IDs and explicit replacement image IDs. No screenshot bytes, EXIF or streaming credentials. |
+| States | Receiving, complete, incomplete, resolved. An interrupted receiving attempt remains unresolved without inventing its cause. No timeout or background worker silently clears it. |
+| Replacement | An explicit owner operation in draft selects available, successfully saved images from the same batch, either already present or newly uploaded. This includes an accepted image from a partially failed request when the owner identifies it as covering the failed input. Merely removing a local file, retrying, matching a filename or uploading an unrelated image never resolves an issue. |
+| Deleting a replacement | Removing its saved image in draft invalidates the resolution and withholds removals again. Resolution is not a permanent ignore flag. |
+| Re-extraction | Incomplete/unknown source intake stays incomplete in the derived batch. Re-reading accepted screenshots cannot recover rejected inputs. A fresh capture is required to regain removal eligibility. |
+
+Persist the upload attempt **before multipart buffering/decode**, after owner
+and draft validation. Legacy callers of the existing image endpoint are tracked
+too; tracking is not conditional on a client flag. Final image-row persistence
+and the attempt result share a transaction. Draft admission, resolution and
+image commit serialize on the batch row, so submit/discard and a late upload
+cannot cross. Resolving an interrupted attempt makes a later original commit
+fail rather than introducing extra images after replacement.
+
+Client-side format/size/count refusals also matter. Before a batch exists,
+retain them with the protected local capture and include them atomically in
+creation. Within a saved draft, persist them through an owner-initiated report;
+unverified reports block progression until saved status can be checked. A
+stable report token prevents lost responses from creating duplicate issues.
+This is user-initiated work, not reconnect replay or a new background process.
+
+Batch detail exposes unresolved evidence and available replacement choices.
+The draft explains which input is missing, keeps successfully saved images,
+and offers explicit replacement association. Review, removal decisions and
+close all use the same server completeness predicate. Full-update remains
+full-update, but unresolved or unverified intake withholds **all removals**;
+additions remain usable. Append-only never acquires a removal path.
+
+Retain metadata evidence; only screenshot blobs have the existing 30-day purge.
+Replacement selection refuses expired input, but later blob expiry does not
+invent a new list-staleness rule or reverse a completed intake decision.
+No new scheduler, list TTL, automatic mutation replay or filename-based
+identity inference is permitted.
+
+The owner chose **explicit existing-or-new replacement**: a failed duplicate
+must not force another upload when a saved screenshot already covers it.
+Association records the owner's decision, not a claim that the server compared
+the images. Show the saved previews and the scope of the failed input before
+confirmation; never preselect a replacement. Preserve the original failure
+evidence after resolution, and invalidate the resolution if a selected image
+is removed.
+
+Before shipping, named `T-UX-164` tests must prove parser and per-file rejection,
+interruption, partial success, failed/successful explicit replacement, removed
+replacement, reload, legacy/derived capture, expired replacement refusal,
+cross-owner/cross-batch refusal, submit/late-commit races, and review/transactional
+close withholding despite otherwise sufficient successful extraction.
+
 ## 7. Scenario matrix and delivery order
 
 Each slice must add collected named tests before claiming completion. Pending
