@@ -93,7 +93,7 @@ test('T-UX-162p: editable and offline decisions remain clear', async ({ page }, 
     await page.getByTestId('apply-changes-button').click();
     const summary = page.getByRole('dialog');
     await expect(summary).toBeVisible();
-    await summary.getByRole('button', { name: /Back/ }).focus();
+    await expect(summary.getByRole('button', { name: /Back/ })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(summary).toHaveCount(0);
     await expect(card.getByTestId('addition-outcome')).toContainText('Discarded');

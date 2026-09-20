@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 3 |
+| ⬜ todo | 2 |
 | 🚧 doing | 0 |
-| ✅ done | 223 |
+| ✅ done | 224 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **229** |
@@ -24,7 +24,7 @@ Not done, and every task they depend on is done.
 
 | Task | Size | Section |
 |---|---|---|
-| `TASK-229` | 1 agent-run + 20 owner-review-minutes | Approved capture lifecycle improvements, 2026-09-19 |
+| `TASK-230` | 2 agent-runs + 30 owner-review-minutes | Approved capture lifecycle improvements, 2026-09-19 |
 
 ## Waiting on the owner
 
@@ -36,11 +36,10 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-2 tasks cannot start yet.
+1 task cannot start yet.
 
 | Task | Waiting on |
 |---|---|
-| `TASK-230` | `TASK-229` |
 | `TASK-231` | `TASK-230` |
 
 ## Done
@@ -270,3 +269,4 @@ Not done, and every task they depend on is done.
 | `TASK-226` | Authoritative owner-scoped entry checkpoint bypasses the history cap; state-aware reread/resume, confirmed legal discard, retained early paste and create-time conflict recovery. No automatic upload/replay. `T-UX-160a`–`n`; existing upload, focus, failure-copy, responsive Chromium/WebKit and paste/file-selection regressions. | `T-UX-160` |
 | `TASK-227` | Local/saved previews and upload-byte totals, retained rejected/uncertain inputs, verified saved recovery, route/unload protection, in-place discard reset and no subsequent writes after leaving. `T-UX-161a`–`l`; responsive Chromium/WebKit and existing upload regressions. | `T-UX-161` |
 | `TASK-228` | Authoritative saved decisions with editable outcomes, individually reversible atomic bulk results, separately persisted offline intent, explicit conflict reconciliation and no reconnect replay. Known-match correction, secondary rescue, truthful empty/discarded states and separate discard/re-extract consent preserve server sectioning and original image expiry. `T-UX-162a`–`r`; responsive Chromium/WebKit and full owner-journey regressions. No schema or infrastructure changes. | `T-UX-162` |
+| `TASK-229` | Failed Apply responses resolve against saved status before another write; verified in-review refreshes the summary for explicit retry, unreadable outcomes remain read-only, and terminal review links open durable outcomes. Batch detail projects actual listing-change counts and owner-scoped undo information from persisted records. No reconnect replay or late navigation after leaving. `T-UX-163a`–`j`; existing close/auth/undo and responsive Chromium/WebKit regressions. No migration or infrastructure changes. | `T-UX-163` |

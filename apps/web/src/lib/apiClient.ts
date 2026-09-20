@@ -500,6 +500,15 @@ export interface BatchImage {
  * added. See TASK-059's ledger row.
  */
 export interface BatchStatus {
+  application?: {
+    summary: {
+      listingsCreated: number;
+      listingsRemoved: number;
+      removalGroupId: string | null;
+    };
+    undoable: boolean;
+    removalsUndone: boolean;
+  } | null;
   batchTotals?: { imageCount: number; uploadedByteSize: number; storedByteSize: number };
   batchId: string;
   service: Service;

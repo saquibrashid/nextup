@@ -135,6 +135,7 @@ function stubClient(
 
   const client = {
     getReview: record('getReview', review),
+    getBatch: record('getBatch', { batchId: 'bat_1', status: 'in-review' }),
     closeBatch: record('closeBatch', closeResult()),
     discardBatch: record('discardBatch', {}),
     confirmAllCandidates: record('confirmAllCandidates', { section: 'additions', confirmed: 0 }),
@@ -218,10 +219,7 @@ describe('T-UX-064 — §6.12 the close is in flight', () => {
     expect(calls.filter((name) => name === 'closeBatch')).toHaveLength(1);
   });
 
-  it('T-UX-064d: a failed close re-enables the retry', async () => {
-    // ⚠ THE INVERSE FAILURE, AND THE MORE DANGEROUS ONE. §6.16 makes **Apply
-    // changes** itself the "Try again"; a guard that latched on would leave
-    // the owner with a permanently dead button on the irreversible path.
+  it('T-UX-064d: a verified in-review failure re-enables the retry', async () => {
     const { client } = stubClient(reviewNoRemovals(), {
       closeBatch: () => Promise.reject(new ApiError('INTERNAL', 500, 'boom', {})),
     });

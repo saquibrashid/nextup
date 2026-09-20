@@ -936,19 +936,15 @@ export const REVIEW_TITLE = 'Review this batch';
  */
 export const REVIEW_CONFIRM_ALL = 'Confirm all {n}';
 export const REVIEW_LOADING = 'Reading this batch…';
-export const REVIEW_LOAD_FAILED = "Couldn't load this review. Nothing has changed.";
+export const REVIEW_LOAD_FAILED = "Couldn't load this review. Check your connection and try again.";
 export const REVIEW_RETRY_LABEL = 'Try again';
 
 /**
- * `specs/ux-states.md` §6.16 — a 5xx (or a network failure) on the batch
- * CLOSE. ⚠ NOT `REVIEW_LOAD_FAILED`: the review is still fully on screen and
- * every disposition the owner made is intact, which is why the sentence ends
- * *"your review is still here"*. The em dash is part of the copy — `T-UX-067a`
- * asserts against this constant, not a substring, so a straight hyphen here
- * would be caught, not silently accepted.
+ * Only after a saved-status read proves the batch is still in review and
+ * the review has been refreshed. A failed close alone proves neither.
  */
 export const REVIEW_APPLY_FAILED =
-  "Couldn't apply these changes. Nothing was changed — your review is still here.";
+  'The saved batch is still in review. Check the refreshed changes before applying again.';
 
 /**
  * `specs/ux-states.md` §6.14 (`T-UX-066`) — a 409 `PENDING_ADDITIONS` on the

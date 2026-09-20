@@ -1449,6 +1449,16 @@ history (data-model I-7 exempts pre-submit draft images).
 
 ### 6.15 `GET /api/batches/:batchId`
 
+TASK-229 adds `application`, null before a service batch is applied and for
+discovery batches. Applied/undone service batches carry persisted change counts
+(`summary.listingsCreated`, `summary.listingsRemoved`), an owner-scoped active
+`summary.removalGroupId` (null once that group is undone), `removalsUndone`,
+and `undoable` (applied and creates-only under the shared domain predicate).
+Counts use listing change rows, not title-plus-listing sums. This is a durable
+receipt after a lost close response; clients accept absence during rolling
+deployment and still show the existing provenance. Undo endpoints retain their
+transactional/current-state refusal checks.
+
 **200**
 ```jsonc
 { "batchId": "01J8ZF...", "service": "netflix", "mode": "full-update",

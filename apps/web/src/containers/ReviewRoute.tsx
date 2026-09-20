@@ -34,6 +34,7 @@ import { ReviewPage, type ConfirmableSection } from '../pages/ReviewPage';
 import { useReviewDecisions, intentLabel } from '../lib/useReviewDecisions';
 import { Button } from '../components/ui/Button';
 import { ReviewRecovery } from '../components/ReviewRecovery';
+import { useCaptureLifetime } from '../lib/useCaptureLifetime';
 
 export interface ReviewRouteProps {
   readonly client?: ApiClient;
@@ -104,10 +105,11 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
    */
   const online = useOnline();
 
-  // `specs/ux-states.md` §6.16. `true` when the last close attempt failed with
-  // a 5xx or a network error; cleared the instant a new attempt starts, so a
-  // subsequent success never leaves a stale error on screen during navigation.
+  const [applyRecovery, setApplyRecovery] = useState<'none' | 'checking' | 'unknown'>('none');
   const [applyFailed, setApplyFailed] = useState(false);
+  const [outcomeRefused, setOutcomeRefused] = useState(false);
+  const checkingOutcome = useRef(false);
+  const isActive = useCaptureLifetime();
   /** §6.12 — the close is in flight; the sticky bar's controls are disabled. */
   const [applying, setApplying] = useState(false);
 
@@ -179,7 +181,18 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
     return () => setUnauthorizedHandler(null);
   }, []);
 
-  const review = useResource((signal) => client.getReview(batchId, signal), `review:${batchId}`);
+  const review = useResource(async (signal) => {
+    try {
+      return await client.getReview(batchId, signal);
+    } catch (error) {
+      if (!signal.aborted && error instanceof ApiError && error.code === 'BATCH_NOT_IN_REVIEW') {
+        const saved = await client.getBatch(batchId, signal);
+        if (!signal.aborted && saved.status !== 'in-review')
+          navigate(`/batches/${batchId}`, { replace: true });
+      }
+      throw error;
+    }
+  }, `review:${batchId}`);
 
   /*
    * ⚠ THE PREVIOUS REVIEW IS HELD ACROSS A REFETCH, AND THAT IS THE WHOLE FIX
@@ -236,73 +249,52 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
     [decisions],
   );
 
+  const checkOutcome = useCallback(async (): Promise<void> => {
+    if (checkingOutcome.current || !online) return;
+    checkingOutcome.current = true;
+    closing.current = true;
+    setApplyRecovery('checking');
+    setApplyFailed(false);
+    setDecisionError(null);
+    try {
+      const saved = await client.getBatch(batchId);
+      if (!isActive()) return;
+      if (saved.status !== 'in-review') {
+        navigate(`/batches/${batchId}`, { replace: true });
+        return;
+      }
+      await refresh();
+      if (!isActive()) return;
+      closing.current = false;
+      setApplyRecovery('none');
+      setApplyFailed(true);
+    } catch (error) {
+      if (isActive() && error instanceof RefusedError) setOutcomeRefused(true);
+      if (isActive()) setApplyRecovery('unknown');
+    } finally {
+      checkingOutcome.current = false;
+    }
+  }, [batchId, client, isActive, navigate, online, refresh]);
+
   const apply = useCallback(
     (confirmRemovals: boolean): void => {
       if (closing.current || writing.current || !online || decisions.intents.length > 0) return;
       closing.current = true;
-      // `confirmRemovals` is carried through EXACTLY as the page computed it:
-      // it is `true` only once the owner has been through the §6.10 dialog.
-      //
-      // ⚠ **THE CLOSE RESULT IS CARRIED TO THE LIST, NOT DISCARDED.** US-017
-      // AC-1 requires the undo to be offered *immediately* after confirmation,
-      // and `BatchAppliedNotice` on `/` is where §6.13 puts it. This route
-      // previously ran `.then(() => navigate('/'))`, dropping the only copy of
-      // the summary that exists — `removalGroupId` and `undoable` are not
-      // derivable from `GET /api/titles`, so the notice could never render and
-      // the owner who mis-ticked a removal had no offered way back.
-      //
-      // History state, not a store: it belongs to THIS navigation. A module
-      // variable would re-show the notice on the next visit to `/`, and the
-      // back button would take the owner to a screen still claiming a batch
-      // had just been applied.
-      //
-      // Clear any prior §6.16 / §6.14 error the moment a fresh attempt starts,
-      // or a subsequent success leaves a stale "couldn't apply" / "titles still
-      // need a decision" alert on screen. The §6.15 nonce is monotonic and is
-      // not reset here — bumping it is what re-opens the dialog, and it never
-      // renders anything by itself.
+      setApplyRecovery('none');
       setApplyFailed(false);
+      setDecisionError(null);
       setPendingAdditionIds(null);
       setApplying(true);
       void client.closeBatch(batchId, confirmRemovals).then(
         (result) => {
-          // ⚠ `applying` is deliberately NOT cleared here. The navigation is
-          // the terminal state; clearing it first re-enables both buttons for
-          // the frame before the route changes, which is exactly the window a
-          // double-tap lands in.
-          navigate('/', { state: { applied: toAppliedBatch(result) } });
+          if (isActive()) navigate('/', { state: { applied: toAppliedBatch(result) } });
         },
         (error: unknown) => {
-          // A failed close must NOT navigate: the batch is still in review and
-          // the list has not changed. Sending the owner to `/` would show them
-          // an unchanged list as though the close had succeeded.
-          //
-          // ⚠ Each close-error state is DISTINCT and routed on its own code —
-          // §6.16's "nothing was changed, try again" wording is wrong for the
-          // others, so an empty or catch-all handler is a defect, not caution:
-          //
-          //   - 409 `PENDING_ADDITIONS` (§6.14) → name the still-pending
-          //     candidates and send the owner to the first card to decide it.
-          //   - 409 `REMOVALS_NOT_CONFIRMED` (§6.15) → re-open the §6.10 removal
-          //     dialog so the owner confirms the group, then retries with
-          //     `confirmRemovals: true`. Reachable when the client's and the
-          //     server's view of "are there removals" diverged.
-          //   - 401 (§6.18) is handled by the screen-scoped handler installed
-          //     above, which renders the session-ended page instead of
-          //     redirecting; every other 4xx (a refusal) is not a "try again"
-          //     case either.
-          //   - Only a 5xx or a network failure is §6.16.
-          //
-          // ⚠ CLEARED BEFORE THE BRANCHING, NOT INSIDE EACH ARM. Every one of
-          // these arms leaves the owner on the review with something to do,
-          // and three of them `return` early — a per-arm clear would be
-          // forgotten by exactly the arm that was added last, leaving the
-          // owner with a permanently dead **Apply changes** button and no way
-          // to retry the close.
+          if (!isActive()) return;
           setApplying(false);
-          closing.current = false;
           if (error instanceof ApiError) {
             if (error.code === 'PENDING_ADDITIONS') {
+              closing.current = false;
               setPendingAdditionIds(pendingCandidateIdsFrom(error.details));
               return;
             }
@@ -310,22 +302,32 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
               setSaving(true);
               void refresh()
                 .then(
-                  () => setReconfirmSignal((n) => n + 1),
+                  () => {
+                    if (isActive()) setReconfirmSignal((n) => n + 1);
+                  },
                   () =>
                     setDecisionError(
                       'Could not refresh the removal proposals. Go back and try again.',
                     ),
                 )
-                .finally(() => setSaving(false));
+                .finally(() => {
+                  closing.current = false;
+                  if (isActive()) setSaving(false);
+                });
               return;
             }
           }
-          if (error instanceof RefusedError) return;
-          setApplyFailed(true);
+          if (error instanceof RefusedError) {
+            setOutcomeRefused(true);
+            setApplyRecovery('unknown');
+            return;
+          }
+          setApplyRecovery('unknown');
+          void checkOutcome();
         },
       );
     },
-    [batchId, client, navigate, online, refresh, decisions.intents.length],
+    [batchId, client, navigate, online, refresh, decisions.intents.length, checkOutcome, isActive],
   );
 
   const discard = useCallback((): void => {
@@ -447,7 +449,8 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
     );
   }
 
-  if (review.resource.kind === 'refused') return <RefusalPage reason="not-allowed" />;
+  if (review.resource.kind === 'refused' || outcomeRefused)
+    return <RefusalPage reason="not-allowed" />;
   return (
     <ReviewPage
       controlled
@@ -458,7 +461,7 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
             batchId={batchId}
             client={client}
             offline={!online}
-            busy={saving || applying}
+            busy={saving || applying || applyRecovery !== 'none'}
             onDiscarded={decisions.clear}
             onNavigate={(path) => {
               void navigate(path);
@@ -554,9 +557,29 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
       loading={review.resource.kind === 'loading' && shown === null}
       skeletonCount={skeletonCount}
       loadFailed={review.resource.kind === 'failed'}
+      applyRecovery={
+        applyRecovery === 'none' ? null : (
+          <div className="review-unsaved" role="alert">
+            <p>
+              {applyRecovery === 'checking'
+                ? 'Checking the saved outcome...'
+                : 'We could not verify whether the changes were applied. Check saved status before trying again.'}
+            </p>
+            <Button
+              variant="secondary"
+              disabled={!online || applyRecovery === 'checking'}
+              onClick={() => {
+                void checkOutcome();
+              }}
+            >
+              Check saved status
+            </Button>
+          </div>
+        )
+      }
       applyFailed={applyFailed}
       applying={applying}
-      saving={saving}
+      saving={saving || applyRecovery !== 'none'}
       decisionError={decisionError}
       offline={!online}
       pendingAdditionIds={pendingAdditionIds}

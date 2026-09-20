@@ -106,6 +106,7 @@ export interface ReviewPageProps {
    * bar. The container clears it the instant a new attempt starts.
    */
   readonly applyFailed?: boolean;
+  readonly applyRecovery?: JSX.Element | null;
   /**
    * `specs/ux-states.md` §6.12 (`T-UX-064`) — the close is in flight.
    *
@@ -375,6 +376,7 @@ export function ReviewPage({
   skeletonCount = null,
   loadFailed = false,
   applyFailed = false,
+  applyRecovery = null,
   applying = false,
   saving = false,
   decisionError = null,
@@ -641,6 +643,7 @@ export function ReviewPage({
         </p>
       )}
       {reviewTools}
+      {!confirming && applyRecovery}
       {allDiscarded && (
         <p role="status">
           You discarded every proposed new title. You can change those decisions before applying.
@@ -1000,6 +1003,7 @@ export function ReviewPage({
 
       {confirming && (
         <RemovalConfirmDialog
+          recovery={applyRecovery}
           service={review.service}
           items={sections.removals.items}
           additions={additions}
