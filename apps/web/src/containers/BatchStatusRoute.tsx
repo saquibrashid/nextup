@@ -81,6 +81,7 @@ export function BatchStatusRoute({
   const [refused, setRefused] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [draftPending, setDraftPending] = useState(false);
   const inFlight = useRef(false);
   const readVersion = useRef(0);
 
@@ -205,9 +206,9 @@ export function BatchStatusRoute({
    * the load it is covering for.
    */
   useEffect(() => {
-    if (batch?.status === 'in-review')
+    if (batch?.status === 'in-review' && !draftPending)
       void navigate(`/batches/${batchId}/review`, { state: skeletonState(batch) });
-  }, [batch, batchId, navigate]);
+  }, [batch, batchId, navigate, draftPending]);
 
   function mutate(action: () => Promise<unknown>, destination?: string): void {
     if (inFlight.current || offline || loadFailed) return;
@@ -235,10 +236,12 @@ export function BatchStatusRoute({
   }
 
   if (refused) return <RefusalPage reason="not-allowed" />;
-  if (batch?.status === 'draft' && !loadFailed) {
+  if (batch !== null && (batch.status === 'draft' || draftPending)) {
     return (
       <DraftBatch
         batch={batch}
+        key={batchId}
+        onPendingChange={setDraftPending}
         client={client}
         offline={offline}
         onRefresh={load}

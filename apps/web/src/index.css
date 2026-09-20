@@ -3070,9 +3070,9 @@ button {
 
 .upload-flow .dropzone > ul > li,
 .draft-images > li {
-  display: flex;
+  display: grid;
+  grid-template-columns: 5rem minmax(0, 1fr);
   align-items: center;
-  flex-wrap: wrap;
   gap: var(--space-2);
   padding: var(--space-3);
   border: 1px solid var(--color-border-soft);
@@ -3080,10 +3080,48 @@ button {
   overflow-wrap: anywhere;
 }
 
-.upload-flow .dropzone > ul > li > span,
-.draft-images > li > span {
-  flex: 1;
+.capture-image-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   min-inline-size: 0;
+}
+
+.upload-flow .dropzone > ul > li > button,
+.draft-images > li > button {
+  grid-column: 2;
+}
+
+@media (min-width: 40rem) {
+  .upload-flow .dropzone > ul > li,
+  .draft-images > li {
+    grid-template-columns: 5rem minmax(0, 1fr) auto;
+  }
+  .upload-flow .dropzone > ul > li > button,
+  .draft-images > li > button {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
+
+.capture-preview {
+  inline-size: 5rem;
+  block-size: 5rem;
+  flex: 0 0 5rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-soft);
+  overflow: hidden;
+  text-align: center;
+  font-size: var(--text-sm);
+}
+
+.capture-preview img {
+  inline-size: 100%;
+  block-size: 100%;
+  object-fit: contain;
 }
 
 @media (min-width: 56.25rem) {

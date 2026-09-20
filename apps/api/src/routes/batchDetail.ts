@@ -233,6 +233,11 @@ export function registerBatchDetailRoutes(router: Router): void {
       createdAt: batch.createdAt.toISOString(),
       submittedAt: batch.submittedAt?.toISOString() ?? null,
       completedAt: batch.completedAt?.toISOString() ?? null,
+      batchTotals: {
+        imageCount: images.length,
+        uploadedByteSize: images.reduce((sum, image) => sum + Number(image.uploadedByteSize), 0),
+        storedByteSize: images.reduce((sum, image) => sum + Number(image.byteSize), 0),
+      },
       images: images.map((image) => ({
         imageId: image.id,
         fileName: image.fileName,

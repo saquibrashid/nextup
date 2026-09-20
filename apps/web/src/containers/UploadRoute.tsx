@@ -20,14 +20,23 @@
  * server batch. A synchronous ref guards the entire upload/submit operation.
  */
 
-import { useCallback, useRef, useState, type JSX } from 'react';
+import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { SERVICES, SERVICE_LABELS } from '@nextup/domain';
 
 import { ImageDropzone, type QueuedImage, type ServerRejection } from '../components/ImageDropzone';
 import { UploadCheckpoint } from '../components/UploadCheckpoint';
+import { DraftBatch } from '../components/DraftBatch';
+import { useCaptureNavigation } from '../components/CaptureNavigation';
+import { uploadSelection, type ImageUploadState } from '../lib/uploadSelection';
 import { resumeAction, useUploadCheckpoint } from '../lib/useUploadCheckpoint';
-import { ApiError, RefusedError, apiClient, type ApiClient } from '../lib/apiClient';
+import {
+  ApiError,
+  RefusedError,
+  apiClient,
+  type ApiClient,
+  type BatchStatus,
+} from '../lib/apiClient';
 import { RefusalPage } from '../pages/RefusalPage';
 import { UploadPage, type BatchDraftSelection } from '../pages/UploadPage';
 import {
@@ -45,10 +54,10 @@ import {
 } from '../copy';
 import { OFFLINE_DISABLED_REASON } from '../copy';
 import { useOnline } from '../lib/useOnline';
+import { useCaptureLifetime } from '../lib/useCaptureLifetime';
 import { Button } from '../components/ui/Button';
 import { Fieldset } from '../components/ui/Fieldset';
 import { UploadStep } from '../components/UploadStep';
-import { rejectionsFromError } from '../components/RejectionList';
 export { rejectionsFromError } from '../components/RejectionList';
 
 export interface UploadRouteProps {
@@ -92,6 +101,7 @@ export function submitBlockedReason(
  */
 export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.Element {
   const navigate = useNavigate();
+  const isActive = useCaptureLifetime();
   const online = useOnline();
   const [params] = useSearchParams();
   const requestedService = params.get('service');
@@ -103,6 +113,9 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
   });
   const [batchId, setBatchId] = useState<string | null>(null);
   const [queue, setQueue] = useState<readonly QueuedImage[]>([]);
+  const [uploadStates, setUploadStates] = useState<ReadonlyMap<File, ImageUploadState>>(new Map());
+  const [savedBatch, setSavedBatch] = useState<BatchStatus | null>(null);
+  const [draftPending, setDraftPending] = useState(false);
   const [serverRejected, setServerRejected] = useState<readonly ServerRejection[]>([]);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
@@ -110,6 +123,16 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
   const [checkpointError, setCheckpointError] = useState<string | null>(null);
   const [refused, setRefused] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const allowNavigation = useCaptureNavigation(
+    savedBatch === null && queue.length > 0,
+    savedBatch === null && busy,
+  );
+  useEffect(() => {
+    if (savedBatch !== null && savedBatch.status !== 'draft' && !draftPending && !busy) {
+      allowNavigation();
+      void navigate(`/batches/${savedBatch.batchId}`);
+    }
+  }, [allowNavigation, busy, draftPending, navigate, savedBatch]);
 
   const inFlight = useRef(false);
   const checkpoint = useUploadCheckpoint(client, online, batchId === null);
@@ -157,56 +180,62 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
       let id: string | null = null;
       try {
         const created = await client.createBatch(service, mode);
+        if (!isActive()) return;
         id = created.batchId;
         setBatchId(id);
-        const problems: string[] = [];
-        const rejected: ServerRejection[] = [];
-        // One image per request: source provenance survives and decode work
-        // stays serial. A failed image never prevents the others being tried.
-        for (const image of queue) {
-          const form = new FormData();
-          form.append('files', image.file);
-          form.append('ingestSource', image.source);
-          try {
-            const result = await client.addBatchImages(id, form);
-            rejected.push(...result.rejected);
-          } catch (error) {
-            if (error instanceof RefusedError) throw error;
-            const rejections = rejectionsFromError(error);
-            rejected.push(...rejections);
-            problems.push(
-              ...(rejections.length === 0
-                ? [
-                    `${image.file.name}: ${error instanceof Error ? error.message : 'Upload failed.'}`,
-                  ]
-                : []),
-            );
-          }
-        }
-        if (problems.length > 0 || rejected.length > 0) {
-          setServerRejected(rejected);
-          setFailure(`${UPLOAD_RECOVERY_NOTE} ${problems.join(' ')}`);
+        const result = await uploadSelection(
+          client,
+          id,
+          queue,
+          (file, state) => {
+            setUploadStates((current) => new Map(current).set(file, state));
+          },
+          isActive,
+        );
+        if (!isActive()) return;
+        setQueue(result.remaining);
+        if (result.remaining.length > 0) {
+          setServerRejected(result.rejected);
+          setFailure(`${UPLOAD_RECOVERY_NOTE} ${result.problems.join(' ')}`);
           return;
         }
         await client.submitBatch(id);
+        if (!isActive()) return;
         setSubmitted(true);
+        allowNavigation();
         // §4.9 — success IS the navigation. There is no interstitial: the
         // status screen is where the owner watches the work happen.
         void navigate(`/batches/${id}`);
       } catch (error) {
+        if (!isActive()) return;
         if (id !== null && !(error instanceof RefusedError)) {
           // Never replay an upload or submit whose response may have been
           // lost. The saved draft is re-read before another explicit action.
           setFailure(
             `${UPLOAD_RECOVERY_NOTE} ${error instanceof Error ? error.message : 'Upload failed.'}`,
           );
-        } else report(error);
+        } else {
+          report(error);
+          if (!(error instanceof RefusedError) && !(error instanceof ApiError)) await check();
+        }
       } finally {
         inFlight.current = false;
         setBusy(false);
       }
     })();
-  }, [batchId, client, entryReady, navigate, online, queue, report, selection]);
+  }, [
+    allowNavigation,
+    batchId,
+    check,
+    client,
+    entryReady,
+    isActive,
+    navigate,
+    online,
+    queue,
+    report,
+    selection,
+  ]);
 
   const resolveExisting = async (discard: boolean): Promise<void> => {
     if (checkpoint.state.kind !== 'open' || inFlight.current || !online) return;
@@ -216,6 +245,7 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
     setCheckpointError(null);
     try {
       const latest = await client.getBatch(id);
+      if (!isActive()) return;
       const action = resumeAction(latest.status);
       if (action === null) {
         await check();
@@ -223,6 +253,7 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
         return;
       }
       if (!discard) {
+        allowNavigation();
         void navigate(latest.status === 'in-review' ? `/batches/${id}/review` : `/batches/${id}`);
         return;
       }
@@ -253,6 +284,38 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
   };
 
   if (refused || checkpoint.state.kind === 'refused') return <RefusalPage reason="not-allowed" />;
+  if (savedBatch !== null) {
+    return (
+      <DraftBatch
+        key={savedBatch.batchId}
+        batch={savedBatch}
+        initialQueue={queue}
+        initialStates={uploadStates}
+        initialRejected={serverRejected}
+        initialFailure={failure}
+        onPendingChange={setDraftPending}
+        client={client}
+        offline={!online}
+        onRefused={() => setRefused(true)}
+        onDiscarded={() => {
+          allowNavigation();
+          setSavedBatch(null);
+          setBatchId(null);
+          setQueue([]);
+          setUploadStates(new Map());
+          setServerRejected([]);
+          setFailure(null);
+          setDraftPending(false);
+          setConflictMessage('The saved batch was discarded. No new upload was started.');
+          void check();
+        }}
+        onRefresh={async () => {
+          const next = await client.getBatch(savedBatch.batchId);
+          setSavedBatch(next);
+        }}
+      />
+    );
+  }
 
   const blocked = submitBlockedReason(selection, queue.length, !online);
   const ready = selection.service !== null && selection.mode !== null;
@@ -305,6 +368,8 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
               testId="images-step-panel"
             >
               <ImageDropzone
+                images={queue}
+                uploadStates={uploadStates}
                 batchReady={ready}
                 offline={!online}
                 disabled={busy || batchId !== null}
@@ -371,8 +436,30 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
                 <Button
                   variant="secondary"
                   type="button"
+                  disabled={busy || !online}
                   onClick={() => {
-                    void navigate(`/batches/${batchId}`);
+                    if (inFlight.current) return;
+                    inFlight.current = true;
+                    setBusy(true);
+                    void client
+                      .getBatch(batchId)
+                      .then(
+                        (next) => {
+                          setDraftPending(queue.length > 0);
+                          setSavedBatch(next);
+                        },
+                        (error: unknown) => {
+                          if (error instanceof RefusedError) setRefused(true);
+                          else
+                            setFailure(
+                              'Saved status could not be checked. Your local screenshots remain here; try checking again.',
+                            );
+                        },
+                      )
+                      .finally(() => {
+                        inFlight.current = false;
+                        setBusy(false);
+                      });
                   }}
                 >
                   Open saved batch

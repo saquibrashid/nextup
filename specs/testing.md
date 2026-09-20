@@ -130,12 +130,15 @@ state-aware checkpoint and confirmation rather than immediate conflict discard.
 | `T-UX-160i` | Unit | Owner-scoped open lookup bypasses capped history, returns empty when none, and rejects malformed query values. `apps/api/test/unit/routes/batchDetailRoute.spec.ts`. |
 | `T-UX-160j` | E2E | Responsive checkpoint, legal actions, dialog focus/Escape, early paste and accessible layout at 280/390/1440px in Chromium/WebKit. `tests/e2e/uploadCheckpoint.spec.ts`. |
 
-TASK-227 through TASK-231 and their T-UX-161 through T-UX-165 suites remain
-planned in the lifecycle proposal, not delivered coverage.
+TASK-227 adds the T-UX-161 coverage below. TASK-228 through TASK-231 and their
+T-UX-162 through T-UX-165 suites remain planned, not delivered coverage.
 
-| Test ID | Planned level | Required assertion (not yet implemented) |
+| Test ID | Level | Assertion or remaining work |
 | --- | --- | --- |
-| `T-UX-161` | Web/E2E | Distinguish local and saved inputs, preserve partial success, and protect navigation without replaying uncertain uploads. |
+| `T-UX-161a`–`h` | Web | Local/saved states; link/Back and native-unload guards; combined count/upload-byte limits; rejected/unknown retention and no replay; failed reads; competing state; preview cleanup and expired/offline intake. `apps/web/test/captureContinuity.spec.tsx`. |
+| `T-UX-161i` | Unit | Batch-detail totals keep uploaded and stored bytes distinct. `apps/api/test/unit/routes/batchDetailRoute.spec.ts`. |
+| `T-UX-161j` | E2E | Real-router cancellation/leave, local previews, partial saved recovery, explicit retry, and responsive accessible geometry. `tests/e2e/captureContinuity.spec.ts`. |
+| `T-UX-161k`–`l` | Web | In-place discard returns to empty capture after rereading; leaving during upload stops subsequent writes and navigation. `apps/web/test/guidedUpload.spec.tsx`. |
 | `T-UX-162` | Web/E2E | Edit prior review decisions, distinguish empty-state causes, retain offline intent, and provide legal correction/re-extraction recovery. |
 | `T-UX-163` | Web/E2E | Resolve uncertain Apply against saved status, preserve explicit retry, and route terminal outcomes to durable success/undo. |
 | `T-UX-164` | Integration/Web | Persist rejected-ingest completeness evidence and withhold removals after an incomplete full capture across reloads. |

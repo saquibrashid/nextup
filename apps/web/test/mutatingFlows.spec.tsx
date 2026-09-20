@@ -836,13 +836,14 @@ describe('T-UI-013 — a decode rejection never takes the batch down', () => {
           },
         ],
       }),
-      addBatchImages: (_id: unknown, form: unknown) =>
-        Promise.resolve(
-          attachResult(
+      addBatchImages: (_id: unknown, form: unknown) => {
+        const heic = (form as FormData)
+          .getAll('files')
+          .some((file) => file instanceof File && file.name.endsWith('.heic'));
+        return Promise.resolve({
+          ...attachResult(
             1,
-            (form as FormData)
-              .getAll('files')
-              .some((file) => file instanceof File && file.name.endsWith('.heic'))
+            heic
               ? [
                   {
                     fileName: 'beach-list-03.heic',
@@ -853,7 +854,9 @@ describe('T-UI-013 — a decode rejection never takes the batch down', () => {
                 ]
               : [],
           ),
-        ),
+          accepted: heic ? [] : [{ imageId: 'img_1', fileName: 'a.png' }],
+        });
+      },
     });
     render(
       <MemoryRouter initialEntries={['/upload']}>
@@ -873,8 +876,10 @@ describe('T-UI-013 — a decode rejection never takes the batch down', () => {
     expect(screen.getAllByTestId('accepted-file').length).toBeGreaterThan(0);
     expect(calls).not.toContain('submitBatch');
     fireEvent.click(screen.getByRole('button', { name: 'Open saved batch' }));
-    expect(await screen.findByTestId('draft-submit')).toBeEnabled();
+    expect(await screen.findByTestId('draft-submit')).toBeDisabled();
     expect(screen.getByRole('list', { name: 'Saved screenshots' })).toHaveTextContent('a.png');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove beach-list-03.heic' }));
+    expect(screen.getByTestId('draft-submit')).toBeEnabled();
   });
 });
 
