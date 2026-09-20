@@ -100,6 +100,8 @@ for (const width of [280, 390, 1440]) {
           await route.fulfill({ json: { items: [], limit: 50, nextCursor: null } });
         } else if (path === '/api/service-state') {
           await route.fulfill({ json: { services: [] } });
+        } else if (path === '/api/suppressions' || path === '/api/removed') {
+          await route.fulfill({ json: { items: [] } });
         } else {
           throw new Error(`Unexpected request: ${request.method()} ${path}`);
         }
@@ -160,6 +162,7 @@ for (const width of [280, 390, 1440]) {
       await expect(page.getByTestId('draft-submit')).toBeEnabled();
       await page.locator('a[href="/"]:visible').first().click();
       await expect(page).toHaveURL('/');
+      await expect(page.getByRole('heading', { name: 'Your list', exact: true })).toBeVisible();
       await expect(leave).toHaveCount(0);
       expect(writes).toBe(2);
     });
