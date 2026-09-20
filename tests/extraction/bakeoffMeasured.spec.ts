@@ -249,7 +249,20 @@ describe('T-AI-045 the bake-off is measured, and the pre-committed rule decides 
     // rather than textual — it depended on where OCR's row buckets fell, not
     // on how many readings per caption an arm emits. The incumbent's lead
     // widened from 15.9 points to 16.9.
-    expect(chal.falseTitleRate).toBe(0.22388059701492538);
+    // ⚠ THEN 0.2239 → 0.1875 AT R6 (the Netflix tile-badge vocabulary:
+    // `recently added`, `new season`, `new episodes`). A 3.6-point
+    // improvement, and the LARGEST single move this pin has ever made — which
+    // is the measurement that justifies the vocabulary change rather than any
+    // argument about it. ⚠ NOTE WHAT DID *NOT* MOVE: the incumbent's pin above
+    // is unchanged. That is not a bug and not a reason to doubt this number.
+    // The offline recordings are fixed captures, and these three badges appear
+    // as their own OCR line in the challenger's readings but not the
+    // incumbent's on this corpus — the incumbent's exposure to them is
+    // recorded LIVE instead (`docs/evaluation/golden-2026-09-18.md` names
+    // `recently added` as a false title on `netflix-mylist-mobile-01`, 1 of 3
+    // runs). A pipeline rule can be worth shipping while moving only one arm
+    // offline; asymmetry here measures the recordings, not the rule.
+    expect(chal.falseTitleRate).toBe(0.1875);
     // Same denominator artefact as the incumbent's: 0.035 → 0.036649. Then
     // 0.036649 → 0.037234 at TASK-206, as R3 handed a handful of challenger
     // captions back to their printed text too. ⚠ THEN 0.037234 → 0.038462 AT
