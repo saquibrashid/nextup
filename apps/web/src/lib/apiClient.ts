@@ -500,6 +500,7 @@ export interface BatchImage {
  * added. See TASK-059's ledger row.
  */
 export interface BatchStatus {
+  batchTotals?: { imageCount: number; uploadedByteSize: number; storedByteSize: number };
   batchId: string;
   service: Service;
   mode: string;

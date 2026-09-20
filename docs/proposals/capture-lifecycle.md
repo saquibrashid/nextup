@@ -74,7 +74,7 @@ Retain all three input paths and PNG/JPEG/HEIC support. Changing service renews
 mode consent without dropping files. Saved drafts have fixed service/mode
 because there is no current draft-edit API.
 
-The next slice distinguishes Selected on this device, Uploading, Saved,
+TASK-227 distinguishes Selected on this device, Uploading, Saved,
 Rejected and Outcome unknown. Navigation protection is specific to unsaved
 files or unverified writes, not a blanket warning on every navigation.
 Recognizable previews must not depend on unsupported HEIC rendering.
@@ -82,6 +82,15 @@ Recognizable previews must not depend on unsupported HEIC rendering.
 Successful files survive individual failures. Retrying means reconciling saved
 contents first, not replaying all requests. Saved and newly selected counts
 must be clear, including the total batch limits.
+
+The implementation keeps recovery on the capture page until local input is
+resolved. Saved-only drafts can be left without a warning. In-app Back and
+links use React Router's supported blocker; reload/sign-out use the native
+unload warning where the browser supports it. No promise of mobile reload
+persistence or screenshot web-storage cache is made. Unknown requests require
+checking saved previews, then explicit removal/reselection rather than a replay.
+Counts and uploaded-byte totals come from saved batch detail; storage bytes
+remain a separate measure. Server validation remains authoritative.
 
 ## 4. Reading and reviewing
 

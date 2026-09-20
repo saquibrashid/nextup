@@ -1510,6 +1510,11 @@ above was never written by any code path; `candidatesCollapsed`, `matched`,
 `unmatched` and `suppressedGated` are stage 3–5 measurements that do not exist
 yet.
 
+The `GET /api/batches/:batchId` response additionally includes
+`batchTotals: { imageCount, uploadedByteSize, storedByteSize }` (TASK-227),
+summed over its current saved images. Upload limits use `uploadedByteSize`,
+not the potentially larger lossless-transcode storage total.
+
 ### 6.15a `GET /api/batches` (US-031, `ux-states.md` §9)
 
 The owner's batch history across **every** service, newest first, capped at 50.

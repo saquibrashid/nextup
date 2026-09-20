@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -86,6 +86,58 @@ function upload(stub = client()) {
 }
 
 describe('T-UX-156 — guided capture and authoritative saved drafts', () => {
+  it('T-UX-161k: discarding an in-place recovery resets capture only after the final saved-state read', async () => {
+    const stub = client();
+    stub.addBatchImages.mockRejectedValueOnce(new Error('Connection lost'));
+    upload(stub);
+    await choose();
+    add('pending.png');
+    fireEvent.click(screen.getByTestId('submit-button'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open saved batch' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Discard batch and start again' }));
+    stub.discardBatch.mockImplementationOnce(async () => {
+      stub.getBatch.mockResolvedValue({ ...saved, status: 'discarded' });
+      return {};
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Discard batch', exact: true }));
+    await waitFor(() => expect(screen.getByTestId('file-input')).toBeEnabled());
+    expect(screen.queryByRole('heading', { name: 'Check your saved screenshots' })).toBeNull();
+    expect(screen.queryByText('Saved batch destination')).toBeNull();
+    expect(screen.queryByTestId('accepted-name')).toBeNull();
+    expect(stub.discardBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('T-UX-161l: leaving during an upload stops the remaining writes and cannot hijack navigation', async () => {
+    const stub = client();
+    let finish!: (value: Awaited<ReturnType<ApiClient['addBatchImages']>>) => void;
+    stub.addBatchImages.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const view = render(
+      <MemoryRouter>
+        <UploadRoute client={stub} />
+      </MemoryRouter>,
+    );
+    await choose();
+    add('first.png');
+    add('not-started.png');
+    fireEvent.click(screen.getByTestId('submit-button'));
+    await waitFor(() => expect(stub.addBatchImages).toHaveBeenCalledTimes(1));
+    view.unmount();
+    await act(async () => {
+      finish({
+        accepted: [{ imageId: 'first', fileName: 'first.png' }],
+        rejected: [],
+        batchTotals: { imageCount: 1, uploadedByteSize: 5, storedByteSize: 5 },
+      });
+    });
+    expect(stub.addBatchImages).toHaveBeenCalledTimes(1);
+    expect(stub.submitBatch).not.toHaveBeenCalled();
+  });
+
   it('T-UX-156a: an early attachment stays local, can be removed, and follows the final service consent', async () => {
     const stub = upload();
     add('removed.png');
@@ -133,7 +185,9 @@ describe('T-UX-156 — guided capture and authoritative saved drafts', () => {
     expect(screen.getByTestId('submit-failure')).toHaveTextContent('first.png: Connection lost');
     expect(screen.getByTestId('submit-button')).toBeDisabled();
     fireEvent.click(recovery);
-    await screen.findByText('Saved batch destination');
+    await screen.findByRole('heading', { name: 'Check your saved screenshots' });
+    expect(screen.getByRole('button', { name: 'Remove first.png' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Upload selected screenshots' })).toBeDisabled();
     expect(stub.addBatchImages).toHaveBeenCalledTimes(2);
   });
 
@@ -193,7 +247,7 @@ describe('T-UX-156 — guided capture and authoritative saved drafts', () => {
     await waitFor(() => expect(stub.submitBatch).toHaveBeenCalledExactlyOnceWith('bat_1'));
   });
 
-  it('T-UX-156g: saved-draft uploads preserve per-file memory diagnostics and require explicit re-selection on retry', async () => {
+  it('T-UX-156g: saved-draft uploads retain rejected files and preserve per-file memory diagnostics', async () => {
     const stub = client();
     stub.addBatchImages.mockRejectedValueOnce(
       new ApiError('IMAGE_DECODE_OOM', 503, 'Memory exhausted', {
@@ -222,7 +276,9 @@ describe('T-UX-156 — guided capture and authoritative saved drafts', () => {
       'href',
       expect.stringContaining('scale-up-memory'),
     );
-    expect(screen.getByRole('button', { name: 'Upload selected screenshots' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Upload selected screenshots' })).toBeEnabled();
+    expect(screen.getByTestId('draft-submit')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove large.png' }));
     expect(screen.getByTestId('draft-submit')).toBeEnabled();
   });
 

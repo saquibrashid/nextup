@@ -23,7 +23,9 @@ import { Input } from './ui/Input';
 // the drop target's full behaviour (TASK-162, `T-UI-014`) fill them in.
 
 import { useCallback, useId, useRef, useState, type DragEvent, type JSX } from 'react';
-import { MAX_IMAGES_PER_BATCH, MAX_IMAGE_BYTES } from '@nextup/domain';
+import { MAX_IMAGES_PER_BATCH, MAX_IMAGE_BYTES, MAX_BATCH_UPLOAD_BYTES } from '@nextup/domain';
+import { ScreenshotPreview } from './ScreenshotPreview';
+import { IMAGE_UPLOAD_LABELS, type ImageUploadState } from '../lib/uploadSelection';
 
 import {
   CHOOSE_FILES_LABEL,
@@ -96,7 +98,11 @@ function declaresNonImage(type: string): boolean {
  * `alreadyAccepted` is passed in rather than read from state so the count
  * ceiling is evaluated against the batch as it will be, not as it was.
  */
-export function reviewFiles(files: readonly File[], alreadyAccepted: number): DropzoneReview {
+export function reviewFiles(
+  files: readonly File[],
+  alreadyAccepted: number,
+  existingBytes = 0,
+): DropzoneReview {
   const accepted: File[] = [];
   const rejected: RejectedFile[] = [];
 
@@ -123,6 +129,16 @@ export function reviewFiles(files: readonly File[], alreadyAccepted: number): Dr
         reason: `That would be ${String(wouldBe)} screenshots. The limit is ${String(
           MAX_IMAGES_PER_BATCH,
         )} per batch.`,
+      });
+      continue;
+    }
+    if (
+      existingBytes + accepted.reduce((sum, item) => sum + item.size, 0) + file.size >
+      MAX_BATCH_UPLOAD_BYTES
+    ) {
+      rejected.push({
+        name: file.name,
+        reason: `The selected and saved screenshots would exceed the ${megabytes(MAX_BATCH_UPLOAD_BYTES)} MB upload limit per batch.`,
       });
       continue;
     }
@@ -175,6 +191,10 @@ export function isTouchDevice(): boolean {
 }
 
 export interface ImageDropzoneProps {
+  readonly images?: readonly QueuedImage[];
+  readonly savedCount?: number;
+  readonly savedUploadedBytes?: number;
+  readonly uploadStates?: ReadonlyMap<File, ImageUploadState>;
   readonly disabled?: boolean;
   /** Local preparation: report the complete queue without uploading it. */
   readonly onQueueChange?: (images: readonly QueuedImage[]) => void;
@@ -213,6 +233,10 @@ export interface ImageDropzoneProps {
  * when it replayed, and `ADR-0009` exists precisely to tell the three apart.
  */
 export function ImageDropzone({
+  images,
+  savedCount = 0,
+  savedUploadedBytes = 0,
+  uploadStates,
   onQueueChange,
   disabled = false,
   batchReady = false,
@@ -221,8 +245,10 @@ export function ImageDropzone({
   serverRejected = [],
   touch,
 }: ImageDropzoneProps = {}): JSX.Element {
-  const [accepted, setAccepted] = useState<readonly File[]>([]);
+  const [localQueue, setLocalQueue] = useState<readonly QueuedImage[]>([]);
+  const accepted = (images ?? localQueue).map((image) => image.file);
   const queue = useRef<readonly QueuedImage[]>([]);
+  if (images !== undefined) queue.current = images;
   const disabledRef = useRef(disabled);
   disabledRef.current = disabled;
   const [rejected, setRejected] = useState<readonly RejectedFile[]>([]);
@@ -240,7 +266,11 @@ export function ImageDropzone({
         return;
       const review =
         files.length > 0
-          ? reviewFiles(files, queue.current.length)
+          ? reviewFiles(
+              files,
+              savedCount + queue.current.length,
+              savedUploadedBytes + queue.current.reduce((sum, image) => sum + image.file.size, 0),
+            )
           : { accepted: [], rejected: [] };
       // Rejections REPLACE the previous batch's rejections but never the
       // accepted list (§4.4): both are visible at once, because a rejection
@@ -248,11 +278,11 @@ export function ImageDropzone({
       setRejected([...(extraRejections ?? []), ...review.rejected]);
       if (review.accepted.length > 0) {
         queue.current = [...queue.current, ...review.accepted.map((file) => ({ file, source }))];
-        setAccepted(queue.current.map((item) => item.file));
+        setLocalQueue(queue.current);
         onQueueChange?.(queue.current);
       }
     },
-    [onQueueChange],
+    [onQueueChange, savedCount, savedUploadedBytes],
   );
 
   const pastedByListener = useCallback(
@@ -367,6 +397,7 @@ export function ImageDropzone({
           accept={IMAGE_ACCEPT_ATTRIBUTE}
           onChange={(event) => {
             addFiles([...(event.target.files ?? [])], 'upload');
+            event.target.value = '';
           }}
         />
       </div>
@@ -385,19 +416,26 @@ export function ImageDropzone({
           <ul data-testid="accepted-list">
             {accepted.map((file, index) => (
               <li key={index} data-testid="accepted-file">
-                <span data-testid="accepted-name">{file.name}</span>
-                {/*
+                <ScreenshotPreview source={file} name={file.name} unsupported={isHeic(file)} />
+                <div className="capture-image-details">
+                  <span data-testid="accepted-name">{file.name}</span>
+                  <span role="status">
+                    {IMAGE_UPLOAD_LABELS[uploadStates?.get(file) ?? 'selected']}
+                  </span>
+                  {/*
                   No client preview of HEIC: only Safari can render it, so every
                   other browser would show a broken image tile.
                 */}
-                {isHeic(file) && (
-                  <span data-testid="heic-placeholder">{HEIC_PREVIEW_PLACEHOLDER}</span>
-                )}
+                  {isHeic(file) && (
+                    <span data-testid="heic-placeholder">{HEIC_PREVIEW_PLACEHOLDER}</span>
+                  )}
+                </div>
                 <Button
                   variant="secondary"
+                  disabled={disabled}
                   onClick={() => {
                     queue.current = queue.current.filter((item) => item.file !== file);
-                    setAccepted(queue.current.map((item) => item.file));
+                    setLocalQueue(queue.current);
                     onQueueChange?.(queue.current);
                   }}
                 >

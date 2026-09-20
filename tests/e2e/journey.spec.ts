@@ -267,6 +267,7 @@ interface Listing {
 }
 
 interface BatchRuntime {
+  uploadedImages: number;
   batchId: string;
   plan: BatchPlan;
   statusReads: number;
@@ -760,6 +761,7 @@ async function stubBackend(page: Page, be: Backend): Promise<void> {
         batchId,
         plan,
         statusReads: 0,
+        uploadedImages: 0,
         submitted: false,
         confirmedAdditions: false,
         closed: false,
@@ -769,7 +771,7 @@ async function stubBackend(page: Page, be: Backend): Promise<void> {
         batchId,
         service: plan.service,
         mode: plan.mode,
-        status: 'open',
+        status: 'draft',
         createdAt: iso(TODAY),
       };
       await fulfillJson(route, 201, created);
@@ -826,13 +828,21 @@ async function stubBackend(page: Page, be: Backend): Promise<void> {
       }
 
       if (method === 'POST' && suffix === '/images') {
+        const n = ++batch.uploadedImages;
+        const fileName = request
+          .postDataBuffer()
+          ?.toString()
+          .match(/filename="([^"]+)"/)?.[1];
+        expect(fileName).toBe(`${batch.plan.service}-golden-${String(n)}.png`);
         const result: AddImagesResult = {
-          accepted: [1, 2, 3].map((n) => ({
-            imageId: `img_${String(n)}`,
-            fileName: `${batch.plan.service}-golden-${String(n)}.png`,
-          })),
+          accepted: [
+            {
+              imageId: `img_${String(n)}`,
+              fileName: `${batch.plan.service}-golden-${String(n)}.png`,
+            },
+          ],
           rejected: [],
-          batchTotals: { imageCount: 3, uploadedByteSize: 300, storedByteSize: 300 },
+          batchTotals: { imageCount: n, uploadedByteSize: n * 5, storedByteSize: n * 5 },
         };
         await fulfillJson(route, 201, result);
         return;

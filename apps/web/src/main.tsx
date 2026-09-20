@@ -7,7 +7,8 @@
 
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
+import { CaptureNavigationProvider } from './components/CaptureNavigation';
 
 import { OwnerGate } from './containers/OwnerGate';
 
@@ -19,11 +20,19 @@ import './index.css';
 
 const root = document.getElementById('root');
 if (root) {
+  const router = createBrowserRouter([
+    {
+      path: '*',
+      element: (
+        <CaptureNavigationProvider>
+          <OwnerGate />
+        </CaptureNavigationProvider>
+      ),
+    },
+  ]);
   createRoot(root).render(
     <StrictMode>
-      <BrowserRouter>
-        <OwnerGate />
-      </BrowserRouter>
+      <RouterProvider router={router} />
     </StrictMode>,
   );
 }

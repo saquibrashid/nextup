@@ -1,7 +1,7 @@
 /**
  * `App` (TASK-025) - the router, mounting all nine routes inside `AppShell`.
  *
- * `BrowserRouter` per `specs/ui.md` (top matter): real paths, not hashes, so
+ * Browser-history routing per `specs/ui.md`: real paths, not hashes, so
  * every screen is deep-linkable and Easy Auth can return the owner to the path
  * they actually asked for after sign-in (TASK-027).
  *

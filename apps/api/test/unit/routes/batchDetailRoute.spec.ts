@@ -111,6 +111,8 @@ const imageRow = (over: Record<string, unknown> = {}) => ({
   retainUntil: new Date('2099-01-01T00:00:00.000Z'),
   candidateCount: 14,
   blobPath: 'owner/batch/img-1.png',
+  uploadedByteSize: 10n,
+  byteSize: 30n,
   ...over,
 });
 
@@ -210,6 +212,18 @@ describe('GET /api/batches — history (T-BATCH-016)', () => {
 });
 
 describe('GET /api/batches/:batchId — detail (§6.15)', () => {
+  it('T-UX-161i: saved batch totals distinguish uploaded bytes from transcoded storage bytes', async () => {
+    findUploadBatch.mockResolvedValue(batchRow({ status: 'draft' }));
+    listImagesForBatch.mockResolvedValue([
+      imageRow(),
+      imageRow({ id: 'img-2', uploadedByteSize: 7n, byteSize: 100n }),
+    ]);
+    const response = await get(`/api/batches/${BATCH_ID}`);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      batchTotals: { imageCount: 2, uploadedByteSize: 17, storedByteSize: 130 },
+    });
+  });
   it('T-BATCH-017: the route the SPA polls is registered and answers 200', async () => {
     findUploadBatch.mockResolvedValue(batchRow());
 

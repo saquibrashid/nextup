@@ -76,7 +76,10 @@ and scrollable rather than expanding into an eight-button toolbar.
 REQ-061…REQ-064, REQ-070, REQ-072, NFR-006, NFR-007, NFR-013.
 
 Stack: React 18 + Vite + Tailwind + TanStack Query + Zod (ADR-0004). Files
-under `apps/web/src/`. Routing: `react-router-dom`, `BrowserRouter`.
+under `apps/web/src/`. Routing: `react-router-dom`, `createBrowserRouter`
+with `RouterProvider` (TASK-227), retaining real paths and the existing
+container-owned data calls. The data-router host supplies supported navigation
+blocking; it introduces no loaders, actions or automatic mutation replay.
 
 ---
 
@@ -529,6 +532,25 @@ image does not remove successful ones. Saved drafts keep service/mode fixed;
 discard-and-start-over is explicit and confirmed. Offline disables mutations.
 The capture summary and disabled-action reasons distinguish local preparation
 from saved recovery rather than claiming an attachment already reached Azure.
+
+**Input continuity (TASK-227):** distinguish Selected on this device, Uploading,
+Saved, Rejected and Outcome unknown. In-page saved-draft recovery retains
+failed/uncertain local files; successful files leave the local selection and
+appear only in the authoritative saved list. Unknown outcomes cannot be
+re-uploaded as a group: check saved previews first, then explicitly remove a
+local copy or reselect it for retry. Never infer identity from matching filenames.
+Read the latest draft before every mutation. Failed saved-state reads pause
+writes until an explicit successful check. Saved and selected counts/UPLOAD
+bytes share the batch ceilings; stored/transcoded bytes are not upload bytes.
+Expired saved images need replacement before extraction.
+
+Protect in-app links and browser Back with a focused leave confirmation when
+local input or unverified work remains. Reload, closing the tab and sign-out
+use the native `beforeunload` warning where supported; mobile browsers can
+ignore it, so never promise reload persistence. Completed/saved-only work
+does not trigger a blanket warning. PNG/JPEG previews use revocable local
+object URLs; HEIC/HEIF has an explicit placeholder until the server returns
+its transcoded image. No screenshot data is written to web storage.
 
 ### 3.1 Step 1 — service and mode
 
