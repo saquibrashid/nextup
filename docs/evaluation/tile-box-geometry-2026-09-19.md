@@ -23,8 +23,19 @@ progression** that wraps into rows.
 | `rotated-01` | 6 | 0.143 / 0.143 / 0.143 |
 | `truncated-titles-01` | 4 | 0.380 / 0.380 / 0.380 |
 
-Ten images, ten times `min == med == max`. Real artwork tiles are not all
-exactly equal to three decimal places.
+Ten images, ten times `min == med == max`.
+
+⚠ **Corrected 2026-09-20 — this table is true but is WEAK evidence on its own.**
+Real streaming grids genuinely do render every tile at an identical width, so
+uniformity is equally consistent with an accurate reading of a uniform grid.
+It does not by itself show the boxes are generated. The claim survives on the
+two arguments below — the off-image box, and now direct comparison against
+measured ground truth (`tests/fixtures/golden/tiles/`, recorded in
+[`tile-geometry-2026-09-20.md`](./tile-geometry-2026-09-20.md)), which shows
+**24 of 46 box centres miss the tile they name**, by up to 2.3 tiles, on
+layouts whose real pitch differs from the model's.
+
+~~Real artwork tiles are not all exactly equal to three decimal places.~~
 
 The positions confirm it:
 
@@ -69,16 +80,33 @@ straddling two real tiles smears across both.
 
 ## The owner-visible defect this explains
 
-From a live Netflix "My List" capture (4 tiles, one wide row): the thumbnail
-shown for **Jo Koy: Blue in the Face** depicted *Best of the Best* and
-*Stranger Things* — the two tiles to its right. The model's habitual ~6-across
-grid does not match a 4-across strip, so cell boundaries fall mid-tile, and
-padding smears each crop across the join.
+From a live Netflix "My List" capture (4 tiles in one wide 1246×205 strip): the
+thumbnails shown for **Jo Koy: Blue in the Face** and two others each depicted
+*Best of the Best* and *Stranger Things*.
 
-⚠ **This is the same root cause as the earlier "it shows me the whole
+⚠ **Corrected 2026-09-20 — the diagnosis below was WRONG.** All three cards
+showed the **identical** region. Independent fabricated crops carry different
+boxes and cannot coincide; a shared *uncropped* render must. This capture is
+the `null` branch: with no crop, `CandidateCard` renders the whole screenshot
+into a ~96 px box under `object-fit: cover`, which on a 6:1 strip displays its
+middle ~22 % — `x ≈ 0.387–0.613`, spanning exactly the tile-2/tile-3 boundary.
+
+So this is the **same branch as the earlier "it shows me the whole screenshot"
+report**, presenting differently because a wide strip makes a centre-crop look
+deliberate. The inverted rule is still the root cause, but both owner reports
+land on the `'ocr' → null` side of it, not one on each side.
+
+⚠ **`crop === null` is therefore a defect in its own right**, not a safe
+fallback: it presents an arbitrary slice of the screenshot with the same
+framing and confidence as a real tile crop.
+
+~~The model's habitual ~6-across grid does not match a 4-across strip, so cell
+boundaries fall mid-tile, and padding smears each crop across the join.~~
+
+~~⚠ **This is the same root cause as the earlier "it shows me the whole
 screenshot" report, not a separate bug.** That was the `boxSource === 'ocr'`
 branch returning `null`; this is the `'llm'` branch returning a fabricated
-rectangle. One inverted rule, two complaints.
+rectangle. One inverted rule, two complaints.~~
 
 ## What this rules out
 
@@ -90,17 +118,32 @@ rectangle. One inverted rule, two complaints.
 
 ## What the fix has to do, and why it is not in this commit
 
-The tile region must be **anchored to measured geometry** — the OCR line boxes
-— rather than to the model's grid, and then expanded so artwork is visible as
-§5.3a requires.
+⚠ **Corrected 2026-09-20 — the plan below was REFUTED by the measurement it
+asked for.** The caption-to-tile ratio was measured across 106 pairs and it is
+not a stable quantity: **1.32–12.15 in width, 4.04–14.29 in height** (p25–max).
+Anchor-and-expand cannot work, because the relationship depends on whether the
+caption is baked into the artwork or sits beside it — and a title frequently
+has **both** kinds of box at once, disagreeing by most of a tile.
 
-That expansion needs a measurement this note does not yet have. OCR line boxes
-are text strips (median height 0.015–0.027) and tiles are ten-plus times
+The note was right that the factor had to be measured before it could be
+written, and right to refuse to guess it. It was wrong to assume a factor
+exists. See [`tile-geometry-2026-09-20.md`](./tile-geometry-2026-09-20.md) §3
+for the numbers and §5 for the supported alternative: measured caption for
+**position**, the model's box for **size** (which measurement did validate,
+p25–p75 of 1.02–1.19), restricted to the unambiguous baked-in case.
+
+~~The tile region must be **anchored to measured geometry** — the OCR line
+boxes — rather than to the model's grid, and then expanded so artwork is
+visible as §5.3a requires.~~
+
+~~That expansion needs a measurement this note does not yet have. OCR line
+boxes are text strips (median height 0.015–0.027) and tiles are ten-plus times
 taller, so the expansion factor is large and cannot be guessed responsibly.
 ⚠ **It cannot be a fixed per-axis factor either: `rotated-01` is rotated 90°,
 where the text strips are tall and narrow (median `w` 0.016, `h` 0.089) and an
-axis-fixed rule inverts.**
+axis-fixed rule inverts.**~~
 
-Writing that factor from intuition is exactly what §4A's discipline exists to
+~~Writing that factor from intuition is exactly what §4A's discipline exists to
 prevent, so it is deliberately left to a task that can measure the
-caption-to-tile ratio across the corpus first.
+caption-to-tile ratio across the corpus first.~~
+
