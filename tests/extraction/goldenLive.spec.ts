@@ -69,6 +69,8 @@ import {
 } from '../../apps/api/src/extraction/recordings.js';
 import { transcodeHeicToPng } from '../../apps/api/src/images/transcode.js';
 
+import { costReportLines, estimateCostUsd } from './liveCost.js';
+
 import {
   IMAGES,
   RECALL_VERDICTS,
@@ -137,20 +139,6 @@ const COST_CEILING_USD = 0.5; // L7
 
 /** The §9.2 artwork-only fixture L6 names. */
 const ARTWORK_ONLY_IMAGE = 'netflix-artwork-only-01';
-
-/**
- * Azure OpenAI `gpt-4.1` global-standard list price, USD per 1M tokens.
- *
- * ⚠ L7 IS A REGRESSION GUARD ON PROMPT AND TOKEN GROWTH, NOT A BILLING
- * RECONCILIATION. The dollar figure only scales the token counts, so a list
- * price that drifts by a few percent moves the number without changing what
- * the assertion detects — a prompt that doubled, an image detail setting that
- * changed, or a reader that started emitting far more output. The Azure AI
- * Vision leg is the **F0 free tier** (`docs/architecture.md`), so it
- * contributes 0 and is reported as such rather than silently omitted.
- */
-const USD_PER_1M_PROMPT_TOKENS = 2.0;
-const USD_PER_1M_COMPLETION_TOKENS = 8.0;
 
 /**
  * L1's per-image `minRecall`.
@@ -495,12 +483,13 @@ function reportMarkdown(runs: readonly LiveRun[], cost: number, arm: Arm): strin
   lines.push('');
   const prompt = runs.reduce((n, r) => n + r.usage.promptTokens, 0);
   const completion = runs.reduce((n, r) => n + r.usage.completionTokens, 0);
-  lines.push(`- Prompt tokens: ${String(prompt)}`);
-  lines.push(`- Completion tokens: ${String(completion)}`);
   lines.push(
-    `- Estimated cost: **$${cost.toFixed(4)}** at $${USD_PER_1M_PROMPT_TOKENS.toFixed(2)}/1M ` +
-      `prompt and $${USD_PER_1M_COMPLETION_TOKENS.toFixed(2)}/1M completion. The Azure AI ` +
-      'Vision leg is F0 (free tier) and contributes $0.',
+    ...costReportLines({
+      cost,
+      promptTokens: prompt,
+      completionTokens: completion,
+      deployment: arm.deployment,
+    }),
   );
   lines.push('');
   lines.push(
@@ -649,10 +638,10 @@ describe('T-AI-051 · §4A the live quality suite — MANUAL, COSTS MONEY', () =
       runs.push({ index, scored, usage });
     }
 
-    totalCostUsd =
-      (runs.reduce((n, r) => n + r.usage.promptTokens, 0) / 1_000_000) * USD_PER_1M_PROMPT_TOKENS +
-      (runs.reduce((n, r) => n + r.usage.completionTokens, 0) / 1_000_000) *
-        USD_PER_1M_COMPLETION_TOKENS;
+    totalCostUsd = estimateCostUsd(
+      runs.reduce((n, r) => n + r.usage.promptTokens, 0),
+      runs.reduce((n, r) => n + r.usage.completionTokens, 0),
+    );
 
     // ⚠ WRITTEN BEFORE ANY BAND IS CHECKED. A run that fails a band is the run
     // whose numbers matter most; a report emitted only on success would throw
