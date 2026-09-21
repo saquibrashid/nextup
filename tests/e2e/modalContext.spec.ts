@@ -177,9 +177,7 @@ for (const width of [320, 1280]) {
       await expect(page.getByTestId('add-title-open')).toBeFocused();
     });
 
-    test('T-MOD-002b: removal keeps pending writes, undo and errors in the modal', async ({
-      page,
-    }) => {
+    test('T-MOD-002b: removal keeps pending writes and undo in the modal', async ({ page }) => {
       const api = await fixture(page);
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/');
@@ -202,7 +200,18 @@ for (const width of [320, 1280]) {
       await page.getByRole('button', { name: 'Close', exact: true }).click();
       await expect(row).toBeVisible();
       await expect(trigger).toBeFocused();
+    });
 
+    test('T-MOD-002d: removal errors stay visible and return focus on dismissal', async ({
+      page,
+    }) => {
+      const api = await fixture(page);
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('/');
+      await expect(page.getByTestId('title-name')).toHaveCount(40);
+      const row = page.getByTestId('title-row-modal-15');
+      await row.scrollIntoViewIfNeeded();
+      const trigger = row.getByTestId('row-menu');
       await trigger.click();
       await page.getByTestId('row-menu-remove').click();
       api.fail();
