@@ -49,7 +49,7 @@ import path from 'node:path';
 import { DefaultAzureCredential } from '@azure/identity';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import type { ImageMimeType, LlmTile, OcrLine } from '@nextup/domain';
+import type { ImageMimeType, LlmTile, OcrLine, ReaderMetrics } from '@nextup/domain';
 
 import {
   AzureVisionExtractor,
@@ -70,6 +70,13 @@ import {
 import { transcodeHeicToPng } from '../../apps/api/src/images/transcode.js';
 
 import { costReportLines, estimateCostUsd } from './liveCost.js';
+import {
+  acceptedTitles,
+  jaccard,
+  pairwiseJaccard,
+  readerMetrics,
+  unstableTitles,
+} from './readerMetrics.js';
 
 import {
   IMAGES,
@@ -188,27 +195,14 @@ interface LiveRun {
   readonly usage: RunUsage;
 }
 
-/** The normalised titles a run ACCEPTED, corpus-wide. Sorted set, never ordered output. */
-function acceptedTitles(scored: readonly Scored[]): Set<string> {
-  const out = new Set<string>();
-  for (const s of scored) {
-    for (const c of s.candidates) {
-      if (RECALL_VERDICTS.has(c.cleanupVerdict)) out.add(c.normalisedText);
-    }
-  }
-  return out;
-}
-
-function jaccard(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
-  // ⚠ TWO EMPTY SETS ARE IDENTICAL, NOT UNDEFINED. Returning NaN here would
-  // make L2 pass by comparison-with-NaN semantics on a run that extracted
-  // nothing at all — the zero-yield trap, arriving through the stability gate.
-  if (a.size === 0 && b.size === 0) return 1;
-  let shared = 0;
-  for (const value of a) if (b.has(value)) shared += 1;
-  return shared / (a.size + b.size - shared);
-}
-
+/**
+ * ⚠ `acceptedTitles`, `jaccard`, `pairwiseJaccard` and `unstableTitles` ARE
+ * IMPORTED FROM `readerMetrics.ts`, NOT DEFINED HERE. They were private copies
+ * in this file and again in `bakeoffMeasured.spec.ts`. Two definitions of the
+ * same metric — one live, one offline — is precisely the arrangement that lets
+ * a divergence between the *copies* be read as model drift, which is the one
+ * conclusion this suite exists to support.
+ */
 function requireEnv(name: string, why: string): string {
   const value = process.env[name]?.trim();
   if (value === undefined || value === '') {
@@ -317,30 +311,17 @@ function armFromEnv(): Arm {
 }
 
 /**
- * Every pairwise Jaccard between the runs' accepted-title sets — L2.
+ * The runs' scored corpora, in order — the shape `readerMetrics.ts` consumes.
  *
- * ⚠ EXTRACTED BECAUSE THE REPORT DID NOT CARRY L2 AT ALL, WHICH IS HOW A FLOOR
- * NOTHING HAS EVER MET SURVIVED THIS LONG. The numbers existed only inside
- * `T-AI-051b`'s failure message, so they were visible when the band broke and
- * invisible when it passed — and a band that is always red is indistinguishable
- * from a band nobody reads. Committing them to the report is what makes the
- * floor auditable against measurement rather than against intent.
+ * ⚠ L2's report note is preserved here because it explains why it is emitted
+ * at all: the pairwise numbers existed only inside `T-AI-051b`'s failure
+ * message, so they were visible when the band broke and invisible when it
+ * passed — and a band that is always red is indistinguishable from a band
+ * nobody reads. Committing them is what makes the floor auditable against
+ * measurement rather than against intent.
  */
-function pairwiseJaccard(runs: readonly LiveRun[]): { pair: string; value: number }[] {
-  const sets = runs.map((r) => acceptedTitles(r.scored));
-  const pairs: { pair: string; value: number }[] = [];
-  for (let i = 0; i < sets.length; i += 1) {
-    for (let j = i + 1; j < sets.length; j += 1) {
-      // Non-null: both indices are inside `sets` by construction, and
-      // `noUncheckedIndexedAccess` cannot see that.
-      pairs.push({
-        pair: `${String(i + 1)}×${String(j + 1)}`,
-        value: jaccard(sets[i] as Set<string>, sets[j] as Set<string>),
-      });
-    }
-  }
-  return pairs;
-}
+const scoredRuns = (runs: readonly LiveRun[]): readonly (readonly Scored[])[] =>
+  runs.map((r) => r.scored);
 
 function reportMarkdown(runs: readonly LiveRun[], cost: number, arm: Arm): string {
   const lines: string[] = [];
@@ -393,12 +374,12 @@ function reportMarkdown(runs: readonly LiveRun[], cost: number, arm: Arm): strin
   }
   lines.push('');
 
-  const unstable = unstableTitles(runs);
+  const unstable = unstableTitles(scoredRuns(runs));
   lines.push('## L2 — pairwise run-to-run stability (Jaccard)');
   lines.push('');
   lines.push(`| Pair | Jaccard | Floor ${JACCARD_STABILITY_FLOOR.toFixed(2)} |`);
   lines.push('|---|---|---|');
-  for (const p of pairwiseJaccard(runs)) {
+  for (const p of pairwiseJaccard(scoredRuns(runs))) {
     lines.push(
       `| ${p.pair} | ${p.value.toFixed(4)} | ${p.value < JACCARD_STABILITY_FLOOR ? 'BELOW' : 'ok'} |`,
     );
@@ -501,19 +482,6 @@ function reportMarkdown(runs: readonly LiveRun[], cost: number, arm: Arm): strin
 }
 
 /** Expected titles found in fewer than every run — L3. */
-function unstableTitles(runs: readonly LiveRun[]): { title: string; runs: number }[] {
-  const expected = new Set<string>();
-  for (const s of runs[0]?.scored ?? []) {
-    for (const c of s.expected.expectedCandidates) expected.add(c.normalisedText);
-  }
-  const perRun = runs.map((r) => acceptedTitles(r.scored));
-  const out: { title: string; runs: number }[] = [];
-  for (const title of [...expected].sort()) {
-    const hits = perRun.filter((set) => set.has(title)).length;
-    if (hits > 0 && hits < runs.length) out.push({ title, runs: hits });
-  }
-  return out;
-}
 
 /**
  * Expected titles that were NOT accepted, per image, with how many runs missed
@@ -586,6 +554,9 @@ describe('T-AI-051 · §4A the live quality suite — MANUAL, COSTS MONEY', () =
   let runs: LiveRun[] = [];
   let totalCostUsd = 0;
   let reportPath = '';
+  let metricsPath = '';
+  let metrics: ReaderMetrics | undefined;
+  let firstRunEntries = new Map<string, Recording>();
   let offline: readonly Scored[] = [];
 
   beforeAll(async () => {
@@ -635,6 +606,10 @@ describe('T-AI-051 · §4A the live quality suite — MANUAL, COSTS MONEY', () =
       // would report divergence between the copies as model drift, which is
       // the one conclusion this suite exists to support.
       const scored = await scoreWithStore(inMemoryRecordingStore(entries));
+      // Run 1's legs are kept for `omissionRecovery`, which needs the raw LLM
+      // and OCR outputs rather than the scored result. See `readerMetrics`'
+      // note on why the point metrics come from run 1 and are not averaged.
+      if (index === 0) firstRunEntries = entries;
       runs.push({ index, scored, usage });
     }
 
@@ -655,6 +630,45 @@ describe('T-AI-051 · §4A the live quality suite — MANUAL, COSTS MONEY', () =
     reportPath = path.join(EVALUATION_DIR, `${stem}.md`);
     writeFileSync(reportPath, reportMarkdown(runs, totalCostUsd, arm), 'utf8');
     console.log(`\nLive quality report written to ${path.relative(REPO_ROOT, reportPath)}\n`);
+
+    /**
+     * ⚠ THE MACHINE-READABLE COMPANION, AND IT IS THE POINT OF THIS WHOLE
+     * ARTEFACT. The markdown above is for a human; `chooseReader()` cannot
+     * read it. Until this file existed, running the §9.7 decision meant a
+     * person retyping nine floats per arm out of a table, and §9.7 is blunt
+     * about where that leads: *"supplying invented values would yield a
+     * fabricated decision carrying a function's authority."* A transcription
+     * slip does not look like a bug, it looks like a verdict.
+     *
+     * ⚠ WRITTEN BEFORE ANY BAND IS CHECKED, for the same reason the markdown
+     * is. The arm whose metrics matter most is the one that failed a band.
+     *
+     * ⚠ IT CARRIES THE ARM, and shares the report's collision-proof stem. An
+     * investigation run that overwrote `golden-<date>.metrics.json` would
+     * corrupt the incumbent's recorded metrics exactly as it would the
+     * baseline report — and this file is the one a decision is computed from.
+     */
+    metricsPath = path.join(EVALUATION_DIR, `${stem}.metrics.json`);
+    const expectedTitleTotal = (runs[0]?.scored ?? []).reduce(
+      (n, s) => n + s.expected.expectedCandidates.length,
+      0,
+    );
+    metrics = readerMetrics({
+      modelId: arm.deployment,
+      runs: scoredRuns(runs),
+      store: inMemoryRecordingStore(firstRunEntries),
+      hashFor: (image) => sha256OfBytes(readFileSync(path.join(IMAGES, image.file))),
+      expectedTitleTotal,
+      // Per IMAGE, not per run: §9.7's row is `costUsdPerImage`, and the
+      // denominator is every image read across every run.
+      costUsdPerImage: totalCostUsd / (manifest.images.length * RUNS),
+    });
+    writeFileSync(
+      metricsPath,
+      `${JSON.stringify({ arm, generatedAt: new Date().toISOString(), metrics }, null, 2)}\n`,
+      'utf8',
+    );
+    console.log(`Stage 3 metrics written to ${path.relative(REPO_ROOT, metricsPath)}\n`);
 
     // The offline baseline, replayed from the committed recordings. Free, and
     // the only thing that keeps `MIN_RECALL` honest (`T-AI-051j`).
@@ -767,7 +781,7 @@ describe('T-AI-051 · §4A the live quality suite — MANUAL, COSTS MONEY', () =
       0,
     );
     expect(expectedTotal).toBeGreaterThan(0);
-    const unstable = unstableTitles(runs);
+    const unstable = unstableTitles(scoredRuns(runs));
     // Named in the failure message as well as the report — a bare ratio tells
     // the reader the model wobbled but not on what.
     expect(

@@ -39,13 +39,13 @@ import {
   BAKEOFF_CORPUS_IMAGES,
   MIN_MEANINGFUL_TITLE_DELTA,
   chooseReader,
-  normaliseTitleText,
   type ReaderMetrics,
 } from '@nextup/domain';
 
 import { goldenRecordingStore, sha256OfBytes } from '../../apps/api/src/extraction/recordings.js';
 
 import { GOLDEN, IMAGES, aggregate, manifest, scoreAll, type Scored } from './goldenScorer.js';
+import { artworkOnlyRecall, omissionRecovery } from './readerMetrics.js';
 
 const INCUMBENT = 'gpt-4.1';
 const CHALLENGER = 'gpt-5-4-mini';
@@ -64,46 +64,14 @@ const CHALLENGER_CAPABILITIES = {
   availableInRegion: true,
 } as const;
 
-function artworkRecall(scored: readonly Scored[]): number {
-  const artwork = scored.filter((s) => s.image.expectedArtworkOnly === true);
-  const expectedTotal = artwork.reduce((n, s) => n + s.expected.expectedCandidates.length, 0);
-  return artwork.reduce((n, s) => n + s.found, 0) / expectedTotal;
-}
-
 /**
- * REQ-012's metric, computed per arm: an expected title the LLM leg missed but
- * the OCR leg saw must survive as an orphan.
- *
- * ⚠ THE DENOMINATOR IS ARM-SPECIFIC AND THAT IS CORRECT, NOT A BUG. A better
- * reader misses fewer titles, so it offers the OCR leg fewer chances to rescue
- * one; the metric is "of the rescues that were available to you, how many did
- * you keep", which is the property REQ-012 actually asserts.
+ * ⚠ `artworkOnlyRecall` AND `omissionRecovery` ARE IMPORTED, NOT DEFINED HERE.
+ * Both used to be private copies in this file and a second private copy in
+ * `goldenLive.spec.ts`. Two definitions of the same metric, one offline and
+ * one live, is the arrangement that lets a divergence between the *copies* be
+ * read as model drift — the single conclusion these suites exist to support.
+ * See `readerMetrics.ts`.
  */
-function omissionRecovery(modelId: string, scored: readonly Scored[]): number {
-  const store = goldenRecordingStore(GOLDEN, modelId);
-  let recoverable = 0;
-  let recovered = 0;
-
-  for (const s of scored) {
-    const bytes = readFileSync(path.join(IMAGES, s.image.file));
-    const recording = store.get(sha256OfBytes(bytes));
-    expect(recording, `${s.image.id} has no ${modelId} recording`).toBeDefined();
-
-    const llmTexts = new Set(
-      recording!.llm.map((t) => normaliseTitleText(t.identifiedTitle ?? t.visibleText ?? '')),
-    );
-    const ocrTexts = new Set(recording!.ocr.map((l) => normaliseTitleText(l.text)));
-
-    for (const c of s.expected.expectedCandidates) {
-      if (llmTexts.has(c.normalisedText) || !ocrTexts.has(c.normalisedText)) continue;
-      recoverable += 1;
-      if (s.candidates.some((x) => x.normalisedText === c.normalisedText)) recovered += 1;
-    }
-  }
-
-  return recoverable === 0 ? 1 : recovered / recoverable;
-}
-
 function metricsFor(
   modelId: string,
   scored: readonly Scored[],
@@ -113,10 +81,12 @@ function metricsFor(
   const agg = aggregate(scored);
   return {
     modelId,
-    omissionRecovery: omissionRecovery(modelId, scored),
+    omissionRecovery: omissionRecovery(scored, goldenRecordingStore(GOLDEN, modelId), (image) =>
+      sha256OfBytes(readFileSync(path.join(IMAGES, image.file))),
+    ),
     fabricationRate: agg.fabricationRate,
     titleRecall: agg.recall,
-    artworkOnlyRecall: artworkRecall(scored),
+    artworkOnlyRecall: artworkOnlyRecall(scored),
     falseTitleRate: agg.falseTitleRate,
     chromeRejection: agg.chromeRejectionRate,
     stabilityJaccard: stability,
