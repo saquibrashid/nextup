@@ -279,7 +279,7 @@ describe('T-AI-041 · specs/ui.md §5.3a · the thumbnail is CROPPED to the tile
     expect(screen.getByTestId('candidate-thumb')).toHaveAttribute('src', '/api/images/img_abc');
   });
 
-  it('T-AI-041r: with no crop the whole screenshot is still shown, unwrapped', () => {
+  it('T-AI-041r: with no crop the whole screenshot is still shown, not hidden', () => {
     render(
       <ReviewPage
         review={review([
@@ -294,5 +294,74 @@ describe('T-AI-041 · specs/ui.md §5.3a · the thumbnail is CROPPED to the tile
 
     expect(screen.queryByTestId('candidate-thumb-crop')).toBeNull();
     expect(screen.getByTestId('candidate-thumb')).toHaveAttribute('src', '/api/images/img_abc');
+  });
+});
+
+/**
+ * `T-UX-166` — the uncropped thumbnail must SAY it is uncropped.
+ *
+ * ⚠ **The no-crop path is not the neutral fallback it looks like.** The two
+ * thumbnails render in the same 96px box and differ only in content, so a
+ * whole screenshot of ~20 tiles and a crop of one tile are visually the same
+ * kind of thing: a small picture beside "is this the right match?". The owner
+ * reads it as *this is the tile* — which is what they did report, twice,
+ * before the crop rule was fixed. Refusing to crop is the right call when the
+ * geometry is not trustworthy (`T-AI-055`), and it is still the case that
+ * ~29 of ~48 candidates take this path, so it is common rather than
+ * exceptional. Saying so is what turns a misleading picture into context.
+ *
+ * `b` keeps the caption meaningful. A caption that appears on every card says
+ * nothing, and the failure is silent: the cropped card still shows the right
+ * region, so the only symptom is a label that has quietly stopped carrying
+ * information.
+ *
+ * ⚠ **NOT covered here, deliberately, and worth knowing:** whether the
+ * uncropped image is `object-fit: contain`. Under `cover` a 16:9 screenshot
+ * in a square box is centre-cropped by the BROWSER, so the "whole screenshot"
+ * is invisibly its own arbitrary crop — strictly worse than either honest
+ * option. jsdom does not apply stylesheets, so no assertion in this file can
+ * see it; it lives in `apps/web/src/index.css` and would need a rendered
+ * browser to test.
+ */
+describe('T-UX-166 - the uncropped thumbnail is labelled as the whole screenshot', () => {
+  const uncropped = () =>
+    render(
+      <ReviewPage
+        review={review([
+          candidate({
+            verdict: 'inferred-unverified',
+            sourceImageIds: ['img_abc'],
+            tileCrop: null,
+          }),
+        ])}
+      />,
+    );
+
+  it('T-UX-166a: an uncropped thumbnail is marked and captioned', () => {
+    uncropped();
+
+    const whole = screen.getByTestId('candidate-thumb-whole');
+    expect(whole).toContainElement(screen.getByTestId('candidate-thumb'));
+    // ⚠ Assert the TEXT, not just the wrapper. A wrapper with no caption is
+    // invisible to the person the caption is for.
+    expect(whole).toHaveTextContent(/whole screenshot/i);
+  });
+
+  it('T-UX-166b: a cropped thumbnail carries neither the marker nor the caption', () => {
+    render(
+      <ReviewPage
+        review={review([
+          candidate({
+            verdict: 'inferred-unverified',
+            sourceImageIds: ['img_abc'],
+            tileCrop: { imageId: 'img_abc', x: 0.25, y: 0.5, w: 0.25, h: 0.25 },
+          }),
+        ])}
+      />,
+    );
+
+    // Otherwise the caption is always true and therefore says nothing.
+    expect(screen.queryByTestId('candidate-thumb-whole')).toBeNull();
+    expect(screen.getByTestId('candidate-thumb-crop')).not.toHaveTextContent(/whole screenshot/i);
   });
 });

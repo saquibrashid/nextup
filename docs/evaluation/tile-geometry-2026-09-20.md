@@ -168,3 +168,45 @@ crop of the wrong tiles. That is what an owner reported as a mis-cropped
 thumbnail on a 1246×205 Netflix strip; all three affected cards showed the
 *identical* region, which is what a shared uncropped render predicts and what
 independent bad crops do not.
+
+## 6. What was built, and what it measured (same day)
+
+§5's rule was implemented in `tileCropFor` and re-measured through the **same
+harness** — the committed recordings driven through the real `crossCheck()`,
+scored against the §1 annotations. `T-AI-055` is that measurement, kept as a
+test.
+
+⚠ **The baseline below is worse than any figure in §§1–4, and only this
+measurement could have produced it.** §§1–4 score the extractor's boxes. The
+product crops only the *non-corroborated* subset of them, which is a different
+and much worse population — so the honest before-figure is not "22 of 46
+centres are on-tile" but this:
+
+| | before | after |
+| --- | --- | --- |
+| crops offered (of 48 matched tiles) | 10 | **22** |
+| crops showing **< 50 %** of their tile | **8** | **0** |
+| median tile coverage | 0.24 | **0.89** |
+| minimum tile coverage | 0.00 | **0.59** |
+| suppressed (whole screenshot shown) | 38 | 26 |
+
+**Only 2 of 48 thumbnails were useful.** The cause was a single inverted
+condition — `tileCropFor` refused a crop unless `boxSource === 'llm'`, and
+`crossCheck` sets `'llm'` to mean *no OCR line corroborated this tile*. The
+crop was offered exactly when the geometry was fabricated and refused exactly
+when it had been measured. Three separate owner reports — "the whole
+screenshot", "the wrong tile", "two other tiles" — are that one condition seen
+from its two sides.
+
+⚠ **The agreement gate is most of the value, not the position source.**
+Scored across the four candidate rules, what removes the misleading crops is
+requiring the caption centre to fall inside the model's box — i.e. that the
+two readers agree where the title is — rather than which of them supplies the
+coordinates. A variant that took position from the caption but skipped the
+gate still produced crops below 0.5 coverage.
+
+⚠ **Two thirds of the earlier analysis in this note funded a plan that was
+then refuted** (§§3–4: no expansion factor exists, drift correction destroys
+two images). That is the note working as intended: the measurement was
+commissioned to choose between two confident diagnoses and it eliminated
+both, leaving a third option that neither had proposed.

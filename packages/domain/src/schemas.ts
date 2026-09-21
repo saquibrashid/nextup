@@ -458,6 +458,13 @@ export const boundingBoxSchema = z
     y: z.number(),
     w: z.number().positive(),
     h: z.number().positive(),
+    // Optional: only a MEASURED box carries the reader's tile estimate, and
+    // only when a tile corroborated it. See the `BoundingBox` type note —
+    // the two rectangles describe different things.
+    tileBox: z
+      .object({ x: z.number(), y: z.number(), w: z.number().positive(), h: z.number().positive() })
+      .strict()
+      .optional(),
   })
   .strict() satisfies z.ZodType<BoundingBox>;
 

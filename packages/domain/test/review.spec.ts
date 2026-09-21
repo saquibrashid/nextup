@@ -487,20 +487,32 @@ describe('T-REV-010 — the response echoes the batch safety state verbatim', ()
 // proposed title, at a size where the ARTWORK is legible (>= 96 px on the
 // short edge)". `tileCropFor` decides WHICH region that is, or refuses.
 describe('T-AI-041 - tileCropFor selects the tile region, or refuses', () => {
+  // A MEASURED caption line (a wide, short strip) together with the reader
+  // tile that corroborated it. Both are needed: position comes from the
+  // caption, size from the tile. See `tileCropFor`'s note.
   const box = (
-    over: Partial<{ imageId: string; x: number; y: number; w: number; h: number }> = {},
+    over: Partial<{
+      imageId: string;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      tileBox: { x: number; y: number; w: number; h: number } | undefined;
+    }> = {},
   ) => ({
     imageId: 'img_1',
     x: 0.2,
     y: 0.4,
     w: 0.2,
-    h: 0.2,
+    h: 0.02,
+    // Contains the caption centre (0.3, 0.41), so the two readers agree.
+    tileBox: { x: 0.15, y: 0.25, w: 0.3, h: 0.25 },
     ...over,
   });
 
-  it('T-AI-041f: an inferred-unverified candidate with an LLM tile box gets a padded crop', () => {
+  it('T-AI-041f: a corroborated candidate is cropped to the tile, padded', () => {
     const crop = tileCropFor({
-      boxSource: 'llm',
+      boxSource: 'ocr',
       boundingBoxes: [box()],
     });
 
@@ -510,25 +522,32 @@ describe('T-AI-041 - tileCropFor selects the tile region, or refuses', () => {
     // expectation in terms of the constant makes the assertion recompute the
     // implementation: setting the padding to 0 then satisfies it, and the
     // padding that stops the artwork being clipped can be deleted silently.
-    // 0.2 wide, padded by 8% of its own width on each side => 0.184 .. 0.416.
-    expect(crop?.x).toBeCloseTo(0.184, 6);
-    expect(crop?.w).toBeCloseTo(0.232, 6);
+    //
+    // The tile is 0.3 wide, padded by 8% of its own width on each side =>
+    // 0.348, centred on the caption's centre at x 0.3 => 0.126 .. 0.474.
+    expect(crop?.x).toBeCloseTo(0.126, 6);
+    expect(crop?.w).toBeCloseTo(0.348, 6);
+    // ⚠ The crop takes the TILE's height (0.25 + padding), NOT the caption
+    // line's 0.02. A crop of the line shows the words and no artwork, which
+    // is the one thing §5.3a forbids.
+    expect(crop?.h).toBeCloseTo(0.29, 6);
   });
 
   it('T-AI-041g: an unreadable-tile candidate is cropped too - the tile is all it has', () => {
-    expect(tileCropFor({ boxSource: 'llm', boundingBoxes: [box()] })).not.toBeNull();
+    expect(tileCropFor({ boxSource: 'ocr', boundingBoxes: [box()] })).not.toBeNull();
   });
 
   // ⚠ THE LOAD-BEARING CASE. An OCR box is a text-LINE strip, not artwork.
   // Cropping to it fills the thumbnail with the caption the owner is already
   // shown as `rawText` and shows none of the artwork that is the entire
-  // reason §5.3a makes the thumbnail mandatory. An implementation that
-  // "crops the box" without reading `boxSource` passes every other case here.
-  it('T-AI-041h: an OCR box yields NO crop - it is a text line, not the artwork', () => {
+  // reason §5.3a makes the thumbnail mandatory. With no reader tile to take a
+  // size from, there is nothing to crop TO, so the whole image is shown
+  // instead. An implementation that "crops the box" passes every other case.
+  it('T-AI-041h: an OCR box with no tile yields NO crop - it is a text line', () => {
     expect(
       tileCropFor({
         boxSource: 'ocr',
-        boundingBoxes: [box({ h: 0.02 })],
+        boundingBoxes: [box({ tileBox: undefined })],
       }),
     ).toBeNull();
   });
@@ -542,36 +561,36 @@ describe('T-AI-041 - tileCropFor selects the tile region, or refuses', () => {
     // once `T-UX-151b` made `CandidateCard` render a thumbnail for every
     // card with no poster: those cards got no crop and showed the WHOLE
     // pasted screenshot beside "is this the right match?". See `T-UX-154`.
-    expect(tileCropFor({ boxSource: 'llm', boundingBoxes: [box()] })).not.toBeNull();
+    expect(tileCropFor({ boxSource: 'ocr', boundingBoxes: [box()] })).not.toBeNull();
   });
 
   it('T-AI-041j: no boxes at all degrades to the whole image, not a throw', () => {
-    expect(tileCropFor({ boxSource: 'llm', boundingBoxes: [] })).toBeNull();
+    expect(tileCropFor({ boxSource: 'ocr', boundingBoxes: [] })).toBeNull();
   });
 
   it('T-AI-041k: boxes are unioned, but only those on the SAME image as the first', () => {
     const crop = tileCropFor({
-      boxSource: 'llm',
+      boxSource: 'ocr',
       boundingBoxes: [
-        box({ x: 0.2, y: 0.4, w: 0.1, h: 0.1 }),
-        box({ x: 0.35, y: 0.4, w: 0.1, h: 0.1 }),
+        box({ x: 0.2, y: 0.4, w: 0.1, h: 0.02 }),
+        box({ x: 0.35, y: 0.4, w: 0.1, h: 0.02, tileBox: undefined }),
         // A box on a DIFFERENT image must not widen the rectangle - the crop
         // is only meaningful against the image it was measured on.
-        box({ imageId: 'img_2', x: 0.9, y: 0.9, w: 0.05, h: 0.05 }),
+        box({ imageId: 'img_2', x: 0.9, y: 0.9, w: 0.05, h: 0.02, tileBox: undefined }),
       ],
     });
 
     expect(crop?.imageId).toBe('img_1');
-    // Union spans 0.2 -> 0.45, i.e. 0.25 wide, plus 8% padding on both sides.
-    expect(crop?.w).toBeCloseTo(0.29, 6);
-    // and does NOT reach img_2's box at 0.9.
+    // The union of the img_1 captions spans 0.2 -> 0.45, so its centre is
+    // 0.325 — moved right by the second box, and NOT dragged to img_2's 0.9.
+    expect((crop?.x ?? 0) + (crop?.w ?? 0) / 2).toBeCloseTo(0.325, 6);
     expect((crop?.x ?? 0) + (crop?.w ?? 0)).toBeLessThan(0.9);
   });
 
   it('T-AI-041l: a crop is clamped into the image, never negative or past the edge', () => {
     const crop = tileCropFor({
-      boxSource: 'llm',
-      boundingBoxes: [box({ x: 0, y: 0, w: 1, h: 1 })],
+      boxSource: 'ocr',
+      boundingBoxes: [box({ x: 0, y: 0, w: 1, h: 1, tileBox: { x: 0, y: 0, w: 1, h: 1 } })],
     });
 
     expect(crop?.x).toBe(0);
@@ -585,8 +604,8 @@ describe('T-AI-041 - tileCropFor selects the tile region, or refuses', () => {
   it('T-AI-041m: a degenerate box is refused rather than magnified infinitely', () => {
     expect(
       tileCropFor({
-        boxSource: 'llm',
-        boundingBoxes: [box({ w: 0, h: 0 })],
+        boxSource: 'ocr',
+        boundingBoxes: [box({ tileBox: { x: 0.2, y: 0.4, w: 0, h: 0 } })],
       }),
     ).toBeNull();
   });
@@ -594,8 +613,16 @@ describe('T-AI-041 - tileCropFor selects the tile region, or refuses', () => {
   it('T-AI-041n: a non-finite coordinate degrades to the whole image', () => {
     expect(
       tileCropFor({
-        boxSource: 'llm',
+        boxSource: 'ocr',
         boundingBoxes: [box({ x: Number.NaN })],
+      }),
+    ).toBeNull();
+    // ...and a non-finite TILE coordinate too: it is the size source, so a
+    // NaN there produces a crop of NaN width, which renders as nothing.
+    expect(
+      tileCropFor({
+        boxSource: 'ocr',
+        boundingBoxes: [box({ tileBox: { x: 0.15, y: 0.25, w: Number.NaN, h: 0.25 } })],
       }),
     ).toBeNull();
   });

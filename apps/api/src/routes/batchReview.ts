@@ -100,20 +100,41 @@ function isMatchRef(value: unknown): value is ReviewMatchRef {
  */
 export function parseBoundingBoxes(
   raw: string | null,
-): { imageId: string; x: number; y: number; w: number; h: number }[] {
+): { imageId: string; x: number; y: number; w: number; h: number; tileBox?: Rect }[] {
   if (raw === null || raw === '') return [];
   try {
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isBoundingBox);
+    return parsed.filter(isBoundingBox).map((box) => {
+      // ⚠ A malformed `tileBox` DROPS THE TILE, NOT THE BOX. `tileBox` only
+      // exists on OCR-corroborated items, so rejecting the whole box would
+      // discard the candidate's only recorded evidence and change which rows
+      // the review page can locate at all. Losing just the tile means "no
+      // crop" — the whole screenshot, which `tileCropFor` already handles.
+      const { tileBox, ...rest } = box;
+      return isRect(tileBox) ? { ...rest, tileBox } : rest;
+    });
   } catch {
     return [];
   }
 }
 
+interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+function isRect(value: unknown): value is Rect {
+  if (typeof value !== 'object' || value === null) return false;
+  const rect = value as Record<string, unknown>;
+  return (['x', 'y', 'w', 'h'] as const).every((key) => typeof rect[key] === 'number');
+}
+
 function isBoundingBox(
   value: unknown,
-): value is { imageId: string; x: number; y: number; w: number; h: number } {
+): value is { imageId: string; x: number; y: number; w: number; h: number; tileBox?: unknown } {
   if (typeof value !== 'object' || value === null) return false;
   const box = value as Record<string, unknown>;
   if (typeof box['imageId'] !== 'string') return false;

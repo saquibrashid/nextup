@@ -340,6 +340,22 @@ export interface BoundingBox {
   y: number;
   w: number;
   h: number;
+  /**
+   * The primary reader's tile rectangle that this MEASURED box corroborated,
+   * when there is one (`specs/ai.md` §2.1c step 3).
+   *
+   * ⚠ **The two boxes describe different things and neither replaces the
+   * other.** `x/y/w/h` above is a text-LINE rectangle — exact in position,
+   * useless as a thumbnail, because it contains the caption and none of the
+   * artwork. `tileBox` is the reader's estimate of the whole tile — accurate
+   * in SIZE and unreliable in POSITION, measured at
+   * `docs/evaluation/tile-geometry-2026-09-20.md`. `tileCropFor` needs both:
+   * the position from one and the size from the other.
+   *
+   * Absent when no tile corroborated the line, and absent on `boxSource:
+   * 'llm'` boxes, where the box already IS the reader's tile.
+   */
+  tileBox?: { x: number; y: number; w: number; h: number } | undefined;
 }
 
 export interface MatchCandidate {
