@@ -275,8 +275,9 @@ describe('suppressed-view UX states — §8', () => {
     await waitFor(() => {
       expect(screen.getByTestId('suppressed-row')).toHaveAttribute('aria-busy', 'true');
     });
-    expect(screen.getByTestId('unsuppress-submitting')).toBeDisabled();
-    expect(screen.queryByTestId('stop-ignoring-button')).not.toBeInTheDocument();
+    expect(screen.getByTestId('unsuppress-submitting')).toHaveAttribute('role', 'status');
+    expect(screen.getByTestId('unsuppress-confirm-button')).toBeDisabled();
+    expect(screen.getByTestId('stop-ignoring-button')).toBeDisabled();
   });
 
   it('T-UX-084a: success restates the un-suppression caveat as a status', async () => {
@@ -331,7 +332,7 @@ describe('offline state — T-UX-003 / §8.7 deferred surface', () => {
     fireEvent.click(screen.getByTestId('stop-ignoring-button'));
     fireEvent.click(screen.getByTestId('unsuppress-confirm-button'));
     await waitFor(() => {
-      expect(screen.getByTestId('unsuppress-submitting')).toBeDisabled();
+      expect(screen.getByTestId('unsuppress-confirm-button')).toBeDisabled();
     });
 
     setNavigatorOnline(false);

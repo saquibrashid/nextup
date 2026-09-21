@@ -690,7 +690,20 @@ finished, so the exception cannot outlive its reason.
 | `TASK-231` | `done` | Owner-scoped unfinished-capture strip and shared history/resume vocabulary; authoritative stage reread; keyed status lifetimes, nonoverlapping polls, explicit slow/failed-read recovery, unavailable links and no late redirect after leaving. Capture navigation and replaced decision controls restore focus without losing a large review's position. `T-UX-165a`–`k` cover component races and complete Chromium/WebKit journeys at 280/390/1440px in both modes. No API, migration, dependency or infrastructure change; CI-gated release. |
 | `TASK-232` | `done` | #328: validated browser-local destination persists filters/search and complete sort across restarts. Bare-root entry and application returns resolve before list reads, preserve receipt state and omit cursors; explicit links, Back/Forward and clear operations remain authoritative. Direction-only session fallback retired. Unsupported choices/storage failure are disclosed. `T-LIB-001a`–`h`, full web and responsive browser regressions. Separate PR; #326 follows. |
 | `TASK-233` | `done` | #326: browse-first filter/sort row with Compact/Grid and compact Search below. Labelled disclosure focuses input; active query remains named and clearable when collapsed. Explicit submit, cursor reset, focus-preserving clear, Escape/draft dismissal and history reveal retain URL semantics. `T-LIB-002a`–`d`; responsive geometry, accessibility and existing search/navigation regressions. Separate dependent PR; no API, dependency or infrastructure change. |
+| `TASK-234` | `done` | All shared dialogs use viewport portals, scroll lock and inert backgrounds. Library actions, Stop ignoring, restore conflicts and extraction discard/replace preserve consent, pending writes, visible failures, undo and no-scroll focus return. Long workflows and candidate editing stay in context. `T-MOD-001`–`004` cover component guards and responsive Chromium/WebKit geometry, long content, focus, scroll and accessibility. No API, migration, dependency or infrastructure changes. |
 <!-- STATUS-LEDGER:END -->
+
+### Approved modal context correction, 2026-09-21
+
+Before #327, the owner requested fixing Remove from list scrolling to a
+page-bottom confirmation and auditing the other pages for appropriate modals.
+Short confirmation/edit tasks use the shared viewport overlay; long workflows
+and inline candidate edits remain pages or in-context controls. See
+`specs/ui.md` modal contract.
+
+| Task | Work | Size | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| TASK-234 | Make all Dialog variants truly modal; correct library, removal-history, Not interested and extraction-recovery confirmations. Preserve scroll/focus, pending writes, consent and undo. | 1 agent-run + 15 owner-review-minutes | TASK-233 | `T-MOD-001`, `T-MOD-002`, `T-MOD-003`, `T-MOD-004`; existing dialog/capture regressions |
 
 ### Approved library follow-ups, 2026-09-21
 

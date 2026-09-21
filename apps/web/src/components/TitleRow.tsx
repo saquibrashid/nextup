@@ -432,7 +432,8 @@ export function TitleRow({
                 // exists to prevent; disabling the whole LIST instead is the
                 // failure mode it names in the same sentence.
                 disabled={busy}
-                onClick={() => {
+                onClick={(event) => {
+                  event.currentTarget.focus({ preventScroll: true });
                   onFixMatch(item);
                 }}
               >
@@ -456,7 +457,8 @@ export function TitleRow({
                   aria-label={`Actions for ${item.name}`}
                   data-testid="row-menu"
                   disabled={busy}
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.currentTarget.focus({ preventScroll: true });
                     onOpenMenu(item);
                   }}
                 >

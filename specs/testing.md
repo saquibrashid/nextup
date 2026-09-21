@@ -162,6 +162,10 @@ TASK-231 adds navigation, status-read lifetime and complete responsive journeys.
 | `T-LIB-001i` | Web | Default saved choices do not add redundant redirects or query parameters on entry/return. `apps/web/test/libraryNavigation.spec.tsx`. |
 | `T-LIB-002a`–`c` | Web | #326: compact default, labelled keyboard disclosure and input focus, Escape/draft dismissal, active collapse without clearing, clear focus, and history reveal without stealing focus. `apps/web/test/listSearch.spec.tsx`. |
 | `T-LIB-002d` | E2E | #326: real toolbar height reduction, browse-first hierarchy, phone/desktop tap targets, native submit without keystroke requests, visible clearable active chip while collapsed, focus, overflow and axe in Chromium/WebKit. `tests/e2e/refinedLibrary.spec.ts`. |
+| `T-MOD-001` | Web | Cases a–e: all Dialog defaults portal, lock scroll and restore prior inert state; safe initial focus, removal/suppression pending-write and undo dismissal guards, Add/Fix pending dismissal guards; surviving-neighbour/heading focus without scrolling. `apps/web/test/modalContext.spec.tsx`. |
+| `T-MOD-002` | E2E | Long-library Remove, Not interested, Fix match and Add title stay viewport-bounded with inert background, cancellation scroll/focus, held writes, undo, visible errors and axe at 320/1280px in Chromium/WebKit. `tests/e2e/modalContext.spec.ts`. |
+| `T-MOD-003` | Web + E2E | Not interested and removal-history duplicate/suppression consent use accessible, cancellable overlays with stable scroll/focus on desktop and phone; pending writes, explicit failures and missing-action explanation. `apps/web/test/removedPage.spec.tsx`, `tests/e2e/modalContext.spec.ts`. |
+| `T-MOD-004` | Web | Extraction discard/replace confirmation portals, retains errors and disables all dismissal/commit paths while saving or offline as appropriate. `apps/web/test/batchStatusPage.spec.tsx`. |
 
 > ### ⚠ REVISION 7 (2026-08-11) — `A45`: clipboard paste is the primary ingest path
 >

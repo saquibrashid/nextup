@@ -54,7 +54,10 @@ function focusable(root: HTMLElement): HTMLElement[] {
  * control inside is disabled, so there is nothing else to hold focus, and
  * focus falling to `<body>` at that moment escapes the trap entirely.
  */
-export function useDialogFocus(onDismiss: () => void): RefObject<HTMLDivElement | null> {
+export function useDialogFocus(
+  onDismiss: () => void,
+  returnFocus?: RefObject<HTMLElement | null>,
+): RefObject<HTMLDivElement | null> {
   const ref = useRef<HTMLDivElement | null>(null);
   const dismiss = useRef(onDismiss);
   dismiss.current = onDismiss;
@@ -64,10 +67,20 @@ export function useDialogFocus(onDismiss: () => void): RefObject<HTMLDivElement 
     if (element === null) return;
 
     // ⚠ Captured BEFORE the first focus move, or the trigger is already gone.
-    const trigger = document.activeElement;
+    const trigger = returnFocus?.current ?? document.activeElement;
+    const row = trigger instanceof HTMLElement ? trigger.closest('li') : null;
+    const controlIndex =
+      row !== null && trigger instanceof HTMLElement ? focusable(row).indexOf(trigger) : -1;
+    const neighbours = [
+      row?.nextElementSibling?.querySelector<HTMLElement>(FOCUSABLE),
+      row?.previousElementSibling?.querySelector<HTMLElement>(FOCUSABLE),
+    ];
+    const heading = document.querySelector<HTMLElement>('main h1');
 
-    const first = focusable(element)[0];
-    (first ?? element).focus();
+    const first =
+      element.querySelector<HTMLElement>('[data-dialog-initial-focus]:not([disabled])') ??
+      focusable(element)[0];
+    (first ?? element).focus({ preventScroll: true });
 
     function onKeyDown(event: KeyboardEvent): void {
       if (element === null) return;
@@ -114,9 +127,26 @@ export function useDialogFocus(onDismiss: () => void): RefObject<HTMLDivElement 
       // dialog's own action has just re-rendered away. Focusing a detached
       // node silently sends focus to `<body>`, which is the bug this restore
       // exists to prevent, so only restore to something still on the page.
-      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
+      const restoredRow = row?.id ? document.getElementById(row.id) : null;
+      const target =
+        trigger instanceof HTMLElement && trigger !== document.body && trigger.isConnected
+          ? trigger
+          : ((restoredRow === null ? undefined : focusable(restoredRow)[controlIndex]) ??
+            neighbours.find((node) => node?.isConnected) ??
+            heading);
+      if (target?.isConnected) {
+        if (!target.hasAttribute('tabindex') && target === heading) target.tabIndex = -1;
+        target.focus({ preventScroll: true });
+      }
     };
-  }, []);
+  }, [returnFocus]);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (element !== null && !element.contains(document.activeElement)) {
+      element.focus({ preventScroll: true });
+    }
+  });
 
   return ref;
 }

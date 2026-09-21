@@ -25,7 +25,7 @@
  * change, not a code change, and is left to the owner.
  */
 
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -356,6 +356,66 @@ function apiError(code: string, message: string, details: Record<string, unknown
 }
 
 describe('the restore control — T-RES-016 / T-UI-009', () => {
+  it.each(['duplicate', 'suppressed'] as const)(
+    'T-MOD-003a: %s consent stays modal during writes and exposes failures',
+    async (kind) => {
+      const user = userEvent.setup();
+      let rejectWrite!: (error: Error) => void;
+      const pending = () =>
+        new Promise<RestoreResponse>((_resolve, reject) => {
+          rejectWrite = reject;
+        });
+      const onRestore = vi
+        .fn()
+        .mockRejectedValueOnce(
+          apiError(
+            kind === 'duplicate' ? 'DUPLICATE_WORK_IDENTITY' : 'WORK_SUPPRESSED',
+            'Conflict',
+            { unsuppressHref: '/api/suppressions/sup_99/unsuppress' },
+          ),
+        )
+        .mockImplementation(pending);
+      const onUnsuppress = vi.fn(pending);
+      render(<RemovedPage items={[removed()]} onRestore={onRestore} onUnsuppress={onUnsuppress} />);
+      await user.click(screen.getByTestId('restore-button'));
+      await screen.findByRole('dialog');
+      await user.click(
+        screen.getByTestId(
+          kind === 'duplicate' ? 'restore-keep-both' : 'restore-unsuppress-action',
+        ),
+      );
+      await user.keyboard('{Escape}');
+      fireEvent.click(screen.getByRole('dialog').parentElement!);
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(
+        screen.getByTestId(
+          kind === 'duplicate' ? 'restore-duplicate-cancel' : 'restore-suppressed-cancel',
+        ),
+      ).toBeDisabled();
+      await act(async () => rejectWrite(new Error('Connection lost')));
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        kind === 'duplicate' ? 'Could not restore' : 'Could not stop ignoring',
+      );
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(screen.getByTestId('restore-button')).toHaveFocus();
+    },
+  );
+
+  it('T-MOD-003b: a missing suppression action has an explanation, not a dead confirmation', async () => {
+    render(
+      <RemovedPage
+        items={[removed()]}
+        onRestore={() => Promise.reject(apiError('WORK_SUPPRESSED', 'Suppressed'))}
+        onUnsuppress={vi.fn()}
+      />,
+    );
+    await userEvent.click(screen.getByTestId('restore-button'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Open Not interested');
+    expect(screen.getByTestId('restore-unsuppress-action')).toBeDisabled();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByTestId('restore-button')).toHaveFocus();
+  });
+
   it('T-RES-016a: every row has a restore button', () => {
     render(
       <RemovedPage
@@ -392,7 +452,7 @@ describe('submitting state — T-UX-074', () => {
 
     expect(screen.getByTestId('restore-submitting')).toHaveTextContent(RESTORE_SUBMITTING_LABEL);
     expect(screen.getByTestId('restore-submitting')).toHaveAttribute('aria-busy', 'true');
-    expect(screen.queryByTestId('restore-button')).toBeNull();
+    expect(screen.getByTestId('restore-button')).toBeDisabled();
   });
 });
 
