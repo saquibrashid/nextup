@@ -105,7 +105,8 @@ describe('T-EXPORT-001 — every owner row reaches the artefact', () => {
     // above is satisfied by an export of nothing compared against a model list
     // of nothing — both sides derive from the same source, so a DMMF that
     // failed to load would agree with itself.
-    expect(expected.length).toBe(13);
+    expect(expected.length).toBe(14);
+    expect(expected).toContain('capture_ingest_attempt');
     expect(expected).toContain('upload_batch');
     expect(expected).toContain('suppression');
     expect(expected).toContain('removal_decision');

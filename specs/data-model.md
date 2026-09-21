@@ -2663,3 +2663,41 @@ constraints; the CI schema-diff gate must report no Prisma drift.
 All eight services use the existing screenshot, review, reconciliation,
 suppression and watch-preference paths. Full-update affects one selected
 service only. No data is imported or reclassified merely by enabling a service.
+
+## 20. Capture intake evidence (TASK-230)
+
+Additive migration `0013_capture_completeness` adds
+`upload_batch.capture_tracking`: `tracked`, `unverified` (SQL default), or
+`inherited-incomplete`. Existing rows and older writers remain unverified.
+Current protocol-aware capture creation opts into tracked intake; derivation
+preserves source uncertainty without changing the original batch.
+
+`capture_ingest_attempt` stores owner/batch-scoped ID and client token, kind
+(`upload`, `local-refusal`, `image-removal`), state (`receiving`, `complete`,
+`incomplete`, `resolved`), started/completed/resolved timestamps and JSON arrays
+of failures, accepted image IDs and replacement image IDs. The owner/batch/token
+index is unique. Identity columns use BIN2; state/kind/origin and JSON-array
+CHECKs live in migration SQL. The batch FK is NO ACTION. A resolved record
+requires a resolved timestamp; other states cannot carry one.
+
+An upload attempt is admitted durably before buffering. Final accepted rows
+and attempt result commit together; finalization only changes `receiving`.
+Explicit replacement resolution cannot be overwritten by a late upload.
+The owner selects existing or newly saved images; accepted siblings of a
+partially failed request are eligible too. Coverage is an owner assertion,
+never a filename or image-comparison inference. Original failure evidence is
+retained. Removing a selected row invalidates resolution, but later blob
+expiry does not retroactively change a completed intake decision.
+
+Draft edits and submit serialize on the batch row. A durable image-removal
+attempt precedes blob deletion because external Blob state cannot roll back
+with SQL. An unfinished deletion blocks completeness and replacement selection;
+retry finishes its markers with the row deletion. No new background process
+clears uncertainty. Metadata has no TTL; the existing 30-day blob purge is
+unchanged. Owner export includes the new model through schema enumeration.
+
+The common intake predicate is only one removal gate: extraction yield,
+quality, review decisions and owner confirmation remain independently required.
+Missing intake permits additions but never full-update removal. See
+`docs/proposals/capture-lifecycle.md` §6.1 for rollout/rollback constraints and
+`specs/testing.md` for `T-UX-164a`–`ab`.

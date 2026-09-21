@@ -341,7 +341,12 @@ async function expectServiceUpload(page: Page, service: Service): Promise<void> 
   expect(state.uploadedFileNames).toEqual([]);
   await page.getByRole('button', { name: SUBMIT_LABEL }).click();
   await expect(page).toHaveURL(`/batches/${BATCH_ID}/review`);
-  expect(state.batchCreatedWith).toEqual({ service, mode: 'full-update' });
+  expect(state.batchCreatedWith).toEqual({
+    service,
+    mode: 'full-update',
+    captureProtocol: 1,
+    selectionRefusals: [],
+  });
   await expect(page.getByRole('heading', { name: 'Review this batch' })).toBeVisible();
   await page.getByRole('button', { name: 'Confirm all 1' }).click();
   await page.getByRole('button', { name: REVIEW_APPLY_LABEL }).click();
@@ -512,7 +517,12 @@ test.describe('T-PASTE-010 — the add-not-swap regression guard', () => {
 
     await page.getByRole('button', { name: SUBMIT_LABEL }).click();
     await expect(page).toHaveURL(`/batches/${BATCH_ID}/review`);
-    expect(state.batchCreatedWith).toEqual({ service: 'netflix', mode: 'full-update' });
+    expect(state.batchCreatedWith).toEqual({
+      service: 'netflix',
+      mode: 'full-update',
+      captureProtocol: 1,
+      selectionRefusals: [],
+    });
     expect(state.submitted).toBe(true);
 
     await expect(page.getByRole('heading', { name: 'Review this batch' })).toBeVisible();

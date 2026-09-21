@@ -49,6 +49,7 @@ import {
 } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
+import { readCaptureIntake } from '../services/captureIntake.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import {
   findUploadBatch,
@@ -387,6 +388,7 @@ export function registerBatchReviewRoutes(router: Router): void {
       untickedListingIds,
       imagesWithNoText,
       tmdbUnavailable: readTmdbUnavailable(batch.extractionStats),
+      captureComplete: (await readCaptureIntake(ownerId, batch)).complete,
     });
 
     // REQ-012 is asserted on the way out, not merely tested. A verdict added

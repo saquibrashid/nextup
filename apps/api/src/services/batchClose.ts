@@ -69,6 +69,7 @@ import {
 } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
+import { readCaptureIntake } from './captureIntake.js';
 import { loadReviewCandidates, proposedRemovalsFrom } from '../routes/batchReview.js';
 import { toIsoDate } from '../routes/titles.js';
 import {
@@ -353,7 +354,13 @@ interface RemovalPlan {
  */
 async function planRemovals(
   ownerId: OwnerId,
-  batch: { id: string; mode: string; lowYield: boolean; crossCheck: string | null },
+  batch: {
+    id: string;
+    mode: string;
+    lowYield: boolean;
+    crossCheck: string | null;
+    captureTracking: string;
+  },
   service: Service,
   loaded: Awaited<ReturnType<typeof loadReviewCandidates>>,
   options: CloseOptions,
@@ -368,6 +375,7 @@ async function planRemovals(
   const withheld = removalWithheldReason({
     lowYield: batch.lowYield,
     crossCheck: (batch.crossCheck ?? 'ok') as CrossCheckOutcome,
+    captureComplete: (await readCaptureIntake(ownerId, batch)).complete,
   });
   if (withheld !== null) return null;
 

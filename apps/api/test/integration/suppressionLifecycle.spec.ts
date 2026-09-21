@@ -182,6 +182,7 @@ async function makeBatch(service = 'netflix', mode = 'append-only'): Promise<str
   const id = `batch-sup-${++batchSeq}`;
   await testPrisma().uploadBatch.create({
     data: {
+      captureTracking: 'tracked',
       id,
       ownerId,
       service,

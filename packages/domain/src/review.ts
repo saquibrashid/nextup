@@ -308,6 +308,7 @@ export interface BuildReviewInput {
    * rather than forced to assert one either way.
    */
   tmdbUnavailable?: boolean;
+  captureComplete?: boolean;
 }
 
 // ── Output ─────────────────────────────────────────────────────────────────
@@ -329,7 +330,7 @@ export interface RemovalSection extends ReviewSection<ReviewRemovalItem> {
   withheldReason: RemovalWithheldReason | null;
 }
 
-export type RemovalWithheldReason = 'low-yield' | 'degraded-extraction';
+export type RemovalWithheldReason = 'low-yield' | 'degraded-extraction' | 'incomplete-capture';
 
 export interface ReviewResponse {
   candidateSummary?: { total: number; alreadyKnown: number };
@@ -538,7 +539,9 @@ function clampUnit(value: number): number {
 export function removalWithheldReason(input: {
   lowYield: boolean;
   crossCheck: CrossCheckOutcome;
+  captureComplete?: boolean;
 }): RemovalWithheldReason | null {
+  if (input.captureComplete === false) return 'incomplete-capture';
   if (input.lowYield) return 'low-yield';
   if (input.crossCheck === 'llm-unavailable') return 'degraded-extraction';
   return null;
@@ -647,7 +650,11 @@ export function buildReviewResponse(input: BuildReviewInput): ReviewResponse {
   // omitting it would hide a title the owner definitely captured.
   const showAlready = fullUpdate || discovery;
   const withheldReason = fullUpdate
-    ? removalWithheldReason({ lowYield: input.lowYield, crossCheck: input.crossCheck })
+    ? removalWithheldReason({
+        lowYield: input.lowYield,
+        crossCheck: input.crossCheck,
+        captureComplete: input.captureComplete ?? true,
+      })
     : null;
   const showRemovals = fullUpdate && withheldReason === null;
 
@@ -661,14 +668,22 @@ export function buildReviewResponse(input: BuildReviewInput): ReviewResponse {
     degradedExtraction: input.degradedExtraction,
     crossCheck: input.crossCheck,
     tmdbUnavailable: input.tmdbUnavailable ?? false,
-    banner: reviewBanner({
-      mode: input.mode,
-      lowYield: input.lowYield,
-      crossCheck: input.crossCheck,
-      candidateCount: visible.length,
-      imageCount: input.imagesWithNoText.length + countDistinctImages(visible),
-      tmdbUnavailable: input.tmdbUnavailable ?? false,
-    }),
+    banner:
+      [
+        fullUpdate && input.captureComplete === false
+          ? 'This capture has unresolved or unverified screenshot input. Nothing will be removed. Additions can still be reviewed and applied.'
+          : null,
+        reviewBanner({
+          mode: input.mode,
+          lowYield: input.lowYield,
+          crossCheck: input.crossCheck,
+          candidateCount: visible.length,
+          imageCount: input.imagesWithNoText.length + countDistinctImages(visible),
+          tmdbUnavailable: input.tmdbUnavailable ?? false,
+        }),
+      ]
+        .filter((message) => message !== null)
+        .join(' ') || null,
     sections: {
       additions: {
         label: REVIEW_LABELS.additions,

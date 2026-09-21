@@ -31,8 +31,10 @@ const createUploadedImage = vi.fn();
 
 vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/repository/ownerData.js')>();
+  const { emptyCaptureRepository } = await import('./captureRepositoryFixture.js');
   return {
     ...actual,
+    ...emptyCaptureRepository,
     findUploadBatch: (...args: unknown[]) => findUploadBatch(...args) as unknown,
     batchImageTotals: (...args: unknown[]) => batchImageTotals(...args) as unknown,
     createUploadedImage: (...args: unknown[]) => createUploadedImage(...args) as unknown,

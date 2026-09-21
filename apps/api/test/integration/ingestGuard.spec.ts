@@ -479,7 +479,7 @@ describe('T-IMG-018 no compensating cleanup exists to get wrong', () => {
     const ingestPath = route.slice(0, deleteHandlerAt);
 
     // NON-VACUITY. A slice that missed the POST handler would pass forever.
-    expect(ingestPath).toContain("router.post('/batches/:batchId/images'");
+    expect(ingestPath).toMatch(/router\.post\(\s*'\/batches\/:batchId\/images'/);
     expect(ingestPath).toContain('ingestFiles(');
 
     for (const source of [ingest, ingestPath]) {

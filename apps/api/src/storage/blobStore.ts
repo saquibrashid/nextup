@@ -83,6 +83,10 @@ export interface ImageBlobStore {
   remove(blobPath: string): Promise<void>;
 }
 
+export async function imageBlobExists(blobPath: string): Promise<boolean> {
+  return containerClient().getBlockBlobClient(blobPath).exists();
+}
+
 let cached: ContainerClient | undefined;
 let cachedCredential: DefaultAzureCredential | undefined;
 

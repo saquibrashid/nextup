@@ -53,6 +53,7 @@ import {
   findUploadBatch,
   listImagesForBatch,
   transitionUploadBatchStatus,
+  runInTransaction,
   type Db,
   type OwnerId,
 } from '../repository/ownerData.js';
@@ -106,8 +107,8 @@ export function canTransition(from: BatchStatus, to: BatchStatus): boolean {
 }
 
 /** The batch, or a 404 — never a 403, which would confirm the id exists (NFR-008). */
-export async function loadOwnedBatch(ownerId: OwnerId, batchId: string) {
-  const batch = await findUploadBatch(ownerId, batchId);
+export async function loadOwnedBatch(ownerId: OwnerId, batchId: string, tx?: Db) {
+  const batch = await findUploadBatch(ownerId, batchId, tx);
   if (!batch) {
     throw new AppError('NOT_FOUND', 404, 'No such batch.');
   }
@@ -213,7 +214,7 @@ export interface SubmitResult {
  * `POST /api/batches/:batchId/submit` (§6.14).
  *
  * ⚠ The empty-batch check is a **400 `NO_IMAGES`**, not a 409, and it is made
- * before the transition — but only while the batch is still `draft`, so a
+ * inside the transition's transaction — but only when the source is `draft`, so a
  * second submit of an empty-but-already-submitted batch still reports the
  * 409 the client is waiting for rather than changing its answer.
  *
@@ -227,30 +228,34 @@ export async function submitBatch(
   batchId: string,
   now: Date = new Date(),
 ): Promise<SubmitResult> {
-  const batch = await loadOwnedBatch(ownerId, batchId);
-  const images = await listImagesForBatch(ownerId, batchId);
-  if (images.length === 0 && batch.status === 'draft') {
-    throw new AppError('NO_IMAGES', 400, 'Add at least one screenshot before submitting.', {
+  return runInTransaction(async (tx) => {
+    const batch = await loadOwnedBatch(ownerId, batchId, tx);
+    await transitionBatch(
+      ownerId,
+      batch,
+      'submitted',
+      'BATCH_NOT_DRAFT',
+      'This batch has already been submitted.',
+      { submittedAt: now },
+      tx,
+    );
+    // Seal under the batch row lock before reading images; a failed validation
+    // rolls back the seal, while upload/delete finalizers wait for this transaction.
+    const images = await listImagesForBatch(ownerId, batchId, tx);
+    if (images.length === 0 && batch.status === 'draft') {
+      throw new AppError('NO_IMAGES', 400, 'Add at least one screenshot before submitting.', {
+        batchId,
+      });
+    }
+
+    return {
       batchId,
-    });
-  }
-
-  await transitionBatch(
-    ownerId,
-    batch,
-    'submitted',
-    'BATCH_NOT_DRAFT',
-    'This batch has already been submitted.',
-    { submittedAt: now },
-  );
-
-  return {
-    batchId,
-    status: 'submitted',
-    imageCount: images.length,
-    submittedAt: now.toISOString(),
-    pollAfterMs: SUBMIT_POLL_AFTER_MS,
-  };
+      status: 'submitted',
+      imageCount: images.length,
+      submittedAt: now.toISOString(),
+      pollAfterMs: SUBMIT_POLL_AFTER_MS,
+    };
+  });
 }
 
 export interface DiscardResult {

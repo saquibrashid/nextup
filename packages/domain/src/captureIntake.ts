@@ -1,5 +1,28 @@
 export type CaptureTrackingOrigin = 'tracked' | 'unverified' | 'inherited-incomplete';
 
+export interface CaptureSelectionRefusal {
+  readonly token: string;
+  readonly name: string;
+  readonly message: string;
+}
+
+export interface CaptureIntakeStatus extends CaptureIntakeAssessment {
+  readonly origin: CaptureTrackingOrigin;
+  readonly attempts: readonly {
+    readonly id: string;
+    readonly token: string;
+    readonly kind: string;
+    readonly state: string;
+    readonly failures: readonly {
+      readonly name: string;
+      readonly message: string;
+      readonly code?: string;
+    }[];
+    readonly acceptedImageIds: readonly string[];
+    readonly replacementImageIds: readonly string[];
+  }[];
+}
+
 export type CaptureAttemptEvidence =
   | { readonly id: string; readonly state: 'receiving' | 'complete' | 'incomplete' }
   | {

@@ -161,16 +161,15 @@ Add-only work may remain available; it must not silently change mode.
 
 ### 6.1 TASK-230 persistence contract
 
-Implementation status: the pure intake assessment and its `T-UX-164a`–`g`
-unit coverage are present. The database ledger, request admission, replacement
-endpoint, upload UI and review/close integration are **not implemented yet**.
-This slice must remain a draft until those surfaces and their integration
-tests are complete; the helper alone changes no production behavior.
+Implementation status: the additive ledger, pre-parser admission, atomic image
+finalization, explicit replacement UI and shared review/tick/close gate are
+implemented. `T-UX-164a`–`ab` cover domain policy, API behavior, real SQL/Blob
+failures and responsive browser recovery. Release remains CI-gated.
 
-The current image route runs multipart parsing before recording anything and
-only inserts accepted images after ingest. A parser rejection, interrupted
-request, process death or rejected file therefore leaves no durable negative
-evidence. Extraction statistics cannot reconstruct those missing inputs.
+The image route now records a receiving attempt before multipart parsing.
+Previously, a parser rejection, interrupted request, process death or rejected
+file left no durable negative evidence. Extraction statistics cannot reconstruct
+those missing inputs.
 
 Use an additive `capture_ingest_attempt` ledger and an explicit capture-origin
 field on `UploadBatch`; do not overload `lowYield`, `degradedExtraction` or
@@ -179,7 +178,7 @@ field on `UploadBatch`; do not overload `lowYield`, `degradedExtraction` or
 | Record | Contract |
 | --- | --- |
 | Batch capture origin | New tracked captures explicitly opt into tracking. Existing/older-writer batches default to unverified. Derived captures inherit an incomplete origin when the source cannot prove complete intake. |
-| Attempt | Owner/batch-scoped ID, kind (upload, local selection refusal), started/completed times, state, display-only failure evidence, accepted image IDs and explicit replacement image IDs. No screenshot bytes, EXIF or streaming credentials. |
+| Attempt | Owner/batch-scoped ID and idempotency token, kind (upload, local selection refusal, image removal), started/completed/resolved times, state, display-only failure evidence, accepted image IDs and explicit replacement image IDs. No screenshot bytes, EXIF or streaming credentials. |
 | States | Receiving, complete, incomplete, resolved. An interrupted receiving attempt remains unresolved without inventing its cause. No timeout or background worker silently clears it. |
 | Replacement | An explicit owner operation in draft selects available, successfully saved images from the same batch, either already present or newly uploaded. This includes an accepted image from a partially failed request when the owner identifies it as covering the failed input. Merely removing a local file, retrying, matching a filename or uploading an unrelated image never resolves an issue. |
 | Deleting a replacement | Removing its saved image in draft invalidates the resolution and withholds removals again. Resolution is not a permanent ignore flag. |
@@ -192,6 +191,18 @@ and the attempt result share a transaction. Draft admission, resolution and
 image commit serialize on the batch row, so submit/discard and a late upload
 cannot cross. Resolving an interrupted attempt makes a later original commit
 fail rather than introducing extra images after replacement.
+
+Image removal records its own receiving attempt **before deleting the blob**.
+Blob deletion cannot roll back with SQL. If the row transaction fails or the
+process stops between those steps, the marker keeps intake incomplete even
+when the surviving row still names a selected replacement. That image cannot
+be selected again while its removal is unfinished. Explicitly retrying removal
+finishes all interrupted removal markers for that image atomically with row
+deletion; it does not repair other unresolved input.
+
+Submit seals the batch in the same transaction that reads its images.
+Validation failure rolls back the seal. The existing `extraction-failed`
+submit retry remains supported, while late draft upload commits are refused.
 
 Client-side format/size/count refusals also matter. Before a batch exists,
 retain them with the protected local capture and include them atomically in
@@ -212,6 +223,16 @@ Replacement selection refuses expired input, but later blob expiry does not
 invent a new list-staleness rule or reverse a completed intake decision.
 No new scheduler, list TTL, automatic mutation replay or filename-based
 identity inference is permitted.
+
+Migration `0013_capture_completeness` is additive. Old rows and requests
+without `captureProtocol: 1` remain unverified; they may add titles but cannot
+remove them through the new API. Deploy the migration before the new image and
+route code. Keep traffic on a single application revision: an older binary
+does not enforce this new removal gate, so rollback to that binary is not a
+safety-preserving recovery for captures using the ledger. Prefer a forward
+fix; do not reopen full-update writes on an old revision as if the gate existed.
+Tracking proves only **recorded intake**, not that the owner photographed
+every item on a streaming service.
 
 The owner chose **explicit existing-or-new replacement**: a failed duplicate
 must not force another upload when a saved screenshot already covers it.

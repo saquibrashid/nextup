@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 2 |
+| ⬜ todo | 1 |
 | 🚧 doing | 0 |
-| ✅ done | 224 |
+| ✅ done | 225 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **229** |
@@ -24,7 +24,7 @@ Not done, and every task they depend on is done.
 
 | Task | Size | Section |
 |---|---|---|
-| `TASK-230` | 2 agent-runs + 30 owner-review-minutes | Approved capture lifecycle improvements, 2026-09-19 |
+| `TASK-231` | 1 agent-run + 20 owner-review-minutes | Approved capture lifecycle improvements, 2026-09-19 |
 
 ## Waiting on the owner
 
@@ -36,11 +36,8 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-1 task cannot start yet.
+0 tasks cannot start yet.
 
-| Task | Waiting on |
-|---|---|
-| `TASK-231` | `TASK-230` |
 
 ## Done
 
@@ -270,3 +267,4 @@ Not done, and every task they depend on is done.
 | `TASK-227` | Local/saved previews and upload-byte totals, retained rejected/uncertain inputs, verified saved recovery, route/unload protection, in-place discard reset and no subsequent writes after leaving. `T-UX-161a`–`l`; responsive Chromium/WebKit and existing upload regressions. | `T-UX-161` |
 | `TASK-228` | Authoritative saved decisions with editable outcomes, individually reversible atomic bulk results, separately persisted offline intent, explicit conflict reconciliation and no reconnect replay. Known-match correction, secondary rescue, truthful empty/discarded states and separate discard/re-extract consent preserve server sectioning and original image expiry. `T-UX-162a`–`r`; responsive Chromium/WebKit and full owner-journey regressions. No schema or infrastructure changes. | `T-UX-162` |
 | `TASK-229` | Failed Apply responses resolve against saved status before another write; verified in-review refreshes the summary for explicit retry, unreadable outcomes remain read-only, and terminal review links open durable outcomes. Batch detail projects actual listing-change counts and owner-scoped undo information from persisted records. No reconnect replay or late navigation after leaving. `T-UX-163a`–`j`; existing close/auth/undo and responsive Chromium/WebKit regressions. No migration or infrastructure changes. | `T-UX-163` |
+| `TASK-230` | Additive intake ledger records failures before parsing and commits image rows with finalization. Explicit existing-or-new replacement, sticky local reports, legacy/derived uncertainty, and interrupted blob-deletion evidence feed one review/tick/close removal gate. Submit seals the image snapshot transactionally while retaining failed-extraction retry. `T-UX-164a`–`ab` cover real SQL/Blob rollback/concurrency and responsive Chromium/WebKit recovery. CI-gated release; TASK-231 remains separate. | `T-UX-164` |

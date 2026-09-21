@@ -1,7 +1,37 @@
 import { describe, expect, it, vi } from 'vitest';
 import { assessCaptureIntake, type CaptureAttemptEvidence } from '../src/captureIntake.js';
+import { buildReviewResponse, removalWithheldReason } from '../src/review.js';
 
 describe('Capture intake evidence', () => {
+  it('T-UX-164t: intake withholding composes with extraction safeguards without changing append-only behavior', () => {
+    expect(
+      removalWithheldReason({ lowYield: false, crossCheck: 'ok', captureComplete: false }),
+    ).toBe('incomplete-capture');
+    for (const mode of ['full-update', 'append-only'] as const) {
+      for (const lowYield of [false, true]) {
+        const result = buildReviewResponse({
+          batchId: 'batch',
+          service: 'netflix',
+          mode,
+          lowYield,
+          degradedExtraction: false,
+          crossCheck: 'ok',
+          captureComplete: false,
+          candidates: [],
+          disappearedListings: [],
+          imagesWithNoText: [],
+        });
+        expect(result.sections.removals.items).toEqual([]);
+        if (mode === 'full-update') {
+          expect(result.sections.removals.withheldReason).toBe('incomplete-capture');
+          expect(result.banner).toContain('Nothing will be removed');
+        } else {
+          expect(result.sections.removals.omitted).toBe(true);
+          expect(result.banner ?? '').not.toContain('unverified screenshot input');
+        }
+      }
+    }
+  });
   it('T-UX-164a: successful intake cannot erase a rejected or interrupted request', () => {
     const attempts: CaptureAttemptEvidence[] = [
       { id: 'saved', state: 'complete' },

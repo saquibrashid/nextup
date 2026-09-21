@@ -131,8 +131,8 @@ state-aware checkpoint and confirmation rather than immediate conflict discard.
 | `T-UX-160j` | E2E | Responsive checkpoint, legal actions, dialog focus/Escape, early paste and accessible layout at 280/390/1440px in Chromium/WebKit. `tests/e2e/uploadCheckpoint.spec.ts`. |
 
 TASK-227 through TASK-229 add T-UX-161 through T-UX-163 coverage below.
-TASK-230 has pure intake-policy coverage only; its persistence, API, browser
-and transactional close coverage remains planned. TASK-231/T-UX-165 remains planned.
+TASK-230 adds persisted intake, replacement and removal-safety coverage below.
+TASK-231/T-UX-165 remains planned.
 
 | Test ID | Level | Assertion or remaining work |
 | --- | --- | --- |
@@ -149,7 +149,11 @@ and transactional close coverage remains planned. TASK-231/T-UX-165 remains plan
 | `T-UX-163h` | Unit | Durable receipt counts actual listing changes, owner-scopes the group lookup, and suppresses already-undone group offers. `apps/api/test/unit/routes/batchDetailRoute.spec.ts`. |
 | `T-UX-163i` | E2E | Lost response/read failure locks Apply; explicit status check reaches a reload-persistent receipt with no mutation replay. Chromium/WebKit at 280/390/1440px, axe and overflow. `tests/e2e/applyOutcome.spec.ts`. |
 | `T-UX-164` | Integration/Web | Persist rejected-ingest completeness evidence and withhold removals after an incomplete full capture across reloads. |
-| `T-UX-164a`–`g` | Unit | Pure intake policy: interruption/rejection survives successful input; unrelated uploads never resolve it; explicit existing/new replacements affect only the associated issue; empty or removed replacements invalidate resolution; legacy/derived uncertainty persists; intake and extraction gates remain separate; reassessment preserves evidence without a clock. `packages/domain/test/captureIntake.spec.ts`. This does not yet verify persistence or production removal withholding. |
+| `T-UX-164a`–`g`, `T-UX-164t` | Unit | Pure intake policy, explicit replacement identity, removed replacement, legacy/derived uncertainty, immutable evidence without an expiry clock, and composition with extraction/append-only safeguards. `packages/domain/test/captureIntake.spec.ts`. |
+| `T-UX-164h`–`k` | Unit | Receiving/finalization compare-and-set, ownership/draft/availability refusals, idempotent report validation and malformed persisted evidence fail closed. `apps/api/test/unit/captureIntake.spec.ts`. |
+| `T-UX-164l`–`s`, `T-UX-164aa`–`ab` | Integration | Real SQL/Blob parser and partial failures, stable reports, explicit replacement, expiry/deletion, late-commit rollback, submit sealing, owner/batch isolation, sufficient-extraction removal withholding and successful one-service removal after resolution, inherited uncertainty, constraints and creation rollback. Blob-first delete interruption remains blocking after SQL rollback; retry recovers it. Deterministic upload/submit interleaving includes the committed image snapshot. `apps/api/test/integration/captureIntake.spec.ts`. |
+| `T-UX-164u`–`y` | Web | No automatic selection; stale/deleting replacements; memory remedy; local persistence/reload/storage failure; explicit idempotent retries without reconnect replay; initial refusal declaration; unknown response/read recovery; missing intake blocks full-update extraction. `apps/web/test/captureIntake.spec.tsx`. |
+| `T-UX-164z` | E2E | Existing/new explicit replacement, lost response plus failed read, reload, deletion invalidation, accessible/overflow-free recovery at 280/390/1440px in Chromium/WebKit. `tests/e2e/captureIntake.spec.ts`. |
 | `T-UX-165` | Web/E2E | Provide unfinished-work navigation, correct terminal routing, and complete lifecycle continuity across both update modes. |
 
 > ### ⚠ REVISION 7 (2026-08-11) — `A45`: clipboard paste is the primary ingest path

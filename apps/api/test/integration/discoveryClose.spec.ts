@@ -78,6 +78,7 @@ async function makeServiceBatch(mode: string): Promise<string> {
   const id = `batch-disc-${++batchSeq}`;
   await testPrisma().uploadBatch.create({
     data: {
+      captureTracking: 'tracked',
       id,
       ownerId,
       service: 'netflix',

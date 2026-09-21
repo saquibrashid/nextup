@@ -61,6 +61,13 @@ function attachResult(imageCount: number, rejected: unknown[] = []) {
 
 function batch(status: string) {
   return {
+    intake: {
+      origin: 'tracked',
+      complete: true,
+      reason: null,
+      unresolvedAttemptIds: [],
+      attempts: [],
+    },
     batchId: 'bat_1',
     service: 'netflix',
     mode: 'full-update',

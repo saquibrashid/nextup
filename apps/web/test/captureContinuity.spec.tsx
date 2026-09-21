@@ -10,6 +10,13 @@ import { apiClient, ApiError, type ApiClient, type BatchStatus } from '../src/li
 import { ScreenshotPreview } from '../src/components/ScreenshotPreview';
 
 const saved: BatchStatus = {
+  intake: {
+    origin: 'tracked',
+    complete: true,
+    reason: null,
+    unresolvedAttemptIds: [],
+    attempts: [],
+  },
   batchId: 'draft',
   service: 'netflix',
   mode: 'full-update',

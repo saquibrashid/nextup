@@ -755,6 +755,33 @@ to change them."*
 
 ## 4. `/batches/:batchId` — Extraction status (US-006)
 
+### Saved-draft input recovery (TASK-230)
+
+The draft groups persisted input issues separately from saved screenshots and
+the local queue. It names failures, preserves memory-specific remedy links,
+and explains that unresolved full-update input withholds removals while
+additions remain available. Legacy/derived uncertainty asks for a fresh capture
+before removal eligibility, never silently treating the capture as append-only.
+
+For each failed/interrupted input, show available saved previews and initially
+unchecked choices. The owner explicitly confirms that the selected existing
+or newly uploaded screenshots cover the entire failed input. New uploads,
+filename matches and local queue removal never auto-resolve it. Removed,
+expired and unfinished-deletion images cannot remain selected for submission.
+An unfinished image removal offers retry removal, not a coverage bypass.
+Resolved input receives a status confirmation; this is not a guarantee the
+owner captured every title on the service.
+
+Local refusal reports are sticky through draft reloads and carry stable tokens.
+Rejected-only selections offer **Save input issues**. Report failures retain
+intent for explicit retry; reconnect never writes. Unreadable local evidence
+blocks extraction and directs explicit discard rather than assuming success.
+An unknown mutation followed by an unreadable saved status locks writes until
+**Check saved screenshots** succeeds. Missing intake from an older response
+blocks full-update extraction.
+
+### Extraction progress
+
 Polls `GET /api/batches/:batchId` every 2 s while `submitted`/`extracting`.
 Shows `progress.imagesDone / imagesTotal`, a per-image thumbnail strip fed by
 `GET /api/images/:imageId`, and — the moment extraction ends — the count of

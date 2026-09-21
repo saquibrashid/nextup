@@ -13,7 +13,14 @@
  * they would be subtly different on at least one of them (REQ-097).
  */
 
-import type { BatchProvenance, ErrorCode, ReviewResponse, Service } from '@nextup/domain';
+import type {
+  BatchProvenance,
+  CaptureIntakeStatus,
+  CaptureSelectionRefusal,
+  ErrorCode,
+  ReviewResponse,
+  Service,
+} from '@nextup/domain';
 
 import type { TitleListItem as WireTitleListItem } from '../components/TitleRow';
 import type { ServiceFreshness as WireServiceFreshness } from '../components/FreshnessStrip';
@@ -500,6 +507,7 @@ export interface BatchImage {
  * added. See TASK-059's ledger row.
  */
 export interface BatchStatus {
+  intake?: CaptureIntakeStatus;
   application?: {
     summary: {
       listingsCreated: number;
@@ -793,8 +801,34 @@ export function createApiClient(deps: ApiClientDeps = {}) {
         deps,
       ),
 
-    createBatch: (service: string, mode: string) =>
-      request<CreatedBatch>('/api/batches', { method: 'POST', body: { service, mode } }, deps),
+    createBatch: (
+      service: string,
+      mode: string,
+      selectionRefusals: readonly CaptureSelectionRefusal[] = [],
+    ) =>
+      request<CreatedBatch>(
+        '/api/batches',
+        { method: 'POST', body: { service, mode, captureProtocol: 1, selectionRefusals } },
+        deps,
+      ),
+
+    reportCaptureRefusals: (batchId: string, refusals: readonly CaptureSelectionRefusal[]) =>
+      request<unknown>(
+        `/api/batches/${encodeURIComponent(batchId)}/intake-refusals`,
+        { method: 'POST', body: { refusals } },
+        deps,
+      ),
+
+    resolveCaptureInput: (
+      batchId: string,
+      attemptId: string,
+      replacementImageIds: readonly string[],
+    ) =>
+      request<unknown>(
+        `/api/batches/${encodeURIComponent(batchId)}/intake/${encodeURIComponent(attemptId)}`,
+        { method: 'PATCH', body: { replacementImageIds } },
+        deps,
+      ),
 
     /** §6.15a — the batch history `/batches` renders. */
     listBatches: (signal?: AbortSignal, openOnly = false) =>
