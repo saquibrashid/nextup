@@ -13,6 +13,13 @@ import { DraftBatch } from '../src/components/DraftBatch';
 import { ImageDropzone, type QueuedImage } from '../src/components/ImageDropzone';
 
 const saved: BatchStatus = {
+  intake: {
+    origin: 'tracked',
+    complete: true,
+    reason: null,
+    unresolvedAttemptIds: [],
+    attempts: [],
+  },
   batchId: 'bat_1',
   service: 'netflix',
   mode: 'full-update',
@@ -151,7 +158,7 @@ describe('T-UX-156 — guided capture and authoritative saved drafts', () => {
     expect(stub.createBatch).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId('submit-button'));
     await screen.findByText('Saved batch destination');
-    expect(stub.createBatch).toHaveBeenCalledExactlyOnceWith('max', 'append-only');
+    expect(stub.createBatch).toHaveBeenCalledExactlyOnceWith('max', 'append-only', []);
     const form = stub.addBatchImages.mock.calls[0]?.[1];
     expect(form?.get('ingestSource')).toBe('upload');
     expect((form?.get('files') as File).name).toBe('kept.png');

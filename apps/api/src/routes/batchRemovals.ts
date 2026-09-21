@@ -21,9 +21,12 @@ import {
   REMOVAL_PATCH_MESSAGES,
   type BatchMode,
   requireServiceOf,
+  removalWithheldReason,
+  type CrossCheckOutcome,
 } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
+import { readCaptureIntake } from '../services/captureIntake.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import {
   findUploadBatch,
@@ -68,6 +71,17 @@ export function registerBatchRemovalRoutes(router: Router): void {
     if (!parsed.ok) {
       throw new AppError('VALIDATION_FAILED', 400, REMOVAL_PATCH_MESSAGES[parsed.reason], {
         reason: parsed.reason,
+      });
+    }
+
+    const withheld = removalWithheldReason({
+      lowYield: batch.lowYield,
+      crossCheck: (batch.crossCheck ?? 'ok') as CrossCheckOutcome,
+      captureComplete: (await readCaptureIntake(ownerId, batch)).complete,
+    });
+    if (withheld !== null) {
+      throw new AppError('VALIDATION_FAILED', 400, 'Removals are withheld for this capture.', {
+        reason: withheld,
       });
     }
 

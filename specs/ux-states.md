@@ -128,6 +128,21 @@ no-open-batch check, not before it. Full contract: the capture lifecycle proposa
 
 ## 5. `/batches/:batchId` — Extraction status
 
+### Persisted intake recovery (TASK-230)
+
+| State | Owner action and consequence |
+| --- | --- |
+| Local refusal before creation | Retain with the local selection and declare atomically at creation; explicit fresh-start clears only this not-yet-created selection. |
+| Unsaved refusal in an existing draft | Persist locally, show **Save input issues**, and save before further upload/submit. Lost responses retry the same tokens explicitly. |
+| Saved failed/interrupted input | Keep successful screenshots. Choose existing/new saved coverage with no preselection; confirm each issue explicitly. Additions remain possible without removal eligibility. |
+| Failed/unknown replacement response | Read authoritative saved status. If that read fails, lock mutations until explicit status check; never replay automatically. |
+| Selected replacement removed | Reopen the issue; another upload does not resolve it until explicitly associated. |
+| Interrupted screenshot deletion | Retain a durable blocker even if SQL rolled back after blob deletion. Retry removal; do not let the missing blob serve as coverage. |
+| Legacy or inherited uncertainty | Explain that a fresh capture is needed for removals. Re-extraction cannot reconstruct missing inputs. |
+| Unreadable local refusal evidence | Block extraction and show the error. A later successful local write must not erase the unknown prior evidence. Explicit discard is the recovery. |
+
+### Extraction progress
+
 | State | Owner sees | Can do | Test |
 |---|---|---|---|
 | **5.1 Queued (`submitted`)** | Actual reported counts, when available; no invented percentage. Saved screenshot names remain visible. | Leave and return; no discard until a discardable state (`api.md` §6.23). | `T-UX-050`, `T-UX-157` |

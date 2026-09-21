@@ -34,6 +34,14 @@ import {
 } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
+import {
+  beginCaptureAttempt,
+  beginImageRemoval,
+  failCaptureAttempt,
+  finishCaptureAttempt,
+  finishImageRemovals,
+  withDraftCapture,
+} from '../services/captureIntake.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import {
   batchImageTotals,
@@ -189,158 +197,216 @@ export function registerBatchImageRoutes(
   store: ImageBlobStore = azureImageBlobStore,
   stages: IngestStages = DEFAULT_STAGES,
 ): void {
-  router.post('/batches/:batchId/images', acceptUploads, async (req, res) => {
-    const ownerId = requireOwnerId(req);
-    const batchId = firstParam(req.params.batchId);
-
-    const batch = await findUploadBatch(ownerId, batchId);
-    if (!batch) {
-      throw new AppError('NOT_FOUND', 404, "That batch doesn't exist.");
-    }
-    // Images attach to a DRAFT only. Afterwards the batch has been reconciled
-    // against the list and appending would change what was already applied.
-    if (batch.status !== 'draft') {
-      throw new AppError('BATCH_NOT_DRAFT', 409, 'That batch has already been submitted.', {
-        batchId,
-        status: batch.status,
+  router.post(
+    '/batches/:batchId/images',
+    async (req, res, next) => {
+      const ownerId = requireOwnerId(req);
+      const batchId = firstParam(req.params.batchId);
+      const attempt = await beginCaptureAttempt(ownerId, batchId);
+      res.locals['captureAttemptId'] = attempt.id;
+      acceptUploads(req, res, (error: unknown) => {
+        if (error === undefined || error === null) next();
+        else
+          void failCaptureAttempt(ownerId, batchId, attempt.id, error).then(
+            () => next(error),
+            next,
+          );
       });
-    }
+    },
+    async (req, res) => {
+      const ownerId = requireOwnerId(req);
+      const batchId = firstParam(req.params.batchId);
+      const attemptId: unknown = res.locals['captureAttemptId'];
+      if (typeof attemptId !== 'string') throw new Error('Upload attempt was not recorded.');
 
-    const ingestSource = parseIngestSource(req);
-    const files = (req.files as Express.Multer.File[] | undefined) ?? [];
-    if (files.length === 0) {
-      throw new AppError('VALIDATION_FAILED', 400, 'Attach at least one image.', {
-        field: 'files',
-      });
-    }
-    if (files.length > MAX_FILES_PER_REQUEST) {
-      throw new AppError(
-        'TOO_MANY_FILES_IN_REQUEST',
-        400,
-        `Attach at most ${MAX_FILES_PER_REQUEST} files per request.`,
-        { max: MAX_FILES_PER_REQUEST, received: files.length },
-      );
-    }
+      try {
+        const batch = await findUploadBatch(ownerId, batchId);
+        if (!batch) {
+          throw new AppError('NOT_FOUND', 404, "That batch doesn't exist.");
+        }
+        // Images attach to a DRAFT only. Afterwards the batch has been reconciled
+        // against the list and appending would change what was already applied.
+        if (batch.status !== 'draft') {
+          throw new AppError('BATCH_NOT_DRAFT', 409, 'That batch has already been submitted.', {
+            batchId,
+            status: batch.status,
+          });
+        }
 
-    // ── Whole-request ceilings ────────────────────────────────────────────
-    // Only a ceiling the request as a whole would breach refuses the request
-    // outright (§6.12). These are evaluated against what is ALREADY in the
-    // batch plus what arrived, across all ingest sources.
-    const totals = await batchImageTotals(ownerId, batchId);
-    if (totals.imageCount + files.length > MAX_IMAGES_PER_BATCH) {
-      throw new AppError(
-        'TOO_MANY_IMAGES',
-        400,
-        `A batch holds at most ${MAX_IMAGES_PER_BATCH} images.`,
-        { max: MAX_IMAGES_PER_BATCH, current: totals.imageCount, incoming: files.length },
-      );
-    }
-    const incomingBytes = files.reduce((sum, file) => sum + file.size, 0);
-    // ⚠ UPLOADED vs UPLOADED. `totals.uploadedByteSize`, never
-    // `totals.storedByteSize`: this ceiling bounds what the owner SENDS, and
-    // the stored total for the same batch can be many times larger after the
-    // HEIC→PNG transcode. Summing the stored total with incoming uploaded
-    // bytes — which this line used to do — is wrong in both directions at
-    // once: it under-counts arriving HEIC so the ceiling never fires, and
-    // inflates what is already held so a later request is refused with a
-    // 60 MiB message after ~7 MiB of files.
-    if (totals.uploadedByteSize + incomingBytes > MAX_BATCH_UPLOAD_BYTES) {
-      throw new AppError(
-        'BATCH_TOO_LARGE',
-        413,
-        `A batch holds at most ${MAX_BATCH_UPLOAD_BYTES / (1024 * 1024)} MiB of images.`,
-        {
-          max: MAX_BATCH_UPLOAD_BYTES,
-          current: totals.uploadedByteSize,
-          incoming: incomingBytes,
-        },
-      );
-    }
+        const ingestSource = parseIngestSource(req);
+        const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+        if (files.length === 0) {
+          throw new AppError('VALIDATION_FAILED', 400, 'Attach at least one image.', {
+            field: 'files',
+          });
+        }
+        if (files.length > MAX_FILES_PER_REQUEST) {
+          throw new AppError(
+            'TOO_MANY_FILES_IN_REQUEST',
+            400,
+            `Attach at most ${MAX_FILES_PER_REQUEST} files per request.`,
+            { max: MAX_FILES_PER_REQUEST, received: files.length },
+          );
+        }
 
-    const incoming: IncomingFile[] = files.map((file) => ({
-      // ⚠ Passed through UNSANITISED and UNTRUSTED. `resolveFileName` decides
-      // whether it is used at all, and no path is ever composed from it.
-      clientFileName: file.originalname,
-      bytes: new Uint8Array(file.buffer),
-    }));
+        // ── Whole-request ceilings ────────────────────────────────────────────
+        // Only a ceiling the request as a whole would breach refuses the request
+        // outright (§6.12). These are evaluated against what is ALREADY in the
+        // batch plus what arrived, across all ingest sources.
+        const totals = await batchImageTotals(ownerId, batchId);
+        if (totals.imageCount + files.length > MAX_IMAGES_PER_BATCH) {
+          throw new AppError(
+            'TOO_MANY_IMAGES',
+            400,
+            `A batch holds at most ${MAX_IMAGES_PER_BATCH} images.`,
+            { max: MAX_IMAGES_PER_BATCH, current: totals.imageCount, incoming: files.length },
+          );
+        }
+        const incomingBytes = files.reduce((sum, file) => sum + file.size, 0);
+        // ⚠ UPLOADED vs UPLOADED. `totals.uploadedByteSize`, never
+        // `totals.storedByteSize`: this ceiling bounds what the owner SENDS, and
+        // the stored total for the same batch can be many times larger after the
+        // HEIC→PNG transcode. Summing the stored total with incoming uploaded
+        // bytes — which this line used to do — is wrong in both directions at
+        // once: it under-counts arriving HEIC so the ceiling never fires, and
+        // inflates what is already held so a later request is refused with a
+        // 60 MiB message after ~7 MiB of files.
+        if (totals.uploadedByteSize + incomingBytes > MAX_BATCH_UPLOAD_BYTES) {
+          throw new AppError(
+            'BATCH_TOO_LARGE',
+            413,
+            `A batch holds at most ${MAX_BATCH_UPLOAD_BYTES / (1024 * 1024)} MiB of images.`,
+            {
+              max: MAX_BATCH_UPLOAD_BYTES,
+              current: totals.uploadedByteSize,
+              incoming: incomingBytes,
+            },
+          );
+        }
 
-    const receivedAt = new Date();
-    const { accepted, rejected } = await ingestFiles(incoming, {
-      ownerId,
-      batchId,
-      ingestSource,
-      // Receipt-order ordinals continue from what the batch already holds, so
-      // a second paste into the same batch reads `-03`, not `-01` again.
-      firstSeqInBatch: totals.imageCount + 1,
-      receivedAt,
-      store,
-      stages,
-      // The decode sentinel repeats this on both of its lines (`api.md` §9.1)
-      // so an abandoned decode can be read against the request that caused it.
-      // ⚠ Not the owner id and not a hash of it: identity belongs on the
-      // request line, and §9.1 rule 5 forbids repeating it here.
-      correlationId: randomUUID(),
-    });
+        const incoming: IncomingFile[] = files.map((file) => ({
+          // ⚠ Passed through UNSANITISED and UNTRUSTED. `resolveFileName` decides
+          // whether it is used at all, and no path is ever composed from it.
+          clientFileName: file.originalname,
+          bytes: new Uint8Array(file.buffer),
+        }));
 
-    for (const image of accepted) {
-      await createUploadedImage(ownerId, {
-        id: image.imageId,
-        batchId,
-        blobPath: image.blobPath,
-        fileName: image.fileName,
-        ingestSource: image.ingestSource,
-        uploadedFormat: image.uploadedFormat,
-        format: image.format,
-        byteSize: BigInt(image.byteSize),
-        uploadedByteSize: BigInt(image.uploadedByteSize),
-        width: image.width,
-        height: image.height,
-        retainUntil: image.retainUntil,
-      });
-    }
+        const receivedAt = new Date();
+        const { accepted, rejected } = await ingestFiles(incoming, {
+          ownerId,
+          batchId,
+          ingestSource,
+          // Receipt-order ordinals continue from what the batch already holds, so
+          // a second paste into the same batch reads `-03`, not `-01` again.
+          firstSeqInBatch: totals.imageCount + 1,
+          receivedAt,
+          store,
+          stages,
+          // The decode sentinel repeats this on both of its lines (`api.md` §9.1)
+          // so an abandoned decode can be read against the request that caused it.
+          // ⚠ Not the owner id and not a hash of it: identity belongs on the
+          // request line, and §9.1 rule 5 forbids repeating it here.
+          correlationId: randomUUID(),
+        });
 
-    if (accepted.length === 0) {
-      // Nothing landed, so the request takes the first rejection's own status
-      // rather than a 201 with an empty `accepted[]` — which would read to the
-      // client as success.
-      const first = rejected[0];
-      throw new AppError(
-        (first?.code ?? 'UNSUPPORTED_IMAGE_FORMAT') as 'UNSUPPORTED_IMAGE_FORMAT',
-        statusForRejection(first?.code),
-        first?.message ?? 'nextup accepts PNG, JPEG and HEIC screenshots.',
-        { rejected },
-      );
-    }
+        const committedTotals = await withDraftCapture(ownerId, batchId, async (tx) => {
+          const current = await batchImageTotals(ownerId, batchId, tx);
+          if (current.imageCount + files.length > MAX_IMAGES_PER_BATCH) {
+            throw new AppError(
+              'TOO_MANY_IMAGES',
+              400,
+              'The saved batch no longer has room for these screenshots.',
+            );
+          }
+          if (current.uploadedByteSize + incomingBytes > MAX_BATCH_UPLOAD_BYTES) {
+            throw new AppError(
+              'BATCH_TOO_LARGE',
+              413,
+              'The saved batch no longer has room for these uploaded bytes.',
+            );
+          }
+          for (const image of accepted) {
+            await createUploadedImage(
+              ownerId,
+              {
+                id: image.imageId,
+                batchId,
+                blobPath: image.blobPath,
+                fileName: image.fileName,
+                ingestSource: image.ingestSource,
+                uploadedFormat: image.uploadedFormat,
+                format: image.format,
+                byteSize: BigInt(image.byteSize),
+                uploadedByteSize: BigInt(image.uploadedByteSize),
+                width: image.width,
+                height: image.height,
+                retainUntil: image.retainUntil,
+              },
+              tx,
+            );
+          }
+          await finishCaptureAttempt(
+            ownerId,
+            batchId,
+            attemptId,
+            accepted.map((image) => image.imageId),
+            rejected.map((item) => ({
+              name: item.fileName,
+              message: item.message,
+              code: item.code,
+            })),
+            tx,
+          );
+          return {
+            imageCount: current.imageCount + accepted.length,
+            uploadedByteSize:
+              current.uploadedByteSize +
+              accepted.reduce((sum, image) => sum + image.uploadedByteSize, 0),
+            storedByteSize:
+              current.storedByteSize + accepted.reduce((sum, image) => sum + image.byteSize, 0),
+          };
+        });
 
-    res.status(201).json({
-      // ⚠ `blobPath` is NEVER emitted (`T-SEC-003`). It is mapped out here
-      // explicitly rather than spread, so adding a field to `AcceptedImage`
-      // cannot leak it by accident.
-      accepted: accepted.map((image) => ({
-        imageId: image.imageId,
-        fileName: image.fileName,
-        format: image.format,
-        uploadedFormat: image.uploadedFormat,
-        ingestSource: image.ingestSource,
-        byteSize: image.byteSize,
-        width: image.width,
-        height: image.height,
-      })),
-      rejected,
-      // ⚠ BOTH totals, each named for its unit. A single `byteSize` here was
-      // ambiguous in exactly the way that produced the ceiling defect: the
-      // client would render one number against a limit expressed in the
-      // other. `uploadedByteSize` is the one `MAX_BATCH_UPLOAD_BYTES` bounds.
-      batchTotals: {
-        imageCount: totals.imageCount + accepted.length,
-        uploadedByteSize:
-          totals.uploadedByteSize +
-          accepted.reduce((sum, image) => sum + image.uploadedByteSize, 0),
-        storedByteSize:
-          totals.storedByteSize + accepted.reduce((sum, image) => sum + image.byteSize, 0),
-      },
-    });
-  });
+        if (accepted.length === 0) {
+          // Nothing landed, so the request takes the first rejection's own status
+          // rather than a 201 with an empty `accepted[]` — which would read to the
+          // client as success.
+          const first = rejected[0];
+          throw new AppError(
+            (first?.code ?? 'UNSUPPORTED_IMAGE_FORMAT') as 'UNSUPPORTED_IMAGE_FORMAT',
+            statusForRejection(first?.code),
+            first?.message ?? 'nextup accepts PNG, JPEG and HEIC screenshots.',
+            { rejected },
+          );
+        }
+
+        res.status(201).json({
+          // ⚠ `blobPath` is NEVER emitted (`T-SEC-003`). It is mapped out here
+          // explicitly rather than spread, so adding a field to `AcceptedImage`
+          // cannot leak it by accident.
+          accepted: accepted.map((image) => ({
+            imageId: image.imageId,
+            fileName: image.fileName,
+            format: image.format,
+            uploadedFormat: image.uploadedFormat,
+            ingestSource: image.ingestSource,
+            byteSize: image.byteSize,
+            width: image.width,
+            height: image.height,
+          })),
+          rejected,
+          // ⚠ BOTH totals, each named for its unit. A single `byteSize` here was
+          // ambiguous in exactly the way that produced the ceiling defect: the
+          // client would render one number against a limit expressed in the
+          // other. `uploadedByteSize` is the one `MAX_BATCH_UPLOAD_BYTES` bounds.
+          batchTotals: committedTotals,
+        });
+      } catch (error) {
+        await failCaptureAttempt(ownerId, batchId, attemptId, error);
+        throw error;
+      }
+    },
+  );
 
   /**
    * `DELETE /api/batches/:batchId/images/:imageId` (§6.13, US-004 AC-4).
@@ -391,8 +457,17 @@ export function registerBatchImageRoutes(
     // purge will ever reach. This order can only fail the other way - a row
     // whose blob is already gone - which the delete below then removes, and
     // which a retry of the same request resolves either way.
-    await store.remove(image.blobPath);
-    await deleteUploadedImage(ownerId, imageId);
+    const removalAttempt = await beginImageRemoval(ownerId, batchId, imageId);
+    try {
+      await withDraftCapture(ownerId, batchId, async (tx) => {
+        await store.remove(image.blobPath);
+        await deleteUploadedImage(ownerId, imageId, tx);
+        await finishImageRemovals(ownerId, batchId, imageId, tx);
+      });
+    } catch (error) {
+      await failCaptureAttempt(ownerId, batchId, removalAttempt.id, error);
+      throw error;
+    }
 
     res.status(204).end();
   });

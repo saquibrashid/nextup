@@ -47,9 +47,11 @@ import {
   createUploadedImage,
   findOpenUploadBatch,
   listImagesForBatch,
+  runInTransaction,
   type OwnerId,
 } from '../repository/ownerData.js';
 import { loadOwnedBatch } from './batchLifecycle.js';
+import { readCaptureIntake } from './captureIntake.js';
 
 export interface ReextractResult {
   batchId: string;
@@ -120,54 +122,66 @@ export async function reextractBatch(
   }
 
   const derivedId = ulid();
-  await createUploadBatch(ownerId, {
-    id: derivedId,
-    // ⚠ SERVICE AND MODE ARE INHERITED, NOT RE-ASKED (US-034 AC-3). The
-    // screenshots are of one service and were captured under one mode; a
-    // re-read of the same pixels cannot honestly be attributed to a different
-    // service, and re-asking would let the owner point a `full-update`
-    // reconciliation at bytes captured as `append-only`.
-    //
-    // ⚠ The SOURCE is inherited whole, discovery or not (ADR-0010 D-1). A
-    // re-extraction of a discovery capture is still a discovery capture, and
-    // dropping `discoverySource` here would silently promote it to a service
-    // batch with no service — which `ck_batch_source_exclusive` would then
-    // reject at the store, correctly but obscurely.
-    service: source.service,
-    discoverySource: source.discoverySource,
-    mode: source.mode,
-    derivedFromBatchId: source.id,
-    // Straight to `submitted`: there is nothing to attach, so a `draft` state
-    // would be a state the owner could never act on.
-    status: 'submitted',
-    submittedAt: now,
-  });
+  const intake = await readCaptureIntake(ownerId, source);
+  await runInTransaction(async (tx) => {
+    await createUploadBatch(
+      ownerId,
+      {
+        id: derivedId,
+        // ⚠ SERVICE AND MODE ARE INHERITED, NOT RE-ASKED (US-034 AC-3). The
+        // screenshots are of one service and were captured under one mode; a
+        // re-read of the same pixels cannot honestly be attributed to a different
+        // service, and re-asking would let the owner point a `full-update`
+        // reconciliation at bytes captured as `append-only`.
+        //
+        // ⚠ The SOURCE is inherited whole, discovery or not (ADR-0010 D-1). A
+        // re-extraction of a discovery capture is still a discovery capture, and
+        // dropping `discoverySource` here would silently promote it to a service
+        // batch with no service — which `ck_batch_source_exclusive` would then
+        // reject at the store, correctly but obscurely.
+        service: source.service,
+        discoverySource: source.discoverySource,
+        mode: source.mode,
+        derivedFromBatchId: source.id,
+        // Straight to `submitted`: there is nothing to attach, so a `draft` state
+        // would be a state the owner could never act on.
+        status: 'submitted',
+        submittedAt: now,
+        captureTracking: intake.complete ? 'tracked' : 'inherited-incomplete',
+      },
+      tx,
+    );
 
-  for (const image of images) {
-    await createUploadedImage(ownerId, {
-      id: ulid(),
-      batchId: derivedId,
-      // The SAME bytes. No copy is made in blob storage: two rows pointing at
-      // one blob is correct here, and duplicating the object would double the
-      // storage the 30-day purge is sized against for no benefit.
-      blobPath: image.blobPath,
-      fileName: image.fileName,
-      ingestSource: image.ingestSource,
-      uploadedFormat: image.uploadedFormat,
-      format: image.format,
-      byteSize: image.byteSize,
-      uploadedByteSize: image.uploadedByteSize,
-      width: image.width,
-      height: image.height,
-      // See the header note: both copied, neither restamped.
-      uploadedAt: image.uploadedAt,
-      retainUntil: image.retainUntil,
-      // ⚠ NOT copied. `null` means "not extracted yet" and `0` means
-      // "extracted, found nothing" (US-006 AC-3) — carrying the old count over
-      // would make the derived batch report results it has not produced.
-      candidateCount: null,
-    });
-  }
+    for (const image of images) {
+      await createUploadedImage(
+        ownerId,
+        {
+          id: ulid(),
+          batchId: derivedId,
+          // The SAME bytes. No copy is made in blob storage: two rows pointing at
+          // one blob is correct here, and duplicating the object would double the
+          // storage the 30-day purge is sized against for no benefit.
+          blobPath: image.blobPath,
+          fileName: image.fileName,
+          ingestSource: image.ingestSource,
+          uploadedFormat: image.uploadedFormat,
+          format: image.format,
+          byteSize: image.byteSize,
+          uploadedByteSize: image.uploadedByteSize,
+          width: image.width,
+          height: image.height,
+          // See the header note: both copied, neither restamped.
+          uploadedAt: image.uploadedAt,
+          retainUntil: image.retainUntil,
+          // ⚠ NOT copied. `null` means "not extracted yet" and `0` means
+          // "extracted, found nothing" (US-006 AC-3) — carrying the old count over
+          // would make the derived batch report results it has not produced.
+          candidateCount: null,
+        },
+        tx,
+      );
+    }
+  });
 
   return {
     batchId: derivedId,

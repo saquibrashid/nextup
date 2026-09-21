@@ -68,6 +68,7 @@ export async function closeTestPrisma(): Promise<void> {
  */
 export async function resetDatabase(db = testPrisma()): Promise<void> {
   await db.$executeRawUnsafe(`
+    DELETE FROM capture_ingest_attempt;
     DELETE FROM candidate_source_image;
     DELETE FROM extraction_candidate;
     DELETE FROM uploaded_image;
@@ -113,6 +114,7 @@ export function batchInput(overrides: Record<string, unknown> = {}) {
     mode: 'append-only',
     service: 'netflix',
     status: 'draft',
+    captureTracking: 'tracked',
     ...overrides,
   };
 }

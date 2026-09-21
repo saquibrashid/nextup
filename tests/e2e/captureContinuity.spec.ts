@@ -39,6 +39,13 @@ for (const width of [280, 390, 1440]) {
           await route.fulfill({
             json: {
               batchId: 'draft',
+              intake: {
+                origin: 'tracked',
+                complete: true,
+                reason: null,
+                unresolvedAttemptIds: [],
+                attempts: [],
+              },
               service: 'netflix',
               mode: 'full-update',
               status: 'draft',
@@ -74,6 +81,13 @@ for (const width of [280, 390, 1440]) {
           await route.fulfill({
             json: {
               batchId: 'draft',
+              intake: {
+                origin: 'tracked',
+                complete: true,
+                reason: null,
+                unresolvedAttemptIds: [],
+                attempts: [],
+              },
               service: 'netflix',
               mode: 'full-update',
               status: 'draft',

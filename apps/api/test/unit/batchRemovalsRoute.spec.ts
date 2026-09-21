@@ -89,15 +89,17 @@ const store: {
 
 vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/repository/ownerData.js')>();
+  const { emptyCaptureRepository } = await import('./captureRepositoryFixture.js');
   return {
     ...actual,
+    ...emptyCaptureRepository,
     findUploadBatch: (_ownerId: string, batchId: string) =>
       Promise.resolve(
         // `discovery_source` is NOT NULL-able but always PRESENT on a stored row
         // (migration 0006). Defaulting it here rather than in every fixture keeps
         // the mock shaped like the store instead of like the test that wrote it.
         store.batch !== null && store.batch.id === batchId
-          ? { discoverySource: null, ...store.batch }
+          ? { captureTracking: 'tracked', discoverySource: null, ...store.batch }
           : null,
       ),
     listCandidatesForReview: () => Promise.resolve([]),

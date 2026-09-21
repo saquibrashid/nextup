@@ -54,8 +54,10 @@ import {
 // agreement rather than evidence.
 vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/repository/ownerData.js')>();
+  const { emptyCaptureRepository } = await import('./captureRepositoryFixture.js');
   return {
     ...actual,
+    ...emptyCaptureRepository,
     findUploadBatch: vi.fn(),
     listImagesForBatch: vi.fn(),
     transitionUploadBatchStatus: vi.fn(),
@@ -417,7 +419,7 @@ describe('T-BATCH-017 — the refusal branches, without a store', () => {
     expect((thrown as AppError).code).toBe('BATCH_NOT_DRAFT');
   });
 
-  it('T-BATCH-019g: a draft with no images is NO_IMAGES and is never written', async () => {
+  it('T-BATCH-019g: a draft with no images raises NO_IMAGES inside the sealing transaction', async () => {
     mockFind.mockResolvedValue(batchRow('draft'));
     mockImages.mockResolvedValue([]);
 
@@ -429,7 +431,7 @@ describe('T-BATCH-017 — the refusal branches, without a store', () => {
     }
     expect((thrown as AppError).code).toBe('NO_IMAGES');
     expect((thrown as AppError).httpStatus).toBe(400);
-    expect(mockTransition).not.toHaveBeenCalled();
+    expect(mockTransition).toHaveBeenCalledTimes(1);
   });
 
   it('T-BATCH-019h: a successful submit reports the image count and the poll interval', async () => {

@@ -198,6 +198,7 @@ export interface ImageDropzoneProps {
   readonly disabled?: boolean;
   /** Local preparation: report the complete queue without uploading it. */
   readonly onQueueChange?: (images: readonly QueuedImage[]) => void;
+  readonly onSelectionRejected?: (files: readonly RejectedFile[]) => void;
   /** Whether service and mode are chosen, so a batch exists (`ux-states.md` §4.0a). */
   readonly batchReady?: boolean;
   /**
@@ -238,6 +239,7 @@ export function ImageDropzone({
   savedUploadedBytes = 0,
   uploadStates,
   onQueueChange,
+  onSelectionRejected,
   disabled = false,
   batchReady = false,
   offline = false,
@@ -276,13 +278,15 @@ export function ImageDropzone({
       // accepted list (§4.4): both are visible at once, because a rejection
       // that clears the grid reads as "everything failed".
       setRejected([...(extraRejections ?? []), ...review.rejected]);
+      const refusals = [...(extraRejections ?? []), ...review.rejected];
+      if (refusals.length > 0) onSelectionRejected?.(refusals);
       if (review.accepted.length > 0) {
         queue.current = [...queue.current, ...review.accepted.map((file) => ({ file, source }))];
         setLocalQueue(queue.current);
         onQueueChange?.(queue.current);
       }
     },
-    [onQueueChange, savedCount, savedUploadedBytes],
+    [onQueueChange, onSelectionRejected, savedCount, savedUploadedBytes],
   );
 
   const pastedByListener = useCallback(

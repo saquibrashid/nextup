@@ -1006,7 +1006,14 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
   expect(be.createdBodies).toHaveLength(0);
 
   await page.getByRole('button', { name: SUBMIT_LABEL }).click();
-  await expect.poll(() => be.createdBodies[0]).toEqual({ service: 'netflix', mode: 'full-update' });
+  await expect
+    .poll(() => be.createdBodies[0])
+    .toEqual({
+      service: 'netflix',
+      mode: 'full-update',
+      captureProtocol: 1,
+      selectionRefusals: [],
+    });
   await expect(page).toHaveURL('/batches/bat_e2e_1/review');
 
   // The list is still empty until the batch is applied.

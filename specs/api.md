@@ -1332,7 +1332,8 @@ Body: `{ "confirmDuplicate": false }`
 
 ### 6.11 `POST /api/batches` (US-003, US-005)
 
-Body: `{ "service": "netflix", "mode": "full-update" }` — **both required**;
+Body: `{ "service": "netflix", "mode": "full-update", "captureProtocol": 1,
+"selectionRefusals": [] }` — **service and mode required**;
 there is **no default mode** (US-003 AC-5). Omitting either is 400
 `VALIDATION_FAILED`.
 
@@ -1346,9 +1347,49 @@ there is **no default mode** (US-003 AC-5). Omitting either is 400
 (US-003 AC-2/AC-3) has one wording. **409 `OPEN_BATCH_EXISTS`** with
 `details.batchId` when a batch is already open (US-005 AC-5).
 
+Current capture clients send `captureProtocol: 1`; absence creates an
+unverified capture for compatibility, not a complete one. Any other supplied
+version is `400 VALIDATION_FAILED`. Optional `selectionRefusals` is an array
+of at most 100 `{ token, name, message }` records. Tokens are distinct,
+1–200 ASCII letters/digits/underscore/hyphen; names are at most 255 characters
+and messages at most 2000. Batch and initial reports commit atomically.
+
+### 6.11a Persisted screenshot input issues (TASK-230)
+
+- `POST /api/batches/:batchId/intake-refusals`: body `{ refusals: [...] }`,
+  using the same refusal schema. `204` on success, including exact-token
+  replay. A token reused for different evidence is `409 VALIDATION_FAILED`.
+- `PATCH /api/batches/:batchId/intake/:attemptId`: body
+  `{ replacementImageIds: ["saved-image-id"] }`. Requires 1–40 distinct
+  saved, unexpired images belonging to this owner and batch, with existing
+  blobs and no unfinished deletion. `204` records explicit coverage;
+  invalid/unavailable selection is `400 VALIDATION_FAILED`. Uploading an
+  image alone never resolves an issue.
+- Both operations are draft-only (`409 BATCH_NOT_DRAFT`) and owner-scoped
+  (`404 NOT_FOUND` for unavailable ownership/identity). Neither changes lists.
+- Batch detail returns `intake`: origin, complete/reason,
+  unresolvedAttemptIds and attempts with id/token/kind/state, display
+  failures (name/message/optional diagnostic code), acceptedImageIds and
+  replacementImageIds. Blob paths and screenshot bytes are never included.
+
+Review, removal ticks and close use the same persisted assessment.
+Unresolved/unverified full-update intake withholds every removal with reason
+`incomplete-capture`; additions remain usable and the mode is unchanged.
+Extraction-quality gates still apply after intake is resolved. A derived
+capture inherits source uncertainty; re-extraction cannot erase missing input.
+
 ### 6.12 `POST /api/batches/:batchId/images` (US-004)
 
 `multipart/form-data`, field name `files` (1..10 per request).
+
+After owner/draft admission, persist a receiving intake attempt **before**
+multipart buffering. Parser/decode/partial failures remain durable.
+Accepted image rows and attempt finalization share a transaction under the
+draft batch lock; a late commit after submit or explicit resolution refuses.
+Deleting a draft image likewise records a removal attempt before blob deletion;
+interruption/SQL rollback remains incomplete until explicit removal retry.
+Deleting a selected replacement invalidates its coverage. No automatic cleanup
+erases intake metadata; unused blobs keep the existing lifecycle purge.
 
 **(A45) This is the ONE ingest route for all three sources — paste, drag-drop
 and file upload.** There is no second endpoint and no JSON+base64 variant.

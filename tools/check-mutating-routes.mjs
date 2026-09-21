@@ -204,6 +204,18 @@ export const MUTATING_ROUTE_REGISTRY = [
   // — Mutating, but NOT list state. Draft/batch scaffolding only. —
   {
     method: 'POST',
+    path: '/api/batches/:batchId/intake-refusals',
+    changesListState: false,
+    why: 'records refused draft input; only batch close can change listings (TASK-230)',
+  },
+  {
+    method: 'PATCH',
+    path: '/api/batches/:batchId/intake/:attemptId',
+    changesListState: false,
+    why: 'explicitly associates saved draft replacements; applies no list changes (TASK-230)',
+  },
+  {
+    method: 'POST',
     path: '/api/batches',
     changesListState: false,
     why: 'opens a DRAFT batch; nothing is applied until close (US-005 AC-3)',

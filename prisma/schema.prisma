@@ -48,6 +48,7 @@ model UploadBatch {
   /// ⚠ NOT a `SERVICES` member and never to be widened into one.
   discoverySource String? @map("discovery_source") @db.NVarChar(64)
   status  String  @db.NVarChar(24)
+  captureTracking String @default("unverified", map: "df_batch_capture_tracking") @map("capture_tracking") @db.NVarChar(24)
 
   /// US-034 AC-3 — set for re-extraction batches. Self-referential.
   derivedFromBatchId String?       @map("derived_from_batch_id") @db.NVarChar(200)
@@ -87,10 +88,31 @@ model UploadBatch {
   candidates      ExtractionCandidate[]
   serviceStates   ServiceState[]
   watchIntents    WatchIntent[]
+  ingestAttempts CaptureIngestAttempt[]
 
   @@index([ownerId, service, status], map: "upload_batch_owner_service_status")
   @@index([derivedFromBatchId], map: "upload_batch_derived_from")
   @@map("upload_batch")
+}
+
+model CaptureIngestAttempt {
+  id String @id(map: "pk_capture_ingest_attempt") @db.NVarChar(200)
+  ownerId String @map("owner_id") @db.NVarChar(200)
+  batchId String @map("batch_id") @db.NVarChar(200)
+  batch UploadBatch @relation(fields: [batchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_capture_attempt_batch")
+  clientToken String @map("client_token") @db.NVarChar(200)
+  kind String @db.NVarChar(24)
+  state String @db.NVarChar(16)
+  failures String @db.NVarChar(Max)
+  acceptedImageIds String @map("accepted_image_ids") @db.NVarChar(Max)
+  replacementImageIds String @map("replacement_image_ids") @db.NVarChar(Max)
+  startedAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_capture_attempt_started") @map("started_at") @db.DateTime2
+  completedAt DateTime? @map("completed_at") @db.DateTime2
+  resolvedAt DateTime? @map("resolved_at") @db.DateTime2
+
+  @@unique([ownerId, batchId, clientToken], map: "uq_capture_attempt_token")
+  @@index([ownerId, batchId], map: "ix_capture_attempt_owner_batch")
+  @@map("capture_ingest_attempt")
 }
 
 /// One row per WORK. Deduplicated across services — REQ-005.

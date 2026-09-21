@@ -68,6 +68,7 @@ async function seedBatch(id: string, service: string, status: string, mode = 'ap
     where: { id },
     update: {},
     create: {
+      captureTracking: 'tracked',
       id,
       ownerId,
       service,

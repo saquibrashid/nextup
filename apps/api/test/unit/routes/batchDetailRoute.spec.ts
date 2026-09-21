@@ -34,13 +34,15 @@ const listTitleNames = vi.fn();
 
 vi.mock('../../../src/repository/ownerData.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/repository/ownerData.js')>();
+  const { emptyCaptureRepository, trackedBatch } = await import('../captureRepositoryFixture.js');
   return {
     ...actual,
+    ...emptyCaptureRepository,
     listBatchHistory: (...args: unknown[]) => listBatchHistory(...args) as unknown,
     findOpenUploadBatch: (...args: unknown[]) => findOpenUploadBatch(...args) as unknown,
     findBatchRemovalGroup: (...args: unknown[]) => findBatchRemovalGroup(...args) as unknown,
     countBatchChangeKinds: (...args: unknown[]) => countBatchChangeKinds(...args) as unknown,
-    findUploadBatch: (...args: unknown[]) => findUploadBatch(...args) as unknown,
+    findUploadBatch: async (...args: unknown[]) => trackedBatch(await findUploadBatch(...args)),
     listImagesForBatch: (...args: unknown[]) => listImagesForBatch(...args) as unknown,
     listBatchChanges: (...args: unknown[]) => listBatchChanges(...args) as unknown,
     listTitleNames: (...args: unknown[]) => listTitleNames(...args) as unknown,

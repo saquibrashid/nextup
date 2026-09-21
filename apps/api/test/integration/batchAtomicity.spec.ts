@@ -118,6 +118,7 @@ async function makeBatch(
   const id = `batch-atomic-${++batchSeq}`;
   await testPrisma().uploadBatch.create({
     data: {
+      captureTracking: 'tracked',
       id,
       ownerId,
       service: over.service ?? 'netflix',

@@ -90,7 +90,10 @@ async function list(query = ''): Promise<ListBody> {
 }
 
 async function capture(service: Service, name = 'Dune', mode: BatchMode = 'append-only') {
-  const created = await succeeds(await request('/batches', 'POST', { source: service, mode }), 201);
+  const created = await succeeds(
+    await request('/batches', 'POST', { source: service, mode, captureProtocol: 1 }),
+    201,
+  );
   const { batchId } = (await created.json()) as { batchId: string };
   const form = new FormData();
   form.append(
@@ -164,7 +167,10 @@ beforeEach(async () => {
   vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   vi.stubEnv('NEXTUP_ALLOWED_SUBJECTS', `${SUBJECT},${OTHER}`);
   vi.stubEnv('TMDB_API_KEY', 'test-key');
-  vi.stubEnv('AZURE_STORAGE_CONNECTION_STRING', 'UseDevelopmentStorage=true');
+  vi.stubEnv(
+    'AZURE_STORAGE_CONNECTION_STRING',
+    process.env['AZURE_STORAGE_CONNECTION_STRING'] ?? 'UseDevelopmentStorage=true',
+  );
   testPrisma();
   await resetDatabase();
   msw = tmdbMswServer();

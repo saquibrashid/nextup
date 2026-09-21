@@ -22,7 +22,7 @@
 
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { SERVICES, SERVICE_LABELS } from '@nextup/domain';
+import { SERVICES, SERVICE_LABELS, ulid, type CaptureSelectionRefusal } from '@nextup/domain';
 
 import { ImageDropzone, type QueuedImage, type ServerRejection } from '../components/ImageDropzone';
 import { UploadCheckpoint } from '../components/UploadCheckpoint';
@@ -113,6 +113,17 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
   });
   const [batchId, setBatchId] = useState<string | null>(null);
   const [queue, setQueue] = useState<readonly QueuedImage[]>([]);
+  const [localRefusals, setLocalRefusals] = useState<readonly CaptureSelectionRefusal[]>([]);
+  const recordRefusals = useCallback((files: readonly { name: string; reason: string }[]) => {
+    setLocalRefusals((current) => [
+      ...current,
+      ...files.map((file) => ({
+        token: ulid(),
+        name: file.name.slice(0, 255),
+        message: file.reason.slice(0, 2000),
+      })),
+    ]);
+  }, []);
   const [uploadStates, setUploadStates] = useState<ReadonlyMap<File, ImageUploadState>>(new Map());
   const [savedBatch, setSavedBatch] = useState<BatchStatus | null>(null);
   const [draftPending, setDraftPending] = useState(false);
@@ -124,7 +135,7 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
   const [refused, setRefused] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const allowNavigation = useCaptureNavigation(
-    savedBatch === null && queue.length > 0,
+    savedBatch === null && (queue.length > 0 || localRefusals.length > 0),
     savedBatch === null && busy,
   );
   useEffect(() => {
@@ -179,7 +190,7 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
     void (async () => {
       let id: string | null = null;
       try {
-        const created = await client.createBatch(service, mode);
+        const created = await client.createBatch(service, mode, localRefusals);
         if (!isActive()) return;
         id = created.batchId;
         setBatchId(id);
@@ -197,6 +208,11 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
         if (result.remaining.length > 0) {
           setServerRejected(result.rejected);
           setFailure(`${UPLOAD_RECOVERY_NOTE} ${result.problems.join(' ')}`);
+          return;
+        }
+        if (localRefusals.length > 0) {
+          const saved = await client.getBatch(id);
+          if (isActive()) setSavedBatch(saved);
           return;
         }
         await client.submitBatch(id);
@@ -235,6 +251,7 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
     queue,
     report,
     selection,
+    localRefusals,
   ]);
 
   const resolveExisting = async (discard: boolean): Promise<void> => {
@@ -302,6 +319,7 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
           setSavedBatch(null);
           setBatchId(null);
           setQueue([]);
+          setLocalRefusals([]);
           setUploadStates(new Map());
           setServerRejected([]);
           setFailure(null);
@@ -329,7 +347,7 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
           state={checkpoint.state}
           online={online}
           busy={busy}
-          heldCount={queue.length}
+          heldCount={queue.length + localRefusals.length}
           message={conflictMessage}
           error={checkpointError}
           onRetry={() => {
@@ -375,7 +393,26 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
                 disabled={busy || batchId !== null}
                 serverRejected={serverRejected}
                 onQueueChange={setQueue}
+                onSelectionRejected={recordRefusals}
               />
+              {localRefusals.length > 0 && (
+                <p role="status">
+                  {localRefusals.length} rejected inputs remain part of this capture. After upload,
+                  choose saved replacements or continue with additions only.
+                </p>
+              )}
+              {(queue.length > 0 || localRefusals.length > 0) && batchId === null && (
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => {
+                    setQueue([]);
+                    setLocalRefusals([]);
+                  }}
+                >
+                  Discard local selection and start fresh
+                </Button>
+              )}
               {busy && <p role="status">{SUBMIT_IN_FLIGHT}</p>}
               <p className="upload-flow__note">{UPLOAD_LOCAL_NOTE}</p>
             </UploadStep>

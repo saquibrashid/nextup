@@ -29,8 +29,10 @@ const deleteUploadedImage = vi.fn();
 
 vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/repository/ownerData.js')>();
+  const { emptyCaptureRepository } = await import('./captureRepositoryFixture.js');
   return {
     ...actual,
+    ...emptyCaptureRepository,
     findUploadBatch: (...args: unknown[]) => findUploadBatch(...args) as unknown,
     findUploadedImage: (...args: unknown[]) => findUploadedImage(...args) as unknown,
     deleteUploadedImage: (...args: unknown[]) => deleteUploadedImage(...args) as unknown,

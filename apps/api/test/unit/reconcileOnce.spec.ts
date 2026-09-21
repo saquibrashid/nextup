@@ -64,11 +64,14 @@ const store: {
 
 vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/repository/ownerData.js')>();
+  const { emptyCaptureRepository } = await import('./captureRepositoryFixture.js');
   return {
     ...actual,
+    ...emptyCaptureRepository,
     findUploadBatch: () =>
       Promise.resolve({
         id: 'batch-1',
+        captureTracking: 'tracked',
         service: 'netflix',
         discoverySource: null,
         status: 'in-review',

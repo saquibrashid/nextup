@@ -155,6 +155,45 @@ export async function findUploadBatch(ownerId: OwnerId, id: string, tx?: Db) {
   return db(tx).uploadBatch.findFirst({ where: { ownerId, id } });
 }
 
+export async function lockDraftUploadBatch(ownerId: OwnerId, id: string, tx: Db) {
+  return db(tx).uploadBatch.updateMany({
+    where: { ownerId, id, status: 'draft' },
+    data: { status: 'draft' },
+  });
+}
+
+export async function createCaptureAttempt(
+  ownerId: OwnerId,
+  data: Omit<Prisma.CaptureIngestAttemptUncheckedCreateInput, 'ownerId'>,
+  tx: Db,
+) {
+  return db(tx).captureIngestAttempt.create({ data: { ...data, ownerId } });
+}
+
+export async function listCaptureAttempts(ownerId: OwnerId, batchId: string, tx?: Db) {
+  return db(tx).captureIngestAttempt.findMany({
+    where: { ownerId, batchId },
+    orderBy: [{ startedAt: 'asc' }, { id: 'asc' }],
+  });
+}
+
+export async function updateCaptureAttempt(
+  ownerId: OwnerId,
+  batchId: string,
+  id: string,
+  states: readonly string[],
+  data: Pick<
+    Prisma.CaptureIngestAttemptUpdateManyMutationInput,
+    'state' | 'failures' | 'acceptedImageIds' | 'replacementImageIds' | 'completedAt' | 'resolvedAt'
+  >,
+  tx?: Db,
+) {
+  return db(tx).captureIngestAttempt.updateMany({
+    where: { ownerId, batchId, id, state: { in: [...states] } },
+    data,
+  });
+}
+
 /**
  * Batches for one service, newest first.
  *

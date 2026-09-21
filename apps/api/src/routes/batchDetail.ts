@@ -30,6 +30,7 @@ import { type Router } from 'express';
 import { isCreatesOnly, toBatchProvenance, type BatchProvenance } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
+import { readCaptureIntake } from '../services/captureIntake.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import {
   countBatchChangeKinds,
@@ -233,6 +234,7 @@ export function registerBatchDetailRoutes(router: Router): void {
       mode: batch.mode,
       status: batch.status,
       derivedFromBatchId: batch.derivedFromBatchId,
+      intake: await readCaptureIntake(ownerId, batch),
       createdAt: batch.createdAt.toISOString(),
       submittedAt: batch.submittedAt?.toISOString() ?? null,
       completedAt: batch.completedAt?.toISOString() ?? null,

@@ -151,6 +151,7 @@ async function makeBatch(
   const id = `batch-close-${++batchSeq}`;
   await testPrisma().uploadBatch.create({
     data: {
+      captureTracking: 'tracked',
       id,
       ownerId,
       service: over.service ?? 'netflix',

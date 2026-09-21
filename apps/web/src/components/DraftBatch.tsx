@@ -7,6 +7,8 @@ import { uploadSelection, type ImageUploadState } from '../lib/uploadSelection';
 import { useCaptureLifetime } from '../lib/useCaptureLifetime';
 import { useCaptureNavigation } from './CaptureNavigation';
 import { ScreenshotPreview } from './ScreenshotPreview';
+import { CaptureInputIssues } from './CaptureInputIssues';
+import { useCaptureRefusals } from '../lib/useCaptureRefusals';
 import { Button } from './ui/Button';
 import { Fieldset } from './ui/Fieldset';
 import { Dialog } from './ui/Dialog';
@@ -42,6 +44,7 @@ export function DraftBatch({
 }: DraftBatchProps): JSX.Element {
   const isActive = useCaptureLifetime();
   const [queue, setQueue] = useState<readonly QueuedImage[]>(initialQueue);
+  const localRefusals = useCaptureRefusals(`nextup.capture.refusals.${suppliedBatch.batchId}`);
   const [states, setStates] = useState(initialStates);
   const [verified, setVerified] = useState<BatchStatus | null>(null);
   const batch = verified ?? suppliedBatch;
@@ -54,15 +57,34 @@ export function DraftBatch({
   const inFlight = useRef(false);
   const offlineRef = useRef(offline);
   offlineRef.current = offline;
-  const allowNavigation = useCaptureNavigation(queue.length > 0 || needsCheck, busy);
+  const allowNavigation = useCaptureNavigation(
+    queue.length > 0 ||
+      needsCheck ||
+      localRefusals.reports.length > 0 ||
+      localRefusals.error !== null,
+    busy,
+  );
   const unknown = queue.some((image) => states.get(image.file) === 'unknown');
   const editable = batch.status === 'draft';
   useEffect(() => {
     setVerified(null);
   }, [suppliedBatch]);
   useEffect(() => {
-    onPendingChange?.(queue.length > 0 || busy || needsCheck);
-  }, [queue.length, busy, needsCheck, onPendingChange]);
+    onPendingChange?.(
+      queue.length > 0 ||
+        busy ||
+        needsCheck ||
+        localRefusals.reports.length > 0 ||
+        localRefusals.error !== null,
+    );
+  }, [
+    queue.length,
+    busy,
+    needsCheck,
+    localRefusals.reports.length,
+    localRefusals.error,
+    onPendingChange,
+  ]);
   const changeQueue = useCallback((images: readonly QueuedImage[]) => {
     setQueue(images);
     const files = new Set(images.map((image) => image.file));
@@ -126,14 +148,27 @@ export function DraftBatch({
   }
 
   function upload(): void {
-    if (unknown) return;
+    if (unknown || localRefusals.error !== null) return;
     run(async () => {
+      await saveRefusals();
+      if (!isActive()) return;
       const result = await uploadSelection(client, batch.batchId, queue, update, isActive);
       if (!isActive()) return;
       setRejected(result.rejected);
       changeQueue(result.remaining);
       if (result.problems.length > 0) setFailure(result.problems.join(' '));
     });
+  }
+
+  async function saveRefusals(): Promise<void> {
+    const reports = localRefusals.reports;
+    for (let index = 0; index < reports.length; index += 100) {
+      if (!isActive()) return;
+      if (offlineRef.current) throw new Error(OFFLINE_DISABLED_REASON);
+      const chunk = reports.slice(index, index + 100);
+      await client.reportCaptureRefusals(batch.batchId, chunk);
+      if (isActive()) localRefusals.saved(chunk);
+    }
   }
 
   return (
@@ -179,6 +214,7 @@ export function DraftBatch({
                   await client.discardBatch(batch.batchId);
                 },
                 () => {
+                  localRefusals.clear();
                   allowNavigation();
                   onDiscarded();
                 },
@@ -195,6 +231,30 @@ export function DraftBatch({
       </p>
       {offline && <p role="status">{OFFLINE_DISABLED_REASON}</p>}
       {failure !== null && <p role="alert">{failure}</p>}
+      {localRefusals.error !== null && <p role="alert">{localRefusals.error}</p>}
+      {localRefusals.reports.length > 0 && (
+        <section aria-label="Unsaved input issues">
+          <h2>Input issues waiting to be saved</h2>
+          <ul>
+            {localRefusals.reports.map((report) => (
+              <li key={report.token}>
+                {report.name}: {report.message}
+              </li>
+            ))}
+          </ul>
+          <p>
+            These issues must be saved before reading the screenshots. Reconnecting does not save
+            them automatically.
+          </p>
+          <Button
+            variant="secondary"
+            disabled={busy || offline || needsCheck || !editable}
+            onClick={() => run(saveRefusals)}
+          >
+            Save input issues
+          </Button>
+        </section>
+      )}
       {needsCheck && (
         <p role="status">Saved status is unverified. Upload and Extract are paused.</p>
       )}
@@ -259,15 +319,38 @@ export function DraftBatch({
           offline={offline}
           disabled={busy}
           onQueueChange={changeQueue}
+          onSelectionRejected={localRefusals.record}
         />
         <Button
           variant="secondary"
-          disabled={queue.length === 0 || busy || offline || needsCheck || unknown || !editable}
+          disabled={
+            queue.length === 0 ||
+            busy ||
+            offline ||
+            needsCheck ||
+            unknown ||
+            !editable ||
+            localRefusals.error !== null
+          }
           onClick={upload}
         >
           Upload selected screenshots
         </Button>
       </Fieldset>
+      <CaptureInputIssues
+        batch={batch}
+        disabled={busy || offline || needsCheck || !editable}
+        onResolve={(attemptId, imageIds) =>
+          run(async () => {
+            await client.resolveCaptureInput(batch.batchId, attemptId, imageIds);
+          })
+        }
+        onRetryRemoval={(imageId) =>
+          run(async () => {
+            await client.removeBatchImage(batch.batchId, imageId);
+          })
+        }
+      />
       {unknown && (
         <p role="alert">
           An upload outcome is unknown. Check the saved previews first. If it is already saved,
@@ -291,10 +374,14 @@ export function DraftBatch({
           busy ||
           offline ||
           needsCheck ||
+          localRefusals.error !== null ||
+          (batch.mode === 'full-update' && batch.intake === undefined) ||
           !editable
         }
         onClick={() => {
           run(async () => {
+            await saveRefusals();
+            if (!isActive()) return;
             await client.submitBatch(batch.batchId);
           });
         }}

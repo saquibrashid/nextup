@@ -51,7 +51,17 @@ import { requireOwnerId } from '../middleware/requestContext.js';
 import { discardBatch, retryExtraction, submitBatch } from '../services/batchLifecycle.js';
 import { reextractBatch } from '../services/batchReextract.js';
 import { beginExtraction } from '../jobs/startExtraction.js';
-import { createUploadBatch, findOpenUploadBatch } from '../repository/ownerData.js';
+import {
+  createUploadBatch,
+  findOpenUploadBatch,
+  runInTransaction,
+} from '../repository/ownerData.js';
+import {
+  parseSelectionRefusals,
+  resolveCaptureAttempt,
+  saveSelectionRefusals,
+  withDraftCapture,
+} from '../services/captureIntake.js';
 
 /** The status every batch starts in. Images attach to a draft; nothing applies. */
 export const INITIAL_BATCH_STATUS = 'draft';
@@ -60,6 +70,8 @@ interface CreateBatchBody {
   service?: unknown;
   source?: unknown;
   mode?: unknown;
+  captureProtocol?: unknown;
+  selectionRefusals?: unknown;
 }
 
 /**
@@ -103,6 +115,10 @@ export function registerBatchRoutes(router: Router): void {
     const rawSource = body.source ?? body.service;
     const source = requireEnum<BatchSource>(rawSource, 'service', BATCH_SOURCES);
     const mode = requireEnum<BatchMode>(body.mode, 'mode', BATCH_MODES);
+    if (body.captureProtocol !== undefined && body.captureProtocol !== 1) {
+      throw new AppError('VALIDATION_FAILED', 400, 'Unknown capture protocol.');
+    }
+    const reports = parseSelectionRefusals(body.selectionRefusals);
 
     // ⚠ REFUSED BY SOURCE TYPE, NEVER BY A CLIENT-SUPPLIED FLAG (ADR-0010 D-2,
     // `T-WAIT-001b`/`c`). This runs before the open-batch lookup for the same
@@ -132,12 +148,21 @@ export function registerBatchRoutes(router: Router): void {
       );
     }
 
-    const batch = await createUploadBatch(ownerId, {
-      id: ulid(),
-      service,
-      discoverySource,
-      mode,
-      status: INITIAL_BATCH_STATUS,
+    const batch = await runInTransaction(async (tx) => {
+      const created = await createUploadBatch(
+        ownerId,
+        {
+          id: ulid(),
+          service,
+          discoverySource,
+          mode,
+          status: INITIAL_BATCH_STATUS,
+          captureTracking: body.captureProtocol === 1 ? 'tracked' : 'unverified',
+        },
+        tx,
+      );
+      await saveSelectionRefusals(ownerId, created.id, reports, tx);
+      return created;
     });
 
     res.status(201).json({
@@ -159,6 +184,32 @@ export function registerBatchRoutes(router: Router): void {
           ? modeExplanation(mode, service)
           : discoveryModeExplanation(discoverySource),
     });
+  });
+
+  router.post('/batches/:batchId/intake-refusals', async (req, res) => {
+    const ownerId = requireOwnerId(req);
+    const batchId = req.params.batchId ?? '';
+    await withDraftCapture(ownerId, batchId, async (tx) => {
+      const body: unknown = req.body;
+      const reports = parseSelectionRefusals(
+        typeof body === 'object' && body !== null && 'refusals' in body ? body.refusals : null,
+      );
+      await saveSelectionRefusals(ownerId, batchId, reports, tx);
+    });
+    res.status(204).end();
+  });
+
+  router.patch('/batches/:batchId/intake/:attemptId', async (req, res) => {
+    const body: unknown = req.body;
+    await resolveCaptureAttempt(
+      requireOwnerId(req),
+      req.params.batchId ?? '',
+      req.params.attemptId ?? '',
+      typeof body === 'object' && body !== null && 'replacementImageIds' in body
+        ? body.replacementImageIds
+        : null,
+    );
+    res.status(204).end();
   });
 
   // §6.14. **202, not 200**: extraction runs in-process and asynchronously,
