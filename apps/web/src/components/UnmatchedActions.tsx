@@ -26,7 +26,7 @@ import { Input } from './ui/Input';
  * server-side; this renders the actions for the rows that arrived in it.
  */
 
-import { useState, type FormEvent, type JSX } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type JSX } from 'react';
 
 import {
   ADDITION_CHANGE_MATCH_LABEL,
@@ -194,6 +194,21 @@ export function UnmatchedActions({
   const [failure, setFailure] = useState<string | null>(null);
   const [local, setLocal] = useState<Outcome | null>(null);
   const [editing, setEditing] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const restoreFocus = useRef(false);
+
+  useEffect(() => {
+    if (busy || !restoreFocus.current) return;
+    restoreFocus.current = false;
+    if (
+      document.activeElement === document.body ||
+      actionsRef.current?.contains(document.activeElement)
+    ) {
+      actionsRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({
+        preventScroll: true,
+      });
+    }
+  }, [busy, editing, disposition, local]);
 
   const copy = VARIANT_COPY[variant];
   // ⚠ SERVER STATE WINS ON A RE-RENDER. `local` is the click path's optimistic
@@ -206,6 +221,7 @@ export function UnmatchedActions({
 
   const run = (action: () => Promise<void>, next: Outcome): void => {
     if (busy) return;
+    restoreFocus.current = actionsRef.current?.contains(document.activeElement) === true;
     setBusy(true);
     setFailure(null);
     void action().then(
@@ -247,11 +263,17 @@ export function UnmatchedActions({
 
   if (outcome !== null && !editing) {
     return (
-      <div className="unmatched-actions">
+      <div className="unmatched-actions" ref={actionsRef}>
         <p className="unmatched-actions__outcome" data-testid={`${variant}-outcome`} role="status">
           {outcomeText(outcome, copy)}
         </p>
-        <Button variant="ghost" onClick={() => setEditing(true)}>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            restoreFocus.current = true;
+            setEditing(true);
+          }}
+        >
           Change decision
         </Button>
       </div>
@@ -259,11 +281,18 @@ export function UnmatchedActions({
   }
 
   return (
-    <div className="unmatched-actions" data-testid={`${variant}-actions`}>
+    <div className="unmatched-actions" data-testid={`${variant}-actions`} ref={actionsRef}>
       {outcome !== null && (
         <p className="unmatched-actions__outcome">
           {outcomeText(outcome, copy)}{' '}
-          <Button variant="ghost" disabled={busy} onClick={() => setEditing(false)}>
+          <Button
+            variant="ghost"
+            disabled={busy}
+            onClick={() => {
+              restoreFocus.current = true;
+              setEditing(false);
+            }}
+          >
             Keep current decision
           </Button>
         </p>

@@ -111,6 +111,15 @@ phrase "all nine routes" survived at §8 and §10 until it was retyped.~~
 Every screen sits inside `components/AppShell.tsx`, which renders the header,
 the nav, and the **global footer carrying TMDB attribution** (§8).
 
+**Capture continuity (TASK-231).** Outside capture screens, `CaptureResume`
+shows owner-scoped unfinished work beside the navigation, with service, stage
+and a state-specific resume link. It reads on navigation, never by a new poll;
+failed/offline checks remain visibly unknown. It does not add a phone nav
+destination or a second navigation landmark. Checkpoint, strip and history
+share resume vocabulary; all resume links reread batch status before review.
+Capture navigation focuses the main landmark. Missing/foreign detail or review
+IDs focus **Capture unavailable**, with history and upload entry links.
+
 ---
 
 ## 2. `/` — Combined list (US-018, US-019, US-020, US-022)
@@ -783,6 +792,11 @@ blocks full-update extraction.
 ### Extraction progress
 
 Polls `GET /api/batches/:batchId` every 2 s while `submitted`/`extracting`.
+Only one status read may be pending; ticks share it instead of invalidating a
+slow response. **Check saved status** explicitly supersedes a stalled read.
+Initial loading does not invent queued counts. Failed reads retain clearly
+labelled last-known evidence, stop polling and disable writes until read-only
+recovery. A status-read failure must never use extraction-failure copy.
 Shows `progress.imagesDone / imagesTotal`, a per-image thumbnail strip fed by
 `GET /api/images/:imageId`, and — the moment extraction ends — the count of
 images that yielded **no text**, named individually (US-006 AC-3).
@@ -1300,8 +1314,12 @@ surfaces first in the owner's real data.
 
 ### 12.7 Polling — narrow, and not a background process
 
-`/batches/:batchId` may poll while a batch is running (REQ-103). It stops on a
-terminal state, on unmount, and while `document.hidden` (`T-DATA-009`).
+`/batches/:batchId` may poll only while submitted/extracting (REQ-103). It
+pauses offline or hidden, stops at every other status and on a failed read,
+and aborts on unmount (`T-DATA-009`, `T-UX-165`). Changing batch ID starts a
+fresh keyed lifetime; no old state or late response may redirect the new page.
+Leaving during a write does not cancel that write, but its response must not
+redirect the owner afterward.
 
 ⚠ **This does not engage REQ-041.** That invariant forbids a *non-owner*
 process changing *user-visible list state*. This is the owner's own browser,

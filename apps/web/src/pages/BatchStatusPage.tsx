@@ -61,6 +61,7 @@ import { RejectionList, mergeRejections } from '../components/RejectionList';
 export interface BatchStatusPageProps {
   readonly batch?: BatchStatus | null;
   readonly loadFailed?: boolean;
+  readonly loadErrorMessage?: string | null;
   readonly offline?: boolean;
   readonly busy?: boolean;
   readonly actionError?: string | null;
@@ -305,6 +306,7 @@ function ProvenancePanels({ batch }: { batch: BatchStatus }): JSX.Element {
 export function BatchStatusPage({
   batch = null,
   loadFailed = false,
+  loadErrorMessage = null,
   offline = false,
   busy = false,
   actionError = null,
@@ -315,23 +317,39 @@ export function BatchStatusPage({
   onUploadNew,
 }: BatchStatusPageProps): JSX.Element {
   const [confirmAction, setConfirmAction] = useState<'discard' | 'replace' | null>(null);
-  if (loadFailed || batch === null) {
+  const readError = loadFailed ? (
+    <div role="alert" data-testid="batch-status-load-error">
+      {loadErrorMessage !== null && <p>{loadErrorMessage}</p>}
+      <p>
+        We could not check the saved capture status. This does not mean screenshot reading failed.
+        {batch !== null && ' The details below are the last reported state.'}
+      </p>
+      {onRetry !== undefined && (
+        <Button variant="secondary" disabled={offline || busy} onClick={onRetry}>
+          Check saved status
+        </Button>
+      )}
+    </div>
+  ) : null;
+  if (batch === null) {
     return (
       <>
         <h1>{STATUS_TITLE}</h1>
         {loadFailed ? (
-          <div role="alert" data-testid="batch-status-load-error">
-            <p>{STATUS_ERROR_EXTRACTOR}</p>
+          readError
+        ) : (
+          <>
+            <p role="status" data-testid="batch-status-loading">
+              {offline
+                ? 'Reconnect to check this saved capture.'
+                : 'Checking the saved capture. You can leave and return while this takes a moment.'}
+            </p>
             {onRetry !== undefined && (
-              <Button variant="secondary" onClick={onRetry}>
-                {STATUS_RETRY_LABEL}
+              <Button variant="secondary" disabled={offline || busy} onClick={onRetry}>
+                Check saved status
               </Button>
             )}
-          </div>
-        ) : (
-          <p role="status" data-testid="batch-status-loading">
-            {STATUS_QUEUED.replace('{done}', '0').replace('{total}', '0')}
-          </p>
+          </>
         )}
       </>
     );
@@ -363,6 +381,7 @@ export function BatchStatusPage({
           <p>Your list stays unchanged until you review and confirm the titles.</p>
         )}
       </header>
+      {readError}
       {outcome}
       {terminal && (
         <div className="upload-checkpoint__actions">
@@ -397,7 +416,7 @@ export function BatchStatusPage({
       )}
 
       {actionError !== null && <p role="alert">{actionError}</p>}
-      <Fieldset legend="Extraction actions" hideLegend disabled={busy || offline}>
+      <Fieldset legend="Extraction actions" hideLegend disabled={busy || offline || loadFailed}>
         {batch.status === 'extraction-failed' && batch.extractionError !== null ? (
           <ExtractionError
             code={batch.extractionError}
@@ -409,7 +428,7 @@ export function BatchStatusPage({
           />
         ) : (
           <>
-            {headline !== null && (
+            {!loadFailed && headline !== null && (
               <p
                 className="batch-status__progress"
                 role="status"
@@ -464,7 +483,7 @@ export function BatchStatusPage({
       {inProgress && batch.progress !== undefined && batch.progress.imagesTotal > 0 && (
         <progress
           className="capture-status__meter"
-          aria-label="Screenshots processed"
+          aria-label={loadFailed ? 'Last reported screenshots processed' : 'Screenshots processed'}
           value={batch.progress.imagesDone}
           max={batch.progress.imagesTotal}
         />

@@ -145,6 +145,9 @@ no-open-batch check, not before it. Full contract: the capture lifecycle proposa
 
 | State | Owner sees | Can do | Test |
 |---|---|---|---|
+| **Initial/slow status read** | Checking saved capture; no fabricated queued/running result. | Leave or explicitly **Check saved status**; a replacement read supersedes the pending read. | `T-UX-165a`, `T-UX-165b` |
+| **Failed status read** | Status cannot be checked, distinct from extraction failure. Last-known evidence remains labelled; writes are disabled. | Explicit read-only **Check saved status**; no poll-driven retry loop. | `T-UX-165f` |
+| **Unavailable capture link** | Focused **Capture unavailable**; does not distinguish missing from another owner's capture. | History or upload entry; no endless retry or write. | `T-UX-165e`, `T-UX-165j` |
 | **5.1 Queued (`submitted`)** | Actual reported counts, when available; no invented percentage. Saved screenshot names remain visible. | Leave and return; no discard until a discardable state (`api.md` §6.23). | `T-UX-050`, `T-UX-157` |
 | **5.2 Running (`extracting`)** | *"Reading 4 of 7…"* with a measured progress bar and per-image waiting / titles found / no titles / failed / expired labels. | Leave and return; no discard while the runner owns the batch. | `T-UX-051`, `T-UX-157` |
 | **5.3 Partial — some images yielded nothing** | *"No text was found in 1 of 7 screenshots"*, the image **named and thumbnailed** (US-006 AC-3) | Continue to review | `T-AI-020` |
@@ -156,6 +159,13 @@ no-open-batch check, not before it. Full contract: the capture lifecycle proposa
 | **5.8 Offline while polling** | Banner; polling pauses and resumes on reconnect; no error is invented | Wait | `T-UX-056` |
 | **5.9 Degraded — the tile reader was unavailable** *(new, ADR-0001 R2)* | A **persistent, non-dismissible banner on both this page and the review page**: *"One of the two readers was unavailable, so these results may be less complete than usual. Nothing has been removed from your list — you can still add titles, and you can re-read these screenshots later."* The batch **completes**, OCR-only. In **full-update** mode, **removals are withheld entirely** — no removal section is rendered, because an incomplete read would propose removing titles that are still on the list. | Continue to review; re-extract later (REQ-074) | **`T-AI-036`**, `T-UX-057` |
 | **5.10 Degraded — the cross-check reader was unavailable** *(new, ADR-0001 R2)* | Same banner wording, milder consequence: extraction proceeds on the model alone, every candidate carries `ocrSupport: 'not-checked'`, and **removals are still permitted** (completeness is unaffected — only corroboration is). | Continue to review | `T-UX-058` |
+
+Outside capture screens, the unfinished-capture strip reports saved service
+and stage or an explicit failed/offline check. Its action always rereads batch
+status, including when another tab changed that stage. History uses the same
+labels. Capture navigation focuses main; review decision controls restore
+focus locally without scrolling after their outcome replaces them. Existing
+cards stay mounted across refresh and summary cancellation. `T-UX-165g`–`k`.
 
 ---
 

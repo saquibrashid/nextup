@@ -51,6 +51,7 @@ import { NavLink, Outlet, matchPath, useLocation } from 'react-router-dom';
 import { ErrorBoundary } from './ErrorBoundary';
 import { OfflineBanner } from './OfflineBanner';
 import { TmdbAttribution } from './TmdbAttribution';
+import { CaptureResume } from './CaptureResume';
 // ⚠ THROUGH THE BARREL, NOT THE INDIVIDUAL FILES. `components/icons/index.ts`
 // is the REGISTER that makes REQ-124's set closed; importing a drawing
 // directly bypasses it, and an unregistered icon could then ship without ever
@@ -212,6 +213,14 @@ export function AppShell(): JSX.Element {
   const online = useOnline();
   const location = useLocation();
   const wide = useWideViewport();
+  const mainRef = useRef<HTMLElement>(null);
+  const captureRoute = location.pathname === '/upload' || location.pathname.startsWith('/batches/');
+
+  useEffect(() => {
+    if (location.pathname === '/upload' || /^\/batches(?:\/|$)/.test(location.pathname)) {
+      mainRef.current?.focus({ preventScroll: true });
+    }
+  }, [location.pathname]);
 
   const barPaths = wide ? DESKTOP_BAR_PATHS : PHONE_BAR_PATHS;
   const barItems = NAV_ITEMS.filter((route) => barPaths.includes(route.path));
@@ -327,8 +336,9 @@ export function AppShell(): JSX.Element {
       </header>
 
       <OfflineBanner offline={!online} />
+      {!captureRoute && <CaptureResume key={location.key} />}
 
-      <main>
+      <main ref={mainRef} tabIndex={-1}>
         <ErrorBoundary resetKey={location.pathname}>
           <Outlet />
         </ErrorBoundary>

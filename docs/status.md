@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 1 |
+| ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 225 |
+| ✅ done | 226 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **229** |
@@ -22,9 +22,7 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 Not done, and every task they depend on is done.
 
-| Task | Size | Section |
-|---|---|---|
-| `TASK-231` | 1 agent-run + 20 owner-review-minutes | Approved capture lifecycle improvements, 2026-09-19 |
+_Nothing is ready: every unfinished task is waiting on a dependency._
 
 ## Waiting on the owner
 
@@ -268,3 +266,4 @@ Not done, and every task they depend on is done.
 | `TASK-228` | Authoritative saved decisions with editable outcomes, individually reversible atomic bulk results, separately persisted offline intent, explicit conflict reconciliation and no reconnect replay. Known-match correction, secondary rescue, truthful empty/discarded states and separate discard/re-extract consent preserve server sectioning and original image expiry. `T-UX-162a`–`r`; responsive Chromium/WebKit and full owner-journey regressions. No schema or infrastructure changes. | `T-UX-162` |
 | `TASK-229` | Failed Apply responses resolve against saved status before another write; verified in-review refreshes the summary for explicit retry, unreadable outcomes remain read-only, and terminal review links open durable outcomes. Batch detail projects actual listing-change counts and owner-scoped undo information from persisted records. No reconnect replay or late navigation after leaving. `T-UX-163a`–`j`; existing close/auth/undo and responsive Chromium/WebKit regressions. No migration or infrastructure changes. | `T-UX-163` |
 | `TASK-230` | Additive intake ledger records failures before parsing and commits image rows with finalization. Explicit existing-or-new replacement, sticky local reports, legacy/derived uncertainty, and interrupted blob-deletion evidence feed one review/tick/close removal gate. Submit seals the image snapshot transactionally while retaining failed-extraction retry. `T-UX-164a`–`ab` cover real SQL/Blob rollback/concurrency and responsive Chromium/WebKit recovery. CI-gated release; TASK-231 remains separate. | `T-UX-164` |
+| `TASK-231` | Owner-scoped unfinished-capture strip and shared history/resume vocabulary; authoritative stage reread; keyed status lifetimes, nonoverlapping polls, explicit slow/failed-read recovery, unavailable links and no late redirect after leaving. Capture navigation and replaced decision controls restore focus without losing a large review's position. `T-UX-165a`–`k` cover component races and complete Chromium/WebKit journeys at 280/390/1440px in both modes. No API, migration, dependency or infrastructure change; CI-gated release. | `T-UX-165` |
