@@ -336,7 +336,7 @@ export function AppShell(): JSX.Element {
       </header>
 
       <OfflineBanner offline={!online} />
-      {!captureRoute && <CaptureResume key={location.key} />}
+      {!captureRoute && <CaptureResume key={location.pathname} />}
 
       <main ref={mainRef} tabIndex={-1}>
         <ErrorBoundary resetKey={location.pathname}>

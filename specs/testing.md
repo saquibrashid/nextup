@@ -156,6 +156,7 @@ TASK-231 adds navigation, status-read lifetime and complete responsive journeys.
 | `T-UX-164z` | E2E | Existing/new explicit replacement, lost response plus failed read, reload, deletion invalidation, accessible/overflow-free recovery at 280/390/1440px in Chromium/WebKit. `tests/e2e/captureIntake.spec.ts`. |
 | `T-UX-165a`–`j` | Web | Coalesced slow reads; explicit supersession and stale-response refusal; keyed batch transitions; no late navigation/read after leaving a write; owner-scoped unavailable links; labelled failed-poll recovery; all five resume states; truthful empty/failed lookup and history vocabulary. `apps/web/test/captureJourney.spec.tsx`. |
 | `T-UX-165k` | E2E | Guided input through applied receipt and new capture in both modes at 280/390/1440px in Chromium/WebKit; navigation resume rereads a changed stage, one nav landmark, real 40-card scroll preservation during held refresh, local keyboard focus, summary Back, selected removals versus append-only, terminal review links, axe and no overflow. `tests/e2e/captureJourney.spec.ts`. |
+| `T-UX-165l` | Web | In-place library query changes do not restart the capture indicator or introduce loading-strip layout shifts; leaving for another route does refresh it. `apps/web/test/captureJourney.spec.tsx`. |
 
 > ### ⚠ REVISION 7 (2026-08-11) — `A45`: clipboard paste is the primary ingest path
 >

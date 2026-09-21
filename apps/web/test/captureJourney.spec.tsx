@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CaptureResume } from '../src/components/CaptureResume';
+import { AppShell } from '../src/components/AppShell';
 import { BatchStatusRoute, POLL_INTERVAL_MS } from '../src/containers/BatchStatusRoute';
 import { ReviewRoute } from '../src/containers/ReviewRoute';
 import { BatchHistoryPage } from '../src/pages/BatchHistoryPage';
@@ -62,6 +63,29 @@ afterEach(() => {
 });
 
 describe('T-UX-165 journey continuity', () => {
+  it('T-UX-165l: in-place library query changes do not remount the navigation indicator', async () => {
+    const listBatches = vi.spyOn(apiClient, 'listBatches').mockResolvedValue({ batches: [] });
+    render(
+      <MemoryRouter>
+        <Link to="/about">Leave library</Link>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="/" element={<Link to="/?sort=name">Change library sort</Link>} />
+            <Route path="/about" element={<p>Another page</p>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.queryByRole('complementary')).toBeNull());
+    expect(listBatches).toHaveBeenCalledTimes(1);
+    await act(async () =>
+      fireEvent.click(screen.getByRole('link', { name: 'Change library sort' })),
+    );
+    expect(listBatches).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('link', { name: 'Leave library' }));
+    await waitFor(() => expect(listBatches).toHaveBeenCalledTimes(2));
+  });
+
   it('T-UX-165a: slow status reads are coalesced instead of starved by polling', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const pending = deferred<BatchStatus>();

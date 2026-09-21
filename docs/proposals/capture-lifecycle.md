@@ -255,6 +255,8 @@ close withholding despite otherwise sufficient successful extraction.
 Outside the upload/detail/review screens, a compact unfinished-capture strip
 reads the owner-scoped open lookup on navigation. It names the service and
 saved stage and offers the same resume action as the upload checkpoint.
+In-place query changes, such as library filtering or sorting, do not restart
+that lookup or reinsert a loading strip above the existing content.
 It does not add a phone navigation destination, poll in the background, or
 claim there is no unfinished work when the lookup fails. Resume always enters
 the batch status route, which rereads the current state before opening review.
