@@ -242,6 +242,37 @@ async function request<T>(path: string, options: RequestOptions, deps: ApiClient
     return undefined as T;
   }
 
+  // ⚠ AN EXPIRED SESSION DOES NOT ARRIVE AS A 401 IN THIS DEPLOYMENT, WHICH
+  // IS WHY THE BRANCH ABOVE NEVER FIRED FOR THE OWNER.
+  //
+  // Container Apps Easy Auth is configured with `login.tokenStore.enabled`
+  // false (`infra/aca.bicep` — a token store would persist C3 identity
+  // material and also requires a blob store, so enabling it without one
+  // breaks sign-in). Without the store, an unauthenticated request is not
+  // rejected: it FALLS THROUGH to the app, which serves the SPA's
+  // `index.html` with a **200**. So `response.ok` is true, the 401 branch is
+  // skipped, and `response.json()` throws a `SyntaxError` on `<!doctype` —
+  // surfacing as a generic "something went wrong", with no mention of signing
+  // in and a Retry that fails identically forever. The owner is stuck on a
+  // screen whose only real remedy is never named.
+  //
+  // ⚠ THE SIGNAL IS THE CONTENT TYPE, NOT THE URL. Easy Auth does not
+  // redirect here, so `response.url` is the API path and `response.redirected`
+  // is false — a check built on either reads as "authenticated" during exactly
+  // the failure it is meant to catch. Every 2xx that reaches this line is
+  // required to be JSON (204 already returned above), so HTML is proof the
+  // API did not answer.
+  //
+  // ⚠ SCOPED TO HTML DELIBERATELY. Any other non-JSON body is a genuine shape
+  // failure and must keep falling through to the existing throw: claiming an
+  // expired session for it would send a correctly signed-in owner to the IdP
+  // and return them to the same broken screen, having "fixed" nothing.
+  if ((response.headers.get('content-type') ?? '').toLowerCase().includes('html')) {
+    const redirect = deps.onUnauthorized ?? defaultRedirect;
+    redirect(signInUrl((deps.currentPath ?? defaultPath)()));
+    throw new ApiError('UNAUTHENTICATED', 401, 'Your session expired.', {});
+  }
+
   return (await response.json()) as T;
 }
 

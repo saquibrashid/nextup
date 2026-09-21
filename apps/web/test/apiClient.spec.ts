@@ -168,6 +168,91 @@ describe('T-DATA-004 — 401 redirects, and is never an error screen', () => {
       '/.auth/login/aad?post_login_redirect_uri=%2Flist%3Fsort%3Ddate%26dir%3Ddesc',
     );
   });
+
+  it('T-DATA-004d: an expired session arriving as 200 HTML is treated as a 401', async () => {
+    /*
+      ⚠ THIS IS HOW AN EXPIRED SESSION ACTUALLY ARRIVES HERE, AND `a` DOES NOT
+      COVER IT. Container Apps Easy Auth runs with `login.tokenStore.enabled`
+      false (`infra/aca.bicep` — a token store would persist C3 identity
+      material and needs a blob store, so enabling it without one breaks
+      sign-in). Without the store an unauthenticated request is not rejected:
+      it FALLS THROUGH to the app, which serves the SPA's `index.html` with a
+      **200**. `response.ok` is true, the 401 branch never runs, and
+      `response.json()` throws a `SyntaxError` on `<!doctype`.
+
+      The owner saw a generic "something went wrong" with a Retry that fails
+      identically forever and no mention of signing in — the one remedy that
+      works was the one thing never named.
+    */
+    const { client, redirects } = harness(
+      () =>
+        new Response('<!doctype html><html><body>nextup</body></html>', {
+          status: 200,
+          headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        }),
+    );
+
+    await expect(client.getTitles('')).rejects.toBeInstanceOf(ApiError);
+    // Identical treatment to a real 401, including path preservation: the
+    // owner is mid-task and must come back where they were.
+    expect(redirects).toEqual([
+      '/.auth/login/aad?post_login_redirect_uri=%2Fremoved%3Fservice%3Dmax',
+    ]);
+  });
+
+  it('T-DATA-004e: the signal is the content type, not the URL', async () => {
+    /*
+      ⚠ THE OBVIOUS IMPLEMENTATION IS WRONG AND LOOKS RIGHT. Easy Auth does
+      NOT redirect in this configuration, so `response.url` is still the API
+      path and `response.redirected` is false. A check built on either reads
+      as "authenticated" during exactly the failure it exists to catch, and it
+      would pass a test that hand-builds a redirected Response. This case pins
+      the detection to a response carrying no redirect information at all.
+    */
+    const html = new Response('<!doctype html>', {
+      status: 200,
+      headers: { 'Content-Type': 'text/html' },
+    });
+    expect(html.redirected).toBe(false);
+
+    const { client, redirects } = harness(() => html.clone());
+    await expect(client.getMe()).rejects.toBeInstanceOf(ApiError);
+    expect(redirects).toHaveLength(1);
+  });
+
+  it('T-DATA-004f: a non-HTML shape failure stays a shape failure', async () => {
+    /*
+      ⚠ THE BOUND, AND IT MATTERS MORE THAN IT LOOKS. Claiming an expired
+      session for any malformed 2xx would send a CORRECTLY SIGNED-IN owner to
+      the IdP and return them to the same broken screen, having "fixed"
+      nothing — an infinite loop through a login they never needed, with the
+      real defect now invisible behind it. Only HTML is proof the API did not
+      answer; everything else must keep failing as a shape error, which the
+      ErrorBoundary renders (§1 "Never a blank page").
+    */
+    const { client, redirects } = harness(
+      () => new Response('not json', { status: 200, headers: { 'Content-Type': 'text/plain' } }),
+    );
+
+    await expect(client.getMe()).rejects.toBeDefined();
+    expect(redirects).toEqual([]);
+  });
+
+  it('T-DATA-004g: a 204 is still a 204, not an expired session', async () => {
+    /*
+      ⚠ THIS GUARDS THE ORDERING, NOT THE PREDICATE, AND I FIRST WROTE THE
+      COMMENT CLAIMING OTHERWISE. A 204 returns BEFORE the content-type check,
+      so broadening that check to "not JSON" does not fail this case — proven
+      by mutation, which failed only `f`. What this case really pins is that
+      the 204 early return stays ABOVE the check: a 204 carries no content
+      type at all, so moving the check up would send every successful delete
+      to the sign-in page, and every other case here would stay green.
+    */
+    const { client, redirects } = harness(() => new Response(null, { status: 204 }));
+
+    await expect(client.removeBatchImage('batch-1', 'image-1')).resolves.toBeUndefined();
+    expect(redirects).toEqual([]);
+  });
 });
 
 describe('T-DATA-005 — 403 is a refusal, distinct from a transport failure', () => {
