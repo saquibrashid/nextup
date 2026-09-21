@@ -280,7 +280,7 @@ async function mountLibrary(
 const { describe } = test;
 for (const width of [320, 1280]) {
   describe(`Remembered library at ${width}px`, () => {
-    test('T-UX-166h: library choices survive navigation and browser restart', async ({
+    test('T-LIB-001h: library choices survive navigation and browser restart', async ({
       page,
       browser,
     }) => {

@@ -598,7 +598,7 @@ says so in a comment and does not do it, because `SortControl` shipped later
 > | **Sort** | **URL → per-field default.** | LibraryNavigation restores a validated complete destination before list reads on fresh bare-root entry or application return. Explicit query/history URLs win. The old direction-only session fallback is retired because it changed older history entries. Explicit field selection uses §5b's complete-order rule. |
 >
 > A navigation bookmark is not a second live filter model. **`T-UI-016`,
-> `T-UX-115` and `T-UX-166` guard URL, history and return behavior.**
+> `T-UX-115` and `T-LIB-001` guard URL, history and return behavior.**
 
 Also invariant: `applyFilters` must preserve `sort`, `dir` and `cursor`.
 Changing a filter must not silently reset the owner's ordering.

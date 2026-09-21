@@ -65,7 +65,7 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe('remembered library destination', () => {
-  it('T-UX-166a: restores before the first list request and across a fresh app lifetime', async () => {
+  it('T-LIB-001a: restores before the first list request and across a fresh app lifetime', async () => {
     const first = mount(`/?${CHOICES}`);
     await screen.findByTestId('zero-match');
     first.unmount();
@@ -78,7 +78,7 @@ describe('remembered library destination', () => {
   });
 
   it.each(['/upload', '/batches', '/batches/first/review', '/titles/first'])(
-    'T-UX-166b: returns from %s with the saved URL and navigation state',
+    'T-LIB-001b: returns from %s with the saved URL and navigation state',
     async (path) => {
       localStorage.setItem(KEY, CHOICES);
       mount(path);
@@ -89,7 +89,7 @@ describe('remembered library destination', () => {
     },
   );
 
-  it('T-UX-166c: explicit links replace remembered choices rather than merging', async () => {
+  it('T-LIB-001c: explicit links replace remembered choices rather than merging', async () => {
     localStorage.setItem(KEY, CHOICES);
     mount('/?sort=runtime&dir=desc');
     await waitFor(() => expect(localStorage.getItem(KEY)).toBe('sort=runtime&dir=desc'));
@@ -97,7 +97,7 @@ describe('remembered library destination', () => {
     expect(screen.queryByRole('button', { name: 'Remove genre filter: Drama' })).toBeNull();
   });
 
-  it('T-UX-166d: Back/Forward and an in-place clear keep their authoritative URLs', async () => {
+  it('T-LIB-001d: Back/Forward and an in-place clear keep their authoritative URLs', async () => {
     mount();
     await screen.findByRole('heading', { name: 'Your list' });
     expect(vi.mocked(apiClient.getTitles).mock.calls[0]?.[0]).toBe('');
@@ -114,7 +114,7 @@ describe('remembered library destination', () => {
     await waitFor(() => expect(screen.getByTestId('url').textContent).not.toContain('service='));
   });
 
-  it('T-UX-166e: supported absent genres stay visible and clearable; cursors are never remembered', async () => {
+  it('T-LIB-001e: supported absent genres stay visible and clearable; cursors are never remembered', async () => {
     mount('/?genre=Vanished&sort=dateAdded&dir=asc&cursor=old');
     await screen.findByTestId('zero-match');
     expect(localStorage.getItem(KEY)).toBe('genre=Vanished&sort=dateAdded&dir=asc');
@@ -122,7 +122,7 @@ describe('remembered library destination', () => {
     await waitFor(() => expect(localStorage.getItem(KEY)).toBe('sort=dateAdded&dir=asc'));
   });
 
-  it('T-UX-166f: obsolete stored values are validated and disclosed rather than breaking requests', async () => {
+  it('T-LIB-001f: obsolete stored values are validated and disclosed rather than breaking requests', async () => {
     localStorage.setItem(KEY, 'service=retired&type=bogus&sort=old&dir=wrong&cursor=secret');
     mount();
     await screen.findByText('Some saved browsing choices are no longer supported and were reset.');
@@ -132,7 +132,7 @@ describe('remembered library destination', () => {
     );
   });
 
-  it('T-UX-166g: blocked storage reports the limitation but keeps in-app navigation working', async () => {
+  it('T-LIB-001g: blocked storage reports the limitation but keeps in-app navigation working', async () => {
     const originalGet = Storage.prototype.getItem;
     const originalSet = Storage.prototype.setItem;
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(function (this: Storage, key) {

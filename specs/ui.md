@@ -290,7 +290,7 @@ restore, suppress, un-suppress or fix-match.
    Fresh bare-root visits and application returns restore it before list reads;
    explicit query links and Back/Forward remain authoritative. Clearing choices
    updates that destination. Unsupported saved choices and blocked storage are
-   disclosed without disabling the page (`T-UX-166`).
+   disclosed without disabling the page (`T-LIB-001`).
    Explicit entry/history URLs without direction use the per-field default;
    the former direction-only session fallback is superseded because it
    changed old history entries using newer choices.
