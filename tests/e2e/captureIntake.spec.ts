@@ -131,6 +131,7 @@ for (const width of [280, 390, 1440]) {
       expect(resolutionWrites).toBe(1);
       await page.getByRole('button', { name: 'Remove saved.png', exact: true }).click();
       await expect(page.getByText(/Upload a replacement screenshot above/)).toBeVisible();
+      await expect(page.getByTestId('file-input')).toBeEnabled();
       await page.getByTestId('file-input').setInputFiles({
         name: 'new.png',
         mimeType: 'image/png',
