@@ -31,6 +31,13 @@
     }
   ],
   "expectedChrome": ["my list"],
+  "expectedTruncations": [
+    {
+      "truncated": "dr strangelove or how i lear",
+      "of": "dr strangelove or how i learned to stop worrying and love the bomb"
+    },
+    { "truncated": "hitchhiker s guide to the", "of": "hitchhiker s guide to the galaxy" }
+  ],
   "minRecall": 0.75,
   "maxFalseTitles": 1,
   "maxFabricated": 0
