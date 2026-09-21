@@ -250,8 +250,35 @@ close withholding despite otherwise sufficient successful extraction.
 
 ## 7. Scenario matrix and delivery order
 
-Each slice must add collected named tests before claiming completion. Pending
-slices below are design/work orders, not claims of implemented behavior.
+### TASK-231 navigation and read-lifetime contract
+
+Outside the upload/detail/review screens, a compact unfinished-capture strip
+reads the owner-scoped open lookup on navigation. It names the service and
+saved stage and offers the same resume action as the upload checkpoint.
+In-place query changes, such as library filtering or sorting, do not restart
+that lookup or reinsert a loading strip above the existing content.
+It does not add a phone navigation destination, poll in the background, or
+claim there is no unfinished work when the lookup fails. Resume always enters
+the batch status route, which rereads the current state before opening review.
+History uses the same stage/action vocabulary and authoritative status route.
+
+Each batch detail route has its own component lifetime. Status polls share
+one pending read; elapsed time never invents extraction failure or authorizes
+discard. An explicit status retry may supersede a stalled read. Failed reads
+retain the last reported progress, label it as last known, disable writes and
+require a read-only retry. Leaving aborts reads and prevents late mutation
+responses from redirecting the owner. Missing or inaccessible batch IDs offer
+history and a new-capture entry point, without guessing which cause applies.
+
+Capture navigation moves keyboard/screen-reader focus into the page, not into
+the navigation bar. Review cards remain mounted during decision refresh and
+summary cancellation; the large-review regression must measure scroll and
+focus in a real browser. This slice does not promise saved scroll position
+across a browser reload or change library filter/sort persistence (#328).
+
+Each slice must add collected named tests before claiming completion.
+TASK-231 implements this contract with `T-UX-165a`–`k`; the backlog records
+implementation status, and every release remains CI-gated.
 
 | Slice | Required scenarios | Named coverage |
 | --- | --- | --- |

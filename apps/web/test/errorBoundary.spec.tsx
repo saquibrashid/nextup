@@ -15,7 +15,7 @@
  * ignore red console output in this suite will ignore the real thing later.
  */
 
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -106,7 +106,7 @@ describe('T-BOUND-001 a render crash never becomes a blank page', () => {
     await user.click(screen.getByRole('button', { name: 'More' }));
     await user.click(screen.getByRole('link', { name: 'About' }));
 
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('main')).queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByText('a screen that works')).toBeInTheDocument();
   });
 

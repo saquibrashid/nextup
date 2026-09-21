@@ -637,9 +637,13 @@ async function stubUndoRefusal(page: Page): Promise<void> {
 
     const body = url.includes('/me')
       ? ME
-      : url.endsWith('/api/batches') && method === 'GET'
-        ? REFUSAL_BATCH
-        : { items: [] };
+      : new URL(url).pathname === '/api/batches' &&
+          new URL(url).searchParams.get('open') === 'true' &&
+          method === 'GET'
+        ? { batches: [] }
+        : url.endsWith('/api/batches') && method === 'GET'
+          ? REFUSAL_BATCH
+          : { items: [] };
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -654,6 +658,7 @@ async function openRefusalPanel(page: Page): Promise<void> {
   await page.setViewportSize(NARROW);
   await page.goto('/batches');
   await expectStyledAndRendered(page);
+  await expect(page.getByRole('complementary', { name: 'Unfinished capture' })).toHaveCount(0);
 
   await page.getByTestId('batch-card-undo').click();
   await expect(page.getByTestId('undo-refusal-panel')).toBeVisible();

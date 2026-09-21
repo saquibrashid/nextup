@@ -181,6 +181,10 @@ async function mountLibrary(
     expect(request.method()).toBe('GET');
     let body: unknown;
     switch (target.pathname) {
+      case '/api/batches':
+        expect(target.searchParams.get('open')).toBe('true');
+        body = { batches: [] };
+        break;
       case '/api/me':
         body = {
           ownerId: 'fixture-owner',

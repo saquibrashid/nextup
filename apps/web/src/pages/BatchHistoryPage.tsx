@@ -36,6 +36,7 @@ import {
 } from '../copy';
 import type { BatchHistoryItem } from '../lib/apiClient';
 import { Button } from '../components/ui/Button';
+import { resumeAction } from '../lib/useUploadCheckpoint';
 
 export interface BatchHistoryPageProps {
   readonly items?: readonly BatchHistoryItem[];
@@ -74,7 +75,7 @@ export function canOfferUndo(item: BatchHistoryItem): boolean {
 }
 
 const MODE_LABELS: Record<string, string> = {
-  append: 'Add to list',
+  'append-only': 'Add to list',
   'full-update': 'Full update',
 };
 
@@ -113,16 +114,18 @@ function BatchCard({
   undoing?: boolean;
   offline?: boolean;
 }): JSX.Element {
+  const resume = item.undoneAt === null ? resumeAction(item.status) : null;
   return (
     <li className="batch-card" data-testid="batch-card">
       <Link to={`/batches/${item.batchId}`} data-testid="batch-card-link">
         <span data-testid="batch-card-date">{batchDate(item)}</span>
-        <span data-testid="batch-card-service">{SERVICE_LABELS[item.service] ?? item.service}</span>
+        <span data-testid="batch-card-service">{SERVICE_LABELS[item.service] ?? 'Discovery'}</span>
         <span data-testid="batch-card-mode">{MODE_LABELS[item.mode] ?? item.mode}</span>
         <span data-testid="batch-card-status">
-          {item.undoneAt === null ? item.status : 'undone'}
+          {item.undoneAt === null ? (resume?.state ?? item.status) : 'undone'}
         </span>
         <span data-testid="batch-card-counts">{countsLine(item.counts)}</span>
+        {resume !== null && <span>{resume.label}</span>}
       </Link>
       {onUndo !== undefined && canOfferUndo(item) && (
         <>

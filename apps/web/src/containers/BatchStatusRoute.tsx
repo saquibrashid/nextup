@@ -19,11 +19,19 @@
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-import { RefusedError, apiClient, type ApiClient, type BatchStatus } from '../lib/apiClient';
+import {
+  ApiError,
+  RefusedError,
+  apiClient,
+  type ApiClient,
+  type BatchStatus,
+} from '../lib/apiClient';
 import { BatchStatusPage } from '../pages/BatchStatusPage';
 import { RefusalPage } from '../pages/RefusalPage';
 import { DraftBatch } from '../components/DraftBatch';
 import { BatchAppliedNotice } from '../components/BatchAppliedNotice';
+import { CaptureUnavailable } from '../components/CaptureUnavailable';
+import { useCaptureLifetime } from '../lib/useCaptureLifetime';
 
 /** §4 — "every 2 s while `submitted`/`extracting`". */
 export const POLL_INTERVAL_MS = 2_000;
@@ -69,7 +77,12 @@ export interface BatchStatusRouteProps {
   readonly visibility?: () => boolean;
 }
 
-export function BatchStatusRoute({
+export function BatchStatusRoute(props: BatchStatusRouteProps = {}): JSX.Element {
+  const { batchId } = useParams();
+  return <BatchStatusContent key={batchId} {...props} />;
+}
+
+function BatchStatusContent({
   client = apiClient,
   visibility,
 }: BatchStatusRouteProps = {}): JSX.Element {
@@ -79,12 +92,17 @@ export function BatchStatusRoute({
 
   const [batch, setBatch] = useState<BatchStatus | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [loadErrorMessage, setLoadErrorMessage] = useState<string | null>(null);
   const [refused, setRefused] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [draftPending, setDraftPending] = useState(false);
   const inFlight = useRef(false);
   const readVersion = useRef(0);
+  const pendingRead = useRef<{ controller: AbortController; promise: Promise<void> } | null>(null);
+  const readFailed = useRef(false);
+  const isActive = useCaptureLifetime();
 
   const isOnline = useCallback(
     (): boolean => typeof navigator === 'undefined' || navigator.onLine !== false,
@@ -115,27 +133,47 @@ export function BatchStatusRoute({
   offlineRef.current = offline;
 
   const load = useCallback(
-    async (signal?: AbortSignal): Promise<void> => {
+    (replace = false): Promise<void> => {
+      if (pendingRead.current !== null && !replace) return pendingRead.current.promise;
+      pendingRead.current?.controller.abort();
+      const controller = new AbortController();
+      const signal = controller.signal;
       const version = ++readVersion.current;
-      try {
-        const next = await client.getBatch(batchId, signal);
-        if (signal?.aborted === true || version !== readVersion.current) return;
-        statusRef.current = next.status;
-        setBatch(next);
-        setLoadFailed(false);
-      } catch (error) {
-        if (signal?.aborted === true || version !== readVersion.current) return;
-        if (error instanceof RefusedError) {
-          setRefused(true);
-          return;
+      const promise = (async () => {
+        try {
+          const next = await client.getBatch(batchId, signal);
+          if (signal.aborted || !isActive() || version !== readVersion.current) return;
+          statusRef.current = next.status;
+          setBatch(next);
+          readFailed.current = false;
+          setLoadFailed(false);
+          setLoadErrorMessage(null);
+        } catch (error) {
+          if (signal.aborted || !isActive() || version !== readVersion.current) return;
+          if (error instanceof RefusedError) {
+            statusRef.current = 'refused';
+            setRefused(true);
+            return;
+          }
+          if (error instanceof ApiError && error.status === 404) {
+            statusRef.current = 'unavailable';
+            setUnavailable(true);
+            return;
+          }
+          // §5.8 — offline is not a failure of the batch. The last known state
+          // stays on screen under the banner.
+          if (offlineRef.current) return;
+          readFailed.current = true;
+          setLoadFailed(true);
+          setLoadErrorMessage(error instanceof ApiError ? error.message : null);
+        } finally {
+          if (pendingRead.current?.controller === controller) pendingRead.current = null;
         }
-        // §5.8 — offline is not a failure of the batch. The last known state
-        // stays on screen under the banner.
-        if (offlineRef.current) return;
-        setLoadFailed(true);
-      }
+      })();
+      pendingRead.current = { controller, promise };
+      return promise;
     },
-    [batchId, client],
+    [batchId, client, isActive],
   );
 
   /**
@@ -144,14 +182,14 @@ export function BatchStatusRoute({
    * a `GET` is a duplicate read the abort discards.
    */
   useEffect(() => {
-    const controller = new AbortController();
-    void load(controller.signal);
+    void load(true);
 
     const timer = setInterval(() => {
       // Checked on every tick, not once at set-up: the owner switches tabs
       // mid-extraction, which is the whole case this exists for.
       if (isHidden()) return;
       if (inFlight.current) return;
+      if (readFailed.current) return;
       // §5.8 — the poll PAUSES rather than firing into a dead network. A tick
       // that fires offline costs a rejected request and, without the guard in
       // `load`, an invented error.
@@ -162,7 +200,9 @@ export function BatchStatusRoute({
     }, POLL_INTERVAL_MS);
 
     return () => {
-      controller.abort();
+      readVersion.current += 1;
+      pendingRead.current?.controller.abort();
+      pendingRead.current = null;
       clearInterval(timer);
     };
   }, [isHidden, load]);
@@ -182,7 +222,7 @@ export function BatchStatusRoute({
     const goOnline = (): void => {
       setOffline(false);
       const status = statusRef.current;
-      if (status === null || isRunning(status)) void load();
+      if (status === null || isRunning(status)) void load(true);
     };
 
     window.addEventListener('offline', goOffline);
@@ -218,10 +258,16 @@ export function BatchStatusRoute({
     setBusy(true);
     setActionError(null);
     void (async () => {
+      let navigated = false;
       try {
         await action();
-        if (destination !== undefined) void navigate(destination);
+        if (!isActive()) return;
+        if (destination !== undefined) {
+          navigated = true;
+          void navigate(destination);
+        }
       } catch (error) {
+        if (!isActive()) return;
         if (error instanceof RefusedError) setRefused(true);
         else
           setActionError(
@@ -229,14 +275,15 @@ export function BatchStatusRoute({
               'Check the saved status before trying again. Nothing was automatically retried.',
           );
       } finally {
-        await load();
+        if (isActive() && !navigated) await load(true);
         inFlight.current = false;
-        setBusy(false);
+        if (isActive()) setBusy(false);
       }
     })();
   }
 
   if (refused) return <RefusalPage reason="not-allowed" />;
+  if (unavailable) return <CaptureUnavailable />;
   if (batch !== null && (batch.status === 'draft' || draftPending)) {
     return (
       <DraftBatch
@@ -279,13 +326,14 @@ export function BatchStatusRoute({
       }
       batch={batch}
       loadFailed={loadFailed}
+      loadErrorMessage={loadErrorMessage}
       offline={offline}
       busy={busy}
       actionError={actionError}
       onRetry={() => {
         if (batch?.status === 'extraction-failed' && !loadFailed)
           mutate(() => client.retryExtraction(batchId));
-        else void load();
+        else void load(true);
       }}
       onDiscard={() => {
         // A MUTATION, and therefore in a handler (REQ-102).

@@ -35,6 +35,7 @@ import { useReviewDecisions, intentLabel } from '../lib/useReviewDecisions';
 import { Button } from '../components/ui/Button';
 import { ReviewRecovery } from '../components/ReviewRecovery';
 import { useCaptureLifetime } from '../lib/useCaptureLifetime';
+import { CaptureUnavailable } from '../components/CaptureUnavailable';
 
 export interface ReviewRouteProps {
   readonly client?: ApiClient;
@@ -108,6 +109,7 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
   const [applyRecovery, setApplyRecovery] = useState<'none' | 'checking' | 'unknown'>('none');
   const [applyFailed, setApplyFailed] = useState(false);
   const [outcomeRefused, setOutcomeRefused] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const checkingOutcome = useRef(false);
   const isActive = useCaptureLifetime();
   /** §6.12 — the close is in flight; the sticky bar's controls are disabled. */
@@ -183,12 +185,19 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
 
   const review = useResource(async (signal) => {
     try {
-      return await client.getReview(batchId, signal);
+      try {
+        return await client.getReview(batchId, signal);
+      } catch (error) {
+        if (!signal.aborted && error instanceof ApiError && error.code === 'BATCH_NOT_IN_REVIEW') {
+          const saved = await client.getBatch(batchId, signal);
+          if (!signal.aborted && saved.status !== 'in-review')
+            navigate(`/batches/${batchId}`, { replace: true });
+        }
+        throw error;
+      }
     } catch (error) {
-      if (!signal.aborted && error instanceof ApiError && error.code === 'BATCH_NOT_IN_REVIEW') {
-        const saved = await client.getBatch(batchId, signal);
-        if (!signal.aborted && saved.status !== 'in-review')
-          navigate(`/batches/${batchId}`, { replace: true });
+      if (!signal.aborted && error instanceof ApiError && error.status === 404) {
+        setUnavailable(true);
       }
       throw error;
     }
@@ -335,14 +344,16 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
     writing.current = true;
     setSaving(true);
     void client.discardBatch(batchId).then(
-      () => navigate('/'),
+      () => {
+        if (isActive()) navigate('/');
+      },
       () => {
         writing.current = false;
         setSaving(false);
         setDecisionError('Could not verify the discard. Your review is still here.');
       },
     );
-  }, [batchId, client, navigate, online]);
+  }, [batchId, client, navigate, online, isActive]);
 
   const searchTmdb = useCallback(
     async (query: string) => {
@@ -451,6 +462,7 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
 
   if (review.resource.kind === 'refused' || outcomeRefused)
     return <RefusalPage reason="not-allowed" />;
+  if (unavailable) return <CaptureUnavailable />;
   return (
     <ReviewPage
       controlled
