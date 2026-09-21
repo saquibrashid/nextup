@@ -2192,7 +2192,56 @@ button {
   min-width: 96px;
   width: 104px;
   height: 104px;
-  object-fit: cover;
+  /*
+   * ⚠ `contain`, NOT `cover`. This class now renders ONLY the uncropped
+   * whole-screenshot fallback (the crop branch has its own wrapper below), and
+   * `cover` made that fallback lie: a 6:1 screenshot in a 104px box shows its
+   * middle ~22% and is indistinguishable from a deliberate crop of whatever
+   * sits in the centre. Reported by the owner as a mis-cropped thumbnail three
+   * times before the cause was found. Letterboxing is honest — see
+   * `CandidateCard`'s no-crop branch.
+   */
+  object-fit: contain;
+}
+
+/*
+ * The no-crop fallback: the whole screenshot, letterboxed and labelled.
+ *
+ * ⚠ The label is not decoration. Without it a letterboxed screenshot is still
+ * a small picture of something, and the owner — who is being asked "is this
+ * the right match?" — has no way to tell that the thumbnail is not pointing at
+ * a specific tile.
+ */
+.candidate-card__whole {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 104px;
+}
+
+.candidate-card__whole .candidate-card__thumb {
+  /*
+   * A letterboxed screenshot leaves bars; give them a surface so the gap
+   * reads as framing rather than as a hole in the card.
+   */
+  background: var(--color-accent-soft);
+  height: 104px;
+  min-height: 104px;
+  width: 104px;
+}
+
+.candidate-card__whole-note {
+  /*
+   * ⚠ `--text-sm`, NOT `--text-xs` (`T-CSS-007`). This is content, not an
+   * uppercase tracked label: it tells the owner the picture beside "is this
+   * the right match?" is the whole screenshot rather than the tile, which is
+   * the only thing stopping them reading it as the tile.
+   */
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  text-align: center;
 }
 
 /*

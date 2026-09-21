@@ -407,6 +407,61 @@ describe('cleanup — reading-order grouping (T-AI-004)', () => {
     ]);
   });
 
+  it('T-AI-004aq classifies the Netflix tile-painted badges as chrome', () => {
+    // ⚠ R6, FROM A LIVE OWNER CAPTURE OF NETFLIX "MY LIST". Same class as
+    // `am` above — painted on the artwork, not in a nav bar — but Netflix's.
+    // Both reached the owner as rows to decide: `Recently Added` as an
+    // "Couldn't identify these" row, and `New Season` as a PROPOSED MATCH to
+    // an unrelated Japanese release whose poster is adult artwork.
+    //
+    // ⚠ THAT SECOND OUTCOME IS WHY THIS IS A SAFETY TEST, NOT A TIDINESS ONE.
+    // Chrome that survives step 3 does not stop at an "unidentified" row — it
+    // is handed to TMDB as if it were a title, and a generic two-word phrase
+    // matches whatever that search ranks first. The badge vocabulary is the
+    // only thing standing between a UI label and arbitrary poster art in the
+    // owner's review screen.
+    const out = cleanup(
+      [
+        ocr({ rawText: 'Recently Added' }),
+        ocr({ rawText: 'NEW SEASON' }),
+        ocr({ rawText: 'New Episodes' }),
+      ],
+      { now: NOW },
+    );
+
+    expect(out.map((c) => c.cleanupVerdict)).toEqual([
+      'chrome-suspected',
+      'chrome-suspected',
+      'chrome-suspected',
+    ]);
+  });
+
+  it('T-AI-004ar leaves real works that CONTAIN the new badge words alone', () => {
+    // ⚠ THE DISCRIMINATING TWIN FOR THE R6 TERMS SPECIFICALLY. `ao` above
+    // already guards the bare `new` term with *New Amsterdam*; these are the
+    // works the THREE-WORD badges put at risk, which `ao` cannot speak to.
+    //
+    // ⚠ THIS IS WHY EACH BADGE IS ENUMERATED AND NO `new <anything>` RULE IS
+    // WRITTEN. `new` was already a term and did NOT cover `new season` —
+    // exactly the lesson `my watchlist` taught against a bare `watchlist`.
+    // The tempting fix for that gap is a prefix or substring rule; it would
+    // delete every title below, all of which are real works.
+    const out = cleanup(
+      [
+        ocr({ rawText: 'Season of the Witch' }),
+        ocr({ rawText: 'A New Season of Love' }),
+        ocr({ rawText: 'New Jack City' }),
+      ],
+      { now: NOW },
+    );
+
+    expect(out.map((c) => c.cleanupVerdict)).toEqual([
+      'title-candidate',
+      'title-candidate',
+      'title-candidate',
+    ]);
+  });
+
   it('T-AI-004an NEVER applies the badge vocabulary to the primary reader', () => {
     // ⚠ THE SAFETY TWIN, AND THE REASON `new` IS TOLERABLE AS A TERM AT ALL.
     // It is three generic letters. Step 3 is `ocr-only`-scoped precisely so a

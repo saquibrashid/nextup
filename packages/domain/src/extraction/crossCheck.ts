@@ -259,7 +259,19 @@ export function crossCheck(llm: readonly LlmTile[], ocr: readonly OcrLine[]): Ex
       // geometry is approximate; OCR's is measured. The thumbnail shown beside
       // an `inferred-unverified` candidate (`T-AI-041`) is cropped from this,
       // so a sloppy box is a visible product defect, not a detail.
-      boundingBox: corroborating ? { ...corroborating.box } : { ...tile.box },
+      //
+      // ⚠ **The model's tile rectangle is RETAINED, not discarded**, because
+      // the measured box alone cannot make a thumbnail: it is a text line, so
+      // cropping to it shows the caption and none of the artwork. Measurement
+      // (`docs/evaluation/tile-geometry-2026-09-20.md`) separates the two
+      // cleanly — the reader's box SIZE is accurate (p25-p75 1.02-1.19 of the
+      // true tile) while its POSITION drifts by up to 2.3 tiles — so
+      // `tileCropFor` takes size from here and position from the measured
+      // line. Dropping `tileBox` again silently returns the thumbnail to the
+      // whole screenshot, which is `T-AI-055`'s subject.
+      boundingBox: corroborating
+        ? { ...corroborating.box, tileBox: { ...tile.box } }
+        : { ...tile.box },
       boxSource: corroborating ? 'ocr' : 'llm',
       confidence: tile.confidence,
     });

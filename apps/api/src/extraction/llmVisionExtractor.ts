@@ -131,6 +131,29 @@ export interface LlmVisionExtractorOptions {
    * `max_completion_tokens` as well as an ADR-0001 revision.
    */
   tokenParam?: 'max_tokens' | 'max_completion_tokens';
+  /**
+   * The sampling temperature. **Production must not set this** — it defaults
+   * to `AOAI_TEMPERATURE` (0), which is what §2.1a specifies.
+   *
+   * ⚠ IT EXISTS FOR ONE REASON AND THAT REASON IS NOT TUNING. Every model
+   * newer than `gpt-5.4` rejects `temperature: 0` outright —
+   * `unsupported_value: 'temperature' does not support 0.0 with this model.
+   * Only the default (1) value is supported.` — which §9.7 Stage 0 treats as
+   * a disqualifier. That rule is only defensible if someone can measure what
+   * it is buying, and measuring it requires being able to *run* a
+   * temperature-1 arm through the §4A harness. Without this seam the rule can
+   * only ever be argued about, never tested, and it happens to exclude every
+   * future frontier model.
+   *
+   * ⚠ RAISING IT IS A CONTRACT CHANGE, NOT A SETTING. `temperature: 0` and
+   * `seed` are what make two runs of the same fixture comparable; §9.5's whole
+   * golden apparatus is built on that. Anything set here other than
+   * `AOAI_TEMPERATURE` produces numbers that must not be filed as a §4A
+   * baseline — which is why `goldenLive.spec.ts` writes a *differently named*
+   * report the moment this is overridden, rather than trusting anyone to
+   * remember.
+   */
+  temperature?: number;
   /** Injected so retry backoff does not add five seconds to every test. */
   sleep?: (ms: number) => Promise<void>;
   /** Injected so the timeout path is assertable without waiting 60 s. */
@@ -214,10 +237,12 @@ export class LlmVisionExtractor implements TitleExtractor {
   readonly #newCorrelationId: () => string;
   readonly #log: (event: LlmLogEvent) => void;
   readonly #tokenParam: 'max_tokens' | 'max_completion_tokens';
+  readonly #temperature: number;
 
   constructor(options: LlmVisionExtractorOptions) {
     this.#deployment = options.deployment;
     this.#tokenParam = options.tokenParam ?? 'max_tokens';
+    this.#temperature = options.temperature ?? AOAI_TEMPERATURE;
     this.#sleep = options.sleep ?? realSleep;
     this.#timeoutMs = options.timeoutMs ?? AOAI_TIMEOUT_MS;
     this.#newCorrelationId = options.newCorrelationId ?? (() => randomUUID());
@@ -382,7 +407,7 @@ export class LlmVisionExtractor implements TitleExtractor {
       response = (await this.#client.chat.completions.create(
         {
           model: this.#deployment,
-          temperature: AOAI_TEMPERATURE,
+          temperature: this.#temperature,
           top_p: AOAI_TOP_P,
           seed: AOAI_SEED,
           [this.#tokenParam]: AOAI_MAX_TOKENS,

@@ -111,6 +111,32 @@ export const CHROME_TERMS: ReadonlySet<string> = new Set([
   // NOT written: it would fold `my home` onto `home` and suppress any work
   // actually called *My Home*.
   'my watchlist',
+  // ── Added R6 (owner report, live Netflix "My List" capture). The SAME class
+  // as the TASK-199 badges above — painted ON the tile artwork rather than in
+  // a nav bar — but Netflix's, and both reached the owner as rows to decide.
+  //
+  // ⚠ `new` WAS ALREADY HERE AND DID NOT COVER `new season`, which is the
+  // same lesson `my watchlist` taught against a bare `watchlist`: step 3 is an
+  // EXACT line match by design, so a shorter term never covers a longer line.
+  // Each badge is enumerated, and no `new <anything>` rule is written — it
+  // would fold *New Jack City* and *New Girl* onto chrome.
+  //
+  // ⚠ `recently added` IS CORPUS-REPRODUCIBLE, NOT A ONE-OFF. It is already a
+  // named false title in the committed baseline
+  // (`docs/evaluation/golden-2026-09-18.md`: `netflix-mylist-mobile-01` ·
+  // `recently added` — in 1 of 3 runs), so this entry closes a gap the golden
+  // corpus had already recorded and nobody had acted on.
+  //
+  // ⚠ `new season` IS THE WORST OF THE TWO AND THE REASON THIS IS URGENT.
+  // Unmatched chrome does not stop at an "unidentified" row: it is sent to
+  // TMDB as if it were a title, and a two-word generic phrase matches
+  // whatever that search happens to rank first. On the owner's own capture
+  // `New Season` resolved to an unrelated Japanese release whose poster is
+  // adult artwork, which was then rendered in the review UI. Chrome reaching
+  // the matcher is therefore a CONTENT-SAFETY path, not only a tidiness one.
+  'recently added',
+  'new season',
+  'new episodes',
 ]);
 
 /**

@@ -1,0 +1,30 @@
+[
+  {
+    "x": 0.0638,
+    "y": 0.127,
+    "w": 0.4043,
+    "h": 0.3175,
+    "title": "The Lord of the Rings: The Fellowship of the Ring"
+  },
+  {
+    "x": 0.5319,
+    "y": 0.127,
+    "w": 0.4043,
+    "h": 0.3175,
+    "title": "Everything Everywhere All at Once"
+  },
+  {
+    "x": 0.0638,
+    "y": 0.5556,
+    "w": 0.4043,
+    "h": 0.3175,
+    "title": "Dr. Strangelove or: How I Learned to Stop Worrying and Love the Bomb"
+  },
+  {
+    "x": 0.5319,
+    "y": 0.5556,
+    "w": 0.4043,
+    "h": 0.3175,
+    "title": "The Hitchhiker's Guide to the Galaxy"
+  }
+]

@@ -433,13 +433,39 @@ export const TILE_CROP_PADDING = 0.08;
  * The region to crop for a candidate's tile thumbnail, or `null` to show the
  * whole image.
  *
- * ⚠ **A crop is only offered for a TILE box (`boxSource === 'llm'`), never an
- * OCR box.** §5.3a requires a thumbnail "at a size where the ARTWORK is
- * legible". An OCR box is a text-LINE rectangle — a strip a few percent tall
- * containing the caption — so cropping to it fills the thumbnail with the
- * words the owner is already being shown as `rawText`, and shows none of the
- * artwork that is the entire reason the thumbnail is mandatory. That failure
- * is invisible in a test that only asserts "a crop was produced".
+ * ⚠ **THE RULE IS: POSITION FROM THE MEASURED CAPTION, SIZE FROM THE READER'S
+ * TILE, AND NO CROP UNLESS BOTH AGREE.** Each half is measured against the
+ * annotated corpus in `tests/fixtures/golden/tiles/`
+ * (`docs/evaluation/tile-geometry-2026-09-20.md`), and neither half works
+ * alone:
+ *
+ *  - The reader's box **SIZE** is accurate — p25-p75 of 1.02-1.19 against the
+ *    true tile, never worse than 1.43x. Usable.
+ *  - The reader's box **POSITION** is not. Only 22 of 46 box centres land on
+ *    the tile they name, and the worst is 2.3 tiles away. On two images the
+ *    boxes step at a constant pitch that is not the real one and the last box
+ *    is emitted off the edge of the picture — which no observation can do.
+ *  - The OCR line's **POSITION** is exact, because it was measured. Its
+ *    **SIZE** is a text strip a few percent tall, so a crop to it shows the
+ *    caption the owner is already reading as `rawText` and none of the
+ *    artwork that §5.3a requires be legible.
+ *
+ * ⚠ **THE GATE IS NOT DECORATION — IT IS MOST OF THE VALUE.** A crop is
+ * produced only when the measured caption's centre falls INSIDE the reader's
+ * own tile box, i.e. the two independent readers agree about where this title
+ * is. Where the reader's geometry has drifted, the caption falls outside it,
+ * no crop is offered, and the owner sees the uncropped image instead of a
+ * confident crop of the wrong tile.
+ *
+ * ⚠ **`boxSource === 'llm'` NOW MEANS NO CROP, WHICH IS THE OPPOSITE OF WHAT
+ * THIS FUNCTION USED TO DO.** `'llm'` means no OCR line corroborated the tile
+ * — so the geometry is the reader's unverified estimate and nothing else.
+ * Measured over the real corpus through the real `crossCheck()`, that branch
+ * produced 10 crops of which **8 showed under half the tile they named** and
+ * the median crop showed **24%** of it. It is the branch behind the owner's
+ * *"the image represented for Jo Koy is incorrect — it shows rectangles for 2
+ * other items"*. Restoring it re-opens that defect; `T-AI-055c` fails if it
+ * returns.
  *
  * ⚠ **NO VERDICT GATE — and one must not be re-added (`T-UX-154`).** This
  * function used to refuse every verdict outside `inferred-unverified` and
@@ -472,7 +498,11 @@ export const TILE_CROP_PADDING = 0.08;
  * case, so the client renders its existing uncropped `<img>` path instead of a
  * crop that happens to be the identity. A degenerate rectangle is refused for
  * the same reason: a zero-width box scaled to fill a thumbnail is an infinite
- * magnification of one column of pixels.
+ * magnification of one column of pixels. ⚠ That uncropped path is NOT a
+ * neutral fallback and must not be treated as one — see `CandidateCard`, which
+ * has to letterbox it and label it, because an `object-fit: cover` render of a
+ * wide screenshot shows its middle fifth and is indistinguishable from a
+ * deliberate crop of the wrong tiles.
  *
  * ⚠ `verdict` is deliberately **not** a parameter. Keeping it "in case the
  * rule comes back" would leave the defect one uncommented line away, and a
@@ -482,9 +512,17 @@ export const TILE_CROP_PADDING = 0.08;
  */
 export function tileCropFor(input: {
   boxSource: string;
-  boundingBoxes: readonly { imageId: string; x: number; y: number; w: number; h: number }[];
+  boundingBoxes: readonly {
+    imageId: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    tileBox?: { x: number; y: number; w: number; h: number } | undefined;
+  }[];
 }): ReviewTileCrop | null {
-  if (input.boxSource !== 'llm') return null;
+  // Unverified reader geometry. Measured 8-in-10 wrong; see the note above.
+  if (input.boxSource !== 'ocr') return null;
 
   const first = input.boundingBoxes[0];
   if (first === undefined) return null;
@@ -497,6 +535,7 @@ export function tileCropFor(input: {
   let top = Number.POSITIVE_INFINITY;
   let right = Number.NEGATIVE_INFINITY;
   let bottom = Number.NEGATIVE_INFINITY;
+  let tile: { x: number; y: number; w: number; h: number } | undefined;
   for (const box of onImage) {
     if (!Number.isFinite(box.x) || !Number.isFinite(box.y)) return null;
     if (!Number.isFinite(box.w) || !Number.isFinite(box.h)) return null;
@@ -504,14 +543,31 @@ export function tileCropFor(input: {
     if (box.y < top) top = box.y;
     if (box.x + box.w > right) right = box.x + box.w;
     if (box.y + box.h > bottom) bottom = box.y + box.h;
+    tile ??= box.tileBox;
   }
 
-  const padX = (right - left) * TILE_CROP_PADDING;
-  const padY = (bottom - top) * TILE_CROP_PADDING;
-  const x = clampUnit(left - padX);
-  const y = clampUnit(top - padY);
-  const w = clampUnit(right + padX) - x;
-  const h = clampUnit(bottom + padY) - y;
+  // No reader tile to take a size from. The measured box is a text line, and
+  // cropping to it shows the caption and none of the artwork (§5.3a).
+  if (tile === undefined) return null;
+  if (!Number.isFinite(tile.x) || !Number.isFinite(tile.y)) return null;
+  if (!Number.isFinite(tile.w) || !Number.isFinite(tile.h)) return null;
+  if (tile.w <= 0 || tile.h <= 0) return null;
+
+  // THE GATE: the two readers must agree about where this title is.
+  const capX = (left + right) / 2;
+  const capY = (top + bottom) / 2;
+  if (capX < tile.x || capX > tile.x + tile.w) return null;
+  if (capY < tile.y || capY > tile.y + tile.h) return null;
+
+  const padX = tile.w * TILE_CROP_PADDING;
+  const padY = tile.h * TILE_CROP_PADDING;
+  const halfW = tile.w / 2 + padX;
+  const halfH = tile.h / 2 + padY;
+
+  const x = clampUnit(capX - halfW);
+  const y = clampUnit(capY - halfH);
+  const w = clampUnit(capX + halfW) - x;
+  const h = clampUnit(capY + halfH) - y;
   if (w <= 0 || h <= 0) return null;
 
   return { imageId: first.imageId, x, y, w, h };

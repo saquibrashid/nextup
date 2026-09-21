@@ -152,12 +152,34 @@ export function CandidateCard({
     >
       {needsThumbnail && thumbnailUrl !== null ? (
         crop === null ? (
-          <img
-            className="candidate-card__thumb"
-            data-testid="candidate-thumb"
-            src={thumbnailUrl}
-            alt=""
-          />
+          // NO CROP — the two readers did not agree on where this tile is, so
+          // the whole screenshot is all there is to show.
+          //
+          // ⚠ **THIS BRANCH MUST NOT LOOK LIKE A CROP, AND IT USED TO.** With
+          // `object-fit: cover` in a ~96px box, a wide screenshot renders as
+          // its middle fifth — a confident, well-framed rectangle of whatever
+          // happens to be in the centre. The owner reported exactly that from
+          // a 1246x205 Netflix strip: three different cards each showed the
+          // same two unrelated tiles, and it read as a mis-crop rather than as
+          // "we could not locate this". The tell was that all three were
+          // IDENTICAL, which independent crops cannot be and a shared
+          // uncropped render must.
+          //
+          // So it is letterboxed (`contain`, not `cover`) and labelled. Seeing
+          // the entire screenshot is honest and occasionally useful; seeing an
+          // arbitrary fifth of it presented as the tile is neither.
+          <span className="candidate-card__whole" data-testid="candidate-thumb-whole">
+            <img
+              className="candidate-card__thumb"
+              data-testid="candidate-thumb"
+              src={thumbnailUrl}
+              alt=""
+            />
+            {/* Not `aria-hidden`: a screen-reader user has no other way to
+                learn that this picture is the whole screenshot rather than
+                the tile, which is the one thing the sighted cue conveys. */}
+            <span className="candidate-card__whole-note">Whole screenshot</span>
+          </span>
         ) : (
           // §5.3a's CROP. The whole image is fetched either way — the byte
           // route serves whole screenshots and cropping server-side would put

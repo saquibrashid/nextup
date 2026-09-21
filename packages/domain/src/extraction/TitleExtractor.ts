@@ -115,7 +115,16 @@ export interface ExtractedTextItem {
   ocrSupport: OcrSupport;
   /** Which reader produced this item. `'ocr-only'` is a model orphan (§2.1c step 2). */
   provider: CandidateProvider;
-  boundingBox: NormalisedBox;
+  /**
+   * The geometry to use for this item.
+   *
+   * ⚠ `tileBox` is present only on a MEASURED box that a reader tile
+   * corroborated, and it carries that tile's rectangle. The two are not
+   * interchangeable: this box is exact in position and is a text line; the
+   * tile box is accurate in size and drifts in position. `tileCropFor`
+   * combines them. See `BoundingBox` in `types.ts`.
+   */
+  boundingBox: NormalisedBox & { tileBox?: NormalisedBox };
   /** Where the geometry came from. OCR wins wherever it corroborated (§2.1c step 3). */
   boxSource: BoxSource;
   /** Provider confidence 0..1, or `null`. */

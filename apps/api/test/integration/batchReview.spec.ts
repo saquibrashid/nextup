@@ -961,14 +961,27 @@ describe('T-REM-010 · US-014 · removals as the owner actually receives them', 
 // difference is visible. It is the same dead-wiring defect `thumbnailUrl`
 // already shipped with once.
 describe('T-AI-041 · the review response carries the tile crop for the client to render', () => {
+  // A MEASURED caption line, plus the reader tile that corroborated it. The
+  // crop takes its POSITION from the caption and its SIZE from the tile, so
+  // both are needed — see `tileCropFor` and `T-AI-055`.
   const boxes = (over: Record<string, unknown> = {}) =>
-    JSON.stringify([{ imageId: 'img_tile', x: 0.25, y: 0.5, w: 0.25, h: 0.25, ...over }]);
+    JSON.stringify([
+      {
+        imageId: 'img_tile',
+        x: 0.28,
+        y: 0.7,
+        w: 0.19,
+        h: 0.03,
+        tileBox: { x: 0.25, y: 0.5, w: 0.25, h: 0.25 },
+        ...over,
+      },
+    ]);
 
   it('T-AI-041v: an inferred-unverified candidate is served WITH its crop', async () => {
     const batchId = await makeBatch();
     await makeCandidate(batchId, {
       verdict: 'inferred-unverified',
-      boxSource: 'llm',
+      boxSource: 'ocr',
       boundingBoxes: boxes(),
     });
 
@@ -987,7 +1000,7 @@ describe('T-AI-041 · the review response carries the tile crop for the client t
       verdict: 'unreadable-tile',
       rawText: '',
       workIdentity: null,
-      boxSource: 'llm',
+      boxSource: 'ocr',
       boundingBoxes: boxes(),
     });
 
@@ -995,12 +1008,37 @@ describe('T-AI-041 · the review response carries the tile crop for the client t
     expect(body.sections.unreadableTiles.items[0]?.tileCrop).toBeTruthy();
   });
 
-  it('T-AI-041x: an OCR box is served as NO crop - it is a caption strip, not artwork', async () => {
+  // ⚠ THIS CASE IS THE INVERSION OF ITS OWN FORMER SELF. It read *"an OCR box
+  // is served as NO crop"* and passed `boxSource: 'ocr'` — which was backwards
+  // and was the defect: `crossCheck` sets `'llm'` when NO OCR line
+  // corroborated the tile, so refusing `'ocr'` refused every MEASURED box and
+  // admitted only the reader's unverified guess. Measured against ground
+  // truth that guess was wrong 8 times in 10 (`T-AI-055`).
+  //
+  // The true half of the old reasoning survives here: a caption strip on its
+  // own is not artwork. With no reader tile to take a size from there is
+  // nothing to crop TO, so the whole image is shown instead.
+  it('T-AI-041x: a caption strip with no reader tile is served as NO crop', async () => {
     const batchId = await makeBatch();
     await makeCandidate(batchId, {
       verdict: 'inferred-unverified',
       boxSource: 'ocr',
-      boundingBoxes: boxes({ h: 0.02 }),
+      boundingBoxes: boxes({ tileBox: undefined }),
+    });
+
+    const body = (await (await getReview(batchId)).json()) as ReviewBody;
+    expect(body.sections.additions.items[0]?.tileCrop).toBeNull();
+  });
+
+  // The other half of the inversion, and the regression guard that matters:
+  // an UNCORROBORATED reader box is never cropped, even when it carries a
+  // tile. This is the branch that produced every bad thumbnail.
+  it('T-AI-055e: an uncorroborated reader box is served as NO crop', async () => {
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, {
+      verdict: 'inferred-unverified',
+      boxSource: 'llm',
+      boundingBoxes: boxes(),
     });
 
     const body = (await (await getReview(batchId)).json()) as ReviewBody;
@@ -1014,7 +1052,7 @@ describe('T-AI-041 · the review response carries the tile crop for the client t
     const batchId = await makeBatch();
     await makeCandidate(batchId, {
       verdict: 'inferred-unverified',
-      boxSource: 'llm',
+      boxSource: 'ocr',
       boundingBoxes: '{"not":"an array"}',
     });
 
@@ -1044,13 +1082,14 @@ describe('T-AI-041 · the review response carries the tile crop for the client t
   //
   // ⚠ This case is an UNMATCHED `title-candidate`, not merely a
   // title-candidate, because that is the row the owner was actually looking
-  // at and the one the widened client branch is for. `T-AI-041x` still pins
-  // the real limit — an OCR caption strip is refused whatever the verdict.
+  // at and the one the widened client branch is for. `T-AI-041x` and
+  // `T-AI-055e` pin the two real limits — a caption strip with no reader tile,
+  // and an uncorroborated reader box — whatever the verdict.
   it('T-UX-154a: an unmatched title-candidate IS served its crop, not the whole screenshot', async () => {
     const batchId = await makeBatch();
     await makeCandidate(batchId, {
       workIdentity: 'unmatched:0123456789abcdef',
-      boxSource: 'llm',
+      boxSource: 'ocr',
       boundingBoxes: boxes(),
     });
 
