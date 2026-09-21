@@ -237,3 +237,86 @@ export function readerMetrics(input: ReaderMetricsInput): ReaderMetrics {
     costUsdPerImage: input.costUsdPerImage,
   };
 }
+
+/**
+ * The on-disk shape of `<stem>.metrics.json` — `specs/ai.md` §9.7 Outputs.
+ *
+ * ⚠ THE SERIALISATION IS SEPARATED FROM THE EMISSION DELIBERATELY. The only
+ * caller that writes this file is `goldenLive.spec.ts`, which is excluded
+ * from every Vitest project because it spends real money — so nothing inside
+ * it is ever executed by a gate (`T-CI-008`: an uncollected spec passes by
+ * never running). That is right for the measurement and wrong for the
+ * ARTEFACT, which §9.7 now names as a required output and which a decision
+ * is computed from months later. Extracted here, the round trip is testable.
+ */
+export interface MetricsDocument {
+  readonly arm: { readonly slug: string; readonly deployment: string };
+  readonly generatedAt: string;
+  readonly metrics: ReaderMetrics;
+}
+
+/**
+ * Every numeric field `chooseReader` reads. ⚠ THIS IS A TYPE-CHECKED
+ * EXHAUSTIVE LIST, NOT A CONVENIENCE ARRAY: `Record<Exclude<keyof
+ * ReaderMetrics, 'modelId'>, true>` means adding a row to `ReaderMetrics`
+ * without adding it here FAILS `tsc`. A metric that exists in the decision
+ * function but not in the artefact is the exact defect this file was written
+ * after — `unstableTitleRate` was in the spec for two days, absent from
+ * `chooseReader`, and the suite stayed green throughout (`T-AI-045aa`).
+ */
+const METRIC_FIELDS: Record<Exclude<keyof ReaderMetrics, 'modelId'>, true> = {
+  omissionRecovery: true,
+  fabricationRate: true,
+  titleRecall: true,
+  artworkOnlyRecall: true,
+  falseTitleRate: true,
+  chromeRejection: true,
+  stabilityJaccard: true,
+  unstableTitleRate: true,
+  costUsdPerImage: true,
+};
+
+export function metricsDocumentJson(doc: MetricsDocument): string {
+  return `${JSON.stringify(doc, null, 2)}\n`;
+}
+
+/**
+ * Read a companion back, VALIDATING every field `chooseReader` will read.
+ *
+ * ⚠ IT VALIDATES RATHER THAN CASTS, AND THE DIFFERENCE IS WHEN THE FAILURE
+ * SURFACES. `chooseReader` does fail closed on a missing metric — it returns
+ * `invalid-input` — but that happens at the NEXT bake-off, against a file
+ * written months earlier at a cost of 66 billed vision calls, and by then the
+ * run cannot be repeated for free. Parsing strictly moves the same failure to
+ * the moment the file is written, while the model is still loaded and the
+ * numbers can simply be re-emitted.
+ *
+ * ⚠ `Number.isFinite` REJECTS `null` AND `NaN`, WHICH `typeof === 'number'`
+ * DOES NOT for the latter. A `NaN` reaching a band is the silent case: every
+ * comparison against it is false, so `x < floor` reports no breach and the
+ * arm passes a row it never measured.
+ */
+export function parseMetricsDocument(json: string): MetricsDocument {
+  const raw: unknown = JSON.parse(json);
+  if (typeof raw !== 'object' || raw === null) {
+    throw new Error('metrics document is not an object');
+  }
+  const doc = raw as { metrics?: unknown };
+  const metrics = doc.metrics;
+  if (typeof metrics !== 'object' || metrics === null) {
+    throw new Error('metrics document carries no `metrics` object');
+  }
+  const m = metrics as Record<string, unknown>;
+  if (typeof m['modelId'] !== 'string' || m['modelId'] === '') {
+    throw new Error('metrics document carries no `modelId`: the arm it measured is unrecorded');
+  }
+  for (const field of Object.keys(METRIC_FIELDS)) {
+    if (!Number.isFinite(m[field])) {
+      throw new Error(
+        `metrics document field \`${field}\` is not a finite number (got ${JSON.stringify(m[field])}). ` +
+          'specs/ai.md §9.7 Stage 3 reads this row; an absent or NaN value passes every band silently.',
+      );
+    }
+  }
+  return raw as MetricsDocument;
+}

@@ -26,14 +26,16 @@
 
 import { describe, expect, it } from 'vitest';
 
-import type { ExtractionCandidate } from '@nextup/domain';
+import type { ExtractionCandidate, ReaderMetrics } from '@nextup/domain';
 
 import type { ManifestImage, Scored } from './goldenScorer.js';
 import {
   acceptedTitles,
   artworkOnlyRecall,
   jaccard,
+  metricsDocumentJson,
   omissionRecovery,
+  parseMetricsDocument,
   unstableTitleRate,
   unstableTitles,
   worstPairJaccard,
@@ -193,5 +195,61 @@ describe('T-AI-057 · the Stage 3 metric set is computed, not transcribed', () =
     expect(() => artworkOnlyRecall([scored('text', ['gamma'], ['gamma'])])).toThrow(
       /no artwork-only images/,
     );
+  });
+});
+
+describe('T-AI-057 · claims j/k/l · the metrics companion survives the round trip', () => {
+  const metrics: ReaderMetrics = {
+    modelId: 'gpt-4.1',
+    omissionRecovery: 1,
+    fabricationRate: 0.02,
+    titleRecall: 0.97,
+    artworkOnlyRecall: 0.86,
+    falseTitleRate: 0.06,
+    chromeRejection: 0.91,
+    stabilityJaccard: 0.82,
+    unstableTitleRate: 0.03,
+    costUsdPerImage: 0.0094,
+  };
+
+  it('T-AI-057j · a written document parses back to the SAME numbers a decision is made from', () => {
+    // ⚠ THE PROPERTY IS EQUALITY, NOT PARSEABILITY. §9.7's whole reason for a
+    // machine-readable companion is that the alternative — a human retyping
+    // nine floats out of a markdown table — produces a decision carrying a
+    // function's authority from numbers nobody measured. A round trip that
+    // parses but rounds would reintroduce exactly that, quietly.
+    const parsed = parseMetricsDocument(
+      metricsDocumentJson({
+        arm: { slug: '', deployment: 'gpt-4.1' },
+        generatedAt: '2026-09-21T00:00:00.000Z',
+        metrics,
+      }),
+    );
+    expect(parsed.metrics).toEqual(metrics);
+    expect(parsed.arm.deployment).toBe('gpt-4.1');
+  });
+
+  it('T-AI-057k · a MISSING metric is refused at write time, not at the next bake-off', () => {
+    // `chooseReader` does fail closed on this — it returns `invalid-input`.
+    // But that verdict arrives at the next comparison, against a file written
+    // months earlier by 66 billed vision calls, and the run cannot be repeated
+    // for free. Parsing strictly moves the failure to the moment of writing.
+    const rest: Record<string, unknown> = { ...metrics };
+    delete rest['unstableTitleRate'];
+    const json = JSON.stringify({ arm: { slug: '', deployment: 'gpt-4.1' }, metrics: rest });
+    expect(() => parseMetricsDocument(json)).toThrow(/unstableTitleRate/);
+  });
+
+  it('T-AI-057l · a NaN metric is refused, because NaN passes every band silently', () => {
+    // ⚠ THIS IS THE CASE `typeof x === 'number'` WOULD ADMIT. Every comparison
+    // against NaN is false, so `x < floor` reports no breach and the arm
+    // clears a row it never measured. JSON cannot even hold NaN — it
+    // serialises to `null` — so the artefact loses the distinction between
+    // "not measured" and "measured as zero" unless it is rejected here.
+    const json = JSON.stringify({
+      arm: { slug: '', deployment: 'gpt-4.1' },
+      metrics: { ...metrics, stabilityJaccard: Number.NaN },
+    });
+    expect(() => parseMetricsDocument(json)).toThrow(/stabilityJaccard/);
   });
 });
