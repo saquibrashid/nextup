@@ -66,3 +66,7 @@ owner-export-*.json
 # converge. Kept in the working tree only so a freshly spawned agent can read
 # one with a relative path.
 .lane-briefs/
+# Scratch directory for eyeballing fixture crops locally. Committed by accident
+# in e3ab501 (PR #236) and removed 2026-09-21: 17 derived JPEGs referenced by
+# no test, tool or workflow. Every one is regenerable from the kept fixtures.
+.tmp-view/
