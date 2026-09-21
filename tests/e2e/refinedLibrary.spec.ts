@@ -128,6 +128,7 @@ async function mountLibrary(
     withGenres = true,
     allServices = false,
     varied = false,
+    expectedCount = TITLES.length,
   } = {},
 ): Promise<URL[]> {
   const requests: URL[] = [];
@@ -257,7 +258,7 @@ async function mountLibrary(
     // The first three are stable even if a visible sentinel has loaded page two.
     await expect(page.getByTestId('title-name').nth(2)).toBeVisible();
   } else {
-    await expect(page.getByTestId('title-name')).toHaveCount(TITLES.length);
+    await expect(page.getByTestId('title-name')).toHaveCount(expectedCount);
   }
   await expect(page.getByRole('button', { name: 'Service updates', exact: true })).toBeVisible();
   await page.waitForLoadState('networkidle');
@@ -274,6 +275,73 @@ async function mountLibrary(
     )
     .toBe(true);
   return requests;
+}
+
+const { describe } = test;
+for (const width of [320, 1280]) {
+  describe(`Remembered library at ${width}px`, () => {
+    test('T-UX-166h: library choices survive navigation and browser restart', async ({
+      page,
+      browser,
+    }) => {
+      const requests = await mountLibrary(page, { width });
+      await page.getByTestId('sort-trigger').click();
+      await page.getByRole('button', { name: 'Name A-Z', exact: true }).click();
+      await page.getByTestId('filters-trigger').click();
+      await page.getByRole('button', { name: /^Services / }).click();
+      await page.getByRole('checkbox', { name: 'Netflix', exact: true }).click();
+      await expect(page.getByRole('checkbox', { name: 'Netflix', exact: true })).toBeChecked();
+      await page.keyboard.press('Escape');
+      await page.getByRole('searchbox', { name: 'Search your list', exact: true }).fill('Orbit');
+      await page.getByRole('search').getByRole('button', { name: 'Search', exact: true }).click();
+      await expect(page.getByTestId('title-name')).toHaveText(['Quiet Orbit']);
+      const saved = `?${await page.evaluate(() => localStorage.getItem('nextup.library.v1'))}`;
+      await page.getByRole('navigation').getByRole('link', { name: 'Upload', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Upload screenshots' })).toBeVisible();
+      requests.length = 0;
+      await page.getByRole('navigation').getByRole('link', { name: 'List', exact: true }).click();
+      await expect(page.getByTestId('title-name')).toHaveText(['Quiet Orbit']);
+      expect(new URL(page.url()).search).toBe(saved);
+      expect(requests.find((url) => url.pathname === '/api/titles')?.search).toBe(saved);
+      await expect(
+        page.getByRole('button', { name: 'Remove service filter: Netflix' }),
+      ).toBeVisible();
+      await expect(page.getByTestId('sort-trigger')).toContainText('Name A-Z');
+      await noOverflow(page);
+
+      const state = await page.context().storageState();
+      const restarted = await browser.newContext({ storageState: state });
+      try {
+        const fresh = await restarted.newPage();
+        const restoredRequests = await mountLibrary(fresh, { width, expectedCount: 1 });
+        expect(new URL(fresh.url()).search).toBe(saved);
+        expect(restoredRequests.find((url) => url.pathname === '/api/titles')?.search).toBe(saved);
+        await fresh.getByRole('button', { name: 'Clear search', exact: true }).click();
+        await fresh.getByTestId('clear-filters').click();
+        await expect(fresh).toHaveURL(
+          (url) => !url.searchParams.has('service') && !url.searchParams.has('q'),
+        );
+        await expect(
+          fresh.getByRole('button', { name: 'Remove service filter: Netflix' }),
+        ).toHaveCount(0);
+        await expect
+          .poll(() => fresh.evaluate(() => localStorage.getItem('nextup.library.v1')))
+          .toBe('sort=name&dir=asc');
+        await expect(fresh.getByTestId('title-name')).toHaveCount(TITLES.length);
+        await fresh.goto('http://localhost:4173/');
+        await expect(fresh.getByTestId('title-name')).toHaveCount(TITLES.length);
+        expect(new URL(fresh.url()).searchParams.has('service')).toBe(false);
+        expect(new URL(fresh.url()).searchParams.has('q')).toBe(false);
+        await expect(fresh.getByTestId('sort-trigger')).toContainText('Name A-Z');
+        await fresh.goto('http://localhost:4173/?sort=runtime&dir=desc');
+        await expect(fresh.getByTestId('sort-trigger')).toContainText('Longest runtime');
+        await expect(fresh.getByTestId('title-name').first()).toHaveText('Paper Lanterns');
+        expect(new URL(fresh.url()).searchParams.has('service')).toBe(false);
+      } finally {
+        await restarted.close();
+      }
+    });
+  });
 }
 
 async function bounds(locator: Locator) {
@@ -709,8 +777,6 @@ test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone
     controls.getByRole('button', { name: 'Runtime 1h 30m – 2h', exact: true }),
   ).toBeVisible();
 });
-
-const { describe } = test;
 
 for (const width of [320, 1280]) {
   describe(`Service filters at ${width}px`, () => {

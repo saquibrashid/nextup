@@ -52,6 +52,7 @@ import { ErrorBoundary } from './ErrorBoundary';
 import { OfflineBanner } from './OfflineBanner';
 import { TmdbAttribution } from './TmdbAttribution';
 import { CaptureResume } from './CaptureResume';
+import { LibraryNavigation } from './LibraryNavigation';
 // ⚠ THROUGH THE BARREL, NOT THE INDIVIDUAL FILES. `components/icons/index.ts`
 // is the REGISTER that makes REQ-124's set closed; importing a drawing
 // directly bypasses it, and an unregistered icon could then ship without ever
@@ -340,7 +341,9 @@ export function AppShell(): JSX.Element {
 
       <main ref={mainRef} tabIndex={-1}>
         <ErrorBoundary resetKey={location.pathname}>
-          <Outlet />
+          <LibraryNavigation>
+            <Outlet />
+          </LibraryNavigation>
         </ErrorBoundary>
       </main>
 

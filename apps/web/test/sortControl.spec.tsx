@@ -40,6 +40,10 @@ import {
   type SortKey,
 } from '../src/components/SortControl';
 import { ListPage } from '../src/pages/ListPage';
+import { LibraryNavigation } from '../src/components/LibraryNavigation';
+
+const remembered = (): URLSearchParams =>
+  new URLSearchParams(localStorage.getItem('nextup.library.v1') ?? '');
 
 const FIELD_NAMES = [
   'Added to list',
@@ -116,11 +120,11 @@ function SearchProbe({ onSearch }: { onSearch?: (search: string) => void }): JSX
     onSearch?.(search);
   }, [search, onSearch]);
   return (
-    <>
+    <LibraryNavigation>
       <span data-testid="search-probe">{params.toString()}</span>
       <button onClick={() => navigate(-1)}>Back</button>
       <button onClick={() => navigate(1)}>Forward</button>
-    </>
+    </LibraryNavigation>
   );
 }
 
@@ -212,9 +216,9 @@ describe('T-UI-024 - SortControl', () => {
     expect(readSortDir(new URLSearchParams())).toBe('desc');
   });
 
-  it('T-UI-024j: readSortDir reads asc from session when no URL param', () => {
+  it('T-UI-024j: obsolete direction-only session storage cannot change a URL default', () => {
     sessionStorage.setItem('nextup.sort.dir', 'asc');
-    expect(readSortDir(new URLSearchParams())).toBe('asc');
+    expect(readSortDir(new URLSearchParams())).toBe('desc');
   });
 
   it('T-UI-024k: URL param overrides session storage', () => {
@@ -250,17 +254,18 @@ describe('T-UI-024 - SortControl', () => {
     expectOrder('Oldest additions');
   });
 
-  it('T-UI-024o: a session-persisted asc is written into the URL', async () => {
-    sessionStorage.setItem('nextup.sort.dir', 'asc');
+  it('T-UI-024o: a persisted complete order is written into the URL', async () => {
+    localStorage.setItem('nextup.library.v1', 'sort=dateAdded&dir=asc');
     renderWithProbe();
     await waitFor(() => expect(query().get('dir')).toBe('asc'));
     expectOrder('Oldest additions');
   });
 
-  it('T-UI-024p: reconciliation keeps existing filters', async () => {
-    sessionStorage.setItem('nextup.sort.dir', 'asc');
+  it('T-UI-024p: explicit filters beat saved choices without inheriting their direction', () => {
+    localStorage.setItem('nextup.library.v1', 'sort=dateAdded&dir=asc');
     renderWithProbe('/?service=netflix&type=movie');
-    await waitFor(() => expect(query().get('dir')).toBe('asc'));
+    expect(query().has('dir')).toBe(false);
+    expectOrder('Recently added');
     expect(query().get('service')).toBe('netflix');
     expect(query().get('type')).toBe('movie');
   });
@@ -330,11 +335,12 @@ describe('T-UX-120 - sort fields', () => {
     expect(query().get('sort')).toBe('rating');
   });
 
-  it('T-UX-120g the key is not persisted in session storage, unlike direction', () => {
+  it('T-UX-120g the complete order is persisted together, not as separate session fields', () => {
     renderWithProbe();
     fireEvent.click(button('Longest runtime'));
-    expect(Object.keys(sessionStorage)).toEqual(['nextup.sort.dir']);
-    expect(sessionStorage.getItem('nextup.sort.dir')).toBe('desc');
+    expect(Object.keys(sessionStorage)).toEqual([]);
+    expect(remembered().get('sort')).toBe('runtime');
+    expect(remembered().get('dir')).toBe('desc');
   });
 });
 
@@ -423,7 +429,7 @@ describe('One-click complete orders and stable visible controls', () => {
     renderWithProbe('/?dir=asc');
     fireEvent.click(button('Highest rated'));
     expect(query().get('dir')).toBe('desc');
-    expect(sessionStorage.getItem('nextup.sort.dir')).toBe('desc');
+    expect(remembered().get('dir')).toBe('desc');
   });
 
   it('T-UX-130b changing the field preserves filters and other URL parameters', () => {
@@ -489,8 +495,9 @@ describe('One-click complete orders and stable visible controls', () => {
     fireEvent.click(screen.getByTestId('filters-trigger'));
     fireEvent.click(screen.getByRole('button', { name: /^Services / }));
     fireEvent.click(screen.getByRole('checkbox', { name: 'Netflix' }));
-    expect(sessionStorage.getItem('nextup.sort.dir')).toBe('asc');
-    expect(Object.values(sessionStorage)).not.toContain('netflix');
+    expect(remembered().get('dir')).toBe('asc');
+    expect(remembered().get('service')).toBe('netflix');
+    expect(Object.keys(sessionStorage)).toEqual([]);
   });
 
   it('T-UX-114a changing a filter preserves sort and dir', () => {
@@ -506,21 +513,21 @@ describe('One-click complete orders and stable visible controls', () => {
 
 describe('Persistence and the default-view one-press escape hatch', () => {
   it('T-UX-115a remembered direction is reconciled into the URL and label', async () => {
-    sessionStorage.setItem('nextup.sort.dir', 'asc');
+    localStorage.setItem('nextup.library.v1', 'sort=dateAdded&dir=asc');
     renderWithProbe();
     await waitFor(() => expect(query().get('dir')).toBe('asc'));
     expectOrder('Oldest additions');
   });
 
-  it('T-UX-115b remembered direction survives a field whose default differs', async () => {
-    sessionStorage.setItem('nextup.sort.dir', 'desc');
+  it('T-UX-115b explicit field links use their own default, not a newer preference', () => {
+    localStorage.setItem('nextup.library.v1', 'sort=dateAdded&dir=desc');
     renderWithProbe('/?sort=name');
-    await waitFor(() => expect(query().get('dir')).toBe('desc'));
-    expectOrder('Name Z-A');
+    expect(query().has('dir')).toBe(false);
+    expectOrder('Name A-Z');
   });
 
   it('T-UX-115c the URL beats session storage for a deep link', () => {
-    sessionStorage.setItem('nextup.sort.dir', 'asc');
+    localStorage.setItem('nextup.library.v1', 'sort=dateAdded&dir=asc');
     renderWithProbe('/?dir=desc');
     expect(query().get('dir')).toBe('desc');
     expectOrder('Recently added');
@@ -562,7 +569,7 @@ describe('T-UX-138 - atomic complete-order choices and navigation', () => {
 
       expect(readSortKey(query())).toBe(key);
       expect(query().get('dir')).toBe(dir);
-      expect(sessionStorage.getItem('nextup.sort.dir')).toBe(dir);
+      expect(remembered().get('dir')).toBe(dir);
       expect(onSearch).toHaveBeenCalledTimes(1);
       expectOrder(label);
     },
@@ -583,7 +590,7 @@ describe('T-UX-138 - atomic complete-order choices and navigation', () => {
       expectOrder(reverse);
       expectSelectedOrder(reverse);
       expect(query().get('dir')).toBe(dir === 'desc' ? 'asc' : 'desc');
-      expect(sessionStorage.getItem('nextup.sort.dir')).toBe(dir === 'desc' ? 'asc' : 'desc');
+      expect(remembered().get('dir')).toBe(dir === 'desc' ? 'asc' : 'desc');
       expect(onSearch).toHaveBeenCalledTimes(1);
 
       onSearch.mockClear();
@@ -599,7 +606,7 @@ describe('T-UX-138 - atomic complete-order choices and navigation', () => {
     renderWithProbe('/?sort=runtime&dir=asc&service=max');
     fireEvent.click(button('Name A-Z'));
     fireEvent.click(reverseButton());
-    expect(sessionStorage.getItem('nextup.sort.dir')).toBe('desc');
+    expect(remembered().get('dir')).toBe('desc');
 
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
     expectOrder('Name A-Z');
@@ -614,9 +621,9 @@ describe('T-UX-138 - atomic complete-order choices and navigation', () => {
     expectOrder('Name Z-A');
   });
 
-  it('T-UX-138d session reconciliation replaces history rather than adding an entry', () => {
-    sessionStorage.setItem('nextup.sort.dir', 'desc');
-    renderWithProbe('/', { entries: ['/?dir=asc', '/?sort=name&service=max'] });
+  it('T-UX-138d destination restoration replaces history rather than adding an entry', () => {
+    localStorage.setItem('nextup.library.v1', 'service=max&sort=name&dir=desc');
+    renderWithProbe('/', { entries: ['/?dir=asc', '/'] });
     expect(query().get('dir')).toBe('desc');
     expectOrder('Name Z-A');
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
@@ -627,12 +634,12 @@ describe('T-UX-138 - atomic complete-order choices and navigation', () => {
     expect(query().get('service')).toBe('max');
   });
 
-  it('T-UX-138e history entry without dir uses session and reconciles against its field default', () => {
+  it('T-UX-138e history without dir keeps its field default despite newer choices', () => {
     renderWithProbe('/?sort=name');
     fireEvent.click(button('Highest rated'));
     fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-    expectOrder('Name Z-A');
-    expect(query().get('dir')).toBe('desc');
+    expectOrder('Name A-Z');
+    expect(query().has('dir')).toBe(false);
     fireEvent.click(screen.getByRole('button', { name: 'Forward' }));
     expectOrder('Highest rated');
   });
@@ -656,13 +663,13 @@ describe('T-UX-138 - atomic complete-order choices and navigation', () => {
     expect(query().get('service')).toBe('max');
   });
 
-  it('T-UX-138g invalid directions fall through session then the field default', () => {
+  it('T-UX-138g invalid directions use the field default, never a stale session choice', () => {
     sessionStorage.setItem('nextup.sort.dir', 'invalid');
     expect(readSortDir(new URLSearchParams('sort=name&dir=invalid'))).toBe('asc');
     sessionStorage.setItem('nextup.sort.dir', 'desc');
     renderWithProbe('/?sort=name&dir=invalid');
-    expect(query().get('dir')).toBe('desc');
-    expectOrder('Name Z-A');
+    expect(query().get('dir')).toBe('invalid');
+    expectOrder('Name A-Z');
   });
 });
 
@@ -742,7 +749,7 @@ describe('T-UX-146 - the sort chooser and the toolbar it hides behind', () => {
     await user.click(button('Highest rated'));
     expect(query().get('sort')).toBe('rating');
     expect(query().get('dir')).toBe('desc');
-    expect(sessionStorage.getItem('nextup.sort.dir')).toBe('desc');
+    expect(remembered().get('dir')).toBe('desc');
     expectOrder('Highest rated');
   });
 

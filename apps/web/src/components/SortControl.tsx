@@ -14,10 +14,10 @@
 // because it looks redundant with the selected row — re-breaks the
 // requirement, and the list still sorts, so nothing looks wrong.
 //
-// ⚠ WHAT DID NOT CHANGE: `chooseOrder` and the URL → session → default
-// persistence are untouched. This revision is presentation only.
+// #328: LibraryNavigation now persists the complete destination. This control
+// reads only the URL, so a later preference cannot rewrite a history entry.
 
-import { useCallback, useEffect, useId, useState, type JSX } from 'react';
+import { useCallback, useId, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from './ui/Button';
 import { Dialog } from './ui/Dialog';
@@ -55,7 +55,6 @@ export const SORT_KEYS = [
 ] as const;
 export type SortKey = (typeof SORT_KEYS)[number];
 
-const SESSION_KEY = 'nextup.sort.dir';
 const DEFAULT_SORT: SortKey = 'dateAdded';
 
 // Mirrors defaultDirectionFor in apps/api/src/routes/titlesQuery.ts.
@@ -82,7 +81,7 @@ const SORT_KEY_ICONS = {
   watchPriority: FlagIcon,
 } as const;
 
-/** The field is URL-only; unlike direction, it is not a session preference. */
+/** Both field and direction come from the authoritative URL. */
 export function readSortKey(params: URLSearchParams): SortKey {
   const fromUrl = params.get('sort');
   return (SORT_KEYS as readonly string[]).includes(fromUrl ?? '')
@@ -90,16 +89,10 @@ export function readSortKey(params: URLSearchParams): SortKey {
     : DEFAULT_SORT;
 }
 
-/** Initial entry and history navigation use URL > session > field default. */
+/** Missing directions mean the field default, including during Back/Forward. */
 export function readSortDir(params: URLSearchParams): SortDir {
   const fromUrl = params.get('dir');
   if (fromUrl === 'desc' || fromUrl === 'asc') return fromUrl;
-  try {
-    const stored = sessionStorage.getItem(SESSION_KEY);
-    if (stored === 'desc' || stored === 'asc') return stored;
-  } catch {
-    // sessionStorage may be unavailable in some private-browsing configurations.
-  }
   return defaultDirFor(readSortKey(params));
 }
 
@@ -113,44 +106,6 @@ export function SortControl(): JSX.Element {
   const close = useCallback(() => {
     setOpen(false);
   }, []);
-
-  // ListRoute sends the URL to the API. Reconcile a remembered non-default
-  // direction so the label matches the server order, without adding history.
-  const urlDir = params.get('dir');
-  useEffect(() => {
-    if (urlDir === 'desc' || urlDir === 'asc') return;
-    if (dir === defaultDirFor(sort)) return;
-    setParams(
-      (prev) => {
-        const updated = new URLSearchParams(prev);
-        updated.set('dir', dir);
-        return updated;
-      },
-      { replace: true },
-    );
-  }, [urlDir, dir, sort, setParams]);
-
-  /*
-    ⚠ THE URL LEADS AND SESSION STORAGE FOLLOWS. NEVER WRITE THE REMEMBERED
-    DIRECTION INSIDE `chooseOrder`.
-
-    `readSortDir` falls back to session storage whenever the URL carries no
-    `dir`, so a session write that lands before the navigation commits makes
-    the reconcile effect above believe the owner is on a dir-less URL with a
-    remembered non-default direction — and it then `replace`s the entry the
-    pending navigation was about to push. The chosen field is silently
-    dropped and only the direction survives (`T-UX-138e`). This is reachable
-    only because the chooser toggles its own open state in the same handler,
-    which lets a render run between the two.
-  */
-  useEffect(() => {
-    if (urlDir !== 'desc' && urlDir !== 'asc') return;
-    try {
-      sessionStorage.setItem(SESSION_KEY, urlDir);
-    } catch {
-      // Best-effort persistence; the URL still records the user's choice.
-    }
-  }, [urlDir]);
 
   const chooseOrder = useCallback(
     (key: SortKey) => {

@@ -27,4 +27,5 @@ configure({ asyncUtilTimeout: 5000 });
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
 });

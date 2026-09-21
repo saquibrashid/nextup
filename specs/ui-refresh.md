@@ -589,17 +589,16 @@ says so in a comment and does not do it, because `SortControl` shipped later
 > ### ⚠ MERGING THEM VISUALLY MUST NOT MERGE THEM MECHANICALLY.
 >
 > **This is the single most likely way to break working behaviour in this
-> refresh**, because the two controls look like siblings and have deliberately
-> opposite persistence models:
+> refresh**, because shared presentation must not introduce mirrored control
+> state. #328 (owner-approved 2026-09-21) now remembers the complete destination:
 >
 > | | Source of truth | Why |
 > |---|---|---|
 > | **Filters** | **URL only.** Render *from* the query string, write *to* it, **no `useState` mirror.** | `FilterBar.tsx` documents this at length: one direction is the only thing that survives the back button, a deep link, and an external `navigate()`. A mirror desynchronises silently. |
-> | **Sort** | **URL → `sessionStorage` → per-field default.** | On entry/history navigation the URL wins; otherwise the session direction is used, then `name=asc` / all other fields `desc`. Reconcile a remembered non-default direction **into the URL** so the label and request agree. Explicit field selection uses §5b's complete-order rule. |
+> | **Sort** | **URL → per-field default.** | LibraryNavigation restores a validated complete destination before list reads on fresh bare-root entry or application return. Explicit query/history URLs win. The old direction-only session fallback is retired because it changed older history entries. Explicit field selection uses §5b's complete-order rule. |
 >
-> A refactor that "tidies" these into one shared hook will produce a green
-> suite and a broken back button. **`T-UI-016` guards the filter side; the sort
-> side needs `T-UX-115` below.**
+> A navigation bookmark is not a second live filter model. **`T-UI-016`,
+> `T-UX-115` and `T-UX-166` guard URL, history and return behavior.**
 
 Also invariant: `applyFilters` must preserve `sort`, `dir` and `cursor`.
 Changing a filter must not silently reset the owner's ordering.
@@ -808,8 +807,9 @@ not the streaming service's save date.
 **Oldest additions is one press on the selected Recently added button from
 the default view**, without opening a menu. Sort controls may wrap at narrow
 widths but must remain visible; no sheet or collapsed selector adds a press.
-The URL owns the field. Direction on entry/history follows URL → session →
-field default; explicit inactive-field clicks deliberately choose the field
+The URL owns field and direction. Missing direction means the field default;
+#328 restores complete saved destinations before list reads, never over an
+explicit query/history URL. Explicit inactive-field clicks choose the field
 default instead of carrying the previous field's direction. Both `sort` and
 `dir` change atomically while filters, `q` and unrelated parameters survive.
 The route resets its paging state, never locally sorts loaded titles.
