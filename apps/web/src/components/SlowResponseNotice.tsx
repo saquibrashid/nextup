@@ -19,10 +19,26 @@
  * is a progress update and must not interrupt what a screen-reader user is
  * doing; the second is a failure they need now. Announcing the 1200 ms notice
  * assertively would interrupt on every ordinary slow request.
+ *
+ * ⚠ **THE `waking` PHASE IS NOT THE DELETED `ColdStartNotice` COMING BACK.**
+ * TASK-143 was right: the APP never cold-starts (`minReplicas = 1`), so copy
+ * blaming a sleeping app named a cause that cannot occur, and it stays
+ * deleted. The staging DATABASE is Azure SQL serverless and genuinely does
+ * pause — deliberately, to bill nothing — taking 30-60 s to resume. The
+ * server waits that out (`SQL_CONNECT_TIMEOUT_MS` = 60 s) and the request
+ * succeeds; it was this component that called it a failure at 15 s. `waking`
+ * therefore names the **database**, keeps `role="status"`, and offers no
+ * Retry — there is nothing to retry, only something to wait for, and a Retry
+ * here restarts the wait it is trying to escape.
  */
 import type { JSX } from 'react';
 
-import { RETRY_LABEL, SLOW_RESPONSE_BODY, SLOW_RESPONSE_STALLED_BODY } from '../copy';
+import {
+  RETRY_LABEL,
+  SLOW_RESPONSE_BODY,
+  SLOW_RESPONSE_STALLED_BODY,
+  SLOW_RESPONSE_WAKING_BODY,
+} from '../copy';
 import type { RequestPhase } from '../lib/useSlowRequest';
 import { Button } from './ui/Button';
 
@@ -38,12 +54,23 @@ export function SlowResponseNotice({
 }: SlowResponseNoticeProps): JSX.Element | null {
   // ⚠ Renders NOTHING before 1200 ms. A notice that appears with the skeletons
   // fires on every ordinary load and stops carrying information at all.
-  if (phase !== 'slow' && phase !== 'stalled') return null;
+  if (phase !== 'slow' && phase !== 'waking' && phase !== 'stalled') return null;
 
   if (phase === 'slow') {
     return (
       <p role="status" className="slow-response" data-testid="slow-response">
         {SLOW_RESPONSE_BODY}
+      </p>
+    );
+  }
+
+  // ⚠ `role="status"`, NOT `role="alert"` — a resuming database is progress,
+  // and this phase exists precisely because announcing it as a failure was
+  // the defect. See `useSlowRequest`'s header and `SLOW_RESPONSE_WAKING_BODY`.
+  if (phase === 'waking') {
+    return (
+      <p role="status" className="slow-response" data-testid="slow-waking">
+        {SLOW_RESPONSE_WAKING_BODY}
       </p>
     );
   }

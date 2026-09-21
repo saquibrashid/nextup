@@ -1506,6 +1506,31 @@ export const BOUNDARY_RETRY_LABEL = 'Try again';
 export const SLOW_RESPONSE_BODY = 'Still working…';
 
 /*
+  ⚠ THIS IS NOT A RESTORATION OF THE COPY TASK-143 DELETED, AND MUST NOT BE
+  COLLAPSED BACK INTO IT. TASK-143 removed *"Waking things up…"* because it
+  named the APP cold-starting, which cannot happen: ADR-0003 Rev 3 pins
+  `minReplicas = 1`, so the container is always warm. That reasoning is still
+  correct and the old copy must stay deleted.
+
+  The DATABASE is a different thing and does genuinely sleep. Staging runs
+  Azure SQL serverless with `autoPauseDelay = 60` (ADR-0003 Rev 3) — paused ON
+  PURPOSE, to bill nothing while idle — and the first request after a pause
+  triggers a resume of roughly 30-60 seconds. Observed live on 2026-09-18:
+  `resumedDate` 12:54:34Z, every read failing until 12:55:44, then recovery
+  with no intervention. `SQL_CONNECT_TIMEOUT_MS` (60 s) now waits that out, so
+  the request really does succeed — but the client declared it STALLED at 15 s
+  and showed *"This is taking longer than it should"* with a Retry that could
+  only hit the same wall. A healthy, billed-for, entirely expected state was
+  being reported as a failure.
+
+  So this names the database explicitly, and says how long, because "a bit
+  longer" gives the owner nothing to decide with and the whole complaint is
+  that they could not tell waiting from broken.
+*/
+export const SLOW_RESPONSE_WAKING_BODY =
+  'Waking the database — this takes up to a minute after a quiet spell. Nothing has been changed.';
+
+/*
   ⚠ FINDING - invented copy, pending owner review.
 
   §1 specifies the 15-second BEHAVIOUR ("it becomes the `slow` error state
