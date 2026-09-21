@@ -349,7 +349,6 @@ export function ListPage({
 
       {(!loadFailed || offline) && !(offline && items.length === 0) && (
         <div className="list-controls" data-testid="list-controls">
-          <ListSearch />
           <FilterBar
             genres={genres}
             shown={shown}
@@ -359,7 +358,10 @@ export function ListPage({
             countPending={loading}
           />
           <SortControl />
-          <ListViewControl view={view} onChange={setView} />
+          <div className="list-secondary-controls">
+            <ListViewControl view={view} onChange={setView} />
+            <ListSearch />
+          </div>
         </div>
       )}
 
