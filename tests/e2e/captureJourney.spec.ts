@@ -246,6 +246,16 @@ for (const width of [280, 390, 1440]) {
         await nav.getByRole('link', { name: 'Batches', exact: true }).click();
         const resume = page.getByRole('complementary', { name: 'Unfinished capture' });
         await expect(resume).toContainText('Reading screenshots');
+        const metadataGap = await page.getByTestId('batch-card-link').evaluate((link) => {
+          const [first, second] = Array.from(link.children);
+          if (!(first instanceof HTMLElement) || !(second instanceof HTMLElement)) {
+            throw new Error('Capture history metadata is missing.');
+          }
+          const a = first.getBoundingClientRect();
+          const b = second.getBoundingClientRect();
+          return b.top >= a.bottom ? b.top - a.bottom : b.left - a.right;
+        });
+        expect(metadataGap).toBeGreaterThanOrEqual(8);
         const navigationScan = await new AxeBuilder({ page })
           .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
           .analyze();
