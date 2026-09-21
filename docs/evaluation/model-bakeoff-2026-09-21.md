@@ -2,11 +2,31 @@
 
 > **Outcome: no change. `gpt-4.1` remains the primary reader.**
 >
-> ⚠ **That is not an endorsement, and this document exists mainly to say so.**
-> The incumbent **fails two of its own §9.7 quality floors**, and the only arm
+> ⚠ **CORRECTION, 2026-09-21 (later the same day). The reason recorded below
+> for "no change" was WRONG, and the conclusion is now weaker than it reads.**
+> This document reported `gpt-6-astra` as disqualified at **Stage 0** on
+> `temperatureZero`. That was the **stale code's** verdict, not the spec's:
+> `specs/ai.md` §9.7 removed `temperature: 0` from Stage 0 on **2026-09-19**,
+> two days before this run, and `chooseReader.ts` had not been updated. Under
+> §9.7 **as it actually stands, `gpt-6-astra` clears Stage 0**, meets every
+> quality floor, and is the most stable arm measured. The correct reading of
+> this bake-off is therefore: **no eligible challenger was CARRIED to Stage 3,
+> because the implementation refused one on a deleted rule** — not that none
+> existed. Corrected in place per §5 of the repository instructions;
+> superseded text below is struck through, not deleted.
+>
+> ⚠ **This does NOT promote `gpt-6-astra`.** §9.7: *"Any bake-off must still be
+> run fresh, after this commit."* The arms here were run against the stale
+> gate, and Stage 3 needs `omissionRecovery`, `stabilityJaccard` and
+> `costUsdPerImage`, which this report still does not emit. The incumbent
+> stays until a fresh, complete run says otherwise.
+>
+> ⚠ ~~That is not an endorsement, and this document exists mainly to say so.~~
+> The incumbent **fails two of its own §9.7 quality floors**, and ~~the only arm
 > that passes every floor is excluded by a **Stage 0 capability gate**, not on
-> quality. "No change" here means *no eligible challenger reached Stage 3* — it
-> does **not** mean the incumbent was found adequate.
+> quality~~ **the arm that passes every floor was excluded by a Stage 0 gate
+> §9.7 no longer contains**. "No change" here means *no eligible challenger
+> reached Stage 3* — it does **not** mean the incumbent was found adequate.
 
 Required by `specs/ai.md` §9.7 ("**including when the decision is 'no change',
 which is a result worth recording and not a wasted run**"). The 2026-09-08
@@ -101,15 +121,35 @@ That is explicit non-compliance."* Cost is reported, never decisive.
 
 ## 4. Why the decision is "no change"
 
-`gpt-6-astra` is the only arm meeting every floor, and it is **disqualified at
+⚠ **CORRECTED 2026-09-21. The superseded reasoning is struck through below;
+read this paragraph as the operative one.**
+
+`gpt-6-astra` is the only arm meeting every floor. It was **refused by
+`chooseReader.ts` at Stage 0 on `temperatureZero`** — but that key had been
+removed from §9.7's Stage 0 list on **2026-09-19**, two days before this run,
+and the code had not been updated (repaired 2026-09-21; guarded by
+`T-AI-045x`/`y`/`z`/`aa`). **Under §9.7 as written, no capability gate excludes
+it.** What actually prevents a Stage 3 decision here is narrower and entirely
+procedural: the three Stage 3 inputs — `omissionRecovery`, `stabilityJaccard`
+and per-image `costUsdPerImage` — are **not emitted by `golden:live`**, and
+§9.7 requires any bake-off informing a change to be run **fresh, after the
+2026-09-19 revision**. These arms were not. **The incumbent therefore stays by
+default, not on the merits**, and this is the weakest form of "no change" the
+protocol admits.
+
+~~`gpt-6-astra` is the only arm meeting every floor, and it is **disqualified at
 Stage 0** — not on quality, but on `temperatureZero`, a member of
 `REQUIRED_CAPABILITIES` in `chooseReader.ts`. It accepts only
 `temperature: 1`. The same gate excludes `gpt-5.6-sol` and `gpt-5.5`; of the
 frontier candidates only `gpt-5.4` clears it, and `gpt-5.4` fails the
-fabrication ceiling on all three runs and the recall floor on one.
+fabrication ceiling on all three runs and the recall floor on one.~~
 
-So no arm reaches Stage 3, and Stage 3 is where a challenger could replace the
-incumbent. Under the protocol as written, the incumbent stays.
+~~So no arm reaches Stage 3, and Stage 3 is where a challenger could replace the
+incumbent. Under the protocol as written, the incumbent stays.~~
+
+⚠ The surviving half of the struck text is still true and still matters:
+`gpt-5.4` **fails the fabrication ceiling on all three runs** and the recall
+floor on one, so it is not a candidate on quality regardless of any gate.
 
 ## 5. Findings the owner needs, which this outcome would otherwise bury
 
@@ -121,26 +161,45 @@ the incumbent" is therefore **not a safe status quo**, and the open
 been a regression at all, but floors set from a luckier sample than the corpus
 now contains.
 
-**F2 — `temperatureZero` is deciding this bake-off, and it is a determinism
-gate, not a quality one.** It exists so runs are reproducible. It is currently
-excluding the only arm that satisfies every quality floor, including a **7.5
-point** recall improvement over the incumbent — far outside §9.7's
-two-title noise band. Whether a determinism requirement should outrank a
-measured quality floor is an **owner decision**, and it is the decision this
-bake-off actually surfaces.
+**F2 — ~~`temperatureZero` is deciding this bake-off, and it is a determinism
+gate, not a quality one.~~ `temperatureZero` decided this bake-off IN THE CODE
+AFTER THE OWNER HAD ALREADY REMOVED IT FROM THE SPEC.** ⚠ **Corrected
+2026-09-21: the finding below framed as an "owner decision" one that had been
+made two days earlier** — §9.7 demoted `temperature: 0` to a Stage 2
+measurement on 2026-09-19, replacing it with a Stage 3 **L3 unstable-titles**
+band, and `chooseReader.ts` kept enforcing the deleted rule. The real finding
+is not about determinism policy at all; it is that **the decision function had
+drifted three revisions behind the spec it claims to transcribe, and the test
+suite pinned the stale values so CI stayed green on them.** That is the
+defect. ~~Whether a determinism requirement should outrank a measured quality
+floor is an **owner decision**, and it is the decision this bake-off actually
+surfaces.~~
 
-⚠ **But relaxing it is not free, and the data says so.** `gpt-6-astra` at
-`temperature: 1` produced **intermittent misses** — `stranger things vhs
-special edition` missed in 2 of 3 runs, `louis c k ridiculous` in 1 of 3. Its
-aggregate recall was nonetheless identical across all three runs (0.9851 ×3),
-and its L3 table ("unstable titles") reads `None`. ⚠ **L3 is not evidence of
-determinism here**: it reads `None` for all three arms, including both
-`temperature: 0` arms, so it does not discriminate — and `gpt-4.1` and
+The measurement below stands and is now the *supporting* evidence for the
+2026-09-19 revision rather than an argument for making it:
+
+~~It exists so runs are reproducible.~~ It was ~~currently~~ excluding the only
+arm that satisfies every quality floor, including a **7.5 point** recall
+improvement over the incumbent — far outside §9.7's two-title noise band.
+
+⚠ **~~But relaxing it is not free, and the data says so.~~ The stability cost
+of relaxing it was measured, and it is the opposite of what was feared.**
+`gpt-6-astra` at `temperature: 1` produced **intermittent misses** — `stranger
+things vhs special edition` missed in 2 of 3 runs, `louis c k ridiculous` in 1
+of 3. Its aggregate recall was nonetheless identical across all three runs
+(0.9851 ×3), and its L3 table ("unstable titles") reads `None`. ⚠ **L3 is not
+evidence of determinism here**: it reads `None` for all three arms, including
+both `temperature: 0` arms, so it does not discriminate — and `gpt-4.1` and
 `gpt-5.4` produced intermittent misses of their own at `temperature: 0`
-anyway. The honest summary is that **this corpus cannot separate the arms on
+anyway. ⚠ **Measured L2 (worst pairwise Jaccard, 3 runs × 11 images) DOES
+discriminate, and it ranks the sampling arm FIRST:** `gpt-4.1` **0.7692** at
+`temperature: 0`, `gpt-5.4` 0.8205 at 0, `gpt-6-astra` **0.8750** at forced
+`temperature: 1`. §9.7's conclusion, in its own words: *"A gate cannot be
+justified by a property its own subject fails and its excluded candidates
+satisfy."* ~~The honest summary is that **this corpus cannot separate the arms on
 run-to-run stability**, and a determinism gate being decided on non-discriminating
 evidence is precisely the thing to put in front of the owner rather than
-resolve here.
+resolve here.~~
 
 **F3 — the corpus is too small to separate close arms.** 11 images. §9.7's own
 rule says any conclusion drawn from a difference smaller than two titles must
@@ -167,10 +226,17 @@ question, not a model finding.
 not honestly have been.** `chooseReader()` requires `omissionRecovery`,
 `stabilityJaccard` and a per-image `costUsdPerImage` per arm; none of the three
 is measured by the current `golden:live` report, and supplying invented values
-would yield a fabricated decision carrying a function's authority. It is moot
-regardless: the Stage 0 disqualification is reached **before** any metric is
-consulted, so the outcome does not turn on the unmeasured inputs. If §9.7 is
-ever amended per F2, those three fields must be emitted by the report first.
+would yield a fabricated decision carrying a function's authority. ⚠
+**CORRECTED 2026-09-21: the sentence that followed said this was "moot
+regardless" because Stage 0 short-circuits. It is the reverse — those three
+unmeasured inputs are now the ONLY thing standing between this data and a
+Stage 3 decision.** ~~It is moot regardless: the Stage 0 disqualification is
+reached **before** any metric is consulted, so the outcome does not turn on the
+unmeasured inputs. If §9.7 is ever amended per F2, those three fields must be
+emitted by the report first.~~ §9.7 was amended on 2026-09-19, so **emitting
+those three fields from `golden:live` is now on the critical path** for any
+reader change, and `stabilityJaccard` is already computable from the L2 data
+the report gathers.
 
 ## 6. What this does NOT change
 
@@ -184,11 +250,26 @@ ever amended per F2, those three fields must be emitted by the report first.
 
 ## 7. Open, and owner-facing
 
+⚠ **CORRECTED 2026-09-21. Item 2 was not open — the owner closed it on
+2026-09-19 and only the code disagreed. It is struck through and replaced by
+the question the repair actually leaves behind.**
+
 1. Keep `gpt-4.1` and attack the missed floors with deterministic rules?
-2. Demote `temperatureZero` from a Stage 0 disqualifier to a **reported
-   property**, unblocking `gpt-6-astra` and every other frontier model?
+   ⚠ **Partly answered since**: `docs/evaluation/false-title-offline-vs-live-2026-09-21.md`
+   measures the offline false-title rate at **0.0545** against live
+   0.179/0.132/0.093, with only 3 false titles offline — **2 of them the
+   primary reader's own output at confidence 0.95 and 1.00**. The deterministic
+   half has very little left to catch; the remaining mass is model-side.
+2. ~~Demote `temperatureZero` from a Stage 0 disqualifier to a **reported
+   property**, unblocking `gpt-6-astra` and every other frontier model?~~
+   **DONE — decided by the owner 2026-09-19 in `specs/ai.md` §9.7, implemented
+   in `chooseReader.ts` 2026-09-21.** The replacement question: **run a fresh
+   §9.7 bake-off now that Stage 0 admits the frontier arms**, which first
+   requires `golden:live` to emit `omissionRecovery`, `stabilityJaccard` and
+   `costUsdPerImage`.
 3. Measure `gpt-6-astra`'s real cost against its own price card before
    deciding, now that the token figures are known not to be cost figures?
+   (Still open, and now blocking: it is one of the three Stage 3 inputs.)
 
 None of these can be settled from the data; all three are recorded here so the
 next run starts from the measurement rather than from the argument.

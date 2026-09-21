@@ -8,6 +8,25 @@
  * cheaper model that benefits. If this file needs to change, change it in a
  * separate commit that states why, BEFORE the run.
  *
+ * ⚠ DISCLOSURE — THIS FILE WAS EDITED ON 2026-09-21 AFTER THREE ARMS' NUMBERS
+ * WERE KNOWN, AND THE RULE ABOVE BINDS THAT EDIT. Three changes were made:
+ * `temperatureZero` left `REQUIRED_CAPABILITIES`, the `stabilityJaccard`
+ * floor went 0.95 → 0.75, and the `unstableTitleRate` (L3) row was added.
+ * **None of them is a new threshold.** All three had already been decided in
+ * `specs/ai.md` §9.7 on **2026-09-19** — before the reports were written —
+ * and this file had simply not been updated to match; it claimed to
+ * transcribe §9.7 "row for row" while executing a superseded revision. This
+ * commit makes code agree with an existing spec. It moves no floor that the
+ * spec does not already state, and it is deliberately a **separate commit
+ * that changes nothing else**, so the diff can be checked against §9.7
+ * line by line.
+ *
+ * ⚠ CONSEQUENTLY, ANY BAKE-OFF RUN BEFORE THIS COMMIT IS VOID AS A DECISION.
+ * §9.7 says so for its own 2026-09-19 edit — *"Any bake-off must still be run
+ * fresh, after this commit"* — and the same applies here. The measured
+ * reports remain valid as **evidence**; they are not a decision, and
+ * `chooseReader` must be re-run on fresh numbers before any reader changes.
+ *
  * ⚠ IT IS PURE AND TOTAL. No I/O, no clock, no randomness, and it never
  * throws — every input, including a malformed or hostile one, yields a
  * decision. Totality is a safety property here: a bake-off harness that
@@ -82,16 +101,51 @@ export interface ReaderCapabilities {
   readonly vision: boolean;
   /** `additionalProperties: false` actually honoured, per §2.1a. */
   readonly strictStructuredOutputs: boolean;
+  /**
+   * ⚠ REPORTED, NOT REQUIRED, SINCE 2026-09-19. Kept on this interface so the
+   * Stage 2 stability numbers stay interpretable; see `REQUIRED_CAPABILITIES`.
+   */
   readonly temperatureZero: boolean;
   readonly seed: boolean;
   readonly availableInRegion: boolean;
 }
 
-/** The Stage 0 capability keys, in the order §9.7 lists them. */
+/**
+ * The Stage 0 capability keys, in the order §9.7 lists them.
+ *
+ * ⚠ `temperatureZero` IS DELIBERATELY ABSENT, AND ITS ABSENCE IS THE RULE.
+ * It was a Stage 0 disqualifier until **2026-09-19**, when `specs/ai.md` §9.7
+ * moved it to a **Stage 2 measurement**. The rule was not relaxed — it was
+ * moved to the place that can actually test it. It existed to guarantee
+ * run-to-run stability and was written as a check on a *request parameter*,
+ * on the assumption that asking for `temperature: 0` delivers determinism.
+ * Measurement says it does not, and the measurement is about the
+ * **incumbent**: over three runs of the eleven golden images the worst
+ * pairwise L2 Jaccard was `gpt-4.1` **0.7692** at `temperature: 0`,
+ * `gpt-5.4` 0.8205 at 0, and `gpt-6-astra` **0.8750** at a *forced*
+ * `temperature: 1`. The gate's own subject was the least stable arm and the
+ * candidate it excluded was the most stable. A gate cannot be justified by a
+ * property its own subject fails and its excluded candidates satisfy.
+ *
+ * ⚠ THE REQUIREMENT DID NOT DISAPPEAR — it is enforced below by the
+ * `stabilityJaccard` (L2) and `unstableTitleRate` (L3) rows, on measured
+ * evidence, which is strictly stronger than inferring stability from a field
+ * in the request body. A candidate that cannot set `temperature: 0` must
+ * still MEET those floors; it is simply no longer refused the chance to try.
+ *
+ * ⚠ `temperatureZero` REMAINS ON `ReaderCapabilities` ON PURPOSE. It is now a
+ * *reported* property, not a gate. Deleting the field would erase it from
+ * every report and make the Stage 2 stability numbers uninterpretable — the
+ * reader could no longer tell which arm was sampling and which was not.
+ *
+ * ⚠ WHAT WOULD PUT IT BACK (§9.7, verbatim): if a future candidate clears
+ * Stage 3 on means but posts a **worse worst-pair L2 than the incumbent**,
+ * the conclusion above is wrong, sampling temperature *is* carrying stability
+ * in this workload, and the disqualifier must be restored.
+ */
 export const REQUIRED_CAPABILITIES = [
   'vision',
   'strictStructuredOutputs',
-  'temperatureZero',
   'seed',
   'availableInRegion',
 ] as const satisfies readonly (keyof ReaderCapabilities)[];
@@ -106,8 +160,31 @@ export interface ReaderMetrics {
   readonly artworkOnlyRecall: number;
   readonly falseTitleRate: number;
   readonly chromeRejection: number;
-  /** Run-to-run Jaccard across the three runs of §9.7 Stage 2. */
+  /**
+   * Run-to-run Jaccard across the three runs of §9.7 Stage 2 — the **L2**
+   * band. This is the WORST pairwise value, not the mean: §9.5 measures the
+   * worst pair because an average hides one bad run behind two good ones.
+   */
   readonly stabilityJaccard: number;
+  /**
+   * **L3** — the share of expected titles that were found in some runs but
+   * not all, as a fraction of expected titles. Floor ≤ 0.05 and ≤ the
+   * incumbent's (§9.5, §9.7 Stage 3).
+   *
+   * ⚠ ADDED TO THIS FILE 2026-09-21, BUT TO THE SPEC 2026-09-19 — it was
+   * missing here for two days while the decision function claimed to
+   * transcribe §9.7 "row for row". It landed in the spec together with the
+   * `temperatureZero` Stage 0 move, and that pairing is the point: when the
+   * parameter gate moved out of Stage 0 the guarantee it stood proxy for had
+   * to land somewhere binding.
+   *
+   * ⚠ L2 ALONE IS THE WRONG LANDING PLACE, which is why this row exists
+   * separately. L2 counts *false-title churn*, which is noise, so a model
+   * that drops a title the owner really saved can still post a good average.
+   * L3 measures the guarantee the owner actually has: **a title that was
+   * found is found every time.**
+   */
+  readonly unstableTitleRate: number;
   /** Recorded for the report. ⚠ Never decisive — see `costIsNeverDecisive`. */
   readonly costUsdPerImage: number;
 }
@@ -210,6 +287,14 @@ interface RowSpec {
  *
  * ⚠ `omissionRecovery` is an equality, not a floor: exactly 1.0. REQ-012
  * allows no trade, so it is handled separately below rather than as a `>=`.
+ *
+ * ⚠ THE `stabilityJaccard` FLOOR IS 0.75 AND WAS 0.95 UNTIL 2026-09-21. The
+ * 0.95 was never in §9.5 or §9.7 — both say **≥ 0.75, and ≥ the incumbent's**
+ * — and it was not a harmlessly strict value. Every arm ever measured fails
+ * it, **including the incumbent at 0.7692**, so the row could only ever
+ * return `floor-breach`: `chooseReader` would have disqualified `gpt-4.1`
+ * against itself. A floor no real reader can clear does not protect quality,
+ * it silently disables the comparison it sits in.
  */
 const ROWS: readonly RowSpec[] = [
   {
@@ -256,7 +341,15 @@ const ROWS: readonly RowSpec[] = [
     metric: 'stabilityJaccard',
     label: 'Run-to-run stability (Jaccard)',
     direction: 'higher-is-better',
-    floor: 0.95,
+    floor: 0.75,
+    comparedToIncumbent: true,
+    titleDenominated: true,
+  },
+  {
+    metric: 'unstableTitleRate',
+    label: 'L3 unstable titles',
+    direction: 'lower-is-better',
+    floor: 0.05,
     comparedToIncumbent: true,
     titleDenominated: true,
   },
@@ -279,6 +372,7 @@ function invalidMetricFields(m: ReaderMetrics | undefined, arm: string): string[
     'falseTitleRate',
     'chromeRejection',
     'stabilityJaccard',
+    'unstableTitleRate',
   ] as const;
   for (const f of rateFields) {
     if (!isRate(m[f])) bad.push(`${arm}: ${f} is not a fraction in [0, 1]`);
