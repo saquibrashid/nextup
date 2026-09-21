@@ -58,6 +58,8 @@ None. Every expected title that was found was found in all three runs.
 
 - Prompt tokens: 59061
 - Completion tokens: 13278
-- Estimated cost: **$0.2243** at $2.00/1M prompt and $8.00/1M completion. The Azure AI Vision leg is F0 (free tier) and contributes $0.
+- Estimated cost: **$0.2243** at $2.00/1M prompt and $8.00/1M completion (the `gpt-4.1` list price). The Azure AI Vision leg is F0 (free tier) and contributes $0.
+
+> ⚠ **NOT THIS ARM'S COST.** The figure above prices `gpt-5.4`'s tokens at `gpt-4.1`'s rates, because L7 exists to detect prompt and token growth rather than to reconcile billing. It is comparable with another report **only** as a token-volume signal. Do **not** read it as what `gpt-5.4` costs, and do not compare it against the incumbent's report to justify a model change on cost. *(Added retrospectively by `T-AI-056`; the report was generated before the price card was named.)*
 
 > A drop between two reports is the only early warning of model drift this product has. Commit this file.
