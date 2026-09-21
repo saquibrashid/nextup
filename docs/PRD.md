@@ -1694,7 +1694,7 @@ oldest-first while burying it a press deeper.
 
 | AC | Acceptance criterion |
 |---|---|
-| AC-1 | The filters and sort present as a single control group and remain independent: filter state is URL-only; sort direction is remembered for the session. |
+| AC-1 | The filters and sort present as a single control group and remain independently editable from the URL. #328 (owner-approved 2026-09-21) remembers the complete browsing destination across browser restarts; explicit query links and Back/Forward remain authoritative. |
 | AC-2 | The list can be ordered by date added, name, release year, runtime and IMDb rating. |
 | AC-3 | Five complete-order buttons are directly visible, with exactly one marked selected; its accessible name states current order and the next reverse action. There is no separate direction segment. |
 | AC-4 | Labels describe complete orders: Recently added / Oldest additions, Name A-Z / Name Z-A, Newest releases / Oldest releases, Longest runtime / Shortest runtime, Highest rated / Lowest rated. Date-added means when the work entered nextup. |

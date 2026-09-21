@@ -284,11 +284,19 @@ restore, suppress, un-suppress or fix-match.
    (`?service=netflix&type=movie&genre=Drama&runtime=30-60&sort=runtime&dir=asc`),
    so it
    is deep-linkable, survives back/forward, and — per US-020 AC-6 —
-   **persists for the session**. On entry/history navigation direction is
-   URL → `sessionStorage` → per-field default; a remembered non-default
-   direction is reconciled into the URL so the request agrees with the label.
+   **persists across browser restarts for library return navigation** (#328,
+   owner-approved 2026-09-21; `docs/proposals/library-browsing.md`). A validated
+   browser-local destination remembers filters, search and complete sort order.
+   Fresh bare-root visits and application returns restore it before list reads;
+   explicit query links and Back/Forward remain authoritative. Clearing choices
+   updates that destination. Unsupported saved choices and blocked storage are
+   disclosed without disabling the page (`T-LIB-001`).
+   Explicit entry/history URLs without direction use the per-field default;
+   the former direction-only session fallback is superseded because it
+   changed old history entries using newer choices.
    Explicit inactive-field selection uses that field's default, not the
-   previous field's direction. Filters never use session storage.
+   previous field's direction. Filter controls still render from the URL; the
+   navigation bookmark is not a second live filter model.
    **At 320 px controls wrap without horizontal page scrolling.** Sort stays
    directly visible; filter panels are bounded to the viewport, nonmodal and
    keyboard-operable, with generated IDs, Escape/Done/outside dismissal and

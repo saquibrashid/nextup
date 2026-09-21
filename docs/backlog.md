@@ -688,7 +688,19 @@ finished, so the exception cannot outlive its reason.
 | `TASK-229` | `done` | Failed Apply responses resolve against saved status before another write; verified in-review refreshes the summary for explicit retry, unreadable outcomes remain read-only, and terminal review links open durable outcomes. Batch detail projects actual listing-change counts and owner-scoped undo information from persisted records. No reconnect replay or late navigation after leaving. `T-UX-163a`–`j`; existing close/auth/undo and responsive Chromium/WebKit regressions. No migration or infrastructure changes. |
 | `TASK-230` | `done` | Additive intake ledger records failures before parsing and commits image rows with finalization. Explicit existing-or-new replacement, sticky local reports, legacy/derived uncertainty, and interrupted blob-deletion evidence feed one review/tick/close removal gate. Submit seals the image snapshot transactionally while retaining failed-extraction retry. `T-UX-164a`–`ab` cover real SQL/Blob rollback/concurrency and responsive Chromium/WebKit recovery. CI-gated release; TASK-231 remains separate. |
 | `TASK-231` | `done` | Owner-scoped unfinished-capture strip and shared history/resume vocabulary; authoritative stage reread; keyed status lifetimes, nonoverlapping polls, explicit slow/failed-read recovery, unavailable links and no late redirect after leaving. Capture navigation and replaced decision controls restore focus without losing a large review's position. `T-UX-165a`–`k` cover component races and complete Chromium/WebKit journeys at 280/390/1440px in both modes. No API, migration, dependency or infrastructure change; CI-gated release. |
+| `TASK-232` | `done` | #328: validated browser-local destination persists filters/search and complete sort across restarts. Bare-root entry and application returns resolve before list reads, preserve receipt state and omit cursors; explicit links, Back/Forward and clear operations remain authoritative. Direction-only session fallback retired. Unsupported choices/storage failure are disclosed. `T-LIB-001a`–`h`, full web and responsive browser regressions. Separate PR; #326 follows. |
 <!-- STATUS-LEDGER:END -->
+
+### Approved library follow-ups, 2026-09-21
+
+The owner requested #328, then #326, as separate PRs, and explicitly chose
+remembered browsing choices across browser restarts. The contract is
+[library-browsing.md](proposals/library-browsing.md). #327 and #325 remain
+outside these two slices.
+
+| Task | Work | Size | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| TASK-232 | #328: persist a validated complete library destination; preserve explicit URLs, Back/Forward, clear operations and receipt state; restore before list reads. | 1 agent-run + 15 owner-review-minutes | TASK-231 | `T-LIB-001`; sort/history and real responsive navigation regressions |
 
 ### Approved capture lifecycle improvements, 2026-09-19
 
