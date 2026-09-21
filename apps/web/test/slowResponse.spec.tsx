@@ -21,9 +21,19 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SlowResponseNotice } from '../src/components/SlowResponseNotice';
-import { useSlowRequest, SLOW_AFTER_MS, STALLED_AFTER_MS } from '../src/lib/useSlowRequest';
+import {
+  useSlowRequest,
+  SLOW_AFTER_MS,
+  WAKING_AFTER_MS,
+  STALLED_AFTER_MS,
+} from '../src/lib/useSlowRequest';
 import { ListPage } from '../src/pages/ListPage';
-import { LIST_LOADING_BODY, SLOW_RESPONSE_BODY, SLOW_RESPONSE_STALLED_BODY } from '../src/copy';
+import {
+  LIST_LOADING_BODY,
+  SLOW_RESPONSE_BODY,
+  SLOW_RESPONSE_STALLED_BODY,
+  SLOW_RESPONSE_WAKING_BODY,
+} from '../src/copy';
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -73,7 +83,17 @@ describe('T-UX-001 never an indefinite spinner', () => {
       and this is the one place the two must be compared rather than shared.
     */
     expect(SLOW_AFTER_MS).toBe(1200);
-    expect(STALLED_AFTER_MS).toBe(15000);
+    expect(WAKING_AFTER_MS).toBe(15000);
+    expect(STALLED_AFTER_MS).toBe(70000);
+
+    /*
+      ⚠ THE STALL THRESHOLD MUST OUTLAST THE SERVER'S CONNECT TIMEOUT
+      (`SQL_CONNECT_TIMEOUT_MS` = 60 s). Below it, this machine calls a request
+      stalled while the server is still waiting for a resuming database — it
+      reports failure for a request that is about to succeed, which is the
+      whole defect the `waking` phase was added to fix.
+    */
+    expect(STALLED_AFTER_MS).toBeGreaterThan(60000);
 
     /*
       ⚠ A notice that appears WITH the skeletons fires on every ordinary load
@@ -85,6 +105,7 @@ describe('T-UX-001 never an indefinite spinner', () => {
     // renders the *stalled* block early, which is a worse defect, not a lesser
     // one — a mutation that did exactly that slipped through this test once.
     expect(screen.queryByTestId('slow-stalled')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('slow-waking')).not.toBeInTheDocument();
   });
 
   it('T-UX-001b: passing 1200 ms swaps in the notice', () => {
@@ -114,25 +135,108 @@ describe('T-UX-001 never an indefinite spinner', () => {
     expect(text.toLowerCase()).not.toContain('cold');
   });
 
-  it('T-UX-001d: past 15 s the wait becomes an error with a remedy', () => {
+  it('T-UX-001i: past 15 s the wait is attributed to the database, as progress', () => {
+    /*
+      ⚠ THE DEFECT THIS FIXES WAS REPORTED AS A FAILURE THAT WASN'T ONE.
+      Staging's Azure SQL is serverless with `autoPauseDelay = 60` (ADR-0003
+      Rev 3) — paused on purpose, to bill nothing while idle — and the first
+      request after a pause triggers a 30-60 s resume. The server waits it out
+      (`SQL_CONNECT_TIMEOUT_MS` = 60 s) and the request SUCCEEDS. This machine
+      was declaring it stalled at 15 s and showing "This is taking longer than
+      it should" with a Retry that could only hit the same wall. Observed live
+      2026-09-18: `resumedDate` 12:54:34Z, reads failing to 12:55:44, then
+      recovery with no intervention.
+    */
     render(<Probe pending />);
 
     advance(15000);
+
+    const waking = screen.getByTestId('slow-waking');
+    expect(waking).toHaveTextContent(SLOW_RESPONSE_WAKING_BODY);
+    // ⚠ `status`, not `alert`. A resuming database is progress, and announcing
+    // it assertively — as a fault — is precisely what was wrong before.
+    expect(waking).toHaveAttribute('role', 'status');
+    // ⚠ NO RETRY. There is nothing to retry, only something to wait for, and a
+    // Retry here restarts the very wait it appears to offer an escape from.
+    expect(screen.queryByTestId('slow-retry')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('slow-stalled')).not.toBeInTheDocument();
+    // The "still working" reassurance is replaced, not stacked above it.
+    expect(screen.queryByTestId('slow-response')).not.toBeInTheDocument();
+  });
+
+  it('T-UX-001j: the waking notice blames the database, not the app', () => {
+    /*
+      ⚠ THIS IS THE GUARD ON `T-UX-001c`'s REASONING SURVIVING THE CHANGE.
+      TASK-143 deleted "Waking things up…" because it blamed the APP cold
+      starting, which cannot happen (`minReplicas = 1`). That is still true.
+      The nearest wrong fix here is to reuse the old app-flavoured wording for
+      the database phase, which would re-assert the falsified cause while
+      looking like a tidy-up. The word "database" is what makes the sentence
+      true, and it must be present.
+    */
+    render(<Probe pending />);
+    advance(15000);
+
+    const text = (screen.getByTestId('slow-waking').textContent ?? '').toLowerCase();
+    expect(text).toContain('database');
+    // §1 "Errors say what was NOT changed" applies to every wait, not only the
+    // terminal one — a 60 s pause is exactly when the owner starts wondering.
+    expect(text).toMatch(/nothing has been changed/i);
+  });
+
+  it('T-UX-001d: past 70 s the wait becomes an error with a remedy', () => {
+    /*
+      ⚠ THE EXIT SURVIVES THE NEW PHASE, WHICH IS THE POINT OF KEEPING IT.
+      `waking` is inserted BEFORE the terminal state, not substituted for it —
+      §1 still requires the wait to end in something actionable, and a "waking"
+      notice that never ends would be the indefinite spinner wearing the new
+      copy. 70 s is past the server's own 60 s connect timeout plus margin, so
+      a request still pending here genuinely has no way left to succeed.
+    */
+    render(<Probe pending />);
+
+    advance(70000);
 
     const stalled = screen.getByTestId('slow-stalled');
     expect(stalled).toHaveTextContent(SLOW_RESPONSE_STALLED_BODY);
     // ⚠ `alert`, not `status`. This one IS a failure the owner needs now.
     expect(stalled).toHaveAttribute('role', 'alert');
     expect(screen.getByTestId('slow-retry')).toBeInTheDocument();
-    // The "still working" reassurance must be GONE, not stacked above it.
+    // Both earlier notices must be GONE, not stacked above it.
     expect(screen.queryByTestId('slow-response')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('slow-waking')).not.toBeInTheDocument();
+  });
+
+  it('T-UX-001k: a healthy resume is never called a failure', () => {
+    /*
+      ⚠ THE REGRESSION GUARD FOR THE OWNER-REPORTED SYMPTOM, STATED AS THE
+      OWNER WOULD STATE IT: across the entire window a real resume occupies
+      (observed 30-60 s), nothing that looks like a failure may appear. Written
+      as a sweep rather than a single instant because the defect was a
+      threshold, and a threshold moved a few seconds the wrong way passes any
+      test that samples one point.
+    */
+    render(<Probe pending />);
+
+    advance(15000);
+    for (let elapsed = 15000; elapsed <= 60000; elapsed += 5000) {
+      expect(
+        screen.queryByTestId('slow-stalled'),
+        `at ${String(elapsed)} ms`,
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByTestId('slow-retry'),
+        `at ${String(elapsed)} ms`,
+      ).not.toBeInTheDocument();
+      advance(5000);
+    }
   });
 
   it('T-UX-001e: the stalled state says nothing was changed', () => {
     // §1 "Errors say what was NOT changed" — the ASM-029 defence. A timeout is
     // the case where the owner is least able to tell whether it half-applied.
     render(<Probe pending />);
-    advance(15000);
+    advance(70000);
 
     expect(screen.getByTestId('slow-stalled').textContent ?? '').toMatch(
       /nothing has been changed/i,
@@ -147,7 +251,7 @@ describe('T-UX-001 never an indefinite spinner', () => {
       telling the owner a request that started a moment ago has already failed.
     */
     const { rerender } = render(<Probe pending />);
-    advance(15000);
+    advance(70000);
     expect(screen.getByTestId('slow-stalled')).toBeInTheDocument();
 
     rerender(<Probe pending={false} />);
@@ -169,8 +273,11 @@ describe('T-UX-001 never an indefinite spinner', () => {
       The leak only shows when the first attempt settles EARLY. Here the
       abandoned timer is still armed for absolute t=15000; the second attempt
       starts at t=1200 and is only 13.9 s old when the clock reaches 15.1 s —
-      so a leaked timer reports a stall that has not happened, on a request
-      that is still perfectly healthy.
+      so a leaked timer reports a phase change that has not happened, on a
+      request that is still perfectly healthy. ⚠ Asserted for BOTH later
+      timers: the `waking` one is armed at exactly the old stalled threshold,
+      so checking only `slow-stalled` would leave the new timer's cleanup
+      untested at precisely the moment it is easiest to forget.
     */
     const { rerender } = render(<Probe pending />);
     advance(1200);
@@ -180,6 +287,7 @@ describe('T-UX-001 never an indefinite spinner', () => {
     advance(13900);
 
     expect(screen.queryByTestId('slow-stalled')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('slow-waking')).not.toBeInTheDocument();
     expect(screen.getByTestId('phase')).toHaveTextContent('slow');
   });
 
@@ -191,6 +299,7 @@ describe('T-UX-001 never an indefinite spinner', () => {
     rerender(<Probe pending={false} />);
 
     expect(screen.queryByTestId('slow-response')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('slow-waking')).not.toBeInTheDocument();
     expect(screen.queryByTestId('slow-stalled')).not.toBeInTheDocument();
   });
 });
@@ -251,8 +360,26 @@ describe('T-UX-010 the list loading state', () => {
   it('T-UX-010e: a stalled list load offers a retry', () => {
     renderLoadingList();
 
-    advance(15000);
+    advance(70000);
 
     expect(screen.getByTestId('slow-retry')).toBeInTheDocument();
+  });
+
+  it('T-UX-010f: a resuming database shows the waking notice on the real screen', () => {
+    /*
+      ⚠ THE WIRING CASE FOR THE NEW PHASE, for the same reason `T-UX-010d`
+      exists: every probe-driven case above passes with `ListPage` never
+      calling the hook. And the list is where this defect was actually
+      reported — the owner opened the app after a quiet spell and was told
+      "Couldn't load your list."
+    */
+    renderLoadingList();
+
+    advance(15000);
+
+    expect(screen.getByTestId('slow-waking')).toHaveTextContent(SLOW_RESPONSE_WAKING_BODY);
+    expect(screen.queryByTestId('slow-retry')).not.toBeInTheDocument();
+    // The skeletons stay: the request has not failed, it is merely waiting.
+    expect(screen.getAllByTestId('title-row-skeleton')).toHaveLength(6);
   });
 });
