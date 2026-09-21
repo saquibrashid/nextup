@@ -159,6 +159,7 @@ TASK-231 adds navigation, status-read lifetime and complete responsive journeys.
 | `T-UX-165l` | Web | In-place library query changes do not restart the capture indicator or introduce loading-strip layout shifts; leaving for another route does refresh it. `apps/web/test/captureJourney.spec.tsx`. |
 | `T-LIB-001a`–`g` | Web | #328: cross-restart destination restoration before list fetch, all return routes and receipt state, explicit URL authority, Back/Forward/clear, absent genres and cursor exclusion, obsolete values, blocked-storage disclosure and in-app fallback. `apps/web/test/libraryNavigation.spec.tsx`. |
 | `T-LIB-001h` | E2E | #328: real shell desktop/phone navigation, first restored request, chips/sort/rows, browser-context restart, explicit link and Clear persistence in Chromium/WebKit. `tests/e2e/refinedLibrary.spec.ts`. |
+| `T-LIB-001i` | Web | Default saved choices do not add redundant redirects or query parameters on entry/return. `apps/web/test/libraryNavigation.spec.tsx`. |
 
 > ### ⚠ REVISION 7 (2026-08-11) — `A45`: clipboard paste is the primary ingest path
 >

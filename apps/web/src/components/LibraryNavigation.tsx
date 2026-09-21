@@ -19,6 +19,8 @@ export function libraryQuery(params: URLSearchParams): string {
   return next.toString();
 }
 
+const DEFAULT_QUERY = libraryQuery(new URLSearchParams());
+
 function readSaved(): { query: string | null; message: string | null } {
   let raw: string | null;
   try {
@@ -36,9 +38,10 @@ export function LibraryNavigation({ children }: { readonly children: ReactNode }
   const location = useLocation();
   const navigationType = useNavigationType();
   const [saved, setSaved] = useState(readSaved);
+  const hasSavedChoices = saved.query !== null && saved.query !== DEFAULT_QUERY;
   const [entry, setEntry] = useState(() => ({
     location,
-    restore: location.pathname === '/' && location.search === '' && saved.query !== null,
+    restore: location.pathname === '/' && location.search === '' && hasSavedChoices,
   }));
 
   // Latch the entry decision until the redirect commits; a render/effect race
@@ -51,7 +54,7 @@ export function LibraryNavigation({ children }: { readonly children: ReactNode }
         location.search === '' &&
         entry.location.pathname !== '/' &&
         navigationType !== 'POP' &&
-        saved.query !== null,
+        hasSavedChoices,
     });
   }
 

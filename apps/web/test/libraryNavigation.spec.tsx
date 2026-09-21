@@ -126,10 +126,21 @@ describe('remembered library destination', () => {
     localStorage.setItem(KEY, 'service=retired&type=bogus&sort=old&dir=wrong&cursor=secret');
     mount();
     await screen.findByText('Some saved browsing choices are no longer supported and were reset.');
-    expect(vi.mocked(apiClient.getTitles).mock.calls[0]?.[0]).toBe('sort=dateAdded&dir=desc');
+    expect(vi.mocked(apiClient.getTitles).mock.calls[0]?.[0]).toBe('');
     expect(libraryQuery(new URLSearchParams(`q=${'x'.repeat(501)}`))).toBe(
       'sort=dateAdded&dir=desc',
     );
+  });
+
+  it('T-LIB-001i: default saved choices do not add a redundant redirect on entry or return', async () => {
+    localStorage.setItem(KEY, 'sort=dateAdded&dir=desc');
+    mount();
+    await screen.findByRole('heading', { name: 'Your list' });
+    expect(screen.getByTestId('url').textContent).toBe('/');
+    fireEvent.click(screen.getByRole('link', { name: 'Upload fixture' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Return to list' }));
+    await screen.findByRole('heading', { name: 'Your list' });
+    expect(screen.getByTestId('url').textContent).toBe('/');
   });
 
   it('T-LIB-001g: blocked storage reports the limitation but keeps in-app navigation working', async () => {
@@ -139,6 +150,7 @@ describe('remembered library destination', () => {
       if (this === localStorage) throw new DOMException('Blocked', 'SecurityError');
       return originalGet.call(this, key);
     });
+
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
       if (this === localStorage) throw new DOMException('Full', 'QuotaExceededError');
       originalSet.call(this, key, value);
