@@ -55,39 +55,44 @@ import {
  * they remain live recognition defects, merely no longer gated by a floor that
  * could not pass.
  *
- * **L5 false-title (ceiling 0.10, measured 0.1786 / 0.1321 / 0.0926).** ⚠ **DO
- * NOT "FIX" THIS BY RAISING THE CEILING, AND DO NOT BACK OUT THE TRUNCATED
- * READS EITHER.** `truncated-titles-01` presents deliberately truncated
- * captions, and the reader emits `dr strangelove or how i lear` and
- * `hitchhiker s guide to the` in all three runs. It is tempting to call each
- * one defect charged to two gates — a missed title (L1) plus a false title
- * (L5) — and excuse it the way `goldenScorer.ts` excuses chrome.
+ * **L5 false-title (ceiling 0.10; 2026-09-21 baseline 0.1020 / 0.1296 / 0.0926).**
+ * ⚠ **DO NOT "FIX" THIS BY RAISING THE CEILING, AND DO NOT BACK OUT TRUNCATED
+ * READS EITHER.** On the 2026-09-18 baseline the reader emitted stumps
+ * (`dr strangelove or how i lear`, `hitchhiker s guide to the`) on
+ * `truncated-titles-01` in all three runs, and it was tempting to call each
+ * one defect charged to two gates and excuse it as `goldenScorer.ts` excuses
+ * chrome. That was wrong twice over: the same image scored recall **1.000**,
+ * so every full title WAS found and nothing was charged twice — and on the
+ * 2026-09-21 baseline **the stumps do not occur at all**. `T-AI-059` keeps the
+ * exclusion pinned shut so the obvious-but-wrong fix stays a test failure.
  *
- * ⚠ THE REPORT REFUTES THAT. `truncated-titles-01` scored recall **1.000 on
- * all three runs**: every full title WAS found. The stumps appear ALONGSIDE
- * the titles they truncate, not instead of them, so nothing is charged twice.
- * Each stump is a genuine extra junk row — the "one title split across several
- * rows" recognition defect — and backing it out would delete two real defects
- * from the metric. `T-AI-059` builds the exclusion and then pins it SHUT for
- * exactly this case, so the obvious-but-wrong fix now fails a test.
+ * ⚠ **THE REAL DOUBLE COUNT IS A DIFFERENT MECHANISM, AND IT IS STILL OPEN.**
+ * Four of the eight named false titles on 2026-09-21 are near-variants of a
+ * title MISSED ON THE SAME IMAGE IN THE SAME RUN — `true detective night
+ * country` where `true detective` is missed 3 of 3, and `in the shadow of
+ * dante` where `in the hand of dante` is missed 3 of 3. Each is one defect
+ * (the title was misread) charged to recall AND to L5. Excusing just those two
+ * takes the rates to 3/49, 5/54, 3/54 = 0.0612 / 0.0926 / 0.0556 — **all three
+ * runs clear**. That is an owner decision, not a change to make quietly: it
+ * redefines what L5 counts, and `true detective night country` is arguably the
+ * reader reading the screen correctly against a lenient answer key.
  *
- * The L5 breach is therefore real and unexplained by arithmetic. It needs
- * extraction work or an owner-accepted ceiling, not a scorer change.
- *
- * ⚠ AND THE BASELINE IS STALE, WHICH OUTRANKS BOTH. `golden-2026-09-18.md`
- * predates at least `recently added` entering `chromeTerms` — an entry whose
- * own source comment cites this very report as its evidence, and a false title
- * in that table which today's code would classify `chrome-suspected` and
- * exclude from the numerator. Moving a band against these numbers would
- * calibrate it to a pipeline that no longer exists, which is precisely how L2
- * got to 0.95. A fresh `npm run golden:live` (manual, ~$0.20) comes first.
+ * ⚠ **THE STALE BASELINE IS RESOLVED, AND THE RE-RUN VINDICATED THE CAUTION.**
+ * `golden-2026-09-18.md` predated `recently added` entering `chromeTerms` — an
+ * entry whose own source comment cited that report as its evidence. Moving a
+ * band against those numbers would have calibrated it to a pipeline that no
+ * longer existed, which is exactly how L2 got to 0.95. The fresh
+ * `golden-2026-09-21.md` moved L5 from 0.1786 / 0.1321 / 0.0926 to
+ * 0.1020 / 0.1296 / 0.0926 and made the truncation stumps vanish entirely, so
+ * any ceiling tuned to the old numbers would already be wrong.
  */
 const KNOWN_BREACHES: readonly string[] = [
   // ⚠ L1 `netflix-mylist-desktop-01` WAS here (floor 0.900 vs measured 0.800).
-  // The floor moved to 0.75 in `liveBands.ts`, so it is no longer a breach.
-  // The two live misses behind it are untouched and still real.
-  'L5 · run 1 false-title rate 0.1786 vs band 0.1000',
-  'L5 · run 2 false-title rate 0.1321 vs band 0.1000',
+  // The floor moved to 0.75 in `liveBands.ts`, and the 2026-09-21 baseline
+  // measures 0.900 / 0.900 / 0.800 — so it clears, but only on the lowered
+  // floor. The old 0.900 would still have failed run 3.
+  'L5 · run 1 false-title rate 0.1020 vs band 0.1000',
+  'L5 · run 2 false-title rate 0.1296 vs band 0.1000',
 ];
 
 describe('T-AI-058 · every live band is achievable by the model in production', () => {

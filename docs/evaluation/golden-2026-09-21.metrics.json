@@ -1,0 +1,21 @@
+{
+  "arm": {
+    "deployment": "gpt-4.1",
+    "tokenParam": "max_tokens",
+    "temperature": 0,
+    "slug": ""
+  },
+  "generatedAt": "2026-09-21T20:43:57.713Z",
+  "metrics": {
+    "modelId": "gpt-4.1",
+    "omissionRecovery": 0.5,
+    "fabricationRate": 0.024691358024691357,
+    "titleRecall": 0.9104477611940298,
+    "artworkOnlyRecall": 0.8571428571428571,
+    "falseTitleRate": 0.10204081632653061,
+    "chromeRejection": 0.8354430379746836,
+    "stabilityJaccard": 0.7948717948717948,
+    "unstableTitleRate": 0,
+    "costUsdPerImage": 0.006219939393939394
+  }
+}
