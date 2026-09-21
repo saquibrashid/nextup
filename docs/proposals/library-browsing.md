@@ -31,7 +31,18 @@ The owner explicitly chose persistence **across browser restarts**.
 
 ## #326: compact search, separate slice
 
-Retain search functionality, but put the input behind a visibly labelled
-Search disclosure. Active URL search stays visible and clearable. Preserve
-keyboard focus, URL history, filters, sorting, Compact/Grid and phone layouts.
-Do not introduce a second query model or change list membership/order.
+Retain search functionality instead of removing it. Put a labelled Search
+disclosure beside Compact/Grid, below the primary filter/count/sort row.
+The initial unsearched page has no full-width input.
+
+Opening focuses the labelled input. Enter explicitly submits; typing never
+requests data. Escape, Close search and the disclosure itself close the form
+and return focus without clearing the submitted query; an unsubmitted draft
+is discarded. Active search remains visible as both "Search active" and the
+existing independently clearable query chip. Explicit URL/history changes
+with a query reveal the form without stealing focus from navigation.
+
+Clear search removes only search/cursor, retains filters/order, keeps the
+form open and restores input focus. The URL remains the only submitted state.
+Preserve Compact/Grid, metadata, actions, oldest-first and phone target floors.
+`T-LIB-002` adds real geometry, focus, overflow and accessibility evidence.

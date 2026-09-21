@@ -147,16 +147,17 @@ restore, suppress, un-suppress or fix-match.
    stale chip and its conditional "Update now" link are dropped entirely — no
    staleness threshold, no nag, no derived "stale" state. REQ-040 and ASM-038
    are retired.)*
-2. **List controls** — one **single-row compact toolbar** (`.list-toolbar`,
-   owner-approved 2026-09-17) carrying, in order: the submitted title-search
-   form, a **Filters** button, a **Sort** button, a **dedicated reverse-order
-   button**, and the view switch. The toolbar is the whole of the controls at
-   rest; the filter fields and the sort orders live behind their two buttons.
+2. **List controls** — a compact browse-first toolbar (`.list-controls`).
+   #326 (owner-approved 2026-09-21) puts filters/count/sort/reverse first,
+   followed by Compact/Grid and a labelled on-demand **Search** disclosure.
+   The default unsearched view has no full-width search input.
+   Filter fields and sort orders remain behind their existing buttons.
 
    The **Filters button, the live result count, the Sort button and the reverse
    button share ONE line from 360 px upward** (owner refinement 2026-09-17,
-   `T-UX-147b`); the search field and the view switch take the lines above and
-   below it. ⚠ **Below 360 px the sort control takes its own line** — four
+   `T-UX-147b`); view and Search controls share a wrapping secondary row below,
+   and the search form occupies a full line only when opened.
+   ⚠ **Below 360 px the sort control takes its own line** — four
    controls plus a 44 px reverse target do not fit, and forcing them pushed the
    reverse button off the 280 px reflow floor (`T-UX-147d`, `T-A11Y-015a`). To
    make the single line possible the toolbar is a **grid** and `FilterBar`
@@ -228,6 +229,13 @@ restore, suppress, un-suppress or fix-match.
    ordering, paging and runtime-hidden counts (`api.md` §6.2c), never just
    against titles already loaded in the browser. Query changes reset paging
    while preserving sort, filters and view. `T-UX-140`, `T-API-030`.
+
+   Opening Search focuses its input. Escape, Close search and the disclosure
+   return focus without clearing the submitted query. A collapsed active
+   search shows **Search active** and the removable query chip; it never
+   silently hides a constraint. URL/history searches reveal the form without
+   stealing focus. Clear search keeps the form open and focuses the cleared
+   input. Unsubmitted drafts are discarded on close (`T-LIB-002`).
 
    **The runtime filter is BUCKETED, not a slider.** Buckets are *Under 30m*,
    *30m–1h*, *1h–1h 30m*, *1h 30m–2h*, *Over 2h*, and they map to `runtime=` in the query

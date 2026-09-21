@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 227 |
+| ✅ done | 228 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **230** |
+| **total** | **231** |
 
 ## Ready to start
 
@@ -268,3 +268,4 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-230` | Additive intake ledger records failures before parsing and commits image rows with finalization. Explicit existing-or-new replacement, sticky local reports, legacy/derived uncertainty, and interrupted blob-deletion evidence feed one review/tick/close removal gate. Submit seals the image snapshot transactionally while retaining failed-extraction retry. `T-UX-164a`–`ab` cover real SQL/Blob rollback/concurrency and responsive Chromium/WebKit recovery. CI-gated release; TASK-231 remains separate. | `T-UX-164` |
 | `TASK-231` | Owner-scoped unfinished-capture strip and shared history/resume vocabulary; authoritative stage reread; keyed status lifetimes, nonoverlapping polls, explicit slow/failed-read recovery, unavailable links and no late redirect after leaving. Capture navigation and replaced decision controls restore focus without losing a large review's position. `T-UX-165a`–`k` cover component races and complete Chromium/WebKit journeys at 280/390/1440px in both modes. No API, migration, dependency or infrastructure change; CI-gated release. | `T-UX-165` |
 | `TASK-232` | #328: validated browser-local destination persists filters/search and complete sort across restarts. Bare-root entry and application returns resolve before list reads, preserve receipt state and omit cursors; explicit links, Back/Forward and clear operations remain authoritative. Direction-only session fallback retired. Unsupported choices/storage failure are disclosed. `T-LIB-001a`–`h`, full web and responsive browser regressions. Separate PR; #326 follows. | `T-LIB-001` |
+| `TASK-233` | #326: browse-first filter/sort row with Compact/Grid and compact Search below. Labelled disclosure focuses input; active query remains named and clearable when collapsed. Explicit submit, cursor reset, focus-preserving clear, Escape/draft dismissal and history reveal retain URL semantics. `T-LIB-002a`–`d`; responsive geometry, accessibility and existing search/navigation regressions. Separate dependent PR; no API, dependency or infrastructure change. | `T-LIB-002` |

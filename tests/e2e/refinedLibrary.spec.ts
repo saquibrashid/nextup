@@ -292,6 +292,7 @@ for (const width of [320, 1280]) {
       await page.getByRole('checkbox', { name: 'Netflix', exact: true }).click();
       await expect(page.getByRole('checkbox', { name: 'Netflix', exact: true })).toBeChecked();
       await page.keyboard.press('Escape');
+      await page.getByTestId('list-search-trigger').click();
       await page.getByRole('searchbox', { name: 'Search your list', exact: true }).fill('Orbit');
       await page.getByRole('search').getByRole('button', { name: 'Search', exact: true }).click();
       await expect(page.getByTestId('title-name')).toHaveText(['Quiet Orbit']);
@@ -350,6 +351,51 @@ async function bounds(locator: Locator) {
   if (box === null) throw new Error('Visible element has no bounding box');
   return box;
 }
+
+test('T-LIB-002d: compact search prioritizes browsing and preserves accessible active search', async ({
+  page,
+}) => {
+  for (const width of [320, 1280]) {
+    const requests = await mountLibrary(page, { width });
+    const controls = page.getByTestId('list-controls');
+    const trigger = page.getByTestId('list-search-trigger');
+    await expect(page.getByRole('search')).toHaveCount(0);
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    const compactHeight = (await bounds(controls)).height;
+    expect((await bounds(trigger)).y).toBeGreaterThanOrEqual(
+      (await bounds(page.getByTestId('sort-trigger'))).y,
+    );
+    await usableTarget(page, trigger);
+    await trigger.focus();
+    await page.keyboard.press('Enter');
+    const search = page.getByRole('searchbox', { name: 'Search your list', exact: true });
+    await expect(search).toBeFocused();
+    expect((await bounds(controls)).height).toBeGreaterThan(compactHeight + 30);
+    const reads = requests.length;
+    await search.fill('Orbit');
+    expect(requests.length).toBe(reads);
+    await page.keyboard.press('Enter');
+    await expect(page.getByTestId('title-name')).toHaveText(['Quiet Orbit']);
+    await page.keyboard.press('Escape');
+    await expect(trigger).toBeFocused();
+    await expect(page.getByRole('search')).toHaveCount(0);
+    await expect(trigger).toHaveText('Search active');
+    const chip = page.getByRole('button', { name: 'Remove search filter: Search: Orbit' });
+    await expect(chip).toBeVisible();
+    await noOverflow(page);
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await chip.click();
+    await expect(page.getByTestId('title-name')).toHaveCount(TITLES.length);
+    expect(new URL(page.url()).searchParams.has('q')).toBe(false);
+    await trigger.click();
+    await expect(search).toHaveValue('');
+    await expect(search).toBeFocused();
+    await noOverflow(page);
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await page.getByRole('button', { name: 'Close search' }).click();
+    await expect(trigger).toBeFocused();
+  }
+});
 
 async function noOverflow(page: Page): Promise<void> {
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
@@ -584,10 +630,11 @@ test('T-UX-143c: submitted URL search resets loaded pages, requests unfiltered t
     requests.some((request) => request.searchParams.get('cursor') === 'fixture-next-page'),
   ).toBe(true);
   const before = requests.length;
+  await page.getByTestId('list-search-trigger').click();
   const search = page.getByRole('searchbox', { name: 'Search your list', exact: true });
   await search.fill('Amber');
   expect(requests.length).toBe(before);
-  await page.getByRole('button', { name: 'Search', exact: true }).click();
+  await page.getByRole('search').getByRole('button', { name: 'Search', exact: true }).click();
   await expect(page).toHaveURL(/\?q=Amber$/);
   await expect(page.getByTestId('title-name')).toHaveText(['Amber Harbor']);
   const searchRequests = requests
@@ -619,6 +666,8 @@ test('T-UX-143c: submitted URL search resets loaded pages, requests unfiltered t
   expect(new URL(page.url()).searchParams.has('q')).toBe(false);
   // Shorter cards may already bring the sentinel into view. Verify pagination
   // completes instead of racing the transient Load more button's removal.
+  await expect(page.getByTestId('title-name').nth(2)).toBeVisible();
+  await expect(search).toBeFocused();
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await expect(page.getByTestId('title-name')).toHaveCount(TITLES.length);
 });

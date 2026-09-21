@@ -1085,7 +1085,6 @@ button {
   padding: var(--space-2);
 }
 
-.list-controls form[role='search'],
 /*
  * ⚠ EVERY ROW IS EXPLICIT, AND THAT IS THE BUG FIX — not tidiness.
  *
@@ -1106,34 +1105,35 @@ button {
  * count and a 44 px reverse target (`T-A11Y-015a`), so it takes its own row
  * and everything after it shifts down by one.
  */
-.list-controls > [role='search'] {
+.list-secondary-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
   grid-column: 1 / -1;
-  grid-row: 1;
+  grid-row: 4;
 }
 
 .filter-bar__chips {
   grid-column: 1 / -1;
-  grid-row: 3;
-}
-
-.list-view-control {
-  grid-column: 1 / -1;
+  grid-row: 2;
 }
 
 .filter-bar {
   grid-column: 1;
-  grid-row: 2;
+  grid-row: 1;
 }
 
 .filter-bar__status {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 1;
   min-inline-size: 0;
 }
 
 .sort-control-group {
   grid-column: 1 / -1;
-  grid-row: 4;
+  grid-row: 3;
   min-inline-size: 0;
 }
 
@@ -1155,7 +1155,11 @@ button {
 
   .sort-control-group {
     grid-column: 3;
-    grid-row: 2;
+    grid-row: 1;
+  }
+
+  .list-secondary-controls {
+    grid-row: 3;
   }
 }
 
@@ -3859,14 +3863,8 @@ button {
 
 @media (min-width: 640px) {
   .list-controls {
-    grid-template-columns: auto auto minmax(0, 1fr) auto;
+    grid-template-columns: auto auto minmax(0, 1fr);
     padding: var(--space-3);
-  }
-
-  .list-controls > .list-view-control {
-    grid-column: 4;
-    grid-row: 2;
-    justify-self: end;
   }
 
   .sort-control-group {
