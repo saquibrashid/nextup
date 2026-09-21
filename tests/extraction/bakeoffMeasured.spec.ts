@@ -20,13 +20,14 @@
  * different parameters would have introduced the second difference Stage 1
  * forbids).
  *
- * ⚠ `stabilityJaccard` IS NOT MEASURED HERE, AND THE SUITE PROVES IT IS NOT
- * DECIDING ANYTHING. Stage 2's three-runs-per-image protocol is TASK-079b's
- * manual live suite; a single recorded run per arm cannot produce a Jaccard.
- * Rather than invent one, `T-AI-045c` runs the decision TWICE over the two
- * extreme assumptions and asserts the outcome is identical — so the missing
- * input is demonstrably not load-bearing for this result, instead of being
- * assumed harmless.
+ * ⚠ `stabilityJaccard` AND `unstableTitleRate` ARE NOT MEASURED HERE, AND THE
+ * SUITE PROVES NEITHER IS DECIDING ANYTHING. Stage 2's three-runs-per-image
+ * protocol is TASK-079b's manual live suite; a single recorded run per arm
+ * cannot produce a Jaccard, nor a count of titles that come and go between
+ * runs. Rather than invent them, `T-AI-045c` runs the decision TWICE over the
+ * two extreme assumptions and asserts the outcome is identical — so the
+ * missing inputs are demonstrably not load-bearing for this result, instead
+ * of being assumed harmless.
  */
 
 import { readFileSync } from 'node:fs';
@@ -103,7 +104,12 @@ function omissionRecovery(modelId: string, scored: readonly Scored[]): number {
   return recoverable === 0 ? 1 : recovered / recoverable;
 }
 
-function metricsFor(modelId: string, scored: readonly Scored[], stability: number): ReaderMetrics {
+function metricsFor(
+  modelId: string,
+  scored: readonly Scored[],
+  stability: number,
+  unstable: number,
+): ReaderMetrics {
   const agg = aggregate(scored);
   return {
     modelId,
@@ -114,6 +120,21 @@ function metricsFor(modelId: string, scored: readonly Scored[], stability: numbe
     falseTitleRate: agg.falseTitleRate,
     chromeRejection: agg.chromeRejectionRate,
     stabilityJaccard: stability,
+    // ⚠ NOT MEASURED HERE EITHER, AND FOR THE SAME REASON AS `stabilityJaccard`.
+    // L3 counts titles that appear in some runs of an arm but not others, so
+    // like Jaccard it needs Stage 2's three runs per image; one recorded run
+    // per arm cannot produce it. §9.7 added this row on 2026-09-19 when
+    // `temperature: 0` was demoted out of Stage 0, and that pairing is the
+    // point: L3 is the band that now carries the stability guarantee the
+    // parameter gate used to stand proxy for.
+    //
+    // ⚠ IT IS PASSED IN, NOT DEFAULTED TO 0. A literal 0 here would be a
+    // fabricated measurement — "this arm never wobbles" — asserted from
+    // evidence that cannot show it, and it would read as the arm's best
+    // possible score, silently disarming a row that compares against the
+    // incumbent. `T-AI-045c` instead takes the decision at both extremes of
+    // what this input could be and requires the outcome to be identical.
+    unstableTitleRate: unstable,
     // ⚠ RECORDED, NEVER DECISIVE (§9.7, NFR-012a). Both arms are set to the
     // same value on purpose: a cost difference must not be able to move this
     // decision even by accident, and `chooseReader` already refuses to let it.
@@ -125,10 +146,10 @@ const incScored = await scoreAll(INCUMBENT);
 const chalScored = await scoreAll(CHALLENGER);
 const expectedTitleTotal = incScored.reduce((n, s) => n + s.expected.expectedCandidates.length, 0);
 
-function decide(stability: number) {
+function decide(stability: number, unstable: number) {
   return chooseReader({
-    incumbent: metricsFor(INCUMBENT, incScored, stability),
-    challenger: metricsFor(CHALLENGER, chalScored, stability),
+    incumbent: metricsFor(INCUMBENT, incScored, stability, unstable),
+    challenger: metricsFor(CHALLENGER, chalScored, stability, unstable),
     challengerCapabilities: CHALLENGER_CAPABILITIES,
     expectedTitleTotal,
     corpusImages: manifest.images.length,
@@ -306,14 +327,21 @@ describe('T-AI-045 the bake-off is measured, and the pre-committed rule decides 
     expect(chal.fabricationRate).toBeGreaterThan(inc.fabricationRate);
   });
 
-  it('T-AI-045c · the pre-committed rule keeps the incumbent, and stability is not what decided it', () => {
-    // ⚠ THE UNMEASURED INPUT IS PROVEN INERT RATHER THAN ASSUMED INERT.
-    // `stabilityJaccard` needs Stage 2's three runs per image (TASK-079b,
-    // manual and live), which a single recorded run per arm cannot produce.
-    // So the decision is taken twice, at both extremes of what that input
-    // could be, and the outcome must be identical.
-    const perfect = decide(1);
-    const atFloor = decide(0.95);
+  it('T-AI-045c · the pre-committed rule keeps the incumbent, and neither unmeasured Stage 2 input decided it', () => {
+    // ⚠ THE UNMEASURED INPUTS ARE PROVEN INERT RATHER THAN ASSUMED INERT.
+    // `stabilityJaccard` and `unstableTitleRate` both need Stage 2's three
+    // runs per image (TASK-079b, manual and live), which a single recorded
+    // run per arm cannot produce. So the decision is taken twice, at both
+    // extremes of what those inputs could be, and the outcome must be
+    // identical.
+    //
+    // ⚠ THE LOW EXTREME IS 0.75, NOT 0.95. §9.5 has never contained a 0.95
+    // stability floor; `chooseReader.ts` carried one until 2026-09-21, and at
+    // that value this call returned `floor-breach` for BOTH arms — the row
+    // could only ever produce one answer, so taking it as an "extreme" tested
+    // nothing. `T-AI-045z` guards the floor itself.
+    const perfect = decide(1, 0);
+    const atFloor = decide(0.75, 0.05);
 
     expect(perfect.outcome).toBe('incumbent-stays');
     expect(atFloor.outcome).toBe('incumbent-stays');

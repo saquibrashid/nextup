@@ -76,6 +76,7 @@ const INCUMBENT: ReaderMetrics = {
   falseTitleRate: 0.04,
   chromeRejection: 0.9,
   stabilityJaccard: 0.98,
+  unstableTitleRate: 0.01,
   costUsdPerImage: 0.0094,
 };
 
@@ -202,7 +203,12 @@ describe('T-AI-045d · the decision function is pure, total, and defaults to the
       ['artworkOnlyRecall', 0.79],
       ['falseTitleRate', 0.11],
       ['chromeRejection', 0.79],
-      ['stabilityJaccard', 0.94],
+      // ⚠ 0.74, NOT 0.94. The floor is 0.75 (§9.5, §9.7 Stage 3); it read
+      // 0.95 in `chooseReader.ts` until 2026-09-21 and this row pinned the
+      // stale value, so the suite was green on a floor no measured arm —
+      // including the incumbent at 0.7692 — could ever clear.
+      ['stabilityJaccard', 0.74],
+      ['unstableTitleRate', 0.06],
     ];
 
     for (const [metric, value] of breaches) {
@@ -243,6 +249,7 @@ describe('T-AI-045d · the decision function is pure, total, and defaults to the
             falseTitleRate: 0,
             chromeRejection: 1,
             stabilityJaccard: 1,
+            unstableTitleRate: 0,
           }),
         }),
       );
@@ -391,6 +398,110 @@ describe('T-AI-045e · a sub-two-title delta is "no measured difference", not a 
     const reasons = decision.reasons.join(' ');
     expect(reasons).toContain(`not the ${String(BAKEOFF_CORPUS_IMAGES)}`);
     expect(reasons).toContain('3 images');
+  });
+});
+
+/**
+ * ⚠ THESE FOUR GUARD A CODE/SPEC DRIFT THAT WENT UNDETECTED FOR TWO DAYS AND
+ * DISABLED THE DECISION FUNCTION IN BOTH DIRECTIONS.
+ *
+ * `specs/ai.md` §9.7 was revised on **2026-09-19**: `temperature: 0` moved
+ * out of Stage 0 into a Stage 2 measurement, and an **L3 unstable-titles**
+ * row was added to Stage 3 to carry the guarantee the parameter gate had
+ * stood proxy for. `chooseReader.ts` was not updated until **2026-09-21**,
+ * while its own header claimed to transcribe §9.7 "row for row".
+ *
+ * ⚠ THE OLD SUITE WAS FULLY GREEN THROUGHOUT, which is why these exist. It
+ * pinned the stale values (`['stabilityJaccard', 0.94]` asserted a breach of
+ * a 0.95 floor that §9.5 never contained), so the tests actively certified
+ * the drift. Every assertion below is written against the SPEC's number, and
+ * several use the REAL measured figures so that a silent revert to the old
+ * values fails on evidence rather than on a preference.
+ */
+describe('T-AI-045 · claims x/y/z/aa · the Stage 0 / Stage 3 tables match §9.7 as revised 2026-09-19', () => {
+  it('T-AI-045x · temperatureZero is NOT a Stage 0 disqualifier', () => {
+    // ⚠ THE EXACT SHAPE OF THE REAL CANDIDATE. `gpt-6-astra` accepts only
+    // `temperature: 1`; under the stale gate it was refused with zero images
+    // spent despite meeting every quality floor. §9.7: "A gate cannot be
+    // justified by a property its own subject fails and its excluded
+    // candidates satisfy."
+    const decision = chooseReader(
+      input({
+        challengerCapabilities: { ...ALL_CAPABILITIES, temperatureZero: false },
+        challenger: challenger({ titleRecall: INCUMBENT.titleRecall + MEASURABLE }),
+      }),
+    );
+
+    expect(decision.outcome).not.toBe('challenger-disqualified');
+    expect(decision.missingCapabilities).toEqual([]);
+    expect(REQUIRED_CAPABILITIES).not.toContain('temperatureZero');
+  });
+
+  it('T-AI-045y · temperatureZero survives as a REPORTED capability, not a deleted one', () => {
+    // ⚠ Deleting the field would be the tidy-looking wrong fix: it would
+    // erase which arm was sampling from every report, making the Stage 2
+    // stability numbers uninterpretable. Demotion is not removal.
+    const caps: ReaderCapabilities = { ...ALL_CAPABILITIES, temperatureZero: false };
+    expect(caps.temperatureZero).toBe(false);
+    expect(Object.keys(ALL_CAPABILITIES)).toContain('temperatureZero');
+  });
+
+  it('T-AI-045z · the L2 stability floor is 0.75, which the real incumbent clears and 0.95 did not', () => {
+    // The measured worst-pair L2 values (§9.7, three runs × 11 images).
+    const GPT_41_MEASURED = 0.7692;
+    const ASTRA_MEASURED = 0.875;
+
+    // ⚠ THE INCUMBENT AGAINST ITSELF. At the stale 0.95 floor this returned
+    // `floor-breach` — `chooseReader` disqualified `gpt-4.1` for being
+    // `gpt-4.1`. A floor no real reader can clear does not protect quality,
+    // it silently disables the row it sits in.
+    const selfIncumbent: ReaderMetrics = { ...INCUMBENT, stabilityJaccard: GPT_41_MEASURED };
+    const self = chooseReader(
+      input({
+        incumbent: selfIncumbent,
+        challenger: { ...selfIncumbent, modelId: 'gpt-6-astra', stabilityJaccard: ASTRA_MEASURED },
+      }),
+    );
+    const row = self.rows.find((r) => r.metric === 'Run-to-run stability (Jaccard)');
+    expect(row?.status).not.toBe('floor-breach');
+
+    // And the floor still bites just below the spec's number.
+    const under = chooseReader(
+      input({
+        incumbent: { ...INCUMBENT, stabilityJaccard: 0.74 },
+        challenger: challenger({ stabilityJaccard: 0.74 }),
+      }),
+    );
+    expect(under.outcome).toBe('incumbent-stays');
+    expect(under.reasons.join(' ')).toContain('floor');
+  });
+
+  it('T-AI-045aa · the L3 unstable-titles row exists and binds at 0.05 AND against the incumbent', () => {
+    // ⚠ L2 ALONE IS THE WRONG LANDING PLACE, which is the reason this row was
+    // added alongside the Stage 0 move. L2 counts false-title churn — noise —
+    // so a challenger that DROPS titles the owner really saved can still post
+    // a better Jaccard. Here it does exactly that, and must still lose.
+    const churnyButDroppy = chooseReader(
+      input({
+        challenger: challenger({
+          stabilityJaccard: 1,
+          unstableTitleRate: INCUMBENT.unstableTitleRate + MEASURABLE,
+        }),
+      }),
+    );
+    expect(churnyButDroppy.outcome).toBe('incumbent-stays');
+    const row = churnyButDroppy.rows.find((r) => r.metric === 'L3 unstable titles');
+    expect(row?.status).toBe('worse-than-incumbent');
+
+    // The absolute floor bites independently of the incumbent comparison.
+    const overFloor = chooseReader(
+      input({
+        incumbent: { ...INCUMBENT, unstableTitleRate: 0.06 },
+        challenger: challenger({ unstableTitleRate: 0.06 }),
+      }),
+    );
+    expect(overFloor.outcome).toBe('incumbent-stays');
+    expect(overFloor.reasons.join(' ')).toContain('floor');
   });
 });
 
