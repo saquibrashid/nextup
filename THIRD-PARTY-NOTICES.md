@@ -253,8 +253,8 @@ so they do not relicense this work — but their notices must be retained.
 | `rc9` | 2.1.2 | MIT |
 | `react` | 19.3.0 | MIT |
 | `react-dom` | 19.3.0 | MIT |
-| `react-router` | 7.18.3 | MIT |
-| `react-router-dom` | 7.18.3 | MIT |
+| `react-router` | 7.18.4 | MIT |
+| `react-router-dom` | 7.18.4 | MIT |
 | `readable-stream` | 3.6.2 | MIT |
 | `readable-stream` | 4.7.0 | MIT |
 | `readdirp` | 4.1.2 | MIT |
