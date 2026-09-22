@@ -104,7 +104,7 @@ so they do not relicense this work — but their notices must be retained.
 | `@tanstack/react-virtual` | 3.14.11 | MIT |
 | `@tanstack/virtual-core` | 3.17.9 | MIT |
 | `@tediousjs/connection-string` | 0.5.0 | MIT |
-| `@types/node` | 22.20.2 | MIT |
+| `@types/node` | 22.20.4 | MIT |
 | `@types/readable-stream` | 4.0.24 | MIT |
 | `@typespec/ts-http-runtime` | 0.3.8 | MIT |
 | `abort-controller` | 3.0.0 | MIT |
@@ -120,7 +120,7 @@ so they do not relicense this work — but their notices must be retained.
 | `buffer-equal-constant-time` | 1.0.1 | BSD-3-Clause |
 | `buffer-from` | 1.1.2 | MIT |
 | `bundle-name` | 4.1.0 | MIT |
-| `busboy` | 1.6.0 | MIT |
+| `busboy` | 1.6.0 | UNKNOWN |
 | `bytes` | 3.1.2 | MIT |
 | `c12` | 3.1.0 | MIT |
 | `call-bind-apply-helpers` | 1.0.2 | MIT |
@@ -276,7 +276,7 @@ so they do not relicense this work — but their notices must be retained.
 | `source-map-js` | 1.2.1 | BSD-3-Clause |
 | `sprintf-js` | 1.1.3 | BSD-3-Clause |
 | `statuses` | 2.0.2 | MIT |
-| `streamsearch` | 1.1.0 | MIT |
+| `streamsearch` | 1.1.0 | UNKNOWN |
 | `string_decoder` | 1.3.0 | MIT |
 | `strnum` | 2.4.1 | MIT |
 | `tarn` | 3.1.2 | MIT |
