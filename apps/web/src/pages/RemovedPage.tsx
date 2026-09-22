@@ -27,7 +27,7 @@
  * Restore is an EXPLICIT user action — never automatic (product invariant 7).
  */
 
-import { useState, type JSX } from 'react';
+import { useId, useRef, useState, type JSX } from 'react';
 
 import { SERVICE_LABELS, dateAddedLabel, removedOnLabel, type Service } from '@nextup/domain';
 
@@ -60,6 +60,7 @@ import { TMDB_IMAGE_BASE } from '../components/TitleRow';
 import { LoadMoreSentinel } from '../components/LoadMoreSentinel';
 import { useOnline } from '../lib/useOnline';
 import { Button } from '../components/ui/Button';
+import { Dialog } from '../components/ui/Dialog';
 
 export interface RemovedPageProps {
   readonly items?: readonly RemovedItem[];
@@ -185,8 +186,13 @@ function RestoreControl({
   offline: boolean;
 }): JSX.Element | null {
   const [state, setState] = useState<RestoreState>({ phase: 'idle' });
+  const [prompt, setPrompt] = useState<'duplicate' | 'suppressed' | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const headingId = useId();
+  const trigger = useRef<HTMLButtonElement>(null);
 
   async function attemptRestore(confirmDuplicate = false): Promise<void> {
+    setFailure(null);
     setState({ phase: 'submitting' });
     try {
       const result = await onRestore(item.listingId, { confirmDuplicate });
@@ -195,6 +201,7 @@ function RestoreControl({
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         if (err.code === 'WORK_SUPPRESSED') {
+          setPrompt('suppressed');
           const href =
             typeof err.details['unsuppressHref'] === 'string'
               ? err.details['unsuppressHref']
@@ -208,16 +215,18 @@ function RestoreControl({
           return;
         }
         if (err.code === 'DUPLICATE_WORK_IDENTITY') {
+          setPrompt('duplicate');
           setState({ phase: 'confirm-duplicate' });
           return;
         }
         if (err.code === 'LISTING_NOT_REMOVED') {
+          setPrompt(null);
           setState({ phase: 'already-active' });
           return;
         }
       }
-      // Other errors: fall back to idle (the ApiError's message was shown
-      // by the caller or is visible in devtools; no silent swallow).
+      setFailure('Could not restore this title. Check its saved state before trying again.');
+      setPrompt(null);
       setState({ phase: 'idle' });
     }
   }
@@ -230,100 +239,126 @@ function RestoreControl({
       await onUnsuppress(id);
       await attemptRestore();
     } catch {
+      setFailure('Could not stop ignoring this title. Nothing was restored.');
+      setPrompt(null);
       setState({ phase: 'idle' });
     }
   }
 
-  if (state.phase === 'idle') {
+  if (state.phase !== 'already-active') {
     return (
       <>
         <Button
           variant="secondary"
           data-testid="restore-button"
-          disabled={offline}
-          onClick={() => void attemptRestore()}
+          ref={trigger}
+          disabled={offline || state.phase === 'submitting'}
+          onClick={(event) => {
+            event.currentTarget.focus({ preventScroll: true });
+            void attemptRestore();
+          }}
         >
           {RESTORE_LABEL}
         </Button>
-        {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
+        {offline && prompt === null && state.phase !== 'submitting' && (
+          <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>
+        )}
+        {failure !== null && <p role="alert">{failure}</p>}
+        {state.phase === 'submitting' && prompt === null && (
+          <span
+            className="removed-row__restoring"
+            data-testid="restore-submitting"
+            aria-busy="true"
+          >
+            {RESTORE_SUBMITTING_LABEL}
+          </span>
+        )}
+        {prompt !== null && (
+          <Dialog
+            returnFocus={trigger}
+            aria-labelledby={headingId}
+            data-testid={
+              prompt === 'duplicate' ? 'restore-duplicate-dialog' : 'restore-suppressed-dialog'
+            }
+            onDismiss={() => {
+              if (state.phase === 'submitting') return;
+              setPrompt(null);
+              setState({ phase: 'idle' });
+            }}
+          >
+            <h2 id={headingId}>
+              {prompt === 'duplicate' ? 'Restore another copy?' : 'Stop ignoring and restore?'}
+            </h2>
+            <p>
+              {withName(
+                prompt === 'duplicate' ? RESTORE_DUPLICATE_BODY : RESTORE_SUPPRESSED_BODY,
+                item.name,
+              )}
+            </p>
+            {offline && <p className="offline-reason">{OFFLINE_DISABLED_REASON}</p>}
+            {state.phase === 'submitting' && (
+              <p role="status" data-testid="restore-submitting">
+                {RESTORE_SUBMITTING_LABEL}
+              </p>
+            )}
+            {prompt === 'suppressed' &&
+              state.unsuppressId === undefined &&
+              state.phase !== 'submitting' && (
+                <p role="alert">
+                  Open Not interested to stop ignoring this title, then return here to restore it.
+                </p>
+              )}
+            <Button
+              variant="secondary"
+              data-testid={
+                prompt === 'duplicate' ? 'restore-keep-both' : 'restore-unsuppress-action'
+              }
+              disabled={
+                offline ||
+                state.phase === 'submitting' ||
+                (prompt === 'suppressed' && state.unsuppressId === undefined)
+              }
+              onClick={() => {
+                if (prompt === 'duplicate') void attemptRestore(true);
+                else void doUnsuppressAndRetry();
+              }}
+            >
+              {prompt === 'duplicate' ? RESTORE_DUPLICATE_KEEP_BOTH : RESTORE_SUPPRESSED_ACTION}
+            </Button>
+            <Button
+              variant="secondary"
+              data-dialog-initial-focus
+              disabled={state.phase === 'submitting'}
+              data-testid={
+                prompt === 'duplicate' ? 'restore-duplicate-cancel' : 'restore-suppressed-cancel'
+              }
+              onClick={() => {
+                setPrompt(null);
+                setState({ phase: 'idle' });
+              }}
+            >
+              {prompt === 'duplicate' ? RESTORE_DUPLICATE_CANCEL : RESTORE_SUPPRESSED_CANCEL}
+            </Button>
+          </Dialog>
+        )}
       </>
     );
   }
 
-  if (state.phase === 'submitting') {
-    return (
-      <span className="removed-row__restoring" data-testid="restore-submitting" aria-busy="true">
-        {RESTORE_SUBMITTING_LABEL}
-      </span>
-    );
-  }
-
-  if (state.phase === 'confirm-duplicate') {
-    return (
-      <div data-testid="restore-duplicate-dialog" role="alertdialog">
-        <p>{withName(RESTORE_DUPLICATE_BODY, item.name)}</p>
-        <Button
-          variant="secondary"
-          data-testid="restore-keep-both"
-          disabled={offline}
-          onClick={() => void attemptRestore(true)}
-        >
-          {RESTORE_DUPLICATE_KEEP_BOTH}
-        </Button>
-        {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
-        <Button
-          variant="secondary"
-          data-testid="restore-duplicate-cancel"
-          onClick={() => setState({ phase: 'idle' })}
-        >
-          {RESTORE_DUPLICATE_CANCEL}
-        </Button>
-      </div>
-    );
-  }
-
-  if (state.phase === 'unsuppress-first') {
-    return (
-      <div data-testid="restore-suppressed-dialog" role="alertdialog">
-        <p>{withName(RESTORE_SUPPRESSED_BODY, item.name)}</p>
-        <Button
-          variant="secondary"
-          data-testid="restore-unsuppress-action"
-          disabled={offline}
-          onClick={() => void doUnsuppressAndRetry()}
-        >
-          {RESTORE_SUPPRESSED_ACTION}
-        </Button>
-        {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
-        <Button
-          variant="secondary"
-          data-testid="restore-suppressed-cancel"
-          onClick={() => setState({ phase: 'idle' })}
-        >
-          {RESTORE_SUPPRESSED_CANCEL}
-        </Button>
-      </div>
-    );
-  }
-
-  if (state.phase === 'already-active') {
-    return (
-      <div data-testid="restore-already-active" role="alert">
-        <p>{withName(RESTORE_ALREADY_ACTIVE, item.name)}</p>
-        <Button
-          variant="secondary"
-          data-testid="restore-refresh"
-          disabled={offline}
-          onClick={() => window.location.reload()}
-        >
-          {RESTORE_ALREADY_ACTIVE_REFRESH}
-        </Button>
-        {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
-      </div>
-    );
-  }
-
-  return null;
+  return (
+    <div data-testid="restore-already-active" role="alert">
+      <p>{withName(RESTORE_ALREADY_ACTIVE, item.name)}</p>
+      <Button
+        variant="secondary"
+        data-testid="restore-refresh"
+        disabled={offline}
+        onClick={() => window.location.reload()}
+      >
+        {RESTORE_ALREADY_ACTIVE_REFRESH}
+      </Button>
+      {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
+    </div>
+  );
 }
 
 function RemovedRow({

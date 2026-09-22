@@ -119,7 +119,12 @@ export function RemoveTitleDialog({
   }, [onRowState, removedListingIds, restoreListing]);
 
   return (
-    <Dialog onDismiss={onClose} aria-labelledby={headingId}>
+    <Dialog
+      onDismiss={() => {
+        if (phase !== 'submitting' && phase !== 'undoing') onClose();
+      }}
+      aria-labelledby={headingId}
+    >
       <h2 id={headingId}>{ROW_MENU_REMOVE_LABEL}</h2>
 
       {(phase === 'confirm' || phase === 'submitting') && (
@@ -168,7 +173,7 @@ export function RemoveTitleDialog({
       )}
 
       {phase !== 'submitting' && phase !== 'undoing' && (
-        <Button variant="secondary" onClick={onClose}>
+        <Button variant="secondary" data-dialog-initial-focus onClick={onClose}>
           {phase === 'confirm' ? 'Cancel' : 'Close'}
         </Button>
       )}

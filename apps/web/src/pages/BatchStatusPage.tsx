@@ -29,7 +29,7 @@
  * container's job; this file renders a state and nothing else.
  */
 
-import { useState, type JSX } from 'react';
+import { useId, useState, type JSX } from 'react';
 import { Link } from 'react-router-dom';
 
 import { DEGRADED_EXTRACTION_BANNER } from '@nextup/domain';
@@ -56,6 +56,7 @@ import {
 import type { BatchImage, BatchStatus, BatchTitleRef } from '../lib/apiClient';
 import { Button } from '../components/ui/Button';
 import { Fieldset } from '../components/ui/Fieldset';
+import { Dialog } from '../components/ui/Dialog';
 import { RejectionList, mergeRejections } from '../components/RejectionList';
 
 export interface BatchStatusPageProps {
@@ -180,7 +181,13 @@ function ExtractionError({
       <div role="alert" data-testid="batch-status-error">
         <p data-testid="batch-status-error-message">{STATUS_ERROR_PURGED}</p>
         {onUploadNew !== undefined && (
-          <Button variant="primary" onClick={onUploadNew}>
+          <Button
+            variant="primary"
+            onClick={(event) => {
+              event.currentTarget.focus({ preventScroll: true });
+              onUploadNew();
+            }}
+          >
             {STATUS_PURGED_ACTION_LABEL}
           </Button>
         )}
@@ -204,7 +211,13 @@ function ExtractionError({
             §5.6 is transient — the service is merely busy, the batch is still
             good, and offering to destroy it there would be wrong. */}
         {!unavailable && onDiscard !== undefined && (
-          <Button variant="secondary" onClick={onDiscard}>
+          <Button
+            variant="secondary"
+            onClick={(event) => {
+              event.currentTarget.focus({ preventScroll: true });
+              onDiscard();
+            }}
+          >
             {STATUS_DISCARD_BATCH_LABEL}
           </Button>
         )}
@@ -317,6 +330,7 @@ export function BatchStatusPage({
   onUploadNew,
 }: BatchStatusPageProps): JSX.Element {
   const [confirmAction, setConfirmAction] = useState<'discard' | 'replace' | null>(null);
+  const confirmHeading = useId();
   const readError = loadFailed ? (
     <div role="alert" data-testid="batch-status-load-error">
       {loadErrorMessage !== null && <p>{loadErrorMessage}</p>}
@@ -415,7 +429,7 @@ export function BatchStatusPage({
         </p>
       )}
 
-      {actionError !== null && <p role="alert">{actionError}</p>}
+      {actionError !== null && confirmAction === null && <p role="alert">{actionError}</p>}
       <Fieldset legend="Extraction actions" hideLegend disabled={busy || offline || loadFailed}>
         {batch.status === 'extraction-failed' && batch.extractionError !== null ? (
           <ExtractionError
@@ -458,28 +472,37 @@ export function BatchStatusPage({
             {showsProvenance(batch) && <ProvenancePanels batch={batch} />}
           </>
         )}
-        {confirmAction !== null && (
-          <div className="batch-status__banner">
-            <p>Discard this batch? Your list will not change.</p>
-            <div className="batch-status__actions">
-              <Button variant="secondary" onClick={() => setConfirmAction(null)}>
-                Keep batch
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  if (confirmAction === 'replace') onUploadNew?.();
-                  else onDiscard?.();
-                  setConfirmAction(null);
-                }}
-              >
-                Discard batch and continue
-              </Button>
-            </div>
-          </div>
-        )}
       </Fieldset>
-      {busy && <p role="status">Saving your request…</p>}
+      {confirmAction !== null && !terminal && (
+        <Dialog
+          aria-labelledby={confirmHeading}
+          onDismiss={() => {
+            if (!busy) setConfirmAction(null);
+          }}
+        >
+          <h2 id={confirmHeading}>Discard this batch?</h2>
+          <p>Your list will not change.</p>
+          {actionError !== null && <p role="alert">{actionError}</p>}
+          {busy && <p role="status">Saving your request…</p>}
+          {offline && <p>{STATUS_OFFLINE}</p>}
+          <div className="batch-status__actions">
+            <Button variant="secondary" disabled={busy} onClick={() => setConfirmAction(null)}>
+              Keep batch
+            </Button>
+            <Button
+              variant="primary"
+              disabled={busy || offline || loadFailed}
+              onClick={() => {
+                if (confirmAction === 'replace') onUploadNew?.();
+                else onDiscard?.();
+              }}
+            >
+              Discard batch and continue
+            </Button>
+          </div>
+        </Dialog>
+      )}
+      {busy && confirmAction === null && <p role="status">Saving your request…</p>}
       {inProgress && batch.progress !== undefined && batch.progress.imagesTotal > 0 && (
         <progress
           className="capture-status__meter"

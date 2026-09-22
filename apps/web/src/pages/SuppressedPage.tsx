@@ -16,7 +16,7 @@
 // and a future screenshot that reads the title slightly differently would
 // produce a new row and bypass it.
 
-import { useState, type JSX } from 'react';
+import { useId, useState, type JSX } from 'react';
 import { Link } from 'react-router-dom';
 
 import {
@@ -34,6 +34,7 @@ import type { SuppressionItem } from '../lib/apiClient';
 import { TMDB_IMAGE_BASE } from '../components/TitleRow';
 import { useOnline } from '../lib/useOnline';
 import { Button } from '../components/ui/Button';
+import { Dialog } from '../components/ui/Dialog';
 
 export interface SuppressedPageProps {
   readonly items?: readonly SuppressionItem[];
@@ -62,6 +63,7 @@ function SuppressionRow({
   offline: boolean;
 }): JSX.Element {
   const [rowState, setRowState] = useState<RowState>({ phase: 'idle' });
+  const headingId = useId();
   const { displaySnapshot, identityStability, suppressionId } = item;
   const name = displaySnapshot.name;
   const year = displaySnapshot.releaseYear;
@@ -104,61 +106,67 @@ function SuppressionRow({
           <p data-testid="suppressed-caveat">{UNMATCHED_SUPPRESSION_CAVEAT}</p>
         )}
 
-        {rowState.phase === 'idle' && (
+        {rowState.phase !== 'done' && (
           <Button
             variant="secondary"
             data-testid="stop-ignoring-button"
-            disabled={offline}
-            onClick={() => setRowState({ phase: 'confirming' })}
+            disabled={offline || rowState.phase === 'submitting'}
+            onClick={(event) => {
+              event.currentTarget.focus({ preventScroll: true });
+              setRowState({ phase: 'confirming' });
+            }}
           >
             Stop ignoring
           </Button>
         )}
 
-        {rowState.phase === 'confirming' && (
-          <div data-testid="unsuppress-confirm">
+        {(rowState.phase === 'confirming' ||
+          rowState.phase === 'submitting' ||
+          rowState.phase === 'error') && (
+          <Dialog
+            data-testid="unsuppress-confirm"
+            aria-labelledby={headingId}
+            onDismiss={() => {
+              if (rowState.phase !== 'submitting') setRowState({ phase: 'idle' });
+            }}
+          >
+            <h2 id={headingId}>Stop ignoring this title?</h2>
             <p data-testid="unsuppress-confirm-body">{withName(UNSUPPRESS_CONFIRM_BODY, name)}</p>
+            {rowState.phase === 'error' && (
+              <p role="alert" data-testid="unsuppress-error">
+                {`Couldn\u2019t remove \u201c${name}\u201d from Not interested. Nothing has changed.`}
+              </p>
+            )}
+            {offline && rowState.phase !== 'submitting' && (
+              <p className="offline-reason">{OFFLINE_DISABLED_REASON}</p>
+            )}
+            {rowState.phase === 'submitting' && (
+              <p role="status" data-testid="unsuppress-submitting">
+                Removing…
+              </p>
+            )}
             <Button
               variant="secondary"
               data-testid="unsuppress-confirm-button"
-              disabled={offline}
+              disabled={offline || rowState.phase === 'submitting'}
               onClick={confirm}
             >
-              Stop ignoring
+              {rowState.phase === 'error' ? 'Try again' : 'Stop ignoring'}
             </Button>
             <Button
               variant="secondary"
               data-testid="unsuppress-cancel-button"
+              data-dialog-initial-focus
+              disabled={rowState.phase === 'submitting'}
               onClick={() => setRowState({ phase: 'idle' })}
             >
               Cancel
             </Button>
-          </div>
+          </Dialog>
         )}
 
-        {offline && rowState.phase !== 'submitting' && (
+        {offline && rowState.phase === 'idle' && (
           <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>
-        )}
-
-        {rowState.phase === 'submitting' && (
-          <Button variant="secondary" data-testid="unsuppress-submitting" disabled>
-            Removing…
-          </Button>
-        )}
-
-        {rowState.phase === 'error' && (
-          <>
-            <p role="alert" data-testid="unsuppress-error">
-              {`Couldn\u2019t remove \u201c${name}\u201d from Not interested. Nothing has changed.`}
-            </p>
-            <Button
-              variant="secondary"
-              data-testid="stop-ignoring-button"
-              onClick={() => setRowState({ phase: 'confirming' })}
-            >
-              Try again
-            </Button>
-          </>
         )}
       </div>
     </li>

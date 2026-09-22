@@ -1,11 +1,11 @@
-import { useLayoutEffect, type HTMLAttributes } from 'react';
+import { useLayoutEffect, type HTMLAttributes, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useDialogFocus } from '../../lib/useDialogFocus';
 
 type DialogVariant = 'default' | 'removal' | 'overlay' | 'panel';
 const DIALOG_CLASS: Record<DialogVariant, string> = {
-  default: 'dialog',
-  removal: 'dialog removal-confirm',
+  default: 'dialog dialog--overlay',
+  removal: 'dialog dialog--overlay removal-confirm',
   overlay: 'dialog dialog--overlay',
   panel: 'dialog dialog--panel',
 };
@@ -17,33 +17,35 @@ const DIALOG_CLASS: Record<DialogVariant, string> = {
  * sheet below it). Giving it its own portal/scroll code would be a second
  * implementation of `T-UI-031f`'s contract that no test is watching.
  */
-const PORTALED: Readonly<Record<DialogVariant, boolean>> = {
-  default: false,
-  removal: false,
-  overlay: true,
-  panel: true,
-};
-
 interface DialogProps extends Omit<HTMLAttributes<HTMLDivElement>, 'className'> {
   onDismiss: () => void;
   variant?: DialogVariant;
+  returnFocus?: RefObject<HTMLElement | null>;
   'aria-labelledby': string;
 }
 
-export function Dialog({ onDismiss, variant = 'default', ...props }: DialogProps) {
-  const ref = useDialogFocus(onDismiss);
+export function Dialog({ onDismiss, variant = 'default', returnFocus, ...props }: DialogProps) {
+  const ref = useDialogFocus(onDismiss, returnFocus);
   useLayoutEffect(() => {
-    if (!PORTALED[variant]) return;
     const root = document.documentElement;
     const { overflow, scrollbarGutter } = root.style;
     const hasScrollbarSpace = window.innerWidth > root.clientWidth;
     root.style.overflow = 'hidden';
     if (hasScrollbarSpace) root.style.scrollbarGutter = 'stable';
+    const background = [...document.body.children].filter(
+      (element): element is HTMLElement =>
+        element instanceof HTMLElement && !element.contains(ref.current),
+    );
+    const inert = background.map((element) => element.hasAttribute('inert'));
+    background.forEach((element) => element.setAttribute('inert', ''));
     return () => {
       root.style.overflow = overflow;
       root.style.scrollbarGutter = scrollbarGutter;
+      background.forEach((element, index) => {
+        if (!inert[index]) element.removeAttribute('inert');
+      });
     };
-  }, [variant]);
+  }, [ref]);
   const dialog = (
     <div
       {...props}
@@ -54,17 +56,15 @@ export function Dialog({ onDismiss, variant = 'default', ...props }: DialogProps
       aria-modal="true"
     />
   );
-  return PORTALED[variant]
-    ? createPortal(
-        <div
-          className="dialog-backdrop"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) onDismiss();
-          }}
-        >
-          {dialog}
-        </div>,
-        document.body,
-      )
-    : dialog;
+  return createPortal(
+    <div
+      className="dialog-backdrop"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onDismiss();
+      }}
+    >
+      {dialog}
+    </div>,
+    document.body,
+  );
 }

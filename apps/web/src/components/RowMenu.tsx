@@ -67,6 +67,7 @@ export function RowMenu({
 }: RowMenuProps): JSX.Element {
   const firstItem = useRef<HTMLButtonElement>(null);
   const cancelItem = useRef<HTMLButtonElement>(null);
+  const trigger = useRef<HTMLElement | null>(null);
 
   // The menu opens in response to a keyboard or pointer activation, so focus
   // has to follow it: leaving focus on the `⋮` behind an open menu strands a
@@ -77,8 +78,22 @@ export function RowMenu({
   // precise stranding this effect exists to prevent, so the fallback is
   // **Cancel**: the one item that is still live.
   useEffect(() => {
+    if (trigger.current === null && document.activeElement instanceof HTMLElement)
+      trigger.current = document.activeElement;
     (offline ? cancelItem : firstItem).current?.focus();
   }, [offline]);
+
+  const returnFocus = (): void => {
+    trigger.current?.focus({ preventScroll: true });
+  };
+  const dismiss = (): void => {
+    returnFocus();
+    onDismiss();
+  };
+  const choose = (choice: RowMenuChoice): void => {
+    returnFocus();
+    onChoose(choice);
+  };
 
   return (
     <div
@@ -87,7 +102,7 @@ export function RowMenu({
       data-testid="row-menu-popup"
       aria-label={`Actions for ${item.name}`}
       onKeyDown={(event) => {
-        if (event.key === 'Escape') onDismiss();
+        if (event.key === 'Escape') dismiss();
       }}
     >
       <Button
@@ -97,7 +112,7 @@ export function RowMenu({
         data-testid="row-menu-suppress"
         disabled={offline}
         onClick={() => {
-          onChoose('suppress');
+          choose('suppress');
         }}
       >
         {ROW_MENU_SUPPRESS_LABEL}
@@ -108,7 +123,7 @@ export function RowMenu({
         data-testid="row-menu-fix-match"
         disabled={offline}
         onClick={() => {
-          onChoose('fix-match');
+          choose('fix-match');
         }}
       >
         {ROW_MENU_FIX_MATCH_LABEL}
@@ -136,7 +151,7 @@ export function RowMenu({
           data-testid="row-menu-remove"
           disabled={offline}
           onClick={() => {
-            onChoose('remove');
+            choose('remove');
           }}
         >
           {ROW_MENU_REMOVE_LABEL}
@@ -152,7 +167,7 @@ export function RowMenu({
         role="menuitem"
         ref={cancelItem}
         data-testid="row-menu-cancel"
-        onClick={onDismiss}
+        onClick={dismiss}
       >
         {ROW_MENU_CANCEL_LABEL}
       </Button>

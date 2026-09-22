@@ -8,6 +8,31 @@ sourceOfTruth: docs/PRD.md §9, docs/architecture.md
 
 # specs/ui.md — nextup screens
 
+## Modal context contract (owner correction, 2026-09-21)
+
+Remove from list, Not interested, Add title, Fix match, Stop ignoring, restore
+duplicate/suppression conflicts, and extraction discard/replace confirmations
+use the shared `Dialog` viewport overlay, never an inline page-bottom form.
+Every variant portals outside page layout, locks page scroll, makes the
+background inert, traps focus and has an accessible heading. Long content
+scrolls inside a viewport-bounded surface. Cancel is the initial focus for
+destructive confirmations; Escape/backdrop mean cancel, never confirm.
+Pending writes/undo cannot be dismissed. Failures remain visible.
+
+Opening and cancelling preserve list scroll; closing returns focus without
+scrolling to the invoking control. A menu-to-dialog handoff returns through
+the stable row action trigger. If the action removed that row, focus moves to
+a surviving neighbour or the page heading instead of the document body.
+Portals must not accidentally remove inherited offline/pending restrictions.
+
+Filters/Sort stay in their existing responsive sheet/panel. Watch preferences,
+final Apply, unfinished-capture discard, draft discard, leave-capture and
+read-again confirmations retain their overlays and existing consent rules.
+Upload, extraction status, review, capture history, and undo-refusal repair
+remain full pages. Review candidate choices/search, manual candidate entry,
+progress, errors and result/Undo notices remain inline: they need surrounding
+evidence or describe an outcome, not a second interruption.
+
 **Expanded service contract (US-061 / REQ-127, 2026-09-17).** Upload, manual add,
 filtering, badges, review, batch/removal history, waiting availability and factual
 service-update labels derive from the same eight-service `SERVICES` /

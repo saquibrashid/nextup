@@ -234,7 +234,12 @@ export function FixMatchDialog({
   }, [submit]);
 
   return (
-    <Dialog onDismiss={onClose} aria-labelledby={headingId}>
+    <Dialog
+      onDismiss={() => {
+        if (phase !== 'submitting') onClose();
+      }}
+      aria-labelledby={headingId}
+    >
       <h2 id={headingId}>Fix match</h2>
 
       {/* ── Search phase ─────────────────────────────────────────────────── */}

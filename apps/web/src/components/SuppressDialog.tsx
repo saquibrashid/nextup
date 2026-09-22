@@ -156,7 +156,12 @@ export function SuppressDialog({
   );
 
   return (
-    <Dialog onDismiss={onClose} aria-labelledby={headingId}>
+    <Dialog
+      onDismiss={() => {
+        if (phase !== 'submitting' && phase !== 'undoing') onClose();
+      }}
+      aria-labelledby={headingId}
+    >
       <h2 id={headingId}>Not interested</h2>
 
       {(phase === 'confirm' || phase === 'submitting' || phase === 'error') && (
@@ -212,7 +217,12 @@ export function SuppressDialog({
         </Button>
       )}
 
-      <Button variant="secondary" onClick={onClose}>
+      <Button
+        variant="secondary"
+        data-dialog-initial-focus
+        disabled={phase === 'submitting' || phase === 'undoing'}
+        onClick={onClose}
+      >
         {phase === 'confirm' || phase === 'error' ? 'Cancel' : 'Close'}
       </Button>
     </Dialog>

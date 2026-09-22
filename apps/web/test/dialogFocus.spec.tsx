@@ -180,7 +180,7 @@ describe('T-A11Y-006 dialogs trap focus, restore it, and close on Escape', () =>
     // TASK-210 centralises the hook rather than deleting the focus contract.
     expect(consumers.length).toBeGreaterThanOrEqual(5);
     const primitive = readFileSync(join(COMPONENTS, 'ui', 'Dialog.tsx'), 'utf8');
-    expect(primitive).toContain('useDialogFocus(onDismiss)');
+    expect(primitive).toContain('useDialogFocus(onDismiss, returnFocus)');
     expect(primitive).toContain('ref={ref}');
     expect(primitive).toContain('tabIndex={-1}');
     expect(primitive).toContain('aria-modal="true"');

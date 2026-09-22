@@ -193,7 +193,12 @@ export function AddTitleDialog({
     phase === 'search-unavailable';
 
   return (
-    <Dialog onDismiss={onClose} aria-labelledby={headingId}>
+    <Dialog
+      onDismiss={() => {
+        if (phase !== 'submitting') onClose();
+      }}
+      aria-labelledby={headingId}
+    >
       <h2 id={headingId}>{ADD_TITLE_HEADING}</h2>
 
       {searching && (

@@ -33,7 +33,7 @@
  * reach.
  */
 
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -59,6 +59,48 @@ import {
 import type { BatchImage, BatchStatus } from '../src/lib/apiClient';
 
 afterEach(cleanup);
+
+describe('T-MOD-004 extraction recovery confirmations', () => {
+  it.each(['discard', 'replace'] as const)(
+    'T-MOD-004: extraction %s is modal, retains errors and blocks dismissal while saving',
+    async (action) => {
+      const user = userEvent.setup();
+      const onDiscard = vi.fn();
+      const failedBatch = batch({
+        extractionError: action === 'discard' ? 'EXTRACTOR_ERROR' : 'IMAGES_PURGED',
+      });
+      const props = { batch: failedBatch, onDiscard, onUploadNew: onDiscard };
+      const { rerender } = render(<BatchStatusPage {...props} />);
+      const trigger = screen.getByRole('button', {
+        name: action === 'discard' ? STATUS_DISCARD_BATCH_LABEL : STATUS_PURGED_ACTION_LABEL,
+      });
+      await user.click(trigger);
+      const modal = screen.getByRole('dialog', { name: 'Discard this batch?' });
+      expect(modal).toHaveClass('dialog--overlay');
+      expect(within(modal).getByRole('button', { name: 'Keep batch' })).toHaveFocus();
+      await user.keyboard('{Escape}');
+      expect(trigger).toHaveFocus();
+      expect(onDiscard).not.toHaveBeenCalled();
+      await user.click(trigger);
+      await user.click(screen.getByRole('button', { name: 'Discard batch and continue' }));
+      expect(onDiscard).toHaveBeenCalledOnce();
+      rerender(<BatchStatusPage {...props} busy />);
+      await user.keyboard('{Escape}');
+      fireEvent.click(screen.getByRole('dialog').parentElement!);
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Keep batch' })).toBeDisabled();
+      rerender(
+        <BatchStatusPage {...props} actionError="The save could not be confirmed." offline />,
+      );
+      expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent(
+        'The save could not be confirmed.',
+      );
+      expect(screen.getByRole('button', { name: 'Discard batch and continue' })).toBeDisabled();
+      await user.click(screen.getByRole('button', { name: 'Keep batch' }));
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    },
+  );
+});
 
 function image(overrides: Partial<BatchImage> = {}): BatchImage {
   return {

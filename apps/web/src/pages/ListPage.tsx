@@ -288,7 +288,8 @@ export function ListPage({
               variant="secondary"
               data-testid="add-title-open"
               disabled={offline}
-              onClick={() => {
+              onClick={(event) => {
+                event.currentTarget.focus({ preventScroll: true });
                 setDialog({ kind: 'add' });
               }}
             >
