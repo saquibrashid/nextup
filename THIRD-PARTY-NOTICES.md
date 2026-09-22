@@ -120,7 +120,7 @@ so they do not relicense this work — but their notices must be retained.
 | `buffer-equal-constant-time` | 1.0.1 | BSD-3-Clause |
 | `buffer-from` | 1.1.2 | MIT |
 | `bundle-name` | 4.1.0 | MIT |
-| `busboy` | 1.6.0 | MIT |
+| `busboy` | 1.6.0 | UNKNOWN |
 | `bytes` | 3.1.2 | MIT |
 | `c12` | 3.1.0 | MIT |
 | `call-bind-apply-helpers` | 1.0.2 | MIT |
@@ -250,8 +250,8 @@ so they do not relicense this work — but their notices must be retained.
 | `range-parser` | 1.3.0 | MIT |
 | `raw-body` | 3.0.2 | MIT |
 | `rc9` | 2.1.2 | MIT |
-| `react` | 19.2.8 | MIT |
-| `react-dom` | 19.2.8 | MIT |
+| `react` | 19.3.0 | MIT |
+| `react-dom` | 19.3.0 | MIT |
 | `react-router` | 7.18.3 | MIT |
 | `react-router-dom` | 7.18.3 | MIT |
 | `readable-stream` | 3.6.2 | MIT |
@@ -262,7 +262,7 @@ so they do not relicense this work — but their notices must be retained.
 | `run-applescript` | 7.1.0 | MIT |
 | `safe-buffer` | 5.2.1 | MIT |
 | `safer-buffer` | 2.1.2 | MIT |
-| `scheduler` | 0.27.0 | MIT |
+| `scheduler` | 0.28.0 | MIT |
 | `semver` | 7.8.5 | ISC |
 | `send` | 1.2.1 | MIT |
 | `serve-static` | 2.2.1 | MIT |
@@ -276,7 +276,7 @@ so they do not relicense this work — but their notices must be retained.
 | `source-map-js` | 1.2.1 | BSD-3-Clause |
 | `sprintf-js` | 1.1.3 | BSD-3-Clause |
 | `statuses` | 2.0.2 | MIT |
-| `streamsearch` | 1.1.0 | MIT |
+| `streamsearch` | 1.1.0 | UNKNOWN |
 | `string_decoder` | 1.3.0 | MIT |
 | `strnum` | 2.4.1 | MIT |
 | `tarn` | 3.1.2 | MIT |
