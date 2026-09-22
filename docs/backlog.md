@@ -692,7 +692,19 @@ finished, so the exception cannot outlive its reason.
 | `TASK-233` | `done` | #326: browse-first filter/sort row with Compact/Grid and compact Search below. Labelled disclosure focuses input; active query remains named and clearable when collapsed. Explicit submit, cursor reset, focus-preserving clear, Escape/draft dismissal and history reveal retain URL semantics. `T-LIB-002a`–`d`; responsive geometry, accessibility and existing search/navigation regressions. Separate dependent PR; no API, dependency or infrastructure change. |
 | `TASK-234` | `done` | All shared dialogs use viewport portals, scroll lock and inert backgrounds. Library actions, Stop ignoring, restore conflicts and extraction discard/replace preserve consent, pending writes, visible failures, undo and no-scroll focus return. Long workflows and candidate editing stay in context. `T-MOD-001`–`004` cover component guards and responsive Chromium/WebKit geometry, long content, focus, scroll and accessibility. No API, migration, dependency or infrastructure changes. |
 | `TASK-235` | `done` | Capture-status banners reserve a 16px gap above library headings/actions at phone, tablet and desktop widths. Validated Grid/Compact memory uses the existing browsing boundary and a separate browser-local layout key, preserving query/history, loaded rows and request semantics; invalid/blocked storage is disclosed. `T-LIB-003`, `T-LIB-004`; existing layout, search and browsing continuity regressions. No API, dependency or infrastructure changes. |
+| `TASK-236` | `done` | Visual-only premium refinement: shared noninteractive capture orientation; restrained surfaces, step and preview grouping; year/type/warning/evidence review hierarchy and desktop decision columns; consistent larger grid artwork with unchanged compact density. `T-POL-001`, `T-POL-002`, `T-POL-003` plus capture, review, virtualization, accessibility and remembered-browsing regressions. No API, schema, dependency or infrastructure change; no automatic confirmation or stage skipping. |
 <!-- STATUS-LEDGER:END -->
+
+### Approved premium visual refinement
+
+Presentation only: a shared capture-stage indicator, calmer surfaces and spacing,
+clearer evidence/decision hierarchy, and consistent catalog framing. Preserve all
+capture safeguards, accessibility, query/layout memory and existing actions.
+The measurable contract is `specs/ui-refresh.md` §2.2.
+
+| Task | Work | Size | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| TASK-236 | Polish upload, extraction, review and library presentation without changing functionality. | 1 agent-run + 15 owner-review-minutes | TASK-235 | `T-POL-001`, `T-POL-002`, `T-POL-003`; existing capture, review, library and accessibility regressions |
 
 ### Approved library header and layout follow-up, 2026-09-22
 

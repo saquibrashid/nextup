@@ -55,6 +55,7 @@ import {
 } from '../copy';
 import type { BatchImage, BatchStatus, BatchTitleRef } from '../lib/apiClient';
 import { Button } from '../components/ui/Button';
+import { CaptureProgress } from '../components/CaptureProgress';
 import { Fieldset } from '../components/ui/Fieldset';
 import { Dialog } from '../components/ui/Dialog';
 import { RejectionList, mergeRejections } from '../components/RejectionList';
@@ -377,6 +378,7 @@ export function BatchStatusPage({
   return (
     <section className="capture-status">
       <header className="capture-status__header">
+        {(inProgress || batch.status === 'extraction-failed') && <CaptureProgress stage="read" />}
         <p className="capture-status__eyebrow">
           {terminal ? 'Capture / Saved status' : 'Capture / Read screenshots'}
         </p>

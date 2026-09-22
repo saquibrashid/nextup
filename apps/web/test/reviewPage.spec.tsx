@@ -92,6 +92,38 @@ function review(overrides: Partial<BuildReviewInput> = {}) {
 
 /* -------------------------------------------------------------------------- */
 
+describe('T-POL-002 review evidence hierarchy', () => {
+  it('T-POL-002a: year/type precede real warnings and labelled original text remains intact', () => {
+    const reading = 'THE MATRlX - unabridged screenshot evidence';
+    render(
+      <ReviewPage
+        review={review({
+          candidates: [candidate({ rawText: reading, match: match({ uncertain: true }) })],
+        })}
+      />,
+    );
+    expect(screen.getByTestId('candidate-meta')).toHaveTextContent('1999 · Film');
+    const warning = screen.getByTestId('candidate-chip');
+    const consequence = screen.getByTestId('candidate-consequence');
+    const raw = screen.getByTestId('candidate-raw-text');
+    expect(screen.getByTestId('candidate-meta').compareDocumentPosition(warning)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
+    expect(warning.compareDocumentPosition(consequence)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(consequence.compareDocumentPosition(raw)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(raw.textContent).toBe(reading);
+    expect(raw.parentElement).toHaveTextContent('Read from screenshot');
+    expect(screen.queryByText(/\d+%/)).not.toBeInTheDocument();
+  });
+
+  it('T-POL-002b: a clean match does not acquire a synthetic confidence badge', () => {
+    render(<ReviewPage review={review()} />);
+    expect(screen.queryByTestId('candidate-chip')).not.toBeInTheDocument();
+    expect(screen.getByTestId('candidate-meta')).toHaveTextContent('1999 · Film');
+    expect(screen.getByTestId('candidate-raw-text').textContent).toBe('THE MATRIX');
+  });
+});
+
 describe('T-REV-013 · specs/ui.md §5.3 · an addition card shows poster, name, year and type', () => {
   it('T-REV-013a: the resolved name is rendered', () => {
     render(<ReviewPage review={review()} />);

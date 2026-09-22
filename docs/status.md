@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 230 |
+| ✅ done | 231 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **233** |
+| **total** | **234** |
 
 ## Ready to start
 
@@ -271,3 +271,4 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-233` | #326: browse-first filter/sort row with Compact/Grid and compact Search below. Labelled disclosure focuses input; active query remains named and clearable when collapsed. Explicit submit, cursor reset, focus-preserving clear, Escape/draft dismissal and history reveal retain URL semantics. `T-LIB-002a`–`d`; responsive geometry, accessibility and existing search/navigation regressions. Separate dependent PR; no API, dependency or infrastructure change. | `T-LIB-002` |
 | `TASK-234` | All shared dialogs use viewport portals, scroll lock and inert backgrounds. Library actions, Stop ignoring, restore conflicts and extraction discard/replace preserve consent, pending writes, visible failures, undo and no-scroll focus return. Long workflows and candidate editing stay in context. `T-MOD-001`–`004` cover component guards and responsive Chromium/WebKit geometry, long content, focus, scroll and accessibility. No API, migration, dependency or infrastructure changes. | `T-MOD-001`, `T-MOD-002`, `T-MOD-003`, `T-MOD-004` |
 | `TASK-235` | Capture-status banners reserve a 16px gap above library headings/actions at phone, tablet and desktop widths. Validated Grid/Compact memory uses the existing browsing boundary and a separate browser-local layout key, preserving query/history, loaded rows and request semantics; invalid/blocked storage is disclosed. `T-LIB-003`, `T-LIB-004`; existing layout, search and browsing continuity regressions. No API, dependency or infrastructure changes. | `T-LIB-003`, `T-LIB-004` |
+| `TASK-236` | Visual-only premium refinement: shared noninteractive capture orientation; restrained surfaces, step and preview grouping; year/type/warning/evidence review hierarchy and desktop decision columns; consistent larger grid artwork with unchanged compact density. `T-POL-001`, `T-POL-002`, `T-POL-003` plus capture, review, virtualization, accessibility and remembered-browsing regressions. No API, schema, dependency or infrastructure change; no automatic confirmation or stage skipping. | `T-POL-001`, `T-POL-002`, `T-POL-003` |

@@ -80,6 +80,7 @@ import {
 } from '../copy';
 import { OFFLINE_DISABLED_REASON } from '../copy';
 import { Button } from '../components/ui/Button';
+import { CaptureProgress } from '../components/CaptureProgress';
 import { Fieldset } from '../components/ui/Fieldset';
 
 export interface ReviewPageProps {
@@ -356,6 +357,7 @@ function CandidateSection({
 function ReviewHeading({ subtitle }: { readonly subtitle: string | null }): JSX.Element {
   return (
     <div className="review-heading" data-testid="review-heading">
+      <CaptureProgress stage="review" />
       <h1>{REVIEW_TITLE}</h1>
       {subtitle !== null && (
         <p className="review-heading__context" data-testid="review-context">
