@@ -35,6 +35,7 @@ import { IMDB_SWEEP_BUDGET_MS, IMDB_SWEEP_PER_REQUEST } from '../services/imdbRa
 import {
   countRuntimeUnknown,
   findTitleDetail,
+  findActiveSuppression,
   listTitlePage,
   listTitleRatingRows,
 } from '../repository/ownerData.js';
@@ -46,6 +47,7 @@ import {
 } from '../services/tmdbRefresh.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import { parseTitleListQuery } from './titlesQuery.js';
+import { readTitlePresentation } from '../services/titlePresentation.js';
 
 /** `date` columns come back as a `Date` at UTC midnight; we want `YYYY-MM-DD`. */
 export function toIsoDate(value: Date): string {
@@ -460,6 +462,13 @@ export function registerTitleRoutes(router: Router): void {
     const typed = row as unknown as TitleDetailRow;
     const refresh = await refreshStaleMetadata(ownerId, [toRefreshableTitle(typed)]);
 
-    res.status(200).json(toDetailItem(applyRefresh(typed, refresh), refresh.stale.has(typed.id)));
+    const presentation = await readTitlePresentation(ownerId, row);
+    const suppression = await findActiveSuppression(ownerId, row.workIdentity);
+    res.status(200).json({
+      ...toDetailItem(applyRefresh(typed, refresh), refresh.stale.has(typed.id)),
+      presentation,
+      listState:
+        suppression !== null ? 'suppressed' : row.state === 'active' ? 'active' : 'removed',
+    });
   });
 }

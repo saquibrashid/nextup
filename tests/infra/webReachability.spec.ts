@@ -26,9 +26,7 @@
  * Two properties, deliberately asymmetric:
  *
  *   **A. Every client method has a call site in `apps/web/src/**`.** A
- *      RATCHETED BASELINE, because three methods are genuinely unreached today
- *      and each is a real, separately-tracked gap — the gate's job is to stop
- *      a FOURTH, not to block on the three.
+ *      RATCHETED BASELINE, now empty: TASK-238 connects the final unused read.
  *
  *   **B. Every component and page module is imported by another `src` module.**
  *      NO BASELINE — zero tolerance. This property was RED before PR #114 and
@@ -90,9 +88,7 @@ const CLIENT = path.join(SRC, 'lib', 'apiClient.ts');
  * owner; adding a new one to make this suite green is the exact move the file
  * exists to prevent.
  *
- * - `getTitle` — `GET /api/titles/:titleId`. The `/#title-<titleId>` deep-link
- *   target (TASK-076) resolves against the already-loaded list, so nothing
- *   fetches a single title yet.
+ * `getTitle` was discharged by TASK-238's dedicated title-details route.
  * `removeBatchImage` was discharged by TASK-222's saved-draft removal control.
  *
  * ~~`restoreListing` — the restore UI is TASK-099 and the removed view it
@@ -101,7 +97,7 @@ const CLIENT = path.join(SRC, 'lib', 'apiClient.ts');
  * mounted bare by `routes.tsx`, so nothing could reach it. `RemovedRoute` now
  * wires it (`T-DATA-002z`).
  */
-const BASELINE_UNREACHED = new Set(['getTitle']);
+const BASELINE_UNREACHED = new Set<string>();
 
 /**
  * A CALL, not a mention.

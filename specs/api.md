@@ -1205,7 +1205,11 @@ Historical source records remain. See `data-model.md` §18 and `T-WATCH-001`–`
 ### 6.3 `GET /api/titles/:titleId`
 
 Same item shape plus `removedListings[]` (state, service, `removedAt`),
-`createdByBatchId`, `createdAt`.
+`createdByBatchId`, `createdAt`, `listState` (`active`, `removed`, `suppressed`)
+and `presentation` (`status`, nullable validated `data`). The display-only
+synopsis/credits cache, its provider identity checks and explicit unavailable
+states are specified in `title-details.md` (TASK-238 / #327). Only this detail
+read fetches rich presentation metadata; list and extraction responses do not.
 
 ### 6.4 Lazy TMDB refresh (REQ-076, NFR-014) — no scheduler exists
 

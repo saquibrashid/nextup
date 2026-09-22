@@ -73,5 +73,6 @@ export * from './sortName.js';
 // unlisted field is rejected, never stripped. Also a Rule A defence.
 export * from './tmdbStorage.js';
 export * from './titleRuntime.js';
+export * from './titlePresentation.js';
 export * from './types.js';
 export * from './undo.js';

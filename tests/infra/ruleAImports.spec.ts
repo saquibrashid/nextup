@@ -75,6 +75,19 @@ afterAll(() => {
 
 describe('T-AI-012 · RSK-022 · no AI SDK is importable from the matching path', () => {
   it(
+    'T-DETAIL-001f: the display-only synopsis cache cannot import an inference SDK',
+    async () => {
+      const messages = await lint(
+        'apps/api/src/services/titlePresentation.ts',
+        "import OpenAI from 'openai';\nexport const probe = OpenAI;\n",
+      );
+      expect(messages.join('\n')).toContain('Rule A');
+      expect(messages.join('\n')).toContain('no-restricted-imports');
+    },
+    LINT_TIMEOUT_MS,
+  );
+
+  it(
     'T-AI-012a: importing an inference SDK from the matcher is an ESLint error',
     async () => {
       const messages = await lint(

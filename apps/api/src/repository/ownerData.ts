@@ -56,6 +56,7 @@ import {
   type WatchPriority,
   type WatchPreferences,
   type WatchPreferencesPatch,
+  type TitlePresentation,
 } from '@nextup/domain';
 
 import { getPrisma } from './client.js';
@@ -1092,6 +1093,25 @@ export async function updateTitleRating(
       imdbRatingTenths: rating.imdbRatingTenths,
       imdbRatingFetchedAt: rating.imdbRatingFetchedAt,
     },
+  });
+}
+
+/** The identity predicate prevents a late provider response from overwriting a corrected match. */
+export async function updateTitlePresentation(
+  ownerId: OwnerId,
+  id: string,
+  presentation: TitlePresentation,
+  tx?: Db,
+) {
+  return db(tx).title.updateMany({
+    where: {
+      ownerId,
+      id,
+      matchState: 'matched',
+      tmdbId: presentation.tmdbId,
+      tmdbMediaType: presentation.mediaType,
+    },
+    data: { tmdbPresentation: JSON.stringify(presentation) },
   });
 }
 

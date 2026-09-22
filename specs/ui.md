@@ -113,6 +113,7 @@ blocking; it introduces no loaders, actions or automatic mutation replay.
 | Route | Component file | Purpose | Optimises for |
 |---|---|---|---|
 | `/` | `pages/ListPage.tsx` | The combined list — **the value loop** | Seeing everything you can watch, fast |
+| `/titles/:titleId` | `pages/TitleDetailsPage.tsx` | Synopsis, cast and directors/creators, saved services and existing actions | Recognising a work without losing library browsing choices; `title-details.md` |
 | `/upload` | `pages/UploadPage.tsx` | Create a batch and attach screenshots | Getting the mode choice right before any work is done |
 | `/batches/:batchId` | `pages/BatchStatusPage.tsx` | Extraction progress and failure | Knowing whether it worked, and what to do if not |
 | `/batches/:batchId/review` | `pages/ReviewPage.tsx` | The review pass — **the safety gate** | Not losing anything you didn't mean to lose |

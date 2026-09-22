@@ -160,7 +160,11 @@ module.exports = [
     // reads as the stricter, safer rule and is simply wrong: it breaks the
     // deterministic matcher this rule exists to protect, which is the fastest
     // route to somebody switching the whole rule off.
-    files: ['packages/domain/src/matching/**/*.{ts,tsx}', 'apps/api/src/clients/tmdbClient.ts'],
+    files: [
+      'packages/domain/src/matching/**/*.{ts,tsx}',
+      'apps/api/src/clients/tmdbClient.ts',
+      'apps/api/src/services/titlePresentation.ts',
+    ],
     rules: {
       'no-restricted-imports': [
         'error',

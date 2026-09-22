@@ -30,9 +30,12 @@ import {
   createTitle,
   createUploadBatch,
   softDeleteServiceListing,
+  updateTitlePresentation,
+  findTitle,
   type OwnerId,
 } from '../../src/repository/ownerData.js';
 import { closeTestPrisma, resetDatabase, testPrisma } from './harness.js';
+import { TmdbClient } from '../../src/clients/tmdbClient.js';
 
 const OID = 'http://schemas.microsoft.com/identity/claims/objectidentifier';
 const SUBJECT = 'oid-owner-detail';
@@ -66,6 +69,8 @@ interface RemovedListing {
 }
 
 interface DetailBody {
+  presentation: import('@nextup/domain').TitlePresentationResult;
+  listState: string;
   titleId: string;
   workIdentity: string;
   matchState: string;
@@ -192,6 +197,58 @@ afterEach(async () => {
 
 afterAll(async () => {
   await closeTestPrisma();
+});
+
+describe('T-DETAIL-003 persisted owner-scoped presentation', () => {
+  it('T-DETAIL-003a: detail reads persist display metadata without altering identity, dates or memberships', async () => {
+    const { title } = await seedTitle({});
+    const before = await findTitle(owner, title.id);
+    const value = {
+      tmdbId: title.tmdbId ?? 1,
+      mediaType: 'movie' as const,
+      overview: 'An invented lighthouse story.',
+      cast: [{ name: 'Avery Example', character: 'Keeper' }],
+      directors: ['Morgan Example'],
+      creators: [],
+    };
+    const provider = vi.spyOn(TmdbClient.prototype, 'getPresentation').mockResolvedValue(value);
+    const response = await detail(title.id);
+    expect(response.presentation.status).toBe('available');
+    expect(response.presentation.data).toMatchObject(value);
+    const after = await findTitle(owner, title.id);
+    expect(after).toEqual({
+      ...before,
+      tmdbPresentation: JSON.stringify(response.presentation.data),
+    });
+    expect((await detail(title.id)).presentation).toEqual(response.presentation);
+    expect(provider).toHaveBeenCalledTimes(1);
+    expect((await get(title.id, OTHER_SUBJECT)).status).toBe(404);
+    expect(provider).toHaveBeenCalledTimes(1);
+  });
+  it('T-DETAIL-003b: foreign owner and changed identity cannot write presentation metadata', async () => {
+    const { title } = await seedTitle({});
+    const value = {
+      tmdbId: title.tmdbId ?? 1,
+      mediaType: 'movie' as const,
+      overview: null,
+      cast: [],
+      directors: [],
+      creators: [],
+      fetchedAt: new Date().toISOString(),
+    };
+    expect((await updateTitlePresentation(other, title.id, value)).count).toBe(0);
+    expect(
+      (await updateTitlePresentation(owner, title.id, { ...value, tmdbId: value.tmdbId + 1 }))
+        .count,
+    ).toBe(0);
+    expect((await findTitle(owner, title.id))?.tmdbPresentation).toBeNull();
+    await expect(
+      testPrisma().title.update({
+        where: { id: title.id },
+        data: { tmdbPresentation: 'not JSON' },
+      }),
+    ).rejects.toThrow();
+  });
 });
 
 describe('T-LIST-028 GET /api/titles/:titleId', () => {
