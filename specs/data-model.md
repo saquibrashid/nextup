@@ -1973,6 +1973,12 @@ does not work — see `Msg 468` above.~~
 
 ### 16.3 Tables (T-SQL DDL — normative; supersedes §15.3)
 
+TASK-238 adds nullable `title.tmdb_presentation` NVARCHAR(MAX), guarded by
+`ck_title_presentation_json` (`ISJSON = 1` or NULL), in migration
+`0014_title_presentation`. This strictly validated, provider-identity-keyed
+display cache holds synopsis and credits separately from matching metadata;
+see `title-details.md`. It has no membership, ordering or inference role.
+
 > ⚠ **Revision 5 (2026-08-12). This DDL was previously NOT EXECUTABLE.** It was
 > extracted verbatim and run against `mcr.microsoft.com/mssql/server:2022-latest`
 > (16.0.4265.3); the published form created **0 of 9 tables**. Every correction

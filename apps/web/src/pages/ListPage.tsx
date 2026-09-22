@@ -13,7 +13,7 @@ import type { JSX } from 'react';
 import { useState } from 'react';
 import { WatchPreferencesDialog } from '../components/WatchPreferencesDialog';
 import type { WatchPreferencesRequest, WatchPreferencesResult } from '../lib/apiClient';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { FilterBar, parseFilters, applyFilters, NO_FILTERS } from '../components/FilterBar';
 import { BatchAppliedNotice, type AppliedBatch } from '../components/BatchAppliedNotice';
@@ -432,6 +432,15 @@ export function ListPage({
         <>
           <TitleList
             items={visible}
+            renderTitle={(item) => (
+              <Link
+                className="title-row__link"
+                to={`/titles/${encodeURIComponent(item.titleId)}`}
+                state={{ librarySearch: params.toString() }}
+              >
+                {item.name}
+              </Link>
+            )}
             onWatchPreferences={
               onWatchPreferences && !offline
                 ? (item) => setDialog({ kind: 'watch', item })

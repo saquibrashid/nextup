@@ -133,6 +133,7 @@ export interface TitleListItem {
 }
 
 export interface TitleRowProps {
+  readonly titleLink?: ReactNode;
   readonly onWatchPreferences?: ((item: TitleListItem) => void) | undefined;
   readonly item: TitleListItem;
   /**
@@ -185,6 +186,7 @@ const MEDIA_TYPE_LABELS: Readonly<Record<TitleListItem['mediaType'], string>> = 
 
 export function TitleRow({
   item,
+  titleLink,
   onWatchPreferences,
   onOpenMenu,
   onFixMatch,
@@ -196,10 +198,7 @@ export function TitleRow({
   const busy = pending === true;
 
   return (
-    // ⚠ `id` IS A LINK TARGET, not decoration (TASK-076). v1 has no
-    // title-detail route, so `ux-states.md` §9.4's "each entry linking to the
-    // title" resolves to `/#title-<titleId>` — this anchor. Removing it turns
-    // every provenance link into a no-op that still looks like a link.
+    // Preserve existing provenance anchors alongside the dedicated details link.
     <li
       className="title-row"
       id={`title-${item.titleId}`}
@@ -238,7 +237,7 @@ export function TitleRow({
         <div className="title-row__identity">
           <div className="title-row__heading">
             <h2 className="title-row__name" data-testid="title-name">
-              {item.name}
+              {titleLink ?? item.name}
             </h2>
             {item.watching === true && <span className="title-row__watching">Watching</span>}
 

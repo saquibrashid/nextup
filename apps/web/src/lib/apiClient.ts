@@ -20,6 +20,7 @@ import type {
   ErrorCode,
   ReviewResponse,
   Service,
+  TitlePresentationResult,
 } from '@nextup/domain';
 
 import type { TitleListItem as WireTitleListItem } from '../components/TitleRow';
@@ -37,6 +38,11 @@ export interface WatchPreferencesResult {
 export interface WatchPreferencesRequest {
   watching?: boolean;
   priority?: WatchPriority;
+}
+
+export interface TitleDetailResponse extends WireTitleListItem {
+  readonly presentation?: TitlePresentationResult;
+  readonly listState?: 'active' | 'removed' | 'suppressed';
 }
 
 /** The wire shape of a failure (`apps/api/src/middleware/errorEnvelope.ts`). */
@@ -768,7 +774,7 @@ export function createApiClient(deps: ApiClientDeps = {}) {
       ),
 
     getTitle: (titleId: string, signal?: AbortSignal) =>
-      request<WireTitleListItem>(`/api/titles/${encodeURIComponent(titleId)}`, { signal }, deps),
+      request<TitleDetailResponse>(`/api/titles/${encodeURIComponent(titleId)}`, { signal }, deps),
 
     getServiceState: (signal?: AbortSignal) =>
       request<ServiceStateResponse>('/api/service-state', { signal }, deps),

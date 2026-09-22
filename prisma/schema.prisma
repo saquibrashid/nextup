@@ -166,6 +166,9 @@ model Title {
   /// constant, which is a different number for a different purpose (T-INV-008).
   tmdbFetchedAt DateTime? @map("tmdb_fetched_at") @db.DateTime2
 
+  /// Display-only synopsis/credits, keyed by provider identity within the JSON.
+  tmdbPresentation String? @map("tmdb_presentation") @db.NVarChar(Max)
+
   /// The IMDb id from TMDB (REQ-094). NULL means TMDB has no IMDb mapping for
   /// this work, which is a real answer, not a missing read.
   /// ⚠ Read from `external_ids` first — a series carries it nowhere else

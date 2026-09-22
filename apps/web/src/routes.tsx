@@ -9,9 +9,8 @@
  * and would drift SILENTLY - the suite would keep passing while no longer
  * covering the new screen.
  *
- * ⚠ ELEVEN ROUTES SINCE EPIC L, not ten. `/waiting` (US-043) was added, and
- * the enumerate-from-here design is exactly what made that a one-entry change
- * rather than a four-suite coverage hole.
+ * Contextual routes include `/titles/:titleId` (TASK-238). Enumerating this
+ * table keeps attribution and accessibility coverage aligned with the app.
  *
  * ~~⚠ TEN ROUTES SINCE EPIC M, not nine. `/rating` (REQ-092) was added~~
  * *(Superseded — corrected in place: this comment is read as a statement of
@@ -25,6 +24,7 @@ import { AboutPage } from './pages/AboutPage';
 import { BatchHistoryRoute } from './containers/BatchHistoryRoute';
 import { BatchStatusRoute } from './containers/BatchStatusRoute';
 import { ListRoute } from './containers/ListRoute';
+import { TitleDetailsRoute } from './containers/TitleDetailsRoute';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { RatingLookupPage } from './pages/RatingLookupPage';
 import { RemovedRoute } from './containers/RemovedRoute';
@@ -52,6 +52,12 @@ export const EXAMPLE_BATCH_ID = '01J0000000000000000000BTCH';
 
 export const ROUTES: readonly RouteDefinition[] = [
   { path: '/', Component: ListRoute, examplePath: '/', navLabel: 'List' },
+  {
+    path: '/titles/:titleId',
+    Component: TitleDetailsRoute,
+    examplePath: '/titles/example-title',
+    navLabel: null,
+  },
   {
     path: '/upload',
     Component: UploadRoute,

@@ -218,6 +218,10 @@ export function AppShell(): JSX.Element {
   const captureRoute = location.pathname === '/upload' || location.pathname.startsWith('/batches/');
 
   useEffect(() => {
+    if (location.pathname.startsWith('/titles/')) {
+      mainRef.current?.focus();
+      return;
+    }
     if (location.pathname === '/upload' || /^\/batches(?:\/|$)/.test(location.pathname)) {
       mainRef.current?.focus({ preventScroll: true });
     }

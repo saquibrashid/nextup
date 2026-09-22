@@ -694,7 +694,14 @@ finished, so the exception cannot outlive its reason.
 | `TASK-235` | `done` | Capture-status banners reserve a 16px gap above library headings/actions at phone, tablet and desktop widths. Validated Grid/Compact memory uses the existing browsing boundary and a separate browser-local layout key, preserving query/history, loaded rows and request semantics; invalid/blocked storage is disclosed. `T-LIB-003`, `T-LIB-004`; existing layout, search and browsing continuity regressions. No API, dependency or infrastructure changes. |
 | `TASK-236` | `done` | Visual-only premium refinement: shared noninteractive capture orientation; restrained surfaces, step and preview grouping; year/type/warning/evidence review hierarchy and desktop decision columns; consistent larger grid artwork with unchanged compact density. `T-POL-001`, `T-POL-002`, `T-POL-003` plus capture, review, virtualization, accessibility and remembered-browsing regressions. No API, schema, dependency or infrastructure change; no automatic confirmation or stage skipping. |
 | `TASK-237` | `done` | Grid cards use content-sized shared tracks for headings, metadata, priority/rating, dates and service footers. Watching is always beneath the title and aligns across neighboring watched cards; footer dividers and heights stay aligned with different logos or wrapped badges. Compact, full text, missing-data states, actions and browsing memory remain unchanged. `T-POL-004` and existing responsive library/modal regressions. CSS-only application change; no API, dependency or infrastructure change. |
+| `TASK-238` | `done` | #327: directly linkable movie/show details with synopsis, cast/characters, directors/creators, artwork and existing actions. Strict display-only cache uses owner/provider-identity-scoped metadata writes and the 183-day lazy policy; unavailable/stale/unidentified states retain saved data. Additive nullable SQL JSON column, preserved query/layout return, existing consent/undo dialogs and stronger reachability/inference gates. `T-DETAIL-001` through `T-DETAIL-006`; unit/web coverage, real SQL and responsive Chromium/WebKit regressions. Separate PR; watched history and personal ratings remain outside scope. |
 <!-- STATUS-LEDGER:END -->
+
+### Approved title details, 2026-09-22
+
+| Task | Work | Size | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| TASK-238 | Implement #327 according to `specs/title-details.md`, preserving existing actions, attribution, metadata-only refresh and library context. | 1 agent-run + 15 owner-review-minutes | TASK-237 | `T-DETAIL-001` through `T-DETAIL-006`; existing owner-scope, inference-isolation and library regressions |
 
 ### Approved catalog alignment follow-up
 

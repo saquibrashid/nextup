@@ -25,7 +25,12 @@
  * backlog is the work order, so the file is here.
  */
 
-import { isKnownRuntime, type MediaType } from '@nextup/domain';
+import {
+  isKnownRuntime,
+  titlePresentationSchema,
+  type TitlePresentation,
+  type MediaType,
+} from '@nextup/domain';
 
 export const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 
@@ -268,6 +273,51 @@ export class TmdbClient {
       () => null as never,
     );
     return readFlatrateProviders(body, region);
+  }
+
+  async getPresentation(
+    mediaType: MediaType,
+    tmdbId: number,
+  ): Promise<Omit<TitlePresentation, 'fetchedAt'>> {
+    const body = await this.#get<unknown>(
+      `/${mediaType}/${tmdbId}`,
+      { append_to_response: 'credits' },
+      () => {
+        throw new TmdbWorkNotFoundError(mediaType, tmdbId);
+      },
+    );
+    if (!isRecord(body) || !isRecord(body['credits'])) {
+      throw new TmdbUnavailableError('TMDB returned unreadable title credits.', 200, false);
+    }
+    const credits = body['credits'];
+    const cast = credits['cast'];
+    const crew = credits['crew'];
+    const creators = mediaType === 'tv' ? body['created_by'] : [];
+    if (!Array.isArray(cast) || !Array.isArray(crew) || !Array.isArray(creators)) {
+      throw new TmdbUnavailableError('TMDB returned unreadable title credits.', 200, false);
+    }
+    const projected = {
+      tmdbId,
+      mediaType,
+      overview: body['overview'] === '' ? null : (body['overview'] ?? null),
+      cast: cast.map((person: unknown) =>
+        isRecord(person)
+          ? { name: person['name'], character: person['character'] || null }
+          : person,
+      ),
+      directors:
+        mediaType === 'movie'
+          ? crew
+              .filter((person: unknown) => isRecord(person) && person['job'] === 'Director')
+              .map((person: Record<string, unknown>) => person['name'])
+          : [],
+      creators: creators.map((person: unknown) => (isRecord(person) ? person['name'] : person)),
+    };
+    const result = titlePresentationSchema.omit({ fetchedAt: true }).safeParse(projected);
+    if (!result.success) {
+      throw new TmdbUnavailableError('TMDB returned unreadable title information.', 200, false);
+    }
+    return result.data;
   }
 
   // ── HTTP ──────────────────────────────────────────────────────────────────

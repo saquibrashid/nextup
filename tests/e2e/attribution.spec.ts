@@ -43,8 +43,8 @@ const NARROW = { width: 320, height: 720 };
  */
 
 /**
- * ⚠ THE NINE-ROUTE COUNT IS ASSERTED, NOT ASSUMED. US-011 AC-1 and AC-5 both
- * say "all nine routes". If `ROUTES` grows or shrinks without this suite being
+ * ⚠ THE ROUTE COUNT IS ASSERTED, NOT ASSUMED. Attribution covers every route,
+ * including title details. If `ROUTES` grows or shrinks without this suite being
  * reconsidered, the per-route loop below still passes over whatever it finds —
  * so the shape of the set is pinned here, once.
  */
@@ -155,12 +155,12 @@ async function expectStyledAndRendered(page: Page): Promise<void> {
 }
 
 test.describe('T-ATTR-002 — the disclaimer is visible on every route, without interaction', () => {
-  test('T-ATTR-002a: ROUTES holds exactly ten routes plus the catch-all', async () => {
+  test('T-ATTR-002a: ROUTES holds exactly eleven routes plus the catch-all', async () => {
     // Pins the set the two per-route loops below iterate. Without this they
     // are self-fulfilling: they cover whatever exists and report success.
     const routes = await loadRoutes();
-    expect(routes.filter((route) => route.path !== '*')).toHaveLength(10);
-    expect(routes).toHaveLength(11);
+    expect(routes.filter((route) => route.path !== '*')).toHaveLength(11);
+    expect(routes).toHaveLength(12);
   });
 
   /**
