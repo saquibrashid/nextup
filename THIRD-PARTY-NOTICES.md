@@ -104,7 +104,7 @@ so they do not relicense this work — but their notices must be retained.
 | `@tanstack/react-virtual` | 3.14.11 | MIT |
 | `@tanstack/virtual-core` | 3.17.9 | MIT |
 | `@tediousjs/connection-string` | 0.5.0 | MIT |
-| `@types/node` | 22.20.2 | MIT |
+| `@types/node` | 22.20.4 | MIT |
 | `@types/readable-stream` | 4.0.24 | MIT |
 | `@typespec/ts-http-runtime` | 0.3.8 | MIT |
 | `abort-controller` | 3.0.0 | MIT |
