@@ -12,8 +12,8 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 | Status | Count |
 |---|---|
 | ⬜ todo | 0 |
-| 🚧 doing | 1 |
-| ✅ done | 233 |
+| 🚧 doing | 0 |
+| ✅ done | 234 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **237** |
@@ -22,9 +22,7 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 Not done, and every task they depend on is done.
 
-| Task | Size | Section |
-|---|---|---|
-| `TASK-239` | 2 agent-runs + 10 owner-review-minutes | Approved tile-first extraction and review |
+_Nothing is ready: every unfinished task is waiting on a dependency._
 
 ## Waiting on the owner
 
@@ -276,3 +274,4 @@ Not done, and every task they depend on is done.
 | `TASK-236` | Visual-only premium refinement: shared noninteractive capture orientation; restrained surfaces, step and preview grouping; year/type/warning/evidence review hierarchy and desktop decision columns; consistent larger grid artwork with unchanged compact density. `T-POL-001`, `T-POL-002`, `T-POL-003` plus capture, review, virtualization, accessibility and remembered-browsing regressions. No API, schema, dependency or infrastructure change; no automatic confirmation or stage skipping. | `T-POL-001`, `T-POL-002`, `T-POL-003` |
 | `TASK-237` | Grid cards use content-sized shared tracks for headings, metadata, priority/rating, dates and service footers. Watching is always beneath the title and aligns across neighboring watched cards; footer dividers and heights stay aligned with different logos or wrapped badges. Compact, full text, missing-data states, actions and browsing memory remain unchanged. `T-POL-004` and existing responsive library/modal regressions. CSS-only application change; no API, dependency or infrastructure change. | `T-POL-004` |
 | `TASK-238` | #327: directly linkable movie/show details with synopsis, cast/characters, directors/creators, artwork and existing actions. Strict display-only cache uses owner/provider-identity-scoped metadata writes and the 183-day lazy policy; unavailable/stale/unidentified states retain saved data. Additive nullable SQL JSON column, preserved query/layout return, existing consent/undo dialogs and stronger reachability/inference gates. `T-DETAIL-001` through `T-DETAIL-006`; unit/web coverage, real SQL and responsive Chromium/WebKit regressions. Separate PR; watched history and personal ratings remain outside scope. | `T-DETAIL-001`, `T-DETAIL-006` |
+| `TASK-239` | Owner-approved tile-first extraction/review: detect before reading, serial original-resolution crops, controlled input provenance, visible per-tile next steps including known titles, safe bulk policy and separate Apply summary. `T-AI-065`, `T-AI-066`, `T-AI-067`; one live read of the reported screenshot returned all five intended titles in five source regions, without the earlier stray OCR candidates (27.5 seconds, five calls per reader). This is a bounded recognition check, not a new corpus quality baseline. No migration, dependency or infrastructure change. | `T-AI-065`, `T-AI-066`, `T-AI-067` |
