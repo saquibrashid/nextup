@@ -297,4 +297,4 @@ so they do not relicense this work — but their notices must be retained.
 | `ws` | 8.21.2 | MIT |
 | `wsl-utils` | 0.1.0 | MIT |
 | `xml-naming` | 0.3.0 | MIT |
-| `zod` | 4.6.1 | MIT |
+| `zod` | 4.6.5 | MIT |
