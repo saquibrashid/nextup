@@ -1448,12 +1448,28 @@ no quality floor, noise band, recorded result or production model changes.
 ~~Superseded: cost is a tie-breaker, and tying every row is sufficient to replace
 the incumbent.~~ See `docs/current-release.md` and `T-AI-045`.
 
-**Outputs.** A report at `docs/evaluation/model-bakeoff-<date>.md` carrying
-both arms' full metric tables, the per-image deltas, the observed cost of the
-run, and the resulting decision — **including when the decision is "no
-change", which is a result worth recording and not a wasted run.** A change of
-reader additionally requires an ADR-0001 revision; the model is named there,
-in this section, in §10's cost model and in `.env.example`.
+**Outputs.** Two artifacts, and both are required:
+
+1. A report at `docs/evaluation/model-bakeoff-<date>.md` carrying
+   both arms' full metric tables, the per-image deltas, the observed cost of the
+   run, and the resulting decision — **including when the decision is "no
+   change", which is a result worth recording and not a wasted run.** A change of
+   reader additionally requires an ADR-0001 revision; the model is named there,
+   in this section, in §10's cost model and in `.env.example`.
+2. A machine-readable companion at `<same-stem>.metrics.json`, carrying the
+   Stage 3 metric set exactly as `tests/extraction/readerMetrics.ts` computed
+   it, per run and per arm. ⚠ **This is not a convenience duplicate of the
+   markdown.** The report is prose a human reads months later; the JSON is the
+   only form in which a past run can be **re-decided** — fed back through
+   `chooseReader` when a band moves — without re-billing 66 vision calls. §9.5's
+   L2 floor has already been rebased once (0.95 → 0.75) and the L3 row added
+   underneath it; every run recorded before that change became unreusable, and
+   `chooseReader` had been three revisions behind the spec while the suite stayed
+   green (`T-AI-045x`/`z`/`aa`). A recorded number whose definition is not also
+   recorded cannot be re-checked, only re-run. The companion is emitted by the
+   live suite and guarded by `T-AI-057`.
+
+~~Superseded: "A report at `docs/evaluation/model-bakeoff-<date>.md` carrying both arms' full metric tables…" as the sole named output.~~ *(Amended 2026-09-21, owner-approved: the markdown clause is unchanged and still binding; the `.metrics.json` companion is added beside it.)*
 
 **Cost and safety of running it.** 11 images × 3 runs × 2 arms = **66 vision
 calls**, ≈ **$0.62** at §10's per-image figure. This is manual-only and never

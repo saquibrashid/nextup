@@ -1,0 +1,21 @@
+{
+  "arm": {
+    "deployment": "probe-gpt-6-astra",
+    "tokenParam": "max_completion_tokens",
+    "temperature": 1,
+    "slug": "probe-gpt-6-astra-t1"
+  },
+  "generatedAt": "2026-09-22T00:37:16.349Z",
+  "metrics": {
+    "modelId": "probe-gpt-6-astra",
+    "omissionRecovery": 1,
+    "fabricationRate": 0.04819277108433735,
+    "titleRecall": 1,
+    "artworkOnlyRecall": 1,
+    "falseTitleRate": 0.06451612903225806,
+    "chromeRejection": 0.8987341772151899,
+    "stabilityJaccard": 0.9032258064516129,
+    "unstableTitleRate": 0,
+    "costUsdPerImage": 0.011538363636363637
+  }
+}

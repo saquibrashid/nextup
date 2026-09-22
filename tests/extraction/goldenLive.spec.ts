@@ -49,7 +49,7 @@ import path from 'node:path';
 import { DefaultAzureCredential } from '@azure/identity';
 import { beforeAll, describe, expect, it } from 'vitest';
 
-import type { ImageMimeType, LlmTile, OcrLine } from '@nextup/domain';
+import type { ImageMimeType, LlmTile, OcrLine, ReaderMetrics } from '@nextup/domain';
 
 import {
   AzureVisionExtractor,
@@ -70,6 +70,14 @@ import {
 import { transcodeHeicToPng } from '../../apps/api/src/images/transcode.js';
 
 import { costReportLines, estimateCostUsd } from './liveCost.js';
+import {
+  acceptedTitles,
+  jaccard,
+  metricsDocumentJson,
+  pairwiseJaccard,
+  readerMetrics,
+  unstableTitles,
+} from './readerMetrics.js';
 
 import {
   IMAGES,
@@ -89,91 +97,16 @@ const EVALUATION_DIR = path.join(REPO_ROOT, 'docs', 'evaluation');
 /** §4A: "It runs each golden image N = 3 times". Not a tuning knob. */
 const RUNS = 3;
 
-/** The §4A bands. Every one of these is quoted from the table in §9.5. */
-/**
- * L2 — the pairwise set-stability floor.
- *
- * ⚠ RE-BASED FROM 0.95 ON 2026-09-19, AND THE OLD VALUE WAS NOT A STRETCH
- * GOAL — IT WAS UNREACHABLE BY ANYTHING, INCLUDING THE MODEL IN PRODUCTION.
- * Measured worst pair, three runs over the eleven golden images:
- *
- *   `gpt-4.1` @ t=0 (production)   0.7692
- *   `gpt-5.4` @ t=0                0.8205
- *   `gpt-6-astra` @ t=1            0.8750
- *
- * 0.95 appears to have been calibrated against the OFFLINE replay, where the
- * recordings are fixed and Jaccard is 1.0 by construction, and then applied to
- * a LIVE run that resamples the model every time. §4A already spells out why
- * that is the wrong move — it is the same reasoning that keeps `MIN_RECALL` as
- * hand-declared bands rather than pinned measurements: "a live run resamples,
- * so pinning it would fail on the model's own variance and teach the reader to
- * ignore this suite." L2 was the one band that never got the treatment, and it
- * duly went permanently red.
- *
- * ⚠ A BAND THAT IS ALWAYS RED IS WORSE THAN NO BAND. It cannot distinguish a
- * healthy run from a regression, it trains the owner to skip the failure, and
- * — the concrete cost here — it silently blocks every model change, because
- * §9.7 Stage 3 requires a challenger to clear the same floor. The gate that
- * was meant to protect stability was instead pinning the product to `gpt-4.1`
- * by a threshold `gpt-4.1` itself fails.
- *
- * 0.75 sits just below the incumbent's measured worst pair, on the same
- * "drop to the next band below" convention `MIN_RECALL` uses. `T-AI-051k`
- * holds it there: it parses the committed baseline report and fails if this
- * floor ever exceeds what the incumbent actually achieved, so the value cannot
- * drift back into aspiration.
- *
- * ⚠ THIS IS NOT A RELAXATION OF THE STABILITY REQUIREMENT, BECAUSE L3 CARRIES
- * IT. Every arm measured so far reports L3 empty — each expected title that
- * was found was found in all three runs. The L2 shortfall is entirely
- * false-title churn. L3 is the band that says "the list the owner sees is the
- * same every time"; L2 says "the noise around it is too". Read them together,
- * which is why the report now prints both.
- */
-const JACCARD_STABILITY_FLOOR = 0.75; // L2
-const UNSTABLE_TITLE_CEILING = 0.05; // L3
-const FABRICATION_CEILING = 0.05; // L4
-const FALSE_TITLE_CEILING = 0.1; // L5
-const ARTWORK_ONLY_RECALL_FLOOR = 0.8; // L6
-const COST_CEILING_USD = 0.5; // L7
-
-/** The §9.2 artwork-only fixture L6 names. */
-const ARTWORK_ONLY_IMAGE = 'netflix-artwork-only-01';
-
-/**
- * L1's per-image `minRecall`.
- *
- * ⚠ THESE ARE FLOORS, NOT THE MEASURED VALUES, AND THE DIFFERENCE IS THE
- * WHOLE POINT. §9.2's offline numbers are pinned to four decimal places
- * because the recordings are fixed; a live run resamples, so pinning it would
- * fail on the model's own variance and teach the reader to ignore this suite.
- * Each floor is the offline per-image recall dropped to the next band below,
- * so ordinary sampling noise passes and a real regression does not.
- *
- * ⚠ `netflix-continue-watching-01` IS 0 AND THAT IS NOT AN OVERSIGHT. It has
- * one expected title, which the offline recordings do not recover at all
- * (`T-AI-030b` records `found: 0`). A floor above 0 would fail every live run
- * for a known offline shortfall, which is not drift. `T-AI-051j` holds every
- * floor at or below what the committed recordings already achieve, so this
- * table cannot quietly become aspirational.
- *
- * ⚠ `blank-no-content-01` HAS NO EXPECTED TITLES, so its recall is 1 by
- * definition (see `scoreWithStore`'s 0/0 note) and its floor of 1 asserts that
- * the fixture keeps behaving that way rather than asserting reader quality.
- */
-const MIN_RECALL: Readonly<Record<string, number>> = {
-  'netflix-mylist-mobile-01': 0.75, // offline 0.875 (7/8)
-  'netflix-mylist-mobile-02': 0.875, // offline 1.0 (8/8)
-  'netflix-mylist-desktop-01': 0.9, // offline 1.0 (10/10)
-  'netflix-continue-watching-01': 0, // offline 0.0 (0/1) — see above
-  'max-saved-mobile-01': 0.83, // offline 1.0 (6/6)
-  'max-saved-desktop-01': 0.83, // offline 1.0 (6/6)
-  'netflix-artwork-only-01': 0.8, // offline 1.0 (10/10); L6 names the same floor
-  'blank-no-content-01': 1, // 0 expected — recall is 1 by definition
-  'truncated-titles-01': 0.75, // offline 1.0 (4/4)
-  'low-quality-jpeg-01': 0.75, // offline 0.875 (7/8)
-  'rotated-01': 0.83, // offline 1.0 (6/6)
-};
+import {
+  ARTWORK_ONLY_IMAGE,
+  ARTWORK_ONLY_RECALL_FLOOR,
+  COST_CEILING_USD,
+  FABRICATION_CEILING,
+  FALSE_TITLE_CEILING,
+  JACCARD_STABILITY_FLOOR,
+  MIN_RECALL,
+  UNSTABLE_TITLE_CEILING,
+} from './liveBands.js';
 
 interface RunUsage {
   promptTokens: number;
@@ -188,27 +121,14 @@ interface LiveRun {
   readonly usage: RunUsage;
 }
 
-/** The normalised titles a run ACCEPTED, corpus-wide. Sorted set, never ordered output. */
-function acceptedTitles(scored: readonly Scored[]): Set<string> {
-  const out = new Set<string>();
-  for (const s of scored) {
-    for (const c of s.candidates) {
-      if (RECALL_VERDICTS.has(c.cleanupVerdict)) out.add(c.normalisedText);
-    }
-  }
-  return out;
-}
-
-function jaccard(a: ReadonlySet<string>, b: ReadonlySet<string>): number {
-  // ⚠ TWO EMPTY SETS ARE IDENTICAL, NOT UNDEFINED. Returning NaN here would
-  // make L2 pass by comparison-with-NaN semantics on a run that extracted
-  // nothing at all — the zero-yield trap, arriving through the stability gate.
-  if (a.size === 0 && b.size === 0) return 1;
-  let shared = 0;
-  for (const value of a) if (b.has(value)) shared += 1;
-  return shared / (a.size + b.size - shared);
-}
-
+/**
+ * ⚠ `acceptedTitles`, `jaccard`, `pairwiseJaccard` and `unstableTitles` ARE
+ * IMPORTED FROM `readerMetrics.ts`, NOT DEFINED HERE. They were private copies
+ * in this file and again in `bakeoffMeasured.spec.ts`. Two definitions of the
+ * same metric — one live, one offline — is precisely the arrangement that lets
+ * a divergence between the *copies* be read as model drift, which is the one
+ * conclusion this suite exists to support.
+ */
 function requireEnv(name: string, why: string): string {
   const value = process.env[name]?.trim();
   if (value === undefined || value === '') {
@@ -317,30 +237,17 @@ function armFromEnv(): Arm {
 }
 
 /**
- * Every pairwise Jaccard between the runs' accepted-title sets — L2.
+ * The runs' scored corpora, in order — the shape `readerMetrics.ts` consumes.
  *
- * ⚠ EXTRACTED BECAUSE THE REPORT DID NOT CARRY L2 AT ALL, WHICH IS HOW A FLOOR
- * NOTHING HAS EVER MET SURVIVED THIS LONG. The numbers existed only inside
- * `T-AI-051b`'s failure message, so they were visible when the band broke and
- * invisible when it passed — and a band that is always red is indistinguishable
- * from a band nobody reads. Committing them to the report is what makes the
- * floor auditable against measurement rather than against intent.
+ * ⚠ L2's report note is preserved here because it explains why it is emitted
+ * at all: the pairwise numbers existed only inside `T-AI-051b`'s failure
+ * message, so they were visible when the band broke and invisible when it
+ * passed — and a band that is always red is indistinguishable from a band
+ * nobody reads. Committing them is what makes the floor auditable against
+ * measurement rather than against intent.
  */
-function pairwiseJaccard(runs: readonly LiveRun[]): { pair: string; value: number }[] {
-  const sets = runs.map((r) => acceptedTitles(r.scored));
-  const pairs: { pair: string; value: number }[] = [];
-  for (let i = 0; i < sets.length; i += 1) {
-    for (let j = i + 1; j < sets.length; j += 1) {
-      // Non-null: both indices are inside `sets` by construction, and
-      // `noUncheckedIndexedAccess` cannot see that.
-      pairs.push({
-        pair: `${String(i + 1)}×${String(j + 1)}`,
-        value: jaccard(sets[i] as Set<string>, sets[j] as Set<string>),
-      });
-    }
-  }
-  return pairs;
-}
+const scoredRuns = (runs: readonly LiveRun[]): readonly (readonly Scored[])[] =>
+  runs.map((r) => r.scored);
 
 function reportMarkdown(runs: readonly LiveRun[], cost: number, arm: Arm): string {
   const lines: string[] = [];
@@ -393,12 +300,12 @@ function reportMarkdown(runs: readonly LiveRun[], cost: number, arm: Arm): strin
   }
   lines.push('');
 
-  const unstable = unstableTitles(runs);
+  const unstable = unstableTitles(scoredRuns(runs));
   lines.push('## L2 — pairwise run-to-run stability (Jaccard)');
   lines.push('');
   lines.push(`| Pair | Jaccard | Floor ${JACCARD_STABILITY_FLOOR.toFixed(2)} |`);
   lines.push('|---|---|---|');
-  for (const p of pairwiseJaccard(runs)) {
+  for (const p of pairwiseJaccard(scoredRuns(runs))) {
     lines.push(
       `| ${p.pair} | ${p.value.toFixed(4)} | ${p.value < JACCARD_STABILITY_FLOOR ? 'BELOW' : 'ok'} |`,
     );
@@ -501,19 +408,6 @@ function reportMarkdown(runs: readonly LiveRun[], cost: number, arm: Arm): strin
 }
 
 /** Expected titles found in fewer than every run — L3. */
-function unstableTitles(runs: readonly LiveRun[]): { title: string; runs: number }[] {
-  const expected = new Set<string>();
-  for (const s of runs[0]?.scored ?? []) {
-    for (const c of s.expected.expectedCandidates) expected.add(c.normalisedText);
-  }
-  const perRun = runs.map((r) => acceptedTitles(r.scored));
-  const out: { title: string; runs: number }[] = [];
-  for (const title of [...expected].sort()) {
-    const hits = perRun.filter((set) => set.has(title)).length;
-    if (hits > 0 && hits < runs.length) out.push({ title, runs: hits });
-  }
-  return out;
-}
 
 /**
  * Expected titles that were NOT accepted, per image, with how many runs missed
@@ -586,6 +480,9 @@ describe('T-AI-051 · §4A the live quality suite — MANUAL, COSTS MONEY', () =
   let runs: LiveRun[] = [];
   let totalCostUsd = 0;
   let reportPath = '';
+  let metricsPath = '';
+  let metrics: ReaderMetrics | undefined;
+  let firstRunEntries = new Map<string, Recording>();
   let offline: readonly Scored[] = [];
 
   beforeAll(async () => {
@@ -635,6 +532,10 @@ describe('T-AI-051 · §4A the live quality suite — MANUAL, COSTS MONEY', () =
       // would report divergence between the copies as model drift, which is
       // the one conclusion this suite exists to support.
       const scored = await scoreWithStore(inMemoryRecordingStore(entries));
+      // Run 1's legs are kept for `omissionRecovery`, which needs the raw LLM
+      // and OCR outputs rather than the scored result. See `readerMetrics`'
+      // note on why the point metrics come from run 1 and are not averaged.
+      if (index === 0) firstRunEntries = entries;
       runs.push({ index, scored, usage });
     }
 
@@ -655,6 +556,45 @@ describe('T-AI-051 · §4A the live quality suite — MANUAL, COSTS MONEY', () =
     reportPath = path.join(EVALUATION_DIR, `${stem}.md`);
     writeFileSync(reportPath, reportMarkdown(runs, totalCostUsd, arm), 'utf8');
     console.log(`\nLive quality report written to ${path.relative(REPO_ROOT, reportPath)}\n`);
+
+    /**
+     * ⚠ THE MACHINE-READABLE COMPANION, AND IT IS THE POINT OF THIS WHOLE
+     * ARTEFACT. The markdown above is for a human; `chooseReader()` cannot
+     * read it. Until this file existed, running the §9.7 decision meant a
+     * person retyping nine floats per arm out of a table, and §9.7 is blunt
+     * about where that leads: *"supplying invented values would yield a
+     * fabricated decision carrying a function's authority."* A transcription
+     * slip does not look like a bug, it looks like a verdict.
+     *
+     * ⚠ WRITTEN BEFORE ANY BAND IS CHECKED, for the same reason the markdown
+     * is. The arm whose metrics matter most is the one that failed a band.
+     *
+     * ⚠ IT CARRIES THE ARM, and shares the report's collision-proof stem. An
+     * investigation run that overwrote `golden-<date>.metrics.json` would
+     * corrupt the incumbent's recorded metrics exactly as it would the
+     * baseline report — and this file is the one a decision is computed from.
+     */
+    metricsPath = path.join(EVALUATION_DIR, `${stem}.metrics.json`);
+    const expectedTitleTotal = (runs[0]?.scored ?? []).reduce(
+      (n, s) => n + s.expected.expectedCandidates.length,
+      0,
+    );
+    metrics = readerMetrics({
+      modelId: arm.deployment,
+      runs: scoredRuns(runs),
+      store: inMemoryRecordingStore(firstRunEntries),
+      hashFor: (image) => sha256OfBytes(readFileSync(path.join(IMAGES, image.file))),
+      expectedTitleTotal,
+      // Per IMAGE, not per run: §9.7's row is `costUsdPerImage`, and the
+      // denominator is every image read across every run.
+      costUsdPerImage: totalCostUsd / (manifest.images.length * RUNS),
+    });
+    writeFileSync(
+      metricsPath,
+      metricsDocumentJson({ arm, generatedAt: new Date().toISOString(), metrics }),
+      'utf8',
+    );
+    console.log(`Stage 3 metrics written to ${path.relative(REPO_ROOT, metricsPath)}\n`);
 
     // The offline baseline, replayed from the committed recordings. Free, and
     // the only thing that keeps `MIN_RECALL` honest (`T-AI-051j`).
@@ -767,7 +707,7 @@ describe('T-AI-051 · §4A the live quality suite — MANUAL, COSTS MONEY', () =
       0,
     );
     expect(expectedTotal).toBeGreaterThan(0);
-    const unstable = unstableTitles(runs);
+    const unstable = unstableTitles(scoredRuns(runs));
     // Named in the failure message as well as the report — a bare ratio tells
     // the reader the model wobbled but not on what.
     expect(

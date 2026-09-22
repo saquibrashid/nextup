@@ -1,5 +1,13 @@
 # Model bake-off — 2026-09-21
 
+> ⚠ **SUPERSEDED BY `model-bakeoff-2026-09-22.md`.** The fresh, complete run
+> this document demanded has been done: both arms re-measured live, full
+> Stage 3 metrics emitted, and the decision returned by `chooseReader` rather
+> than read off a table. The outcome is unchanged (`gpt-4.1` stays) but the
+> *reason* is finally the real one — `gpt-6-astra` clears Stage 0, wins four
+> Stage 3 rows and loses exactly one (fabrication rate). Read this file only
+> for the history of how the Stage 0 defect was found.
+
 > **Outcome: no change. `gpt-4.1` remains the primary reader.**
 >
 > ⚠ **CORRECTION, 2026-09-21 (later the same day). The reason recorded below

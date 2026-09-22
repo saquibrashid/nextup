@@ -12,10 +12,10 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, readdirSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
 import { checkActionPinning, checkDependencies } from '../../tools/check-deps.mjs';
 
@@ -24,6 +24,33 @@ const SCRIPT = path.join(ROOT, 'tools', 'check-deps.mjs');
 
 /** Temp workspaces created inside the repo, so the checker actually walks them. */
 const created: string[] = [];
+
+/**
+ * ⚠ SWEEP STALE SCRATCH DIRS BEFORE ANYTHING ELSE. `afterEach` below already
+ * removes what this run creates, but it cannot run when a run is INTERRUPTED
+ * (Ctrl-C, a killed watcher, a crashed worker). A `.tmp-vendor-*` left behind
+ * then contains a `package.json` declaring `dd-trace` or `@sentry/node`, and
+ * because `checkDependencies()` scans the repo root it finds them — so the
+ * NEXT run fails `T-SEC-009a` ("the repository as committed is clean") and,
+ * via the same stray directory, `T-SEC-001a` and `T-STATUS-001p`.
+ *
+ * That presents as an intermittent multi-test failure with no relation to the
+ * change under test, and it is the whole of the long-standing infra "flake".
+ * It is not flaky: it is deterministic given a leftover directory, and it
+ * persists until someone deletes it by hand. Sweeping on entry makes an
+ * interrupted run cost nothing.
+ *
+ * ⚠ The scratch dirs must live in the repo ROOT, not `os.tmpdir()`, because
+ * the checker only scans the repo — moving them out would make every
+ * violation test pass vacuously.
+ */
+beforeAll(() => {
+  for (const entry of readdirSync(ROOT, { withFileTypes: true })) {
+    if (entry.isDirectory() && entry.name.startsWith('.tmp-')) {
+      rmSync(path.join(ROOT, entry.name), { recursive: true, force: true });
+    }
+  }
+});
 
 afterEach(() => {
   while (created.length > 0) {

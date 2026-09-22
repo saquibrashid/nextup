@@ -117,6 +117,49 @@ export interface ExpectedDoc {
   readonly imageId: string;
   readonly expectedCandidates: readonly ExpectedCandidate[];
   readonly expectedChrome: readonly string[];
+  /**
+   * On-screen TRUNCATED forms of expected titles, declared by the answer key.
+   *
+   * ⚠ DECLARED, NOT INFERRED, AND THE DIFFERENCE IS THE WHOLE DESIGN. The
+   * obvious implementation — "a candidate that is a prefix of an expected
+   * title is a truncation" — cannot be made safe. Real OCR truncation cuts
+   * MID-WORD (`dr strangelove or how i lear`), so a word-boundary test rejects
+   * the very case this exists for; a length-ratio test rejects it too (28 of
+   * 66 characters); and dropping both guards excuses `true detective`, which
+   * is a prefix of `true detective night country` and a DIFFERENT REAL WORK
+   * that the corpus expects on two images. Every heuristic here either misses
+   * the defect or silently deletes a real false title, and `thresholds.ts`
+   * already states the house rule for that trade: a heuristic that quietly
+   * removes evidence is the one failure class this product exists to avoid.
+   *
+   * So the fixture states the truncations it deliberately renders. It is
+   * ground truth, hand-annotated, reviewable in the diff, and it cannot
+   * over-reach onto an image that never declared one. `T-AI-059b` holds every
+   * declared form to being a strict prefix of the title it names, so a typo
+   * cannot quietly excuse an unrelated string.
+   */
+  readonly expectedTruncations: readonly { readonly truncated: string; readonly of: string }[];
+}
+
+/**
+ * Which of `texts` are excused from the false-title numerator as declared
+ * truncated reads.
+ *
+ * ⚠ THE `!found.has(t.of)` CONDITION IS THE ENTIRE RULE, NOT A SAFETY CHECK.
+ * A truncation is excused ONLY when the title it truncates is missing from the
+ * same run — that is the one shape where a single defect is charged to two
+ * gates (recall for the miss, L5 for the stump). When the full title WAS read,
+ * the stump is an additional junk row on top of a correct read: a real defect,
+ * charged once, and it must keep counting. Dropping this condition would erase
+ * two genuine defects on `truncated-titles-01`, which is exactly what
+ * `T-AI-059a` exists to catch.
+ */
+export function excusedTruncations(
+  texts: readonly string[],
+  truncations: readonly { readonly truncated: string; readonly of: string }[],
+  found: ReadonlySet<string>,
+): string[] {
+  return texts.filter((text) => truncations.some((t) => t.truncated === text && !found.has(t.of)));
 }
 
 export interface Scored {
@@ -126,6 +169,11 @@ export interface Scored {
   readonly recall: number;
   readonly found: number;
   readonly falseTitles: number;
+  /**
+   * Candidates excluded from `falseTitles` as DECLARED truncated reads of an
+   * expected title this run did not find — reported, never silently dropped.
+   */
+  readonly truncatedReads: readonly string[];
   readonly fabricated: number;
   readonly chromeRejected: number;
 }
@@ -164,9 +212,12 @@ export function tmdbResultsFor(normalised: string): TmdbSearchResult[] {
 }
 
 export function expectedFor(imageId: string): ExpectedDoc {
-  return JSON.parse(
+  const doc = JSON.parse(
     readFileSync(path.join(EXPECTED, `${imageId}.expected.json`), 'utf8'),
-  ) as ExpectedDoc;
+  ) as Partial<ExpectedDoc> & Omit<ExpectedDoc, 'expectedTruncations'>;
+  // Most answer keys declare no truncations; normalise so callers never see
+  // `undefined` for a field the interface promises is always an array.
+  return { ...doc, expectedTruncations: doc.expectedTruncations ?? [] };
 }
 
 /**
@@ -285,11 +336,40 @@ export async function scoreWithStore(store: RecordingStore): Promise<Scored[]> {
     // that leaked through as a title is measured by the chrome rejection
     // metric, and counting it twice would let one defect blow two unrelated
     // gates and obscure which one actually moved.
+    //
+    // A DECLARED TRUNCATED READ is excluded for exactly the same reason, and
+    // only under exactly the same condition: the title it truncates must be
+    // MISSING from this run. When the full title was also read, the truncated
+    // row is a genuine extra junk row — the "one title split across several
+    // rows" recognition defect — and it goes on counting. When the full title
+    // was not read, the miss is already charged to recall, and charging it
+    // again here is the same one-defect-two-gates double count the chrome rule
+    // above exists to prevent.
+    //
+    // ⚠ NUMERATOR ONLY, matching the chrome convention. `titleCandidates` in
+    // `aggregate` counts every `title-candidate` verdict, so an excluded read
+    // stays in the denominator and the rate never improves by shrinking the
+    // thing it is measured against.
+    const truncatedReads = excusedTruncations(
+      candidates
+        .filter(
+          (c) =>
+            c.cleanupVerdict === 'title-candidate' &&
+            !expectedTexts.has(c.normalisedText) &&
+            !chromeTexts.has(c.normalisedText),
+        )
+        .map((c) => c.normalisedText),
+      expected.expectedTruncations,
+      foundTexts,
+    );
+    const truncatedSet = new Set(truncatedReads);
+
     const falseTitles = candidates.filter(
       (c) =>
         c.cleanupVerdict === 'title-candidate' &&
         !expectedTexts.has(c.normalisedText) &&
-        !chromeTexts.has(c.normalisedText),
+        !chromeTexts.has(c.normalisedText) &&
+        !truncatedSet.has(c.normalisedText),
     ).length;
 
     // §9.2 fabrication: `ocrSupport === 'none'` AND neither an expected title
@@ -313,6 +393,7 @@ export async function scoreWithStore(store: RecordingStore): Promise<Scored[]> {
       recall,
       found,
       falseTitles,
+      truncatedReads,
       fabricated,
       chromeRejected,
     });
@@ -327,6 +408,12 @@ export interface Aggregate {
   readonly fabricationRate: number;
   readonly chromeRejectionRate: number;
   readonly candidateCount: number;
+  /**
+   * Every declared truncated read excused across the corpus, as
+   * `<imageId>: <text>`. Excluding these from `falseTitleRate` without naming
+   * them would make the rate improve for a reason no report could show.
+   */
+  readonly truncatedReads: readonly string[];
 }
 
 export function aggregate(scored: readonly Scored[]): Aggregate {
@@ -345,5 +432,6 @@ export function aggregate(scored: readonly Scored[]): Aggregate {
     fabricationRate: scored.reduce((n, s) => n + s.fabricated, 0) / candidateCount,
     chromeRejectionRate: scored.reduce((n, s) => n + s.chromeRejected, 0) / chromeTotal,
     candidateCount,
+    truncatedReads: scored.flatMap((s) => s.truncatedReads.map((t) => `${s.image.id}: ${t}`)),
   };
 }
