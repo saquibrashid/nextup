@@ -47,6 +47,14 @@ export function FilterDisclosure({ label, children, value }: FilterDisclosurePro
     if (raisesKeyboard && coarsePointer) panel.current?.focus();
     else first?.focus();
 
+    let pointerDown = false;
+    function onPointerDown(): void {
+      pointerDown = true;
+    }
+    function onPointerRelease(): void {
+      pointerDown = false;
+    }
+
     function onEscape(event: KeyboardEvent): void {
       if (event.key !== 'Escape') return;
       event.preventDefault();
@@ -86,6 +94,9 @@ export function FilterDisclosure({ label, children, value }: FilterDisclosurePro
        * is for.
        */
       if (!(event.target instanceof HTMLElement) || event.target.tabIndex < 0) return;
+      // Pointer focus precedes click: collapsing an inline group here moves the
+      // target before mouse-up and can swallow the drawer's Done/Close action.
+      if (pointerDown) return;
       // Tab follows the document order; do not pull focus back into the picker.
       setOpen(false);
     }
@@ -93,10 +104,16 @@ export function FilterDisclosure({ label, children, value }: FilterDisclosurePro
     document.addEventListener('keydown', onEscape);
     document.addEventListener('click', onOutsideClick);
     document.addEventListener('focusin', onFocusLeave);
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('pointerup', onPointerRelease);
+    document.addEventListener('pointercancel', onPointerRelease);
     return () => {
       document.removeEventListener('keydown', onEscape);
       document.removeEventListener('click', onOutsideClick);
       document.removeEventListener('focusin', onFocusLeave);
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('pointerup', onPointerRelease);
+      document.removeEventListener('pointercancel', onPointerRelease);
     };
   }, [open]);
 

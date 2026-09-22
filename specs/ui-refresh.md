@@ -132,8 +132,8 @@ dependency, data model, network behavior, consent, default or action.
   separate columns; on narrower screens actions remain below the identity.
   Keep every section, native disclosure, 104px evidence box and virtualized list.
   Apply stays sticky with mobile navigation clearance.
-- **Library:** flat, quiet surfaces replace per-card gradients. Desktop grid
-  artwork grows to a consistent 192px by 288px; compact retains its 72px by
+- **Library:** flat, quiet surfaces replace per-card gradients. Grid artwork
+  fills each card at 2:3 (TASK-239); compact retains its 72px by
   108px posters and aligned comparison columns. Controls keep their compact
   phone geometry, low-prominence search and persisted choices.
 - **Interaction:** restrained border/background transitions, visible keyboard
@@ -151,8 +151,9 @@ tests remain mandatory; screenshots accompany browser coverage for visual review
 In Grid view, Watching always occupies a new line beneath the title, rather than
 moving between inline and wrapped positions according to title length. At tablet
 and desktop widths, adjacent cards share content-sized row tracks: artwork,
-heading/status, metadata, priority/rating, date, service footer, and recovery
-actions. Service footers share their top edge and height, including when badges
+heading/status, metadata, rating, date, service footer, and recovery
+actions. TASK-240 places priority on the artwork while retaining its full label
+and target size. Service footers share their top edge and height, including when badges
 wrap. Long titles, genres, missing posters, absent ratings and unmatched actions
 must remain complete and usable; do not substitute fixed heights or truncation.
 Compact layout, markup, semantics and persistence remain unchanged.
@@ -160,6 +161,45 @@ Compact layout, markup, semantics and persistence remain unchanged.
 `T-POL-004` measures these alignments for short/long watched titles, unwatched
 titles, different service logos and wrapped multi-service footers in both browser
 engines. Existing library geometry and action tests remain mandatory.
+
+### 2.4 Owner mockups: in-app design only — TASK-240
+
+Adopt the three owner-supplied library/import/review mockups, excluding their
+scenic promotional surround, slogans, avatars and unimplemented destinations.
+Use only the existing routes, service registry and saved data.
+
+- At 1024px and above, the existing primary navigation becomes a left sidebar
+  beside a bordered navy content panel. Retain one header/nav/main/footer and
+  the existing More destinations. Tablet keeps the top navigation; phone keeps
+  List, Upload and More with safe-area clearance. Long sidebar content remains
+  reachable at short viewport heights and zoom.
+- Use local Georgia/Cambria serif page headings, the existing system sans-serif
+  for content and controls, restrained violet accents and contrasting navy
+  panels. No downloaded fonts, scenery or new dependencies.
+- Library cards use full-width 2:3 artwork at tablet/desktop widths, equal
+  content-sized metadata/footer tracks and complete title text. Compact keeps
+  72x108 posters. The priority control remains labelled and always available.
+  Service chips expose the existing multi-service filter: All clears only the
+  service dimension. Share URL, cursor reset, history and remembered state with
+  the existing list route/filter panel; no second filter store. Expanded filter
+  groups stay in the drawer's flow rather than covering its close control.
+  Do not collapse them between pointer-down focus and click: moving the outer
+  Done button before release can swallow its click. Tab and programmatic focus
+  leaving a group still close it; pointer clicks close it after activation.
+- Upload retains progressive required choices, editable summaries and all three
+  intake paths. Refine numbered orientation, logo tiles, mode cards, previews
+  and the sticky summary; never default a service/mode or auto-submit.
+- Review uses distinct section headings, restrained state accents and framed
+  evidence/identity/action groups. Keep original text, real warnings, all
+  full-update candidates, virtualization, explicit confirmation and sticky
+  apply controls. Do not invent confidence or completeness percentages.
+
+`T-MOCK-001` checks shared service-filter semantics. `T-MOCK-002` measures sidebar,
+content, artwork and chip geometry and keyboard access in both browser engines.
+`T-MOCK-003` verifies the heading/step/section treatment on upload and review.
+Existing accessibility, narrow reflow, reduced-motion and workflow tests remain
+mandatory. The earlier fixed 192x288 grid-artwork size is superseded by full-width
+2:3 artwork, not by cropping or fixed-height text.
 
 ## 3. The five defects — these are BUGS, not design
 

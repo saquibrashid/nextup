@@ -273,7 +273,9 @@ export function AppShell(): JSX.Element {
       <header className="app-shell__header">
         <NavLink to="/" className="app-shell__logo">
           <BrandIcon />
-          nextup
+          <span>
+            next<span className="app-shell__wordmark-accent">up</span>
+          </span>
         </NavLink>
         <nav aria-label="Primary" className="nav">
           <ul className="nav__list">
@@ -340,20 +342,22 @@ export function AppShell(): JSX.Element {
         </nav>
       </header>
 
-      <OfflineBanner offline={!online} />
-      {!captureRoute && <CaptureResume key={location.pathname} />}
+      <div className="app-shell__content">
+        <OfflineBanner offline={!online} />
+        {!captureRoute && <CaptureResume key={location.pathname} />}
 
-      <main ref={mainRef} tabIndex={-1}>
-        <ErrorBoundary resetKey={location.pathname}>
-          <LibraryNavigation>
-            <Outlet />
-          </LibraryNavigation>
-        </ErrorBoundary>
-      </main>
+        <main ref={mainRef} tabIndex={-1}>
+          <ErrorBoundary resetKey={location.pathname}>
+            <LibraryNavigation>
+              <Outlet />
+            </LibraryNavigation>
+          </ErrorBoundary>
+        </main>
 
-      <footer data-testid="app-footer">
-        <TmdbAttribution />
-      </footer>
+        <footer data-testid="app-footer">
+          <TmdbAttribution />
+        </footer>
+      </div>
     </div>
   );
 }

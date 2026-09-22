@@ -389,12 +389,12 @@ for (const width of [320, 1280]) {
           .poll(() => fresh.evaluate(() => localStorage.getItem('nextup.library.v1')))
           .toBe('sort=name&dir=asc');
         await expect(fresh.getByTestId('title-name')).toHaveCount(TITLES.length);
-        await fresh.goto('http://localhost:4173/');
+        await fresh.goto(new URL('/', fresh.url()).href);
         await expect(fresh.getByTestId('title-name')).toHaveCount(TITLES.length);
         expect(new URL(fresh.url()).searchParams.has('service')).toBe(false);
         expect(new URL(fresh.url()).searchParams.has('q')).toBe(false);
         await expect(fresh.getByTestId('sort-trigger')).toContainText('Name A-Z');
-        await fresh.goto('http://localhost:4173/?sort=runtime&dir=desc');
+        await fresh.goto(new URL('/?sort=runtime&dir=desc', fresh.url()).href);
         await expect(fresh.getByTestId('sort-trigger')).toContainText('Longest runtime');
         await expect(fresh.getByTestId('title-name').first()).toHaveText('Paper Lanterns');
         expect(new URL(fresh.url()).searchParams.has('service')).toBe(false);
@@ -1252,6 +1252,77 @@ for (const width of [640, 900, 1280]) {
   }
 }
 
+for (const width of [390, 1024, 1440]) {
+  describe(`Mockup catalog at ${width}px`, () => {
+    test('T-MOCK-002: sidebar, service chips and poster cards form an accessible catalog', async ({
+      page,
+    }, testInfo) => {
+      await mountLibrary(page, { width, varied: true });
+      const content = await bounds(page.locator('.app-shell__content'));
+      const navigation = await bounds(page.getByRole('navigation'));
+      if (width >= 1024) {
+        expect(navigation.x + navigation.width).toBeLessThan(content.x);
+        const links = page.getByRole('navigation').getByRole('link');
+        const first = await bounds(links.nth(0));
+        const second = await bounds(links.nth(1));
+        expect(second.y).toBeGreaterThanOrEqual(first.y + first.height);
+        await page.getByRole('navigation').getByRole('button', { name: 'More' }).click();
+        await expect(
+          page.getByRole('navigation').getByRole('link', { name: 'About' }),
+        ).toBeVisible();
+        await page.keyboard.press('Escape');
+        for (const row of await page.locator('li.title-row').all()) {
+          const poster = await bounds(row.locator('.title-row__poster'));
+          const priority = await bounds(row.locator('.title-row__watch'));
+          expect(priority.y).toBeGreaterThanOrEqual(poster.y);
+          expect(priority.y + priority.height).toBeLessThan(poster.y + poster.height);
+        }
+      } else {
+        expect(navigation.y + navigation.height).toBeCloseTo(900, 0);
+      }
+      expect(
+        await page
+          .getByRole('heading', { level: 1 })
+          .evaluate((el) => getComputedStyle(el).fontFamily),
+      ).toContain('Georgia');
+      const services = page.getByRole('group', { name: 'Filter by streaming service' });
+      for (const button of await services.getByRole('button').all()) {
+        await button.focus();
+        await expect(button).toBeFocused();
+        await expect
+          .poll(async () => {
+            const rect = await bounds(button);
+            return rect.x + rect.width;
+          })
+          .toBeLessThanOrEqual(width);
+        const rect = await bounds(button);
+        expect(rect.height).toBeGreaterThanOrEqual(44);
+        expect(rect.width).toBeGreaterThanOrEqual(44);
+        expect(rect.x).toBeGreaterThanOrEqual(0);
+        expect(rect.x + rect.width).toBeLessThanOrEqual(width);
+      }
+      await services.getByRole('button', { name: 'Netflix' }).click();
+      await expect(services.getByRole('button', { name: 'Netflix' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      await page.getByTestId('filters-trigger').click();
+      await page.getByRole('button', { name: /^Services/ }).click();
+      await expect(page.getByRole('checkbox', { name: 'Netflix' })).toBeChecked();
+      await page.getByRole('button', { name: 'Close filters', exact: true }).click();
+      await services.getByRole('button', { name: 'All services' }).click();
+      await noOverflow(page);
+      const scan = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+        .analyze();
+      expect(
+        scan.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical'),
+      ).toEqual([]);
+      await page.screenshot({ path: testInfo.outputPath('mockup-library.png'), fullPage: true });
+    });
+  });
+}
+
 test('T-POL-003c: catalog surfaces and artwork stay consistent in both layouts with reduced motion', async ({
   page,
 }, testInfo) => {
@@ -1262,21 +1333,18 @@ test('T-POL-003c: catalog surfaces and artwork stay consistent in both layouts w
     await expect(page.getByTestId('title-list')).toHaveAttribute('data-view', view.toLowerCase());
     const rows = page.locator('li.title-row');
     // Even the reduced-motion 0.01ms transition needs its first animation frame.
-    await expect
-      .poll(() =>
-        rows.locator('.title-row__poster').evaluateAll((elements) =>
-          elements.map((element) => {
-            const { width, height } = element.getBoundingClientRect();
-            return { width, height };
-          }),
-        ),
-      )
-      .toEqual(
-        TITLES.map(() => ({
-          width: view === 'Grid' ? 192 : 72,
-          height: view === 'Grid' ? 288 : 108,
-        })),
-      );
+    for (const poster of await rows.locator('.title-row__poster').all()) {
+      const { width, height } = await bounds(poster);
+      if (view === 'Compact') {
+        expect(width).toBe(72);
+        expect(height).toBe(108);
+      } else {
+        expect(width).toBeGreaterThanOrEqual(192);
+        expect(height / width).toBeCloseTo(1.5, 2);
+        const row = await bounds(poster.locator('..'));
+        expect(row.width - width).toBeLessThanOrEqual(2);
+      }
+    }
     const appearance = await rows.first().evaluate((element) => {
       const style = getComputedStyle(element);
       return {

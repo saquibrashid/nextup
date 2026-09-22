@@ -98,6 +98,63 @@ function url(): string {
   return screen.getByTestId('url').textContent ?? '';
 }
 
+describe('T-MOCK-001 service chips share the existing filter state', () => {
+  it('T-MOCK-001b: pointer focus does not collapse an inline group before the outer Done click', async () => {
+    const user = userEvent.setup();
+    mount('/');
+    await openFiltersWith(user);
+    const trigger = screen.getByRole('button', { name: /^Services / });
+    await user.click(trigger);
+    const done = panelDoneButton();
+    fireEvent.pointerDown(done);
+    fireEvent.focusIn(done);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.pointerUp(done);
+    fireEvent.click(done);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('T-MOCK-001a: toggles multiple services and preserves other query choices', async () => {
+    const user = userEvent.setup();
+    mount('/?service=netflix&type=tv&q=moon&sort=rating&dir=asc&cursor=old');
+    const services = within(screen.getByRole('group', { name: 'Filter by streaming service' }));
+    const scroll = vi.fn();
+    const netflix = services.getByRole('button', { name: 'Netflix' });
+    Object.defineProperty(netflix, 'scrollIntoView', { value: scroll });
+    fireEvent.focus(netflix);
+    expect(scroll).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+    expect(services.getAllByRole('button')).toHaveLength(SERVICES.length + 1);
+    expect(services.getByRole('button', { name: 'Netflix' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await user.click(services.getByRole('button', { name: 'Max', exact: true }));
+    let params = new URL(url(), 'https://nextup.test').searchParams;
+    expect(params.getAll('service')).toEqual(['netflix', 'max']);
+    expect(params.get('cursor')).toBe('old');
+    expect(params.get('type')).toBe('tv');
+    expect(params.get('q')).toBe('moon');
+    expect(params.get('sort')).toBe('rating');
+    expect(params.get('dir')).toBe('asc');
+    await user.click(services.getByRole('button', { name: 'Netflix' }));
+    expect(new URL(url(), 'https://nextup.test').searchParams.getAll('service')).toEqual(['max']);
+    await user.click(services.getByRole('button', { name: 'All services' }));
+    params = new URL(url(), 'https://nextup.test').searchParams;
+    expect(params.has('service')).toBe(false);
+    expect(params.get('type')).toBe('tv');
+    expect(params.get('q')).toBe('moon');
+    expect(services.getByRole('button', { name: 'All services' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await user.click(screen.getByRole('button', { name: 'Back', exact: true }));
+    expect(services.getByRole('button', { name: 'Max', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+});
+
 function openFilters(): HTMLElement {
   fireEvent.click(screen.getByTestId('filters-trigger'));
   return screen.getByRole('dialog', { name: 'Filter your list' });

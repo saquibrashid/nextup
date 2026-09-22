@@ -110,6 +110,11 @@ describe('T-POL-003b review decision geometry', () => {
           expect((identity?.y ?? 0) + (identity?.height ?? 0)).toBeLessThan(decisions?.y ?? 0);
         }
         await expect(card.getByText('Read from screenshot', { exact: true })).toBeVisible();
+        expect(
+          await page
+            .getByRole('heading', { level: 1 })
+            .evaluate((el) => getComputedStyle(el).fontFamily),
+        ).toContain('Georgia');
         await expect(card.getByTestId('candidate-raw-text')).toHaveText(candidate.rawText);
         await expect(page.getByTestId('candidate-known')).toBeVisible();
         await page.getByTestId('review-secondary').locator('summary').first().click();

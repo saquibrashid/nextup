@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 234 |
+| ✅ done | 235 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **237** |
+| **total** | **238** |
 
 ## Ready to start
 
@@ -275,3 +275,4 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-237` | Grid cards use content-sized shared tracks for headings, metadata, priority/rating, dates and service footers. Watching is always beneath the title and aligns across neighboring watched cards; footer dividers and heights stay aligned with different logos or wrapped badges. Compact, full text, missing-data states, actions and browsing memory remain unchanged. `T-POL-004` and existing responsive library/modal regressions. CSS-only application change; no API, dependency or infrastructure change. | `T-POL-004` |
 | `TASK-238` | #327: directly linkable movie/show details with synopsis, cast/characters, directors/creators, artwork and existing actions. Strict display-only cache uses owner/provider-identity-scoped metadata writes and the 183-day lazy policy; unavailable/stale/unidentified states retain saved data. Additive nullable SQL JSON column, preserved query/layout return, existing consent/undo dialogs and stronger reachability/inference gates. `T-DETAIL-001` through `T-DETAIL-006`; unit/web coverage, real SQL and responsive Chromium/WebKit regressions. Separate PR; watched history and personal ratings remain outside scope. | `T-DETAIL-001`, `T-DETAIL-006` |
 | `TASK-239` | Owner-approved tile-first extraction/review: detect before reading, serial original-resolution crops, controlled input provenance, visible per-tile next steps including known titles, safe bulk policy and separate Apply summary. `T-AI-065`, `T-AI-066`, `T-AI-067`; one live read of the reported screenshot returned all five intended titles in five source regions, without the earlier stray OCR candidates (27.5 seconds, five calls per reader). This is a bounded recognition check, not a new corpus quality baseline. No migration, dependency or infrastructure change. | `T-AI-065`, `T-AI-066`, `T-AI-067` |
+| `TASK-240` | Owner mockup-led in-app design: desktop sidebar, navy/violet surfaces, local serif headings, full-width artwork, shared service-filter chips and refined upload/review grouping. Preserve all workflows, persistence, safety, evidence, attribution and accessibility; no scenic branding or fictional features. `T-MOCK-001`, `T-MOCK-002`, `T-MOCK-003`. | `T-MOCK-001`, `T-MOCK-002`, `T-MOCK-003` |
