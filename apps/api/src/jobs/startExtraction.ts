@@ -162,7 +162,7 @@ export function extractionPorts(
           // The grouping key for collapse, BIN2-collated in the migration.
           normalisedText: candidate.normalisedText,
           extractedYear: candidate.extractedYear,
-          boundingBoxes: JSON.stringify([item.boundingBox]),
+          boundingBoxes: JSON.stringify([{ ...item.boundingBox, imageId: image.imageId }]),
           boxSource: item.boxSource,
           ocrConfidence: item.confidence,
           cleanupVerdict: candidate.cleanupVerdict,

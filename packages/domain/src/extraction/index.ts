@@ -13,3 +13,5 @@ export * from './chromeTerms.js';
 export * from './cleanup.js';
 export * from './chooseReader.js';
 export * from './lowYield.js';
+export * from './tileGrid.js';
+export * from './tileEvidence.js';

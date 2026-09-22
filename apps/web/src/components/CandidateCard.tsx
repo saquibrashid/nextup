@@ -106,7 +106,10 @@ export function CandidateCard({
   actions = null,
   consequence = null,
 }: CandidateCardProps): JSX.Element {
-  const { match } = candidate;
+  // Chrome is a transcription to inspect, not a resolved movie to promote.
+  // Keep alternatives available in the action controls without its poster/year
+  // making an incidental catalogue match look like screenshot evidence.
+  const match = candidate.verdict === 'chrome-suspected' ? null : candidate.match;
   const unreadable = candidate.verdict === 'unreadable-tile';
   // §5.3a: the tile must be rendered for both fabrication-adjacent verdicts,
   // and it is the ONLY content an unreadable tile has.
@@ -118,7 +121,8 @@ export function CandidateCard({
   // tile is the only evidence the card can carry, so show it (`T-UX-151b`).
   const hasPoster = match?.posterPath !== undefined && match?.posterPath !== null;
   const needsThumbnail = unreadable || candidate.verdict === 'inferred-unverified' || !hasPoster;
-  const displayName = match?.name ?? candidate.inferredTitle;
+  const displayName =
+    candidate.verdict === 'chrome-suspected' ? null : (match?.name ?? candidate.inferredTitle);
   // ⚠ "No title read from this tile" is a claim about the READER, not about
   // matching, and it is false whenever the tile produced text. An unmatched
   // candidate has no `match` and usually no `inferredTitle`, so the old

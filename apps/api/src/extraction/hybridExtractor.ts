@@ -28,6 +28,7 @@ import {
   isExtractorError,
   llmOnlyItems,
   ocrOnlyItems,
+  withTileEvidence,
   type CrossCheckOutcome,
   type ExtractionResult,
   type ExtractorName,
@@ -40,6 +41,7 @@ import {
 
 import type { AzureVisionExtractor } from './azureVisionExtractor.js';
 import type { LlmVisionExtractor } from './llmVisionExtractor.js';
+import { measureTileGrid } from '../images/luminanceRaster.js';
 
 const EXTRACTOR: ExtractorName = 'hybrid';
 
@@ -108,6 +110,8 @@ export class HybridExtractor implements TitleExtractor {
 
   async extract(imageBytes: Uint8Array, mimeType: ImageMimeType): Promise<ExtractionResult> {
     const startedAt = Date.now();
+    // Decode serially, inside the runner's image sentinel and error boundary.
+    const grid = await measureTileGrid(imageBytes);
 
     const [llmSettled, visionSettled] = await Promise.allSettled([
       this.#llm.readTiles(imageBytes, mimeType),
@@ -162,7 +166,11 @@ export class HybridExtractor implements TitleExtractor {
       elapsedMs: Date.now() - startedAt,
     });
 
-    return { items, crossCheck: outcome, providerMeta };
+    return {
+      ...(grid === null ? { items } : withTileEvidence(items, lines ?? [], grid)),
+      crossCheck: outcome,
+      providerMeta,
+    };
   }
 }
 

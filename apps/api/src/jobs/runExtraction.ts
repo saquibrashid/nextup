@@ -42,6 +42,7 @@ import {
   type ImageFormat,
   type ImageMimeType,
   type TitleExtractor,
+  type TileCoverage,
 } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
@@ -127,6 +128,7 @@ export interface ExtractionProgress {
  * a stage that never ran would be a false one.
  */
 export interface ExtractionStats {
+  tileCoverage?: Array<TileCoverage & { imageId: string }>;
   imagesProcessed: number;
   imagesWithZeroCandidates: number;
   candidatesRaw: number;
@@ -423,6 +425,9 @@ export async function runExtraction(input: RunExtractionInput): Promise<RunExtra
     stats.estimatedCostUsd += costOf(result);
 
     stats.candidatesAfterCleanup += await ports.recordItems(image, result.items);
+    if (result.tileCoverage !== undefined) {
+      (stats.tileCoverage ??= []).push({ imageId: image.imageId, ...result.tileCoverage });
+    }
 
     imagesDone += 1;
     await ports.reportProgress(progress(), imageFailures);
@@ -449,7 +454,12 @@ export async function runExtraction(input: RunExtractionInput): Promise<RunExtra
     // of `degradedExtraction`: a fully corroborated read of five blank
     // screenshots is not degraded and is still low yield.
     // An unread image makes absence unsafe even when other images yielded many titles.
-    lowYield: isLowYield(stats) || imageFailures.length > 0,
+    // So does an unlocated measured tile: duplicate candidate rows do not
+    // prove that every tile was read.
+    lowYield:
+      isLowYield(stats) ||
+      imageFailures.length > 0 ||
+      (stats.tileCoverage?.some((image) => image.locatedTiles < image.detectedTiles) ?? false),
     crossCheck,
     imageFailures,
     progress: progress(),

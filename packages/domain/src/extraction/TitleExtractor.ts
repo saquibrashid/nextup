@@ -123,8 +123,10 @@ export interface ExtractedTextItem {
    * interchangeable: this box is exact in position and is a text line; the
    * tile box is accurate in size and drifts in position. `tileCropFor`
    * combines them. See `BoundingBox` in `types.ts`.
+   * `gridTileBox` instead carries an image-measured tile with an OCR-backed
+   * location. It must never be attached using only a model's predicted centre.
    */
-  boundingBox: NormalisedBox & { tileBox?: NormalisedBox };
+  boundingBox: NormalisedBox & { tileBox?: NormalisedBox; gridTileBox?: NormalisedBox };
   /** Where the geometry came from. OCR wins wherever it corroborated (§2.1c step 3). */
   boxSource: BoxSource;
   /** Provider confidence 0..1, or `null`. */
@@ -141,7 +143,15 @@ export interface ExtractedTextItem {
  */
 export type ProviderMeta = Record<string, string | number | boolean | null>;
 
+export interface TileCoverage {
+  detectedTiles: number;
+  locatedTiles: number;
+  titleCandidates: number;
+}
+
 export interface ExtractionResult {
+  /** Absent means the image layout could not be measured, never zero tiles. */
+  tileCoverage?: TileCoverage;
   items: ExtractedTextItem[];
   /**
    * Whether the two readers could corroborate each other (`specs/ai.md` §2.2).

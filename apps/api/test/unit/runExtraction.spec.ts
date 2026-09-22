@@ -139,6 +139,45 @@ function scripted(
 }
 
 describe('T-EXT-010 the runner processes every image and advances progress', () => {
+  it('T-AI-063e - partial tile coverage survives per-image stats and withholds removals', async () => {
+    const coverage = { detectedTiles: 5, locatedTiles: 3, titleCandidates: 6 };
+    const outcome = await runExtraction({
+      batchId: 'batch-1',
+      images: [image(1), image(2)],
+      extractor: scripted([
+        result({ tileCoverage: coverage }),
+        result({ tileCoverage: { detectedTiles: 2, locatedTiles: 2, titleCandidates: 2 } }),
+      ]),
+      ports: harness().ports,
+    });
+    expect(outcome.status).toBe('in-review');
+    if (outcome.status !== 'in-review') throw new Error('Expected review');
+    expect(outcome.stats.tileCoverage).toEqual([
+      { imageId: 'img-1', ...coverage },
+      { imageId: 'img-2', detectedTiles: 2, locatedTiles: 2, titleCandidates: 2 },
+    ]);
+    // More candidate rows than tiles is NOT evidence all tiles were read.
+    expect(outcome.lowYield).toBe(true);
+    expect(
+      removalWithheldReason({
+        lowYield: outcome.lowYield,
+        crossCheck: outcome.crossCheck,
+        captureComplete: true,
+      }),
+    ).toBe('low-yield');
+    const complete = await runExtraction({
+      batchId: 'batch-2',
+      images: [image(1)],
+      extractor: scripted([
+        result({
+          tileCoverage: { detectedTiles: 2, locatedTiles: 2, titleCandidates: 2 },
+        }),
+      ]),
+      ports: harness().ports,
+    });
+    expect(complete.status === 'in-review' && complete.lowYield).toBe(false);
+  });
+
   it('T-EXT-010 · US-006 AC-1 · every image is processed and imagesDone advances to the total', async () => {
     const h = harness();
     const outcome = await runExtraction({

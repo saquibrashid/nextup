@@ -312,6 +312,7 @@ function union(a: NormalisedBox, b: NormalisedBox): NormalisedBox {
 }
 
 function mergeable(prev: ExtractedTextItem, next: ExtractedTextItem): boolean {
+  if (differentMeasuredTiles(prev, next)) return false;
   // ⚠ A CHROME LABEL IS A COMPLETE STRING AND MUST NOT BE GLUED TO ITS
   // NEIGHBOUR. Step 1 runs BEFORE step 3, so without this a navigation bar —
   // whose labels sit on one row inside `OCR_MERGE_GAP` of each other — is
@@ -396,6 +397,7 @@ function mergeable(prev: ExtractedTextItem, next: ExtractedTextItem): boolean {
  * never be recognised as chrome again.
  */
 function wrapsUnder(prev: ExtractedTextItem, next: ExtractedTextItem): boolean {
+  if (differentMeasuredTiles(prev, next)) return false;
   if (isChromeLine(prev.rawText) || isChromeLine(next.rawText)) return false;
 
   const p = prev.boundingBox;
@@ -412,6 +414,15 @@ function wrapsUnder(prev: ExtractedTextItem, next: ExtractedTextItem): boolean {
   return Math.min(p.h, n.h) / taller >= CAPTION_WRAP_HEIGHT_RATIO;
 }
 
+function differentMeasuredTiles(prev: ExtractedTextItem, next: ExtractedTextItem): boolean {
+  const a = prev.boundingBox.gridTileBox;
+  const b = next.boundingBox.gridTileBox;
+  if (a === undefined && b === undefined) return false;
+  return (
+    a === undefined || b === undefined || a.x !== b.x || a.y !== b.y || a.w !== b.w || a.h !== b.h
+  );
+}
+
 function mergeTwo(prev: ExtractedTextItem, next: ExtractedTextItem): ExtractedTextItem {
   // Both texts are kept, in reading order. This is the whole reason merging is
   // not dropping.
@@ -420,7 +431,12 @@ function mergeTwo(prev: ExtractedTextItem, next: ExtractedTextItem): ExtractedTe
   return {
     ...prev,
     rawText,
-    boundingBox: union(prev.boundingBox, next.boundingBox),
+    boundingBox: {
+      ...union(prev.boundingBox, next.boundingBox),
+      ...(prev.boundingBox.gridTileBox === undefined
+        ? {}
+        : { gridTileBox: prev.boundingBox.gridTileBox }),
+    },
     // Worst-of, not mean. A merged caption is only as trustworthy as its least
     // trustworthy fragment, and averaging would let one confident fragment
     // carry a doubtful one over the low-confidence floor.

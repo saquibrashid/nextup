@@ -43,6 +43,7 @@ import {
   type ReviewMatch,
   type ReviewMatchRef,
   type ReviewDisposition,
+  type ReviewTileCoverage,
   type Service,
   requireServiceOf,
   discoverySourceOf,
@@ -99,9 +100,15 @@ function isMatchRef(value: unknown): value is ReviewMatchRef {
  * which renders as a confident thumbnail of the wrong part of the screenshot.
  * A rejected box shows the whole image instead, which is honest.
  */
-export function parseBoundingBoxes(
-  raw: string | null,
-): { imageId: string; x: number; y: number; w: number; h: number; tileBox?: Rect }[] {
+export function parseBoundingBoxes(raw: string | null): {
+  imageId: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  tileBox?: Rect;
+  gridTileBox?: Rect;
+}[] {
   if (raw === null || raw === '') return [];
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -112,8 +119,12 @@ export function parseBoundingBoxes(
       // discard the candidate's only recorded evidence and change which rows
       // the review page can locate at all. Losing just the tile means "no
       // crop" — the whole screenshot, which `tileCropFor` already handles.
-      const { tileBox, ...rest } = box;
-      return isRect(tileBox) ? { ...rest, tileBox } : rest;
+      const { tileBox, gridTileBox, ...rest } = box;
+      return {
+        ...rest,
+        ...(isRect(tileBox) ? { tileBox } : {}),
+        ...(isRect(gridTileBox) ? { gridTileBox } : {}),
+      };
     });
   } catch {
     return [];
@@ -133,13 +144,75 @@ function isRect(value: unknown): value is Rect {
   return (['x', 'y', 'w', 'h'] as const).every((key) => typeof rect[key] === 'number');
 }
 
-function isBoundingBox(
-  value: unknown,
-): value is { imageId: string; x: number; y: number; w: number; h: number; tileBox?: unknown } {
+function isBoundingBox(value: unknown): value is {
+  imageId: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  tileBox?: unknown;
+  gridTileBox?: unknown;
+} {
   if (typeof value !== 'object' || value === null) return false;
   const box = value as Record<string, unknown>;
   if (typeof box['imageId'] !== 'string') return false;
   return (['x', 'y', 'w', 'h'] as const).every((key) => typeof box[key] === 'number');
+}
+
+/** Old batches have no measurement. Never turn absent/malformed stats into zero tiles. */
+export function readTileCoverage(
+  raw: string | null | undefined,
+  images: readonly { id: string; fileName: string }[],
+): ReviewTileCoverage[] {
+  if (!raw) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (typeof parsed !== 'object' || parsed === null || !('stage1' in parsed)) return [];
+  const stage = parsed.stage1;
+  if (typeof stage !== 'object' || stage === null || !('tileCoverage' in stage)) return [];
+  if (!Array.isArray(stage.tileCoverage)) return [];
+  const entries: unknown[] = stage.tileCoverage;
+  return images.flatMap((image) => {
+    const entry: unknown = entries.find(
+      (value: unknown) =>
+        typeof value === 'object' &&
+        value !== null &&
+        'imageId' in value &&
+        value.imageId === image.id,
+    );
+    if (typeof entry !== 'object' || entry === null) return [];
+    if (!('detectedTiles' in entry && 'locatedTiles' in entry && 'titleCandidates' in entry))
+      return [];
+    const { detectedTiles, locatedTiles, titleCandidates } = entry;
+    if (
+      typeof detectedTiles !== 'number' ||
+      typeof locatedTiles !== 'number' ||
+      typeof titleCandidates !== 'number'
+    )
+      return [];
+    if (
+      ![detectedTiles, locatedTiles, titleCandidates].every(Number.isSafeInteger) ||
+      detectedTiles < 2 ||
+      locatedTiles < 0 ||
+      locatedTiles > detectedTiles ||
+      titleCandidates < locatedTiles
+    )
+      return [];
+    return [
+      {
+        imageId: image.id,
+        fileName: image.fileName,
+        href: `/api/images/${encodeURIComponent(image.id)}`,
+        detectedTiles,
+        locatedTiles,
+        titleCandidates,
+      },
+    ];
+  });
 }
 
 /**
@@ -408,6 +481,7 @@ export function registerBatchReviewRoutes(router: Router): void {
       disappearedListings,
       untickedListingIds,
       imagesWithNoText,
+      tileCoverage: readTileCoverage(batch.extractionStats, images),
       tmdbUnavailable: readTmdbUnavailable(batch.extractionStats),
       captureComplete: (await readCaptureIntake(ownerId, batch)).complete,
     });

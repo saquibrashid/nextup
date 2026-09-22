@@ -256,7 +256,14 @@ export interface ReviewImageWithNoText {
   href: string;
 }
 
+export interface ReviewTileCoverage extends ReviewImageWithNoText {
+  detectedTiles: number;
+  locatedTiles: number;
+  titleCandidates: number;
+}
+
 export interface BuildReviewInput {
+  tileCoverage?: readonly ReviewTileCoverage[];
   batchId: string;
   /**
    * `null` for a DISCOVERY capture (TASK-186, ADR-0010 D-1).
@@ -333,6 +340,7 @@ export interface RemovalSection extends ReviewSection<ReviewRemovalItem> {
 export type RemovalWithheldReason = 'low-yield' | 'degraded-extraction' | 'incomplete-capture';
 
 export interface ReviewResponse {
+  tileCoverage?: ReviewTileCoverage[];
   candidateSummary?: { total: number; alreadyKnown: number };
   batchId: string;
   /** `null` for a discovery capture — see `BuildReviewInput.service`. */
@@ -433,8 +441,11 @@ export const TILE_CROP_PADDING = 0.08;
  * The region to crop for a candidate's tile thumbnail, or `null` to show the
  * whole image.
  *
- * ⚠ **THE RULE IS: POSITION FROM THE MEASURED CAPTION, SIZE FROM THE READER'S
- * TILE, AND NO CROP UNLESS BOTH AGREE.** Each half is measured against the
+ * Image-measured tiles take precedence when a verified OCR anchor lies inside
+ * them (T-AI-062). Return the tile itself, not a caption-centred approximation.
+ * Without measured geometry the legacy rule remains: position from the
+ * measured caption, size from the reader's tile, only when both agree.
+ * Each half is measured against the
  * annotated corpus in `tests/fixtures/golden/tiles/`
  * (`docs/evaluation/tile-geometry-2026-09-20.md`), and neither half works
  * alone:
@@ -519,6 +530,7 @@ export function tileCropFor(input: {
     w: number;
     h: number;
     tileBox?: { x: number; y: number; w: number; h: number } | undefined;
+    gridTileBox?: { x: number; y: number; w: number; h: number } | undefined;
   }[];
 }): ReviewTileCrop | null {
   // Unverified reader geometry. Measured 8-in-10 wrong; see the note above.
@@ -530,6 +542,29 @@ export function tileCropFor(input: {
   // Only the boxes on the SAME image as the first are unioned — see the
   // `imageId` note on `ReviewTileCrop`.
   const onImage = input.boundingBoxes.filter((box) => box.imageId === first.imageId);
+
+  const measured = onImage.find((box) => box.gridTileBox !== undefined);
+  if (measured?.gridTileBox !== undefined) {
+    const tile = measured.gridTileBox;
+    const numbers = [
+      tile.x,
+      tile.y,
+      tile.w,
+      tile.h,
+      measured.x,
+      measured.y,
+      measured.w,
+      measured.h,
+    ];
+    if (!numbers.every(Number.isFinite)) return null;
+    if (tile.x < 0 || tile.y < 0 || tile.w <= 0 || tile.h <= 0) return null;
+    if (tile.x + tile.w > 1 || tile.y + tile.h > 1) return null;
+    if (measured.w <= 0 || measured.h <= 0) return null;
+    const x = measured.x + measured.w / 2;
+    const y = measured.y + measured.h / 2;
+    if (x < tile.x || x > tile.x + tile.w || y < tile.y || y > tile.y + tile.h) return null;
+    return { imageId: first.imageId, x: tile.x, y: tile.y, w: tile.w, h: tile.h };
+  }
 
   let left = Number.POSITIVE_INFINITY;
   let top = Number.POSITIVE_INFINITY;
@@ -717,6 +752,7 @@ export function buildReviewResponse(input: BuildReviewInput): ReviewResponse {
   return {
     batchId: input.batchId,
     candidateSummary: { total: visible.length, alreadyKnown: buckets.alreadyOnYourList.length },
+    tileCoverage: [...(input.tileCoverage ?? [])],
     service: input.service,
     discoverySource: input.discoverySource ?? null,
     mode: input.mode,
