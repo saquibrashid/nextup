@@ -48,6 +48,10 @@ describe('T-POL-003a calm capture framing', () => {
         );
         expect(new Set(stages.map((item) => Math.round(item.bottom))).size).toBe(1);
         expect(Math.max(...stages.map((item) => item.height))).toBeLessThanOrEqual(120);
+        const markers = await progress
+          .getByRole('listitem')
+          .evaluateAll((items) => items.map((item) => getComputedStyle(item, '::before').width));
+        expect(markers).toEqual(Array<string>(3).fill(width >= 640 ? '36px' : '24px'));
         expect(
           Math.max(...stages.map((item) => item.width)) -
             Math.min(...stages.map((item) => item.width)),

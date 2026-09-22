@@ -2957,8 +2957,8 @@ button {
   content: counter(capture-stage);
   display: grid;
   place-items: center;
-  inline-size: 2.25rem;
-  block-size: 2.25rem;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
   flex: none;
   border: 1px solid var(--color-border);
   border-radius: 50%;
@@ -2975,6 +2975,11 @@ button {
   .capture-progress > li {
     flex-direction: row;
     justify-content: center;
+  }
+
+  .capture-progress > li::before {
+    inline-size: 2.25rem;
+    block-size: 2.25rem;
   }
 }
 

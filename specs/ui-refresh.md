@@ -189,6 +189,8 @@ Use only the existing routes, service registry and saved data.
 - Upload retains progressive required choices, editable summaries and all three
   intake paths. Refine numbered orientation, logo tiles, mode cards, previews
   and the sticky summary; never default a service/mode or auto-submit.
+  Use 24px step markers on phones and 36px from 640px upward; narrow-screen
+  progress must remain within its 120px height budget with wrapped labels.
 - Review uses distinct section headings, restrained state accents and framed
   evidence/identity/action groups. Keep original text, real warnings, all
   full-update candidates, virtualization, explicit confirmation and sticky
