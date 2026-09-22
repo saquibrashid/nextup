@@ -46,6 +46,7 @@ import {
   WATCH_PRIORITY_LABELS,
   runtimeUnknownHiddenLabel,
 } from '../copy';
+import { ServiceMark } from './ServiceMark';
 
 /** `api.md` §6.2 — `type` is `movie|tv`. */
 export const MEDIA_TYPES = ['movie', 'tv'] as const;
@@ -529,6 +530,31 @@ export function FilterBar({
             </div>
           </Dialog>
         )}
+      </div>
+
+      <div
+        className="service-filters"
+        role="group"
+        aria-label="Filter by streaming service"
+        onFocus={(event) => event.target.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })}
+      >
+        <Button
+          variant="secondary"
+          aria-pressed={filters.services.length === 0}
+          onClick={() => update({ ...filters, services: [] })}
+        >
+          All services
+        </Button>
+        {SERVICES.map((service) => (
+          <Button
+            key={service}
+            variant="secondary"
+            aria-pressed={filters.services.includes(service)}
+            onClick={() => update({ ...filters, services: toggle(filters.services, service) })}
+          >
+            <ServiceMark service={service} />
+          </Button>
+        ))}
       </div>
 
       {(chips.length > 0 || isFiltered(filters) || query !== '') && (

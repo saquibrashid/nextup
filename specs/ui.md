@@ -353,13 +353,14 @@ restore, suppress, un-suppress or fix-match.
    metadata, badges and actions in both views. **Owner-approved 2026-09-18:
    Cover browser maps to Grid; Comparison desk maps to Compact.** Grid stays
    the default and uses portrait-led cards in two columns from 640px and three
-   from 1024px. On phones it uses one horizontal card per row, with a 96px-wide
+   from 1024px, then five from 1440px (TASK-239). On phones it uses one horizontal card per row, with a 96px-wide
    poster and more generous spacing than Compact's 72px poster.
    Compact stays single-column: wrapping facts below 1200px, then a flexible
    title/metadata column with fixed-width service, rating, priority and date
    columns. Each fact column aligns across titles (`T-UX-147a`); content-sized
    tracks must not reintroduce ragged offsets. At 390px rating and priority
-   share a line (`T-UX-147c`). The frame is bounded to 78rem.
+   share a line (`T-UX-147c`). The frame is bounded to 96rem, including the
+   desktop sidebar. Grid artwork fills each card at 2:3.
    Both layouts retain the same DOM, query/state ownership, all metadata and
    actions. Watching is a separate textual status beside title information,
    not part of the priority button's visible label. Priority buttons use the
@@ -1485,13 +1486,16 @@ Modifiers use the `--` suffix already in use: `title-row__poster--empty`,
 | `--bp-sm` | `640px` | §10.1. Named so a breakpoint cannot be typed twice with different values |
 | `--bp-md` | `768px` | Intermediate responsive token; the list grid activates at `--bp-lg` (`T-UX-110`, `T-UX-111`) |
 | `--bp-lg` | `1024px` | §10.1 |
-| `--layout-max-width` | `78rem` | Bounded Cover browser and Comparison desk; three Grid columns and aligned Compact facts |
+| `--layout-max-width` | `96rem` | Bounded catalog and desktop sidebar; responsive two/three/five-column Grid and aligned Compact facts |
 | `--tap-target-min` | `44px` | NFR-006. **The one definition**; `.tap-target` is its only consumer |
 | `--color-text` | `#f2efff` | **14.97:1** on `--color-surface` |
 | `--color-text-muted` | `#bcb4d2` | **8.54:1** on `--color-surface` |
 | `--color-bg` | `#121020` | Dark ink background |
 | `--color-surface` | `#1e1932` | Dark indigo surface; also the foreground on primary accent-filled buttons |
 | `--color-surface-raised` | `#262039` | Subtle card-gradient endpoint |
+| `--color-catalog` | `#111526` | Owner mockup's navy content and section surfaces |
+| `--color-catalog-raised` | `#1a2036` | Navy cards and capture/action summaries; contrast checked with semantic text and interactive borders |
+| `--font-display` | `Georgia, Cambria, 'Times New Roman', serif` | Local serif page/step headings; body and controls keep the existing system sans-serif stack |
 | `--color-secondary` | `#adc5f7` | Secondary metadata, never a provider brand |
 | `--color-rating` | `#e8c88f` | IMDb scores, not recommendations |
 | `--color-success` | `#7adcb0` | Watching text, independently of priority |

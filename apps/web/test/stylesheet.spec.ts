@@ -484,7 +484,13 @@ describe('T-CSS-004 — contrast is computed from the tokens, not eyeballed', ()
       '--color-success',
       '--color-accent',
     ]) {
-      for (const background of ['--color-bg', '--color-surface', '--color-surface-raised']) {
+      for (const background of [
+        '--color-bg',
+        '--color-surface',
+        '--color-surface-raised',
+        '--color-catalog',
+        '--color-catalog-raised',
+      ]) {
         expect(
           ratio(token(foreground), token(background)),
           `${foreground} on ${background}`,
@@ -492,7 +498,12 @@ describe('T-CSS-004 — contrast is computed from the tokens, not eyeballed', ()
       }
     }
     // Controls use the base surface/background, not the lighter card endpoint.
-    for (const background of ['--color-bg', '--color-surface']) {
+    for (const background of [
+      '--color-bg',
+      '--color-surface',
+      '--color-catalog',
+      '--color-catalog-raised',
+    ]) {
       expect(ratio(token('--color-border'), token(background))).toBeGreaterThanOrEqual(3);
     }
   });

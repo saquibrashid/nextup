@@ -33,6 +33,11 @@ describe('T-POL-003a calm capture framing', () => {
         await page.setViewportSize({ width, height: 900 });
         await page.goto('/upload');
         await expect(page.getByRole('heading', { level: 1 })).toHaveText('Upload screenshots');
+        expect(
+          await page
+            .getByRole('heading', { level: 1 })
+            .evaluate((el) => getComputedStyle(el).fontFamily),
+        ).toContain('Georgia');
         const progress = page.getByRole('list', { name: 'Capture progress' });
         await expect(progress.locator('[aria-current="step"]')).toHaveText('Prepare');
         const stages = await progress.getByRole('listitem').evaluateAll((items) =>
@@ -43,6 +48,10 @@ describe('T-POL-003a calm capture framing', () => {
         );
         expect(new Set(stages.map((item) => Math.round(item.bottom))).size).toBe(1);
         expect(Math.max(...stages.map((item) => item.height))).toBeLessThanOrEqual(120);
+        const markers = await progress
+          .getByRole('listitem')
+          .evaluateAll((items) => items.map((item) => getComputedStyle(item, '::before').width));
+        expect(markers).toEqual(Array<string>(3).fill(width >= 640 ? '36px' : '24px'));
         expect(
           Math.max(...stages.map((item) => item.width)) -
             Math.min(...stages.map((item) => item.width)),
@@ -101,4 +110,29 @@ describe('T-POL-003a calm capture framing', () => {
       });
     });
   }
+});
+
+test('T-MOCK-003a: mockup upload framing retains real choices and a readable numbered flow', async ({
+  page,
+}) => {
+  await page.route('**/api/me', (route) =>
+    route.fulfill({ json: { ownerId: 'owner', attribution: {} } }),
+  );
+  await page.route('**/api/batches?open=true', (route) => route.fulfill({ json: { batches: [] } }));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/upload');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Upload screenshots');
+  const step = page
+    .getByRole('list', { name: 'Capture progress' })
+    .locator('[aria-current="step"]');
+  expect(
+    await step.evaluate((el) => Number.parseFloat(getComputedStyle(el, '::before').width)),
+  ).toBe(36);
+  const choices = page.getByTestId('service-step').locator('label');
+  expect(
+    await choices.first().evaluate((el) => el.getBoundingClientRect().height),
+  ).toBeGreaterThanOrEqual(96);
+  await expect(page.getByRole('radio', { checked: true })).toHaveCount(0);
+  await expect(page.getByTestId('file-input')).toBeEnabled();
+  await expect(page.getByTestId('submit-button')).toBeDisabled();
 });
