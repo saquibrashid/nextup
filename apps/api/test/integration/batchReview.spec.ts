@@ -565,7 +565,7 @@ describe('T-REV-006 full-update shows ALL extracted titles — the safety proper
     await makeCandidate(batchId, { workIdentity: DUNE });
 
     const body = (await (await getReview(batchId)).json()) as ReviewBody;
-    expect(body.sections.alreadyOnYourList.omitted).toBe(true);
+    expect(body.sections.alreadyOnYourList.omitted).toBe(false);
     expect(body.sections.removals.omitted).toBe(true);
     expect(body.sections.removals.count).toBe(0);
   });
@@ -821,18 +821,16 @@ describe('T-SUP-002 suppression is gated BEFORE classification and never appears
 });
 
 describe('T-UI-006 · US-013 AC-3 · the mode contract: omitted means "not applicable", never "nothing found"', () => {
-  it('T-UI-006a: append-only marks alreadyOnYourList omitted with an empty item list', async () => {
+  it('T-UI-006a: append-only keeps already-known extracted titles visible', async () => {
     const batchId = await makeBatch({ mode: 'append-only' });
-    // The data to fill the section EXISTS: this title is on the list and was
-    // extracted. Append-only omits the section anyway, because the owner has
-    // not told us the screenshots are a complete picture.
+    // Incomplete capture affects removals, never the visibility of known matches.
     await makeActiveListing(DUNE, 'netflix', 'Dune');
     await makeCandidate(batchId, { workIdentity: DUNE, rawText: 'Dune' });
 
     const body = (await (await getReview(batchId)).json()) as ReviewBody;
-    expect(body.sections.alreadyOnYourList.omitted).toBe(true);
-    expect(body.sections.alreadyOnYourList.items).toEqual([]);
-    expect(body.sections.alreadyOnYourList.count).toBe(0);
+    expect(body.sections.alreadyOnYourList.omitted).toBe(false);
+    expect(body.sections.alreadyOnYourList.items).toHaveLength(1);
+    expect(body.sections.alreadyOnYourList.count).toBe(1);
   });
 
   it('T-UI-006b: the SAME data in full-update fills the section — the mode is what decides', async () => {

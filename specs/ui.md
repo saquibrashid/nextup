@@ -865,17 +865,11 @@ shows the failure states in `specs/ux-states.md` §5.
 
   (banner, when present — low yield, TMDB unreachable, …)
 
-  ▸ New to your list (9)                       [Confirm all 9]
-      … candidate cards, expanded by default …
-
-  ▸ Couldn't identify these (2)
-      … unmatched cards with a "Find a match" search …
-
-  ▾ Already on your list (54)          ← FULL UPDATE ONLY, collapsed, NEVER omitted
-      … saved matches with a deliberate identity-correction action …
-
-  ▾ Probably not titles (25)                   collapsed
-      … cards with a "This is a title" rescue …
+  5 tiles found · 2 already saved · 3 to review
+  [Original tile 1]  [Match and next step: already saved]
+  [Original tile 2]  [Match and next step: confirm/change/discard]
+      … every original tile in screenshot order …
+      … conflicting readings stay beneath their source tile …
 
   ▸ No longer on Netflix (3)                   ← FULL UPDATE ONLY
       … removal cards, ALL TICKED …
@@ -890,8 +884,8 @@ shows the failure states in `specs/ux-states.md` §5.
 
 | Rule | Implementation |
 |---|---|
-| Full update shows **all** extracted titles (REQ-057) | The **"Already on your list (N)"** section is rendered whenever `mode === 'full-update'`. It is **collapsible but never omitted**, and its **count is visible while collapsed** so the owner can sanity-check it against what they expect. `T-REV-006`, `T-UI-005`. |
-| Append-only shows only new (REQ-022) | The section, and the entire removals section, are **absent from the DOM**. `T-UI-006`. |
+| Both modes show **all** extracted titles (REQ-057; owner-approved tile-first revision) | Every verified input tile remains visible, including already-known matches and unidentified tiles. Older batches retain the section layout with known titles expanded. `T-REV-006`, `T-UI-005`, `T-AI-067`. |
+| Append-only never proposes removals (REQ-022) | Only the removals section is absent. Already-known matches remain visible and require no action. `T-UI-006`. |
 | Known matches are not additions | No confirm, discard or bulk-add controls in the known section. **Find the right title** corrects mistaken identity through the existing candidate API; the server determines the new section. `T-REV-016`, `T-UX-162g`. |
 | Removals ticked by default (REQ-055) | Every removal checkbox is `checked` on first render. `T-UI-007`. |
 | Removals individually rescuable (REQ-021) | Each labelled checkbox calls `PATCH /api/batches/:id/removals` and rereads the review. A failed write is visible; no optimistic removal consent. |
@@ -927,8 +921,22 @@ Flags rendered as chips: **"Low confidence"** (`verdict === 'low-confidence'`),
 
 #### 5.3a Revision-2 verdicts (ADR-0001 Revision 2)
 
-**Image-derived evidence (2026-09-22, `T-AI-062`–`T-AI-064`).** When the
-single-row grid detector accepts a layout, crop to its measured tile only with
+**Tile-first review (`T-AI-065`–`T-AI-067`).** Render every controlled
+`inputTileBox` beside its proposed catalogue match and explicit next step.
+Already saved on this service: nothing to add, with Change match recovery.
+Known on another service: confirm adding this service. New: confirm, change
+or discard. Unidentified: search, keep unidentified or discard; a textless
+unreadable tile offers search/discard, never an empty-title Keep.
+Related or weak readings require individual decisions and are excluded from
+bulk confirmation consistently in the client, API and offline replay.
+Show conflicting readings inside the same physical tile, not as additional
+tiles. Shared identities retain every source tile but share one saved decision.
+Window tile groups above the existing 100-item threshold. Apply changes still
+has its separate authoritative summary and never adds an undecided reading.
+Unreadable tiles are not additions; leaving one unidentified does not add it.
+
+**Legacy image-derived evidence (`T-AI-062`–`T-AI-064`).** Without controlled
+input provenance, crop to a measured tile only with
 an OCR-backed title location. Unique exact OCR text, including a tile's joined
 OCR lines, may locate an otherwise unverified artwork candidate without
 upgrading its confidence or removing its warning. Never snap an unverified
@@ -936,11 +944,12 @@ model box to its nearest tile. Rejected layouts retain the existing crop rule
 and labelled whole-screenshot fallback.
 
 Show per-image coverage above collapsed review groups, with a link to the
-source: **"3 title candidates; titles located in 3 of 5 detected tiles."**
+source: **"3 title candidates; readings located in 3 of 5 detected tiles."**
 If coverage is incomplete, ask the owner to compare the screenshot and add
 missing titles, explicitly distinguishing *unlocated* from *unread*. The
 "Couldn't read these" bucket still counts explicit unreadable candidates,
-not silently omitted tiles. Absent measurement makes no completeness claim.
+not silently omitted tiles. Readings may be duplicates or misreads, not
+verified identities. Absent measurement makes no completeness claim.
 Any unlocated detected tile withholds full-update removals through `lowYield`.
 
 In **Probably not titles**, headline the raw transcription (e.g. **My List**),

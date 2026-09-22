@@ -69,7 +69,7 @@ describe('T-AI-064 - visible tile evidence', () => {
     expect(data.sections.unreadableTiles.count).toBe(0);
     render(<ReviewPage review={data} />);
     expect(
-      screen.getByText(/3 title candidates; titles located in 3 of 5 detected tiles/),
+      screen.getByText(/3 title candidates; readings located in 3 of 5 detected tiles/),
     ).toBeVisible();
     expect(screen.getByText(/an unlocated tile is not necessarily unread/)).toBeVisible();
     expect(screen.getByRole('link', { name: 'shot.png' })).toHaveAttribute(
@@ -102,7 +102,14 @@ describe('T-AI-064 - visible tile evidence', () => {
       lowYield: false,
       degradedExtraction: false,
       crossCheck: 'ok',
-      candidates: [{ ...candidate, verdict: 'title-candidate' }],
+      candidates: [
+        {
+          ...candidate,
+          provider: 'llm',
+          verdict: 'title-candidate',
+          match: { ...candidate.match!, uncertain: false },
+        },
+      ],
       disappearedListings: [],
       imagesWithNoText: [],
     });

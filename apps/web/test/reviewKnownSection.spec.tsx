@@ -111,7 +111,9 @@ describe('T-REV-016 · US-013 AC-2 · known titles are not additions', () => {
       within(section).queryByRole('button', { name: /Confirm|Discard|Keep/ }),
     ).not.toBeInTheDocument();
     expect(within(section).queryAllByRole('checkbox')).toHaveLength(0);
-    expect(within(section).queryAllByRole('link')).toHaveLength(0);
+    expect(within(section).getAllByRole('link', { name: 'Open source screenshot' })).toHaveLength(
+      2,
+    );
     expect(mutation).not.toHaveBeenCalled();
   });
 
@@ -122,7 +124,7 @@ describe('T-REV-016 · US-013 AC-2 · known titles are not additions', () => {
     render(<ReviewPage review={review()} />);
 
     const focusable = knownSection().querySelectorAll(
-      'button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])',
+      'button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
     );
     expect(focusable).toHaveLength(0);
   });
@@ -140,15 +142,12 @@ describe('T-REV-016 · US-013 AC-2 · known titles are not additions', () => {
     expect(screen.getByTestId('review-action-bar')).toBeInTheDocument();
   });
 
-  it('T-REV-016d: it is collapsed by default', () => {
-    // SD-11b. The owner is reviewing what is NEW; the known titles are proof
-    // that nothing was silently dropped, and proof does not need to be
-    // scrolled past.
+  it('T-REV-016d: it is expanded by default so recognised known titles are obvious', () => {
     render(<ReviewPage review={review()} />);
 
     const details = knownSection().querySelector('details');
     expect(details).not.toBeNull();
-    expect(details).not.toHaveAttribute('open');
+    expect(details).toHaveAttribute('open');
   });
 
   it('T-REV-016e: the count stays visible while it is collapsed', () => {
@@ -182,7 +181,8 @@ describe('T-REV-016 · US-013 AC-2 · known titles are not additions', () => {
     render(<ReviewPage review={review()} />);
 
     const details = knownSection().querySelector('details');
-    expect(details).not.toHaveAttribute('open');
+    expect(details).toHaveAttribute('open');
+    details?.removeAttribute('open');
     expect(within(knownSection()).getAllByTestId('candidate-name').length).toBeGreaterThan(0);
   });
 });

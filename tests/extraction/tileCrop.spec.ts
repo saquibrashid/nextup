@@ -48,9 +48,9 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { crossCheck, tileCropFor } from '@nextup/domain';
+import { crossCheck, tileCropFor, withTileEvidence } from '@nextup/domain';
 import type { LlmTile, OcrLine } from '@nextup/domain';
-import { HybridExtractor } from '../../apps/api/src/extraction/hybridExtractor.js';
+import { measureTileGrid } from '../../apps/api/src/images/luminanceRaster.js';
 
 const GOLDEN = join(process.cwd(), 'tests', 'fixtures', 'golden');
 
@@ -141,8 +141,8 @@ describe('T-AI-055 - the tile crop, scored against ground truth', () => {
   it('T-AI-062h - image-derived crops retain identity-paired corpus coverage, with nonzero measured yield', async () => {
     // The new branch must face the same oracle as the old one. Scoring boxes
     // against whichever tile they hit would certify confidently wrong crops.
-    // Replay the shipped hybrid with recorded reader output but REAL pixels;
-    // the positive floor prevents "refuse everything" satisfying the test.
+    // Historical whole-image recordings only prove the legacy crop path.
+    // Crop-scoped reader input is independently exercised by T-AI-063/066.
     let measuredCrops = 0;
     let crops = 0;
     const files = readdirSync(join(GOLDEN, 'images'));
@@ -152,13 +152,9 @@ describe('T-AI-055 - the tile crop, scored against ground truth', () => {
       const llm = read<LlmTile[]>(join(GOLDEN, 'llm', 'gpt-4.1', `${id}.llm.json`));
       const ocr = read<OcrLine[]>(join(GOLDEN, 'ocr', `${id}.ocr.json`));
       const truth = read<Tile[]>(join(GOLDEN, 'tiles', `${id}.tiles.json`));
-      const result = await new HybridExtractor({
-        llm: { readTiles: async () => llm },
-        vision: { readLines: async () => ocr },
-      }).extract(
-        readFileSync(join(GOLDEN, 'images', file)),
-        file.endsWith('.png') ? 'image/png' : 'image/jpeg',
-      );
+      const grid = await measureTileGrid(readFileSync(join(GOLDEN, 'images', file)));
+      const items = crossCheck(llm, ocr);
+      const result = grid === null ? { items } : withTileEvidence(items, ocr, grid);
       for (const item of result.items) {
         const tile = truth.find(
           (entry) => norm(entry.title) === norm(item.inferredTitle ?? item.rawText),

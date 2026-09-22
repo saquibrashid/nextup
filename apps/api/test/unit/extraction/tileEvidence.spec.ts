@@ -1,8 +1,8 @@
 import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
-import { tileCropFor, type LlmTile, type OcrLine } from '@nextup/domain';
-import { HybridExtractor } from '../../../src/extraction/hybridExtractor.js';
-import { luminanceRasterFrom } from '../../../src/images/luminanceRaster.js';
+import { cleanup, ExtractorError, tileCropFor, type LlmTile, type OcrLine } from '@nextup/domain';
+import { HybridExtractor, type HybridLegs } from '../../../src/extraction/hybridExtractor.js';
+import { luminanceRasterFrom, measureTileGrid } from '../../../src/images/luminanceRaster.js';
 import { parseBoundingBoxes, readTileCoverage } from '../../../src/routes/batchReview.js';
 import { runExtraction } from '../../../src/jobs/runExtraction.js';
 
@@ -12,7 +12,8 @@ async function screenshot(alpha = false): Promise<Buffer> {
   for (let y = 0; y < 100; y++) {
     for (let x = 0; x < 1000; x++) {
       const start = (y * 1000 + x) * channels;
-      if (y >= 20 && y < 80 && x % 200 >= 10) data.fill(200, start, start + 3);
+      if (y >= 20 && y < 80 && x % 200 >= 10)
+        data.fill(120 + Math.floor(x / 200) * 25, start, start + 3);
       if (alpha) data[start + 3] = 255;
     }
   }
@@ -30,6 +31,102 @@ async function screenshot(alpha = false): Promise<Buffer> {
  * empty, and stats cannot mint a link to an image outside this owner's batch.
  */
 describe('T-AI-063 - image evidence wiring', () => {
+  it('T-AI-066a - detection precedes readers, crops are serial, and only their two legs overlap', async () => {
+    const original = await screenshot();
+    const grid = await measureTileGrid(original);
+    expect(grid?.tiles).toHaveLength(5);
+    let active = 0;
+    let peak = 0;
+    const events: string[] = [];
+    const reader = async (leg: string, bytes: Uint8Array) => {
+      const { width, height } = await sharp(bytes).metadata();
+      expect(width).toBeLessThan(210);
+      expect(height).toBeLessThan(70);
+      events.push(`${leg}:start`);
+      peak = Math.max(peak, ++active);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      events.push(`${leg}:end`);
+      active--;
+      return [];
+    };
+    await new HybridExtractor({
+      llm: { readTiles: (bytes) => reader('llm', bytes) },
+      vision: { readLines: (bytes) => reader('ocr', bytes) },
+    }).extract(original, 'image/png');
+    expect(peak).toBe(2);
+    expect(events).toHaveLength(20);
+    for (let i = 0; i < events.length; i += 4) {
+      expect(events.slice(i, i + 2).sort()).toEqual(['llm:start', 'ocr:start']);
+      expect(events.slice(i + 2, i + 4).sort()).toEqual(['llm:end', 'ocr:end']);
+    }
+  });
+
+  it('T-AI-066b - empty and all-chrome crops retain unreadable placeholders with original input regions', async () => {
+    let index = 0;
+    const result = await new HybridExtractor({
+      llm: { readTiles: async () => [] },
+      vision: {
+        readLines: async () =>
+          index++ === 0
+            ? [
+                {
+                  text: 'My List',
+                  confidence: 1,
+                  box: { x: 0, y: 0, w: 1, h: 1 },
+                },
+              ]
+            : [],
+      },
+    }).extract(await screenshot(), 'image/png');
+    const cleaned = cleanup(result.items);
+    expect(cleaned.filter((item) => item.cleanupVerdict === 'unreadable-tile')).toHaveLength(5);
+    expect(cleaned.filter((item) => item.cleanupVerdict === 'chrome-suspected')).toHaveLength(1);
+    expect(result.tileCoverage?.locatedTiles).toBe(0);
+    expect(new Set(result.items.map((item) => item.boundingBox.inputTileBox?.x)).size).toBe(5);
+  });
+
+  it('T-AI-066c - one degraded crop degrades the image and preserves every input tile', async () => {
+    let index = 0;
+    const result = await new HybridExtractor({
+      llm: {
+        readTiles: async () => {
+          if (index++ === 2) throw new ExtractorError('unavailable', 'llm-vision', 'Unavailable');
+          return [];
+        },
+      },
+      vision: { readLines: async () => [] },
+    }).extract(await screenshot(), 'image/png');
+    expect(result.crossCheck).toBe('llm-unavailable');
+    expect(result.providerMeta['llmOk']).toBe(false);
+    expect(result.tileCoverage?.tiles).toHaveLength(5);
+    expect(result.items).toHaveLength(5);
+  });
+
+  it('T-AI-066d - refused layouts explicitly withhold removals even with many whole-image readings', async () => {
+    const result = await runExtraction({
+      batchId: 'batch',
+      images: [{ imageId: 'img', fileName: 'shot.png', format: 'png', blobPath: 'img' }],
+      extractor: {
+        name: 'hybrid',
+        extract: async () => ({
+          items: [],
+          providerMeta: {},
+          crossCheck: 'ok',
+          layout: 'unverified',
+        }),
+      },
+      ports: {
+        loadImageBytes: async () => new Uint8Array(),
+        recordItems: async () => 50,
+        reportProgress: () => undefined,
+        now: () => 0,
+      },
+    });
+    expect(result.status).toBe('in-review');
+    expect(result.stats?.unsegmentedImageIds).toEqual(['img']);
+    expect(result).toMatchObject({ lowYield: true });
+  });
+
   it('T-AI-063h - a corrupt raster fails only its image and keeps the batch reviewable', async () => {
     const valid = await screenshot();
     const extractor = new HybridExtractor({
@@ -64,7 +161,7 @@ describe('T-AI-063 - image evidence wiring', () => {
     expect(outcome.imageFailures[0]?.message).not.toMatch(/memory|runbook/i);
   });
 
-  it('T-AI-063a - real pixels reach the review crop and coverage without extra reader calls', async () => {
+  it('T-AI-063a - real crop pixels reach each reader and persist into review geometry', async () => {
     const llm: LlmTile[] = [
       {
         visibleText: 'The Film',
@@ -81,17 +178,42 @@ describe('T-AI-063 - image evidence wiring', () => {
         box: { x: 0.04, y: 0.3, w: 0.1, h: 0.04 },
       },
     ];
-    const readTiles = vi.fn(async () => llm);
-    const readLines = vi.fn(async () => ocr);
+    const readTiles = vi.fn<HybridLegs['llm']['readTiles']>(async () => llm);
+    const readLines = vi.fn<HybridLegs['vision']['readLines']>(async () => ocr);
+    const original = await screenshot();
     const result = await new HybridExtractor({
       llm: { readTiles },
       vision: { readLines },
-    }).extract(await screenshot(), 'image/png');
-    expect(readTiles).toHaveBeenCalledTimes(1);
-    expect(readLines).toHaveBeenCalledTimes(1);
-    // The OCR orphan is retained, never silently deleted. Two candidate rows
-    // still occupy ONE tile, so they cannot cover a missing neighbour.
-    expect(result.tileCoverage).toEqual({ detectedTiles: 5, locatedTiles: 1, titleCandidates: 2 });
+    }).extract(original, 'image/png');
+    expect(readTiles).toHaveBeenCalledTimes(5);
+    expect(readLines).toHaveBeenCalledTimes(5);
+    expect(result.layout).toBe('tile-first');
+    expect(result.tileCoverage).toMatchObject({
+      detectedTiles: 5,
+      locatedTiles: 5,
+      titleCandidates: 10,
+    });
+    expect(result.tileCoverage?.tiles).toHaveLength(5);
+    for (const [i, region] of result.tileCoverage!.tiles!.entries()) {
+      const bytes = readTiles.mock.calls[i]![0];
+      const expected = await sharp(original)
+        .extract({
+          left: Math.round(region.x * 1000),
+          top: Math.round(region.y * 100),
+          width: Math.round(region.w * 1000),
+          height: Math.round(region.h * 100),
+        })
+        .png()
+        .toBuffer();
+      expect(Buffer.from(bytes)).toEqual(expected);
+      expect(bytes).not.toEqual(original);
+      expect(readLines.mock.calls[i]).toEqual([bytes, 'image/png']);
+      expect(readTiles.mock.calls[i]?.[1]).toBe('image/png');
+      expect(
+        result.items.filter((item) => item.boundingBox.inputTileBox?.x === region.x),
+      ).toHaveLength(2);
+    }
+    expect(readTiles.mock.calls[0]?.[0]).not.toEqual(readTiles.mock.calls[1]?.[0]);
     const candidate = result.items[0]!;
     const crop = tileCropFor({
       boxSource: candidate.boxSource,
@@ -123,6 +245,7 @@ describe('T-AI-063 - image evidence wiring', () => {
     }).extract(bytes, 'image/png');
     expect(result.items).toEqual([]);
     expect(result.tileCoverage).toBeUndefined();
+    expect(result.layout).toBe('unverified');
   });
 
   it('T-AI-063c - opaque alpha PNGs produce the same single-channel raster as RGB', async () => {

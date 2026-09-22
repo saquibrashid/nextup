@@ -1,5 +1,10 @@
 import { useRef, useState, type RefObject } from 'react';
-import { parseCandidatePatch, type ReviewCandidate, type ReviewResponse } from '@nextup/domain';
+import {
+  canBulkConfirm,
+  parseCandidatePatch,
+  type ReviewCandidate,
+  type ReviewResponse,
+} from '@nextup/domain';
 import type { ApiClient, CandidatePatchBody } from './apiClient';
 import { useCaptureLifetime } from './useCaptureLifetime';
 
@@ -203,9 +208,7 @@ export function useReviewDecisions({
             for (const item of group) remove(item);
             continue;
           }
-          const pending = latest.sections[section].items.filter(
-            (item) => item.disposition === 'pending',
-          );
+          const pending = latest.sections[section].items.filter(canBulkConfirm);
           if (
             pending.length !== group.length ||
             group.some(
@@ -315,7 +318,7 @@ export function useReviewDecisions({
       throw new Error('Wait for the review to be available.');
     const selected = review.sections[section].items.filter(
       (item) =>
-        item.disposition === 'pending' &&
+        canBulkConfirm(item) &&
         !current.current.some(
           (intent) => intent.kind === 'candidate' && intent.id === item.candidateId,
         ),

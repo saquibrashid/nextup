@@ -1,7 +1,7 @@
 /**
  * TASK-056c — the HYBRID reader, and the shipped design (ADR-0001 Rev 2).
  *
- * Two independent readers issued together for one image, merged by the pure
+ * Two independent readers issued together for one detected input crop, merged by the pure
  * deterministic `crossCheck()`. This is `DEFAULT_EXTRACTOR`; everything else in
  * `factory.ts` is a revert path or a test double.
  *
@@ -11,8 +11,8 @@
  * (`T-AI-010b`) fails the build if a second file imports the OpenAI SDK.
  *
  * ⚠ THE LEGS ARE ISSUED IN PARALLEL, AND THAT IS THE ONLY PARALLELISM ALLOWED
- * HERE. `specs/ai.md` §2.2: reader concurrency 2 (the two legs for ONE image),
- * image concurrency 1. The two legs cost no additional decoded raster — the
+ * HERE. `specs/ai.md` §2.2: reader concurrency 2 (the two legs for ONE crop),
+ * image and crop concurrency 1. The two legs cost no additional decoded raster — the
  * same `imageBytes` is handed to both — which is exactly why this "2" is safe
  * at 0.5 GiB while the image-level "2" is not (REQ-079, `RSK-016`).
  *
@@ -28,7 +28,9 @@ import {
   isExtractorError,
   llmOnlyItems,
   ocrOnlyItems,
-  withTileEvidence,
+  cleanup,
+  type ExtractedTextItem,
+  type NormalisedBox,
   type CrossCheckOutcome,
   type ExtractionResult,
   type ExtractorName,
@@ -41,7 +43,7 @@ import {
 
 import type { AzureVisionExtractor } from './azureVisionExtractor.js';
 import type { LlmVisionExtractor } from './llmVisionExtractor.js';
-import { measureTileGrid } from '../images/luminanceRaster.js';
+import { cropInputTile, measureTileGrid } from '../images/luminanceRaster.js';
 
 const EXTRACTOR: ExtractorName = 'hybrid';
 
@@ -109,9 +111,88 @@ export class HybridExtractor implements TitleExtractor {
   }
 
   async extract(imageBytes: Uint8Array, mimeType: ImageMimeType): Promise<ExtractionResult> {
-    const startedAt = Date.now();
-    // Decode serially, inside the runner's image sentinel and error boundary.
     const grid = await measureTileGrid(imageBytes);
+    if (grid === null) {
+      return { ...(await this.readImage(imageBytes, mimeType)), layout: 'unverified' };
+    }
+    const items: ExtractedTextItem[] = [];
+    const regions: NormalisedBox[] = [];
+    let outcome: CrossCheckOutcome = 'ok';
+    let locatedTiles = 0;
+    let allLlmOk = true;
+    let allVisionOk = true;
+    let tileCount = 0;
+    let lineCount = 0;
+    // Only two calls in flight: the two readers of ONE lossless crop.
+    for (const tile of grid.tiles) {
+      const { bytes, region } = await cropInputTile(imageBytes, tile);
+      const result = await this.readImage(bytes, 'image/png');
+      regions.push(region);
+      tileCount += Number(result.providerMeta['tileCount']);
+      lineCount += Number(result.providerMeta['lineCount']);
+      allLlmOk &&= result.crossCheck !== 'llm-unavailable';
+      allVisionOk &&= result.crossCheck !== 'ocr-unavailable';
+      if (result.crossCheck === 'llm-unavailable') outcome = 'llm-unavailable';
+      else if (result.crossCheck === 'ocr-unavailable' && outcome === 'ok')
+        outcome = 'ocr-unavailable';
+      const cleaned = cleanup(result.items);
+      if (
+        cleaned.some(
+          (item) =>
+            item.cleanupVerdict !== 'chrome-suspected' && item.cleanupVerdict !== 'unreadable-tile',
+        )
+      )
+        locatedTiles++;
+      const readings = [...result.items];
+      if (!cleaned.some((item) => item.cleanupVerdict !== 'chrome-suspected'))
+        readings.push({
+          rawText: '',
+          inferredTitle: null,
+          basis: 'unknown' as const,
+          ocrSupport: 'none' as const,
+          provider: 'llm' as const,
+          boundingBox: { x: 0, y: 0, w: 1, h: 1 },
+          boxSource: 'llm' as const,
+          confidence: null,
+        });
+      for (const item of readings) {
+        items.push({
+          ...item,
+          boundingBox: {
+            ...projectBox(item.boundingBox, region),
+            inputTileBox: region,
+          },
+        });
+      }
+    }
+    return {
+      items,
+      layout: 'tile-first',
+      crossCheck: outcome,
+      providerMeta: {
+        llmOk: allLlmOk,
+        visionOk: allVisionOk,
+        inputTileCount: regions.length,
+        tileCount,
+        lineCount,
+      },
+      tileCoverage: {
+        detectedTiles: regions.length,
+        locatedTiles,
+        titleCandidates: cleanup(items).filter(
+          (item) =>
+            item.cleanupVerdict !== 'chrome-suspected' && item.cleanupVerdict !== 'unreadable-tile',
+        ).length,
+        tiles: regions,
+      },
+    };
+  }
+
+  private async readImage(
+    imageBytes: Uint8Array,
+    mimeType: ImageMimeType,
+  ): Promise<ExtractionResult> {
+    const startedAt = Date.now();
 
     const [llmSettled, visionSettled] = await Promise.allSettled([
       this.#llm.readTiles(imageBytes, mimeType),
@@ -167,11 +248,20 @@ export class HybridExtractor implements TitleExtractor {
     });
 
     return {
-      ...(grid === null ? { items } : withTileEvidence(items, lines ?? [], grid)),
+      items,
       crossCheck: outcome,
       providerMeta,
     };
   }
+}
+
+function projectBox(box: NormalisedBox, region: NormalisedBox): NormalisedBox {
+  return {
+    x: region.x + box.x * region.w,
+    y: region.y + box.y * region.h,
+    w: box.w * region.w,
+    h: box.h * region.h,
+  };
 }
 
 /**

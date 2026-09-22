@@ -415,8 +415,8 @@ function wrapsUnder(prev: ExtractedTextItem, next: ExtractedTextItem): boolean {
 }
 
 function differentMeasuredTiles(prev: ExtractedTextItem, next: ExtractedTextItem): boolean {
-  const a = prev.boundingBox.gridTileBox;
-  const b = next.boundingBox.gridTileBox;
+  const a = prev.boundingBox.inputTileBox ?? prev.boundingBox.gridTileBox;
+  const b = next.boundingBox.inputTileBox ?? next.boundingBox.gridTileBox;
   if (a === undefined && b === undefined) return false;
   return (
     a === undefined || b === undefined || a.x !== b.x || a.y !== b.y || a.w !== b.w || a.h !== b.h
@@ -436,6 +436,9 @@ function mergeTwo(prev: ExtractedTextItem, next: ExtractedTextItem): ExtractedTe
       ...(prev.boundingBox.gridTileBox === undefined
         ? {}
         : { gridTileBox: prev.boundingBox.gridTileBox }),
+      ...(prev.boundingBox.inputTileBox === undefined
+        ? {}
+        : { inputTileBox: prev.boundingBox.inputTileBox }),
     },
     // Worst-of, not mean. A merged caption is only as trustworthy as its least
     // trustworthy fragment, and averaging would let one confident fragment

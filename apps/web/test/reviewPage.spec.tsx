@@ -102,17 +102,17 @@ describe('T-POL-002 review evidence hierarchy', () => {
         })}
       />,
     );
-    expect(screen.getByTestId('candidate-meta')).toHaveTextContent('1999 · Film');
+    expect(screen.getByTestId('candidate-suggestion')).toHaveTextContent('1999 · Film');
     const warning = screen.getByTestId('candidate-chip');
     const consequence = screen.getByTestId('candidate-consequence');
-    const raw = screen.getByTestId('candidate-raw-text');
-    expect(screen.getByTestId('candidate-meta').compareDocumentPosition(warning)).toBe(
+    const raw = screen.getByTestId('candidate-name');
+    expect(screen.getByTestId('candidate-suggestion').compareDocumentPosition(warning)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
     expect(warning.compareDocumentPosition(consequence)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(consequence.compareDocumentPosition(raw)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(raw.compareDocumentPosition(consequence)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(raw.textContent).toBe(reading);
-    expect(raw.parentElement).toHaveTextContent('Read from screenshot');
+    expect(raw.parentElement).toHaveTextContent('Catalogue suggestion');
     expect(screen.queryByText(/\d+%/)).not.toBeInTheDocument();
   });
 
@@ -706,13 +706,13 @@ describe('the mode contract is visible in the DOM', () => {
     expect(list?.textContent ?? '').not.toContain('(2)');
   });
 
-  it('T-REV-013i: append-only renders NEITHER the known section NOR removals', () => {
+  it('T-REV-013i: append-only retains the known section but omits removals', () => {
     // REQ-022. `T-REM-011` (TASK-093) owns this properly; asserted here too
     // because the section components are written here and a regression is
     // cheapest to catch at the point it is introduced.
     render(<ReviewPage review={review({ mode: 'append-only' })} />);
 
-    expect(screen.queryByTestId('review-already-on-list')).not.toBeInTheDocument();
+    expect(screen.getByTestId('review-already-on-list')).toBeVisible();
     expect(screen.queryByTestId('review-removals')).not.toBeInTheDocument();
   });
 });

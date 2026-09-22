@@ -23,7 +23,7 @@
 // and is not recomputed here.
 
 import type { JSX } from 'react';
-import type { ReviewCandidate } from '@nextup/domain';
+import { individualReviewReason, type ReviewCandidate } from '@nextup/domain';
 
 import {
   CANDIDATE_AMBIGUOUS_CHIP,
@@ -36,6 +36,7 @@ import {
   CANDIDATE_UNREADABLE_NO_TITLE,
 } from '../copy';
 import { TMDB_IMAGE_BASE } from './TitleRow';
+import { SourceTile } from './SourceTile';
 
 const MEDIA_TYPE_LABELS: Record<string, string> = { movie: 'Film', tv: 'Series' };
 
@@ -51,6 +52,8 @@ export function reviewCandidateDomId(candidateId: string): string {
 }
 
 export interface CandidateCardProps {
+  readonly sourceShown?: boolean;
+  readonly domId?: string;
   readonly candidate: ReviewCandidate;
   /**
    * The cropped tile for this candidate, when one exists. ⚠ Required by §5.3a
@@ -105,11 +108,16 @@ export function CandidateCard({
   unidentified = false,
   actions = null,
   consequence = null,
+  sourceShown = false,
+  domId,
 }: CandidateCardProps): JSX.Element {
   // Chrome is a transcription to inspect, not a resolved movie to promote.
   // Keep alternatives available in the action controls without its poster/year
   // making an incidental catalogue match look like screenshot evidence.
   const match = candidate.verdict === 'chrome-suspected' ? null : candidate.match;
+  const weakSuggestion = match !== null && (match.uncertain || match.ambiguous);
+  const related = candidate.relatedReadings ?? [];
+  const individualReason = individualReviewReason(candidate);
   const unreadable = candidate.verdict === 'unreadable-tile';
   // §5.3a: the tile must be rendered for both fabrication-adjacent verdicts,
   // and it is the ONLY content an unreadable tile has.
@@ -120,7 +128,14 @@ export function CandidateCard({
   // no image" and asked "what am I confirming?". When there is no poster the
   // tile is the only evidence the card can carry, so show it (`T-UX-151b`).
   const hasPoster = match?.posterPath !== undefined && match?.posterPath !== null;
-  const needsThumbnail = unreadable || candidate.verdict === 'inferred-unverified' || !hasPoster;
+  const needsThumbnail =
+    !sourceShown &&
+    (unreadable ||
+      candidate.verdict === 'inferred-unverified' ||
+      candidate.provider === 'ocr-only' ||
+      weakSuggestion ||
+      related.length > 0 ||
+      !hasPoster);
   const displayName =
     candidate.verdict === 'chrome-suspected' ? null : (match?.name ?? candidate.inferredTitle);
   // ⚠ "No title read from this tile" is a claim about the READER, not about
@@ -130,7 +145,9 @@ export function CandidateCard({
   // reader had in fact read — the card contradicted itself. Say what was read;
   // the consequence line below already says it will not be added (`T-UX-151a`).
   const readText = candidate.rawText !== '' ? candidate.rawText : null;
-  const headline = displayName ?? readText;
+  const headline = weakSuggestion
+    ? (readText ?? candidate.inferredTitle ?? displayName)
+    : (displayName ?? readText);
   // ⚠ `?? null`, not `=== null`. `tileCrop` was added to the review payload
   // after this component shipped, so a response from an older API — or from
   // the previous revision during a Container Apps rolling deploy — carries no
@@ -151,7 +168,7 @@ export function CandidateCard({
     // of the tab order; any supplied correction controls have their own stops.
     <div
       className="candidate-card"
-      id={reviewCandidateDomId(candidate.candidateId)}
+      id={domId ?? reviewCandidateDomId(candidate.candidateId)}
       tabIndex={-1}
       data-testid={`candidate-${candidate.candidateId}`}
     >
@@ -183,7 +200,9 @@ export function CandidateCard({
             {/* Not `aria-hidden`: a screen-reader user has no other way to
                 learn that this picture is the whole screenshot rather than
                 the tile, which is the one thing the sighted cue conveys. */}
-            <span className="candidate-card__whole-note">Whole screenshot</span>
+            <span className="candidate-card__whole-note">
+              Whole screenshot — title location not verified
+            </span>
           </span>
         ) : (
           // §5.3a's CROP. The whole image is fetched either way — the byte
@@ -196,22 +215,7 @@ export function CandidateCard({
           // ⚠ `overflow: hidden` on the wrapper is what makes this a crop and
           // not a very large picture. Removing it renders a hugely magnified
           // screenshot that overflows the card.
-          <span
-            className="candidate-card__thumb candidate-card__thumb--cropped"
-            data-testid="candidate-thumb-crop"
-          >
-            <img
-              data-testid="candidate-thumb"
-              src={thumbnailUrl}
-              alt=""
-              style={{
-                width: `${(100 / crop.w).toFixed(4)}%`,
-                height: `${(100 / crop.h).toFixed(4)}%`,
-                left: `${(-(crop.x * 100) / crop.w).toFixed(4)}%`,
-                top: `${(-(crop.y * 100) / crop.h).toFixed(4)}%`,
-              }}
-            />
-          </span>
+          <SourceTile crop={crop} src={thumbnailUrl} />
         )
       ) : match?.posterPath !== undefined && match?.posterPath !== null ? (
         <img
@@ -241,7 +245,21 @@ export function CandidateCard({
           </p>
         )}
 
-        {match !== null && (
+        {weakSuggestion && match !== null && (
+          <p className="candidate-card__meta" data-testid="candidate-suggestion">
+            {candidate.disposition === 'confirmed' || candidate.disposition === 'corrected'
+              ? 'Chosen catalogue match'
+              : 'Catalogue suggestion'}
+            : {match.name}
+            {' ('}
+            {[match.releaseYear, MEDIA_TYPE_LABELS[match.mediaType]]
+              .filter((part) => part !== null)
+              .join(' · ')}
+            {')'}
+            {' — check against the source, not catalogue artwork.'}
+          </p>
+        )}
+        {match !== null && !weakSuggestion && (
           <p className="candidate-card__meta" data-testid="candidate-meta">
             {[match.releaseYear, MEDIA_TYPE_LABELS[match.mediaType] ?? match.mediaType]
               .filter((part) => part !== null && part !== undefined)
@@ -263,6 +281,22 @@ export function CandidateCard({
           <p className="candidate-card__consequence" data-testid="candidate-consequence">
             {consequence}
           </p>
+        )}
+        {candidate.disposition === 'pending' && individualReason !== null && (
+          <p className="candidate-card__raw">{individualReason}</p>
+        )}
+        {related.map((reading) => (
+          <p className="candidate-card__raw" key={reading.candidateId}>
+            {reading.relation === 'same-tile'
+              ? 'Another reading on this same measured tile'
+              : 'Possibly the same work as another reading; location is not verified'}
+            : {reading.rawText}. Compare both readings before keeping separate titles.
+          </p>
+        ))}
+        {thumbnailUrl !== null && (
+          <a href={thumbnailUrl} target="_blank" rel="noreferrer">
+            Open source screenshot
+          </a>
         )}
 
         {/* ⚠ ALWAYS RENDERED when there is text - this is what the owner

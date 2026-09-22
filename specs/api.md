@@ -1619,22 +1619,34 @@ withhold full-update removals rather than treating unread screenshots as absence
 **409 `BATCH_NOT_IN_REVIEW`** unless `status === 'in-review'`.
 
 `candidateSummary` counts visible (non-collapsed) candidates before section
-omission: `total` and `alreadyKnown`. It distinguishes known-only append
-captures without exposing the omitted known section. Clients accept its absence
+grouping: `total` and `alreadyKnown`. Known entries remain visible in both modes.
+Clients accept its absence
 during rolling deployment and must not infer "all known" from empty additions.
 
 `tileCoverage` is an array of measured image summaries:
-`{ imageId, fileName, href, detectedTiles, locatedTiles, titleCandidates }`.
+`{ imageId, fileName, href, detectedTiles, locatedTiles, titleCandidates, tiles? }`.
+For tile-first reads, `tiles` contains every validated, pixel-rounded input
+region, including unreadable regions. `tiles` on the review response contains
+`{ tileId, source, candidates }` groups in screenshot order; one deduplicated
+candidate may appear in several groups, with one shared decision. Candidate
+`inputTiles` records its controlled input regions; `alreadyInLibrary` is
+derived from owner-scoped listed work identities, not a new stored classification.
+`unsegmentedImages` names only this batch's images whose layout was refused.
+These fallback reads withhold removals. Re-extraction is required to acquire
+input provenance on a historical batch; ordinary GET never reruns extraction.
 It is absent on older APIs and empty when no layout could be measured; neither
 means zero tiles. `href` is an owner-scoped image API path, never a blob URL.
 Counts are extraction-time facts before identity collapse or owner decisions.
 Multiple candidate rows can occupy one tile. `locatedTiles` counts distinct
 detected tiles with a non-chrome, non-unreadable candidate and an OCR-backed
-location; it does not claim the other tiles were unread. A detected tile without
+location for legacy reads, or a controlled input crop for tile-first reads.
+It counts readings, not correct identities. A detected tile without
 that evidence sets the existing persisted `lowYield` safety flag, withholding
 full-update removals while still allowing additions. `T-AI-063` / `T-AI-064`.
 
-Candidate `tileCrop` prefers an image-measured tile containing a verified OCR
+Candidate `tileCrop` first prefers bounded `inputTileBox` provenance, even
+for an unverified artwork identity. This is the crop actually sent to readers,
+never a model output box. Otherwise it prefers an image-measured tile containing a verified OCR
 anchor. `boundingBoxes` stores that rectangle as `gridTileBox`, separately from
 the reader's estimated `tileBox`, together with the source `imageId`. Without
 measured evidence, the existing OCR/reader agreement rule remains. No migration
@@ -1672,7 +1684,7 @@ neither counts nor measured geometry until explicitly re-extracted.
     "alreadyOnYourList": {
       "label": "Already on your list",
       "count": 54,
-      "collapsedByDefault": true,
+      "collapsedByDefault": false,
       "omitted": false,
       "items": [ /* same item shape */ ]
     },
@@ -1712,7 +1724,7 @@ neither counts nor measured geometry until explicitly re-extracted.
 | Section | `append-only` | `full-update` |
 |---|---|---|
 | `additions` | present | present |
-| `alreadyOnYourList` | **`"omitted": true, "items": [], "count": 0`** | **present with the true count and all items** |
+| `alreadyOnYourList` | **present, expanded, true count and all items** | **present, expanded, true count and all items** |
 | `probablyNotTitles` | present | present |
 | `unmatched` | present | present |
 | `unreadableTiles` *(new, R2)* | present | present |

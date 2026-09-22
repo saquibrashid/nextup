@@ -20,9 +20,8 @@
  * silently reconciled as a removal. Showing all extracted titles turns a
  * silent data-loss bug into a visible discrepancy the owner can act on.
  *
- * That is why `alreadyOnYourList.omitted` is `true` ONLY in `append-only`
- * mode, where absence means nothing, and why there is no "hide known titles"
- * option anywhere in this file. `T-REV-006`.
+ * Known matches stay visible in both modes: append-only must explain which
+ * source tiles were already saved, without treating them as new additions.
  *
  * ─────────────────────────────────────────────────────────────────────────
  * ⚠ NOTHING IS EVER DROPPED
@@ -217,11 +216,96 @@ export interface ReviewCandidate {
    * about what the extractor produced, and the client cannot see `boxSource`.
    */
   tileCrop: ReviewTileCrop | null;
+  /** Validated image-measured tiles only, never model estimates or legacy crops. */
+  measuredTiles?: ReviewTileCrop[];
+  /** Regions that were physically cropped and read independently. */
+  inputTiles?: ReviewTileCrop[];
+  relatedReadings?: {
+    candidateId: string;
+    rawText: string;
+    relation: 'same-tile' | 'possible-same-work';
+  }[];
   disposition: ReviewDisposition;
   /** SD-02. Non-null ⇒ absorbed by the survivor; not rendered again. */
   collapsedIntoCandidateId: string | null;
   /** `null` for an unmatched candidate (`T-CLS-013`). */
   classification: ReviewClassification | null;
+  alreadyInLibrary?: boolean;
+}
+
+/** Relationships explain competing evidence; they never change identity or transfer geometry. */
+export function withReviewEvidence(candidates: readonly ReviewCandidate[]): ReviewCandidate[] {
+  const visible = candidates.filter(
+    (candidate) =>
+      candidate.collapsedIntoCandidateId === null &&
+      candidate.verdict !== 'chrome-suspected' &&
+      candidate.verdict !== 'unreadable-tile' &&
+      candidate.disposition !== 'discarded',
+  );
+  return candidates.map((candidate) => {
+    const relatedReadings: NonNullable<ReviewCandidate['relatedReadings']> = [];
+    if (visible.includes(candidate)) {
+      for (const other of visible) {
+        if (other === candidate) continue;
+        const sameTile = (candidate.measuredTiles ?? []).some((tile) =>
+          (other.measuredTiles ?? []).some(
+            (peer) =>
+              tile.imageId === peer.imageId &&
+              tile.x === peer.x &&
+              tile.y === peer.y &&
+              tile.w === peer.w &&
+              tile.h === peer.h,
+          ),
+        );
+        const sameImage = candidate.sourceImageIds.some((id) => other.sourceImageIds.includes(id));
+        const sharesSuggestedWork =
+          candidate.alternatives.some(
+            (match) => `tmdb:${match.mediaType}:${match.tmdbId}` === other.resolvedWorkIdentity,
+          ) ||
+          other.alternatives.some(
+            (match) => `tmdb:${match.mediaType}:${match.tmdbId}` === candidate.resolvedWorkIdentity,
+          );
+        const missingLocation =
+          (candidate.measuredTiles?.length ?? 0) === 0 || (other.measuredTiles?.length ?? 0) === 0;
+        if (
+          sameTile ||
+          (sameImage &&
+            missingLocation &&
+            other.provider !== candidate.provider &&
+            sharesSuggestedWork)
+        ) {
+          relatedReadings.push({
+            candidateId: other.candidateId,
+            rawText: other.rawText || other.inferredTitle || 'Unreadable text',
+            relation: sameTile ? 'same-tile' : 'possible-same-work',
+          });
+        }
+      }
+    }
+    return { ...candidate, relatedReadings };
+  });
+}
+
+/** Shared by the UI, persisted-intent replay and bulk API; individual choices remain possible. */
+export function individualReviewReason(candidate: ReviewCandidate): string | null {
+  if ((candidate.relatedReadings?.length ?? 0) > 0) {
+    return 'Related readings need an individual decision; they may describe the same title.';
+  }
+  if (candidate.match?.uncertain || candidate.match?.ambiguous) {
+    return 'This catalogue suggestion needs an individual check against the screenshot.';
+  }
+  if (
+    candidate.verdict === 'inferred-unverified' ||
+    candidate.verdict === 'low-confidence' ||
+    candidate.verdict === 'unreadable-tile'
+  ) {
+    return 'This reading needs an individual check against the screenshot.';
+  }
+  return null;
+}
+
+export function canBulkConfirm(candidate: ReviewCandidate): boolean {
+  return candidate.disposition === 'pending' && individualReviewReason(candidate) === null;
 }
 
 /** A listing that may be proposed for removal. */
@@ -260,9 +344,11 @@ export interface ReviewTileCoverage extends ReviewImageWithNoText {
   detectedTiles: number;
   locatedTiles: number;
   titleCandidates: number;
+  tiles?: { x: number; y: number; w: number; h: number }[];
 }
 
 export interface BuildReviewInput {
+  unsegmentedImages?: readonly ReviewImageWithNoText[];
   tileCoverage?: readonly ReviewTileCoverage[];
   batchId: string;
   /**
@@ -340,6 +426,8 @@ export interface RemovalSection extends ReviewSection<ReviewRemovalItem> {
 export type RemovalWithheldReason = 'low-yield' | 'degraded-extraction' | 'incomplete-capture';
 
 export interface ReviewResponse {
+  tiles?: ReviewTileGroup[];
+  unsegmentedImages?: ReviewImageWithNoText[];
   tileCoverage?: ReviewTileCoverage[];
   candidateSummary?: { total: number; alreadyKnown: number };
   batchId: string;
@@ -362,6 +450,34 @@ export interface ReviewResponse {
     removals: RemovalSection;
   };
   imagesWithNoText: ReviewImageWithNoText[];
+}
+
+export interface ReviewTileGroup {
+  tileId: string;
+  source: ReviewTileCrop;
+  candidates: ReviewCandidate[];
+}
+
+function sameSourceTile(a: ReviewTileCrop, b: ReviewTileCrop): boolean {
+  return a.imageId === b.imageId && a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;
+}
+
+function reviewTiles(
+  coverage: readonly ReviewTileCoverage[],
+  candidates: readonly ReviewCandidate[],
+): ReviewTileGroup[] {
+  return coverage.flatMap((image) =>
+    (image.tiles ?? []).map((rect, index) => {
+      const source = { imageId: image.imageId, ...rect };
+      return {
+        tileId: `${image.imageId}-${index}`,
+        source,
+        candidates: candidates.filter((candidate) =>
+          (candidate.inputTiles ?? []).some((tile) => sameSourceTile(tile, source)),
+        ),
+      };
+    }),
+  );
 }
 
 // ── Section labels (`specs/api.md` §6.17) ──────────────────────────────────
@@ -468,7 +584,8 @@ export const TILE_CROP_PADDING = 0.08;
  * no crop is offered, and the owner sees the uncropped image instead of a
  * confident crop of the wrong tile.
  *
- * ⚠ **`boxSource === 'llm'` NOW MEANS NO CROP, WHICH IS THE OPPOSITE OF WHAT
+ * ⚠ **WITHOUT CONTROLLED `inputTileBox`, `boxSource === 'llm'` MEANS NO CROP,
+ * THE OPPOSITE OF WHAT
  * THIS FUNCTION USED TO DO.** `'llm'` means no OCR line corroborated the tile
  * — so the geometry is the reader's unverified estimate and nothing else.
  * Measured over the real corpus through the real `crossCheck()`, that branch
@@ -531,8 +648,26 @@ export function tileCropFor(input: {
     h: number;
     tileBox?: { x: number; y: number; w: number; h: number } | undefined;
     gridTileBox?: { x: number; y: number; w: number; h: number } | undefined;
+    inputTileBox?: { x: number; y: number; w: number; h: number } | undefined;
   }[];
 }): ReviewTileCrop | null {
+  // A controlled input crop is evidence about location even when its identity
+  // is unverified. It is never inferred from the model's output coordinates.
+  const inputTile = input.boundingBoxes.find((box) => box.inputTileBox !== undefined);
+  if (inputTile?.inputTileBox !== undefined) {
+    const { x, y, w, h } = inputTile.inputTileBox;
+    if (
+      ![x, y, w, h].every(Number.isFinite) ||
+      x < 0 ||
+      y < 0 ||
+      w <= 0 ||
+      h <= 0 ||
+      x + w > 1 ||
+      y + h > 1
+    )
+      return null;
+    return { imageId: inputTile.imageId, x, y, w, h };
+  }
   // Unverified reader geometry. Measured 8-in-10 wrong; see the note above.
   if (input.boxSource !== 'ocr') return null;
 
@@ -714,7 +849,7 @@ function readSafetyBanner(input: {
  *
  * | section | `append-only` | `full-update` |
  * |---|---|---|
- * | `alreadyOnYourList` | omitted — absence means nothing here | **present, always** |
+ * | `alreadyOnYourList` | present, expanded | present, expanded |
  * | `removals` | omitted (REQ-022) | present unless withheld |
  */
 export function buildReviewResponse(input: BuildReviewInput): ReviewResponse {
@@ -732,14 +867,6 @@ export function buildReviewResponse(input: BuildReviewInput): ReviewResponse {
   }
 
   const fullUpdate = input.mode === 'full-update';
-  const discovery = input.service === null;
-  // ⚠ US-041 AC-1 — a discovery pass shows EVERY extracted title, including
-  // the ones already on the combined list. In append-only for a SERVICE the
-  // "already on your list" section is omitted because the answer is "nothing
-  // to do, it is already there"; for a discovery capture that same answer is
-  // the useful reporting US-040 AC-5 asks for ("you already have this"), and
-  // omitting it would hide a title the owner definitely captured.
-  const showAlready = fullUpdate || discovery;
   const withheldReason = fullUpdate
     ? removalWithheldReason({
         lowYield: input.lowYield,
@@ -751,6 +878,8 @@ export function buildReviewResponse(input: BuildReviewInput): ReviewResponse {
 
   return {
     batchId: input.batchId,
+    tiles: reviewTiles(input.tileCoverage ?? [], visible),
+    unsegmentedImages: [...(input.unsegmentedImages ?? [])],
     candidateSummary: { total: visible.length, alreadyKnown: buckets.alreadyOnYourList.length },
     tileCoverage: [...(input.tileCoverage ?? [])],
     service: input.service,
@@ -785,10 +914,10 @@ export function buildReviewResponse(input: BuildReviewInput): ReviewResponse {
       alreadyOnYourList: {
         label: REVIEW_LABELS.alreadyOnYourList,
         // ⚠ In full-update the TRUE count and ALL items, never a summary.
-        count: showAlready ? buckets.alreadyOnYourList.length : 0,
-        collapsedByDefault: true,
-        omitted: !showAlready,
-        items: showAlready ? buckets.alreadyOnYourList : [],
+        count: buckets.alreadyOnYourList.length,
+        collapsedByDefault: false,
+        omitted: false,
+        items: buckets.alreadyOnYourList,
       },
       probablyNotTitles: {
         label: REVIEW_LABELS.probablyNotTitles,
@@ -841,15 +970,11 @@ function countDistinctImages(candidates: readonly ReviewCandidate[]): number {
 
 /**
  * `T-AI-004` — the partition is TOTAL: every candidate the caller passed is
- * reachable in exactly one section, with exactly two documented exceptions.
+ * reachable in exactly one section, except for collapsed duplicates.
  *
  * 1. An SD-02 collapse loser (`collapsedIntoCandidateId !== null`) — its
  *    provenance lives in a survivor that IS present, so rendering it again
  *    would double-count one work (`T-AI-007`).
- * 2. An already-present candidate in `append-only` mode — REQ-057 shows only
- *    the new ones there, and absence means nothing in that mode. ⚠ This
- *    exception must NEVER extend to `full-update`; that is the safety
- *    property in this file's header.
  *
  * Exported so the route and the tests can both assert it rather than trusting
  * the routing function to stay total as verdicts are added.
@@ -868,10 +993,8 @@ export function assertEveryCandidateRouted(
   ]) {
     for (const item of section.items) rendered.add(item.candidateId);
   }
-  const appendOnly = response.mode === 'append-only';
   const missing = candidates
     .filter((c) => c.collapsedIntoCandidateId === null)
-    .filter((c) => !(appendOnly && sectionForCandidate(c) === 'alreadyOnYourList'))
     .filter((c) => !rendered.has(c.candidateId))
     .map((c) => c.candidateId);
   if (missing.length > 0) {

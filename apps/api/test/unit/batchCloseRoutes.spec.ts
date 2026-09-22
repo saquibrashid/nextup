@@ -162,6 +162,7 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
     listCandidatesForReview: () => Promise.resolve(store.candidates),
     listActiveSuppressions: () => Promise.resolve(store.suppressions),
     listActiveListingsForService: () => Promise.resolve(store.activeListings),
+    listListedWorkIdentities: () => Promise.resolve(new Set<string>()),
     listRemovalDecisions: () => Promise.resolve(store.decisions),
     createRemovalGroup: (_ownerId: string, data: Record<string, unknown>) => {
       store.removalGroups.push(data['id'] as string);

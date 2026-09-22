@@ -376,7 +376,8 @@ describe('T-UX-162 reversible review and recovery', () => {
       />,
     );
     expect(screen.getByText(/Everything nextup could read is already on your list/)).toBeVisible();
-    expect(screen.queryByTestId('review-already-on-list')).toBeNull();
+    expect(screen.getByTestId('review-already-on-list')).toBeVisible();
+    expect(screen.getByTestId('candidate-one')).toBeVisible();
     view.rerender(
       <ReviewPage
         review={review([candidate('one', { resolvedWorkIdentity: null, match: null })])}

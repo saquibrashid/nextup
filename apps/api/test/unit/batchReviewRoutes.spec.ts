@@ -142,7 +142,10 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
       ),
     listCandidatesForReview: () => Promise.resolve(store.candidates),
     listActiveSuppressions: () => Promise.resolve(store.suppressions),
-    listActiveListingsForService: () => Promise.resolve(store.listings),
+    listActiveListingsForService: (_ownerId: string, service: string) =>
+      Promise.resolve(store.listings.filter((row) => row.service === service)),
+    listListedWorkIdentities: () =>
+      Promise.resolve(new Set(store.listings.map((row) => row.title.workIdentity))),
     // TASK-085 — the review route now reads the owner's tick/untick
     // deviations. Stubbed empty: absence of a row means ticked (REQ-055), so
     // this is the state every one of these cases is asserting against.
@@ -274,6 +277,70 @@ afterEach(async () => {
 });
 
 describe('T-REV-010 · GET /review without a store', () => {
+  it('T-AI-066h - persisted input regions expose all tiles and service membership while bulk skips weak readings', async () => {
+    const regions = Array.from({ length: 5 }, (_, i) => ({ x: i * 0.2, y: 0.1, w: 0.19, h: 0.8 }));
+    store.images = [{ id: 'img-1', fileName: 'shot.png', candidateCount: 5 }];
+    store.batch!.extractionStats = JSON.stringify({
+      stage1: {
+        tileCoverage: [
+          {
+            imageId: 'img-1',
+            detectedTiles: 5,
+            locatedTiles: 5,
+            titleCandidates: 5,
+            tiles: regions,
+          },
+        ],
+        unsegmentedImageIds: ['foreign'],
+      },
+    });
+    store.listings = [
+      makeListing('known', 'tmdb:movie:1', 'Known'),
+      { ...makeListing('other', 'tmdb:movie:2', 'Other service'), service: 'max' },
+    ];
+    regions.forEach((inputTileBox, index) =>
+      makeCandidate({
+        id: `c${index}`,
+        resolvedWorkIdentity: `tmdb:movie:${index + 1}`,
+        boxSource: 'llm',
+        matchState: index === 3 ? 'uncertain' : 'matched',
+        cleanupVerdict: index === 4 ? 'low-confidence' : 'title-candidate',
+        boundingBoxes: JSON.stringify([
+          { imageId: 'img-1', x: 0, y: 0, w: 0.1, h: 0.1, inputTileBox },
+        ]),
+        matchCandidates: JSON.stringify([
+          {
+            tmdbId: index + 1,
+            mediaType: 'movie',
+            name: `Film ${index}`,
+            releaseYear: 2026,
+            posterPath: null,
+            score: index === 3 ? 0.85 : 1,
+          },
+        ]),
+      }),
+    );
+    const response = await getReview('batch-1');
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.tiles).toHaveLength(5);
+    expect(body.tiles[0].candidates[0]).toMatchObject({
+      candidateId: 'c0',
+      classification: 'already-present-for-this-service',
+      alreadyInLibrary: true,
+      tileCrop: { imageId: 'img-1', ...regions[0] },
+    });
+    expect(body.tiles[1].candidates[0]).toMatchObject({
+      classification: 'new',
+      alreadyInLibrary: true,
+    });
+    expect(body.sections.alreadyOnYourList.omitted).toBe(false);
+    expect(body.unsegmentedImages).toEqual([]);
+    const bulk = await confirmAll('batch-1', { section: 'additions' });
+    expect(bulk.status).toBe(200);
+    expect(store.bulkConfirmed.sort()).toEqual(['c1', 'c2']);
+    expect((await patchCandidate('batch-1', 'c3', { disposition: 'confirmed' })).status).toBe(200);
+  });
   it('T-AI-063g - serves persisted measured crops and coverage through the owner-scoped review route', async () => {
     store.images = [{ id: 'img-1', fileName: 'shot.png', candidateCount: 1 }];
     store.batch = {

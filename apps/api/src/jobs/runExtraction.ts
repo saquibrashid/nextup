@@ -128,6 +128,7 @@ export interface ExtractionProgress {
  * a stage that never ran would be a false one.
  */
 export interface ExtractionStats {
+  unsegmentedImageIds?: string[];
   tileCoverage?: Array<TileCoverage & { imageId: string }>;
   imagesProcessed: number;
   imagesWithZeroCandidates: number;
@@ -428,6 +429,9 @@ export async function runExtraction(input: RunExtractionInput): Promise<RunExtra
     if (result.tileCoverage !== undefined) {
       (stats.tileCoverage ??= []).push({ imageId: image.imageId, ...result.tileCoverage });
     }
+    if (result.layout === 'unverified') {
+      (stats.unsegmentedImageIds ??= []).push(image.imageId);
+    }
 
     imagesDone += 1;
     await ports.reportProgress(progress(), imageFailures);
@@ -459,6 +463,7 @@ export async function runExtraction(input: RunExtractionInput): Promise<RunExtra
     lowYield:
       isLowYield(stats) ||
       imageFailures.length > 0 ||
+      (stats.unsegmentedImageIds?.length ?? 0) > 0 ||
       (stats.tileCoverage?.some((image) => image.locatedTiles < image.detectedTiles) ?? false),
     crossCheck,
     imageFailures,

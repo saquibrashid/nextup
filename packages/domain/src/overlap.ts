@@ -199,6 +199,22 @@ function sharesAnImage(a: ExtractionCandidate, b: ExtractionCandidate): boolean 
   return a.sourceImageIds.some((id) => b.sourceImageIds.includes(id));
 }
 
+function compatibleInputTiles(a: ExtractionCandidate, b: ExtractionCandidate): boolean {
+  const left = a.boundingBoxes.filter((box) => box.inputTileBox !== undefined);
+  const right = b.boundingBoxes.filter((box) => box.inputTileBox !== undefined);
+  if (left.length === 0 && right.length === 0) return true;
+  return left.some((x) =>
+    right.some(
+      (y) =>
+        x.imageId === y.imageId &&
+        x.inputTileBox?.x === y.inputTileBox?.x &&
+        x.inputTileBox?.y === y.inputTileBox?.y &&
+        x.inputTileBox?.w === y.inputTileBox?.w &&
+        x.inputTileBox?.h === y.inputTileBox?.h,
+    ),
+  );
+}
+
 /**
  * Collapse OCR fragments into the whole title another candidate already holds
  * on the same image (`TASK-199` finding (a), `specs/ai.md` §7.4a).
@@ -244,6 +260,7 @@ export function collapseFragments(
       (host) =>
         containsAtTokenBoundary(host.normalisedText, fragment.normalisedText) &&
         sharesAnImage(host, fragment) &&
+        compatibleInputTiles(host, fragment) &&
         verticalGap(host, fragment) <= FRAGMENT_MAX_VERTICAL_GAP,
     );
     if (hosts.length > 0) hostsFor.set(fragment.id, hosts);

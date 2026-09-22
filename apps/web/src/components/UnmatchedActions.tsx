@@ -26,7 +26,7 @@ import { Input } from './ui/Input';
  * server-side; this renders the actions for the rows that arrived in it.
  */
 
-import { useEffect, useRef, useState, type FormEvent, type JSX } from 'react';
+import { useEffect, useId, useRef, useState, type FormEvent, type JSX } from 'react';
 
 import {
   ADDITION_CHANGE_MATCH_LABEL,
@@ -96,6 +96,8 @@ const VARIANT_COPY: Record<CandidateActionsVariant, VariantCopy> = {
 };
 
 export interface UnmatchedActionsProps {
+  readonly alternatives?: readonly TmdbSearchResult[];
+  readonly hideKeep?: boolean;
   readonly candidateId: string;
   /**
    * Which review section this card sits in. Drives the button words and the
@@ -184,7 +186,10 @@ export function UnmatchedActions({
   onDiscard,
   onMatch,
   onSearch,
+  hideKeep = false,
+  alternatives = [],
 }: UnmatchedActionsProps): JSX.Element {
+  const searchInputId = useId();
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<TmdbSearchResult[] | null>(null);
@@ -299,7 +304,7 @@ export function UnmatchedActions({
       )}
       <div className="unmatched-actions__buttons">
         {/* ⚠ FIRST. See the header note — this is the outcome US-008 exists for. */}
-        {variant !== 'correction' && (
+        {variant !== 'correction' && !hideKeep && (
           <Button
             variant="secondary"
             data-testid={`${variant}-keep`}
@@ -347,10 +352,38 @@ export function UnmatchedActions({
 
       {searchOpen && (
         <>
+          {alternatives.length > 0 && (
+            <div className="unmatched-actions__results">
+              <p>Catalogue alternatives for this reading</p>
+              {alternatives.map((result) => (
+                <div
+                  className="unmatched-actions__result"
+                  key={`${result.mediaType}:${result.tmdbId}`}
+                >
+                  <span className="unmatched-actions__result-label">{resultLabel(result)}</span>
+                  <Button
+                    variant="secondary"
+                    disabled={busy}
+                    aria-label={UNMATCHED_MATCH_LABEL.replace('{name}', result.name)}
+                    onClick={() =>
+                      run(
+                        async () => {
+                          await onMatch(candidateId, result);
+                        },
+                        { kind: 'matched', name: result.name },
+                      )
+                    }
+                  >
+                    {UNMATCHED_MATCH_SHORT}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
           <form className="unmatched-actions__form" onSubmit={search}>
-            <label htmlFor={`${variant}-q-${candidateId}`}>{UNMATCHED_SEARCH_LABEL}</label>
+            <label htmlFor={searchInputId}>{UNMATCHED_SEARCH_LABEL}</label>
             <Input
-              id={`${variant}-q-${candidateId}`}
+              id={searchInputId}
               type="search"
               value={query}
               onChange={(event) => {
