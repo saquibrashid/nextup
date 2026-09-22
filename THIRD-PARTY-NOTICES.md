@@ -47,13 +47,14 @@ so they do not relicense this work — but their notices must be retained.
 | `@azure/core-tracing` | 1.4.0 | MIT |
 | `@azure/core-util` | 1.14.0 | MIT |
 | `@azure/core-xml` | 1.6.0 | MIT |
-| `@azure/identity` | 4.13.2 | MIT |
+| `@azure/identity` | 4.13.3 | MIT |
 | `@azure/keyvault-common` | 2.1.0 | MIT |
 | `@azure/keyvault-keys` | 4.10.2 | MIT |
 | `@azure/logger` | 1.4.0 | MIT |
 | `@azure/msal-browser` | 5.18.0 | MIT |
 | `@azure/msal-common` | 16.12.0 | MIT |
-| `@azure/msal-node` | 5.5.0 | MIT |
+| `@azure/msal-common` | 16.14.1 | MIT |
+| `@azure/msal-node` | 6.0.1 | MIT |
 | `@azure/storage-blob` | 12.33.0 | MIT |
 | `@azure/storage-common` | 12.5.0 | MIT |
 | `@babel/helper-string-parser` | 7.29.7 | MIT |
