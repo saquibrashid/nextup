@@ -33,6 +33,7 @@ import {
   computeRemovals,
   reconcile,
   tileCropFor,
+  withReviewEvidence,
   type BatchMode,
   type CandidateBasis,
   type CandidateProvider,
@@ -108,6 +109,7 @@ export function parseBoundingBoxes(raw: string | null): {
   h: number;
   tileBox?: Rect;
   gridTileBox?: Rect;
+  inputTileBox?: Rect;
 }[] {
   if (raw === null || raw === '') return [];
   try {
@@ -119,11 +121,12 @@ export function parseBoundingBoxes(raw: string | null): {
       // discard the candidate's only recorded evidence and change which rows
       // the review page can locate at all. Losing just the tile means "no
       // crop" — the whole screenshot, which `tileCropFor` already handles.
-      const { tileBox, gridTileBox, ...rest } = box;
+      const { tileBox, gridTileBox, inputTileBox, ...rest } = box;
       return {
         ...rest,
         ...(isRect(tileBox) ? { tileBox } : {}),
         ...(isRect(gridTileBox) ? { gridTileBox } : {}),
+        ...(isRect(inputTileBox) ? { inputTileBox } : {}),
       };
     });
   } catch {
@@ -152,6 +155,7 @@ function isBoundingBox(value: unknown): value is {
   h: number;
   tileBox?: unknown;
   gridTileBox?: unknown;
+  inputTileBox?: unknown;
 } {
   if (typeof value !== 'object' || value === null) return false;
   const box = value as Record<string, unknown>;
@@ -210,9 +214,58 @@ export function readTileCoverage(
         detectedTiles,
         locatedTiles,
         titleCandidates,
+        ...('tiles' in entry &&
+        Array.isArray(entry.tiles) &&
+        entry.tiles.length === detectedTiles &&
+        entry.tiles.every(isValidRect)
+          ? { tiles: entry.tiles.map(({ x, y, w, h }: Rect) => ({ x, y, w, h })) }
+          : {}),
       },
     ];
   });
+}
+
+function isValidRect(value: unknown): value is Rect {
+  return (
+    isRect(value) &&
+    [value.x, value.y, value.w, value.h].every(Number.isFinite) &&
+    value.x >= 0 &&
+    value.y >= 0 &&
+    value.w > 0 &&
+    value.h > 0 &&
+    value.x + value.w <= 1 &&
+    value.y + value.h <= 1
+  );
+}
+
+export function readUnsegmentedImages(
+  raw: string | null | undefined,
+  images: readonly { id: string; fileName: string }[],
+): { imageId: string; fileName: string; href: string }[] {
+  if (!raw) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  if (typeof parsed !== 'object' || parsed === null || !('stage1' in parsed)) return [];
+  const stage = parsed.stage1;
+  if (
+    typeof stage !== 'object' ||
+    stage === null ||
+    !('unsegmentedImageIds' in stage) ||
+    !Array.isArray(stage.unsegmentedImageIds)
+  )
+    return [];
+  const ids: unknown[] = stage.unsegmentedImageIds;
+  return images
+    .filter((image) => ids.includes(image.id))
+    .map((image) => ({
+      imageId: image.id,
+      fileName: image.fileName,
+      href: `/api/images/${encodeURIComponent(image.id)}`,
+    }));
 }
 
 /**
@@ -288,7 +341,7 @@ export async function loadReviewCandidates(
       : listActiveListingsForService(ownerId, service),
     // The combined-list membership question a discovery review asks instead
     // (US-040 AC-5). Loaded only when it is the question being asked.
-    service === null ? listListedWorkIdentities(ownerId) : Promise.resolve(new Set<string>()),
+    listListedWorkIdentities(ownerId),
   ]);
 
   // The suppression gate. Keyed on WORK IDENTITY, never on a row id
@@ -320,6 +373,7 @@ export async function loadReviewCandidates(
     .filter((row) => row.resolvedWorkIdentity === null || !suppressed.has(row.resolvedWorkIdentity))
     .map((row) => {
       const alternatives = parseMatchCandidates(row.matchCandidates);
+      const boundingBoxes = parseBoundingBoxes(row.boundingBoxes);
       // REQ-109 — the owner's correction wins over the extraction's guess.
       //
       // ⚠ The projection lives in the DOMAIN (`chosenReviewMatch`) and is not
@@ -361,7 +415,17 @@ export async function loadReviewCandidates(
         // uncropped one shows the whole screenshot (`T-UX-154`).
         tileCrop: tileCropFor({
           boxSource: row.boxSource,
-          boundingBoxes: parseBoundingBoxes(row.boundingBoxes),
+          boundingBoxes,
+        }),
+        measuredTiles: boundingBoxes.flatMap((box) => {
+          if (box.gridTileBox === undefined && box.inputTileBox === undefined) return [];
+          const crop = tileCropFor({ boxSource: row.boxSource, boundingBoxes: [box] });
+          return crop === null ? [] : [crop];
+        }),
+        inputTiles: boundingBoxes.flatMap((box) => {
+          if (box.inputTileBox === undefined) return [];
+          const crop = tileCropFor({ boxSource: row.boxSource, boundingBoxes: [box] });
+          return crop === null ? [] : [crop];
         }),
         disposition: row.reviewDisposition as ReviewDisposition,
         collapsedIntoCandidateId: row.collapsedIntoCandidateId,
@@ -369,10 +433,12 @@ export async function loadReviewCandidates(
           service === null
             ? classifyDiscoveryWorkIdentity(row.resolvedWorkIdentity, listedIdentities)
             : classifyWorkIdentity(row.resolvedWorkIdentity, service, index),
+        alreadyInLibrary:
+          row.resolvedWorkIdentity !== null && listedIdentities.has(row.resolvedWorkIdentity),
       };
     });
 
-  return { candidates, suppressed, activeListings, rows };
+  return { candidates: withReviewEvidence(candidates), suppressed, activeListings, rows };
 }
 
 /**
@@ -482,6 +548,7 @@ export function registerBatchReviewRoutes(router: Router): void {
       untickedListingIds,
       imagesWithNoText,
       tileCoverage: readTileCoverage(batch.extractionStats, images),
+      unsegmentedImages: readUnsegmentedImages(batch.extractionStats, images),
       tmdbUnavailable: readTmdbUnavailable(batch.extractionStats),
       captureComplete: (await readCaptureIntake(ownerId, batch)).complete,
     });

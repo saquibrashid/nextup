@@ -83,6 +83,7 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => {
     listCandidatesForReview: () => Promise.resolve(store.candidates),
     listActiveSuppressions: () => Promise.resolve([]),
     listActiveListingsForService: () => Promise.resolve(store.listings),
+    listListedWorkIdentities: () => Promise.resolve(new Set<string>()),
     listRemovalDecisions: () => Promise.resolve([]),
     listImagesForBatch: () => Promise.resolve(store.images),
   };

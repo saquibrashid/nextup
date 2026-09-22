@@ -2153,6 +2153,35 @@ button {
   padding-block: var(--space-4);
 }
 
+.review-tile {
+  display: grid;
+  gap: var(--space-4);
+  margin-block: var(--space-5);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.review-tile__source,
+.review-tile__readings {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.review-tile__source .candidate-card__thumb {
+  width: 100%;
+  height: auto;
+  min-height: 96px;
+  margin-block: var(--space-3);
+}
+
+@media (min-width: 48rem) {
+  .review-tile {
+    grid-template-columns: minmax(180px, 1fr) minmax(0, 3fr);
+  }
+}
+
 .review-heading {
   margin-bottom: var(--space-5);
 }

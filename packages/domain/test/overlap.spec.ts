@@ -14,7 +14,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { collapseOverlap } from '../src/overlap.js';
+import { collapseFragments, collapseOverlap } from '../src/overlap.js';
 import type { ExtractionCandidate } from '../src/types.js';
 
 const NOW = '2026-01-01T00:00:00.000Z';
@@ -54,6 +54,32 @@ function aCandidate(overrides: Partial<ExtractionCandidate> = {}): ExtractionCan
 const imageOrder = [IMG1, IMG2];
 
 describe('T-AI-007 · intra-batch overlap collapse (SD-02)', () => {
+  it('T-AI-066g - a same-height OCR fragment cannot collapse into a neighbouring input tile', () => {
+    const region = { x: 0, y: 0.1, w: 0.4, h: 0.8 };
+    const short = aCandidate({
+      id: 'short',
+      normalisedText: 'first',
+      boundingBoxes: [{ imageId: IMG1, x: 0.1, y: 0.2, w: 0.1, h: 0.02, inputTileBox: region }],
+    });
+    const long = aCandidate({
+      id: 'long',
+      normalisedText: 'ladies first',
+      boundingBoxes: [
+        { imageId: IMG1, x: 0.6, y: 0.2, w: 0.2, h: 0.02, inputTileBox: { ...region, x: 0.5 } },
+      ],
+    });
+    expect(
+      collapseFragments([short, long], { pass: 'pre-match', imageOrder }).candidates.filter(
+        (item) => item.collapsedIntoCandidateId === null,
+      ),
+    ).toHaveLength(2);
+    long.boundingBoxes[0]!.inputTileBox = region;
+    expect(
+      collapseFragments([short, long], { pass: 'pre-match', imageOrder }).candidates.filter(
+        (item) => item.collapsedIntoCandidateId === null,
+      ),
+    ).toHaveLength(1);
+  });
   it('T-AI-007a: the same title on two overlapping screenshots collapses to one candidate, and the survivor holds both source images', () => {
     const onImage1 = aCandidate({ id: 'cand:a', sourceImageIds: [IMG1] });
     const onImage2 = aCandidate({

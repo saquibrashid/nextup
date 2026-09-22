@@ -64,13 +64,13 @@ describe('T-UX-158 grouped review', () => {
     expect(screen.getByTestId('candidate-new')).toHaveTextContent('READ FROM SCREENSHOT');
   });
 
-  it('T-UX-158b: empty full-update known group remains counted; append-only omits it', () => {
+  it('T-UX-158b: known groups remain counted in both modes; append-only omits removals', () => {
     const { rerender } = render(<ReviewPage review={review({ candidates: [] })} />);
     expect(screen.getByTestId('review-already-on-list')).toHaveTextContent(
       'Already on your list (0)',
     );
     rerender(<ReviewPage review={review({ mode: 'append-only' })} />);
-    expect(screen.queryByTestId('review-already-on-list')).not.toBeInTheDocument();
+    expect(screen.getByTestId('review-already-on-list')).toBeVisible();
     expect(screen.queryByTestId('review-removals')).not.toBeInTheDocument();
   });
 

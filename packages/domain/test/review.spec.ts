@@ -267,16 +267,17 @@ describe('T-REV-006 — full-update shows ALL extracted titles (the safety prope
     expect(res.sections.alreadyOnYourList.items).toHaveLength(2);
   });
 
-  it('T-REV-006b · append-only omits alreadyOnYourList — absence means nothing there', () => {
+  it('T-REV-006b · append-only shows known titles without requiring another confirmation', () => {
     const res = buildReviewResponse(
       input({
         mode: 'append-only',
         candidates: [candidate({ classification: 'already-present-for-this-service' })],
       }),
     );
-    expect(res.sections.alreadyOnYourList.omitted).toBe(true);
-    expect(res.sections.alreadyOnYourList.count).toBe(0);
-    expect(res.sections.alreadyOnYourList.items).toEqual([]);
+    expect(res.sections.alreadyOnYourList.omitted).toBe(false);
+    expect(res.sections.alreadyOnYourList.collapsedByDefault).toBe(false);
+    expect(res.sections.alreadyOnYourList.count).toBe(1);
+    expect(res.sections.alreadyOnYourList.items).toHaveLength(1);
   });
 
   it('T-REV-006c · append-only omits removals entirely (REQ-022)', () => {

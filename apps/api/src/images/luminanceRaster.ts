@@ -1,6 +1,11 @@
 import sharp from 'sharp';
 
-import { detectTileGrid, type LuminanceRaster, type TileGrid } from '@nextup/domain';
+import {
+  detectTileGrid,
+  type LuminanceRaster,
+  type TileGrid,
+  type NormalisedBox,
+} from '@nextup/domain';
 import { AppError } from '../errors/AppError.js';
 import { isOutOfMemoryError } from './transcode.js';
 import { imageDecodeFailedMessage } from './decodeErrorMessages.js';
@@ -56,5 +61,42 @@ export async function measureTileGrid(image: Uint8Array): Promise<TileGrid | nul
     if (isOutOfMemoryError(error)) throw error;
     throw new AppError('IMAGE_DECODE_FAILED', 415, imageDecodeFailedMessage('That image'));
   }
+
   return detectTileGrid(raster);
+}
+
+/** Decode/crop serially at original resolution; no lossy re-encode or enlarged raster. */
+export async function cropInputTile(
+  image: Uint8Array,
+  tile: NormalisedBox,
+): Promise<{
+  bytes: Uint8Array;
+  region: NormalisedBox;
+}> {
+  try {
+    const metadata = await sharp(image).metadata();
+    const width = metadata.width;
+    const height = metadata.height;
+    if (width === undefined || height === undefined) throw new Error('Missing image dimensions');
+    const left = Math.max(0, Math.floor(tile.x * width));
+    const top = Math.max(0, Math.floor(tile.y * height));
+    const right = Math.min(width, Math.ceil((tile.x + tile.w) * width));
+    const bottom = Math.min(height, Math.ceil((tile.y + tile.h) * height));
+    const bytes = await sharp(image)
+      .extract({ left, top, width: right - left, height: bottom - top })
+      .png()
+      .toBuffer();
+    return {
+      bytes,
+      region: {
+        x: left / width,
+        y: top / height,
+        w: (right - left) / width,
+        h: (bottom - top) / height,
+      },
+    };
+  } catch (error) {
+    if (isOutOfMemoryError(error)) throw error;
+    throw new AppError('IMAGE_DECODE_FAILED', 415, imageDecodeFailedMessage('That image'));
+  }
 }

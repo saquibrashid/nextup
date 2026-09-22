@@ -156,14 +156,11 @@ describe('T-REM-011 · US-014 AC-2 · append-only: the removals section does not
     expect(container.innerHTML).not.toContain('display: none');
   });
 
-  it('T-REM-011f: "Already on your list" is absent in append-only too', () => {
-    // REQ-022 covers both. ⚠ ABSENCE IS ONLY SAFE HERE BECAUSE APPEND-ONLY
-    // REMOVES NOTHING. In full-update the same absence would be product
-    // invariant 2 violated, which is why `T-UI-006e` exists.
+  it('T-REM-011f: known extracted titles remain visible in append-only while removals stay absent', () => {
     render(<ReviewPage review={appendOnly()} />);
 
-    expect(screen.queryByTestId('review-already-on-list')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Already on your list/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('review-already-on-list')).toBeVisible();
+    expect(screen.queryByTestId('review-removals')).not.toBeInTheDocument();
   });
 
   it('T-REM-011g: the running count says 0 to remove, never a number borrowed from elsewhere', () => {

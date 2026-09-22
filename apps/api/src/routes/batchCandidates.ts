@@ -19,7 +19,7 @@
  */
 
 import {
-  isConfirmable,
+  canBulkConfirm,
   normaliseTitleText,
   parseCandidatePatch,
   parseConfirmAllSection,
@@ -345,7 +345,7 @@ export function registerBatchCandidateRoutes(
       (candidate: ReviewCandidate) =>
         candidate.collapsedIntoCandidateId === null && sectionForCandidate(candidate) === section,
     );
-    const confirmable = inSection.filter((candidate) => isConfirmable(candidate.disposition));
+    const confirmable = inSection.filter(canBulkConfirm);
 
     const { count } = await confirmPendingCandidates(
       ownerId,

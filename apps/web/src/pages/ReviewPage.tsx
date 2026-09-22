@@ -41,12 +41,13 @@ import { Input } from '../components/ui/Input';
 
 import { useEffect, useState, type JSX, type ReactNode } from 'react';
 import type { ReviewCandidate, ReviewResponse, ReviewSection } from '@nextup/domain';
-import { DISCOVERY_SOURCE_LABELS, SERVICE_LABELS } from '@nextup/domain';
+import { canBulkConfirm, DISCOVERY_SOURCE_LABELS, SERVICE_LABELS } from '@nextup/domain';
 
 import type { TmdbSearchResult } from '../lib/apiClient';
 
 import { CandidateCard, reviewCandidateDomId } from '../components/CandidateCard';
 import { CandidateList } from '../components/CandidateList';
+import { TileReview, alreadySaved, tileNextStep } from '../components/TileReview';
 import { ManualEntryPanel } from '../components/ManualEntryPanel';
 import { RemovalConfirmDialog } from '../components/RemovalConfirmDialog';
 import { ReviewSkeleton } from '../components/ReviewSkeleton';
@@ -272,6 +273,7 @@ function CandidateSection({
   confirmAll,
   confirmDisabled = false,
   pendingCount,
+  individualCount = 0,
   renderCard,
   description,
   variant = 'plain',
@@ -282,6 +284,7 @@ function CandidateSection({
   readonly confirmAll?: () => void;
   readonly confirmDisabled?: boolean;
   readonly pendingCount?: number;
+  readonly individualCount?: number;
   /** Overrides the card rendering — the §6.8 unmatched treatment uses it. */
   readonly renderCard?: (candidate: ReviewCandidate) => JSX.Element;
   readonly description?: string;
@@ -319,6 +322,11 @@ function CandidateSection({
           {`${section.label} (${section.count})`}
         </summary>
         {description !== undefined && <p className="review-section__description">{description}</p>}
+        {individualCount > 0 && (
+          <p className="review-section__description">
+            {individualCount} readings need individual review and are not included in Confirm all.
+          </p>
+        )}
         {showConfirmAll && (
           <p className="review-section__confirm-all">
             {/* Layout only — the margin belongs to the section, not the button. */}
@@ -529,6 +537,14 @@ export function ReviewPage({
       return disposition === 'confirmed' || disposition === 'corrected';
     }).length;
 
+  const bulkPendingIn = (items: readonly ReviewCandidate[]): number =>
+    items.filter((candidate) =>
+      canBulkConfirm({
+        ...candidate,
+        disposition: effectiveDisposition(candidate.disposition, local[candidate.candidateId]),
+      }),
+    ).length;
+
   // ⚠ ALL FOUR OR NONE. See `onKeepUnmatched` above: a partly-wired card is a
   // control that silently does nothing, which on the review screen reads as a
   // decision the owner has made.
@@ -556,7 +572,12 @@ export function ReviewPage({
       // ⚠ Only the pending ones. Overwriting a `discarded` row here would turn
       // a bulk confirm into a silent undo of a decision the owner had already
       // made, which is the one thing a one-tap control must never do.
-      if (effectiveDisposition(candidate.disposition, local[candidate.candidateId]) === 'pending') {
+      if (
+        canBulkConfirm({
+          ...candidate,
+          disposition: effectiveDisposition(candidate.disposition, local[candidate.candidateId]),
+        })
+      ) {
         next[candidate.candidateId] = 'confirmed';
       }
     }
@@ -631,6 +652,91 @@ export function ReviewPage({
     sections.additions.items.length > 0 &&
     sections.additions.items.every((candidate) => candidate.disposition === 'discarded');
 
+  const byId = new Map(
+    [
+      ...sections.additions.items,
+      ...sections.unmatched.items,
+      ...sections.alreadyOnYourList.items,
+      ...sections.probablyNotTitles.items,
+      ...sections.unreadableTiles.items,
+    ].map((candidate) => [candidate.candidateId, candidate]),
+  );
+  const tiles = (review.tiles ?? []).map((tile) => ({
+    ...tile,
+    candidates: tile.candidates.map((candidate) => {
+      const current = byId.get(candidate.candidateId) ?? candidate;
+      return {
+        ...current,
+        disposition: effectiveDisposition(current.disposition, local[current.candidateId]),
+      };
+    }),
+  }));
+  const groupedIds = new Set(
+    tiles.flatMap((tile) => tile.candidates.map((candidate) => candidate.candidateId)),
+  );
+  const untiled = [
+    ...sections.additions.items,
+    ...sections.unmatched.items,
+    ...sections.alreadyOnYourList.items,
+    ...sections.probablyNotTitles.items,
+    ...sections.unreadableTiles.items,
+  ].filter((candidate) => !groupedIds.has(candidate.candidateId));
+  const renderTileCandidate = (candidate: ReviewCandidate, domId?: string): JSX.Element => {
+    const current = {
+      ...candidate,
+      disposition: effectiveDisposition(candidate.disposition, local[candidate.candidateId]),
+    };
+    return (
+      <CandidateCard
+        candidate={current}
+        {...(domId === undefined ? {} : { domId })}
+        sourceShown={(candidate.inputTiles?.length ?? 0) > 0}
+        thumbnailUrl={(candidate.inputTiles?.length ?? 0) > 0 ? null : thumbnailUrlFor(candidate)}
+        consequence={tileNextStep(current, review.service)}
+        unidentified={candidate.match === null && candidate.verdict !== 'chrome-suspected'}
+        actions={
+          unmatchedWired ? (
+            <>
+              <UnmatchedActions
+                controlled={controlled}
+                candidateId={candidate.candidateId}
+                alternatives={candidate.alternatives}
+                disposition={current.disposition}
+                correctedName={candidate.match?.name ?? null}
+                variant={
+                  alreadySaved(candidate) || candidate.verdict === 'chrome-suspected'
+                    ? 'correction'
+                    : candidate.match === null
+                      ? 'unmatched'
+                      : 'addition'
+                }
+                hideKeep={candidate.verdict === 'unreadable-tile'}
+                onDiscard={onDiscardU}
+                onKeep={onKeepU}
+                onMatch={onMatchU}
+                onSearch={onSearchU}
+              />
+              {candidate.verdict === 'chrome-suspected' && onRescueCandidate !== undefined && (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    void onRescueCandidate(candidate.candidateId).catch(() =>
+                      setPrepareError(
+                        'The rescue was not verified. Check the saved review before trying again.',
+                      ),
+                    );
+                  }}
+                >
+                  This is a title
+                </Button>
+              )}
+            </>
+          ) : null
+        }
+      />
+    );
+  };
+
   return (
     <div className="review-flow">
       <ReviewHeading subtitle={`${service} · ${mode}`} />
@@ -644,12 +750,25 @@ export function ReviewPage({
           {review.banner}
         </p>
       )}
+      {(review.unsegmentedImages ?? []).map((image) => (
+        <p className="review-banner" role="status" key={image.imageId}>
+          Tile boundaries could not be verified for{' '}
+          <a href={image.href} target="_blank" rel="noreferrer">
+            {image.fileName}
+          </a>
+          . These readings came from the whole screenshot; their count is not a tile count. Check
+          the source for missed titles.
+        </p>
+      ))}
       {(review.tileCoverage ?? []).map((image) => (
         <p className="review-guidance" key={image.imageId}>
           <a href={image.href} target="_blank" rel="noreferrer">
             {image.fileName}
           </a>
-          {`: ${image.titleCandidates} title candidates; titles located in ${image.locatedTiles} of ${image.detectedTiles} detected tiles.`}
+          {`: ${image.titleCandidates} title candidates; readings located in ${image.locatedTiles} of ${image.detectedTiles} detected tiles.`}
+          {
+            ' Located readings can include duplicates or misreads; this does not verify every title.'
+          }
           {image.locatedTiles < image.detectedTiles &&
             ' Some tiles could not be linked to a title. Compare the screenshot and add any missing titles below; an unlocated tile is not necessarily unread.'}
         </p>
@@ -663,185 +782,217 @@ export function ReviewPage({
       )}
 
       <Fieldset legend="Review decisions" hideLegend disabled={applying || saving || preparing}>
-        {sections.additions.count === 0 ? (
-          <section className="review-section" data-testid="review-additions">
-            {/* ⚠ `T-UX-061`. A BLANK PANEL READS AS A FAILED RENDER, and the
-              owner's next move is to upload the same screenshots again. */}
-            <div className="review-empty" data-testid="review-additions-empty">
-              <p className="review-empty__title">
-                {extracted === 0
-                  ? 'No extracted titles are available to review'
-                  : sections.unmatched.count > 0
-                    ? 'Some titles still need identification'
-                    : knownCount === extracted
-                      ? REVIEW_NO_ADDITIONS_TITLE
-                      : 'No new titles are ready to add'}
-              </p>
-              <p className="review-empty__body">
-                {extracted > 0 && knownCount === extracted
-                  ? REVIEW_NO_ADDITIONS_BODY
-                  : 'Check the screenshots and remaining evidence below. You can identify a title manually or read the screenshots again.'}
-              </p>
-            </div>
-          </section>
+        {tiles.length > 0 ? (
+          <>
+            {bulkPendingIn(sections.additions.items) > 0 && (
+              <Button
+                variant="secondary"
+                disabled={hasUnsaved}
+                onClick={() => confirmAll('additions')}
+              >
+                Confirm all {bulkPendingIn(sections.additions.items)} clear new matches
+              </Button>
+            )}
+            <TileReview tiles={tiles} renderCandidate={renderTileCandidate} />
+            {untiled.length > 0 && (
+              <section className="review-section">
+                <h2>Other readings without a verified tile</h2>
+                <p>These readings still need review. Their location has not been verified.</p>
+                {untiled.map((candidate) => (
+                  <div key={candidate.candidateId}>{renderTileCandidate(candidate)}</div>
+                ))}
+              </section>
+            )}
+          </>
         ) : (
-          <CandidateSection
-            description="Check each proposed match against the screenshot text. Confirm only the titles you want to keep."
-            confirmAll={() => {
-              confirmAll('additions');
-            }}
-            pendingCount={pendingIn(sections.additions.items)}
-            confirmDisabled={hasUnsaved}
-            renderCard={(candidate) => (
-              <CandidateCard
-                candidate={candidate}
-                thumbnailUrl={thumbnailUrlFor(candidate)}
-                consequence={
-                  effectiveDisposition(candidate.disposition, local[candidate.candidateId]) ===
-                  'discarded'
-                    ? 'Not included in these changes'
-                    : REVIEW_CONSEQUENCE_ADDITION
+          <>
+            {sections.additions.count === 0 ? (
+              <section className="review-section" data-testid="review-additions">
+                {/* ⚠ `T-UX-061`. A BLANK PANEL READS AS A FAILED RENDER, and the
+              owner's next move is to upload the same screenshots again. */}
+                <div className="review-empty" data-testid="review-additions-empty">
+                  <p className="review-empty__title">
+                    {extracted === 0
+                      ? 'No extracted titles are available to review'
+                      : sections.unmatched.count > 0
+                        ? 'Some titles still need identification'
+                        : knownCount === extracted
+                          ? REVIEW_NO_ADDITIONS_TITLE
+                          : 'No new titles are ready to add'}
+                  </p>
+                  <p className="review-empty__body">
+                    {extracted > 0 && knownCount === extracted
+                      ? REVIEW_NO_ADDITIONS_BODY
+                      : 'Check the screenshots and remaining evidence below. You can identify a title manually or read the screenshots again.'}
+                  </p>
+                </div>
+              </section>
+            ) : (
+              <CandidateSection
+                description="Check each proposed match against the screenshot text. Confirm only the titles you want to keep."
+                confirmAll={() => {
+                  confirmAll('additions');
+                }}
+                pendingCount={bulkPendingIn(sections.additions.items)}
+                individualCount={
+                  pendingIn(sections.additions.items) - bulkPendingIn(sections.additions.items)
                 }
-                actions={
-                  /* ⚠ TASK-200 / `specs/ui.md` §5.3. Before this the additions
+                confirmDisabled={hasUnsaved}
+                renderCard={(candidate) => (
+                  <CandidateCard
+                    candidate={candidate}
+                    thumbnailUrl={thumbnailUrlFor(candidate)}
+                    consequence={
+                      effectiveDisposition(candidate.disposition, local[candidate.candidateId]) ===
+                      'discarded'
+                        ? 'Not included in these changes'
+                        : REVIEW_CONSEQUENCE_ADDITION
+                    }
+                    actions={
+                      /* ⚠ TASK-200 / `specs/ui.md` §5.3. Before this the additions
                    section had NO per-card control, so one false extra among
                    ten good rows — a fragment like "LEVANTE" split off
                    "SOL LEVANTE" — could only be rejected by abandoning the
                    whole batch. `unmatchedWired` is reused deliberately: the
                    same four handlers serve both sections, and all-four-or-none
                    still applies. */
-                  unmatchedWired ? (
-                    <UnmatchedActions
-                      controlled={controlled}
-                      candidateId={candidate.candidateId}
-                      correctedName={candidate.match?.name ?? null}
-                      disposition={effectiveDisposition(
-                        candidate.disposition,
-                        local[candidate.candidateId],
-                      )}
-                      onDiscard={onDiscardU}
-                      onKeep={onKeepU}
-                      onMatch={onMatchU}
-                      onSearch={onSearchU}
-                      variant="addition"
-                    />
-                  ) : null
-                }
-              />
-            )}
-            section={sections.additions}
-            testId="review-additions"
-            variant="additions"
-          />
-        )}
-
-        <CandidateSection
-          description="These readings need your help. Keep the text as an unidentified title, find a match, or discard it."
-          confirmAll={() => {
-            confirmAll('unmatched');
-          }}
-          pendingCount={pendingIn(sections.unmatched.items)}
-          confirmDisabled={hasUnsaved}
-          renderCard={(candidate) => (
-            <CandidateCard
-              candidate={candidate}
-              thumbnailUrl={thumbnailUrlFor(candidate)}
-              unidentified
-              consequence={
-                effectiveDisposition(candidate.disposition, local[candidate.candidateId]) ===
-                'discarded'
-                  ? 'Not included in these changes'
-                  : REVIEW_CONSEQUENCE_UNMATCHED
-              }
-              actions={
-                unmatchedWired ? (
-                  <UnmatchedActions
-                    controlled={controlled}
-                    candidateId={candidate.candidateId}
-                    correctedName={candidate.match?.name ?? null}
-                    disposition={effectiveDisposition(
-                      candidate.disposition,
-                      local[candidate.candidateId],
-                    )}
-                    onDiscard={onDiscardU}
-                    onKeep={onKeepU}
-                    onMatch={onMatchU}
-                    onSearch={onSearchU}
+                      unmatchedWired ? (
+                        <UnmatchedActions
+                          controlled={controlled}
+                          candidateId={candidate.candidateId}
+                          correctedName={candidate.match?.name ?? null}
+                          disposition={effectiveDisposition(
+                            candidate.disposition,
+                            local[candidate.candidateId],
+                          )}
+                          onDiscard={onDiscardU}
+                          onKeep={onKeepU}
+                          onMatch={onMatchU}
+                          onSearch={onSearchU}
+                          variant="addition"
+                        />
+                      ) : null
+                    }
                   />
-                ) : null
+                )}
+                section={sections.additions}
+                testId="review-additions"
+                variant="additions"
+              />
+            )}
+
+            <CandidateSection
+              description="These readings need your help. Keep the text as an unidentified title, find a match, or discard it."
+              confirmAll={() => {
+                confirmAll('unmatched');
+              }}
+              pendingCount={bulkPendingIn(sections.unmatched.items)}
+              individualCount={
+                pendingIn(sections.unmatched.items) - bulkPendingIn(sections.unmatched.items)
               }
+              confirmDisabled={hasUnsaved}
+              renderCard={(candidate) => (
+                <CandidateCard
+                  candidate={candidate}
+                  thumbnailUrl={thumbnailUrlFor(candidate)}
+                  unidentified
+                  consequence={
+                    effectiveDisposition(candidate.disposition, local[candidate.candidateId]) ===
+                    'discarded'
+                      ? 'Not included in these changes'
+                      : REVIEW_CONSEQUENCE_UNMATCHED
+                  }
+                  actions={
+                    unmatchedWired ? (
+                      <UnmatchedActions
+                        controlled={controlled}
+                        candidateId={candidate.candidateId}
+                        correctedName={candidate.match?.name ?? null}
+                        disposition={effectiveDisposition(
+                          candidate.disposition,
+                          local[candidate.candidateId],
+                        )}
+                        onDiscard={onDiscardU}
+                        onKeep={onKeepU}
+                        onMatch={onMatchU}
+                        onSearch={onSearchU}
+                      />
+                    ) : null
+                  }
+                />
+              )}
+              section={sections.unmatched}
+              testId="review-unmatched"
+              variant="unmatched"
             />
-          )}
-          section={sections.unmatched}
-          testId="review-unmatched"
-          variant="unmatched"
-        />
-        <CandidateSection
-          section={sections.alreadyOnYourList}
-          testId="review-already-on-list"
-          description="These extracted titles are already on your list. Open this group to check the matches."
-          renderCard={(candidate) => (
-            <CandidateCard
-              candidate={candidate}
-              thumbnailUrl={thumbnailUrlFor(candidate)}
-              consequence="Stays on your list"
-              actions={correctionActions(candidate)}
+            <CandidateSection
+              section={sections.alreadyOnYourList}
+              testId="review-already-on-list"
+              description="These titles were identified in your screenshot and are already saved. Nothing needs adding; change a match if it is wrong."
+              renderCard={(candidate) => (
+                <CandidateCard
+                  candidate={candidate}
+                  thumbnailUrl={thumbnailUrlFor(candidate)}
+                  consequence="Stays on your list"
+                  actions={correctionActions(candidate)}
+                />
+              )}
             />
-          )}
-        />
-        <details
-          className="review-secondary"
-          data-testid="review-secondary"
-          open={sections.unreadableTiles.count > 0}
-        >
-          <summary className="review-section__summary">
-            {`Other extracted items (${sections.probablyNotTitles.count + sections.unreadableTiles.count})`}
-          </summary>
-          <p className="review-section__description">
-            Nothing here is silently added. Inspect the evidence; use manual entry below if a title
-            was missed.
-          </p>
-          <CandidateSection
-            section={sections.probablyNotTitles}
-            testId="review-probably-not-titles"
-            renderCard={(candidate) => (
-              <CandidateCard
-                candidate={candidate}
-                thumbnailUrl={thumbnailUrlFor(candidate)}
-                actions={
-                  <>
-                    {correctionActions(candidate)}
-                    {onRescueCandidate !== undefined && (
-                      <Button
-                        variant="secondary"
-                        onClick={() => {
-                          void onRescueCandidate(candidate.candidateId).catch(() =>
-                            setPrepareError(
-                              'The rescue was not verified. Check the saved review before trying again.',
-                            ),
-                          );
-                        }}
-                      >
-                        This is a title
-                      </Button>
-                    )}
-                  </>
-                }
+            <details
+              className="review-secondary"
+              data-testid="review-secondary"
+              open={sections.unreadableTiles.count > 0}
+            >
+              <summary className="review-section__summary">
+                {`Other extracted items (${sections.probablyNotTitles.count + sections.unreadableTiles.count})`}
+              </summary>
+              <p className="review-section__description">
+                Nothing here is silently added. Inspect the evidence; use manual entry below if a
+                title was missed.
+              </p>
+              <CandidateSection
+                section={sections.probablyNotTitles}
+                testId="review-probably-not-titles"
+                renderCard={(candidate) => (
+                  <CandidateCard
+                    candidate={candidate}
+                    thumbnailUrl={thumbnailUrlFor(candidate)}
+                    actions={
+                      <>
+                        {correctionActions(candidate)}
+                        {onRescueCandidate !== undefined && (
+                          <Button
+                            variant="secondary"
+                            onClick={() => {
+                              void onRescueCandidate(candidate.candidateId).catch(() =>
+                                setPrepareError(
+                                  'The rescue was not verified. Check the saved review before trying again.',
+                                ),
+                              );
+                            }}
+                          >
+                            This is a title
+                          </Button>
+                        )}
+                      </>
+                    }
+                  />
+                )}
               />
-            )}
-          />
-          <CandidateSection
-            section={sections.unreadableTiles}
-            testId="review-unreadable-tiles"
-            renderCard={(candidate) => (
-              <CandidateCard
-                candidate={candidate}
-                thumbnailUrl={thumbnailUrlFor(candidate)}
-                actions={correctionActions(candidate)}
+              <CandidateSection
+                section={sections.unreadableTiles}
+                testId="review-unreadable-tiles"
+                renderCard={(candidate) => (
+                  <CandidateCard
+                    candidate={candidate}
+                    thumbnailUrl={thumbnailUrlFor(candidate)}
+                    actions={correctionActions(candidate)}
+                  />
+                )}
               />
-            )}
-          />
-        </details>
+            </details>
+          </>
+        )}
 
         {sections.removals.withheld && (
           <p className="review-banner" role="status" data-testid="review-removals-withheld">

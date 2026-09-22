@@ -428,14 +428,12 @@ function reviewResponse(be: Backend, batch: BatchRuntime): ReviewResponse {
       },
       alreadyOnYourList: {
         label: REVIEW_LABELS.alreadyOnYourList,
-        count: appendOnly ? 0 : alreadyIds.length,
-        items: appendOnly
-          ? []
-          : alreadyIds.map((id) =>
-              candidate(batch, id, 'already-present-for-this-service', 'confirmed'),
-            ),
-        collapsedByDefault: true,
-        omitted: appendOnly,
+        count: alreadyIds.length,
+        items: alreadyIds.map((id) =>
+          candidate(batch, id, 'already-present-for-this-service', 'confirmed'),
+        ),
+        collapsedByDefault: false,
+        omitted: false,
       },
       probablyNotTitles: {
         label: REVIEW_LABELS.probablyNotTitles,
@@ -1038,7 +1036,7 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
 
   const already1 = page.getByTestId('review-already-on-list');
   await expect(already1.locator('summary')).toHaveText('Already on your list (0)');
-  await expect(already1.locator('details')).toHaveJSProperty('open', false);
+  await expect(already1.locator('details')).toHaveJSProperty('open', true);
   // ⚠ Nothing on the list yet ⇒ nothing to remove ⇒ the removals section is ABSENT.
   await expect(page.getByTestId('review-removals')).toHaveCount(0);
   await expect(page.getByText(removalsLabel('netflix'))).toHaveCount(0);
@@ -1214,8 +1212,8 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
   // ENTIRELY from the review — it is neither an addition nor "already on your
   // list". A row-id-keyed suppression would have let this reappear.
   await expect(page.getByText('Dune'), 'a suppressed work must not reappear').toHaveCount(0);
-  // Append-only ⇒ no already-on-list section and no removals.
-  await expect(page.getByTestId('review-already-on-list')).toHaveCount(0);
+  // Append-only retains known-title accounting but never proposes removals.
+  await expect(page.getByTestId('review-already-on-list')).toBeVisible();
   await expect(page.getByTestId('review-removals')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Confirm all 1' }).click();

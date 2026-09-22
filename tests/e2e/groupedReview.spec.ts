@@ -111,7 +111,6 @@ describe('T-POL-003b review decision geometry', () => {
         }
         await expect(card.getByText('Read from screenshot', { exact: true })).toBeVisible();
         await expect(card.getByTestId('candidate-raw-text')).toHaveText(candidate.rawText);
-        await page.getByTestId('review-already-on-list').locator('summary').click();
         await expect(page.getByTestId('candidate-known')).toBeVisible();
         await page.getByTestId('review-secondary').locator('summary').first().click();
         await page.getByTestId('review-probably-not-titles').locator('summary').click();

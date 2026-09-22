@@ -145,6 +145,11 @@ onwards is a pure function of stage-1 output and is gated at exactly
 ```
                 image bytes  (PNG | JPEG — post-transcode; never HEIC)
                      │
+             measure tile boundaries
+                     │
+          original-resolution lossless crop
+           (one detected tile at a time)
+                     │
         ┌────────────┴────────────┐
         ▼                         ▼
   1a. gpt-4.1 vision        1b. Vision Read OCR
@@ -157,9 +162,28 @@ onwards is a pure function of stage-1 output and is gated at exactly
              ExtractionResult
 ```
 
-Both calls are issued **in parallel** per image. Neither waits on the
-other. The merge (1c) is a pure function and is where every flag the
-owner will see is computed.
+Detect boundaries **before either reader**. For an accepted layout, process
+tiles serially, at original resolution, as lossless PNG crops. Issue the two
+reader calls **in parallel for that one crop**, never for multiple crops at
+once. Merge inside the crop, then project local coordinates to the original
+screenshot. Persist the exact pixel-rounded input region as `inputTileBox`;
+it proves what each reader saw, not that the proposed identity is correct.
+Keep all readings, and emit an unreadable placeholder if a crop yields no
+non-chrome reading. Fragment collapse cannot join different input tiles.
+
+The conservative single-row detector may refuse a layout. In that case, read
+the whole screenshot with the existing reader policy, mark the layout
+`unverified`, show an explicit review warning, and withhold full-update
+removals. Do not invent a one-tile result or trust model coordinates as source
+provenance. Any unreadable detected tile also withholds removals. Partial
+reader failures retain the existing asymmetric policy, aggregated across
+all tiles; image-scoped memory/decode failures remain image-scoped.
+
+This owner-approved tile-first change increases reader requests from two per
+screenshot to two per detected tile. Existing whole-image golden recordings
+remain **legacy** regression evidence, not measurements of crop-read accuracy
+or cost. Do not claim a quality improvement from replaying a whole-image
+response for each crop. `T-AI-063`, `T-AI-066`.
 
 ### 2.1a Primary reader — Azure OpenAI `gpt-4.1` vision
 

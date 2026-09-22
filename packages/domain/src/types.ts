@@ -358,6 +358,7 @@ export interface BoundingBox {
   tileBox?: { x: number; y: number; w: number; h: number } | undefined;
   /** Image-measured tile containing a verified OCR anchor, not an LLM box. */
   gridTileBox?: { x: number; y: number; w: number; h: number } | undefined;
+  inputTileBox?: { x: number; y: number; w: number; h: number } | undefined;
 }
 
 export interface MatchCandidate {

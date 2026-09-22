@@ -126,7 +126,12 @@ export interface ExtractedTextItem {
    * `gridTileBox` instead carries an image-measured tile with an OCR-backed
    * location. It must never be attached using only a model's predicted centre.
    */
-  boundingBox: NormalisedBox & { tileBox?: NormalisedBox; gridTileBox?: NormalisedBox };
+  boundingBox: NormalisedBox & {
+    tileBox?: NormalisedBox;
+    gridTileBox?: NormalisedBox;
+    /** Exact source region cropped BEFORE either reader ran. Not model geometry. */
+    inputTileBox?: NormalisedBox;
+  };
   /** Where the geometry came from. OCR wins wherever it corroborated (§2.1c step 3). */
   boxSource: BoxSource;
   /** Provider confidence 0..1, or `null`. */
@@ -147,9 +152,12 @@ export interface TileCoverage {
   detectedTiles: number;
   locatedTiles: number;
   titleCandidates: number;
+  /** Present only for tile-first extraction; includes tiles with no readable text. */
+  tiles?: NormalisedBox[];
 }
 
 export interface ExtractionResult {
+  layout?: 'tile-first' | 'unverified';
   /** Absent means the image layout could not be measured, never zero tiles. */
   tileCoverage?: TileCoverage;
   items: ExtractedTextItem[];
