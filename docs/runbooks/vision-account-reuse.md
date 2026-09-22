@@ -1,7 +1,7 @@
 # Runbook — the re-used Azure AI Vision account
 
-**Status:** in force. Applied to **staging** on 2026-08-19. Production has not
-been provisioned and does **not** yet hold this grant.
+**Status:** in force. Applied to **staging** on 2026-08-19 and **production**
+on 2026-09-22. Both managed identities hold the account-scoped grant.
 
 **Why this file exists:** there is one piece of nextup's live configuration
 that is deliberately **not** in a Bicep template. Without this page it looks
@@ -104,6 +104,12 @@ az role assignment list --scope "<the same scope>" `
 Applied and verified for staging (`926bd9c1-847a-4b68-b930-28cc71299e77`) on
 2026-08-19.
 
+Applied for production (`6b2d6917-dbce-4796-92ad-575d7d285de6`) on 2026-09-22
+with the owner's approval during PR #347 deployment validation. Production was
+configured with the shared endpoint but lacked both a direct and inherited
+grant. The repair changes only that identity's access to this Vision account;
+the deployment principal's permissions remain unchanged.
+
 ## 5. ⚠ Standing consequences
 
 **The F0 quota is now shared with another project.** 5,000 transactions/month
@@ -126,16 +132,17 @@ and this account is outside that boundary.
 missing. If OCR starts failing with 401/403 after an environment is rebuilt,
 this page is the first thing to check.
 
-## 6. When production is provisioned
+## 6. Production and environment rebuilds
 
-`infra/main.prod.bicepparam` deliberately does **not** set `deployAi`. When it
-does:
+Production now sets `deployAi = true`, `deployVision = false`, and the shared
+`existingVisionEndpoint` in `infra/main.prod.bicepparam`. Its one-time grant is
+recorded in §4. When either environment is rebuilt with a new managed identity:
 
-1. Set `deployAi = true`, `deployVision = false`, and the same
-   `existingVisionEndpoint`.
-2. Re-run §4 with `-n ca-nextup-prod` — **production has its own managed
-   identity and inherits nothing from staging.**
-3. Note that this makes three consumers of one F0 quota.
+1. Confirm those parameters still point at the intended shared account.
+2. Re-run §4 with the affected app name (`ca-nextup-prod` for production) —
+   **production has its own managed identity and inherits nothing from staging.**
+3. Verify and record the new grant. Both environments and the other project
+   share one F0 quota.
 
 ## 7. Undoing it
 
