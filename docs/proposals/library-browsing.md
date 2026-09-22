@@ -3,6 +3,24 @@
 Owner work order, 2026-09-21: #328 first, then #326, each in a separate PR.
 The owner explicitly chose persistence **across browser restarts**.
 
+## Header spacing and layout memory (owner follow-up, 2026-09-22)
+
+- The unfinished-capture banner must have at least 16px of separation from
+  the library heading and its Service updates/Add title actions, including
+  when controls wrap on phones. Keep the status and library actions in
+  normal document flow.
+- Remember Grid/Compact across navigation, reload and browser restarts.
+  Reuse the browser-local browsing-memory boundary, with a separately
+  validated `nextup.library.layout.v1` value (`grid` or `compact`).
+  Grid remains the first-use default. Invalid values reset with the existing
+  unsupported-choice notice; blocked storage retains in-app state and shows
+  the existing persistence limitation.
+- Layout remains presentation-only: it does not change the URL, API query,
+  loaded pages, order, filters or search. Explicit filter links and
+  Back/Forward keep their URL semantics without resetting the layout.
+- `T-LIB-003` covers persistent layout and unchanged requests; `T-LIB-004`
+  measures real banner/action spacing at phone, tablet and desktop widths.
+
 ## #328: remembered browsing destination
 
 - Remember the last library filters, search, sort field and direction in

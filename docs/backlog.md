@@ -691,7 +691,18 @@ finished, so the exception cannot outlive its reason.
 | `TASK-232` | `done` | #328: validated browser-local destination persists filters/search and complete sort across restarts. Bare-root entry and application returns resolve before list reads, preserve receipt state and omit cursors; explicit links, Back/Forward and clear operations remain authoritative. Direction-only session fallback retired. Unsupported choices/storage failure are disclosed. `T-LIB-001a`–`h`, full web and responsive browser regressions. Separate PR; #326 follows. |
 | `TASK-233` | `done` | #326: browse-first filter/sort row with Compact/Grid and compact Search below. Labelled disclosure focuses input; active query remains named and clearable when collapsed. Explicit submit, cursor reset, focus-preserving clear, Escape/draft dismissal and history reveal retain URL semantics. `T-LIB-002a`–`d`; responsive geometry, accessibility and existing search/navigation regressions. Separate dependent PR; no API, dependency or infrastructure change. |
 | `TASK-234` | `done` | All shared dialogs use viewport portals, scroll lock and inert backgrounds. Library actions, Stop ignoring, restore conflicts and extraction discard/replace preserve consent, pending writes, visible failures, undo and no-scroll focus return. Long workflows and candidate editing stay in context. `T-MOD-001`–`004` cover component guards and responsive Chromium/WebKit geometry, long content, focus, scroll and accessibility. No API, migration, dependency or infrastructure changes. |
+| `TASK-235` | `done` | Capture-status banners reserve a 16px gap above library headings/actions at phone, tablet and desktop widths. Validated Grid/Compact memory uses the existing browsing boundary and a separate browser-local layout key, preserving query/history, loaded rows and request semantics; invalid/blocked storage is disclosed. `T-LIB-003`, `T-LIB-004`; existing layout, search and browsing continuity regressions. No API, dependency or infrastructure changes. |
 <!-- STATUS-LEDGER:END -->
+
+### Approved library header and layout follow-up, 2026-09-22
+
+The owner reported the capture-status banner touching Service updates/Add
+title and requested Grid/Compact persistence like filters and sort. Follow
+`docs/proposals/library-browsing.md`; do not change list query semantics.
+
+| Task | Work | Size | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| TASK-235 | Separate capture status from library actions and remember Grid/Compact across navigation and browser restarts; disclose invalid or unavailable storage without changing list requests. | 1 agent-run + 10 owner-review-minutes | TASK-234 | `T-LIB-003`, `T-LIB-004`; existing layout/navigation regressions |
 
 ### Approved modal context correction, 2026-09-21
 

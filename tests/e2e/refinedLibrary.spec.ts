@@ -128,6 +128,7 @@ async function mountLibrary(
     withGenres = true,
     allServices = false,
     varied = false,
+    unfinishedCapture = false,
     expectedCount = TITLES.length,
   } = {},
 ): Promise<URL[]> {
@@ -184,7 +185,19 @@ async function mountLibrary(
     switch (target.pathname) {
       case '/api/batches':
         expect(target.searchParams.get('open')).toBe('true');
-        body = { batches: [] };
+        body = {
+          batches: unfinishedCapture
+            ? [
+                {
+                  batchId: 'unfinished-review',
+                  service: 'netflix',
+                  mode: 'append-only',
+                  status: 'in-review',
+                  createdAt: '2026-09-22T10:00:00Z',
+                },
+              ]
+            : [],
+        };
         break;
       case '/api/me':
         body = {
@@ -280,6 +293,50 @@ async function mountLibrary(
 const { describe } = test;
 for (const width of [320, 1280]) {
   describe(`Remembered library at ${width}px`, () => {
+    test('T-LIB-003d: layout survives return, reload and restart without changing data requests', async ({
+      page,
+      browser,
+    }) => {
+      const requests = await mountLibrary(page, {
+        width,
+        url: '/?service=netflix&sort=name&dir=asc&q=Orbit',
+        expectedCount: 1,
+      });
+      const url = page.url();
+      const rows = await page.getByTestId('title-list').innerHTML();
+      const reads = requests.filter((request) => request.pathname === '/api/titles').length;
+      await page.getByRole('button', { name: 'Compact view', exact: true }).click();
+      await expect(page.getByTestId('title-list')).toHaveAttribute('data-view', 'compact');
+      expect(await page.getByTestId('title-list').innerHTML()).toBe(rows);
+      expect(page.url()).toBe(url);
+      expect(requests.filter((request) => request.pathname === '/api/titles')).toHaveLength(reads);
+      await page.getByRole('navigation').getByRole('link', { name: 'Upload', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Upload screenshots' })).toBeVisible();
+      await page.getByRole('navigation').getByRole('link', { name: 'List', exact: true }).click();
+      await expect(page.getByTestId('title-list')).toHaveAttribute('data-view', 'compact');
+      expect(page.url()).toBe(url);
+      await page.reload();
+      await expect(page.getByTestId('title-list')).toHaveAttribute('data-view', 'compact');
+      const restarted = await browser.newContext({
+        storageState: await page.context().storageState(),
+      });
+      try {
+        const fresh = await restarted.newPage();
+        await mountLibrary(fresh, { width, expectedCount: 1 });
+        await expect(fresh.getByTestId('title-list')).toHaveAttribute('data-view', 'compact');
+        await expect(
+          fresh.getByRole('button', { name: 'Compact view', exact: true }),
+        ).toHaveAttribute('aria-pressed', 'true');
+        expect(fresh.url()).toBe(url);
+        await fresh.getByRole('button', { name: 'Grid view', exact: true }).click();
+        await fresh.reload();
+        await expect(fresh.getByTestId('title-list')).toHaveAttribute('data-view', 'grid');
+        await noOverflow(fresh);
+      } finally {
+        await restarted.close();
+      }
+    });
+
     test('T-LIB-001h: library choices survive navigation and browser restart', async ({
       page,
       browser,
@@ -341,6 +398,38 @@ for (const width of [320, 1280]) {
       } finally {
         await restarted.close();
       }
+    });
+  });
+}
+
+for (const width of [320, 640, 1280]) {
+  describe(`Capture and library header at ${width}px`, () => {
+    test('T-LIB-004: unfinished capture stays separate from library heading and actions', async ({
+      page,
+    }) => {
+      await mountLibrary(page, { width, unfinishedCapture: true });
+      const banner = page.getByRole('complementary', { name: 'Unfinished capture' });
+      await expect(banner).toContainText('Netflix / Ready to review');
+      const status = await bounds(banner);
+      for (const control of [
+        page.getByRole('heading', { name: 'Your list', exact: true }),
+        page.getByRole('button', { name: 'Service updates', exact: true }),
+        page.getByTestId('add-title-open'),
+      ]) {
+        const box = await bounds(control);
+        expect(box.y - (status.y + status.height)).toBeGreaterThanOrEqual(16);
+      }
+      await expect(banner.getByRole('link', { name: 'Continue review' })).toHaveAttribute(
+        'href',
+        '/batches/unfinished-review',
+      );
+      await page.getByRole('button', { name: 'Service updates', exact: true }).click();
+      await expect(page.getByText('Netflix updated today', { exact: true })).toBeVisible();
+      await page.keyboard.press('Escape');
+      await page.getByTestId('add-title-open').click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await noOverflow(page);
     });
   });
 }

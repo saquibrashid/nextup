@@ -727,6 +727,7 @@ button {
 
 .capture-resume {
   display: flex;
+  margin-bottom: var(--space-4);
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
