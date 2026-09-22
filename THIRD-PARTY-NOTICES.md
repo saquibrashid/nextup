@@ -47,13 +47,14 @@ so they do not relicense this work — but their notices must be retained.
 | `@azure/core-tracing` | 1.4.0 | MIT |
 | `@azure/core-util` | 1.14.0 | MIT |
 | `@azure/core-xml` | 1.6.0 | MIT |
-| `@azure/identity` | 4.13.2 | MIT |
+| `@azure/identity` | 4.13.3 | MIT |
 | `@azure/keyvault-common` | 2.1.0 | MIT |
 | `@azure/keyvault-keys` | 4.10.2 | MIT |
 | `@azure/logger` | 1.4.0 | MIT |
 | `@azure/msal-browser` | 5.18.0 | MIT |
 | `@azure/msal-common` | 16.12.0 | MIT |
-| `@azure/msal-node` | 5.5.0 | MIT |
+| `@azure/msal-common` | 16.14.1 | MIT |
+| `@azure/msal-node` | 6.0.1 | MIT |
 | `@azure/storage-blob` | 12.33.0 | MIT |
 | `@azure/storage-common` | 12.5.0 | MIT |
 | `@babel/helper-string-parser` | 7.29.7 | MIT |
@@ -120,7 +121,7 @@ so they do not relicense this work — but their notices must be retained.
 | `buffer-equal-constant-time` | 1.0.1 | BSD-3-Clause |
 | `buffer-from` | 1.1.2 | MIT |
 | `bundle-name` | 4.1.0 | MIT |
-| `busboy` | 1.6.0 | MIT |
+| `busboy` | 1.6.0 | UNKNOWN |
 | `bytes` | 3.1.2 | MIT |
 | `c12` | 3.1.0 | MIT |
 | `call-bind-apply-helpers` | 1.0.2 | MIT |
@@ -276,7 +277,7 @@ so they do not relicense this work — but their notices must be retained.
 | `source-map-js` | 1.2.1 | BSD-3-Clause |
 | `sprintf-js` | 1.1.3 | BSD-3-Clause |
 | `statuses` | 2.0.2 | MIT |
-| `streamsearch` | 1.1.0 | MIT |
+| `streamsearch` | 1.1.0 | UNKNOWN |
 | `string_decoder` | 1.3.0 | MIT |
 | `strnum` | 2.4.1 | MIT |
 | `tarn` | 3.1.2 | MIT |
