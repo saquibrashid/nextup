@@ -644,6 +644,16 @@ export function ReviewPage({
           {review.banner}
         </p>
       )}
+      {(review.tileCoverage ?? []).map((image) => (
+        <p className="review-guidance" key={image.imageId}>
+          <a href={image.href} target="_blank" rel="noreferrer">
+            {image.fileName}
+          </a>
+          {`: ${image.titleCandidates} title candidates; titles located in ${image.locatedTiles} of ${image.detectedTiles} detected tiles.`}
+          {image.locatedTiles < image.detectedTiles &&
+            ' Some tiles could not be linked to a title. Compare the screenshot and add any missing titles below; an unlocated tile is not necessarily unread.'}
+        </p>
+      ))}
       {reviewTools}
       {!confirming && applyRecovery}
       {allDiscarded && (

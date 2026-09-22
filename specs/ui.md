@@ -926,6 +926,26 @@ Flags rendered as chips: **"Low confidence"** (`verdict === 'low-confidence'`),
 
 #### 5.3a Revision-2 verdicts (ADR-0001 Revision 2)
 
+**Image-derived evidence (2026-09-22, `T-AI-062`–`T-AI-064`).** When the
+single-row grid detector accepts a layout, crop to its measured tile only with
+an OCR-backed title location. Unique exact OCR text, including a tile's joined
+OCR lines, may locate an otherwise unverified artwork candidate without
+upgrading its confidence or removing its warning. Never snap an unverified
+model box to its nearest tile. Rejected layouts retain the existing crop rule
+and labelled whole-screenshot fallback.
+
+Show per-image coverage above collapsed review groups, with a link to the
+source: **"3 title candidates; titles located in 3 of 5 detected tiles."**
+If coverage is incomplete, ask the owner to compare the screenshot and add
+missing titles, explicitly distinguishing *unlocated* from *unread*. The
+"Couldn't read these" bucket still counts explicit unreadable candidates,
+not silently omitted tiles. Absent measurement makes no completeness claim.
+Any unlocated detected tile withholds full-update removals through `lowYield`.
+
+In **Probably not titles**, headline the raw transcription (e.g. **My List**),
+not a speculative TMDB result (e.g. **My Wish List**). Do not promote that
+match's poster/year; keep correction controls and alternatives available.
+
 Two verdicts are new and each has a **mandatory** presentation. These are not
 cosmetic — they are the review-side half of the mitigation for `RSK-028`
 (fabrication), and an implementation that renders them as ordinary cards

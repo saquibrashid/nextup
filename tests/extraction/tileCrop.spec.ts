@@ -50,6 +50,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { crossCheck, tileCropFor } from '@nextup/domain';
 import type { LlmTile, OcrLine } from '@nextup/domain';
+import { HybridExtractor } from '../../apps/api/src/extraction/hybridExtractor.js';
 
 const GOLDEN = join(process.cwd(), 'tests', 'fixtures', 'golden');
 
@@ -137,6 +138,49 @@ function score(): { crops: Scored[]; refusedLlm: number; llmItems: number } {
 }
 
 describe('T-AI-055 - the tile crop, scored against ground truth', () => {
+  it('T-AI-062h - image-derived crops retain identity-paired corpus coverage, with nonzero measured yield', async () => {
+    // The new branch must face the same oracle as the old one. Scoring boxes
+    // against whichever tile they hit would certify confidently wrong crops.
+    // Replay the shipped hybrid with recorded reader output but REAL pixels;
+    // the positive floor prevents "refuse everything" satisfying the test.
+    let measuredCrops = 0;
+    let crops = 0;
+    const files = readdirSync(join(GOLDEN, 'images'));
+    for (const id of IMAGE_IDS) {
+      const file = files.find((name) => name.startsWith(`${id}.`) && /\.(png|jpg)$/.test(name));
+      if (!file) throw new Error(`Missing PNG/JPEG for ${id}`);
+      const llm = read<LlmTile[]>(join(GOLDEN, 'llm', 'gpt-4.1', `${id}.llm.json`));
+      const ocr = read<OcrLine[]>(join(GOLDEN, 'ocr', `${id}.ocr.json`));
+      const truth = read<Tile[]>(join(GOLDEN, 'tiles', `${id}.tiles.json`));
+      const result = await new HybridExtractor({
+        llm: { readTiles: async () => llm },
+        vision: { readLines: async () => ocr },
+      }).extract(
+        readFileSync(join(GOLDEN, 'images', file)),
+        file.endsWith('.png') ? 'image/png' : 'image/jpeg',
+      );
+      for (const item of result.items) {
+        const tile = truth.find(
+          (entry) => norm(entry.title) === norm(item.inferredTitle ?? item.rawText),
+        );
+        if (!tile) continue;
+        const crop = tileCropFor({
+          boxSource: item.boxSource,
+          boundingBoxes: [{ imageId: id, ...item.boundingBox }],
+        });
+        if (crop === null) continue;
+        crops++;
+        if (item.boundingBox.gridTileBox !== undefined) measuredCrops++;
+        expect(
+          overlapArea(crop, tile) / (tile.w * tile.h),
+          `${id}/${tile.title}`,
+        ).toBeGreaterThanOrEqual(0.5);
+      }
+    }
+    expect(crops).toBeGreaterThanOrEqual(15);
+    expect(measuredCrops).toBeGreaterThanOrEqual(2);
+  }, 120_000);
+
   it('T-AI-055a - no crop shows less than half of the tile it names', () => {
     const { crops } = score();
     const bad = crops.filter((c) => c.coverage < 0.5);

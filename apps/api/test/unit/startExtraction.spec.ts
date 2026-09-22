@@ -137,6 +137,34 @@ beforeEach(() => {
 });
 
 describe('startExtraction', () => {
+  it('T-AI-063f - persists the crop image ID and measured evidence through cleanup and final stats', async () => {
+    const gridTileBox = { x: 0.02, y: 0.2, w: 0.45, h: 0.6 };
+    const tileCoverage = { detectedTiles: 5, locatedTiles: 1, titleCandidates: 1 };
+    await startExtraction(OWNER, BATCH, {
+      blobStore,
+      extractor: extractorReturning({
+        tileCoverage,
+        items: [item({ boundingBox: { x: 0.1, y: 0.3, w: 0.2, h: 0.02, gridTileBox } })],
+      }),
+    });
+    const stored = mockCreate.mock.calls[0]?.[1].boundingBoxes;
+    expect(typeof stored).toBe('string');
+    expect(JSON.parse(stored as string)).toEqual([
+      {
+        imageId: 'img-1',
+        x: 0.1,
+        y: 0.3,
+        w: 0.2,
+        h: 0.02,
+        gridTileBox,
+      },
+    ]);
+    expect(lastStats()['stage1']).toMatchObject({
+      tileCoverage: [{ imageId: 'img-1', ...tileCoverage }],
+    });
+    expect(mockRecord.mock.calls.at(-1)?.[2].lowYield).toBe(true);
+  });
+
   it('T-BATCH-026e: each run resets displayed counts and records measured zero separately from unknown', async () => {
     await startExtraction(OWNER, BATCH, {
       blobStore,

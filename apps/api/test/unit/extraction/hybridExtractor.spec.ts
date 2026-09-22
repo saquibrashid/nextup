@@ -15,6 +15,12 @@ import { ExtractorError, type LlmTile, type OcrLine } from '@nextup/domain';
 
 import { HybridExtractor } from '../../../src/extraction/hybridExtractor.js';
 
+// These cases isolate reader failure policy and deliberately supply non-image
+// bytes. Real pixel-to-review wiring is covered by T-AI-063.
+vi.mock('../../../src/images/luminanceRaster.js', () => ({
+  measureTileGrid: vi.fn(async () => null),
+}));
+
 const BYTES = new Uint8Array([1, 2, 3]);
 
 const tiles: LlmTile[] = [

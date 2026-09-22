@@ -1619,6 +1619,24 @@ omission: `total` and `alreadyKnown`. It distinguishes known-only append
 captures without exposing the omitted known section. Clients accept its absence
 during rolling deployment and must not infer "all known" from empty additions.
 
+`tileCoverage` is an array of measured image summaries:
+`{ imageId, fileName, href, detectedTiles, locatedTiles, titleCandidates }`.
+It is absent on older APIs and empty when no layout could be measured; neither
+means zero tiles. `href` is an owner-scoped image API path, never a blob URL.
+Counts are extraction-time facts before identity collapse or owner decisions.
+Multiple candidate rows can occupy one tile. `locatedTiles` counts distinct
+detected tiles with a non-chrome, non-unreadable candidate and an OCR-backed
+location; it does not claim the other tiles were unread. A detected tile without
+that evidence sets the existing persisted `lowYield` safety flag, withholding
+full-update removals while still allowing additions. `T-AI-063` / `T-AI-064`.
+
+Candidate `tileCrop` prefers an image-measured tile containing a verified OCR
+anchor. `boundingBoxes` stores that rectangle as `gridTileBox`, separately from
+the reader's estimated `tileBox`, together with the source `imageId`. Without
+measured evidence, the existing OCR/reader agreement rule remains. No migration
+or image processing on the review GET is required. Historical batches gain
+neither counts nor measured geometry until explicitly re-extracted.
+
 **200**
 ```jsonc
 {

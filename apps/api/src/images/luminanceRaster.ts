@@ -1,6 +1,9 @@
 import sharp from 'sharp';
 
-import type { LuminanceRaster } from '@nextup/domain';
+import { detectTileGrid, type LuminanceRaster, type TileGrid } from '@nextup/domain';
+import { AppError } from '../errors/AppError.js';
+import { isOutOfMemoryError } from './transcode.js';
+import { imageDecodeFailedMessage } from './decodeErrorMessages.js';
 
 /**
  * Downsampled greyscale raster for `detectTileGrid`.
@@ -32,6 +35,7 @@ export const WORKING_WIDTH = 1000;
  */
 export async function luminanceRasterFrom(image: Buffer): Promise<LuminanceRaster> {
   const { data, info } = await sharp(image)
+    .flatten({ background: '#000000' })
     .greyscale()
     .resize({ width: WORKING_WIDTH, fit: 'fill' })
     .raw()
@@ -41,4 +45,16 @@ export async function luminanceRasterFrom(image: Buffer): Promise<LuminanceRaste
     height: info.height,
     data: new Uint8Array(data.buffer, data.byteOffset, data.byteLength),
   };
+}
+
+export async function measureTileGrid(image: Uint8Array): Promise<TileGrid | null> {
+  let raster: LuminanceRaster;
+  try {
+    raster = await luminanceRasterFrom(Buffer.from(image));
+  } catch (error) {
+    // Preserve memory errors for the runner's one-image failure classification.
+    if (isOutOfMemoryError(error)) throw error;
+    throw new AppError('IMAGE_DECODE_FAILED', 415, imageDecodeFailedMessage('That image'));
+  }
+  return detectTileGrid(raster);
 }

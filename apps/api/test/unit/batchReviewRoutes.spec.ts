@@ -75,6 +75,7 @@ const makeListing = (listingId: string, workIdentity: string, name: string): Lis
 });
 
 interface CandidateRow {
+  boxSource?: string;
   id: string;
   batchId: string;
   rawText: string;
@@ -273,6 +274,62 @@ afterEach(async () => {
 });
 
 describe('T-REV-010 · GET /review without a store', () => {
+  it('T-AI-063g - serves persisted measured crops and coverage through the owner-scoped review route', async () => {
+    store.images = [{ id: 'img-1', fileName: 'shot.png', candidateCount: 1 }];
+    store.batch = {
+      id: 'batch-1',
+      service: 'netflix',
+      status: 'in-review',
+      mode: 'full-update',
+      lowYield: true,
+      extractionStats: JSON.stringify({
+        stage1: {
+          tileCoverage: [
+            {
+              imageId: 'img-1',
+              detectedTiles: 5,
+              locatedTiles: 1,
+              titleCandidates: 1,
+            },
+          ],
+        },
+      }),
+    };
+    const gridTileBox = { x: 0.02, y: 0.2, w: 0.45, h: 0.6 };
+    makeCandidate({
+      boxSource: 'ocr',
+      boundingBoxes: JSON.stringify([
+        {
+          imageId: 'img-1',
+          x: 0.1,
+          y: 0.3,
+          w: 0.2,
+          h: 0.02,
+          gridTileBox,
+        },
+      ]),
+    });
+    const res = await getReview('batch-1');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      tileCoverage: [
+        {
+          imageId: 'img-1',
+          fileName: 'shot.png',
+          href: '/api/images/img-1',
+          detectedTiles: 5,
+          locatedTiles: 1,
+          titleCandidates: 1,
+        },
+      ],
+      sections: {
+        additions: { items: [{ tileCrop: { imageId: 'img-1', ...gridTileBox } }] },
+        removals: { withheld: true },
+      },
+    });
+  });
+
   it('T-REV-010o: 404 when the batch does not belong to the owner', async () => {
     const res = await getReview('batch-elsewhere');
     expect(res.status).toBe(404);

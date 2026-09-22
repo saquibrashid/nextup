@@ -465,6 +465,10 @@ export const boundingBoxSchema = z
       .object({ x: z.number(), y: z.number(), w: z.number().positive(), h: z.number().positive() })
       .strict()
       .optional(),
+    gridTileBox: z
+      .object({ x: z.number(), y: z.number(), w: z.number().positive(), h: z.number().positive() })
+      .strict()
+      .optional(),
   })
   .strict() satisfies z.ZodType<BoundingBox>;
 

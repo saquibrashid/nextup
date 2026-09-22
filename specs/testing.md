@@ -20,6 +20,24 @@ baselines are empty. A mapped name is not proof of sufficient assertions or
 completed manual acceptance. See `docs/current-release.md` for the evidence
 boundaries and owner-dependent work.
 
+### Image-derived review evidence, approved 2026-09-22
+
+| Test ID | Level | Assertion |
+| --- | --- | --- |
+| `T-AI-062` | U+G | `packages/domain/test/tileEvidence.spec.ts` (`a`–`g`) and `tests/extraction/tileCrop.spec.ts` (`h`). The owner's five-tile capture produced three candidates and mostly whole-image thumbnails. Image geometry alone cannot associate identities: OCR anchors use the whole measured tile, never a caption-centred approximation; an uncorroborated model centre or gutter point cannot choose a tile. A unique exact OCR line or joined same-tile transcription can locate artwork without upgrading its confidence. Duplicate/fuzzy/empty subjects refuse. Counts exclude chrome/unreadable candidates and count occupied tiles once; cleanup preserves same-tile evidence and refuses cross-tile merges. Persisted crops validate bounds, provenance and containment. The corpus case replays the shipped hybrid on real pixels and recorded readers, pairs crops to independent ground truth **by identity**, requires every paired crop to cover at least half its tile, at least 15 crops overall and at least two measured crops. Synthetic boxes alone cannot certify crop quality. |
+| `T-AI-063` | U | `apps/api/test/unit/extraction/tileEvidence.spec.ts` (`a`–`d`), `runExtraction.spec.ts` (`e`), `startExtraction.spec.ts` (`f`), `batchReviewRoutes.spec.ts` (`g`). Real pixels traverse hybrid detection, evidence association, JSON parsing and crop projection without extra paid reader calls. Rejected layouts do not invent counts; opaque-alpha PNGs produce one-channel rasters equivalent to RGB. Persisted counts validate integer ranges and only name this batch's images. The runner persists per-image measurements and withholds removals if any measured tile remains unlocated, even if duplicate candidate rows outnumber tiles or another image is complete. The writer must include the source **imageId** with its box: the old writer omitted the field the read parser required, so domain-only crop tests could pass while the live route silently refused every such box. Measured boxes and stats survive cleanup, final outcome persistence and the real owner-scoped route. |
+| `T-AI-064` | C | `apps/web/test/tileCoverage.spec.tsx` (`a`–`d`). Measured partial coverage stays visible when the explicit unreadable bucket is empty; image links and wording distinguish unlocated from unread. Older payloads make no invented completeness claim. Chrome headlines its raw transcription and does not promote a speculative catalogue poster/year; ordinary matched candidates retain their chosen identity and poster. All fixtures use `buildReviewResponse`, not a parallel invented response shape. |
+
+`T-AI-063h` additionally exercises a corrupt raster through the real hybrid and
+runner: only that image fails, the next image is processed, and its message
+does not misdiagnose corruption as memory pressure.
+
+Mutation checks for this slice independently removed unique OCR association,
+OCR provenance, same-tile evidence preservation, measured-crop projection,
+the persisted image ID, measured-box parsing, partial-coverage withholding,
+the raw chrome headline and visible coverage. Each failed its named regression;
+sources were restored from byte snapshots between mutations.
+
 ### Library composition refinement, approved 2026-09-18
 
 These extend the existing library presentation contracts; no data/ordering or

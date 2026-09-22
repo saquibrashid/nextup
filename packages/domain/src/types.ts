@@ -356,6 +356,8 @@ export interface BoundingBox {
    * 'llm'` boxes, where the box already IS the reader's tile.
    */
   tileBox?: { x: number; y: number; w: number; h: number } | undefined;
+  /** Image-measured tile containing a verified OCR anchor, not an LLM box. */
+  gridTileBox?: { x: number; y: number; w: number; h: number } | undefined;
 }
 
 export interface MatchCandidate {
