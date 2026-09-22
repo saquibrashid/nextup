@@ -35,6 +35,7 @@
 
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { DEGRADED_EXTRACTION_BANNER } from '@nextup/domain';
@@ -135,6 +136,30 @@ function batch(overrides: Partial<BatchStatus> = {}): BatchStatus {
     ...overrides,
   };
 }
+
+describe('T-POL-001 saved capture orientation', () => {
+  it.each(['submitted', 'extracting', 'extraction-failed'] as const)(
+    'T-POL-001c: %s stays at reading rather than claiming success',
+    (status) => {
+      render(<BatchStatusPage batch={batch({ status })} />);
+      expect(
+        screen.getByRole('list', { name: 'Capture progress' }).querySelector('[aria-current]'),
+      ).toHaveTextContent('Read screenshots');
+    },
+  );
+
+  it.each(['applied', 'undone', 'discarded'] as const)(
+    'T-POL-001d: %s is a saved outcome, not an active wizard',
+    (status) => {
+      render(
+        <MemoryRouter>
+          <BatchStatusPage batch={batch({ status })} />
+        </MemoryRouter>,
+      );
+      expect(screen.queryByRole('list', { name: 'Capture progress' })).not.toBeInTheDocument();
+    },
+  );
+});
 
 describe('T-UX-007 — per-image progress without navigating away', () => {
   it('T-UX-050 · T-UX-007a: a submitted batch reads as QUEUED, with both counts', () => {

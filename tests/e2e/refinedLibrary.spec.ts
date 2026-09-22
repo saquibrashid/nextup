@@ -1182,6 +1182,55 @@ test('T-UX-141g: default, popovers and Compact pass axe and honor reduced motion
  * LAYOUT fact that only a real browser can answer, which is why they live here
  * and not in the jsdom suite.
  */
+test('T-POL-003c: catalog surfaces and artwork stay consistent in both layouts with reduced motion', async ({
+  page,
+}, testInfo) => {
+  await mountLibrary(page, { width: 1280, allServices: true, varied: true });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  for (const view of ['Grid', 'Compact']) {
+    await page.getByRole('button', { name: `${view} view`, exact: true }).click();
+    await expect(page.getByTestId('title-list')).toHaveAttribute('data-view', view.toLowerCase());
+    const rows = page.locator('li.title-row');
+    // Even the reduced-motion 0.01ms transition needs its first animation frame.
+    await expect
+      .poll(() =>
+        rows.locator('.title-row__poster').evaluateAll((elements) =>
+          elements.map((element) => {
+            const { width, height } = element.getBoundingClientRect();
+            return { width, height };
+          }),
+        ),
+      )
+      .toEqual(
+        TITLES.map(() => ({
+          width: view === 'Grid' ? 192 : 72,
+          height: view === 'Grid' ? 288 : 108,
+        })),
+      );
+    const appearance = await rows.first().evaluate((element) => {
+      const style = getComputedStyle(element);
+      return {
+        image: style.backgroundImage,
+        transform: style.transform,
+        durations: style.transitionDuration.split(',').map(Number.parseFloat),
+      };
+    });
+    expect(appearance.image).toBe('none');
+    expect(appearance.transform).toBe('none');
+    expect(appearance.durations.every((duration) => duration <= 0.00001)).toBe(true);
+    const control = rows.first().getByRole('button', { name: /^Watch preferences for/ });
+    await control.focus();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    await expect(control).toBeFocused();
+    expect(await control.evaluate((element) => getComputedStyle(element).outlineStyle)).not.toBe(
+      'none',
+    );
+    await noOverflow(page);
+    await page.screenshot({ path: testInfo.outputPath(`premium-${view}.png`), fullPage: true });
+  }
+});
+
 test('T-UX-147a: compact rows line their ratings, badges and priority controls up as columns', async ({
   page,
 }) => {

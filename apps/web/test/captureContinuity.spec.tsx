@@ -84,6 +84,27 @@ function unload() {
   return event.defaultPrevented;
 }
 
+describe('T-POL-001 saved preparation', () => {
+  it.each(['draft', 'extracting'])(
+    'T-POL-001f: %s advertises preparation only while the saved capture is editable',
+    (status) => {
+      render(
+        <DraftBatch
+          batch={{ ...saved, status }}
+          client={client()}
+          offline={false}
+          onRefresh={async () => {}}
+          onRefused={vi.fn()}
+          onDiscarded={vi.fn()}
+        />,
+      );
+      expect(Boolean(screen.queryByRole('list', { name: 'Capture progress' }))).toBe(
+        status === 'draft',
+      );
+    },
+  );
+});
+
 describe('T-UX-161 local and saved capture continuity', () => {
   it('T-UX-161a: route links and Back preserve unsaved input until explicit leave; reload/sign-out use the native warning', async () => {
     const router = createMemoryRouter(

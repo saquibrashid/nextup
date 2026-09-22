@@ -134,6 +134,7 @@ export function CandidateCard({
   // screenshot; strict `=== null` would instead take the crop branch and throw
   // on `undefined.w`, blanking the entire review page.
   const crop = candidate.tileCrop ?? null;
+  const chips = chipsFor(candidate, unidentified);
 
   return (
     // ⚠ A `<div>`, NOT the `<li>`: `CandidateList` owns the row element,
@@ -238,10 +239,20 @@ export function CandidateCard({
 
         {match !== null && (
           <p className="candidate-card__meta" data-testid="candidate-meta">
-            {[MEDIA_TYPE_LABELS[match.mediaType] ?? match.mediaType, match.releaseYear]
+            {[match.releaseYear, MEDIA_TYPE_LABELS[match.mediaType] ?? match.mediaType]
               .filter((part) => part !== null && part !== undefined)
               .join(' · ')}
           </p>
+        )}
+
+        {chips.length > 0 && (
+          <div className="candidate-card__signals">
+            {chips.map((chip) => (
+              <span className="candidate-card__chip" data-testid="candidate-chip" key={chip}>
+                {chip}
+              </span>
+            ))}
+          </div>
         )}
 
         {consequence !== null && (
@@ -256,16 +267,13 @@ export function CandidateCard({
             IS that text (an unmatched row), where repeating it verbatim one
             line down reads as two separate findings. */}
         {candidate.rawText !== '' && headline !== candidate.rawText && (
-          <p className="candidate-card__raw" data-testid="candidate-raw-text">
-            {candidate.rawText}
-          </p>
+          <div className="candidate-card__evidence">
+            <span className="candidate-card__evidence-label">Read from screenshot</span>
+            <p className="candidate-card__raw" data-testid="candidate-raw-text">
+              {candidate.rawText}
+            </p>
+          </div>
         )}
-
-        {chipsFor(candidate, unidentified).map((chip) => (
-          <span className="candidate-card__chip" data-testid="candidate-chip" key={chip}>
-            {chip}
-          </span>
-        ))}
       </div>
       {actions !== null && <div className="candidate-card__actions">{actions}</div>}
     </div>

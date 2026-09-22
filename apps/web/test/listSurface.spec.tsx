@@ -227,7 +227,7 @@ describe('T-UX-111 · ui-refresh.md §4.1/§4.2 · at 1280 px the grid layout re
     expect(ruleBody(`${gridSelector} \\.title-row`, block)).toMatch(
       /grid-template-columns:\s*minmax\(0,\s*1fr\)/,
     );
-    expect(ruleBody(`${gridSelector} \\.title-row__poster`, block)).toMatch(/width:\s*10rem/);
+    expect(ruleBody(`${gridSelector} \\.title-row__poster`, block)).toMatch(/width:\s*12rem/);
     expect(ruleBody(`${gridSelector} \\.title-row__poster`, BASE_CSS)).toMatch(/height:\s*auto/);
   });
 

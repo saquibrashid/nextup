@@ -8,6 +8,7 @@ import { useCaptureLifetime } from '../lib/useCaptureLifetime';
 import { useCaptureNavigation } from './CaptureNavigation';
 import { ScreenshotPreview } from './ScreenshotPreview';
 import { CaptureInputIssues } from './CaptureInputIssues';
+import { CaptureProgress } from './CaptureProgress';
 import { useCaptureRefusals } from '../lib/useCaptureRefusals';
 import { Button } from './ui/Button';
 import { Fieldset } from './ui/Fieldset';
@@ -173,6 +174,7 @@ export function DraftBatch({
 
   return (
     <section className="upload-flow saved-capture">
+      {editable && <CaptureProgress stage="prepare" />}
       <RejectionList entries={mergeRejections([], rejected)} />
       <h1>Check your saved screenshots</h1>
       <p>

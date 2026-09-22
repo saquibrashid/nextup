@@ -109,6 +109,43 @@ before writing a `must`.
 
 ---
 
+### 2.2 Premium presentation pass — TASK-236
+
+The owner's visual-only refinement applies to upload, extraction, review and the
+library. Retain the approved dark ink/indigo tokens and native font stack; no new
+dependency, data model, network behavior, consent, default or action.
+
+- **Orientation:** a shared, noninteractive ordered indicator reads Prepare,
+  Read screenshots, Review. The current stage has `aria-current="step"` and a
+  non-colour underline. It indicates location, not percentage or extraction
+  quality. No stage skipping or automatic confirmation. Show it for new/local
+  preparation, editable saved drafts, active/failed reading and review; omit it
+  from terminal status records and unresolved capture checkpoints.
+- **Upload:** active step numbers have restrained accent treatment; answered
+  steps remain compact and editable. Group screenshot previews and the primary
+  action with consistent borders and spacing. The desktop summary remains
+  sticky; phone layout remains linear. All three input methods and explanatory
+  disabled/error text remain visible and usable.
+- **Review:** title, year/type, existing confidence warnings, consequence, then
+  labelled original screenshot text form the metadata hierarchy. Raw evidence
+  never truncates. At 1024px and above, evidence, identity and decisions occupy
+  separate columns; on narrower screens actions remain below the identity.
+  Keep every section, native disclosure, 104px evidence box and virtualized list.
+  Apply stays sticky with mobile navigation clearance.
+- **Library:** flat, quiet surfaces replace per-card gradients. Desktop grid
+  artwork grows to a consistent 192px by 288px; compact retains its 72px by
+  108px posters and aligned comparison columns. Controls keep their compact
+  phone geometry, low-prominence search and persisted choices.
+- **Interaction:** restrained border/background transitions, visible keyboard
+  focus, no scaling/lifting or hidden-on-hover actions. Existing reduced-motion
+  override applies to every new transition. Target floors remain 44px and
+  layouts must not overflow at 280px, 320px, phone, tablet or desktop widths.
+
+`T-POL-001` covers stage semantics; `T-POL-002` covers review hierarchy and honest
+evidence; `T-POL-003` measures responsive stage/card geometry, catalog proportions
+and reduced motion in Chromium and WebKit. Existing functional and accessibility
+tests remain mandatory; screenshots accompany browser coverage for visual review.
+
 ## 3. The five defects — these are BUGS, not design
 
 ⚠ **These are separated from the design sections on purpose.** Bundled into a

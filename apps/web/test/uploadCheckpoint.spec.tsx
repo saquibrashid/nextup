@@ -96,6 +96,21 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe('T-POL-001 entry orientation', () => {
+  it('T-POL-001e: preparation progress appears only after the saved-capture check resolves', async () => {
+    const pending = deferred<BatchHistoryResponse>();
+    const client = stub(null);
+    client.listBatches.mockReturnValueOnce(pending.promise);
+    mount(client);
+    expect(screen.queryByRole('list', { name: 'Capture progress' })).not.toBeInTheDocument();
+    await act(async () => pending.resolve({ batches: [] }));
+    expect(
+      screen.getByRole('list', { name: 'Capture progress' }).querySelector('[aria-current]'),
+    ).toHaveTextContent('Prepare');
+    expect(client.createBatch).not.toHaveBeenCalled();
+  });
+});
+
 describe('T-UX-160 entry checkpoint', () => {
   it.each([null, 'applied', 'undone', 'discarded'])(
     'T-UX-160a: %s permits preparation only after an authoritative read',
