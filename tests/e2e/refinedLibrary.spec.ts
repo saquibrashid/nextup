@@ -128,6 +128,8 @@ async function mountLibrary(
     withGenres = true,
     allServices = false,
     varied = false,
+    watchingIndexes = [2],
+    singleService = false,
     unfinishedCapture = false,
     expectedCount = TITLES.length,
   } = {},
@@ -137,7 +139,7 @@ async function mountLibrary(
   if (varied) {
     TITLES.forEach((title, index) =>
       preferences.set(title.titleId, {
-        watching: index === 2,
+        watching: watchingIndexes.includes(index),
         priority: index === 0 ? 'up-next' : index === 1 ? 'someday' : 'normal',
       }),
     );
@@ -220,13 +222,14 @@ async function mountLibrary(
                 }
               : {}),
             genres: withGenres ? title.genres : [],
-            badges: allServices
-              ? SERVICES.map((service) => ({
-                  service,
-                  listingId: `${service}-${title.titleId}`,
-                  dateAdded: '2026-09-01',
-                }))
-              : title.badges,
+            badges:
+              allServices || singleService
+                ? (singleService ? SERVICES.slice(index, index + 1) : SERVICES).map((service) => ({
+                    service,
+                    listingId: `${service}-${title.titleId}`,
+                    dateAdded: '2026-09-01',
+                  }))
+                : title.badges,
           }))
           .filter(
             (title) =>
@@ -1182,6 +1185,73 @@ test('T-UX-141g: default, popovers and Compact pass axe and honor reduced motion
  * LAYOUT fact that only a real browser can answer, which is why they live here
  * and not in the jsdom suite.
  */
+for (const width of [640, 900, 1280]) {
+  for (const singleService of [true, false]) {
+    describe(`Aligned grid at ${width}px with ${singleService ? 'different logos' : 'wrapped services'}`, () => {
+      test('T-POL-004: Watching and content-sized service footers stay aligned', async ({
+        page,
+      }, testInfo) => {
+        await mountLibrary(page, {
+          width,
+          varied: true,
+          watchingIndexes: [0, 1],
+          singleService,
+          allServices: !singleService,
+        });
+        const cards = page.locator('li.title-row');
+        const geometry = await cards.evaluateAll((rows) =>
+          rows.map((row) => {
+            const rect = (selector: string) => {
+              const element = row.querySelector(selector);
+              if (!element) throw new Error(`Missing ${selector}`);
+              const { x, y, width, height, bottom } = element.getBoundingClientRect();
+              return { x, y, width, height, bottom };
+            };
+            return {
+              top: Math.round(row.getBoundingClientRect().top),
+              name: rect('.title-row__name'),
+              watching: row.querySelector('.title-row__watching')
+                ? rect('.title-row__watching')
+                : null,
+              meta: rect('.title-row__meta'),
+              priority: rect('.title-row__watch'),
+              date: rect('.title-row__date'),
+              footer: rect('.title-row__badges'),
+            };
+          }),
+        );
+        expect(geometry.filter((card) => card.watching !== null)).toHaveLength(2);
+        for (const card of geometry) {
+          if (card.watching !== null) {
+            expect(card.watching.y).toBeGreaterThanOrEqual(card.name.bottom);
+            expect(card.watching.x).toBeCloseTo(card.name.x, 0);
+          }
+        }
+        for (const top of new Set(geometry.map((card) => card.top))) {
+          const siblings = geometry.filter((card) => card.top === top);
+          expect(siblings.length).toBe(width >= 1024 ? 3 : 2);
+          for (const part of ['meta', 'priority', 'date', 'footer'] as const) {
+            const positions = siblings.map((card) => card[part].y);
+            expect(Math.max(...positions) - Math.min(...positions), part).toBeLessThan(1);
+          }
+          const heights = siblings.map((card) => card.footer.height);
+          expect(Math.max(...heights) - Math.min(...heights)).toBeLessThan(1);
+          const watchingPositions = siblings.flatMap((card) =>
+            card.watching === null ? [] : [card.watching.y],
+          );
+          if (watchingPositions.length > 1) {
+            expect(Math.max(...watchingPositions) - Math.min(...watchingPositions)).toBeLessThan(1);
+          }
+        }
+        await expect(page.getByTestId('poster-placeholder')).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Find a match', exact: true })).toBeVisible();
+        await noOverflow(page);
+        await page.screenshot({ path: testInfo.outputPath('aligned-catalog.png'), fullPage: true });
+      });
+    });
+  }
+}
+
 test('T-POL-003c: catalog surfaces and artwork stay consistent in both layouts with reduced motion', async ({
   page,
 }, testInfo) => {

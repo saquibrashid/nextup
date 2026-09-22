@@ -4010,6 +4010,10 @@ button {
   gap: var(--space-2);
 }
 
+.title-list[data-view='grid'] .title-row__watching {
+  flex-basis: 100%;
+}
+
 .title-row__watch {
   max-width: 100%;
 }
@@ -4034,7 +4038,10 @@ button {
 
   .title-list[data-view='grid'] .title-row {
     grid-template-columns: minmax(0, 1fr);
-    align-content: start;
+    /* Share content-sized tracks across cards without clipping longer titles. */
+    grid-template-rows: subgrid;
+    grid-row: span 7;
+    row-gap: var(--space-2);
   }
 
   .title-list[data-view='grid'] .title-row__poster {
@@ -4042,7 +4049,6 @@ button {
     justify-self: center;
   }
 
-  .title-list[data-view='grid'] .title-row__body,
   .title-list[data-view='grid'] .title-row__actions {
     grid-column: 1;
     grid-row: 2;
@@ -4050,11 +4056,14 @@ button {
 
   .title-list[data-view='grid'] .title-row[data-match-state='unmatched'] .title-row__actions,
   .title-list[data-view='grid'] .title-row[aria-busy='true'] .title-row__actions {
-    grid-row: 3;
+    grid-row: 7;
   }
 
   .title-list[data-view='grid'] .title-row__body {
+    grid-column: 1;
+    grid-row: 2 / span 5;
     grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: subgrid;
     align-items: center;
   }
 
@@ -4066,11 +4075,45 @@ button {
 
   .title-list[data-view='grid'] .title-row__watch {
     grid-column: 1;
+    grid-row: 3;
   }
 
   .title-list[data-view='grid'] .title-row__rating {
     grid-column: 2;
+    grid-row: 3;
     justify-self: end;
+  }
+
+  .title-list[data-view='grid'] .title-row__identity {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: subgrid;
+    grid-row: 1 / span 2;
+    align-self: stretch;
+  }
+
+  .title-list[data-view='grid'] .title-row__heading {
+    flex-direction: column;
+    align-items: flex-start;
+    align-self: stretch;
+  }
+
+  .title-list[data-view='grid'] .title-row__watching {
+    flex-basis: auto;
+    margin-top: auto;
+  }
+
+  .title-list[data-view='grid'] .title-row__meta {
+    align-self: start;
+  }
+
+  .title-list[data-view='grid'] .title-row__date {
+    grid-row: 4;
+  }
+
+  .title-list[data-view='grid'] .title-row__badges {
+    grid-row: 5;
+    align-self: stretch;
   }
 }
 

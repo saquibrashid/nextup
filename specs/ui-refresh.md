@@ -146,6 +146,21 @@ evidence; `T-POL-003` measures responsive stage/card geometry, catalog proportio
 and reduced motion in Chromium and WebKit. Existing functional and accessibility
 tests remain mandatory; screenshots accompany browser coverage for visual review.
 
+### 2.3 Catalog alignment follow-up — TASK-237
+
+In Grid view, Watching always occupies a new line beneath the title, rather than
+moving between inline and wrapped positions according to title length. At tablet
+and desktop widths, adjacent cards share content-sized row tracks: artwork,
+heading/status, metadata, priority/rating, date, service footer, and recovery
+actions. Service footers share their top edge and height, including when badges
+wrap. Long titles, genres, missing posters, absent ratings and unmatched actions
+must remain complete and usable; do not substitute fixed heights or truncation.
+Compact layout, markup, semantics and persistence remain unchanged.
+
+`T-POL-004` measures these alignments for short/long watched titles, unwatched
+titles, different service logos and wrapped multi-service footers in both browser
+engines. Existing library geometry and action tests remain mandatory.
+
 ## 3. The five defects — these are BUGS, not design
 
 ⚠ **These are separated from the design sections on purpose.** Bundled into a
