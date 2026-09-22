@@ -7,6 +7,7 @@ import { ListRoute } from '../src/containers/ListRoute';
 import { apiClient, type ApiClient } from '../src/lib/apiClient';
 
 const KEY = 'nextup.library.v1';
+const LAYOUT_KEY = 'nextup.library.layout.v1';
 const CHOICES = 'service=max&type=tv&genre=Drama&runtime=30-60&sort=name&dir=asc&q=Orbit';
 
 function Controls() {
@@ -63,6 +64,98 @@ beforeEach(() => {
 });
 
 afterEach(() => vi.restoreAllMocks());
+
+describe('T-LIB-003 remembered library layout', () => {
+  it('T-LIB-003a: layout persists across navigation and remount without changing URL or list reads', async () => {
+    const first = mount(`/?${CHOICES}`);
+    await screen.findByTestId('zero-match');
+    expect(screen.getByRole('button', { name: 'Grid view' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    const reads = vi.mocked(apiClient.getTitles).mock.calls.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Compact view' }));
+    expect(localStorage.getItem(LAYOUT_KEY)).toBe('compact');
+    expect(localStorage.getItem(KEY)).toBe(CHOICES);
+    expect(screen.getByTestId('url')).toHaveTextContent(`/?${CHOICES}`);
+    expect(vi.mocked(apiClient.getTitles).mock.calls).toHaveLength(reads);
+    fireEvent.click(screen.getByRole('link', { name: 'Upload fixture' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Return to list' }));
+    await screen.findByTestId('zero-match');
+    expect(screen.getByRole('button', { name: 'Compact view' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    first.unmount();
+    const restarted = mount();
+    expect(screen.getByRole('button', { name: 'Compact view' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await screen.findByTestId('zero-match');
+    fireEvent.click(screen.getByRole('link', { name: 'Explicit order' }));
+    await waitFor(() =>
+      expect(screen.getByTestId('url')).toHaveTextContent('sort=runtime&dir=desc'),
+    );
+    expect(screen.getByRole('button', { name: 'Compact view' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(CHOICES));
+    expect(screen.getByRole('button', { name: 'Compact view' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Grid view' }));
+    expect(localStorage.getItem(LAYOUT_KEY)).toBe('grid');
+    restarted.unmount();
+    mount();
+    expect(screen.getByRole('button', { name: 'Grid view' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await screen.findByTestId('zero-match');
+  });
+
+  it('T-LIB-003b: invalid saved layouts reset visibly without discarding valid filters', async () => {
+    localStorage.setItem(KEY, CHOICES);
+    localStorage.setItem(LAYOUT_KEY, 'cinema');
+    mount();
+    await screen.findByText('Some saved browsing choices are no longer supported and were reset.');
+    expect(screen.getByRole('button', { name: 'Grid view' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(localStorage.getItem(KEY)).toBe(CHOICES);
+    expect(localStorage.getItem(LAYOUT_KEY)).toBe('grid');
+  });
+
+  it('T-LIB-003c: failed layout writes keep in-app choices and disclose that restart persistence failed', async () => {
+    localStorage.setItem(LAYOUT_KEY, 'compact');
+    const write = Storage.prototype.setItem;
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
+      if (key === LAYOUT_KEY) throw new DOMException('Full', 'QuotaExceededError');
+      write.call(this, key, value);
+    });
+    mount(`/?${CHOICES}`);
+    await screen.findByTestId('zero-match');
+    expect(screen.getByRole('button', { name: 'Compact view' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Grid view' }));
+    await screen.findByText(/could not remember them across restarts/);
+    fireEvent.click(screen.getByRole('link', { name: 'Upload fixture' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Return to list' }));
+    await screen.findByTestId('zero-match');
+    expect(screen.getByRole('button', { name: 'Grid view' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(localStorage.getItem(LAYOUT_KEY)).toBe('compact');
+  });
+});
 
 describe('remembered library destination', () => {
   it('T-LIB-001a: restores before the first list request and across a fresh app lifetime', async () => {
@@ -157,8 +250,13 @@ describe('remembered library destination', () => {
     });
     mount(`/?${CHOICES}`);
     await screen.findByText(/could not remember them across restarts/);
+    fireEvent.click(screen.getByRole('button', { name: 'Compact view' }));
     fireEvent.click(screen.getByRole('link', { name: 'Upload fixture' }));
     fireEvent.click(screen.getByRole('link', { name: 'Return to list' }));
     await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(CHOICES));
+    expect(screen.getByRole('button', { name: 'Compact view' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
   });
 });

@@ -13,6 +13,7 @@
  */
 
 import type { JSX } from 'react';
+import { useContext } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 
 import { type AppliedBatch } from '../components/BatchAppliedNotice';
@@ -24,6 +25,7 @@ import { SERVICES, normaliseGenres } from '@nextup/domain';
 import { useCursorPages } from '../lib/useCursorPages';
 import { useOnline } from '../lib/useOnline';
 import { ListPage } from '../pages/ListPage';
+import { LibraryLayoutContext } from '../components/LibraryNavigation';
 import { RefusalPage } from '../pages/RefusalPage';
 
 export interface ListRouteProps {
@@ -111,6 +113,7 @@ export function withCursor(query: string, cursor: string): string {
 }
 
 export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Element {
+  const layout = useContext(LibraryLayoutContext);
   const [params] = useSearchParams();
   const location = useLocation();
   const query = params.toString();
@@ -285,6 +288,7 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
    */
   return (
     <ListPage
+      {...(layout ?? {})}
       items={items}
       serviceState={
         serviceState.resource.kind === 'ok' ? serviceState.resource.value.services : null

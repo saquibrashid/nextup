@@ -51,6 +51,8 @@ import {
 } from '../copy';
 
 export interface ListPageProps {
+  readonly view?: ListView;
+  readonly onViewChange?: (view: ListView) => void;
   readonly onWatchPreferences?: (
     titleId: string,
     body: WatchPreferencesRequest,
@@ -173,6 +175,8 @@ function rejectMissingHandler(): Promise<never> {
 }
 
 export function ListPage({
+  view: rememberedView,
+  onViewChange,
   items = [],
   serviceState = null,
   total,
@@ -209,7 +213,9 @@ export function ListPage({
   const loadingPhase = useSlowRequest(loading);
   const [menuFor, setMenuFor] = useState<TitleListItem | null>(null);
   const [dialog, setDialog] = useState<OpenDialog | null>(null);
-  const [view, setView] = useState<ListView>('grid');
+  const [localView, setLocalView] = useState<ListView>('grid');
+  const view = rememberedView ?? localView;
+  const setView = onViewChange ?? setLocalView;
   /**
    * ⚠ ROWS ARE HIDDEN ON `suppressed`, NEVER ON `pending`. `SuppressDialog`
    * reports `pending` while the POST is in flight and `suppressed` only once
