@@ -239,15 +239,16 @@ export function TitleRow({
             <h2 className="title-row__name" data-testid="title-name">
               {titleLink ?? item.name}
             </h2>
-            {item.watching === true && <span className="title-row__watching">Watching</span>}
+            <span className="title-row__status">
+              {item.watching === true && <span className="title-row__watching">Watching</span>}
 
-            {unmatched && (
-              <span className="title-row__chip" data-testid="unidentified-chip">
-                Unidentified
-              </span>
-            )}
+              {unmatched && (
+                <span className="title-row__chip" data-testid="unidentified-chip">
+                  Unidentified
+                </span>
+              )}
 
-            {/*
+              {/*
           `specs/ux-states.md` §2.8 (`T-UX-017`). Rendered PER ROW, from the
           per-item flag, because the refresh is per item: one title can miss
           the 5 s budget on a page where every other title refreshed fine, and
@@ -266,14 +267,15 @@ export function TitleRow({
           it would be noise. It is ordinary text, present in the accessibility
           tree in reading order, which is what "subtle" means here.
         */}
-            {item.metadataStale === true && (
-              <span
-                className="title-row__chip title-row__chip--stale"
-                data-testid="metadata-stale-chip"
-              >
-                {METADATA_STALE_CHIP}
-              </span>
-            )}
+              {item.metadataStale === true && (
+                <span
+                  className="title-row__chip title-row__chip--stale"
+                  data-testid="metadata-stale-chip"
+                >
+                  {METADATA_STALE_CHIP}
+                </span>
+              )}
+            </span>
           </div>
 
           <p className="title-row__meta" data-testid="title-meta">
@@ -281,7 +283,7 @@ export function TitleRow({
             REQ-106 — year and type precede runtime and wrapping genres.
             It previously rendered type-then-year, which is why the owner's
             screenshot read `TV2004Animation`. The separators themselves are
-            CSS-generated (`.title-row__meta > span + span::before`) so they
+            CSS-generated (`.title-row__facts > span + span::before`) so they
             stay out of the row's accessible name.
           */}
             <span className="title-row__facts">

@@ -311,7 +311,7 @@ not announce "middot" between every fact.
 | Test id | Asserts |
 |---|---|
 | `T-UX-102` | The wrapping metadata row has CSS-generated separators; decoration is not concatenated into accessible text. |
-| `T-UX-103` | Direct children follow year → type → runtime → genres; absent genres invent no placeholder. |
+| `T-UX-103` | Metadata facts follow year → type → runtime → genres, including within the facts grouping wrapper; absent genres invent no placeholder. |
 
 ### REQ-107 (`must`) — the `⋮` control is a button, not a full-height column
 

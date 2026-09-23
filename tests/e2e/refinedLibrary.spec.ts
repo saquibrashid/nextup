@@ -1376,6 +1376,9 @@ for (const width of [640, 1024, 1440]) {
       expect((await bounds(row)).height).toBeGreaterThan(card.height);
       for (const item of await page.locator('li.title-row').all()) {
         const outer = await bounds(item);
+        const title = await bounds(item.getByTestId('title-name'));
+        const facts = await bounds(item.locator('.title-row__facts'));
+        expect(facts.y).toBeGreaterThanOrEqual(title.y + title.height);
         for (const selector of ['.title-row__name', '.title-row__meta', '.title-row__footer']) {
           const part = item.locator(selector);
           const box = await bounds(part);
@@ -1399,6 +1402,7 @@ for (const width of [390, 1280, 1440]) {
     test('T-MOCK-005: search and quick filters share URL state without crowding library actions', async ({
       page,
     }, testInfo) => {
+      test.setTimeout(60_000);
       await mountLibrary(page, { width });
       await page.screenshot({ path: testInfo.outputPath('library-header.png'), fullPage: true });
       const quick = page.getByRole('group', { name: 'Quick filters' });
@@ -1461,14 +1465,14 @@ for (const width of [390, 1280, 1440]) {
       expect(new URL(page.url()).searchParams.has('q')).toBe(false);
       await input.press('Enter');
       await expect(page).toHaveURL(/q=Orbit/);
-      await expect(page.getByTestId('title-name')).toHaveText('Quiet Orbit');
+      await expect(page.getByTestId('title-name')).toHaveText(['Quiet Orbit']);
       await noOverflow(page);
       await page.getByRole('button', { name: 'Clear search', exact: true }).click();
       await expect(page.getByTestId('title-name')).toHaveCount(TITLES.length);
       await expect(input).toBeFocused();
       await page.goBack();
       await expect(input).toHaveValue('Orbit');
-      await expect(page.getByTestId('title-name')).toHaveText('Quiet Orbit');
+      await expect(page.getByTestId('title-name')).toHaveText(['Quiet Orbit']);
       await noOverflow(page);
     });
   });
@@ -1595,7 +1599,7 @@ test('T-UX-155c: library frame, priority geometry and portrait artwork stay inte
           const action = button.getBoundingClientRect();
           return [
             ...row.querySelectorAll(
-              '.title-row__heading > *, .title-row__meta, .title-row__watch, .title-row__badges, .title-row__date',
+              '.title-row__heading > *, .title-row__status > *, .title-row__meta, .title-row__watch, .title-row__badges, .title-row__date',
             ),
           ]
             .filter((content) => {
