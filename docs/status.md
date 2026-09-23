@@ -12,8 +12,8 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 | Status | Count |
 |---|---|
 | ⬜ todo | 0 |
-| 🚧 doing | 1 |
-| ✅ done | 239 |
+| 🚧 doing | 0 |
+| ✅ done | 240 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **243** |
@@ -22,9 +22,7 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 Not done, and every task they depend on is done.
 
-| Task | Size | Section |
-|---|---|---|
-| `TASK-245` | 2 agent-runs + 15 owner-review-minutes | Approved edition labels, 2026-09-23 |
+_Nothing is ready: every unfinished task is waiting on a dependency._
 
 ## Waiting on the owner
 
@@ -282,3 +280,4 @@ Not done, and every task they depend on is done.
 | `TASK-242` | Authentic, provenance-verified local service artwork replaces approximations; ADR-0014 Revision 3 records sources and presentation changes. Native proportions, canonical names and removal fallback remain. `T-BRAND-001`, `T-BRAND-002`, `T-BRAND-003` and all twelve CI jobs passed on `dfd0c17` (run `35814917567`). No service requests, new dependency or backend change. | `T-BRAND-001`, `T-BRAND-002`, `T-BRAND-003` |
 | `TASK-243` | Keep Service updates above artwork and card controls and inside the viewport; add optional, persisted Confirm match acknowledgements for already-saved readings with secondary Change match. Preserve no-duplicate/no-required-acknowledgement behavior, pending-addition gates and separate Apply summary. `T-MOCK-005`, `T-LIB-004`, `T-AI-067`, `T-REV-016`, `T-REV-012`. Runtime-slider follow-up is tracked separately in #366. | `T-AI-067`, `T-MOCK-005`, `T-REV-012`, `T-REV-016` |
 | `TASK-244` | Owner-approved edition labels within canonical film entries. Verified typed catalogue aliases persist through review, correction, close and metadata refresh without changing identity, listings or dates. Explicit saved-label replacement and edition-aware offline recovery are covered by `T-EDITION-001` through `T-EDITION-005`. All 12 CI jobs passed on implementation head `ee85ff2` (run `35887909658`); validation used GitHub CI because the approved local npm proxy cannot restore ESLint 10.11.0. PR #368; not merged or deployed. | `T-EDITION-001`, `T-EDITION-005` |
+| `TASK-245` | PR #372. Owner-approved 75% artwork overlay, tighter catalog tracks, larger titles, two genres plus overflow, star rating, honest shortened Added label and translucent controls. Unified Watching/Up next/Normal/Someday across cards, editor, details and filtering without migration; legacy URLs, server ordering and stored preferences preserved. Artwork-specific text and control boundaries retain computed contrast. `T-WATCH-001`, `T-WATCH-003`, `T-LIST-018`, `T-UX-127`, `T-IMDB-008`, `T-UX-155`, `T-MOCK-004`, `T-POL-004` and complete owner journeys pass; all twelve CI gates green in run 35918395447. Separate follow-ups: navigation #369, toolbar #370, Add a title dialog #371. | `T-IMDB-008`, `T-LIST-018`, `T-MOCK-004`, `T-POL-004`, `T-UX-127`, `T-UX-155`, `T-WATCH-001p`, `T-WATCH-003l` |

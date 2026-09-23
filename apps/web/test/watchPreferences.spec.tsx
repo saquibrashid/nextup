@@ -248,9 +248,8 @@ it('T-WATCH-003h the real container PATCHes once then refetches authoritative li
   expect(paths.filter((path) => path.includes('/watch-preferences'))).toHaveLength(1);
 });
 
-it.each(['Up next', 'Normal', 'Someday'])(
-  'T-WATCH-003l selecting %s stops Watching explicitly',
-  async (label) => {
+for (const label of ['Up next', 'Normal', 'Someday']) {
+  it(`T-WATCH-003l selecting ${label} stops Watching explicitly`, async () => {
     const save = vi.fn(async (_id: string, body: { watching?: boolean; priority?: string }) => ({
       titleId: item.titleId,
       watching: body.watching ?? false,
@@ -274,8 +273,8 @@ it.each(['Up next', 'Normal', 'Someday'])(
         priority: label === 'Up next' ? 'up-next' : label.toLowerCase(),
       }),
     );
-  },
-);
+  });
+}
 
 it('T-WATCH-003m unified status filters exclude Watching from other priorities and clear as one chip', () => {
   render(
