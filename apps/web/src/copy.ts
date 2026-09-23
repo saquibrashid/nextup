@@ -1405,6 +1405,8 @@ export const ADDITION_CHANGE_MATCH_LABEL = 'Change match';
 export const ADDITION_DISCARD_LABEL = 'Not a title — discard';
 export const ADDITION_CONFIRMED = 'Confirmed. This will be added to your list.';
 export const ADDITION_DISCARDED = "Discarded. It won't be added to your list.";
+export const KNOWN_CONFIRM_LABEL = 'Confirm match';
+export const KNOWN_CONFIRMED = 'Match confirmed. Already saved; nothing will be added.';
 
 /**
  * TASK-028 — the owner gate (`apps/web/src/containers/OwnerGate.tsx`).

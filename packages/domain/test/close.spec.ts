@@ -88,16 +88,20 @@ describe('T-REV-012 · US-012 AC-3 · close applies only decided additions', () 
     expect(pendingAdditionIds(rows)).toEqual(['z', 'a', 'm']);
   });
 
-  it('T-REV-012d: an already-known item never blocks, however many there are', () => {
-    // US-013 AC-2: "already on your list" is READ-ONLY. A full-update review
-    // of a 200-title list would be unclosable if these blocked, and the owner
-    // would have no control to clear them with.
-    const rows = Array.from({ length: 50 }, (_, i) =>
-      inSection('alreadyOnYourList', { candidateId: `k${String(i)}` }),
-    );
-    expect(pendingAdditionIds(rows)).toEqual([]);
-    expect(applicableCandidates(rows)).toEqual([]);
-  });
+  it.each(['pending', 'confirmed', 'corrected'] as const)(
+    'T-REV-012d: known %s matches never block or become additions',
+    (disposition) => {
+      const rows = Array.from({ length: 50 }, (_, i) =>
+        inSection('alreadyOnYourList', {
+          candidateId: `k${String(i)}`,
+          disposition,
+          classification: i % 2 === 0 ? 'already-present-for-this-service' : 'already-in-your-list',
+        }),
+      );
+      expect(pendingAdditionIds(rows)).toEqual([]);
+      expect(applicableCandidates(rows)).toEqual([]);
+    },
+  );
 
   it('T-REV-012e: a collapsed-by-default section never blocks', () => {
     // Blocking on a row the owner has not been shown is unresolvable from the

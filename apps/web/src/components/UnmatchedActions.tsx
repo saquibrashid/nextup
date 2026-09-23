@@ -34,6 +34,8 @@ import {
   ADDITION_CONFIRMED,
   ADDITION_DISCARD_LABEL,
   ADDITION_DISCARDED,
+  KNOWN_CONFIRM_LABEL,
+  KNOWN_CONFIRMED,
   UNMATCHED_ACTION_FAILED,
   UNMATCHED_CANCEL_LABEL,
   UNMATCHED_DISCARD_LABEL,
@@ -54,7 +56,7 @@ import { resultLabel } from './ManualEntryPanel';
 import type { TmdbSearchResult } from '../lib/apiClient';
 import { Button } from './ui/Button';
 
-export type CandidateActionsVariant = 'unmatched' | 'addition' | 'correction';
+export type CandidateActionsVariant = 'unmatched' | 'addition' | 'known' | 'correction';
 
 interface VariantCopy {
   readonly keepLabel: string;
@@ -72,6 +74,13 @@ interface VariantCopy {
  * was unidentified.
  */
 const VARIANT_COPY: Record<CandidateActionsVariant, VariantCopy> = {
+  known: {
+    keepLabel: KNOWN_CONFIRM_LABEL,
+    findLabel: ADDITION_CHANGE_MATCH_LABEL,
+    discardLabel: ADDITION_DISCARD_LABEL,
+    keptText: KNOWN_CONFIRMED,
+    discardedText: ADDITION_DISCARDED,
+  },
   correction: {
     keepLabel: ADDITION_CONFIRM_LABEL,
     findLabel: 'Find the right title',
@@ -322,7 +331,7 @@ export function UnmatchedActions({
           </Button>
         )}
         <Button
-          variant="secondary"
+          variant={variant === 'known' ? 'ghost' : 'secondary'}
           data-testid={`${variant}-find`}
           disabled={busy}
           onClick={() => {
@@ -331,7 +340,7 @@ export function UnmatchedActions({
         >
           {searchOpen ? UNMATCHED_CANCEL_LABEL : copy.findLabel}
         </Button>
-        {variant !== 'correction' && (
+        {variant !== 'correction' && variant !== 'known' && (
           <Button
             variant="secondary"
             data-testid={`${variant}-discard`}

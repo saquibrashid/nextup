@@ -222,6 +222,11 @@ poster/solid-panel arrangement of section 2.4, not its safety or content guarant
   filter trigger, view switch and sort as a compact header. Service chips and
   available filter controls follow without oversized separators or empty rows.
   Keep service updates and Add title accessible and separated from resume banners.
+  Service updates must paint above the entire catalog, including artwork gradients,
+  priority pills and menus. Contain card stacking within the list; every service
+  link and Done must receive pointer input, not merely be present in the DOM.
+  Align that panel with its left-side trigger on tablet and its right-side
+  trigger on wide desktop; neither edge may leave the viewport.
   No actor search, rating/year filters or other unsupported mockup features.
   Phone controls retain accessible disclosure/reflow and remembered query/layout.
 - Import uses full-width service tiles, grouped mode cards and a single

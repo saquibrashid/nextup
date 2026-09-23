@@ -921,7 +921,15 @@ Flags rendered as chips: **"Low confidence"** (`verdict === 'low-confidence'`),
 
 **Tile-first review (`T-AI-065`–`T-AI-067`).** Render every controlled
 `inputTileBox` beside its proposed catalogue match and explicit next step.
-Already saved on this service: nothing to add, with Change match recovery.
+Already saved on this service: **Confirm match** records an optional review
+acknowledgement, with **Change match** as the secondary recovery action
+(owner-requested clarification, 2026-09-23, TASK-243). Use the existing persisted
+candidate decision, not a browser-only tick. Report **Match confirmed. Already
+saved; nothing will be added.** only after the decision is verified; failed
+saves remain visibly retryable. This applies to legacy known-title cards too.
+Known matches still need no action to finish the batch (US-013 AC-2): an
+acknowledgement never becomes an addition, resets date-added, or introduces a
+new close gate. Do not expose discard/addition controls on these cards.
 Known on another service: confirm adding this service. New: confirm, change
 or discard. Unidentified: search, keep unidentified or discard; a textless
 unreadable tile offers search/discard, never an empty-title Keep.
@@ -929,7 +937,8 @@ Related or weak readings require individual decisions and are excluded from
 bulk confirmation consistently in the client, API and offline replay.
 Show conflicting readings inside the same physical tile, not as additional
 tiles. Shared identities retain every source tile but share one saved decision.
-Window tile groups above the existing 100-item threshold. Apply changes still
+Window tile groups above the existing 100-item threshold. Explain that
+**Apply changes** is the separate next step to review and finish the batch. It still
 has its separate authoritative summary and never adds an undecided reading.
 Unreadable tiles are not additions; leaving one unidentified does not add it.
 

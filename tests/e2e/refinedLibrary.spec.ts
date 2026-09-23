@@ -119,6 +119,32 @@ function orderedTitles(
     });
 }
 
+async function checkServiceUpdates(page: Page): Promise<void> {
+  const panel = page.getByRole('group', { name: 'Service updates', exact: true });
+  const box = await bounds(panel);
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await expect(panel.getByRole('link')).toHaveCount(SERVICES.length);
+  for (const chip of await panel.getByRole('link').all()) {
+    await chip.click({ trial: true });
+    expect(
+      await chip.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return element.contains(
+          document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2),
+        );
+      }),
+      await chip.innerText(),
+    ).toBe(true);
+  }
+  await panel.getByRole('button', { name: 'Done', exact: true }).click();
+  const trigger = page.getByRole('button', { name: 'Service updates', exact: true });
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
+}
+
 async function mountLibrary(
   page: Page,
   {
@@ -438,7 +464,7 @@ for (const width of [320, 640, 1280]) {
       );
       await page.getByRole('button', { name: 'Service updates', exact: true }).click();
       await expect(page.getByText('Netflix updated today', { exact: true })).toBeVisible();
-      await page.keyboard.press('Escape');
+      await checkServiceUpdates(page);
       await page.getByTestId('add-title-open').click();
       await expect(page.getByRole('dialog')).toBeVisible();
       await page.keyboard.press('Escape');
@@ -1430,7 +1456,7 @@ for (const width of [390, 1280, 1440]) {
       await expect(add).toBeFocused();
       await page.getByRole('button', { name: 'Service updates', exact: true }).click();
       await expect(page.getByText('Netflix updated today', { exact: true })).toBeVisible();
-      await page.keyboard.press('Escape');
+      await checkServiceUpdates(page);
       const quick = page.getByRole('group', { name: 'Quick filters' });
       const input = page.getByRole('searchbox', { name: 'Search your list' });
       if (width >= 1280) {

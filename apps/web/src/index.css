@@ -1526,6 +1526,8 @@ button {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  /* Keep artwork and card actions below the library's disclosure panels. */
+  isolation: isolate;
 }
 
 /* Cover browser: horizontal phone cards, portrait-led tiles on wider screens. */
@@ -4243,6 +4245,7 @@ button {
     max-width: calc(100vw - var(--space-6));
   }
 
+  .freshness-strip .filter-disclosure__panel,
   .filter-controls .filter-disclosure__panel {
     inset-inline: 0 auto;
   }
@@ -4684,6 +4687,10 @@ button {
   .library-actions .btn {
     font-size: var(--text-sm);
     padding-inline: var(--space-2);
+  }
+
+  .freshness-strip .filter-disclosure__panel {
+    inset-inline: auto 0;
   }
 
   .library-browser .list-controls {

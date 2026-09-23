@@ -19,7 +19,10 @@ export function tileNextStep(candidate: ReviewCandidate, service: Service | null
   if (candidate.disposition === 'discarded')
     return 'You discarded this reading. It will not be added.';
   if (alreadySaved(candidate)) {
-    return `Already ${service === null ? 'in your library' : `on your ${SERVICE_LABELS[service]} list`}. Nothing to add. Change the match if it is wrong.`;
+    const saved = `Already ${service === null ? 'in your library' : `on your ${SERVICE_LABELS[service]} list`}. Nothing to add.`;
+    return candidate.disposition === 'pending'
+      ? `${saved} Confirm this match, or change it if needed.`
+      : `${saved} Your match is confirmed.`;
   }
   if (candidate.disposition === 'confirmed' || candidate.disposition === 'corrected') {
     return 'Your choice is saved for review. It will be included when you apply changes.';

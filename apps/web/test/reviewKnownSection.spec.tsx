@@ -11,8 +11,8 @@
  * actually names this AC is `T-REV-016`, and it had no implementation.
  * Reported as a finding; the epic row is corrected in place.
  *
- * TASK-228 adds deliberate identity correction, not accept/discard controls.
- * Known evidence stays visible; the server reclassifies a correction.
+ * Known matches can be acknowledged or corrected, never added or discarded.
+ * Acknowledgements are optional and persist without changing list membership.
  */
 
 import { render, screen, within } from '@testing-library/react';
@@ -90,7 +90,7 @@ const knownSection = () => screen.getByTestId('review-already-on-list');
 /* -------------------------------------------------------------------------- */
 
 describe('T-REV-016 · US-013 AC-2 · known titles are not additions', () => {
-  it('T-REV-016a: it offers deliberate identity correction, never addition/discard controls', async () => {
+  it('T-REV-016a: it offers match confirmation and correction, never addition/discard controls', () => {
     const mutation = vi.fn(async () => undefined);
     render(
       <ReviewPage
@@ -101,14 +101,11 @@ describe('T-REV-016 · US-013 AC-2 · known titles are not additions', () => {
         onSearchTmdb={async () => []}
       />,
     );
-    await userEvent.click(screen.getByText('Already on your list (2)'));
-
     const section = knownSection();
-    expect(within(section).getAllByRole('button', { name: 'Find the right title' })).toHaveLength(
-      2,
-    );
+    expect(within(section).getAllByRole('button', { name: 'Change match' })).toHaveLength(2);
+    expect(within(section).getAllByRole('button', { name: 'Confirm match' })).toHaveLength(2);
     expect(
-      within(section).queryByRole('button', { name: /Confirm|Discard|Keep/ }),
+      within(section).queryByRole('button', { name: /^Confirm$|Discard|Keep/i }),
     ).not.toBeInTheDocument();
     expect(within(section).queryAllByRole('checkbox')).toHaveLength(0);
     expect(within(section).getAllByRole('link', { name: 'Open source screenshot' })).toHaveLength(
@@ -185,4 +182,47 @@ describe('T-REV-016 · US-013 AC-2 · known titles are not additions', () => {
     details?.removeAttribute('open');
     expect(within(knownSection()).getAllByTestId('candidate-name').length).toBeGreaterThan(0);
   });
+
+  it('T-REV-016h: a refused match confirmation stays retryable and never claims it was saved', async () => {
+    const keep = vi.fn(async () => {
+      throw new Error('Request refused');
+    });
+    render(
+      <ReviewPage
+        controlled
+        review={review()}
+        onKeepUnmatched={keep}
+        onDiscardUnmatched={async () => undefined}
+        onMatchUnmatched={async () => undefined}
+        onSearchTmdb={async () => []}
+      />,
+    );
+    const card = within(screen.getByTestId('candidate-cand_1'));
+    await userEvent.click(card.getByRole('button', { name: 'Confirm match' }));
+    expect(keep).toHaveBeenCalledExactlyOnceWith('cand_1');
+    expect(card.getByRole('alert')).toBeVisible();
+    expect(card.getByRole('button', { name: 'Confirm match' })).toBeEnabled();
+    expect(card.queryByTestId('known-outcome')).not.toBeInTheDocument();
+  });
+
+  it.each(['append-only', 'full-update'] as const)(
+    'T-REV-016i: optional acknowledgements never block the %s summary or imply additions',
+    async (mode) => {
+      render(
+        <ReviewPage
+          controlled
+          review={review({ mode })}
+          onKeepUnmatched={async () => undefined}
+          onDiscardUnmatched={async () => undefined}
+          onMatchUnmatched={async () => undefined}
+          onSearchTmdb={async () => []}
+        />,
+      );
+      await userEvent.click(screen.getByTestId('apply-changes-button'));
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).not.toHaveTextContent('The Matrix');
+      expect(dialog).not.toHaveTextContent('Severance');
+      expect(screen.queryByTestId('review-pending-error')).not.toBeInTheDocument();
+    },
+  );
 });

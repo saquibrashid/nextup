@@ -626,14 +626,17 @@ export function ReviewPage({
     const disposition = effectiveDisposition(item.disposition, local[item.candidateId]);
     return disposition === 'confirmed' || disposition === 'corrected';
   });
-  const correctionActions = (candidate: ReviewCandidate) =>
+  const correctionActions = (
+    candidate: ReviewCandidate,
+    variant: 'known' | 'correction' = 'correction',
+  ) =>
     unmatchedWired ? (
       <UnmatchedActions
         candidateId={candidate.candidateId}
         correctedName={candidate.match?.name ?? null}
         disposition={candidate.disposition}
         controlled={controlled}
-        variant="correction"
+        variant={variant}
         onKeep={onKeepU}
         onDiscard={onDiscardU}
         onMatch={onMatchU}
@@ -704,11 +707,13 @@ export function ReviewPage({
                 disposition={current.disposition}
                 correctedName={candidate.match?.name ?? null}
                 variant={
-                  alreadySaved(candidate) || candidate.verdict === 'chrome-suspected'
+                  candidate.verdict === 'chrome-suspected'
                     ? 'correction'
-                    : candidate.match === null
-                      ? 'unmatched'
-                      : 'addition'
+                    : alreadySaved(candidate)
+                      ? 'known'
+                      : candidate.match === null
+                        ? 'unmatched'
+                        : 'addition'
                 }
                 hideKeep={candidate.verdict === 'unreadable-tile'}
                 onDiscard={onDiscardU}
@@ -741,8 +746,9 @@ export function ReviewPage({
     <div className="review-flow">
       <ReviewHeading subtitle={`${service} · ${mode}`} />
       <p className="review-guidance">
-        Decide the new titles first, then check the remaining evidence. Nothing changes until you
-        apply this batch.
+        Decide the new titles first, then check the remaining evidence. When you are finished,
+        choose Apply changes to review and finish this batch. Nothing changes in your library before
+        that.
       </p>
 
       {review.banner !== null && (
@@ -928,13 +934,13 @@ export function ReviewPage({
             <CandidateSection
               section={sections.alreadyOnYourList}
               testId="review-already-on-list"
-              description="These titles were identified in your screenshot and are already saved. Nothing needs adding; change a match if it is wrong."
+              description="These titles are already saved. Confirm the matches you have checked, or change a match if needed. They will not be added again."
               renderCard={(candidate) => (
                 <CandidateCard
                   candidate={candidate}
                   thumbnailUrl={thumbnailUrlFor(candidate)}
                   consequence="Stays on your list"
-                  actions={correctionActions(candidate)}
+                  actions={correctionActions(candidate, 'known')}
                 />
               )}
             />

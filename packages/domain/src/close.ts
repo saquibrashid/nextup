@@ -33,8 +33,8 @@ import { sectionForCandidate, type ReviewSectionName } from './review.js';
  * list for this service, so there is nothing to apply and — the load-bearing
  * half — nothing to block on: a full-update review that lists two hundred
  * known titles would otherwise be unclosable until the owner clicked every one
- * of them, which is exactly the "already on your list is READ-ONLY" contract
- * (US-013 AC-2).
+ * of them. Optional match acknowledgements do not change membership or this
+ * no-required-action contract (US-013 AC-2).
  *
  * `probablyNotTitles` and `unreadableTiles` are absent for the same reason
  * from the other direction: they are collapsed by default, so blocking on them
