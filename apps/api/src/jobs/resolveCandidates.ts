@@ -168,7 +168,11 @@ export async function resolveCandidates(
   // `normalisedText`. Runs BEFORE matching so a title read twice costs one
   // TMDB call rather than two, and so the two readings cannot resolve
   // differently and then fail to collapse in pass B.
-  const passA = collapseOverlap(initial, { pass: 'pre-match', imageOrder });
+  const passA = collapseOverlap(initial, {
+    pass: 'pre-match',
+    imageOrder,
+    preserveSourceEvidence: true,
+  });
 
   /*
    * Pass A' — the fragment collapse (`TASK-199` finding (a), `specs/ai.md`

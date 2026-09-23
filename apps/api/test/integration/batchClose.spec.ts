@@ -410,6 +410,53 @@ describe('T-REV-012 · US-012 AC-3 · close applies confirmed work and refuses p
     ).toBe(0);
   });
 
+  it('T-EDITION-003d persists a corrected edition outside the original alternatives', async () => {
+    const edition: EditionLabel = { name: 'Dune Extended', kind: 'extended' };
+    const batchId = await makeBatch();
+    const candidateId = await makeCandidate(batchId, { workIdentity: HEAT, originalName: 'Heat' });
+    const correction = await fetch(`${origin}/api/batches/${batchId}/candidates/${candidateId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', [CLIENT_PRINCIPAL_HEADER]: principalHeader },
+      body: JSON.stringify({
+        disposition: 'corrected',
+        tmdbId: 438631,
+        mediaType: 'movie',
+        correctedName: 'Dune',
+        correctedReleaseYear: 2021,
+        correctedPosterPath: null,
+        correctedEdition: edition,
+      }),
+    });
+    expect(correction.status).toBe(200);
+    const candidate = await testPrisma().extractionCandidate.findUniqueOrThrow({
+      where: { id: candidateId },
+    });
+    expect(candidate.correctedDisplayEdition).toBe(JSON.stringify(edition));
+    expect(candidate.matchCandidates).toContain('Heat');
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+    const row = await testPrisma().title.findFirstOrThrow();
+    expect(row.workIdentity).toBe(DUNE);
+    expect(row.editionLabels).toBe(JSON.stringify([edition]));
+  });
+
+  it('T-EDITION-003e a discovery capture can label an existing film without creating an intent or listing', async () => {
+    const edition: EditionLabel = { name: 'Dune Extended', kind: 'extended' };
+    const titleId = await seedListing(DUNE, 'Dune', 'netflix');
+    const batchId = await makeBatch();
+    await testPrisma().uploadBatch.update({
+      where: { id: batchId },
+      data: { discoverySource: 'fandango-at-home', service: null },
+    });
+    await makeCandidate(batchId, { edition, disposition: 'confirmed' });
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+    expect(await countTitles()).toBe(1);
+    expect(await countListings()).toBe(1);
+    expect(await testPrisma().watchIntent.count()).toBe(0);
+    expect(
+      (await testPrisma().title.findUniqueOrThrow({ where: { id: titleId } })).editionLabels,
+    ).toBe(JSON.stringify([edition]));
+  });
+
   it('T-REV-012n: a confirmed addition becomes a title and a listing', async () => {
     const batchId = await makeBatch();
     await makeCandidate(batchId, { disposition: 'confirmed' });

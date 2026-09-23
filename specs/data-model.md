@@ -1052,7 +1052,7 @@ Two deterministic passes, in this order:
 
 | Pass | Key | When | Kept |
 |---|---|---|---|
-| **A — pre-match** | `normalisedText` and normalized raw source text (exact equality); differing edition evidence must reach matching | after cleanup, before TMDB | first occurrence by `(imageIndex, yTop, xLeft)` |
+| **A — pre-match** | `normalisedText` (exact equality) in cleanup; Stage 3 additionally partitions by normalized raw source text so inference cannot erase differing edition evidence before catalogue lookup | after cleanup, before TMDB | first occurrence by `(imageIndex, yTop, xLeft)` |
 | **B — post-match** | `resolvedWorkIdentity` plus verified edition kind/name when present; distinct cuts stay individually reviewable but close into the same canonical film | after matching | first occurrence by the same ordering |
 
 In both passes the survivor **absorbs** the losers: `sourceImageIds` becomes the

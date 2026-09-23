@@ -15,6 +15,8 @@ export type OverlapPass = 'pre-match' | 'post-match';
 
 export interface CollapseOptions {
   pass: OverlapPass;
+  /** Stage 3 retains distinct source evidence for catalogue edition lookup. */
+  preserveSourceEvidence?: boolean;
   /**
    * The batch's images in capture order. Position in this array is the
    * `imageIndex` of the SD-02 ordering key.
@@ -99,12 +101,15 @@ function compareOrderKeys(a: OrderKey, b: OrderKey): number {
  * unresolved together would invent an identity that matching declined to
  * assert.
  */
-function collapseKeyFor(candidate: ExtractionCandidate, pass: OverlapPass): string | null {
+function collapseKeyFor(candidate: ExtractionCandidate, options: CollapseOptions): string | null {
+  const { pass } = options;
   if (pass === 'pre-match') {
     // An inferred base title must not erase distinguishing source evidence
     // before the catalogue has had a chance to identify the edition.
     return candidate.normalisedText.length > 0
-      ? JSON.stringify([candidate.normalisedText, normaliseTitleText(candidate.rawText)])
+      ? options.preserveSourceEvidence
+        ? JSON.stringify([candidate.normalisedText, normaliseTitleText(candidate.rawText)])
+        : candidate.normalisedText
       : null;
   }
   const identity = candidate.resolvedWorkIdentity;
@@ -348,7 +353,7 @@ export function collapseOverlap(
   candidates: readonly ExtractionCandidate[],
   options: CollapseOptions,
 ): CollapseResult {
-  const { pass, imageOrder } = options;
+  const { imageOrder } = options;
 
   const imageIndexById = new Map<string, number>();
   imageOrder.forEach((imageId, index) => {
@@ -359,7 +364,7 @@ export function collapseOverlap(
   const groups = new Map<string, ExtractionCandidate[]>();
   for (const candidate of candidates) {
     if (candidate.collapsedIntoCandidateId !== null) continue;
-    const key = collapseKeyFor(candidate, pass);
+    const key = collapseKeyFor(candidate, options);
     if (key === null) continue;
     const group = groups.get(key);
     if (group === undefined) groups.set(key, [candidate]);

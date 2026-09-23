@@ -233,7 +233,7 @@ async function applyReclassify(
   if (query === '') return;
 
   try {
-    const results = await getClient().searchMulti(query, { limit: 5 });
+    const results = await getClient().searchMulti(query, { limit: 5, evidenceText: row.rawText });
     await updateCandidateDisposition(ownerId, candidateId, {
       matchCandidates: JSON.stringify(
         results.map((item, position) => ({
@@ -242,6 +242,7 @@ async function applyReclassify(
           name: item.name,
           releaseYear: item.releaseYear,
           posterPath: item.posterPath,
+          ...(item.edition === undefined ? {} : { edition: item.edition }),
           // Rank-derived, and deliberately NOT the matcher's score: this is a
           // raw TMDB ordering, and presenting it as a confidence the matcher
           // produced would let a later reader treat it as auto-matchable.

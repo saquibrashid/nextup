@@ -138,6 +138,36 @@ afterEach(async () => {
 });
 
 describe('PATCH candidates — TMDB-outage mapping (§6.18)', () => {
+  it('T-EDITION-002f reclassifying an item preserves the source edition in its suggestions', async () => {
+    const edition = { name: 'Dune Extended', kind: 'extended' };
+    findExtractionCandidate.mockResolvedValue({ ...ROW, rawText: edition.name });
+    searchMulti.mockResolvedValue([
+      {
+        tmdbId: 438631,
+        mediaType: 'movie',
+        name: 'Dune',
+        releaseYear: 2021,
+        posterPath: null,
+        edition,
+      },
+    ]);
+    expect((await patch({ reclassifyAsTitle: true })).status).toBe(200);
+    expect(searchMulti).toHaveBeenCalledWith('Dune', { limit: 5, evidenceText: edition.name });
+    expect(updateCandidateDisposition).toHaveBeenCalledWith(expect.anything(), ROW.id, {
+      matchCandidates: JSON.stringify([
+        {
+          tmdbId: 438631,
+          mediaType: 'movie',
+          name: 'Dune',
+          releaseYear: 2021,
+          posterPath: null,
+          edition,
+          score: 0.9,
+        },
+      ]),
+    });
+  });
+
   it('T-AI-017b · a TmdbUnavailableError reaching the handler is 502 TMDB_UNAVAILABLE, not 500', async () => {
     // Injected at a NON-swallowing seam: the disposition write. The route's
     // contract is "any escaping TmdbUnavailableError is 502", and the seam is
