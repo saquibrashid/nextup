@@ -1,5 +1,6 @@
 import { useRef, useState, type RefObject } from 'react';
 import {
+  editionLabelText,
   canBulkConfirm,
   parseCandidatePatch,
   type ReviewCandidate,
@@ -40,7 +41,7 @@ export function intentLabel(intent: ReviewIntent): string {
     return intent.ticked ? 'Remove from this service' : 'Keep on this service';
   if ('reclassifyAsTitle' in intent.body) return 'Review as a title';
   if (intent.body.disposition === 'corrected')
-    return `Match to ${intent.body.correctedName ?? 'the selected title'}`;
+    return `Match to ${intent.body.correctedEdition === undefined ? (intent.body.correctedName ?? 'the selected title') : editionLabelText(intent.body.correctedEdition)}`;
   return { confirmed: 'Keep', discarded: 'Discard', pending: 'Reopen decision' }[
     intent.body.disposition
   ];
@@ -54,7 +55,14 @@ function fingerprint(review: ReviewResponse, intent: Pick<ReviewIntent, 'kind' |
   const item = reviewCandidates(review).find((row) => row.candidateId === intent.id);
   return item === undefined
     ? 'missing'
-    : JSON.stringify([item.disposition, item.resolvedWorkIdentity, item.verdict]);
+    : JSON.stringify([
+        item.disposition,
+        item.resolvedWorkIdentity,
+        item.verdict,
+        ...(item.match?.edition === undefined
+          ? []
+          : [[item.match.edition.kind, item.match.edition.name]]),
+      ]);
 }
 
 function isSatisfied(review: ReviewResponse, intent: ReviewIntent): boolean {
@@ -69,7 +77,9 @@ function isSatisfied(review: ReviewResponse, intent: ReviewIntent): boolean {
   if (intent.body.disposition === 'corrected') {
     return (
       item.disposition === 'corrected' &&
-      item.resolvedWorkIdentity === `tmdb:${intent.body.mediaType}:${intent.body.tmdbId}`
+      item.resolvedWorkIdentity === `tmdb:${intent.body.mediaType}:${intent.body.tmdbId}` &&
+      item.match?.edition?.kind === intent.body.correctedEdition?.kind &&
+      item.match?.edition?.name === intent.body.correctedEdition?.name
     );
   }
   return (

@@ -56,6 +56,7 @@ import {
  * stage-1 evidence, and taking the whole row would let it acquire one.
  */
 export interface ResolvableCandidate {
+  rawText?: string;
   id: string;
   normalisedText: string;
   extractedYear: number | null;
@@ -81,7 +82,7 @@ export interface ResolveCandidatesPorts {
    * One TMDB `search/multi` call. Throwing is expected and handled — see
    * `tmdbUnavailable` below.
    */
-  searchTmdb: (query: string) => Promise<TmdbSearchResult[]>;
+  searchTmdb: (query: string, evidenceText?: string) => Promise<TmdbSearchResult[]>;
   /** Persist one candidate's resolution. Called once per candidate that changed. */
   persist: (resolution: CandidateResolution) => Promise<void>;
   log?: (event: string, fields: Record<string, unknown>) => void;
@@ -128,7 +129,7 @@ function toDomainCandidate(row: ResolvableCandidate): ExtractionCandidate {
     ownerId: '',
     batchId: '',
     sourceImageIds: row.sourceImageIds,
-    rawText: '',
+    rawText: row.rawText ?? '',
     inferredTitle: null,
     basis: 'text',
     ocrSupport: 'none',
@@ -167,7 +168,11 @@ export async function resolveCandidates(
   // `normalisedText`. Runs BEFORE matching so a title read twice costs one
   // TMDB call rather than two, and so the two readings cannot resolve
   // differently and then fail to collapse in pass B.
-  const passA = collapseOverlap(initial, { pass: 'pre-match', imageOrder });
+  const passA = collapseOverlap(initial, {
+    pass: 'pre-match',
+    imageOrder,
+    preserveSourceEvidence: true,
+  });
 
   /*
    * Pass A' — the fragment collapse (`TASK-199` finding (a), `specs/ai.md`
@@ -209,14 +214,18 @@ export async function resolveCandidates(
 
     let results: TmdbSearchResult[] = [];
     if (!tmdbUnavailable) {
-      const cached = cache.get(candidate.normalisedText);
+      const cacheKey = `${candidate.normalisedText}\u0000${candidate.rawText}`;
+      const cached = cache.get(cacheKey);
       if (cached !== undefined) {
         results = cached;
       } else {
         try {
-          results = await ports.searchTmdb(candidate.normalisedText);
+          results =
+            candidate.rawText === ''
+              ? await ports.searchTmdb(candidate.normalisedText)
+              : await ports.searchTmdb(candidate.normalisedText, candidate.rawText);
           tmdbQueries += 1;
-          cache.set(candidate.normalisedText, results);
+          cache.set(cacheKey, results);
         } catch (error) {
           // ⚠ The outage is latched, not retried per candidate. §4.1 allows two
           // retries INSIDE one search; retrying it once per candidate would turn
@@ -235,7 +244,11 @@ export async function resolveCandidates(
     if (outcome.ambiguous) ambiguous += 1;
     if (outcome.uncertain) uncertain += 1;
 
-    matched[index] = { ...candidate, resolvedWorkIdentity: outcome.resolvedWorkIdentity };
+    matched[index] = {
+      ...candidate,
+      resolvedWorkIdentity: outcome.resolvedWorkIdentity,
+      matchCandidates: outcome.matchCandidates,
+    };
     outcomes.set(candidate.id, outcome.matchCandidates);
   }
 

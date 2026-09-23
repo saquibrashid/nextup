@@ -37,6 +37,7 @@ import {
   MANUAL_ENTRY_TITLE,
 } from '../copy';
 import type { TmdbSearchResult } from '../lib/apiClient';
+import { editionLabelText, releaseYearText } from '@nextup/domain';
 import { Button } from './ui/Button';
 
 export interface ManualEntryPanelProps {
@@ -67,6 +68,10 @@ function addFailureMessage(error: unknown): string {
 
 /** "Dune (2021)" — the year disambiguates remakes, which is most of the risk here. */
 export function resultLabel(result: TmdbSearchResult): string {
+  if (result.edition !== undefined) {
+    const year = releaseYearText(result.releaseYear, true);
+    return `${editionLabelText(result.edition)}${year === null ? '' : ` (${year})`}`;
+  }
   return result.releaseYear === null
     ? result.name
     : `${result.name} (${String(result.releaseYear)})`;

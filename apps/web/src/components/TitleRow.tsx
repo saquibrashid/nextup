@@ -22,6 +22,8 @@ import { Badge } from './ui/Badge';
 import { ServiceMark } from './ServiceMark';
 import { ChevronIcon, MoreIcon } from './icons';
 import { GenreChips } from './GenreChips';
+import { EditionLabels } from './EditionLabels';
+import { releaseYearText } from '@nextup/domain';
 
 import {
   IMDB_RATING_ABSENT,
@@ -87,6 +89,7 @@ export interface TitleBadge {
 
 /** An item of `GET /api/titles` (`specs/api.md` §6.2). */
 export interface TitleListItem {
+  readonly editionLabels?: readonly import('@nextup/domain').EditionLabel[];
   /** Optional for cached responses from before watch preferences shipped. */
   readonly watching?: boolean;
   readonly priority?: WatchPriority;
@@ -279,6 +282,7 @@ export function TitleRow({
           </div>
 
           <p className="title-row__meta" data-testid="title-meta">
+            <EditionLabels labels={item.editionLabels} />
             {/*
             REQ-106 — year and type precede runtime and wrapping genres.
             It previously rendered type-then-year, which is why the owner's
@@ -288,7 +292,9 @@ export function TitleRow({
           */}
             <span className="title-row__facts">
               {item.releaseYear !== null && (
-                <span data-testid="release-year">{item.releaseYear}</span>
+                <span data-testid="release-year">
+                  {releaseYearText(item.releaseYear, (item.editionLabels?.length ?? 0) > 0)}
+                </span>
               )}
               <span data-testid="media-type">{MEDIA_TYPE_LABELS[item.mediaType]}</span>
               {/*

@@ -69,6 +69,7 @@ function mount(over: Partial<FixMatchDialogProps> = {}) {
       titleId={TITLE_ID}
       name={TITLE_NAME}
       badges={BADGES}
+      editionLabels={over.editionLabels}
       searchTmdb={searchTmdb}
       fixMatch={fixMatch}
       onClose={onClose}
@@ -80,6 +81,38 @@ function mount(over: Partial<FixMatchDialogProps> = {}) {
 // ── T-UI-020 ─────────────────────────────────────────────────────────────────
 
 describe('T-UI-020 - FixMatchDialog renders search input, results, and selection', () => {
+  it('T-EDITION-004e keeps saved editions unless replacement is explicitly selected', async () => {
+    const edition = { name: 'Dune extended edition', kind: 'extended' as const };
+    const { fixMatch, user } = mount({ editionLabels: [edition] });
+    await user.type(screen.getByTestId('tmdb-search-input'), 'Dune');
+    await screen.findByTestId('tmdb-results');
+    await user.click(screen.getByTestId(`select-result-${SEARCH_RESULT.tmdbId}`));
+    expect(screen.getByRole('checkbox')).not.toBeChecked();
+    await user.click(screen.getByTestId('confirm-fix-match'));
+    expect(fixMatch).toHaveBeenCalledWith(TITLE_ID, {
+      tmdbId: SEARCH_RESULT.tmdbId,
+      mediaType: 'movie',
+      confirmDuplicate: false,
+    });
+  });
+
+  it('T-EDITION-004f explicitly clears labels when the base film is selected', async () => {
+    const edition = { name: 'Dune extended edition', kind: 'extended' as const };
+    const { fixMatch, user } = mount({ editionLabels: [edition] });
+    await user.type(screen.getByTestId('tmdb-search-input'), 'Dune');
+    await screen.findByTestId('tmdb-results');
+    await user.click(screen.getByTestId(`select-result-${SEARCH_RESULT.tmdbId}`));
+    await user.click(screen.getByRole('checkbox'));
+    expect(screen.getByText(/Saved edition labels will be cleared/)).toBeVisible();
+    await user.click(screen.getByTestId('confirm-fix-match'));
+    expect(fixMatch).toHaveBeenCalledWith(TITLE_ID, {
+      tmdbId: SEARCH_RESULT.tmdbId,
+      mediaType: 'movie',
+      confirmDuplicate: false,
+      clearEditions: true,
+    });
+  });
+
   it('T-UI-020a renders a TMDB search input on open', () => {
     mount();
     expect(screen.getByTestId('tmdb-search-input')).toBeTruthy();

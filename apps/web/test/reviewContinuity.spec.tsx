@@ -107,6 +107,7 @@ function fixture(items = [candidate()]) {
             name: body.correctedName ?? 'Chosen title',
             releaseYear: body.correctedReleaseYear ?? null,
             posterPath: body.correctedPosterPath ?? null,
+            ...(body.correctedEdition === undefined ? {} : { edition: body.correctedEdition }),
             uncertain: false,
             ambiguous: false,
             score: 1,
@@ -284,6 +285,48 @@ describe('T-UX-162 reversible review and recovery', () => {
     await screen.findByText(/This item changed identity/);
     expect(f.client.patchCandidate).not.toHaveBeenCalled();
     expect(screen.getByRole('region', { name: 'Unsaved review choices' })).toBeVisible();
+  });
+
+  it('T-EDITION-004g a different edition of the same film does not satisfy an offline correction', async () => {
+    const item = candidate();
+    const f = fixture([item]);
+    const edition = { name: 'Title one extended edition', kind: 'extended' as const };
+    f.client.searchTmdb.mockResolvedValue({
+      items: [
+        {
+          tmdbId: 1,
+          mediaType: 'movie',
+          name: 'Title one',
+          releaseYear: 2020,
+          posterPath: null,
+          edition,
+        },
+      ],
+    });
+    mount(f.client);
+    await screen.findByTestId('candidate-one');
+    fireEvent.click(card().getByTestId('addition-find'));
+    fireEvent.change(card().getByRole('searchbox'), { target: { value: edition.name } });
+    fireEvent.submit(card().getByRole('searchbox').closest('form')!);
+    const result = await card().findByRole('button', { name: 'Use Title one' });
+    online(false);
+    fireEvent.click(result);
+    await screen.findByRole('region', { name: 'Unsaved review choices' });
+    item.disposition = 'corrected';
+    online(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Check and save choices' }));
+    await screen.findByText(/Saved review changed/);
+    expect(f.client.patchCandidate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Use my choice' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('region', { name: 'Unsaved review choices' })).toBeNull(),
+    );
+    expect(f.client.patchCandidate).toHaveBeenCalledWith(
+      'review',
+      'one',
+      expect.objectContaining({ correctedEdition: edition }),
+    );
+    expect(item.match?.edition).toEqual(edition);
   });
 
   it('T-UX-162r: discarded matched and unidentified cards do not claim they will be added', () => {

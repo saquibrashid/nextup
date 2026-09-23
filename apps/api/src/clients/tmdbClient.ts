@@ -26,6 +26,11 @@
  */
 
 import {
+  catalogueEdition,
+  editionForText,
+  mergeEditionLabels,
+  normaliseTitleText,
+  type EditionLabel,
   isKnownRuntime,
   titlePresentationSchema,
   type TitlePresentation,
@@ -80,6 +85,7 @@ export function resetTmdbRateLimiterForTests(): void {
 
 /** One search hit, already narrowed to the fields nextup is allowed to keep. */
 export interface TmdbSearchItem {
+  edition?: EditionLabel;
   tmdbId: number;
   mediaType: MediaType;
   name: string;
@@ -127,6 +133,7 @@ export interface TmdbClientOptions {
 }
 
 export interface TmdbSearchOptions {
+  evidenceText?: string;
   type?: MediaType;
   limit?: number;
 }
@@ -149,6 +156,7 @@ export class TmdbClient {
    * forbids that — and nothing here is persisted.
    */
   readonly #searchCache = new Map<string, TmdbSearchItem[]>();
+  readonly #editionCache = new Map<number, EditionLabel[]>();
 
   constructor(options: TmdbClientOptions) {
     this.#apiKey = options.apiKey;
@@ -167,7 +175,8 @@ export class TmdbClient {
    */
   async searchMulti(query: string, options: TmdbSearchOptions = {}): Promise<TmdbSearchItem[]> {
     const limit = options.limit ?? TMDB_SEARCH_LIMIT_DEFAULT;
-    const cacheKey = `${query.trim().toLowerCase()}\u0000${options.type ?? ''}\u0000${limit}`;
+    const evidence = options.evidenceText ?? query;
+    const cacheKey = `${query.trim().toLowerCase()}\u0000${options.type ?? ''}\u0000${limit}\u0000${evidence}`;
 
     const cached = this.#searchCache.get(cacheKey);
     if (cached) return cached;
@@ -183,8 +192,46 @@ export class TmdbClient {
       .filter((item) => options.type === undefined || item.mediaType === options.type)
       .slice(0, limit);
 
+    for (const item of items) {
+      if (
+        item.mediaType !== 'movie' ||
+        normaliseTitleText(evidence) === normaliseTitleText(item.name)
+      ) {
+        continue;
+      }
+      const edition = editionForText(evidence, item.name, await this.getEditionLabels(item.tmdbId));
+      if (edition !== undefined) item.edition = edition;
+    }
     this.#searchCache.set(cacheKey, items);
     return items;
+  }
+
+  async getEditionLabels(tmdbId: number): Promise<EditionLabel[]> {
+    const cached = this.#editionCache.get(tmdbId);
+    if (cached !== undefined) return cached;
+    let body: unknown;
+    try {
+      body = await this.#get<unknown>(`/movie/${tmdbId}/alternative_titles`, {}, () => {
+        throw new TmdbWorkNotFoundError('movie', tmdbId);
+      });
+    } catch (error) {
+      if (!(error instanceof TmdbWorkNotFoundError)) throw error;
+      this.#editionCache.set(tmdbId, []);
+      return [];
+    }
+    if (!isRecord(body) || !Array.isArray(body['titles'])) {
+      throw new TmdbUnavailableError('TMDB returned unreadable alternative titles.', 200, false);
+    }
+    const labels = mergeEditionLabels(
+      [],
+      body['titles'].flatMap((row: unknown) => {
+        if (!isRecord(row)) return [];
+        const edition = catalogueEdition(row['title'], row['type']);
+        return edition === null ? [] : [edition];
+      }),
+    );
+    this.#editionCache.set(tmdbId, labels);
+    return labels;
   }
 
   /**

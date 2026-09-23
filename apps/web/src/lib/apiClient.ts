@@ -394,6 +394,7 @@ export interface SuppressionsResponse {
  * suppressed by exactly the same call as a listed one, deliberately.
  */
 export interface WaitingItem {
+  editionLabels?: import('@nextup/domain').EditionLabel[];
   intentId: string;
   titleId: string;
   workIdentity: string;
@@ -434,6 +435,7 @@ export interface WaitingResponse {
  * re-derive it — there is no raw text in this DTO to fall back to.
  */
 export interface RemovedItem {
+  editionLabels?: import('@nextup/domain').EditionLabel[];
   listingId: string;
   titleId: string;
   workIdentity: string;
@@ -682,6 +684,7 @@ export interface ConfirmAllResult {
  * reason the dialog could not simply be handed the client's search method.
  */
 export interface TmdbSearchResult {
+  edition?: import('@nextup/domain').EditionLabel;
   tmdbId: number;
   mediaType: 'movie' | 'tv';
   name: string;
@@ -739,6 +742,7 @@ export type CandidatePatchBody =
        * refused rather than half-stored.
        */
       correctedName?: string;
+      correctedEdition?: import('@nextup/domain').EditionLabel;
       correctedReleaseYear?: number | null;
       correctedPosterPath?: string | null;
     }
@@ -807,8 +811,12 @@ export function createApiClient(deps: ApiClientDeps = {}) {
      * editing it to v1.1), so sending either would be a value the API ignores
      * while the caller believes it was honoured.
      */
-    addTitle: (body: { tmdbId: number; mediaType: 'movie' | 'tv'; service: string }) =>
-      request<AddTitleResponse>('/api/titles', { method: 'POST', body }, deps),
+    addTitle: (body: {
+      tmdbId: number;
+      mediaType: 'movie' | 'tv';
+      service: string;
+      edition?: import('@nextup/domain').EditionLabel;
+    }) => request<AddTitleResponse>('/api/titles', { method: 'POST', body }, deps),
 
     /**
      * §6.32 (US-048) — take a title off the list by hand.
@@ -978,10 +986,18 @@ export function createApiClient(deps: ApiClientDeps = {}) {
      * it would make the client's rendering of a work part of that work's
      * identity, which SD-05 forbids.
      */
-    addManualEntry: (batchId: string, tmdbId: number, mediaType: string) =>
+    addManualEntry: (
+      batchId: string,
+      tmdbId: number,
+      mediaType: string,
+      edition?: import('@nextup/domain').EditionLabel,
+    ) =>
       request<ManualEntryResult>(
         `/api/batches/${encodeURIComponent(batchId)}/manual-entry`,
-        { method: 'POST', body: { tmdbId, mediaType } },
+        {
+          method: 'POST',
+          body: { tmdbId, mediaType, ...(edition === undefined ? {} : { edition }) },
+        },
         deps,
       ),
 

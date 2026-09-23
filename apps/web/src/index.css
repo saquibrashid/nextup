@@ -18,6 +18,12 @@
  * makes a visual tidy-up break tests for reasons no one can see.
  */
 
+.edition-label {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: var(--text-sm);
+}
+
 .title-row__link {
   color: inherit;
   text-decoration: none;

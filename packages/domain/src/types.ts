@@ -67,6 +67,7 @@ export interface Title {
   listings: ServiceListing[];
   /** `null` iff `matchState === 'unmatched'`. */
   tmdb: TmdbMetadata | null;
+  editionLabels?: import('./editions.js').EditionLabel[] | undefined;
   /** DERIVED (§5.2). `null` iff every listing is removed AND none had a date. */
   sortDateAdded: IsoDate | null;
   createdAt: IsoDateTime;
@@ -362,6 +363,7 @@ export interface BoundingBox {
 }
 
 export interface MatchCandidate {
+  edition?: import('./editions.js').EditionLabel | undefined;
   tmdbId: number;
   mediaType: MediaType;
   name: string;

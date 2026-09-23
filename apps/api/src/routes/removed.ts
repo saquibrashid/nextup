@@ -24,6 +24,7 @@
  */
 
 import { type Router } from 'express';
+import { parseEditionLabels } from '@nextup/domain';
 
 import {
   countRemovalsForWorks,
@@ -106,6 +107,7 @@ export function toRemovedItem(
   return {
     listingId: row.listing_id,
     titleId: row.title_id,
+    editionLabels: parseEditionLabels(row.edition_labels),
     workIdentity: row.work_identity,
     matchState: row.match_state,
     name: row.tmdb_name ?? row.raw_extracted_text ?? '',

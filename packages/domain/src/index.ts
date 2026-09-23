@@ -74,5 +74,6 @@ export * from './sortName.js';
 export * from './tmdbStorage.js';
 export * from './titleRuntime.js';
 export * from './titlePresentation.js';
+export * from './editions.js';
 export * from './types.js';
 export * from './undo.js';

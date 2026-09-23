@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type JSX, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { formatRuntime, normaliseGenres } from '@nextup/domain';
+import { formatRuntime, normaliseGenres, releaseYearText } from '@nextup/domain';
+import { EditionLabels } from '../components/EditionLabels';
 import type { ApiClient, TitleDetailResponse } from '../lib/apiClient';
 import { Button } from '../components/ui/Button';
 import { ServiceMark } from '../components/ServiceMark';
@@ -80,11 +81,19 @@ export function TitleDetailsPage({
         <div className="title-details__identity">
           <p className="title-details__eyebrow">
             {unidentified ? 'Unidentified title' : item.mediaType === 'tv' ? 'TV series' : 'Movie'}
-            {item.releaseYear !== null && ` · ${String(item.releaseYear)}`}
+            {item.releaseYear !== null &&
+              ` · ${releaseYearText(item.releaseYear, (item.editionLabels?.length ?? 0) > 0)}`}
           </p>
           <h1 ref={heading} tabIndex={-1}>
             {item.name}
           </h1>
+          <EditionLabels labels={item.editionLabels} />
+          {(item.editionLabels?.length ?? 0) > 0 && (
+            <p>
+              Year, runtime, artwork and ratings describe the original catalogue film, not a
+              separately catalogued edition.
+            </p>
+          )}
           <p>{formatRuntime(item.runtimeMinutes, item.mediaType) ?? 'Runtime not available'}</p>
           {item.genres.length > 0 && <p>{normaliseGenres(item.genres).join(' · ')}</p>}
           <p className="title-details__rating">
@@ -211,6 +220,7 @@ export function TitleDetailsPage({
       )}
       {active && dialog === 'fix' && (
         <FixMatchDialog
+          editionLabels={item.editionLabels}
           titleId={item.titleId}
           name={item.name}
           badges={item.badges}

@@ -302,12 +302,15 @@ describe('T-TMDB-010 the client refuses to invent data from a malformed body', (
   function clientServing(body: unknown, status = 200): TmdbClient {
     return new TmdbClient({
       apiKey: 'fixture-key-not-a-real-secret',
-      fetch: (() =>
+      fetch: ((input: URL | RequestInfo) =>
         Promise.resolve(
-          new Response(JSON.stringify(body), {
-            status,
-            headers: { 'content-type': 'application/json' },
-          }),
+          new Response(
+            JSON.stringify(String(input).includes('/alternative_titles') ? { titles: [] } : body),
+            {
+              status,
+              headers: { 'content-type': 'application/json' },
+            },
+          ),
         )) as typeof globalThis.fetch,
       sleep: () => Promise.resolve(),
     });

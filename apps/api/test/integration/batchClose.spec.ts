@@ -23,6 +23,9 @@ import type { Express } from 'express';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { toBatchProvenance } from '@nextup/domain';
+import type { EditionLabel } from '@nextup/domain';
+import { toListItem } from '../../src/routes/titles.js';
+import { updateTitleMetadata, type OwnerId } from '../../src/repository/ownerData.js';
 
 import { createApp } from '../../src/app.js';
 import { CLIENT_PRINCIPAL_HEADER } from '../../src/auth/principal.js';
@@ -180,6 +183,7 @@ async function makeCandidate(
     verdict?: string;
     disposition?: string;
     tmdbId?: number;
+    edition?: EditionLabel;
     /**
      * The pipeline's own top match, when it differs from the resolved identity
      * — i.e. what a REAL correction leaves behind, because applying one
@@ -225,6 +229,7 @@ async function makeCandidate(
                 releaseYear: 2021,
                 posterPath: '/dune.jpg',
                 score: 1,
+                ...(over.edition === undefined ? {} : { edition: over.edition }),
               },
             ]),
     },
@@ -331,6 +336,127 @@ afterAll(async () => {
 /* ── tests ────────────────────────────────────────────────────────────── */
 
 describe('T-REV-012 · US-012 AC-3 · close applies confirmed work and refuses pending', () => {
+  it('T-EDITION-003a persists a confirmed cut on the existing film without a duplicate or changed listing dates', async () => {
+    const identity = 'tmdb:movie:8836';
+    const name = 'The X-Files: I Want to Believe';
+    const edition: EditionLabel = { name: `${name} Vrach Frankenshteyn`, kind: 'directors-cut' };
+    const titleId = await seedListing(identity, name, 'netflix');
+    const before = await testPrisma().serviceListing.findMany({ where: { titleId } });
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, {
+      workIdentity: identity,
+      rawText: edition.name,
+      originalName: name,
+      disposition: 'confirmed',
+      edition,
+    });
+    const response = await closeBatchRequest(batchId);
+    expect(response.status).toBe(200);
+    expect(await countTitles()).toBe(1);
+    expect(await testPrisma().serviceListing.findMany({ where: { titleId } })).toEqual(before);
+    const row = await testPrisma().title.findUniqueOrThrow({
+      where: { id: titleId },
+      include: { listings: true },
+    });
+    expect(row.workIdentity).toBe(identity);
+    expect(JSON.parse(row.editionLabels)).toEqual([edition]);
+    expect(toListItem(row)).toMatchObject({ editionLabels: [edition], workIdentity: identity });
+    await updateTitleMetadata(ownerId as OwnerId, titleId, {
+      tmdbName: name,
+      tmdbReleaseYear: 2008,
+      tmdbRuntimeMinutes: 104,
+      tmdbGenres: '[]',
+      tmdbPosterPath: null,
+      imdbId: null,
+      tmdbFetchedAt: new Date(),
+    });
+    expect(
+      (await testPrisma().title.findUniqueOrThrow({ where: { id: titleId } })).editionLabels,
+    ).toBe(JSON.stringify([edition]));
+    expect(
+      await testPrisma().batchChange.findFirst({
+        where: { batchId, titleId, attr: 'editionLabels' },
+      }),
+    ).toMatchObject({ prevValue: '[]', nextValue: JSON.stringify([edition]) });
+  });
+
+  it('T-EDITION-003b does not save an undecided known edition, and rolls back labels with the batch', async () => {
+    const edition: EditionLabel = { name: 'Dune Extended', kind: 'extended' };
+    const titleId = await seedListing(DUNE, 'Dune', 'netflix');
+    const pendingBatch = await makeBatch();
+    await makeCandidate(pendingBatch, { edition });
+    expect((await closeBatchRequest(pendingBatch)).status).toBe(200);
+    expect(
+      (await testPrisma().title.findUniqueOrThrow({ where: { id: titleId } })).editionLabels,
+    ).toBe('[]');
+    const confirmedBatch = await makeBatch();
+    await makeCandidate(confirmedBatch, { edition, disposition: 'confirmed' });
+    failServiceState = true;
+    expect((await closeBatchRequest(confirmedBatch)).status).toBe(500);
+    expect(
+      (await testPrisma().title.findUniqueOrThrow({ where: { id: titleId } })).editionLabels,
+    ).toBe('[]');
+  });
+
+  it('T-EDITION-003c stores a new title edition as part of creation, not an undo-blocking modification', async () => {
+    const edition: EditionLabel = { name: 'Dune Extended', kind: 'extended' };
+    const batchId = await makeBatch();
+    await makeCandidate(batchId, { edition, disposition: 'confirmed' });
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+    const row = await testPrisma().title.findFirstOrThrow();
+    expect(JSON.parse(row.editionLabels)).toEqual([edition]);
+    expect(
+      await testPrisma().batchChange.count({ where: { batchId, attr: 'editionLabels' } }),
+    ).toBe(0);
+  });
+
+  it('T-EDITION-003d persists a corrected edition outside the original alternatives', async () => {
+    const edition: EditionLabel = { name: 'Dune Extended', kind: 'extended' };
+    const batchId = await makeBatch();
+    const candidateId = await makeCandidate(batchId, { workIdentity: HEAT, originalName: 'Heat' });
+    const correction = await fetch(`${origin}/api/batches/${batchId}/candidates/${candidateId}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', [CLIENT_PRINCIPAL_HEADER]: principalHeader },
+      body: JSON.stringify({
+        disposition: 'corrected',
+        tmdbId: 438631,
+        mediaType: 'movie',
+        correctedName: 'Dune',
+        correctedReleaseYear: 2021,
+        correctedPosterPath: null,
+        correctedEdition: edition,
+      }),
+    });
+    expect(correction.status).toBe(200);
+    const candidate = await testPrisma().extractionCandidate.findUniqueOrThrow({
+      where: { id: candidateId },
+    });
+    expect(candidate.correctedDisplayEdition).toBe(JSON.stringify(edition));
+    expect(candidate.matchCandidates).toContain('Heat');
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+    const row = await testPrisma().title.findFirstOrThrow();
+    expect(row.workIdentity).toBe(DUNE);
+    expect(row.editionLabels).toBe(JSON.stringify([edition]));
+  });
+
+  it('T-EDITION-003e a discovery capture can label an existing film without creating an intent or listing', async () => {
+    const edition: EditionLabel = { name: 'Dune Extended', kind: 'extended' };
+    const titleId = await seedListing(DUNE, 'Dune', 'netflix');
+    const batchId = await makeBatch();
+    await testPrisma().uploadBatch.update({
+      where: { id: batchId },
+      data: { discoverySource: 'fandango-at-home', service: null },
+    });
+    await makeCandidate(batchId, { edition, disposition: 'confirmed' });
+    expect((await closeBatchRequest(batchId)).status).toBe(200);
+    expect(await countTitles()).toBe(1);
+    expect(await countListings()).toBe(1);
+    expect(await testPrisma().watchIntent.count()).toBe(0);
+    expect(
+      (await testPrisma().title.findUniqueOrThrow({ where: { id: titleId } })).editionLabels,
+    ).toBe(JSON.stringify([edition]));
+  });
+
   it('T-REV-012n: a confirmed addition becomes a title and a listing', async () => {
     const batchId = await makeBatch();
     await makeCandidate(batchId, { disposition: 'confirmed' });

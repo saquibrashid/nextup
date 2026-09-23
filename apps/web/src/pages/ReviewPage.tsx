@@ -637,6 +637,7 @@ export function ReviewPage({
         disposition={candidate.disposition}
         controlled={controlled}
         variant={variant}
+        alternatives={candidate.alternatives}
         onKeep={onKeepU}
         onDiscard={onDiscardU}
         onMatch={onMatchU}
@@ -1176,6 +1177,13 @@ export function ReviewPage({
           service={review.service}
           items={sections.removals.items}
           additions={additions}
+          editionUpdates={sections.alreadyOnYourList.items.filter(
+            (item) =>
+              item.match?.edition !== undefined &&
+              ['confirmed', 'corrected'].includes(
+                effectiveDisposition(item.disposition, local[item.candidateId]),
+              ),
+          )}
           submitting={applying}
           disabled={offline || saving || decisionError !== null}
           error={applyFailed ? REVIEW_APPLY_FAILED : decisionError}

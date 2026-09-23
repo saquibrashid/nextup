@@ -53,6 +53,7 @@ import type {
 } from './enums.js';
 import { CANDIDATE_CLASSIFICATIONS } from './enums.js';
 import { mediaTypeForWorkIdentity } from './identity.js';
+import type { EditionLabel } from './editions.js';
 import type { IsoDate } from './types.js';
 import { DEGRADED_EXTRACTION_BANNER, TMDB_UNAVAILABLE_BANNER, SERVICE_LABELS } from './copy.js';
 
@@ -92,6 +93,7 @@ export type ReviewClassification = (typeof REVIEW_CLASSIFICATIONS)[number];
 
 /** One scored TMDB alternative, as rendered inline (US-007 AC-4). */
 export interface ReviewMatchRef {
+  edition?: EditionLabel;
   tmdbId: number;
   mediaType: MediaType;
   name: string;
@@ -107,6 +109,7 @@ export interface ReviewMatch extends ReviewMatchRef {
 
 /** The stored candidate columns `chosenReviewMatch` reads. */
 export interface ChosenMatchInput {
+  correctedEdition?: EditionLabel;
   reviewDisposition: string;
   resolvedWorkIdentity: string | null;
   correctedToTmdbId: number | null;
@@ -164,6 +167,7 @@ function correctedReviewMatch(input: ChosenMatchInput): ReviewMatch | null {
 
   return {
     tmdbId: input.correctedToTmdbId,
+    ...(input.correctedEdition === undefined ? {} : { edition: input.correctedEdition }),
     mediaType,
     name: input.correctedDisplayName,
     releaseYear: input.correctedDisplayYear,
@@ -288,6 +292,9 @@ export function withReviewEvidence(candidates: readonly ReviewCandidate[]): Revi
 
 /** Shared by the UI, persisted-intent replay and bulk API; individual choices remain possible. */
 export function individualReviewReason(candidate: ReviewCandidate): string | null {
+  if (candidate.match?.edition !== undefined) {
+    return 'Check this edition against the screenshot. It will be saved within the existing film entry.';
+  }
   if ((candidate.relatedReadings?.length ?? 0) > 0) {
     return 'Related readings need an individual decision; they may describe the same title.';
   }

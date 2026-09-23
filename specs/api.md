@@ -8,6 +8,36 @@ sourceOfTruth: docs/PRD.md, docs/architecture.md, docs/adr/ADR-0002, ADR-0006
 
 # specs/api.md — nextup HTTP API
 
+## Edition labels (TASK-244, 2026-09-23)
+
+`GET /api/tmdb/search` and review match/alternative objects may carry optional
+`edition: { name, kind }`, where kind is `directors-cut`, `extended`, `uncut`,
+`theatrical`, or `special-edition`. The base `name`, `tmdbId`, media type and
+release year remain the original film's metadata. An ordinary base-title search
+does not assert an edition.
+
+Manual title addition, fix-match and batch manual entry accept optional `edition`;
+the server verifies it against the selected film's catalogue aliases before
+saving. Review corrections accept optional `correctedEdition` alongside the
+existing corrected display fields, with the same network-free/display-only
+semantics and strict shape validation. This selection must survive offline
+intent storage and response reconciliation, not be mistaken for another cut
+sharing the same film ID.
+
+Fix-match also accepts optional boolean `clearEditions`: explicit `true`
+replaces saved labels with the chosen edition, or clears them when the selected
+base film has none. The confirmation dialog exposes this choice when the title
+already has labels. Absent/false preserves labels for the same work, including
+older clients; changing canonical work always clears labels belonging to the
+previous film.
+
+List, detail, waiting and removed responses add `editionLabels: []` or the
+owner-confirmed labels. Older responses without the field render normally.
+The UI labels the year **Original film: 2008** when an edition is shown; it
+must not invent an edition release year, runtime, artwork or rating. Optional
+known-match confirmation saves the label at Apply without adding another row
+or badge. Pending known readings do not block close and are not silently saved.
+
 **Current service vocabulary (US-061 / REQ-127, 2026-09-17).** Every subscription
 service body, query parameter and response field uses the shared `Service`:
 `netflix | max | prime-video | disney-plus | apple-tv-plus | paramount-plus |

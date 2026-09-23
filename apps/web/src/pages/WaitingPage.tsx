@@ -20,7 +20,8 @@
 
 import { useState, type JSX } from 'react';
 import { Link } from 'react-router-dom';
-import { SERVICES, SERVICE_LABELS } from '@nextup/domain';
+import { SERVICES, SERVICE_LABELS, releaseYearText } from '@nextup/domain';
+import { EditionLabels } from '../components/EditionLabels';
 
 import {
   JUSTWATCH_ATTRIBUTION,
@@ -111,7 +112,12 @@ function WaitingRow({
 
       <div className="waiting-row__body">
         <span data-testid="waiting-name">{item.name}</span>
-        {item.releaseYear !== null && <span data-testid="waiting-year">{item.releaseYear}</span>}
+        <EditionLabels labels={item.editionLabels} />
+        {item.releaseYear !== null && (
+          <span data-testid="waiting-year">
+            {releaseYearText(item.releaseYear, (item.editionLabels?.length ?? 0) > 0)}
+          </span>
+        )}
 
         {/* US-043 AC-1 — the discovery date and the storefront it was seen on. */}
         <p data-testid="waiting-discovery">

@@ -39,6 +39,7 @@ import {
 } from '@nextup/domain';
 
 import { Button } from './ui/Button';
+import { EditionLabels } from './EditionLabels';
 
 import {
   REMOVAL_CANCEL_LABEL,
@@ -51,6 +52,7 @@ import {
 export interface RemovalConfirmDialogProps {
   readonly service: Service | null;
   readonly additions?: readonly ReviewCandidate[];
+  readonly editionUpdates?: readonly ReviewCandidate[];
   readonly disabled?: boolean;
   readonly offline?: boolean;
   readonly error?: string | null;
@@ -79,6 +81,7 @@ export function RemovalConfirmDialog({
   onCancel,
   submitting = false,
   additions = [],
+  editionUpdates = [],
   disabled = false,
   offline = false,
   error = null,
@@ -121,11 +124,33 @@ export function RemovalConfirmDialog({
                   {item.match === null
                     ? ' (unidentified)'
                     : ` (${item.match.releaseYear ?? 'year unknown'}, ${item.match.mediaType === 'tv' ? 'series' : 'film'})`}
+                  {item.match?.edition !== undefined && (
+                    <EditionLabels labels={[item.match.edition]} />
+                  )}
                 </li>
               ))}
             </ul>
           )}
         </section>
+        {editionUpdates.length > 0 && (
+          <section className="review-confirm__group" data-testid="confirmation-editions">
+            <h3>Keep edition labels on existing films</h3>
+            <p>
+              These labels stay on the existing film entry. No duplicate title or new date is
+              created.
+            </p>
+            <ul>
+              {editionUpdates.map((item) => (
+                <li key={item.candidateId}>
+                  {item.match?.name}
+                  {item.match?.edition !== undefined && (
+                    <EditionLabels labels={[item.match.edition]} />
+                  )}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         <section className="review-confirm__group">
           <h3>Removals</h3>
           <p>

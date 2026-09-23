@@ -26,6 +26,7 @@ import {
   type ResolveCandidatesPorts,
 } from '../../../src/jobs/resolveCandidates.js';
 import type { TmdbSearchResult } from '@nextup/domain';
+import { normaliseTitleText } from '@nextup/domain';
 
 const IMAGE_A = 'img-a';
 const IMAGE_B = 'img-b';
@@ -89,6 +90,44 @@ function harness(
 }
 
 describe('resolveCandidates · stage 3 in the pipeline', () => {
+  it('T-EDITION-002e preserves source evidence and keeps distinct cuts individually reviewable', async () => {
+    const name = 'The X-Files: I Want to Believe';
+    const edition = { name: `${name} Vrach Frankenshteyn`, kind: 'directors-cut' as const };
+    const rows = [
+      candidate({ id: 'base', normalisedText: normaliseTitleText(name), rawText: name }),
+      candidate({ id: 'cut', normalisedText: normaliseTitleText(name), rawText: edition.name }),
+      candidate({
+        id: 'cut-again',
+        normalisedText: normaliseTitleText(name),
+        rawText: edition.name,
+      }),
+    ];
+    const evidence: Array<string | undefined> = [];
+    const h = harness(rows, async () => []);
+    h.ports.searchTmdb = async (_query, raw) => {
+      evidence.push(raw);
+      return [
+        tmdbHit({
+          tmdbId: 8836,
+          mediaType: 'movie',
+          name,
+          releaseYear: 2008,
+          ...(raw === edition.name ? { edition } : {}),
+        }),
+      ];
+    };
+    const result = await resolveCandidates({ imageOrder: [IMAGE_A], ports: h.ports });
+    expect(evidence).toEqual([name, edition.name]);
+    expect(result.matched).toBe(2);
+    expect(result.candidatesCollapsed).toBe(1);
+    expect(h.writes.find((row) => row.candidateId === 'cut')).toMatchObject({
+      resolvedWorkIdentity: 'tmdb:movie:8836',
+      collapsedIntoCandidateId: null,
+      matchCandidates: [expect.objectContaining({ edition })],
+    });
+    expect(h.writes.find((row) => row.candidateId === 'base')?.collapsedIntoCandidateId).toBeNull();
+  });
+
   it('T-AI-007l · the same caption read from two overlapping screenshots collapses to one survivor, and the loser is RETAINED pointing at it', async () => {
     const rows = [
       candidate({ id: 'c-first', sourceImageIds: [IMAGE_A] }),

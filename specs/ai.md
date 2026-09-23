@@ -11,6 +11,23 @@ sourceOfTruth: docs/PRD.md, docs/adr/ADR-0001 (Revision 2), docs/diagrams/ai-pip
 
 # specs/ai.md — nextup extraction and matching
 
+## Edition-aware catalogue resolution (TASK-244, 2026-09-23)
+
+Stage 3 retains the verbatim source reading as edition evidence even when the
+inferred search title is shorter. For non-exact movie evidence, the TMDB client
+may read `/movie/{id}/alternative_titles` through its existing rate limit,
+timeout and retry boundary. Only explicitly typed cut/edition aliases qualify;
+ordinary translations, working titles and untyped alternatives do not. A label
+requires an exact normalized alias or a distinguishing multiword suffix, never
+the base film title alone. Cache entries include evidence, and alias lookups
+are cached only for the existing per-client lifetime.
+
+An exact verified edition alias can score as an exact name match, but year
+penalties, ambiguity thresholds and canonical work identity are unchanged.
+The base film's year is not the recut's year. Edition labels require individual
+review rather than bulk confirmation. No catalogue material enters inference,
+no extra AI call is made, and alias outages remain visible matching failures.
+
 > **REVISION 2 (2026-08-10T21:07) — the extractor changed.** Constraint
 > change `A40` added `NFR-012a`: extraction is exempt from the near-zero
 > cost constraint and **quality outranks cost for this component**.

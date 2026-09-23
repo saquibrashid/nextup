@@ -221,6 +221,7 @@ export function resolutionPorts(
       return rows.map((row) => ({
         id: row.id,
         normalisedText: row.normalisedText,
+        rawText: row.rawText,
         extractedYear: row.extractedYear,
         sourceImageIds: row.sourceImages.map((source) => source.imageId),
         // UNTRUSTED at read: the column is JSON text, and a malformed value
@@ -232,8 +233,8 @@ export function resolutionPorts(
       }));
     },
 
-    async searchTmdb(query) {
-      return getClient().searchMulti(query);
+    async searchTmdb(query, evidenceText) {
+      return getClient().searchMulti(query, evidenceText === undefined ? {} : { evidenceText });
     },
 
     async persist(resolution) {

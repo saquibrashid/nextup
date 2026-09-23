@@ -1,4 +1,6 @@
 import { Dialog } from './ui/Dialog';
+import { EditionLabels } from './EditionLabels';
+import { releaseYearText } from '@nextup/domain';
 import { Input } from './ui/Input';
 /**
  * "Add title" dialog (US-047, TASK-207).
@@ -55,6 +57,7 @@ const MEDIA_TYPE_LABELS: Record<string, string> = { movie: 'Movie', tv: 'TV' };
 const SERVICE_OPTIONS = SERVICES.map((value) => ({ value, label: SERVICE_LABELS[value] }));
 
 export interface AddTitleRequest {
+  edition?: import('@nextup/domain').EditionLabel;
   tmdbId: number;
   mediaType: 'movie' | 'tv';
   service: string;
@@ -156,7 +159,12 @@ export function AddTitleDialog({
     }
     setServiceError(false);
     setPhase('submitting');
-    addTitle({ tmdbId: selected.tmdbId, mediaType: selected.mediaType, service }).then(
+    addTitle({
+      tmdbId: selected.tmdbId,
+      mediaType: selected.mediaType,
+      service,
+      ...(selected.edition === undefined ? {} : { edition: selected.edition }),
+    }).then(
       (resp) => {
         setResult(resp);
         setPhase('success');
@@ -224,7 +232,10 @@ export function AddTitleDialog({
                     <img src={`${TMDB_IMAGE_BASE}${item.posterPath}`} alt="" />
                   )}
                   <span data-testid="add-result-name">{item.name}</span>
-                  {item.releaseYear !== null && <span>{item.releaseYear}</span>}
+                  {item.edition !== undefined && <EditionLabels labels={[item.edition]} />}
+                  {item.releaseYear !== null && (
+                    <span>{releaseYearText(item.releaseYear, item.edition !== undefined)}</span>
+                  )}
                   <span>{MEDIA_TYPE_LABELS[item.mediaType] ?? item.mediaType}</span>
                   <Button
                     variant="secondary"
@@ -247,8 +258,12 @@ export function AddTitleDialog({
         <>
           <p>
             Add <strong data-testid="add-selected-name">{selected.name}</strong>
-            {selected.releaseYear !== null && <> ({selected.releaseYear})</>} to your list?
+            {selected.releaseYear !== null && (
+              <> ({releaseYearText(selected.releaseYear, selected.edition !== undefined)})</>
+            )}{' '}
+            to your list?
           </p>
+          {selected.edition !== undefined && <EditionLabels labels={[selected.edition]} />}
 
           <Field legend={ADD_TITLE_SERVICE_LABEL} legendId={serviceLabelId}>
             {SERVICE_OPTIONS.map((option) => (

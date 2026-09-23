@@ -374,8 +374,14 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
    * owner a success notice for a title the batch does not contain.
    */
   const manualEntry = useCallback(
-    async (result: { tmdbId: number; mediaType: string }): Promise<void> => {
-      await decide(() => client.addManualEntry(batchId, result.tmdbId, result.mediaType));
+    async (result: {
+      tmdbId: number;
+      mediaType: string;
+      edition?: import('@nextup/domain').EditionLabel;
+    }): Promise<void> => {
+      await decide(() =>
+        client.addManualEntry(batchId, result.tmdbId, result.mediaType, result.edition),
+      );
     },
     [batchId, client, decide],
   );
@@ -432,6 +438,7 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
         name: string;
         releaseYear: number | null;
         posterPath: string | null;
+        edition?: import('@nextup/domain').EditionLabel;
       },
     ) =>
       patch(candidateId, {
@@ -441,6 +448,7 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
         correctedName: result.name,
         correctedReleaseYear: result.releaseYear,
         correctedPosterPath: result.posterPath,
+        ...(result.edition === undefined ? {} : { correctedEdition: result.edition }),
       }),
     [patch],
   );

@@ -24,6 +24,8 @@
 
 import { type Router } from 'express';
 import {
+  editionLabelSchema,
+  parseEditionLabel,
   assertEveryCandidateRouted,
   buildActiveListingIndex,
   buildReviewResponse,
@@ -75,15 +77,19 @@ function toIsoDate(value: Date): string {
  * A malformed blob degrades to "no alternatives", which review can still work
  * with, rather than making the batch unreviewable.
  */
-function parseMatchCandidates(raw: string | null): ReviewMatchRef[] {
+export function parseMatchCandidates(raw: string | null): ReviewMatchRef[] {
   if (raw === null || raw === '') return [];
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isMatchRef);
+    parsed = JSON.parse(raw);
   } catch {
     return [];
   }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter(isMatchRef).map((match) => ({
+    ...match,
+    ...(match.edition === undefined ? {} : { edition: editionLabelSchema.parse(match.edition) }),
+  }));
 }
 
 function isMatchRef(value: unknown): value is ReviewMatchRef {
@@ -388,6 +394,10 @@ export async function loadReviewCandidates(
         correctedDisplayName: row.correctedDisplayName,
         correctedDisplayYear: row.correctedDisplayYear,
         correctedDisplayPoster: row.correctedDisplayPoster,
+        ...(() => {
+          const edition = parseEditionLabel(row.correctedDisplayEdition);
+          return edition === undefined ? {} : { correctedEdition: edition };
+        })(),
         alternatives,
       });
       return {

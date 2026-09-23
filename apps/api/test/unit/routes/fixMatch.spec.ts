@@ -36,6 +36,7 @@ const updateTitle = vi.fn();
 const carryWatchPreference = vi.fn();
 const lockTitleForWatchPreferences = vi.fn();
 const getWork = vi.fn();
+const getEditionLabels = vi.fn();
 
 vi.mock('../../../src/repository/ownerData.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/repository/ownerData.js')>();
@@ -65,6 +66,7 @@ vi.mock('../../../src/clients/tmdbClient.js', async (importOriginal) => {
     // threw.
     TmdbClient: class {
       getWork = (...args: unknown[]) => getWork(...args) as unknown;
+      getEditionLabels = (...args: unknown[]) => getEditionLabels(...args) as unknown;
     },
   };
 });
@@ -144,6 +146,7 @@ beforeEach(async () => {
   carryWatchPreference.mockResolvedValue(undefined);
   lockTitleForWatchPreferences.mockResolvedValue(undefined);
   getWork.mockResolvedValue(DETAIL);
+  getEditionLabels.mockResolvedValue([]);
 
   await new Promise<void>((resolve) => {
     app = createApp({ webRoot: '/nonexistent-web-root' });
@@ -161,6 +164,52 @@ afterEach(async () => {
 });
 
 describe('parseFixMatchRequest', () => {
+  it('T-EDITION-005f refuses malformed edition and replacement requests', () => {
+    for (const body of [
+      { ...GOOD, clearEditions: 'true' },
+      { ...GOOD, edition: { name: 'Cut' } },
+    ]) {
+      expect(parseFixMatchRequest(body).ok).toBe(false);
+    }
+    expect(parseFixMatchRequest({ ...GOOD, clearEditions: false })).toMatchObject({
+      ok: true,
+      value: { clearEditions: false },
+    });
+  });
+
+  it('T-EDITION-005g preserves, merges, replaces and clears editions only as requested', async () => {
+    const previous = { name: 'Dune extended edition', kind: 'extended' };
+    const selected = { name: 'Dune uncut', kind: 'uncut' };
+    findTitleDetail.mockResolvedValue({
+      ...TITLE,
+      workIdentity: 'tmdb:movie:438631',
+      editionLabels: JSON.stringify([previous]),
+    });
+    getEditionLabels.mockResolvedValue([selected]);
+    for (const [body, expected] of [
+      [GOOD, [previous]],
+      [{ ...GOOD, edition: selected }, [previous, selected]],
+      [{ ...GOOD, edition: selected, clearEditions: true }, [selected]],
+      [{ ...GOOD, clearEditions: true }, []],
+    ] as const) {
+      expect((await post(body)).status).toBe(200);
+      expect(updateTitle).toHaveBeenLastCalledWith(
+        expect.anything(),
+        TITLE.id,
+        expect.objectContaining({ editionLabels: JSON.stringify(expected) }),
+        undefined,
+      );
+    }
+    findTitleDetail.mockResolvedValue({ ...TITLE, editionLabels: JSON.stringify([previous]) });
+    expect((await post(GOOD)).status).toBe(200);
+    expect(updateTitle).toHaveBeenLastCalledWith(
+      expect.anything(),
+      TITLE.id,
+      expect.objectContaining({ editionLabels: '[]' }),
+      undefined,
+    );
+  });
+
   it('T-FIX-010a · accepts a well-formed body and defaults confirmDuplicate', () => {
     expect(parseFixMatchRequest({ tmdbId: 438631, mediaType: 'movie' })).toEqual({
       ok: true,

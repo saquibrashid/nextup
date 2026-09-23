@@ -1460,6 +1460,7 @@ export async function searchRemovedListings(
 
 /** One row of the removed view, widened for `GET /api/removed` (§6.9). */
 export interface RemovedViewRow {
+  edition_labels?: string;
   listing_id: string;
   title_id: string;
   service: string;
@@ -1526,7 +1527,7 @@ export async function listRemovedView(
       l.listing_id, l.title_id, l.service, l.removed_at, l.date_added,
       l.removed_by_batch_id, l.removed_by_group_id,
       t.work_identity, t.match_state, t.tmdb_name, t.tmdb_media_type,
-      t.tmdb_release_year, t.tmdb_poster_path, t.raw_extracted_text
+      t.tmdb_release_year, t.tmdb_poster_path, t.raw_extracted_text, t.edition_labels
     FROM service_listing l
     JOIN title t ON t.owner_id = l.owner_id AND t.id = l.title_id
     WHERE l.owner_id = ${ownerId}
@@ -2059,6 +2060,7 @@ export async function updateCandidateDisposition(
     | 'correctedDisplayName'
     | 'correctedDisplayYear'
     | 'correctedDisplayPoster'
+    | 'correctedDisplayEdition'
   >,
   tx?: Db,
 ) {
