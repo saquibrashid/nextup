@@ -532,9 +532,7 @@ export function FilterBar({
                     maxName={RUNTIME_RANGE_MAX_NAME}
                     formatValue={(stop) => RUNTIME_RANGE_STOP_LABELS[stop] ?? ''}
                     speakValue={(stop) => RUNTIME_RANGE_STOP_SPOKEN[stop] ?? ''}
-                    move={(handle, requested) =>
-                      moveRuntimeRangeHandle(runtimeRange, handle, requested)
-                    }
+                    move={moveRuntimeRangeHandle}
                     onChange={(range) => {
                       update({ ...filters, runtimes: runtimeBucketsForRange(range) });
                     }}

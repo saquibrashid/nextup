@@ -23,6 +23,7 @@ export interface RangeSliderProps {
    * was refused. Handles never swap; the caller decides how far one may go.
    */
   readonly move: (
+    range: RangeSliderValue,
     handle: 'min' | 'max',
     requested: number,
   ) => { readonly range: RangeSliderValue; readonly clamped: boolean };
@@ -57,15 +58,27 @@ export function RangeSlider({
   const maxId = `${id}-max`;
   const descriptionId = `${id}-description`;
   const [notice, setNotice] = useState('');
+  // The owner's URL update can land after the next key repeat or pointer move;
+  // the pending range keeps the controlled inputs from snapping back meanwhile.
+  const [pending, setPending] = useState<RangeSliderValue | null>(null);
+  const [committed, setCommitted] = useState(value);
+  if (committed.min !== value.min || committed.max !== value.max) {
+    setCommitted(value);
+    setPending(null);
+  }
+  const shown = pending ?? value;
   const track = {
-    '--range-start': String(value.min / last),
-    '--range-end': String(value.max / last),
+    '--range-start': String(shown.min / last),
+    '--range-end': String(shown.max / last),
   } as CSSProperties;
 
   function handle(which: 'min' | 'max', requested: number): void {
-    const next = move(which, requested);
+    const next = move(shown, which, requested);
     setNotice(next.clamped ? clampMessages[which] : '');
-    if (next.range.min !== value.min || next.range.max !== value.max) onChange(next.range);
+    if (next.range.min !== shown.min || next.range.max !== shown.max) {
+      setPending(next.range);
+      onChange(next.range);
+    }
   }
 
   return (
@@ -79,13 +92,13 @@ export function RangeSlider({
         <div className="range-slider__value">
           <label htmlFor={minId}>{minLabel}</label>
           <output htmlFor={minId} data-testid="range-min-value">
-            {formatValue(value.min)}
+            {formatValue(shown.min)}
           </output>
         </div>
         <div className="range-slider__value range-slider__value--end">
           <label htmlFor={maxId}>{maxLabel}</label>
           <output htmlFor={maxId} data-testid="range-max-value">
-            {formatValue(value.max)}
+            {formatValue(shown.max)}
           </output>
         </div>
       </div>
@@ -97,9 +110,9 @@ export function RangeSlider({
           min={0}
           max={last}
           step={1}
-          value={value.min}
+          value={shown.min}
           aria-label={minName}
-          aria-valuetext={speakValue(value.min)}
+          aria-valuetext={speakValue(shown.min)}
           data-handle="min"
           onChange={(event) => {
             handle('min', Number(event.target.value));
@@ -111,9 +124,9 @@ export function RangeSlider({
           min={0}
           max={last}
           step={1}
-          value={value.max}
+          value={shown.max}
           aria-label={maxName}
-          aria-valuetext={speakValue(value.max)}
+          aria-valuetext={speakValue(shown.max)}
           data-handle="max"
           onChange={(event) => {
             handle('max', Number(event.target.value));

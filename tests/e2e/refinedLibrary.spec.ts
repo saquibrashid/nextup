@@ -976,6 +976,7 @@ async function handleCentre(slider: Locator, stop: number): Promise<{ x: number;
 }
 
 async function openRuntimeSlider(page: Page): Promise<{
+  trigger: Locator;
   panel: Locator;
   minimum: Locator;
   maximum: Locator;
@@ -986,6 +987,7 @@ async function openRuntimeSlider(page: Page): Promise<{
   const panel = dialog.locator('.filter-disclosure__panel:visible');
   await panel.locator('.range-slider').scrollIntoViewIfNeeded();
   return {
+    trigger,
     panel,
     minimum: panel.getByRole('slider', { name: 'Minimum runtime', exact: true }),
     maximum: panel.getByRole('slider', { name: 'Maximum runtime', exact: true }),
@@ -1002,7 +1004,7 @@ for (const width of [320, 640, 1280]) {
       page,
     }) => {
       await mountLibrary(page, { width });
-      const { panel, minimum, maximum } = await openRuntimeSlider(page);
+      const { trigger, panel, minimum, maximum } = await openRuntimeSlider(page);
       await horizontallyBounded(page, panel, width);
       const slider = panel.locator('.range-slider');
       await expect(slider.locator('label', { hasText: /^Min$/ })).toBeVisible();
@@ -1050,9 +1052,7 @@ for (const width of [320, 640, 1280]) {
       await page.mouse.move(to.x + 10, to.y, { steps: 8 });
       await page.mouse.up();
       await expect.poll(() => runtimeParams(page)).toEqual(['60-90', '90-120', 'over120']);
-      await expect(
-        page.getByRole('button', { name: 'Runtime Over 1h', exact: true }),
-      ).toBeVisible();
+      await expect(trigger).toHaveAccessibleName('Runtime Over 1h');
       await noOverflow(page);
       expect(
         (await new AxeBuilder({ page }).include('.range-slider').analyze()).violations,
