@@ -997,68 +997,74 @@ function runtimeParams(page: Page): string[] {
 }
 
 for (const width of [320, 640, 1280]) {
-  test(`T-RANGE-003a: runtime slider handles are usable targets by keyboard and pointer at ${String(width)}px`, async ({
-    page,
-  }) => {
-    await mountLibrary(page, { width });
-    const { panel, minimum, maximum } = await openRuntimeSlider(page);
-    await horizontallyBounded(page, panel, width);
-    const slider = panel.locator('.range-slider');
-    await expect(slider.locator('label', { hasText: /^Min$/ })).toBeVisible();
-    await expect(slider.locator('label', { hasText: /^Max$/ })).toBeVisible();
-    await expect(slider.getByTestId('range-min-value')).toHaveText('0m');
-    await expect(slider.getByTestId('range-max-value')).toHaveText('No limit');
+  describe(`Runtime range slider at ${String(width)}px`, () => {
+    test('T-RANGE-003a: runtime slider handles are usable targets by keyboard and pointer', async ({
+      page,
+    }) => {
+      await mountLibrary(page, { width });
+      const { panel, minimum, maximum } = await openRuntimeSlider(page);
+      await horizontallyBounded(page, panel, width);
+      const slider = panel.locator('.range-slider');
+      await expect(slider.locator('label', { hasText: /^Min$/ })).toBeVisible();
+      await expect(slider.locator('label', { hasText: /^Max$/ })).toBeVisible();
+      await expect(slider.getByTestId('range-min-value')).toHaveText('0m');
+      await expect(slider.getByTestId('range-max-value')).toHaveText('No limit');
 
-    // Each visible handle is the element under its own centre, so the other
-    // input spanning the same track cannot swallow the press.
-    for (const [locator, stop, handle] of [
-      [minimum, 0, 'min'],
-      [maximum, 5, 'max'],
-    ] as const) {
-      const centre = await handleCentre(locator, stop);
-      const hit = await page.evaluate(
-        ({ x, y }) => document.elementFromPoint(x, y)?.getAttribute('data-handle') ?? null,
-        centre,
+      // Each visible handle is the element under its own centre, so the other
+      // input spanning the same track cannot swallow the press.
+      for (const [locator, stop, handle] of [
+        [minimum, 0, 'min'],
+        [maximum, 5, 'max'],
+      ] as const) {
+        const centre = await handleCentre(locator, stop);
+        const hit = await page.evaluate(
+          ({ x, y }) => document.elementFromPoint(x, y)?.getAttribute('data-handle') ?? null,
+          centre,
+        );
+        expect(hit).toBe(handle);
+        const viewport = page.viewportSize();
+        expect(centre.x - 22).toBeGreaterThanOrEqual(0);
+        expect(centre.x + 22).toBeLessThanOrEqual((viewport?.width ?? 0) + 1);
+      }
+
+      await minimum.focus();
+      await page.keyboard.press('ArrowRight');
+      await page.keyboard.press('ArrowRight');
+      await expect.poll(() => runtimeParams(page)).toEqual(['60-90', '90-120', 'over120']);
+      await expect(minimum).toHaveAttribute('aria-valuetext', '1 hour');
+      await expect(slider.getByTestId('range-min-value')).toHaveText('1h');
+
+      await maximum.focus();
+      for (let step = 0; step < 5; step += 1) await page.keyboard.press('ArrowLeft');
+      await expect.poll(() => runtimeParams(page)).toEqual(['60-90']);
+      await expect(maximum).toHaveAttribute('aria-valuetext', '1 hour 30 minutes');
+      await expect(minimum).toHaveAttribute('aria-valuetext', '1 hour');
+      await expect(slider.getByTestId('range-notice')).toHaveText(
+        'The maximum cannot go below the minimum.',
       );
-      expect(hit).toBe(handle);
-      const viewport = page.viewportSize();
-      expect(centre.x - 22).toBeGreaterThanOrEqual(0);
-      expect(centre.x + 22).toBeLessThanOrEqual((viewport?.width ?? 0) + 1);
-    }
 
-    await minimum.focus();
-    await page.keyboard.press('ArrowRight');
-    await page.keyboard.press('ArrowRight');
-    await expect.poll(() => runtimeParams(page)).toEqual(['60-90', '90-120', 'over120']);
-    await expect(minimum).toHaveAttribute('aria-valuetext', '1 hour');
-    await expect(slider.getByTestId('range-min-value')).toHaveText('1h');
-
-    await maximum.focus();
-    for (let step = 0; step < 5; step += 1) await page.keyboard.press('ArrowLeft');
-    await expect.poll(() => runtimeParams(page)).toEqual(['60-90']);
-    await expect(maximum).toHaveAttribute('aria-valuetext', '1 hour 30 minutes');
-    await expect(minimum).toHaveAttribute('aria-valuetext', '1 hour');
-    await expect(slider.getByRole('status')).toHaveText('The maximum cannot go below the minimum.');
-
-    const from = await handleCentre(maximum, 3);
-    const to = await handleCentre(maximum, 5);
-    await page.mouse.move(from.x, from.y);
-    await page.mouse.down();
-    await page.mouse.move(to.x + 10, to.y, { steps: 8 });
-    await page.mouse.up();
-    await expect.poll(() => runtimeParams(page)).toEqual(['60-90', '90-120', 'over120']);
-    await expect(page.getByRole('button', { name: 'Runtime Over 1h', exact: true })).toBeVisible();
-    await noOverflow(page);
-    expect((await new AxeBuilder({ page }).include('.range-slider').analyze()).violations).toEqual(
-      [],
-    );
+      const from = await handleCentre(maximum, 3);
+      const to = await handleCentre(maximum, 5);
+      await page.mouse.move(from.x, from.y);
+      await page.mouse.down();
+      await page.mouse.move(to.x + 10, to.y, { steps: 8 });
+      await page.mouse.up();
+      await expect.poll(() => runtimeParams(page)).toEqual(['60-90', '90-120', 'over120']);
+      await expect(
+        page.getByRole('button', { name: 'Runtime Over 1h', exact: true }),
+      ).toBeVisible();
+      await noOverflow(page);
+      expect(
+        (await new AxeBuilder({ page }).include('.range-slider').analyze()).violations,
+      ).toEqual([]);
+    });
   });
 }
 
 test('T-RANGE-003b: a touch drag moves the minimum handle in the phone filter drawer', async ({
   page,
 }, testInfo) => {
-  test.skip(testInfo.project.name !== 'chromium', 'Touch is dispatched through Chromium CDP');
+  testInfo.skip(testInfo.project.name !== 'chromium', 'Touch is dispatched through Chromium CDP');
   await mountLibrary(page, { width: 390 });
   const { panel, minimum } = await openRuntimeSlider(page);
   await horizontallyBounded(page, panel, 390);

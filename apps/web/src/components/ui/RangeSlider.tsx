@@ -125,7 +125,7 @@ export function RangeSlider({
           {description}
         </p>
       )}
-      <p className="range-slider__notice" role="status">
+      <p className="range-slider__notice" role="status" data-testid="range-notice">
         {notice}
       </p>
     </fieldset>

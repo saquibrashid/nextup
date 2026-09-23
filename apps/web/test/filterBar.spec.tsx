@@ -1020,7 +1020,8 @@ describe('T-RANGE-002 the runtime range slider (#366)', () => {
     expect(runtimeHandle('min')).toHaveValue('2');
     expect(runtimeHandle('max')).toHaveValue('3');
     expect(new URLSearchParams(url().split('?')[1]).getAll('runtime')).toEqual(['60-90']);
-    const notice = within(screen.getByTestId('filter-runtime')).getByRole('status');
+    const notice = within(screen.getByTestId('filter-runtime')).getByTestId('range-notice');
+    expect(notice).toHaveAttribute('role', 'status');
     expect(notice).toHaveTextContent(RUNTIME_RANGE_MIN_CLAMPED);
     moveRuntime('max', 0);
     expect(runtimeHandle('min')).toHaveValue('2');
