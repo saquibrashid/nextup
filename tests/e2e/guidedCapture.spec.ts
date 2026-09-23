@@ -65,6 +65,8 @@ for (const width of [280, 390, 1440]) {
         if (!logo.name) throw new Error('Empty service name');
         const option = page.getByRole('radio', { name: logo.name, exact: true });
         await option.check();
+        await expect(page.getByTestId('service-step-panel-answer')).toHaveText(logo.name);
+        await page.getByTestId('service-step-panel-change').click();
         await expect(option).toBeChecked();
       }
       expect(requests.filter((url) => new URL(url).origin !== new URL(page.url()).origin)).toEqual(
