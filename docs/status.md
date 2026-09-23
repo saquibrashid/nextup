@@ -12,8 +12,8 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 | Status | Count |
 |---|---|
 | ⬜ todo | 0 |
-| 🚧 doing | 2 |
-| ✅ done | 235 |
+| 🚧 doing | 0 |
+| ✅ done | 237 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **240** |
@@ -22,9 +22,7 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 Not done, and every task they depend on is done.
 
-| Task | Size | Section |
-|---|---|---|
-| `TASK-241` | 2 agent-runs + 15 owner-review-minutes | Approved mockup composition follow-up, 2026-09-22 |
+_Nothing is ready: every unfinished task is waiting on a dependency._
 
 ## Waiting on the owner
 
@@ -36,11 +34,8 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-1 task cannot start yet.
+0 tasks cannot start yet.
 
-| Task | Waiting on |
-|---|---|
-| `TASK-242` | `TASK-241` |
 
 ## Done
 
@@ -281,3 +276,5 @@ Not done, and every task they depend on is done.
 | `TASK-238` | #327: directly linkable movie/show details with synopsis, cast/characters, directors/creators, artwork and existing actions. Strict display-only cache uses owner/provider-identity-scoped metadata writes and the 183-day lazy policy; unavailable/stale/unidentified states retain saved data. Additive nullable SQL JSON column, preserved query/layout return, existing consent/undo dialogs and stronger reachability/inference gates. `T-DETAIL-001` through `T-DETAIL-006`; unit/web coverage, real SQL and responsive Chromium/WebKit regressions. Separate PR; watched history and personal ratings remain outside scope. | `T-DETAIL-001`, `T-DETAIL-006` |
 | `TASK-239` | Owner-approved tile-first extraction/review: detect before reading, serial original-resolution crops, controlled input provenance, visible per-tile next steps including known titles, safe bulk policy and separate Apply summary. `T-AI-065`, `T-AI-066`, `T-AI-067`; one live read of the reported screenshot returned all five intended titles in five source regions, without the earlier stray OCR candidates (27.5 seconds, five calls per reader). This is a bounded recognition check, not a new corpus quality baseline. No migration, dependency or infrastructure change. | `T-AI-065`, `T-AI-066`, `T-AI-067` |
 | `TASK-240` | Owner mockup-led in-app design: desktop sidebar, navy/violet surfaces, local serif headings, full-width artwork, shared service-filter chips and refined upload/review grouping. Preserve all workflows, persistence, safety, evidence, attribution and accessibility; no scenic branding or fictional features. `T-MOCK-001`, `T-MOCK-002`, `T-MOCK-003`. | `T-MOCK-001`, `T-MOCK-002`, `T-MOCK-003` |
+| `TASK-241` | Compact artwork cards, grouped library header and import formatting preserve full titles, Compact, dates and safety. Corrected shared-grid action hit testing and desktop Escape focus; responsive search and nonzero-scroll modal regressions retain their behavioral assertions. `T-MOCK-004`, `T-MOCK-005`, `T-MOCK-006` and all twelve CI jobs passed on `dfd0c17` (run `35814917567`). | `T-MOCK-004`, `T-MOCK-005`, `T-MOCK-006` |
+| `TASK-242` | Authentic, provenance-verified local service artwork replaces approximations; ADR-0014 Revision 3 records sources and presentation changes. Native proportions, canonical names and removal fallback remain. `T-BRAND-001`, `T-BRAND-002`, `T-BRAND-003` and all twelve CI jobs passed on `dfd0c17` (run `35814917567`). No service requests, new dependency or backend change. | `T-BRAND-001`, `T-BRAND-002`, `T-BRAND-003` |
