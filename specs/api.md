@@ -8,6 +8,24 @@ sourceOfTruth: docs/PRD.md, docs/architecture.md, docs/adr/ADR-0002, ADR-0006
 
 # specs/api.md — nextup HTTP API
 
+## Display category (TASK-247, #364)
+
+`GET /api/titles` accepts repeated `category=movie|tv|comedy-show`, OR within
+category and AND with other filters. Existing `type=movie|tv` still filters
+canonical media type. List/detail items additionally expose `category`,
+`automaticCategory`, `categoryOverride` (nullable category values) and
+`categoryPending` (boolean). List responses expose `categoryPending` (number of
+eligible titles not yet classified or refreshed), zero when no category filter.
+Category-filtered reads attempt at most 25 metadata reads within the existing
+refresh budget before SQL pagination; they do not reclassify after selection.
+Cached results remain usable, with a visible incomplete-results warning.
+
+`PATCH /api/titles/:titleId/category` accepts exactly
+`{categoryOverride: null | "movie" | "tv" | "comedy-show"}` and returns
+`{titleId, categoryOverride}`. Owner scope, active visibility, suppression
+refusal, explicit-save/error/offline behavior follow watch preferences.
+`null` means Automatic, not an omitted edit. See `title-category.md`.
+
 ## Edition labels (TASK-244, 2026-09-23)
 
 `GET /api/tmdb/search` and review match/alternative objects may carry optional

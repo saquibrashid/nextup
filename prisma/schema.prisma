@@ -165,6 +165,8 @@ model Title {
   /// TMDB_METADATA_MAX_AGE_DAYS (183) — never the screenshot-retention
   /// constant, which is a different number for a different purpose (T-INV-008).
   tmdbFetchedAt DateTime? @map("tmdb_fetched_at") @db.DateTime2
+  tmdbComedyShow Boolean? @map("tmdb_comedy_show")
+  categoryCheckedAt DateTime? @map("category_checked_at") @db.DateTime2
 
   /// Display-only synopsis/credits, keyed by provider identity within the JSON.
   tmdbPresentation String? @map("tmdb_presentation") @db.NVarChar(Max)
@@ -215,6 +217,7 @@ model Title {
 
 /// Owner choices survive removal/reappearance. No title foreign key or expiry.
 model WatchPreference {
+  categoryOverride String? @map("category_override") @db.NVarChar(16)
   ownerId      String  @map("owner_id") @db.NVarChar(200)
   workIdentity String  @map("work_identity") @db.NVarChar(200)
   watching     Boolean @default(false, map: "df_watch_preference_watching")

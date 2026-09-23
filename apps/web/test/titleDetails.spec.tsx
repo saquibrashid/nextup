@@ -71,6 +71,76 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+describe('T-CATEGORY-004 category editor', () => {
+  it('T-CATEGORY-004a uses explicit save, restores Automatic, and Cancel writes nothing', async () => {
+    const { actions, reload } = mount({
+      category: 'comedy-show',
+      automaticCategory: 'comedy-show',
+    });
+    const save = vi
+      .spyOn(actions, 'updateTitleCategory')
+      .mockResolvedValue({ titleId: item.titleId, categoryOverride: 'movie' });
+    const trigger = screen.getByRole('button', { name: 'Title category' });
+    await userEvent.click(trigger);
+    const dialog = screen.getByRole('dialog', { name: 'Title category' });
+    expect(within(dialog).getByRole('radio', { name: 'Automatic (Comedy Show)' })).toBeChecked();
+    await userEvent.click(within(dialog).getByRole('radio', { name: 'Movie', exact: true }));
+    expect(save).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(save).not.toHaveBeenCalled();
+    expect(trigger).toHaveFocus();
+    await userEvent.click(trigger);
+    await userEvent.click(screen.getByRole('radio', { name: 'Movie', exact: true }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save category' }));
+    expect(save).toHaveBeenCalledWith(item.titleId, { categoryOverride: 'movie' });
+    expect(reload).toHaveBeenCalledOnce();
+    await userEvent.click(trigger);
+    await userEvent.click(screen.getByRole('button', { name: 'Save category' }));
+    expect(save).toHaveBeenLastCalledWith(item.titleId, { categoryOverride: null });
+  });
+  it('T-CATEGORY-004b keeps the draft after errors and prevents duplicate pending saves', async () => {
+    const { actions, reload } = mount({ categoryPending: true });
+    const save = vi
+      .spyOn(actions, 'updateTitleCategory')
+      .mockRejectedValueOnce(new Error('failed'));
+    await userEvent.click(screen.getByRole('button', { name: 'Title category' }));
+    expect(screen.getByText(/Catalogue classification is not available/)).toBeVisible();
+    await userEvent.click(screen.getByRole('radio', { name: 'Comedy Show', exact: true }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save category' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not save the category');
+    expect(screen.getByRole('radio', { name: 'Comedy Show', exact: true })).toBeChecked();
+    expect(reload).not.toHaveBeenCalled();
+    let complete: (() => void) | undefined;
+    save.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          complete = () => resolve({ titleId: item.titleId, categoryOverride: 'comedy-show' });
+        }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save category' }));
+    expect(screen.getByRole('button', { name: 'Saving...' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('dialog')).toBeVisible();
+    complete?.();
+    await waitFor(() => expect(reload).toHaveBeenCalledOnce());
+  });
+  it('T-CATEGORY-004c disables offline edits and discloses incomplete filtered results with manual retry', async () => {
+    mount({}, true);
+    expect(screen.getByRole('button', { name: 'Title category' })).toBeDisabled();
+    cleanup();
+    const retry = vi.fn();
+    render(
+      <MemoryRouter>
+        <ListPage items={[]} categoryPending={27} onRetry={retry} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/Category classification is still pending for 27/)).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: 'Retry classification' }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+});
+
 describe('T-DETAIL-004 detail presentation and owner actions', () => {
   it('T-DETAIL-004a: shows hierarchy, saved badges, synopsis, movie directors and expandable character credits', async () => {
     mount();

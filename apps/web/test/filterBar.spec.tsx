@@ -103,6 +103,29 @@ function url(): string {
 }
 
 describe('T-MOCK-001 service chips share the existing filter state', () => {
+  it('T-CATEGORY-004d preserves category URL selections, chips, back navigation and legacy type semantics', async () => {
+    const filters = parseFilters(
+      new URLSearchParams('category=comedy-show&category=tv&category=invalid&type=movie'),
+    );
+    expect(filters.categories).toEqual(['comedy-show', 'tv']);
+    expect(filters.types).toEqual(['movie']);
+    expect(isFiltered(filters)).toBe(true);
+    expect(activeFilterChips(filters)).toEqual(['Movies', 'Comedy Show', 'TV Show']);
+    expect(applyFilters(new URLSearchParams('sort=name'), filters).toString()).toBe(
+      'sort=name&type=movie&category=comedy-show&category=tv',
+    );
+    const user = userEvent.setup();
+    mount('/?category=comedy-show&sort=name');
+    await openFiltersWith(user);
+    await user.click(screen.getByRole('button', { name: /^Type / }));
+    expect(screen.getByRole('checkbox', { name: 'Comedy Show' })).toBeChecked();
+    await user.click(screen.getByRole('checkbox', { name: 'Movie', exact: true }));
+    expect(url()).toContain('category=movie');
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Back', exact: true }));
+    expect(url()).not.toContain('category=movie');
+    expect(url()).toContain('category=comedy-show');
+  });
   it('T-MOCK-001b: pointer focus does not collapse an inline group before the outer Done click', async () => {
     const user = userEvent.setup();
     mount('/');
@@ -769,19 +792,19 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
       const trigger = screen.getByRole('button', { name: /^Type / });
       trigger.focus();
       await user.keyboard('{Enter}');
-      const movies = screen.getByRole('checkbox', { name: 'Movies' });
+      const movies = screen.getByRole('checkbox', { name: 'Movie', exact: true });
       expect(movies).toHaveFocus();
       await user.keyboard(' ');
       expect(movies).toBeChecked();
       await user.keyboard('{Escape}');
       expect(panelTrigger).toHaveFocus();
       expect(screen.queryByRole('dialog', { name: FILTERS_PANEL_TITLE })).not.toBeInTheDocument();
-      expect(url()).toContain('type=movie');
+      expect(url()).toContain('category=movie');
       await openFiltersWith(user);
       const updatedTrigger = screen.getByRole('button', { name: /^Type / });
       updatedTrigger.focus();
       await user.keyboard(' ');
-      expect(screen.getByRole('checkbox', { name: 'Movies' })).toBeChecked();
+      expect(screen.getByRole('checkbox', { name: 'Movie', exact: true })).toBeChecked();
       await user.click(
         within(disclosurePanel(updatedTrigger)).getByRole('button', { name: 'Done' }),
       );
@@ -795,13 +818,15 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
       await openFiltersWith(user);
       const trigger = screen.getByRole('button', { name: /^Type / });
       await user.click(trigger);
-      screen.getByRole('checkbox', { name: 'Movies' }).focus();
+      screen.getByRole('checkbox', { name: 'Movie', exact: true }).focus();
       fireEvent.click(screen.getByRole('heading', { name: 'Filter your list' }));
       expect(trigger).toHaveAttribute('aria-expanded', 'false');
       expect(trigger).toHaveFocus();
       await user.click(trigger);
       await user.tab();
-      expect(screen.getByRole('checkbox', { name: 'TV series' })).toHaveFocus();
+      expect(screen.getByRole('checkbox', { name: 'TV Show' })).toHaveFocus();
+      await user.tab();
+      expect(screen.getByRole('checkbox', { name: 'Comedy Show' })).toHaveFocus();
       await user.tab();
       expect(within(disclosurePanel(trigger)).getByRole('button', { name: 'Done' })).toHaveFocus();
       await user.tab();

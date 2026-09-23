@@ -328,6 +328,8 @@ export function registerFixMatchRoutes(router: Router, getClient: () => TmdbClie
           tmdbReleaseYear: detail.releaseYear,
           tmdbRuntimeMinutes: detail.runtimeMinutes,
           tmdbGenres: JSON.stringify(detail.genres),
+          tmdbComedyShow: detail.comedyShow ?? null,
+          categoryCheckedAt: null,
           tmdbPosterPath: detail.posterPath,
           tmdbFetchedAt: new Date(),
           imdbId: detail.imdbId,

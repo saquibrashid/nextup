@@ -12,6 +12,21 @@ sourceOfTruth: docs/PRD.md (current story/AC rows, checked by T-META-001)
 
 # specs/testing.md — nextup
 
+### US-062 — Comedy Show category (TASK-247, #364)
+
+| AC | Level | Test IDs | Assertion |
+| --- | --- | --- | --- |
+| AC-1 | U/E | `T-CATEGORY-001`, `T-CATEGORY-002`, `T-CATEGORY-005` | Explicit performance keywords only; provider shapes, unknown evidence, derived boolean storage and visible category. |
+| AC-2 | U/I/E | `T-CATEGORY-001`, `T-CATEGORY-003`, `T-CATEGORY-004`, `T-CATEGORY-005` | Exact payload, owner isolation, explicit save/reset/cancel, error/pending/offline, reappearance, refresh and correction persistence. |
+| AC-3 | U/I/E | `T-CATEGORY-002`, `T-CATEGORY-003`, `T-CATEGORY-004`, `T-CATEGORY-005` | SQL filtering before cursors, OR/AND dimensions, hidden runtime count, legacy type URLs and unchanged identity/listing facts. |
+| AC-4 | U/I | `T-CATEGORY-003`, `T-CATEGORY-004` | Bounded 25-title pre-filter pass discovers old caches; missing evidence stays unknown, failed entries do not starve later titles; visible retry. |
+
+Collected locations: `packages/domain/test/titleCategory.spec.ts`;
+`apps/api/test/unit/titleCategory.spec.ts`, `watchPreferencesRoutes.spec.ts`,
+`services/tmdbRefresh.spec.ts`; `apps/api/test/integration/watchPreferences.spec.ts`;
+`apps/web/test/titleDetails.spec.tsx`, `filterBar.spec.tsx`;
+`tests/e2e/titleDetails.spec.ts`.
+
 **Current mapping, reconciled 2026-09-17:** 367 distinct story/AC keys across
 60 PRD stories, with 367 mapped keys. The original 39-story / 241-AC counts in
 dated revision history describe that revision, not the current release.

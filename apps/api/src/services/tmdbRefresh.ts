@@ -48,6 +48,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** The subset of a served row this refresh is allowed to see. */
 export interface RefreshableTitle {
+  tmdbComedyShow?: boolean | null;
   id: string;
   tmdbId: number | null;
   tmdbMediaType: string | null;
@@ -99,6 +100,7 @@ export function staleTitles(
 
 /** What a successful refresh wrote, so the caller can serve it immediately. */
 export interface RefreshedMetadata {
+  tmdbComedyShow?: boolean;
   tmdbName: string;
   tmdbReleaseYear: number | null;
   tmdbRuntimeMinutes: number | null;
@@ -189,6 +191,7 @@ export async function refreshStaleMetadata(
         // unnoticed. `imdbId` is validated separately below because it is a
         // cross-catalogue mapping, not TMDB descriptive metadata.
         const metadata = parseStoredTmdbMetadata({
+          ...(typeof detail.comedyShow === 'boolean' ? { comedyShow: detail.comedyShow } : {}),
           tmdbId: detail.tmdbId,
           mediaType: detail.mediaType,
           name: detail.name,
@@ -200,6 +203,7 @@ export async function refreshStaleMetadata(
         });
 
         const written: RefreshedMetadata = {
+          ...(metadata.comedyShow === undefined ? {} : { tmdbComedyShow: metadata.comedyShow }),
           tmdbName: metadata.name,
           tmdbReleaseYear: metadata.releaseYear,
           tmdbRuntimeMinutes: metadata.runtimeMinutes,

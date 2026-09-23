@@ -1863,6 +1863,22 @@ The reason full update shows already-known titles (REQ-057) is the product's mos
 
 **How REQ-036 (earliest date) and REQ-038 (newest-first) compose:** these two rules do not contradict each other — they compose coherently. REQ-036 fixes *which* date a Title sorts on (the earliest non-removed listing's date-added, stable regardless of later re-acquisitions on other services); REQ-038 fixes the *direction* the list is walked by default (descending — most recent sort-value first). Put together: **the list is ordered by when each work first entered the owner's world, most-recently-first.** Worked example: a work saved on Netflix in 2024 and added to Max yesterday sorts by its 2024 date (REQ-036) and stays low in the list — it does **not** jump to the top just because it was re-added on Max yesterday. "Newest-first" describes the walk direction over sort values that are themselves anchored to the earliest, not most recent, acquisition date.
 
+#### US-062 — Classify stand-up and live comedy performances
+
+**REQ-128 (`must`, owner-approved #364).** Comedy Show is a user-facing category
+for stand-up specials and live comedy performances, not ordinary comedy movies
+or sitcoms. Explicit TMDB keyword evidence assigns it automatically; the owner
+can choose Movie, TV Show, Comedy Show or Automatic in title details.
+
+| AC | Given / when | Then |
+| --- | --- | --- |
+| AC-1 | Explicit performance metadata is present | The display category is Comedy Show; Comedy genre alone never qualifies. |
+| AC-2 | Owner saves or clears an override | It persists by owner/work identity through removal/reappearance, with existing destination-wins semantics on match correction. Cancel/offline/error never reports a saved change. |
+| AC-3 | A category filter is selected | SQL filters before pagination; other filters/counts agree; canonical Movie/TV identity, dates, badges and runtime semantics remain unchanged. |
+| AC-4 | Existing cached titles have no category evidence or metadata fails | An access-triggered bounded refresh attempts classification before filtering; pending results are disclosed and manually retryable, without a scheduler. |
+
+Implementation contract: `specs/title-category.md`; named tests in `specs/testing.md`.
+
 ### 7.4 Closed enumeration of permitted mutations (REQ-041)
 
 **Owner-initiated operations that may change user-visible list state — this list is closed:**
@@ -1882,6 +1898,9 @@ The reason full update shows already-known titles (REQ-057) is the product's mos
     selected watch filters and Watch priority order, not membership, dates,
     metadata or badges. No automatic preference mutation or background process
     is introduced. `T-MUT-001` pins the extended closed enumeration.
+12. Saving or clearing an owner category override (US-062, REQ-128), synchronously
+    affecting display/category filters only. Canonical identity, membership,
+    dates and badges do not change.
 
 ~~Superseded: entries 1–8 only, before the manual list edits were added.~~ The
 amendment was made because a **false extraction** — a title the services never

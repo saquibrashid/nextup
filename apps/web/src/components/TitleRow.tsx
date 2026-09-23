@@ -84,6 +84,10 @@ export interface TitleBadge {
 
 /** An item of `GET /api/titles` (`specs/api.md` §6.2). */
 export interface TitleListItem {
+  readonly category?: import('@nextup/domain').TitleCategory | null;
+  readonly categoryOverride?: import('@nextup/domain').TitleCategory | null;
+  readonly automaticCategory?: import('@nextup/domain').TitleCategory | null;
+  readonly categoryPending?: boolean;
   readonly editionLabels?: readonly import('@nextup/domain').EditionLabel[];
   /** Optional for cached responses from before watch preferences shipped. */
   readonly watching?: boolean;
@@ -289,7 +293,11 @@ export function TitleRow({
                   {releaseYearText(item.releaseYear, (item.editionLabels?.length ?? 0) > 0)}
                 </span>
               )}
-              <span data-testid="media-type">{MEDIA_TYPE_LABELS[item.mediaType]}</span>
+              <span data-testid="media-type">
+                {item.category === 'comedy-show'
+                  ? 'Comedy Show'
+                  : MEDIA_TYPE_LABELS[item.category ?? item.mediaType]}
+              </span>
               {/*
             US-019 AC-6: an empty genre list renders NOTHING - not "Unknown",
             not "-". A placeholder would read as a fact about the work rather

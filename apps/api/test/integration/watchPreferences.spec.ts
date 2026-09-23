@@ -3,6 +3,7 @@ import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import type { WatchPreferences, WatchPriority } from '@nextup/domain';
+import { http, HttpResponse } from 'msw';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createApp } from '../../src/app.js';
@@ -46,11 +47,14 @@ let seq = 0;
 let msw: ReturnType<typeof tmdbMswServer>;
 
 interface Item extends WatchPreferences {
+  category?: string;
+  categoryOverride?: string | null;
   titleId: string;
   workIdentity: string;
   badges: { service: string }[];
 }
 interface ListBody {
+  categoryPending?: number;
   items: Item[];
   nextCursor: string | null;
   runtimeUnknownHidden: number | null;
@@ -218,6 +222,143 @@ afterEach(async () => {
   delete process.env['TMDB_API_KEY'];
 });
 afterAll(closeTestPrisma);
+
+describe('T-CATEGORY-003 real SQL category persistence and filtering', () => {
+  async function category(id: string, value: string | null, subject = SUBJECT) {
+    return request(`/titles/${id}/category`, 'PATCH', { categoryOverride: value }, subject);
+  }
+  async function classified(id: string, comedy: boolean, mediaType: 'movie' | 'tv' = 'movie') {
+    const title = await seed(id, { mediaType });
+    await testPrisma().title.updateMany({
+      where: { ownerId: owner, id },
+      data: { tmdbComedyShow: comedy },
+    });
+    return title;
+  }
+  it('T-CATEGORY-003a owner overrides survive refresh and reappearance without changing title or listing facts', async () => {
+    const title = await classified('special', true);
+    await seed('foreign', { owner: other, identity: title.workIdentity });
+    expect((await category('special', 'movie', OTHER_SUBJECT)).status).toBe(404);
+    const before = await testPrisma().title.findFirstOrThrow({
+      where: { ownerId: owner, id: title.id },
+    });
+    const listings = await testPrisma().serviceListing.findMany({
+      where: { ownerId: owner, titleId: title.id },
+    });
+    await patch(title.id, { watching: true, priority: 'someday' });
+    expect((await category(title.id, 'movie')).status).toBe(200);
+    expect(await detail(title.id)).toMatchObject({
+      category: 'movie',
+      watching: true,
+      priority: 'someday',
+    });
+    expect(
+      await testPrisma().title.findFirstOrThrow({ where: { ownerId: owner, id: title.id } }),
+    ).toEqual(before);
+    expect(
+      await testPrisma().serviceListing.findMany({ where: { ownerId: owner, titleId: title.id } }),
+    ).toEqual(listings);
+    await updateTitleMetadata(owner, title.id, {
+      tmdbName: before.tmdbName ?? '',
+      tmdbReleaseYear: null,
+      tmdbRuntimeMinutes: 100,
+      tmdbGenres: '["Comedy"]',
+      tmdbPosterPath: null,
+      imdbId: null,
+      tmdbFetchedAt: new Date(),
+      tmdbComedyShow: true,
+    });
+    expect((await detail(title.id)).category).toBe('movie');
+    expect((await category(title.id, null)).status).toBe(200);
+    expect((await detail(title.id)).category).toBe('comedy-show');
+    await category(title.id, 'tv');
+    await testPrisma().serviceListing.updateMany({
+      where: { ownerId: owner, titleId: title.id },
+      data: { state: 'removed', removedAt: new Date(), removalReason: 'service-removed' },
+    });
+    await testPrisma().title.updateMany({
+      where: { ownerId: owner, id: title.id },
+      data: { state: 'removed' },
+    });
+    await seed('reappeared', { identity: title.workIdentity });
+    expect(await detail('reappeared')).toMatchObject({ category: 'tv', categoryOverride: 'tv' });
+    expect(await findWatchPreference(other, title.workIdentity)).toBeNull();
+    await runInTransaction(async (tx) =>
+      carryWatchPreference(owner, title.workIdentity, 'tmdb:movie:999999', tx),
+    );
+    expect(await findWatchPreference(owner, 'tmdb:movie:999999')).toMatchObject({
+      categoryOverride: 'tv',
+      watching: true,
+    });
+  });
+  it('T-CATEGORY-003b category SQL filtering agrees across page cursors, mixed filters and hidden runtime count', async () => {
+    await classified('a-special', true);
+    await classified('b-special', true, 'tv');
+    await classified('c-comedy-film', false);
+    await classified('d-sitcom', false, 'tv');
+    await testPrisma().title.updateMany({
+      where: { ownerId: owner, id: 'b-special' },
+      data: { tmdbRuntimeMinutes: null },
+    });
+    const first = await list('?category=comedy-show&limit=1&sort=name&dir=asc');
+    expect(first.items.map((item) => item.titleId)).toEqual(['a-special']);
+    expect(first.categoryPending).toBe(0);
+    expect(first.nextCursor).not.toBeNull();
+    const second = await list(
+      `?category=comedy-show&limit=1&sort=name&dir=asc&cursor=${encodeURIComponent(first.nextCursor ?? '')}`,
+    );
+    expect(second.items.map((item) => item.titleId)).toEqual(['b-special']);
+    expect(second.nextCursor).toBeNull();
+    const runtime = await list('?category=comedy-show&runtime=90-120&service=netflix');
+    expect(runtime.items.map((item) => item.titleId)).toEqual(['a-special']);
+    expect(runtime.runtimeUnknownHidden).toBe(1);
+    expect((await list('?category=movie')).items.map((item) => item.titleId)).toEqual([
+      'c-comedy-film',
+    ]);
+    expect((await list('?category=tv')).items.map((item) => item.titleId)).toEqual(['d-sitcom']);
+    expect((await list('?type=tv')).items).toHaveLength(2);
+    expect((await list('?category=movie&category=comedy-show')).items).toHaveLength(3);
+    await category('d-sitcom', 'comedy-show');
+    expect((await list('?category=comedy-show')).items).toHaveLength(3);
+  });
+  it('T-CATEGORY-003c old fresh caches are classified before filtering in bounded retryable batches', async () => {
+    const seen: string[] = [];
+    msw.use(
+      http.get('https://api.themoviedb.org/3/movie/:id', ({ params, request: incoming }) => {
+        const id = String(params['id']);
+        seen.push(id);
+        expect(new URL(incoming.url).searchParams.get('append_to_response')).toContain('keywords');
+        return HttpResponse.json({
+          title: 'Stand-up special',
+          runtime: 70,
+          genres: [{ name: 'Comedy' }],
+          ...(id === '900000' ? {} : { keywords: { keywords: [{ name: 'stand-up comedy' }] } }),
+        });
+      }),
+    );
+    for (let i = 0; i < 27; i += 1) {
+      await seed(`old-${String(i).padStart(2, '0')}`, {
+        identity: `tmdb:movie:${String(900000 + i)}`,
+      });
+    }
+    const first = await list('?category=comedy-show');
+    expect(seen).toHaveLength(25);
+    expect(first.items).toHaveLength(24);
+    expect(first.categoryPending).toBe(3);
+    const second = await list('?category=comedy-show');
+    expect(second.items).toHaveLength(26);
+    expect(second.categoryPending).toBe(1);
+    expect(seen).toContain('900026');
+    expect(await testPrisma().title.count({ where: { ownerId: owner } })).toBe(27);
+    expect(
+      await testPrisma().title.findFirstOrThrow({ where: { ownerId: owner, id: 'old-00' } }),
+    ).toMatchObject({
+      tmdbComedyShow: null,
+      workIdentity: 'tmdb:movie:900000',
+      sortDateAdded: new Date('2026-01-01'),
+    });
+  });
+});
 
 describe('T-WATCH-001 mutation and canonical-work persistence on real SQL', () => {
   it('T-WATCH-001d defaults, partial edits, independence, idempotency, and two-owner isolation', async () => {

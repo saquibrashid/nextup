@@ -16,6 +16,8 @@
 
 import {
   MEDIA_TYPES,
+  TITLE_CATEGORIES,
+  type TitleCategory,
   RUNTIME_BUCKETS,
   SERVICES,
   WATCH_PRIORITIES,
@@ -150,6 +152,7 @@ const MAX_GENRE_LENGTH = 60;
 const GENRE_FORBIDDEN_CHARS = /[%_[\]"\\]/;
 
 export interface TitleListQuery {
+  categories: TitleCategory[];
   watching: boolean | undefined;
   priorities: WatchPriority[];
   q: string | undefined;
@@ -236,6 +239,11 @@ export function parseTitleListQuery(query: Request['query']): TitleListQuery {
   );
 
   const mediaTypes = requireEnumValues(toStringArray(query['type'], 'type'), 'type', MEDIA_TYPES);
+  const categories = requireEnumValues(
+    toStringArray(query['category'], 'category'),
+    'category',
+    TITLE_CATEGORIES,
+  );
 
   const genres = toStringArray(query['genre'], 'genre').map((genre) => {
     const trimmed = genre.trim();
@@ -288,6 +296,7 @@ export function parseTitleListQuery(query: Request['query']): TitleListQuery {
   const sort = (sortRaw as TitleSort | undefined) ?? 'dateAdded';
 
   return {
+    categories,
     watching: watchingRaw === undefined ? undefined : watchingRaw === 'true',
     priorities,
     q,

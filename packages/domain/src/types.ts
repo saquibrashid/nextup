@@ -98,6 +98,7 @@ export interface ServiceListing {
 
 /** `specs/data-model.md` §3.4. */
 export interface TmdbMetadata {
+  comedyShow?: boolean;
   tmdbId: number;
   mediaType: MediaType;
   name: string;

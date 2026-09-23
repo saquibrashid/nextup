@@ -296,6 +296,9 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
       total={unfiltered.length}
       totalIsLowerBound={totalIsLowerBound}
       runtimeUnknownHidden={runtimeUnknownHidden}
+      categoryPending={
+        titles.resource.kind === 'ok' ? (titles.resource.value.categoryPending ?? 0) : 0
+      }
       hasMore={paged.hasMore}
       loadingMore={paged.loadingMore}
       loadMoreFailed={paged.loadMoreFailed}

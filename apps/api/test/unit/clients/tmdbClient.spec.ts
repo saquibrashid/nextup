@@ -256,6 +256,7 @@ describe('T-TMDB-010 the TMDB client reads only what nextup is allowed to keep',
   it('T-TMDB-010m · US-007 AC-2 · a detail read returns type, year, runtime, genres, poster', async () => {
     const { client } = makeClient();
     expect(await client.getWork('movie', 438631)).toEqual({
+      comedyShow: null,
       tmdbId: 438631,
       mediaType: 'movie',
       name: 'Dune',
@@ -355,6 +356,7 @@ describe('T-TMDB-010 the client refuses to invent data from a malformed body', (
 
   it('T-TMDB-010x · a detail read survives absent, empty and junk optional fields', async () => {
     expect(await clientServing({}).getWork('tv', 77)).toEqual({
+      comedyShow: null,
       tmdbId: 77,
       mediaType: 'tv',
       name: '',
@@ -435,8 +437,9 @@ describe('T-TMDB-010 the client refuses to invent data from a malformed body', (
       const work = await client.getWork('tv', 123);
       expect(work.runtimeMinutes).toBe(43);
       expect(calls.map((url) => url.pathname)).toEqual(['/3/tv/123', '/3/tv/123/season/2']);
-      expect(calls[0]?.searchParams.get('append_to_response')).toBe('external_ids');
+      expect(calls[0]?.searchParams.get('append_to_response')).toBe('external_ids,keywords');
       expect(Object.keys(work).sort()).toEqual([
+        'comedyShow',
         'genres',
         'imdbId',
         'mediaType',

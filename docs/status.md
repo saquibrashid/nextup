@@ -12,17 +12,19 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 | Status | Count |
 |---|---|
 | ⬜ todo | 0 |
-| 🚧 doing | 0 |
+| 🚧 doing | 1 |
 | ✅ done | 241 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **244** |
+| **total** | **245** |
 
 ## Ready to start
 
 Not done, and every task they depend on is done.
 
-_Nothing is ready: every unfinished task is waiting on a dependency._
+| Task | Size | Section |
+|---|---|---|
+| `TASK-247` | 2 agent-runs + 10 owner-review-minutes | Approved Comedy Show category (#364) |
 
 ## Waiting on the owner
 

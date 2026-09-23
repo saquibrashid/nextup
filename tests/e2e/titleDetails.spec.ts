@@ -42,6 +42,7 @@ const item = {
 
 async function mock(page: Page) {
   const writes: string[] = [];
+  let categoryOverride: string | null = null;
   await page.route('https://image.tmdb.org/**', (route) =>
     route.fulfill({
       contentType: 'image/png',
@@ -56,6 +57,12 @@ async function mock(page: Page) {
     const path = new URL(request.url()).pathname;
     if (request.method() !== 'GET') writes.push(path);
     let json: unknown;
+    const saved = {
+      ...item,
+      category: categoryOverride ?? 'movie',
+      automaticCategory: 'movie',
+      categoryOverride,
+    };
     switch (path) {
       case '/api/me':
         json = {
@@ -69,10 +76,24 @@ async function mock(page: Page) {
         json = { batches: [] };
         break;
       case '/api/titles':
-        json = { items: [item], nextCursor: null, limit: 50, runtimeUnknownHidden: 0 };
+        json = {
+          items: new URL(request.url()).searchParams
+            .getAll('category')
+            .every((category) => category !== 'comedy-show' || saved.category === category)
+            ? [saved]
+            : [],
+          nextCursor: null,
+          limit: 50,
+          runtimeUnknownHidden: 0,
+        };
         break;
       case '/api/titles/detail-one':
-        json = item;
+        json = saved;
+        break;
+      case '/api/titles/detail-one/category':
+        categoryOverride = (request.postDataJSON() as { categoryOverride: string | null })
+          .categoryOverride;
+        json = { titleId: item.titleId, categoryOverride };
         break;
       case '/api/service-state':
         json = { services: [] };
@@ -91,6 +112,37 @@ async function mock(page: Page) {
 
 for (const width of [320, 768, 1440]) {
   describe(`details at ${width}px`, () => {
+    test('T-CATEGORY-005: explicit category save, reload, filtering and Automatic preserve the title', async ({
+      page,
+    }) => {
+      const writes = await mock(page);
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('/titles/detail-one');
+      await page.getByRole('button', { name: 'Title category', exact: true }).click();
+      const dialog = page.getByRole('dialog', { name: 'Title category' });
+      await dialog.getByRole('radio', { name: 'Comedy Show', exact: true }).check();
+      expect(writes).toEqual([]);
+      expect(
+        (await new AxeBuilder({ page }).include('[role="dialog"]').analyze()).violations,
+      ).toEqual([]);
+      await dialog.getByRole('button', { name: 'Save category' }).click();
+      await expect(dialog).toHaveCount(0);
+      await expect(page.locator('.title-details__eyebrow')).toContainText('Comedy Show');
+      await page.reload();
+      await expect(page.locator('.title-details__eyebrow')).toContainText('Comedy Show');
+      await page.goto('/?category=comedy-show');
+      await expect(page.locator('[data-testid="media-type"]')).toHaveText('Comedy Show');
+      await page.goto('/titles/detail-one');
+      await page.getByRole('button', { name: 'Title category', exact: true }).click();
+      await dialog.getByRole('radio', { name: 'Automatic (Movie)' }).check();
+      await dialog.getByRole('button', { name: 'Save category' }).click();
+      await expect(page.locator('.title-details__eyebrow')).toContainText('Movie');
+      await expect(page.getByRole('heading', { level: 1 })).toHaveText(item.name);
+      expect(writes).toEqual([
+        '/api/titles/detail-one/category',
+        '/api/titles/detail-one/category',
+      ]);
+    });
     test('T-DETAIL-006a: responsive details preserve complete text, accessible structure and modal context', async ({
       page,
     }, testInfo) => {

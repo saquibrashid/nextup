@@ -703,7 +703,14 @@ finished, so the exception cannot outlive its reason.
 | `TASK-244` | `done` | Owner-approved edition labels within canonical film entries. Verified typed catalogue aliases persist through review, correction, close and metadata refresh without changing identity, listings or dates. Explicit saved-label replacement and edition-aware offline recovery are covered by `T-EDITION-001` through `T-EDITION-005`. All 12 CI jobs passed on implementation head `ee85ff2` (run `35887909658`); validation used GitHub CI because the approved local npm proxy cannot restore ESLint 10.11.0. PR #368; merged and deployed as `b23bc0d`. |
 | `TASK-245` | `done` | PR #372. Owner-approved 75% artwork overlay, tighter catalog tracks, larger titles, two genres plus overflow, star rating, honest shortened Added label and translucent controls. Unified Watching/Up next/Normal/Someday across cards, editor, details and filtering without migration; legacy URLs, server ordering and stored preferences preserved. Artwork-specific text and control boundaries retain computed contrast. `T-WATCH-001`, `T-WATCH-003`, `T-LIST-018`, `T-UX-127`, `T-IMDB-008`, `T-UX-155`, `T-MOCK-004`, `T-POL-004` and complete owner journeys pass; all twelve CI gates green in run 35918395447. Separate follow-ups: navigation #369, toolbar #370, Add a title dialog #371. |
 | `TASK-246` | `done` | #366: the runtime filter becomes an accessible two-handle range slider whose stops are the existing bucket edges, so canonical `runtime=` tokens, API/SQL semantics, chips, reset, retained filters and hidden-unknown counts are unchanged. Visible Min/Max values with units, named handles with spoken values, 44px thumbs, keyboard stops, clamped (never swapped) handles and a disclosed, unrewritten gapped saved selection. `T-RANGE-001`, `T-RANGE-002`, `T-RANGE-003` plus existing `T-UX-123`/`T-UX-144` regressions. No API, migration, dependency or infrastructure change. |
+| `TASK-247` | `doing` | #364: owner-approved Comedy Show classification and override. Implementation and named tests are in progress; authoritative CI/release validation pending. |
 <!-- STATUS-LEDGER:END -->
+
+### Approved Comedy Show category (#364)
+
+| Task | Work | Size | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| TASK-247 | Classify stand-up specials/live comedy performances from explicit TMDB keywords with a persistent owner override; add category display/filter/editor without changing canonical Movie/TV identity, services or dates. Bounded on-access classification exposes incomplete results for old cached titles. Contract: `specs/title-category.md`. | 2 agent-runs + 10 owner-review-minutes | TASK-245, TASK-246 | `T-CATEGORY-001`, `T-CATEGORY-002`, `T-CATEGORY-003`, `T-CATEGORY-004`, `T-CATEGORY-005` |
 
 ### Approved runtime range slider, 2026-09-23
 
