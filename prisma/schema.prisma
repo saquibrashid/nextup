@@ -169,6 +169,9 @@ model Title {
   /// Display-only synopsis/credits, keyed by provider identity within the JSON.
   tmdbPresentation String? @map("tmdb_presentation") @db.NVarChar(Max)
 
+  /// Owner-confirmed edition labels; independent of refreshable TMDB metadata.
+  editionLabels String @default("[]", map: "df_title_editions") @map("edition_labels") @db.NVarChar(Max)
+
   /// The IMDb id from TMDB (REQ-094). NULL means TMDB has no IMDb mapping for
   /// this work, which is a real answer, not a missing read.
   /// ⚠ Read from `external_ids` first — a series carries it nowhere else
@@ -537,6 +540,7 @@ model ExtractionCandidate {
   correctedDisplayName   String? @map("corrected_display_name") @db.NVarChar(500)
   correctedDisplayYear   Int?    @map("corrected_display_year")
   correctedDisplayPoster String? @map("corrected_display_poster") @db.NVarChar(500)
+  correctedDisplayEdition String? @map("corrected_display_edition") @db.NVarChar(Max)
 
   /// Intra-batch overlap collapse (SD-02, `specs/data-model.md` §7.4).
   ///

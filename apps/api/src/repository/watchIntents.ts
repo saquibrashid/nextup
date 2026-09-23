@@ -57,6 +57,7 @@ export async function listWaitingIntents(
           tmdbId: true,
           tmdbMediaType: true,
           tmdbName: true,
+          editionLabels: true,
           tmdbReleaseYear: true,
           tmdbPosterPath: true,
           rawExtractedText: true,

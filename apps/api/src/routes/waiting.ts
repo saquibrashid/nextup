@@ -21,6 +21,7 @@
  */
 
 import { type Router } from 'express';
+import { parseEditionLabels, type EditionLabel } from '@nextup/domain';
 
 import { TmdbClient } from '../clients/tmdbClient.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
@@ -35,6 +36,7 @@ import { toIsoDate } from './titles.js';
 
 /** One row of the waiting view. Shaped field by field, never spread. */
 export interface WaitingItem {
+  editionLabels?: EditionLabel[];
   intentId: string;
   titleId: string;
   workIdentity: string;
@@ -124,6 +126,7 @@ export function registerWaitingRoutes(
         titleId: intent.titleId,
         workIdentity: intent.workIdentity,
         name: intent.title.tmdbName ?? intent.title.rawExtractedText ?? '',
+        editionLabels: parseEditionLabels(intent.title.editionLabels),
         releaseYear: intent.title.tmdbReleaseYear,
         posterPath: intent.title.tmdbPosterPath,
         discoveredAt: toIsoDate(intent.discoveredAt),

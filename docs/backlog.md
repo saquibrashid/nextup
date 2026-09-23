@@ -700,6 +700,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-241` | `done` | Compact artwork cards, grouped library header and import formatting preserve full titles, Compact, dates and safety. Corrected shared-grid action hit testing and desktop Escape focus; responsive search and nonzero-scroll modal regressions retain their behavioral assertions. `T-MOCK-004`, `T-MOCK-005`, `T-MOCK-006` and all twelve CI jobs passed on `dfd0c17` (run `35814917567`). |
 | `TASK-242` | `done` | Authentic, provenance-verified local service artwork replaces approximations; ADR-0014 Revision 3 records sources and presentation changes. Native proportions, canonical names and removal fallback remain. `T-BRAND-001`, `T-BRAND-002`, `T-BRAND-003` and all twelve CI jobs passed on `dfd0c17` (run `35814917567`). No service requests, new dependency or backend change. |
 | `TASK-243` | `done` | Keep Service updates above artwork and card controls and inside the viewport; add optional, persisted Confirm match acknowledgements for already-saved readings with secondary Change match. Preserve no-duplicate/no-required-acknowledgement behavior, pending-addition gates and separate Apply summary. `T-MOCK-005`, `T-LIB-004`, `T-AI-067`, `T-REV-016`, `T-REV-012`. Runtime-slider follow-up is tracked separately in #366. |
+| `TASK-244` | `doing` | Owner-approved edition labels within canonical film entries. Implementation and named regression coverage in progress; exact-lock validation through GitHub CI because the approved local npm proxy cannot restore ESLint 10.11.0. Not merged or deployed. |
 <!-- STATUS-LEDGER:END -->
 
 ### Approved service panel and review clarity fixes, 2026-09-23
@@ -707,6 +708,12 @@ finished, so the exception cannot outlive its reason.
 | Task | Work | Size | Depends on | Done when |
 | --- | --- | --- | --- | --- |
 | TASK-243 | Contain card stacking beneath library disclosures. Offer Confirm match and Change match for known readings in both tile-first and legacy review; use the existing persisted candidate decision without changing membership, date-added or close gates. Make the separate Apply changes step explicit. | 1 agent-run + 10 owner-review-minutes | TASK-241, TASK-239 | `T-MOCK-005` checks pointer hit targets, not visibility alone; `T-AI-067` and `T-REV-016` cover acknowledgement, failure, reload and optional completion; `T-REV-012` excludes known pending/confirmed/corrected readings from additions. |
+
+### Approved edition labels, 2026-09-23
+
+| Task | Work | Size | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| TASK-244 | Recognize catalogue-typed edition aliases from screenshot/search evidence and retain the owner-confirmed edition within the existing film entry. Keep canonical work identity, suppression, deduplication, dates and original-film metadata unchanged. Show edition labels and explicitly identify the original film's year in review, correction and saved-list/detail views; never infer an edition from the base title alone or erase labels during metadata refresh. | 2 agent-runs + 10 owner-review-minutes | TASK-239, TASK-238, TASK-243 | `T-EDITION-001` through `T-EDITION-005`; existing extraction, correction, close, refresh, identity, owner-scope and UI regressions |
 
 ### Approved authentic service artwork, 2026-09-23
 

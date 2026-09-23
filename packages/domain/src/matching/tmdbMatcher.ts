@@ -67,6 +67,7 @@ export const MATCH_ALTERNATIVES_LIMIT = 5;
  * store (REQ-029; `T-TMDB-013` rejects anything outside this set).
  */
 export interface TmdbSearchResult {
+  edition?: import('../editions.js').EditionLabel;
   tmdbId: number;
   mediaType: MediaType;
   name: string;
@@ -130,7 +131,8 @@ export function scoreTmdbResult(candidate: MatchableCandidate, result: TmdbSearc
   // The SAME normalisation on both sides — §4.2 step 1.
   const b = normaliseTitleText(result.name);
 
-  const base = a === b ? 1 : jaroWinkler(a, b);
+  const edition = result.edition === undefined ? null : normaliseTitleText(result.edition.name);
+  const base = a === b || a === edition ? 1 : jaroWinkler(a, b);
 
   const extractedYear = candidate.extractedYear;
   const tmdbYear = result.releaseYear;
@@ -155,6 +157,7 @@ export function matchCandidate(
 ): MatchOutcome {
   const scored: (MatchCandidate & { readonly providerIndex: number })[] = results
     .map((result, providerIndex) => ({
+      ...(result.edition === undefined ? {} : { edition: result.edition }),
       tmdbId: result.tmdbId,
       mediaType: result.mediaType,
       name: result.name,
@@ -183,7 +186,8 @@ export function matchCandidate(
   // `providerIndex` is an ordering device only — it never leaves this function,
   // so the shape returned to the API and the SPA is unchanged.
   const ranked: MatchCandidate[] = scored.map(
-    ({ tmdbId, mediaType, name, releaseYear, posterPath, score }) => ({
+    ({ tmdbId, mediaType, name, releaseYear, posterPath, score, edition }) => ({
+      ...(edition === undefined ? {} : { edition }),
       tmdbId,
       mediaType,
       name,

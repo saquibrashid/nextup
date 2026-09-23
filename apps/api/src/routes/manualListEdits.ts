@@ -37,6 +37,8 @@
  */
 
 import {
+  editionLabelSchema,
+  type EditionLabel,
   type MediaType,
   type Service,
   MEDIA_TYPES,
@@ -65,8 +67,10 @@ import {
 } from '../repository/ownerData.js';
 import { tmdbUnavailableAppError } from './tmdb.js';
 import { toIsoDate } from './titles.js';
+import { addTitleEdition, verifyEditionSelection } from '../services/titleEditions.js';
 
 export interface AddTitleRequest {
+  edition?: EditionLabel;
   tmdbId: number;
   mediaType: MediaType;
   service: Service;
@@ -98,6 +102,13 @@ export function parseAddTitleRequest(body: unknown): AddTitleParseResult {
     return { ok: false, message: 'That request body could not be read as an object.', details: {} };
   }
   const record = body as Record<string, unknown>;
+  const edition = editionLabelSchema.optional().safeParse(record['edition']);
+  if (!edition.success)
+    return {
+      ok: false,
+      message: '"edition" is not a valid edition label.',
+      details: { field: 'edition' },
+    };
 
   const tmdbId = record['tmdbId'];
   if (typeof tmdbId !== 'number' || !Number.isInteger(tmdbId) || tmdbId <= 0) {
@@ -132,6 +143,7 @@ export function parseAddTitleRequest(body: unknown): AddTitleParseResult {
       tmdbId,
       mediaType: mediaType as MediaType,
       service: service as Service,
+      ...(edition.data === undefined ? {} : { edition: edition.data }),
     },
   };
 }
@@ -201,6 +213,12 @@ export function registerManualListEditRoutes(router: Router, getClient: () => Tm
     }
 
     const today = dateOnlyUtc(new Date());
+    const edition = await verifyEditionSelection(
+      getClient(),
+      mediaType,
+      tmdbId,
+      parsed.value.edition,
+    );
 
     // ⚠ NEW TITLE vs NEW LISTING ON AN EXISTING TITLE — this rule is NOT
     // re-derived here. It is `batchClose`'s, transcribed: `findTitleByWork-
@@ -253,6 +271,8 @@ export function registerManualListEditRoutes(router: Router, getClient: () => Tm
       }
 
       const listingId = ulid();
+      if (edition !== undefined)
+        await addTitleEdition(ownerId, titleId, edition, tx, undefined, workIdentity);
       await createServiceListing(
         ownerId,
         {

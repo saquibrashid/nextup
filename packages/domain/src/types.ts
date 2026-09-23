@@ -362,6 +362,7 @@ export interface BoundingBox {
 }
 
 export interface MatchCandidate {
+  edition?: import('./editions.js').EditionLabel;
   tmdbId: number;
   mediaType: MediaType;
   name: string;

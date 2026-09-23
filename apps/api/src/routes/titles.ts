@@ -18,7 +18,12 @@
  * `nextCursor` that skips rows.
  */
 
-import { dateAddedLabel, watchPriorityRank, type WatchPriority } from '@nextup/domain';
+import {
+  dateAddedLabel,
+  parseEditionLabels,
+  watchPriorityRank,
+  type WatchPriority,
+} from '@nextup/domain';
 import { type Router } from 'express';
 
 import {
@@ -81,6 +86,7 @@ interface ListingRow {
 }
 
 interface TitleRow {
+  editionLabels?: string;
   watching?: boolean;
   priority?: WatchPriority;
   id: string;
@@ -163,6 +169,7 @@ export function toListItem(row: TitleRow, metadataStale = false): Record<string,
 
   return {
     titleId: row.id,
+    editionLabels: parseEditionLabels(row.editionLabels),
     watching: row.watching ?? false,
     priority: row.priority ?? 'normal',
     workIdentity: row.workIdentity,

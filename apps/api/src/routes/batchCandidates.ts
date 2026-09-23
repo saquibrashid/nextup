@@ -18,6 +18,7 @@
  * that either does nothing or corrupts an applied result.
  */
 
+import { verifyEditionSelection } from '../services/titleEditions.js';
 import {
   canBulkConfirm,
   normaliseTitleText,
@@ -191,6 +192,8 @@ async function applyCorrection(
     correctedDisplayName: patch.display?.name ?? null,
     correctedDisplayYear: patch.display?.releaseYear ?? null,
     correctedDisplayPoster: patch.display?.posterPath ?? null,
+    correctedDisplayEdition:
+      patch.display?.edition === undefined ? null : JSON.stringify(patch.display.edition),
     // ⚠ A corrected candidate is a TITLE by definition — the owner just named
     // it. Leaving a `chrome-suspected` or `unreadable-tile` verdict in place
     // would leave the item collapsed behind an expander after the owner fixed
@@ -435,6 +438,12 @@ export function registerBatchCandidateRoutes(
     }
 
     const candidateId = ulid();
+    const edition = await verifyEditionSelection(
+      getTmdbClient(),
+      entry.mediaType,
+      entry.tmdbId,
+      entry.edition,
+    );
     await createExtractionCandidate(ownerId, {
       id: candidateId,
       batchId: batch.id,
@@ -481,6 +490,7 @@ export function registerBatchCandidateRoutes(
           // 1 — and this is the ONE place a certainty of 1 is truthful: the
           // owner named the work. Nothing was matched.
           score: 1,
+          ...(edition === undefined ? {} : { edition }),
         },
       ]),
     });

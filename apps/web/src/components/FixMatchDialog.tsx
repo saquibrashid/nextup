@@ -1,4 +1,6 @@
 import { Dialog } from './ui/Dialog';
+import { EditionLabels } from './EditionLabels';
+import { releaseYearText } from '@nextup/domain';
 import { Input } from './ui/Input';
 /**
  * "Fix match" dialog (US-030, TASK-111).
@@ -41,6 +43,7 @@ export const TMDB_UNAVAILABLE_MESSAGE =
   "Couldn't reach TMDB. Try again in a moment. Nothing has changed.";
 
 export interface TmdbSearchResult {
+  edition?: import('@nextup/domain').EditionLabel;
   tmdbId: number;
   mediaType: 'movie' | 'tv';
   name: string;
@@ -53,6 +56,7 @@ export interface TmdbSearchResponse {
 }
 
 export interface FixMatchRequest {
+  edition?: import('@nextup/domain').EditionLabel;
   tmdbId: number;
   mediaType: 'movie' | 'tv';
   confirmDuplicate: boolean;
@@ -186,6 +190,7 @@ export function FixMatchDialog({
         tmdbId: selected.tmdbId,
         mediaType: selected.mediaType,
         confirmDuplicate,
+        ...(selected.edition === undefined ? {} : { edition: selected.edition }),
       }).then(
         (resp) => {
           setSuccessResult(resp);
@@ -276,8 +281,11 @@ export function FixMatchDialog({
                     />
                   )}
                   <span data-testid="result-name">{result.name}</span>
+                  {result.edition !== undefined && <EditionLabels labels={[result.edition]} />}
                   {result.releaseYear !== null && (
-                    <span data-testid="result-year">{result.releaseYear}</span>
+                    <span data-testid="result-year">
+                      {releaseYearText(result.releaseYear, result.edition !== undefined)}
+                    </span>
                   )}
                   <span data-testid="result-type">
                     {MEDIA_TYPE_LABELS[result.mediaType] ?? result.mediaType}
@@ -302,8 +310,12 @@ export function FixMatchDialog({
           <p>
             Match &ldquo;{name}&rdquo; to{' '}
             <strong data-testid="selected-name">{selected.name}</strong>
-            {selected.releaseYear !== null && <> ({selected.releaseYear})</>}?
+            {selected.releaseYear !== null && (
+              <> ({releaseYearText(selected.releaseYear, selected.edition !== undefined)})</>
+            )}
+            ?
           </p>
+          {selected.edition !== undefined && <EditionLabels labels={[selected.edition]} />}
           {/* §2.3: "Your Netflix badge and the date you added it … stay the same." */}
           {badges.length > 0 && (
             <p data-testid="preserved-notice">

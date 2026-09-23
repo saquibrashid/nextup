@@ -36,6 +36,12 @@
  */
 
 import { type MediaType, MEDIA_TYPES, suppressionIdFor, workIdentityForTmdb } from '@nextup/domain';
+import {
+  editionLabelSchema,
+  parseEditionLabels,
+  mergeEditionLabels,
+  type EditionLabel,
+} from '@nextup/domain';
 import { type Router } from 'express';
 
 import { type TmdbClient, TmdbWorkNotFoundError } from '../clients/tmdbClient.js';
@@ -54,8 +60,10 @@ import {
 import { toDisplaySnapshot } from './suppressions.js';
 import { tmdbUnavailableAppError } from './tmdb.js';
 import { toIsoDate } from './titles.js';
+import { verifyEditionSelection } from '../services/titleEditions.js';
 
 export interface FixMatchRequest {
+  edition?: EditionLabel;
   tmdbId: number;
   mediaType: MediaType;
   /** US-030 AC-4 — the owner has seen the duplicate warning and meant it. */
@@ -83,6 +91,13 @@ export function parseFixMatchRequest(body: unknown): FixMatchParseResult {
     return { ok: false, message: 'That request body could not be read as an object.', details: {} };
   }
   const record = body as Record<string, unknown>;
+  const edition = editionLabelSchema.optional().safeParse(record['edition']);
+  if (!edition.success)
+    return {
+      ok: false,
+      message: '"edition" is not a valid edition label.',
+      details: { field: 'edition' },
+    };
 
   const tmdbId = record['tmdbId'];
   if (typeof tmdbId !== 'number' || !Number.isInteger(tmdbId) || tmdbId <= 0) {
@@ -117,6 +132,7 @@ export function parseFixMatchRequest(body: unknown): FixMatchParseResult {
       tmdbId,
       mediaType: mediaType as MediaType,
       confirmDuplicate: confirmDuplicate === true,
+      ...(edition.data === undefined ? {} : { edition: edition.data }),
     },
   };
 }
@@ -254,6 +270,12 @@ export function registerFixMatchRoutes(router: Router, getClient: () => TmdbClie
       throw error;
     }
 
+    const edition = await verifyEditionSelection(
+      getClient(),
+      mediaType,
+      tmdbId,
+      parsed.value.edition,
+    );
     // SD-06 — read the OLD identity's suppression before the write replaces it.
     const carried = identityChanged
       ? await findActiveSuppression(ownerId, previousWorkIdentity)
@@ -276,6 +298,12 @@ export function registerFixMatchRoutes(router: Router, getClient: () => TmdbClie
         {
           workIdentity,
           matchState: 'matched',
+          editionLabels: JSON.stringify(
+            mergeEditionLabels(
+              identityChanged ? [] : parseEditionLabels(current.editionLabels),
+              edition === undefined ? [] : [edition],
+            ),
+          ),
           // §6.3 step 4 — the extracted text was evidence for a match that is
           // now settled. Kept on an unmatched row so the owner can still see
           // what was read; cleared here so a later reader cannot mistake it

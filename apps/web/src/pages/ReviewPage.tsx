@@ -637,6 +637,7 @@ export function ReviewPage({
         disposition={candidate.disposition}
         controlled={controlled}
         variant={variant}
+        alternatives={candidate.alternatives}
         onKeep={onKeepU}
         onDiscard={onDiscardU}
         onMatch={onMatchU}

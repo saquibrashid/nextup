@@ -29,7 +29,14 @@
 
 import { useId, useRef, useState, type JSX } from 'react';
 
-import { SERVICE_LABELS, dateAddedLabel, removedOnLabel, type Service } from '@nextup/domain';
+import {
+  SERVICE_LABELS,
+  dateAddedLabel,
+  removedOnLabel,
+  releaseYearText,
+  type Service,
+} from '@nextup/domain';
+import { EditionLabels } from '../components/EditionLabels';
 
 import {
   OFFLINE_DISABLED_REASON,
@@ -395,7 +402,12 @@ function RemovedRow({
         <span className="removed-row__name" data-testid="removed-name">
           {item.name}
         </span>
-        {item.releaseYear !== null && <span data-testid="removed-year">{item.releaseYear}</span>}
+        <EditionLabels labels={item.editionLabels} />
+        {item.releaseYear !== null && (
+          <span data-testid="removed-year">
+            {releaseYearText(item.releaseYear, (item.editionLabels?.length ?? 0) > 0)}
+          </span>
+        )}
         <span className="removed-row__service" data-testid="removed-service">
           {SERVICE_LABELS[item.service]}
         </span>

@@ -18,6 +18,7 @@
  */
 
 import { MEDIA_TYPES, type MediaType } from './enums.js';
+import { editionLabelSchema, type EditionLabel } from './editions.js';
 
 /** The three sections whose items `confirm-all` may act on (§6.19). */
 export const CONFIRMABLE_SECTIONS = ['additions', 'unmatched', 'alreadyOnYourList'] as const;
@@ -44,6 +45,7 @@ export type SettableDisposition = (typeof SETTABLE_DISPOSITIONS)[number];
  * solely from `tmdbId` + `mediaType`; nothing here reaches it (SD-05).
  */
 export interface CorrectedDisplay {
+  edition?: EditionLabel;
   name: string;
   releaseYear: number | null;
   posterPath: string | null;
@@ -242,7 +244,17 @@ function parseCorrectedDisplay(
   const releaseYear = record['correctedReleaseYear'];
   const posterPath = record['correctedPosterPath'];
 
-  if (name === undefined && releaseYear === undefined && posterPath === undefined) {
+  const edition = editionLabelSchema.optional().safeParse(record['correctedEdition']);
+  if (!edition.success)
+    return reject('"correctedEdition" is not a valid edition label.', {
+      field: 'correctedEdition',
+    });
+  if (
+    name === undefined &&
+    releaseYear === undefined &&
+    posterPath === undefined &&
+    edition.data === undefined
+  ) {
     return { ok: true, value: null };
   }
 
@@ -283,6 +295,7 @@ function parseCorrectedDisplay(
     ok: true,
     value: {
       name,
+      ...(edition.data === undefined ? {} : { edition: edition.data }),
       releaseYear: typeof releaseYear === 'number' ? releaseYear : null,
       posterPath: typeof posterPath === 'string' && posterPath !== '' ? posterPath : null,
     },
@@ -291,6 +304,7 @@ function parseCorrectedDisplay(
 
 /** One §6.20 manual entry: a work the extraction missed entirely. */
 export interface ManualEntry {
+  edition?: EditionLabel;
   tmdbId: number;
   mediaType: MediaType;
 }
@@ -337,7 +351,17 @@ export function parseManualEntry(body: unknown): ParseResult<ManualEntry> {
     return reject('"name" is read from TMDB, not supplied.', { field: 'name' });
   }
 
-  return { ok: true, value: { tmdbId, mediaType: mediaType as MediaType } };
+  const edition = editionLabelSchema.optional().safeParse(record['edition']);
+  if (!edition.success)
+    return reject('"edition" is not a valid edition label.', { field: 'edition' });
+  return {
+    ok: true,
+    value: {
+      tmdbId,
+      mediaType: mediaType as MediaType,
+      ...(edition.data === undefined ? {} : { edition: edition.data }),
+    },
+  };
 }
 
 /** Parses one §6.19 body. */

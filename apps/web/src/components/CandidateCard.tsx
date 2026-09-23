@@ -37,6 +37,8 @@ import {
 } from '../copy';
 import { TMDB_IMAGE_BASE } from './TitleRow';
 import { SourceTile } from './SourceTile';
+import { releaseYearText } from '@nextup/domain';
+import { EditionLabels } from './EditionLabels';
 
 const MEDIA_TYPE_LABELS: Record<string, string> = { movie: 'Film', tv: 'Series' };
 
@@ -252,7 +254,10 @@ export function CandidateCard({
               : 'Catalogue suggestion'}
             : {match.name}
             {' ('}
-            {[match.releaseYear, MEDIA_TYPE_LABELS[match.mediaType]]
+            {[
+              releaseYearText(match.releaseYear, match.edition !== undefined),
+              MEDIA_TYPE_LABELS[match.mediaType],
+            ]
               .filter((part) => part !== null)
               .join(' · ')}
             {')'}
@@ -261,12 +266,16 @@ export function CandidateCard({
         )}
         {match !== null && !weakSuggestion && (
           <p className="candidate-card__meta" data-testid="candidate-meta">
-            {[match.releaseYear, MEDIA_TYPE_LABELS[match.mediaType] ?? match.mediaType]
+            {[
+              releaseYearText(match.releaseYear, match.edition !== undefined),
+              MEDIA_TYPE_LABELS[match.mediaType] ?? match.mediaType,
+            ]
               .filter((part) => part !== null && part !== undefined)
               .join(' · ')}
           </p>
         )}
 
+        {match?.edition !== undefined && <EditionLabels labels={[match.edition]} />}
         {chips.length > 0 && (
           <div className="candidate-card__signals">
             {chips.map((chip) => (

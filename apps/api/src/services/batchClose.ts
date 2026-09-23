@@ -96,6 +96,7 @@ import {
 } from '../repository/ownerData.js';
 import { satisfyWaitingIntents } from '../repository/watchIntents.js';
 import { canTransition, loadOwnedBatch, transitionBatch } from './batchLifecycle.js';
+import { applyConfirmedEditions } from './titleEditions.js';
 
 export interface CloseResult {
   batchId: string;
@@ -544,6 +545,7 @@ async function closeDiscoveryBatch(
     }
 
     await setCandidateResolvedTitles(ownerId, resolvedTitleLinks, tx);
+    await applyConfirmedEditions(ownerId, batch.id, candidates, tx);
 
     // ── US-041 AC-2 — DISCARD SUPPRESSES ──────────────────────────────────
     //
@@ -881,6 +883,7 @@ export async function closeBatch(
     // the title — so the link is derivable in one hop. Writing it twice would
     // create a second thing that can disagree with the first.
     await setCandidateResolvedTitles(ownerId, resolvedTitleLinks, tx);
+    await applyConfirmedEditions(ownerId, batch.id, candidates, tx);
 
     // ── graduation (TASK-189, US-043 AC-3) ──────────────────────────────
     //
