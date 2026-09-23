@@ -1416,18 +1416,34 @@ for (const width of [390, 1280, 1440]) {
         expect(Math.abs(search.y - filters.y)).toBeLessThan(1);
         expect(quickBox.x + quickBox.width).toBeLessThanOrEqual(actions.x);
         await quick.getByRole('button', { name: /^Type/ }).click();
-        await quick.getByRole('checkbox', { name: 'Movies', exact: true }).check();
+        await quick.getByRole('checkbox', { name: 'Movies', exact: true }).click();
+        await expect(quick.getByRole('checkbox', { name: 'Movies', exact: true })).toBeChecked();
         await expect(page).toHaveURL(/type=movie/);
         await page.getByTestId('filters-trigger').click();
-        const dialog = page.getByRole('dialog', { name: 'Filters', exact: true });
+        const dialog = page.getByRole('dialog', { name: 'Filter your list', exact: true });
         await dialog.getByRole('button', { name: /^Type/ }).click();
         await expect(dialog.getByRole('checkbox', { name: 'Movies', exact: true })).toBeChecked();
-        await dialog.getByRole('checkbox', { name: 'Movies', exact: true }).uncheck();
+        await dialog.getByRole('checkbox', { name: 'Movies', exact: true }).click();
+        await expect(
+          dialog.getByRole('checkbox', { name: 'Movies', exact: true }),
+        ).not.toBeChecked();
         await dialog.getByRole('button', { name: 'Close filters', exact: true }).click();
         await quick.getByRole('button', { name: /^Type/ }).click();
         await expect(
           quick.getByRole('checkbox', { name: 'Movies', exact: true }),
         ).not.toBeChecked();
+        await page.keyboard.press('Escape');
+        await quick.getByRole('button', { name: /^Watching/ }).click();
+        await quick.getByRole('radio', { name: 'Not watching', exact: true }).check();
+        await page.getByTestId('filters-trigger').click();
+        await dialog.getByRole('button', { name: /^Watching/ }).click();
+        await expect(
+          dialog.getByRole('radio', { name: 'Not watching', exact: true }),
+        ).toBeChecked();
+        await dialog.getByRole('button', { name: 'Close filters', exact: true }).click();
+        await quick.getByRole('button', { name: /^Watching/ }).click();
+        await expect(quick.getByRole('radio', { name: 'Not watching', exact: true })).toBeChecked();
+        await quick.getByRole('radio', { name: 'All titles', exact: true }).check();
         await page.keyboard.press('Escape');
       } else {
         await expect(quick).toBeHidden();

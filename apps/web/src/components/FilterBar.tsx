@@ -493,7 +493,7 @@ export function FilterBar({
                       <label key={option.label}>
                         <Input
                           type="radio"
-                          name="watching"
+                          name={`watching-${headingId}`}
                           checked={filters.watching === option.value}
                           onChange={() => update({ ...filters, watching: option.value })}
                         />

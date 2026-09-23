@@ -26,7 +26,7 @@ jobs:
         run: npx vitest run --project web listSurface listSearch filterBar stylesheet --maxWorkers=2
       - name: Browser composition
         if: ${{ !cancelled() }}
-        run: npx playwright test refinedLibrary.spec.ts guidedCapture.spec.ts --grep "T-MOCK|T-POL-004|T-POL-003c|T-UX-155c|T-UX-141e|T-UX-156i" --workers=2
+        run: npx playwright test refinedLibrary.spec.ts guidedCapture.spec.ts --grep "T-MOCK|T-POL-004|T-POL-003c|T-UX-155c|T-UX-141e|T-UX-156i" --workers=2 --retries=0
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: ${{ !cancelled() }}
         with:
@@ -34,4 +34,5 @@ jobs:
           path: |
             test-results/
             playwright-report/
+            apps/web/dist/
           retention-days: 3
