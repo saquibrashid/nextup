@@ -40,6 +40,7 @@ import {
   type BatchMode,
   type Service,
 } from '@nextup/domain';
+import { CaptureProgress } from '../components/CaptureProgress';
 
 import {
   MODE_APPEND_ONLY_LABEL,
@@ -140,6 +141,7 @@ export function UploadPage({
     <>
       <h1>Upload screenshots</h1>
       <p className="upload-flow__intro">{UPLOAD_INTRO}</p>
+      <CaptureProgress stage="prepare" />
 
       <UploadStep
         index={1}
@@ -169,7 +171,7 @@ export function UploadPage({
                 ⚠ The name stays VISIBLE here. This is the screen where
                 picking the wrong service attributes a whole capture to the
                 wrong list, so the mark assists recognition and never replaces
-                the word — and three of the eight have no mark at all.
+                the word. All eight use the shared, attributed mark register.
               */}
               <ServiceMark service={candidate} />
             </label>

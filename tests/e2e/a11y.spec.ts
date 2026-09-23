@@ -450,7 +450,9 @@ test.describe('T-A11Y-001 — the 320 px floor', () => {
     await expectNoHorizontalOverflow(page);
   });
 
-  test('T-A11Y-001b: every interactive control meets the 44 px touch floor', async ({ page }) => {
+  test('T-A11Y-001b: every visible interactive control meets the 44 px touch floor', async ({
+    page,
+  }) => {
     await stubApi(page);
     await page.setViewportSize(NARROW);
     await page.goto('/');
@@ -459,6 +461,7 @@ test.describe('T-A11Y-001 — the 320 px floor', () => {
     const small = await page.evaluate(() => {
       const nodes = [...document.querySelectorAll('.tap-target')];
       return nodes
+        .filter((node) => node.getClientRects().length > 0)
         .map((node) => {
           const rect = node.getBoundingClientRect();
           return { text: node.textContent?.trim() ?? '', w: rect.width, h: rect.height };
@@ -466,6 +469,10 @@ test.describe('T-A11Y-001 — the 320 px floor', () => {
         .filter((box) => box.w < 44 || box.h < 44);
     });
     expect(small).toEqual([]);
+    await expect(page.getByRole('group', { name: 'Quick filters' })).toBeHidden();
+    await expect(page.getByRole('search', { name: 'Search your list' })).toBeHidden();
+    await expect(page.getByTestId('list-search-trigger')).toBeVisible();
+    await expect(page.getByTestId('filters-trigger')).toBeVisible();
   });
 
   test('T-A11Y-001e: the open row menu keeps every menu item at the 44 px touch floor', async ({

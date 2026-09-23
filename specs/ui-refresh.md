@@ -203,6 +203,39 @@ Existing accessibility, narrow reflow, reduced-motion and workflow tests remain
 mandatory. The earlier fixed 192x288 grid-artwork size is superseded by full-width
 2:3 artwork, not by cropping or fixed-height text.
 
+### 2.5 Compact composition, library header and import — TASK-241
+
+The owner chose compact composition **with full titles and content-sized growth**,
+not uniform-height cards with truncated titles. This supersedes the stacked
+poster/solid-panel arrangement of section 2.4, not its safety or content guarantees.
+
+- From 640px, Grid is one artwork-led tile: retain the 2:3 image, put the title
+  over a dark gradient, share a row between genres and the real IMDb rating,
+  and group service badges with the verbatim "Added to nextup" date in a compact
+  footer. Preserve missing-data states, watched state, full titles, genre expansion,
+  active genres, all badges and correction/recovery actions. Neighbouring cards
+  retain aligned content tracks; long content may increase the row height.
+- Priority has a small visual pill over the artwork but a target of at least
+  44px. No hover-only actions. The gradient must maintain text contrast even
+  over white artwork. Compact and narrow phone cards remain unchanged.
+- At wide desktop sizes, group the heading/count, visible title search,
+  filter trigger, view switch and sort as a compact header. Service chips and
+  available filter controls follow without oversized separators or empty rows.
+  Keep service updates and Add title accessible and separated from resume banners.
+  No actor search, rating/year filters or other unsupported mockup features.
+  Phone controls retain accessible disclosure/reflow and remembered query/layout.
+- Import uses full-width service tiles, grouped mode cards and a single
+  screenshot-intake area with a quieter summary. Retain progressive required
+  choices, change/undo paths, all eight services, early file/paste/drop intake,
+  PNG/JPEG/HEIC/HEIF, truthful saved/local state, and explicit submission.
+  Capture-stage vocabulary and safety are unchanged; no default selections.
+
+`T-MOCK-004` measures card density, overlay geometry, complete text, shared rows,
+footer alignment, growth and actions. `T-MOCK-005` covers responsive header
+geometry, search/filter behavior and preserved browsing state. `T-MOCK-006`
+covers import geometry, full service choices and all intake affordances.
+Existing keyboard, reduced-motion, contrast and narrow-reflow checks still apply.
+
 ## 3. The five defects — these are BUGS, not design
 
 ⚠ **These are separated from the design sections on purpose.** Bundled into a
@@ -278,7 +311,7 @@ not announce "middot" between every fact.
 | Test id | Asserts |
 |---|---|
 | `T-UX-102` | The wrapping metadata row has CSS-generated separators; decoration is not concatenated into accessible text. |
-| `T-UX-103` | Direct children follow year → type → runtime → genres; absent genres invent no placeholder. |
+| `T-UX-103` | Metadata facts follow year → type → runtime → genres, including within the facts grouping wrapper; absent genres invent no placeholder. |
 
 ### REQ-107 (`must`) — the `⋮` control is a button, not a full-height column
 

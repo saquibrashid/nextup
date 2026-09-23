@@ -239,15 +239,16 @@ export function TitleRow({
             <h2 className="title-row__name" data-testid="title-name">
               {titleLink ?? item.name}
             </h2>
-            {item.watching === true && <span className="title-row__watching">Watching</span>}
+            <span className="title-row__status">
+              {item.watching === true && <span className="title-row__watching">Watching</span>}
 
-            {unmatched && (
-              <span className="title-row__chip" data-testid="unidentified-chip">
-                Unidentified
-              </span>
-            )}
+              {unmatched && (
+                <span className="title-row__chip" data-testid="unidentified-chip">
+                  Unidentified
+                </span>
+              )}
 
-            {/*
+              {/*
           `specs/ux-states.md` §2.8 (`T-UX-017`). Rendered PER ROW, from the
           per-item flag, because the refresh is per item: one title can miss
           the 5 s budget on a page where every other title refreshed fine, and
@@ -266,14 +267,15 @@ export function TitleRow({
           it would be noise. It is ordinary text, present in the accessibility
           tree in reading order, which is what "subtle" means here.
         */}
-            {item.metadataStale === true && (
-              <span
-                className="title-row__chip title-row__chip--stale"
-                data-testid="metadata-stale-chip"
-              >
-                {METADATA_STALE_CHIP}
-              </span>
-            )}
+              {item.metadataStale === true && (
+                <span
+                  className="title-row__chip title-row__chip--stale"
+                  data-testid="metadata-stale-chip"
+                >
+                  {METADATA_STALE_CHIP}
+                </span>
+              )}
+            </span>
           </div>
 
           <p className="title-row__meta" data-testid="title-meta">
@@ -281,14 +283,15 @@ export function TitleRow({
             REQ-106 — year and type precede runtime and wrapping genres.
             It previously rendered type-then-year, which is why the owner's
             screenshot read `TV2004Animation`. The separators themselves are
-            CSS-generated (`.title-row__meta > span + span::before`) so they
+            CSS-generated (`.title-row__facts > span + span::before`) so they
             stay out of the row's accessible name.
           */}
-            {item.releaseYear !== null && (
-              <span data-testid="release-year">{item.releaseYear}</span>
-            )}
-            <span data-testid="media-type">{MEDIA_TYPE_LABELS[item.mediaType]}</span>
-            {/*
+            <span className="title-row__facts">
+              {item.releaseYear !== null && (
+                <span data-testid="release-year">{item.releaseYear}</span>
+              )}
+              <span data-testid="media-type">{MEDIA_TYPE_LABELS[item.mediaType]}</span>
+              {/*
             US-019 AC-6: an empty genre list renders NOTHING - not "Unknown",
             not "-". A placeholder would read as a fact about the work rather
             than an absence of data, and the owner cannot tell the difference.
@@ -296,7 +299,7 @@ export function TitleRow({
             compact presentation too, including the `+0` it newly makes
             possible (REQ-112, `T-UX-102b`).
           */}
-            {/*
+              {/*
             REQ-119 - runtime precedes genres; unknown runtime is named rather than omitted.
 
             ⚠ THIS DELIBERATELY DIFFERS FROM THE GENRE BRANCH DIRECTLY ABOVE,
@@ -312,8 +315,9 @@ export function TitleRow({
             for why a bare `45m` beside a nine-season series is a false
             statement rather than a terse one.
           */}
-            <span className="title-row__runtime" data-testid="runtime">
-              {formatRuntime(item.runtimeMinutes, item.mediaType) ?? RUNTIME_UNKNOWN_LABEL}
+              <span className="title-row__runtime" data-testid="runtime">
+                {formatRuntime(item.runtimeMinutes, item.mediaType) ?? RUNTIME_UNKNOWN_LABEL}
+              </span>
             </span>
             <GenreChips genres={item.genres} activeGenres={activeGenres} />
           </p>
@@ -334,7 +338,9 @@ export function TitleRow({
                 onWatchPreferences(item);
               }}
             >
-              {WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}
+              <span className="title-row__priority">
+                {WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}
+              </span>
               <ChevronIcon />
             </Button>
           ) : (
@@ -373,30 +379,32 @@ export function TitleRow({
           </p>
         )}
 
-        {/*
+        <div className="title-row__footer">
+          {/*
           Verbatim from the API. Rendered only when the API supplied one: with
           no listings there is no date, and inventing "Added today" here would
           state something false about when the work entered nextup.
         */}
-        {item.dateAddedLabel !== null && (
-          <p className="title-row__date" data-testid="date-added-label">
-            {item.dateAddedLabel}
-          </p>
-        )}
+          {item.dateAddedLabel !== null && (
+            <p className="title-row__date" data-testid="date-added-label">
+              {item.dateAddedLabel}
+            </p>
+          )}
 
-        <ul className="title-row__badges" data-testid="badges">
-          {item.badges.map((badge) => (
-            // The mark carries recognition on screen; the service name is
-            // still in the DOM, visually hidden, so the badge keeps its
-            // accessible name and stays findable by in-page text search
-            // (§2.2a, ADR-0014). Colour is never the sole carrier of meaning.
-            <li key={badge.listingId} data-testid={`badge-${badge.service}`}>
-              <Badge>
-                <ServiceMark service={badge.service} nameHidden />
-              </Badge>
-            </li>
-          ))}
-        </ul>
+          <ul className="title-row__badges" data-testid="badges">
+            {item.badges.map((badge) => (
+              // The mark carries recognition on screen; the service name is
+              // still in the DOM, visually hidden, so the badge keeps its
+              // accessible name and stays findable by in-page text search
+              // (§2.2a, ADR-0014). Colour is never the sole carrier of meaning.
+              <li key={badge.listingId} data-testid={`badge-${badge.service}`}>
+                <Badge>
+                  <ServiceMark service={badge.service} nameHidden />
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
 
       <div className="title-row__actions">

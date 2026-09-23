@@ -273,10 +273,13 @@ export function ListPage({
 
   return (
     <>
-      <div className="library-heading">
-        <h1>Your list</h1>
-        <FreshnessStrip services={serviceState} />
-        {/*
+      <div className="library-browser">
+        <div className="library-heading">
+          <h1>Your list</h1>
+        </div>
+        <div className="library-actions">
+          <FreshnessStrip services={serviceState} />
+          {/*
         US-047 — the standalone add, ABOVE the list and outside every
         loading/failure branch.
 
@@ -288,89 +291,91 @@ export function ListPage({
         ⚠ Disabled offline, with the reason stated as text, like every other
         mutating control (§2.12).
       */}
-        {addWired && (
-          <>
-            <Button
-              variant="secondary"
-              data-testid="add-title-open"
-              disabled={offline}
-              onClick={(event) => {
-                event.currentTarget.focus({ preventScroll: true });
-                setDialog({ kind: 'add' });
-              }}
-            >
-              {ADD_TITLE_LABEL}
-            </Button>
-            {offline && (
-              <span className="offline-reason" data-testid="add-title-offline-reason">
-                {OFFLINE_DISABLED_REASON}
-              </span>
-            )}
-            {/*
+          {addWired && (
+            <>
+              <Button
+                variant="secondary"
+                data-testid="add-title-open"
+                disabled={offline}
+                onClick={(event) => {
+                  event.currentTarget.focus({ preventScroll: true });
+                  setDialog({ kind: 'add' });
+                }}
+              >
+                {ADD_TITLE_LABEL}
+              </Button>
+              {offline && (
+                <span className="offline-reason" data-testid="add-title-offline-reason">
+                  {OFFLINE_DISABLED_REASON}
+                </span>
+              )}
+              {/*
             ⚠ RENDERED HERE, BESIDE ITS BUTTON, AND NOT INSIDE THE LIST BRANCH
             BELOW. The button is outside every loading/failure branch, so a
             dialog rendered inside one would open from a screen where the list
             read failed and then not exist. `onAdded` fires on SUCCESS, not on
             close: closing is not evidence anything was written.
           */}
-            {dialog !== null && dialog.kind === 'add' && (
-              <AddTitleDialog
-                searchTmdb={searchFn}
-                addTitle={addFn}
-                onClose={closeAll}
-                {...(onReload === undefined ? {} : { onAdded: onReload })}
-              />
-            )}
-          </>
-        )}
-      </div>
-      {/*
+              {dialog !== null && dialog.kind === 'add' && (
+                <AddTitleDialog
+                  searchTmdb={searchFn}
+                  addTitle={addFn}
+                  onClose={closeAll}
+                  {...(onReload === undefined ? {} : { onAdded: onReload })}
+                />
+              )}
+            </>
+          )}
+        </div>
+        {/*
         ⚠ OUTSIDE the loading/failure branches below. The notice reports a
         write that has already happened; hiding it because `GET /api/titles`
         failed would take away the undo at exactly the moment the owner cannot
         see what the batch did.
       */}
-      {applied !== undefined && (
-        <BatchAppliedNotice
-          applied={applied}
-          undoRemovalGroup={onUndoRemovalGroup ?? rejectMissingHandler}
-          undoBatch={onUndoBatch ?? rejectMissingHandler}
-        />
-      )}
-      {/*
+        {applied !== undefined && (
+          <BatchAppliedNotice
+            applied={applied}
+            undoRemovalGroup={onUndoRemovalGroup ?? rejectMissingHandler}
+            undoBatch={onUndoBatch ?? rejectMissingHandler}
+          />
+        )}
+        {/*
         The strip is informational and NEVER blocks the list (§2.1), so it is a
         sibling of the list rather than a gate in front of it: whatever it is
         showing, the rows below render unchanged.
       */}
 
-      {/*
+        {/*
         §2.12 (`T-UX-023`) — the rows the owner is looking at were loaded
         before the connection went, and they say so. The banner in `AppShell`
         states the fact; this states its consequence for what is on screen.
       */}
-      {offline && items.length > 0 && (
-        <p className="offline-cached-note" data-testid="list-cached-note">
-          {OFFLINE_SHOWING_CACHED}
-        </p>
-      )}
+        {offline && items.length > 0 && (
+          <p className="offline-cached-note" data-testid="list-cached-note">
+            {OFFLINE_SHOWING_CACHED}
+          </p>
+        )}
 
-      {(!loadFailed || offline) && !(offline && items.length === 0) && (
-        <div className="list-controls" data-testid="list-controls">
-          <FilterBar
-            genres={genres}
-            shown={shown}
-            total={unfilteredTotal}
-            totalIsLowerBound={totalIsLowerBound}
-            runtimeUnknownHidden={runtimeUnknownHidden}
-            countPending={loading}
-          />
-          <SortControl />
-          <div className="list-secondary-controls">
-            <ListViewControl view={view} onChange={setView} />
-            <ListSearch />
+        {(!loadFailed || offline) && !(offline && items.length === 0) && (
+          <div className="list-controls" data-testid="list-controls">
+            <FilterBar
+              genres={genres}
+              shown={shown}
+              total={unfilteredTotal}
+              totalIsLowerBound={totalIsLowerBound}
+              runtimeUnknownHidden={runtimeUnknownHidden}
+              countPending={loading}
+            />
+            <SortControl />
+            <FilterBar inline genres={genres} shown={shown} total={unfilteredTotal} />
+            <div className="list-secondary-controls">
+              <ListViewControl view={view} onChange={setView} />
+              <ListSearch />
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {loadFailed && !offline ? (
         // ⚠ The filter bar is NOT rendered over a failed read. Its live count

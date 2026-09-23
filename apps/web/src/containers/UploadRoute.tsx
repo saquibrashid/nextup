@@ -58,7 +58,6 @@ import { useCaptureLifetime } from '../lib/useCaptureLifetime';
 import { Button } from '../components/ui/Button';
 import { Fieldset } from '../components/ui/Fieldset';
 import { UploadStep } from '../components/UploadStep';
-import { CaptureProgress } from '../components/CaptureProgress';
 export { rejectionsFromError } from '../components/RejectionList';
 
 export interface UploadRouteProps {
@@ -362,7 +361,6 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
       {!showCheckpoint && conflictMessage !== null && <p role="status">{conflictMessage}</p>}
       {!showCheckpoint && checkpointError !== null && <p role="alert">{checkpointError}</p>}
       <div hidden={showCheckpoint}>
-        <CaptureProgress stage="prepare" />
         <div className="upload-flow__layout">
           <Fieldset
             legend="Prepare screenshots"

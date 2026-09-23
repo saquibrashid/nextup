@@ -1,100 +1,93 @@
 # Bundled service marks — attribution and terms
 
-The marks in this directory have **two different origins, and the difference
-matters more than anything visible on screen**:
+All eight marks use authentic vendored geometry, not hand-drawn approximations.
+ADR-0014 Revision 3 records the owner's request to use the actual service icons.
+Nothing is fetched at build time or runtime: Vite's `?inline` imports compile
+the local SVGs into data URLs.
 
-- **Five are vendored** — CC0, copied verbatim, re-derivable from a pinned
-  commit.
-- **Three are drawn here** — Prime Video, Disney+ and Peacock, authored at the
-  owner's direction on 2026-09-17 because no CC0 artwork exists for them.
+## Simple Icons: four retained marks
 
-Nothing is fetched at runtime. See `docs/adr/ADR-0014-service-marks.md` for the
-decision; this file is the record of _what_ was taken, _from where_, and _what
-was not taken_.
+Project: [Simple Icons](https://github.com/simple-icons/simple-icons).
+Licence: **CC0 1.0 Universal**, which covers the files, not trademark rights.
+Pinned commit: `f2365d33171bd1897a41aaae6c0b6e795bcc0483`.
+Source: `icons/<slug>.svg`; path data is unchanged from the previously reviewed
+components. The upstream disclaimer remains applicable.
 
-## Vendored (five)
+| Component           | Asset                | Slug            |
+| ------------------- | -------------------- | --------------- |
+| `NetflixMark`       | `netflix.svg`        | `netflix`       |
+| `HboMaxMark`        | `max.svg`            | `hbomax`        |
+| `ParamountPlusMark` | `paramount-plus.svg` | `paramountplus` |
+| `StarzMark`         | `starz.svg`          | `starz`         |
 
-## Source
+The `hbomax` asset is the streaming Max wordmark. Simple Icons' `max` slug is
+unrelated music software. Upstream streaming-service source URLs are deliberately
+not reproduced: the outbound-host gate has no documentation exception.
 
-|                            |                                                                           |
-| -------------------------- | ------------------------------------------------------------------------- |
-| **Project**                | [Simple Icons](https://github.com/simple-icons/simple-icons)              |
-| **Licence of the project** | CC0 1.0 Universal (public domain dedication)                              |
-| **Pinned commit**          | `f2365d33171bd1897a41aaae6c0b6e795bcc0483` (2026-09-17)                   |
-| **Taken**                  | `icons/<slug>.svg` path data only, verbatim                               |
-| **Disclaimer read**        | <https://github.com/simple-icons/simple-icons/blob/develop/DISCLAIMER.md> |
+## Wikimedia Commons: four replacement marks
 
-## What is bundled
+Each file's Commons image-info metadata was checked on 2026-09-23:
+`LicenseShortName=Public domain`, `Copyrighted=False`, category **PD-textlogo**,
+and restriction **trademarked**. This records Commons' copyright assessment,
+not a trademark licence or a representation that the brands endorsed this use.
+Only Wikimedia hosts were contacted; no brand website or press kit was fetched.
+The downloaded bytes were verified against the source SHA-1 before conversion.
 
-| Component           | Slug            | Title upstream | Brand source recorded upstream         |
-| ------------------- | --------------- | -------------- | -------------------------------------- |
-| `NetflixMark`       | `netflix`       | Netflix        | the Netflix brand-assets site          |
-| `HboMaxMark`        | `hbomax`        | HBO Max        | the Max 2025 logo on Wikimedia Commons |
-| `AppleTvMark`       | `appletv`       | Apple TV       | the Apple TV logo file on Wikipedia    |
-| `ParamountPlusMark` | `paramountplus` | Paramount+     | the Paramount brand site               |
-| `StarzMark`         | `starz`         | STARZ          | the STARZ site                         |
+| Component        | Commons file page                                                                                                                        | File revision (UTC) | Source SHA-1                               |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | ------------------------------------------ |
+| `PrimeVideoMark` | [Prime Video logo (2024).svg](<https://commons.wikimedia.org/wiki/File:Prime_Video_logo_(2024).svg>)                                     | 2024-07-31 09:06:19 | `53e6b00e5c9b9a64871eb57217f1f52747a22a3e` |
+| `DisneyPlusMark` | [Disney+ logo.svg](https://commons.wikimedia.org/wiki/File:Disney%2B_logo.svg)                                                           | 2025-05-09 23:14:55 | `7cbe03a01075d65033a465de975b61c9ce8dd87b` |
+| `PeacockMark`    | [NBCUniversal Peacock Logo (2020–2026).svg](<https://commons.wikimedia.org/wiki/File:NBCUniversal_Peacock_Logo_(2020%E2%80%932026).svg>) | 2026-03-07 09:11:51 | `f56ef08a5b2f23e556c9f441911b697d64ea9f45` |
+| `AppleTvMark`    | [Apple TV Plus Logo.svg](https://commons.wikimedia.org/wiki/File:Apple_TV_Plus_Logo.svg)                                                 | 2023-09-09 23:17:32 | `15156b3ef18d33361fa789beb0b2d858c5d38234` |
 
-⚠ **The upstream `source` URLs are described, not linked, on purpose.** Three of
-the five point at a streaming service's own domain, and `T-SEC-001` fails the
-build on a streaming-service host appearing anywhere in the tree — the gate that
-keeps this product from ever addressing a streaming service (NFR-010, product
-invariant 10). The exact URLs live in the pinned upstream `_data/simple-icons.json`
-and are recoverable from the commit above; putting them back here trips the gate
-and, worse, teaches the next reader that the rule has exceptions.
+Prime Video, Disney+ and Peacock replace the original approximations. Apple TV+
+replaces the earlier Apple TV glyph so the actual plus sign is included.
+The Peacock wordmark/dots and Max wordmark follow the supplied reference; they
+are recorded versions, not a claim to automatically track future rebrands.
 
-> ⚠ **The `max` slug upstream is Cycling '74 Max, the music software — not HBO
-> Max.** The slug that matches this product's `max` service is **`hbomax`**.
-> The names collide exactly where a careless vendoring would not notice, and
-> the wrong glyph would have shipped looking perfectly deliberate.
+## Presentation changes
 
-## Drawn here (three)
+- All path geometry is preserved. XML declarations, editor comments, redundant
+  dimensions and unused namespaces are removed; SVGs retain their viewBoxes.
+- Disney's script/plus, Peacock's lettering and Apple TV+ are white for the navy
+  interface. Disney's original blue gradient arc and Peacock's six coloured dots
+  remain. Apple's black-only style/title wrapper is removed.
+- Prime Video keeps its source blue. Netflix uses red `#e50914`. Max, Paramount+
+  and Starz use the reference's light-on-dark blue treatments (`#4b7bff`,
+  `#4b91ff`, `#86c9ed`). These are presentation tints, not claimed official
+  palette specifications or brand-approved variants.
+- Max and Starz viewBoxes remove empty vertical padding without clipping paths:
+  `0 8.7 24 6.6` and `0 9.2 24 5.6`. No path coordinates are changed.
+- Images use `object-fit: contain`, never stretching or cropping. Brand colour
+  is confined to these assets; it does not style controls, selection or text.
 
-**Owner-directed 2026-09-17.** Having seen the mixed presentation on the live
-list, the owner asked for the three remaining services to get a mark too.
+## Bundled SHA-256
 
-| Component        | Service     | What it is                                            |
-| ---------------- | ----------- | ----------------------------------------------------- |
-| `PrimeVideoMark` | Prime Video | A curved arrow, in the spirit of the Amazon smile     |
-| `DisneyPlusMark` | Disney+     | A `D+` monogram — **not** the Disney script or castle |
-| `PeacockMark`    | Peacock     | A six-feather fan of rotated ellipses                 |
+Hashes are over UTF-8 with LF line endings. `T-BRAND-001g` pins these bytes;
+changing an asset requires a provenance update, not just a new expected image.
 
-These are **geometric approximations, drawn from scratch to be recognisable at
-16 px** — they are not traces, and no press-kit asset, SVG or image file was
-obtained from any brand to make them. That is deliberate on two counts: the
-artwork is the part carrying the brands' protection, and fetching anything from
-a streaming service's own domain is forbidden outright here (product invariant
-10, enforced by `T-SEC-001`).
+| Asset                | SHA-256                                                            |
+| -------------------- | ------------------------------------------------------------------ |
+| `prime-video.svg`    | `4d2874553d1df490cdec9694c761f7cb2389d7fab417466885bcdadcfcf1a49a` |
+| `disney-plus.svg`    | `435b6cc464dac531962f7f098fa8ac3241e4e2ee1035645a2624337f15e59d17` |
+| `peacock.svg`        | `f974ecfa0b93fdfae2629c40a797471cf6989b32d4e7bb23f5a99a21e2453a66` |
+| `apple-tv-plus.svg`  | `00e64e52cc4eb88999740d5abdcdf3e413031e43da9176254ab91bc7f1ee993b` |
+| `netflix.svg`        | `7160e35c5d7d90dfb9c94ce6f3ca62da154f52c90159da3eb64fb55323d1605c` |
+| `max.svg`            | `347eddb7773c13331e0cc198b061db50d15e0a111b62eb3facbcf490e32164ca` |
+| `paramount-plus.svg` | `cd22e71f842bc000b7a277932aae279f2824840bd70589306ffb2b6bc0703dc5` |
+| `starz.svg`          | `85f8f5b6b901c789b56cafc6a66a520a89ca543cd7494a49dd702164ff87dee2` |
 
-⚠ **Their position is weaker than the vendored five, and the owner accepted
-that knowingly.** A CC0 file has an unambiguous copyright story; an
-approximation of a protected mark does not. If tightening this is ever wanted,
-the fix is **deletion**, not improvement — a more faithful drawing is a worse
-position, not a better one.
+## Terms and removal
 
-⚠ **Do not "upgrade" a drawn mark by tracing the real logo.** It reproduces
-precisely what the approximation avoids, and every test in this repository
-would stay green.
+The marks remain their owners' trademarks. Use is nominative identification in
+a private, single-owner, non-commercial watchlist. No affiliation, sponsorship
+or endorsement is claimed. Copyright status does not grant trademark rights.
+This is a provenance record, not legal advice.
 
-~~Superseded 2026-09-17: "**Prime Video, Disney+ and Peacock have no mark**,
-and that is a decision. … Those three services render their **word mark**,
-which is what all eight rendered before this change."~~ Retained because it
-still explains why these three differ in kind from the other five.
+If an asset must be withdrawn, remove its component and `SERVICE_MARKS` entry.
+`ServiceMark` then displays the canonical service name, even when `nameHidden`
+was requested. `T-BRAND-002c` preserves that removal path.
 
-## Terms, stated plainly
-
-- **CC0 covers the SVG files** taken from the vendored source. It does not, and
-  cannot, transfer any rights in the underlying trademarks. It says nothing at
-  all about the three marks drawn here, which are original artwork owned by
-  this project but depict marks that are not.
-- **The marks remain the property of their respective owners.** They are used
-  here **nominatively** — to identify which streaming service a title is saved
-  on, in a private single-owner watchlist. No affiliation, sponsorship or
-  endorsement is claimed or implied.
-- **Rendering is monochrome and inherits `currentColor`.** No brand colour is
-  reproduced, and the marks are never used as a logo of this product.
-- **Nothing is ever fetched from a streaming service** (product invariant 10).
-  The paths are compiled into the bundle; the app makes no request for them, at
-  build time or at run time.
-- Should a brand ask for its mark not to be used here, deleting its component
-  and its `SERVICE_MARKS` entry is sufficient — the word-mark fallback then
-  renders, and nothing else changes.
+~~Revision 2 used five CC0 marks and three original approximations, all
+monochrome. Revision 3 replaces those approximations with verified public-domain
+artwork and explicitly records the presentation changes above.~~

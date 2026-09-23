@@ -118,7 +118,8 @@ describe('T-UI-010 - the row shows poster, name, type, year, date-added label an
 
     expect(within(row).getByTestId('poster-placeholder')).toBeInTheDocument();
     expect(within(row).queryByTestId('poster')).toBeNull();
-    expect(row.querySelectorAll('img')).toHaveLength(0);
+    expect(row.querySelectorAll('img:not(.brand-mark)')).toHaveLength(0);
+    expect(within(row).getByTestId('badges').querySelectorAll('img.brand-mark')).toHaveLength(2);
   });
 
   it('T-UI-010e renders one row with two badges for a work saved on both services', () => {
@@ -423,14 +424,12 @@ describe('REQ-119 - the runtime is on the row (`specs/ui-refresh.md` §5a)', () 
   it('T-UX-121c the runtime precedes the wrapping genre names', () => {
     const row = renderRow({});
     const meta = within(row).getByTestId('title-meta');
-    // ⚠ `:scope > *`, NOT `querySelectorAll('span')`. Since REQ-120 the genre
-    // slot is a `<span>` wrapping one nested `<span>` per chip, so an unscoped
-    // sweep returns the chips too and this assertion would have to be rewritten
-    // every time the fixture's genre count changed. Direct children keep the
-    // case about ORDER, which is the only thing it is here to prove.
-    const order = Array.from(meta.querySelectorAll<HTMLElement>(':scope > *')).map(
-      (s) => s.dataset['testid'],
-    );
+    // Ignore the grouping wrapper without including the nested genre chips.
+    const order = Array.from(
+      meta.querySelectorAll<HTMLElement>(
+        ':scope > .title-row__facts > *, :scope > :not(.title-row__facts)',
+      ),
+    ).map((s) => s.dataset['testid']);
 
     expect(order).toEqual(['release-year', 'media-type', 'runtime', 'genres']);
   });

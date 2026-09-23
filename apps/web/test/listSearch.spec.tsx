@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { ListSearch } from '../src/components/ListSearch';
 
@@ -31,6 +31,40 @@ function params(): URLSearchParams {
 }
 
 describe('T-UX-140 server-backed library search control', () => {
+  it('T-MOCK-005b: Escape retains input focus when the desktop disclosure cannot receive focus', async () => {
+    mount('/?q=Orbit&service=max');
+    const user = userEvent.setup();
+    const input = screen.getByRole('searchbox');
+    const focus = vi
+      .spyOn(screen.getByTestId('list-search-trigger'), 'focus')
+      .mockImplementation(() => {});
+    try {
+      await user.type(input, ' unfinished');
+      await user.keyboard('{Escape}');
+      expect(input).toHaveFocus();
+      expect(input).toHaveValue('Orbit');
+      expect(params().get('q')).toBe('Orbit');
+      expect(params().get('service')).toBe('max');
+    } finally {
+      focus.mockRestore();
+    }
+  });
+
+  it('T-MOCK-005a: one mounted form resets discarded drafts without losing canonical search', async () => {
+    mount('/?q=Orbit&service=max');
+    const user = userEvent.setup();
+    const form = screen.getByRole('search');
+    await user.type(screen.getByRole('searchbox'), ' unfinished');
+    await user.click(screen.getByRole('button', { name: 'Close search' }));
+    expect(form).toBeInTheDocument();
+    expect(form).not.toBeVisible();
+    expect(params().get('q')).toBe('Orbit');
+    await user.click(screen.getByTestId('list-search-trigger'));
+    expect(screen.getByRole('search')).toBe(form);
+    expect(screen.getByRole('searchbox')).toHaveValue('Orbit');
+    expect(params().get('service')).toBe('max');
+  });
+
   it('T-UX-140a reads the URL and exposes a labelled, bounded native search form', () => {
     mount('/?q=Dune');
     expect(screen.getByRole('search', { name: 'Search your list' })).toBeTruthy();

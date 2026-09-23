@@ -427,6 +427,33 @@ function token(name: string): string {
 }
 
 describe('T-CSS-004 — contrast is computed from the tokens, not eyeballed', () => {
+  it('T-MOCK-004c: artwork text and priority boundaries retain contrast over a white poster', () => {
+    const shade = /--color-artwork-shade:\s*rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/.exec(css);
+    if (shade?.[4] === undefined) throw new Error('Missing artwork scrim token');
+    const alpha = Number(shade[4]);
+    expect(alpha).toBeGreaterThan(0);
+    expect(alpha).toBeLessThanOrEqual(1);
+    const background = `#${shade
+      .slice(1, 4)
+      .map((value) =>
+        Math.round(Number(value) * alpha + 255 * (1 - alpha))
+          .toString(16)
+          .padStart(2, '0'),
+      )
+      .join('')}`;
+    for (const foreground of [
+      '--color-text',
+      '--color-text-muted',
+      '--color-secondary',
+      '--color-rating',
+    ]) {
+      expect(ratio(token(foreground), background), foreground).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(ratio(token('--color-border'), background)).toBeGreaterThanOrEqual(3);
+    expect(css).toMatch(/var\(--color-artwork-shade\)\s+var\(--space-6\)/);
+    expect(css).toMatch(/padding:\s*var\(--space-6\)\s+var\(--space-3\)\s+var\(--space-2\)/);
+  });
+
   /**
    * ⚠ FOUR OF THE FIVE RATIOS IN THE FIRST DRAFT OF §13.2 WERE WRONG, in both
    * directions: a border asserted at "≥ 3:1" is 1.47:1, and a grey rejected as

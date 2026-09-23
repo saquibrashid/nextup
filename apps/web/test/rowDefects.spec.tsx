@@ -174,23 +174,17 @@ describe('REQ-106 — independent facts in the metadata line are separated', () 
 
     const meta = screen.getAllByTestId('title-meta')[0];
     if (meta === undefined) throw new Error('no metadata line rendered');
-    // ⚠ `:scope > *`, NOT `querySelectorAll('span')` — widened at TASK-213,
-    // and widening it is what keeps the assertion exact. REQ-112 made the
-    // genre cell a container of chip `<span>`s, so an unscoped span sweep now
-    // returns the chips too and the expected array below would have had to
-    // grow a `undefined` entry per genre — turning a statement about the ORDER
-    // OF THE FOUR FACTS into a statement about how many genres the fixture
-    // happens to carry. Direct children only, and any element type, so the
-    // cell can change shape again without this test either breaking or going
-    // vague.
-    const order = Array.from(meta.querySelectorAll<HTMLElement>(':scope > *')).map(
-      (s) => s.dataset['testid'],
-    );
+    // Flatten the facts group, but not the genre chips inside their own slot.
+    const order = Array.from(
+      meta.querySelectorAll<HTMLElement>(
+        ':scope > .title-row__facts > *, :scope > :not(.title-row__facts)',
+      ),
+    ).map((s) => s.dataset['testid']);
     expect(order).toEqual(['release-year', 'media-type', 'runtime', 'genres']);
 
     // The separator is generated, so the RULE is the assertion: jsdom does not
     // render `::before`, so checking the text would prove nothing either way.
-    expect(cssWithoutComments).toMatch(/\.title-row__meta\s*>\s*span\s*\+\s*span::before/);
+    expect(cssWithoutComments).toMatch(/\.title-row__facts\s*>\s*span\s*\+\s*span::before/);
     expect(ruleFor('.title-row__meta')).toMatch(/display:\s*flex/);
   });
 

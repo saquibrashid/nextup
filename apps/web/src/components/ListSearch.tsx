@@ -28,8 +28,10 @@ export function ListSearch(): JSX.Element {
 
   function close(): void {
     focusInput.current = false;
+    if (input.current) input.current.value = q;
     setExpanded(false);
     trigger.current?.focus();
+    if (document.activeElement !== trigger.current) input.current?.focus();
   }
 
   function applySearch(value: string): void {
@@ -70,50 +72,49 @@ export function ListSearch(): JSX.Element {
         <SearchIcon />
         {q !== '' ? 'Search active' : 'Search'}
       </Button>
-      {expanded && (
-        <form
-          id={panelId}
-          role="search"
-          aria-label="Search your list"
-          onSubmit={submit}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') {
-              event.preventDefault();
-              event.stopPropagation();
-              close();
-            }
-          }}
-        >
-          <Field label="Search your list">
-            {(props) => (
-              <Input
-                {...props}
-                ref={input}
-                key={q}
-                type="search"
-                name="q"
-                defaultValue={q}
-                maxLength={500}
-                placeholder="Find something to watch"
-              />
-            )}
-          </Field>
-          <Button type="submit">Search</Button>
-          {params.has('q') && (
-            <Button
-              variant="ghost"
-              onClick={() => {
-                applySearch('');
-              }}
-            >
-              Clear search
-            </Button>
+      <form
+        hidden={!expanded}
+        id={panelId}
+        role="search"
+        aria-label="Search your list"
+        onSubmit={submit}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            event.stopPropagation();
+            close();
+          }
+        }}
+      >
+        <Field label="Search your list">
+          {(props) => (
+            <Input
+              {...props}
+              ref={input}
+              key={q}
+              type="search"
+              name="q"
+              defaultValue={q}
+              maxLength={500}
+              placeholder="Find something to watch"
+            />
           )}
-          <Button variant="ghost" aria-label="Close search" onClick={close}>
-            <CloseIcon />
+        </Field>
+        <Button type="submit">Search</Button>
+        {params.has('q') && (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              applySearch('');
+            }}
+          >
+            Clear search
           </Button>
-        </form>
-      )}
+        )}
+        <Button variant="ghost" aria-label="Close search" onClick={close}>
+          <CloseIcon />
+        </Button>
+      </form>
     </>
   );
 }

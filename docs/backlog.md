@@ -697,7 +697,21 @@ finished, so the exception cannot outlive its reason.
 | `TASK-238` | `done` | #327: directly linkable movie/show details with synopsis, cast/characters, directors/creators, artwork and existing actions. Strict display-only cache uses owner/provider-identity-scoped metadata writes and the 183-day lazy policy; unavailable/stale/unidentified states retain saved data. Additive nullable SQL JSON column, preserved query/layout return, existing consent/undo dialogs and stronger reachability/inference gates. `T-DETAIL-001` through `T-DETAIL-006`; unit/web coverage, real SQL and responsive Chromium/WebKit regressions. Separate PR; watched history and personal ratings remain outside scope. |
 | `TASK-239` | `done` | Owner-approved tile-first extraction/review: detect before reading, serial original-resolution crops, controlled input provenance, visible per-tile next steps including known titles, safe bulk policy and separate Apply summary. `T-AI-065`, `T-AI-066`, `T-AI-067`; one live read of the reported screenshot returned all five intended titles in five source regions, without the earlier stray OCR candidates (27.5 seconds, five calls per reader). This is a bounded recognition check, not a new corpus quality baseline. No migration, dependency or infrastructure change. |
 | `TASK-240` | `done` | Owner mockup-led in-app design: desktop sidebar, navy/violet surfaces, local serif headings, full-width artwork, shared service-filter chips and refined upload/review grouping. Preserve all workflows, persistence, safety, evidence, attribution and accessibility; no scenic branding or fictional features. `T-MOCK-001`, `T-MOCK-002`, `T-MOCK-003`. |
+| `TASK-241` | `done` | Compact artwork cards, grouped library header and import formatting preserve full titles, Compact, dates and safety. Corrected shared-grid action hit testing and desktop Escape focus; responsive search and nonzero-scroll modal regressions retain their behavioral assertions. `T-MOCK-004`, `T-MOCK-005`, `T-MOCK-006` and all twelve CI jobs passed on `dfd0c17` (run `35814917567`). |
+| `TASK-242` | `done` | Authentic, provenance-verified local service artwork replaces approximations; ADR-0014 Revision 3 records sources and presentation changes. Native proportions, canonical names and removal fallback remain. `T-BRAND-001`, `T-BRAND-002`, `T-BRAND-003` and all twelve CI jobs passed on `dfd0c17` (run `35814917567`). No service requests, new dependency or backend change. |
 <!-- STATUS-LEDGER:END -->
+
+### Approved authentic service artwork, 2026-09-23
+
+| Task | Work | Size | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| TASK-242 | Use actual service artwork, not geometric approximations; verify independent asset provenance and update ADR-0014 explicitly. Keep local-only bundling, names, bounded proportions and all existing selection/list behavior. | 1 agent-run + 10 owner-review-minutes | TASK-241 | `T-BRAND-001`, `T-BRAND-002`, `T-BRAND-003`; existing responsive library/capture geometry and accessibility regressions |
+
+### Approved mockup composition follow-up, 2026-09-22
+
+| Task | Work | Size | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| TASK-241 | Replace stacked Grid cards with unified artwork/gradient tiles; group the library heading/search/controls and refine the import service/mode/intake layout per `specs/ui-refresh.md` section 2.5. Preserve full text and allow growth; no fictional features or backend changes. | 2 agent-runs + 15 owner-review-minutes | TASK-240 | `T-MOCK-004`, `T-MOCK-005`, `T-MOCK-006`; existing responsive library, capture, consent and accessibility regressions |
 
 ### Approved tile-first extraction and review
 
