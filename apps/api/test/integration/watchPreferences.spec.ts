@@ -224,6 +224,21 @@ afterEach(async () => {
 afterAll(closeTestPrisma);
 
 describe('T-CATEGORY-003 real SQL category persistence and filtering', () => {
+  it('T-CATEGORY-003d the database rejects unknown and wrongly cased override values', async () => {
+    const title = await classified('constraint', false);
+    expect((await category(title.id, 'comedy-show')).status).toBe(200);
+    for (const invalid of ['Comedy-Show', 'documentary']) {
+      await expect(
+        testPrisma().watchPreference.updateMany({
+          where: { ownerId: owner, workIdentity: title.workIdentity },
+          data: { categoryOverride: invalid },
+        }),
+      ).rejects.toThrow();
+    }
+    expect(await findWatchPreference(owner, title.workIdentity)).toMatchObject({
+      categoryOverride: 'comedy-show',
+    });
+  });
   async function category(id: string, value: string | null, subject = SUBJECT) {
     return request(`/titles/${id}/category`, 'PATCH', { categoryOverride: value }, subject);
   }
@@ -274,7 +289,7 @@ describe('T-CATEGORY-003 real SQL category persistence and filtering', () => {
     await category(title.id, 'tv');
     await testPrisma().serviceListing.updateMany({
       where: { ownerId: owner, titleId: title.id },
-      data: { state: 'removed', removedAt: new Date(), removalReason: 'service-removed' },
+      data: { state: 'removed', removedAt: new Date() },
     });
     await testPrisma().title.updateMany({
       where: { ownerId: owner, id: title.id },
