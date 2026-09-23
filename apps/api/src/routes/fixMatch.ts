@@ -63,6 +63,7 @@ import { toIsoDate } from './titles.js';
 import { verifyEditionSelection } from '../services/titleEditions.js';
 
 export interface FixMatchRequest {
+  clearEditions?: boolean;
   edition?: EditionLabel;
   tmdbId: number;
   mediaType: MediaType;
@@ -91,6 +92,14 @@ export function parseFixMatchRequest(body: unknown): FixMatchParseResult {
     return { ok: false, message: 'That request body could not be read as an object.', details: {} };
   }
   const record = body as Record<string, unknown>;
+  const clearEditions = record['clearEditions'];
+  if (clearEditions !== undefined && typeof clearEditions !== 'boolean') {
+    return {
+      ok: false,
+      message: '"clearEditions" must be a boolean.',
+      details: { field: 'clearEditions' },
+    };
+  }
   const edition = editionLabelSchema.optional().safeParse(record['edition']);
   if (!edition.success)
     return {
@@ -132,6 +141,7 @@ export function parseFixMatchRequest(body: unknown): FixMatchParseResult {
       tmdbId,
       mediaType: mediaType as MediaType,
       confirmDuplicate: confirmDuplicate === true,
+      ...(clearEditions === undefined ? {} : { clearEditions }),
       ...(edition.data === undefined ? {} : { edition: edition.data }),
     },
   };
@@ -300,7 +310,9 @@ export function registerFixMatchRoutes(router: Router, getClient: () => TmdbClie
           matchState: 'matched',
           editionLabels: JSON.stringify(
             mergeEditionLabels(
-              identityChanged ? [] : parseEditionLabels(current.editionLabels),
+              identityChanged || parsed.value.clearEditions === true
+                ? []
+                : parseEditionLabels(current.editionLabels),
               edition === undefined ? [] : [edition],
             ),
           ),

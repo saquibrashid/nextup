@@ -8,6 +8,27 @@ sourceOfTruth: docs/PRD.md, docs/architecture.md, docs/adr/ADR-0005, ADR-0006, A
 
 # specs/data-model.md — nextup
 
+## Owner-approved edition labels (TASK-244, 2026-09-23)
+
+An edition such as **Vrach Frankenshteyn — director's cut** remains part of its
+canonical TMDB film, not a new work identity. `Title.editionLabels` contains
+owner-confirmed `{ name, kind }` labels independently of `TmdbMetadata`.
+Migration `0015_title_editions` adds `title.edition_labels` as a non-null
+JSON array defaulting to `[]`, plus nullable JSON
+`extraction_candidate.corrected_display_edition`. Both columns are ISJSON-guarded;
+application schemas validate their contents. Existing data requires no backfill.
+
+Extraction alternatives may carry an optional `edition` label. Corrections
+store the selected label separately from the original alternatives, using the
+existing display-only, network-free correction contract. Only explicit
+confirmed/corrected decisions persist labels at batch close, including optional
+known-match acknowledgements. Writes are owner scoped, merged under a title
+lock, and transactional with the batch; changes to an existing title record
+before/after provenance. New-title labels remain part of title creation.
+TMDB refresh never writes this owner-controlled column. Reappearance still
+creates a new title; neither edition labels nor catalogue aliases alter
+suppression identity, listing membership, dates or ordering.
+
 > ⚠ **REVISION 5 — 2026-08-11 (`A45`) — CLIPBOARD PASTE IS THE PRIMARY INGEST
 > PATH, AND FILE UPLOAD REMAINS FULLY SUPPORTED.**
 > The owner corrected the ingestion assumption verbatim: *"for screenshots,
@@ -1031,8 +1052,8 @@ Two deterministic passes, in this order:
 
 | Pass | Key | When | Kept |
 |---|---|---|---|
-| **A — pre-match** | `normalisedText` (exact equality) | after cleanup, before TMDB | first occurrence by `(imageIndex, yTop, xLeft)` |
-| **B — post-match** | `resolvedWorkIdentity` | after matching | first occurrence by the same ordering |
+| **A — pre-match** | `normalisedText` and normalized raw source text (exact equality); differing edition evidence must reach matching | after cleanup, before TMDB | first occurrence by `(imageIndex, yTop, xLeft)` |
+| **B — post-match** | `resolvedWorkIdentity` plus verified edition kind/name when present; distinct cuts stay individually reviewable but close into the same canonical film | after matching | first occurrence by the same ordering |
 
 In both passes the survivor **absorbs** the losers: `sourceImageIds` becomes the
 union, `boundingBoxes` becomes the concatenation, `ocrConfidence` becomes the

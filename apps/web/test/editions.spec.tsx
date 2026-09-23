@@ -8,6 +8,7 @@ import { TitleRow, type TitleListItem } from '../src/components/TitleRow';
 import { EditionLabels } from '../src/components/EditionLabels';
 import { UnmatchedActions } from '../src/components/UnmatchedActions';
 import { resultLabel } from '../src/components/ManualEntryPanel';
+import { RemovalConfirmDialog } from '../src/components/RemovalConfirmDialog';
 
 afterEach(cleanup);
 const name = 'The X-Files: I Want to Believe';
@@ -58,7 +59,21 @@ const item: TitleListItem = {
 };
 
 describe('T-EDITION-004 visible editions retain the original film context', () => {
-  it('shows the verified edition beside untouched screenshot evidence and original-year metadata', () => {
+  it('T-EDITION-004h names the edition in final confirmation even when no film is added', () => {
+    render(
+      <RemovalConfirmDialog
+        service="netflix"
+        items={[]}
+        editionUpdates={[candidate]}
+        onConfirm={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('No titles will be added.')).toBeVisible();
+    expect(screen.getByTestId('confirmation-editions')).toHaveTextContent(edition.name);
+  });
+
+  it('T-EDITION-004a shows the verified edition beside untouched screenshot evidence and original-year metadata', () => {
     render(<CandidateCard candidate={candidate} />);
     expect(screen.getByTestId('edition-labels')).toHaveTextContent(
       "Vrach Frankenshteyn — Director's cut",
@@ -69,7 +84,7 @@ describe('T-EDITION-004 visible editions retain the original film context', () =
     expect(resultLabel({ ...match, releaseYear: null })).not.toContain('2008');
   });
 
-  it('shows the same edition on the saved film without duplicating its row or service badge', () => {
+  it('T-EDITION-004b shows the same edition on the saved film without duplicating its row or service badge', () => {
     render(
       <MemoryRouter>
         <ul>
@@ -83,12 +98,12 @@ describe('T-EDITION-004 visible editions retain the original film context', () =
     expect(screen.getAllByTestId('badge-netflix')).toHaveLength(1);
   });
 
-  it('does not invent an edition for an older response', () => {
+  it('T-EDITION-004c does not invent an edition for an older response', () => {
     render(<EditionLabels />);
     expect(screen.queryByTestId('edition-labels')).not.toBeInTheDocument();
   });
 
-  it('lets an already-saved film explicitly keep its edition without changing its match', async () => {
+  it('T-EDITION-004d lets an already-saved film explicitly keep its edition without changing its match', async () => {
     const keep = vi.fn().mockResolvedValue(undefined);
     render(
       <UnmatchedActions

@@ -235,6 +235,7 @@ describe('rankRemovals', () => {
 describe('toRemovedItem', () => {
   it('T-REM-020g: renders the §6.9 item, dates as a date and removals as an instant', () => {
     expect(toRemovedItem(row(), rank, false)).toEqual({
+      editionLabels: [],
       listingId: 'l-1',
       titleId: 't-1',
       workIdentity: 'tmdb:movie:438631',

@@ -34,6 +34,7 @@ import {
 } from './enums.js';
 import { deriveSortDateAdded, deriveTitleState } from './derive.js';
 import { WORK_IDENTITY_RE } from './identity.js';
+import { editionLabelSchema } from './editions.js';
 import type {
   BatchProvenance,
   BoundingBox,
@@ -137,6 +138,7 @@ export const titleSchema = z
     visible: z.boolean(),
     listings: z.array(serviceListingSchema).min(1).max(SERVICES.length),
     tmdb: tmdbMetadataSchema.nullable(),
+    editionLabels: z.array(editionLabelSchema).optional(),
     sortDateAdded: isoDateSchema.nullable(),
     createdAt: isoDateTimeSchema,
     updatedAt: isoDateTimeSchema,
@@ -483,6 +485,7 @@ export const boundingBoxSchema = z
 
 export const matchCandidateSchema = z
   .object({
+    edition: editionLabelSchema.optional(),
     tmdbId: z.number().int().positive(),
     mediaType: mediaTypeSchema,
     name: z.string().min(1).max(300),

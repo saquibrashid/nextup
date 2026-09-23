@@ -1,14 +1,15 @@
 // Intra-batch overlap collapse — SD-02, `specs/data-model.md` §7.4 (TASK-063).
 
 import type { ExtractionCandidate } from './types.js';
+import { normaliseTitleText } from './identity.js';
 
 /**
  * The two passes of SD-02. They differ ONLY in the key they collapse on; the
  * ordering, the absorption and the loser bookkeeping are identical, which is
  * why there is one implementation parameterised by the pass rather than two.
  *
- *   pre-match   `normalisedText`        after cleanup, before TMDB
- *   post-match  `resolvedWorkIdentity`  after matching
+ *   pre-match   normalized query + source evidence  before TMDB
+ *   post-match  canonical identity + edition       after matching
  */
 export type OverlapPass = 'pre-match' | 'post-match';
 
@@ -100,10 +101,20 @@ function compareOrderKeys(a: OrderKey, b: OrderKey): number {
  */
 function collapseKeyFor(candidate: ExtractionCandidate, pass: OverlapPass): string | null {
   if (pass === 'pre-match') {
-    return candidate.normalisedText.length > 0 ? candidate.normalisedText : null;
+    // An inferred base title must not erase distinguishing source evidence
+    // before the catalogue has had a chance to identify the edition.
+    return candidate.normalisedText.length > 0
+      ? JSON.stringify([candidate.normalisedText, normaliseTitleText(candidate.rawText)])
+      : null;
   }
   const identity = candidate.resolvedWorkIdentity;
-  return identity !== null && identity.length > 0 ? identity : null;
+  if (identity === null || identity.length === 0) return null;
+  const edition = candidate.matchCandidates.find(
+    (match) => `tmdb:${match.mediaType}:${match.tmdbId}` === identity,
+  )?.edition;
+  return edition === undefined
+    ? identity
+    : JSON.stringify([identity, edition.kind, normaliseTitleText(edition.name)]);
 }
 
 function unionSourceImageIds(survivor: ExtractionCandidate, loser: ExtractionCandidate): string[] {

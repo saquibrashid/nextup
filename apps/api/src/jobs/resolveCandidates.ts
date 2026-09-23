@@ -240,7 +240,11 @@ export async function resolveCandidates(
     if (outcome.ambiguous) ambiguous += 1;
     if (outcome.uncertain) uncertain += 1;
 
-    matched[index] = { ...candidate, resolvedWorkIdentity: outcome.resolvedWorkIdentity };
+    matched[index] = {
+      ...candidate,
+      resolvedWorkIdentity: outcome.resolvedWorkIdentity,
+      matchCandidates: outcome.matchCandidates,
+    };
     outcomes.set(candidate.id, outcome.matchCandidates);
   }
 

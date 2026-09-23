@@ -41,7 +41,7 @@ function clientFor(
 }
 
 describe('T-EDITION-002 live-catalogue-shaped edition lookup', () => {
-  it('finds the reported cut under 8836 without inventing an ID or release year', async () => {
+  it('T-EDITION-002a finds the reported cut under 8836 without inventing an ID or release year', async () => {
     const { client, fetcher } = clientFor();
     const items = await client.searchMulti(editionName.toUpperCase());
     expect(items[0]).toMatchObject({
@@ -55,7 +55,7 @@ describe('T-EDITION-002 live-catalogue-shaped edition lookup', () => {
     expect(fetcher).toHaveBeenCalledTimes(3);
   });
 
-  it('uses the source reading when the inferred search title omitted the suffix', async () => {
+  it('T-EDITION-002b uses the source reading when the inferred search title omitted the suffix', async () => {
     const { client } = clientFor();
     expect((await client.searchMulti(name, { evidenceText: editionName }))[0]?.edition?.name).toBe(
       editionName,
@@ -63,7 +63,7 @@ describe('T-EDITION-002 live-catalogue-shaped edition lookup', () => {
     expect((await client.searchMulti(name))[0]?.edition).toBeUndefined();
   });
 
-  it('does not turn ordinary aliases, unknown types or malformed rows into edition claims', async () => {
+  it('T-EDITION-002c does not turn ordinary aliases, unknown types or malformed rows into edition claims', async () => {
     const { client } = clientFor({
       titles: [
         null,
@@ -74,7 +74,7 @@ describe('T-EDITION-002 live-catalogue-shaped edition lookup', () => {
     expect((await client.searchMulti(editionName))[0]?.edition).toBeUndefined();
   });
 
-  it('distinguishes catalogue misses from outages and unreadable metadata', async () => {
+  it('T-EDITION-002d distinguishes catalogue misses from outages and unreadable metadata', async () => {
     const absent = clientFor({}, 404);
     expect(await absent.client.getEditionLabels(8836)).toEqual([]);
     expect(await absent.client.getEditionLabels(8836)).toEqual([]);

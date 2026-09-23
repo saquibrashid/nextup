@@ -61,7 +61,7 @@ beforeEach(() => {
 });
 
 describe('T-EDITION-005 edition writes are explicit, owner scoped and independent of metadata', () => {
-  it('validates manual choices against catalogue metadata and keeps upstream failure visible', async () => {
+  it('T-EDITION-005a validates manual choices against catalogue metadata and keeps upstream failure visible', async () => {
     const client = new TmdbClient({ apiKey: 'fixture-key' });
     const read = vi.spyOn(client, 'getEditionLabels').mockResolvedValue([edition]);
     expect(await verifyEditionSelection(client, 'movie', 1, undefined)).toBeUndefined();
@@ -80,7 +80,7 @@ describe('T-EDITION-005 edition writes are explicit, owner scoped and independen
     });
   });
 
-  it('merges without duplication and records before/after values inside the same transaction', async () => {
+  it('T-EDITION-005b merges without duplication and records before/after values inside the same transaction', async () => {
     await addTitleEdition(owner, 'title', edition, tx, 'batch');
     expect(repo.lockTitleForWatchPreferences).toHaveBeenCalledWith(owner, 'title', tx);
     expect(repo.findTitle).toHaveBeenCalledWith(owner, 'title', tx);
@@ -108,14 +108,14 @@ describe('T-EDITION-005 edition writes are explicit, owner scoped and independen
     });
   });
 
-  it('does not create modification provenance for a newly created title or a standalone add', async () => {
+  it('T-EDITION-005c does not create modification provenance for a newly created title or a standalone add', async () => {
     repo.findTitle.mockResolvedValue({ editionLabels: '[]', createdByBatchId: 'batch' });
     await addTitleEdition(owner, 'title', edition, tx, 'batch');
     await addTitleEdition(owner, 'title', edition, tx);
     expect(repo.recordBatchChange).not.toHaveBeenCalled();
   });
 
-  it('applies only reviewed, uncollapsed, unsuppressed editions of the selected work', async () => {
+  it('T-EDITION-005d applies only reviewed, uncollapsed, unsuppressed editions of the selected work', async () => {
     await applyConfirmedEditions(
       owner,
       'batch',
@@ -139,7 +139,7 @@ describe('T-EDITION-005 edition writes are explicit, owner scoped and independen
     });
   });
 
-  it('refuses an intervening fix-match rather than labelling a different film', async () => {
+  it('T-EDITION-005e refuses an intervening fix-match rather than labelling a different film', async () => {
     await expect(
       addTitleEdition(owner, 'title', edition, tx, 'batch', 'tmdb:movie:2'),
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });

@@ -79,16 +79,17 @@ function toIsoDate(value: Date): string {
  */
 export function parseMatchCandidates(raw: string | null): ReviewMatchRef[] {
   if (raw === null || raw === '') return [];
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isMatchRef).map((match) => ({
-      ...match,
-      ...(match.edition === undefined ? {} : { edition: editionLabelSchema.parse(match.edition) }),
-    }));
+    parsed = JSON.parse(raw);
   } catch {
     return [];
   }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.filter(isMatchRef).map((match) => ({
+    ...match,
+    ...(match.edition === undefined ? {} : { edition: editionLabelSchema.parse(match.edition) }),
+  }));
 }
 
 function isMatchRef(value: unknown): value is ReviewMatchRef {

@@ -56,6 +56,7 @@ export interface TmdbSearchResponse {
 }
 
 export interface FixMatchRequest {
+  clearEditions?: boolean;
   edition?: import('@nextup/domain').EditionLabel;
   tmdbId: number;
   mediaType: 'movie' | 'tv';
@@ -74,6 +75,7 @@ export interface FixMatchResponse {
 }
 
 export interface FixMatchDialogProps {
+  editionLabels?: readonly import('@nextup/domain').EditionLabel[] | undefined;
   titleId: string;
   name: string;
   /** Active service badges — shown in the confirmation step. */
@@ -113,11 +115,14 @@ export function FixMatchDialog({
   searchTmdb,
   fixMatch,
   onClose,
+  editionLabels = [],
 }: FixMatchDialogProps): JSX.Element {
   const [query, setQuery] = useState('');
   const [phase, setPhase] = useState<Phase>('idle');
   const [results, setResults] = useState<TmdbSearchResult[]>([]);
   const [selected, setSelected] = useState<TmdbSearchResult | null>(null);
+  const [clearEditions, setClearEditions] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   // 409 DUPLICATE_WORK_IDENTITY details
   const [duplicateInfo, setDuplicateInfo] = useState<{ existingTitleId: string } | null>(null);
   // 409 TARGET_WORK_SUPPRESSED details
@@ -179,17 +184,20 @@ export function FixMatchDialog({
 
   const selectResult = useCallback((result: TmdbSearchResult) => {
     setSelected(result);
+    setClearEditions(false);
     setPhase('confirming');
   }, []);
 
   const submit = useCallback(
     (confirmDuplicate = false) => {
       if (selected === null) return;
+      setSubmitError(null);
       setPhase('submitting');
       fixMatch(titleId, {
         tmdbId: selected.tmdbId,
         mediaType: selected.mediaType,
         confirmDuplicate,
+        ...(clearEditions ? { clearEditions: true } : {}),
         ...(selected.edition === undefined ? {} : { edition: selected.edition }),
       }).then(
         (resp) => {
@@ -221,13 +229,15 @@ export function FixMatchDialog({
             });
             setPhase('suppressed-409');
           } else {
-            // General error: stay on confirming with an inline message.
+            setSubmitError(
+              err instanceof Error ? err.message : 'The match could not be saved. Try again.',
+            );
             setPhase('confirming');
           }
         },
       );
     },
-    [fixMatch, selected, titleId],
+    [fixMatch, selected, titleId, clearEditions],
   );
 
   const retryTmdb = useCallback(() => {
@@ -316,6 +326,27 @@ export function FixMatchDialog({
             ?
           </p>
           {selected.edition !== undefined && <EditionLabels labels={[selected.edition]} />}
+          {submitError !== null && <p role="alert">{submitError}</p>}
+          {editionLabels.length > 0 && (
+            <div>
+              <p>Currently saved editions</p>
+              <EditionLabels labels={editionLabels} />
+              <label className="tap-target">
+                <Input
+                  type="checkbox"
+                  checked={clearEditions}
+                  disabled={phase === 'submitting'}
+                  onChange={(event) => setClearEditions(event.currentTarget.checked)}
+                />
+                Replace saved edition labels with this selection
+              </label>
+              {clearEditions && selected.edition === undefined && (
+                <p>
+                  The selected base film has no edition label. Saved edition labels will be cleared.
+                </p>
+              )}
+            </div>
+          )}
           {/* §2.3: "Your Netflix badge and the date you added it … stay the same." */}
           {badges.length > 0 && (
             <p data-testid="preserved-notice">

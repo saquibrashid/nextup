@@ -554,6 +554,7 @@ export function ListPage({
             searchFn !== undefined &&
             fixMatchFn !== undefined && (
               <FixMatchDialog
+                editionLabels={dialog.item.editionLabels}
                 titleId={dialog.item.titleId}
                 name={dialog.item.name}
                 badges={dialog.item.badges}

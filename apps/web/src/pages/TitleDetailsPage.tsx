@@ -220,6 +220,7 @@ export function TitleDetailsPage({
       )}
       {active && dialog === 'fix' && (
         <FixMatchDialog
+          editionLabels={item.editionLabels}
           titleId={item.titleId}
           name={item.name}
           badges={item.badges}

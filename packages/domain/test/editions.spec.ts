@@ -17,7 +17,7 @@ const name = 'The X-Files: I Want to Believe';
 const edition: EditionLabel = { name: `${name} Vrach Frankenshteyn`, kind: 'directors-cut' };
 
 describe('T-EDITION-001 catalogue editions preserve canonical identity', () => {
-  it('recognizes typed catalogue aliases, not arbitrary alternative titles', () => {
+  it('T-EDITION-001a recognizes typed catalogue aliases, not arbitrary alternative titles', () => {
     expect(catalogueEdition(edition.name, "director's cut")).toEqual(edition);
     expect(catalogueEdition(edition.name, '')).toBeNull();
     expect(catalogueEdition(edition.name, null)).toBeNull();
@@ -26,7 +26,7 @@ describe('T-EDITION-001 catalogue editions preserve canonical identity', () => {
     expect(catalogueEdition('Example extended', 'extended edition')?.kind).toBe('extended');
   });
 
-  it('requires distinguishing evidence, including the suffix in manual search', () => {
+  it('T-EDITION-001b requires distinguishing evidence, including the suffix in manual search', () => {
     expect(
       editionForText('THE X FILES I WANT TO BELIEVE VRACH FRANKENSHTEYN', name, [edition]),
     ).toEqual(edition);
@@ -37,7 +37,7 @@ describe('T-EDITION-001 catalogue editions preserve canonical identity', () => {
     expect(editionForText(edition.name, name, [])).toBeUndefined();
   });
 
-  it('keeps the same work ID and original film year, with ordinary scoring safeguards', () => {
+  it('T-EDITION-001c keeps the same work ID and original film year, with ordinary scoring safeguards', () => {
     const result = {
       tmdbId: 8836,
       mediaType: 'movie' as const,
@@ -63,7 +63,7 @@ describe('T-EDITION-001 catalogue editions preserve canonical identity', () => {
     ).toBe(true);
   });
 
-  it('merges labels without losing earlier cuts; malformed persisted data is not hidden', () => {
+  it('T-EDITION-001d merges labels without losing earlier cuts; malformed persisted data is not hidden', () => {
     const other: EditionLabel = { name: 'Another cut', kind: 'extended' };
     expect(
       mergeEditionLabels([edition], [{ ...edition, name: edition.name.toUpperCase() }, other]),
@@ -80,7 +80,7 @@ describe('T-EDITION-001 catalogue editions preserve canonical identity', () => {
     expect(editionLabelText(edition)).toContain("Director's cut");
   });
 
-  it('validates edition selections without putting them into identity', () => {
+  it('T-EDITION-001e validates edition selections without putting them into identity', () => {
     expect(parseManualEntry({ tmdbId: 8836, mediaType: 'movie', edition })).toMatchObject({
       ok: true,
       value: { edition },
