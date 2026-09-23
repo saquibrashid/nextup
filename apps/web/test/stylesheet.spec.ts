@@ -428,28 +428,45 @@ function token(name: string): string {
 
 describe('T-CSS-004 — contrast is computed from the tokens, not eyeballed', () => {
   it('T-MOCK-004c: artwork text and priority boundaries retain contrast over a white poster', () => {
-    const shade = /--color-artwork-shade:\s*rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/.exec(css);
-    if (shade?.[4] === undefined) throw new Error('Missing artwork scrim token');
-    const alpha = Number(shade[4]);
-    expect(alpha).toBeGreaterThan(0);
-    expect(alpha).toBeLessThanOrEqual(1);
-    const background = `#${shade
-      .slice(1, 4)
-      .map((value) =>
-        Math.round(Number(value) * alpha + 255 * (1 - alpha))
-          .toString(16)
-          .padStart(2, '0'),
-      )
-      .join('')}`;
+    function overWhite(name: string): string {
+      const shade = new RegExp(
+        `${name}:\\s*rgba\\((\\d+),\\s*(\\d+),\\s*(\\d+),\\s*([\\d.]+)\\)`,
+      ).exec(css);
+      if (shade?.[4] === undefined) throw new Error(`Missing artwork token ${name}`);
+      const alpha = Number(shade[4]);
+      expect(alpha).toBeGreaterThan(0);
+      expect(alpha).toBeLessThanOrEqual(1);
+      return `#${shade
+        .slice(1, 4)
+        .map((value) =>
+          Math.round(Number(value) * alpha + 255 * (1 - alpha))
+            .toString(16)
+            .padStart(2, '0'),
+        )
+        .join('')}`;
+    }
+    const background = overWhite('--color-artwork-shade');
     for (const foreground of [
       '--color-text',
-      '--color-text-muted',
+      '--color-artwork-text-muted',
       '--color-secondary',
       '--color-rating',
     ]) {
       expect(ratio(token(foreground), background), foreground).toBeGreaterThanOrEqual(4.5);
     }
-    expect(ratio(token('--color-border'), background)).toBeGreaterThanOrEqual(3);
+    const control = overWhite('--color-artwork-control');
+    for (const foreground of [
+      '--color-artwork-text-muted',
+      '--color-accent',
+      '--color-secondary',
+      '--color-success',
+    ]) {
+      expect(ratio(token(foreground), control), foreground).toBeGreaterThanOrEqual(4.5);
+    }
+    expect(ratio(token('--color-artwork-control-border'), control)).toBeGreaterThanOrEqual(3);
+    expect(css).toMatch(/--color-text-muted:\s*var\(--color-artwork-text-muted\)/);
+    expect(css).toMatch(/border:\s*1px solid var\(--color-artwork-control-border\)/);
+    expect(css).toMatch(/\.genre-chips \.btn\s*\{\s*color:\s*var\(--color-secondary\)/);
     expect(css).toMatch(/var\(--color-artwork-shade\)\s+var\(--space-6\)/);
     expect(css).toMatch(/padding:\s*var\(--space-6\)\s+var\(--space-3\)\s+var\(--space-2\)/);
   });

@@ -23,7 +23,7 @@ boundaries and owner-dependent work.
 ### Compact cards and unified status, approved 2026-09-23
 
 `TASK-245` extends existing named tests, without changing API storage or routes:
-`T-WATCH-001d` covers legacy status projection and every transition;
+`T-WATCH-001p` covers legacy status projection and every transition;
 `T-WATCH-003l` covers explicitly stopping Watching;
 `T-WATCH-003m` covers the unified Status filter, legacy URL disclosure and atomic chip removal.
 `T-LIST-018a`/`c`/`e` cover short visible dates with full accessible/hover provenance;

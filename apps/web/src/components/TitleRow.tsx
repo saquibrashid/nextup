@@ -349,7 +349,8 @@ export function TitleRow({
           REQ-091 - "no rating" is a FIRST-CLASS RENDERED STATE, and the two
           branches below are the whole requirement:
 
-          - a rating renders as `IMDb 8.7`, always to one decimal place. The
+          - a rating renders as a star and `8.7`, with IMDb named accessibly,
+            always to one decimal place. The
             server stores tenths as an integer precisely so 8.8 does not arrive
             as 8.800000000000001, and `toFixed(1)` keeps `8` from rendering as
             a bare "8" that reads like a different, coarser scale.
@@ -379,11 +380,12 @@ export function TitleRow({
 
         <div className="title-row__footer">
           {/*
-          Verbatim from the API. Rendered only when the API supplied one: with
+          API wording is retained accessibly and on hover; visible copy shortens
+          "Added to nextup" to "Added". Rendered only when the API supplied one: with
           no listings there is no date, and inventing "Added today" here would
           state something false about when the work entered nextup.
         */}
-          {item.dateAddedLabel !== null && (
+          {item.dateAddedLabel != null && (
             <p
               className="title-row__date"
               data-testid="date-added-label"

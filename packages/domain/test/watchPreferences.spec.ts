@@ -11,7 +11,7 @@ import {
 } from '../src/watchPreferences.js';
 
 describe('T-WATCH-001 owner preference grammar', () => {
-  it('T-WATCH-001d projects legacy preferences into one status without losing stored priority', () => {
+  it('T-WATCH-001p projects legacy preferences into one status without losing stored priority', () => {
     expect(WATCH_STATUSES).toEqual(['watching', 'up-next', 'normal', 'someday']);
     expect(watchStatus({})).toBe('normal');
     expect(preferencesForStatus('watching')).toEqual({ watching: true, priority: 'normal' });

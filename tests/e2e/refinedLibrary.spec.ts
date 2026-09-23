@@ -1077,11 +1077,11 @@ test('T-WATCH-003k: preferences overlay preserves the scrolled list and returns 
       expect(box.y + box.height).toBeLessThanOrEqual(640);
       expect(box.width).toBeLessThanOrEqual(544);
       expect(Math.abs(box.x + box.width / 2 - width / 2)).toBeLessThan(12);
-      await expect(dialog.getByRole('checkbox')).toBeFocused();
+      await expect(dialog.getByRole('radio', { name: 'Watching', exact: true })).toBeFocused();
       await page.keyboard.press('Shift+Tab');
       await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
       await page.keyboard.press('Tab');
-      await expect(dialog.getByRole('checkbox')).toBeFocused();
+      await expect(dialog.getByRole('radio', { name: 'Watching', exact: true })).toBeFocused();
       await expect(page.locator('html')).toHaveCSS('overflow', 'hidden');
       if (!testInfo.project.use.isMobile) {
         await page.mouse.move(2, 2);
@@ -1412,7 +1412,7 @@ for (const width of [640, 1024, 1440]) {
           .locator('.title-row__body')
           .evaluate((el) => getComputedStyle(el).backgroundImage),
       ).toContain('0.75');
-      for (const selector of ['.title-row__priority', '.title-row__actions > .btn']) {
+      for (const selector of ['.title-row__priority', '[data-testid="row-menu"]']) {
         expect(
           await row.locator(selector).evaluate((el) => getComputedStyle(el).backgroundColor),
         ).toContain('0.85');
