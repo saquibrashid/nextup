@@ -74,7 +74,7 @@ afterEach(() => {
   sessionStorage.clear();
 });
 
-it('T-UX-155a Watching is independent of the priority control and both survive layout changes', () => {
+it('T-UX-155a one Watching status replaces the priority badge and survives layout changes', () => {
   const save = vi.fn(async () => {
     throw new Error('Layout must not save preferences');
   });
@@ -85,10 +85,10 @@ it('T-UX-155a Watching is independent of the priority control and both survive l
   );
   const list = screen.getByTestId('title-list');
   const trigger = within(list).getByRole('button', {
-    name: /Watch preferences for.*Watching, Up next/,
+    name: /Watch status for.*Watching/,
   });
-  expect(trigger).toHaveTextContent('Up next');
-  expect(trigger).not.toHaveTextContent('Watching');
+  expect(trigger).not.toHaveTextContent('Up next');
+  expect(trigger).toHaveTextContent('Watching');
   expect(within(list).getByText('Watching', { exact: true })).toBeVisible();
   expect(trigger.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   const contents = list.innerHTML;

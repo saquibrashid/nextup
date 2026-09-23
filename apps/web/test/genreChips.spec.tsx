@@ -158,12 +158,12 @@ describe('T-UX-127 · ui-refresh.md §4.3 · compact genres with a `+n` overflow
   it('T-UX-127b: over the limit the rest collapse behind a `+n` that names the count', () => {
     renderChips(MANY);
 
-    expect(chipTexts()).toStrictEqual(['Drama', 'Thriller', 'Crime']);
+    expect(chipTexts()).toStrictEqual(['Drama', 'Thriller']);
     const overflow = screen.getByTestId('genre-overflow');
     expect(overflow).toHaveTextContent(`+${MANY.length - GENRE_CHIP_LIMIT}`);
     // An unlabelled `+2` is silent to assistive technology, and this is the
     // only route to the hidden genres.
-    expect(overflow).toHaveAccessibleName('Show 2 more genres');
+    expect(overflow).toHaveAccessibleName('Show 3 more genres');
   });
 
   it('T-UX-127c: the `+n` reveals the rest IN PLACE, not in a tooltip or a dialog', async () => {
@@ -187,7 +187,7 @@ describe('T-UX-127 · ui-refresh.md §4.3 · compact genres with a `+n` overflow
 
     expect(chipTexts()[0]).toBe('Horror');
     expect(chipTexts()).toContain('Horror');
-    expect(screen.getByTestId('genre-overflow')).toHaveTextContent('+2');
+    expect(screen.getByTestId('genre-overflow')).toHaveTextContent('+3');
   });
 
   it('T-UX-127e: more active genres than the limit widens the row rather than hiding one', () => {
@@ -219,5 +219,13 @@ describe('T-UX-127 · ui-refresh.md §4.3 · compact genres with a `+n` overflow
     expect(rule('\\.genre-chips')).toMatch(/display:\s*inline-flex/);
     expect(rule('\\.chip')).not.toMatch(/text-overflow:\s*ellipsis|white-space:\s*nowrap/);
     expect(rule('\\.chip')).toMatch(/overflow-wrap:\s*anywhere/);
+  });
+
+  it('T-UX-127h: two visible genres retain canonical Science Fiction meaning and overflow access', () => {
+    expect(GENRE_CHIP_LIMIT).toBe(2);
+    renderChips(['Animation', 'Science Fiction', 'Fantasy']);
+    expect(chipTexts()).toEqual(['Animation', 'Sci-Fi']);
+    expect(screen.getByTitle('Science Fiction')).toHaveTextContent('Sci-Fi');
+    expect(screen.getByRole('button', { name: 'Show 1 more genre' })).toHaveTextContent('+1');
   });
 });

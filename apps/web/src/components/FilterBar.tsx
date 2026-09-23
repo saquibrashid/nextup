@@ -26,12 +26,14 @@ import { FilterDisclosure } from './FilterDisclosure';
 import {
   RUNTIME_BUCKETS,
   WATCH_PRIORITIES,
+  WATCH_STATUSES,
   SERVICES,
   SERVICE_LABELS,
   normalizeRuntimeBuckets,
   type RuntimeBucket,
   type Service,
   type WatchPriority,
+  type WatchStatus,
 } from '@nextup/domain';
 
 import {
@@ -44,6 +46,7 @@ import {
   RUNTIME_BUCKET_LABELS,
   ZERO_MATCH_TITLE,
   WATCH_PRIORITY_LABELS,
+  WATCH_STATUS_LABELS,
   runtimeUnknownHiddenLabel,
 } from '../copy';
 import { ServiceMark } from './ServiceMark';
@@ -65,6 +68,36 @@ export interface ListFilters {
 }
 
 export const NO_FILTERS: ListFilters = { services: [], types: [], genres: [], runtimes: [] };
+
+function statusChips(filters: ListFilters) {
+  const priorities = filters.priorities ?? [];
+  if (filters.watching === true && priorities.length === 0) {
+    return [{ dimension: 'status', value: 'watching', label: WATCH_STATUS_LABELS.watching }];
+  }
+  if (filters.watching === false && priorities.length === 1) {
+    return priorities.map((value) => ({
+      dimension: 'status',
+      value,
+      label: WATCH_STATUS_LABELS[value],
+    }));
+  }
+  return [
+    ...(filters.watching === undefined
+      ? []
+      : [
+          {
+            dimension: 'watching',
+            value: String(filters.watching),
+            label: filters.watching ? 'Watching' : 'Not watching',
+          },
+        ]),
+    ...priorities.map((value) => ({
+      dimension: 'priority',
+      value,
+      label: WATCH_PRIORITY_LABELS[value],
+    })),
+  ];
+}
 
 function isService(value: string): value is Service {
   return (SERVICES as readonly string[]).includes(value);
@@ -142,8 +175,7 @@ export function isFiltered(filters: ListFilters): boolean {
 /** The chips §2.4 shows alongside the zero-match message, in URL order. */
 export function activeFilterChips(filters: ListFilters): readonly string[] {
   return [
-    ...(filters.watching === undefined ? [] : [filters.watching ? 'Watching' : 'Not watching']),
-    ...(filters.priorities ?? []).map((priority) => WATCH_PRIORITY_LABELS[priority]),
+    ...statusChips(filters).map((chip) => chip.label),
     ...filters.services.map((service) => SERVICE_LABELS[service]),
     ...filters.types.map((type) => MEDIA_TYPE_LABELS[type]),
     ...filters.genres,
@@ -228,21 +260,15 @@ export function FilterBar({
     SERVICE_LABELS[service].toLowerCase().includes(serviceQuery.trim().toLowerCase()),
   );
   const query = params.get('q') ?? '';
+  const watchChips = statusChips(filters);
+  const watchSelection =
+    watchChips.length === 0
+      ? 'all'
+      : watchChips[0]?.dimension === 'status'
+        ? watchChips[0].value
+        : 'custom';
   const chips = [
-    ...(filters.watching === undefined
-      ? []
-      : [
-          {
-            dimension: 'watching',
-            value: String(filters.watching),
-            label: filters.watching ? 'Watching' : 'Not watching',
-          },
-        ]),
-    ...(filters.priorities ?? []).map((value) => ({
-      dimension: 'priority',
-      value,
-      label: WATCH_PRIORITY_LABELS[value],
-    })),
+    ...watchChips,
     ...filters.services.map((value) => ({
       dimension: 'service',
       value,
@@ -274,7 +300,10 @@ export function FilterBar({
 
   function removeChip(dimension: string, value: string): void {
     const next = new URLSearchParams(params);
-    if (dimension === 'q') next.delete('q');
+    if (dimension === 'status') {
+      next.delete('watching');
+      next.delete('priority');
+    } else if (dimension === 'q') next.delete('q');
     else if (dimension === 'runtime') {
       // A legacy range may supply two chips; rewrite it so removing one sticks.
       next.delete('runtime');
@@ -289,6 +318,14 @@ export function FilterBar({
     // `replace: false` — each filter change is a history entry, so Back undoes
     // exactly one choice. This is what makes the URL sync worth having.
     setParams(applyFilters(params, next));
+  }
+
+  function selectStatus(status: WatchStatus | 'all'): void {
+    update({
+      ...filters,
+      watching: status === 'all' ? undefined : status === 'watching',
+      priorities: status === 'all' || status === 'watching' ? [] : [status],
+    });
   }
 
   return (
@@ -475,56 +512,42 @@ export function FilterBar({
                   </Field>
                 </FilterDisclosure>
                 <FilterDisclosure
-                  label="Watching"
+                  label="Status"
                   value={
-                    filters.watching === undefined
-                      ? 'All titles'
-                      : filters.watching
-                        ? 'Watching'
-                        : 'Not watching'
+                    watchSelection === 'custom'
+                      ? 'Custom saved filter'
+                      : selectionSummary(
+                          watchChips.map((chip) => chip.label),
+                          'All statuses',
+                        )
                   }
                 >
-                  <Field legend="Watching">
-                    {[
-                      { value: undefined, label: 'All titles' },
-                      { value: true, label: 'Watching' },
-                      { value: false, label: 'Not watching' },
-                    ].map((option) => (
-                      <label key={option.label}>
-                        <Input
-                          type="radio"
-                          name={`watching-${headingId}`}
-                          checked={filters.watching === option.value}
-                          onChange={() => update({ ...filters, watching: option.value })}
-                        />
-                        {option.label}
-                      </label>
-                    ))}
-                  </Field>
-                </FilterDisclosure>
-                <FilterDisclosure
-                  label="Priority"
-                  value={selectionSummary(
-                    (filters.priorities ?? []).map((value) => WATCH_PRIORITY_LABELS[value]),
-                    'All priorities',
+                  {watchSelection === 'custom' && (
+                    <p>
+                      This saved link uses a combined watching/priority filter. Choose a status to
+                      replace it.
+                    </p>
                   )}
-                >
-                  <Field legend="Priority">
-                    {WATCH_PRIORITIES.map((value) => (
+                  <Field legend="Status">
+                    <label>
+                      <Input
+                        type="radio"
+                        name={`status-${headingId}`}
+                        checked={watchSelection === 'all'}
+                        onChange={() => selectStatus('all')}
+                      />
+                      All statuses
+                    </label>
+                    {WATCH_STATUSES.map((value) => (
                       <label key={value}>
                         <Input
-                          type="checkbox"
-                          name="priority"
+                          type="radio"
+                          name={`status-${headingId}`}
                           value={value}
-                          checked={filters.priorities?.includes(value) ?? false}
-                          onChange={() =>
-                            update({
-                              ...filters,
-                              priorities: toggle(filters.priorities ?? [], value),
-                            })
-                          }
+                          checked={watchSelection === value}
+                          onChange={() => selectStatus(value)}
                         />
-                        {WATCH_PRIORITY_LABELS[value]}
+                        {WATCH_STATUS_LABELS[value]}
                       </label>
                     ))}
                   </Field>

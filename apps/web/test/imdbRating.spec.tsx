@@ -55,6 +55,12 @@ describe('T-IMDB-008 — rating display (REQ-091)', () => {
 
     expect(screen.getByTestId('imdb-rating-value')).toHaveTextContent('8.7');
     expect(screen.getByTestId('imdb-rating')).toHaveTextContent('IMDb');
+    expect(screen.getByTestId('imdb-rating')).toHaveAttribute('title', 'IMDb');
+    expect(screen.getByTestId('imdb-rating').querySelector('.sr-only')).toHaveTextContent('IMDb');
+    expect(screen.getByTestId('imdb-rating').querySelector('svg')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
   });
 
   it('T-IMDB-008b renders a whole-number rating as 8.0, not 8', () => {

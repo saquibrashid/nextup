@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type JSX, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { formatRuntime, normaliseGenres, releaseYearText } from '@nextup/domain';
+import { formatRuntime, normaliseGenres, releaseYearText, watchStatus } from '@nextup/domain';
 import { EditionLabels } from '../components/EditionLabels';
 import type { ApiClient, TitleDetailResponse } from '../lib/apiClient';
 import { Button } from '../components/ui/Button';
@@ -10,7 +10,7 @@ import { WatchPreferencesDialog } from '../components/WatchPreferencesDialog';
 import { FixMatchDialog } from '../components/FixMatchDialog';
 import { SuppressDialog } from '../components/SuppressDialog';
 import { RemoveTitleDialog } from '../components/RemoveTitleDialog';
-import { OFFLINE_DISABLED_REASON, WATCH_PRIORITY_LABELS } from '../copy';
+import { OFFLINE_DISABLED_REASON, WATCH_STATUS_LABELS } from '../copy';
 
 interface TitleDetailsPageProps {
   readonly item: TitleDetailResponse;
@@ -123,13 +123,10 @@ export function TitleDetailsPage({
             </p>
           ) : (
             <>
-              <p>
-                {item.watching === true ? 'Watching · ' : ''}
-                {WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}
-              </p>
+              <p>{WATCH_STATUS_LABELS[watchStatus(item)]}</p>
               <div className="title-details__actions" aria-label="Title actions">
                 <Button variant="secondary" onClick={open('watch')} disabled={offline}>
-                  Watching and priority
+                  Watch status
                 </Button>
                 <Button variant="secondary" onClick={open('fix')} disabled={offline}>
                   {unidentified ? 'Find a match' : 'Fix match'}

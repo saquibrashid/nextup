@@ -362,11 +362,11 @@ restore, suppress, un-suppress or fix-match.
    share a line (`T-UX-147c`). The frame is bounded to 96rem, including the
    desktop sidebar. Grid artwork fills each card at 2:3.
    Both layouts retain the same DOM, query/state ownership, all metadata and
-   actions. Watching is a separate textual status beside title information,
-   not part of the priority button's visible label. Priority buttons use the
+   actions. Watching replaces the priority label in one status control, without
+   reserving a separate blank status row. Compact status buttons use the
    same 8rem width and 44px minimum target; at tested viewports they remain
-   44px high for all three priorities. Accessible names still include Watching
-   and priority. Semantic colors distinguish services, rating and Watching
+   44px high for all four statuses. Accessible names include the title and
+   effective status. Semantic colors distinguish services, rating and Watching
    without replacing text. `T-UX-155a`/`b`/`c` cover these refinements.
    The heading reserves the 44px row-menu target; status text and metadata
    cannot overlap it. Unidentified and pending rows place their wider action
@@ -387,8 +387,9 @@ Loading is never the never-uploaded or zero-match state.
 
 ### 2.1a Watching and watch priority (US-060, REQ-126)
 
-`WatchPreferencesDialog` edits a local draft: an independent **Currently
-watching** checkbox and **Up next / Normal / Someday** radio choices. It opens as a bounded, viewport-centered
+`WatchPreferencesDialog` edits one local **Watching / Up next / Normal / Someday**
+radio selection (owner-approved 2026-09-23). Its heading is **Watch status**.
+It opens as a bounded, viewport-centered
 overlay with a dimmed backdrop, never a panel appended beneath the list.
 Opening and dismissing it preserve the list's scroll position. The dialog is
 portaled outside the list, locks background scrolling, scrolls internally on
@@ -398,7 +399,7 @@ presentation is opt-in for watch preferences; other dialog flows are unchanged.
 phone and desktop in Chromium/WebKit, not merely `aria-modal` semantics.
 
 New works default to not watching and Normal. No data changes until **Save
-preferences** succeeds. Cancel/Escape dismiss the draft and restore focus.
+status** succeeds. Cancel/Escape dismiss the draft and restore focus.
 Pending saves disable all inputs, Save and Cancel, ignore dismissal and cannot
 double-submit. Failures show the server message verbatim (generic visible
 fallback for non-API errors), preserve the draft, and require explicit retry.
@@ -407,13 +408,16 @@ Offline disables Save if the dialog is already open.
 Success closes the editor and refetches page one from the server; do not
 optimistically reorder, filter or reset list rows. Preserve the URL and local
 Grid/Compact choice. A refetch failure uses the existing list error/retry
-state. The Watching filter is a single All titles / Watching / Not watching
-radio choice. Priority is a multiselect; active chips and Clear filters cover
-both dimensions.
+state. One Status filter offers All statuses / Watching / Up next / Normal /
+Someday. Watching maps to `watching=true` with no priority restriction;
+other statuses map to `watching=false&priority=<status>`. A status chip removes
+both parameters together. Existing combined links retain their exact semantics
+and show Custom saved filter until explicitly replaced or cleared.
 
 The sixth sort button, **Watch priority**, is opt-in: Watching first,
 then nonwatching Up next, Normal, Someday. Pressing it again selects
-**Lower priority first**. Watching does not overwrite the selected priority.
+**Lower priority first**. Selecting Watching preserves the stored priority;
+selecting any other status explicitly writes `watching=false` and that priority.
 Default Recently added and one-press Oldest additions remain unchanged.
 Preferences survive removal/readdition and screenshot imports; no episode
 tracking, reminders, inferred priorities or automatic assignments are added.
@@ -432,10 +436,10 @@ required TMDB/JustWatch attribution remain unchanged. `T-UI-010` and
 |---|---|---|
 | Poster | `posterPath` → `src` = `https://image.tmdb.org/t/p/w342{path}`, plus `srcset` offering `w342` as `1x` and `https://image.tmdb.org/t/p/w500{path}` as `2x` | `alt=""` (decorative; the name is adjacent text). A missing poster renders the same 2:3 neutral tile, never a broken image. Current Grid posters are 96 CSS px wide on phones and 160 CSS px from 640px; Compact retains REQ-111's 72 x 108 floor. The existing w342/w500 renditions are retained: the previous w154 image was visibly soft when enlarged, and artwork is how a title is recognised (REQ-111). Density descriptors select by display density, not by card width. `T-UX-153a` pins the literal source widths; `T-UX-153b` asserts every rendition exceeds the 72 px floor. `T-UX-155c` measures the rendered aspect ratio and floor, including missing artwork. ~~Superseded: horizontal desktop Grid with approximately 200px-or-larger artwork; a single w154 rendition.~~ |
 | Name | `name` | The only element with heading weight in the row |
-| Watch preferences (REQ-126) | `watching`, `priority` | A separate native button below the title reads `Priority: Normal` by default, or `Watching · Up next` etc. Its accessible name includes the title, Watching state and priority. Opens the explicit-save editor (§2.1a); offline shows the same facts without an edit affordance. |
-| Year · type · runtime · genres | `releaseYear`, `mediaType`, `runtimeMinutes`, `genres` | Runtime precedes genres in the approved 2026-09-16 layout. Film renders `1h 55m`, TV `45m/ep` (**one episode**, never a whole-series claim); missing runtime says **"Runtime unknown"**. Genres use three chips plus `+n` expansion, with active-filter genres always visible even above that limit. **Names wrap, never truncate**; `genres: []` renders nothing, never "Unknown" or `+0` (US-019 AC-6). All facts, including IMDb rating or its absent state, remain in Grid and Compact. |
+| Watch status (REQ-126) | `watching`, `priority` | One Watching / Up next / Normal / Someday badge, top-left on artwork cards. Its accessible edit name includes the title and effective status. Opens the explicit-save editor (§2.1a); offline shows the same status without an edit affordance. |
+| Year · type · runtime · genres | `releaseYear`, `mediaType`, `runtimeMinutes`, `genres` | Runtime precedes genres in the approved 2026-09-16 layout. Film renders `1h 55m`, TV `45m/ep` (**one episode**, never a whole-series claim); missing runtime says **"Runtime unknown"**. Genres use two chips plus `+n` expansion, with active-filter genres always visible even above that limit. **Names wrap, never truncate**; `genres: []` renders nothing, never "Unknown" or `+0` (US-019 AC-6). All facts, including IMDb rating or its absent state, remain in Grid and Compact. |
 | **Service badges** | `badges[]` | One badge per **active** listing (REQ-026), up to eight. Each badge renders through `components/ServiceMark.tsx` (§2.2a): locally bundled authentic artwork with restrained brand colour (ADR-0014 Revision 3), with canonical `SERVICE_LABELS` text **always present** and visually hidden; a visible word mark where no asset exists. Never colour-only; no per-service control theming. |
-| Date-added label | `dateAddedLabel` | Rendered **verbatim from the API** (`specs/api.md` §6.2). REQ-061: it always contains "to nextup". The component **must not** construct this string. |
+| Date-added label | `dateAddedLabel` | Owner-approved 2026-09-23: shorten only the known "Added to nextup" prefix to "Added" in catalog rows. Preserve the full API label in accessible and hover text, and visibly in details. Never construct or reformat dates; unknown wording remains verbatim and null renders nothing. |
 | Row menu | — | `⋮` button → **Not interested** (US-027), **Fix match** (US-030), **Remove from list** (US-048). 44×44 px hit area. ⚠ **Three items, and Remove was ADDED beside "Not interested", not in place of it.** They read alike — the row disappears either way — and mean opposite things: suppression is a permanent, work-identity decision that survives every future upload (REQ-071), while removal asserts nothing about the work and lets a later capture legitimately bring it back as a new row (product invariant 7). Collapsing them into one item is the defect this row exists to prevent; `T-MANUAL-016` fails if either disappears. |
 
 A row for an **unmatched** title (`matchState === 'unmatched'`) shows the raw
@@ -1504,7 +1508,7 @@ Modifiers use the `--` suffix already in use: `title-row__poster--empty`,
 | `--font-display` | `Georgia, Cambria, 'Times New Roman', serif` | Local serif page/step headings; body and controls keep the existing system sans-serif stack |
 | `--color-secondary` | `#adc5f7` | Secondary metadata, never a provider brand |
 | `--color-rating` | `#e8c88f` | IMDb scores, not recommendations |
-| `--color-success` | `#7adcb0` | Watching text, independently of priority |
+| `--color-success` | `#7adcb0` | Watching status text |
 | `--color-border` | `#77678f` | **3.32:1** on surface; interactive boundaries, not a soft decorative divider |
 | `--color-accent` | `#b3a0ff` | **7.57:1** on surface, also for **surface-coloured text on accent fill**. White/light foreground on the primary button is not the approved pair |
 | `--color-danger` | `#ff9ba8` | **8.47:1** on surface. Destructive confirmation only |

@@ -134,7 +134,7 @@ describe('T-DETAIL-004 detail presentation and owner actions', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Find a match' }));
     expect(screen.getByRole('dialog')).toBeVisible();
   });
-  it.each(['Watching and priority', 'Fix match', 'Not interested', 'Remove from list'])(
+  it.each(['Watch status', 'Fix match', 'Not interested', 'Remove from list'])(
     'T-DETAIL-004e: existing actions open their real confirmation dialog without immediate writes',
     async (name) => {
       const { actions } = mount();
@@ -156,9 +156,9 @@ describe('T-DETAIL-004 detail presentation and owner actions', () => {
       watching: true,
       priority: 'normal',
     });
-    await userEvent.click(screen.getByRole('button', { name: 'Watching and priority' }));
-    await userEvent.click(screen.getByLabelText('Currently watching'));
-    await userEvent.click(screen.getByRole('button', { name: 'Save preferences' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Watch status' }));
+    await userEvent.click(screen.getByRole('radio', { name: 'Watching' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save status' }));
     expect(save).toHaveBeenCalledWith(item.titleId, { watching: true, priority: 'normal' });
     expect(reload).toHaveBeenCalledOnce();
   });
