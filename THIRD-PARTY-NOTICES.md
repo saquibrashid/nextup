@@ -119,7 +119,6 @@ so they do not relicense this work — but their notices must be retained.
 | `body-parser` | 2.3.0 | MIT |
 | `buffer` | 6.0.3 | MIT |
 | `buffer-equal-constant-time` | 1.0.1 | BSD-3-Clause |
-| `buffer-from` | 1.1.2 | MIT |
 | `bundle-name` | 4.1.0 | MIT |
 | `busboy` | 1.6.0 | MIT |
 | `bytes` | 3.1.2 | MIT |
@@ -130,7 +129,6 @@ so they do not relicense this work — but their notices must be retained.
 | `citty` | 0.1.6 | MIT |
 | `citty` | 0.2.2 | MIT |
 | `commander` | 11.1.0 | MIT |
-| `concat-stream` | 2.0.0 | MIT |
 | `confbox` | 0.2.4 | MIT |
 | `consola` | 3.4.2 | MIT |
 | `content-disposition` | 1.1.0 | MIT |
@@ -225,7 +223,7 @@ so they do not relicense this work — but their notices must be retained.
 | `mime-types` | 3.0.2 | MIT |
 | `ms` | 2.1.3 | MIT |
 | `mssql` | 11.0.1 | MIT |
-| `multer` | 2.3.0 | MIT |
+| `multer` | 2.4.0 | MIT |
 | `native-duplexpair` | 1.0.0 | MIT |
 | `negotiator` | 1.0.0 | MIT |
 | `node-fetch-native` | 1.6.7 | MIT |
@@ -255,7 +253,6 @@ so they do not relicense this work — but their notices must be retained.
 | `react-dom` | 19.3.0 | MIT |
 | `react-router` | 7.18.4 | MIT |
 | `react-router-dom` | 7.18.4 | MIT |
-| `readable-stream` | 3.6.2 | MIT |
 | `readable-stream` | 4.7.0 | MIT |
 | `readdirp` | 4.1.2 | MIT |
 | `rfdc` | 1.4.1 | MIT |
@@ -287,11 +284,9 @@ so they do not relicense this work — but their notices must be retained.
 | `tslib` | 2.8.1 | 0BSD |
 | `type-is` | 1.6.18 | MIT |
 | `type-is` | 2.1.0 | MIT |
-| `typedarray` | 0.0.6 | MIT |
 | `typescript` | 6.0.3 | Apache-2.0 |
 | `undici-types` | 6.21.0 | MIT |
 | `unpipe` | 1.0.0 | MIT |
-| `util-deprecate` | 1.0.2 | MIT |
 | `vary` | 1.1.2 | MIT |
 | `wrappy` | 1.0.2 | ISC |
 | `ws` | 8.21.2 | MIT |
