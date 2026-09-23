@@ -3930,8 +3930,8 @@ button {
   font-size: var(--text-xl);
 }
 
-.library-heading .freshness-strip {
-  margin: 0 0 0 auto;
+.library-actions .freshness-strip {
+  margin: 0;
 }
 
 .list-view-control {
@@ -4357,12 +4357,22 @@ button {
   .title-list[data-view='grid'] .title-row {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: subgrid;
-    grid-row: span 5;
+    grid-row: span 6;
+    width: 100%;
+    min-width: 0;
     row-gap: 0;
-    padding: 75% 0 0;
+    padding: 0;
     position: relative;
     aspect-ratio: 2 / 3;
+    min-height: min-content;
     background: var(--color-catalog);
+  }
+
+  .title-list[data-view='grid'] .title-row::before {
+    content: '';
+    grid-column: 1;
+    grid-row: 1;
+    aspect-ratio: 4 / 3;
   }
 
   .title-list[data-view='grid'] .title-row__poster {
@@ -4380,22 +4390,32 @@ button {
   }
 
   .title-list[data-view='grid'] .title-row__actions {
-    grid-column: 1;
-    grid-row: 1;
-    margin: var(--space-6) var(--space-3) 0;
-    z-index: 2;
+    position: absolute;
+    grid-area: auto;
+    inset: var(--space-1) var(--space-2) auto auto;
+    margin: 0;
+    z-index: 4;
+  }
+
+  .title-list[data-view='grid'] .title-row__actions > .btn,
+  .title-list[data-view='grid'] .title-row__menu > .btn {
+    background: var(--color-artwork-shade);
   }
 
   .title-list[data-view='grid'] .title-row[data-match-state='unmatched'] .title-row__actions,
   .title-list[data-view='grid'] .title-row[aria-busy='true'] .title-row__actions {
-    grid-row: 5;
+    position: relative;
+    inset: auto;
+    grid-column: 1;
+    grid-row: 6;
+    margin-inline: var(--space-3);
     margin-top: 0;
     padding-bottom: var(--space-2);
   }
 
   .title-list[data-view='grid'] .title-row__body {
     grid-column: 1;
-    grid-row: 1 / span 4;
+    grid-row: 2 / span 4;
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: subgrid;
     align-items: start;
@@ -4468,6 +4488,7 @@ button {
     grid-row: 1;
     flex-direction: column;
     flex-wrap: nowrap;
+    padding-inline-end: 0;
     align-items: flex-start;
     align-self: stretch;
   }
@@ -4493,6 +4514,10 @@ button {
     flex-wrap: wrap;
     gap: var(--space-1);
     grid-column: 1 / -1;
+  }
+
+  .title-list[data-view='grid'] .title-row__facts > .title-row__runtime::before {
+    content: '·';
   }
 
   .title-list[data-view='grid'] .genre-chips {
