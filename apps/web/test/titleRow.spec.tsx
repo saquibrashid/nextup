@@ -118,7 +118,8 @@ describe('T-UI-010 - the row shows poster, name, type, year, date-added label an
 
     expect(within(row).getByTestId('poster-placeholder')).toBeInTheDocument();
     expect(within(row).queryByTestId('poster')).toBeNull();
-    expect(row.querySelectorAll('img')).toHaveLength(0);
+    expect(row.querySelectorAll('img:not(.brand-mark)')).toHaveLength(0);
+    expect(within(row).getByTestId('badges').querySelectorAll('img.brand-mark')).toHaveLength(2);
   });
 
   it('T-UI-010e renders one row with two badges for a work saved on both services', () => {

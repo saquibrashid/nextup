@@ -1,19 +1,9 @@
 /**
  * The closed service-mark register (ADR-0014, issue #288).
  *
- * ⚠ **ALL EIGHT SERVICES HAVE A MARK, AND THEY DO NOT ALL COME FROM THE SAME
- * PLACE.** Five are vendored verbatim from a CC0 source. Three — Prime Video,
- * Disney+ and Peacock — are **originally drawn here** at the owner's explicit
- * direction (2026-09-17), because those brands are absent from that source:
- * Amazon and Disney are among the brands removed from it through its published
- * removal process. The drawn three are geometric approximations, not traces of
- * the brands' artwork, and they carry a weaker position than the vendored
- * five. `ATTRIBUTION.md` records which is which; ADR-0014 Revision 2 records
- * the decision and the risk the owner accepted.
- *
- * ⚠ **DO NOT SILENTLY "UPGRADE" A DRAWN MARK INTO A TRACED ONE.** Tracing a
- * press-kit asset reproduces the artwork the approximation deliberately does
- * not, which changes the legal position without changing a single test.
+ * All eight use vendored artwork, not hand-drawn substitutes (Revision 3).
+ * ATTRIBUTION.md records the pinned CC0/public-domain sources, presentation
+ * changes and trademark limits. No streaming-service asset requests.
  *
  * ⚠ **THE WORD-MARK FALLBACK IN `ServiceMark` IS STILL LIVE CODE.** No service
  * reaches it today, which is exactly why it is easy to delete as dead. It is
@@ -21,12 +11,6 @@
  * here restores the word mark and changes nothing else. `T-BRAND-002c` covers
  * that path with this register mocked.
  *
- * ~~Superseded 2026-09-17: "`SERVICE_MARKS` IS DELIBERATELY PARTIAL … DO NOT
- * 'COMPLETE' THIS MAP. A future contributor adding `'disney-plus':
- * DisneyPlusMark` would be undoing the decision, not finishing the work."~~
- * The owner reviewed the mixed presentation on the live list and directed that
- * the three be drawn. The reasoning behind the original gap is kept in
- * ADR-0014 §5 because it is still why these three differ in kind.
  */
 
 import type { Service } from '@nextup/domain';

@@ -434,7 +434,7 @@ required TMDB/JustWatch attribution remain unchanged. `T-UI-010` and
 | Name | `name` | The only element with heading weight in the row |
 | Watch preferences (REQ-126) | `watching`, `priority` | A separate native button below the title reads `Priority: Normal` by default, or `Watching · Up next` etc. Its accessible name includes the title, Watching state and priority. Opens the explicit-save editor (§2.1a); offline shows the same facts without an edit affordance. |
 | Year · type · runtime · genres | `releaseYear`, `mediaType`, `runtimeMinutes`, `genres` | Runtime precedes genres in the approved 2026-09-16 layout. Film renders `1h 55m`, TV `45m/ep` (**one episode**, never a whole-series claim); missing runtime says **"Runtime unknown"**. Genres use three chips plus `+n` expansion, with active-filter genres always visible even above that limit. **Names wrap, never truncate**; `genres: []` renders nothing, never "Unknown" or `+0` (US-019 AC-6). All facts, including IMDb rating or its absent state, remain in Grid and Compact. |
-| **Service badges** | `badges[]` | One badge per **active** listing (REQ-026), up to eight. Each badge renders through `components/ServiceMark.tsx` (§2.2a): a bundled monochrome mark where one exists, with the canonical `SERVICE_LABELS` text **always present** and visually hidden; a plain word mark where none exists. Never colour-only — colour is never the sole carrier of meaning, and the marks carry no brand colour at all |
+| **Service badges** | `badges[]` | One badge per **active** listing (REQ-026), up to eight. Each badge renders through `components/ServiceMark.tsx` (§2.2a): locally bundled authentic artwork with restrained brand colour (ADR-0014 Revision 3), with canonical `SERVICE_LABELS` text **always present** and visually hidden; a visible word mark where no asset exists. Never colour-only; no per-service control theming. |
 | Date-added label | `dateAddedLabel` | Rendered **verbatim from the API** (`specs/api.md` §6.2). REQ-061: it always contains "to nextup". The component **must not** construct this string. |
 | Row menu | — | `⋮` button → **Not interested** (US-027), **Fix match** (US-030), **Remove from list** (US-048). 44×44 px hit area. ⚠ **Three items, and Remove was ADDED beside "Not interested", not in place of it.** They read alike — the row disappears either way — and mean opposite things: suppression is a permanent, work-identity decision that survives every future upload (REQ-071), while removal asserts nothing about the work and lets a later capture legitimately bring it back as a new row (product invariant 7). Collapsing them into one item is the defect this row exists to prevent; `T-MANUAL-016` fails if either disappears. |
 
@@ -461,24 +461,21 @@ Rules, all of them load-bearing:
    `nameHidden` controls *visibility*, never *presence* — a logo-only badge is
    invisible to a screen reader and to the browser's own find-in-page.
    `T-BRAND-002a/b`.
-2. ⚠ **Five marks are vendored (CC0) and three are drawn here**, and nothing on
-   screen tells them apart. Prime Video, Disney+ and Peacock are hand-authored
-   approximations, added at the owner's direction (ADR-0014 Revision 2) after
-   the mixed presentation was reviewed live. `T-BRAND-001g` keeps the two
-   origins tellable apart in the source, because "improving" a drawn mark by
-   tracing the real logo changes the legal position and no test would notice.
-   ~~Superseded 2026-09-17: "Three services have no mark, and that is the
-   decision, not a gap. … `T-BRAND-002c` asserts the three gaps remain
-   gaps."~~
+2. **All eight use authentic vendored geometry** (owner-directed ADR-0014
+   Revision 3): four retained CC0 marks and four verified Commons public-domain
+   assets. `ATTRIBUTION.md` pins sources, revisions, hashes and presentation
+   changes; `T-BRAND-001g` detects unreviewed replacements.
+   ~~Revision 2 used five CC0 marks and three drawn approximations.~~
 3. ⚠ **The word-mark fallback in `ServiceMark` is still live code**, even
    though no service reaches it. It is the removal path if a brand objects;
    `T-BRAND-002c` asserts it with the register mocked empty.
-4. **Marks are monochrome `currentColor`.** No brand colour, anywhere. They
-   inherit the badge's colour and therefore its contrast.
+4. **Brand colours are confined to pinned artwork.** Labels, selection and focus
+   keep the application's accessible tokens. Natural proportions are retained
+   in bounded frames; logos never stretch. ~~Revision 2 required monochrome.~~
 5. **Marks live in `components/brands/`, not the ADR-0013 icon register.**
    They are filled brand glyphs, not 1.5-weight line art, and they depict
    third-party trademarks. `T-BRAND-001` applies the icon register's
-   closed-set, no-colour, no-package, no-network contract to them separately.
+   closed-set, provenance, safe-SVG, no-package and no-network contract separately.
 6. **Nothing is ever fetched, and no artwork is obtained from a brand.** The
    marks are compiled in. A request to a streaming service's CDN would be an
    automated request to a streaming service, which the product forbids outright

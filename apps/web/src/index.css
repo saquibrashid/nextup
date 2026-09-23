@@ -654,17 +654,17 @@ button {
 /*
  * ADR-0014 — a bundled service mark.
  *
- * ⚠ NO COLOUR HERE, EVER. The mark inherits `currentColor` from the chip, so
- * it is legible in both themes by construction. A brand colour would be a
- * literal outside `:root` (`T-CSS-003b/c`) and, on the dark theme's surface,
- * a real contrast failure rather than a hypothetical one.
+ * Brand colours are confined to the attributed SVG assets (Revision 3).
+ * Labels and control states retain the application's accessible colour tokens.
  *
  * Sized in `em` so a mark tracks the text it sits beside instead of needing a
  * second size scale of its own.
  */
 .brand-mark {
   block-size: 1.6em;
-  inline-size: 1.6em;
+  inline-size: auto;
+  max-inline-size: 2.8em;
+  object-fit: contain;
   flex: none;
 }
 
@@ -3493,9 +3493,10 @@ button {
   right: var(--space-1);
 }
 
-.upload-flow .upload-step[data-step='1'] .segmented > label > svg {
-  height: 2rem;
-  max-width: 100%;
+.upload-flow .upload-step[data-step='1'] .segmented > label > .brand-mark {
+  block-size: 2rem;
+  inline-size: 5rem;
+  max-inline-size: 100%;
   grid-row: 1;
 }
 

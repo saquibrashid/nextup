@@ -3,6 +3,90 @@ import { expect, test } from '@playwright/test';
 
 const { describe } = test;
 
+for (const width of [280, 390, 1440]) {
+  describe(`Authentic service artwork at ${width}px`, () => {
+    test('T-BRAND-003: all local logos load within their choices and preserve service selection', async ({
+      page,
+    }, testInfo) => {
+      const requests: string[] = [];
+      page.on('request', (request) => requests.push(request.url()));
+      await page.route('**/api/me', (route) =>
+        route.fulfill({ json: { ownerId: 'owner', attribution: {} } }),
+      );
+      await page.route('**/api/batches?open=true', (route) =>
+        route.fulfill({ json: { batches: [] } }),
+      );
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('/upload');
+      const choices = page.getByTestId('service-step').locator('label');
+      const logos = choices.locator('img.brand-mark');
+      await expect(logos).toHaveCount(8);
+      await expect
+        .poll(() =>
+          logos.evaluateAll((images) =>
+            images.every(
+              (image) =>
+                image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0,
+            ),
+          ),
+        )
+        .toBe(true);
+      const geometry = await choices.evaluateAll((labels) =>
+        labels.map((label) => {
+          const image = label.querySelector('img');
+          const name = label.querySelector('.service-mark__name');
+          if (!image || !name) throw new Error('Missing service artwork or visible name');
+          const frame = image.getBoundingClientRect();
+          const card = label.getBoundingClientRect();
+          const text = name.getBoundingClientRect();
+          return {
+            source: image.src,
+            fit: getComputedStyle(image).objectFit,
+            width: frame.width,
+            height: frame.height,
+            contained:
+              frame.left >= card.left &&
+              frame.right <= card.right &&
+              frame.top >= card.top &&
+              frame.bottom <= card.bottom,
+            separate: frame.bottom <= text.top + 1,
+            name: name.textContent,
+          };
+        }),
+      );
+      for (const logo of geometry) {
+        expect(logo.source).toMatch(/^data:image\/svg\+xml[;,]/);
+        expect(logo.fit).toBe('contain');
+        expect(logo.width).toBeGreaterThan(0);
+        expect(logo.width).toBeLessThanOrEqual(80);
+        expect(logo.height).toBe(32);
+        expect(logo.contained).toBe(true);
+        expect(logo.separate).toBe(true);
+        if (!logo.name) throw new Error('Empty service name');
+        const option = page.getByRole('radio', { name: logo.name, exact: true });
+        await option.check();
+        await expect(option).toBeChecked();
+      }
+      expect(requests.filter((url) => new URL(url).origin !== new URL(page.url()).origin)).toEqual(
+        [],
+      );
+      const scan = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+        .analyze();
+      expect(
+        scan.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical'),
+      ).toEqual([]);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+      ).toBe(true);
+      await page.screenshot({
+        path: testInfo.outputPath('authentic-service-logos.png'),
+        fullPage: true,
+      });
+    });
+  });
+}
+
 describe('T-POL-003a calm capture framing', () => {
   for (const width of [280, 320, 390, 640, 900, 1440]) {
     describe(`Guided capture at ${width}px`, () => {

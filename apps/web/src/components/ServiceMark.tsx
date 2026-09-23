@@ -9,9 +9,8 @@
  * the DOM: `T-BRAND-002a` asserts the name across all eight services and
  * `T-BRAND-002b` asserts it does not change between the two branches.
  *
- * ⚠ **THE FALLBACK IS NOT A DEGRADED STATE.** Three of the eight services have
- * no bundled mark on purpose (see `brands/index.ts`), so the word mark is a
- * permanent, first-class rendering — not a placeholder awaiting an asset.
+ * The visible word-mark fallback remains the removal path if a bundled asset
+ * must be withdrawn. All eight services currently have a mark.
  */
 
 import type { JSX } from 'react';

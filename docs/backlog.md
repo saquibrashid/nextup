@@ -698,7 +698,14 @@ finished, so the exception cannot outlive its reason.
 | `TASK-239` | `done` | Owner-approved tile-first extraction/review: detect before reading, serial original-resolution crops, controlled input provenance, visible per-tile next steps including known titles, safe bulk policy and separate Apply summary. `T-AI-065`, `T-AI-066`, `T-AI-067`; one live read of the reported screenshot returned all five intended titles in five source regions, without the earlier stray OCR candidates (27.5 seconds, five calls per reader). This is a bounded recognition check, not a new corpus quality baseline. No migration, dependency or infrastructure change. |
 | `TASK-240` | `done` | Owner mockup-led in-app design: desktop sidebar, navy/violet surfaces, local serif headings, full-width artwork, shared service-filter chips and refined upload/review grouping. Preserve all workflows, persistence, safety, evidence, attribution and accessibility; no scenic branding or fictional features. `T-MOCK-001`, `T-MOCK-002`, `T-MOCK-003`. |
 | `TASK-241` | `done` | Matched the owner's compact artwork-card composition, library header and import-page formatting. Full titles stay visible and cards grow when necessary; Compact stays unchanged. Preserved real filters/search, all ingest paths, required choices, safety, dates, attribution and accessible targets. Verified `T-MOCK-004`, `T-MOCK-005`, `T-MOCK-006`, complete unit/web coverage and 54 focused Chromium/WebKit cases in GitHub CI. |
+| `TASK-242` | `doing` | Owner-requested authentic service icons: replace approximations with provenance-verified bundled artwork, record ADR-0014 Revision 3 and restrained colour/native proportions, preserve names and removal fallback. `T-BRAND-001`, `T-BRAND-002`, `T-BRAND-003` plus existing library/import geometry. Awaiting GitHub CI; no service requests, new dependency or backend change. |
 <!-- STATUS-LEDGER:END -->
+
+### Approved authentic service artwork, 2026-09-23
+
+| Task | Work | Size | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| TASK-242 | Use actual service artwork, not geometric approximations; verify independent asset provenance and update ADR-0014 explicitly. Keep local-only bundling, names, bounded proportions and all existing selection/list behavior. | 1 agent-run + 10 owner-review-minutes | TASK-241 | `T-BRAND-001`, `T-BRAND-002`, `T-BRAND-003`; existing responsive library/capture geometry and accessibility regressions |
 
 ### Approved mockup composition follow-up, 2026-09-22
 
