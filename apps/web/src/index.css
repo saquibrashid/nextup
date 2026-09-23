@@ -1526,6 +1526,8 @@ button {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  /* Keep artwork and card actions below the library's disclosure panels. */
+  isolation: isolate;
 }
 
 /* Cover browser: horizontal phone cards, portrait-led tiles on wider screens. */

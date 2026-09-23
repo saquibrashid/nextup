@@ -438,6 +438,23 @@ for (const width of [320, 640, 1280]) {
       );
       await page.getByRole('button', { name: 'Service updates', exact: true }).click();
       await expect(page.getByText('Netflix updated today', { exact: true })).toBeVisible();
+      const updatesPanel = page.getByRole('group', { name: 'Service updates', exact: true });
+      for (const chip of await updatesPanel.getByRole('link').all()) {
+        await chip.click({ trial: true });
+        expect(
+          await chip.evaluate((element) => {
+            const rect = element.getBoundingClientRect();
+            return element.contains(
+              document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2),
+            );
+          }),
+        ).toBe(true);
+      }
+      await updatesPanel.getByRole('button', { name: 'Done', exact: true }).click();
+      await expect(
+        page.getByRole('button', { name: 'Service updates', exact: true }),
+      ).toBeFocused();
+      await page.getByRole('button', { name: 'Service updates', exact: true }).click();
       await page.keyboard.press('Escape');
       await page.getByTestId('add-title-open').click();
       await expect(page.getByRole('dialog')).toBeVisible();

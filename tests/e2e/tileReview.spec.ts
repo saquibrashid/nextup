@@ -127,6 +127,10 @@ test('T-AI-067f: every original tile, known match and next step survives respons
       })
       .toBeCloseTo(190 / 400, 2);
     await expect(first.getByTestId('addition-keep')).toHaveCount(0);
+    await first.getByRole('button', { name: 'Confirm match', exact: true }).click();
+    await expect(first.getByTestId('known-outcome')).toContainText(
+      'Match confirmed. Already saved; nothing will be added.',
+    );
     for (const id of ['c2', 'c3']) {
       const card = page.getByTestId(`candidate-${id}`);
       await card.getByTestId('addition-keep').click();
@@ -138,6 +142,11 @@ test('T-AI-067f: every original tile, known match and next step survives respons
     );
     await expect(page.getByRole('region', { name: 'Unsaved review choices' })).toHaveCount(0);
     await page.reload();
+    await expect(first.getByTestId('known-outcome')).toContainText('Match confirmed');
+    await expect(first.getByRole('button', { name: 'Confirm match', exact: true })).toHaveCount(0);
+    await expect(
+      page.getByRole('region', { name: 'Tile 2' }).getByRole('button', { name: 'Confirm match' }),
+    ).toBeVisible();
     await expect(
       page.getByRole('heading', {
         name: '5 tiles found · 2 already saved · 0 to review · 3 decided',

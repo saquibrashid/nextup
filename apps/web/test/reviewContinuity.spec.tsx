@@ -322,7 +322,7 @@ describe('T-UX-162 reversible review and recovery', () => {
     mount(f.client);
     await screen.findByTestId('candidate-one');
     fireEvent.click(screen.getByText('Already on your list (1)'));
-    fireEvent.click(card().getByTestId('correction-find'));
+    fireEvent.click(card().getByTestId('known-find'));
     fireEvent.change(card().getByRole('searchbox'), { target: { value: 'Correct title' } });
     fireEvent.submit(card().getByRole('searchbox').closest('form')!);
     fireEvent.click(await card().findByRole('button', { name: 'Use Correct title' }));

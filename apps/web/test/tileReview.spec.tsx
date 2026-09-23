@@ -2,6 +2,7 @@ import { fireEvent, render, screen, within, waitFor } from '@testing-library/rea
 import { describe, expect, it, vi } from 'vitest';
 import { buildReviewResponse, withReviewEvidence, type ReviewCandidate } from '@nextup/domain';
 import { ReviewPage } from '../src/pages/ReviewPage';
+import { tileNextStep } from '../src/components/TileReview';
 
 const regions = Array.from({ length: 5 }, (_, i) => ({ x: i * 0.2, y: 0.1, w: 0.19, h: 0.8 }));
 function candidate(index: number, overrides: Partial<ReviewCandidate> = {}): ReviewCandidate {
@@ -71,7 +72,7 @@ function actions() {
 }
 
 describe('T-AI-067 - tile-first owner review', () => {
-  it('T-AI-067a - five originals sit beside five matches, including two known titles without confirm controls', () => {
+  it('T-AI-067a - every original has its match; known matches can be confirmed without addition or discard controls', () => {
     render(<ReviewPage review={review()} {...actions()} />);
     expect(
       screen.getByRole('heading', { name: '5 tiles found · 2 already saved · 3 to review' }),
@@ -83,8 +84,12 @@ describe('T-AI-067 - tile-first owner review', () => {
       expect(tile.getByRole('img', { name: 'Original screenshot tile' })).toBeVisible();
       if (i < 2) {
         expect(tile.getByText(/Already on your Netflix list. Nothing to add/)).toBeVisible();
-        expect(tile.queryByRole('button', { name: /^Confirm$/ })).not.toBeInTheDocument();
-        expect(tile.getByRole('button', { name: 'Find the right title' })).toBeVisible();
+        expect(tile.getByRole('button', { name: 'Confirm match', exact: true })).toBeVisible();
+        expect(tile.getByRole('button', { name: 'Change match', exact: true })).toHaveClass(
+          'btn--ghost',
+        );
+        expect(tile.queryByTestId('addition-keep')).not.toBeInTheDocument();
+        expect(tile.queryByTestId('known-discard')).not.toBeInTheDocument();
       }
     }
     expect(screen.queryByTestId('candidate-thumb-whole')).not.toBeInTheDocument();
@@ -175,5 +180,37 @@ describe('T-AI-067 - tile-first owner review', () => {
         /Your choice is saved for review/,
       ),
     ).toBeVisible();
+  });
+
+  it('T-AI-067g - confirming a known match waits for server state and leaves addition counts unchanged', async () => {
+    const callbacks = actions();
+    const items = regions.map((_, i) => candidate(i));
+    const view = render(<ReviewPage controlled review={review(items)} {...callbacks} />);
+    const tile = within(screen.getByRole('region', { name: 'Tile 1' }));
+    const counts = screen.getByTestId('review-counts').textContent;
+    fireEvent.click(tile.getByRole('button', { name: 'Confirm match' }));
+    await waitFor(() => expect(callbacks.onKeepUnmatched).toHaveBeenCalledWith('c0'));
+    expect(tile.queryByTestId('known-outcome')).not.toBeInTheDocument();
+    items[0]!.disposition = 'confirmed';
+    view.rerender(<ReviewPage controlled review={review(items)} {...callbacks} />);
+    expect(tile.getByTestId('known-outcome')).toHaveTextContent(
+      'Match confirmed. Already saved; nothing will be added.',
+    );
+    expect(tile.getByText(/Your match is confirmed/)).toBeVisible();
+    expect(tile.queryByRole('button', { name: 'Confirm match' })).not.toBeInTheDocument();
+    expect(screen.getByTestId('review-counts').textContent).toBe(counts);
+    fireEvent.click(tile.getByRole('button', { name: 'Change decision' }));
+    expect(tile.getByRole('button', { name: 'Change match' })).toBeVisible();
+    expect(callbacks.onDiscardUnmatched).not.toHaveBeenCalled();
+  });
+
+  it('T-AI-067h - discovery matches also explain confirmation without promising another addition', () => {
+    const known = candidate(0, { classification: 'already-in-your-list' });
+    expect(tileNextStep(known, null)).toBe(
+      'Already in your library. Nothing to add. Confirm this match, or change it if needed.',
+    );
+    expect(tileNextStep({ ...known, disposition: 'corrected' }, null)).toBe(
+      'Already in your library. Nothing to add. Your match is confirmed.',
+    );
   });
 });
