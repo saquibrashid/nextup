@@ -8,13 +8,18 @@ import { describe, expect, it } from 'vitest';
 
 import {
   RUNTIME_BUCKETS,
+  RUNTIME_RANGE_LAST_STOP,
+  RUNTIME_RANGE_STOPS,
   compareTitlesByRuntime,
   formatRuntime,
   isKnownRuntime,
   isRuntimeBucket,
+  moveRuntimeRangeHandle,
   normalizeRuntimeBuckets,
   runtimeInAnyBucket,
+  runtimeBucketsForRange,
   runtimeInBucket,
+  runtimeRangeFromBuckets,
 } from '../src/titleRuntime.js';
 
 describe('runtime buckets', () => {
@@ -263,5 +268,83 @@ describe('compareTitlesByRuntime', () => {
         else expect(result).not.toBe(0);
       }
     }
+  });
+});
+
+describe('T-RANGE-001 runtime range slider maps onto the existing buckets', () => {
+  it('T-RANGE-001a: stops are the bucket edges, so no stop falls inside a bucket', () => {
+    expect(RUNTIME_RANGE_STOPS).toEqual([0, 30, 60, 90, 120, null]);
+    expect(RUNTIME_RANGE_LAST_STOP).toBe(RUNTIME_BUCKETS.length);
+  });
+
+  it('T-RANGE-001b: the full track is any runtime, never every bucket', () => {
+    expect(runtimeBucketsForRange({ min: 0, max: RUNTIME_RANGE_LAST_STOP })).toEqual([]);
+    expect(runtimeRangeFromBuckets([])).toEqual({ min: 0, max: 5, contiguous: true });
+  });
+
+  it('T-RANGE-001c: a range selects the contiguous canonical buckets between its handles', () => {
+    expect(runtimeBucketsForRange({ min: 2, max: 4 })).toEqual(['60-90', '90-120']);
+    expect(runtimeBucketsForRange({ min: 0, max: 1 })).toEqual(['under30']);
+    expect(runtimeBucketsForRange({ min: 4, max: 5 })).toEqual(['over120']);
+    expect(runtimeBucketsForRange({ min: 1, max: 5 })).toEqual([
+      '30-60',
+      '60-90',
+      '90-120',
+      'over120',
+    ]);
+  });
+
+  it('T-RANGE-001d: buckets round-trip through the range in canonical order', () => {
+    const range = runtimeRangeFromBuckets(['90-120', '60-90']);
+    expect(range).toEqual({ min: 2, max: 4, contiguous: true });
+    expect(runtimeBucketsForRange(range)).toEqual(['60-90', '90-120']);
+  });
+
+  it('T-RANGE-001e: a saved selection with a gap is covered but reported as non-contiguous', () => {
+    expect(runtimeRangeFromBuckets(['under30', 'over120'])).toEqual({
+      min: 0,
+      max: 5,
+      contiguous: false,
+    });
+    expect(runtimeRangeFromBuckets(['30-60', '90-120'])).toEqual({
+      min: 1,
+      max: 4,
+      contiguous: false,
+    });
+  });
+
+  it('T-RANGE-001f: a handle stops one step short of the other instead of swapping', () => {
+    expect(moveRuntimeRangeHandle({ min: 1, max: 3 }, 'min', 4)).toEqual({
+      range: { min: 2, max: 3 },
+      clamped: true,
+    });
+    expect(moveRuntimeRangeHandle({ min: 1, max: 3 }, 'max', 0)).toEqual({
+      range: { min: 1, max: 2 },
+      clamped: true,
+    });
+    expect(moveRuntimeRangeHandle({ min: 1, max: 3 }, 'min', 0)).toEqual({
+      range: { min: 0, max: 3 },
+      clamped: false,
+    });
+    expect(moveRuntimeRangeHandle({ min: 1, max: 3 }, 'max', 5)).toEqual({
+      range: { min: 1, max: 5 },
+      clamped: false,
+    });
+  });
+
+  it('T-RANGE-001g: out-of-range and malformed positions are bounded to the track', () => {
+    expect(moveRuntimeRangeHandle({ min: 0, max: 5 }, 'max', 99)).toEqual({
+      range: { min: 0, max: 5 },
+      clamped: false,
+    });
+    expect(moveRuntimeRangeHandle({ min: 0, max: 5 }, 'min', Number.NaN)).toEqual({
+      range: { min: 0, max: 5 },
+      clamped: false,
+    });
+    expect(moveRuntimeRangeHandle({ min: 9, max: -3 }, 'min', 2.4)).toEqual({
+      range: { min: 2, max: 5 },
+      clamped: false,
+    });
+    expect(runtimeBucketsForRange({ min: 5, max: 5 })).toEqual(['over120']);
   });
 });

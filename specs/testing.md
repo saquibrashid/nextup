@@ -5080,6 +5080,14 @@ trust a range reserved earlier in the same document to still be free.**
 | `T-EDITION-004` | U | Review, search labels and saved film show the edition and original-film year without duplicate rows/badges; final confirmation names labels on known films. Saved labels require explicit replacement; offline correction cannot mistake the same film with a different edition for success. Older responses remain supported. `apps/web/test/editions.spec.tsx`, `fixMatchDialog.spec.tsx`, `reviewContinuity.spec.tsx`. | TASK-244 |
 | `T-EDITION-005` | U | Manual selections are checked against catalogue metadata; owner-scoped edition writes merge under the existing title lock and record same-transaction provenance. Fix-match preserves labels for the same identity unless replacement/clearing is explicit, and clears old-work labels on identity change. `apps/api/test/unit/titleEditions.spec.ts`, `apps/api/test/unit/routes/fixMatch.spec.ts`. | TASK-244 |
 
+### Owner-approved runtime range slider (TASK-246, #366)
+
+| Id | Level | What it asserts | Source |
+|---|---|---|---|
+| `T-RANGE-001` | U | Slider stops are derived from `RUNTIME_BUCKET_BOUNDS`, so a `[min, max)` stop range selects exactly the contiguous canonical buckets; the full track is any runtime (`[]`), never all five buckets. Gapped selections report a covering range as non-contiguous. A moved handle stops one step short of the other and reports the refusal instead of swapping; malformed positions stay on the track. `packages/domain/test/titleRuntime.spec.ts`. | TASK-246 |
+| `T-RANGE-002` | U | Visible Min/Max labels and unit-bearing values, per-handle accessible names and spoken values, clamp status without swapping, full-track reset removing `runtime`, a disclosed gapped saved selection that is not rewritten until a handle moves, and Back/Forward positions from the URL. Existing `T-UX-123`/`T-UX-144` cases cover canonical tokens, chips, legacy expansion and preserved sort. `apps/web/test/filterBar.spec.tsx`. | TASK-246 |
+| `T-RANGE-003` | E | At 320, 640 and 1280 px in Chromium and Mobile Safari, the slider stays inside the drawer/panel without horizontal overflow; each handle is the hit target at its own centre; keyboard arrows move and clamp both handles with announced values; a pointer drag moves the maximum; axe reports no violations; a Chromium touch drag moves the minimum in the phone drawer. `tests/e2e/refinedLibrary.spec.ts` (with `T-UX-144g`). | TASK-246 |
+
 ### 39.5 What is deliberately NOT asserted here
 
 **That the refresh looks good.** Taste is the owner's, recorded in **ADR-0013**,

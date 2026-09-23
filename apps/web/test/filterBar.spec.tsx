@@ -32,6 +32,10 @@ import {
   FILTERS_PANEL_TITLE,
   FILTERS_TRIGGER_LABEL,
   RUNTIME_BUCKET_LABELS,
+  RUNTIME_RANGE_MAX_CLAMPED,
+  RUNTIME_RANGE_MAX_NAME,
+  RUNTIME_RANGE_MIN_CLAMPED,
+  RUNTIME_RANGE_MIN_NAME,
   ZERO_MATCH_TITLE,
   runtimeUnknownHiddenLabel,
 } from '../src/copy';
@@ -185,6 +189,20 @@ function panelDoneButton(): HTMLElement {
   const button = buttons.at(-1);
   if (button === undefined) throw new Error('missing panel Done button');
   return button;
+}
+
+/** Opens the Runtime picker and returns one handle of the range slider. */
+function runtimeHandle(handle: 'min' | 'max'): HTMLInputElement {
+  if (screen.queryByRole('dialog', { name: 'Filter your list' }) === null) openFilters();
+  const trigger = screen.getByRole('button', { name: /^Runtime / });
+  if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
+  return screen.getByRole<HTMLInputElement>('slider', {
+    name: handle === 'min' ? RUNTIME_RANGE_MIN_NAME : RUNTIME_RANGE_MAX_NAME,
+  });
+}
+
+function moveRuntime(handle: 'min' | 'max', stop: number): void {
+  fireEvent.change(runtimeHandle(handle), { target: { value: String(stop) } });
 }
 
 function box(name: string, value: string): HTMLInputElement {
@@ -538,24 +556,24 @@ describe('T-UX-144 - labelled filter fields and split runtime options', () => {
     expect(trigger).toHaveFocus();
   });
 
-  it('T-UX-144d runtime exposes five ranges, replacing the broad one with independent 60-90 and 90-120 choices', () => {
+  it('T-UX-144d runtime slider stops keep the five split ranges, with independent 60-90 and 90-120 steps', () => {
     mount('/');
     openFilters();
     fireEvent.click(screen.getByRole('button', { name: 'Runtime Any runtime' }));
-    expect(screen.getAllByRole('checkbox').map((input) => input.getAttribute('value'))).toEqual([
-      'under30',
-      '30-60',
-      '60-90',
-      '90-120',
-      'over120',
-    ]);
-    expect(
-      screen.queryByRole('checkbox', { name: '1h – 2h', exact: true }),
-    ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('checkbox', { name: '1h – 1h 30m', exact: true }));
-    fireEvent.click(screen.getByRole('checkbox', { name: '1h 30m – 2h', exact: true }));
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+    const handles = screen.getAllByRole('slider');
+    expect(handles).toHaveLength(2);
+    for (const handle of handles) {
+      expect(handle).toHaveAttribute('min', '0');
+      expect(handle).toHaveAttribute('max', '5');
+      expect(handle).toHaveAttribute('step', '1');
+    }
+    moveRuntime('min', 2);
+    moveRuntime('max', 3);
+    expect(new URLSearchParams(url().split('?')[1]).getAll('runtime')).toEqual(['60-90']);
+    moveRuntime('max', 4);
     expect(new URLSearchParams(url().split('?')[1]).getAll('runtime')).toEqual(['60-90', '90-120']);
-    expect(screen.getByRole('button', { name: 'Runtime 2 selected' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Runtime 1h – 2h' })).toBeVisible();
   });
 
   it('T-UX-144e a legacy range selects both replacements and either chip can remove only its half', () => {
@@ -564,8 +582,8 @@ describe('T-UX-144 - labelled filter fields and split runtime options', () => {
       '60-90',
       '90-120',
     ]);
-    expect(box('runtime', '60-90')).toBeChecked();
-    expect(box('runtime', '90-120')).toBeChecked();
+    expect(runtimeHandle('min')).toHaveValue('2');
+    expect(runtimeHandle('max')).toHaveValue('4');
     clickDisclosureDone(screen.getByRole('button', { name: /^Runtime / }));
     fireEvent.click(
       screen.getByRole('button', {
@@ -589,17 +607,17 @@ describe('T-UX-144 - labelled filter fields and split runtime options', () => {
     expect(url()).toBe('/?dir=asc');
     openFilters();
     fireEvent.click(screen.getByRole('button', { name: 'Runtime Any runtime' }));
-    for (const input of screen.getAllByRole('checkbox')) expect(input).not.toBeChecked();
-    expect(
-      screen.queryByRole('checkbox', { name: '1h – 2h', exact: true }),
-    ).not.toBeInTheDocument();
+    expect(runtimeHandle('min')).toHaveValue('0');
+    expect(runtimeHandle('max')).toHaveValue('5');
+    expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
   });
 });
 
 describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
   it('T-UX-123h selecting a bucket writes `runtime` to the query string', () => {
     mount('/');
-    fireEvent.click(box('runtime', '60-90'));
+    moveRuntime('max', 3);
+    moveRuntime('min', 2);
 
     const written = new URLSearchParams(url().split('?')[1] ?? '');
     expect(written.getAll('runtime')).toEqual(['60-90']);
@@ -799,7 +817,7 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
       await user.click(services);
       await user.click(screen.getByRole('button', { name: /^Runtime / }));
       expect(services).toHaveAttribute('aria-expanded', 'false');
-      expect(screen.getByRole('checkbox', { name: RUNTIME_BUCKET_LABELS.under30 })).toHaveFocus();
+      expect(screen.getByRole('slider', { name: RUNTIME_RANGE_MIN_NAME })).toHaveFocus();
     });
 
     it('T-UX-139i generated IDs remain unique across instances and stable across updates', () => {
@@ -892,12 +910,12 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
     });
   });
 
-  it('T-UX-123k buckets are OR-ed within the dimension, like every other filter', () => {
+  it('T-UX-123k buckets stay OR-ed within the dimension; the slider selects a contiguous run', () => {
     mount('/?runtime=under30');
-    fireEvent.click(box('runtime', 'over120'));
+    moveRuntime('max', 3);
 
     const written = new URLSearchParams(url().split('?')[1] ?? '');
-    expect(written.getAll('runtime')).toEqual(['under30', 'over120']);
+    expect(written.getAll('runtime')).toEqual(['under30', '30-60', '60-90']);
   });
 
   it('T-UX-123l an unknown bucket is dropped rather than forwarded to the API', () => {
@@ -920,7 +938,7 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
     // Same escape-hatch reasoning as T-UI-016g: rebuilding the query from the
     // filters alone silently resets the owner's sort on the first click.
     mount('/?sort=runtime&dir=asc');
-    fireEvent.click(box('runtime', 'under30'));
+    moveRuntime('max', 1);
 
     const written = new URLSearchParams(url().split('?')[1] ?? '');
     expect(written.get('dir')).toBe('asc');
@@ -971,5 +989,87 @@ describe('REQ-035 - the hidden-unknown disclosure (`T-UX-124`)', () => {
     // all reports that a filter removed titles it could not classify.
     mount('/?runtime=under30', { runtimeUnknownHidden: 2 });
     expect(screen.getByTestId('runtime-unknown-hidden').getAttribute('role')).toBe('status');
+  });
+});
+
+describe('T-RANGE-002 the runtime range slider (#366)', () => {
+  it('T-RANGE-002a shows Min and Max labels, values with units and named handles', () => {
+    mount('/?runtime=60-90&runtime=90-120');
+    const min = runtimeHandle('min');
+    const max = runtimeHandle('max');
+    const slider = screen.getByTestId('filter-runtime');
+    expect(within(slider).getByText('Min', { selector: 'label' })).toHaveAttribute('for', min.id);
+    expect(within(slider).getByText('Max', { selector: 'label' })).toHaveAttribute('for', max.id);
+    expect(within(slider).getByTestId('range-min-value')).toHaveTextContent('1h');
+    expect(within(slider).getByTestId('range-max-value')).toHaveTextContent('2h');
+    expect(min).toHaveAttribute('aria-valuetext', '1 hour');
+    expect(max).toHaveAttribute('aria-valuetext', '2 hours');
+    expect(screen.getByRole('button', { name: 'Runtime 1h – 2h' })).toBeVisible();
+  });
+
+  it('T-RANGE-002b the track ends announce no limit rather than a length', () => {
+    mount('/');
+    expect(runtimeHandle('min')).toHaveAttribute('aria-valuetext', 'No minimum');
+    expect(runtimeHandle('max')).toHaveAttribute('aria-valuetext', 'No maximum');
+    expect(screen.getByTestId('range-max-value')).toHaveTextContent('No limit');
+  });
+
+  it('T-RANGE-002c the minimum stops short of the maximum and says why, never swapping', () => {
+    mount('/?runtime=30-60&runtime=60-90&sort=name');
+    moveRuntime('min', 5);
+    expect(runtimeHandle('min')).toHaveValue('2');
+    expect(runtimeHandle('max')).toHaveValue('3');
+    expect(new URLSearchParams(url().split('?')[1]).getAll('runtime')).toEqual(['60-90']);
+    const notice = within(screen.getByTestId('filter-runtime')).getByRole('status');
+    expect(notice).toHaveTextContent(RUNTIME_RANGE_MIN_CLAMPED);
+    moveRuntime('max', 0);
+    expect(runtimeHandle('min')).toHaveValue('2');
+    expect(runtimeHandle('max')).toHaveValue('3');
+    expect(notice).toHaveTextContent(RUNTIME_RANGE_MAX_CLAMPED);
+    moveRuntime('max', 5);
+    expect(notice).toHaveTextContent('');
+    expect(new URLSearchParams(url().split('?')[1]).get('sort')).toBe('name');
+  });
+
+  it('T-RANGE-002d dragging back to the full track removes the runtime filter', () => {
+    mount('/?runtime=over120&service=netflix', { runtimeUnknownHidden: 2 });
+    expect(screen.getByTestId('runtime-unknown-hidden')).toBeVisible();
+    moveRuntime('min', 0);
+    const written = new URLSearchParams(url().split('?')[1]);
+    expect(written.has('runtime')).toBe(false);
+    expect(written.get('service')).toBe('netflix');
+    expect(screen.getByRole('button', { name: 'Runtime Any runtime' })).toBeVisible();
+  });
+
+  it('T-RANGE-002e a saved selection with a gap is disclosed and kept until a handle moves', () => {
+    mount('/?runtime=under30&runtime=over120');
+    const min = runtimeHandle('min');
+    expect(min).toHaveValue('0');
+    expect(runtimeHandle('max')).toHaveValue('5');
+    const slider = screen.getByTestId('filter-runtime');
+    expect(slider).toHaveAccessibleDescription(/separate ranges \(Under 30m, Over 2h\)/);
+    expect(screen.getByRole('button', { name: 'Runtime 2 selected' })).toBeVisible();
+    expect(new URLSearchParams(url().split('?')[1]).getAll('runtime')).toEqual([
+      'under30',
+      'over120',
+    ]);
+    moveRuntime('min', 1);
+    expect(new URLSearchParams(url().split('?')[1]).getAll('runtime')).toEqual([
+      '30-60',
+      '60-90',
+      '90-120',
+      'over120',
+    ]);
+    expect(screen.getByTestId('filter-runtime')).not.toHaveAccessibleDescription();
+  });
+
+  it('T-RANGE-002f handle positions follow the URL through Back and Forward', () => {
+    mount('/?runtime=under30');
+    moveRuntime('max', 2);
+    expect(runtimeHandle('max')).toHaveValue('2');
+    fireEvent.click(screen.getByRole('button', { name: 'Back', hidden: true }));
+    expect(runtimeHandle('max')).toHaveValue('1');
+    fireEvent.click(screen.getByRole('button', { name: 'Forward', hidden: true }));
+    expect(runtimeHandle('max')).toHaveValue('2');
   });
 });

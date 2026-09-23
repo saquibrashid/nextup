@@ -105,6 +105,95 @@ export function runtimeInAnyBucket(
   return buckets.some((bucket) => runtimeInBucket(minutes, bucket));
 }
 
+/**
+ * The runtime range slider's stops (#366, TASK-246), in minutes.
+ *
+ * Derived from {@link RUNTIME_BUCKET_BOUNDS} rather than restated, so a stop
+ * can never sit between two buckets: stop `i` is bucket `i`'s lower edge (`0`
+ * meaning "no minimum") and the final stop, `null`, is "no maximum". A range
+ * of stop indexes `[min, max)` therefore selects exactly
+ * `RUNTIME_BUCKETS.slice(min, max)` and keeps the existing URL tokens, API
+ * validation, SQL predicates and hidden-unknown count unchanged.
+ */
+export const RUNTIME_RANGE_STOPS: readonly (number | null)[] = [
+  0,
+  ...RUNTIME_BUCKETS.map((bucket) => RUNTIME_BUCKET_BOUNDS[bucket].upper),
+];
+
+/** The index of the unbounded final stop. */
+export const RUNTIME_RANGE_LAST_STOP = RUNTIME_BUCKETS.length;
+
+/** Stop indexes; always `0 <= min < max <= RUNTIME_RANGE_LAST_STOP`. */
+export interface RuntimeRange {
+  readonly min: number;
+  readonly max: number;
+}
+
+export interface RuntimeRangeSelection extends RuntimeRange {
+  /**
+   * `false` when the selected buckets have a gap (a saved `under30` +
+   * `over120` link). The range is then the smallest one covering them, and a
+   * caller must not write it back until the owner actually moves a handle —
+   * doing so would silently widen the filter.
+   */
+  readonly contiguous: boolean;
+}
+
+/** Selected buckets → the slider positions that represent them. */
+export function runtimeRangeFromBuckets(buckets: readonly RuntimeBucket[]): RuntimeRangeSelection {
+  const indexes = RUNTIME_BUCKETS.flatMap((bucket, index) =>
+    buckets.includes(bucket) ? [index] : [],
+  );
+  const first = indexes[0];
+  const last = indexes.at(-1);
+  if (first === undefined || last === undefined) {
+    return { min: 0, max: RUNTIME_RANGE_LAST_STOP, contiguous: true };
+  }
+  return { min: first, max: last + 1, contiguous: indexes.length === last - first + 1 };
+}
+
+/**
+ * Slider positions → canonical buckets. The full track is "any runtime" and
+ * returns `[]`, NOT every bucket: selecting all five would still exclude
+ * titles with no runtime, which is a filter the owner never asked for.
+ */
+export function runtimeBucketsForRange(range: RuntimeRange): RuntimeBucket[] {
+  const { min, max } = normalizeRuntimeRange(range);
+  if (min === 0 && max === RUNTIME_RANGE_LAST_STOP) return [];
+  return RUNTIME_BUCKETS.slice(min, max);
+}
+
+/**
+ * Moves one handle, holding it one stop short of the other rather than
+ * swapping them. `clamped` reports that the OTHER handle stopped it, so the
+ * UI can say why the handle did not reach the requested stop. Positions off
+ * the track are simply bounded to it.
+ */
+export function moveRuntimeRangeHandle(
+  range: RuntimeRange,
+  handle: 'min' | 'max',
+  requested: number,
+): { readonly range: RuntimeRange; readonly clamped: boolean } {
+  const current = normalizeRuntimeRange(range);
+  const position = clampStop(requested);
+  if (handle === 'min') {
+    const min = Math.min(position, current.max - 1);
+    return { range: { min, max: current.max }, clamped: min !== position };
+  }
+  const max = Math.max(position, current.min + 1);
+  return { range: { min: current.min, max }, clamped: max !== position };
+}
+
+function clampStop(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(RUNTIME_RANGE_LAST_STOP, Math.max(0, Math.round(value)));
+}
+
+function normalizeRuntimeRange(range: RuntimeRange): RuntimeRange {
+  const min = Math.min(clampStop(range.min), RUNTIME_RANGE_LAST_STOP - 1);
+  return { min, max: Math.max(clampStop(range.max), min + 1) };
+}
+
 /** The minimum a row must expose to be ordered by runtime. */
 export interface RuntimeOrderableTitle {
   readonly runtimeMinutes: number | null;

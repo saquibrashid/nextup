@@ -934,11 +934,10 @@ test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone
       const panel = field.locator('.filter-disclosure__panel');
       await horizontallyBounded(page, panel, width);
       if (category === 'Runtime') {
-        await expect(panel.getByRole('checkbox')).toHaveCount(5);
-        await expect(panel.getByRole('checkbox', { name: '1h – 2h', exact: true })).toHaveCount(0);
-        for (const label of ['1h – 1h 30m', '1h 30m – 2h']) {
-          const option = panel.getByRole('checkbox', { name: label, exact: true });
-          await usableTarget(page, option.locator('..'));
+        await expect(panel.getByRole('checkbox')).toHaveCount(0);
+        await expect(panel.getByRole('slider')).toHaveCount(2);
+        for (const name of ['Minimum runtime', 'Maximum runtime']) {
+          await usableTarget(page, panel.getByRole('slider', { name, exact: true }));
         }
       }
       await page.keyboard.press('Escape');
@@ -959,14 +958,129 @@ test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone
   const dialog = await openFiltersPanel(page);
   const controls = dialog.getByRole('group', { name: 'Filter by', exact: true });
   await controls.getByRole('button', { name: 'Runtime Any runtime' }).click();
-  const runtime = dialog.getByRole('checkbox', { name: '1h 30m – 2h', exact: true });
-  await chooseInput(runtime);
+  const minimum = dialog.getByRole('slider', { name: 'Minimum runtime', exact: true });
+  const maximum = dialog.getByRole('slider', { name: 'Maximum runtime', exact: true });
+  await minimum.fill('3');
+  await maximum.fill('4');
   await expect.poll(() => new URL(page.url()).searchParams.getAll('runtime')).toEqual(['90-120']);
   await expect(
     controls.getByRole('button', { name: 'Runtime 1h 30m – 2h', exact: true }),
   ).toBeVisible();
 });
 
+/** Viewport centre of a range handle at `stop`, from the input's own box. */
+async function handleCentre(slider: Locator, stop: number): Promise<{ x: number; y: number }> {
+  const box = await bounds(slider);
+  const half = 22;
+  return { x: box.x + half + ((box.width - 2 * half) * stop) / 5, y: box.y + box.height / 2 };
+}
+
+async function openRuntimeSlider(page: Page): Promise<{
+  panel: Locator;
+  minimum: Locator;
+  maximum: Locator;
+}> {
+  const dialog = await openFiltersPanel(page);
+  const trigger = dialog.getByRole('button', { name: /^Runtime / });
+  await trigger.click();
+  const panel = dialog.locator('.filter-disclosure__panel:visible');
+  await panel.locator('.range-slider').scrollIntoViewIfNeeded();
+  return {
+    panel,
+    minimum: panel.getByRole('slider', { name: 'Minimum runtime', exact: true }),
+    maximum: panel.getByRole('slider', { name: 'Maximum runtime', exact: true }),
+  };
+}
+
+function runtimeParams(page: Page): string[] {
+  return new URL(page.url()).searchParams.getAll('runtime');
+}
+
+for (const width of [320, 640, 1280]) {
+  test(`T-RANGE-003a: runtime slider handles are usable targets by keyboard and pointer at ${String(width)}px`, async ({
+    page,
+  }) => {
+    await mountLibrary(page, { width });
+    const { panel, minimum, maximum } = await openRuntimeSlider(page);
+    await horizontallyBounded(page, panel, width);
+    const slider = panel.locator('.range-slider');
+    await expect(slider.locator('label', { hasText: /^Min$/ })).toBeVisible();
+    await expect(slider.locator('label', { hasText: /^Max$/ })).toBeVisible();
+    await expect(slider.getByTestId('range-min-value')).toHaveText('0m');
+    await expect(slider.getByTestId('range-max-value')).toHaveText('No limit');
+
+    // Each visible handle is the element under its own centre, so the other
+    // input spanning the same track cannot swallow the press.
+    for (const [locator, stop, handle] of [
+      [minimum, 0, 'min'],
+      [maximum, 5, 'max'],
+    ] as const) {
+      const centre = await handleCentre(locator, stop);
+      const hit = await page.evaluate(
+        ({ x, y }) => document.elementFromPoint(x, y)?.getAttribute('data-handle') ?? null,
+        centre,
+      );
+      expect(hit).toBe(handle);
+      const viewport = page.viewportSize();
+      expect(centre.x - 22).toBeGreaterThanOrEqual(0);
+      expect(centre.x + 22).toBeLessThanOrEqual((viewport?.width ?? 0) + 1);
+    }
+
+    await minimum.focus();
+    await page.keyboard.press('ArrowRight');
+    await page.keyboard.press('ArrowRight');
+    await expect.poll(() => runtimeParams(page)).toEqual(['60-90', '90-120', 'over120']);
+    await expect(minimum).toHaveAttribute('aria-valuetext', '1 hour');
+    await expect(slider.getByTestId('range-min-value')).toHaveText('1h');
+
+    await maximum.focus();
+    for (let step = 0; step < 5; step += 1) await page.keyboard.press('ArrowLeft');
+    await expect.poll(() => runtimeParams(page)).toEqual(['60-90']);
+    await expect(maximum).toHaveAttribute('aria-valuetext', '1 hour 30 minutes');
+    await expect(minimum).toHaveAttribute('aria-valuetext', '1 hour');
+    await expect(slider.getByRole('status')).toHaveText('The maximum cannot go below the minimum.');
+
+    const from = await handleCentre(maximum, 3);
+    const to = await handleCentre(maximum, 5);
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(to.x + 10, to.y, { steps: 8 });
+    await page.mouse.up();
+    await expect.poll(() => runtimeParams(page)).toEqual(['60-90', '90-120', 'over120']);
+    await expect(page.getByRole('button', { name: 'Runtime Over 1h', exact: true })).toBeVisible();
+    await noOverflow(page);
+    expect((await new AxeBuilder({ page }).include('.range-slider').analyze()).violations).toEqual(
+      [],
+    );
+  });
+}
+
+test('T-RANGE-003b: a touch drag moves the minimum handle in the phone filter drawer', async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== 'chromium', 'Touch is dispatched through Chromium CDP');
+  await mountLibrary(page, { width: 390 });
+  const { panel, minimum } = await openRuntimeSlider(page);
+  await horizontallyBounded(page, panel, 390);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
+  const from = await handleCentre(minimum, 0);
+  const to = await handleCentre(minimum, 2);
+  await cdp.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x: from.x, y: from.y }],
+  });
+  for (let step = 1; step <= 8; step += 1) {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove',
+      touchPoints: [{ x: from.x + ((to.x - from.x) * step) / 8, y: from.y }],
+    });
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await expect.poll(() => runtimeParams(page)).toEqual(['60-90', '90-120', 'over120']);
+  await expect(minimum).toHaveAttribute('aria-valuetext', '1 hour');
+  await noOverflow(page);
+});
 for (const width of [320, 1280]) {
   describe(`Service filters at ${width}px`, () => {
     test('T-SVC-002g: all eight services fit and remain searchable', async ({ page }) => {
