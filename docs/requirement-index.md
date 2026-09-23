@@ -89,6 +89,7 @@ meanings. Original story coverage is also recorded in PRD Appendix A.1.
 | REQ-105 through REQ-125 | [ui-refresh.md](../specs/ui-refresh.md), [ADR-0013](adr/ADR-0013-ui-refresh.md), PRD US-049 through US-059 excluding the deliberately unpromoted US-053 reservation. This includes REQ-119's runtime semantics. |
 | REQ-126 | PRD US-060: owner-set watching and watch-priority preferences, not automatic viewing-history tracking. |
 | REQ-127 | PRD US-061: the closed eight-service set. Use this ID for today's service boundary, not REQ-053. |
+| REQ-128 | PRD US-062: Comedy Show display category for stand-up/live comedy, automatically assigned from explicit metadata with owner override; canonical Movie/TV identity is unchanged. |
 
 ## Non-functional requirements and remaining provenance limits
 

@@ -374,7 +374,7 @@ describe('T-TMDB-004 · metadata older than 183 days refreshes on display', () =
       detailCalls().map((url) =>
         new URL(url, 'https://api.themoviedb.org').searchParams.get('append_to_response'),
       ),
-    ).toEqual(['external_ids', 'credits']);
+    ).toEqual(['external_ids,keywords', 'credits']);
   });
 });
 

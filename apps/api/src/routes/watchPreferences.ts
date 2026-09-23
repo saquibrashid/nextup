@@ -16,14 +16,7 @@ export function registerWatchPreferenceRoutes(router: Router): void {
   router.patch('/titles/:titleId/category', async (req, res) => {
     const ownerId = requireOwnerId(req);
     const titleId = req.params.titleId ?? '';
-    const parsed = parseCategoryOverride(req.body);
-    if (parsed === null)
-      throw new AppError(
-        'VALIDATION_FAILED',
-        400,
-        'Choose Automatic, Movie, TV Show or Comedy Show.',
-      );
-    await runInTransaction(async (tx) => {
+    const result = await runInTransaction(async (tx) => {
       await lockTitleForWatchPreferences(ownerId, titleId, tx);
       const title = await findTitleDetail(ownerId, titleId, tx);
       if (
@@ -32,6 +25,14 @@ export function registerWatchPreferenceRoutes(router: Router): void {
         !title.listings.some((listing) => listing.state === 'active')
       ) {
         throw new AppError('NOT_FOUND', 404, 'No such active title.');
+      }
+      const parsed = parseCategoryOverride(req.body);
+      if (parsed === null) {
+        throw new AppError(
+          'VALIDATION_FAILED',
+          400,
+          'Choose Automatic, Movie, TV Show or Comedy Show.',
+        );
       }
       const blocking = await findActiveSuppression(ownerId, title.workIdentity, tx);
       if (blocking !== null) {
@@ -47,8 +48,9 @@ export function registerWatchPreferenceRoutes(router: Router): void {
         );
       }
       await setCategoryOverride(ownerId, title.workIdentity, parsed.categoryOverride, tx);
+      return parsed;
     });
-    res.status(200).json({ titleId, ...parsed });
+    res.status(200).json({ titleId, ...result });
   });
   router.patch('/titles/:titleId/watch-preferences', async (req, res) => {
     const ownerId = requireOwnerId(req);

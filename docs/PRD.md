@@ -2,7 +2,7 @@
 
 **Project:** nextup
 **Version:** Current v1 scope, including subsequent owner-approved promotions; remaining deferrals are in §11.2.
-**Status:** Approved scope with recorded amendments through US-061 / REQ-127. Implementation status is in `docs/status.md`; it does not replace release acceptance.
+**Status:** Approved scope with recorded amendments through US-062 / REQ-128. Implementation status is in `docs/status.md`; it does not replace release acceptance.
 **Inputs:** `docs/BRD.md`, the recorded owner decisions in the ADRs, and the original authoring-tree `Context/` documents. **The `Context/` tree is not supplied in this repository.** Its citations preserve provenance, not an instruction to invent missing source text. See `docs/current-release.md` for the owner decisions applied on 2026-09-17 and `docs/requirement-index.md` for reconciled reference authority.
 **Audience:** the implementer. Implementation will be performed by GitHub Copilot in autopilot mode (ASM-028, ASM-029, NFR-002, NFR-003, NFR-004). This document, together with the specs, IS the implementation input. Acceptance criteria are written to be executable and verifiable without asking a question.
 **No timeline.** Per A19 / ASM-027 this document contains no dates, durations, or sequencing commitments beyond dependency order.

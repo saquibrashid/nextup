@@ -27,8 +27,8 @@ Collected locations: `packages/domain/test/titleCategory.spec.ts`;
 `apps/web/test/titleDetails.spec.tsx`, `filterBar.spec.tsx`;
 `tests/e2e/titleDetails.spec.ts`.
 
-**Current mapping, reconciled 2026-09-17:** 367 distinct story/AC keys across
-60 PRD stories, with 367 mapped keys. The original 39-story / 241-AC counts in
+**Current mapping:** all current PRD story/AC keys, including US-062, are mapped
+below. The original 39-story / 241-AC counts in
 dated revision history describe that revision, not the current release.
 `T-META-001` checks the current rows; both its unmapped and phantom-citation
 baselines are empty. A mapped name is not proof of sufficient assertions or
