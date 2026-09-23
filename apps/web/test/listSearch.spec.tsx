@@ -31,6 +31,21 @@ function params(): URLSearchParams {
 }
 
 describe('T-UX-140 server-backed library search control', () => {
+  it('T-MOCK-005a: one mounted form resets discarded drafts without losing canonical search', async () => {
+    mount('/?q=Orbit&service=max');
+    const user = userEvent.setup();
+    const form = screen.getByRole('search');
+    await user.type(screen.getByRole('searchbox'), ' unfinished');
+    await user.click(screen.getByRole('button', { name: 'Close search' }));
+    expect(form).toBeInTheDocument();
+    expect(form).not.toBeVisible();
+    expect(params().get('q')).toBe('Orbit');
+    await user.click(screen.getByTestId('list-search-trigger'));
+    expect(screen.getByRole('search')).toBe(form);
+    expect(screen.getByRole('searchbox')).toHaveValue('Orbit');
+    expect(params().get('service')).toBe('max');
+  });
+
   it('T-UX-140a reads the URL and exposes a labelled, bounded native search form', () => {
     mount('/?q=Dune');
     expect(screen.getByRole('search', { name: 'Search your list' })).toBeTruthy();

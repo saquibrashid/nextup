@@ -16,7 +16,7 @@ import { Input } from './ui/Input';
 // opposite rule to filters. Stubbing it here would report it as shipped and
 // bake in the wrong persistence model.
 
-import { useCallback, useId, useState, type JSX } from 'react';
+import { useCallback, useId, useState, type JSX, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from './ui/Button';
 import { Dialog } from './ui/Dialog';
@@ -163,6 +163,7 @@ function selectionSummary(labels: readonly string[], emptyLabel: string): string
 }
 
 export interface FilterBarProps {
+  readonly inline?: boolean;
   /** Every genre present in the unfiltered list. Never invented here. */
   readonly genres?: readonly string[];
   /** Rows currently shown, for the live count (US-019 AC-5). */
@@ -206,6 +207,7 @@ export interface FilterBarProps {
 }
 
 export function FilterBar({
+  inline = false,
   genres = [],
   shown,
   total,
@@ -309,9 +311,11 @@ export function FilterBar({
     <>
       <div
         className="filter-bar"
-        data-testid="filter-bar"
+        data-inline={inline || undefined}
+        hidden={inline}
+        data-testid={inline ? undefined : 'filter-bar'}
         role="group"
-        aria-label="Filter the list"
+        aria-label={inline ? 'Quick filters' : 'Filter the list'}
       >
         {/*
         Owner-approved 2026-09-17 (`specs/ui.md` §2.1 item 2) — the six fields
@@ -322,29 +326,33 @@ export function FilterBar({
         the same reason — a count you can only see inside the control that
         changes it is not a count.
       */}
-        <Button
-          aria-haspopup="dialog"
-          aria-expanded={open}
-          data-testid="filters-trigger"
-          onClick={() => {
-            setOpen(true);
-          }}
-        >
-          <span>{FILTERS_TRIGGER_LABEL}</span>
-          {activeCount > 0 && (
-            <span className="filter-bar__count" aria-label={`${String(activeCount)} active`}>
-              {activeCount}
-            </span>
-          )}
-        </Button>
-        {open && (
-          <Dialog variant="panel" aria-labelledby={headingId} onDismiss={close}>
-            <div className="panel-head">
-              <h2 id={headingId}>{FILTERS_PANEL_TITLE}</h2>
-              <Button variant="ghost" aria-label={FILTERS_CLOSE_LABEL} onClick={close}>
-                <CloseIcon />
-              </Button>
-            </div>
+        {!inline && (
+          <Button
+            aria-haspopup="dialog"
+            aria-expanded={open}
+            data-testid="filters-trigger"
+            onClick={() => {
+              setOpen(true);
+            }}
+          >
+            <span>{FILTERS_TRIGGER_LABEL}</span>
+            {activeCount > 0 && (
+              <span className="filter-bar__count" aria-label={`${String(activeCount)} active`}>
+                {activeCount}
+              </span>
+            )}
+          </Button>
+        )}
+        {(open || inline) && (
+          <FilterPanel inline={inline} headingId={headingId} close={close}>
+            {!inline && (
+              <div className="panel-head">
+                <h2 id={headingId}>{FILTERS_PANEL_TITLE}</h2>
+                <Button variant="ghost" aria-label={FILTERS_CLOSE_LABEL} onClick={close}>
+                  <CloseIcon />
+                </Button>
+              </div>
+            )}
             <Field legend="Filter by">
               <div className="filter-controls">
                 <FilterDisclosure
@@ -523,41 +531,47 @@ export function FilterBar({
                 </FilterDisclosure>
               </div>
             </Field>
-            <div className="panel-foot">
-              <Button variant="primary" onClick={close}>
-                {FILTERS_DONE_LABEL}
-              </Button>
-            </div>
-          </Dialog>
+            {!inline && (
+              <div className="panel-foot">
+                <Button variant="primary" onClick={close}>
+                  {FILTERS_DONE_LABEL}
+                </Button>
+              </div>
+            )}
+          </FilterPanel>
         )}
       </div>
 
-      <div
-        className="service-filters"
-        role="group"
-        aria-label="Filter by streaming service"
-        onFocus={(event) => event.target.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })}
-      >
-        <Button
-          variant="secondary"
-          aria-pressed={filters.services.length === 0}
-          onClick={() => update({ ...filters, services: [] })}
+      {!inline && (
+        <div
+          className="service-filters"
+          role="group"
+          aria-label="Filter by streaming service"
+          onFocus={(event) =>
+            event.target.scrollIntoView?.({ block: 'nearest', inline: 'nearest' })
+          }
         >
-          All services
-        </Button>
-        {SERVICES.map((service) => (
           <Button
-            key={service}
             variant="secondary"
-            aria-pressed={filters.services.includes(service)}
-            onClick={() => update({ ...filters, services: toggle(filters.services, service) })}
+            aria-pressed={filters.services.length === 0}
+            onClick={() => update({ ...filters, services: [] })}
           >
-            <ServiceMark service={service} />
+            All services
           </Button>
-        ))}
-      </div>
+          {SERVICES.map((service) => (
+            <Button
+              key={service}
+              variant="secondary"
+              aria-pressed={filters.services.includes(service)}
+              onClick={() => update({ ...filters, services: toggle(filters.services, service) })}
+            >
+              <ServiceMark service={service} />
+            </Button>
+          ))}
+        </div>
+      )}
 
-      {(chips.length > 0 || isFiltered(filters) || query !== '') && (
+      {!inline && (chips.length > 0 || isFiltered(filters) || query !== '') && (
         <div className="filter-bar__chips">
           {chips.length > 0 && (
             <ul className="active-filters" aria-label="Active filters">
@@ -604,7 +618,7 @@ export function FilterBar({
         </div>
       )}
 
-      {!countPending && (
+      {!inline && !countPending && (
         <div className="filter-bar__status">
           {/*
         `role="status"` so the count is announced when filtering changes it -
@@ -638,6 +652,26 @@ export function FilterBar({
         </div>
       )}
     </>
+  );
+}
+
+function FilterPanel({
+  inline,
+  headingId,
+  close,
+  children,
+}: {
+  readonly inline: boolean;
+  readonly headingId: string;
+  readonly close: () => void;
+  readonly children: ReactNode;
+}): JSX.Element {
+  return inline ? (
+    <>{children}</>
+  ) : (
+    <Dialog variant="panel" aria-labelledby={headingId} onDismiss={close}>
+      {children}
+    </Dialog>
   );
 }
 

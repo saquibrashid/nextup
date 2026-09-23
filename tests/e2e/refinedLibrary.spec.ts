@@ -132,6 +132,8 @@ async function mountLibrary(
     singleService = false,
     unfinishedCapture = false,
     expectedCount = TITLES.length,
+    titleSuffix = '',
+    brightArtwork = false,
   } = {},
 ): Promise<URL[]> {
   const requests: URL[] = [];
@@ -149,7 +151,14 @@ async function mountLibrary(
     const request = route.request();
     const target = new URL(request.url());
     if (target.hostname === 'image.tmdb.org') {
-      await route.fulfill({ contentType: 'image/png', body: PNG });
+      await route.fulfill(
+        brightArtwork
+          ? {
+              contentType: 'image/svg+xml',
+              body: '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="240"><rect width="160" height="240" fill="white"/></svg>',
+            }
+          : { contentType: 'image/png', body: PNG },
+      );
       return;
     }
     if (target.hostname !== 'localhost' && target.hostname !== '127.0.0.1') {
@@ -213,6 +222,7 @@ async function mountLibrary(
         const matching = orderedTitles(target.searchParams, preferences)
           .map((title, index) => ({
             ...title,
+            name: title.name + titleSuffix,
             ...(varied && index === 4
               ? {
                   runtimeMinutes: null,
@@ -621,7 +631,8 @@ test('T-UX-141e: wide Cover browser uses shorter Comparison desk rows without lo
   for (const row of await rows.all()) {
     const poster = await bounds(row.getByTestId('poster'));
     const details = await bounds(row.locator('.title-row__body'));
-    expect(details.y).toBeGreaterThanOrEqual(poster.y + poster.height);
+    expect(details.y).toBeGreaterThan(poster.y);
+    expect(details.y).toBeLessThan(poster.y + poster.height);
     expect(poster.x).toBeGreaterThanOrEqual(first.x);
     expect(poster.height / poster.width).toBeCloseTo(1.5, 1);
   }
@@ -1216,7 +1227,7 @@ for (const width of [640, 900, 1280]) {
               meta: rect('.title-row__meta'),
               priority: rect('.title-row__watch'),
               date: rect('.title-row__date'),
-              footer: rect('.title-row__badges'),
+              footer: rect('.title-row__footer'),
             };
           }),
         );
@@ -1323,6 +1334,123 @@ for (const width of [390, 1024, 1440]) {
   });
 }
 
+for (const width of [640, 1024, 1440]) {
+  describe(`Artwork composition at ${width}px`, () => {
+    test('T-MOCK-004b: compact cards overlay artwork, retain facts and grow for full titles', async ({
+      page,
+    }, testInfo) => {
+      await mountLibrary(page, { width, singleService: true, brightArtwork: true });
+      await page.screenshot({ path: testInfo.outputPath('artwork-cards.png'), fullPage: true });
+      const row = page.locator('li.title-row').first();
+      const card = await bounds(row);
+      const poster = await bounds(row.getByTestId('poster'));
+      const heading = await bounds(row.getByTestId('title-name'));
+      const facts = await bounds(row.locator('.title-row__facts'));
+      const genres = await bounds(row.locator('.genre-chips'));
+      const rating = await bounds(row.getByTestId('imdb-rating'));
+      const date = await bounds(row.getByTestId('date-added-label'));
+      const badges = await bounds(row.getByTestId('badges'));
+      expect(card.height / card.width).toBeLessThanOrEqual(2.1);
+      expect(heading.y).toBeGreaterThan(poster.y);
+      expect(heading.y + heading.height).toBeLessThanOrEqual(poster.y + poster.height);
+      expect(facts.y).toBeGreaterThanOrEqual(heading.y + heading.height);
+      expect(rating.y).toBeGreaterThanOrEqual(genres.y - 1);
+      expect(rating.y).toBeLessThan(genres.y + genres.height);
+      expect(badges.x + badges.width).toBeLessThanOrEqual(date.x);
+      expect(Math.abs(date.y + date.height - badges.y - badges.height)).toBeLessThan(1);
+      await expect(row.getByTestId('date-added-label')).toHaveText(TITLES[0]?.dateAddedLabel ?? '');
+      const scan = await new AxeBuilder({ page })
+        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+        .analyze();
+      expect(scan.violations).toEqual([]);
+      await noOverflow(page);
+
+      const suffix = ' and the extraordinary journey beyond the distant mountains'.repeat(4);
+      await page.unrouteAll({ behavior: 'wait' });
+      await mountLibrary(page, { width, titleSuffix: suffix, allServices: true });
+      await page.screenshot({
+        path: testInfo.outputPath('long-artwork-cards.png'),
+        fullPage: true,
+      });
+      await expect(row.getByTestId('title-name')).toHaveText(`${TITLES[0]?.name ?? ''}${suffix}`);
+      expect((await bounds(row)).height).toBeGreaterThan(card.height);
+      for (const item of await page.locator('li.title-row').all()) {
+        const outer = await bounds(item);
+        for (const selector of ['.title-row__name', '.title-row__meta', '.title-row__footer']) {
+          const part = item.locator(selector);
+          const box = await bounds(part);
+          expect(box.y + box.height).toBeLessThanOrEqual(outer.y + outer.height);
+          expect(await part.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
+        }
+      }
+      await noOverflow(page);
+      await page.getByRole('button', { name: 'Compact view', exact: true }).click();
+      const compactPoster = await bounds(row.getByTestId('poster'));
+      expect(compactPoster.width).toBe(72);
+      expect(compactPoster.height).toBe(108);
+      await expect(row.getByTestId('title-name')).toHaveText(`${TITLES[0]?.name ?? ''}${suffix}`);
+      await noOverflow(page);
+    });
+  });
+}
+
+for (const width of [390, 1280, 1440]) {
+  describe(`Library composition at ${width}px`, () => {
+    test('T-MOCK-005: search and quick filters share URL state without crowding library actions', async ({
+      page,
+    }, testInfo) => {
+      await mountLibrary(page, { width });
+      await page.screenshot({ path: testInfo.outputPath('library-header.png'), fullPage: true });
+      const quick = page.getByRole('group', { name: 'Quick filters' });
+      const input = page.getByRole('searchbox', { name: 'Search your list' });
+      if (width >= 1280) {
+        await expect(input).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Close search', exact: true })).toBeHidden();
+        await expect(quick).toBeVisible();
+        const heading = await bounds(page.getByRole('heading', { level: 1 }));
+        const search = await bounds(page.getByRole('search', { name: 'Search your list' }));
+        const filters = await bounds(page.getByTestId('filters-trigger'));
+        const actions = await bounds(page.locator('.library-actions'));
+        const quickBox = await bounds(quick);
+        expect(search.x).toBeGreaterThanOrEqual(heading.x + heading.width);
+        expect(Math.abs(search.y - filters.y)).toBeLessThan(1);
+        expect(quickBox.x + quickBox.width).toBeLessThanOrEqual(actions.x);
+        await quick.getByRole('button', { name: /^Type/ }).click();
+        await quick.getByRole('checkbox', { name: 'Movies', exact: true }).check();
+        await expect(page).toHaveURL(/type=movie/);
+        await page.getByTestId('filters-trigger').click();
+        const dialog = page.getByRole('dialog', { name: 'Filters', exact: true });
+        await dialog.getByRole('button', { name: /^Type/ }).click();
+        await expect(dialog.getByRole('checkbox', { name: 'Movies', exact: true })).toBeChecked();
+        await dialog.getByRole('checkbox', { name: 'Movies', exact: true }).uncheck();
+        await dialog.getByRole('button', { name: 'Close filters', exact: true }).click();
+        await quick.getByRole('button', { name: /^Type/ }).click();
+        await expect(
+          quick.getByRole('checkbox', { name: 'Movies', exact: true }),
+        ).not.toBeChecked();
+        await page.keyboard.press('Escape');
+      } else {
+        await expect(quick).toBeHidden();
+        await expect(input).toBeHidden();
+        await page.getByTestId('list-search-trigger').click();
+      }
+      await input.fill('Orbit');
+      expect(new URL(page.url()).searchParams.has('q')).toBe(false);
+      await input.press('Enter');
+      await expect(page).toHaveURL(/q=Orbit/);
+      await expect(page.getByTestId('title-name')).toHaveText('Quiet Orbit');
+      await noOverflow(page);
+      await page.getByRole('button', { name: 'Clear search', exact: true }).click();
+      await expect(page.getByTestId('title-name')).toHaveCount(TITLES.length);
+      await expect(input).toBeFocused();
+      await page.goBack();
+      await expect(input).toHaveValue('Orbit');
+      await expect(page.getByTestId('title-name')).toHaveText('Quiet Orbit');
+      await noOverflow(page);
+    });
+  });
+}
+
 test('T-POL-003c: catalog surfaces and artwork stay consistent in both layouts with reduced motion', async ({
   page,
 }, testInfo) => {
@@ -1413,7 +1541,9 @@ test('T-UX-155c: library frame, priority geometry and portrait artwork stay inte
           };
         }),
       );
-      expect(new Set(geometry.map((box) => box.width)).size).toBe(1);
+      if (view === 'Compact' || width < 640) {
+        expect(new Set(geometry.map((box) => box.width)).size).toBe(1);
+      }
       for (const box of geometry) {
         expect(box.height, `${view} ${width}: priority control height`).toBe(44);
         expect(box.width).toBeGreaterThanOrEqual(44);

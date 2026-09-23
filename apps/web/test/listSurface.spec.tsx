@@ -221,7 +221,7 @@ describe('T-UX-111 · ui-refresh.md §4.1/§4.2 · at 1280 px the grid layout re
     expect(grid).toMatch(/grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
   });
 
-  it('T-UX-111c: Cover browser stacks bounded portrait artwork above details', () => {
+  it('T-UX-111c: Cover browser retains full-width bounded portrait artwork', () => {
     const block = mediaBlock('(min-width: 640px)');
     const gridSelector = "\\.title-list\\[data-view='grid'\\]";
     expect(ruleBody(`${gridSelector} \\.title-row`, block)).toMatch(
@@ -229,6 +229,31 @@ describe('T-UX-111 · ui-refresh.md §4.1/§4.2 · at 1280 px the grid layout re
     );
     expect(ruleBody(`${gridSelector} \\.title-row__poster`, block)).toMatch(/width:\s*100%/);
     expect(ruleBody(`${gridSelector} \\.title-row__poster`, BASE_CSS)).toMatch(/height:\s*auto/);
+  });
+
+  describe('T-MOCK-004 compact artwork composition', () => {
+    it('T-MOCK-004a: overlay wrappers preserve complete titles, facts, genres and honest dates', () => {
+      const name = 'A Very Long Title That Must Remain Complete Across Multiple Lines';
+      render(
+        <MemoryRouter>
+          <TitleList items={[{ ...DUNE, name, imdbRating: 8.4 }]} />
+        </MemoryRouter>,
+      );
+      expect(screen.getByTestId('title-name')).toHaveTextContent(name);
+      const row = screen.getByTestId(`title-row-${DUNE.titleId}`);
+      expect(row.querySelector('.title-row__facts')).toHaveTextContent('2021');
+      expect(row.querySelector('.title-row__facts')).toHaveTextContent('Movie');
+      expect(screen.getByTestId('runtime')).toHaveTextContent('2h 35m');
+      for (const genre of DUNE.genres) expect(within(row).getByText(genre)).toBeVisible();
+      expect(screen.getByTestId('imdb-rating')).toHaveTextContent('8.4');
+      expect(row.querySelector('.title-row__footer')).toContainElement(
+        screen.getByTestId('date-added-label'),
+      );
+      expect(screen.getByTestId('date-added-label')).toHaveTextContent(DUNE.dateAddedLabel);
+      expect(row.querySelector('.title-row__footer')).toContainElement(
+        screen.getByTestId('badges'),
+      );
+    });
   });
 
   it('T-UX-111d: REQ-111 — the poster box is a uniform 2:3 declared on the BASE rule', () => {

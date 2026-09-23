@@ -697,7 +697,14 @@ finished, so the exception cannot outlive its reason.
 | `TASK-238` | `done` | #327: directly linkable movie/show details with synopsis, cast/characters, directors/creators, artwork and existing actions. Strict display-only cache uses owner/provider-identity-scoped metadata writes and the 183-day lazy policy; unavailable/stale/unidentified states retain saved data. Additive nullable SQL JSON column, preserved query/layout return, existing consent/undo dialogs and stronger reachability/inference gates. `T-DETAIL-001` through `T-DETAIL-006`; unit/web coverage, real SQL and responsive Chromium/WebKit regressions. Separate PR; watched history and personal ratings remain outside scope. |
 | `TASK-239` | `done` | Owner-approved tile-first extraction/review: detect before reading, serial original-resolution crops, controlled input provenance, visible per-tile next steps including known titles, safe bulk policy and separate Apply summary. `T-AI-065`, `T-AI-066`, `T-AI-067`; one live read of the reported screenshot returned all five intended titles in five source regions, without the earlier stray OCR candidates (27.5 seconds, five calls per reader). This is a bounded recognition check, not a new corpus quality baseline. No migration, dependency or infrastructure change. |
 | `TASK-240` | `done` | Owner mockup-led in-app design: desktop sidebar, navy/violet surfaces, local serif headings, full-width artwork, shared service-filter chips and refined upload/review grouping. Preserve all workflows, persistence, safety, evidence, attribution and accessibility; no scenic branding or fictional features. `T-MOCK-001`, `T-MOCK-002`, `T-MOCK-003`. |
+| `TASK-241` | `doing` | Match the owner's compact artwork-card composition, library header and import-page formatting. Full titles stay visible and cards grow when necessary; Compact stays unchanged. Preserve real filters/search, all ingest paths, required choices, safety, dates, attribution and accessible targets. `T-MOCK-004`, `T-MOCK-005`, `T-MOCK-006`. |
 <!-- STATUS-LEDGER:END -->
+
+### Approved mockup composition follow-up, 2026-09-22
+
+| Task | Work | Size | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| TASK-241 | Replace stacked Grid cards with unified artwork/gradient tiles; group the library heading/search/controls and refine the import service/mode/intake layout per `specs/ui-refresh.md` section 2.5. Preserve full text and allow growth; no fictional features or backend changes. | 2 agent-runs + 15 owner-review-minutes | TASK-240 | `T-MOCK-004`, `T-MOCK-005`, `T-MOCK-006`; existing responsive library, capture, consent and accessibility regressions |
 
 ### Approved tile-first extraction and review
 

@@ -59,6 +59,12 @@ describe('T-POL-003a calm capture framing', () => {
         await page.screenshot({ path: testInfo.outputPath('capture-setup.png'), fullPage: true });
         const cards = page.getByTestId('service-step').locator('label');
         await expect(cards).toHaveCount(8);
+        if (width >= 1280) {
+          const positions = await cards.evaluateAll((nodes) =>
+            nodes.map((node) => Math.round(node.getBoundingClientRect().top)),
+          );
+          expect(new Set(positions).size).toBe(1);
+        }
         const sizes = await cards.evaluateAll((nodes) =>
           nodes.map((node) => {
             const rect = node.getBoundingClientRect();
@@ -110,6 +116,52 @@ describe('T-POL-003a calm capture framing', () => {
       });
     });
   }
+});
+
+test('T-MOCK-006: import groups choices, intake and bottom summary without preselecting answers', async ({
+  page,
+}, testInfo) => {
+  await page.route('**/api/me', (route) =>
+    route.fulfill({ json: { ownerId: 'owner', attribution: {} } }),
+  );
+  await page.route('**/api/batches?open=true', (route) => route.fulfill({ json: { batches: [] } }));
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { read: async () => [] },
+    });
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/upload');
+  await page.screenshot({
+    path: testInfo.outputPath('import-composition.png'),
+    fullPage: true,
+  });
+  const heading = await page.getByRole('heading', { level: 1 }).boundingBox();
+  const progress = await page.getByRole('list', { name: 'Capture progress' }).boundingBox();
+  if (!heading || !progress) throw new Error('Missing import heading or progress');
+  expect(progress.y).toBeGreaterThanOrEqual(heading.y + heading.height);
+  const serviceCards = page.getByTestId('service-step').locator('label');
+  await expect(serviceCards).toHaveCount(8);
+  const tops = await serviceCards.evaluateAll((nodes) =>
+    nodes.map((node) => Math.round(node.getBoundingClientRect().top)),
+  );
+  expect(new Set(tops).size).toBe(1);
+  await expect(page.getByRole('radio', { checked: true })).toHaveCount(0);
+  await expect(page.getByTestId('submit-button')).toBeDisabled();
+  const target = await page.locator('.dropzone__target').boundingBox();
+  const summary = await page.locator('.upload-summary').boundingBox();
+  if (!target || !summary) throw new Error('Missing intake target or summary');
+  expect(summary.y).toBeGreaterThanOrEqual(target.y + target.height);
+  await expect(page.getByTestId('file-input')).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Paste screenshot', exact: true })).toBeVisible();
+  await page.getByRole('radio', { name: 'Netflix', exact: true }).check();
+  await page.getByTestId('mode-card-append-only').getByRole('radio').check();
+  await expect(page.getByTestId('file-input')).toBeEnabled();
+  await expect(page.getByTestId('submit-button')).toBeDisabled();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+    true,
+  );
 });
 
 test('T-MOCK-003a: mockup upload framing retains real choices and a readable numbered flow', async ({

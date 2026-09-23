@@ -12,17 +12,19 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 | Status | Count |
 |---|---|
 | ⬜ todo | 0 |
-| 🚧 doing | 0 |
+| 🚧 doing | 1 |
 | ✅ done | 235 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **238** |
+| **total** | **239** |
 
 ## Ready to start
 
 Not done, and every task they depend on is done.
 
-_Nothing is ready: every unfinished task is waiting on a dependency._
+| Task | Size | Section |
+|---|---|---|
+| `TASK-241` | 2 agent-runs + 15 owner-review-minutes | Approved mockup composition follow-up, 2026-09-22 |
 
 ## Waiting on the owner
 
