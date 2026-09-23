@@ -248,33 +248,32 @@ it('T-WATCH-003h the real container PATCHes once then refetches authoritative li
   expect(paths.filter((path) => path.includes('/watch-preferences'))).toHaveLength(1);
 });
 
-for (const label of ['Up next', 'Normal', 'Someday']) {
-  it(`T-WATCH-003l selecting ${label} stops Watching explicitly`, async () => {
-    const save = vi.fn(async (_id: string, body: { watching?: boolean; priority?: string }) => ({
-      titleId: item.titleId,
-      watching: body.watching ?? false,
-      priority: 'normal' as const,
-    }));
-    render(
-      <MemoryRouter>
-        <ListPage
-          items={[{ ...item, watching: true, priority: 'someday' }]}
-          onWatchPreferences={save}
-        />
-      </MemoryRouter>,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Watch status for Lanterns: Watching' }));
-    expect(screen.getByRole('radio', { name: 'Watching' })).toBeChecked();
-    fireEvent.click(screen.getByRole('radio', { name: label }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save status' }));
-    await waitFor(() =>
-      expect(save).toHaveBeenCalledWith('lanterns', {
-        watching: false,
-        priority: label === 'Up next' ? 'up-next' : label.toLowerCase(),
-      }),
-    );
-  });
-}
+const otherStatuses = ['Up next', 'Normal', 'Someday'];
+it.each(otherStatuses)('T-WATCH-003l %s stops Watching', async (label) => {
+  const save = vi.fn(async (_id: string, body: { watching?: boolean; priority?: string }) => ({
+    titleId: item.titleId,
+    watching: body.watching ?? false,
+    priority: 'normal' as const,
+  }));
+  render(
+    <MemoryRouter>
+      <ListPage
+        items={[{ ...item, watching: true, priority: 'someday' }]}
+        onWatchPreferences={save}
+      />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Watch status for Lanterns: Watching' }));
+  expect(screen.getByRole('radio', { name: 'Watching' })).toBeChecked();
+  fireEvent.click(screen.getByRole('radio', { name: label }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save status' }));
+  await waitFor(() =>
+    expect(save).toHaveBeenCalledWith('lanterns', {
+      watching: false,
+      priority: label === 'Up next' ? 'up-next' : label.toLowerCase(),
+    }),
+  );
+});
 
 it('T-WATCH-003m unified status filters exclude Watching from other priorities and clear as one chip', () => {
   render(
