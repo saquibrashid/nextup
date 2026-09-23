@@ -220,7 +220,10 @@
   --color-success: #7adcb0;
   --color-catalog: #111526;
   --color-catalog-raised: #1a2036;
-  --color-artwork-shade: rgba(17, 21, 38, 0.96);
+  --color-artwork-shade: rgba(17, 21, 38, 0.75);
+  --color-artwork-control: rgba(17, 21, 38, 0.85);
+  --color-artwork-text-muted: #c8c0de;
+  --color-artwork-control-border: #9785b1;
   --gradient-artwork: linear-gradient(
     to bottom,
     transparent,
@@ -274,6 +277,7 @@
   --text-xs: 0.75rem; /* ⚠ UPPERCASE TRACKED LABELS ONLY — see below */
   --text-sm: 0.875rem; /* Secondary and helper copy, genre chips */
   --text-base: 1rem; /* Body. NEVER below this for primary content */
+  --text-card-title: 1.125rem;
   --text-lg: 1.25rem; /* The title-row name, card headings */
   --text-xl: 1.5rem; /* Section headings, the brand mark */
   --text-2xl: 2rem; /* Page heading */
@@ -684,7 +688,8 @@ button {
  * neither failure appears in a screenshot, which is why the name is clipped
  * rather than removed.
  */
-.service-mark__name--hidden {
+.service-mark__name--hidden,
+.sr-only {
   position: absolute;
   inline-size: 1px;
   block-size: 1px;
@@ -1724,7 +1729,8 @@ button {
   padding-inline-end: 0;
 }
 
-.title-row__watching {
+.title-row__watch[data-watching='true'],
+.title-row__watch[data-watching='true'] .btn {
   color: var(--color-success);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
@@ -1804,7 +1810,7 @@ button {
  * spilling onto a second line, and `nowrap` alone would overflow the row.
  */
 .genre-chips {
-  align-items: center;
+  align-items: flex-start;
   display: inline-flex;
   flex-wrap: wrap;
   gap: var(--space-1);
@@ -1840,6 +1846,11 @@ button {
   font-size: var(--text-sm);
   min-height: var(--tap-target-min);
   padding: 0 var(--space-1);
+  align-items: flex-start;
+}
+
+.genre-chips abbr {
+  text-decoration: none;
 }
 
 /*
@@ -1883,9 +1894,11 @@ button {
   font-weight: var(--weight-normal);
 }
 
-.title-row__rating-source {
-  color: var(--color-text-muted);
-  font-size: var(--text-xs);
+.title-row__rating .icon {
+  fill: currentColor;
+  width: 1em;
+  height: 1em;
+  vertical-align: text-bottom;
 }
 
 /*
@@ -4339,10 +4352,6 @@ button {
   gap: var(--space-2);
 }
 
-.title-list[data-view='grid'] .title-row__watching {
-  flex-basis: 100%;
-}
-
 .title-row__watch {
   max-width: 100%;
 }
@@ -4366,9 +4375,10 @@ button {
   }
 
   .title-list[data-view='grid'] .title-row {
+    --color-text-muted: var(--color-artwork-text-muted);
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: subgrid;
-    grid-row: span 7;
+    grid-row: span 6;
     width: 100%;
     min-width: 0;
     row-gap: 0;
@@ -4394,7 +4404,7 @@ button {
   }
 
   .title-list[data-view='grid'] .title-row__name {
-    font-size: var(--text-base);
+    font-size: var(--text-card-title);
     font-weight: var(--weight-medium);
     line-height: var(--leading-tight);
   }
@@ -4409,7 +4419,7 @@ button {
 
   .title-list[data-view='grid'] .title-row__actions > .btn,
   .title-list[data-view='grid'] .title-row__menu > .btn {
-    background: var(--color-artwork-shade);
+    background: var(--color-artwork-control);
   }
 
   .title-list[data-view='grid'] .title-row[data-match-state='unmatched'] .title-row__actions,
@@ -4417,7 +4427,7 @@ button {
     position: relative;
     inset: auto;
     grid-column: 1;
-    grid-row: 7;
+    grid-row: 6;
     margin-inline: var(--space-3);
     margin-top: 0;
     padding-bottom: var(--space-2);
@@ -4425,7 +4435,7 @@ button {
 
   .title-list[data-view='grid'] .title-row__body {
     grid-column: 1;
-    grid-row: 2 / span 5;
+    grid-row: 2 / span 4;
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: subgrid;
     align-items: start;
@@ -4463,9 +4473,9 @@ button {
 
   .title-list[data-view='grid'] .title-row__priority {
     padding: var(--space-1) var(--space-2);
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--color-artwork-control-border);
     border-radius: var(--radius);
-    background: var(--color-artwork-shade);
+    background: var(--color-artwork-control);
     font-size: var(--text-sm);
     line-height: var(--leading-tight);
   }
@@ -4476,7 +4486,7 @@ button {
 
   .title-list[data-view='grid'] .title-row__rating {
     grid-column: 2;
-    grid-row: 4;
+    grid-row: 3;
     justify-self: end;
     align-self: start;
     font-size: var(--text-sm);
@@ -4488,17 +4498,16 @@ button {
     display: grid;
     grid-template-columns: subgrid;
     grid-template-rows: subgrid;
-    grid-row: 1 / span 4;
+    grid-row: 1 / span 3;
     align-self: stretch;
     grid-column: 1 / -1;
   }
 
   .title-list[data-view='grid'] .title-row__heading {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: subgrid;
+    display: block;
     grid-column: 1 / -1;
-    grid-row: 1 / span 2;
+    grid-row: 1;
+    min-height: 0;
     padding-inline-end: 0;
     align-items: start;
     align-self: stretch;
@@ -4508,19 +4517,18 @@ button {
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-1);
-    grid-row: 2;
     align-items: start;
     min-width: 0;
   }
 
   .title-list[data-view='grid'] .title-row__meta {
-    align-self: start;
+    align-self: stretch;
     display: grid;
     grid-template-columns: subgrid;
     grid-template-rows: subgrid;
     grid-column: 1 / -1;
-    grid-row: 3 / span 2;
-    gap: var(--space-1) var(--space-2);
+    grid-row: 2 / span 2;
+    gap: var(--space-2);
     font-size: var(--text-sm);
   }
 
@@ -4538,6 +4546,7 @@ button {
   .title-list[data-view='grid'] .genre-chips {
     grid-column: 1;
     grid-row: 2;
+    column-gap: calc(var(--space-1) / 2);
   }
 
   .title-list[data-view='grid'] .genre-chips .chip {
@@ -4546,9 +4555,13 @@ button {
     line-height: var(--leading-normal);
   }
 
+  .title-list[data-view='grid'] .genre-chips .btn {
+    color: var(--color-secondary);
+  }
+
   .title-list[data-view='grid'] .title-row__footer {
     grid-column: 1 / -1;
-    grid-row: 5;
+    grid-row: 4;
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
     align-items: end;

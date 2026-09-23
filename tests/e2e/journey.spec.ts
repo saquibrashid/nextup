@@ -1056,7 +1056,10 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
     const row = page.getByTestId(`title-row-ttl_${id}`);
     await expect(row.getByTestId('title-name')).toHaveText(work(id).name);
     await expect(row.getByTestId('badge-netflix')).toHaveText(SERVICE_LABELS.netflix);
-    await expect(row.getByTestId('date-added-label')).toHaveText(LABEL_B1);
+    await expect(row.getByTestId('date-added-label').locator('.sr-only')).toHaveText(LABEL_B1);
+    await expect(row.getByTestId('date-added-label').locator('[aria-hidden="true"]')).toHaveText(
+      'Added 27 Aug 2026',
+    );
   }
   await page.getByRole('button', { name: 'Service updates' }).click();
   await expect(page.getByTestId('freshness-label-netflix')).toHaveText('Netflix updated today');
@@ -1138,7 +1141,7 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
   await expect(page.getByTestId('title-row-ttl_arcane')).toBeVisible();
   const sinnersRow = page.getByTestId('title-row-ttl_sinners');
   await expect(sinnersRow.getByTestId('title-name')).toHaveText('Sinners');
-  await expect(sinnersRow.getByTestId('date-added-label')).toHaveText(LABEL_B2);
+  await expect(sinnersRow.getByTestId('date-added-label').locator('.sr-only')).toHaveText(LABEL_B2);
 
   // The removed view LOGS Arrival, with its ORIGINAL date preserved.
   await page.goto('/removed');
@@ -1226,7 +1229,7 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
   const arrivalRow = page.getByTestId('title-row-ttl_arrival');
   await expect(arrivalRow).toBeVisible();
   await expect(
-    arrivalRow.getByTestId('date-added-label'),
+    arrivalRow.getByTestId('date-added-label').locator('.sr-only'),
     'the reappearance is a brand-new row dated today',
   ).toHaveText(LABEL_TODAY);
   // Dune is still suppressed — the append-only batch did not bring it back.

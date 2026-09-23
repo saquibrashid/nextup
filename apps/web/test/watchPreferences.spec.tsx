@@ -35,7 +35,7 @@ function Location() {
 it('T-WATCH-003a defaults to Normal, opens accessible preferences, and only saves on confirmation', async () => {
   const save = vi.fn(async () => ({
     titleId: item.titleId,
-    watching: true,
+    watching: false,
     priority: 'up-next' as const,
   }));
   const reload = vi.fn();
@@ -44,19 +44,23 @@ it('T-WATCH-003a defaults to Normal, opens accessible preferences, and only save
       <ListPage items={[item]} onWatchPreferences={save} onReload={reload} />
     </MemoryRouter>,
   );
-  const trigger = screen.getByRole('button', { name: 'Watch preferences for Lanterns: Normal' });
+  const trigger = screen.getByRole('button', { name: 'Watch status for Lanterns: Normal' });
   fireEvent.click(trigger);
-  const dialog = screen.getByRole('dialog', { name: 'Watch preferences' });
+  const dialog = screen.getByRole('dialog', { name: 'Watch status' });
   expect(container).not.toContainElement(dialog);
   expect(document.documentElement.style.overflow).toBe('hidden');
   expect(within(dialog).getByRole('radio', { name: 'Normal' })).toBeChecked();
-  fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Currently watching' }));
+  expect(within(dialog).queryByRole('checkbox')).not.toBeInTheDocument();
+  expect(within(dialog).getAllByRole('radio')).toHaveLength(4);
   fireEvent.click(within(dialog).getByRole('radio', { name: 'Up next' }));
   expect(save).not.toHaveBeenCalled();
   expect(trigger).toHaveTextContent('Normal');
-  fireEvent.click(within(dialog).getByRole('button', { name: 'Save preferences' }));
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Save status' }));
   await waitFor(() => expect(reload).toHaveBeenCalledOnce());
-  expect(save).toHaveBeenCalledExactlyOnceWith('lanterns', { watching: true, priority: 'up-next' });
+  expect(save).toHaveBeenCalledExactlyOnceWith('lanterns', {
+    watching: false,
+    priority: 'up-next',
+  });
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   expect(document.documentElement.style.overflow).not.toBe('hidden');
 });
@@ -72,7 +76,7 @@ it('T-WATCH-003b cancelling preserves saved values and restores focus', () => {
     </MemoryRouter>,
   );
   const trigger = screen.getByRole('button', {
-    name: 'Watch preferences for Lanterns: Watching, Someday',
+    name: 'Watch status for Lanterns: Watching',
   });
   trigger.focus();
   fireEvent.click(trigger);
@@ -80,7 +84,7 @@ it('T-WATCH-003b cancelling preserves saved values and restores focus', () => {
   fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   expect(save).not.toHaveBeenCalled();
   expect(trigger).toHaveFocus();
-  expect(trigger).toHaveTextContent('Someday');
+  expect(trigger).toHaveTextContent('Watching');
 });
 
 it('T-WATCH-003c failed saves display the server message and retain the draft for explicit retry', async () => {
@@ -96,14 +100,14 @@ it('T-WATCH-003c failed saves display the server message and retain the draft fo
       <ListPage items={[item]} onWatchPreferences={save} onReload={reload} />
     </MemoryRouter>,
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Watch preferences for Lanterns: Normal' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Watch status for Lanterns: Normal' }));
   fireEvent.click(screen.getByRole('radio', { name: 'Someday' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Save preferences' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save status' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Please choose a supported priority.');
   expect(screen.getByRole('radio', { name: 'Someday' })).toBeChecked();
   expect(reload).not.toHaveBeenCalled();
   expect(save).toHaveBeenCalledTimes(1);
-  fireEvent.click(screen.getByRole('button', { name: 'Save preferences' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save status' }));
   await waitFor(() => expect(reload).toHaveBeenCalledOnce());
 });
 
@@ -120,16 +124,14 @@ it('T-WATCH-003d pending saves cannot submit twice and do not optimistically cha
       <ListPage items={[item]} onWatchPreferences={save} />
     </MemoryRouter>,
   );
-  fireEvent.click(screen.getByRole('button', { name: 'Watch preferences for Lanterns: Normal' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Watch status for Lanterns: Normal' }));
   fireEvent.click(screen.getByRole('radio', { name: 'Up next' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Save preferences' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save status' }));
   expect(screen.getByRole('button', { name: 'Saving…' })).toBeDisabled();
   expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
-  expect(
-    screen.getByRole('button', { name: 'Watch preferences for Lanterns: Normal' }),
-  ).toBeVisible();
+  expect(screen.getByRole('button', { name: 'Watch status for Lanterns: Normal' })).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: 'Saving…' }));
-  const dialog = screen.getByRole('dialog', { name: 'Watch preferences' });
+  const dialog = screen.getByRole('dialog', { name: 'Watch status' });
   fireEvent.keyDown(dialog, { key: 'Escape' });
   const backdrop = dialog.parentElement;
   expect(backdrop).toHaveClass('dialog-backdrop');
@@ -151,10 +153,10 @@ it('T-WATCH-003e offline rows display preferences without an editable control', 
       />
     </MemoryRouter>,
   );
-  expect(screen.queryByRole('button', { name: /Watch preferences for/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /Watch status for/ })).not.toBeInTheDocument();
   const row = screen.getByTestId('title-row-lanterns');
   expect(within(row).getByText('Watching', { exact: true })).toBeVisible();
-  expect(within(row).getByText('Up next', { exact: true })).toBeVisible();
+  expect(within(row).queryByText('Up next', { exact: true })).not.toBeInTheDocument();
 });
 
 it('T-WATCH-003f preference filters round-trip, clear independently and preserve unrelated URL state', () => {
@@ -215,13 +217,13 @@ it('T-WATCH-003h the real container PATCHes once then refetches authoritative li
     if (init?.method === 'PATCH') {
       expect(path).toBe('/api/titles/lanterns/watch-preferences');
       expect(init.credentials).toBe('same-origin');
-      expect(JSON.parse(String(init.body))).toEqual({ watching: true, priority: 'someday' });
+      expect(JSON.parse(String(init.body))).toEqual({ watching: true, priority: 'normal' });
       saved = true;
-      return Response.json({ titleId: 'lanterns', watching: true, priority: 'someday' });
+      return Response.json({ titleId: 'lanterns', watching: true, priority: 'normal' });
     }
     if (path.startsWith('/api/titles'))
       return Response.json({
-        items: [{ ...item, watching: saved, priority: saved ? 'someday' : 'normal' }],
+        items: [{ ...item, watching: saved, priority: 'normal' }],
         nextCursor: null,
         limit: 50,
       });
@@ -234,17 +236,73 @@ it('T-WATCH-003h the real container PATCHes once then refetches authoritative li
       <ListRoute client={createApiClient({ fetchImpl })} />
     </MemoryRouter>,
   );
-  fireEvent.click(
-    await screen.findByRole('button', { name: 'Watch preferences for Lanterns: Normal' }),
-  );
-  fireEvent.click(screen.getByRole('checkbox', { name: 'Currently watching' }));
-  fireEvent.click(screen.getByRole('radio', { name: 'Someday' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Save preferences' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Watch status for Lanterns: Normal' }));
+  fireEvent.click(screen.getByRole('radio', { name: 'Watching' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save status' }));
   expect(
     await screen.findByRole('button', {
-      name: 'Watch preferences for Lanterns: Watching, Someday',
+      name: 'Watch status for Lanterns: Watching',
     }),
   ).toBeVisible();
   expect(paths.filter((path) => path === '/api/titles')).toHaveLength(2);
   expect(paths.filter((path) => path.includes('/watch-preferences'))).toHaveLength(1);
+});
+
+const otherStatuses = ['Up next', 'Normal', 'Someday'];
+it.each(otherStatuses)('T-WATCH-003l %s stops Watching', async (label) => {
+  const save = vi.fn(async (_id: string, body: { watching?: boolean; priority?: string }) => ({
+    titleId: item.titleId,
+    watching: body.watching ?? false,
+    priority: 'normal' as const,
+  }));
+  render(
+    <MemoryRouter>
+      <ListPage
+        items={[{ ...item, watching: true, priority: 'someday' }]}
+        onWatchPreferences={save}
+      />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Watch status for Lanterns: Watching' }));
+  expect(screen.getByRole('radio', { name: 'Watching' })).toBeChecked();
+  fireEvent.click(screen.getByRole('radio', { name: label }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save status' }));
+  await waitFor(() =>
+    expect(save).toHaveBeenCalledWith('lanterns', {
+      watching: false,
+      priority: label === 'Up next' ? 'up-next' : label.toLowerCase(),
+    }),
+  );
+});
+
+it('T-WATCH-003m unified status filters exclude Watching from other priorities and clear as one chip', () => {
+  render(
+    <MemoryRouter initialEntries={['/?q=hello&sort=runtime&dir=asc&priority=someday']}>
+      <ListPage items={[item]} />
+      <Location />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByTestId('filters-trigger'));
+  fireEvent.click(screen.getByRole('button', { name: 'Status Custom saved filter' }));
+  expect(screen.getByText(/This saved link uses a combined/)).toBeVisible();
+  fireEvent.click(screen.getByRole('radio', { name: 'Up next' }));
+  let params = new URLSearchParams(screen.getByTestId('watch-query').textContent ?? '');
+  expect(params.get('watching')).toBe('false');
+  expect(params.getAll('priority')).toEqual(['up-next']);
+  fireEvent.click(screen.getByRole('radio', { name: 'Watching' }));
+  params = new URLSearchParams(screen.getByTestId('watch-query').textContent ?? '');
+  expect(params.get('watching')).toBe('true');
+  expect(params.has('priority')).toBe(false);
+  fireEvent.click(screen.getByRole('radio', { name: 'All statuses' }));
+  expect(
+    screen.queryByRole('button', { name: 'Remove status filter: Watching' }),
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('radio', { name: 'Normal' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Remove status filter: Normal' }));
+  params = new URLSearchParams(screen.getByTestId('watch-query').textContent ?? '');
+  expect(params.has('watching')).toBe(false);
+  expect(params.has('priority')).toBe(false);
+  expect(params.get('q')).toBe('hello');
+  expect(params.get('sort')).toBe('runtime');
+  expect(params.get('dir')).toBe('asc');
 });

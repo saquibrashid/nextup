@@ -1,6 +1,8 @@
 /** Owner choices, independent of service membership and extraction metadata. */
 export const WATCH_PRIORITIES = ['up-next', 'normal', 'someday'] as const;
 export type WatchPriority = (typeof WATCH_PRIORITIES)[number];
+export const WATCH_STATUSES = ['watching', ...WATCH_PRIORITIES] as const;
+export type WatchStatus = (typeof WATCH_STATUSES)[number];
 
 export interface WatchPreferences {
   watching: boolean;
@@ -8,6 +10,19 @@ export interface WatchPreferences {
 }
 
 export type WatchPreferencesPatch = Partial<WatchPreferences>;
+
+export function watchStatus(preferences: Partial<WatchPreferences>): WatchStatus {
+  return preferences.watching ? 'watching' : (preferences.priority ?? 'normal');
+}
+
+export function preferencesForStatus(
+  status: WatchStatus,
+  previousPriority: WatchPriority = 'normal',
+): WatchPreferences {
+  return status === 'watching'
+    ? { watching: true, priority: previousPriority }
+    : { watching: false, priority: status };
+}
 
 export function isWatchPriority(value: unknown): value is WatchPriority {
   return WATCH_PRIORITIES.some((priority) => priority === value);

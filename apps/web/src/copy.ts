@@ -426,6 +426,8 @@ export const WATCH_PRIORITY_LABELS = {
   someday: 'Someday',
 } as const;
 
+export const WATCH_STATUS_LABELS = { watching: 'Watching', ...WATCH_PRIORITY_LABELS } as const;
+
 export const WATCH_PREFERENCES_FAILED = 'Could not save your watch preferences. Please try again.';
 
 /**

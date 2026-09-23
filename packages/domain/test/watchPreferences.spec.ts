@@ -5,9 +5,23 @@ import {
   isWatchPriority,
   parseWatchPreferencesPatch,
   watchPriorityRank,
+  watchStatus,
+  preferencesForStatus,
+  WATCH_STATUSES,
 } from '../src/watchPreferences.js';
 
 describe('T-WATCH-001 owner preference grammar', () => {
+  it('T-WATCH-001p projects legacy preferences into one status without losing stored priority', () => {
+    expect(WATCH_STATUSES).toEqual(['watching', 'up-next', 'normal', 'someday']);
+    expect(watchStatus({})).toBe('normal');
+    expect(preferencesForStatus('watching')).toEqual({ watching: true, priority: 'normal' });
+    for (const priority of WATCH_PRIORITIES) {
+      expect(watchStatus({ watching: true, priority })).toBe('watching');
+      expect(watchStatus({ watching: false, priority })).toBe(priority);
+      expect(preferencesForStatus('watching', priority)).toEqual({ watching: true, priority });
+      expect(preferencesForStatus(priority, 'someday')).toEqual({ watching: false, priority });
+    }
+  });
   it('T-WATCH-001a keeps watching independent of all three priorities', () => {
     expect(WATCH_PRIORITIES).toEqual(['up-next', 'normal', 'someday']);
     for (const priority of WATCH_PRIORITIES) {

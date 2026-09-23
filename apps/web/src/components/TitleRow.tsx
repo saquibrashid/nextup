@@ -7,20 +7,15 @@
 // or re-key anything itself. A row keyed on a listing would look identical on a
 // single-service list and split silently the first time a work appeared twice.
 //
-// ⚠ `dateAddedLabel` IS RENDERED VERBATIM AND MUST NEVER BE CONSTRUCTED HERE
-// (REQ-061, `specs/api.md` §6.2). The server owns the one implementation of the
-// honest-labelling rule, so the string always contains "to nextup" and never
-// reads as a bare "Added" that the owner could mistake for Netflix's own save
-// date. A client-side fallback - even a well-meaning one for the null case -
-// would be a second implementation of a rule whose whole point is having one.
-// `T-LIST-018` asserts the marker on every rendered label.
+// The API owns the date label. Cards abbreviate only its prefix; the full
+// provenance remains available in accessible text, hover text and details.
 
 import type { JSX, ReactNode } from 'react';
-import { formatRuntime, type Service, type WatchPriority } from '@nextup/domain';
+import { formatRuntime, watchStatus, type Service, type WatchPriority } from '@nextup/domain';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { ServiceMark } from './ServiceMark';
-import { ChevronIcon, MoreIcon } from './icons';
+import { ChevronIcon, MoreIcon, RatingIcon } from './icons';
 import { GenreChips } from './GenreChips';
 import { EditionLabels } from './EditionLabels';
 import { releaseYearText } from '@nextup/domain';
@@ -31,7 +26,7 @@ import {
   METADATA_STALE_CHIP,
   ROW_PENDING_LABEL,
   RUNTIME_UNKNOWN_LABEL,
-  WATCH_PRIORITY_LABELS,
+  WATCH_STATUS_LABELS,
 } from '../copy';
 
 /**
@@ -242,9 +237,8 @@ export function TitleRow({
             <h2 className="title-row__name" data-testid="title-name">
               {titleLink ?? item.name}
             </h2>
+            <EditionLabels labels={item.editionLabels} />
             <span className="title-row__status">
-              {item.watching === true && <span className="title-row__watching">Watching</span>}
-
               {unmatched && (
                 <span className="title-row__chip" data-testid="unidentified-chip">
                   Unidentified
@@ -282,7 +276,6 @@ export function TitleRow({
           </div>
 
           <p className="title-row__meta" data-testid="title-meta">
-            <EditionLabels labels={item.editionLabels} />
             {/*
             REQ-106 — year and type precede runtime and wrapping genres.
             It previously rendered type-then-year, which is why the owner's
@@ -332,25 +325,23 @@ export function TitleRow({
         <div
           className="title-row__watch"
           data-watching={item.watching === true || undefined}
-          data-priority={item.priority ?? 'normal'}
+          data-priority={watchStatus(item)}
         >
           {onWatchPreferences ? (
             <Button
               disabled={busy}
               aria-haspopup="dialog"
-              aria-label={`Watch preferences for ${item.name}: ${item.watching ? 'Watching, ' : ''}${WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}`}
+              aria-label={`Watch status for ${item.name}: ${WATCH_STATUS_LABELS[watchStatus(item)]}`}
               onClick={(event) => {
                 event.currentTarget.focus({ preventScroll: true });
                 onWatchPreferences(item);
               }}
             >
-              <span className="title-row__priority">
-                {WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}
-              </span>
+              <span className="title-row__priority">{WATCH_STATUS_LABELS[watchStatus(item)]}</span>
               <ChevronIcon />
             </Button>
           ) : (
-            <span>{WATCH_PRIORITY_LABELS[item.priority ?? 'normal']}</span>
+            <span className="title-row__priority">{WATCH_STATUS_LABELS[watchStatus(item)]}</span>
           )}
         </div>
 
@@ -358,7 +349,8 @@ export function TitleRow({
           REQ-091 - "no rating" is a FIRST-CLASS RENDERED STATE, and the two
           branches below are the whole requirement:
 
-          - a rating renders as `IMDb 8.7`, always to one decimal place. The
+          - a rating renders as a star and `8.7`, with IMDb named accessibly,
+            always to one decimal place. The
             server stores tenths as an integer precisely so 8.8 does not arrive
             as 8.800000000000001, and `toFixed(1)` keeps `8` from rendering as
             a bare "8" that reads like a different, coarser scale.
@@ -379,21 +371,30 @@ export function TitleRow({
             {IMDB_RATING_ABSENT}
           </p>
         ) : (
-          <p className="title-row__rating" data-testid="imdb-rating">
-            <span className="title-row__rating-source">{IMDB_RATING_SOURCE}</span>{' '}
+          <p className="title-row__rating" data-testid="imdb-rating" title={IMDB_RATING_SOURCE}>
+            <RatingIcon />
+            <span className="sr-only">{IMDB_RATING_SOURCE}</span>{' '}
             <span data-testid="imdb-rating-value">{item.imdbRating.toFixed(1)}</span>
           </p>
         )}
 
         <div className="title-row__footer">
           {/*
-          Verbatim from the API. Rendered only when the API supplied one: with
+          API wording is retained accessibly and on hover; visible copy shortens
+          "Added to nextup" to "Added". Rendered only when the API supplied one: with
           no listings there is no date, and inventing "Added today" here would
           state something false about when the work entered nextup.
         */}
-          {item.dateAddedLabel !== null && (
-            <p className="title-row__date" data-testid="date-added-label">
-              {item.dateAddedLabel}
+          {item.dateAddedLabel != null && (
+            <p
+              className="title-row__date"
+              data-testid="date-added-label"
+              title={item.dateAddedLabel}
+            >
+              <span aria-hidden="true">
+                {item.dateAddedLabel.replace(/^Added to nextup(?: on)? /, 'Added ')}
+              </span>
+              <span className="sr-only">{item.dateAddedLabel}</span>
             </p>
           )}
 

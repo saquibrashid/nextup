@@ -31,7 +31,7 @@ import { Chip } from './ui/Chip';
  * browser. The number is tuned to the narrowest supported viewport (320 px),
  * which is the only width where the choice can go wrong.
  */
-export const GENRE_CHIP_LIMIT = 3;
+export const GENRE_CHIP_LIMIT = 2;
 
 export interface GenreChipsProps {
   /** The genres as STORED — combined TV names included. Normalised here. */
@@ -42,7 +42,7 @@ export interface GenreChipsProps {
    * ⚠ **§4.3: a genre in the active filter is ALWAYS VISIBLE, never hidden
    * behind `+n`.** Otherwise the row stops explaining the very filter that
    * produced it — the owner filters on `Thriller`, and the row that came back
-   * shows three other genres and a `+2`. That is the same
+   * shows other genres and an overflow count. That is the same
    * silent-lack-of-explanation failure as the filter bug in §4.4, arriving by
    * a different route.
    */
@@ -71,7 +71,7 @@ export function GenreChips({ genres, activeGenres = [] }: GenreChipsProps): JSX.
   const ordered = [...active, ...canonical.filter((genre) => !activeGenres.includes(genre))];
 
   // ⚠ `Math.max` RATHER THAN A PLAIN SLICE. With four active genres and a
-  // limit of three, a plain slice hides one of them — satisfying the limit and
+  // limit of two, a plain slice hides one of them — satisfying the limit and
   // breaking the rule the limit exists under. The limit yields to the
   // guarantee, never the other way round.
   const visible = expanded ? ordered.length : Math.max(GENRE_CHIP_LIMIT, active.length);
@@ -88,7 +88,7 @@ export function GenreChips({ genres, activeGenres = [] }: GenreChipsProps): JSX.
         // each-screen-re-solves-it duplication REQ-125 exists to end, and it
         // left the primitive mounted by nothing but its own test.
         <Chip key={genre} data-testid={`genre-chip-${genre}`}>
-          {genre}
+          {genre === 'Science Fiction' ? <abbr title={genre}>Sci-Fi</abbr> : genre}
         </Chip>
       ))}
       {hidden > 0 && (

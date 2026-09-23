@@ -82,7 +82,7 @@ inference from them:
 | Sort | Inactive field selects its complete default order; active field reverses. Oldest-first is one click, with state and next action named. URL/back/forward and session precedence stay intact. | `T-UX-138` |
 | Filters | Searchable service disclosure, URL-driven checkbox dimensions, removable chips, clear-all preserving sort and view. Provider registry remains Netflix/Max. | `T-UX-139` |
 | Search | Explicit search submission updates `q` in the URL; server applies it before paging and runtime-hidden counts. Never search only loaded rows. | `T-UX-140`, `T-API-030` |
-| Layout | Grid/compact switch preserves server ordering, all metadata, service badges, pending/offline restrictions, row actions and view across filtering. Owner-approved 2026-09-18 composition maps Cover browser to Grid and Comparison desk to Compact; `specs/ui.md` §2.1 defines the current geometry and separate Watching status. Real loading and retry paths remain. | `T-UX-141`, `T-UX-155` |
+| Layout | Grid/compact switch preserves server ordering, all metadata, service badges, pending/offline restrictions, row actions and view across filtering. Owner-approved 2026-09-18 composition maps Cover browser to Grid and Comparison desk to Compact; `specs/ui.md` §2.1 defines the current geometry and unified watch status. Real loading and retry paths remain. | `T-UX-141`, `T-UX-155` |
 | Palette | Dark indigo/violet tokens, body/secondary text >= 4.5:1 and interactive boundaries >= 3:1, no network font or icon dependency. Reduced motion disables animation. | `T-UX-142` |
 | Shell | Compact navigation and play/next identity, one nav landmark, all destinations reachable, factual service-update disclosure with a visible unavailable state. | `T-UX-143` |
 
@@ -148,8 +148,8 @@ tests remain mandatory; screenshots accompany browser coverage for visual review
 
 ### 2.3 Catalog alignment follow-up — TASK-237
 
-In Grid view, Watching always occupies a new line beneath the title, rather than
-moving between inline and wrapped positions according to title length. At tablet
+In Grid view, Watching occupies the top-left status badge instead of a separate
+line beneath the title (owner revision 2026-09-23, TASK-245). At tablet
 and desktop widths, adjacent cards share content-sized row tracks: artwork,
 heading/status, metadata, rating, date, service footer, and recovery
 actions. TASK-240 places priority on the artwork while retaining its full label
@@ -161,6 +161,23 @@ Compact layout, markup, semantics and persistence remain unchanged.
 `T-POL-004` measures these alignments for short/long watched titles, unwatched
 titles, different service logos and wrapped multi-service footers in both browser
 engines. Existing library geometry and action tests remain mandatory.
+
+### 2.3a Denser artwork cards and one status — TASK-245
+
+Owner-approved 2026-09-23: reduce the information gradient's first dark stop to
+75% opacity, still fading to solid at the footer. Top-left status and top-right
+ellipsis surfaces use 85% opacity to retain contrast over bright posters without
+reducing text/icon opacity or hit targets.
+Card headings use 1.125rem. Remove the separate Watching track; retain
+content-sized shared heading, facts, genre/rating and footer tracks.
+Two genre chips plus overflow share the rating row where space permits, aligned
+at the top; narrow/long content may wrap rather than truncate. Replace visible
+IMDb text with the existing star icon; preserve source attribution in accessible
+and hover text and retain the explicit absent-rating state. Shorten visible
+catalog date prefixes to Added, retaining the full API label for accessibility,
+hover and details. Existing artwork crops, edition labels and service badges remain.
+One status editor/filter exposes Watching / Up next / Normal / Someday, as defined
+in `ui.md` section 2.1a; no database migration or inferred preference changes.
 
 ### 2.4 Owner mockups: in-app design only — TASK-240
 
@@ -211,7 +228,7 @@ poster/solid-panel arrangement of section 2.4, not its safety or content guarant
 
 - From 640px, Grid is one artwork-led tile: retain the 2:3 image, put the title
   over a dark gradient, share a row between genres and the real IMDb rating,
-  and group service badges with the verbatim "Added to nextup" date in a compact
+  and group service badges with the short "Added" date (full API label remains accessible) in a compact
   footer. Preserve missing-data states, watched state, full titles, genre expansion,
   active genres, all badges and correction/recovery actions. Neighbouring cards
   retain aligned content tracks; long content may increase the row height.
@@ -608,9 +625,10 @@ the two warnings below are the reason each was put to them rather than built:
 
 ⚠ **"COMPACT" IS A PRESENTATION CHANGE, NOT A CONTENT CHANGE.** The genres are
 **all** still present and still readable; what changes is the room they take.
-The compact presentation shows **three genre chips plus `+n` expansion**;
+The compact presentation shows **two genre chips plus `+n` expansion**;
 this is a count limit, not a measured one-line limit. **Genre names wrap and
-are never ellipsized or clipped.** Expansion reveals the remainder in place.
+are never ellipsized or clipped.** Science Fiction may display as **Sci-Fi** with
+the canonical full name in its abbreviation title. Expansion reveals the remainder in place.
 ⚠ **The `+n` affordance must not be the only way to reach a
 genre that is currently filtered on** — if a genre is in the active filter, its
 chip is always visible, otherwise the row stops explaining the very filter that
@@ -697,12 +715,13 @@ are the whole map.
 | `T-UX-125` | A TV title whose stored genres contain `Action & Adventure` renders the chips `Action` and `Adventure`, and does **not** render `Action & Adventure`. |
 | `T-UX-126` | The genre filter list contains no combined TV name — `Action & Adventure`, `Sci-Fi & Fantasy` and `War & Politics` never appear as options. |
 | `T-API-028` | `?genre=Action` returns **both** a film tagged `Action` and a TV title tagged `Action & Adventure`; `?genre=War` returns a title tagged `War & Politics`. |
-| `T-UX-127` | Three full-name genre chips plus `+n` expansion; names wrap without truncation and active-filter genres stay visible even above the count limit. |
+| `T-UX-127` | Two genre chips plus `+n` expansion; Sci-Fi retains its full canonical name, names wrap without truncation and active-filter genres stay visible even above the count limit. |
 
 ⚠ **"Trimmed" means moved, not deleted, and one line may not move at all.** The
 added-date is the field the **default sort orders by** (REQ-038, newest-first),
-and its label is rendered **verbatim from the API** (REQ-061 — the component
-must not construct it). Hiding the sort key makes the order inexplicable. See
+and its date is always supplied by the API. Catalog rows may shorten the known
+prefix to **Added**, retaining the verbatim full label in accessible/hover text
+and title details (REQ-061, owner revision 2026-09-23). Hiding the sort key makes the order inexplicable. See
 §9, OQ-1.
 
 ---

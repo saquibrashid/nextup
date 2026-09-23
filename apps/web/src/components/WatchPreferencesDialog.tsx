@@ -1,6 +1,6 @@
 import { useId, useState } from 'react';
-import { WATCH_PRIORITIES, type WatchPriority } from '@nextup/domain';
-import { WATCH_PREFERENCES_FAILED, WATCH_PRIORITY_LABELS } from '../copy';
+import { WATCH_STATUSES, preferencesForStatus, watchStatus } from '@nextup/domain';
+import { WATCH_PREFERENCES_FAILED, WATCH_STATUS_LABELS } from '../copy';
 import {
   ApiError,
   type WatchPreferencesRequest,
@@ -22,8 +22,7 @@ interface Props {
 
 export function WatchPreferencesDialog({ item, save, onClose, onSaved, offline }: Props) {
   const headingId = useId();
-  const [watching, setWatching] = useState(item.watching ?? false);
-  const [priority, setPriority] = useState<WatchPriority>(item.priority ?? 'normal');
+  const [status, setStatus] = useState(watchStatus(item));
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   async function submit() {
@@ -31,7 +30,7 @@ export function WatchPreferencesDialog({ item, save, onClose, onSaved, offline }
     setPending(true);
     setFailure(null);
     try {
-      await save(item.titleId, { watching, priority });
+      await save(item.titleId, preferencesForStatus(status, item.priority));
     } catch (error) {
       setFailure(error instanceof ApiError ? error.message : WATCH_PREFERENCES_FAILED);
       setPending(false);
@@ -49,37 +48,26 @@ export function WatchPreferencesDialog({ item, save, onClose, onSaved, offline }
       }}
     >
       <div className="watch-preferences">
-        <h2 id={headingId}>Watch preferences</h2>
+        <h2 id={headingId}>Watch status</h2>
         <p>{item.name}</p>
-        <Field legend="Watching">
-          <label>
-            <Input
-              type="checkbox"
-              checked={watching}
-              disabled={pending}
-              onChange={(event) => setWatching(event.target.checked)}
-            />
-            Currently watching
-          </label>
-        </Field>
-        <Field legend="Priority">
-          {WATCH_PRIORITIES.map((value) => (
+        <Field legend="Status">
+          {WATCH_STATUSES.map((value) => (
             <label key={value}>
               <Input
                 type="radio"
                 name={headingId}
                 value={value}
-                checked={priority === value}
+                checked={status === value}
                 disabled={pending}
-                onChange={() => setPriority(value)}
+                onChange={() => setStatus(value)}
               />
-              {WATCH_PRIORITY_LABELS[value]}
+              {WATCH_STATUS_LABELS[value]}
             </label>
           ))}
         </Field>
         <p>
-          Watch priority sorts Watching first, then Up next, Normal and Someday. Your choices stay
-          with this title if you remove and re-add it.
+          Watch priority sorts Watching first, then Up next, Normal and Someday. Choosing another
+          status stops Watching. Your choice stays with this title if you remove and re-add it.
         </p>
         {failure !== null && <p role="alert">{failure}</p>}
         {offline && <p role="status">Reconnect to save your preferences.</p>}
@@ -91,7 +79,7 @@ export function WatchPreferencesDialog({ item, save, onClose, onSaved, offline }
               void submit();
             }}
           >
-            {pending ? 'Saving…' : 'Save preferences'}
+            {pending ? 'Saving…' : 'Save status'}
           </Button>
           <Button disabled={pending} onClick={onClose}>
             Cancel

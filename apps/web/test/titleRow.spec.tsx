@@ -243,12 +243,13 @@ describe('T-UI-010 - the row shows poster, name, type, year, date-added label an
 });
 
 describe('T-LIST-018 - every rendered date label is honest about whose date it is', () => {
-  it('T-LIST-018a renders the API label verbatim', () => {
+  it('T-LIST-018a abbreviates the visible prefix while preserving the verbatim accessible and hover label', () => {
     const row = renderRow({ dateAddedLabel: 'Added to nextup 11 Jun 2026' });
 
-    expect(within(row).getByTestId('date-added-label').textContent).toBe(
-      'Added to nextup 11 Jun 2026',
-    );
+    const date = within(row).getByTestId('date-added-label');
+    expect(date).toHaveAttribute('title', 'Added to nextup 11 Jun 2026');
+    expect(date.querySelector('[aria-hidden="true"]')).toHaveTextContent('Added 11 Jun 2026');
+    expect(date.querySelector('.sr-only')).toHaveTextContent('Added to nextup 11 Jun 2026');
   });
 
   it('T-LIST-018b every date label rendered by the list contains "to nextup"', () => {
@@ -269,7 +270,7 @@ describe('T-LIST-018 - every rendered date label is honest about whose date it i
     }
   });
 
-  it('T-LIST-018c no bare "Added" label exists anywhere in a rendered row', () => {
+  it('T-LIST-018c every accessible Added label retains its provenance', () => {
     render(<ListPage items={[DUNE, item({ titleId: '01J8ZF', posterPath: null, genres: [] })]} />);
     const list = screen.getByTestId('title-list');
 
@@ -281,10 +282,25 @@ describe('T-LIST-018 - every rendered date label is honest about whose date it i
     for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
       const text = node.textContent ?? '';
       if (!/\bAdded\b/.test(text)) continue;
+      if (node.parentElement?.closest('[aria-hidden="true"]')) continue;
       seen += 1;
       expect(text).toContain(DATE_ADDED_LABEL_MARKER);
     }
     expect(seen).toBe(2);
+  });
+
+  it('T-LIST-018e preserves unknown API wording and abbreviates optional on without constructing dates', () => {
+    const { unmount } = render(
+      <TitleRow item={item({ dateAddedLabel: 'Added to nextup on 11 Jun 2026' })} />,
+    );
+    expect(
+      screen.getByTestId('date-added-label').querySelector('[aria-hidden="true"]'),
+    ).toHaveTextContent('Added 11 Jun 2026');
+    unmount();
+    render(<TitleRow item={item({ dateAddedLabel: 'Imported earlier; date unavailable' })} />);
+    expect(
+      screen.getByTestId('date-added-label').querySelector('[aria-hidden="true"]'),
+    ).toHaveTextContent('Imported earlier; date unavailable');
   });
 
   it('T-LIST-018d renders no date label at all when the API supplies none', () => {

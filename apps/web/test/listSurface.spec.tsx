@@ -244,7 +244,8 @@ describe('T-UX-111 · ui-refresh.md §4.1/§4.2 · at 1280 px the grid layout re
       expect(row.querySelector('.title-row__facts')).toHaveTextContent('2021');
       expect(row.querySelector('.title-row__facts')).toHaveTextContent('Movie');
       expect(screen.getByTestId('runtime')).toHaveTextContent('2h 35m');
-      for (const genre of DUNE.genres) expect(within(row).getByText(genre)).toBeVisible();
+      expect(within(row).getByTitle('Science Fiction')).toHaveTextContent('Sci-Fi');
+      expect(within(row).getByText('Adventure')).toBeVisible();
       expect(screen.getByTestId('imdb-rating')).toHaveTextContent('8.4');
       expect(row.querySelector('.title-row__footer')).toContainElement(
         screen.getByTestId('date-added-label'),

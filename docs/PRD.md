@@ -745,7 +745,7 @@ Nullable keys sort last in both directions.
 |---|---|---|---|
 | AC-1 | A ServiceListing | It is created by a closed batch | Its date-added is set to the date nextup first saw that work on that service, and is stored on the listing (REQ-030) |
 | AC-2 | An existing listing | It is seen again in a later batch for the same service | Its date-added is **not** updated. Re-seeing a title never changes its date (REQ-060) |
-| AC-3 | Any date-added shown in the UI | It renders | It is labelled to mean nextup's own observation — for example "added to nextup" — and is never presented or captioned as the service's own saved date (REQ-061) |
+| AC-3 | Any date-added shown in the UI | It renders | It means nextup's own observation, never the service's saved date (REQ-061). Owner-approved 2026-09-23: catalog rows may show "Added" while preserving the full server-supplied "Added to nextup" label in accessible and hover text; details retain the full visible wording. |
 | AC-4 (edge) | The owner's first-run import of a backlog saved over several years | It closes | Every title carries that import's date. The UI's labelling must make this comprehensible rather than looking like a bug; the honest label in AC-3 is what makes it comprehensible |
 | AC-5 (edge) | A work re-created after removal (US-026) | It renders | Its date-added is today's date, not the original date. The old removed row retains its own original date |
 | AC-6 (failure) | Any code path that writes date-added outside listing creation | Automated verification runs | The test fails. Date-added is write-once per listing in v1 |
@@ -1495,7 +1495,7 @@ Trimming them is the obvious reading of "compact" and is the wrong one.
 | AC-1 | The row's facts render as a single wrapping line with a separator between fields. |
 | AC-2 | The fields appear in the order year, type, runtime, genres (approved 2026-09-16). |
 | AC-3 | The row body has consistent vertical spacing rather than being packed to the minimum. |
-| AC-4 | Genres remain on the row: three chips plus a count/expansion for the remainder. Full names wrap and are never truncated; the limit is a count, not a clipped line. |
+| AC-4 | Genres remain on the row: two chips plus a count/expansion for the remainder (owner-approved 2026-09-23). Names wrap and are never truncated; Science Fiction may display as Sci-Fi with the full name available. The limit is a count, not a clipped line. |
 | AC-5 | A genre that is currently being filtered on is always visible, never hidden behind the overflow count. |
 
 ---
@@ -1667,7 +1667,7 @@ the criterion a half-fix fails.
 | AC-2 | The genre filter offers no combined name as an option. |
 | AC-3 | Filtering by either constituent genre returns **both** the films tagged with it **and** the television titles tagged with the combined name, and filtering by an unrelated genre is not widened. |
 | AC-4 | Normalisation happens on read. No stored genre value is rewritten and no migration is required. |
-| AC-5 | A row shows three full-name genre chips with `+n` expansion for the remainder; names wrap without truncation. Active-filter genres are always visible, even when that requires more than three chips. |
+| AC-5 | A row shows two genre chips with `+n` expansion for the remainder; names wrap without truncation. Science Fiction may display as Sci-Fi with the full name available. Active-filter genres are always visible, even when that requires more than two chips. |
 | AC-6 | A title with no genres renders no genre chips and no placeholder, and is excluded whenever a genre filter is active. |
 
 ---
@@ -1765,15 +1765,17 @@ screens feel like one application and their states remain understandable.
 other titles a watch priority, so ongoing shows and my next choices are easy
 to find without losing the long-term list.
 
-**REQ-126 (`must`, owner-approved 2026-09-16).** Watching is an independent
-boolean; priority is **Up next / Normal / Someday**, default Normal. This is
+**REQ-126 (`must`, revised by owner 2026-09-23).** One visible status is
+**Watching / Up next / Normal / Someday**, default Normal. Stored watching and
+priority remain compatible with existing records; choosing Watching preserves
+the stored priority, and choosing any other status explicitly stops Watching. This is
 manual intent, not episode tracking, completion state or a release reminder.
 
 | AC | Acceptance criterion |
 |---|---|
-| AC-1 | Each title shows its Watching marker and priority, with an accessible edit control in both Grid and Compact. New titles default to not watching / Normal. |
+| AC-1 | Each title shows one status, with an accessible edit control in both Grid and Compact. Watching replaces rather than duplicates the priority badge. New titles default to Normal. |
 | AC-2 | Saving explicitly persists the owner's chosen values; Cancel changes nothing. Pending saves prevent duplicate submission, failures preserve the draft and show a retryable error, and offline data is read-only. |
-| AC-3 | Watching and priority are independently filterable. Choices are URL-driven, OR within priority and AND across dimensions; chips remove individual filters and Clear preserves sorting and unrelated parameters. |
+| AC-3 | One Status selector filters All / Watching / Up next / Normal / Someday. Non-Watching statuses exclude Watching titles. Choices remain URL-driven and server-filtered; each unified status clears as one chip. Legacy combined watching/priority links remain explicitly identified and usable until replaced or cleared. Clear preserves sorting and unrelated parameters. |
 | AC-4 | Optional Watch priority order puts Watching first, then Up next, Normal and Someday; a second activation reverses it. Sorting/filtering are server-side before pagination. The existing default order is unchanged. |
 | AC-5 | Preferences belong to the owner and canonical work, shared across service badges and retained through removal, reappearance and screenshot imports. Imports and metadata refresh never overwrite them. |
 | AC-6 | An explicit match correction carries source preferences to a destination with no preference. If the destination already has explicit preferences, those win; historical source preferences remain retained. No cross-owner access, batch visibility bypass or mutation of memberships/dates is introduced. |

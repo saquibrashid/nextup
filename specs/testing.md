@@ -20,6 +20,20 @@ baselines are empty. A mapped name is not proof of sufficient assertions or
 completed manual acceptance. See `docs/current-release.md` for the evidence
 boundaries and owner-dependent work.
 
+### Compact cards and unified status, approved 2026-09-23
+
+`TASK-245` extends existing named tests, without changing API storage or routes:
+`T-WATCH-001p` covers legacy status projection and every transition;
+`T-WATCH-003l` covers explicitly stopping Watching;
+`T-WATCH-003m` covers the unified Status filter, legacy URL disclosure and atomic chip removal.
+`T-LIST-018a`/`c`/`e` cover short visible dates with full accessible/hover provenance;
+`T-UX-127h` covers two genres, Sci-Fi naming and overflow.
+`T-IMDB-008a` covers the decorative star and retained IMDb source.
+`T-MOCK-004b` measures 18px card headings, top-aligned genres/rating, the 75% gradient,
+85% control surfaces, bounded card proportions, preserved metadata and bright-poster contrast.
+Existing watch-save/reload/cancel/error/offline, sorting, details, responsive, edition
+and accessibility tests remain required.
+
 ### Image-derived review evidence, approved 2026-09-22
 
 | Test ID | Level | Assertion |
@@ -49,7 +63,7 @@ Compact and Cover browser as Grid. `TASK-221` is the first implementation slice.
 
 | Test ID | Level | Assertion |
 | --- | --- | --- |
-| `T-UX-155a` | Web | `apps/web/test/refinedLibrary.spec.tsx`: Watching stays outside the priority label, accessible preference state remains complete, and switching layouts changes neither row DOM nor saved state. |
+| `T-UX-155a` | Web | `apps/web/test/refinedLibrary.spec.tsx`: Watching replaces the priority label in one status control; accessible state remains complete, and switching layouts changes neither row DOM nor saved state. |
 | `T-UX-155b` | Web | `apps/web/test/stylesheet.spec.ts`: semantic text colors meet 4.5:1 on the library background and both card endpoints; controls retain 3:1 boundaries on their own surfaces. |
 | `T-UX-155c` | E2E | `tests/e2e/refinedLibrary.spec.ts`: both layouts at 280/390/900/1280/1600px retain uniform 44px priority controls, all eight service marks, 2:3 posters at least 72px wide, bounded metadata and no page overflow. Varied priority, Watching and unidentified/unknown-artwork states cannot overlap row actions. |
 
@@ -60,8 +74,7 @@ desktop grid and bounded portrait artwork instead of the former auto-fill,
 side-by-side tracks. `T-UX-143c` verifies the
 unfiltered first-page response after clearing search and eventual pagination,
 rather than racing a Load more button that a visible sentinel can retire.
-`T-WATCH-003e` asserts the separate
-Watching/priority text offline instead of their former combined string.
+`T-WATCH-003e` asserts the single effective status offline without an edit affordance.
 `T-UX-147a`/`c` continue measuring aligned desktop columns and compact phone
 facts. Existing sort, filter, search, loading, menu and accessibility cases
 remain regression obligations, not replaced by these new cases.
@@ -194,7 +207,7 @@ TASK-231 adds navigation, status-read lifetime and complete responsive journeys.
 | `T-MOCK-004` | C+E2E | Compact artwork Grid cards retain full titles, honest dates, missing data and actions; measure title-on-artwork placement, ordinary-card density, genres/rating row, badges/date footer, long-content growth, bright-artwork contrast and unchanged Compact geometry. `apps/web/test/listSurface.spec.tsx`, `apps/web/test/stylesheet.spec.ts`, `tests/e2e/refinedLibrary.spec.ts`. |
 | `T-MOCK-005` | C+E2E | Wide library heading, persistent search and controls share a compact header; service/filter choices remain canonical URL state. Real Add title and Service updates clicks must work through the shared grid, not merely have non-overlapping boxes. Every service link must pass browser hit testing above the cards; Done and Escape restore trigger focus. Phone disclosure, desktop Escape focus, explicit submit/clear, sorting, layout memory and no-overflow behavior remain. `apps/web/test/listSearch.spec.tsx`, `tests/e2e/refinedLibrary.spec.ts`. |
 | `T-MOCK-006` | E2E | Import service tiles, mode cards and intake area match the compact composition at desktop/phone widths without default choices, hidden services or lost file/paste/drop paths. `tests/e2e/guidedCapture.spec.ts`. |
-| `T-POL-004` | E2E | Watching stays beneath short and long grid titles; adjacent cards align metadata, priority, date and service footer top/height at 640/900/1280px, including differing logos, wrapped badges, missing artwork, missing ratings and unmatched actions. Compact and responsive regressions retained. `tests/e2e/refinedLibrary.spec.ts`. |
+| `T-POL-004` | E2E | Watching occupies the top status control rather than a separate title row; adjacent cards align metadata, status, date and service footer top/height at 640/900/1280px, including differing logos, wrapped badges, missing artwork, missing ratings and unmatched actions. Compact and responsive regressions retained. `tests/e2e/refinedLibrary.spec.ts`. |
 | `T-DETAIL-001` | U | Strict display-only TMDB schema and movie/series projection; missing versus malformed data and provider failures. Original matching allow-list remains closed. `apps/api/test/unit/clients/titlePresentation.spec.ts`. |
 | `T-DETAIL-002` | U | On-access cache reuse, stale fallback, explicit unavailable state, identity corrections and logged failures without prose or credentials. `apps/api/test/unit/services/titlePresentation.spec.ts`. |
 | `T-DETAIL-003` | I | Real SQL additive JSON constraint, metadata-only persistence, owner/identity scoping and authenticated detail read-through cache. `apps/api/test/integration/titleDetail.spec.ts`. |
@@ -2284,7 +2297,7 @@ owned by their own tasks**.
 | **`T-LIST-031`** | U | The list-item shape: every documented field present, badges carrying service + listing id + date, an **unmatched** title falling back to its raw extracted text, `name` never `undefined`, and a missing date yielding a `null` label rather than an invented one. |
 | **`T-LIST-032`** | U | `tmdb_genres` parsing never defaults a genre: `[]` stays `[]` (US-019 AC-6), a **corrupt** blob yields `[]` rather than a 500 that would take the owner's whole list down, and non-string entries are dropped. |
 | **`T-LIST-033`** | U | A stored date renders as its own calendar day. Guards the off-by-one that a local-time getter produces on any host west of UTC — a date that is simply wrong and that nobody would connect to a timezone. |
-| **`T-LIST-034`** | U | `dateAddedLabel()` always contains **"to nextup"** (REQ-061), never renders a bare `Added <date>`, renders every month as a name, does not shift with the host timezone, and **refuses** a malformed date rather than rendering "Invalid Date". ⚠ This is the DOMAIN half. `T-LIST-018` (layer C, TASK-035) still owns the assertion that every **rendered** label carries the marker, and remains unimplemented. |
+| **`T-LIST-034`** | U | `dateAddedLabel()` always contains **"to nextup"** (REQ-061), never renders a bare `Added <date>`, renders every month as a name, does not shift with the host timezone, and **refuses** a malformed date rather than rendering "Invalid Date". ⚠ This is the DOMAIN half. `T-LIST-018` (layer C, TASK-035) still owns the assertion that every accessible catalog label carries the marker; visible prefixes may be abbreviated under the owner-approved 2026-09-23 exception. |
 | **`T-LIST-035`** | U | The DETAIL-item shape (§6.3, TASK-034): the list item's fields plus `removedListings[]`, `createdByBatchId` and `createdAt`. ⚠ Its load-bearing case is the **active/removed split** — `badges` must be built from the active listings alone even though the handler is handed all of them, or a service that no longer holds the title gets its badge back in the one view that shows the removal beside it. `removedAt` is a **timestamp**, not a date, because the removed view is an ordered log (REQ-028) in which two removals on one day must stay distinguishable. `T-LIST-028` (layer I) owns the endpoint's owner-scoping and its 404-never-403 refusal. |
 | **`T-API-018`** | U | `limit` is bounded 1..200, defaults to 50, and out-of-range is **refused rather than clamped** — clamping returns a page the caller did not ask for and gives no hint why the remaining rows are missing. |
 | **`T-API-022`** | U | **REQ-109 · `chosenReviewMatch` serves the owner's correction, not the guess they rejected** (`packages/domain/test/chosenReviewMatch.spec.ts`). The `match` on a review candidate is projected from the stored `correctedDisplay*` columns when the disposition is `corrected`; otherwise the previous `alternatives[0]` behaviour is unchanged. ⚠ **`b` is the mutation case**: the rejected guess stays in `alternatives` and `resolvedWorkIdentity` still starts with `tmdb:`, so deleting the corrected branch re-serves it — which is precisely the defect. ⚠ `c` pins `score: 1` / `uncertain: false` / `ambiguous: false` as **constants, not computations**: derived from the alternatives' scores they would describe a different candidate and chip the owner's own hand-made choice as doubtful. ⚠ `e` pins the fallback for a correction stored **before** these columns existed — no name is invented. ⚠ `matchCandidates` is never rewritten; see §16.6 and `services/batchClose.ts`. ⚠ `i` and `j` are the **integration** half (`apps/api/test/integration/batchReview.spec.ts`) and are the ONLY place the three `corrected_display_*` columns and the `0008` migration are exercised against a real database — the unit cases prove the projection, these prove the columns exist, accept the values and come back through Prisma. |
@@ -4948,7 +4961,7 @@ migrations remain immutable. No general escape flag or comment can bypass
 
 | AC | Level | Tests | Assertion |
 |---|---|---|---|
-| AC-1 | U/E | `T-WATCH-003` | Default Normal/not-watching and visible editable preference summary in both layouts. |
+| AC-1 | U/E | `T-WATCH-003` | Default Normal and one visible editable watch-status summary in both layouts. |
 | AC-2 | U/I/E | `T-WATCH-001`, `T-WATCH-003` | Explicit save, cancellation, pending/error/retry/offline states and real API wiring. |
 | AC-3 | U/I/E | `T-WATCH-002`, `T-WATCH-003` | URL filters, chips/clear and whole-set server filtering, including hidden runtime counts. |
 | AC-4 | U/I/E | `T-WATCH-002`, `T-WATCH-003` | Rank-based order both directions, stable cursor paging, default order retained. |
@@ -4959,7 +4972,7 @@ migrations remain immutable. No general escape flag or comment can bypass
 |---|---|---|
 | `T-WATCH-001` | U/I | Mutation validation, owner/work persistence, defaults, retained preferences and correction lifecycle. |
 | `T-WATCH-002` | U/I | Priority/watching filters, Watch priority rank, strict cursor validation and pagination, unknown-runtime counts. |
-| `T-WATCH-003` | U/E | `apps/web/test/watchPreferences.spec.tsx` cases `a`–`h`: defaults, explicit confirmation, cancel/focus, pending, visible failures and manual retry, offline restriction, URL filters/clear, opt-in/reversible sort and real container PATCH/refetch. `tests/e2e/refinedLibrary.spec.ts` case `i`: phone save/reload/filter/sort and axe; `j`: bounded 320/640/1280px filter panels without Genre facets; `k`: viewport overlay, unchanged document height/scroll, locked background, keyboard trap and Escape/Cancel focus restoration from a scrolled Grid/Compact list at phone/desktop sizes. Existing field geometry and Grid/Compact preservation cases cover the added controls. |
+| `T-WATCH-003` | U/E | `apps/web/test/watchPreferences.spec.tsx` cases `a`–`h`, `l`–`m`: unified status projection/transitions and filtering, defaults, explicit confirmation, cancel/focus, pending, visible failures and manual retry, offline restriction, URL filters/clear, opt-in/reversible sort and real container PATCH/refetch. `tests/e2e/refinedLibrary.spec.ts` case `i`: phone save/reload/filter/sort and axe; `j`: bounded 320/640/1280px filter panels without Genre facets; `k`: viewport overlay, unchanged document height/scroll, locked background, keyboard trap and Escape/Cancel focus restoration from a scrolled Grid/Compact list at phone/desktop sizes. Existing field geometry and Grid/Compact preservation cases cover the added controls. |
 
 ### Owner refinement: TV episode-runtime fallback (2026-09-16)
 

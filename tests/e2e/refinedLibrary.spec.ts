@@ -911,7 +911,7 @@ test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone
     let controls = dialog.getByRole('group', { name: 'Filter by', exact: true });
     await expect(controls).toBeVisible();
     let fields = controls.locator('.filter-disclosure[data-filter-field]');
-    await expect(fields).toHaveCount(6);
+    await expect(fields).toHaveCount(5);
     const positions = await fields.evaluateAll((elements) =>
       elements.map((element) => element.getBoundingClientRect().x),
     );
@@ -924,14 +924,7 @@ test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone
      * viewport. `T-UX-147e` measures the consequence the owner actually sees.
      */
     expect(new Set(positions).size).toBe(2);
-    for (const [index, category] of [
-      'Services',
-      'Type',
-      'Genre',
-      'Runtime',
-      'Watching',
-      'Priority',
-    ].entries()) {
+    for (const [index, category] of ['Services', 'Type', 'Genre', 'Runtime', 'Status'].entries()) {
       const field = fields.nth(index);
       const trigger = field.getByRole('button', { name: new RegExp(`^${category} `) });
       await usableTarget(page, trigger);
@@ -951,7 +944,7 @@ test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone
       await page.keyboard.press('Escape');
       await expect(dialog).toHaveCount(0);
       await expect(page.getByTestId('filters-trigger')).toHaveAttribute('aria-expanded', 'false');
-      if (category !== 'Priority') {
+      if (category !== 'Status') {
         dialog = await openFiltersPanel(page);
         controls = dialog.getByRole('group', { name: 'Filter by', exact: true });
         fields = controls.locator('.filter-disclosure[data-filter-field]');
@@ -1032,8 +1025,8 @@ for (const width of [320, 640, 1280]) {
       const dialogBox = await bounds(dialog);
       expect(dialogBox.x).toBeGreaterThanOrEqual(0);
       expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(width + 1);
-      await expect(controls.locator('.filter-disclosure[data-filter-field]')).toHaveCount(5);
-      const categories = ['Services', 'Type', 'Runtime', 'Watching', 'Priority'];
+      await expect(controls.locator('.filter-disclosure[data-filter-field]')).toHaveCount(4);
+      const categories = ['Services', 'Type', 'Runtime', 'Status'];
       for (const [index, category] of categories.entries()) {
         const trigger = controls.getByRole('button', { name: new RegExp(`^${category} `) });
         await usableTarget(page, trigger);
@@ -1061,7 +1054,7 @@ test('T-WATCH-003k: preferences overlay preserves the scrolled list and returns 
     for (const view of ['Grid', 'Compact']) {
       await page.getByRole('button', { name: `${view} view`, exact: true }).click();
       const trigger = page.getByRole('button', {
-        name: 'Watch preferences for The Last Observatory: Normal',
+        name: 'Watch status for The Last Observatory: Normal',
         exact: true,
       });
       await trigger.evaluate((element) => element.scrollIntoView({ block: 'center' }));
@@ -1072,7 +1065,7 @@ test('T-WATCH-003k: preferences overlay preserves the scrolled list and returns 
       expect(before.scroll).toBeGreaterThan(0);
       const triggerBefore = await bounds(trigger);
       await trigger.click();
-      const dialog = page.getByRole('dialog', { name: 'Watch preferences', exact: true });
+      const dialog = page.getByRole('dialog', { name: 'Watch status', exact: true });
       const box = await bounds(dialog);
       expect(
         Math.abs((await page.evaluate(() => window.scrollY)) - before.scroll),
@@ -1084,11 +1077,11 @@ test('T-WATCH-003k: preferences overlay preserves the scrolled list and returns 
       expect(box.y + box.height).toBeLessThanOrEqual(640);
       expect(box.width).toBeLessThanOrEqual(544);
       expect(Math.abs(box.x + box.width / 2 - width / 2)).toBeLessThan(12);
-      await expect(dialog.getByRole('checkbox')).toBeFocused();
+      await expect(dialog.getByRole('radio', { name: 'Watching', exact: true })).toBeFocused();
       await page.keyboard.press('Shift+Tab');
       await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeFocused();
       await page.keyboard.press('Tab');
-      await expect(dialog.getByRole('checkbox')).toBeFocused();
+      await expect(dialog.getByRole('radio', { name: 'Watching', exact: true })).toBeFocused();
       await expect(page.locator('html')).toHaveCSS('overflow', 'hidden');
       if (!testInfo.project.use.isMobile) {
         await page.mouse.move(2, 2);
@@ -1114,31 +1107,30 @@ test('T-WATCH-003i: watch preferences save, survive reload, filter and sort in a
   page,
 }) => {
   await mountLibrary(page, { width: 320 });
-  const trigger = page.getByRole('button', { name: 'Watch preferences for Amber Harbor: Normal' });
+  const trigger = page.getByRole('button', { name: 'Watch status for Amber Harbor: Normal' });
   await trigger.click();
-  const dialog = page.getByRole('dialog', { name: 'Watch preferences', exact: true });
+  const dialog = page.getByRole('dialog', { name: 'Watch status', exact: true });
   for (const input of await dialog.locator('input').all()) {
     await usableTarget(page, input.locator('..'));
   }
-  await dialog.getByRole('checkbox', { name: 'Currently watching' }).check();
-  await dialog.getByRole('radio', { name: 'Someday' }).check();
+  await dialog.getByRole('radio', { name: 'Watching' }).check();
   const accessibility = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
     .analyze();
   expect(accessibility.violations).toEqual([]);
-  await dialog.getByRole('button', { name: 'Save preferences' }).click();
+  await dialog.getByRole('button', { name: 'Save status' }).click();
   await expect(
-    page.getByRole('button', { name: 'Watch preferences for Amber Harbor: Watching, Someday' }),
+    page.getByRole('button', { name: 'Watch status for Amber Harbor: Watching' }),
   ).toBeVisible();
   await page.reload();
   await expect(
-    page.getByRole('button', { name: 'Watch preferences for Amber Harbor: Watching, Someday' }),
+    page.getByRole('button', { name: 'Watch status for Amber Harbor: Watching' }),
   ).toBeVisible();
   const sortGroup = await openSortPanel(page);
   await sortGroup.getByRole('button', { name: 'Watch priority', exact: true }).click();
   await expect(page.getByTestId('title-name').first()).toHaveText('Amber Harbor');
   const filterDialog = await openFiltersPanel(page);
-  await filterDialog.getByRole('button', { name: 'Watching All titles', exact: true }).click();
+  await filterDialog.getByRole('button', { name: 'Status All statuses', exact: true }).click();
   const watching = filterDialog.getByRole('radio', { name: 'Watching', exact: true });
   await chooseInput(watching);
   await expect.poll(() => new URL(page.url()).searchParams.get('watching')).toBe('true');
@@ -1147,8 +1139,8 @@ test('T-WATCH-003i: watch preferences save, survive reload, filter and sort in a
     .getByRole('button', { name: 'Done', exact: true })
     .click();
   await expect(page.getByTestId('title-name')).toHaveText(['Amber Harbor']);
-  await filterDialog.getByRole('button', { name: 'Priority All priorities', exact: true }).click();
-  await chooseInput(filterDialog.getByRole('checkbox', { name: 'Up next', exact: true }));
+  await filterDialog.getByRole('button', { name: 'Status Watching', exact: true }).click();
+  await chooseInput(filterDialog.getByRole('radio', { name: 'Up next', exact: true }));
   await filterDialog
     .locator('.filter-disclosure__panel:visible')
     .getByRole('button', { name: 'Done', exact: true })
@@ -1265,8 +1257,8 @@ for (const width of [640, 900, 1280]) {
             return {
               top: Math.round(row.getBoundingClientRect().top),
               name: rect('.title-row__name'),
-              watching: row.querySelector('.title-row__watching')
-                ? rect('.title-row__watching')
+              watching: row.querySelector('.title-row__watch[data-watching="true"]')
+                ? rect('.title-row__watch[data-watching="true"]')
                 : null,
               meta: rect('.title-row__meta'),
               priority: rect('.title-row__watch'),
@@ -1278,8 +1270,8 @@ for (const width of [640, 900, 1280]) {
         expect(geometry.filter((card) => card.watching !== null)).toHaveLength(2);
         for (const card of geometry) {
           if (card.watching !== null) {
-            expect(card.watching.y).toBeGreaterThanOrEqual(card.name.bottom);
-            expect(card.watching.x).toBeCloseTo(card.name.x, 0);
+            expect(card.watching.y).toBeLessThan(card.name.y);
+            expect(card.watching.y).toBeCloseTo(card.priority.y, 0);
           }
         }
         for (const top of new Set(geometry.map((card) => card.top))) {
@@ -1402,7 +1394,29 @@ for (const width of [640, 1024, 1440]) {
       expect(rating.y).toBeLessThan(genres.y + genres.height);
       expect(badges.x + badges.width).toBeLessThanOrEqual(date.x);
       expect(Math.abs(date.y + date.height - badges.y - badges.height)).toBeLessThan(1);
-      await expect(row.getByTestId('date-added-label')).toHaveText(TITLES[0]?.dateAddedLabel ?? '');
+      await expect(row.getByTestId('date-added-label')).toHaveAttribute(
+        'title',
+        TITLES[0]?.dateAddedLabel ?? '',
+      );
+      await expect(row.getByTestId('date-added-label').locator('[aria-hidden="true"]')).toHaveText(
+        'Added 16 Sep 2026',
+      );
+      expect(Math.abs(rating.y - genres.y)).toBeLessThanOrEqual(1);
+      expect(
+        await row
+          .getByTestId('title-name')
+          .evaluate((el) => parseFloat(getComputedStyle(el).fontSize)),
+      ).toBe(18);
+      expect(
+        await row
+          .locator('.title-row__body')
+          .evaluate((el) => getComputedStyle(el).backgroundImage),
+      ).toContain('0.75');
+      for (const selector of ['.title-row__priority', '[data-testid="row-menu"]']) {
+        expect(
+          await row.locator(selector).evaluate((el) => getComputedStyle(el).backgroundColor),
+        ).toContain('0.85');
+      }
       const scan = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
         .analyze();
@@ -1494,19 +1508,17 @@ for (const width of [390, 1280, 1440]) {
           quick.getByRole('checkbox', { name: 'Movies', exact: true }),
         ).not.toBeChecked();
         await page.keyboard.press('Escape');
-        await quick.getByRole('button', { name: /^Watching/ }).click();
-        await quick.getByRole('radio', { name: 'Not watching', exact: true }).click();
-        await expect(quick.getByRole('radio', { name: 'Not watching', exact: true })).toBeChecked();
+        await quick.getByRole('button', { name: /^Status/ }).click();
+        await quick.getByRole('radio', { name: 'Normal', exact: true }).click();
+        await expect(quick.getByRole('radio', { name: 'Normal', exact: true })).toBeChecked();
         await page.getByTestId('filters-trigger').click();
-        await dialog.getByRole('button', { name: /^Watching/ }).click();
-        await expect(
-          dialog.getByRole('radio', { name: 'Not watching', exact: true }),
-        ).toBeChecked();
+        await dialog.getByRole('button', { name: /^Status/ }).click();
+        await expect(dialog.getByRole('radio', { name: 'Normal', exact: true })).toBeChecked();
         await dialog.getByRole('button', { name: 'Close filters', exact: true }).click();
-        await quick.getByRole('button', { name: /^Watching/ }).click();
-        await expect(quick.getByRole('radio', { name: 'Not watching', exact: true })).toBeChecked();
-        await quick.getByRole('radio', { name: 'All titles', exact: true }).click();
-        await expect(quick.getByRole('radio', { name: 'All titles', exact: true })).toBeChecked();
+        await quick.getByRole('button', { name: /^Status/ }).click();
+        await expect(quick.getByRole('radio', { name: 'Normal', exact: true })).toBeChecked();
+        await quick.getByRole('radio', { name: 'All statuses', exact: true }).click();
+        await expect(quick.getByRole('radio', { name: 'All statuses', exact: true })).toBeChecked();
         await page.keyboard.press('Escape');
       } else {
         await expect(quick).toBeHidden();
@@ -1563,7 +1575,7 @@ test('T-POL-003c: catalog surfaces and artwork stay consistent in both layouts w
     expect(appearance.image).toBe('none');
     expect(appearance.transform).toBe('none');
     expect(appearance.durations.every((duration) => duration <= 0.00001)).toBe(true);
-    const control = rows.first().getByRole('button', { name: /^Watch preferences for/ });
+    const control = rows.first().getByRole('button', { name: /^Watch status for/ });
     await control.focus();
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Tab');
@@ -1608,7 +1620,7 @@ test('T-UX-155c: library frame, priority geometry and portrait artwork stay inte
       await page.getByRole('button', { name: `${view} view`, exact: true }).click();
       const list = page.getByTestId('title-list');
       expect((await bounds(list)).width).toBeLessThanOrEqual(1248);
-      const buttons = list.getByRole('button', { name: /^Watch preferences for/ });
+      const buttons = list.getByRole('button', { name: /^Watch status for/ });
       const geometry = await buttons.evaluateAll((elements) =>
         elements.map((element) => {
           const box = element.getBoundingClientRect();
