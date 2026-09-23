@@ -358,6 +358,50 @@ export const RUNTIME_BUCKET_LABELS: Readonly<Record<RuntimeBucket, string>> = {
   over120: 'Over 2h',
 };
 
+/**
+ * #366 (TASK-246) - the runtime range slider. Stop `i` is
+ * `RUNTIME_RANGE_STOPS[i]`; the visible values carry units and the spoken
+ * values are what each handle's `aria-valuetext` announces. The first stop is
+ * never "0 minutes" to a screen reader and the last is never a length at all.
+ */
+export const RUNTIME_RANGE_MIN_LABEL = 'Min';
+export const RUNTIME_RANGE_MAX_LABEL = 'Max';
+export const RUNTIME_RANGE_MIN_NAME = 'Minimum runtime';
+export const RUNTIME_RANGE_MAX_NAME = 'Maximum runtime';
+export const RUNTIME_RANGE_STOP_LABELS: readonly string[] = [
+  '0m',
+  '30m',
+  '1h',
+  '1h 30m',
+  '2h',
+  'No limit',
+];
+export const RUNTIME_RANGE_STOP_SPOKEN: readonly string[] = [
+  'No minimum',
+  '30 minutes',
+  '1 hour',
+  '1 hour 30 minutes',
+  '2 hours',
+  'No maximum',
+];
+export const RUNTIME_RANGE_MIN_CLAMPED = 'The minimum cannot go past the maximum.';
+export const RUNTIME_RANGE_MAX_CLAMPED = 'The maximum cannot go below the minimum.';
+
+/** Names the selected range in the Runtime field summary, e.g. "1h – 2h". */
+export function runtimeRangeSummary(min: number, max: number, last: number): string {
+  const from = RUNTIME_RANGE_STOP_LABELS[min] ?? '';
+  const to = RUNTIME_RANGE_STOP_LABELS[max] ?? '';
+  if (min === 0 && max === last) return 'Any runtime';
+  if (min === 0) return `Under ${to}`;
+  if (max === last) return `Over ${from}`;
+  return `${from} – ${to}`;
+}
+
+/** Explains a saved selection with gaps that one slider track cannot show. */
+export function runtimeRangeGapNotice(labels: readonly string[]): string {
+  return `Your saved runtime filter has separate ranges (${labels.join(', ')}). Moving a handle replaces it with one continuous range.`;
+}
+
 /** REQ-037 - the runtime sort's direction labels (`T-UX-120`). */
 export const SORT_SHORTEST_LABEL = 'Shortest first';
 /** REQ-037 - `dir=desc` under `sort=runtime`. */

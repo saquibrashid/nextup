@@ -898,8 +898,11 @@ since v1 precisely so this would be additive.
 
 The filter is **bucketed** (*Under 30m*, *30m–1h*, *1h–1h 30m*,
 *1h 30m–2h*, *Over 2h*), with
-half-open `[lower, upper)` boundaries, and **not a range slider** — see
-`specs/ui.md` §2.1 item 2 for why a slider fails the accessibility floor.
+half-open `[lower, upper)` boundaries, and is operated by a **two-handle range
+slider whose stops are those bucket edges** (owner-approved 2026-09-23, #366)
+— see `specs/ui.md` §2.1 item 2 for how it meets the accessibility floor.
+~~Superseded: "and **not a range slider** — see `specs/ui.md` §2.1 item 2 for
+why a slider fails the accessibility floor."~~
 
 The owner split the old *1h–2h* option on 2026-09-16. Canonical tokens are
 `60-90` and `90-120`; 90 belongs only in the second and 120 remains in

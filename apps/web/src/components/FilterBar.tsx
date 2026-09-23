@@ -24,12 +24,15 @@ import { CloseIcon } from './icons';
 import { Field } from './ui/Field';
 import { FilterDisclosure } from './FilterDisclosure';
 import {
-  RUNTIME_BUCKETS,
+  RUNTIME_RANGE_LAST_STOP,
   WATCH_PRIORITIES,
   WATCH_STATUSES,
   SERVICES,
   SERVICE_LABELS,
+  moveRuntimeRangeHandle,
   normalizeRuntimeBuckets,
+  runtimeBucketsForRange,
+  runtimeRangeFromBuckets,
   type RuntimeBucket,
   type Service,
   type WatchPriority,
@@ -44,12 +47,23 @@ import {
   FILTERS_PANEL_TITLE,
   FILTERS_TRIGGER_LABEL,
   RUNTIME_BUCKET_LABELS,
+  RUNTIME_RANGE_MAX_CLAMPED,
+  RUNTIME_RANGE_MAX_LABEL,
+  RUNTIME_RANGE_MAX_NAME,
+  RUNTIME_RANGE_MIN_CLAMPED,
+  RUNTIME_RANGE_MIN_LABEL,
+  RUNTIME_RANGE_MIN_NAME,
+  RUNTIME_RANGE_STOP_LABELS,
+  RUNTIME_RANGE_STOP_SPOKEN,
   ZERO_MATCH_TITLE,
   WATCH_PRIORITY_LABELS,
   WATCH_STATUS_LABELS,
+  runtimeRangeGapNotice,
+  runtimeRangeSummary,
   runtimeUnknownHiddenLabel,
 } from '../copy';
 import { ServiceMark } from './ServiceMark';
+import { RangeSlider } from './ui/RangeSlider';
 
 /** `api.md` §6.2 — `type` is `movie|tv`. */
 export const MEDIA_TYPES = ['movie', 'tv'] as const;
@@ -254,6 +268,7 @@ export function FilterBar({
     setOpen(false);
   }, []);
   const filters = parseFilters(params);
+  const runtimeRange = runtimeRangeFromBuckets(filters.runtimes);
   const genreOptions = [...new Set([...genres, ...filters.genres])];
   const [serviceQuery, setServiceQuery] = useState('');
   const services = SERVICES.filter((service) =>
@@ -480,36 +495,59 @@ export function FilterBar({
                 )}
 
                 {/*
-        REQ-035 — the runtime buckets. ALWAYS PRESENT, unlike the genre
+        REQ-035 — the runtime filter. ALWAYS PRESENT, unlike the genre
         fieldset above, which is conditional on the list actually containing
-        genres. The bucket set is fixed by `RUNTIME_BUCKET_BOUNDS` rather than
+        genres. The stops are fixed by `RUNTIME_BUCKET_BOUNDS` rather than
         derived from the data, so hiding it when no title happens to have a
         runtime would remove the only control that explains why the list is
         the length it is.
+        #366 (TASK-246): a two-handle slider whose stops are the bucket edges,
+        so it still writes the same canonical `runtime=` bucket tokens. A saved
+        selection with a gap is shown as its covering range but is NOT
+        rewritten until the owner moves a handle.
       */}
                 <FilterDisclosure
                   label="Runtime"
-                  value={selectionSummary(
-                    filters.runtimes.map((bucket) => RUNTIME_BUCKET_LABELS[bucket]),
-                    'Any runtime',
-                  )}
+                  value={
+                    runtimeRange.contiguous
+                      ? runtimeRangeSummary(
+                          runtimeRange.min,
+                          runtimeRange.max,
+                          RUNTIME_RANGE_LAST_STOP,
+                        )
+                      : selectionSummary(
+                          filters.runtimes.map((bucket) => RUNTIME_BUCKET_LABELS[bucket]),
+                          'Any runtime',
+                        )
+                  }
                 >
-                  <Field legend="Runtime" testId="filter-runtime">
-                    {RUNTIME_BUCKETS.map((bucket) => (
-                      <label key={bucket}>
-                        <Input
-                          type="checkbox"
-                          name="runtime"
-                          value={bucket}
-                          checked={filters.runtimes.includes(bucket)}
-                          onChange={() => {
-                            update({ ...filters, runtimes: toggle(filters.runtimes, bucket) });
-                          }}
-                        />
-                        {RUNTIME_BUCKET_LABELS[bucket]}
-                      </label>
-                    ))}
-                  </Field>
+                  <RangeSlider
+                    legend="Runtime"
+                    testId="filter-runtime"
+                    last={RUNTIME_RANGE_LAST_STOP}
+                    value={runtimeRange}
+                    minLabel={RUNTIME_RANGE_MIN_LABEL}
+                    maxLabel={RUNTIME_RANGE_MAX_LABEL}
+                    minName={RUNTIME_RANGE_MIN_NAME}
+                    maxName={RUNTIME_RANGE_MAX_NAME}
+                    formatValue={(stop) => RUNTIME_RANGE_STOP_LABELS[stop] ?? ''}
+                    speakValue={(stop) => RUNTIME_RANGE_STOP_SPOKEN[stop] ?? ''}
+                    move={moveRuntimeRangeHandle}
+                    onChange={(range) => {
+                      update({ ...filters, runtimes: runtimeBucketsForRange(range) });
+                    }}
+                    clampMessages={{
+                      min: RUNTIME_RANGE_MIN_CLAMPED,
+                      max: RUNTIME_RANGE_MAX_CLAMPED,
+                    }}
+                    description={
+                      runtimeRange.contiguous
+                        ? undefined
+                        : runtimeRangeGapNotice(
+                            filters.runtimes.map((bucket) => RUNTIME_BUCKET_LABELS[bucket]),
+                          )
+                    }
+                  />
                 </FilterDisclosure>
                 <FilterDisclosure
                   label="Status"

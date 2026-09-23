@@ -263,13 +263,30 @@ restore, suppress, un-suppress or fix-match.
    stealing focus. Clear search keeps the form open and focuses the cleared
    input. Unsubmitted drafts are discarded on close (`T-LIB-002`).
 
-   **The runtime filter is BUCKETED, not a slider.** Buckets are *Under 30m*,
-   *30m–1h*, *1h–1h 30m*, *1h 30m–2h*, *Over 2h*, and they map to `runtime=` in the query
-   string. A range slider is rejected outright: it is the control this
-   repository's accessibility floor (§9) is worst at — two draggable thumbs,
-   no 44×44 px target at either end, and a value only reachable by pointer
-   precision — and it also invites a meaningless *exact* range over data whose
-   TV values are per-episode.
+   **The runtime filter is a two-handle range slider over the fixed
+   buckets** (owner-approved 2026-09-23, #366, TASK-246). Its six stops are
+   the bucket edges — *0m*, *30m*, *1h*, *1h 30m*, *2h*, *No limit* — so the
+   handles select a contiguous run of *Under 30m*, *30m–1h*, *1h–1h 30m*,
+   *1h 30m–2h*, *Over 2h* and still write those canonical `runtime=` tokens.
+   The full track is **Any runtime** and writes no `runtime` parameter. The
+   accessibility objections that once ruled a slider out are met, not waived:
+   the handles are two native range inputs with visible **Min**/**Max**
+   labels, values with units, distinct accessible names (*Minimum runtime*,
+   *Maximum runtime*) and spoken `aria-valuetext`; each thumb is a 44×44 px
+   target; arrow keys move one stop, so no value needs pointer precision; and
+   there is no exact-minute range over per-episode TV values. A handle stops
+   one step short of the other and a status message says why — the handles
+   are never silently swapped. A saved selection with a gap (for example
+   `under30` + `over120`) is shown as its covering range with a notice and is
+   **not rewritten** until the owner moves a handle. Chips, reset, retained
+   filters and the hidden-unknown count are unchanged. `T-RANGE-001`–`003`.
+   ~~Superseded (2026-09-23, #366): "**The runtime filter is BUCKETED, not a
+   slider.** Buckets are *Under 30m*, *30m–1h*, *1h–1h 30m*, *1h 30m–2h*,
+   *Over 2h*, and they map to `runtime=` in the query string. A range slider
+   is rejected outright: it is the control this repository's accessibility
+   floor (§9) is worst at — two draggable thumbs, no 44×44 px target at either
+   end, and a value only reachable by pointer precision — and it also invites
+   a meaningless *exact* range over data whose TV values are per-episode."~~
    ⚠ **Bucket boundaries are inclusive of the lower bound and exclusive of the
    upper** (`[30, 60)`), so a 60-minute film appears in exactly one bucket. An
    overlapping definition makes the result count disagree with the list.
@@ -1249,7 +1266,7 @@ Touch targets: minimum **44×44 CSS px** for every interactive element
 | Contrast | ≥ 4.5:1 body text, ≥ 3:1 large text and UI boundaries | `T-A11Y-007` (`axe-core` `color-contrast`) |
 | Non-colour meaning | Service badges, low-confidence and ticked-removal all carry text or an icon, never colour alone | `T-A11Y-008` |
 | **Sort control** *(new, `A44`)* | `SortControl.tsx` is a real, labelled, keyboard-operable control (same treatment as every other control in this table — reachable via the standard keyboard path, focus ring, 44×44 px target) that renders on the combined list and toggles `dir` **and selects `sort` (`A48`)**. From 2026-09-17 the six orders live in a labelled chooser dialog opened from the toolbar, and **a dedicated reverse-order button on the toolbar keeps `dir` reversible in one tap with nothing open** (§2.1 item 2, §10.1) | **`T-UI-024`** |
-| **Runtime filter** *(new, `A48`)* | The bucket control is a real labelled control on the same terms — standard keyboard path, focus ring, 44×44 px target — and **not a range slider**, which cannot meet any of the three. The hidden-unknowns disclosure is rendered in the same live region as the result count, so a screen-reader user is told the list shortened rather than discovering it by absence | **`T-UI-029`** |
+| **Runtime filter** *(new, `A48`; slider at #366)* | The two-handle range slider is a real labelled control on the same terms — native keyboard path (one stop per arrow key), focus ring on the focused thumb, 44×44 px thumb targets, a distinct accessible name and spoken value per handle — and its stops are the bucket edges, so no value requires pointer precision. ~~Superseded: "The bucket control is a real labelled control on the same terms … and **not a range slider**, which cannot meet any of the three."~~ The hidden-unknowns disclosure is rendered in the same live region as the result count, so a screen-reader user is told the list shortened rather than discovering it by absence | **`T-UI-029`** (reserved), `T-RANGE-002`, `T-RANGE-003` |
 | Live regions | Filter result count, review counters and toasts in `aria-live="polite"`; errors in `role="alert"` | `T-A11Y-009` |
 | **Paste is never the only way in** *(A45)* | The **"Paste screenshot"** button is a real `<button>` in tab order with a 44×44 px target; the `paste` listener is a **shortcut, not a requirement**, and every image can also be attached with **"Choose files"** by keyboard alone. A clipboard result is announced in the `aria-live="polite"` region (*"Added 1 screenshot — 3 in this batch."*); a clipboard failure renders in `role="alert"`. Drag-and-drop is **never** the only route to any capability | `T-UI-014`, `T-A11Y-005` |
 | Images | Posters `alt=""` (decorative); the TMDB logo `alt="TMDB"`; screenshot thumbnails `alt="Screenshot {n} of {total}"` | `T-A11Y-010` |
