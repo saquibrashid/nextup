@@ -1025,7 +1025,7 @@ for (const width of [320, 640, 1280]) {
       const dialogBox = await bounds(dialog);
       expect(dialogBox.x).toBeGreaterThanOrEqual(0);
       expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(width + 1);
-      await expect(controls.locator('.filter-disclosure[data-filter-field]')).toHaveCount(5);
+      await expect(controls.locator('.filter-disclosure[data-filter-field]')).toHaveCount(4);
       const categories = ['Services', 'Type', 'Runtime', 'Status'];
       for (const [index, category] of categories.entries()) {
         const trigger = controls.getByRole('button', { name: new RegExp(`^${category} `) });
@@ -1517,8 +1517,8 @@ for (const width of [390, 1280, 1440]) {
         await dialog.getByRole('button', { name: 'Close filters', exact: true }).click();
         await quick.getByRole('button', { name: /^Status/ }).click();
         await expect(quick.getByRole('radio', { name: 'Normal', exact: true })).toBeChecked();
-        await quick.getByRole('radio', { name: 'All titles', exact: true }).click();
-        await expect(quick.getByRole('radio', { name: 'All titles', exact: true })).toBeChecked();
+        await quick.getByRole('radio', { name: 'All statuses', exact: true }).click();
+        await expect(quick.getByRole('radio', { name: 'All statuses', exact: true })).toBeChecked();
         await page.keyboard.press('Escape');
       } else {
         await expect(quick).toBeHidden();
