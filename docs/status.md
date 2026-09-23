@@ -12,8 +12,8 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 | Status | Count |
 |---|---|
 | ⬜ todo | 0 |
-| 🚧 doing | 1 |
-| ✅ done | 237 |
+| 🚧 doing | 0 |
+| ✅ done | 238 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **241** |
@@ -22,9 +22,7 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 Not done, and every task they depend on is done.
 
-| Task | Size | Section |
-|---|---|---|
-| `TASK-243` | 1 agent-run + 10 owner-review-minutes | Approved service panel and review clarity fixes, 2026-09-23 |
+_Nothing is ready: every unfinished task is waiting on a dependency._
 
 ## Waiting on the owner
 
@@ -280,3 +278,4 @@ Not done, and every task they depend on is done.
 | `TASK-240` | Owner mockup-led in-app design: desktop sidebar, navy/violet surfaces, local serif headings, full-width artwork, shared service-filter chips and refined upload/review grouping. Preserve all workflows, persistence, safety, evidence, attribution and accessibility; no scenic branding or fictional features. `T-MOCK-001`, `T-MOCK-002`, `T-MOCK-003`. | `T-MOCK-001`, `T-MOCK-002`, `T-MOCK-003` |
 | `TASK-241` | Compact artwork cards, grouped library header and import formatting preserve full titles, Compact, dates and safety. Corrected shared-grid action hit testing and desktop Escape focus; responsive search and nonzero-scroll modal regressions retain their behavioral assertions. `T-MOCK-004`, `T-MOCK-005`, `T-MOCK-006` and all twelve CI jobs passed on `dfd0c17` (run `35814917567`). | `T-MOCK-004`, `T-MOCK-005`, `T-MOCK-006` |
 | `TASK-242` | Authentic, provenance-verified local service artwork replaces approximations; ADR-0014 Revision 3 records sources and presentation changes. Native proportions, canonical names and removal fallback remain. `T-BRAND-001`, `T-BRAND-002`, `T-BRAND-003` and all twelve CI jobs passed on `dfd0c17` (run `35814917567`). No service requests, new dependency or backend change. | `T-BRAND-001`, `T-BRAND-002`, `T-BRAND-003` |
+| `TASK-243` | Keep Service updates above artwork and card controls and inside the viewport; add optional, persisted Confirm match acknowledgements for already-saved readings with secondary Change match. Preserve no-duplicate/no-required-acknowledgement behavior, pending-addition gates and separate Apply summary. `T-MOCK-005`, `T-LIB-004`, `T-AI-067`, `T-REV-016`, `T-REV-012`. Runtime-slider follow-up is tracked separately in #366. | `T-AI-067`, `T-MOCK-005`, `T-REV-012`, `T-REV-016` |

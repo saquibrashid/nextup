@@ -2,14 +2,13 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { buildReviewResponse, type ReviewCandidate } from '@nextup/domain';
 
-test('T-AI-067f: every original tile, known match and next step survives responsive saved review', async ({
-  page,
-}, testInfo) => {
-  const svg =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="500"><rect width="1000" height="500" fill="black"/><rect x="0" y="50" width="190" height="400" fill="red"/><rect x="200" y="50" width="190" height="400" fill="green"/><rect x="400" y="50" width="190" height="400" fill="blue"/><rect x="600" y="50" width="190" height="400" fill="yellow"/><rect x="800" y="50" width="190" height="400" fill="white"/></svg>';
-  const regions = Array.from({ length: 5 }, (_, i) => ({ x: i * 0.2, y: 0.1, w: 0.19, h: 0.8 }));
-  for (const width of [280, 390, 1440]) {
-    await page.unrouteAll();
+for (const width of [280, 390, 1440]) {
+  test(`T-AI-067f: every original tile, known match and next step survives saved review at ${width}px`, async ({
+    page,
+  }, testInfo) => {
+    const svg =
+      '<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="500"><rect width="1000" height="500" fill="black"/><rect x="0" y="50" width="190" height="400" fill="red"/><rect x="200" y="50" width="190" height="400" fill="green"/><rect x="400" y="50" width="190" height="400" fill="blue"/><rect x="600" y="50" width="190" height="400" fill="yellow"/><rect x="800" y="50" width="190" height="400" fill="white"/></svg>';
+    const regions = Array.from({ length: 5 }, (_, i) => ({ x: i * 0.2, y: 0.1, w: 0.19, h: 0.8 }));
     const items: ReviewCandidate[] = regions.map((region, index) => ({
       candidateId: `c${index}`,
       rawText: index === 4 ? '' : `TITLE ${index}`,
@@ -171,5 +170,5 @@ test('T-AI-067f: every original tile, known match and next step survives respons
     await expect(dialog).toContainText('Title 3');
     await expect(dialog).not.toContainText('Title 0');
     await page.keyboard.press('Escape');
-  }
-});
+  });
+}

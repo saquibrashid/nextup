@@ -225,6 +225,8 @@ poster/solid-panel arrangement of section 2.4, not its safety or content guarant
   Service updates must paint above the entire catalog, including artwork gradients,
   priority pills and menus. Contain card stacking within the list; every service
   link and Done must receive pointer input, not merely be present in the DOM.
+  Align that panel with its left-side trigger on tablet and its right-side
+  trigger on wide desktop; neither edge may leave the viewport.
   No actor search, rating/year filters or other unsupported mockup features.
   Phone controls retain accessible disclosure/reflow and remembered query/layout.
 - Import uses full-width service tiles, grouped mode cards and a single
