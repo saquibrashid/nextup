@@ -42,51 +42,51 @@ function patch(body: unknown) {
     headers: { [CLIENT_PRINCIPAL_HEADER]: principal, 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
-
-  describe('T-CATEGORY-002 owner category mutation', () => {
-    async function category(body: unknown) {
-      return fetch(`${origin}/api/titles/title-1/category`, {
-        method: 'PATCH',
-        headers: { [CLIENT_PRINCIPAL_HEADER]: principal, 'content-type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-    }
-    it('T-CATEGORY-002d locks owned active identity and saves or clears only the category', async () => {
-      expect((await category({ categoryOverride: 'comedy-show' })).status).toBe(200);
-      expect(setCategoryOverride).toHaveBeenCalledWith(
-        expect.any(String),
-        'tmdb:movie:1',
-        'comedy-show',
-        tx,
-      );
-      expect(lockTitleForWatchPreferences).toHaveBeenCalledWith(expect.any(String), 'title-1', tx);
-      expect((await category({ categoryOverride: null })).status).toBe(200);
-      expect(setCategoryOverride).toHaveBeenLastCalledWith(
-        expect.any(String),
-        'tmdb:movie:1',
-        null,
-        tx,
-      );
-      expect(setWatchPreference).not.toHaveBeenCalled();
-    });
-    it('T-CATEGORY-002e rejects malformed, unavailable and suppressed titles without saving', async () => {
-      expect((await category({})).status).toBe(400);
-      findTitleDetail.mockResolvedValueOnce(null);
-      expect((await category({ categoryOverride: null })).status).toBe(404);
-      findTitleDetail.mockResolvedValueOnce({ state: 'removed', listings: [] });
-      expect((await category({ categoryOverride: null })).status).toBe(404);
-      findTitleDetail.mockResolvedValueOnce({ state: 'active', listings: [] });
-      expect((await category({ categoryOverride: null })).status).toBe(404);
-      findActiveSuppression.mockResolvedValueOnce({ id: 'blocked' });
-      expect((await category({ categoryOverride: null })).status).toBe(409);
-      expect(setCategoryOverride).not.toHaveBeenCalled();
-    });
-    it('T-CATEGORY-002f surfaces failed storage, never false success', async () => {
-      setCategoryOverride.mockRejectedValueOnce(new Error('storage unavailable'));
-      expect((await category({ categoryOverride: 'movie' })).status).toBe(500);
-    });
-  });
 }
+
+describe('T-CATEGORY-002 owner category mutation', () => {
+  async function category(body: unknown) {
+    return fetch(`${origin}/api/titles/title-1/category`, {
+      method: 'PATCH',
+      headers: { [CLIENT_PRINCIPAL_HEADER]: principal, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+  it('T-CATEGORY-002d locks owned active identity and saves or clears only the category', async () => {
+    expect((await category({ categoryOverride: 'comedy-show' })).status).toBe(200);
+    expect(setCategoryOverride).toHaveBeenCalledWith(
+      expect.any(String),
+      'tmdb:movie:1',
+      'comedy-show',
+      tx,
+    );
+    expect(lockTitleForWatchPreferences).toHaveBeenCalledWith(expect.any(String), 'title-1', tx);
+    expect((await category({ categoryOverride: null })).status).toBe(200);
+    expect(setCategoryOverride).toHaveBeenLastCalledWith(
+      expect.any(String),
+      'tmdb:movie:1',
+      null,
+      tx,
+    );
+    expect(setWatchPreference).not.toHaveBeenCalled();
+  });
+  it('T-CATEGORY-002e rejects malformed, unavailable and suppressed titles without saving', async () => {
+    expect((await category({})).status).toBe(400);
+    findTitleDetail.mockResolvedValueOnce(null);
+    expect((await category({ categoryOverride: null })).status).toBe(404);
+    findTitleDetail.mockResolvedValueOnce({ state: 'removed', listings: [] });
+    expect((await category({ categoryOverride: null })).status).toBe(404);
+    findTitleDetail.mockResolvedValueOnce({ state: 'active', listings: [] });
+    expect((await category({ categoryOverride: null })).status).toBe(404);
+    findActiveSuppression.mockResolvedValueOnce({ id: 'blocked' });
+    expect((await category({ categoryOverride: null })).status).toBe(409);
+    expect(setCategoryOverride).not.toHaveBeenCalled();
+  });
+  it('T-CATEGORY-002f surfaces failed storage, never false success', async () => {
+    setCategoryOverride.mockRejectedValueOnce(new Error('storage unavailable'));
+    expect((await category({ categoryOverride: 'movie' })).status).toBe(500);
+  });
+});
 
 beforeEach(async () => {
   vi.clearAllMocks();

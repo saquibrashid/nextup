@@ -364,7 +364,7 @@ describe('T-IMDB-005 · REQ-095 / invariant 5 · the refresh cannot touch list s
     const src = await readFile(new URL('../../../src/routes/titles.ts', import.meta.url), 'utf8');
 
     const sweep = src.indexOf('runRatingRefresh(');
-    const respond = src.indexOf('res.status(200).json(');
+    const respond = src.search(/res\s*\.\s*status\(200\)\s*\.\s*json\(/);
     const lazy = src.indexOf('beginRatingRefresh(');
 
     expect(sweep).toBeGreaterThan(-1);

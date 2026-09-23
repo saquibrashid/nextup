@@ -237,7 +237,7 @@ export function TitleDetailsPage({
       {active && dialog === 'category' && (
         <TitleCategoryDialog
           item={item}
-          save={actions.updateTitleCategory}
+          save={(titleId, body) => actions.updateTitleCategory(titleId, body)}
           offline={offline}
           onClose={close}
           onSaved={() => {

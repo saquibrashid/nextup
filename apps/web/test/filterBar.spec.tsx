@@ -232,6 +232,7 @@ function box(name: string, value: string): HTMLInputElement {
   const labels: Record<string, string> = {
     service: 'Services',
     type: 'Type',
+    category: 'Type',
     genre: 'Genre',
     runtime: 'Runtime',
   };
@@ -268,11 +269,11 @@ describe('T-UI-016 - the filter bar syncs to the query string in both directions
     // The direction a one-way implementation forgets: nothing was clicked, so
     // a component that only writes on change shows every box unchecked while
     // the list below is filtered.
-    mount('/?service=netflix&type=movie&genre=Drama');
+    mount('/?service=netflix&category=movie&genre=Drama');
 
     expect(box('service', 'netflix').checked).toBe(true);
     expect(box('service', 'max').checked).toBe(false);
-    expect(box('type', 'movie').checked).toBe(true);
+    expect(box('category', 'movie').checked).toBe(true);
     expect(box('genre', 'Drama').checked).toBe(true);
     expect(box('genre', 'Comedy').checked).toBe(false);
   });
@@ -287,13 +288,14 @@ describe('T-UI-016 - the filter bar syncs to the query string in both directions
   it('T-UI-016d round-trips a selection through the URL unchanged', () => {
     mount('/');
     fireEvent.click(box('service', 'max'));
-    fireEvent.click(box('type', 'tv'));
+    fireEvent.click(box('category', 'tv'));
     fireEvent.click(box('genre', 'Comedy'));
 
     const written = new URLSearchParams(url().split('?')[1] ?? '');
     expect(parseFilters(written)).toEqual({
       services: ['max'],
-      types: ['tv'],
+      types: [],
+      categories: ['tv'],
       genres: ['Comedy'],
       runtimes: [],
     });
@@ -322,7 +324,7 @@ describe('T-UI-016 - the filter bar syncs to the query string in both directions
     // newest-first default. Rebuilding the query string from the filters alone
     // silently resets it on the first checkbox click.
     mount('/?sort=dateAdded&dir=asc');
-    fireEvent.click(box('type', 'movie'));
+    fireEvent.click(box('category', 'movie'));
 
     const written = new URLSearchParams(url().split('?')[1] ?? '');
     expect(written.get('dir')).toBe('asc');
