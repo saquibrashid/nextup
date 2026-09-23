@@ -1402,7 +1402,7 @@ for (const width of [390, 1280, 1440]) {
     test('T-MOCK-005: search and quick filters share URL state without crowding library actions', async ({
       page,
     }, testInfo) => {
-      test.setTimeout(60_000);
+      testInfo.setTimeout(60_000);
       await mountLibrary(page, { width });
       await page.screenshot({ path: testInfo.outputPath('library-header.png'), fullPage: true });
       const quick = page.getByRole('group', { name: 'Quick filters' });

@@ -4386,6 +4386,7 @@ button {
   .title-list[data-view='grid'] .title-row__name {
     font-size: var(--text-base);
     font-weight: var(--weight-medium);
+    line-height: var(--leading-tight);
   }
 
   .title-list[data-view='grid'] .title-row__actions {
