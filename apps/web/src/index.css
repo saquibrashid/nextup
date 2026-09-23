@@ -4678,6 +4678,7 @@ button {
     justify-content: end;
     align-self: start;
     margin: 0;
+    z-index: 1;
   }
 
   .library-actions .btn {

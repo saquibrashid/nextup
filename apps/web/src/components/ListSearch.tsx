@@ -31,6 +31,7 @@ export function ListSearch(): JSX.Element {
     if (input.current) input.current.value = q;
     setExpanded(false);
     trigger.current?.focus();
+    if (document.activeElement !== trigger.current) input.current?.focus();
   }
 
   function applySearch(value: string): void {

@@ -362,7 +362,7 @@ for (const width of [320, 1280]) {
       await page.getByRole('checkbox', { name: 'Netflix', exact: true }).click();
       await expect(page.getByRole('checkbox', { name: 'Netflix', exact: true })).toBeChecked();
       await page.keyboard.press('Escape');
-      await page.getByTestId('list-search-trigger').click();
+      if (width < 1280) await page.getByTestId('list-search-trigger').click();
       await page.getByRole('searchbox', { name: 'Search your list', exact: true }).fill('Orbit');
       await page.getByRole('search').getByRole('button', { name: 'Search', exact: true }).click();
       await expect(page.getByTestId('title-name')).toHaveText(['Quiet Orbit']);
@@ -454,33 +454,45 @@ async function bounds(locator: Locator) {
   return box;
 }
 
-test('T-LIB-002d: compact search prioritizes browsing and preserves accessible active search', async ({
+test('T-LIB-002d: responsive search preserves disclosure, desktop persistence and active search', async ({
   page,
 }) => {
   for (const width of [320, 1280]) {
     const requests = await mountLibrary(page, { width });
     const controls = page.getByTestId('list-controls');
     const trigger = page.getByTestId('list-search-trigger');
-    await expect(page.getByRole('search')).toHaveCount(0);
-    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    const compactHeight = (await bounds(controls)).height;
-    expect((await bounds(trigger)).y).toBeGreaterThanOrEqual(
-      (await bounds(page.getByTestId('sort-trigger'))).y,
-    );
-    await usableTarget(page, trigger);
-    await trigger.focus();
-    await page.keyboard.press('Enter');
     const search = page.getByRole('searchbox', { name: 'Search your list', exact: true });
+    if (width < 1280) {
+      await expect(page.getByRole('search')).toHaveCount(0);
+      await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      const compactHeight = (await bounds(controls)).height;
+      expect((await bounds(trigger)).y).toBeGreaterThanOrEqual(
+        (await bounds(page.getByTestId('sort-trigger'))).y,
+      );
+      await usableTarget(page, trigger);
+      await trigger.focus();
+      await page.keyboard.press('Enter');
+      expect((await bounds(controls)).height).toBeGreaterThan(compactHeight + 30);
+    } else {
+      await expect(trigger).toBeHidden();
+      await expect(search).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Close search' })).toBeHidden();
+      await search.focus();
+    }
     await expect(search).toBeFocused();
-    expect((await bounds(controls)).height).toBeGreaterThan(compactHeight + 30);
     const reads = requests.length;
     await search.fill('Orbit');
     expect(requests.length).toBe(reads);
     await page.keyboard.press('Enter');
     await expect(page.getByTestId('title-name')).toHaveText(['Quiet Orbit']);
     await page.keyboard.press('Escape');
-    await expect(trigger).toBeFocused();
-    await expect(page.getByRole('search')).toHaveCount(0);
+    if (width < 1280) {
+      await expect(trigger).toBeFocused();
+      await expect(page.getByRole('search')).toHaveCount(0);
+    } else {
+      await expect(search).toBeFocused();
+      await expect(page.getByRole('search')).toBeVisible();
+    }
     await expect(trigger).toHaveText('Search active');
     const chip = page.getByRole('button', { name: 'Remove search filter: Search: Orbit' });
     await expect(chip).toBeVisible();
@@ -489,13 +501,19 @@ test('T-LIB-002d: compact search prioritizes browsing and preserves accessible a
     await chip.click();
     await expect(page.getByTestId('title-name')).toHaveCount(TITLES.length);
     expect(new URL(page.url()).searchParams.has('q')).toBe(false);
-    await trigger.click();
+    if (width < 1280) await trigger.click();
+    else await search.focus();
     await expect(search).toHaveValue('');
     await expect(search).toBeFocused();
     await noOverflow(page);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-    await page.getByRole('button', { name: 'Close search' }).click();
-    await expect(trigger).toBeFocused();
+    if (width < 1280) {
+      await page.getByRole('button', { name: 'Close search' }).click();
+      await expect(trigger).toBeFocused();
+    } else {
+      await page.keyboard.press('Escape');
+      await expect(search).toBeFocused();
+    }
   }
 });
 
@@ -733,8 +751,8 @@ test('T-UX-143c: submitted URL search resets loaded pages, requests unfiltered t
     requests.some((request) => request.searchParams.get('cursor') === 'fixture-next-page'),
   ).toBe(true);
   const before = requests.length;
-  await page.getByTestId('list-search-trigger').click();
   const search = page.getByRole('searchbox', { name: 'Search your list', exact: true });
+  await expect(search).toBeVisible();
   await search.fill('Amber');
   expect(requests.length).toBe(before);
   await page.getByRole('search').getByRole('button', { name: 'Search', exact: true }).click();
@@ -1017,7 +1035,7 @@ test('T-WATCH-003k: preferences overlay preserves the scrolled list and returns 
     for (const view of ['Grid', 'Compact']) {
       await page.getByRole('button', { name: `${view} view`, exact: true }).click();
       const trigger = page.getByRole('button', {
-        name: 'Watch preferences for Quiet Orbit: Normal',
+        name: 'Watch preferences for The Last Observatory: Normal',
         exact: true,
       });
       await trigger.evaluate((element) => element.scrollIntoView({ block: 'center' }));
@@ -1405,6 +1423,14 @@ for (const width of [390, 1280, 1440]) {
       testInfo.setTimeout(60_000);
       await mountLibrary(page, { width });
       await page.screenshot({ path: testInfo.outputPath('library-header.png'), fullPage: true });
+      const add = page.getByTestId('add-title-open');
+      await add.click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(add).toBeFocused();
+      await page.getByRole('button', { name: 'Service updates', exact: true }).click();
+      await expect(page.getByText('Netflix updated today', { exact: true })).toBeVisible();
+      await page.keyboard.press('Escape');
       const quick = page.getByRole('group', { name: 'Quick filters' });
       const input = page.getByRole('searchbox', { name: 'Search your list' });
       if (width >= 1280) {

@@ -12,8 +12,8 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 | Status | Count |
 |---|---|
 | ⬜ todo | 0 |
-| 🚧 doing | 1 |
-| ✅ done | 236 |
+| 🚧 doing | 2 |
+| ✅ done | 235 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **240** |
@@ -24,7 +24,7 @@ Not done, and every task they depend on is done.
 
 | Task | Size | Section |
 |---|---|---|
-| `TASK-242` | 1 agent-run + 10 owner-review-minutes | Approved authentic service artwork, 2026-09-23 |
+| `TASK-241` | 2 agent-runs + 15 owner-review-minutes | Approved mockup composition follow-up, 2026-09-22 |
 
 ## Waiting on the owner
 
@@ -36,8 +36,11 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-0 tasks cannot start yet.
+1 task cannot start yet.
 
+| Task | Waiting on |
+|---|---|
+| `TASK-242` | `TASK-241` |
 
 ## Done
 
@@ -278,4 +281,3 @@ Not done, and every task they depend on is done.
 | `TASK-238` | #327: directly linkable movie/show details with synopsis, cast/characters, directors/creators, artwork and existing actions. Strict display-only cache uses owner/provider-identity-scoped metadata writes and the 183-day lazy policy; unavailable/stale/unidentified states retain saved data. Additive nullable SQL JSON column, preserved query/layout return, existing consent/undo dialogs and stronger reachability/inference gates. `T-DETAIL-001` through `T-DETAIL-006`; unit/web coverage, real SQL and responsive Chromium/WebKit regressions. Separate PR; watched history and personal ratings remain outside scope. | `T-DETAIL-001`, `T-DETAIL-006` |
 | `TASK-239` | Owner-approved tile-first extraction/review: detect before reading, serial original-resolution crops, controlled input provenance, visible per-tile next steps including known titles, safe bulk policy and separate Apply summary. `T-AI-065`, `T-AI-066`, `T-AI-067`; one live read of the reported screenshot returned all five intended titles in five source regions, without the earlier stray OCR candidates (27.5 seconds, five calls per reader). This is a bounded recognition check, not a new corpus quality baseline. No migration, dependency or infrastructure change. | `T-AI-065`, `T-AI-066`, `T-AI-067` |
 | `TASK-240` | Owner mockup-led in-app design: desktop sidebar, navy/violet surfaces, local serif headings, full-width artwork, shared service-filter chips and refined upload/review grouping. Preserve all workflows, persistence, safety, evidence, attribution and accessibility; no scenic branding or fictional features. `T-MOCK-001`, `T-MOCK-002`, `T-MOCK-003`. | `T-MOCK-001`, `T-MOCK-002`, `T-MOCK-003` |
-| `TASK-241` | Matched the owner's compact artwork-card composition, library header and import-page formatting. Full titles stay visible and cards grow when necessary; Compact stays unchanged. Preserved real filters/search, all ingest paths, required choices, safety, dates, attribution and accessible targets. Verified `T-MOCK-004`, `T-MOCK-005`, `T-MOCK-006`, complete unit/web coverage and 54 focused Chromium/WebKit cases in GitHub CI. | `T-MOCK-004`, `T-MOCK-005`, `T-MOCK-006` |
