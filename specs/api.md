@@ -8,6 +8,30 @@ sourceOfTruth: docs/PRD.md, docs/architecture.md, docs/adr/ADR-0002, ADR-0006
 
 # specs/api.md — nextup HTTP API
 
+## Waiting to stream (TASK-251, #378)
+
+`GET /api/waiting` items additionally expose `accessState`
+(`on-your-services | on-other-services | rent-only | not-streaming | unknown`),
+`otherServicesOn` (`Service[]`, subscription offers on services the owner has
+not used), `otherProvidersOn` (provider names outside `SERVICES`), `rentOn`
+(rent/buy provider names; `[]` = none, absent = not known) and
+`streamingSince` (ISO time a subscription offer was first seen, or `null`).
+Free and ad-supported offers never count as streaming. `discoverySource` may
+now be any rental storefront (`fandango-at-home | apple-tv-store |
+prime-video-store | google-tv-store`) or `search`.
+
+`POST /api/waiting` accepts exactly `{tmdbId: positive integer, mediaType:
+"movie" | "tv"}` and returns `201 {intentId, titleId, workIdentity, name,
+discoverySource: "search", titleWasCreated}`. It records a search-origin
+`WatchIntent` with no source batch and never adds a listing, a date-added or a
+badge. Refusals: `400 VALIDATION_FAILED`; `404 TMDB_WORK_NOT_FOUND`;
+`409 WORK_SUPPRESSED` (with `suppressionId`); `409 DUPLICATE_WORK_IDENTITY`
+with `details.reason` `already-waiting` or `already-listed`; TMDB outages map
+as for other TMDB reads.
+
+Batch list and detail responses expose `discoverySource` (nullable). A
+storefront batch has `service: null` and is always `append-only`.
+
 ## Display category (TASK-247, #364)
 
 `GET /api/titles` accepts repeated `category=movie|tv|comedy-show`, OR within

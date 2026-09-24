@@ -22,6 +22,7 @@ import {
   type DiscoverySource,
   type Service,
 } from './enums.js';
+import { SERVICE_LABELS } from './copy.js';
 
 /**
  * The mode a batch from this source is allowed to have.
@@ -137,10 +138,62 @@ export function discoverySourceOf(batch: {
   return batch.discoverySource as DiscoverySource;
 }
 
-/** Display names, mirroring `SERVICE_LABELS` in `copy.ts`. */
+/**
+ * Display names, mirroring `SERVICE_LABELS` in `copy.ts`.
+ *
+ * ⚠ **EVERY LABEL CARRIES "(rent/buy)"** (#378, owner decision 4). These are
+ * rental storefronts, and at least one brand is ALSO a subscription the owner
+ * may hold: "Prime Video" is the `prime-video` service, "Prime Video
+ * (rent/buy)" is this storefront. The marker is part of the label rather than
+ * something each surface remembers to append, so no surface that names a
+ * source — the picker, the Review page, a waiting row, a refusal message —
+ * can present a storefront as a streaming subscription.
+ */
 export const DISCOVERY_SOURCE_LABELS: Readonly<Record<DiscoverySource, string>> = {
-  'fandango-at-home': 'Fandango at Home',
+  'fandango-at-home': 'Fandango at Home (rent/buy)',
+  'apple-tv-store': 'Apple TV (rent/buy)',
+  'prime-video-store': 'Prime Video (rent/buy)',
+  'google-tv-store': 'Google TV (rent/buy)',
 };
+
+/** What a waiting row says about where it came from (#378). */
+export const SEARCH_INTENT_LABEL = 'Added by search';
+
+/**
+ * The label for any `WatchIntent.discoverySource` as stored.
+ *
+ * ⚠ Total over strings, never throwing: this renders a list, and one
+ * unexpected stored value must not take the page down. An unknown slug is
+ * shown as-is rather than guessed at.
+ */
+export function intentSourceLabel(source: string): string {
+  if (source === 'search') return SEARCH_INTENT_LABEL;
+  return (DISCOVERY_SOURCES as readonly string[]).includes(source)
+    ? DISCOVERY_SOURCE_LABELS[source as DiscoverySource]
+    : source;
+}
+
+/**
+ * The label for a batch's source, whichever of the two columns carries it
+ * (#378).
+ *
+ * ⚠ Replaces a `SERVICE_LABELS[batch.service] ?? 'Discovery'` fallback that
+ * several surfaces carried. With four storefronts, "Discovery" no longer says
+ * where a capture came from, and it never said that the place was a rental
+ * storefront rather than a subscription.
+ */
+export function batchSourceLabel(batch: {
+  service: string | null;
+  discoverySource?: string | null;
+}): string {
+  if (batch.service !== null) {
+    return (SERVICES as readonly string[]).includes(batch.service)
+      ? SERVICE_LABELS[batch.service as Service]
+      : batch.service;
+  }
+  const source = batch.discoverySource ?? null;
+  return source === null ? 'Rental storefront (rent/buy)' : intentSourceLabel(source);
+}
 
 /**
  * The `modeExplanation` a discovery batch answers with (US-003 AC-2/AC-3).

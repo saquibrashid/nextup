@@ -35,6 +35,8 @@ function intent(over: Partial<IntentRow> = {}): IntentRow {
     availabilityRegion: DEFAULT_AVAILABILITY_REGION,
     availabilityCheckedAt: null,
     availableOn: null,
+    rentOn: null,
+    streamingSince: null,
     ...over,
   };
 }
@@ -121,9 +123,9 @@ describe('T-AVAIL-010 · ASM-059/A49 · the region is stored on the row and pass
     const { writes } = await refreshAvailability(
       rows,
       {
-        getWatchProviders: (_mediaType, tmdbId, region) => {
+        getWatchOffers: (_mediaType, tmdbId, region) => {
           asked.push({ region, tmdbId });
-          return Promise.resolve(['Netflix']);
+          return Promise.resolve({ flatrate: ['Netflix'], rentOrBuy: [] });
         },
       },
       NOW,
@@ -152,8 +154,10 @@ describe('T-AVAIL-010 · ASM-059/A49 · the region is stored on the row and pass
     const { writes, failedIds } = await refreshAvailability(
       rows,
       {
-        getWatchProviders: (_mediaType, tmdbId) =>
-          tmdbId === 2 ? Promise.reject(new Error('tmdb down')) : Promise.resolve([]),
+        getWatchOffers: (_mediaType, tmdbId) =>
+          tmdbId === 2
+            ? Promise.reject(new Error('tmdb down'))
+            : Promise.resolve({ flatrate: [], rentOrBuy: [] }),
       },
       NOW,
     );
@@ -180,7 +184,10 @@ describe('T-AVAIL-010 · ASM-059/A49 · the region is stored on the row and pass
     // `checkedAt`. It must NOT be re-asked on every render for ever, which is
     // what conflating it with never-checked would do.
     expect(
-      isAvailabilityStale(intent({ availabilityCheckedAt: daysAgo(0), availableOn: [] }), NOW),
+      isAvailabilityStale(
+        intent({ availabilityCheckedAt: daysAgo(0), availableOn: [], rentOn: [] }),
+        NOW,
+      ),
     ).toBe(false);
 
     // Nothing to ask about: an unmatched work has no TMDB id, and a request

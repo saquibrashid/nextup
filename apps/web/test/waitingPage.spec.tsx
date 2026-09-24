@@ -107,8 +107,11 @@ describe('T-AVAIL-003c/d · US-042 AC-3 · flagged is an invitation, never an ad
 
     const flag = screen.getByTestId('waiting-flag');
     expect(flag.textContent).toContain('Now on Netflix');
-    // The invitation, not an action this screen takes on the owner's behalf.
-    expect(screen.getByTestId('waiting-flag-link').getAttribute('href')).toBe('/upload');
+    // The invitation, not an action this screen takes on the owner's behalf —
+    // and it lands on THAT service's import, not a blank picker (#378).
+    expect(screen.getByTestId('waiting-flag-link').getAttribute('href')).toBe(
+      '/upload?service=netflix',
+    );
     // And the row is still in the WAITING view — it has not moved anywhere.
     expect(screen.getAllByTestId('waiting-row')).toHaveLength(1);
   });
@@ -195,9 +198,11 @@ describe('T-WAIT-010 · US-043 AC-6 · the empty view explains itself', () => {
 
     expect(screen.getByTestId('waiting-empty').textContent).toContain(WAITING_EMPTY_TITLE);
     expect(screen.getByTestId('waiting-empty').textContent).toContain(WAITING_EMPTY_BODY);
-    // "How to fill it" has to be reachable, not merely described.
+    // "How to fill it" has to be reachable, not merely described — and it
+    // opens the STOREFRONT import, not the service picker (#378: the old
+    // bare `/upload` offered no storefront at all).
     expect(screen.getByTestId('waiting-empty').querySelector('a')?.getAttribute('href')).toBe(
-      '/upload',
+      '/upload?source=fandango-at-home',
     );
   });
 

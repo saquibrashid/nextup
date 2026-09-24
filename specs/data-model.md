@@ -2560,12 +2560,14 @@ Mitigations, none of which fully restores the 35-day window:
 | `titleId` | `uuid` → `Title` | The matched canonical work |
 | `workIdentity` | `nvarchar` | Denormalised for the suppression join, exactly as elsewhere (REQ-071) |
 | `discoveredAt` | `datetime2` | ⚠️ A **discovery** date, NOT a date-added. It must never feed the REQ-038 title-level date sort, which is defined over `ServiceListing.dateAdded` |
-| `sourceBatchId` | `uuid` → `UploadBatch` | Provenance, as for every other record |
-| `discoverySource` | `nvarchar` | The storefront browsed, e.g. `fandango-at-home`. ⚠️ **NOT a `SERVICES` member** and must not be stored in, validated against, or widened into that enum (ADR-0010 D-1) |
+| `sourceBatchId` | `uuid?` → `UploadBatch` | Provenance. **Nullable from migration 0017 (#378):** `NULL` exactly when `discoverySource = 'search'` (`ck_intent_source_batch_coherent`); every storefront intent still has its capture batch |
+| `discoverySource` | `nvarchar` | Where the intent came from: a rental storefront (`fandango-at-home`, `apple-tv-store`, `prime-video-store`, `google-tv-store`) or `search` (`INTENT_SOURCES`, `ck_intent_source`). ⚠️ **NOT a `SERVICES` member** and must not be stored in, validated against, or widened into that enum (ADR-0010 D-1). `UploadBatch.discovery_source` accepts the storefronts only (`ck_batch_discovery_source`) |
 | `state` | `nvarchar` | `waiting` \| `satisfied` \| `suppressed`. Soft only — see 17.4 |
 | `satisfiedAt` | `datetime2?` | Set when the work enters the combined list by the ordinary capture path |
 | `availabilityCheckedAt` | `datetime2?` | `NULL` = never checked. Drives the lazy refresh (REQ-086) |
 | `availableOn` | `nvarchar?` | JSON array of provider identifiers reported `flatrate` for the owner's region. `NULL` ≠ "not streaming anywhere" — it means *not known* (ADR-0010 Trap 4) |
+| `rentOn` | `nvarchar?` | JSON array of rent/buy provider names (0017). `NULL` = not known; `[]` = checked, none. `ISJSON` (`ck_intent_rent_on_json`) and only set once `availabilityCheckedAt` is (`ck_intent_rent_on_coherent`) |
+| `streamingSince` | `datetime2?` | When a subscription offer was first seen (0017); `NULL` = not streaming. Free and ad-supported offers never count |
 | `availabilityRegion` | `nvarchar` | Explicit, never implicit. **`US`, confirmed by the owner at `A49`** (`ASM-059`) — a settled value, not an assumption. ⚠️ Still **stored on the row and passed explicitly**: a hard-coded `'US'` scattered through the availability path is unfindable the day it changes, and a stored row is also the only way to tell an availability answer computed for one region from one computed for another |
 
 **Constraints**

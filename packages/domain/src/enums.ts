@@ -42,8 +42,32 @@ export type BatchMode = (typeof BATCH_MODES)[number];
  * "service" whose saved list is an editorial feed, and the first full-update
  * capture proposes deleting the owner's entire waiting list.
  */
-export const DISCOVERY_SOURCES = ['fandango-at-home'] as const; // REQ-082
+/*
+ * #378 (ADR-0010 Revision 2, owner decision 4) widened this from Fandango at
+ * Home alone to every rental storefront the owner browses. ⚠ The `-store`
+ * suffix is load-bearing: `prime-video-store` is the Prime Video RENT/BUY
+ * storefront, and `prime-video` (a `SERVICES` member) is the subscription.
+ * The two must never share a slug, a label or a code path.
+ */
+export const DISCOVERY_SOURCES = [
+  'fandango-at-home',
+  'apple-tv-store',
+  'prime-video-store',
+  'google-tv-store',
+] as const; // REQ-082, #378
 export type DiscoverySource = (typeof DISCOVERY_SOURCES)[number];
+
+/**
+ * Where a `WatchIntent` came from: a storefront capture, or the owner
+ * searching for one title and asking to wait for it (#378, owner decision 2).
+ *
+ * ⚠ `search` is an INTENT source only, never a batch source — there is no
+ * batch behind a search-to-add, which is why `watch_intent.source_batch_id`
+ * is nullable from migration 0017 and `ck_intent_source_batch_coherent`
+ * requires it to be null exactly when the source is `search`.
+ */
+export const INTENT_SOURCES = [...DISCOVERY_SOURCES, 'search'] as const;
+export type IntentSource = (typeof INTENT_SOURCES)[number];
 
 /**
  * Everywhere a batch's origin is named at the API boundary. The union exists

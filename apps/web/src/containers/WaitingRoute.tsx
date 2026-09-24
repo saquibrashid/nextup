@@ -54,6 +54,11 @@ export function WaitingRoute({ client = apiClient }: WaitingRouteProps = {}): JS
       refreshFailed={value?.availabilityRefreshFailed ?? false}
       onRetry={waiting.reload}
       onSuppress={(titleId) => client.suppressTitle(titleId)}
+      onSearch={async (query) => (await client.searchTmdb(query)).items}
+      onSearchAdd={async (result) => {
+        await client.addWaiting({ tmdbId: result.tmdbId, mediaType: result.mediaType });
+        waiting.reload();
+      }}
     />
   );
 }

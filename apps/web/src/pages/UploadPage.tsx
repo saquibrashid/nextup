@@ -30,15 +30,21 @@ import { Input } from '../components/ui/Input';
 
 import { useId, useState, type JSX } from 'react';
 import { SegmentedControl } from '../components/ui/SegmentedControl';
+import { Button } from '../components/ui/Button';
 import { UploadStep, type UploadStepState } from '../components/UploadStep';
 import { ServiceMark } from '../components/ServiceMark';
 import {
   BATCH_MODES,
+  DISCOVERY_SOURCES,
   SERVICES,
   SERVICE_LABELS,
+  batchSourceLabel,
+  discoveryModeExplanation,
+  isDiscoverySource,
   modeExplanation,
+  modeRefusalFor,
   type BatchMode,
-  type Service,
+  type BatchSource,
 } from '@nextup/domain';
 import { CaptureProgress } from '../components/CaptureProgress';
 
@@ -50,17 +56,27 @@ import {
   MODE_STEP_LEGEND,
   MODE_STEP_LOCKED_HINT,
   SERVICE_STEP_LEGEND,
+  STOREFRONT_GROUP_LEGEND,
+  STOREFRONT_GROUP_TOGGLE,
+  STOREFRONT_GROUP_HINT,
   UPLOAD_INTRO,
 } from '../copy.js';
 
-/** The step-1 answer. `null` means "not yet chosen" - never a default. */
+/**
+ * The step-1 answer. `null` means "not yet chosen" - never a default.
+ *
+ * ⚠ `service` is a BATCH SOURCE, so it may be a rental storefront (#378).
+ * `POST /api/batches` already takes either in its `service` field and splits
+ * them server-side (`splitBatchSource`); this type follows the wire rather
+ * than inventing a second field the server would have to reconcile.
+ */
 export interface BatchDraftSelection {
-  readonly service: Service | null;
+  readonly service: BatchSource | null;
   readonly mode: BatchMode | null;
 }
 
 export interface UploadPageProps {
-  readonly initialService?: Service | null;
+  readonly initialService?: BatchSource | null;
   /** Notified on every change so step 2 can enable itself. */
   readonly onSelectionChange?: (selection: BatchDraftSelection) => void;
 }
@@ -82,7 +98,12 @@ const MODE_LABELS: Readonly<Record<BatchMode, string>> = {
  * Append-only names no service at all, so the replace is a no-op for it by
  * construction rather than by a branch that could rot.
  */
-export function modeConsequence(mode: BatchMode, service: Service | null): string {
+export function modeConsequence(mode: BatchMode, service: BatchSource | null): string {
+  if (service !== null && isDiscoverySource(service)) {
+    return mode === 'append-only'
+      ? discoveryModeExplanation(service)
+      : (modeRefusalFor(service, mode) ?? '');
+  }
   if (service !== null) return modeExplanation(mode, service);
   return modeExplanation(mode, SERVICES[0]).replace(
     SERVICE_LABELS[SERVICES[0]],
@@ -94,8 +115,19 @@ export function UploadPage({
   onSelectionChange,
   initialService = null,
 }: UploadPageProps = {}): JSX.Element {
-  const [service, setService] = useState<Service | null>(initialService);
-  const [mode, setMode] = useState<BatchMode | null>(null);
+  const [service, setService] = useState<BatchSource | null>(initialService);
+  /*
+   * ⚠ A storefront has exactly one permitted mode (ADR-0010 D-2), so it is
+   * answered for the owner rather than asked. The server refuses anything
+   * else regardless (`T-WAIT-001c`); this only stops the page asking a
+   * question with one legal answer.
+   */
+  const [mode, setMode] = useState<BatchMode | null>(
+    initialService !== null && isDiscoverySource(initialService) ? 'append-only' : null,
+  );
+  const [storefrontsOpen, setStorefrontsOpen] = useState(
+    initialService !== null && isDiscoverySource(initialService),
+  );
   /**
    * Which answered step the owner has reopened with `Change`, if any.
    *
@@ -106,6 +138,7 @@ export function UploadPage({
    */
   const [reopened, setReopened] = useState<'service' | 'mode' | null>(null);
   const serviceGroup = useId();
+  const storefrontGroup = useId();
   const modeGroup = useId();
   const modeHintId = useId();
 
@@ -124,7 +157,14 @@ export function UploadPage({
      */
     const changedService = next.service !== undefined && next.service !== service;
     const nextService = next.service !== undefined ? next.service : service;
-    const nextMode = next.mode !== undefined ? next.mode : changedService ? null : mode;
+    const nextMode =
+      nextService !== null && isDiscoverySource(nextService)
+        ? 'append-only'
+        : next.mode !== undefined
+          ? next.mode
+          : changedService
+            ? null
+            : mode;
     setService(nextService);
     setMode(nextMode);
     setReopened(null);
@@ -136,6 +176,7 @@ export function UploadPage({
   const modeState: UploadStepState =
     service === null ? 'locked' : mode !== null && reopened !== 'mode' ? 'done' : 'active';
   const modeLocked = modeState === 'locked';
+  const storefront = service !== null && isDiscoverySource(service);
 
   return (
     <>
@@ -147,7 +188,7 @@ export function UploadPage({
         index={1}
         legend={SERVICE_STEP_LEGEND}
         state={serviceState}
-        answer={service === null ? null : SERVICE_LABELS[service]}
+        answer={service === null ? null : batchSourceLabel(splitSource(service))}
         onChange={() => {
           setReopened('service');
         }}
@@ -177,6 +218,43 @@ export function UploadPage({
             </label>
           ))}
         </SegmentedControl>
+        {/*
+          ⚠ Rental storefronts are a SEPARATE group behind a toggle, never
+          mixed into the services (ADR-0010 D-1). A storefront is a place the
+          owner browses, not a list they saved, and each label says
+          "(rent/buy)" so it cannot be read as a subscription (#378).
+        */}
+        {storefrontsOpen ? (
+          <SegmentedControl legend={STOREFRONT_GROUP_LEGEND} testId="storefront-step">
+            {DISCOVERY_SOURCES.map((candidate) => (
+              <label key={candidate} data-testid={`storefront-option-${candidate}`}>
+                <Input
+                  type="radio"
+                  name={storefrontGroup}
+                  value={candidate}
+                  checked={service === candidate}
+                  onChange={() => {
+                    choose({ service: candidate });
+                  }}
+                />
+                <span>{batchSourceLabel(splitSource(candidate))}</span>
+              </label>
+            ))}
+          </SegmentedControl>
+        ) : (
+          <div className="upload-flow__storefronts">
+            <p>{STOREFRONT_GROUP_HINT}</p>
+            <Button
+              variant="ghost"
+              data-testid="storefront-toggle"
+              onClick={() => {
+                setStorefrontsOpen(true);
+              }}
+            >
+              {STOREFRONT_GROUP_TOGGLE}
+            </Button>
+          </div>
+        )}
       </UploadStep>
 
       <UploadStep
@@ -200,7 +278,7 @@ export function UploadPage({
                 name={modeGroup}
                 value={candidate}
                 checked={mode === candidate}
-                disabled={modeLocked}
+                disabled={modeLocked || (storefront && candidate !== 'append-only')}
                 aria-describedby={modeLocked ? modeHintId : undefined}
                 onChange={() => {
                   choose({ mode: candidate });
@@ -230,4 +308,13 @@ export function UploadPage({
       </UploadStep>
     </>
   );
+}
+
+function splitSource(source: BatchSource): {
+  service: string | null;
+  discoverySource: string | null;
+} {
+  return isDiscoverySource(source)
+    ? { service: null, discoverySource: source }
+    : { service: source, discoverySource: null };
 }

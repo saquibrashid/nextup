@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { SERVICE_LABELS } from '@nextup/domain';
+import { batchSourceLabel } from '@nextup/domain';
 import { resumeAction, type UploadCheckpointState } from '../lib/useUploadCheckpoint';
 import { useSlowRequest } from '../lib/useSlowRequest';
 import { useOutcomeFocus } from '../lib/useOutcomeFocus';
@@ -75,7 +75,7 @@ export function UploadCheckpoint({
           <dl className="upload-checkpoint__facts">
             <div>
               <dt>Service</dt>
-              <dd>{SERVICE_LABELS[batch.service] ?? 'Discovery'}</dd>
+              <dd>{batchSourceLabel(batch)}</dd>
             </div>
             <div>
               <dt>Update mode</dt>

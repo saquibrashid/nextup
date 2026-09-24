@@ -21,7 +21,7 @@
 
 import type { JSX } from 'react';
 import { Link } from 'react-router-dom';
-import { SERVICE_LABELS } from '@nextup/domain';
+import { batchSourceLabel } from '@nextup/domain';
 
 import {
   BATCHES_COUNTS,
@@ -133,7 +133,7 @@ function BatchCard({
     <li className="batch-card" data-testid="batch-card">
       <Link to={`/batches/${item.batchId}`} data-testid="batch-card-link">
         <span data-testid="batch-card-date">{batchDate(item)}</span>
-        <span data-testid="batch-card-service">{SERVICE_LABELS[item.service] ?? 'Discovery'}</span>
+        <span data-testid="batch-card-service">{batchSourceLabel(item)}</span>
         <span data-testid="batch-card-mode">{MODE_LABELS[item.mode] ?? item.mode}</span>
         <span data-testid="batch-card-status">
           {item.undoneAt === null ? (resume?.state ?? item.status) : 'undone'}

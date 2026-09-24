@@ -20,8 +20,9 @@
 
 import { useState, type JSX } from 'react';
 import { Link } from 'react-router-dom';
-import { SERVICES, SERVICE_LABELS, releaseYearText } from '@nextup/domain';
+import { SERVICES, SERVICE_LABELS, intentSourceLabel, releaseYearText } from '@nextup/domain';
 import { EditionLabels } from '../components/EditionLabels';
+import { WaitingSearchAdd } from '../components/WaitingSearchAdd';
 
 import {
   JUSTWATCH_ATTRIBUTION,
@@ -36,10 +37,16 @@ import {
   WAITING_NOT_ON_YOUR_SERVICES,
   WAITING_NOW_ON_INVITATION,
   WAITING_NOW_ON_PREFIX,
+  WAITING_NOW_STREAMING_BADGE,
+  WAITING_OTHER_SERVICES_PREFIX,
+  WAITING_OTHER_SERVICES_SUFFIX,
   WAITING_REFRESH_FAILED,
+  WAITING_RENT_ONLY_PREFIX,
+  WAITING_RENT_ONLY_SUFFIX,
+  WAITING_STREAMING_SINCE,
   WAITING_SUPPRESS_FAILED,
 } from '../copy';
-import type { WaitingItem } from '../lib/apiClient';
+import type { TmdbSearchResult, WaitingItem } from '../lib/apiClient';
 import { TMDB_IMAGE_BASE } from '../components/TitleRow';
 import { useOnline } from '../lib/useOnline';
 import { Button } from '../components/ui/Button';
@@ -52,6 +59,9 @@ export interface WaitingPageProps {
   readonly refreshFailed?: boolean;
   readonly onRetry?: () => void;
   readonly onSuppress?: (titleId: string) => Promise<unknown>;
+  /** #378 — search-to-add. The box renders only when both are supplied. */
+  readonly onSearch?: (query: string) => Promise<readonly TmdbSearchResult[]>;
+  readonly onSearchAdd?: (result: TmdbSearchResult) => Promise<unknown>;
 }
 
 function serviceLabel(service: string): string {
@@ -72,6 +82,52 @@ export function availabilityLine(item: WaitingItem): string {
   return `${WAITING_NOT_ON_YOUR_SERVICES} ${asOf}.`;
 }
 
+/**
+ * #378 — the rent-only sentence, or `null` when the row is not rent-only.
+ *
+ * ⚠ Says BOTH halves: where it can be rented or bought, and that it is not
+ * streaming on the owner's services. A rental offer alone must never read
+ * as the answer the waiting view exists to give.
+ */
+export function rentOnlyLine(item: WaitingItem): string | null {
+  if (item.accessState !== 'rent-only') return null;
+  const rentOn = item.rentOn ?? [];
+  if (rentOn.length === 0 || item.availabilityCheckedAt === null) return null;
+  const asOf = item.availabilityCheckedAt.slice(0, 10);
+  return `${WAITING_RENT_ONLY_PREFIX} ${rentOn.join(', ')}. ${WAITING_RENT_ONLY_SUFFIX} ${asOf}.`;
+}
+
+/**
+ * #378, owner decision 3 — streaming somewhere the owner does not subscribe,
+ * or `null`. Services nextup knows and providers it does not are one list
+ * here: to the owner both are simply "not mine".
+ */
+export function otherServicesLine(item: WaitingItem): string | null {
+  const names = [
+    ...(item.otherServicesOn ?? []).map(serviceLabel),
+    ...(item.otherProvidersOn ?? []),
+  ];
+  if (names.length === 0) return null;
+  return `${WAITING_OTHER_SERVICES_PREFIX} ${names.join(', ')} ${WAITING_OTHER_SERVICES_SUFFIX}`;
+}
+
+/**
+ * Rows that have reached one of the owner's services lead the list (#378):
+ * noticing that moment is what the view is for. Stable within each group, so
+ * the server's order is otherwise kept.
+ */
+export function orderWaiting(items: readonly WaitingItem[]): WaitingItem[] {
+  const streaming = items.filter((item) => (item.flaggedOn ?? []).length > 0);
+  const rest = items.filter((item) => (item.flaggedOn ?? []).length === 0);
+  return [...streaming, ...rest];
+}
+
+/** A literal map, so the class vocabulary stays scannable (`T-CSS-001c`). */
+const ROW_CLASS = {
+  streaming: 'waiting-row waiting-row--streaming',
+  waiting: 'waiting-row',
+} as const;
+
 function WaitingRow({
   item,
   onSuppress,
@@ -85,6 +141,9 @@ function WaitingRow({
 }): JSX.Element {
   const [phase, setPhase] = useState<'idle' | 'submitting' | 'error'>('idle');
   const flagged = item.flaggedOn ?? [];
+  const rentOnly = rentOnlyLine(item);
+  const others = otherServicesLine(item);
+  const rowKind = flagged.length > 0 ? 'streaming' : 'waiting';
 
   function suppress(): void {
     setPhase('submitting');
@@ -95,7 +154,7 @@ function WaitingRow({
   }
 
   return (
-    <li className="waiting-row" data-testid="waiting-row" aria-busy={phase === 'submitting'}>
+    <li className={ROW_CLASS[rowKind]} data-testid="waiting-row" aria-busy={phase === 'submitting'}>
       {item.posterPath !== null ? (
         <img
           className="waiting-row__poster"
@@ -111,6 +170,11 @@ function WaitingRow({
       )}
 
       <div className="waiting-row__body">
+        {flagged.length > 0 && (
+          <span className="waiting-row__badge" data-testid="waiting-streaming-badge">
+            {WAITING_NOW_STREAMING_BADGE}
+          </span>
+        )}
         <span data-testid="waiting-name">{item.name}</span>
         <EditionLabels labels={item.editionLabels} />
         {item.releaseYear !== null && (
@@ -119,20 +183,45 @@ function WaitingRow({
           </span>
         )}
 
-        {/* US-043 AC-1 — the discovery date and the storefront it was seen on. */}
+        {/*
+          US-043 AC-1 — the discovery date and where it came from. The label
+          carries "(rent/buy)" for a storefront (#378), and a search add says
+          so rather than naming a storefront it never came from.
+        */}
         <p data-testid="waiting-discovery">
-          {`Seen on ${item.discoverySource} on ${item.discoveredAt}`}
+          {item.discoverySource === 'search'
+            ? `${intentSourceLabel(item.discoverySource)} on ${item.discoveredAt}`
+            : `Seen on ${intentSourceLabel(item.discoverySource)} on ${item.discoveredAt}`}
         </p>
 
         {flagged.length > 0 ? (
           <p className="waiting-row__flag" data-testid="waiting-flag">
             {`${WAITING_NOW_ON_PREFIX} ${flagged.map(serviceLabel).join(' and ')} — `}
-            <Link to="/upload" data-testid="waiting-flag-link">
+            {/* Straight to the import for that service, never an auto-add. */}
+            <Link
+              to={`/upload?service=${encodeURIComponent(flagged[0] ?? '')}`}
+              data-testid="waiting-flag-link"
+            >
               {WAITING_NOW_ON_INVITATION}
             </Link>
+            {item.streamingSince != null && (
+              <span data-testid="waiting-streaming-since">
+                {` (${WAITING_STREAMING_SINCE} ${item.streamingSince.slice(0, 10)})`}
+              </span>
+            )}
+          </p>
+        ) : rentOnly !== null ? (
+          <p className="waiting-row__rent" data-testid="waiting-rent-only">
+            {rentOnly}
           </p>
         ) : (
           <p data-testid="waiting-availability">{availabilityLine(item)}</p>
+        )}
+
+        {others !== null && (
+          <p className="waiting-row__other" data-testid="waiting-other-services">
+            {others}
+          </p>
         )}
 
         {phase === 'idle' && (
@@ -175,15 +264,21 @@ export function WaitingPage({
   refreshFailed = false,
   onRetry,
   onSuppress = () => Promise.resolve(),
+  onSearch,
+  onSearchAdd,
 }: WaitingPageProps = {}): JSX.Element {
   const offline = !useOnline();
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
 
-  const visible = items.filter((item) => !dismissed.has(item.intentId));
+  const visible = orderWaiting(items.filter((item) => !dismissed.has(item.intentId)));
 
   return (
     <>
       <h1>Waiting to stream</h1>
+
+      {onSearch !== undefined && onSearchAdd !== undefined && (
+        <WaitingSearchAdd onSearch={onSearch} onAdd={onSearchAdd} offline={offline} />
+      )}
 
       {refreshFailed && (
         <p role="status" data-testid="waiting-refresh-failed">
@@ -217,7 +312,7 @@ export function WaitingPage({
         <div data-testid="waiting-empty">
           <p>{WAITING_EMPTY_TITLE}</p>
           <p>{WAITING_EMPTY_BODY}</p>
-          <Link className="tap-target" to="/upload">
+          <Link className="tap-target" to="/upload?source=fandango-at-home">
             {WAITING_EMPTY_ACTION}
           </Link>
         </div>

@@ -14,22 +14,47 @@
 // invariant the database was enforcing; `sp_rename` on a column is a rename
 // that orphans every reader of the old name.
 //
-// No general escape hatch. The owner authorized ONLY 0012's three service
-// CHECK replacements after this gate was raised. Its exact path and full SQL
-// hash are pinned below; changing that approval requires another visible diff.
+// No general escape hatch. The owner authorized exactly two CHECK-widening
+// migrations after this gate was raised: 0012's three service CHECK
+// replacements, and 0017's two discovery-source CHECK replacements (#378,
+// 2026-09-24). Each is pinned by exact path and full SQL hash below, with the
+// exact DROP lines it may hold; changing either approval requires another
+// visible diff here.
 
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
-const SERVICE_EXPANSION_PATH = 'prisma/migrations/0012_expand_services/migration.sql';
-// Normalize CRLF only, not whitespace/comments/literals: none may hide added SQL.
-const SERVICE_EXPANSION_SHA256 = '7c357e70ae71ffa2d703aeb60ae271d6cebfebcd1b322f36fbdcb9eb9312bdb5';
-const SERVICE_CONSTRAINT_DROPS = new Set([
-  'ALTER TABLE [dbo].[upload_batch] DROP CONSTRAINT [ck_batch_service];',
-  'ALTER TABLE [dbo].[service_listing] DROP CONSTRAINT [ck_listing_service];',
-  'ALTER TABLE [dbo].[service_state] DROP CONSTRAINT [ck_state_service];',
-]);
+interface PinnedException {
+  /** Printed in the violation, so a mismatch names which approval failed. */
+  label: string;
+  path: string;
+  // Normalize CRLF only, not whitespace/comments/literals: none may hide added SQL.
+  sha256: string;
+  drops: ReadonlySet<string>;
+}
+
+const PINNED_EXCEPTIONS: readonly PinnedException[] = [
+  {
+    label: 'service expansion',
+    path: 'prisma/migrations/0012_expand_services/migration.sql',
+    sha256: '7c357e70ae71ffa2d703aeb60ae271d6cebfebcd1b322f36fbdcb9eb9312bdb5',
+    drops: new Set([
+      'ALTER TABLE [dbo].[upload_batch] DROP CONSTRAINT [ck_batch_service];',
+      'ALTER TABLE [dbo].[service_listing] DROP CONSTRAINT [ck_listing_service];',
+      'ALTER TABLE [dbo].[service_state] DROP CONSTRAINT [ck_state_service];',
+    ]),
+  },
+  {
+    label: 'discovery source expansion',
+    path: 'prisma/migrations/0017_waiting_to_stream/migration.sql',
+    sha256: '72148643cbad9a7737f411c5f7338e71fa4716fa058cf2ffa82c3f4dcd405371',
+    drops: new Set([
+      'ALTER TABLE [dbo].[upload_batch] DROP CONSTRAINT [ck_batch_discovery_source];',
+      'ALTER TABLE [dbo].[watch_intent] DROP CONSTRAINT [ck_intent_source];',
+    ]),
+  },
+];
 
 /** Statements that destroy data or repeal an enforced invariant. */
 export const DESTRUCTIVE_PATTERNS = [
@@ -127,18 +152,17 @@ function collectSqlFiles(dir: string): string[] {
 /** Scan one migration's SQL text. Exported so tests can feed it violations. */
 export function scanSql(file: string, sql: string): MigrationViolation[] {
   const violations: MigrationViolation[] = [];
-  const isServiceExpansion = file.replace(/\\/g, '/') === SERVICE_EXPANSION_PATH;
-  const approvedServiceExpansion =
-    isServiceExpansion &&
-    createHash('sha256').update(sql.replace(/\r\n/g, '\n')).digest('hex') ===
-      SERVICE_EXPANSION_SHA256;
-  if (isServiceExpansion && !approvedServiceExpansion) {
+  const pinned = PINNED_EXCEPTIONS.find((exception) => file.replace(/\\/g, '/') === exception.path);
+  const approved =
+    pinned !== undefined &&
+    createHash('sha256').update(sql.replace(/\r\n/g, '\n')).digest('hex') === pinned.sha256;
+  if (pinned !== undefined && !approved) {
     violations.push({
       file,
       line: 1,
-      statement: 'Unapproved service expansion SQL',
+      statement: `Unapproved ${pinned.label} SQL`,
       text: 'The complete migration must match its owner-authorized SHA-256.',
-      why: 'only the immutable 0012 service CHECK replacement is authorized; no other SQL is exempt',
+      why: `only the immutable ${pinned.path} CHECK replacement is authorized; no other SQL is exempt`,
     });
   }
 
@@ -149,11 +173,7 @@ export function scanSql(file: string, sql: string): MigrationViolation[] {
     for (const match of uncommented.matchAll(new RegExp(pattern, `${pattern.flags}g`))) {
       const line = uncommented.slice(0, match.index).split('\n').length;
       const text = uncommented.split(/\r?\n/)[line - 1]?.trim() ?? '';
-      if (
-        approvedServiceExpansion &&
-        name === 'DROP CONSTRAINT' &&
-        SERVICE_CONSTRAINT_DROPS.has(text)
-      ) {
+      if (approved && name === 'DROP CONSTRAINT' && pinned.drops.has(text)) {
         continue;
       }
       violations.push({ file, line, statement: name, text, why });

@@ -228,6 +228,12 @@ export const MUTATING_ROUTE_REGISTRY = [
   },
   {
     method: 'POST',
+    path: '/api/waiting',
+    changesListState: false,
+    why: 'adds a waiting-to-stream intent; the created Title is `removed` with no list date, so it never joins the list (#378, TASK-251)',
+  },
+  {
+    method: 'POST',
     path: '/api/batches',
     changesListState: false,
     why: 'opens a DRAFT batch; nothing is applied until close (US-005 AC-3)',

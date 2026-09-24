@@ -71,16 +71,21 @@ export async function listWaitingIntents(
  * Record one availability answer. **Metadata-only, by construction.**
  *
  * ⚠ THE NARROWNESS IS THE POINT (US-042 AC-4, product invariant 5). The `data`
- * shape reaches exactly three columns, so this writer cannot change an
- * intent's `state`, its `workIdentity` or its `discoveredAt` even by mistake —
- * which is what keeps the access-triggered refresh admissible under REQ-041 at
- * all. Do not widen it; add a separate writer instead.
+ * shape reaches exactly five AVAILABILITY columns — the three of TASK-187
+ * plus #378's `rentOn` and `streamingSince`, which describe the same one TMDB
+ * answer — so this writer cannot change an intent's `state`, its
+ * `workIdentity` or its `discoveredAt` even by mistake. That is what keeps
+ * the access-triggered refresh admissible under REQ-041 at all. Never widen
+ * it to anything that is not part of an availability answer; add a separate
+ * writer instead.
  */
 export async function updateWatchIntentAvailability(
   ownerId: OwnerId,
   id: string,
   data: {
     availableOn: string | null;
+    rentOn: string | null;
+    streamingSince: Date | null;
     availabilityCheckedAt: Date;
     availabilityRegion: string;
   },
@@ -117,4 +122,27 @@ export async function satisfyWaitingIntents(
     where: { ownerId, state: 'waiting', workIdentity: { in: [...workIdentities] } },
     data: { state: 'satisfied', satisfiedAt },
   });
+}
+
+/**
+ * The services the owner USES (#378, owner decision 3): any service with a
+ * completed import or an active listing. A streaming offer on one of these is
+ * an invitation to import; on any other it is shown, styled distinctly.
+ *
+ * ⚠ Read-only, and about the owner's own rows only — it asks no streaming
+ * service anything.
+ */
+export async function listOwnerServices(ownerId: OwnerId, tx?: Db): Promise<string[]> {
+  const [states, listings] = await Promise.all([
+    db(tx).serviceState.findMany({
+      where: { ownerId, lastCompletedBatchAt: { not: null } },
+      select: { service: true },
+    }),
+    db(tx).serviceListing.findMany({
+      where: { ownerId, state: 'active' },
+      select: { service: true },
+      distinct: ['service'],
+    }),
+  ]);
+  return [...new Set([...states, ...listings].map((row) => row.service))];
 }
