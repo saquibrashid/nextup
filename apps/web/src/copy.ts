@@ -633,6 +633,15 @@ export const MODE_FULL_UPDATE_LABEL = 'Full update';
 
 /** §3.1 - the two required choices, neither defaulted (US-003 AC-1/AC-2). */
 export const SERVICE_STEP_LEGEND = 'Which service did these screenshots come from?';
+/**
+ * #378 — the rental storefronts, offered apart from the services because a
+ * storefront is somewhere the owner browses, not a list they saved. Every
+ * storefront label already carries "(rent/buy)" (`DISCOVERY_SOURCE_LABELS`).
+ */
+export const STOREFRONT_GROUP_LEGEND = 'Or a rental storefront (rent/buy)';
+export const STOREFRONT_GROUP_HINT =
+  'Found something to rent or buy that you would rather wait to stream?';
+export const STOREFRONT_GROUP_TOGGLE = 'Import from a rental storefront';
 export const MODE_STEP_LEGEND = 'Is this a complete capture of that list?';
 
 /* -------------------------------------------------------------------------- */
@@ -1616,9 +1625,9 @@ export const WAITING_LOADING = 'Loading what you are waiting for…';
  */
 export const WAITING_EMPTY_TITLE = "You aren't waiting on anything yet.";
 export const WAITING_EMPTY_BODY =
-  'Upload a screenshot of a rental storefront and keep the titles you want to watch. ' +
-  'They wait here until they reach your streaming services.';
-export const WAITING_EMPTY_ACTION = 'Upload a storefront screenshot';
+  'Import a screenshot of a rental storefront, or search for a title, and keep what you ' +
+  'want to watch. It waits here until it reaches a streaming service.';
+export const WAITING_EMPTY_ACTION = 'Import a storefront screenshot';
 
 /**
  * ⚠ **US-042 AC-6, ADR-0010 Trap 4 — THE SENTENCE THE DATA CAN SUPPORT.**
@@ -1645,6 +1654,41 @@ export const WAITING_REFRESH_FAILED =
 
 /** US-042 AC-9 / REQ-087. A condition of using TMDB's watch-provider data. */
 export const JUSTWATCH_ATTRIBUTION = 'Streaming availability data provided by JustWatch.';
+
+/* ── #378 — waiting to stream: access states, search-to-add ─────────────── */
+
+/**
+ * ⚠ **"(rent/buy)" IS NEVER STREAMING** (#378, owner decision 4). A rental
+ * offer is how the owner can watch it NOW for money; the waiting view exists
+ * for the moment it reaches a subscription. The sentence says both halves.
+ */
+export const WAITING_RENT_ONLY_PREFIX = 'Rent or buy only (rent/buy) on';
+export const WAITING_RENT_ONLY_SUFFIX = 'Not streaming on your services yet, as of';
+/** The highlight on a row that has reached one of the owner's services. */
+export const WAITING_NOW_STREAMING_BADGE = 'Now streaming';
+export const WAITING_STREAMING_SINCE = 'first seen streaming';
+/**
+ * #378, owner decision 3. Streaming somewhere the owner does NOT subscribe is
+ * useful to know and must not read as "on your services" — so the WORDS say
+ * it, and the distinct style only reinforces them.
+ */
+export const WAITING_OTHER_SERVICES_PREFIX = 'Streaming on';
+export const WAITING_OTHER_SERVICES_SUFFIX = '(not one of your services)';
+
+export const WAITING_SEARCH_LEGEND = 'Wait for a title';
+export const WAITING_SEARCH_HINT =
+  'Search for something you would rather wait to stream than rent or buy.';
+export const WAITING_SEARCH_LABEL = 'Title';
+export const WAITING_SEARCH_ACTION = 'Search';
+export const WAITING_SEARCH_SEARCHING = 'Searching…';
+export const WAITING_SEARCH_NO_RESULTS = 'No matches. Try a different spelling.';
+export const WAITING_SEARCH_UNAVAILABLE = "Search isn't available right now. Try again later.";
+export const WAITING_SEARCH_ADD = 'Wait for it';
+export const WAITING_SEARCH_ADDED = 'Added to Waiting to stream:';
+export const WAITING_SEARCH_ALREADY_WAITING = 'You are already waiting for this.';
+export const WAITING_SEARCH_ALREADY_LISTED = 'This is already in your library.';
+export const WAITING_SEARCH_SUPPRESSED = 'You marked this as not interested.';
+export const WAITING_SEARCH_FAILED = "Couldn't add that. Nothing was changed.";
 
 /** US-043 AC-4 — the same suppression as anywhere else, keyed on identity. */
 export const WAITING_NOT_INTERESTED = 'Not interested';

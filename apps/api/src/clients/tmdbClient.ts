@@ -324,6 +324,31 @@ export class TmdbClient {
     return readFlatrateProviders(body, region);
   }
 
+  /**
+   * The same one request as `getWatchProviders`, read twice: the subscription
+   * (`flatrate`) providers, and separately the storefronts that RENT or SELL
+   * it (#378). ONE lookup per refresh, never two.
+   *
+   * ⚠ The two lists are kept APART and never merged. `flatrate` alone is
+   * availability; `rentOrBuy` only lets the waiting view say "rent/buy only
+   * on Apple TV" instead of a bare "not seen" (owner decision 1 on #378 —
+   * free and ad-supported tiers count as neither and are not read at all).
+   */
+  async getWatchOffers(
+    mediaType: MediaType,
+    tmdbId: number,
+    region: string,
+  ): Promise<WatchOffers | null> {
+    const body = await this.#get<TmdbWatchProviderResponse>(
+      `/${mediaType}/${tmdbId}/watch/providers`,
+      {},
+      () => null as never,
+    );
+    const flatrate = readFlatrateProviders(body, region);
+    if (flatrate === null) return null;
+    return { flatrate, rentOrBuy: readRentOrBuyProviders(body, region) ?? [] };
+  }
+
   async getPresentation(
     mediaType: MediaType,
     tmdbId: number,
@@ -538,12 +563,30 @@ export function readComedyShow(value: unknown, mediaType: MediaType): boolean | 
 /**
  * `/{media}/{id}/watch/providers`, as much of it as we read.
  *
- * ⚠ Only `flatrate` is declared. `rent`, `buy`, `ads` and `free` exist in the
- * payload and are deliberately absent from this type, so a future edit cannot
- * reach one by accident — see `getWatchProviders`.
+ * ⚠ `ads` and `free` exist in the payload and are deliberately absent from
+ * this type (owner decision 1 on #378: they are not streaming). `rent` and
+ * `buy` are declared since #378 for `readRentOrBuyProviders` ONLY; the
+ * flatrate rule never reads them, and `T-AVAIL-005a` fails if it starts to.
  */
 export interface TmdbWatchProviderResponse {
-  results?: Record<string, { flatrate?: Array<{ provider_name?: unknown }> } | undefined>;
+  results?: Record<
+    string,
+    | {
+        flatrate?: Array<{ provider_name?: unknown }>;
+        // #378: read ONLY by `readRentOrBuyProviders`, never by the flatrate rule.
+        rent?: Array<{ provider_name?: unknown }>;
+        buy?: Array<{ provider_name?: unknown }>;
+      }
+    | undefined
+  >;
+}
+
+/** Both halves of one `/watch/providers` answer, kept apart (#378). */
+export interface WatchOffers {
+  /** Subscription providers — the only availability there is. */
+  flatrate: string[];
+  /** Storefronts that rent or sell it. ⚠ Never availability. */
+  rentOrBuy: string[];
 }
 
 /**
@@ -556,8 +599,8 @@ export interface TmdbWatchProviderResponse {
  *
  * It lives out here, separate from the HTTP call, so the rule is a unit test
  * against a literal payload rather than something that needs a recording and
- * a network stack to check. `TmdbWatchProviderResponse` declares only
- * `flatrate` for the same reason: an edit cannot reach `rent` by accident.
+ * a network stack to check. It reads `flatrate` and nothing else; the rent
+ * and buy offers have their own reader, `readRentOrBuyProviders`.
  *
  * ⚠ **`null` ≠ `[]`.** `null` is NOT KNOWN — TMDB gave us nothing usable. `[]`
  * is the different, weaker fact that TMDB answered and no subscription
@@ -580,6 +623,34 @@ export function readFlatrateProviders(
   return flatrate
     .map((entry) => (typeof entry?.provider_name === 'string' ? entry.provider_name : ''))
     .filter((name) => name.length > 0);
+}
+
+/**
+ * The storefronts that RENT or SELL a work in `region`, deduplicated, rent
+ * first (#378). A separate function from `readFlatrateProviders` on purpose:
+ * that rule must stay blind to `rent` and `buy`, and sharing a body would put
+ * both keys one edit away from the availability answer.
+ *
+ * `null` = not known, `[]` = TMDB answered and nobody rents or sells it.
+ */
+export function readRentOrBuyProviders(
+  body: TmdbWatchProviderResponse | null,
+  region: string,
+): string[] | null {
+  if (body === null || typeof body !== 'object') return null;
+
+  const forRegion = body.results?.[region];
+  if (forRegion === undefined) return [];
+
+  const names: string[] = [];
+  for (const offers of [forRegion.rent, forRegion.buy]) {
+    if (!Array.isArray(offers)) continue;
+    for (const entry of offers) {
+      const name = typeof entry?.provider_name === 'string' ? entry.provider_name : '';
+      if (name.length > 0 && !names.includes(name)) names.push(name);
+    }
+  }
+  return names;
 }
 
 function toSearchItem(raw: unknown): TmdbSearchItem | null {

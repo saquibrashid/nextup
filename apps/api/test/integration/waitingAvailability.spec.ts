@@ -53,14 +53,17 @@ let providerThrows = false;
 vi.mock('../../src/clients/tmdbClient.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/clients/tmdbClient.js')>();
   class StubTmdbClient extends actual.TmdbClient {
-    override getWatchProviders(
+    // #378: the refresh reads flatrate AND rent/buy from one request.
+    override getWatchOffers(
       _mediaType: 'movie' | 'tv',
       tmdbId: number,
       region: string,
-    ): Promise<string[] | null> {
+    ): Promise<{ flatrate: string[]; rentOrBuy: string[] } | null> {
       providerCalls.push({ tmdbId, region });
       if (providerThrows) return Promise.reject(new Error('injected tmdb failure'));
-      return Promise.resolve(providerResult);
+      return Promise.resolve(
+        providerResult === null ? null : { flatrate: providerResult, rentOrBuy: [] },
+      );
     }
   }
   return { ...actual, TmdbClient: StubTmdbClient };
@@ -183,6 +186,10 @@ async function makeWaitingIntent(over: {
       availabilityRegion: over.region ?? 'US',
       availabilityCheckedAt: over.checkedAt ?? null,
       availableOn: over.availableOn ?? null,
+      // #378: an answered row also recorded its rent offers; one without
+      // them is re-asked once (`isAvailabilityStale`), which is not what
+      // these fixtures are about.
+      rentOn: over.checkedAt != null && over.availableOn != null ? JSON.stringify([]) : null,
     },
   });
 

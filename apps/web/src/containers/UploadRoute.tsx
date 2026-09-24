@@ -22,7 +22,13 @@
 
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { SERVICES, SERVICE_LABELS, ulid, type CaptureSelectionRefusal } from '@nextup/domain';
+import {
+  BATCH_SOURCES,
+  batchSourceLabel,
+  isDiscoverySource,
+  ulid,
+  type CaptureSelectionRefusal,
+} from '@nextup/domain';
 
 import { ImageDropzone, type QueuedImage, type ServerRejection } from '../components/ImageDropzone';
 import { UploadCheckpoint } from '../components/UploadCheckpoint';
@@ -104,12 +110,16 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
   const isActive = useCaptureLifetime();
   const online = useOnline();
   const [params] = useSearchParams();
-  const requestedService = params.get('service');
-  const initialService = SERVICES.find((service) => service === requestedService) ?? null;
+  /*
+   * `?service=netflix` or `?source=fandango-at-home` (#378). Either names a
+   * batch source; anything unrecognised is ignored rather than guessed at.
+   */
+  const requestedSource = params.get('source') ?? params.get('service');
+  const initialService = BATCH_SOURCES.find((source) => source === requestedSource) ?? null;
 
   const [selection, setSelection] = useState<BatchDraftSelection>({
     service: initialService,
-    mode: null,
+    mode: initialService !== null && isDiscoverySource(initialService) ? 'append-only' : null,
   });
   const [batchId, setBatchId] = useState<string | null>(null);
   const [queue, setQueue] = useState<readonly QueuedImage[]>([]);
@@ -424,7 +434,9 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
               <dd>
                 {selection.service === null
                   ? 'Choose a service'
-                  : SERVICE_LABELS[selection.service]}
+                  : isDiscoverySource(selection.service)
+                    ? batchSourceLabel({ service: null, discoverySource: selection.service })
+                    : batchSourceLabel({ service: selection.service })}
               </dd>
               <dt>Update mode</dt>
               <dd>

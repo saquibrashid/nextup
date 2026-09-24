@@ -41,7 +41,7 @@ import { Input } from '../components/ui/Input';
 
 import { useEffect, useState, type JSX, type ReactNode } from 'react';
 import type { ReviewCandidate, ReviewResponse, ReviewSection } from '@nextup/domain';
-import { canBulkConfirm, DISCOVERY_SOURCE_LABELS, SERVICE_LABELS } from '@nextup/domain';
+import { batchSourceLabel, canBulkConfirm } from '@nextup/domain';
 
 import type { TmdbSearchResult } from '../lib/apiClient';
 
@@ -482,10 +482,7 @@ export function ReviewPage({
   // ⚠ A DISCOVERY capture has no service (ADR-0010 D-1), so the heading names
   // the storefront instead. Reading `SERVICE_LABELS[null]` would render
   // `undefined` in the one place the owner looks to check what they captured.
-  const service =
-    review.service === null
-      ? (DISCOVERY_SOURCE_LABELS[review.discoverySource ?? 'fandango-at-home'] ?? 'Discovery')
-      : (SERVICE_LABELS[review.service] ?? review.service);
+  const service = batchSourceLabel(review);
   const mode = MODE_LABELS[review.mode] ?? review.mode;
   // ⚠ THE COUNT IS THE SERVER'S. `buildReviewResponse` already reports
   // `count: 0` whenever removals are omitted or withheld, so a client-side

@@ -40,7 +40,12 @@ describe('T-SVC-001 expanded subscription services', () => {
       'Starz',
       'Peacock',
     ]);
-    expect(DISCOVERY_SOURCES).toEqual(['fandango-at-home']);
+    expect(DISCOVERY_SOURCES).toEqual([
+      'fandango-at-home',
+      'apple-tv-store',
+      'prime-video-store',
+      'google-tv-store',
+    ]);
     expect(BATCH_SOURCES).toEqual([...SERVICES, ...DISCOVERY_SOURCES]);
     for (const service of SERVICES) {
       expect(isService(service)).toBe(true);

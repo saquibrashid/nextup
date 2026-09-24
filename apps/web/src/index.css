@@ -2063,6 +2063,89 @@ button {
   font-weight: var(--weight-medium);
 }
 
+/*
+  #378 — a row that has reached one of the owner's services. The thicker
+  border and the "Now streaming" badge carry it; colour only reinforces the
+  words, so it survives greyscale and forced colours.
+*/
+.waiting-row--streaming {
+  border-color: var(--color-success);
+  border-inline-start-width: 4px;
+}
+
+.waiting-row__badge {
+  align-self: flex-start;
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  padding-inline: var(--space-1);
+  text-transform: uppercase;
+}
+
+.waiting-row__rent,
+.waiting-row__other {
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+/*
+  #378, owner decision 3 — streaming somewhere the owner does not subscribe.
+  The sentence already says "(not one of your services)"; the dashed rule is
+  a second, non-colour cue that this line is not the good news above it.
+*/
+.waiting-row__other {
+  border-inline-start: 2px dashed var(--color-border);
+  font-style: italic;
+  padding-inline-start: var(--space-2);
+}
+
+.waiting-search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-block-end: var(--space-4);
+}
+
+.waiting-search h2,
+.waiting-search p {
+  margin: 0;
+}
+
+.waiting-search__form {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.waiting-search__form .input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.waiting-search__results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.waiting-search__result {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: space-between;
+}
+
+.waiting-search__result span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .title-row--skeleton,
 .suppressed-row--skeleton,
 .removed-row--skeleton,
@@ -3385,6 +3468,22 @@ button {
 .upload-flow__intro {
   margin-block: var(--space-2) var(--space-5);
   max-inline-size: 56ch;
+}
+
+/* #378 — the rental-storefront toggle under the service choices. */
+.upload-flow__storefronts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-start: var(--space-3);
+  color: var(--color-text-muted);
+}
+
+.upload-flow__storefronts p {
+  margin: 0;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
 }
 
 .upload-flow__note {

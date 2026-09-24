@@ -23,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const listWaitingIntents = vi.fn();
 const updateWatchIntentAvailability = vi.fn();
+const listOwnerServices = vi.fn();
 const getWatchProviders = vi.fn();
 
 vi.mock('../../src/repository/watchIntents.js', async (importOriginal) => {
@@ -32,14 +33,21 @@ vi.mock('../../src/repository/watchIntents.js', async (importOriginal) => {
     listWaitingIntents: (...args: unknown[]) => listWaitingIntents(...args) as unknown,
     updateWatchIntentAvailability: (...args: unknown[]) =>
       updateWatchIntentAvailability(...args) as unknown,
+    listOwnerServices: (...args: unknown[]) => listOwnerServices(...args) as unknown,
   };
 });
 
 vi.mock('../../src/clients/tmdbClient.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../src/clients/tmdbClient.js')>();
   class StubTmdbClient extends actual.TmdbClient {
-    override getWatchProviders(...args: unknown[]): Promise<string[] | null> {
-      return getWatchProviders(...args) as Promise<string[] | null>;
+    // #378: the refresh reads both halves of one answer. The stub keeps the
+    // flatrate-only mock these cases were written against and reports no
+    // rent offers unless a case says otherwise.
+    override async getWatchOffers(
+      ...args: unknown[]
+    ): Promise<{ flatrate: string[]; rentOrBuy: string[] } | null> {
+      const flatrate = (await getWatchProviders(...args)) as string[] | null;
+      return flatrate === null ? null : { flatrate, rentOrBuy: [] };
     }
   }
   return { ...actual, TmdbClient: StubTmdbClient };
@@ -71,6 +79,8 @@ interface StoredOver {
   id?: string;
   checkedAt?: Date | null;
   availableOn?: string | null;
+  rentOn?: string | null;
+  streamingSince?: Date | null;
   region?: string;
   tmdbId?: number | null;
   tmdbName?: string | null;
@@ -86,6 +96,9 @@ function stored(over: StoredOver = {}): Record<string, unknown> {
     availabilityRegion: over.region ?? 'US',
     availabilityCheckedAt: over.checkedAt === undefined ? OLD : over.checkedAt,
     availableOn: over.availableOn ?? null,
+    // A row answered after #378 records rent offers as at least `[]`.
+    rentOn: over.rentOn === undefined ? '[]' : over.rentOn,
+    streamingSince: over.streamingSince ?? null,
     title: {
       id: 'title-1',
       tmdbId: over.tmdbId === undefined ? 438_631 : over.tmdbId,
@@ -130,6 +143,7 @@ beforeEach(async () => {
   process.env['NEXTUP_ALLOWED_SUBJECTS'] = SUBJECT;
   process.env['TMDB_API_KEY'] = 'test-key';
   updateWatchIntentAvailability.mockResolvedValue({ count: 1 });
+  listOwnerServices.mockResolvedValue([]);
   getWatchProviders.mockResolvedValue(['Netflix']);
   app = createApp();
   server = app.listen(0);
@@ -150,7 +164,7 @@ describe('T-AVAIL-011 · GET /api/waiting without a store', () => {
     expect(body.count).toBe(1);
     expect(getWatchProviders).toHaveBeenCalledWith('movie', 438_631, 'US');
 
-    // The write is the narrow three-column one, and the freshly-fetched answer
+    // The write is the narrow availability one, and the freshly-fetched answer
     // is what the response renders — not the stale row it replaced.
     expect(updateWatchIntentAvailability).toHaveBeenCalledTimes(1);
     const [, id, data] = updateWatchIntentAvailability.mock.calls[0] as [

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type JSX } from 'react';
-import { SERVICE_LABELS, MAX_IMAGES_PER_BATCH, MAX_BATCH_UPLOAD_BYTES } from '@nextup/domain';
+import { batchSourceLabel, MAX_IMAGES_PER_BATCH, MAX_BATCH_UPLOAD_BYTES } from '@nextup/domain';
 import { RefusedError, type ApiClient, type BatchStatus } from '../lib/apiClient';
 import { ImageDropzone, type QueuedImage, type ServerRejection } from './ImageDropzone';
 import { RejectionList, mergeRejections } from './RejectionList';
@@ -178,8 +178,7 @@ export function DraftBatch({
       <RejectionList entries={mergeRejections([], rejected)} />
       <h1>Check your saved screenshots</h1>
       <p>
-        {SERVICE_LABELS[batch.service]} ·{' '}
-        {batch.mode === 'full-update' ? 'Full update' : 'Add only'}
+        {batchSourceLabel(batch)} · {batch.mode === 'full-update' ? 'Full update' : 'Add only'}
       </p>
       {!editable && (
         <p role="alert">

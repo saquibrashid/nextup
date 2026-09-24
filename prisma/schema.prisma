@@ -254,10 +254,14 @@ model WatchIntent {
   /// (`T-WAIT-011`).
   discoveredAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_intent_discovered") @map("discovered_at") @db.DateTime2
 
-  sourceBatchId String      @map("source_batch_id") @db.NVarChar(200)
-  sourceBatch   UploadBatch @relation(fields: [sourceBatchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_intent_batch")
+  /// NULL exactly when `discoverySource` is `search` — a search-to-add has no
+  /// capture batch behind it (#378, migration 0017,
+  /// `ck_intent_source_batch_coherent`).
+  sourceBatchId String?      @map("source_batch_id") @db.NVarChar(200)
+  sourceBatch   UploadBatch? @relation(fields: [sourceBatchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_intent_batch")
 
-  /// ⚠ NOT a `SERVICES` member (ADR-0010 D-1).
+  /// ⚠ NOT a `SERVICES` member (ADR-0010 D-1). An `INTENT_SOURCES` member:
+  /// a rental storefront, or `search`.
   discoverySource String @map("discovery_source") @db.NVarChar(64)
 
   /// `waiting` | `satisfied` | `suppressed`. Soft only.
@@ -270,6 +274,15 @@ model WatchIntent {
   /// JSON array of providers reported `flatrate` for `availabilityRegion`.
   /// ⚠ NULL ≠ "not streaming anywhere" — it means NOT KNOWN (ADR-0010 Trap 4).
   availableOn String? @map("available_on") @db.NVarChar(Max)
+
+  /// JSON array of providers offering it to RENT or BUY, for the "rent/buy
+  /// only" state (#378). NULL = not known. ⚠ Never availability: renting is
+  /// what the owner is waiting to escape (US-042 AC-5).
+  rentOn String? @map("rent_on") @db.NVarChar(Max)
+
+  /// When a refresh first saw a subscription offer, cleared when none is
+  /// seen. Drives the "now streaming" highlight (#378). Metadata only.
+  streamingSince DateTime? @map("streaming_since") @db.DateTime2
 
   /// ⚠ Explicit, never implicit (`T-AVAIL-010`, ASM-059, `A49`).
   availabilityRegion String @default("US", map: "df_intent_region") @map("availability_region") @db.NVarChar(8)

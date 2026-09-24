@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Accepted; promoted to v1 at A52 (2026-09-08).** Implementation and remaining acceptance work are tracked in `docs/status.md`. |
+| **Status** | **Accepted; promoted to v1 at A52 (2026-09-08). Revised at #378 (Revision 2, below).** Implementation and remaining acceptance work are tracked in `docs/status.md`. |
 | **Date** | 2026-08-20 |
 | **Deciders** | owner (`A48` — the requirement and both design choices), coordinator |
 | **Forced by** | **`A48`**, REQ-082…REQ-087, REQ-041, REQ-070/071/073, REQ-048, NFR-010, NFR-013, NFR-014, ADR-0007 |
@@ -102,6 +102,52 @@ review pass becomes unusable within about three captures. Suppression already
 does exactly the right thing — it is keyed on canonical work identity
 (REQ-071) and filters **before** record creation (US-028 AC-2), so a rejected
 title never returns no matter how many times the feed shows it again.
+
+## Revision 2 — waiting to stream (#378, owner-approved 2026-09-26)
+
+The owner reported that the waiting view's only action led to an import page
+that offered **no storefront at all**, and that the real use is: find a title
+on a rental storefront (typically Fandango at Home), wait for it to move from
+rent to streaming, and not know in advance which service it will land on.
+The owner's four answers are decisions, and each is binding:
+
+1. **Free and ad-supported tiers are NOT streaming.** Only TMDB `flatrate`
+   counts; `free` and `ads` are never read (unchanged from D-3, now explicit).
+2. **Search-to-add is wanted.** `POST /api/waiting` records a `WatchIntent`
+   with `discoverySource = 'search'` and **no source batch**. It never touches
+   the combined list (D-4 holds): the work is stored as the waiting shape — a
+   `removed` title with a null sort date — or an existing title is reused. A
+   work already listed or already waiting is refused with
+   `DUPLICATE_WORK_IDENTITY` (`details.reason` `already-listed` /
+   `already-waiting`); a suppressed one with `WORK_SUPPRESSED`.
+3. **Streaming on a service the owner does not use is shown, distinctly.**
+   "Your services" are those with a completed import or an active listing
+   (all of `SERVICES` until the owner has used any). `flaggedOn` is limited to
+   them; `otherServicesOn` (known services) and `otherProvidersOn` (providers
+   nextup has no service for) carry the rest, rendered with the words
+   *"(not one of your services)"* — never by colour alone.
+4. **More rental storefronts are discovery sources, each labelled rental.**
+   `DISCOVERY_SOURCES` gains `apple-tv-store`, `prime-video-store` and
+   `google-tv-store`. Every label carries **"(rent/buy)"**, so no surface can
+   present a storefront as a subscription. D-1 holds: no storefront is in
+   `SERVICES`, and the `-store` suffix keeps the Prime Video storefront apart
+   from the `prime-video` service.
+
+**Rent/buy offers are recorded, never treated as availability.** One TMDB
+request now reads `flatrate` **and** `rent`/`buy`: `availableOn` stays
+subscription-only; `rentOn` records the storefronts; `streamingSince` records
+when a subscription offer was first seen (kept across refreshes, cleared when
+it stops streaming) and drives the *"Now streaming"* highlight. A row answered
+before rent offers were recorded is re-asked once. Each row leads with an
+`accessState`: `not-checked`, `unknown`, `streaming`, `rent-only` or
+`not-seen`; Trap 4's bounded sentence is unchanged for the last two.
+
+**Migration 0017 (owner-approved)** widens the discovery-source CHECKs by the
+three storefronts (expand-then-rename, pinned in `tools/check-migrations.ts`),
+makes `watch_intent.source_batch_id` nullable, adds `rent_on` and
+`streaming_since`, and adds `ck_intent_source_batch_coherent` (a search intent
+has no batch; every other intent has one), `ck_intent_rent_on_json` and
+`ck_intent_rent_on_coherent`. Test ids: `specs/testing.md` §38.4.
 
 ## Consequences
 

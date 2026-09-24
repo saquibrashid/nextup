@@ -407,8 +407,32 @@ export interface WaitingItem {
   availableOn: string[] | null;
   /** Which of the owner's own services carry it, or `null` for not known. */
   flaggedOn: string[] | null;
+  /**
+   * #378 — the fields below are optional so a response from a server that
+   * predates them still renders; each absent field reads as "not known".
+   *
+   * `SERVICES` members carrying it that the owner does NOT use.
+   */
+  otherServicesOn?: string[] | null;
+  /** Subscription providers nextup has no service for, as TMDB names them. */
+  otherProvidersOn?: string[] | null;
+  /** Storefronts that RENT or SELL it. ⚠ Never streaming availability. */
+  rentOn?: string[] | null;
+  accessState?: 'not-checked' | 'unknown' | 'streaming' | 'rent-only' | 'not-seen';
+  /** When a subscription offer was first seen — drives the highlight. */
+  streamingSince?: string | null;
   availabilityCheckedAt: string | null;
   availabilityRegion: string;
+}
+
+/** `POST /api/waiting` (#378) — wait for a work found by search. */
+export interface WaitingAddResult {
+  intentId: string;
+  titleId: string;
+  workIdentity: string;
+  name: string;
+  discoverySource: 'search';
+  titleWasCreated: boolean;
 }
 
 export interface WaitingResponse {
@@ -559,7 +583,9 @@ export interface BatchStatus {
   } | null;
   batchTotals?: { imageCount: number; uploadedByteSize: number; storedByteSize: number };
   batchId: string;
-  service: Service;
+  /** `null` for a rental-storefront batch; `discoverySource` names it (#378). */
+  service: Service | null;
+  discoverySource?: string | null;
   mode: string;
   status: string;
   derivedFromBatchId: string | null;
@@ -617,7 +643,9 @@ export interface BatchTitleRef {
  */
 export interface BatchHistoryItem {
   batchId: string;
-  service: Service;
+  /** `null` for a rental-storefront batch; `discoverySource` names it (#378). */
+  service: Service | null;
+  discoverySource?: string | null;
   mode: string;
   status: string;
   createdAt: string;
@@ -806,6 +834,15 @@ export function createApiClient(deps: ApiClientDeps = {}) {
      */
     getWaiting: (signal?: AbortSignal) =>
       request<WaitingResponse>('/api/waiting', { signal }, deps),
+
+    /**
+     * #378 — wait for a work found by search, with no screenshot. Never
+     * touches the combined list; refused with `DUPLICATE_WORK_IDENTITY`
+     * (`details.reason` `already-listed` / `already-waiting`) or
+     * `WORK_SUPPRESSED`.
+     */
+    addWaiting: (body: { tmdbId: number; mediaType: 'movie' | 'tv' }) =>
+      request<WaitingAddResult>('/api/waiting', { method: 'POST', body }, deps),
 
     suppressTitle: (titleId: string, reason?: string) =>
       request<{ suppressionId: string; workIdentity: string; alreadySuppressed: boolean }>(

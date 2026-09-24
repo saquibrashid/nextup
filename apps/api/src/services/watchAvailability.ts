@@ -67,12 +67,21 @@ export interface IntentRow {
   availabilityCheckedAt: Date | null;
   /** ⚠ `null` ≠ "not streaming anywhere" — it means NOT KNOWN (Trap 4). */
   availableOn: string[] | null;
+  /**
+   * Rent/buy storefronts (#378). `null` on a row that HAS an answer means it
+   * was checked before rent offers were recorded, which makes it due.
+   */
+  rentOn: string[] | null;
+  /** When a subscription offer was first seen; carried across refreshes. */
+  streamingSince: Date | null;
 }
 
 /** What one refresh decided to write. Metadata-only, by construction. */
 export interface AvailabilityWrite {
   id: string;
   availableOn: string[] | null;
+  rentOn: string[] | null;
+  streamingSince: Date | null;
   availabilityCheckedAt: Date;
   availabilityRegion: string;
 }
@@ -93,6 +102,10 @@ export function isAvailabilityStale(row: IntentRow, now: Date): boolean {
   // request for one would spend the budget on a guaranteed 404.
   if (row.tmdbId === null || row.tmdbMediaType === null) return false;
   if (row.availabilityCheckedAt === null) return true;
+  // #378: answered before rent offers were recorded. Once, not forever: any
+  // non-null answer writes `rentOn` as at least `[]`, and a NOT KNOWN answer
+  // (`availableOn` null) is excluded so it is not re-asked on every render.
+  if (row.availableOn !== null && row.rentOn === null) return true;
   const ageDays = (now.getTime() - row.availabilityCheckedAt.getTime()) / MS_PER_DAY;
   return ageDays >= WATCH_PROVIDER_MAX_AGE_DAYS;
 }
@@ -197,13 +210,61 @@ export function flaggedProvidersFor(availableOn: readonly string[] | null): Serv
   );
 }
 
+/**
+ * The subscription providers that are NOT one of the owner's services (#378,
+ * owner decision 3): `SERVICES` members the owner does not use, and providers
+ * nextup has no service for, named as TMDB names them, deduplicated.
+ *
+ * ⚠ `ownerServices` is what the owner USES, not what nextup supports. The
+ * caller decides it; this function only partitions.
+ */
+export function otherStreamingFor(
+  availableOn: readonly string[] | null,
+  ownerServices: readonly Service[],
+): { services: Service[]; providers: string[] } | null {
+  if (availableOn === null) return null;
+  const all = flaggedProvidersFor(availableOn) ?? [];
+  const services = all.filter((service) => !ownerServices.includes(service));
+  const known = new Set(Object.values(SUBSCRIPTION_PROVIDER_ALIASES).flat());
+  const providers: string[] = [];
+  const seen = new Set<string>();
+  for (const name of availableOn) {
+    const key = normaliseProvider(name);
+    if (key === '' || known.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    providers.push(name.trim());
+  }
+  return { services, providers };
+}
+
+/**
+ * The one-word answer a waiting row leads with (#378).
+ *
+ * ⚠ `streaming` is decided by `flatrate` alone. `rent-only` needs a rent/buy
+ * offer AND no subscription offer. `not-seen` is the bounded, dated claim of
+ * ADR-0010 Trap 4 — never "not streaming anywhere".
+ */
+export type AccessState = 'not-checked' | 'unknown' | 'streaming' | 'rent-only' | 'not-seen';
+
+export function accessStateFor(
+  availableOn: readonly string[] | null,
+  rentOn: readonly string[] | null,
+  checkedAt: Date | null,
+): AccessState {
+  if (checkedAt === null) return 'not-checked';
+  if (availableOn === null) return 'unknown';
+  if (availableOn.length > 0) return 'streaming';
+  if (rentOn !== null && rentOn.length > 0) return 'rent-only';
+  return 'not-seen';
+}
+
 /** The narrow slice of the TMDB client this refresh is allowed to reach. */
 export interface WatchProviderSource {
-  getWatchProviders(
+  getWatchOffers(
     mediaType: 'movie' | 'tv',
     tmdbId: number,
     region: string,
-  ): Promise<string[] | null>;
+  ): Promise<{ flatrate: string[]; rentOrBuy: string[] } | null>;
 }
 
 /**
@@ -250,20 +311,27 @@ export async function refreshAvailability(
     const mediaType = row.tmdbMediaType;
     if (row.tmdbId === null || (mediaType !== 'movie' && mediaType !== 'tv')) continue;
 
-    let providers: string[] | null;
+    let offers: { flatrate: string[]; rentOrBuy: string[] } | null;
     try {
       // ⚠ The region is PASSED, from the row. Never defaulted here — the whole
       // point of storing it is that a cached answer knows which question it
       // answered (`T-AVAIL-010`).
-      providers = await source.getWatchProviders(mediaType, row.tmdbId, row.availabilityRegion);
+      offers = await source.getWatchOffers(mediaType, row.tmdbId, row.availabilityRegion);
     } catch {
       failedIds.push(row.id);
       continue;
     }
 
+    const streaming = offers !== null && offers.flatrate.length > 0;
     writes.push({
       id: row.id,
-      availableOn: providers,
+      availableOn: offers === null ? null : offers.flatrate,
+      rentOn: offers === null ? null : offers.rentOrBuy,
+      // #378 "now streaming": the FIRST sighting is kept across refreshes, and
+      // cleared when no subscription carries it any more. NOT KNOWN keeps the
+      // last-known value rather than inventing a change.
+      streamingSince:
+        offers === null ? row.streamingSince : streaming ? (row.streamingSince ?? now) : null,
       availabilityCheckedAt: now,
       availabilityRegion: row.availabilityRegion,
     });

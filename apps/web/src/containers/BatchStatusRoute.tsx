@@ -304,7 +304,7 @@ function BatchStatusContent({
   return (
     <BatchStatusPage
       outcome={
-        batch?.status === 'applied' && batch.application != null ? (
+        batch?.status === 'applied' && batch.application != null && batch.service !== null ? (
           <>
             {batch.application.summary.listingsCreated + batch.application.summary.listingsRemoved >
               0 || batch.changedNothing ? (

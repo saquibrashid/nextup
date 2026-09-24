@@ -96,6 +96,7 @@ describe('T-DATA-003 — every method sends credentials', () => {
       getServiceState: () => client.getServiceState(),
       getSuppressions: () => client.getSuppressions(),
       getWaiting: () => client.getWaiting(),
+      addWaiting: () => client.addWaiting({ tmdbId: 438631, mediaType: 'movie' }),
       getRemoved: () => client.getRemoved(''),
       suppressTitle: () => client.suppressTitle('ttl_1'),
       unsuppress: () => client.unsuppress('sup_1'),

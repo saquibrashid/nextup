@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { SERVICE_LABELS } from '@nextup/domain';
+import { batchSourceLabel } from '@nextup/domain';
 import { apiClient, type ApiClient } from '../lib/apiClient';
 import { resumeAction, useUploadCheckpoint } from '../lib/useUploadCheckpoint';
 import { useOnline } from '../lib/useOnline';
@@ -14,7 +14,7 @@ export function CaptureResume({ client = apiClient }: { readonly client?: ApiCli
       {state.kind === 'open' && action !== null ? (
         <>
           <span>
-            <strong>{SERVICE_LABELS[state.batch.service] ?? 'Discovery'}</strong>
+            <strong>{batchSourceLabel(state.batch)}</strong>
             {' / '}
             {action.state}
           </span>

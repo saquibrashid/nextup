@@ -192,6 +192,7 @@ export function registerBatchDetailRoutes(router: Router): void {
         return {
           batchId: batch.id,
           service: batch.service,
+          discoverySource: batch.discoverySource,
           mode: batch.mode,
           status: batch.status,
           createdAt: batch.createdAt.toISOString(),
@@ -231,6 +232,7 @@ export function registerBatchDetailRoutes(router: Router): void {
     res.status(200).json({
       batchId: batch.id,
       service: batch.service,
+      discoverySource: batch.discoverySource,
       mode: batch.mode,
       status: batch.status,
       derivedFromBatchId: batch.derivedFromBatchId,
