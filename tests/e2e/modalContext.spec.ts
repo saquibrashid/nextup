@@ -297,3 +297,104 @@ for (const width of [320, 1280]) {
     });
   });
 }
+
+// #371 / TASK-248. 320 CSS px is the WCAG 1.4.10 reflow width (1280px at
+// 400%), so it also covers the 200%-zoom layout of any wider window.
+const LONG_ADD_NAME =
+  'The Extraordinarily Long and Deliberately Unwrapped Title of a Documentary Series About Everything';
+const ONE_PIXEL_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+  'base64',
+);
+for (const width of [320, 1280]) {
+  describe(`Add a title layout at ${width}px`, () => {
+    test('T-ADDUI-003: result rows are bounded, aligned, sticky-headed and keyboard reachable', async ({
+      page,
+    }) => {
+      test.slow(); // Axe plus layout measurement on every browser project.
+      await fixture(page);
+      await page.route('https://image.tmdb.org/**', (route) =>
+        route.fulfill({ contentType: 'image/png', body: ONE_PIXEL_PNG }),
+      );
+      await page.route('**/api/tmdb/search**', (route) =>
+        route.fulfill({
+          json: {
+            items: [
+              {
+                tmdbId: 603,
+                mediaType: 'movie',
+                name: 'The Matrix',
+                releaseYear: 1999,
+                posterPath: '/matrix.jpg',
+              },
+              {
+                tmdbId: 9001,
+                mediaType: 'tv',
+                name: LONG_ADD_NAME,
+                releaseYear: null,
+                posterPath: null,
+              },
+              ...Array.from({ length: 10 }, (_, index) => ({
+                tmdbId: 700 + index,
+                mediaType: 'movie',
+                name: `Matrix companion ${index}`,
+                releaseYear: 2000 + index,
+                posterPath: `/companion-${index}.jpg`,
+              })),
+            ],
+          },
+        }),
+      );
+      await page.setViewportSize({ width, height: 560 });
+      await page.goto('/');
+      await page.getByTestId('add-title-open').click();
+      const search = page.getByTestId('add-title-search-input');
+      await expect(search).toBeFocused();
+      await search.fill('matrix');
+      const list = page.getByTestId('add-title-results');
+      await expect(list.getByRole('button', { name: 'Select' })).toHaveCount(12);
+      await modalInViewport(page);
+
+      const layout = await list.evaluate((node) => {
+        const rows = [...node.querySelectorAll('li')];
+        return {
+          thumbs: rows.map((row) => {
+            const thumb = row.querySelector('.title-search-thumb')!.getBoundingClientRect();
+            return [Math.round(thumb.width), Math.round(thumb.height)];
+          }),
+          selectX: rows.map((row) =>
+            Math.round(row.querySelector('button')!.getBoundingClientRect().x),
+          ),
+          clipped: [...node.querySelectorAll('.title-search-result__name')].some(
+            (name) => name.scrollWidth > name.clientWidth + 1,
+          ),
+        };
+      });
+      expect(new Set(layout.thumbs.map((size) => size.join('x'))).size).toBe(1);
+      expect(layout.thumbs[0]![1]!).toBeGreaterThan(layout.thumbs[0]![0]!);
+      expect(new Set(layout.selectX).size).toBe(1);
+      expect(layout.clipped).toBe(false);
+
+      const dialog = page.getByRole('dialog');
+      expect(await dialog.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+      await dialog.evaluate((node) => node.scrollTo(0, node.scrollHeight));
+      await expect(search).toBeInViewport();
+      await expect(page.getByRole('button', { name: 'Close add a title' })).toBeInViewport();
+
+      const firstSelect = page.getByTestId('add-select-603');
+      if (test.info().project.name === 'chromium') {
+        // WebKit's native Tab skips buttons by platform default; the order
+        // itself is the DOM order, asserted here once.
+        await search.focus();
+        await page.keyboard.press('Tab');
+      } else {
+        await firstSelect.focus();
+      }
+      await expect(firstSelect).toBeFocused();
+      await page.keyboard.press('Enter');
+      await expect(page.getByTestId('add-selected-summary')).toContainText('The Matrix');
+      await expect(page.getByTestId('confirm-add-title')).toBeVisible();
+      await modalInViewport(page);
+    });
+  });
+}

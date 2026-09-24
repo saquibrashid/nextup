@@ -24,11 +24,16 @@ import { Input } from './ui/Input';
  *
  * ⚠ Search and submit are INJECTED, like every other dialog here —
  * `T-DATA-001` forbids calling the browser's fetch outside `apiClient.ts`.
+ *
+ * #371 (TASK-248): results use the shared `TitleSearchResults` rows, the
+ * heading/close/search stay sticky above them, and search or write failures
+ * offer an explicit Retry that repeats the same owner-chosen request.
  */
 import { useCallback, useEffect, useId, useRef, useState, type JSX } from 'react';
 import { SERVICES, SERVICE_LABELS } from '@nextup/domain';
 
 import {
+  ADD_TITLE_CLOSE_LABEL,
   ADD_TITLE_DONE,
   ADD_TITLE_DONE_BADGE_ONLY,
   ADD_TITLE_DUPLICATE,
@@ -36,6 +41,7 @@ import {
   ADD_TITLE_SEARCH_LABEL,
   ADD_TITLE_SERVICE_LABEL,
   ADD_TITLE_SERVICE_REQUIRED,
+  RETRY_LABEL,
 } from '../copy';
 
 import { useOutcomeFocus } from '../lib/useOutcomeFocus';
@@ -44,15 +50,25 @@ import {
   type TmdbSearchResponse,
   type TmdbSearchResult,
 } from './FixMatchDialog';
+import { CloseIcon } from './icons';
 import { withName } from './SuppressDialog';
+import {
+  TitleSearchResults,
+  TitleSearchThumb,
+  mediaTypeLabel,
+  type TitleSearchResultTestIds,
+} from './TitleSearchResults';
 import { Button } from './ui/Button';
 import { Field } from './ui/Field';
 
-/** Matches `FixMatchDialog` — one debounce, one poster size, one behaviour. */
+/** Matches `FixMatchDialog` — one debounce, one result layout, one behaviour. */
 const DEBOUNCE_MS = 300;
-const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w154';
 
-const MEDIA_TYPE_LABELS: Record<string, string> = { movie: 'Movie', tv: 'TV' };
+const ADD_RESULT_TEST_IDS: TitleSearchResultTestIds = {
+  list: 'add-title-results',
+  name: 'add-result-name',
+  select: (result) => `add-select-${result.tmdbId}`,
+};
 
 const SERVICE_OPTIONS = SERVICES.map((value) => ({ value, label: SERVICE_LABELS[value] }));
 
@@ -200,6 +216,11 @@ export function AddTitleDialog({
     phase === 'no-results' ||
     phase === 'search-unavailable';
 
+  const backToResults = (): void => {
+    setSelected(null);
+    setPhase(results.length > 0 ? 'results' : 'idle');
+  };
+
   return (
     <Dialog
       onDismiss={() => {
@@ -207,63 +228,86 @@ export function AddTitleDialog({
       }}
       aria-labelledby={headingId}
     >
-      <h2 id={headingId}>{ADD_TITLE_HEADING}</h2>
-
-      {searching && (
-        <>
+      {/*
+       * ⚠ STICKY, NOT A NESTED SCROLLER. The dialog is the only scroll
+       * container (`T-MOD-002c`), so 200% zoom and short phones keep one
+       * scrollable surface, while the heading, close control and search stay
+       * reachable above a long result list.
+       */}
+      <div className="title-search-head">
+        <div className="panel-head">
+          <h2 id={headingId}>{ADD_TITLE_HEADING}</h2>
+          {phase !== 'submitting' && (
+            <Button variant="ghost" aria-label={ADD_TITLE_CLOSE_LABEL} onClick={onClose}>
+              <CloseIcon />
+            </Button>
+          )}
+        </div>
+        {searching && (
           <Input
             type="search"
             aria-label={ADD_TITLE_SEARCH_LABEL}
             data-testid="add-title-search-input"
+            data-dialog-initial-focus=""
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search for a film or series…"
           />
+        )}
+      </div>
 
-          {phase === 'searching' && <p aria-busy="true">Searching…</p>}
-          {phase === 'no-results' && <p role="status">No results for &ldquo;{query}&rdquo;</p>}
-          {phase === 'search-unavailable' && <p role="alert">{TMDB_UNAVAILABLE_MESSAGE}</p>}
+      {phase === 'searching' && (
+        <p className="title-search-feedback" aria-busy="true">
+          Searching…
+        </p>
+      )}
+      {phase === 'no-results' && (
+        <p className="title-search-feedback" role="status">
+          No results for &ldquo;{query}&rdquo;
+        </p>
+      )}
+      {phase === 'search-unavailable' && (
+        <div className="title-search-feedback">
+          <p role="alert">{TMDB_UNAVAILABLE_MESSAGE}</p>
+          <Button
+            variant="secondary"
+            data-testid="add-search-retry"
+            onClick={() => doSearch(query)}
+          >
+            {RETRY_LABEL}
+          </Button>
+        </div>
+      )}
 
-          {phase === 'results' && (
-            <ul data-testid="add-title-results">
-              {results.map((item) => (
-                <li key={`${item.mediaType}:${item.tmdbId}`}>
-                  {item.posterPath !== null && (
-                    <img src={`${TMDB_IMAGE_BASE}${item.posterPath}`} alt="" />
-                  )}
-                  <span data-testid="add-result-name">{item.name}</span>
-                  {item.edition !== undefined && <EditionLabels labels={[item.edition]} />}
-                  {item.releaseYear !== null && (
-                    <span>{releaseYearText(item.releaseYear, item.edition !== undefined)}</span>
-                  )}
-                  <span>{MEDIA_TYPE_LABELS[item.mediaType] ?? item.mediaType}</span>
-                  <Button
-                    variant="secondary"
-                    data-testid={`add-select-${item.tmdbId}`}
-                    onClick={() => {
-                      setSelected(item);
-                      setPhase('confirming');
-                    }}
-                  >
-                    Select
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </>
+      {phase === 'results' && (
+        <TitleSearchResults
+          results={results}
+          onSelect={(item) => {
+            setSelected(item);
+            setPhase('confirming');
+          }}
+          testIds={ADD_RESULT_TEST_IDS}
+        />
       )}
 
       {(phase === 'confirming' || phase === 'submitting') && selected !== null && (
         <>
-          <p>
-            Add <strong data-testid="add-selected-name">{selected.name}</strong>
-            {selected.releaseYear !== null && (
-              <> ({releaseYearText(selected.releaseYear, selected.edition !== undefined)})</>
-            )}{' '}
-            to your list?
-          </p>
-          {selected.edition !== undefined && <EditionLabels labels={[selected.edition]} />}
+          <div className="title-search-selected" data-testid="add-selected-summary">
+            <TitleSearchThumb posterPath={selected.posterPath} />
+            <div className="title-search-result__body">
+              <p>
+                Add <strong data-testid="add-selected-name">{selected.name}</strong>
+                {selected.releaseYear !== null && (
+                  <> ({releaseYearText(selected.releaseYear, selected.edition !== undefined)})</>
+                )}{' '}
+                to your list?
+              </p>
+              {selected.edition !== undefined && <EditionLabels labels={[selected.edition]} />}
+              <span className="title-search-result__meta">
+                <span>{mediaTypeLabel(selected.mediaType)}</span>
+              </span>
+            </div>
+          </div>
 
           <Field legend={ADD_TITLE_SERVICE_LABEL} legendId={serviceLabelId}>
             {SERVICE_OPTIONS.map((option) => (
@@ -289,24 +333,19 @@ export function AddTitleDialog({
             </p>
           )}
 
-          <Button
-            variant="primary"
-            data-testid="confirm-add-title"
-            disabled={phase === 'submitting'}
-            onClick={submit}
-          >
-            {phase === 'submitting' ? 'Adding…' : 'Add to list'}
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={phase === 'submitting'}
-            onClick={() => {
-              setSelected(null);
-              setPhase(results.length > 0 ? 'results' : 'idle');
-            }}
-          >
-            Back
-          </Button>
+          <div className="title-search-actions">
+            <Button variant="secondary" disabled={phase === 'submitting'} onClick={backToResults}>
+              Back
+            </Button>
+            <Button
+              variant="primary"
+              data-testid="confirm-add-title"
+              disabled={phase === 'submitting'}
+              onClick={submit}
+            >
+              {phase === 'submitting' ? 'Adding…' : 'Add to list'}
+            </Button>
+          </div>
         </>
       )}
 
@@ -341,6 +380,22 @@ export function AddTitleDialog({
         </p>
       )}
 
+      {/*
+       * Retrying resubmits the SAME explicit selection and service. It is an
+       * owner action after a stated failure, never an automatic retry, and
+       * nothing reads as success until the server confirms the write.
+       */}
+      {(phase === 'tmdb-unavailable' || phase === 'failed') && selected !== null && (
+        <div className="title-search-actions">
+          <Button variant="secondary" onClick={() => setPhase('confirming')}>
+            Back
+          </Button>
+          <Button variant="primary" data-testid="add-submit-retry" onClick={submit}>
+            {RETRY_LABEL}
+          </Button>
+        </div>
+      )}
+
       {phase === 'success' && result !== null && (
         <p role="status" data-testid="add-title-done" ref={outcomeRef} tabIndex={-1}>
           {result.titleWasCreated
@@ -353,9 +408,11 @@ export function AddTitleDialog({
       )}
 
       {phase !== 'submitting' && (
-        <Button variant="secondary" onClick={onClose}>
-          {phase === 'success' ? 'Close' : 'Cancel'}
-        </Button>
+        <div className="title-search-actions">
+          <Button variant="secondary" onClick={onClose}>
+            {phase === 'success' ? 'Close' : 'Cancel'}
+          </Button>
+        </div>
       )}
     </Dialog>
   );

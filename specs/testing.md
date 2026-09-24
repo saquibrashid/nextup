@@ -5103,6 +5103,16 @@ trust a range reserved earlier in the same document to still be free.**
 | `T-RANGE-002` | U | Visible Min/Max labels and unit-bearing values, per-handle accessible names and spoken values, clamp status without swapping, full-track reset removing `runtime`, a disclosed gapped saved selection that is not rewritten until a handle moves, and Back/Forward positions from the URL. Existing `T-UX-123`/`T-UX-144` cases cover canonical tokens, chips, legacy expansion and preserved sort. `apps/web/test/filterBar.spec.tsx`. | TASK-246 |
 | `T-RANGE-003` | E | At 320, 640 and 1280 px in Chromium and Mobile Safari, the slider stays inside the drawer/panel without horizontal overflow; each handle is the hit target at its own centre; keyboard arrows move and clamp both handles with announced values; a pointer drag moves the maximum; axe reports no violations; a Chromium touch drag moves the minimum in the phone drawer. `tests/e2e/refinedLibrary.spec.ts` (with `T-UX-144g`). | TASK-246 |
 
+### Owner-approved Add a title dialog polish (TASK-248, #371)
+
+| Id | Level | What it asserts | Source |
+|---|---|---|---|
+| `T-ADDUI-001` | U | Cases a–h: title, year and type are separate elements with no literal separator text; a result without year or poster keeps its type and a decorative (`aria-hidden`) placeholder; long titles render complete; exactly one Select per result, named Select and described by its own row; the search input gets initial focus and the labelled close control dismisses; an unavailable search offers Retry for the same query; a failed add shows no success, Back keeps the chosen service, and Retry resubmits the identical request with no success, close control or re-enabled confirm until the server resolves. `apps/web/test/addTitleDialog.spec.tsx`. | TASK-248 |
+| `T-ADDUI-002` | U | Fix match renders the same shared rows while keeping `tmdb-results`, `result-year`, `result-type`, `result-poster` and `select-result-*`; the stylesheet bounds thumbnails to a 3rem 2:3 cover box, generates the year/type separator in CSS, wraps long names with `overflow-wrap: anywhere`, keeps the dialog head sticky and never makes the results a nested scroller. `apps/web/test/addTitleDialog.spec.tsx`. | TASK-248 |
+| `T-ADDUI-003` | E | At 320 px (the WCAG reflow width, covering 200% zoom) and 1280 px, with posters, a missing poster/year and a long title: every thumbnail has the same portrait size, every Select shares one x column, no name is clipped and the dialog has no horizontal overflow; after scrolling to the end the search and close control stay in view; keyboard focus reaches Select (DOM Tab order in Chromium) and Enter opens the confirmation summary; axe reports no violations in both states. `tests/e2e/modalContext.spec.ts`. | TASK-248 |
+
+The Review route's correction picker keeps its own card markup and behavior; sharing it is deliberately out of scope for TASK-248.
+
 ### 39.5 What is deliberately NOT asserted here
 
 **That the refresh looks good.** Taste is the owner's, recorded in **ADR-0013**,
