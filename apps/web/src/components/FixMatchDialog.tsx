@@ -33,6 +33,7 @@ import { useCallback, useEffect, useId, useRef, useState, type JSX } from 'react
 import { FIXMATCH_SUPPRESSION_MIGRATED } from '../copy';
 
 import { useOutcomeFocus } from '../lib/useOutcomeFocus';
+import { TitleSearchResults, type TitleSearchResultTestIds } from './TitleSearchResults';
 import { Button } from './ui/Button';
 
 /** 300 ms debounce matches the §2.3 spec. */
@@ -87,13 +88,15 @@ export interface FixMatchDialogProps {
   onClose: () => void;
 }
 
-const MEDIA_TYPE_LABELS: Record<string, string> = {
-  movie: 'Movie',
-  tv: 'TV',
+/** Existing Fix match test contract, rendered by the shared result rows (#371). */
+const FIX_MATCH_RESULT_TEST_IDS: TitleSearchResultTestIds = {
+  list: 'tmdb-results',
+  name: 'result-name',
+  year: 'result-year',
+  type: 'result-type',
+  poster: 'result-poster',
+  select: (result) => `select-result-${result.tmdbId}`,
 };
-
-/** `specs/ui.md` §2.3 poster size. */
-const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w154';
 
 type Phase =
   | 'idle'
@@ -280,36 +283,11 @@ export function FixMatchDialog({
           {phase === 'search-unavailable' && <p role="alert">{TMDB_UNAVAILABLE_MESSAGE}</p>}
 
           {phase === 'results' && (
-            <ul data-testid="tmdb-results">
-              {results.map((result) => (
-                <li key={`${result.mediaType}:${result.tmdbId}`}>
-                  {result.posterPath !== null && (
-                    <img
-                      src={`${TMDB_IMAGE_BASE}${result.posterPath}`}
-                      alt=""
-                      data-testid="result-poster"
-                    />
-                  )}
-                  <span data-testid="result-name">{result.name}</span>
-                  {result.edition !== undefined && <EditionLabels labels={[result.edition]} />}
-                  {result.releaseYear !== null && (
-                    <span data-testid="result-year">
-                      {releaseYearText(result.releaseYear, result.edition !== undefined)}
-                    </span>
-                  )}
-                  <span data-testid="result-type">
-                    {MEDIA_TYPE_LABELS[result.mediaType] ?? result.mediaType}
-                  </span>
-                  <Button
-                    variant="secondary"
-                    onClick={() => selectResult(result)}
-                    data-testid={`select-result-${result.tmdbId}`}
-                  >
-                    Select
-                  </Button>
-                </li>
-              ))}
-            </ul>
+            <TitleSearchResults
+              results={results}
+              onSelect={selectResult}
+              testIds={FIX_MATCH_RESULT_TEST_IDS}
+            />
           )}
         </>
       )}

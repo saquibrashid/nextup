@@ -541,6 +541,15 @@ search and a service picker with **no default**
 (`specs/ux-states.md` §2.15/§3.13). It exists because a title extraction missed
 is otherwise only fixable by re-capturing an entire service.
 
+**Search-result layout (TASK-248, #371).** Add a title and Fix match render
+results through one presentational `components/TitleSearchResults.tsx`: a
+bounded 48×72 (2:3) thumbnail or decorative placeholder, a full wrapping title,
+separate year and type metadata joined by a CSS-generated separator, and one
+Select described by its row. The Add dialog head (heading, labelled close and
+search) is sticky inside the single dialog scroller; unavailable search and
+failed adds offer an owner-initiated Retry of the same request. The Review
+route's correction picker keeps its own card layout and is out of scope.
+
 ---
 
 ## 3. `/upload` — Create a batch (US-003, US-004)

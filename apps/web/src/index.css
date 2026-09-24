@@ -611,6 +611,131 @@ button {
 }
 
 /*
+ * #371 (TASK-248) — shared TMDB search results for Add a title and Fix match.
+ *
+ * ⚠ The head is STICKY inside the dialog rather than the result list being a
+ * second scroller. One scroll surface survives 200% zoom and short phones; a
+ * nested list would shrink to a sliver under the head there.
+ */
+.title-search-head {
+  position: sticky;
+  top: calc(-1 * var(--space-4));
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: calc(-1 * var(--space-4)) calc(-1 * var(--space-4)) 0;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.title-search-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+/* Narrow and zoomed first: the action drops beneath the text column. */
+.title-search-result,
+.title-search-selected {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  background: var(--color-surface-raised);
+}
+
+.title-search-result:hover,
+.title-search-result:focus-within {
+  border-color: var(--color-border);
+}
+
+.title-search-result__action {
+  grid-column: 2;
+  justify-self: start;
+}
+
+.title-search-thumb {
+  display: block;
+  grid-row: span 2;
+  inline-size: 3rem;
+  block-size: auto;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  border-radius: var(--space-1);
+  background: var(--color-bg);
+}
+
+.title-search-selected .title-search-thumb {
+  grid-row: auto;
+}
+
+.title-search-thumb--empty {
+  border: 1px dashed var(--color-border-soft);
+}
+
+.title-search-result__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.title-search-result__name {
+  font-weight: var(--weight-bold);
+  overflow-wrap: anywhere;
+}
+
+.title-search-result__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.title-search-result__meta > span + span::before {
+  content: '·';
+  margin-right: var(--space-2);
+}
+
+.title-search-feedback {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.title-search-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+@media (min-width: 24rem) {
+  .title-search-result {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .title-search-result__action {
+    grid-column: auto;
+    justify-self: end;
+  }
+
+  .title-search-result .title-search-thumb {
+    grid-row: auto;
+  }
+}
+
+/*
  * Owner-approved 2026-09-17 (`specs/ui.md` §2.1 item 2) — the Filters and Sort
  * chooser surface.
  *

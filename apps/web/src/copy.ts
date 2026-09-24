@@ -119,6 +119,7 @@ export const ADD_TITLE_LABEL = 'Add title';
 export const ADD_TITLE_HEADING = 'Add a title';
 export const ADD_TITLE_SEARCH_LABEL = 'Search TMDB';
 export const ADD_TITLE_SERVICE_LABEL = 'Which service is it saved on?';
+export const ADD_TITLE_CLOSE_LABEL = 'Close add a title';
 
 /**
  * US-047 AC-4 — the service is REQUIRED and has no default.
