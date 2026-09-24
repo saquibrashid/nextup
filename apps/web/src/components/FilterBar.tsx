@@ -28,6 +28,10 @@ import {
   WATCH_PRIORITIES,
   WATCH_STATUSES,
   SERVICES,
+  TITLE_CATEGORIES,
+  TITLE_CATEGORY_LABELS,
+  isTitleCategory,
+  type TitleCategory,
   SERVICE_LABELS,
   moveRuntimeRangeHandle,
   normalizeRuntimeBuckets,
@@ -71,6 +75,7 @@ export type MediaType = (typeof MEDIA_TYPES)[number];
 const MEDIA_TYPE_LABELS: Record<MediaType, string> = { movie: 'Movies', tv: 'TV series' };
 
 export interface ListFilters {
+  readonly categories?: readonly TitleCategory[];
   readonly watching?: boolean | undefined;
   readonly priorities?: readonly WatchPriority[] | undefined;
   /** OR within the dimension (`api.md` §6.2, US-019 AC-4). */
@@ -143,6 +148,9 @@ export function parseFilters(params: URLSearchParams): ListFilters {
     ...(priorities.length > 0 ? { priorities } : {}),
     services: params.getAll('service').filter(isService),
     types: params.getAll('type').filter(isMediaType),
+    ...(params.has('category')
+      ? { categories: params.getAll('category').filter(isTitleCategory) }
+      : {}),
     genres: params.getAll('genre').filter((genre) => genre !== ''),
     runtimes: normalizeRuntimeBuckets(params.getAll('runtime')),
   };
@@ -161,6 +169,7 @@ export function applyFilters(params: URLSearchParams, filters: ListFilters): URL
   const next = new URLSearchParams(params);
   next.delete('service');
   next.delete('type');
+  next.delete('category');
   next.delete('genre');
   next.delete('runtime');
   next.delete('watching');
@@ -169,6 +178,7 @@ export function applyFilters(params: URLSearchParams, filters: ListFilters): URL
   for (const priority of filters.priorities ?? []) next.append('priority', priority);
   for (const service of filters.services) next.append('service', service);
   for (const type of filters.types) next.append('type', type);
+  for (const category of filters.categories ?? []) next.append('category', category);
   for (const genre of filters.genres) next.append('genre', genre);
   for (const runtime of filters.runtimes) next.append('runtime', runtime);
   return next;
@@ -178,6 +188,7 @@ export function isFiltered(filters: ListFilters): boolean {
   return (
     filters.watching !== undefined ||
     (filters.priorities?.length ?? 0) > 0 ||
+    (filters.categories?.length ?? 0) > 0 ||
     filters.services.length +
       filters.types.length +
       filters.genres.length +
@@ -192,6 +203,7 @@ export function activeFilterChips(filters: ListFilters): readonly string[] {
     ...statusChips(filters).map((chip) => chip.label),
     ...filters.services.map((service) => SERVICE_LABELS[service]),
     ...filters.types.map((type) => MEDIA_TYPE_LABELS[type]),
+    ...(filters.categories ?? []).map((category) => TITLE_CATEGORY_LABELS[category]),
     ...filters.genres,
     // Named, not tokenised: a chip reading `60-90` states the cause of an
     // empty list in a vocabulary the owner never chose it in.
@@ -293,6 +305,11 @@ export function FilterBar({
       dimension: 'type',
       value,
       label: MEDIA_TYPE_LABELS[value],
+    })),
+    ...(filters.categories ?? []).map((value) => ({
+      dimension: 'category',
+      value,
+      label: TITLE_CATEGORY_LABELS[value],
     })),
     ...filters.genres.map((value) => ({ dimension: 'genre', value, label: value })),
     ...filters.runtimes.map((value) => ({
@@ -448,26 +465,41 @@ export function FilterBar({
                 <FilterDisclosure
                   label="Type"
                   value={selectionSummary(
-                    filters.types.map((type) => MEDIA_TYPE_LABELS[type]),
+                    [
+                      ...filters.types.map((type) => MEDIA_TYPE_LABELS[type]),
+                      ...(filters.categories ?? []).map(
+                        (category) => TITLE_CATEGORY_LABELS[category],
+                      ),
+                    ],
                     'All types',
                   )}
                 >
                   <Field legend="Type" testId="filter-type">
-                    {MEDIA_TYPES.map((type) => (
+                    {TITLE_CATEGORIES.map((type) => (
                       <label key={type}>
                         <Input
                           type="checkbox"
-                          name="type"
+                          name="category"
                           value={type}
-                          checked={filters.types.includes(type)}
+                          checked={(filters.categories ?? []).includes(type)}
                           onChange={() => {
-                            update({ ...filters, types: toggle(filters.types, type) });
+                            update({
+                              ...filters,
+                              types: [],
+                              categories: toggle(filters.categories ?? [], type),
+                            });
                           }}
                         />
-                        {MEDIA_TYPE_LABELS[type]}
+                        {TITLE_CATEGORY_LABELS[type]}
                       </label>
                     ))}
                   </Field>
+                  {filters.types.length > 0 && (
+                    <p>
+                      Saved type filters use the catalogue Movie/TV type. Choosing a category
+                      replaces those filters with the displayed category.
+                    </p>
+                  )}
                 </FilterDisclosure>
 
                 {genreOptions.length > 0 && (

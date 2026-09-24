@@ -100,6 +100,23 @@ afterEach(() => {
 });
 
 describe('T-TMDB-004 · the horizon and the page filter (unit)', () => {
+  it('T-CATEGORY-002g refresh stores only the derived boolean and preserves unknown evidence', async () => {
+    const result = await refreshStaleMetadata(OWNER, [row('special')], {
+      client: fakeClient({ work: detail({ comedyShow: true }) }).client,
+      now: () => NOW,
+    });
+    expect(result.refreshed.get('special')).toMatchObject({ tmdbComedyShow: true });
+    expect(mockWrite).toHaveBeenLastCalledWith(
+      OWNER,
+      'special',
+      expect.objectContaining({ tmdbComedyShow: true }),
+    );
+    await refreshStaleMetadata(OWNER, [row('unknown')], {
+      client: fakeClient({ work: detail({ comedyShow: null }) }).client,
+      now: () => NOW,
+    });
+    expect(mockWrite.mock.calls.at(-1)?.[2]).not.toHaveProperty('tmdbComedyShow');
+  });
   it('T-TMDB-004g: the horizon is exclusive and null is stale', () => {
     // ⚠ Exactly AT the horizon is not yet stale. An inclusive comparison would
     // refresh a row one render early forever, which is invisible in a test

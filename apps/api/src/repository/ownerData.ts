@@ -52,6 +52,8 @@ import {
   deriveSortName,
   storedGenreVariants,
   isWatchPriority,
+  isTitleCategory,
+  type TitleCategory,
   type RuntimeBucket,
   type WatchPriority,
   type WatchPreferences,
@@ -60,6 +62,7 @@ import {
 } from '@nextup/domain';
 
 import { getPrisma } from './client.js';
+import { TMDB_METADATA_MAX_AGE_DAYS } from '../config.js';
 
 /**
  * The authenticated owner's stable identity.
@@ -552,6 +555,7 @@ export async function listActiveTitles(
  * forbids over an ever-growing history.
  */
 export interface TitlePageOptions {
+  categories?: readonly TitleCategory[];
   watching?: boolean | undefined;
   priorities?: readonly WatchPriority[];
   q?: string | undefined;
@@ -614,6 +618,9 @@ function runtimeFilter(buckets: readonly RuntimeBucket[]): Prisma.Sql {
 const WATCH_PREFERENCE_JOIN = Prisma.sql`
   LEFT JOIN watch_preference wp ON wp.owner_id = t.owner_id
     AND wp.work_identity = t.work_identity`;
+
+const EFFECTIVE_CATEGORY = Prisma.sql`COALESCE(wp.category_override,
+  CASE WHEN t.tmdb_comedy_show = 1 THEN N'comedy-show' ELSE t.tmdb_media_type END)`;
 
 const WATCH_PRIORITY_RANK = Prisma.sql`CASE WHEN wp.watching = 1 THEN 0
   WHEN wp.priority = N'up-next' THEN 1
@@ -701,7 +708,15 @@ function nullableKeyset(
  */
 function baseTitleListWhere(
   ownerId: OwnerId,
-  { services = [], mediaType, genres = [], q, watching, priorities = [] }: TitleFilters,
+  {
+    services = [],
+    mediaType,
+    categories = [],
+    genres = [],
+    q,
+    watching,
+    priorities = [],
+  }: TitleFilters,
 ): Prisma.Sql {
   const genreNames = genres.flatMap((genre) => storedGenreVariants(genre));
   return Prisma.sql`
@@ -722,6 +737,7 @@ function baseTitleListWhere(
       ${services.length === 0 ? Prisma.empty : Prisma.sql`AND l.service IN (${Prisma.join(services)})`}
     )
     ${mediaType === undefined ? Prisma.empty : Prisma.sql`AND t.tmdb_media_type = ${mediaType}`}
+    ${categories.length === 0 ? Prisma.empty : Prisma.sql`AND ${EFFECTIVE_CATEGORY} IN (${Prisma.join(categories)})`}
     ${
       genreNames.length === 0
         ? Prisma.empty
@@ -742,6 +758,47 @@ function baseTitleListWhere(
 }
 
 type TitleFilters = Omit<TitlePageOptions, 'limit' | 'dir' | 'cursor' | 'sort' | 'runtimes'>;
+
+export async function listUnclassifiedTitles(ownerId: OwnerId, tx?: Db) {
+  const cutoff = new Date(Date.now() - TMDB_METADATA_MAX_AGE_DAYS * 86400000);
+  return db(tx).$queryRaw<
+    {
+      id: string;
+      tmdbId: number;
+      tmdbMediaType: string;
+      tmdbFetchedAt: Date | null;
+      tmdbComedyShow: boolean | null;
+    }[]
+  >`
+    SELECT TOP (25) t.id, t.tmdb_id AS tmdbId, t.tmdb_media_type AS tmdbMediaType,
+      t.tmdb_fetched_at AS tmdbFetchedAt, t.tmdb_comedy_show AS tmdbComedyShow
+    FROM title t ${WATCH_PREFERENCE_JOIN}
+    WHERE t.owner_id = ${ownerId} AND ${baseTitleListWhere(ownerId, {})}
+      AND ((wp.category_override IS NULL AND t.tmdb_comedy_show IS NULL)
+        OR t.tmdb_fetched_at IS NULL OR t.tmdb_fetched_at < ${cutoff})
+      AND t.tmdb_id IS NOT NULL AND t.tmdb_media_type IN (N'movie', N'tv')
+    ORDER BY t.category_checked_at ASC, t.id ASC`;
+}
+
+export async function markCategoryAttempt(ownerId: OwnerId, ids: readonly string[]) {
+  if (ids.length === 0) return;
+  await db().title.updateMany({
+    where: { ownerId, id: { in: [...ids] } },
+    data: { categoryCheckedAt: new Date() },
+  });
+}
+
+export async function countUnclassifiedTitles(ownerId: OwnerId, tx?: Db): Promise<number> {
+  const cutoff = new Date(Date.now() - TMDB_METADATA_MAX_AGE_DAYS * 86400000);
+  const [row] = await db(tx).$queryRaw<{ count: number }[]>`
+    SELECT COUNT(*) AS count FROM title t ${WATCH_PREFERENCE_JOIN}
+    WHERE t.owner_id = ${ownerId} AND ${baseTitleListWhere(ownerId, {})}
+      AND ((wp.category_override IS NULL AND t.tmdb_comedy_show IS NULL)
+        OR t.tmdb_fetched_at IS NULL OR t.tmdb_fetched_at < ${cutoff})
+      AND t.tmdb_id IS NOT NULL AND t.tmdb_media_type IN (N'movie', N'tv')`;
+  if (row === undefined) throw new Error('Category count returned no row.');
+  return row.count;
+}
 
 /**
  * REQ-035 — how many titles every *other* active filter admits but a runtime
@@ -841,9 +898,11 @@ export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions,
                     AND t.id > ${cursor.id})
                 )`;
 
-  const page = await conn.$queryRaw<{ id: string; watching: boolean; priority: string }[]>`
+  const page = await conn.$queryRaw<
+    { id: string; watching: boolean; priority: string; categoryOverride: string | null }[]
+  >`
     SELECT TOP (${limit + 1}) t.id, CAST(COALESCE(wp.watching, 0) AS BIT) AS watching,
-      COALESCE(wp.priority, N'normal') AS priority
+      COALESCE(wp.priority, N'normal') AS priority, wp.category_override AS categoryOverride
     FROM title t ${WATCH_PREFERENCE_JOIN}
     WHERE t.owner_id = ${ownerId} AND ${baseTitleListWhere(ownerId, options)}
       ${runtimeFilter(runtimes)} ${keyset}
@@ -868,7 +927,11 @@ export async function listTitlePage(ownerId: OwnerId, options: TitlePageOptions,
   const ordered = page.slice(0, limit).map((position) => {
     const row = byId.get(position.id);
     if (row === undefined) throw new Error('A selected title was missing during page hydration.');
-    return { ...row, ...readWatchPreferences(position) };
+    return {
+      ...row,
+      ...readWatchPreferences(position),
+      categoryOverride: readCategoryOverride(position.categoryOverride),
+    };
   });
   return { rows: ordered, hasMore: page.length > limit };
 }
@@ -917,10 +980,33 @@ export async function findTitleDetail(ownerId: OwnerId, id: string, tx?: Db) {
     },
   });
   if (title === null) return null;
+  const preference = await findWatchPreference(ownerId, title.workIdentity, tx);
   return {
     ...title,
-    ...readWatchPreferences(await findWatchPreference(ownerId, title.workIdentity, tx)),
+    ...readWatchPreferences(preference),
+    categoryOverride: readCategoryOverride(preference?.categoryOverride),
   };
+}
+
+function readCategoryOverride(value: unknown): TitleCategory | null {
+  if (value == null) return null;
+  if (!isTitleCategory(value)) throw new Error('Invalid stored title category.');
+  return value;
+}
+
+export async function setCategoryOverride(
+  ownerId: OwnerId,
+  workIdentity: string,
+  category: TitleCategory | null,
+  tx: Db,
+): Promise<void> {
+  await db(tx).$executeRaw`
+    MERGE watch_preference WITH (HOLDLOCK) AS target
+    USING (SELECT ${ownerId} AS owner_id, ${workIdentity} AS work_identity) AS source
+    ON target.owner_id = source.owner_id AND target.work_identity = source.work_identity
+    WHEN MATCHED THEN UPDATE SET category_override = ${category}
+    WHEN NOT MATCHED THEN INSERT (owner_id, work_identity, watching, priority, category_override)
+      VALUES (source.owner_id, source.work_identity, 0, N'normal', ${category});`;
 }
 
 function readWatchPreferences(
@@ -1141,6 +1227,7 @@ export async function updateTitleMetadata(
   ownerId: OwnerId,
   id: string,
   metadata: {
+    tmdbComedyShow?: boolean;
     tmdbName: string;
     tmdbReleaseYear: number | null;
     tmdbRuntimeMinutes: number | null;
@@ -1158,6 +1245,7 @@ export async function updateTitleMetadata(
       tmdbReleaseYear: metadata.tmdbReleaseYear,
       tmdbRuntimeMinutes: metadata.tmdbRuntimeMinutes,
       tmdbGenres: metadata.tmdbGenres,
+      ...(metadata.tmdbComedyShow === undefined ? {} : { tmdbComedyShow: metadata.tmdbComedyShow }),
       tmdbPosterPath: metadata.tmdbPosterPath,
       // ⚠ `null` means LEAVE IT ALONE, not "clear it". TMDB answers a detail
       // request without an `imdb_id` more often than one would like — a series

@@ -2,7 +2,7 @@
  * Mutating-route registry vs the REQ-041 closed enumeration
  * (TASK-121 — `T-MUT-001`, `T-MUT-002`).
  *
- * **REQ-041 is a CLOSED list.** PRD §7.4 enumerates exactly eleven owner-
+ * **REQ-041 is a CLOSED list.** PRD §7.4 enumerates exactly twelve owner-
  * initiated operations that may change user-visible list state, and exactly
  * four non-owner processes that may exist at all — none of which changes
  * list state. *"Anything not on these lists is forbidden by default. REQ-041
@@ -36,7 +36,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * PRD §7.4 — the eleven owner-initiated operations that may change
+ * PRD §7.4 — the twelve owner-initiated operations that may change
  * user-visible list state. **This list is closed.**
  *
  * ~~Superseded: "the eight owner-initiated operations."~~ US-047 and US-048
@@ -89,6 +89,12 @@ export const REQ_041_OPERATIONS = [
     op: 'set-watch-preferences',
     story: 'US-060',
     what: 'Saving owner watch preferences, affecting explicit watch filters and priority order',
+  },
+  {
+    id: 12,
+    op: 'set-title-category',
+    story: 'US-062',
+    what: 'Saving the owner title category override',
   },
 ];
 
@@ -192,6 +198,12 @@ export const MUTATING_ROUTE_REGISTRY = [
     path: '/api/titles/:titleId/watch-preferences',
     changesListState: true,
     op: 'set-watch-preferences',
+  },
+  {
+    method: 'PATCH',
+    path: '/api/titles/:titleId/category',
+    changesListState: true,
+    op: 'set-title-category',
   },
   { method: 'POST', path: '/api/titles/:titleId/suppress', changesListState: true, op: 'suppress' },
   {
@@ -461,9 +473,9 @@ export function checkRegistryAgainstReq041(registry = MUTATING_ROUTE_REGISTRY) {
   // ⚠ The literal is the CLOSEDNESS, restated where a widening would be made.
   // ~~Superseded: 8, before US-047/US-048 added the manual add and removal.~~
   // Changing it is an amendment to PRD §7.4, not a build fix.
-  if (REQ_041_OPERATIONS.length !== 11) {
+  if (REQ_041_OPERATIONS.length !== 12) {
     findings.push(
-      `REQ-041 §7.4 enumerates 11 owner-initiated operations; this list has ${REQ_041_OPERATIONS.length}. The list is CLOSED (T-MUT-001).`,
+      `REQ-041 §7.4 enumerates 12 owner-initiated operations; this list has ${REQ_041_OPERATIONS.length}. The list is CLOSED (T-MUT-001).`,
     );
   }
 

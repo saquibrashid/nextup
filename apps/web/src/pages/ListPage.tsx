@@ -78,6 +78,7 @@ export interface ListPageProps {
    * `FilterBarProps` for why it cannot be derived from `items`.
    */
   readonly runtimeUnknownHidden?: number | null;
+  readonly categoryPending?: number;
   /**
    * The load-more sentinel (`specs/ui.md` §2.1 item 4).
    *
@@ -182,6 +183,7 @@ export function ListPage({
   total,
   totalIsLowerBound = false,
   runtimeUnknownHidden = null,
+  categoryPending = 0,
   hasMore = false,
   loadingMore = false,
   loadMoreFailed = false,
@@ -377,6 +379,17 @@ export function ListPage({
         )}
       </div>
 
+      {!loading && categoryPending > 0 && (
+        <div role="status" className="title-details__notice">
+          <p>
+            Category classification is still pending for {categoryPending} saved titles. These
+            results may be incomplete.
+          </p>
+          <Button disabled={offline} onClick={onRetry}>
+            Retry classification
+          </Button>
+        </div>
+      )}
       {loadFailed && !offline ? (
         // ⚠ The filter bar is NOT rendered over a failed read. Its live count
         // would have to invent numbers it does not have, and "Showing 0 of 0"

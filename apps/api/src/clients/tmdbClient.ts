@@ -26,6 +26,7 @@
  */
 
 import {
+  isComedyPerformance,
   catalogueEdition,
   editionForText,
   mergeEditionLabels,
@@ -254,7 +255,7 @@ export class TmdbClient {
   async getWork(mediaType: MediaType, tmdbId: number): Promise<TmdbWorkDetail> {
     const body = await this.#get<TmdbDetailResponse>(
       `/${mediaType}/${tmdbId}`,
-      { append_to_response: 'external_ids' },
+      { append_to_response: 'external_ids,keywords' },
       () => {
         throw new TmdbWorkNotFoundError(mediaType, tmdbId);
       },
@@ -284,6 +285,7 @@ export class TmdbClient {
         ? body.genres.map((g) => (typeof g?.name === 'string' ? g.name : '')).filter(Boolean)
         : [],
       imdbId: readImdbId(body),
+      comedyShow: readComedyShow(body.keywords, mediaType),
     };
   }
 
@@ -483,6 +485,7 @@ export class TmdbClient {
 
 /** The metadata allow-list of US-007 AC-2/AC-6. Storage validation is TASK-061. */
 export interface TmdbWorkDetail {
+  comedyShow?: boolean | null;
   tmdbId: number;
   mediaType: MediaType;
   name: string;
@@ -504,6 +507,7 @@ interface TmdbSearchResponse {
 }
 
 interface TmdbDetailResponse {
+  keywords?: unknown;
   title?: unknown;
   name?: unknown;
   release_date?: unknown;
@@ -517,6 +521,18 @@ interface TmdbDetailResponse {
   imdb_id?: unknown;
   /** Present for both, once `append_to_response=external_ids` is sent. */
   external_ids?: { imdb_id?: unknown };
+}
+
+export function readComedyShow(value: unknown, mediaType: MediaType): boolean | null {
+  if (!isRecord(value)) return null;
+  const rows = value[mediaType === 'movie' ? 'keywords' : 'results'];
+  if (!Array.isArray(rows)) return null;
+  const names: string[] = [];
+  for (const row of rows) {
+    if (!isRecord(row) || typeof row['name'] !== 'string') return null;
+    names.push(row['name']);
+  }
+  return isComedyPerformance(names);
 }
 
 /**

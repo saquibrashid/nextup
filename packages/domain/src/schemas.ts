@@ -99,6 +99,7 @@ export const serviceListingSchema = z
 
 export const tmdbMetadataSchema = z
   .object({
+    comedyShow: z.boolean().optional(),
     tmdbId: z.number().int().positive(),
     mediaType: mediaTypeSchema,
     name: z.string().min(1).max(300),

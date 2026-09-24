@@ -32,11 +32,12 @@ const VALID = {
 };
 
 describe('T-TMDB-013 · the TMDB storage allow-list rejects, it does not strip', () => {
-  it('T-TMDB-013a: the allow-list is exactly the seven stored fields plus fetchedAt', () => {
+  it('T-TMDB-013a: the allow-list includes only approved metadata and derived category evidence', () => {
     // The vacuity guard. Every case below is "this key is not allowed", so an
     // allow-list that had quietly grown would make them pass while storing the
     // field they exist to keep out.
     expect([...TMDB_STORED_FIELDS]).toEqual([
+      'comedyShow',
       'fetchedAt',
       'genres',
       'mediaType',

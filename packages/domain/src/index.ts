@@ -77,3 +77,4 @@ export * from './titlePresentation.js';
 export * from './editions.js';
 export * from './types.js';
 export * from './undo.js';
+export * from './titleCategory.js';

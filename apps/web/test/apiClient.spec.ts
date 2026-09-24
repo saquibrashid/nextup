@@ -90,6 +90,8 @@ describe('T-DATA-003 — every method sends credentials', () => {
       getTitles: () => client.getTitles('sort=date'),
       updateWatchPreferences: () =>
         client.updateWatchPreferences('ttl_1', { watching: true, priority: 'up-next' }),
+      updateTitleCategory: () =>
+        client.updateTitleCategory('ttl_1', { categoryOverride: 'comedy-show' }),
       getTitle: () => client.getTitle('ttl_1'),
       getServiceState: () => client.getServiceState(),
       getSuppressions: () => client.getSuppressions(),

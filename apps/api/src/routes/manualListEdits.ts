@@ -249,6 +249,7 @@ export function registerManualListEditRoutes(router: Router, getClient: () => Tm
             tmdbReleaseYear: detail.releaseYear,
             tmdbRuntimeMinutes: detail.runtimeMinutes,
             tmdbGenres: JSON.stringify(detail.genres),
+            tmdbComedyShow: detail.comedyShow ?? null,
             tmdbPosterPath: detail.posterPath,
             tmdbFetchedAt: new Date(),
             imdbId: detail.imdbId,

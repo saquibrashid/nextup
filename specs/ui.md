@@ -8,6 +8,17 @@ sourceOfTruth: docs/PRD.md §9, docs/architecture.md
 
 # specs/ui.md — nextup screens
 
+## Display category (TASK-247, #364)
+
+The Type picker offers Movie, TV Show and Comedy Show as displayed categories.
+It writes `category=`; legacy `type=` chips remain readable/removable and preserve
+canonical filtering until a category is chosen. Cards and detail headers show
+the effective category; actual Movie/TV media type still controls runtime units.
+Title details offers an explicit Title category dialog with Automatic plus
+three override choices, Save/Cancel and visible failure/pending/offline states.
+Category-filtered lists disclose incomplete classification and offer Retry
+classification; no timer or automatic re-capture reminder is introduced.
+
 ## Modal context contract (owner correction, 2026-09-21)
 
 Remove from list, Not interested, Add title, Fix match, Stop ignoring, restore

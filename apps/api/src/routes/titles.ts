@@ -22,6 +22,8 @@ import {
   dateAddedLabel,
   parseEditionLabels,
   watchPriorityRank,
+  titleCategory,
+  type TitleCategory,
   type WatchPriority,
 } from '@nextup/domain';
 import { type Router } from 'express';
@@ -43,10 +45,14 @@ import {
   findActiveSuppression,
   listTitlePage,
   listTitleRatingRows,
+  listUnclassifiedTitles,
+  markCategoryAttempt,
+  countUnclassifiedTitles,
 } from '../repository/ownerData.js';
 import { fromTenths, type RatingRow } from '../services/imdbRatings.js';
 import {
   refreshStaleMetadata,
+  staleTitles,
   type MetadataRefreshResult,
   type RefreshableTitle,
 } from '../services/tmdbRefresh.js';
@@ -86,6 +92,8 @@ interface ListingRow {
 }
 
 interface TitleRow {
+  tmdbComedyShow?: boolean | null;
+  categoryOverride?: TitleCategory | null;
   editionLabels?: string;
   watching?: boolean;
   priority?: WatchPriority;
@@ -123,6 +131,7 @@ export function toRefreshableTitle(row: TitleRow): RefreshableTitle {
     tmdbId: row.tmdbId ?? null,
     tmdbMediaType: row.tmdbMediaType,
     tmdbFetchedAt: row.tmdbFetchedAt ?? null,
+    ...(row.tmdbComedyShow === undefined ? {} : { tmdbComedyShow: row.tmdbComedyShow }),
   };
 }
 
@@ -147,6 +156,7 @@ export function applyRefresh<T extends TitleRow>(row: T, refresh: MetadataRefres
     // `null` is "unchanged" here too, for the same reason the writer gives.
     imdbId: written.imdbId ?? row.imdbId ?? null,
     tmdbFetchedAt: written.tmdbFetchedAt,
+    ...(written.tmdbComedyShow === undefined ? {} : { tmdbComedyShow: written.tmdbComedyShow }),
   };
 }
 
@@ -176,6 +186,11 @@ export function toListItem(row: TitleRow, metadataStale = false): Record<string,
     matchState: row.matchState,
     name: row.tmdbName ?? row.rawExtractedText ?? '',
     mediaType: row.tmdbMediaType,
+    category: titleCategory(row.tmdbMediaType, row.tmdbComedyShow, row.categoryOverride),
+    categoryOverride: row.categoryOverride ?? null,
+    automaticCategory: titleCategory(row.tmdbMediaType, row.tmdbComedyShow),
+    categoryPending:
+      row.categoryOverride == null && row.tmdbId != null && row.tmdbComedyShow == null,
     releaseYear: row.tmdbReleaseYear,
     genres: parseGenres(row.tmdbGenres),
     runtimeMinutes: row.tmdbRuntimeMinutes,
@@ -272,6 +287,19 @@ export function registerTitleRoutes(router: Router): void {
     // whatever is in the database, and every rejection path stays reachable
     // without one, which is what lets the unit suite assert them.
     const query = parseTitleListQuery(req.query);
+    let categoryPending = 0;
+    if (query.categories.length > 0) {
+      const pending = await listUnclassifiedTitles(ownerId);
+      await markCategoryAttempt(
+        ownerId,
+        pending.map((row) => row.id),
+      );
+      await refreshStaleMetadata(
+        ownerId,
+        pending.map((row) => ({ ...row, tmdbFetchedAt: null })),
+      );
+      categoryPending = await countUnclassifiedTitles(ownerId);
+    }
 
     // REQ-041 / `A53`, `specs/api.md` §6.2a — THE PRICE OF A RATING SORT.
     //
@@ -313,6 +341,7 @@ export function registerTitleRoutes(router: Router): void {
           q: query.q,
           services: query.services,
           mediaType: query.mediaType,
+          categories: query.categories,
           genres: query.genres,
           runtimes: query.runtimes,
         });
@@ -334,6 +363,7 @@ export function registerTitleRoutes(router: Router): void {
       cursor: query.cursor,
       services: query.services,
       mediaType: query.mediaType,
+      categories: query.categories,
       genres: query.genres,
       runtimes: query.runtimes,
       sort: query.sort,
@@ -354,6 +384,7 @@ export function registerTitleRoutes(router: Router): void {
             q: query.q,
             services: query.services,
             mediaType: query.mediaType,
+            categories: query.categories,
             genres: query.genres,
           });
 
@@ -361,10 +392,15 @@ export function registerTitleRoutes(router: Router): void {
     // for the rows on this page: `metadataStale` has to be on the item being
     // served, so the attempt must finish first. Bounded by the 5 s budget in
     // `tmdbRefresh.ts`; a page with nothing stale on it costs one array scan.
-    const refresh = await refreshStaleMetadata(
-      ownerId,
-      rows.map((row) => toRefreshableTitle(row as unknown as TitleRow)),
-    );
+    const refreshable = rows.map((row) => toRefreshableTitle(row as unknown as TitleRow));
+    // Category-filtered pages must render the same metadata that SQL filtered.
+    const refresh: MetadataRefreshResult =
+      query.categories.length > 0
+        ? {
+            stale: new Set(staleTitles(refreshable, new Date()).map((row) => row.id)),
+            refreshed: new Map(),
+          }
+        : await refreshStaleMetadata(ownerId, refreshable);
     const items = rows.map((row) => {
       const typed = applyRefresh(row as unknown as TitleRow, refresh);
       return toListItem(typed, refresh.stale.has(typed.id));
@@ -433,7 +469,9 @@ export function registerTitleRoutes(router: Router): void {
                   ? encodeCursor({ sortDateAdded: toIsoDate(last.sortDateAdded), id: last.id })
                   : null;
 
-    res.status(200).json({ items, nextCursor, limit: query.limit, runtimeUnknownHidden });
+    res
+      .status(200)
+      .json({ items, nextCursor, limit: query.limit, runtimeUnknownHidden, categoryPending });
 
     // REQ-090. AFTER the response, deliberately — see `refreshRatings.ts`.
     // The owner's list is already on the wire; anything stale here shows up on

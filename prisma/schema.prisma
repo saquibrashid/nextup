@@ -35,7 +35,7 @@ model UploadBatch {
   id      String @id @db.NVarChar(200)
   ownerId String @map("owner_id") @db.NVarChar(200)
 
-  mode    String  @db.NVarChar(16)
+  mode            String  @db.NVarChar(16)
   /// ⚠ NULL iff this is a discovery batch — `discoverySource` is set instead
   /// (ADR-0010 D-1, migration `0006_watch_intent`). Exactly one of the two is
   /// non-null (`ck_batch_source_exclusive`).
@@ -43,12 +43,12 @@ model UploadBatch {
   /// ⚠ A discovery batch has NO truthful service and must never borrow one:
   /// the combined list, the REQ-025 badge count and full-update reconciliation
   /// all filter on this column. Use `requireServiceOf` from `@nextup/domain`.
-  service String? @db.NVarChar(16)
+  service         String? @db.NVarChar(16)
   /// The rental storefront browsed, e.g. `fandango-at-home`.
   /// ⚠ NOT a `SERVICES` member and never to be widened into one.
   discoverySource String? @map("discovery_source") @db.NVarChar(64)
-  status  String  @db.NVarChar(24)
-  captureTracking String @default("unverified", map: "df_batch_capture_tracking") @map("capture_tracking") @db.NVarChar(24)
+  status          String  @db.NVarChar(24)
+  captureTracking String  @default("unverified", map: "df_batch_capture_tracking") @map("capture_tracking") @db.NVarChar(24)
 
   /// US-034 AC-3 — set for re-extraction batches. Self-referential.
   derivedFromBatchId String?       @map("derived_from_batch_id") @db.NVarChar(200)
@@ -78,17 +78,17 @@ model UploadBatch {
 
   createdAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_batch_created") @map("created_at") @db.DateTime2
 
-  titlesCreated   Title[]
-  removalGroups   RemovalGroup[]
+  titlesCreated    Title[]
+  removalGroups    RemovalGroup[]
   removalDecisions RemovalDecision[]
-  listingsCreated ServiceListing[]      @relation("ListingCreatedBy")
-  listingsRemoved ServiceListing[]      @relation("ListingRemovedBy")
-  changes         BatchChange[]
-  images          UploadedImage[]
-  candidates      ExtractionCandidate[]
-  serviceStates   ServiceState[]
-  watchIntents    WatchIntent[]
-  ingestAttempts CaptureIngestAttempt[]
+  listingsCreated  ServiceListing[]       @relation("ListingCreatedBy")
+  listingsRemoved  ServiceListing[]       @relation("ListingRemovedBy")
+  changes          BatchChange[]
+  images           UploadedImage[]
+  candidates       ExtractionCandidate[]
+  serviceStates    ServiceState[]
+  watchIntents     WatchIntent[]
+  ingestAttempts   CaptureIngestAttempt[]
 
   @@index([ownerId, service, status], map: "upload_batch_owner_service_status")
   @@index([derivedFromBatchId], map: "upload_batch_derived_from")
@@ -96,19 +96,19 @@ model UploadBatch {
 }
 
 model CaptureIngestAttempt {
-  id String @id(map: "pk_capture_ingest_attempt") @db.NVarChar(200)
-  ownerId String @map("owner_id") @db.NVarChar(200)
-  batchId String @map("batch_id") @db.NVarChar(200)
-  batch UploadBatch @relation(fields: [batchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_capture_attempt_batch")
-  clientToken String @map("client_token") @db.NVarChar(200)
-  kind String @db.NVarChar(24)
-  state String @db.NVarChar(16)
-  failures String @db.NVarChar(Max)
-  acceptedImageIds String @map("accepted_image_ids") @db.NVarChar(Max)
-  replacementImageIds String @map("replacement_image_ids") @db.NVarChar(Max)
-  startedAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_capture_attempt_started") @map("started_at") @db.DateTime2
-  completedAt DateTime? @map("completed_at") @db.DateTime2
-  resolvedAt DateTime? @map("resolved_at") @db.DateTime2
+  id                  String      @id(map: "pk_capture_ingest_attempt") @db.NVarChar(200)
+  ownerId             String      @map("owner_id") @db.NVarChar(200)
+  batchId             String      @map("batch_id") @db.NVarChar(200)
+  batch               UploadBatch @relation(fields: [batchId], references: [id], onUpdate: NoAction, onDelete: NoAction, map: "fk_capture_attempt_batch")
+  clientToken         String      @map("client_token") @db.NVarChar(200)
+  kind                String      @db.NVarChar(24)
+  state               String      @db.NVarChar(16)
+  failures            String      @db.NVarChar(Max)
+  acceptedImageIds    String      @map("accepted_image_ids") @db.NVarChar(Max)
+  replacementImageIds String      @map("replacement_image_ids") @db.NVarChar(Max)
+  startedAt           DateTime    @default(dbgenerated("SYSUTCDATETIME()"), map: "df_capture_attempt_started") @map("started_at") @db.DateTime2
+  completedAt         DateTime?   @map("completed_at") @db.DateTime2
+  resolvedAt          DateTime?   @map("resolved_at") @db.DateTime2
 
   @@unique([ownerId, batchId, clientToken], map: "uq_capture_attempt_token")
   @@index([ownerId, batchId], map: "ix_capture_attempt_owner_batch")
@@ -164,7 +164,9 @@ model Title {
   /// NFR-014 lazy refresh reads this. ⚠ Its max age is
   /// TMDB_METADATA_MAX_AGE_DAYS (183) — never the screenshot-retention
   /// constant, which is a different number for a different purpose (T-INV-008).
-  tmdbFetchedAt DateTime? @map("tmdb_fetched_at") @db.DateTime2
+  tmdbFetchedAt     DateTime? @map("tmdb_fetched_at") @db.DateTime2
+  tmdbComedyShow    Boolean?  @map("tmdb_comedy_show")
+  categoryCheckedAt DateTime? @map("category_checked_at") @db.DateTime2
 
   /// Display-only synopsis/credits, keyed by provider identity within the JSON.
   tmdbPresentation String? @map("tmdb_presentation") @db.NVarChar(Max)
@@ -194,9 +196,9 @@ model Title {
   createdAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_title_created") @map("created_at") @db.DateTime2
   updatedAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_title_updated") @map("updated_at") @db.DateTime2
 
-  listings   ServiceListing[]
-  changes    BatchChange[]
-  candidates ExtractionCandidate[]
+  listings     ServiceListing[]
+  changes      BatchChange[]
+  candidates   ExtractionCandidate[]
   watchIntents WatchIntent[]
 
   @@index([ownerId, state, sortDateAdded], map: "title_owner_state_sortdate")
@@ -215,10 +217,11 @@ model Title {
 
 /// Owner choices survive removal/reappearance. No title foreign key or expiry.
 model WatchPreference {
-  ownerId      String  @map("owner_id") @db.NVarChar(200)
-  workIdentity String  @map("work_identity") @db.NVarChar(200)
-  watching     Boolean @default(false, map: "df_watch_preference_watching")
-  priority     String  @default("normal", map: "df_watch_preference_priority") @db.NVarChar(16)
+  categoryOverride String? @map("category_override") @db.NVarChar(16)
+  ownerId          String  @map("owner_id") @db.NVarChar(200)
+  workIdentity     String  @map("work_identity") @db.NVarChar(200)
+  watching         Boolean @default(false, map: "df_watch_preference_watching")
+  priority         String  @default("normal", map: "df_watch_preference_priority") @db.NVarChar(16)
 
   @@id([ownerId, workIdentity], map: "pk_watch_preference")
   @@map("watch_preference")
@@ -537,9 +540,9 @@ model ExtractionCandidate {
   /// ⚠ A review-time PLACEHOLDER, not a source of truth. The lazy refresh
   /// (REQ-076, NFR-014) fills the real display fields on first access; nothing
   /// downstream of close reads these.
-  correctedDisplayName   String? @map("corrected_display_name") @db.NVarChar(500)
-  correctedDisplayYear   Int?    @map("corrected_display_year")
-  correctedDisplayPoster String? @map("corrected_display_poster") @db.NVarChar(500)
+  correctedDisplayName    String? @map("corrected_display_name") @db.NVarChar(500)
+  correctedDisplayYear    Int?    @map("corrected_display_year")
+  correctedDisplayPoster  String? @map("corrected_display_poster") @db.NVarChar(500)
   correctedDisplayEdition String? @map("corrected_display_edition") @db.NVarChar(Max)
 
   /// Intra-batch overlap collapse (SD-02, `specs/data-model.md` §7.4).

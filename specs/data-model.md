@@ -8,6 +8,17 @@ sourceOfTruth: docs/PRD.md, docs/architecture.md, docs/adr/ADR-0005, ADR-0006, A
 
 # specs/data-model.md — nextup
 
+## Display category (TASK-247, #364)
+
+Additive migration `0016_title_category` adds nullable `Title.tmdbComedyShow`
+(BIT), `Title.categoryCheckedAt` (DATETIME2 attempt order), and
+`WatchPreference.categoryOverride` (nullable binary-collated NVARCHAR(16),
+CHECK-limited to movie/tv/comedy-show). The strict TMDB metadata allow-list adds
+only an optional derived `comedyShow` boolean; keyword text remains prohibited.
+No canonical identity, MediaType enum, row dates or listing fields change.
+Override is owner/work-scoped and follows the preference row across reappearance
+and correction; the explicit destination row wins. See `title-category.md`.
+
 ## Owner-approved edition labels (TASK-244, 2026-09-23)
 
 An edition such as **Vrach Frankenshteyn — director's cut** remains part of its

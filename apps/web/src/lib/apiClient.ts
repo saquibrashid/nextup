@@ -301,6 +301,7 @@ export type { TitleBadge, TitleListItem } from '../components/TitleRow';
 export type { ServiceFreshness } from '../components/FreshnessStrip';
 
 export interface TitleListResponse {
+  categoryPending?: number;
   items: WireTitleListItem[];
   nextCursor: string | null;
   limit: number;
@@ -779,6 +780,16 @@ export function createApiClient(deps: ApiClientDeps = {}) {
 
     getTitle: (titleId: string, signal?: AbortSignal) =>
       request<TitleDetailResponse>(`/api/titles/${encodeURIComponent(titleId)}`, { signal }, deps),
+
+    updateTitleCategory: (
+      titleId: string,
+      body: { categoryOverride: import('@nextup/domain').TitleCategory | null },
+    ) =>
+      request<{ titleId: string; categoryOverride: import('@nextup/domain').TitleCategory | null }>(
+        `/api/titles/${encodeURIComponent(titleId)}/category`,
+        { method: 'PATCH', body },
+        deps,
+      ),
 
     getServiceState: (signal?: AbortSignal) =>
       request<ServiceStateResponse>('/api/service-state', { signal }, deps),

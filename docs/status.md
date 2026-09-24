@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 241 |
+| ✅ done | 242 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **244** |
+| **total** | **245** |
 
 ## Ready to start
 
@@ -282,3 +282,4 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-244` | Owner-approved edition labels within canonical film entries. Verified typed catalogue aliases persist through review, correction, close and metadata refresh without changing identity, listings or dates. Explicit saved-label replacement and edition-aware offline recovery are covered by `T-EDITION-001` through `T-EDITION-005`. All 12 CI jobs passed on implementation head `ee85ff2` (run `35887909658`); validation used GitHub CI because the approved local npm proxy cannot restore ESLint 10.11.0. PR #368; merged and deployed as `b23bc0d`. | `T-EDITION-001`, `T-EDITION-005` |
 | `TASK-245` | PR #372. Owner-approved 75% artwork overlay, tighter catalog tracks, larger titles, two genres plus overflow, star rating, honest shortened Added label and translucent controls. Unified Watching/Up next/Normal/Someday across cards, editor, details and filtering without migration; legacy URLs, server ordering and stored preferences preserved. Artwork-specific text and control boundaries retain computed contrast. `T-WATCH-001`, `T-WATCH-003`, `T-LIST-018`, `T-UX-127`, `T-IMDB-008`, `T-UX-155`, `T-MOCK-004`, `T-POL-004` and complete owner journeys pass; all twelve CI gates green in run 35918395447. Separate follow-ups: navigation #369, toolbar #370, Add a title dialog #371. | `T-IMDB-008`, `T-LIST-018`, `T-MOCK-004`, `T-POL-004`, `T-UX-127`, `T-UX-155`, `T-WATCH-001p`, `T-WATCH-003l` |
 | `TASK-246` | #366: the runtime filter becomes an accessible two-handle range slider whose stops are the existing bucket edges, so canonical `runtime=` tokens, API/SQL semantics, chips, reset, retained filters and hidden-unknown counts are unchanged. Visible Min/Max values with units, named handles with spoken values, 44px thumbs, keyboard stops, clamped (never swapped) handles and a disclosed, unrewritten gapped saved selection. `T-RANGE-001`, `T-RANGE-002`, `T-RANGE-003` plus existing `T-UX-123`/`T-UX-144` regressions. No API, migration, dependency or infrastructure change. | `T-RANGE-001`, `T-RANGE-002`, `T-RANGE-003` |
+| `TASK-247` | #364 / PR #374: Comedy Show covers stand-up specials and live comedy performances from explicit TMDB keywords, with an owner/work-scoped override and Automatic reset in title details. Cards and SQL-backed category filters preserve canonical Movie/TV identity, services and dates; bounded on-access classification discloses incomplete results for existing caches. `T-CATEGORY-001` through `T-CATEGORY-005` pass, including real SQL persistence, constraints, owner isolation and responsive browser journeys. All twelve CI gates passed on implementation head `9c473d4` in run `35936313460`; release follows final ledger-head CI. | `T-CATEGORY-001`, `T-CATEGORY-002`, `T-CATEGORY-003`, `T-CATEGORY-004`, `T-CATEGORY-005` |

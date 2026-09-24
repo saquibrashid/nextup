@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const findTitleDetail = vi.fn();
 const findActiveSuppression = vi.fn();
 const setWatchPreference = vi.fn();
+const setCategoryOverride = vi.fn();
 const lockTitleForWatchPreferences = vi.fn();
 const tx = { transaction: true };
 
@@ -14,6 +15,7 @@ vi.mock('../../src/repository/ownerData.js', async (importOriginal) => ({
   findTitleDetail: (...args: unknown[]) => findTitleDetail(...args) as unknown,
   findActiveSuppression: (...args: unknown[]) => findActiveSuppression(...args) as unknown,
   setWatchPreference: (...args: unknown[]) => setWatchPreference(...args) as unknown,
+  setCategoryOverride: (...args: unknown[]) => setCategoryOverride(...args) as unknown,
   lockTitleForWatchPreferences: (...args: unknown[]) =>
     lockTitleForWatchPreferences(...args) as unknown,
   runInTransaction: async (work: (value: unknown) => Promise<unknown>) => work(tx),
@@ -41,6 +43,50 @@ function patch(body: unknown) {
     body: JSON.stringify(body),
   });
 }
+
+describe('T-CATEGORY-002 owner category mutation', () => {
+  async function category(body: unknown) {
+    return fetch(`${origin}/api/titles/title-1/category`, {
+      method: 'PATCH',
+      headers: { [CLIENT_PRINCIPAL_HEADER]: principal, 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  }
+  it('T-CATEGORY-002d locks owned active identity and saves or clears only the category', async () => {
+    expect((await category({ categoryOverride: 'comedy-show' })).status).toBe(200);
+    expect(setCategoryOverride).toHaveBeenCalledWith(
+      expect.any(String),
+      'tmdb:movie:1',
+      'comedy-show',
+      tx,
+    );
+    expect(lockTitleForWatchPreferences).toHaveBeenCalledWith(expect.any(String), 'title-1', tx);
+    expect((await category({ categoryOverride: null })).status).toBe(200);
+    expect(setCategoryOverride).toHaveBeenLastCalledWith(
+      expect.any(String),
+      'tmdb:movie:1',
+      null,
+      tx,
+    );
+    expect(setWatchPreference).not.toHaveBeenCalled();
+  });
+  it('T-CATEGORY-002e rejects malformed, unavailable and suppressed titles without saving', async () => {
+    expect((await category({})).status).toBe(400);
+    findTitleDetail.mockResolvedValueOnce(null);
+    expect((await category({ categoryOverride: null })).status).toBe(404);
+    findTitleDetail.mockResolvedValueOnce({ state: 'removed', listings: [] });
+    expect((await category({ categoryOverride: null })).status).toBe(404);
+    findTitleDetail.mockResolvedValueOnce({ state: 'active', listings: [] });
+    expect((await category({ categoryOverride: null })).status).toBe(404);
+    findActiveSuppression.mockResolvedValueOnce({ id: 'blocked' });
+    expect((await category({ categoryOverride: null })).status).toBe(409);
+    expect(setCategoryOverride).not.toHaveBeenCalled();
+  });
+  it('T-CATEGORY-002f surfaces failed storage, never false success', async () => {
+    setCategoryOverride.mockRejectedValueOnce(new Error('storage unavailable'));
+    expect((await category({ categoryOverride: 'movie' })).status).toBe(500);
+  });
+});
 
 beforeEach(async () => {
   vi.clearAllMocks();

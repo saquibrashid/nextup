@@ -1,4 +1,4 @@
-import { parseWatchPreferencesPatch } from '@nextup/domain';
+import { parseWatchPreferencesPatch, parseCategoryOverride } from '@nextup/domain';
 import type { Router } from 'express';
 
 import { AppError } from '../errors/AppError.js';
@@ -9,9 +9,49 @@ import {
   lockTitleForWatchPreferences,
   runInTransaction,
   setWatchPreference,
+  setCategoryOverride,
 } from '../repository/ownerData.js';
 
 export function registerWatchPreferenceRoutes(router: Router): void {
+  router.patch('/titles/:titleId/category', async (req, res) => {
+    const ownerId = requireOwnerId(req);
+    const titleId = req.params.titleId ?? '';
+    const result = await runInTransaction(async (tx) => {
+      await lockTitleForWatchPreferences(ownerId, titleId, tx);
+      const title = await findTitleDetail(ownerId, titleId, tx);
+      if (
+        title === null ||
+        title.state !== 'active' ||
+        !title.listings.some((listing) => listing.state === 'active')
+      ) {
+        throw new AppError('NOT_FOUND', 404, 'No such active title.');
+      }
+      const parsed = parseCategoryOverride(req.body);
+      if (parsed === null) {
+        throw new AppError(
+          'VALIDATION_FAILED',
+          400,
+          'Choose Automatic, Movie, TV Show or Comedy Show.',
+        );
+      }
+      const blocking = await findActiveSuppression(ownerId, title.workIdentity, tx);
+      if (blocking !== null) {
+        throw new AppError(
+          'WORK_SUPPRESSED',
+          409,
+          'Un-suppress this title before changing its category.',
+          {
+            workIdentity: title.workIdentity,
+            suppressionId: blocking.id,
+            unsuppressHref: `/api/suppressions/${encodeURIComponent(blocking.id)}/unsuppress`,
+          },
+        );
+      }
+      await setCategoryOverride(ownerId, title.workIdentity, parsed.categoryOverride, tx);
+      return parsed;
+    });
+    res.status(200).json({ titleId, ...result });
+  });
   router.patch('/titles/:titleId/watch-preferences', async (req, res) => {
     const ownerId = requireOwnerId(req);
     const titleId = req.params.titleId ?? '';

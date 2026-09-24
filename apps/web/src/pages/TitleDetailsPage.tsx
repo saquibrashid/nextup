@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState, type JSX, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { formatRuntime, normaliseGenres, releaseYearText, watchStatus } from '@nextup/domain';
+import {
+  formatRuntime,
+  normaliseGenres,
+  releaseYearText,
+  watchStatus,
+  TITLE_CATEGORY_LABELS,
+} from '@nextup/domain';
+import { TitleCategoryDialog } from '../components/TitleCategoryDialog';
 import { EditionLabels } from '../components/EditionLabels';
 import type { ApiClient, TitleDetailResponse } from '../lib/apiClient';
 import { Button } from '../components/ui/Button';
@@ -26,6 +33,7 @@ interface TitleDetailsPageProps {
     | 'unsuppress'
     | 'removeTitle'
     | 'restoreListing'
+    | 'updateTitleCategory'
   >;
 }
 
@@ -36,7 +44,9 @@ export function TitleDetailsPage({
   onReload,
   actions,
 }: TitleDetailsPageProps): JSX.Element {
-  const [dialog, setDialog] = useState<'watch' | 'fix' | 'suppress' | 'remove' | null>(null);
+  const [dialog, setDialog] = useState<'watch' | 'fix' | 'suppress' | 'remove' | 'category' | null>(
+    null,
+  );
   const [changed, setChanged] = useState(false);
   const [allCast, setAllCast] = useState(false);
   const [artFailed, setArtFailed] = useState(false);
@@ -80,7 +90,13 @@ export function TitleDetailsPage({
         )}
         <div className="title-details__identity">
           <p className="title-details__eyebrow">
-            {unidentified ? 'Unidentified title' : item.mediaType === 'tv' ? 'TV series' : 'Movie'}
+            {item.category
+              ? TITLE_CATEGORY_LABELS[item.category]
+              : unidentified
+                ? 'Unidentified title'
+                : item.mediaType === 'tv'
+                  ? 'TV series'
+                  : 'Movie'}
             {item.releaseYear !== null &&
               ` · ${releaseYearText(item.releaseYear, (item.editionLabels?.length ?? 0) > 0)}`}
           </p>
@@ -125,6 +141,9 @@ export function TitleDetailsPage({
             <>
               <p>{WATCH_STATUS_LABELS[watchStatus(item)]}</p>
               <div className="title-details__actions" aria-label="Title actions">
+                <Button variant="secondary" onClick={open('category')} disabled={offline}>
+                  Title category
+                </Button>
                 <Button variant="secondary" onClick={open('watch')} disabled={offline}>
                   Watch status
                 </Button>
@@ -208,6 +227,18 @@ export function TitleDetailsPage({
           item={item}
           offline={offline}
           save={actions.updateWatchPreferences}
+          onClose={close}
+          onSaved={() => {
+            setDialog(null);
+            onReload();
+          }}
+        />
+      )}
+      {active && dialog === 'category' && (
+        <TitleCategoryDialog
+          item={item}
+          save={(titleId, body) => actions.updateTitleCategory(titleId, body)}
+          offline={offline}
           onClose={close}
           onSaved={() => {
             setDialog(null);

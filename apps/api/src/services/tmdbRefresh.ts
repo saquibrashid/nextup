@@ -9,8 +9,9 @@
  *
  *   1. it is triggered by a READ of the rows it refreshes, never by a timer,
  *      a cron, a queue trigger or a sweep (`T-CI-005` asserts no timer exists);
- *   2. it refreshes ONLY the rows in the page being returned, so a title never
- *      displayed is never refreshed (REQ-076);
+ *   2. ordinary reads refresh only the returned page. Category-filtered reads
+ *      first refresh a bounded eligible set before SQL selection (US-062), so
+ *      an old unclassified title is not permanently excluded by that filter;
  *   3. it writes only descriptive columns (`updateTitleMetadata` enforces that
  *      end) — never membership, ordering, identity or badges.
  *
@@ -48,6 +49,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /** The subset of a served row this refresh is allowed to see. */
 export interface RefreshableTitle {
+  tmdbComedyShow?: boolean | null;
   id: string;
   tmdbId: number | null;
   tmdbMediaType: string | null;
@@ -99,6 +101,7 @@ export function staleTitles(
 
 /** What a successful refresh wrote, so the caller can serve it immediately. */
 export interface RefreshedMetadata {
+  tmdbComedyShow?: boolean;
   tmdbName: string;
   tmdbReleaseYear: number | null;
   tmdbRuntimeMinutes: number | null;
@@ -189,6 +192,7 @@ export async function refreshStaleMetadata(
         // unnoticed. `imdbId` is validated separately below because it is a
         // cross-catalogue mapping, not TMDB descriptive metadata.
         const metadata = parseStoredTmdbMetadata({
+          ...(typeof detail.comedyShow === 'boolean' ? { comedyShow: detail.comedyShow } : {}),
           tmdbId: detail.tmdbId,
           mediaType: detail.mediaType,
           name: detail.name,
@@ -200,6 +204,7 @@ export async function refreshStaleMetadata(
         });
 
         const written: RefreshedMetadata = {
+          ...(metadata.comedyShow === undefined ? {} : { tmdbComedyShow: metadata.comedyShow }),
           tmdbName: metadata.name,
           tmdbReleaseYear: metadata.releaseYear,
           tmdbRuntimeMinutes: metadata.runtimeMinutes,
