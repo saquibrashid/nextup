@@ -1348,8 +1348,13 @@ the floor and `T-CSS-003` already forbids a raw `px` size in a rule body.
 ## 7c. Icons — inline SVG, no font, no network, no dependency (OQ-8)
 
 The shipped inline set is extended by five owner-approved library sort-category
+icons for the 2026-09-17 controls redesign and one Filters mark for the
+2026-09-24 toolbar restyle (issue 370), in addition to the play/next brand and
+Grid/Compact affordances, without importing an icon package.
+
+~~The shipped inline set is extended by five owner-approved library sort-category
 icons for the 2026-09-17 controls redesign, in addition to the play/next brand
-and Grid/Compact affordances, without importing an icon package.
+and Grid/Compact affordances, without importing an icon package.~~
 
 ~~The shipped inline set is extended by the approved play/next brand and
 Grid/Compact affordances, without importing an icon package.~~
@@ -1364,12 +1369,20 @@ Grid/Compact affordances, without importing an icon package.~~
   network request or a runtime dependency; the owner accepted icons explicitly
   on the basis that neither is incurred. NFR-004's small-tree preference and
   `T-CI-007`'s egress rule both stay intact.
-- The set is **closed at 21**: `list`, `upload`, `more`, `history`, `suppressed`,
+- The set is **closed at 22**: `list`, `upload`, `more`, `history`, `suppressed`,
+  `rating`, `close`, `check`, `chevron`, `info`, `warning`, `search`, `image`,
+  **`brand`, `grid`, `compact`**, the library sort-category icons
+  **`alphabet`, `bookmark`, `calendar`, `clock`, `flag`**, and the library
+  toolbar **`filter`** mark (ADR-0013 Revision 3, issue 370) (`BrandIcon`,
+  `GridIcon`, `CompactIcon`, `AlphabetIcon`, `BookmarkIcon`, `CalendarIcon`,
+  `ClockIcon`, `FlagIcon`, `FilterIcon`).
+
+  ~~The set is **closed at 21**: `list`, `upload`, `more`, `history`, `suppressed`,
   `rating`, `close`, `check`, `chevron`, `info`, `warning`, `search`, `image`,
   **`brand`, `grid`, `compact`**, and the library sort-category icons
   **`alphabet`, `bookmark`, `calendar`, `clock`, `flag`** (`BrandIcon`,
   `GridIcon`, `CompactIcon`, `AlphabetIcon`, `BookmarkIcon`, `CalendarIcon`,
-  `ClockIcon`, `FlagIcon`).
+  `ClockIcon`, `FlagIcon`).~~
 
   ~~The set is **closed at 16**: `list`, `upload`, `more`, `history`,
   `suppressed`, `rating`, `close`, `check`, `chevron`, `info`, `warning`,

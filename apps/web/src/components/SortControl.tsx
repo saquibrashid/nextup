@@ -141,10 +141,13 @@ export function SortControl(): JSX.Element {
           setOpen(true);
         }}
       >
-        <span className="sort-arrow" data-dir={dir}>
+        <span className="sort-trigger-label">
+          <span className="sort-trigger-prefix">{SORT_TRIGGER_LABEL}: </span>
+          {label}
+        </span>
+        <span className="sort-trigger-disclosure">
           <ChevronIcon />
         </span>
-        <span className="sort-trigger-label">{label}</span>
       </Button>
       {/*
         ⚠ The reverse button is the §10.1 floor rule, not decoration — see the

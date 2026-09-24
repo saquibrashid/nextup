@@ -5113,6 +5113,14 @@ trust a range reserved earlier in the same document to still be free.**
 
 The Review route's correction picker keeps its own card markup and behavior; sharing it is deliberately out of scope for TASK-248.
 
+### Owner-approved library toolbar restyle (TASK-249, #370)
+
+| Id | Level | What it asserts | Source |
+|---|---|---|---|
+| `T-TOOLBAR-001` | U | The search placeholder advertises only what search matches (`Search titles`, never actors); the submit is an icon button inside the field that keeps the name `Search`; Ctrl+K / Cmd+K expands and focuses search, while modified chords and an open modal are ignored; the keyboard hint shows the platform's keys and is hidden from assistive technology. `apps/web/test/listSearch.spec.tsx`. | TASK-249 |
+| `T-TOOLBAR-002` | U | The Filters trigger keeps its visible label and active count as its accessible name, with a decorative icon, and is marked active only by real filters (not by a search alone). The order trigger reads `Sort:` plus the complete order, keeps its dialog semantics, accessible name and the separate reverse button (REQ-038). Grid/Compact remain one named group with exactly one pressed option. `apps/web/test/libraryToolbar.spec.tsx`. | TASK-249 |
+| `T-TOOLBAR-003` | E | At 1280, 640, 390 and 320 px in Chromium and Mobile Safari: no horizontal overflow; Filters, order, reverse, Grid and Compact are usable 44 px targets; at 1280 px the search, Filters, layout and order controls share one height; the pressed layout carries an inset bar, not colour alone; the order dialog stays in bounds and returns focus; Ctrl/Cmd+K focuses search; the keyboard hint shows only with a fine pointer at 1280 px and hides while typing; axe reports no toolbar violations. `tests/e2e/refinedLibrary.spec.ts`. | TASK-249 |
+
 ### 39.5 What is deliberately NOT asserted here
 
 **That the refresh looks good.** Taste is the owner's, recorded in **ADR-0013**,

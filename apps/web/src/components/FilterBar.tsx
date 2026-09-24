@@ -20,7 +20,7 @@ import { useCallback, useId, useState, type JSX, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from './ui/Button';
 import { Dialog } from './ui/Dialog';
-import { CloseIcon } from './icons';
+import { CloseIcon, FilterIcon } from './icons';
 import { Field } from './ui/Field';
 import { FilterDisclosure } from './FilterDisclosure';
 import {
@@ -400,10 +400,12 @@ export function FilterBar({
             aria-haspopup="dialog"
             aria-expanded={open}
             data-testid="filters-trigger"
+            data-active={activeCount > 0 || undefined}
             onClick={() => {
               setOpen(true);
             }}
           >
+            <FilterIcon />
             <span>{FILTERS_TRIGGER_LABEL}</span>
             {activeCount > 0 && (
               <span className="filter-bar__count" aria-label={`${String(activeCount)} active`}>
