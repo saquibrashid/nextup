@@ -2111,8 +2111,20 @@ describe('T-TOOLBAR-003 library toolbar', () => {
         const prefix = sort.locator('.sort-trigger-prefix');
         if (width >= 640) await expect(prefix).toBeVisible();
         else await expect(prefix).toBeHidden();
+        // Same floor as `usableTarget`, but with its 1 px edge tolerance applied
+        // to the viewport check too: WebKit on Linux lays the end control out
+        // a sub-pixel past the edge (ratio 0.998), which is rounding, not clipping.
+        const viewport = page.viewportSize();
+        if (!viewport) throw new Error('Expected an explicit viewport');
         for (const control of [filters, sort, page.getByTestId('sort-reverse'), grid, compact]) {
-          await usableTarget(page, control);
+          const box = await bounds(control);
+          expect(box.width).toBeGreaterThanOrEqual(44);
+          expect(box.height).toBeGreaterThanOrEqual(44);
+          expect(box.x).toBeGreaterThanOrEqual(0);
+          expect(box.y).toBeGreaterThanOrEqual(0);
+          expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+          expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+          await expect(control).toBeInViewport({ ratio: 0.99 });
         }
         await noOverflow(page);
 
