@@ -2,11 +2,31 @@
 
 | | |
 |---|---|
-| **Status** | **Accepted, Revision 2 (2026-09-17).** The owner approved extending the closed icon register for the library-controls sort chooser. <br />~~**Accepted, Revision 1 (2026-09-16).** Epic P shipped in #275; the owner approved implementation of the refined indigo library preview on 2026-09-16.~~ |
+| **Status** | **Accepted, Revision 3 (2026-09-24).** The owner approved the library toolbar mockup (issue 370), which adds one Filters mark to the closed icon register. <br />~~**Accepted, Revision 2 (2026-09-17).** The owner approved extending the closed icon register for the library-controls sort chooser.~~ <br />~~**Accepted, Revision 1 (2026-09-16).** Epic P shipped in #275; the owner approved implementation of the refined indigo library preview on 2026-09-16.~~ |
 | **Date** | 2026-09-10 |
 | **Deciders** | the owner (visual direction, given explicitly — see "The direction, and who gave it"), coordinator (mechanics) |
 | **Forced by** | The owner using the running app on 2026-09-10 and reporting six things: a row menu that opens at the bottom of the page, metadata rendered as `Movie2026Action, Crime, Thriller`, a row-menu button rendered as a full-height grey column, row text *"scrunched together"*, a fix-match correction that produced **no visible change on the review screen**, and *"the website looks very bare with no styling whatsoever."* |
-| **Supersedes** | Revision 2 extends the closed hand-authored icon register by five sort-category marks only. Revision 1 reopens the light-only decision, the separate field/direction controls, and viewport-only layout selection. No Tailwind, web fonts, icon dependency, provider expansion or background list changes are introduced. <br />~~Revision 1 reopens the light-only decision, the separate field/direction controls, and viewport-only layout selection. No Tailwind, web fonts, icon dependency, provider expansion or background list changes are introduced.~~ |
+| **Supersedes** | Revision 3 extends the closed hand-authored icon register by one Filters mark only. Revision 2 extends the closed hand-authored icon register by five sort-category marks only. Revision 1 reopens the light-only decision, the separate field/direction controls, and viewport-only layout selection. No Tailwind, web fonts, icon dependency, provider expansion or background list changes are introduced. <br />~~Revision 1 reopens the light-only decision, the separate field/direction controls, and viewport-only layout selection. No Tailwind, web fonts, icon dependency, provider expansion or background list changes are introduced.~~ |
+
+## Revision 3 — library toolbar Filters icon, 2026-09-24
+
+The owner supplied a toolbar mockup (issue 370): a wide search field with a
+leading search mark and a keyboard hint, a **Filters button with a filter
+icon**, a connected Grid/List switch and a "Sort: Date added" dropdown. The
+search, Grid, Compact and chevron marks already exist; the Filters mark does
+not.
+
+The closed inline SVG register is therefore extended by exactly one
+hand-authored icon, bringing it to 22:
+
+| Icon | Used by | Meaning |
+|---|---|---|
+| `FilterIcon` | Library Filters trigger | Three horizontal lines of decreasing length (a filter funnel drawn as lines) |
+
+The icon is decorative (`aria-hidden`); the trigger keeps its visible
+"Filters" label and active count, so the icon is never the sole label. The
+register remains closed: adding, removing or substituting an icon requires
+another ADR revision and an update to the strict exported-set test.
 
 ## Revision 2 — library-controls sort-category icons, 2026-09-17
 

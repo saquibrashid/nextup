@@ -4084,21 +4084,37 @@ button {
 
 .list-view-control {
   display: flex;
-  gap: var(--space-1);
-  border: 1px solid var(--color-border-soft);
+  gap: 0;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  padding: var(--space-1);
+  background: var(--color-catalog-raised);
+  overflow: hidden;
 }
 
+/*
+ * #370 — one connected two-option switch. The buttons share the container's
+ * border; the divider and the selected fill are the only chrome inside it.
+ * ⚠ The selected state is a fill AND an inset bar AND bold text — never the
+ * accent colour alone (`T-A11Y-008`) — and `aria-pressed` carries it to
+ * assistive technology.
+ */
 .list-view-control .btn {
   gap: var(--space-2);
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--color-text-muted);
   font-size: var(--text-sm);
+}
+
+.list-view-control .btn + .btn {
+  border-inline-start: 1px solid var(--color-border-soft);
 }
 
 .list-view-control .btn[aria-pressed='true'] {
   background: var(--color-accent-soft);
-  color: var(--color-accent);
-  border-color: var(--color-accent);
+  color: var(--color-text);
+  box-shadow: inset 0 -3px var(--color-accent);
   font-weight: var(--weight-bold);
 }
 
@@ -4332,6 +4348,87 @@ button {
 
 .list-controls form[role='search'] .input {
   width: 100%;
+}
+
+/*
+ * #370 — the search icon sits inside the field and IS the submit button, so
+ * the field reads as one control and a pointer user can still submit without
+ * the keyboard. The input reserves the icon's 44px target at its start.
+ */
+.list-search__control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.list-search__control > .btn {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+}
+
+.list-search__control > .input {
+  min-block-size: var(--tap-target-min);
+  padding-inline-start: var(--tap-target-min);
+  background: var(--color-catalog-raised);
+}
+
+/* The hint only exists where the shortcut is usable: see the desktop block. */
+.list-search__shortcut {
+  display: none;
+}
+
+.list-search__shortcut kbd {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--space-1);
+  background: var(--color-catalog);
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  padding: var(--space-1);
+}
+
+/* #370 — the Filters trigger says it is active by count AND by outline. */
+.filter-bar > .btn {
+  gap: var(--space-2);
+}
+
+.filter-bar > .btn[data-active] {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+/*
+ * #370 — the order chooser is a disclosure: "Sort:", the current complete
+ * order, then a down chevron. The direction lives in the words and on the
+ * joined reverse button, never in this chevron. ⚠ Below 640px the prefix and
+ * the chevron give their width back to the order itself, which otherwise
+ * truncates to three letters on a 390px phone with a filter active.
+ */
+.sort-trigger-prefix {
+  display: none;
+  color: var(--color-text-muted);
+  font-weight: var(--weight-normal);
+}
+
+.sort-trigger-disclosure {
+  display: none;
+  flex: none;
+  transform: rotate(90deg);
+}
+
+@media (min-width: 640px) {
+  .sort-trigger-prefix {
+    display: inline;
+  }
+
+  .sort-trigger-disclosure {
+    display: inline-flex;
+  }
 }
 
 .filter-disclosure__panel label {
@@ -5019,8 +5116,6 @@ button {
     grid-column: 4;
     grid-row: 1;
     align-self: start;
-    border: 0;
-    padding: 0;
   }
 
   .library-browser .list-view-control .btn > span {
@@ -5061,6 +5156,17 @@ button {
 
   .library-browser form[role='search'] > .btn:last-child {
     display: none;
+  }
+
+  .library-browser .list-search__control > .input {
+    padding-inline-end: calc(var(--space-6) * 2 + var(--space-3));
+  }
+
+  .library-browser .list-search__shortcut {
+    position: absolute;
+    inset-inline-end: var(--space-3);
+    gap: var(--space-1);
+    pointer-events: none;
   }
 
   .library-browser .service-filters {
@@ -5187,4 +5293,15 @@ button {
 
 .saved-capture > p {
   max-width: 70ch;
+}
+
+/* #370 — a hint for a keyboard shortcut means nothing without a keyboard. */
+@media (min-width: 1280px) and (hover: hover) and (pointer: fine) {
+  .library-browser .list-search__shortcut {
+    display: inline-flex;
+  }
+
+  .library-browser .list-search__control:focus-within .list-search__shortcut {
+    display: none;
+  }
 }

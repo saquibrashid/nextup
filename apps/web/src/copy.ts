@@ -451,6 +451,11 @@ export const SORT_TRIGGER_LABEL = 'Sort';
 export const SORT_CLOSE_LABEL = 'Close sort options';
 
 export const FILTERS_TRIGGER_LABEL = 'Filters';
+
+/** #370: search matches saved titles only, so the placeholder says titles. */
+export const LIST_SEARCH_PLACEHOLDER = 'Search titles';
+export const LIST_SEARCH_SHORTCUT_APPLE = ['⌘', 'K'] as const;
+export const LIST_SEARCH_SHORTCUT_OTHER = ['Ctrl', 'K'] as const;
 export const FILTERS_PANEL_TITLE = 'Filter your list';
 export const FILTERS_CLOSE_LABEL = 'Close filters';
 export const FILTERS_DONE_LABEL = 'Done';

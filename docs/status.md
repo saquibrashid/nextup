@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 243 |
+| ✅ done | 244 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **246** |
+| **total** | **247** |
 
 ## Ready to start
 
@@ -284,3 +284,4 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-246` | #366: the runtime filter becomes an accessible two-handle range slider whose stops are the existing bucket edges, so canonical `runtime=` tokens, API/SQL semantics, chips, reset, retained filters and hidden-unknown counts are unchanged. Visible Min/Max values with units, named handles with spoken values, 44px thumbs, keyboard stops, clamped (never swapped) handles and a disclosed, unrewritten gapped saved selection. `T-RANGE-001`, `T-RANGE-002`, `T-RANGE-003` plus existing `T-UX-123`/`T-UX-144` regressions. No API, migration, dependency or infrastructure change. | `T-RANGE-001`, `T-RANGE-002`, `T-RANGE-003` |
 | `TASK-247` | #364 / PR #374: Comedy Show covers stand-up specials and live comedy performances from explicit TMDB keywords, with an owner/work-scoped override and Automatic reset in title details. Cards and SQL-backed category filters preserve canonical Movie/TV identity, services and dates; bounded on-access classification discloses incomplete results for existing caches. `T-CATEGORY-001` through `T-CATEGORY-005` pass, including real SQL persistence, constraints, owner isolation and responsive browser journeys. All twelve CI gates passed on implementation head `9c473d4` in run `35936313460`; release follows final ledger-head CI. | `T-CATEGORY-001`, `T-CATEGORY-002`, `T-CATEGORY-003`, `T-CATEGORY-004`, `T-CATEGORY-005` |
 | `TASK-248` | #371 / PR #375: the Add a title dialog uses shared, bounded search-result rows (48×72 2:3 thumbnail or decorative placeholder, full wrapping title, separate year/type metadata, one row-described Select) with a sticky head, labelled close control, explicit search and submit Retry, and a confirmation summary. Fix match adopts the same rows with its behavior and test ids unchanged; the Review correction picker is deliberately out of scope. `T-ADDUI-001`, `T-ADDUI-002`, `T-ADDUI-003` plus existing `T-MOD-001`/`T-MOD-002`, `T-MANUAL-023`..`T-MANUAL-030` and `T-UI-020` regressions. All twelve CI gates passed on implementation head `9deda28` in run `35948242716`. No API, migration, dependency or infrastructure change. | `T-ADDUI-001`, `T-ADDUI-002`, `T-ADDUI-003`, `T-MANUAL-023`, `T-MANUAL-030`, `T-MOD-001`, `T-MOD-002`, `T-UI-020` |
+| `TASK-249` | #370: the library toolbar follows the owner mockup: an iconed search field with a truthful `Search titles` placeholder, an in-field icon submit and a Ctrl/Cmd+K shortcut with a fine-pointer-only hint; an iconed Filters trigger with an active state; a connected Grid/Compact switch whose pressed option carries an inset bar; and a `Sort: <order>` dropdown with a disclosure chevron. Chips, counts, URL state, sort keys, the persisted layout and the reverse button are unchanged. Adds `FilterIcon` (ADR-0013 Revision 3). `T-TOOLBAR-001`, `T-TOOLBAR-002`, `T-TOOLBAR-003`. No API, migration, dependency or infrastructure change. | `T-TOOLBAR-001`, `T-TOOLBAR-002`, `T-TOOLBAR-003` |

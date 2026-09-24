@@ -2081,3 +2081,89 @@ test('T-UX-147g: with a filter active the toolbar rows are full, not half empty'
 
   await noOverflow(page);
 });
+
+/**
+ * `T-TOOLBAR-003` — the restyled library toolbar (issue 370) at every width.
+ *
+ * The mockup made the controls one visual family: an iconed search field with
+ * a keyboard hint, an iconed Filters button, a connected Grid/Compact switch
+ * and a "Sort: ..." dropdown. The restyle must not cost a hit target, overflow
+ * a phone, or leave the keyboard hint on a device that has no keyboard.
+ */
+describe('T-TOOLBAR-003 library toolbar', () => {
+  for (const width of [1280, 640, 390, 320]) {
+    describe(`at ${width}px`, () => {
+      test('T-TOOLBAR-003a: one control family, usable at every width, with a truthful shortcut', async ({
+        page,
+      }, testInfo) => {
+        await mountLibrary(page, { width });
+        const controls = page.getByTestId('list-controls');
+        const filters = page.getByTestId('filters-trigger');
+        const sort = page.getByTestId('sort-trigger');
+        const grid = page.getByRole('button', { name: 'Grid view', exact: true });
+        const compact = page.getByRole('button', { name: 'Compact view', exact: true });
+        const search = page.getByRole('searchbox', { name: 'Search your list', exact: true });
+        const hint = page.getByTestId('list-search-shortcut');
+
+        await expect(filters.locator('svg')).toHaveAttribute('aria-hidden', 'true');
+        await expect(sort).toHaveText(/^Sort: .+/);
+        // Below 640px the visible "Sort:" prefix gives way to the order itself.
+        const prefix = sort.locator('.sort-trigger-prefix');
+        if (width >= 640) await expect(prefix).toBeVisible();
+        else await expect(prefix).toBeHidden();
+        for (const control of [filters, sort, page.getByTestId('sort-reverse'), grid, compact]) {
+          await usableTarget(page, control);
+        }
+        await noOverflow(page);
+
+        const keyboard = width >= 1280 && testInfo.project.name === 'chromium';
+        if (keyboard) {
+          await expect(hint).toBeVisible();
+          await expect(hint).toContainText('K');
+          const heights = await Promise.all(
+            [search, filters, grid, compact, sort].map(async (item) => (await bounds(item)).height),
+          );
+          for (const height of heights)
+            expect(Math.abs(height - (heights[0] ?? 0))).toBeLessThanOrEqual(1);
+        } else {
+          await expect(hint).toBeHidden();
+        }
+
+        // The pressed layout is marked by more than colour: an inset bar.
+        const shadow = (locator: Locator) =>
+          locator.evaluate((el) => getComputedStyle(el).boxShadow);
+        await expect(grid).toHaveAttribute('aria-pressed', 'true');
+        expect(await shadow(grid)).toContain('inset');
+        expect(await shadow(compact)).not.toContain('inset');
+        await compact.click();
+        await expect(compact).toHaveAttribute('aria-pressed', 'true');
+        expect(await shadow(compact)).toContain('inset');
+        await noOverflow(page);
+
+        await sort.focus();
+        await page.keyboard.press('Enter');
+        const panel = page
+          .getByRole('dialog', { name: 'Sort your list', exact: true })
+          .getByTestId('sort-control');
+        await horizontallyBounded(page, panel, width);
+        await page.keyboard.press('Escape');
+        await expect(sort).toBeFocused();
+
+        await page.locator('body').click({ position: { x: 1, y: 1 } });
+        await page.keyboard.press(
+          testInfo.project.name === 'mobile-safari' ? 'Meta+K' : 'Control+K',
+        );
+        await expect(search).toBeFocused();
+        await expect(search).toHaveAttribute('placeholder', 'Search titles');
+        await expect(hint).toBeHidden();
+        await noOverflow(page);
+
+        expect(
+          (await new AxeBuilder({ page }).include('[data-testid="list-controls"]').analyze())
+            .violations,
+        ).toEqual([]);
+        await expect(controls).toBeVisible();
+      });
+    });
+  }
+});
