@@ -371,7 +371,7 @@ describe('T-UX-010 the list loading state', () => {
       exists: every probe-driven case above passes with `ListPage` never
       calling the hook. And the list is where this defect was actually
       reported — the owner opened the app after a quiet spell and was told
-      "Couldn't load your list."
+      "Couldn't load your library."
     */
     renderLoadingList();
 

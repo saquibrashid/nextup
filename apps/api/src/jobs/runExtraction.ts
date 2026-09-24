@@ -265,7 +265,7 @@ function imageScopedFailure(error: unknown): { code: string; message: string } |
       code: 'IMAGE_DECODE_OOM',
       message:
         'That image ran out of memory while being read. This is a memory limit, ' +
-        'not a problem with your image. No other image in this batch was affected; ' +
+        'not a problem with your image. No other image in this import was affected; ' +
         're-attach this file after up-sizing compute — see docs/runbooks/scale-up-memory.md.',
     };
   }
@@ -349,8 +349,8 @@ export async function runExtraction(input: RunExtractionInput): Promise<RunExtra
     if (remainingMs <= 0) {
       return failed(
         'EXTRACTOR_ERROR',
-        `Extraction for this batch passed its ${String(Math.round(timeoutMs / 60_000))}-minute limit and was stopped. ` +
-          'Nothing was changed in your list. You can retry it.',
+        `Extraction for this import passed its ${String(Math.round(timeoutMs / 60_000))}-minute limit and was stopped. ` +
+          'Nothing was changed in your library. You can retry it.',
       );
     }
 
@@ -384,8 +384,8 @@ export async function runExtraction(input: RunExtractionInput): Promise<RunExtra
       if (error instanceof BatchCeilingExceeded) {
         return failed(
           'EXTRACTOR_ERROR',
-          `Extraction for this batch passed its ${String(Math.round(timeoutMs / 60_000))}-minute limit and was stopped. ` +
-            'Nothing was changed in your list. You can retry it.',
+          `Extraction for this import passed its ${String(Math.round(timeoutMs / 60_000))}-minute limit and was stopped. ` +
+            'Nothing was changed in your library. You can retry it.',
         );
       }
 
@@ -411,7 +411,7 @@ export async function runExtraction(input: RunExtractionInput): Promise<RunExtra
       if (isExtractorError(error)) {
         return failed(
           error.kind === 'unavailable' ? 'EXTRACTOR_UNAVAILABLE' : 'EXTRACTOR_ERROR',
-          `${image.fileName} couldn't be read (${error.kind}). Nothing was changed in your list. You can retry it.`,
+          `${image.fileName} couldn't be read (${error.kind}). Nothing was changed in your library. You can retry it.`,
         );
       }
       throw error;
@@ -443,7 +443,7 @@ export async function runExtraction(input: RunExtractionInput): Promise<RunExtra
   if (imagesTotal > 0 && stats.imagesProcessed === 0) {
     return failed(
       'EXTRACTOR_ERROR',
-      'None of the images in this batch could be read. Nothing was changed in your list.',
+      'None of the images in this import could be read. Nothing was changed in your library.',
     );
   }
 

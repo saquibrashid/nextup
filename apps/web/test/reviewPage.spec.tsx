@@ -283,9 +283,9 @@ describe('T-UX-011 · specs/ui.md §5.4 SD-11d · the action bar is STICKY', () 
     // other assertion in this suite.
     const rule = /\.review-action-bar\s*\{([^}]*)\}/.exec(CSS)?.[1] ?? '';
     expect(rule).toMatch(/position:\s*sticky/);
-    expect(rule).toMatch(
-      /bottom:\s*calc\(var\(--nav-bar-height\) \+ env\(safe-area-inset-bottom\)\)/,
-    );
+    // Issue 369 removed the bottom-fixed nav bar, so only the home-indicator
+    // inset remains to clear.
+    expect(rule).toMatch(/bottom:\s*env\(safe-area-inset-bottom\)/);
   });
 
   it('T-UX-011c: the primary action lives inside the bar, not above the fold', () => {
@@ -637,7 +637,7 @@ describe('the mode contract is visible in the DOM', () => {
     render(<ReviewPage review={review()} />);
 
     const section = screen.getByTestId('review-already-on-list');
-    expect(section).toHaveTextContent('Already on your list (0)');
+    expect(section).toHaveTextContent('Already in your library (0)');
   });
 
   it('T-REV-013h: the count is inside the <summary>, so it survives collapsing', () => {
@@ -647,7 +647,7 @@ describe('the mode contract is visible in the DOM', () => {
     render(<ReviewPage review={review()} />);
 
     const summary = within(screen.getByTestId('review-already-on-list')).getByText(
-      /Already on your list \(0\)/,
+      /Already in your library \(0\)/,
     );
     expect(summary.tagName).toBe('SUMMARY');
   });

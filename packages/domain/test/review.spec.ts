@@ -81,7 +81,7 @@ describe('T-REV-010 — new-to-this-service candidates appear in additions', () 
     const res = buildReviewResponse(input({ candidates: [candidate()] }));
     expect(res.sections.additions.count).toBe(1);
     expect(res.sections.additions.items[0]?.candidateId).toBe('c1');
-    expect(res.sections.additions.label).toBe('New to your list');
+    expect(res.sections.additions.label).toBe('New to your library');
   });
 
   it('T-REV-010b · an already-present candidate does NOT land in additions', () => {
@@ -365,7 +365,7 @@ describe('T-AI-021 — low yield in full-update withholds the removal section en
 describe('T-AI-021 — banner copy', () => {
   it('T-AI-021h · lowYield full-update explains that nothing will be removed', () => {
     const res = buildReviewResponse(input({ lowYield: true }));
-    expect(res.banner).toContain('nothing will be removed by this batch');
+    expect(res.banner).toContain('nothing will be removed by this import');
   });
 
   it('T-AI-021i · lowYield append-only counts titles and screenshots, and pluralises', () => {
@@ -426,7 +426,7 @@ describe('T-AI-017 — the TMDB-unreachable banner', () => {
     // one silently displaced the other the owner would lose an answer at
     // exactly the moment they decide whether to confirm.
     const res = buildReviewResponse(input({ lowYield: true, tmdbUnavailable: true }));
-    expect(res.banner).toContain('nothing will be removed by this batch');
+    expect(res.banner).toContain('nothing will be removed by this import');
     expect(res.banner).toContain(TMDB_UNAVAILABLE_BANNER);
     // Read safety first: it is the one that governs deletion.
     expect(res.banner?.indexOf(TMDB_UNAVAILABLE_BANNER)).toBeGreaterThan(0);

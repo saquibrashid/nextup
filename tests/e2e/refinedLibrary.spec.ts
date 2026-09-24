@@ -119,6 +119,21 @@ function orderedTitles(
     });
 }
 
+/**
+ * Issue 369 — follows a destination the way the owner would at this width:
+ * inline in the wide header, or through the Menu drawer on a phone.
+ */
+async function navigateTo(page: Page, name: string): Promise<void> {
+  const nav = page.getByRole('navigation', { name: 'Primary' });
+  const inline = nav.getByRole('link', { name, exact: true });
+  if ((await inline.count()) > 0) {
+    await inline.click();
+    return;
+  }
+  await nav.getByRole('button', { name: 'Menu' }).click();
+  await page.getByRole('dialog', { name: 'Menu' }).getByRole('link', { name, exact: true }).click();
+}
+
 async function checkServiceUpdates(page: Page): Promise<void> {
   const panel = page.getByRole('group', { name: 'Service updates', exact: true });
   const box = await bounds(panel);
@@ -349,9 +364,9 @@ for (const width of [320, 1280]) {
       expect(await page.getByTestId('title-list').innerHTML()).toBe(rows);
       expect(page.url()).toBe(url);
       expect(requests.filter((request) => request.pathname === '/api/titles')).toHaveLength(reads);
-      await page.getByRole('navigation').getByRole('link', { name: 'Upload', exact: true }).click();
-      await expect(page.getByRole('heading', { name: 'Upload screenshots' })).toBeVisible();
-      await page.getByRole('navigation').getByRole('link', { name: 'List', exact: true }).click();
+      await navigateTo(page, 'Import');
+      await expect(page.getByRole('heading', { name: 'Import screenshots' })).toBeVisible();
+      await navigateTo(page, 'Library');
       await expect(page.getByTestId('title-list')).toHaveAttribute('data-view', 'compact');
       expect(page.url()).toBe(url);
       await page.reload();
@@ -389,14 +404,14 @@ for (const width of [320, 1280]) {
       await expect(page.getByRole('checkbox', { name: 'Netflix', exact: true })).toBeChecked();
       await page.keyboard.press('Escape');
       if (width < 1280) await page.getByTestId('list-search-trigger').click();
-      await page.getByRole('searchbox', { name: 'Search your list', exact: true }).fill('Orbit');
+      await page.getByRole('searchbox', { name: 'Search your library', exact: true }).fill('Orbit');
       await page.getByRole('search').getByRole('button', { name: 'Search', exact: true }).click();
       await expect(page.getByTestId('title-name')).toHaveText(['Quiet Orbit']);
       const saved = `?${await page.evaluate(() => localStorage.getItem('nextup.library.v1'))}`;
-      await page.getByRole('navigation').getByRole('link', { name: 'Upload', exact: true }).click();
-      await expect(page.getByRole('heading', { name: 'Upload screenshots' })).toBeVisible();
+      await navigateTo(page, 'Import');
+      await expect(page.getByRole('heading', { name: 'Import screenshots' })).toBeVisible();
       requests.length = 0;
-      await page.getByRole('navigation').getByRole('link', { name: 'List', exact: true }).click();
+      await navigateTo(page, 'Library');
       await expect(page.getByTestId('title-name')).toHaveText(['Quiet Orbit']);
       expect(new URL(page.url()).search).toBe(saved);
       expect(requests.find((url) => url.pathname === '/api/titles')?.search).toBe(saved);
@@ -451,7 +466,7 @@ for (const width of [320, 640, 1280]) {
       await expect(banner).toContainText('Netflix / Ready to review');
       const status = await bounds(banner);
       for (const control of [
-        page.getByRole('heading', { name: 'Your list', exact: true }),
+        page.getByRole('heading', { name: 'Library', exact: true }),
         page.getByRole('button', { name: 'Service updates', exact: true }),
         page.getByTestId('add-title-open'),
       ]) {
@@ -487,7 +502,7 @@ test('T-LIB-002d: responsive search preserves disclosure, desktop persistence an
     const requests = await mountLibrary(page, { width });
     const controls = page.getByTestId('list-controls');
     const trigger = page.getByTestId('list-search-trigger');
-    const search = page.getByRole('searchbox', { name: 'Search your list', exact: true });
+    const search = page.getByRole('searchbox', { name: 'Search your library', exact: true });
     if (width < 1280) {
       await expect(page.getByRole('search')).toHaveCount(0);
       await expect(trigger).toHaveAttribute('aria-expanded', 'false');
@@ -573,7 +588,7 @@ async function openFiltersPanel(page: Page): Promise<Locator> {
   const trigger = page.getByTestId('filters-trigger');
   await trigger.click();
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  const dialog = page.getByRole('dialog', { name: 'Filter your list', exact: true });
+  const dialog = page.getByRole('dialog', { name: 'Filter your library', exact: true });
   await expect(dialog).toBeVisible();
   return dialog;
 }
@@ -588,7 +603,7 @@ async function openSortPanel(page: Page): Promise<Locator> {
   const trigger = page.getByTestId('sort-trigger');
   await trigger.click();
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  const dialog = page.getByRole('dialog', { name: 'Sort your list', exact: true });
+  const dialog = page.getByRole('dialog', { name: 'Sort your library', exact: true });
   await expect(dialog).toBeVisible();
   return dialog.getByTestId('sort-control');
 }
@@ -699,7 +714,7 @@ test('T-UX-142b: six sort buttons select complete server orders and reverse the 
   let group = await openSortPanel(page);
   await expect(group.getByRole('button')).toHaveCount(6);
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('dialog', { name: 'Sort your list', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Sort your library', exact: true })).toHaveCount(0);
   await expect(page.getByTestId('sort-trigger')).toHaveAttribute('aria-expanded', 'false');
   const orders = [
     { label: 'Recently added', reverse: 'Oldest additions', field: 'dateAdded', dir: 'desc' },
@@ -721,9 +736,9 @@ test('T-UX-142b: six sort buttons select complete server orders and reverse the 
       const option = group.getByRole('button', { name: order.label, exact: true });
       await expect(option).toBeVisible();
       await option.click({ force: true });
-      await expect(page.getByRole('dialog', { name: 'Sort your list', exact: true })).toHaveCount(
-        0,
-      );
+      await expect(
+        page.getByRole('dialog', { name: 'Sort your library', exact: true }),
+      ).toHaveCount(0);
       await expect
         .poll(() => requests.filter((request) => request.pathname === '/api/titles').length)
         .toBe(before + 1);
@@ -754,7 +769,7 @@ test('T-UX-142b: six sort buttons select complete server orders and reverse the 
   const before = requests.filter((request) => request.pathname === '/api/titles').length;
   group = await openSortPanel(page);
   await group.getByRole('button', { name: 'Recently added', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Sort your list', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Sort your library', exact: true })).toHaveCount(0);
   await expect
     .poll(() => requests.filter((request) => request.pathname === '/api/titles').length)
     .toBe(before + 1);
@@ -777,7 +792,7 @@ test('T-UX-143c: submitted URL search resets loaded pages, requests unfiltered t
     requests.some((request) => request.searchParams.get('cursor') === 'fixture-next-page'),
   ).toBe(true);
   const before = requests.length;
-  const search = page.getByRole('searchbox', { name: 'Search your list', exact: true });
+  const search = page.getByRole('searchbox', { name: 'Search your library', exact: true });
   await expect(search).toBeVisible();
   await search.fill('Amber');
   expect(requests.length).toBe(before);
@@ -950,9 +965,9 @@ test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone
         await expect(controls).toBeVisible();
       }
     }
-    await expect(page.getByRole('dialog', { name: 'Filter your list', exact: true })).toHaveCount(
-      0,
-    );
+    await expect(
+      page.getByRole('dialog', { name: 'Filter your library', exact: true }),
+    ).toHaveCount(0);
     await noOverflow(page);
   }
   const dialog = await openFiltersPanel(page);
@@ -1433,9 +1448,9 @@ for (const width of [390, 1024, 1440]) {
         const first = await bounds(links.nth(0));
         const second = await bounds(links.nth(1));
         expect(second.y).toBeGreaterThanOrEqual(first.y + first.height);
-        await page.getByRole('navigation').getByRole('button', { name: 'More' }).click();
+        await page.getByRole('navigation').getByRole('button', { name: 'Menu' }).click();
         await expect(
-          page.getByRole('navigation').getByRole('link', { name: 'About' }),
+          page.getByRole('dialog', { name: 'Menu' }).getByRole('link', { name: 'About' }),
         ).toBeVisible();
         await page.keyboard.press('Escape');
         for (const row of await page.locator('li.title-row').all()) {
@@ -1445,7 +1460,8 @@ for (const width of [390, 1024, 1440]) {
           expect(priority.y + priority.height).toBeLessThan(poster.y + poster.height);
         }
       } else {
-        expect(navigation.y + navigation.height).toBeCloseTo(900, 0);
+        expect(navigation.y + navigation.height).toBeLessThanOrEqual(content.y + 1);
+        await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(0);
       }
       expect(
         await page
@@ -1592,13 +1608,13 @@ for (const width of [390, 1280, 1440]) {
       await expect(page.getByText('Netflix updated today', { exact: true })).toBeVisible();
       await checkServiceUpdates(page);
       const quick = page.getByRole('group', { name: 'Quick filters' });
-      const input = page.getByRole('searchbox', { name: 'Search your list' });
+      const input = page.getByRole('searchbox', { name: 'Search your library' });
       if (width >= 1280) {
         await expect(input).toBeVisible();
         await expect(page.getByRole('button', { name: 'Close search', exact: true })).toBeHidden();
         await expect(quick).toBeVisible();
         const heading = await bounds(page.getByRole('heading', { level: 1 }));
-        const search = await bounds(page.getByRole('search', { name: 'Search your list' }));
+        const search = await bounds(page.getByRole('search', { name: 'Search your library' }));
         const filters = await bounds(page.getByTestId('filters-trigger'));
         const actions = await bounds(page.locator('.library-actions'));
         const updates = await bounds(
@@ -1615,7 +1631,7 @@ for (const width of [390, 1280, 1440]) {
         await expect(quick.getByRole('checkbox', { name: 'Movie', exact: true })).toBeChecked();
         await expect(page).toHaveURL(/category=movie/);
         await page.getByTestId('filters-trigger').click();
-        const dialog = page.getByRole('dialog', { name: 'Filter your list', exact: true });
+        const dialog = page.getByRole('dialog', { name: 'Filter your library', exact: true });
         await dialog.getByRole('button', { name: /^Type/ }).click();
         await expect(dialog.getByRole('checkbox', { name: 'Movie', exact: true })).toBeChecked();
         await dialog.getByRole('checkbox', { name: 'Movie', exact: true }).click();
@@ -2102,7 +2118,7 @@ describe('T-TOOLBAR-003 library toolbar', () => {
         const sort = page.getByTestId('sort-trigger');
         const grid = page.getByRole('button', { name: 'Grid view', exact: true });
         const compact = page.getByRole('button', { name: 'Compact view', exact: true });
-        const search = page.getByRole('searchbox', { name: 'Search your list', exact: true });
+        const search = page.getByRole('searchbox', { name: 'Search your library', exact: true });
         const hint = page.getByTestId('list-search-shortcut');
 
         await expect(filters.locator('svg')).toHaveAttribute('aria-hidden', 'true');
@@ -2155,7 +2171,7 @@ describe('T-TOOLBAR-003 library toolbar', () => {
         await sort.focus();
         await page.keyboard.press('Enter');
         const panel = page
-          .getByRole('dialog', { name: 'Sort your list', exact: true })
+          .getByRole('dialog', { name: 'Sort your library', exact: true })
           .getByTestId('sort-control');
         await horizontallyBounded(page, panel, width);
         await page.keyboard.press('Escape');

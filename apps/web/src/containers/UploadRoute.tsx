@@ -277,14 +277,14 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
       if (!action.discardable) {
         await check(id);
         setCheckpointError(
-          'Reading has started. This upload cannot be discarded while it is running.',
+          'Reading has started. This import cannot be discarded while it is running.',
         );
         return;
       }
       await client.discardBatch(id);
       await check();
       setConflictMessage(
-        'The saved batch was discarded. Your library is unchanged. No new upload was started.',
+        'The saved import was discarded. Your library is unchanged. No new import was started.',
       );
     } catch (error) {
       if (error instanceof RefusedError) setRefused(true);
@@ -324,7 +324,7 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
           setServerRejected([]);
           setFailure(null);
           setDraftPending(false);
-          setConflictMessage('The saved batch was discarded. No new upload was started.');
+          setConflictMessage('The saved import was discarded. No new import was started.');
           void check();
         }}
         onRefresh={async () => {
@@ -499,7 +499,7 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
                       });
                   }}
                 >
-                  Open saved batch
+                  Open saved import
                 </Button>
               )}
             </section>
@@ -507,7 +507,7 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
         </div>
       </div>
 
-      {/* Present only so a test can prove the batch was created once. */}
+      {/* Present only so a test can prove the import was created once. */}
       <span data-testid="draft-batch-id" hidden>
         {batchId ?? ''}
       </span>

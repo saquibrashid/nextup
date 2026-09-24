@@ -579,7 +579,7 @@ describe('T-REV-006 full-update shows ALL extracted titles — the safety proper
     expect(body.sections.removals.withheld).toBe(true);
     expect(body.sections.removals.withheldReason).toBe('low-yield');
     expect(body.sections.removals.items).toEqual([]);
-    expect(body.banner).toContain('nothing will be removed by this batch');
+    expect(body.banner).toContain('nothing will be removed by this import');
   });
 
   it('T-REV-006h: a removal proposal never crosses services', async () => {

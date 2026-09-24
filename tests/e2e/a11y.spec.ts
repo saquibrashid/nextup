@@ -190,9 +190,9 @@ const REVIEW = {
   crossCheck: 'ok',
   banner: null,
   sections: {
-    additions: { label: 'New to your list', count: 0, items: [] },
+    additions: { label: 'New to your library', count: 0, items: [] },
     alreadyOnYourList: {
-      label: 'Already on your list',
+      label: 'Already in your library',
       count: 0,
       items: [],
       collapsedByDefault: true,
@@ -470,7 +470,7 @@ test.describe('T-A11Y-001 — the 320 px floor', () => {
     });
     expect(small).toEqual([]);
     await expect(page.getByRole('group', { name: 'Quick filters' })).toBeHidden();
-    await expect(page.getByRole('search', { name: 'Search your list' })).toBeHidden();
+    await expect(page.getByRole('search', { name: 'Search your library' })).toBeHidden();
     await expect(page.getByTestId('list-search-trigger')).toBeVisible();
     await expect(page.getByTestId('filters-trigger')).toBeVisible();
   });
@@ -491,7 +491,7 @@ test.describe('T-A11Y-001 — the 320 px floor', () => {
     await expectNoHorizontalOverflow(page);
 
     const items = menu.getByRole('menuitem');
-    // Four since US-048: Not interested, Fix match, Remove from list, Cancel.
+    // Four since US-048: Not interested, Fix match, Remove from library, Cancel.
     await expect(items).toHaveCount(4);
     for (let i = 0; i < 4; i += 1) {
       await expectTapTarget(items.nth(i));
@@ -634,7 +634,7 @@ async function stubUndoRefusal(page: Page): Promise<void> {
             // one renders the generic retry panel and every assertion below
             // would then be measuring the wrong screen.
             code: 'BATCH_NOT_CREATES_ONLY',
-            message: 'This upload cannot be undone in one step.',
+            message: 'This import cannot be undone in one step.',
             details: REFUSAL_DETAILS,
           },
         }),

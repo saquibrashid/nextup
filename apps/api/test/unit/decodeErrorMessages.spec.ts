@@ -173,7 +173,7 @@ describe('T-IMG-020 the diagnostic decode messages are the specified text', () =
     expect(message).toContain('+~$4/month');
     expect(message).toContain('one command');
     expect(message).toContain(MEMORY_RUNBOOK_PATH);
-    expect(message).toContain('No other image in this batch was affected');
+    expect(message).toContain('No other image in this import was affected');
     expect(message).toContain('re-attach this file after up-sizing');
     expect(message).toContain('not a problem with your image');
   });
@@ -202,7 +202,7 @@ describe('T-IMG-020 the diagnostic decode messages are the specified text', () =
     );
     expect(message).toContain('beach-list-03.heic');
     expect(message).toContain('corrupt or incomplete');
-    expect(message).toContain('the rest of the batch is intact');
+    expect(message).toContain('the rest of the import is intact');
     // ⚠ ASSERTED NEGATIVELY AND DELIBERATELY. More memory can never fix a
     // truncated file; offering the remedy sends the owner to spend money on
     // the wrong problem (`api.md` §5.2.3, product invariant 15).

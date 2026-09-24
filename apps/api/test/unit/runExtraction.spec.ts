@@ -592,7 +592,7 @@ describe('T-BATCH-007 a memory failure fails ONE image, never the batch', () => 
     // copy of the one message A43-M3 specifies.
     const compliant =
       'That image ran out of memory while being opened. This is a memory limit, ' +
-      'not a problem with your image. No other image in this batch was affected; ' +
+      'not a problem with your image. No other image in this import was affected; ' +
       're-attach this file after up-sizing compute — see docs/runbooks/scale-up-memory.md.';
     const outcome = await runExtraction({
       batchId: 'batch-1',

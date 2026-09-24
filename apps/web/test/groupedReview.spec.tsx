@@ -59,7 +59,7 @@ describe('T-UX-158 grouped review', () => {
     expect(screen.getByTestId('candidate-chrome')).toBeInTheDocument();
     expect(screen.getByTestId('candidate-unreadable')).toBeInTheDocument();
     const known = within(screen.getByTestId('review-already-on-list'));
-    expect(known.getByTestId('candidate-known')).toHaveTextContent('Stays on your list');
+    expect(known.getByTestId('candidate-known')).toHaveTextContent('Stays in your library');
     expect(known.queryByRole('button')).not.toBeInTheDocument();
     expect(screen.getByTestId('candidate-new')).toHaveTextContent('READ FROM SCREENSHOT');
   });
@@ -67,7 +67,7 @@ describe('T-UX-158 grouped review', () => {
   it('T-UX-158b: known groups remain counted in both modes; append-only omits removals', () => {
     const { rerender } = render(<ReviewPage review={review({ candidates: [] })} />);
     expect(screen.getByTestId('review-already-on-list')).toHaveTextContent(
-      'Already on your list (0)',
+      'Already in your library (0)',
     );
     rerender(<ReviewPage review={review({ mode: 'append-only' })} />);
     expect(screen.getByTestId('review-already-on-list')).toBeVisible();

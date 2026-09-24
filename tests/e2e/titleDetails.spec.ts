@@ -168,7 +168,7 @@ for (const width of [320, 768, 1440]) {
       );
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
       await page.screenshot({ path: testInfo.outputPath('title-details.png'), fullPage: true });
-      const remove = page.getByRole('button', { name: 'Remove from list', exact: true });
+      const remove = page.getByRole('button', { name: 'Remove from library', exact: true });
       await remove.scrollIntoViewIfNeeded();
       await remove.click();
       const dialog = page.getByRole('dialog');
@@ -198,7 +198,7 @@ test('T-DETAIL-006b: title navigation, refresh and back retain filter, sort and 
   await expect(page).toHaveURL(/\/titles\/detail-one$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(item.name);
   await page.reload();
-  await page.getByRole('link', { name: 'Back to Your list' }).click();
+  await page.getByRole('link', { name: 'Back to Library' }).click();
   await expect(page).toHaveURL(new RegExp(`\\?${query}$`));
   await expect(page.getByTestId('title-list')).toHaveAttribute('data-view', 'compact');
   await page.getByRole('link', { name: item.name }).click();

@@ -71,7 +71,7 @@ export function imageTooLargeToDecodeMessage(
     `${mp(facts.maxMegapixels)} before allocating memory, because decoding this one would exhaust ` +
     'container memory and kill the import. This is a memory limit, not a problem with your image. ' +
     `Remedy: up-size compute to ${UPSIZE_REMEDY} — one command, see ${MEMORY_RUNBOOK_PATH}. ` +
-    'No other image in this batch was affected; re-attach this file after up-sizing.'
+    'No other image in this import was affected; re-attach this file after up-sizing.'
   );
 }
 
@@ -88,7 +88,7 @@ export function imageDecodeOomMessage(
     `${fileName} ran out of memory while being decoded (HEIC → PNG) in the ` +
     `${giB(containerMemoryGiB(env))} container. This is a memory limit, not a corrupt file. ` +
     `Remedy: up-size compute to ${UPSIZE_REMEDY} — ${MEMORY_RUNBOOK_PATH}. ` +
-    'Only this image failed; the rest of the batch is intact and nothing has been committed. ' +
+    'Only this image failed; the rest of the import is intact and nothing has been committed. ' +
     'Re-attach this file after up-sizing.'
   );
 }
@@ -105,7 +105,7 @@ export function imageDecodeFailedMessage(fileName: string): string {
   return (
     `${fileName} couldn't be read — the file appears to be corrupt or incomplete. ` +
     'Try re-exporting or re-taking the screenshot and attaching it again. ' +
-    'Only this image failed; the rest of the batch is intact.'
+    'Only this image failed; the rest of the import is intact.'
   );
 }
 

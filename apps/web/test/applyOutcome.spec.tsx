@@ -58,7 +58,7 @@ function mount(client: ApiClient, entry = '/batches/review/review') {
       <Routes>
         <Route path="/batches/:batchId/review" element={<ReviewRoute client={client} />} />
         <Route path="/batches/:batchId" element={<BatchStatusRoute client={client} />} />
-        <Route path="/" element={<h1>Your list</h1>} />
+        <Route path="/" element={<h1>Your library</h1>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -92,7 +92,7 @@ describe('TASK-229 authoritative Apply outcomes', () => {
     await screen.findByRole('heading', { name: 'Capture applied' });
     expect(screen.getByText('Added 2 titles, removed 1 title from Netflix.')).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: 'Undo the removals' }));
-    await screen.findByText('Those titles are back on your list.');
+    await screen.findByText('Those titles are back in your library.');
     expect(f.client.undoRemovalGroup).toHaveBeenCalledExactlyOnceWith('group');
     expect(f.client.undoBatch).not.toHaveBeenCalled();
     expect(f.client.closeBatch).toHaveBeenCalledTimes(1);
@@ -101,7 +101,7 @@ describe('TASK-229 authoritative Apply outcomes', () => {
     const f = fixture();
     mount(f.client);
     await apply();
-    await screen.findByText(/The saved batch is still in review/);
+    await screen.findByText(/The saved import is still in review/);
     expect(screen.getByRole('dialog')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Apply changes' })).toBeEnabled();
     expect(f.client.getBatch).toHaveBeenCalledTimes(1);
@@ -150,7 +150,7 @@ describe('TASK-229 authoritative Apply outcomes', () => {
     mount(f.client, '/batches/review');
     await screen.findByText('Nothing changed on your Netflix list.');
     expect(screen.queryByRole('button', { name: 'Undo the removals' })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Undo this batch' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Undo this import' }));
     await waitFor(() => expect(f.client.undoBatch).toHaveBeenCalledExactlyOnceWith('review'));
   });
   it('T-UX-163f: leaving during Apply does not trigger later reads or stale navigation', async () => {

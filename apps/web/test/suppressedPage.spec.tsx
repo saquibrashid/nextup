@@ -76,7 +76,7 @@ describe('T-UI-010 — SuppressedPage', () => {
   it('T-UI-010m: renders subtitle about future uploads', () => {
     render(<SuppressedPage />);
     expect(screen.getByTestId('suppressed-subtitle')).toBeInTheDocument();
-    expect(screen.getByTestId('suppressed-subtitle').textContent).toContain('future uploads');
+    expect(screen.getByTestId('suppressed-subtitle').textContent).toContain('future imports');
   });
 
   // T-UI-010n: renders a row with the title name

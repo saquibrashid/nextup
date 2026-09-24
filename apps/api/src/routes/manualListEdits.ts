@@ -306,7 +306,7 @@ export function registerManualListEditRoutes(router: Router, getClient: () => Tm
         throw new AppError(
           'DUPLICATE_WORK_IDENTITY',
           409,
-          'That title is already on your list for that service.',
+          'That title is already in your library for that service.',
           { workIdentity, service },
         );
       }
@@ -371,7 +371,7 @@ export function registerManualListEditRoutes(router: Router, getClient: () => Tm
       throw new AppError(
         'WORK_SUPPRESSED',
         409,
-        "You marked that title as not interested, so it isn't on your list. Nothing was changed.",
+        "You marked that title as not interested, so it isn't in your library. Nothing was changed.",
         {
           titleId,
           suppressionId: suppression.id,
@@ -386,7 +386,7 @@ export function registerManualListEditRoutes(router: Router, getClient: () => Tm
       throw new AppError(
         'TITLE_NOT_ACTIVE',
         409,
-        'That title is not on your list. Nothing was changed.',
+        'That title is not in your library. Nothing was changed.',
         { titleId },
       );
     }

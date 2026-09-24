@@ -85,7 +85,7 @@ export async function reextractBatch(
 
   const images = await listImagesForBatch(ownerId, batchId);
   if (images.length === 0) {
-    throw new AppError('NO_IMAGES', 400, 'This batch has no screenshots to read again.', {
+    throw new AppError('NO_IMAGES', 400, 'This import has no screenshots to read again.', {
       batchId,
     });
   }

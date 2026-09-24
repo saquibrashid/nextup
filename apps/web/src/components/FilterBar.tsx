@@ -384,7 +384,7 @@ export function FilterBar({
         hidden={inline}
         data-testid={inline ? undefined : 'filter-bar'}
         role="group"
-        aria-label={inline ? 'Quick filters' : 'Filter the list'}
+        aria-label={inline ? 'Quick filters' : 'Filter the library'}
       >
         {/*
         Owner-approved 2026-09-17 (`specs/ui.md` §2.1 item 2) — the six fields

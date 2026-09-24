@@ -154,7 +154,9 @@ describe('BatchAppliedNotice — T-UX-065', () => {
     await userEvent.click(screen.getByRole('button', { name: UNDO_REMOVALS_LABEL }));
 
     await waitFor(() => {
-      expect(screen.getByRole('status')).toHaveTextContent('Those titles are back on your list.');
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Those titles are back in your library.',
+      );
     });
     expect(screen.queryByRole('button')).toBeNull();
   });

@@ -208,8 +208,8 @@ function ExtractionError({
             {STATUS_RETRY_LABEL}
           </Button>
         )}
-        {/* §5.5 offers Discard batch as well as Try again (US-006 AC-4/AC-6);
-            §5.6 is transient — the service is merely busy, the batch is still
+        {/* §5.5 offers Discard import as well as Try again (US-006 AC-4/AC-6);
+            §5.6 is transient — the service is merely busy, the import is still
             good, and offering to destroy it there would be wrong. */}
         {!unavailable && onDiscard !== undefined && (
           <Button
@@ -394,7 +394,7 @@ export function BatchStatusPage({
                   : STATUS_TITLE}
         </h1>
         {(inProgress || batch.status === 'extraction-failed') && (
-          <p>Your list stays unchanged until you review and confirm the titles.</p>
+          <p>Your library stays unchanged until you review and confirm the titles.</p>
         )}
       </header>
       {readError}
@@ -402,7 +402,7 @@ export function BatchStatusPage({
       {terminal && (
         <div className="upload-checkpoint__actions">
           <Link to="/" className="tap-target">
-            Your list
+            Your library
           </Link>
           <Link to="/upload" className="tap-target">
             Start another capture
@@ -414,7 +414,7 @@ export function BatchStatusPage({
       )}
 
       {/* ⚠ ABOVE the error branch, and deliberately so. Offline is not a
-          failure of the batch — §5.8 says polling pauses and "no error is
+          failure of the import — §5.8 says polling pauses and "no error is
           invented" — so it must be able to show alongside whatever the last
           known state was. */}
       {offline && (
@@ -482,8 +482,8 @@ export function BatchStatusPage({
             if (!busy) setConfirmAction(null);
           }}
         >
-          <h2 id={confirmHeading}>Discard this batch?</h2>
-          <p>Your list will not change.</p>
+          <h2 id={confirmHeading}>Discard this import?</h2>
+          <p>Your library will not change.</p>
           {actionError !== null && <p role="alert">{actionError}</p>}
           {busy && <p role="status">Saving your request…</p>}
           {offline && <p>{STATUS_OFFLINE}</p>}
@@ -499,7 +499,7 @@ export function BatchStatusPage({
                 else onDiscard?.();
               }}
             >
-              Discard batch and continue
+              Discard import and continue
             </Button>
           </div>
         </Dialog>
@@ -515,7 +515,7 @@ export function BatchStatusPage({
       )}
       {inProgress && (
         <p className="batch-status__zero-yield">
-          Reading can take a few minutes. You can leave this page and return to the saved batch.
+          Reading can take a few minutes. You can leave this page and return to the saved import.
         </p>
       )}
       <ul className="batch-status__images" data-testid="batch-status-images">

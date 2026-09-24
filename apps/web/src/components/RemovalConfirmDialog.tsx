@@ -113,7 +113,7 @@ export function RemovalConfirmDialog({
           changes below. Apply updates your nextup list, not the streaming service.
         </p>
         <section className="review-confirm__group">
-          <h3>{`Add to your list (${additions.length})`}</h3>
+          <h3>{`Add to your library (${additions.length})`}</h3>
           {additions.length === 0 ? (
             <p>No titles will be added.</p>
           ) : (

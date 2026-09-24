@@ -65,11 +65,11 @@ export function CaptureNavigationProvider({ children }: { children: ReactNode })
           <h2 id={title}>Leave this capture?</h2>
           <p>
             Your local screenshots are not safely saved. Leaving clears this selection. Saved
-            screenshots stay in the batch.
+            screenshots stay in the import.
           </p>
           {busy && (
             <p>
-              A request is still in progress and may finish after you leave. Check the saved batch
+              A request is still in progress and may finish after you leave. Check the saved import
               before retrying.
             </p>
           )}

@@ -46,7 +46,7 @@ const remembered = (): URLSearchParams =>
   new URLSearchParams(localStorage.getItem('nextup.library.v1') ?? '');
 
 const FIELD_NAMES = [
-  'Added to list',
+  'Added to library',
   'Title',
   'Release date',
   'Runtime',
@@ -693,7 +693,7 @@ describe('T-UX-146 - the sort chooser and the toolbar it hides behind', () => {
     expect(trigger()).toHaveAttribute('aria-expanded', 'false');
     await user.click(trigger());
     expect(trigger()).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('dialog', { name: 'Sort your list' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Sort your library' })).toBeInTheDocument();
   });
 
   it('T-UX-146c every chooser row names its field and spells out its direction', () => {

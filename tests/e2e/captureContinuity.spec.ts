@@ -122,7 +122,17 @@ for (const width of [280, 390, 1440]) {
       });
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/about');
-      await page.locator('a[href="/upload"]:visible').first().click();
+      const primary = page.getByRole('navigation', { name: 'Primary' });
+      const inlineImport = primary.getByRole('link', { name: 'Import', exact: true });
+      if ((await inlineImport.count()) > 0) {
+        await inlineImport.click();
+      } else {
+        await primary.getByRole('button', { name: 'Menu' }).click();
+        await page
+          .getByRole('dialog', { name: 'Menu' })
+          .getByRole('link', { name: 'Import', exact: true })
+          .click();
+      }
       await expect(page.getByTestId('file-input')).toBeEnabled();
       await page.getByTestId('file-input').setInputFiles([
         { name: 'unknown.png', mimeType: 'image/png', buffer: png },
@@ -142,7 +152,7 @@ for (const width of [280, 390, 1440]) {
       await page.getByRole('radio', { name: 'Netflix', exact: true }).check();
       await page.getByTestId('mode-card-full-update').getByRole('radio').check();
       await page.getByTestId('submit-button').click();
-      await page.getByRole('button', { name: 'Open saved batch' }).click();
+      await page.getByRole('button', { name: 'Open saved import' }).click();
       await expect(
         page.getByRole('heading', { name: 'Check your saved screenshots' }),
       ).toBeVisible();
@@ -176,7 +186,7 @@ for (const width of [280, 390, 1440]) {
       await expect(page.getByTestId('draft-submit')).toBeEnabled();
       await page.locator('a[href="/"]:visible').first().click();
       await expect(page).toHaveURL('/');
-      await expect(page.getByRole('heading', { name: 'Your list', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Library', exact: true })).toBeVisible();
       await expect(leave).toHaveCount(0);
       expect(writes).toBe(2);
     });

@@ -38,7 +38,7 @@ export function tileNextStep(candidate: ReviewCandidate, service: Service | null
   }
   return candidate.match.uncertain || candidate.match.ambiguous
     ? 'Several readings or matches may be possible. Check the original tile and choose the right work.'
-    : 'New to your list. Is this match correct?';
+    : 'New to your library. Is this match correct?';
 }
 
 export function TileReview({

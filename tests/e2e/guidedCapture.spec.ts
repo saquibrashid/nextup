@@ -118,7 +118,7 @@ describe('T-POL-003a calm capture framing', () => {
         });
         await page.setViewportSize({ width, height: 900 });
         await page.goto('/upload');
-        await expect(page.getByRole('heading', { level: 1 })).toHaveText('Upload screenshots');
+        await expect(page.getByRole('heading', { level: 1 })).toHaveText('Import screenshots');
         expect(
           await page
             .getByRole('heading', { level: 1 })
@@ -259,7 +259,7 @@ test('T-MOCK-003a: mockup upload framing retains real choices and a readable num
   await page.route('**/api/batches?open=true', (route) => route.fulfill({ json: { batches: [] } }));
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/upload');
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Upload screenshots');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Import screenshots');
   const step = page
     .getByRole('list', { name: 'Capture progress' })
     .locator('[aria-current="step"]');

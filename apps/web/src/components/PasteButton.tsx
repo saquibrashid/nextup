@@ -176,7 +176,7 @@ export function PasteButton({
         ⚠ §4.11 / `A45` — A PASTE NEEDS A `POST`, so the button is disabled
         offline exactly as submit is, and carries the reason as VISIBLE text.
         Leaving it enabled would let the owner paste screenshot after
-        screenshot into a batch that cannot receive any of them; they would
+        screenshot into an import that cannot receive any of them; they would
         only discover it at submit, with the work already done.
       */}
       {offline && (

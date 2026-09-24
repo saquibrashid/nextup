@@ -163,32 +163,6 @@
    */
   --tap-target-min: 44px;
   /*
-   * REQ-117 — the height the bottom-fixed phone bar occupies, and therefore
-   * the clearance `.app-shell` must reserve beneath its content.
-   *
-   * ⚠ ONE DEFINITION, TWO CONSUMERS, AND THAT IS THE WHOLE POINT. The bar's
-   * own `min-height` and the shell's bottom padding are the same measurement
-   * stated twice; typed as two literals they drift, and the failure is a bar
-   * that covers the last row of a list — the rows at the end of the scroll,
-   * which is exactly where the eye stops. `T-UX-137b` asserts the padding is
-   * expressed in terms of this token rather than a number.
-   *
-   * ⚠ IT IS A FLOOR THAT MUST NOT BE UNDERCUT BY THE BAR'S OWN CONTENT, and
-   * that is the whole reason for the value. `.nav` applies it as `min-height`,
-   * so the bar is exactly this tall ONLY WHILE it exceeds what a slot
-   * naturally measures — and a slot is icon over label (§7c), not a single
-   * line: `.tap-target` padding (2 × `--space-2`) + the 1.25em icon + the
-   * `--space-1` gap + a `--text-sm` label at `--leading-normal` + the 2px
-   * active rule, inside `.nav`'s own 2 × `--space-1`. That is ~71 px. At the
-   * original ~56 px the token was BELOW the rendered bar, so the clearance
-   * under-reserved by ~15 px and the last control on a long page stayed
-   * un-tappable while every unit assertion here still passed — `T-E2E-001b`
-   * caught it at 320 px, with the bar intercepting `apply-changes-button`.
-   * Raising this is therefore not cosmetic: it is what makes "the padding
-   * equals the bar height" TRUE rather than merely well-expressed.
-   */
-  --nav-bar-height: 5rem;
-  /*
    * REQ-105 — the open row menu overlaps the row beneath it, so it needs a
    * shadow to read as a layer rather than as part of that row.
    *
@@ -326,24 +300,6 @@ ol {
 html {
   /* ⚠ Never a fixed px root size: it overrides the browser's text setting. */
   -webkit-text-size-adjust: 100%;
-
-  /*
-   * REQ-117 — CLEARANCE FOR *BROWSER-DRIVEN* SCROLLING, which is a different
-   * problem from the reader's clearance and needs its own declaration.
-   *
-   * ⚠ `.app-shell`'s `padding-bottom` IS NOT ENOUGH ON ITS OWN. It guarantees
-   * the owner CAN scroll the last control clear of the bar; it does nothing
-   * about scrolls the browser performs itself. `scrollIntoView` and the scroll
-   * that follows keyboard focus both move an element only just inside the
-   * viewport — i.e. flush with the bottom edge, which is exactly where the
-   * fixed bar sits. The control is then on screen and un-tappable.
-   *
-   * ⚠ SO THIS IS AN ACCESSIBILITY FIX, NOT A TEST ACCOMMODATION. It was found
-   * by Playwright reporting `nav__item` and `nav__link` as intercepting
-   * pointer events on `apply-changes-button`, but the owner meets the same
-   * bug whenever they Tab to a control near the foot of a long page.
-   */
-  scroll-padding-bottom: calc(var(--nav-bar-height) + env(safe-area-inset-bottom));
 }
 
 body {
@@ -932,19 +888,11 @@ button {
    */
 
   /*
-   * REQ-117 — clearance for the bottom-fixed bar, which is OUT OF FLOW and
-   * therefore reserves no space of its own.
-   *
-   * ⚠ WITHOUT THIS THE BAR SITS ON TOP OF THE CONTENT, and it looks fine on
-   * every screen that does not scroll to its end. The rows it eats are the
-   * last ones in the list.
-   *
    * ⚠ THE `env()` TERM IS NOT DECORATION: on a notched iPhone the home
-   * indicator occupies real estate below the bar, so the clearance is the bar
-   * plus that inset, not the bar alone. `env()` resolves to `0` where there is
-   * no inset, so this is correct on every other device too.
+   * indicator occupies real estate at the foot of the page. `env()` resolves
+   * to `0` where there is no inset, so this is correct on every other device.
    */
-  padding-bottom: calc(var(--space-4) + var(--nav-bar-height) + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
 }
 
 .app-shell__logo {
@@ -993,8 +941,8 @@ button {
  * is the single most visible defect of the epic: a wrapped column of blue
  * browser-default links above every screen. Nothing below is decoration.
  *
- * ⚠ MOBILE-FIRST (§13.3). What follows IS the 320 px case — the three-slot
- * destination bar — and `@media (min-width: 640px)` widens it. Written the
+ * ⚠ MOBILE-FIRST (§13.3). What follows IS the 320 px case — the brand and
+ * the Menu button — and `@media (min-width: 640px)` widens it. Written the
  * other way up, the floor NFR-006 mandates becomes the case reached by
  * subtraction, which is the one nobody looks at.
  */
@@ -1031,46 +979,29 @@ button {
 }
 
 /*
- * REQ-117 — below `--bp-sm` the nav IS the bottom bar.
+ * REQ-117 as revised by issue 369 — the nav sits in the header at every
+ * width. Below `--bp-sm` it holds only the Menu button; from `--bp-sm` up it
+ * also shows Library, Import and Review inline.
  *
- * ⚠ MOBILE-FIRST, SO THIS IS THE BASE RULE AND THE DESKTOP IS THE OVERRIDE
- * (§13.3). `T-CSS-001d` forbids `max-width` anywhere, so the phone case
- * cannot be expressed as a query at all — it has to be the default, and the
- * `min-width: 640px` block below is what puts the nav back in the header.
+ * ⚠ THERE IS NO BOTTOM-FIXED BAR ANY MORE, AND NO CLEARANCE TOKEN. The old
+ * `--nav-bar-height` reservation (shell padding, `scroll-padding-bottom`,
+ * the sticky review bar's `bottom`) went with it; reintroducing a fixed bar
+ * without them buries the last control on every long page.
  *
- * ⚠ IT STAYS INSIDE THE `<header>` IN THE DOM. There is exactly one `<nav>`
- * per page (`T-A11Y-004`, `T-UI-023c`); a second one rendered only on phones
- * is the idiomatic build and fails those tests on every route at once. Fixed
- * positioning takes it out of flow without moving it in the document, so the
- * landmark count is untouched and the tab order still reaches navigation
- * before content.
- *
- * ⚠ THE `padding-bottom` IS THE SAFE-AREA INSET, NOT A GAP. On a notched
- * iPhone the home indicator sits below the bar; without it the labels are
- * under the indicator and the taps land on the wrong thing.
+ * ⚠ ONE `<nav>` PER PAGE (`T-A11Y-004`, `T-UI-023c`). The drawer's links are
+ * inside a modal dialog portalled to `<body>`, not a second landmark.
  */
 .nav {
-  background: var(--color-surface);
-  border-top: 1px solid var(--color-border);
-  bottom: 0;
-  flex: 1 1 100%;
-  inset-inline: 0;
-  min-height: var(--nav-bar-height);
-  padding: var(--space-1) var(--space-3) calc(var(--space-1) + env(safe-area-inset-bottom));
-  position: fixed;
-  z-index: 30;
+  flex: 0 1 auto;
+  margin-inline-start: auto;
 }
 
 .nav__list {
+  align-items: center;
   display: flex;
-  /*
-   * ⚠ REQ-117 — the three slots are spread across the bar's full width so each
-   * is its own thumb target. `flex-wrap` stays for the 320 px floor: a bar
-   * that clips its third slot is worse than one that grows a row.
-   */
-  justify-content: space-around;
   flex-wrap: wrap;
   gap: var(--space-1);
+  justify-content: flex-end;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -1081,7 +1012,7 @@ button {
 }
 
 /*
- * A text destination: the wide bar, and every row of the `More` panel.
+ * A text destination: the wide bar, and every row of the Menu drawer.
  *
  * ⚠ THE TRANSPARENT BOTTOM BORDER IS LOAD-BEARING, NOT A PLACEHOLDER. The
  * active state swaps its colour, so the inactive and active boxes are the same
@@ -1122,91 +1053,48 @@ button {
 }
 
 /*
- * One slot of the phone destination bar: icon over label (§7c). Three slots
- * share the width, so each is a flexible column rather than a fixed box.
+ * The Menu button (issue 369): present at every width, the only header
+ * control below `--bp-sm`. It opens the drawer, which lists every
+ * destination — nothing is nested behind a second "More" disclosure.
  */
-.nav__slot {
-  border-bottom: 2px solid transparent;
-  border-radius: var(--radius);
-  color: var(--color-text);
-  flex-direction: column;
-  gap: var(--space-1);
-  text-decoration: none;
-}
-
-.nav__slot:focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-}
-
-.nav__slot--active {
-  border-bottom-color: var(--color-accent);
-  color: var(--color-accent);
-  font-weight: var(--weight-bold);
-  background: var(--color-accent-soft);
-}
-
-/*
- * ⚠ `--text-sm`, NOT `--text-xs` (`T-CSS-007`). A bar label is content — it is
- * the only thing naming the destination, because §7c forbids the icon standing
- * alone — so shrinking it to win a few pixels of width is exactly the density
- * failure that gate exists to catch.
- */
-.nav__slot-label {
-  font-size: var(--text-sm);
-}
-
-/*
- * ⚠ `position: relative` SO THE PANEL IS ANCHORED TO `More` ITSELF. The same
- * lesson as REQ-105's row menu: a panel positioned against the page rather
- * than against its trigger lands somewhere plausible at one width and
- * somewhere absurd at another.
- */
-.nav__more {
+.nav__menu {
   margin: 0;
-  position: relative;
+}
+
+.nav__menu > .btn {
+  gap: var(--space-2);
 }
 
 /*
- * ⚠ LAYOUT BELONGS TO THE PARENT, NOT TO A BUTTON VARIANT. `Button` refuses a
- * `className` by design (§7d), so the icon-over-label stacking that makes the
- * `More` control match its two sibling slots is applied from here. A fifth
- * button variant differing only in flex direction is the drift that rule
- * exists to prevent.
+ * The Menu drawer — a `Dialog` pinned to the inline-start edge.
+ *
+ * ⚠ IT SCROLLS ITSELF (issue 369). Eight destinations at `--text-base` exceed
+ * a landscape phone's height; `overflow-y: auto` inside a `max-block-size`
+ * keeps every one reachable, and `overscroll-behavior` stops the gesture
+ * chaining to the (inert, scroll-locked) page underneath.
  */
-.nav__more .btn {
-  flex-direction: column;
-  gap: var(--space-1);
+.dialog--drawer {
+  box-shadow: var(--shadow-menu);
+  inline-size: min(20rem, 100%);
+  max-block-size: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  place-self: stretch start;
 }
 
-.nav__panel {
-  background: var(--color-surface);
-  /*
-   * ⚠ REQ-117 — the panel opens UPWARD, because its trigger now sits on the
-   * bottom edge of the screen. Anchored below `More` (the desktop position,
-   * `top: 100%`) every row of it would be off-screen, and the disclosure would
-   * open onto nothing while reporting `aria-expanded="true"`. The
-   * `min-width: 640px` block restores `top: 100%` for the header nav.
-   */
-  bottom: 100%;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-menu);
+.nav-drawer__list {
   display: flex;
   flex-direction: column;
-  inset-inline-end: 0;
+  gap: var(--space-1);
   list-style: none;
-  /*
-   * ⚠ THE SHORTHAND MUST COME FIRST. Written after `margin-bottom` it resets
-   * it to `0` and the panel sits flush against the bar — silently, because
-   * both declarations are present and look intentional.
-   */
   margin: 0;
-  margin-bottom: var(--space-1);
-  min-width: 12rem;
-  padding: var(--space-2);
-  position: absolute;
-  z-index: 20;
+  padding: 0;
+}
+
+.nav-drawer__list .nav__link {
+  justify-content: flex-start;
+  width: 100%;
 }
 
 /* ------------------------------------------------------------- dropzone -- */
@@ -2500,11 +2388,12 @@ button {
   border: 1px solid var(--color-danger);
   border-radius: var(--radius);
   color: var(--color-danger);
+  display: inline-block;
   font-size: var(--text-sm);
   font-weight: var(--weight-normal);
   margin-left: var(--space-2);
+  max-inline-size: calc(100% - var(--space-2));
   padding: var(--space-1) var(--space-2);
-  white-space: nowrap;
 }
 
 /*
@@ -2815,7 +2704,7 @@ button {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-menu);
-  bottom: calc(var(--nav-bar-height) + env(safe-area-inset-bottom));
+  bottom: env(safe-area-inset-bottom);
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-3);
@@ -2872,64 +2761,12 @@ button {
 
 @media (min-width: 640px) {
   /*
-   * ⚠ REQ-117 — THE SCROLL CLEARANCE IS RESET TOO. There is no bottom bar
-   * above `--bp-sm`, so leaving this in place would stop `scrollIntoView` and
-   * focus scrolling short of the true viewport foot on every desktop page.
-   * `T-UX-137i` asserts both halves.
-   */
-  html {
-    scroll-padding-bottom: 0;
-  }
-
-  /*
-   * ⚠ REQ-117 — THE `padding` SHORTHAND IS ALSO THE CLEARANCE RESET. The base
-   * rule adds a `padding-bottom` reserving room for the bottom-fixed bar;
-   * above `--bp-sm` there is no such bar, and this shorthand is what removes
-   * that reservation. Rewriting it as four longhands, or as `padding-inline` /
-   * `padding-top`, silently leaves a bar's worth of dead space under every
-   * desktop page. `T-UX-137g` asserts the shorthand.
+   * The wider shell padding. Since issue 369 there is no bottom-fixed bar to
+   * clear, so this shorthand only restates the gutter at `--space-5`; the
+   * base rule's `padding-bottom` is the home-indicator inset alone.
    */
   .app-shell {
     padding: var(--space-5);
-  }
-
-  /*
-   * ⚠ ABOVE `--bp-sm` THE NAV SITS BESIDE THE BRAND, NOT UNDER IT. Below it
-   * the nav takes the whole row because three slots need the width; here the
-   * text links fit alongside. `flex: 0 1 auto` is the RESET of the
-   * mobile-first `flex: 1 1 100%` — omitting it leaves a full-width nav
-   * wrapping under the logo on a desktop, which looks like the media query
-   * never applied at all.
-   *
-   * ⚠ REQ-117 — AND THIS IS WHERE THE BOTTOM BAR IS UNDONE. Every property
-   * the base rule sets to make the phone bar must be reset here, not merely
-   * the interesting one: a `position: static` that leaves the surface and the
-   * top border behind produces a stray bordered strip across the header that
-   * reads as a rendering bug. `T-UX-137f` asserts the reset names all of
-   * them.
-   */
-  .nav {
-    background: none;
-    border-top: none;
-    flex: 0 1 auto;
-    min-height: 0;
-    padding: 0;
-    position: static;
-  }
-
-  /*
-   * The header nav is in flow with room beneath it, so the panel returns to
-   * hanging below its trigger.
-   */
-  .nav__panel {
-    bottom: auto;
-    margin-bottom: 0;
-    top: 100%;
-  }
-
-  .nav__more .btn {
-    flex-direction: row;
-    align-items: center;
   }
 
   .nav__list {
@@ -4301,7 +4138,7 @@ button {
 .filter-disclosure__panel {
   position: fixed;
   inset-inline: var(--space-4);
-  bottom: calc(var(--nav-bar-height) + env(safe-area-inset-bottom) + var(--space-2));
+  bottom: calc(env(safe-area-inset-bottom) + var(--space-2));
   max-height: 65dvh;
   overflow-y: auto;
   padding: var(--space-4);
@@ -5003,25 +4840,21 @@ button {
     height: 1.5rem;
   }
 
+  /* The sidebar is a column: the auto margin that right-aligns the bar would stop it stretching. */
+  .nav {
+    margin-inline-start: 0;
+  }
+
   .nav__list {
     flex-direction: column;
     align-items: stretch;
   }
 
   .nav__link,
-  .nav__more > .btn {
+  .nav__menu > .btn {
     width: 100%;
     justify-content: flex-start;
     font-size: var(--text-sm);
-  }
-
-  .nav__panel {
-    position: static;
-    width: auto;
-    min-width: 0;
-    margin-top: var(--space-2);
-    padding: var(--space-1);
-    box-shadow: none;
   }
 
   .title-list[data-view='grid'] {

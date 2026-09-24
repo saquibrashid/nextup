@@ -139,7 +139,7 @@ describe('T-UX-165 journey continuity', () => {
     const discardBatch = vi.fn(() => pending.promise);
     mount({ ...apiClient, getBatch, discardBatch });
     fireEvent.click(await screen.findByRole('button', { name: STATUS_DISCARD_BATCH_LABEL }));
-    fireEvent.click(screen.getByRole('button', { name: 'Discard batch and continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discard import and continue' }));
     fireEvent.click(screen.getByRole('link', { name: 'Leave capture' }));
     await act(async () => pending.resolve({}));
     expect(screen.getByText('About destination')).toBeVisible();
@@ -261,7 +261,7 @@ describe('T-UX-165 journey continuity', () => {
       </MemoryRouter>,
     );
     expect(screen.getByTestId('batch-card-status')).toHaveTextContent('Ready to review');
-    expect(screen.getByTestId('batch-card-mode')).toHaveTextContent('Add to list');
+    expect(screen.getByTestId('batch-card-mode')).toHaveTextContent('Add to library');
     expect(screen.getByTestId('batch-card-link')).toHaveTextContent('Continue review');
     expect(screen.getByTestId('batch-card-link')).toHaveAttribute('href', '/batches/first');
   });

@@ -38,14 +38,22 @@
  * indicator is invisible to roughly one man in twelve, and to anyone in bright
  * sunlight - which is where a phone is used.
  *
- * ⚠ COLLAPSING A ROUTE OUT OF THE BAR MUST NEVER COLLAPSE IT OUT OF THE ROUTER
- * (`T-UX-133`). The destinations behind `More` keep their own URLs, are
- * reachable by direct link, and are still marked `aria-current` when open.
- * `More` is a disclosure over the SAME route table, never a second routing
- * mechanism.
+ * ⚠ HIDING A ROUTE FROM THE BAR MUST NEVER HIDE IT FROM THE ROUTER
+ * (`T-UX-133`). The Menu drawer (issue 369) lists EVERY destination as a real
+ * link over the SAME route table, so each keeps its own URL, is reachable by
+ * direct link, and is marked `aria-current` in the drawer. It replaced the
+ * `More` overflow: nothing is nested behind a second disclosure.
  */
 
-import { useEffect, useRef, useState, type ComponentType, type JSX } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ComponentType,
+  type JSX,
+  type RefObject,
+} from 'react';
 import { NavLink, Outlet, matchPath, useLocation } from 'react-router-dom';
 
 import { ErrorBoundary } from './ErrorBoundary';
@@ -57,11 +65,12 @@ import { LibraryNavigation } from './LibraryNavigation';
 // is the REGISTER that makes REQ-124's set closed; importing a drawing
 // directly bypasses it, and an unregistered icon could then ship without ever
 // meeting `T-UI-030`'s count.
-import { BrandIcon, HistoryIcon, ListIcon, MoreIcon, UploadIcon } from './icons';
+import { BrandIcon, CloseIcon, HistoryIcon, ListIcon, MenuIcon, UploadIcon } from './icons';
 import { Button } from './ui/Button';
+import { Dialog } from './ui/Dialog';
 import { useOnline } from '../lib/useOnline';
 import { useWideViewport } from '../lib/useWideViewport';
-import { NAV_MORE_LABEL } from '../copy';
+import { NAV_MENU_CLOSE_LABEL, NAV_MENU_LABEL, NAV_MENU_TITLE } from '../copy';
 import { ROUTES, type RouteDefinition } from '../routes';
 
 type NavRoute = RouteDefinition & { readonly navLabel: string };
@@ -71,22 +80,12 @@ const NAV_ITEMS: readonly NavRoute[] = ROUTES.filter(
 );
 
 /**
- * REQ-117's two real destinations, resolved by the owner at `A53` (OQ-2).
- *
- * ⚠ TWO, PLUS OVERFLOW - AND THE SPARE-LOOKING THIRD SLOT IS NOT AN OMISSION
- * TO BE HELPFULLY CORRECTED. These two are the value loop (*see the list*,
- * *feed the list*); everything else is somewhere the owner goes deliberately,
- * not repeatedly. Promoting `/removed` or `/batches` into the third slot is
- * the obvious "improvement", and it is the thing §6 explicitly forbids.
- *
- * ⚠ THE OVERFLOW IS "EVERYTHING ELSE", NOT A SECOND HAND-WRITTEN LIST. §6
- * names `/removed`, `/not-interested` and `/batches` because those were the
- * only overflow routes when it was written; `/waiting`, `/about` and `/rating`
- * have since joined the table. Enumerating the overflow here would have left
- * three routes in neither list - silently absent from the phone entirely.
+ * The owner's hybrid navigation (issue 369): at and above `--bp-sm` the bar
+ * shows the three destinations of the value loop — Library, Import, Review —
+ * beside a Menu button; below it the bar is the Menu button alone. The drawer
+ * lists all destinations at every width.
  */
-const PHONE_BAR_PATHS: readonly string[] = ['/', '/upload'];
-const DESKTOP_BAR_PATHS: readonly string[] = ['/', '/upload', '/batches'];
+const BAR_PATHS: readonly string[] = ['/', '/upload', '/batches'];
 
 /** Reuse only icons whose meaning matches the destination; labels remain visible. */
 const BAR_ICONS: Record<string, ComponentType<{ readonly label?: string | undefined }>> = {
@@ -100,7 +99,7 @@ const BAR_ICONS: Record<string, ComponentType<{ readonly label?: string | undefi
  *
  * ⚠ `end` IS THE WHOLE SUBTLETY, AND `/` IS THE CASE IT RUINS. `matchPath`
  * with `end: false` compiles `/` to a prefix that matches EVERY path in the
- * application, so without this guard the *List* destination reports itself
+ * application, so without this guard the *Library* destination reports itself
  * active on all eleven routes - and the styling would highlight every
  * destination at once. `T-UX-117d` fails the moment the guard is removed.
  *
@@ -114,33 +113,11 @@ const BAR_ICONS: Record<string, ComponentType<{ readonly label?: string | undefi
  * `T-UX-117b` asserts the two land on the same element.
  *
  * ⚠ EVERY OTHER ROUTE WANTS `end: false`, so `/batches/:id/review` keeps
- * *Batches* marked. That is the point of a prefix match, and the reason this
+ * *Review* marked. That is the point of a prefix match, and the reason this
  * is not simply `pathname === routePath`.
  */
 function isRouteActive(pathname: string, routePath: string): boolean {
   return matchPath({ path: routePath, end: routePath === '/' }, pathname) !== null;
-}
-
-/**
- * Whether `pathname` IS `routePath`, rather than merely inside it.
- *
- * ⚠ HIGHLIGHTING AND AUTO-OPENING ARE NOT THE SAME QUESTION, AND SHARING ONE
- * MATCHER BETWEEN THEM IS A REAL DEFECT. `isRouteActive` is a PREFIX match on
- * purpose, so *Batches* stays marked while the owner is on
- * `/batches/:id/review` - correct for a highlight. Feeding that same answer to
- * the `More` panel's default state opens the panel on every child screen of an
- * overflow destination, and the panel opens UPWARD over the page: on the
- * review screen it covered `Apply changes`, so the owner's last action was
- * visible and un-tappable. `T-E2E-001b` caught it at 320 px with
- * `nav__link` intercepting the click; nothing in the unit suite could, because
- * the panel was genuinely open and genuinely correct-looking.
- *
- * The panel should default open only where the owner has actually ARRIVED at
- * an overflow destination - which is what `T-UX-133b` asks for and all it
- * asks for.
- */
-function isRouteExact(pathname: string, routePath: string): boolean {
-  return matchPath({ path: routePath, end: true }, pathname) !== null;
 }
 
 /*
@@ -158,27 +135,29 @@ const NAV_LINK_CLASS: Record<ActiveKey, string> = {
   inactive: 'nav__link tap-target',
 };
 
-const NAV_SLOT_CLASS: Record<ActiveKey, string> = {
-  active: 'nav__slot nav__slot--active tap-target',
-  inactive: 'nav__slot tap-target',
-};
-
 function activeKey(active: boolean): ActiveKey {
   return active ? 'active' : 'inactive';
 }
 
-/** A text destination - the wide bar, and every row of the `More` panel. */
+/** A text destination - the wide bar, and every row of the Menu drawer. */
 function NavTextLink({
   route,
   active,
+  onNavigate,
 }: {
   readonly route: NavRoute;
   readonly active: boolean;
+  readonly onNavigate?: () => void;
 }): JSX.Element {
   const key = activeKey(active);
   const Icon = BAR_ICONS[route.path];
   return (
-    <NavLink to={route.path} end={route.path === '/'} className={NAV_LINK_CLASS[key]}>
+    <NavLink
+      to={route.path}
+      end={route.path === '/'}
+      className={NAV_LINK_CLASS[key]}
+      onClick={onNavigate}
+    >
       {Icon ? <Icon /> : null}
       {route.navLabel}
     </NavLink>
@@ -186,27 +165,56 @@ function NavTextLink({
 }
 
 /**
- * One slot of the phone bar: icon over label.
+ * The Menu drawer: every destination, directly, in route order.
  *
- * ⚠ THE LABEL IS ALWAYS RENDERED, SO THE ICON IS ALWAYS DECORATIVE (§7c: an
- * icon is never the sole label). An icon-only bar would also fail REQ-116's
- * sibling rule for the same reason the colour-only active cue does - the whole
- * distinction would rest on a single channel.
+ * ⚠ BUILT ON THE `Dialog` PRIMITIVE, NOT A SECOND FOCUS IMPLEMENTATION. The
+ * drawer covers the page, so it is modal: focus moves in and is trapped,
+ * Escape and the backdrop close it, the background is inert and cannot scroll,
+ * and focus returns to the Menu button — all owned by `Dialog` and asserted by
+ * `T-A11Y-006` / `T-UI-031f` already.
+ *
+ * ⚠ A LINK CLOSES THE DRAWER BEFORE IT NAVIGATES. Closing afterwards, from a
+ * location effect, would restore focus to the Menu button AFTER the route had
+ * moved focus into the new page. Following the link to the page you are
+ * already on closes it too, which a location effect alone never sees.
  */
-function NavBarSlot({
-  route,
-  active,
+function NavDrawer({
+  pathname,
+  onClose,
+  returnFocus,
 }: {
-  readonly route: NavRoute;
-  readonly active: boolean;
+  readonly pathname: string;
+  readonly onClose: () => void;
+  readonly returnFocus: RefObject<HTMLButtonElement | null>;
 }): JSX.Element {
-  const Icon = BAR_ICONS[route.path];
-  const key = activeKey(active);
+  const headingId = useId();
   return (
-    <NavLink to={route.path} end={route.path === '/'} className={NAV_SLOT_CLASS[key]}>
-      {Icon ? <Icon /> : null}
-      <span className="nav__slot-label">{route.navLabel}</span>
-    </NavLink>
+    <Dialog
+      variant="drawer"
+      id="nav-drawer"
+      aria-labelledby={headingId}
+      onDismiss={onClose}
+      returnFocus={returnFocus}
+      data-testid="nav-drawer"
+    >
+      <div className="panel-head">
+        <h2 id={headingId}>{NAV_MENU_TITLE}</h2>
+        <Button variant="ghost" aria-label={NAV_MENU_CLOSE_LABEL} onClick={onClose}>
+          <CloseIcon />
+        </Button>
+      </div>
+      <ul className="nav-drawer__list">
+        {NAV_ITEMS.map((route) => (
+          <li key={route.path} className="nav__item">
+            <NavTextLink
+              route={route}
+              active={isRouteActive(pathname, route.path)}
+              onNavigate={onClose}
+            />
+          </li>
+        ))}
+      </ul>
+    </Dialog>
   );
 }
 
@@ -227,46 +235,14 @@ export function AppShell(): JSX.Element {
     }
   }, [location.pathname]);
 
-  const barPaths = wide ? DESKTOP_BAR_PATHS : PHONE_BAR_PATHS;
-  const barItems = NAV_ITEMS.filter((route) => barPaths.includes(route.path));
-  const overflowItems = NAV_ITEMS.filter((route) => !barPaths.includes(route.path));
-  const overflowHoldsCurrent = overflowItems.some((route) =>
-    isRouteExact(location.pathname, route.path),
-  );
+  const barItems = wide ? NAV_ITEMS.filter((route) => BAR_PATHS.includes(route.path)) : [];
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
-  /*
-   * ⚠ `null` MEANS "THE OWNER HAS NOT DECIDED", NOT "CLOSED". The panel must
-   * be open when the route you are ON lives behind it - otherwise `T-UX-133`
-   * cannot hold at all: a deep link to `/removed` would render a closed
-   * disclosure, and the `aria-current="page"` the requirement asks for would
-   * be on an element that does not exist. A plain `useState(false)` looks
-   * correct and quietly makes the requirement unsatisfiable.
-   */
-  const [openOverride, setOpenOverride] = useState<boolean | null>(null);
-  const moreRef = useRef<HTMLLIElement>(null);
-  const moreButtonRef = useRef<HTMLButtonElement>(null);
-
-  /*
-   * ⚠ RESET ON NAVIGATION, so an override never outlives the decision that
-   * produced it. Without this, opening `More`, going to `/removed` and then
-   * pressing back leaves the panel forced open - or forced shut while the
-   * current route is inside it, which is the failing half.
-   */
+  // Back/Forward while the drawer is open closes it too.
   useEffect(() => {
-    setOpenOverride(null);
+    setMenuOpen(false);
   }, [location.pathname]);
-
-  const expanded = openOverride ?? overflowHoldsCurrent;
-  useEffect(() => {
-    if (!expanded) return;
-    function outside(event: PointerEvent): void {
-      if (event.target instanceof Node && !moreRef.current?.contains(event.target)) {
-        setOpenOverride(false);
-      }
-    }
-    document.addEventListener('pointerdown', outside);
-    return () => document.removeEventListener('pointerdown', outside);
-  }, [expanded]);
 
   return (
     <div className="app-shell">
@@ -279,68 +255,34 @@ export function AppShell(): JSX.Element {
         </NavLink>
         <nav aria-label="Primary" className="nav">
           <ul className="nav__list">
-            {wide
-              ? barItems.map((route) => (
-                  <li key={route.path} className="nav__item">
-                    <NavTextLink
-                      route={route}
-                      active={isRouteActive(location.pathname, route.path)}
-                    />
-                  </li>
-                ))
-              : barItems.map((route) => (
-                  <li key={route.path} className="nav__item">
-                    <NavBarSlot
-                      route={route}
-                      active={isRouteActive(location.pathname, route.path)}
-                    />
-                  </li>
-                ))}
-
-            <li
-              className="nav__more"
-              ref={moreRef}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape' && expanded) {
-                  setOpenOverride(false);
-                  moreButtonRef.current?.focus();
-                }
-              }}
-            >
+            {barItems.map((route) => (
+              <li key={route.path} className="nav__item">
+                <NavTextLink route={route} active={isRouteActive(location.pathname, route.path)} />
+              </li>
+            ))}
+            <li className="nav__menu">
               <Button
-                ref={moreButtonRef}
+                ref={menuButtonRef}
                 variant="ghost"
-                aria-expanded={expanded}
-                aria-controls="nav-more-panel"
-                onClick={() => setOpenOverride(!expanded)}
+                aria-expanded={menuOpen}
+                aria-controls="nav-drawer"
+                aria-haspopup="dialog"
+                onClick={() => setMenuOpen(true)}
               >
-                <MoreIcon />
-                <span className="nav__slot-label">{NAV_MORE_LABEL}</span>
+                <MenuIcon />
+                <span>{NAV_MENU_LABEL}</span>
               </Button>
-              {/*
-               * ⚠ NOT RENDERED WHEN CLOSED, rather than hidden with CSS. A
-               * `display: none` subtree is still in the document, so
-               * `T-UX-132`'s "reachable ONLY via More" would pass against a
-               * bar that in fact still exposed every link to anything
-               * reading the DOM - including a screen reader, on some
-               * hiding techniques.
-               */}
-              {expanded ? (
-                <ul className="nav__panel" id="nav-more-panel">
-                  {overflowItems.map((route) => (
-                    <li key={route.path} className="nav__item">
-                      <NavTextLink
-                        route={route}
-                        active={isRouteActive(location.pathname, route.path)}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
             </li>
           </ul>
         </nav>
       </header>
+      {menuOpen && (
+        <NavDrawer
+          pathname={location.pathname}
+          onClose={() => setMenuOpen(false)}
+          returnFocus={menuButtonRef}
+        />
+      )}
 
       <div className="app-shell__content">
         <OfflineBanner offline={!online} />

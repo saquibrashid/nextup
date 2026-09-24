@@ -120,7 +120,7 @@ export async function undoBatch(ownerId: OwnerId, batchId: string): Promise<Undo
       throw new AppError(
         'BATCH_NOT_CREATES_ONLY',
         409,
-        'This batch cannot be undone as a whole.',
+        'This import cannot be undone as a whole.',
         await buildRefusalDetails(ownerId, batchId, null),
       );
     }
@@ -130,7 +130,7 @@ export async function undoBatch(ownerId: OwnerId, batchId: string): Promise<Undo
     throw new AppError(
       'BATCH_NOT_CREATES_ONLY',
       409,
-      'This batch cannot be undone as a whole.',
+      'This import cannot be undone as a whole.',
       await buildRefusalDetails(ownerId, batchId, provenance),
     );
   }
@@ -145,7 +145,7 @@ export async function undoBatch(ownerId: OwnerId, batchId: string): Promise<Undo
     throw new AppError(
       'BATCH_NOT_CREATES_ONLY',
       409,
-      'This batch cannot be undone as a whole.',
+      'This import cannot be undone as a whole.',
       await buildRefusalDetails(ownerId, batchId, provenance, 'later-owner-edits'),
     );
   }

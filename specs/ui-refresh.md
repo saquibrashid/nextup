@@ -1016,7 +1016,42 @@ state diverge — the List destination renders highlighted on all eleven routes
 while assistive technology is told nothing. `T-UX-117b` asserts both land on
 the same element; `T-UX-117d` asserts the `/` case directly.
 
-### REQ-117 (`should`) — the phone gets a primary destination bar
+### REQ-117 (`should`) — a hybrid header with a Menu drawer
+
+> ✅ **CURRENT — issue 369, owner decision 2026-09-25 (ADR-0013 Revision 4).**
+> From `--bp-sm` up, the one header `<nav>` shows **Library (`/`), Import
+> (`/upload`) and Review (`/batches`)** inline, plus a **Menu** button. Below
+> `--bp-sm`, it shows **only the Menu button**. At every width, Menu
+> (`aria-expanded`, `aria-controls="nav-drawer"`, `aria-haspopup="dialog"`,
+> visible label *Menu*) opens a modal drawer on the `Dialog` primitive,
+> pinned to the inline-start edge. The drawer lists **every** nav route
+> directly, in route-table order: Library, Import, Review, Removal history,
+> Not interested, Waiting to stream, About, Rating lookup. It has no nested
+> disclosure and no *More*. The current page is marked `aria-current="page"`
+> with the non-colour active style (REQ-116). The drawer opens closed, even
+> on a deep link.
+>
+> - **Keyboard and focus:** focus moves into the drawer and is trapped
+>   there. This holds in WebKit too, whose default Tab order skips links.
+>   Escape, the backdrop and the labelled *Close menu* button all close the
+>   drawer and return focus to Menu. Following a link closes the drawer and
+>   then navigates. Changing location (including Back/Forward) closes it.
+> - **Layout:** the drawer is `min(20rem, 100%)` wide, fills the viewport
+>   height and scrolls itself (`overflow-y: auto`,
+>   `overscroll-behavior: contain`), so on a short viewport every
+>   destination stays reachable. It honours `env(safe-area-inset-bottom)`.
+> - **The bottom-fixed phone bar is withdrawn**, together with
+>   `--nav-bar-height`, the shell's bar clearance, `scroll-padding-bottom` and
+>   the sticky review bar's bar offset. A sticky footer control now clears
+>   only the home-indicator inset.
+> - **Unchanged:** URLs, deep links, Back/Forward, persisted library state
+>   and drafts. There is still exactly one `<nav>` (`T-A11Y-004`). `/upload`
+>   stays reachable from every width (REQ-039).
+>
+> Everything below this box, down to the test table, is the superseded
+> TASK-211 design. It is kept as history; **do not build it**.
+
+~~### REQ-117 (`should`) — the phone gets a primary destination bar~~
 
 **Approved desktop refinement (2026-09-16):** at and above `--bp-sm`, the
 single header navigation contains **List, Upload, Batches, More**. All other
@@ -1099,11 +1134,38 @@ focus restoration and untrapped Tab behavior.
 
 | Test id | Asserts |
 |---|---|
-| `T-UX-117` | The active destination carries `aria-current="page"` and a non-colour cue. |
-| `T-UX-118` | Opening Service updates exposes every factual service link to `/upload` with that service pre-selected, including when dates are unavailable. |
-| `T-UX-132` | Below `--bp-sm` the bar renders exactly `/`, `/upload` and `More`; **every other nav route** — `/batches`, `/removed`, `/not-interested`, `/waiting`, `/about`, `/rating` — is reachable only via `More`. ⚠ *Corrected in place at TASK-211; this row named only the first three, which were all that existed when it was written.* |
-| `T-UX-133` | A route behind `More` is still marked `aria-current="page"` when it is open, and is still reachable by direct URL. |
-| `T-UX-137` | Below `--bp-sm` the nav is fixed to the bottom of the viewport, the shell reserves matching bottom clearance, the `More` panel opens upward, the safe-area inset is honoured, and **all four are reset at or above `--bp-sm`** so the desktop nav returns to the header. ⚠ Asserted against `index.css` and `index.html` **as files** — jsdom performs no layout and applies no stylesheet, so every rendered assertion about position passes vacuously. |
+| `T-UX-117` | The active destination carries `aria-current="page"` and a non-colour cue, in the wide bar and in the Menu drawer; `/` is exact and a child route keeps its parent (Review) marked. |
+| `T-UX-118` | Opening Service updates exposes every factual service link to `/upload` with that service pre-selected, including when dates are unavailable; `/upload` is reachable exactly once from the phone Menu drawer. ~~…and `/upload` is a phone bar slot.~~ |
+| `T-UX-132` | *(Redefined in place, issue 369.)* Below `--bp-sm` the header renders only the Menu button; at or above it, Library, Import and Review plus Menu. The Menu is a disclosure (`aria-expanded`, `aria-haspopup="dialog"`) opening a modal drawer that lists every destination directly, with no nested *More*. <br />~~Below `--bp-sm` the bar renders exactly `/`, `/upload` and `More`; **every other nav route** — `/batches`, `/removed`, `/not-interested`, `/waiting`, `/about`, `/rating` — is reachable only via `More`. ⚠ *Corrected in place at TASK-211; this row named only the first three, which were all that existed when it was written.*~~ |
+| `T-UX-133` | *(Redefined in place, issue 369.)* A drawer-only route is reachable by direct URL, opens with the drawer closed, and is marked `aria-current="page"` inside the drawer. Every drawer link has its own href. Escape and *Close menu* return focus to Menu. Following a link closes the drawer. <br />~~A route behind `More` is still marked `aria-current="page"` when it is open, and is still reachable by direct URL.~~ |
+| `T-UX-137` | *(Redefined in place, issue 369.)* No rule at any width fixes the nav to the viewport. `--nav-bar-height` and `scroll-padding-bottom` are gone. The shell and the drawer honour the safe-area inset. The drawer scrolls within the viewport, pinned to the inline-start edge. `viewport-fit=cover` stays. The wide shell padding stays the shorthand. The Menu is present on every destination at phone width. Asserted against `index.css` and `index.html` as files. <br />~~Below `--bp-sm` the nav is fixed to the bottom of the viewport, the shell reserves matching bottom clearance, the `More` panel opens upward, the safe-area inset is honoured, and **all four are reset at or above `--bp-sm`** so the desktop nav returns to the header. ⚠ Asserted against `index.css` and `index.html` **as files** — jsdom performs no layout and applies no stylesheet, so every rendered assertion about position passes vacuously.~~ |
+| `T-NAV-001` | Issue 369: the route table carries the owner's names (Library, Import, Review, Rating lookup) and no retired one; Library, Review and Rating lookup open on a heading with that name; no owner-facing copy constant says *your list*, *this batch*, *Batch history* or *Check a rating*; the Review page shows imports with a next step under *Needs review* and everything else under *Import history*, with no *Needs review* heading when nothing is pending. |
+| `T-NAV-002` | Issue 369, in Chromium and Mobile Safari at 320, 390, 640 and 1280 px: the header shows the hybrid bar and the drawer lists every destination with its href and the current page; the drawer fits the viewport with no horizontal overflow; focus is trapped and Escape returns it to Menu; a drawer link navigates, closes the drawer and marks the new page; at 320 px height the drawer scrolls so the last destination is usable; the open drawer has no serious or critical axe violation. |
+
+### 6b. Destination names (issue 369, owner decision 2026-09-25)
+
+**This mapping applies to all owner-facing copy.** Where older specs quote
+copy with a retired name (for example *"Already on your list (N)"* in
+`ux-states.md` §6.6 or `ai.md`), read it through this table. The behaviour
+those specs describe is unchanged.
+
+| Destination | URL | Name | Page heading | In copy |
+|---|---|---|---|---|
+| the combined list | `/` | **Library** | *Library* | "your library", "in your library", "out of your library" |
+| capture | `/upload` | **Import** | *Import screenshots* | a capture is "an import": "this import", "Undo this import", "Review this import" |
+| capture history | `/batches` | **Review** | *Review*, with sections *Needs review* (a draft, a read in progress, a review to finish or an extraction to resolve) and *Import history* (applied, undone or discarded) | "Back to Review", "Check Review" |
+| IMDb lookup | `/rating` | **Rating lookup** | *Rating lookup* | — |
+
+- *Upload* stays only as the verb for sending selected files ("Upload
+  selected screenshots").
+- *Batch* stays an internal term only: code, API paths, `data-testid`s and
+  error codes.
+- Removal history, Not interested, Waiting to stream and About keep their
+  names.
+
+~~No terminology section existed before issue 369. Nav labels were *List*,
+*Upload*, *Batches* and *Check a rating*, over pages headed *Your list*,
+*Upload screenshots* and *Batch history*.~~
 
 ---
 
@@ -1369,13 +1431,22 @@ Grid/Compact affordances, without importing an icon package.~~
   network request or a runtime dependency; the owner accepted icons explicitly
   on the basis that neither is incurred. NFR-004's small-tree preference and
   `T-CI-007`'s egress rule both stay intact.
-- The set is **closed at 22**: `list`, `upload`, `more`, `history`, `suppressed`,
+- The set is **closed at 23**: `list`, `upload`, `more`, `history`, `suppressed`,
+  `rating`, `close`, `check`, `chevron`, `info`, `warning`, `search`, `image`,
+  **`brand`, `grid`, `compact`**, the library sort-category icons
+  **`alphabet`, `bookmark`, `calendar`, `clock`, `flag`**, the library
+  toolbar **`filter`** mark (ADR-0013 Revision 3, issue 370), and the header
+  **`menu`** mark (ADR-0013 Revision 4, issue 369) (`BrandIcon`,
+  `GridIcon`, `CompactIcon`, `AlphabetIcon`, `BookmarkIcon`, `CalendarIcon`,
+  `ClockIcon`, `FlagIcon`, `FilterIcon`, `MenuIcon`).
+
+  ~~The set is **closed at 22**: `list`, `upload`, `more`, `history`, `suppressed`,
   `rating`, `close`, `check`, `chevron`, `info`, `warning`, `search`, `image`,
   **`brand`, `grid`, `compact`**, the library sort-category icons
   **`alphabet`, `bookmark`, `calendar`, `clock`, `flag`**, and the library
   toolbar **`filter`** mark (ADR-0013 Revision 3, issue 370) (`BrandIcon`,
   `GridIcon`, `CompactIcon`, `AlphabetIcon`, `BookmarkIcon`, `CalendarIcon`,
-  `ClockIcon`, `FlagIcon`, `FilterIcon`).
+  `ClockIcon`, `FlagIcon`, `FilterIcon`).~~
 
   ~~The set is **closed at 21**: `list`, `upload`, `more`, `history`, `suppressed`,
   `rating`, `close`, `check`, `chevron`, `info`, `warning`, `search`, `image`,

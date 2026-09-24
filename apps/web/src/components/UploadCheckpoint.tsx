@@ -45,7 +45,7 @@ export function UploadCheckpoint({
     <section className="upload-checkpoint" data-testid="upload-checkpoint">
       <p className="upload-checkpoint__eyebrow">Capture / Unfinished work</p>
       <h1 ref={focus} tabIndex={-1}>
-        {batch === null ? 'Before you upload' : 'Continue your unfinished upload'}
+        {batch === null ? 'Before you upload' : 'Continue your unfinished import'}
       </h1>
       {message !== null && (
         <p role="status" data-testid="open-batch-message">
@@ -62,7 +62,7 @@ export function UploadCheckpoint({
       )}
       {state.kind === 'failed' && (
         <div role="alert">
-          <p>Could not check for unfinished uploads. No new upload was started.</p>
+          <p>Could not check for unfinished uploads. No new import was started.</p>
           <p>{state.message}</p>
           <Button variant="secondary" disabled={disabled} onClick={onRetry}>
             Try again
@@ -89,8 +89,8 @@ export function UploadCheckpoint({
             </div>
           </dl>
           <p>
-            Finish this upload before starting another, even for a different service. Your library
-            has not been changed by this unfinished upload.
+            Finish this import before starting another, even for a different service. Your library
+            has not been changed by this unfinished import.
           </p>
           {!action.discardable && (
             <p>
@@ -117,7 +117,7 @@ export function UploadCheckpoint({
                 data-testid="open-batch-discard"
                 onClick={() => setConfirm('discard')}
               >
-                Discard this batch...
+                Discard this import...
               </Button>
             )}
             <Button variant="secondary" disabled={disabled} onClick={onRetry}>
@@ -144,12 +144,12 @@ export function UploadCheckpoint({
         >
           <h2 id={heading}>
             {confirm === 'discard'
-              ? 'Discard this unfinished upload?'
+              ? 'Discard this unfinished import?'
               : 'Leave these new screenshots?'}
           </h2>
           <p>
             {confirm === 'discard'
-              ? 'This discards the saved batch and its review decisions, not titles in your library. Any new screenshots selected here stay on this device. Nothing starts automatically.'
+              ? 'This discards the saved import and its review decisions, not titles in your library. Any new screenshots selected here stay on this device. Nothing starts automatically.'
               : 'The new screenshots selected on this page are not saved. Continuing to the older upload clears this selection; it does not attach them to that upload.'}
           </p>
           {error !== null && <p role="alert">{error}</p>}
@@ -165,7 +165,7 @@ export function UploadCheckpoint({
                 void request.finally(() => setConfirm(null));
               }}
             >
-              {confirm === 'discard' ? 'Discard saved batch' : 'Leave and continue'}
+              {confirm === 'discard' ? 'Discard saved import' : 'Leave and continue'}
             </Button>
           </div>
         </Dialog>

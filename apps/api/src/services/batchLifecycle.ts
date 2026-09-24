@@ -128,7 +128,7 @@ export function assertBatchMutable(batch: { id: string; status: string }): void 
     throw new AppError(
       'BATCH_IMMUTABLE',
       409,
-      'This batch has already been submitted, so its service and mode can no longer be changed.',
+      'This import has already been submitted, so its service and mode can no longer be changed.',
       { batchId: batch.id, status: batch.status, mutableIn: [...MUTABLE_BATCH_STATUSES] },
     );
   }
@@ -235,7 +235,7 @@ export async function submitBatch(
       batch,
       'submitted',
       'BATCH_NOT_DRAFT',
-      'This batch has already been submitted.',
+      'This import has already been submitted.',
       { submittedAt: now },
       tx,
     );
@@ -279,7 +279,7 @@ export async function retryExtraction(
   }
   const images = await listImagesForBatch(ownerId, batchId);
   if (images.length === 0) {
-    throw new AppError('NO_IMAGES', 400, 'This batch has no screenshots to read again.');
+    throw new AppError('NO_IMAGES', 400, 'This import has no screenshots to read again.');
   }
   if (images.some((image) => image.retainUntil.getTime() <= now.getTime())) {
     throw new AppError('IMAGES_PURGED', 410, 'These screenshots have expired. Upload new ones.');
@@ -289,7 +289,7 @@ export async function retryExtraction(
     batch,
     'submitted',
     'BATCH_NOT_FAILED',
-    'This batch is no longer awaiting a retry.',
+    'This import is no longer awaiting a retry.',
     {
       submittedAt: now,
       extractionStats: JSON.stringify({ progress: { imagesDone: 0, imagesTotal: images.length } }),
@@ -337,7 +337,7 @@ export async function discardBatch(ownerId: OwnerId, batchId: string): Promise<D
     batch,
     'discarded',
     'BATCH_IMMUTABLE',
-    'This batch can no longer be discarded.',
+    'This import can no longer be discarded.',
   );
 
   return { batchId, status: 'discarded', listStateChanged: false };

@@ -114,11 +114,11 @@ const REVIEW = {
   banner: null,
   sections: {
     additions: {
-      label: 'New to your list',
+      label: 'New to your library',
       count: CANDIDATE_COUNT,
       items: Array.from({ length: CANDIDATE_COUNT }, (_, i) => candidate(i)),
     },
-    alreadyOnYourList: emptySection('Already on your list'),
+    alreadyOnYourList: emptySection('Already in your library'),
     probablyNotTitles: emptySection('Probably not titles'),
     unmatched: { label: "Couldn't identify these", count: 0, items: [] },
     unreadableTiles: { label: "Couldn't read these", count: 0, items: [] },
@@ -178,7 +178,7 @@ test.describe('T-PERF-002 — a 500-candidate review stays usable', () => {
     // the count alone by a list that renders nothing, the DOM alone by a list
     // that silently truncated the batch to a handful of candidates.
     await expect(page.getByTestId('review-additions')).toContainText(
-      `New to your list (${String(CANDIDATE_COUNT)})`,
+      `New to your library (${String(CANDIDATE_COUNT)})`,
     );
     await expect(page.getByTestId('candidate-list-viewport')).toBeVisible();
 

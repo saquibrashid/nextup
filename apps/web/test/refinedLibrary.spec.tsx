@@ -241,7 +241,7 @@ it('T-UX-143a service updates are available on demand while unavailable data rem
   expect(screen.getByTestId('freshness-degraded')).toBeVisible();
 });
 
-it('T-UX-143b compact desktop navigation keeps landmarks and restores focus when More closes', async () => {
+it('T-UX-143b compact desktop navigation keeps landmarks and restores focus when the Menu drawer closes', async () => {
   const user = userEvent.setup();
   render(
     <MemoryRouter>
@@ -260,14 +260,18 @@ it('T-UX-143b compact desktop navigation keeps landmarks and restores focus when
     within(nav)
       .getAllByRole('link')
       .map((link) => link.textContent),
-  ).toEqual(['List', 'Upload', 'Batches']);
-  const more = within(nav).getByRole('button', { name: 'More' });
-  await user.click(more);
-  within(nav).getByRole('link', { name: 'About' }).focus();
+  ).toEqual(['Library', 'Import', 'Review']);
+  const menu = within(nav).getByRole('button', { name: 'Menu' });
+  await user.click(menu);
+  expect(menu).toHaveAttribute('aria-expanded', 'true');
+  within(screen.getByRole('dialog', { name: 'Menu' }))
+    .getByRole('link', { name: 'About' })
+    .focus();
   await user.keyboard('{Escape}');
-  expect(more).toHaveFocus();
-  expect(more).toHaveAttribute('aria-expanded', 'false');
-  await user.click(more);
-  await user.click(screen.getByRole('heading'));
-  expect(more).toHaveAttribute('aria-expanded', 'false');
+  expect(menu).toHaveFocus();
+  expect(menu).toHaveAttribute('aria-expanded', 'false');
+  await user.click(menu);
+  await user.click(screen.getByRole('button', { name: 'Close menu' }));
+  expect(menu).toHaveAttribute('aria-expanded', 'false');
+  expect(menu).toHaveFocus();
 });

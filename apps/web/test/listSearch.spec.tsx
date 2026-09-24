@@ -68,8 +68,8 @@ describe('T-UX-140 server-backed library search control', () => {
 
   it('T-UX-140a reads the URL and exposes a labelled, bounded native search form', () => {
     mount('/?q=Dune');
-    expect(screen.getByRole('search', { name: 'Search your list' })).toBeTruthy();
-    const input = screen.getByRole('searchbox', { name: 'Search your list' });
+    expect(screen.getByRole('search', { name: 'Search your library' })).toBeTruthy();
+    const input = screen.getByRole('searchbox', { name: 'Search your library' });
     expect(input).toHaveValue('Dune');
     expect(input).toHaveAttribute('maxlength', '500');
     expect(input).toHaveAttribute('placeholder', LIST_SEARCH_PLACEHOLDER);
@@ -191,7 +191,7 @@ describe('T-UX-140 server-backed library search control', () => {
 describe('T-TOOLBAR-001 the library search field (#370)', () => {
   it('T-TOOLBAR-001a promises title search only and puts a named submit inside the field', () => {
     mount('/?q=Dune');
-    const input = screen.getByRole('searchbox', { name: 'Search your list' });
+    const input = screen.getByRole('searchbox', { name: 'Search your library' });
     expect(LIST_SEARCH_PLACEHOLDER).not.toMatch(/actor|people|cast/i);
     expect(input).toHaveAttribute('placeholder', 'Search titles');
     expect(input).toHaveAttribute('aria-keyshortcuts', 'Control+K Meta+K');

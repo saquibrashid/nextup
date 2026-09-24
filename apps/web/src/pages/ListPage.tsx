@@ -277,7 +277,7 @@ export function ListPage({
     <>
       <div className="library-browser">
         <div className="library-heading">
-          <h1>Your list</h1>
+          <h1>Library</h1>
         </div>
         <div className="library-actions">
           <FreshnessStrip services={serviceState} />
@@ -333,7 +333,7 @@ export function ListPage({
         ⚠ OUTSIDE the loading/failure branches below. The notice reports a
         write that has already happened; hiding it because `GET /api/titles`
         failed would take away the undo at exactly the moment the owner cannot
-        see what the batch did.
+        see what the import did.
       */}
         {applied !== undefined && (
           <BatchAppliedNotice
@@ -504,7 +504,7 @@ export function ListPage({
           {/*
             ⚠ BELOW THE LIST AND INSIDE THE SAME BRANCH. It must not render
             over the loading, failure or offline states: a "Load more" beneath
-            "Couldn't load your list" offers to fetch page 2 of a list whose
+            "Couldn't load your library" offers to fetch page 2 of a list whose
             page 1 never arrived.
 
             ⚠ Rendered only when the container supplied a handler. `hasMore`

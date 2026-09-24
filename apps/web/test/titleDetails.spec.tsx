@@ -204,7 +204,7 @@ describe('T-DETAIL-004 detail presentation and owner actions', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Find a match' }));
     expect(screen.getByRole('dialog')).toBeVisible();
   });
-  it.each(['Watch status', 'Fix match', 'Not interested', 'Remove from list'])(
+  it.each(['Watch status', 'Fix match', 'Not interested', 'Remove from library'])(
     'T-DETAIL-004e: existing actions open their real confirmation dialog without immediate writes',
     async (name) => {
       const { actions } = mount();
@@ -234,9 +234,9 @@ describe('T-DETAIL-004 detail presentation and owner actions', () => {
   });
   it('T-DETAIL-004g: offline disables actions and retries but not return navigation or readable metadata', () => {
     mount({ presentation: { status: 'unavailable', data: null } }, true);
-    expect(screen.getByRole('button', { name: 'Remove from list' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Remove from library' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Retry details' })).toBeDisabled();
-    expect(screen.getByRole('link', { name: 'Back to Your list' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Back to Library' })).toHaveAttribute(
       'href',
       '/?sort=name&dir=asc',
     );
@@ -246,7 +246,7 @@ describe('T-DETAIL-004 detail presentation and owner actions', () => {
     (listState) => {
       mount({ listState });
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(item.name);
-      expect(screen.queryByRole('button', { name: 'Remove from list' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Remove from library' })).toBeNull();
       expect(
         screen.getByRole('link', {
           name: listState === 'removed' ? 'View removal history' : 'Manage Not interested',
@@ -285,7 +285,7 @@ describe('T-DETAIL-004 existing mutation outcomes', () => {
       titleId: item.titleId,
       listingId: 'listing-one',
     });
-    await userEvent.click(screen.getByRole('button', { name: 'Remove from list' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove from library' }));
     await userEvent.click(screen.getByTestId('confirm-remove-title'));
     await screen.findByTestId('remove-done');
     expect(remove).toHaveBeenCalledWith(item.titleId);
@@ -300,7 +300,7 @@ describe('T-DETAIL-004 existing mutation outcomes', () => {
   it('T-DETAIL-004k: a failed write remains visible, never navigates away or claims success', async () => {
     const { actions, reload } = mount();
     vi.spyOn(actions, 'removeTitle').mockRejectedValue(new Error('Unavailable'));
-    await userEvent.click(screen.getByRole('button', { name: 'Remove from list' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Remove from library' }));
     await userEvent.click(screen.getByTestId('confirm-remove-title'));
     expect(await screen.findByTestId('remove-failed')).toBeVisible();
     expect(screen.queryByTestId('remove-done')).toBeNull();
@@ -372,7 +372,7 @@ describe('T-DETAIL-005 detail routing and failure boundaries', () => {
     await userEvent.click(screen.getByRole('link', { name: item.name }));
     await screen.findByRole('heading', { name: item.name, level: 1 });
     expect(read).toHaveBeenCalledWith(item.titleId, expect.any(AbortSignal));
-    expect(screen.getByRole('link', { name: 'Back to Your list' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Back to Library' })).toHaveAttribute(
       'href',
       '/?service=netflix&sort=name&dir=asc',
     );
@@ -407,7 +407,7 @@ describe('T-DETAIL-005 detail routing and failure boundaries', () => {
     vi.spyOn(api, 'getTitle').mockReturnValue(new Promise(() => undefined));
     route(api);
     expect(within(screen.getByRole('status')).getByText('Loading title details...')).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Back to Your list' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Back to Library' })).toHaveAttribute('href', '/');
     expect(detailsReturnTo({ librarySearch: 'cursor=old&sort=name&dir=desc' })).toBe(
       '/?sort=name&dir=desc',
     );

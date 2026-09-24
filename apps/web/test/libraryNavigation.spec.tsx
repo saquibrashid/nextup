@@ -166,7 +166,7 @@ describe('remembered library destination', () => {
     mount();
     await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(`/?${CHOICES}`));
     expect(vi.mocked(apiClient.getTitles).mock.calls[0]?.[0]).toBe(CHOICES);
-    expect(screen.getByRole('searchbox', { name: 'Search your list' })).toHaveValue('Orbit');
+    expect(screen.getByRole('searchbox', { name: 'Search your library' })).toHaveValue('Orbit');
     expect(screen.getByRole('button', { name: 'Remove genre filter: Drama' })).toBeVisible();
   });
 
@@ -192,7 +192,7 @@ describe('remembered library destination', () => {
 
   it('T-LIB-001d: Back/Forward and an in-place clear keep their authoritative URLs', async () => {
     mount();
-    await screen.findByRole('heading', { name: 'Your list' });
+    await screen.findByRole('heading', { name: 'Library' });
     expect(vi.mocked(apiClient.getTitles).mock.calls[0]?.[0]).toBe('');
     fireEvent.click(screen.getByRole('link', { name: 'Choose filters' }));
     await waitFor(() => expect(localStorage.getItem(KEY)).toBe(CHOICES));
@@ -228,11 +228,11 @@ describe('remembered library destination', () => {
   it('T-LIB-001i: default saved choices do not add a redundant redirect on entry or return', async () => {
     localStorage.setItem(KEY, 'sort=dateAdded&dir=desc');
     mount();
-    await screen.findByRole('heading', { name: 'Your list' });
+    await screen.findByRole('heading', { name: 'Library' });
     expect(screen.getByTestId('url').textContent).toBe('/');
     fireEvent.click(screen.getByRole('link', { name: 'Upload fixture' }));
     fireEvent.click(screen.getByRole('link', { name: 'Return to list' }));
-    await screen.findByRole('heading', { name: 'Your list' });
+    await screen.findByRole('heading', { name: 'Library' });
     expect(screen.getByTestId('url').textContent).toBe('/');
   });
 

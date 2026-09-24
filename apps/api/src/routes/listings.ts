@@ -92,7 +92,7 @@ export function registerListingRoutes(router: Router): void {
       throw new AppError(
         'DUPLICATE_WORK_IDENTITY',
         409,
-        'A newer version of that title is already on your list. Confirm to add this listing back anyway.',
+        'A newer version of that title is already in your library. Confirm to add this listing back anyway.',
         {
           existingTitleId: existingActive.id,
         },

@@ -108,11 +108,11 @@ export function appliedSummary(applied: AppliedBatch): string {
  * undone or failed outcomes.
  */
 export const UNDO_REMOVALS_LABEL = 'Undo the removals';
-export const UNDO_BATCH_LABEL = 'Undo this batch';
+export const UNDO_BATCH_LABEL = 'Undo this import';
 export const UNDO_PENDING_LABEL = 'Undoing…';
 export const VIEW_CHANGES_LABEL = 'View what changed';
-export const UNDO_REMOVALS_DONE = 'Those titles are back on your list.';
-export const UNDO_BATCH_DONE = 'That batch has been undone. Nothing it added is on your list.';
+export const UNDO_REMOVALS_DONE = 'Those titles are back in your library.';
+export const UNDO_BATCH_DONE = 'That import has been undone. Nothing it added is in your library.';
 /**
  * ⚠ States plainly that the change is STILL APPLIED. A failed undo that only
  * said "something went wrong" would leave the owner unable to tell whether the

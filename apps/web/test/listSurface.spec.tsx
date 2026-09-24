@@ -300,7 +300,7 @@ describe('T-UX-111 · ui-refresh.md §4.1/§4.2 · at 1280 px the grid layout re
 /* ------------------------------------------------------------------------ */
 
 describe('T-UX-112 · ui-refresh.md §4.1 · the ⋮ menu offers the same item set in both layouts', () => {
-  const ITEMS = ['Not interested', 'Fix match', 'Remove from list', 'Cancel'];
+  const ITEMS = ['Not interested', 'Fix match', 'Remove from library', 'Cancel'];
 
   async function openMenuItems(): Promise<string[]> {
     render(

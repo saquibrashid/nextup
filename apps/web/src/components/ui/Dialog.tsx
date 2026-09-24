@@ -2,12 +2,13 @@ import { useLayoutEffect, type HTMLAttributes, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useDialogFocus } from '../../lib/useDialogFocus';
 
-type DialogVariant = 'default' | 'removal' | 'overlay' | 'panel';
+type DialogVariant = 'default' | 'removal' | 'overlay' | 'panel' | 'drawer';
 const DIALOG_CLASS: Record<DialogVariant, string> = {
   default: 'dialog dialog--overlay',
   removal: 'dialog dialog--overlay removal-confirm',
   overlay: 'dialog dialog--overlay',
   panel: 'dialog dialog--panel',
+  drawer: 'dialog dialog--drawer',
 };
 
 /**

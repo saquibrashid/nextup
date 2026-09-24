@@ -101,7 +101,7 @@ export function ReviewRecovery({
             library will not change. Reading again is a separate action.
           </p>
           {failure !== null && <p role="alert">{failure}</p>}
-          {busy && <p role="status">Checking or saving the batch...</p>}
+          {busy && <p role="status">Checking or saving the import...</p>}
           {source !== null && !available && (
             <p role="alert">
               The saved screenshots are missing or expired. Start a new capture with fresh
@@ -116,7 +116,7 @@ export function ReviewRecovery({
               else setOpen(false);
             }}
           >
-            {closed ? 'View saved batch' : 'Keep reviewing'}
+            {closed ? 'View saved import' : 'Keep reviewing'}
           </Button>
           <Button
             variant="secondary"
@@ -137,7 +137,7 @@ export function ReviewRecovery({
                   const latest = await client.getBatch(batchId);
                   if (!isActive()) return;
                   if (latest.status !== 'in-review')
-                    throw new Error('The batch changed. Check its saved status.');
+                    throw new Error('The import changed. Check its saved status.');
                   await client.discardBatch(batchId);
                 });
               }}
@@ -153,7 +153,7 @@ export function ReviewRecovery({
             >
               {unfinished.derivedFromBatchId === batchId
                 ? 'Continue the new read'
-                : 'Resolve the unfinished batch'}
+                : 'Resolve the unfinished import'}
             </Button>
           )}
           {closed && !other && available && (

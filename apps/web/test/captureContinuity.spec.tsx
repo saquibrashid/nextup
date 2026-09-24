@@ -113,7 +113,7 @@ describe('T-UX-161 local and saved capture continuity', () => {
           path: '*',
           element: (
             <CaptureNavigationProvider>
-              <Link to="/library">Your list</Link>
+              <Link to="/library">Your library</Link>
               <Routes>
                 <Route path="/upload" element={<UploadRoute client={client()} />} />
                 <Route path="/library" element={<h1>Library destination</h1>} />
@@ -129,7 +129,7 @@ describe('T-UX-161 local and saved capture continuity', () => {
     expect(unload()).toBe(false);
     select(file());
     expect(unload()).toBe(true);
-    fireEvent.click(screen.getByRole('link', { name: 'Your list' }));
+    fireEvent.click(screen.getByRole('link', { name: 'Your library' }));
     expect(await screen.findByRole('dialog')).toHaveTextContent('not safely saved');
     fireEvent.click(screen.getByRole('button', { name: 'Stay here' }));
     expect(screen.getByRole('button', { name: 'Remove new.png' })).toBeVisible();

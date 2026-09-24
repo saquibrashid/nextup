@@ -81,7 +81,7 @@ describe('AppShell and routing', () => {
     renderAt('/definitely-not-a-route');
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Page not found');
-    expect(screen.getByRole('link', { name: 'Back to your list' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Back to Library' })).toHaveAttribute('href', '/');
   });
 
   it('T-UI-023e · specs/ui.md §1 · a parameterised route does NOT swallow its own sibling', () => {
@@ -91,22 +91,23 @@ describe('AppShell and routing', () => {
     // symptom is an app that looks fine until the owner opens a batch and
     // lands on the list of batches instead.
     renderAt('/batches');
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Batch history');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Review');
   });
 
   it('T-UI-023f · specs/ui.md §1 · the nav exposes the eight top-level destinations', () => {
     renderAt('/');
 
     const nav = screen.getByRole('navigation', { name: 'Primary' });
-    fireEvent.click(within(nav).getByRole('button', { name: 'More' }));
-    const labels = within(nav)
+    // Issue 369 — every destination is listed in the Menu drawer.
+    fireEvent.click(within(nav).getByRole('button', { name: 'Menu' }));
+    const labels = within(screen.getByRole('dialog', { name: 'Menu' }))
       .getAllByRole('link')
       .map((link) => link.textContent);
 
     expect(labels).toStrictEqual([
-      'List',
-      'Upload',
-      'Batches',
+      'Library',
+      'Import',
+      'Review',
       'Removal history',
       'Not interested',
       // Epic L (US-043). The waiting view is a top-level destination, not a
@@ -116,7 +117,7 @@ describe('AppShell and routing', () => {
       // Epic M (REQ-092). Reachable from the nav rather than only from a row,
       // because US-045 is about checking something the owner has NOT saved -
       // so there is no row to start from.
-      'Check a rating',
+      'Rating lookup',
     ]);
   });
 

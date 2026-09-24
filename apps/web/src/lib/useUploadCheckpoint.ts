@@ -25,7 +25,7 @@ export function resumeAction(status: string) {
       return null;
     default:
       throw new CheckpointStateError(
-        'This upload has an unrecognized status. Refresh before continuing.',
+        'This import has an unrecognized status. Refresh before continuing.',
       );
   }
 }
@@ -59,7 +59,7 @@ export function useUploadCheckpoint(client: ApiClient, online: boolean, enabled:
           const unfinished = history.batches.filter((batch) => resumeAction(batch.status) !== null);
           if (unfinished.length > 1) {
             throw new CheckpointStateError(
-              'More than one unfinished upload was returned. Check Batches before continuing.',
+              'More than one unfinished import was returned. Check Review before continuing.',
             );
           }
           open = unfinished[0];

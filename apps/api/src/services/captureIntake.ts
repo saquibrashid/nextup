@@ -120,7 +120,7 @@ export async function withDraftCapture<T>(
     if (locked.count === 0) {
       const batch = await findUploadBatch(ownerId, batchId, tx);
       if (batch === null) throw new AppError('NOT_FOUND', 404, 'No such batch.');
-      throw new AppError('BATCH_NOT_DRAFT', 409, 'This batch is no longer a draft.', {
+      throw new AppError('BATCH_NOT_DRAFT', 409, 'This import is no longer a draft.', {
         status: batch.status,
       });
     }
@@ -173,7 +173,7 @@ export async function finishCaptureAttempt(
     throw new AppError(
       'VALIDATION_FAILED',
       409,
-      'This upload was already resolved. Check the saved screenshots before retrying.',
+      'This import was already resolved. Check the saved screenshots before retrying.',
     );
   }
 }
@@ -364,7 +364,7 @@ export async function resolveCaptureAttempt(
       throw new AppError(
         'VALIDATION_FAILED',
         400,
-        'Every replacement must be an available screenshot saved in this batch.',
+        'Every replacement must be an available screenshot saved in this import.',
       );
     }
     for (const image of images.filter((item) => selected.includes(item.id))) {

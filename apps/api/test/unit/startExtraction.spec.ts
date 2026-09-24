@@ -369,7 +369,7 @@ describe('startExtraction', () => {
     expect(lastStatus()).toBe('extraction-failed');
     const written = mockRecord.mock.calls.at(-1)?.[2] as Record<string, unknown>;
     expect(written['extractionErrorCode']).toBe('EXTRACTOR_UNAVAILABLE');
-    expect(written['extractionErrorMessage']).toMatch(/nothing in your list changed/i);
+    expect(written['extractionErrorMessage']).toMatch(/nothing in your library changed/i);
     vi.unstubAllEnvs();
   });
 

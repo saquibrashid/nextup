@@ -300,7 +300,7 @@ export function AddTitleDialog({
                 {selected.releaseYear !== null && (
                   <> ({releaseYearText(selected.releaseYear, selected.edition !== undefined)})</>
                 )}{' '}
-                to your list?
+                to your library?
               </p>
               {selected.edition !== undefined && <EditionLabels labels={[selected.edition]} />}
               <span className="title-search-result__meta">
@@ -343,7 +343,7 @@ export function AddTitleDialog({
               disabled={phase === 'submitting'}
               onClick={submit}
             >
-              {phase === 'submitting' ? 'Adding…' : 'Add to list'}
+              {phase === 'submitting' ? 'Adding…' : 'Add to library'}
             </Button>
           </div>
         </>

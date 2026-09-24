@@ -195,7 +195,7 @@ export function DraftBatch({
             if (!busy) setConfirmDiscard(false);
           }}
         >
-          <h2 id={discardTitle}>Discard this saved batch?</h2>
+          <h2 id={discardTitle}>Discard this saved import?</h2>
           <p>Your library will not change.</p>
           {queue.length > 0 && (
             <p>The {queue.length} screenshots selected only on this device will also be cleared.</p>
@@ -223,13 +223,13 @@ export function DraftBatch({
               );
             }}
           >
-            Discard batch
+            Discard import
           </Button>
         </Dialog>
       )}
       <p>
-        These screenshots are saved in this batch. Remove any you do not want, or attach a missing
-        screenshot. Service and mode stay fixed for this saved batch.
+        These screenshots are saved in this import. Remove any you do not want, or attach a missing
+        screenshot. Service and mode stay fixed for this saved import.
       </p>
       {offline && <p role="status">{OFFLINE_DISABLED_REASON}</p>}
       {failure !== null && <p role="alert">{failure}</p>}
@@ -395,7 +395,7 @@ export function DraftBatch({
         disabled={busy || offline || needsCheck || !editable}
         onClick={() => setConfirmDiscard(true)}
       >
-        Discard batch and start again
+        Discard import and start again
       </Button>
       {busy && <p role="status">Saving your changes…</p>}
     </section>
