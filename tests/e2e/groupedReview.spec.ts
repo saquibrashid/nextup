@@ -121,11 +121,22 @@ describe('T-POL-003b review decision geometry', () => {
         await page.getByTestId('review-probably-not-titles').locator('summary').click();
         await expect(page.getByTestId('candidate-chrome')).toBeVisible();
         if (width < 640) {
-          const apply = await page.getByTestId('apply-changes-button').boundingBox();
-          const navigation = await page.getByRole('navigation').boundingBox();
+          // Issue 369 removed the bottom-fixed nav; the sticky action must still
+          // be on screen and the topmost element at its own centre.
+          const applyButton = page.getByTestId('apply-changes-button');
+          await applyButton.scrollIntoViewIfNeeded();
+          const apply = await applyButton.boundingBox();
           expect(apply).not.toBeNull();
-          expect(navigation).not.toBeNull();
-          expect((apply?.y ?? 0) + (apply?.height ?? 0)).toBeLessThanOrEqual(navigation?.y ?? 0);
+          expect((apply?.y ?? 0) + (apply?.height ?? 0)).toBeLessThanOrEqual(
+            page.viewportSize()?.height ?? 0,
+          );
+          expect(
+            await applyButton.evaluate((element) => {
+              const box = element.getBoundingClientRect();
+              const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+              return top !== null && element.contains(top);
+            }),
+          ).toBe(true);
         }
         expect(
           await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),

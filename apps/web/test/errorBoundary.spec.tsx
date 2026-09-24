@@ -103,7 +103,7 @@ describe('T-BOUND-001 a render crash never becomes a blank page', () => {
 
     expect(screen.getByRole('alert')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'More' }));
+    await user.click(screen.getByRole('button', { name: 'Menu' }));
     await user.click(screen.getByRole('link', { name: 'About' }));
 
     expect(within(screen.getByRole('main')).queryByRole('alert')).not.toBeInTheDocument();

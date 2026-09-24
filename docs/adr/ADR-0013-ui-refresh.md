@@ -2,11 +2,49 @@
 
 | | |
 |---|---|
-| **Status** | **Accepted, Revision 3 (2026-09-24).** The owner approved the library toolbar mockup (issue 370), which adds one Filters mark to the closed icon register. <br />~~**Accepted, Revision 2 (2026-09-17).** The owner approved extending the closed icon register for the library-controls sort chooser.~~ <br />~~**Accepted, Revision 1 (2026-09-16).** Epic P shipped in #275; the owner approved implementation of the refined indigo library preview on 2026-09-16.~~ |
+| **Status** | **Accepted, Revision 4 (2026-09-25).** The owner approved a hybrid Menu drawer that replaces the `More` overflow and the bottom-fixed phone bar, and one set of destination names (issue 369); one Menu mark joins the closed icon register. <br />~~**Accepted, Revision 3 (2026-09-24).** The owner approved the library toolbar mockup (issue 370), which adds one Filters mark to the closed icon register.~~ <br />~~**Accepted, Revision 2 (2026-09-17).** The owner approved extending the closed icon register for the library-controls sort chooser.~~ <br />~~**Accepted, Revision 1 (2026-09-16).** Epic P shipped in #275; the owner approved implementation of the refined indigo library preview on 2026-09-16.~~ |
 | **Date** | 2026-09-10 |
 | **Deciders** | the owner (visual direction, given explicitly — see "The direction, and who gave it"), coordinator (mechanics) |
 | **Forced by** | The owner using the running app on 2026-09-10 and reporting six things: a row menu that opens at the bottom of the page, metadata rendered as `Movie2026Action, Crime, Thriller`, a row-menu button rendered as a full-height grey column, row text *"scrunched together"*, a fix-match correction that produced **no visible change on the review screen**, and *"the website looks very bare with no styling whatsoever."* |
-| **Supersedes** | Revision 3 extends the closed hand-authored icon register by one Filters mark only. Revision 2 extends the closed hand-authored icon register by five sort-category marks only. Revision 1 reopens the light-only decision, the separate field/direction controls, and viewport-only layout selection. No Tailwind, web fonts, icon dependency, provider expansion or background list changes are introduced. <br />~~Revision 1 reopens the light-only decision, the separate field/direction controls, and viewport-only layout selection. No Tailwind, web fonts, icon dependency, provider expansion or background list changes are introduced.~~ |
+| **Supersedes** | Revision 4 replaces D-4's `More` overflow and bottom-fixed phone bar with a Menu drawer (Revision 4 below) and extends the closed icon register by one Menu mark. Revision 3 extends the closed hand-authored icon register by one Filters mark only. Revision 2 extends the closed hand-authored icon register by five sort-category marks only. Revision 1 reopens the light-only decision, the separate field/direction controls, and viewport-only layout selection. No Tailwind, web fonts, icon dependency, provider expansion or background list changes are introduced. <br />~~Revision 1 reopens the light-only decision, the separate field/direction controls, and viewport-only layout selection. No Tailwind, web fonts, icon dependency, provider expansion or background list changes are introduced.~~ |
+
+## Revision 4 — Menu drawer and destination names, 2026-09-25
+
+Issue 369 found two navigation problems. The `More` overflow hid most
+destinations behind a second disclosure. And the names disagreed with each
+other: the nav said *List*, *Upload*, *Batches* and *Check a rating*, while the
+pages said *Your list*, *Upload screenshots* and *Batch history*. The owner
+decided (2026-09-25):
+
+- **A hybrid menu.** From `--bp-sm` up, the header shows **Library, Import and
+  Review** inline, beside a **Menu** button. Below `--bp-sm`, the header shows
+  only the Menu button. At every width, Menu opens a modal drawer from the
+  inline-start edge that lists **every** destination directly. Nothing is
+  nested inside the drawer, and it has no "More" entry.
+- **The bottom-fixed phone bar is withdrawn** together with its clearance
+  token. The one `<nav>` sits in the header at every width.
+- **One set of names.** List → **Library**, Upload → **Import**, Batches →
+  **Review** (with sections *Needs review* and *Import history*), and Check a
+  rating → **Rating lookup**. The same names apply to headings and copy
+  (`specs/ui-refresh.md` §6b). URLs do not change.
+
+The drawer is built on the existing `Dialog` primitive, so focus moves in, is
+trapped and is restored to Menu; Escape and the backdrop close it; the page
+behind is inert and cannot scroll. A WebKit gap found while testing this is
+fixed in that primitive: Safari's default Tab order skips links, and focus
+could leave a dialog to `<body>`, where Escape no longer worked. The trap now
+wraps focus back when a native Tab leaves the dialog.
+
+This revision extends the closed register by exactly one hand-authored icon,
+bringing it to 23:
+
+| Icon | Used by | Meaning |
+|---|---|---|
+| `MenuIcon` | the header Menu button | Three equal horizontal lines |
+
+The icon is decorative (`aria-hidden`). The button keeps its visible "Menu"
+label, so the icon is never the only label. `MoreIcon` stays in the register:
+row menus still use it.
 
 ## Revision 3 — library toolbar Filters icon, 2026-09-24
 

@@ -764,7 +764,7 @@ describe('T-UX-048 — the 409 opens a state-aware checkpoint', () => {
     expect(await screen.findByTestId('open-batch-go')).toHaveTextContent(
       'Continue adding screenshots',
     );
-    expect(screen.getByTestId('open-batch-discard')).toHaveTextContent('Discard this batch...');
+    expect(screen.getByTestId('open-batch-discard')).toHaveTextContent('Discard this import...');
   });
 
   it('T-UX-048b: "Go to it" opens the batch named in the envelope details', async () => {
@@ -797,7 +797,7 @@ describe('T-UX-048 — the 409 opens a state-aware checkpoint', () => {
     fireEvent.click(screen.getByTestId('submit-button'));
     fireEvent.click(await screen.findByTestId('open-batch-discard'));
     expect(discarded).toEqual([]);
-    fireEvent.click(screen.getByRole('button', { name: 'Discard saved batch' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discard saved import' }));
 
     // ⚠ The id comes from the ENVELOPE, not from anything this screen holds:
     // the conflicting batch is one the owner started elsewhere, so a
@@ -882,7 +882,7 @@ describe('T-UI-013 — a decode rejection never takes the batch down', () => {
     // The refusal is per-file: the good image is still attached…
     expect(screen.getAllByTestId('accepted-file').length).toBeGreaterThan(0);
     expect(calls).not.toContain('submitBatch');
-    fireEvent.click(screen.getByRole('button', { name: 'Open saved batch' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open saved import' }));
     expect(await screen.findByTestId('draft-submit')).toBeDisabled();
     expect(screen.getByRole('list', { name: 'Saved screenshots' })).toHaveTextContent('a.png');
     fireEvent.click(screen.getByRole('button', { name: 'Remove beach-list-03.heic' }));

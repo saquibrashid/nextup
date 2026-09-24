@@ -5121,6 +5121,18 @@ The Review route's correction picker keeps its own card markup and behavior; sha
 | `T-TOOLBAR-002` | U | The Filters trigger keeps its visible label and active count as its accessible name, with a decorative icon, and is marked active only by real filters (not by a search alone). The order trigger reads `Sort:` plus the complete order, keeps its dialog semantics, accessible name and the separate reverse button (REQ-038). Grid/Compact remain one named group with exactly one pressed option. `apps/web/test/libraryToolbar.spec.tsx`. | TASK-249 |
 | `T-TOOLBAR-003` | E | At 1280, 640, 390 and 320 px in Chromium and Mobile Safari: no horizontal overflow; Filters, order, reverse, Grid and Compact are usable 44 px targets; at 1280 px the search, Filters, layout and order controls share one height; the pressed layout carries an inset bar, not colour alone; the order dialog stays in bounds and returns focus; Ctrl/Cmd+K focuses search; the keyboard hint shows only with a fine pointer at 1280 px and hides while typing; axe reports no toolbar violations. `tests/e2e/refinedLibrary.spec.ts`. | TASK-249 |
 
+### Owner-approved navigation and naming (TASK-250, #369)
+
+| Id | Level | What it asserts | Source |
+|---|---|---|---|
+| `T-UX-117` | U | *(Redefined in place.)* The current destination carries `aria-current="page"` and the non-colour active class, in the wide bar and in the Menu drawer; `/` is exact; a child route keeps Review marked. | ui-refresh §6 REQ-116 |
+| `T-UX-118` | U | *(Case c redefined in place.)* `/upload` is reachable exactly once from the phone Menu drawer. ~~…from the phone bar itself.~~ | ui-refresh §6 REQ-039 |
+| `T-UX-132` | U | *(Redefined in place.)* Phone header = Menu only; wide header = Library, Import, Review + Menu; Menu is a dialog disclosure listing every destination with no nested *More*. ~~Phone bar = List, Upload, More.~~ | ui-refresh §6 REQ-117 |
+| `T-UX-133` | U | *(Redefined in place.)* Drawer-only routes keep direct URLs and hrefs, open with the drawer closed, and are marked current in the drawer. Escape and *Close menu* return focus to Menu. A link click closes the drawer. ~~Routes behind More auto-open the panel.~~ | ui-refresh §6 REQ-117 |
+| `T-UX-137` | U | *(Redefined in place.)* No fixed nav at any width; the bar clearance token and `scroll-padding-bottom` are gone; the drawer scrolls within the viewport and honours the safe-area inset; the Menu is present on every destination. ~~The phone bar is fixed to the bottom with matching clearance.~~ | ui-refresh §6 REQ-117 |
+| `T-NAV-001` | U | Owner-approved names in the route table and headings; no retired wording in copy constants; *Needs review* / *Import history* split by whether an import has a next step. | ui-refresh §6b |
+| `T-NAV-002` | E | At 320/390/640/1280 px in Chromium and Mobile Safari: hybrid bar, full drawer with hrefs and current page, no overflow, focus trap and return, link navigation closes the drawer, short-viewport scroll, and no serious or critical axe violation. | ui-refresh §6 REQ-117 |
+
 ### 39.5 What is deliberately NOT asserted here
 
 **That the refresh looks good.** Taste is the owner's, recorded in **ADR-0013**,

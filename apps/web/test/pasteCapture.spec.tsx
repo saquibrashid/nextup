@@ -849,7 +849,7 @@ describe('T-UI-014 - all three affordances present (TASK-162)', () => {
     expect(label).toHaveTextContent(/choose files/i);
     expect(label).toHaveTextContent(/drag them here/i);
     expect(label).toHaveTextContent(/PNG, JPEG or HEIC/);
-    expect(label).toHaveTextContent(/10 MB each, 40 per batch/);
+    expect(label).toHaveTextContent(/10 MB each, 40 per import/);
   });
 
   it('T-UI-014c the paste button, file picker and drop target are keyboard-reachable', () => {

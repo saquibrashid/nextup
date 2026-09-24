@@ -184,12 +184,12 @@ describe('T-MOCK-001 service chips share the existing filter state', () => {
 
 function openFilters(): HTMLElement {
   fireEvent.click(screen.getByTestId('filters-trigger'));
-  return screen.getByRole('dialog', { name: 'Filter your list' });
+  return screen.getByRole('dialog', { name: 'Filter your library' });
 }
 
 async function openFiltersWith(user: UserEvent): Promise<HTMLElement> {
   await user.click(screen.getByTestId('filters-trigger'));
-  return screen.getByRole('dialog', { name: 'Filter your list' });
+  return screen.getByRole('dialog', { name: 'Filter your library' });
 }
 
 function disclosurePanel(trigger: HTMLElement): HTMLElement {
@@ -216,7 +216,7 @@ function panelDoneButton(): HTMLElement {
 
 /** Opens the Runtime picker and returns one handle of the range slider. */
 function runtimeHandle(handle: 'min' | 'max'): HTMLInputElement {
-  if (screen.queryByRole('dialog', { name: 'Filter your list' }) === null) openFilters();
+  if (screen.queryByRole('dialog', { name: 'Filter your library' }) === null) openFilters();
   const trigger = screen.getByRole('button', { name: /^Runtime / });
   if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
   return screen.getByRole<HTMLInputElement>('slider', {
@@ -236,7 +236,7 @@ function box(name: string, value: string): HTMLInputElement {
     genre: 'Genre',
     runtime: 'Runtime',
   };
-  if (screen.queryByRole('dialog', { name: 'Filter your list' }) === null) openFilters();
+  if (screen.queryByRole('dialog', { name: 'Filter your library' }) === null) openFilters();
   const trigger = screen.getByRole('button', { name: new RegExp(`^${labels[name] ?? name} `) });
   if (trigger.getAttribute('aria-expanded') !== 'true') fireEvent.click(trigger);
   // `Array.from`, NOT `.values().find(...)`. Both work now that the runtime is
@@ -705,7 +705,7 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
         expect(screen.getByRole('checkbox', { name: SERVICE_LABELS[service] })).toBeEnabled();
       }
       expect(screen.queryByRole('checkbox', { name: /all/i })).toBeNull();
-      expect(screen.getByRole('dialog', { name: 'Filter your list' })).toBeVisible();
+      expect(screen.getByRole('dialog', { name: 'Filter your library' })).toBeVisible();
     });
 
     it('T-UX-139b service search filters only picker options, retaining selection and URL state', async () => {
@@ -821,7 +821,7 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
       const trigger = screen.getByRole('button', { name: /^Type / });
       await user.click(trigger);
       screen.getByRole('checkbox', { name: 'Movie', exact: true }).focus();
-      fireEvent.click(screen.getByRole('heading', { name: 'Filter your list' }));
+      fireEvent.click(screen.getByRole('heading', { name: 'Filter your library' }));
       expect(trigger).toHaveAttribute('aria-expanded', 'false');
       expect(trigger).toHaveFocus();
       await user.click(trigger);

@@ -73,7 +73,7 @@ export function TitleDetailsPage({
   return (
     <article className="title-details">
       <Link className="tap-target" to={backTo}>
-        Back to Your list
+        Back to Library
       </Link>
       <div className="title-details__hero">
         {item.posterPath !== null && !artFailed ? (
@@ -135,7 +135,7 @@ export function TitleDetailsPage({
             </p>
           ) : item.listState === 'removed' ? (
             <p>
-              No longer on your list. <Link to="/removed">View removal history</Link>
+              No longer in your library. <Link to="/removed">View removal history</Link>
             </p>
           ) : (
             <>
@@ -154,7 +154,7 @@ export function TitleDetailsPage({
                   Not interested
                 </Button>
                 <Button variant="secondary" onClick={open('remove')} disabled={offline}>
-                  Remove from list
+                  Remove from library
                 </Button>
               </div>
             </>

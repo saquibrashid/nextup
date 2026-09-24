@@ -51,10 +51,10 @@ for (const width of [280, 390, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/upload?service=netflix');
       await expect(
-        page.getByRole('heading', { name: 'Continue your unfinished upload' }),
+        page.getByRole('heading', { name: 'Continue your unfinished import' }),
       ).toBeVisible();
       await expect(
-        page.getByRole('heading', { name: 'Continue your unfinished upload' }),
+        page.getByRole('heading', { name: 'Continue your unfinished import' }),
       ).toBeFocused();
       await expect(page.getByTestId('service-step-panel')).not.toBeVisible();
       await expect(page.getByTestId('submit-button')).toBeDisabled();
@@ -80,7 +80,7 @@ for (const width of [280, 390, 1440]) {
       await page.getByRole('button', { name: 'Refresh status' }).click();
       await expect(page.getByRole('button', { name: 'Continue review' })).toBeVisible();
       await page.getByTestId('open-batch-discard').click();
-      const dialog = page.getByRole('dialog', { name: 'Discard this unfinished upload?' });
+      const dialog = page.getByRole('dialog', { name: 'Discard this unfinished import?' });
       await expect(dialog.getByRole('button', { name: 'Stay here' })).toBeFocused();
       expect(writes).toEqual([]);
       expect(
@@ -93,7 +93,7 @@ for (const width of [280, 390, 1440]) {
         scan.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical'),
       ).toEqual([]);
       await page.screenshot({ path: testInfo.outputPath('upload-checkpoint.png') });
-      await dialog.getByRole('button', { name: 'Discard saved batch' }).click();
+      await dialog.getByRole('button', { name: 'Discard saved import' }).click();
       await expect(dialog).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Remove held.png' })).toBeVisible();
       await expect(page.getByTestId('service-step-panel-answer')).toContainText('Netflix');

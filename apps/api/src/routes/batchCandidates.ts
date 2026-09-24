@@ -415,7 +415,7 @@ export function registerBatchCandidateRoutes(
       (row) => row.resolvedWorkIdentity === workIdentity && row.reviewDisposition !== 'discarded',
     );
     if (clash !== undefined) {
-      throw new AppError('ALREADY_IN_BATCH', 409, 'That title is already in this batch.', {
+      throw new AppError('ALREADY_IN_BATCH', 409, 'That title is already in this import.', {
         workIdentity,
         candidateId: clash.id,
       });

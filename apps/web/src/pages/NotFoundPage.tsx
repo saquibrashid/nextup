@@ -13,9 +13,9 @@ export function NotFoundPage(): JSX.Element {
   return (
     <>
       <h1>Page not found</h1>
-      <p>That page doesn&rsquo;t exist. Nothing on your list has changed.</p>
+      <p>That page doesn&rsquo;t exist. Nothing in your library has changed.</p>
       <Link to="/" className="tap-target">
-        Back to your list
+        Back to Library
       </Link>
     </>
   );

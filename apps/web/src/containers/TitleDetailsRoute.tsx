@@ -56,7 +56,7 @@ export function TitleDetailsRoute({
   return (
     <section className="title-details">
       <Link className="tap-target" to={backTo}>
-        Back to Your list
+        Back to Library
       </Link>
       <h1>Title details</h1>
       {resource.kind === 'loading' ? (
@@ -66,7 +66,7 @@ export function TitleDetailsRoute({
         </div>
       ) : resource.kind === 'failed' ? (
         <div role="alert">
-          <p>Could not load this title. Your list has not changed.</p>
+          <p>Could not load this title. Your library has not changed.</p>
           <Button onClick={reload} disabled={!online}>
             Try again
           </Button>

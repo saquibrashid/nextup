@@ -748,8 +748,8 @@ export function ReviewPage({
       <ReviewHeading subtitle={`${service} · ${mode}`} />
       <p className="review-guidance">
         Decide the new titles first, then check the remaining evidence. When you are finished,
-        choose Apply changes to review and finish this batch. Nothing changes in your library before
-        that.
+        choose Apply changes to review and finish this import. Nothing changes in your library
+        before that.
       </p>
 
       {review.banner !== null && (
@@ -940,7 +940,7 @@ export function ReviewPage({
                 <CandidateCard
                   candidate={candidate}
                   thumbnailUrl={thumbnailUrlFor(candidate)}
-                  consequence="Stays on your list"
+                  consequence="Stays in your library"
                   actions={correctionActions(candidate, 'known')}
                 />
               )}
@@ -1004,7 +1004,7 @@ export function ReviewPage({
         {sections.removals.withheld && (
           <p className="review-banner" role="status" data-testid="review-removals-withheld">
             Removals are withheld because this extraction is incomplete. You can still review
-            additions; nothing will be removed from your list.
+            additions; nothing will be removed from your library.
           </p>
         )}
 
@@ -1031,7 +1031,7 @@ export function ReviewPage({
               </summary>
               <p className="review-section__description">
                 {sections.removals.count === 0
-                  ? 'No removals are proposed for this batch.'
+                  ? 'No removals are proposed for this import.'
                   : 'These titles were not found in this capture. Check the screenshots before agreeing to remove them from this service.'}
               </p>
               <ul className="review-section__list">
@@ -1066,7 +1066,7 @@ export function ReviewPage({
                       off-screen by the time this row is read. Without it a
                       removal card and an addition card are the same object. */}
                     <p className="removal-card__consequence" data-testid="candidate-consequence">
-                      {item.ticked ? REVIEW_CONSEQUENCE_REMOVAL : 'Stays on your list'}
+                      {item.ticked ? REVIEW_CONSEQUENCE_REMOVAL : 'Stays in your library'}
                     </p>
                   </li>
                 ))}

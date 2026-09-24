@@ -80,8 +80,8 @@ const REVIEW = {
   tmdbUnavailable: false,
   banner: null,
   sections: {
-    additions: { label: 'New to your list', count: 0, items: [] },
-    alreadyOnYourList: emptySection('Already on your list'),
+    additions: { label: 'New to your library', count: 0, items: [] },
+    alreadyOnYourList: emptySection('Already in your library'),
     probablyNotTitles: emptySection('Probably not titles'),
     unmatched: { label: "Couldn't identify these", count: 1, items: [UNMATCHED_CANDIDATE] },
     unreadableTiles: { label: "Couldn't read these", count: 0, items: [] },

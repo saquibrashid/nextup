@@ -244,7 +244,7 @@ export function registerFixMatchRoutes(router: Router, getClient: () => TmdbClie
           throw new AppError(
             'DUPLICATE_WORK_IDENTITY',
             409,
-            'That work is already on your list. Send confirmDuplicate to fix the match anyway.',
+            'That work is already in your library. Send confirmDuplicate to fix the match anyway.',
             { workIdentity, existingTitleId: existing.id },
           );
         }

@@ -909,7 +909,7 @@ async function uploadAndSubmit(
   opts: { service: Service; modeLabel: RegExp; expectedBatchId: string },
 ): Promise<void> {
   await page.goto('/upload');
-  await expect(page.getByRole('heading', { name: 'Upload screenshots' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Import screenshots' })).toBeVisible();
   await page.getByRole('radio', { name: /Netflix/ }).check();
   await page.getByRole('radio', { name: opts.modeLabel }).check();
   await attachGoldenScreenshots(page, opts.service);
@@ -989,7 +989,7 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
 
   await page.goto('/upload');
   await expect(page.locator('.app-shell')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Upload screenshots' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Import screenshots' })).toBeVisible();
   await attribution('/upload');
   await noOverflow('/upload (initial)');
 
@@ -1016,26 +1016,26 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
 
   // The list is still empty until the batch is applied.
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Your list' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();
   await expect(page.getByTestId('title-list').locator('[data-testid^="title-row-"]')).toHaveCount(
     0,
   );
 
   await page.goto('/batches/bat_e2e_1/review');
-  await expect(page.getByRole('heading', { name: 'Review this batch' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review this import' })).toBeVisible();
   await attribution('/batches/:id/review (step 3, additions expanded)');
   await axeState('/batches/:id/review (step 3, additions expanded)');
   await noOverflow('/batches/:id/review (step 3)');
 
   const additions1 = page.getByTestId('review-additions');
-  await expect(additions1.locator('summary')).toHaveText('New to your list (3)');
+  await expect(additions1.locator('summary')).toHaveText('New to your library (3)');
   await expect(additions1.locator('details')).toHaveJSProperty('open', true);
   for (const id of ['dune', 'arrival', 'arcane']) {
     await expect(additions1.getByText(work(id).name).first()).toBeVisible();
   }
 
   const already1 = page.getByTestId('review-already-on-list');
-  await expect(already1.locator('summary')).toHaveText('Already on your list (0)');
+  await expect(already1.locator('summary')).toHaveText('Already in your library (0)');
   await expect(already1.locator('details')).toHaveJSProperty('open', true);
   // ⚠ Nothing on the list yet ⇒ nothing to remove ⇒ the removals section is ABSENT.
   await expect(page.getByTestId('review-removals')).toHaveCount(0);
@@ -1075,15 +1075,15 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
     modeLabel: /Full update/,
     expectedBatchId: 'bat_e2e_2',
   });
-  await expect(page.getByRole('heading', { name: 'Review this batch' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review this import' })).toBeVisible();
 
   // One addition (Sinners), and Dune + Arcane already present (collapsed).
   const additions2 = page.getByTestId('review-additions');
-  await expect(additions2.locator('summary')).toHaveText('New to your list (1)');
+  await expect(additions2.locator('summary')).toHaveText('New to your library (1)');
   await expect(additions2.getByText('Sinners').first()).toBeVisible();
 
   const already2 = page.getByTestId('review-already-on-list');
-  await expect(already2.locator('summary')).toHaveText('Already on your list (2)');
+  await expect(already2.locator('summary')).toHaveText('Already in your library (2)');
 
   // ⚠ Arrival — extracted from NO screenshot this batch — is proposed for
   // removal, ticked on arrival (REQ-055). This is the reconcile-with-removals
@@ -1202,12 +1202,12 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
     modeLabel: /Add only/,
     expectedBatchId: 'bat_e2e_3',
   });
-  await expect(page.getByRole('heading', { name: 'Review this batch' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review this import' })).toBeVisible();
   await noOverflow('/batches/:id/review (append-only, step 7)');
 
   // Arrival is a brand-new addition again (it was removed, not suppressed).
   const additions3 = page.getByTestId('review-additions');
-  await expect(additions3.locator('summary')).toHaveText('New to your list (1)');
+  await expect(additions3.locator('summary')).toHaveText('New to your library (1)');
   await expect(additions3.getByText('Arrival').first()).toBeVisible();
 
   // ⚠ THE SUPPRESSION INVARIANT (REQ-071). Dune is in this batch's screenshots

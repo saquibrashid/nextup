@@ -139,7 +139,7 @@ export function UploadPage({
 
   return (
     <>
-      <h1>Upload screenshots</h1>
+      <h1>Import screenshots</h1>
       <p className="upload-flow__intro">{UPLOAD_INTRO}</p>
       <CaptureProgress stage="prepare" />
 

@@ -31,19 +31,19 @@ const GUARD_MESSAGE =
   'decoding this one would exhaust container memory and kill the import. This is a ' +
   'memory limit, not a problem with your image. Remedy: up-size compute to 0.5 vCPU / ' +
   '1.0 GiB (+~$4/month) — one command, see docs/runbooks/scale-up-memory.md. No other ' +
-  'image in this batch was affected; re-attach this file after up-sizing.';
+  'image in this import was affected; re-attach this file after up-sizing.';
 
 const OOM_MESSAGE =
   'beach-list-03.heic ran out of memory while being decoded (HEIC → PNG) in the 0.5 GiB ' +
   'container. This is a memory limit, not a corrupt file. Remedy: up-size compute to ' +
   '0.5 vCPU / 1.0 GiB (+~$4/month) — docs/runbooks/scale-up-memory.md. Only this image ' +
-  'failed; the rest of the batch is intact and nothing has been committed. Re-attach ' +
+  'failed; the rest of the import is intact and nothing has been committed. Re-attach ' +
   'this file after up-sizing.';
 
 const CORRUPT_MESSAGE =
   "truncated.heic couldn't be read — the file appears to be corrupt or incomplete. " +
   'Try re-exporting or re-taking the screenshot and attaching it again. Only this ' +
-  'image failed; the rest of the batch is intact.';
+  'image failed; the rest of the import is intact.';
 
 const GUARD: ServerRejection = {
   fileName: 'beach-list-03.heic',

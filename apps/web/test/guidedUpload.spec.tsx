@@ -100,13 +100,13 @@ describe('T-UX-156 — guided capture and authoritative saved drafts', () => {
     await choose();
     add('pending.png');
     fireEvent.click(screen.getByTestId('submit-button'));
-    fireEvent.click(await screen.findByRole('button', { name: 'Open saved batch' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Discard batch and start again' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open saved import' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Discard import and start again' }));
     stub.discardBatch.mockImplementationOnce(async () => {
       stub.getBatch.mockResolvedValue({ ...saved, status: 'discarded' });
       return {};
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Discard batch', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discard import', exact: true }));
     await waitFor(() => expect(screen.getByTestId('file-input')).toBeEnabled());
     expect(screen.queryByRole('heading', { name: 'Check your saved screenshots' })).toBeNull();
     expect(screen.queryByText('Saved batch destination')).toBeNull();
@@ -186,7 +186,7 @@ describe('T-UX-156 — guided capture and authoritative saved drafts', () => {
     add('first.png');
     add('second.png');
     fireEvent.click(screen.getByTestId('submit-button'));
-    const recovery = await screen.findByRole('button', { name: 'Open saved batch' });
+    const recovery = await screen.findByRole('button', { name: 'Open saved import' });
     expect(stub.addBatchImages).toHaveBeenCalledTimes(2);
     expect(stub.submitBatch).not.toHaveBeenCalled();
     expect(screen.getByTestId('submit-failure')).toHaveTextContent('first.png: Connection lost');
@@ -303,11 +303,11 @@ describe('T-UX-156 — guided capture and authoritative saved drafts', () => {
     expect(screen.getByTestId('draft-submit')).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Remove saved.png' })).toBeDisabled();
     view.rerender(<DraftBatch {...props} offline={false} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Discard batch and start again' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discard import and start again' }));
     fireEvent.click(screen.getByRole('button', { name: 'Keep batch' }));
     expect(stub.discardBatch).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Discard batch and start again' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Discard batch', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discard import and start again' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discard import', exact: true }));
     await waitFor(() => expect(discarded).toHaveBeenCalledTimes(1));
     expect(stub.discardBatch).toHaveBeenCalledExactlyOnceWith('bat_1');
   });

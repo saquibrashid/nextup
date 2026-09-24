@@ -117,6 +117,18 @@ export function useDialogFocus(
         // the page behind a dialog that claims the page is inert.
         event.preventDefault();
         firstItem.focus();
+      } else {
+        /*
+         * ⚠ WEBKIT'S NATIVE TAB ORDER SKIPS LINKS by default, so from the last
+         * BUTTON in a dialog whose last item is a link (the Menu drawer) the
+         * browser moves focus to `<body>` — out of the dialog, where Escape no
+         * longer reaches this listener. Native order is kept inside; only an
+         * exit is caught, after the browser has moved focus, and wrapped.
+         */
+        const wrapTo = event.shiftKey ? lastItem : firstItem;
+        window.setTimeout(() => {
+          if (element.isConnected && !element.contains(document.activeElement)) wrapTo.focus();
+        }, 0);
       }
     }
 

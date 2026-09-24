@@ -128,7 +128,7 @@ export function reviewFiles(
         name: file.name,
         reason: `That would be ${String(wouldBe)} screenshots. The limit is ${String(
           MAX_IMAGES_PER_BATCH,
-        )} per batch.`,
+        )} per import.`,
       });
       continue;
     }
@@ -138,7 +138,7 @@ export function reviewFiles(
     ) {
       rejected.push({
         name: file.name,
-        reason: `The selected and saved screenshots would exceed the ${megabytes(MAX_BATCH_UPLOAD_BYTES)} MB upload limit per batch.`,
+        reason: `The selected and saved screenshots would exceed the ${megabytes(MAX_BATCH_UPLOAD_BYTES)} MB upload limit per import.`,
       });
       continue;
     }

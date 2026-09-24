@@ -190,7 +190,7 @@ export function SuppressedPage({
   return (
     <>
       <h1>Not interested</h1>
-      <p data-testid="suppressed-subtitle">{'These won\u2019t be added back by future uploads.'}</p>
+      <p data-testid="suppressed-subtitle">{'These won\u2019t be added back by future imports.'}</p>
 
       {announcement !== null && (
         <p role="status" data-testid="unsuppress-success-announcement">

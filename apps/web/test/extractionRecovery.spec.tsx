@@ -124,7 +124,7 @@ describe('T-UX-157 extraction progress and deliberate recovery', () => {
     expect(screen.getByRole('button', { name: STATUS_DISCARD_BATCH_LABEL })).toBeDisabled();
     fireEvent(window, new Event('online'));
     fireEvent.click(screen.getByRole('button', { name: STATUS_DISCARD_BATCH_LABEL }));
-    fireEvent.click(screen.getByRole('button', { name: 'Discard batch and continue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discard import and continue' }));
     expect(await screen.findByText('Library destination')).toBeVisible();
     expect(discardBatch).toHaveBeenCalledExactlyOnceWith('b1');
   });

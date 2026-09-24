@@ -1,5 +1,6 @@
 /**
- * `/batches` — upload history (`specs/ux-states.md` §9.1–§9.3, `specs/ui.md`
+ * `/batches` — the Review destination (issue 369): imports that need review,
+ * then import history (`specs/ux-states.md` §9.1–§9.3, `specs/ui.md`
  * §1, US-031, TASK-076).
  *
  * ⚠ **AN EMPTY LIST AND AN UNLOADED LIST ARE THE SAME PIXELS AND OPPOSITE
@@ -26,8 +27,10 @@ import {
   BATCHES_COUNTS,
   BATCHES_EMPTY,
   BATCHES_EMPTY_ACTION_LABEL,
+  BATCHES_HISTORY_TITLE,
   BATCHES_LOADING,
   BATCHES_LOAD_ERROR,
+  BATCHES_NEEDS_REVIEW_TITLE,
   BATCHES_TITLE,
   BATCHES_UNDO_LABEL,
   BATCHES_UNDO_SUBMITTING,
@@ -65,6 +68,17 @@ export interface BatchHistoryPageProps {
 }
 
 /**
+ * Issue 369 — the Review page's two sections. An import NEEDS REVIEW only while
+ * it still has a next step (`resumeAction`: a draft, a read in progress, a
+ * review to finish, an extraction to resolve). Applied, undone and discarded
+ * imports are history: putting them under "Needs review" would claim work the
+ * owner has already done.
+ */
+export function needsReview(item: BatchHistoryItem): boolean {
+  return item.undoneAt === null && resumeAction(item.status) !== null;
+}
+
+/**
  * §9.3 — a batch the owner may attempt to undo. An `applied` batch not already
  * undone is offerable; the server has the final say and refuses the rest into
  * the §9.8 panel, so this is deliberately the coarse gate rather than a client
@@ -75,7 +89,7 @@ export function canOfferUndo(item: BatchHistoryItem): boolean {
 }
 
 const MODE_LABELS: Record<string, string> = {
-  'append-only': 'Add to list',
+  'append-only': 'Add to library',
   'full-update': 'Full update',
 };
 
@@ -186,17 +200,31 @@ export function BatchHistoryPage({
           </Link>
         </div>
       ) : (
-        <ul className="batch-history" data-testid="batches-list">
-          {items.map((item) => (
-            <BatchCard
-              key={item.batchId}
-              item={item}
-              undoing={item.batchId === undoingBatchId}
-              offline={offline}
-              {...(onUndo ? { onUndo } : {})}
-            />
-          ))}
-        </ul>
+        <div data-testid="batches-list">
+          {(
+            [
+              ['needs-review', BATCHES_NEEDS_REVIEW_TITLE, items.filter(needsReview)],
+              ['history', BATCHES_HISTORY_TITLE, items.filter((item) => !needsReview(item))],
+            ] as const
+          ).map(([key, title, group]) =>
+            group.length === 0 ? null : (
+              <section key={key} aria-labelledby={`batches-${key}-heading`}>
+                <h2 id={`batches-${key}-heading`}>{title}</h2>
+                <ul className="batch-history" data-testid={`batches-${key}`}>
+                  {group.map((item) => (
+                    <BatchCard
+                      key={item.batchId}
+                      item={item}
+                      undoing={item.batchId === undoingBatchId}
+                      offline={offline}
+                      {...(onUndo ? { onUndo } : {})}
+                    />
+                  ))}
+                </ul>
+              </section>
+            ),
+          )}
+        </div>
       )}
     </>
   );

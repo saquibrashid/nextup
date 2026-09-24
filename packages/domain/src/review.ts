@@ -490,8 +490,8 @@ function reviewTiles(
 // ── Section labels (`specs/api.md` §6.17) ──────────────────────────────────
 
 export const REVIEW_LABELS = {
-  additions: 'New to your list',
-  alreadyOnYourList: 'Already on your list',
+  additions: 'New to your library',
+  alreadyOnYourList: 'Already in your library',
   probablyNotTitles: 'Probably not titles',
   unmatched: "Couldn't identify these",
   unreadableTiles: "Couldn't read these",
@@ -816,8 +816,8 @@ function readSafetyBanner(input: {
   if (input.lowYield && input.mode === 'full-update') {
     return (
       'Not enough titles were read from these screenshots to safely work out ' +
-      "what's been removed, so nothing will be removed by this batch. You can " +
-      're-extract these images, add more screenshots, or discard this batch.'
+      "what's been removed, so nothing will be removed by this import. You can " +
+      're-extract these images, add more screenshots, or discard this import.'
     );
   }
   if (input.lowYield) {

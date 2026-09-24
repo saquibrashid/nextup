@@ -220,7 +220,7 @@ describe('T-UX-160 entry checkpoint', () => {
     client.discardBatch.mockReturnValue(pending.promise);
     client.listBatches.mockResolvedValue({ batches: [] });
     fireEvent.click(screen.getByTestId('open-batch-discard'));
-    const confirm = screen.getByRole('button', { name: 'Discard saved batch' });
+    const confirm = screen.getByRole('button', { name: 'Discard saved import' });
     fireEvent.click(confirm);
     fireEvent.click(confirm);
     await waitFor(() => expect(client.discardBatch).toHaveBeenCalledExactlyOnceWith('old-upload'));
@@ -230,7 +230,7 @@ describe('T-UX-160 entry checkpoint', () => {
       pending.resolve({});
     });
     expect(await screen.findByRole('button', { name: 'Remove held.png' })).toBeEnabled();
-    expect(screen.getByText(/saved batch was discarded/)).toBeVisible();
+    expect(screen.getByText(/saved import was discarded/)).toBeVisible();
     expect(client.createBatch).not.toHaveBeenCalled();
   });
 
@@ -239,7 +239,7 @@ describe('T-UX-160 entry checkpoint', () => {
     await screen.findByTestId('open-batch-discard');
     client.getBatch.mockResolvedValue(detail('extracting'));
     fireEvent.click(screen.getByTestId('open-batch-discard'));
-    fireEvent.click(screen.getByRole('button', { name: 'Discard saved batch' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discard saved import' }));
     expect(await screen.findByRole('button', { name: 'View progress' })).toBeVisible();
     expect(screen.queryByTestId('open-batch-discard')).toBeNull();
     expect(client.discardBatch).not.toHaveBeenCalled();
@@ -252,7 +252,7 @@ describe('T-UX-160 entry checkpoint', () => {
     client.discardBatch.mockRejectedValueOnce(new Error('Response lost'));
     client.listBatches.mockResolvedValue({ batches: [] });
     fireEvent.click(screen.getByTestId('open-batch-discard'));
-    fireEvent.click(screen.getByRole('button', { name: 'Discard saved batch' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Discard saved import' }));
     await waitFor(() => expect(screen.getByTestId('service-step')).toBeVisible());
     expect(screen.getByRole('alert')).toHaveTextContent('Nothing was automatically retried');
     expect(client.listBatches).toHaveBeenCalledTimes(2);

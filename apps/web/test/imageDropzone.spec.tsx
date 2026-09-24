@@ -68,7 +68,7 @@ describe('T-UI-004 - PNG, JPEG and HEIC, all three, in accept and in the copy', 
     const label = screen.getByTestId('dropzone-label');
 
     expect(label.textContent).toBe(DROPZONE_IDLE_LABEL);
-    for (const token of ['PNG', 'JPEG', 'HEIC', '10 MB', '40 per batch']) {
+    for (const token of ['PNG', 'JPEG', 'HEIC', '10 MB', '40 per import']) {
       expect(label.textContent ?? '').toContain(token);
     }
   });
@@ -240,7 +240,7 @@ describe('T-UX-042 - partial acceptance names every rejected file and its reason
     expect(rejected[0]?.reason).toBe(
       `That would be ${String(MAX_IMAGES_PER_BATCH + 1)} screenshots. The limit is ${String(
         MAX_IMAGES_PER_BATCH,
-      )} per batch.`,
+      )} per import.`,
     );
   });
 
@@ -340,7 +340,7 @@ describe('T-UX-044 - a breached ceiling is rendered, names the number, and accum
     expect(within(rejections[0] as HTMLElement).getByTestId('rejected-reason')).toHaveTextContent(
       `That would be ${String(MAX_IMAGES_PER_BATCH + 1)} screenshots. The limit is ${String(
         MAX_IMAGES_PER_BATCH,
-      )} per batch.`,
+      )} per import.`,
     );
   });
 

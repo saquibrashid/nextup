@@ -129,7 +129,7 @@ export function extractionPorts(
         throw new AppError(
           'IMAGES_PURGED',
           410,
-          'The screenshots for this batch have passed the 30-day retention window and ' +
+          'The screenshots for this import have passed the 30-day retention window and ' +
             'have been deleted. Upload them again to re-run extraction.',
           { imageId: image.imageId },
         );
@@ -316,7 +316,7 @@ export async function startExtraction(
         batchId,
         'EXTRACTOR_UNAVAILABLE',
         'Screenshot reading is not configured in this environment, so nothing was ' +
-          'extracted. Your screenshots are safe and nothing in your list changed. ' +
+          'extracted. Your screenshots are safe and nothing in your library changed. ' +
           'Try again once it is available.',
         { imagesDone: 0, imagesTotal: images.length },
       );
@@ -386,7 +386,7 @@ export async function startExtraction(
         batchId,
         'EXTRACTOR_ERROR',
         'Something went wrong while reading your screenshots. Your screenshots are ' +
-          'safe and nothing in your list changed. Try again.',
+          'safe and nothing in your library changed. Try again.',
         { imagesDone: 0, imagesTotal: 0 },
       );
     } catch (recordError) {

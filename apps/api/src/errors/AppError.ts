@@ -51,7 +51,7 @@ const CONSTRAINT_TO_CODE: ReadonlyMap<string, MappedConstraint> = new Map([
     {
       code: 'DUPLICATE_WORK_IDENTITY',
       status: 409,
-      message: 'That work is already on your list. Nothing was changed.',
+      message: 'That work is already in your library. Nothing was changed.',
     },
   ],
   [

@@ -242,8 +242,15 @@ for (const width of [280, 390, 1440]) {
         await expect(page.getByRole('progressbar')).toBeVisible();
         await expect(page.getByRole('main')).toBeFocused();
         const nav = page.getByRole('navigation', { name: 'Primary' });
-        if (width < 640) await nav.getByRole('button', { name: 'More' }).click();
-        await nav.getByRole('link', { name: 'Batches', exact: true }).click();
+        if (width < 640) {
+          await nav.getByRole('button', { name: 'Menu' }).click();
+          await page
+            .getByRole('dialog', { name: 'Menu' })
+            .getByRole('link', { name: 'Review', exact: true })
+            .click();
+        } else {
+          await nav.getByRole('link', { name: 'Review', exact: true }).click();
+        }
         const resume = page.getByRole('complementary', { name: 'Unfinished capture' });
         await expect(resume).toContainText('Reading screenshots');
         const metadataGap = await page.getByTestId('batch-card-link').evaluate((link) => {

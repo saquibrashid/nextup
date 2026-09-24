@@ -45,26 +45,28 @@ import type { RuntimeBucket } from '@nextup/domain';
 export { TMDB_DISCLAIMER } from '@nextup/domain';
 
 /**
- * REQ-117's overflow destination (`specs/ui-refresh.md` §6, TASK-211).
+ * The navigation Menu (issue 369, `specs/ui-refresh.md` §6 and §6b).
  *
- * ⚠ IT IS A DESTINATION, NOT A HAMBURGER. The word is deliberately "More" and
- * not "Menu": what sits behind it is six places the owner can go, each with
- * its own URL, not a tray of commands. Naming it "Menu" invites exactly the
- * implementation §6 forbids - one that takes the routes out of the router.
+ * ⚠ THE MENU LISTS DESTINATIONS, NOT COMMANDS. Every entry is a real link over
+ * the same route table, with its own URL, so a deep link still works and is
+ * still marked current. The drawer replaces the old `More` overflow: when it is
+ * open nothing is nested behind a second disclosure.
  */
-export const NAV_MORE_LABEL = 'More';
+export const NAV_MENU_LABEL = 'Menu';
+export const NAV_MENU_TITLE = 'Menu';
+export const NAV_MENU_CLOSE_LABEL = 'Close menu';
 
 /** US-023 AC-2, US-024 AC-6 - the removed view is a log, not a recycle bin. */
 export const REMOVED_VIEW_SUBTITLE =
-  "Everything that's ever left your list is kept here forever. The same title can appear more than once — each row is one removal.";
+  "Everything that's ever left your library is kept here forever. The same title can appear more than once — each row is one removal.";
 
 /** US-027 AC-2/AC-3. `{name}` is substituted with the work's name. */
 export const SUPPRESS_CONFIRM_BODY =
-  '"{name}" will be hidden from your list and won\'t come back on future uploads, even if it\'s still saved on your streaming services. You can undo this from "Not interested".';
+  '"{name}" will be hidden from your library and won\'t come back on future imports, even if it\'s still saved on your streaming services. You can undo this from "Not interested".';
 
 /** US-029 AC-4. `{name}` is substituted with the work's name. */
 export const UNSUPPRESS_CONFIRM_BODY =
-  '"{name}" can be added again by a future upload. This doesn\'t bring back anything that was removed — check Removal history for that.';
+  '"{name}" can be added again by a future import. This doesn\'t bring back anything that was removed — check Removal history for that.';
 
 /* ------------------------------------------------------------------ *
  * Manual list edits — `specs/ui.md` §9, US-047 / US-048, TASK-207
@@ -89,12 +91,12 @@ export const UNSUPPRESS_CONFIRM_BODY =
  * reappearance explicitly rather than leaving it to be inferred.
  */
 export const REMOVE_TITLE_CONFIRM_BODY =
-  '"{name}" will be taken off your list and logged in Removal history, where you can put it back. It isn\'t marked "not interested", so a future upload can add it again.';
+  '"{name}" will be taken out of your library and logged in Removal history, where you can put it back. It isn\'t marked "not interested", so a future import can add it again.';
 
 /** US-048 AC-3 — the outcome, with Undo (`ux-states.md` §2.14 shape). */
 export const REMOVE_TITLE_DONE = 'Removed. "{name}" is in Removal history.';
 export const REMOVE_TITLE_UNDO_LABEL = 'Undo';
-export const REMOVE_TITLE_UNDONE = 'Back on your list.';
+export const REMOVE_TITLE_UNDONE = 'Back in your library.';
 
 /**
  * US-048 AC-5 — the removal failed and NOTHING changed.
@@ -106,13 +108,13 @@ export const REMOVE_TITLE_UNDONE = 'Back on your list.';
 export const REMOVE_TITLE_FAILED = "Couldn't remove that. Nothing has changed.";
 
 /** US-048 AC-6 — 409 `TITLE_NOT_ACTIVE`; already gone, so nothing to do. */
-export const REMOVE_TITLE_NOT_ACTIVE = 'That title is already off your list.';
+export const REMOVE_TITLE_NOT_ACTIVE = 'That title is already out of your library.';
 
 /** US-048 — the removed row's provenance when no batch explains it. */
 export const REMOVED_BY_OWNER = 'Removed by you';
 
 /** §2.2 row menu — the third item. */
-export const ROW_MENU_REMOVE_LABEL = 'Remove from list';
+export const ROW_MENU_REMOVE_LABEL = 'Remove from library';
 
 /** US-047 — the standalone add affordance on the list. */
 export const ADD_TITLE_LABEL = 'Add title';
@@ -133,12 +135,12 @@ export const ADD_TITLE_CLOSE_LABEL = 'Close add a title';
 export const ADD_TITLE_SERVICE_REQUIRED = 'Pick the service it’s saved on.';
 
 /** US-047 AC-3 — the outcome, both shapes. */
-export const ADD_TITLE_DONE = 'Added. "{name}" is on your list.';
+export const ADD_TITLE_DONE = 'Added. "{name}" is in your library.';
 export const ADD_TITLE_DONE_BADGE_ONLY =
-  '"{name}" was already on your list — it now has a {service} badge too.';
+  '"{name}" was already in your library — it now has a {service} badge too.';
 
 /** US-047 AC-5 — 409 `DUPLICATE_WORK_IDENTITY`, already on that service. */
-export const ADD_TITLE_DUPLICATE = 'That title is already on your list for that service.';
+export const ADD_TITLE_DUPLICATE = 'That title is already in your library for that service.';
 
 /** data-model §2.3.3 - suppression keyed on read text rather than a work id. */
 export const UNMATCHED_SUPPRESSION_CAVEAT =
@@ -158,7 +160,7 @@ export const FIXMATCH_SUPPRESSION_MIGRATED =
 
 /** US-014 AC-6, `specs/ai.md` §8.2 - the low-yield guard on a full update. */
 export const LOW_YIELD_FULL_UPDATE =
-  "We couldn't read enough titles from these screenshots to safely work out what's been removed, so nothing will be removed by this batch. You can re-extract, add more screenshots, or discard it.";
+  "We couldn't read enough titles from these screenshots to safely work out what's been removed, so nothing will be removed by this import. You can re-extract, add more screenshots, or discard it.";
 
 /**
  * US-003 AC-2. `{Service}` is substituted with the batch's service name.
@@ -206,7 +208,7 @@ export const IMAGE_RETENTION_STATEMENT =
 export const MEMORY_REMEDY_PATH = 'runbooks/scale-up-memory.md';
 
 /** `A43-M2` - true by construction (`specs/api.md` §5.2.1). */
-export const DECODE_BATCH_UNAFFECTED = 'Nothing else in this batch was affected.';
+export const DECODE_BATCH_UNAFFECTED = 'Nothing else in this import was affected.';
 
 /** `specs/ui.md` §3.2a item 4 - the two MEMORY codes only, never `IMAGE_DECODE_FAILED`. */
 export const DECODE_REMEDY_LINK_LABEL = 'How to fix this';
@@ -234,7 +236,7 @@ export const PASTE_DENIED_BODY =
 
 /** `specs/ux-states.md` §4.3 - all three ingest affordances named in one line. */
 export const DROPZONE_IDLE_LABEL =
-  'Paste a screenshot, choose files, or drag them here — PNG, JPEG or HEIC, up to 10 MB each, 40 per batch.';
+  'Paste a screenshot, choose files, or drag them here — PNG, JPEG or HEIC, up to 10 MB each, 40 per import.';
 
 /** `specs/ui.md` §3.2c. */
 export const DROPZONE_ACTIVE_LABEL = 'Drop screenshots here';
@@ -424,7 +426,7 @@ export const SORT_KEY_LEGEND = 'Sort by';
  * the field alone and is meaningless without the direction beside it.
  */
 export const SORT_KEY_NAMES = {
-  dateAdded: 'Added to list',
+  dateAdded: 'Added to library',
   name: 'Title',
   releaseYear: 'Release date',
   runtime: 'Runtime',
@@ -445,7 +447,7 @@ export const SORT_DIRECTION_LABELS = {
   watchPriority: { asc: 'Highest first', desc: 'Lowest first' },
 } as const;
 
-export const SORT_PANEL_TITLE = 'Sort your list';
+export const SORT_PANEL_TITLE = 'Sort your library';
 export const SORT_PANEL_HELP = 'Choose an order. Choose it again to reverse it.';
 export const SORT_TRIGGER_LABEL = 'Sort';
 export const SORT_CLOSE_LABEL = 'Close sort options';
@@ -456,7 +458,7 @@ export const FILTERS_TRIGGER_LABEL = 'Filters';
 export const LIST_SEARCH_PLACEHOLDER = 'Search titles';
 export const LIST_SEARCH_SHORTCUT_APPLE = ['⌘', 'K'] as const;
 export const LIST_SEARCH_SHORTCUT_OTHER = ['Ctrl', 'K'] as const;
-export const FILTERS_PANEL_TITLE = 'Filter your list';
+export const FILTERS_PANEL_TITLE = 'Filter your library';
 export const FILTERS_CLOSE_LABEL = 'Close filters';
 export const FILTERS_DONE_LABEL = 'Done';
 
@@ -603,7 +605,7 @@ export const IDP_FAILURE_TITLE = "Couldn't sign you in.";
 
 /** US-001 AC-5 - names the cause, offers retry, and promises no fallback mode. */
 export const IDP_FAILURE_BODY =
-  'The sign-in service is unavailable or returned an error. Nothing on your list has changed. Try again in a moment.';
+  'The sign-in service is unavailable or returned an error. Nothing in your library has changed. Try again in a moment.';
 
 /* -------------------------------------------------------------------------- */
 /* /about - specs/ui.md §8 (TASK-026)                                         */
@@ -615,7 +617,7 @@ export const ABOUT_TMDB_USE =
 
 /** §8 / US-023 AC-2 - REQ-028: soft delete forever, no TTL, nothing scheduled. */
 export const ABOUT_REMOVED_KEPT_FOREVER =
-  'Titles that leave your list are kept forever in Removal history, so nothing is ever lost without you being asked first.';
+  'Titles that leave your library are kept forever in Removal history, so nothing is ever lost without you being asked first.';
 
 /** §8 / NFR-005 - nothing is collected, so there is nothing to opt out of. */
 export const ABOUT_NO_ANALYTICS =
@@ -662,7 +664,7 @@ export const UPLOAD_SUMMARY_TITLE = 'Your capture';
 export const UPLOAD_NEXT_NOTE =
   'Next: review the extracted titles, then confirm exactly what changes. Nothing is removed without your approval.';
 export const UPLOAD_RECOVERY_NOTE =
-  'Your batch is saved. Open it to check which screenshots arrived before continuing. Uploads will not be repeated automatically.';
+  'Your import is saved. Open it to check which screenshots arrived before continuing. Uploads will not be repeated automatically.';
 
 /**
  * Why a step cannot be answered yet.
@@ -718,7 +720,7 @@ export const SUBMIT_IN_FLIGHT = "Don't close this tab.";
 /**
  * §3.3 batch immutability (US-003 AC-6) - shown once the batch is submitted.
  */
-export const BATCH_LOCKED_NOTE = 'Locked for this batch. Discard and start again to change them.';
+export const BATCH_LOCKED_NOTE = 'Locked for this import. Discard and start again to change them.';
 
 /**
  * §4.10 - `OPEN_BATCH_EXISTS`.
@@ -765,9 +767,9 @@ export const CLEAR_FILTERS_LABEL = 'Clear filters';
 export const ZERO_MATCH_TITLE = 'No titles match these filters.';
 export const LIST_EMPTY_NEVER_UPLOADED_TITLE = 'Nothing here yet.';
 export const LIST_EMPTY_NEVER_UPLOADED_BODY =
-  'Upload screenshots of your saved lists on your streaming services and nextup will build one combined list.';
-export const UPLOAD_SCREENSHOTS_LABEL = 'Upload screenshots';
-export const LIST_EMPTY_ALL_GONE_TITLE = 'Nothing on your list right now.';
+  'Import screenshots of your saved lists on your streaming services and nextup will build one combined library.';
+export const UPLOAD_SCREENSHOTS_LABEL = 'Import screenshots';
+export const LIST_EMPTY_ALL_GONE_TITLE = 'Nothing in your library right now.';
 
 /**
  * ⚠ "Nothing has changed" is the load-bearing half of this sentence
@@ -776,7 +778,7 @@ export const LIST_EMPTY_ALL_GONE_TITLE = 'Nothing on your list right now.';
  * disappears without being asked. `Retry` is offered because the fetch is
  * safe to repeat; nothing was written.
  */
-export const LIST_LOAD_FAILED_BODY = "Couldn't load your list. Nothing has changed.";
+export const LIST_LOAD_FAILED_BODY = "Couldn't load your library. Nothing has changed.";
 export const RETRY_LABEL = 'Retry';
 
 /**
@@ -793,7 +795,7 @@ export const RETRY_LABEL = 'Retry';
  * specifies are NOT built here; they are their own task (`T-UX-001`,
  * `T-UX-010`). This is the honest minimum that keeps the empty state truthful.
  */
-export const LIST_LOADING_BODY = 'Loading your list…';
+export const LIST_LOADING_BODY = 'Loading your library…';
 
 /**
  * Qualifies the count when the page shown is not the whole list (`T-UX-015`).
@@ -896,14 +898,14 @@ export const ROW_PENDING_LABEL = 'Saving…';
 export const METADATA_STALE_CHIP = 'Details may be out of date';
 
 /** The §6.31 lookup surface (REQ-092, US-045). */
-export const IMDB_LOOKUP_TITLE = 'Check a rating';
+export const IMDB_LOOKUP_TITLE = 'Rating lookup';
 export const IMDB_LOOKUP_BODY =
-  'Look up any film or series to see its IMDb rating. Nothing is added to your list.';
+  'Look up any film or series to see its IMDb rating. Nothing is added to your library.';
 export const IMDB_LOOKUP_INPUT_LABEL = 'Film or series name';
 export const IMDB_LOOKUP_SUBMIT_LABEL = 'Look it up';
 export const IMDB_LOOKUP_NOT_FOUND = "Couldn't find that title.";
 export const IMDB_LOOKUP_FAILED = "Couldn't run that lookup. Nothing has changed.";
-export const IMDB_LOOKUP_IN_LIST = 'Already on your list.';
+export const IMDB_LOOKUP_IN_LIST = 'Already in your library.';
 
 /*
  * ── The review pass (`specs/ui.md` §5.3/§5.3a, TASK-069) ──────────────────
@@ -937,11 +939,11 @@ export const CANDIDATE_UNREADABLE_NO_TITLE = 'No title read from this tile';
  */
 export const REVIEW_NO_ADDITIONS_TITLE = 'Nothing new in these screenshots';
 export const REVIEW_NO_ADDITIONS_BODY =
-  'Everything nextup could read is already on your list. Nothing has been added.';
+  'Everything nextup could read is already in your library. Nothing has been added.';
 
 /** §5.1 - the sticky action bar's running counts. */
 export const REVIEW_APPLY_LABEL = 'Review changes';
-export const REVIEW_DISCARD_LABEL = 'Discard batch';
+export const REVIEW_DISCARD_LABEL = 'Discard import';
 
 /**
  * `specs/ux-states.md` §6.12 (`T-UX-064`) — the close is in flight.
@@ -979,7 +981,7 @@ export function reviewCounts(toAdd: number, toRemove: number, stillToReview: num
   return stillToReview > 0 ? `${head} · ${stillToReview} still to review` : head;
 }
 
-export const REVIEW_TITLE = 'Review this batch';
+export const REVIEW_TITLE = 'Review this import';
 
 /**
  * SD-11a, quoted from the `specs/ui.md` §5.2 wireframe (`[Confirm all 9]`).
@@ -987,7 +989,7 @@ export const REVIEW_TITLE = 'Review this batch';
  * section's total — see `CandidateSection` for why that distinction matters.
  */
 export const REVIEW_CONFIRM_ALL = 'Confirm all {n}';
-export const REVIEW_LOADING = 'Reading this batch…';
+export const REVIEW_LOADING = 'Reading this import…';
 export const REVIEW_LOAD_FAILED = "Couldn't load this review. Check your connection and try again.";
 export const REVIEW_RETRY_LABEL = 'Try again';
 
@@ -996,7 +998,7 @@ export const REVIEW_RETRY_LABEL = 'Try again';
  * the review has been refreshed. A failed close alone proves neither.
  */
 export const REVIEW_APPLY_FAILED =
-  'The saved batch is still in review. Check the refreshed changes before applying again.';
+  'The saved import is still in review. Check the refreshed changes before applying again.';
 
 /**
  * `specs/ux-states.md` §6.14 (`T-UX-066`) — a 409 `PENDING_ADDITIONS` on the
@@ -1045,9 +1047,9 @@ export const REVIEW_SECTION_EMPTY = 'Nothing in this group.';
  * what the section is called.** "Removals" is a category; "Removes from your
  * list" is a consequence, and the consequence is the thing that differs.
  */
-export const REVIEW_CONSEQUENCE_ADDITION = 'Adds to your list';
+export const REVIEW_CONSEQUENCE_ADDITION = 'Adds to your library';
 export const REVIEW_CONSEQUENCE_UNMATCHED = 'Not added until you identify it';
-export const REVIEW_CONSEQUENCE_REMOVAL = 'Removes from your list';
+export const REVIEW_CONSEQUENCE_REMOVAL = 'Removes from your library';
 
 /**
  * The section-level consequential marker for removals (REQ-122).
@@ -1055,7 +1057,7 @@ export const REVIEW_CONSEQUENCE_REMOVAL = 'Removes from your list';
  * ⚠ A WORD, deliberately — `specs/ui.md` §10.2 forbids signalling by colour
  * alone, and this is the one section whose agreement takes something away.
  */
-export const REVIEW_REMOVALS_MARKER = 'Takes titles off your list';
+export const REVIEW_REMOVALS_MARKER = 'Takes titles out of your library';
 
 /* ------------------------------------ §6.10/§6.11 removal confirmation -- */
 
@@ -1090,7 +1092,7 @@ export const REMOVAL_CANCEL_LABEL = 'Back to review';
  * one thing REQ-028 promises can never happen.
  */
 export const REMOVED_EMPTY_TITLE = 'Nothing has been removed yet.';
-export const REMOVED_EMPTY_BODY = 'When a title leaves your list, it\u2019s kept here forever.';
+export const REMOVED_EMPTY_BODY = 'When a title leaves your library, it\u2019s kept here forever.';
 
 /** ux-states.md §7.3. `{q}` is substituted with the owner's search text. */
 export const REMOVED_NO_MATCHES = 'No removals match \u201c{q}\u201d.';
@@ -1128,7 +1130,7 @@ export const RESTORE_SUCCESS =
  * work active. Offer to keep both.
  */
 export const RESTORE_DUPLICATE_BODY =
-  'You already have \u2018{name}\u2019 on your list. Do you want two rows for it?';
+  'You already have \u2018{name}\u2019 in your library. Do you want two rows for it?';
 export const RESTORE_DUPLICATE_KEEP_BOTH = 'Yes, keep both';
 export const RESTORE_DUPLICATE_CANCEL = 'Cancel';
 
@@ -1149,7 +1151,7 @@ export const RESTORE_SUPPRESSED_CANCEL = 'Cancel';
 /**
  * §7.10 — 409 `LISTING_NOT_REMOVED`. The listing is already back on the list.
  */
-export const RESTORE_ALREADY_ACTIVE = '\u2018{name}\u2019 is already back on your list.';
+export const RESTORE_ALREADY_ACTIVE = '\u2018{name}\u2019 is already back in your library.';
 export const RESTORE_ALREADY_ACTIVE_REFRESH = 'Refresh';
 
 /* ------------------------- §5 `/batches/:batchId` extraction status ------ */
@@ -1200,7 +1202,7 @@ export const STATUS_PURGED_ACTION_LABEL = 'Upload new screenshots';
 export const STATUS_OFFLINE = 'You\u2019re offline. This will keep updating when you reconnect.';
 
 export const STATUS_DISCARD_LABEL = 'Discard';
-export const STATUS_DISCARD_BATCH_LABEL = 'Discard batch';
+export const STATUS_DISCARD_BATCH_LABEL = 'Discard import';
 export const STATUS_RETRY_LABEL = 'Try again';
 export const STATUS_CONTINUE_LABEL = 'Continue to review';
 
@@ -1220,19 +1222,23 @@ export const REVIEW_NO_TEXT_IN = 'No text was found in {file}.';
 
 // --- `/batches` — batch history (`specs/ux-states.md` §9, TASK-076) ---
 
-export const BATCHES_TITLE = 'Batch history';
+export const BATCHES_TITLE = 'Review';
+/** Issue 369 — imports with a next step (draft, reading, review, extraction issue). */
+export const BATCHES_NEEDS_REVIEW_TITLE = 'Needs review';
+/** Issue 369 — applied, undone and discarded imports. */
+export const BATCHES_HISTORY_TITLE = 'Import history';
 
 /** §9.1. A load in flight must not read as "you have never uploaded anything". */
 export const BATCHES_LOADING = 'Loading your uploads\u2026';
 
 /** §9.2, verbatim. */
 export const BATCHES_EMPTY = 'You haven\u2019t uploaded anything yet.';
-export const BATCHES_EMPTY_ACTION_LABEL = 'Upload screenshots';
+export const BATCHES_EMPTY_ACTION_LABEL = 'Import screenshots';
 
 export const BATCHES_LOAD_ERROR = 'Couldn\u2019t load your uploads. Nothing has changed.';
 
 /** §9.3 — the per-card "attempt to undo this batch" control. */
-export const BATCHES_UNDO_LABEL = 'Undo this batch';
+export const BATCHES_UNDO_LABEL = 'Undo this import';
 
 /**
  * §9.3 — the count triple on a card. `{created}`/`{modified}`/`{removed}`.
@@ -1245,7 +1251,7 @@ export const BATCHES_COUNTS =
   'Created {created} \u00b7 Modified {modified} \u00b7 Removed {removed}';
 
 /** §9.4 — the detail view's provenance panels. */
-export const BATCH_PROVENANCE_TITLE = 'What this upload changed';
+export const BATCH_PROVENANCE_TITLE = 'What this import changed';
 export const BATCH_PROVENANCE_CREATED = 'Added';
 export const BATCH_PROVENANCE_MODIFIED = 'Changed';
 export const BATCH_PROVENANCE_REMOVED = 'Removed';
@@ -1256,7 +1262,7 @@ export const BATCH_PROVENANCE_REMOVED = 'Removed';
  * Empty panels are indistinguishable from a failed load, and this sentence is
  * the difference between "we found nothing to do" and "we didn\u2019t look".
  */
-export const BATCH_CHANGED_NOTHING = 'This upload didn\u2019t change anything.';
+export const BATCH_CHANGED_NOTHING = 'This import didn\u2019t change anything.';
 
 /* ── §9.6/§9.7/§9.10 — the undo OUTCOMES (`specs/ux-states.md` §9.6, §9.7,
  * §9.10, US-032) ────────────────────────────────────────────────────────────
@@ -1286,10 +1292,10 @@ export const BATCHES_UNDONE_ENTRIES_ONE = '1 service entry';
 export const BATCHES_UNDONE_ENTRIES_MANY = '{count} service entries';
 
 /** §9.7 — the link back to the combined list the owner may follow, or not. */
-export const BATCHES_UNDONE_HOME_LABEL = 'Go to your list';
+export const BATCHES_UNDONE_HOME_LABEL = 'Go to Library';
 
 /** §9.10, verbatim — plus its refresh, which reloads the history. */
-export const BATCHES_ALREADY_UNDONE = 'This upload was already undone.';
+export const BATCHES_ALREADY_UNDONE = 'This import was already undone.';
 export const BATCHES_ALREADY_UNDONE_REFRESH_LABEL = 'Refresh';
 
 /**
@@ -1297,7 +1303,7 @@ export const BATCHES_ALREADY_UNDONE_REFRESH_LABEL = 'Refresh';
  * something and leave the batch retryable, kept distinct from §9.10's fact.
  */
 export const BATCHES_UNDO_FAILED =
-  'Couldn\u2019t undo this upload. Nothing has changed \u2014 you can try again.';
+  'Couldn\u2019t undo this import. Nothing has changed \u2014 you can try again.';
 export const BATCHES_UNDO_FAILED_RETRY_LABEL = 'Try again';
 
 /* ── TASK-116 · the §9.8/§9.9 undo-refusal panel (`specs/ux-states.md` §9.8,
@@ -1321,7 +1327,7 @@ export const BATCHES_UNDO_FAILED_RETRY_LABEL = 'Try again';
  * refusal reason is `modified-or-removed` (or `later-owner-edits`).
  */
 export const UNDO_REFUSAL_BODY =
-  'This upload can\u2019t be undone in one step, because it changed things as well as adding them. ' +
+  'This import can\u2019t be undone in one step, because it changed things as well as adding them. ' +
   'Here\u2019s everything it touched, and how to fix each one.';
 
 /**
@@ -1329,11 +1335,11 @@ export const UNDO_REFUSAL_BODY =
  * (`UNDO_REFUSAL_BODY`) but gives the panel no separate heading; this is a
  * short `h1` phrased on the body's leading clause so the panel has a landmark.
  */
-export const UNDO_REFUSAL_TITLE = 'This upload can\u2019t be undone in one step';
+export const UNDO_REFUSAL_TITLE = 'This import can\u2019t be undone in one step';
 
 /** §9.9 body, verbatim — the `provenance-unavailable` refusal. */
 export const UNDO_REFUSAL_PROVENANCE_UNAVAILABLE_BODY =
-  'We can\u2019t tell what this upload changed, so it can\u2019t be undone safely. ' +
+  'We can\u2019t tell what this import changed, so it can\u2019t be undone safely. ' +
   'Nothing has been changed.';
 
 /**
@@ -1341,7 +1347,7 @@ export const UNDO_REFUSAL_PROVENANCE_UNAVAILABLE_BODY =
  * no heading; phrased on the body's leading clause, matching the §9.8 pair.
  */
 export const UNDO_REFUSAL_PROVENANCE_UNAVAILABLE_TITLE =
-  'We can\u2019t tell what this upload changed';
+  'We can\u2019t tell what this import changed';
 
 /** §9.8 — the three group headings, verbatim. The count is appended by the panel. */
 export const UNDO_REFUSAL_GROUP_ADDED = 'Added';
@@ -1366,7 +1372,7 @@ export const UNDO_REFUSAL_CHIP_REMOVED = 'Since removed';
 export const UNDO_REFUSAL_CHIP_SUPPRESSED = 'On your Not interested list';
 
 /** The close control that returns the owner to their batch history. */
-export const UNDO_REFUSAL_CLOSE_LABEL = 'Back to batches';
+export const UNDO_REFUSAL_CLOSE_LABEL = 'Back to Review';
 
 /* ── TASK-067 · manual entry (`specs/api.md` §6.20, US-006 AC-5) ───────────
  *
@@ -1377,17 +1383,17 @@ export const UNDO_REFUSAL_CLOSE_LABEL = 'Back to batches';
  */
 export const MANUAL_ENTRY_TITLE = 'Add a title the reader missed';
 export const MANUAL_ENTRY_HINT =
-  'Some tiles are artwork only, with no text to read. Search for the title and add it to this batch.';
+  'Some tiles are artwork only, with no text to read. Search for the title and add it to this import.';
 export const MANUAL_ENTRY_SEARCH_LABEL = 'Search TMDB';
 export const MANUAL_ENTRY_SEARCH_BUTTON = 'Search';
 export const MANUAL_ENTRY_ADD_LABEL = 'Add {name}';
 export const MANUAL_ENTRY_SEARCHING = 'Searching…';
 export const MANUAL_ENTRY_NO_RESULTS = 'TMDB has nothing under that name.';
 export const MANUAL_ENTRY_SEARCH_FAILED = "Couldn't reach TMDB. Try again in a moment.";
-export const MANUAL_ENTRY_ADDED = 'Added {name} to this batch.';
+export const MANUAL_ENTRY_ADDED = 'Added {name} to this import.';
 export const MANUAL_ENTRY_SUPPRESSED =
   "You marked that title as not interested. Un-suppress it first if you'd like it back.";
-export const MANUAL_ENTRY_ALREADY_IN_BATCH = 'That title is already in this batch.';
+export const MANUAL_ENTRY_ALREADY_IN_BATCH = 'That title is already in this import.';
 export const MANUAL_ENTRY_ADD_FAILED = "Couldn't add that title. Nothing has changed.";
 
 /**
@@ -1412,12 +1418,12 @@ export const UNMATCHED_CHIP = 'Unidentified';
  */
 export const CANDIDATE_UNIDENTIFIED_CHIP = UNMATCHED_CHIP;
 export const UNMATCHED_HINT =
-  "TMDB couldn't name this one. Keeping it is fine — it goes on your list under the text we read.";
+  "TMDB couldn't name this one. Keeping it is fine — it goes in your library under the text we read.";
 export const UNMATCHED_KEEP_LABEL = 'Keep as unidentified';
 export const UNMATCHED_FIND_LABEL = 'Find a match';
 export const UNMATCHED_DISCARD_LABEL = 'Not a title — discard';
 export const UNMATCHED_KEPT = 'Keeping this as an unidentified title.';
-export const UNMATCHED_DISCARDED = "Discarded. It won't be added to your list.";
+export const UNMATCHED_DISCARDED = "Discarded. It won't be added to your library.";
 export const UNMATCHED_MATCHED = 'Matched to {name}.';
 export const UNMATCHED_MATCHED_UNNAMED = 'Matched to the title you chose.';
 export const UNMATCHED_SEARCHING = 'Searching…';
@@ -1455,8 +1461,8 @@ export const UNMATCHED_CANCEL_LABEL = 'Cancel';
 export const ADDITION_CONFIRM_LABEL = 'Confirm';
 export const ADDITION_CHANGE_MATCH_LABEL = 'Change match';
 export const ADDITION_DISCARD_LABEL = 'Not a title — discard';
-export const ADDITION_CONFIRMED = 'Confirmed. This will be added to your list.';
-export const ADDITION_DISCARDED = "Discarded. It won't be added to your list.";
+export const ADDITION_CONFIRMED = 'Confirmed. This will be added to your library.';
+export const ADDITION_DISCARDED = "Discarded. It won't be added to your library.";
 export const KNOWN_CONFIRM_LABEL = 'Confirm match';
 export const KNOWN_CONFIRMED = 'Match confirmed. Already saved; nothing will be added.';
 
@@ -1486,7 +1492,7 @@ export const GATE_FAILED_TITLE = "Couldn't check your access.";
  * ask" (transient, retryable).
  */
 export const GATE_FAILED_BODY =
-  'Something went wrong before your list could load. Nothing has changed — try again.';
+  'Something went wrong before your library could load. Nothing has changed — try again.';
 
 /*
  * ⚠ THE GLOBAL OFFLINE COPY (§11 / `T-UX-023`). Every surface owes an offline
@@ -1517,7 +1523,7 @@ export const OFFLINE_SHOWING_CACHED = 'Showing what was loaded earlier.';
  * anything, the second blames nextup for the owner's network.
  */
 export const OFFLINE_NOTHING_LOADED =
-  'Your list hasn\u2019t loaded yet. It will appear when you\u2019re back online.';
+  'Your library hasn\u2019t loaded yet. It will appear when you\u2019re back online.';
 
 // --- The render-crash boundary (`specs/ux-states.md` §1, TASK-181) ---
 
@@ -1628,7 +1634,7 @@ export const WAITING_NOT_CHECKED = 'Not checked yet.';
 
 /** US-042 AC-3 — the flag, with its invitation. Never an automatic add. */
 export const WAITING_NOW_ON_PREFIX = 'Now on';
-export const WAITING_NOW_ON_INVITATION = 'add it to your list';
+export const WAITING_NOW_ON_INVITATION = 'add it to your library';
 
 /**
  * US-042 AC-7. Unobtrusive, and beside data that still rendered — the view is

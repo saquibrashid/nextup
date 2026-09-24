@@ -127,7 +127,7 @@ for (const width of [280, 390, 1440]) {
       await expect(dialog.getByTestId('review-apply-error')).toBeVisible();
       expect(closes).toBe(1);
       expect(statusReads).toBe(1);
-      await expect(dialog).toContainText('The saved batch is still in review');
+      await expect(dialog).toContainText('The saved import is still in review');
       await dialog.getByRole('button', { name: 'Apply changes' }).click();
       await expect(page).toHaveURL('/');
       expect(closes).toBe(2);

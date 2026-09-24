@@ -44,7 +44,7 @@ const GUARD_MESSAGE =
   'decoding this one would exhaust container memory and kill the import. This is a ' +
   'memory limit, not a problem with your image. Remedy: up-size compute to 0.5 vCPU / ' +
   '1.0 GiB (+~$4/month) — one command, see runbooks/scale-up-memory.md. No other image ' +
-  'in this batch was affected; re-attach this file after up-sizing.';
+  'in this import was affected; re-attach this file after up-sizing.';
 
 const PASTED_NAME = 'pasted-20260811-154233-03.png';
 

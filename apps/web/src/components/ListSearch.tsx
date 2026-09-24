@@ -110,7 +110,7 @@ export function ListSearch(): JSX.Element {
         hidden={!expanded}
         id={panelId}
         role="search"
-        aria-label="Search your list"
+        aria-label="Search your library"
         onSubmit={submit}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
@@ -120,7 +120,7 @@ export function ListSearch(): JSX.Element {
           }
         }}
       >
-        <Field label="Search your list">
+        <Field label="Search your library">
           {(props) => (
             <span className="list-search__control">
               <Button type="submit" variant="ghost" aria-label="Search">

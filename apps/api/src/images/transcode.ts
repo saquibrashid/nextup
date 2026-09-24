@@ -89,7 +89,7 @@ function oomError(): AppError {
     'IMAGE_DECODE_OOM',
     503,
     'That image ran out of memory while being opened. This is a memory limit, ' +
-      'not a problem with your image. No other image in this batch was affected; ' +
+      'not a problem with your image. No other image in this import was affected; ' +
       're-attach this file after up-sizing compute — see docs/runbooks/scale-up-memory.md.',
     { remedy: 'docs/runbooks/scale-up-memory.md' },
   );

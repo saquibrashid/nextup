@@ -76,14 +76,14 @@ describe('T-MOD-004 extraction recovery confirmations', () => {
         name: action === 'discard' ? STATUS_DISCARD_BATCH_LABEL : STATUS_PURGED_ACTION_LABEL,
       });
       await user.click(trigger);
-      const modal = screen.getByRole('dialog', { name: 'Discard this batch?' });
+      const modal = screen.getByRole('dialog', { name: 'Discard this import?' });
       expect(modal).toHaveClass('dialog--overlay');
       expect(within(modal).getByRole('button', { name: 'Keep batch' })).toHaveFocus();
       await user.keyboard('{Escape}');
       expect(trigger).toHaveFocus();
       expect(onDiscard).not.toHaveBeenCalled();
       await user.click(trigger);
-      await user.click(screen.getByRole('button', { name: 'Discard batch and continue' }));
+      await user.click(screen.getByRole('button', { name: 'Discard import and continue' }));
       expect(onDiscard).toHaveBeenCalledOnce();
       rerender(<BatchStatusPage {...props} busy />);
       await user.keyboard('{Escape}');
@@ -96,7 +96,7 @@ describe('T-MOD-004 extraction recovery confirmations', () => {
       expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent(
         'The save could not be confirmed.',
       );
-      expect(screen.getByRole('button', { name: 'Discard batch and continue' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Discard import and continue' })).toBeDisabled();
       await user.click(screen.getByRole('button', { name: 'Keep batch' }));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     },
@@ -291,7 +291,7 @@ describe('T-UX-007 — per-image progress without navigating away', () => {
     await userEvent.click(within(alert).getByRole('button', { name: STATUS_RETRY_LABEL }));
     await userEvent.click(within(alert).getByRole('button', { name: STATUS_DISCARD_BATCH_LABEL }));
     expect(onDiscard).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole('button', { name: 'Discard batch and continue' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Discard import and continue' }));
     expect(onRetry).toHaveBeenCalledOnce();
     expect(onDiscard).toHaveBeenCalledOnce();
   });
@@ -328,7 +328,7 @@ describe('T-UX-007 — per-image progress without navigating away', () => {
     expect(screen.queryByRole('button', { name: STATUS_RETRY_LABEL })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: STATUS_PURGED_ACTION_LABEL }));
     expect(onUploadNew).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole('button', { name: 'Discard batch and continue' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Discard import and continue' }));
     expect(onUploadNew).toHaveBeenCalledOnce();
   });
 
@@ -435,7 +435,7 @@ describe('T-UX-008 — the degraded / cross-check-unavailable banner', () => {
     // the spec text out so the copy cannot drift from §5.9 silently.
     expect(DEGRADED_EXTRACTION_BANNER).toBe(
       'One of the two readers was unavailable, so these results may be less ' +
-        'complete than usual. Nothing has been removed from your list \u2014 you ' +
+        'complete than usual. Nothing has been removed from your library \u2014 you ' +
         'can still add titles, and you can re-read these screenshots later.',
     );
   });

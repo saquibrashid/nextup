@@ -59,9 +59,9 @@ const REVIEW = {
   crossCheck: 'ok',
   banner: null,
   sections: {
-    additions: { label: 'New to your list', count: 0, items: [] },
+    additions: { label: 'New to your library', count: 0, items: [] },
     alreadyOnYourList: {
-      label: 'Already on your list',
+      label: 'Already in your library',
       count: 0,
       items: [],
       collapsedByDefault: true,

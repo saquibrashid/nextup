@@ -379,7 +379,7 @@ export function FixMatchDialog({
       {phase === 'duplicate-409' && selected !== null && duplicateInfo !== null && (
         <>
           <p role="alert" data-testid="duplicate-message">
-            You already have &ldquo;{selected.name}&rdquo; on your list. Do you want two rows for
+            You already have &ldquo;{selected.name}&rdquo; in your library. Do you want two rows for
             it?
           </p>
           <Button variant="secondary" onClick={keepBoth} data-testid="keep-both">

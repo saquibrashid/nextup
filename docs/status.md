@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 244 |
+| ✅ done | 245 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **247** |
+| **total** | **248** |
 
 ## Ready to start
 
@@ -285,3 +285,4 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-247` | #364 / PR #374: Comedy Show covers stand-up specials and live comedy performances from explicit TMDB keywords, with an owner/work-scoped override and Automatic reset in title details. Cards and SQL-backed category filters preserve canonical Movie/TV identity, services and dates; bounded on-access classification discloses incomplete results for existing caches. `T-CATEGORY-001` through `T-CATEGORY-005` pass, including real SQL persistence, constraints, owner isolation and responsive browser journeys. All twelve CI gates passed on implementation head `9c473d4` in run `35936313460`; release follows final ledger-head CI. | `T-CATEGORY-001`, `T-CATEGORY-002`, `T-CATEGORY-003`, `T-CATEGORY-004`, `T-CATEGORY-005` |
 | `TASK-248` | #371 / PR #375: the Add a title dialog uses shared, bounded search-result rows (48×72 2:3 thumbnail or decorative placeholder, full wrapping title, separate year/type metadata, one row-described Select) with a sticky head, labelled close control, explicit search and submit Retry, and a confirmation summary. Fix match adopts the same rows with its behavior and test ids unchanged; the Review correction picker is deliberately out of scope. `T-ADDUI-001`, `T-ADDUI-002`, `T-ADDUI-003` plus existing `T-MOD-001`/`T-MOD-002`, `T-MANUAL-023`..`T-MANUAL-030` and `T-UI-020` regressions. All twelve CI gates passed on implementation head `9deda28` in run `35948242716`. No API, migration, dependency or infrastructure change. | `T-ADDUI-001`, `T-ADDUI-002`, `T-ADDUI-003`, `T-MANUAL-023`, `T-MANUAL-030`, `T-MOD-001`, `T-MOD-002`, `T-UI-020` |
 | `TASK-249` | #370: the library toolbar follows the owner mockup: an iconed search field with a truthful `Search titles` placeholder, an in-field icon submit and a Ctrl/Cmd+K shortcut with a fine-pointer-only hint; an iconed Filters trigger with an active state; a connected Grid/Compact switch whose pressed option carries an inset bar; and a `Sort: <order>` dropdown with a disclosure chevron. Chips, counts, URL state, sort keys, the persisted layout and the reverse button are unchanged. Adds `FilterIcon` (ADR-0013 Revision 3). `T-TOOLBAR-001`, `T-TOOLBAR-002`, `T-TOOLBAR-003`. No API, migration, dependency or infrastructure change. | `T-TOOLBAR-001`, `T-TOOLBAR-002`, `T-TOOLBAR-003` |
+| `TASK-250` | #369: a hybrid header replaces the `More` overflow and the bottom-fixed phone bar. From `--bp-sm` up it shows Library, Import and Review plus a Menu button; below it, only Menu. Menu opens a modal, scrollable drawer that lists every destination. Names are consistent across the nav, headings and copy: List→Library, Upload→Import, Batches→Review (sections *Needs review* / *Import history*), Check a rating→Rating lookup. URLs are unchanged. The shared dialog focus trap now also holds in WebKit. Adds `MenuIcon` (ADR-0013 Revision 4). `T-UX-117`, `T-UX-118`, `T-UX-132`, `T-UX-133`, `T-UX-137` (redefined in place), `T-NAV-001`, `T-NAV-002`. No migration, dependency or infrastructure change. | `T-NAV-001`, `T-NAV-002`, `T-UX-117`, `T-UX-118`, `T-UX-132`, `T-UX-133`, `T-UX-137` |

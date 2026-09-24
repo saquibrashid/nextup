@@ -51,7 +51,7 @@ export interface RouteDefinition {
 export const EXAMPLE_BATCH_ID = '01J0000000000000000000BTCH';
 
 export const ROUTES: readonly RouteDefinition[] = [
-  { path: '/', Component: ListRoute, examplePath: '/', navLabel: 'List' },
+  { path: '/', Component: ListRoute, examplePath: '/', navLabel: 'Library' },
   {
     path: '/titles/:titleId',
     Component: TitleDetailsRoute,
@@ -62,13 +62,13 @@ export const ROUTES: readonly RouteDefinition[] = [
     path: '/upload',
     Component: UploadRoute,
     examplePath: '/upload',
-    navLabel: 'Upload',
+    navLabel: 'Import',
   },
   {
     path: '/batches',
     Component: BatchHistoryRoute,
     examplePath: '/batches',
-    navLabel: 'Batches',
+    navLabel: 'Review',
   },
   {
     path: '/batches/:batchId',
@@ -110,7 +110,7 @@ export const ROUTES: readonly RouteDefinition[] = [
     path: '/rating',
     Component: RatingLookupPage,
     examplePath: '/rating',
-    navLabel: 'Check a rating',
+    navLabel: 'Rating lookup',
   },
   {
     path: '*',

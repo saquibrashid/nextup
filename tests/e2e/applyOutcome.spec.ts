@@ -89,7 +89,7 @@ test('T-UX-163i: uncertain Apply is read-only until a durable receipt can be rea
     await expect(page.getByText('Nothing changed on your Netflix list.')).toBeVisible();
     expect(closes).toBe(1);
     await page.reload();
-    await expect(page.getByRole('button', { name: 'Undo this batch' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Undo this import' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Start another capture' })).toBeVisible();
     expect(closes).toBe(1);
   }

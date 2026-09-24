@@ -343,7 +343,7 @@ describe('T-UX-162 reversible review and recovery', () => {
       />,
     );
     expect(screen.getAllByText('Not included in these changes')).toHaveLength(2);
-    expect(screen.queryByText('Adds to your list')).not.toBeInTheDocument();
+    expect(screen.queryByText('Adds to your library')).not.toBeInTheDocument();
   });
 
   it('T-UX-162f: missing browser storage is explicit and local intent still works in memory', async () => {
@@ -364,7 +364,7 @@ describe('T-UX-162 reversible review and recovery', () => {
     const f = fixture([candidate('one', { classification: 'already-present-for-this-service' })]);
     mount(f.client);
     await screen.findByTestId('candidate-one');
-    fireEvent.click(screen.getByText('Already on your list (1)'));
+    fireEvent.click(screen.getByText('Already in your library (1)'));
     fireEvent.click(card().getByTestId('known-find'));
     fireEvent.change(card().getByRole('searchbox'), { target: { value: 'Correct title' } });
     fireEvent.submit(card().getByRole('searchbox').closest('form')!);
@@ -418,7 +418,9 @@ describe('T-UX-162 reversible review and recovery', () => {
         )}
       />,
     );
-    expect(screen.getByText(/Everything nextup could read is already on your list/)).toBeVisible();
+    expect(
+      screen.getByText(/Everything nextup could read is already in your library/),
+    ).toBeVisible();
     expect(screen.getByTestId('review-already-on-list')).toBeVisible();
     expect(screen.getByTestId('candidate-one')).toBeVisible();
     view.rerender(

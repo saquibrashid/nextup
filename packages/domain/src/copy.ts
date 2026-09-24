@@ -169,7 +169,7 @@ export function removedOnLabel(removedOn: IsoDate): string {
  */
 export const DEGRADED_EXTRACTION_BANNER =
   'One of the two readers was unavailable, so these results may be less ' +
-  'complete than usual. Nothing has been removed from your list \u2014 you ' +
+  'complete than usual. Nothing has been removed from your library \u2014 you ' +
   'can still add titles, and you can re-read these screenshots later.';
 
 /* ------------------------------------- TMDB-unreachable banner (§4.3) ---- */
@@ -191,4 +191,4 @@ export const DEGRADED_EXTRACTION_BANNER =
  */
 export const TMDB_UNAVAILABLE_BANNER =
   'Couldn\u2019t reach TMDB \u2014 nothing was matched. You can still confirm ' +
-  'these as unidentified titles, or discard the batch and try again later.';
+  'these as unidentified titles, or discard the import and try again later.';

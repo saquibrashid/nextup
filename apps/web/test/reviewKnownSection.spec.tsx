@@ -154,7 +154,7 @@ describe('T-REV-016 · US-013 AC-2 · known titles are not additions', () => {
     // unless it lives in the <summary>.
     render(<ReviewPage review={review()} />);
 
-    const summary = within(knownSection()).getByText('Already on your list (2)');
+    const summary = within(knownSection()).getByText('Already in your library (2)');
     expect(summary.tagName).toBe('SUMMARY');
   });
 

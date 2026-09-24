@@ -42,7 +42,7 @@ const ICONS_ROOT = join(SRC_ROOT, 'components', 'icons');
  */
 const BRANDS_ROOT = join(SRC_ROOT, 'components', 'brands');
 
-/** §7c's closed Revision 3 set (ADR-0013, #370), transcribed. A 23rd icon fails `T-UI-030b`. */
+/** §7c's closed Revision 4 set (ADR-0013, #369), transcribed. A 24th icon fails `T-UI-030b`. */
 const CLOSED_SET = [
   'AlphabetIcon',
   'BookmarkIcon',
@@ -54,6 +54,7 @@ const CLOSED_SET = [
   'CloseIcon',
   'CompactIcon',
   'FilterIcon',
+  'MenuIcon',
   'FlagIcon',
   'GridIcon',
   'HistoryIcon',
@@ -92,7 +93,7 @@ describe('T-UI-030 — every icon inherits its colour and declares none of its o
     expect(svg?.getAttribute('stroke')).toBe('currentColor');
   });
 
-  it('T-UI-030b: the exported set is exactly the 22 §7c names', () => {
+  it('T-UI-030b: the exported set is exactly the 23 §7c names', () => {
     // ⚠ A SET THAT GROWS ONE FILE AT A TIME IS NOT CLOSED. §7c's "no icon
     // package" decision rests on the set being small and deliberate; without
     // this the barrel becomes a library with extra steps and nobody notices.

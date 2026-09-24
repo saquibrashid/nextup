@@ -448,7 +448,7 @@ export function registerBatchImageRoutes(
 
     const image = await findUploadedImage(ownerId, batchId, imageId);
     if (!image) {
-      throw new AppError('NOT_FOUND', 404, "That image doesn't exist in this batch.");
+      throw new AppError('NOT_FOUND', 404, "That image doesn't exist in this import.");
     }
 
     // ⚠ BLOB FIRST, ROW SECOND. The reverse order can orphan bytes forever:

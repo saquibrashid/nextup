@@ -118,11 +118,11 @@ function reviewResponse(confirmed: boolean, service: Service = 'netflix'): Revie
     banner: null,
     sections: {
       additions: {
-        label: 'New to your list',
+        label: 'New to your library',
         count: 1,
         items: [duneCandidate(confirmed ? 'confirmed' : 'pending')],
       },
-      alreadyOnYourList: emptyCandidateSection('Already on your list'),
+      alreadyOnYourList: emptyCandidateSection('Already in your library'),
       probablyNotTitles: emptyCandidateSection('Probably not titles'),
       unmatched: { label: "Couldn't identify these", count: 0, items: [] },
       unreadableTiles: { label: "Couldn't read these", count: 0, items: [] },
@@ -347,7 +347,7 @@ async function expectServiceUpload(page: Page, service: Service): Promise<void> 
     captureProtocol: 1,
     selectionRefusals: [],
   });
-  await expect(page.getByRole('heading', { name: 'Review this batch' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review this import' })).toBeVisible();
   await page.getByRole('button', { name: 'Confirm all 1' }).click();
   await page.getByRole('button', { name: REVIEW_APPLY_LABEL }).click();
   await page.getByRole('dialog').getByRole('button', { name: REMOVAL_CONFIRM_LABEL }).click();
@@ -525,7 +525,7 @@ test.describe('T-PASTE-010 — the add-not-swap regression guard', () => {
     });
     expect(state.submitted).toBe(true);
 
-    await expect(page.getByRole('heading', { name: 'Review this batch' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Review this import' })).toBeVisible();
     await page.getByRole('button', { name: 'Confirm all 1' }).click();
 
     await page.getByRole('button', { name: REVIEW_APPLY_LABEL }).click();
