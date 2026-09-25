@@ -2202,9 +2202,10 @@ button {
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   letter-spacing: 0.04em;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   padding: 0 var(--space-2);
   text-transform: uppercase;
-  white-space: nowrap;
 }
 
 .waiting-row__tag--rent {
@@ -2300,13 +2301,20 @@ button {
 }
 
 /* A small secondary control, never the largest thing on the card. */
+/* ⚠ Tags and the button WRAP, never nowrap: at 280 px with Linux WebKit fonts
+   a nowrap "RENT OR BUY ONLY" pushed the page 12 px sideways (T-WAIT-018b). */
 .waiting-row__actions {
   margin-inline-start: auto;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .waiting-row__actions .btn {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 /*
