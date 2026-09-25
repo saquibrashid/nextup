@@ -79,7 +79,11 @@ export function GenreChips({ genres, activeGenres = [] }: GenreChipsProps): JSX.
   const hidden = ordered.length - shown.length;
 
   return (
-    <span className="genre-chips" data-testid="genres">
+    <span
+      className="genre-chips"
+      data-testid="genres"
+      data-filtered={active.length > 0 || undefined}
+    >
       {shown.map((genre) => (
         // ⚠ THE `Chip` PRIMITIVE, NOT A LOCAL `<span>` — `specs/ui-refresh.md`
         // §7d names `chip` as "the compact genre presentation of §4.3,

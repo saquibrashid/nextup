@@ -1,5 +1,6 @@
 // Closed icon register: Revision 4 extends the owner-approved inline set to
-// 23 icons with the navigation Menu mark (issue 369). No external assets.
+// 23 icons with the navigation Menu mark (issue 369); TASK-255 adds the phone
+// library heading's Plus mark, closing it at 24. No external assets.
 
 export { IconBase, type IconProps } from './IconBase';
 
@@ -21,6 +22,7 @@ export { InfoIcon } from './InfoIcon';
 export { ListIcon } from './ListIcon';
 export { MenuIcon } from './MenuIcon';
 export { MoreIcon } from './MoreIcon';
+export { PlusIcon } from './PlusIcon';
 export { RatingIcon } from './RatingIcon';
 export { SearchIcon } from './SearchIcon';
 export { SuppressedIcon } from './SuppressedIcon';

@@ -10,12 +10,18 @@
 // by `listEmptyKind()` from the facts, never by this page picking a message.
 
 import type { JSX } from 'react';
-import { useState } from 'react';
+import { useContext, useState } from 'react';
 import { WatchPreferencesDialog } from '../components/WatchPreferencesDialog';
 import type { WatchPreferencesRequest, WatchPreferencesResult } from '../lib/apiClient';
 import { Link, useSearchParams } from 'react-router-dom';
 
-import { FilterBar, parseFilters, applyFilters, NO_FILTERS } from '../components/FilterBar';
+import {
+  FilterBar,
+  parseFilters,
+  applyFilters,
+  isFiltered,
+  NO_FILTERS,
+} from '../components/FilterBar';
 import { BatchAppliedNotice, type AppliedBatch } from '../components/BatchAppliedNotice';
 import { FreshnessStrip, type ServiceFreshness } from '../components/FreshnessStrip';
 import { ListEmptyState, ListLoadError } from '../components/ListEmptyState';
@@ -42,8 +48,14 @@ import { SlowResponseNotice } from '../components/SlowResponseNotice';
 import { useSlowRequest } from '../lib/useSlowRequest';
 import type { TitleListItem } from '../components/TitleRow';
 import { Button } from '../components/ui/Button';
+import { PlusIcon } from '../components/icons';
+import { LibraryCommandContext } from '../lib/libraryCommand';
+import { useWideViewport } from '../lib/useWideViewport';
 import {
   ADD_TITLE_LABEL,
+  AT_LEAST_PREFIX,
+  LIBRARY_PHONE_HEADING,
+  libraryTitleCount,
   LIST_LOADING_BODY,
   OFFLINE_DISABLED_REASON,
   OFFLINE_NOTHING_LOADED,
@@ -273,62 +285,119 @@ export function ListPage({
     setDialog(null);
   };
 
+  const wide = useWideViewport();
+  const { command, consume, tabs } = useContext(LibraryCommandContext);
+  const filtered = isFiltered(filters) || (params.get('q') ?? '') !== '';
+  // ⚠ The same condition as the toolbar below: no filter control, and no
+  // count, over a failed read or an offline list with nothing cached.
+  const controlsShown = (!loadFailed || offline) && !(offline && items.length === 0);
+
+  /*
+    US-047 — the standalone add, ABOVE the list and outside every
+    loading/failure branch.
+
+    ⚠ Deliberately not inside the empty state. It is needed most when the
+    list is full and long: extraction missed one title out of two hundred,
+    and re-uploading the whole service to capture it is exactly the
+    friction this affordance removes.
+
+    ⚠ Disabled offline, with the reason stated as text, like every other
+    mutating control (§2.12).
+
+    ⚠ THE DIALOG IS RENDERED BESIDE ITS BUTTON, and not inside the list
+    branch below. The button is outside every loading/failure branch, so a
+    dialog rendered inside one would open from a screen where the list read
+    failed and then not exist. `onAdded` fires on SUCCESS, not on close:
+    closing is not evidence anything was written.
+  */
+  const addControl = addWired && (
+    <>
+      <Button
+        variant="secondary"
+        data-testid="add-title-open"
+        disabled={offline}
+        onClick={(event) => {
+          event.currentTarget.focus({ preventScroll: true });
+          setDialog({ kind: 'add' });
+        }}
+      >
+        {wide ? (
+          ADD_TITLE_LABEL
+        ) : (
+          <>
+            <PlusIcon />
+            <span className="sr-only">{ADD_TITLE_LABEL}</span>
+          </>
+        )}
+      </Button>
+      {offline && (
+        <span className="offline-reason" data-testid="add-title-offline-reason">
+          {OFFLINE_DISABLED_REASON}
+        </span>
+      )}
+      {dialog !== null && dialog.kind === 'add' && (
+        <AddTitleDialog
+          searchTmdb={searchFn}
+          addTitle={addFn}
+          onClose={closeAll}
+          {...(onReload === undefined ? {} : { onAdded: onReload })}
+        />
+      )}
+    </>
+  );
+
   return (
     <>
       <div className="library-browser">
-        <div className="library-heading">
-          <h1>Library</h1>
-        </div>
-        <div className="library-actions">
-          <FreshnessStrip services={serviceState} />
-          {/*
-        US-047 — the standalone add, ABOVE the list and outside every
-        loading/failure branch.
-
-        ⚠ Deliberately not inside the empty state. It is needed most when the
-        list is full and long: extraction missed one title out of two hundred,
-        and re-uploading the whole service to capture it is exactly the
-        friction this affordance removes.
-
-        ⚠ Disabled offline, with the reason stated as text, like every other
-        mutating control (§2.12).
-      */}
-          {addWired && (
-            <>
-              <Button
-                variant="secondary"
-                data-testid="add-title-open"
-                disabled={offline}
-                onClick={(event) => {
-                  event.currentTarget.focus({ preventScroll: true });
-                  setDialog({ kind: 'add' });
-                }}
-              >
-                {ADD_TITLE_LABEL}
-              </Button>
-              {offline && (
-                <span className="offline-reason" data-testid="add-title-offline-reason">
-                  {OFFLINE_DISABLED_REASON}
-                </span>
+        {wide ? (
+          <>
+            <div className="library-heading">
+              <h1>Library</h1>
+            </div>
+            <div className="library-actions">
+              <FreshnessStrip services={serviceState} />
+              {addControl}
+            </div>
+          </>
+        ) : (
+          /*
+            TASK-255 — the owner's mobile mockup: "My Library" with its count
+            under it, and the tools at the right of the same line.
+            ⚠ THREE TOOLS WHERE THE MOCKUP DRAWS ONE. Filters is the mockup's;
+            Add title (US-047) and Service updates (REQ-039, RSK-007) must stay
+            reachable from the library at every width, so they sit beside it
+            as icons rather than being dropped to match the picture.
+          */
+          <div className="library-heading">
+            <div className="library-heading__title">
+              <h1>{LIBRARY_PHONE_HEADING}</h1>
+              {controlsShown && !loading && (
+                <p className="library-heading__count" aria-hidden="true">
+                  {filtered
+                    ? `Showing ${String(shown)} of ${totalIsLowerBound ? AT_LEAST_PREFIX : ''}${String(unfilteredTotal)}`
+                    : libraryTitleCount(unfilteredTotal, totalIsLowerBound)}
+                </p>
               )}
-              {/*
-            ⚠ RENDERED HERE, BESIDE ITS BUTTON, AND NOT INSIDE THE LIST BRANCH
-            BELOW. The button is outside every loading/failure branch, so a
-            dialog rendered inside one would open from a screen where the list
-            read failed and then not exist. `onAdded` fires on SUCCESS, not on
-            close: closing is not evidence anything was written.
-          */}
-              {dialog !== null && dialog.kind === 'add' && (
-                <AddTitleDialog
-                  searchTmdb={searchFn}
-                  addTitle={addFn}
-                  onClose={closeAll}
-                  {...(onReload === undefined ? {} : { onAdded: onReload })}
+            </div>
+            <div className="library-heading__tools">
+              {addControl}
+              <FreshnessStrip services={serviceState} compact />
+              {controlsShown && (
+                <FilterBar
+                  part="trigger"
+                  genres={genres}
+                  shown={shown}
+                  total={unfilteredTotal}
+                  totalIsLowerBound={totalIsLowerBound}
+                  countPending={loading}
+                  openRequest={command}
+                  onOpenRequestHandled={consume}
+                  requestReturnFocus={tabs.filters}
                 />
               )}
-            </>
-          )}
-        </div>
+            </div>
+          </div>
+        )}{' '}
         {/*
         ⚠ OUTSIDE the loading/failure branches below. The notice reports a
         write that has already happened; hiding it because `GET /api/titles`
@@ -347,7 +416,6 @@ export function ListPage({
         sibling of the list rather than a gate in front of it: whatever it is
         showing, the rows below render unchanged.
       */}
-
         {/*
         §2.12 (`T-UX-023`) — the rows the owner is looking at were loaded
         before the connection went, and they say so. The banner in `AppShell`
@@ -358,10 +426,10 @@ export function ListPage({
             {OFFLINE_SHOWING_CACHED}
           </p>
         )}
-
-        {(!loadFailed || offline) && !(offline && items.length === 0) && (
+        {controlsShown && (
           <div className="list-controls" data-testid="list-controls">
             <FilterBar
+              {...(wide ? {} : { part: 'summary' as const })}
               genres={genres}
               shown={shown}
               total={unfilteredTotal}
@@ -373,7 +441,14 @@ export function ListPage({
             <FilterBar inline genres={genres} shown={shown} total={unfilteredTotal} />
             <div className="list-secondary-controls">
               <ListViewControl view={view} onChange={setView} />
-              <ListSearch />
+              <ListSearch
+                triggerHidden={!wide}
+                openRequest={command}
+                onOpenRequestHandled={consume}
+                onClosed={() => {
+                  tabs.search.current?.focus();
+                }}
+              />
             </div>
           </div>
         )}

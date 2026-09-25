@@ -38,6 +38,7 @@ import type { JSX } from 'react';
 import { App } from '../App';
 import { apiClient, type ApiClient } from '../lib/apiClient';
 import { useResource } from '../lib/useResource';
+import { OwnerNameContext } from '../lib/ownerContext';
 import { RefusalPage } from '../pages/RefusalPage';
 import { GATE_CHECKING, GATE_FAILED_BODY, GATE_FAILED_TITLE, RETRY_LABEL } from '../copy';
 import { Button } from '../components/ui/Button';
@@ -52,7 +53,11 @@ export function OwnerGate({ client = apiClient }: OwnerGateProps = {}): JSX.Elem
 
   switch (me.resource.kind) {
     case 'ok':
-      return <App />;
+      return (
+        <OwnerNameContext.Provider value={me.resource.value.displayName}>
+          <App />
+        </OwnerNameContext.Provider>
+      );
 
     // 403 `NOT_ALLOWED` — authenticated, but not the owner (US-001 AC-4).
     // ⚠ The email is supplied HERE, and this is the only site that has to

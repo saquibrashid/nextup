@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type FormEvent, type JSX } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import type { LibraryCommand } from '../lib/libraryCommand';
 
 import { Button } from './ui/Button';
 import { Field } from './ui/Field';
@@ -26,7 +27,25 @@ function appleKeyboard(): boolean {
   return typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 }
 
-export function ListSearch(): JSX.Element {
+export interface ListSearchProps {
+  /**
+   * TASK-255 — on the phone the tab bar's Search tab is the trigger (owner
+   * mobile mockup), so the toolbar's own button is not drawn. The field, its
+   * Clear and its Close are unchanged.
+   */
+  readonly triggerHidden?: boolean | undefined;
+  readonly openRequest?: LibraryCommand | null | undefined;
+  readonly onOpenRequestHandled?: ((seq: number) => void) | undefined;
+  /** With the trigger hidden, where focus goes when the field closes. */
+  readonly onClosed?: (() => void) | undefined;
+}
+
+export function ListSearch({
+  triggerHidden = false,
+  openRequest = null,
+  onOpenRequestHandled,
+  onClosed,
+}: ListSearchProps = {}): JSX.Element {
   const [params, setParams] = useSearchParams();
   const q = params.get('q') ?? '';
   const [expanded, setExpanded] = useState(q !== '');
@@ -38,6 +57,15 @@ export function ListSearch(): JSX.Element {
   useEffect(() => {
     if (q !== '') setExpanded(true);
   }, [q]);
+
+  const requestSeq = openRequest?.kind === 'search' ? openRequest.seq : null;
+  useEffect(() => {
+    if (requestSeq === null) return;
+    focusInput.current = true;
+    setExpanded(true);
+    input.current?.focus();
+    onOpenRequestHandled?.(requestSeq);
+  }, [requestSeq, onOpenRequestHandled]);
 
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
@@ -64,6 +92,10 @@ export function ListSearch(): JSX.Element {
     focusInput.current = false;
     if (input.current) input.current.value = q;
     setExpanded(false);
+    if (triggerHidden) {
+      onClosed?.();
+      return;
+    }
     trigger.current?.focus();
     if (document.activeElement !== trigger.current) input.current?.focus();
   }
@@ -89,23 +121,25 @@ export function ListSearch(): JSX.Element {
 
   return (
     <>
-      <Button
-        ref={trigger}
-        variant="ghost"
-        data-testid="list-search-trigger"
-        aria-expanded={expanded}
-        aria-controls={panelId}
-        onClick={() => {
-          if (expanded) close();
-          else {
-            focusInput.current = true;
-            setExpanded(true);
-          }
-        }}
-      >
-        <SearchIcon />
-        {q !== '' ? 'Search active' : 'Search'}
-      </Button>
+      {!triggerHidden && (
+        <Button
+          ref={trigger}
+          variant="ghost"
+          data-testid="list-search-trigger"
+          aria-expanded={expanded}
+          aria-controls={panelId}
+          onClick={() => {
+            if (expanded) close();
+            else {
+              focusInput.current = true;
+              setExpanded(true);
+            }
+          }}
+        >
+          <SearchIcon />
+          {q !== '' ? 'Search active' : 'Search'}
+        </Button>
+      )}
       <form
         hidden={!expanded}
         id={panelId}

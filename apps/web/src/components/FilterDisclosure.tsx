@@ -15,6 +15,11 @@ export interface FilterDisclosureProps {
   readonly active?: boolean;
   /** The inline quick-filter row: the name sits in the pill, not above it. */
   readonly compact?: boolean;
+  /**
+   * TASK-255 — an icon-only trigger for the phone library heading. The label
+   * stays the accessible name, visually hidden; it never becomes the icon's.
+   */
+  readonly icon?: ReactNode;
 }
 
 /** What an inactive field says in the Filters dialog, where the name is above it. */
@@ -26,6 +31,7 @@ export function FilterDisclosure({
   value,
   active = false,
   compact = false,
+  icon,
 }: FilterDisclosureProps) {
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -160,7 +166,14 @@ export function FilterDisclosure({
         }}
       >
         {value === undefined ? (
-          label
+          icon === undefined ? (
+            label
+          ) : (
+            <>
+              {icon}
+              <span className="sr-only">{label}</span>
+            </>
+          )
         ) : (
           <>
             {compact && (

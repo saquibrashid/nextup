@@ -21,6 +21,7 @@ import { SERVICES, SERVICE_LABELS, serviceFreshnessLabel, type Service } from '@
 
 import { FRESHNESS_UNAVAILABLE } from '../copy';
 import { FilterDisclosure } from './FilterDisclosure';
+import { ClockIcon } from './icons';
 
 /** One entry of `GET /api/service-state` (`specs/api.md` §6.28). */
 export interface ServiceFreshness {
@@ -34,6 +35,12 @@ export interface ServiceFreshness {
 export interface FreshnessStripProps {
   /** `null` when `GET /api/service-state` could not be read at all. */
   readonly services: readonly ServiceFreshness[] | null;
+  /**
+   * TASK-255 — the phone library heading draws the disclosure as a clock icon
+   * beside Filters. The facts behind it are unchanged (REQ-039): the same
+   * per-service dates, the same links to `/upload`, never a nag.
+   */
+  readonly compact?: boolean;
 }
 
 /**
@@ -57,7 +64,7 @@ function chipLabel(entry: ServiceFreshness | undefined, service: Service): strin
   return serviceFreshnessLabel(service, entry.ageDays);
 }
 
-export function FreshnessStrip({ services }: FreshnessStripProps): JSX.Element {
+export function FreshnessStrip({ services, compact = false }: FreshnessStripProps): JSX.Element {
   // A missing payload degrades VISIBLY. Rendering nothing would be the worst
   // outcome available: the owner cannot tell "both services are up to date"
   // from "nextup has no idea", and RSK-007 is precisely not noticing.
@@ -83,7 +90,7 @@ export function FreshnessStrip({ services }: FreshnessStripProps): JSX.Element {
           {FRESHNESS_UNAVAILABLE}
         </p>
       )}
-      <FilterDisclosure label="Service updates">
+      <FilterDisclosure label="Service updates" icon={compact ? <ClockIcon /> : undefined}>
         <ul>
           {labels.map(({ service, text }) => (
             <li key={service}>

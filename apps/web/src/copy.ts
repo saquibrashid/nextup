@@ -55,6 +55,29 @@ export { TMDB_DISCLAIMER } from '@nextup/domain';
 export const NAV_MENU_LABEL = 'Menu';
 export const NAV_MENU_TITLE = 'Menu';
 export const NAV_MENU_CLOSE_LABEL = 'Close menu';
+/**
+ * TASK-255 — the phone tab bar (owner mobile mockup). The visible label is the
+ * mockup's single word; the accessible name starts with it (WCAG 2.5.3) and
+ * adds the object, so it cannot be confused with the page's own Search submit
+ * or the Filters trigger in the library heading.
+ */
+export const NAV_TAB_SEARCH_LABEL = 'Search';
+export const NAV_TAB_SEARCH_NAME = 'Search the library';
+export const NAV_TAB_FILTERS_LABEL = 'Filters';
+export const NAV_TAB_FILTERS_NAME = 'Filters for the library';
+/** The phone header's identity mark: who is signed in, never a control. */
+export const signedInAsLabel = (name: string): string => `Signed in as ${name}`;
+/** The phone library heading (owner mobile mockup). */
+export const LIBRARY_PHONE_HEADING = 'My Library';
+export const libraryTitleCount = (total: number, lowerBound: boolean): string =>
+  `${lowerBound ? 'at least ' : ''}${String(total)} ${total === 1 ? 'title' : 'titles'}`;
+export const SERVICE_FILTER_ALL_SHORT = 'All';
+export const FILTERS_RESET_LABEL = 'Reset';
+export const FILTERS_SHEET_TITLE = 'Filters';
+/** While the filtered read is in flight the count is unknown; never guess one. */
+export const SHOW_TITLES_PENDING = 'Show titles';
+export const showTitlesLabel = (shown: number, lowerBound: boolean): string =>
+  `Show ${lowerBound ? 'at least ' : ''}${String(shown)} ${shown === 1 ? 'title' : 'titles'}`;
 
 /** US-023 AC-2, US-024 AC-6 - the removed view is a log, not a recycle bin. */
 export const REMOVED_VIEW_SUBTITLE =

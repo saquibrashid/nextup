@@ -66,7 +66,8 @@ for (const width of [320, 390, 640, 1023]) {
       await page.goto('/about');
       const nav = page.getByRole('navigation', { name: 'Primary' });
       await expect(nav.getByRole('button', { name: 'Menu' })).toBeVisible();
-      if (width < 640) await expect(nav.getByRole('link')).toHaveCount(0);
+      // TASK-255: below --bp-sm the phone tab bar's one link is Library.
+      if (width < 640) await expect(nav.getByRole('link')).toHaveText(['Library']);
       else await expect(nav.getByRole('link')).toHaveText(['Library', 'Import', 'Review']);
 
       const { drawer } = await openMenu(page);
