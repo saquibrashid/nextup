@@ -40,7 +40,11 @@ boundaries and owner-dependent work.
 `TASK-245` extends existing named tests, without changing API storage or routes:
 `T-WATCH-001p` covers legacy status projection and every transition;
 `T-WATCH-003l` covers explicitly stopping Watching;
-`T-WATCH-003m` covers the unified Status filter, legacy URL disclosure and atomic chip removal.
+`T-WATCH-003m` covers the multi-select Status filter, legacy URL disclosure and per-value chip removal
+(redefined in place by TASK-254; ~~single-choice Status filter and atomic chip removal~~);
+`T-WATCH-003n` covers a one-status legacy link reading as its ticked box.
+TASK-254 adds `T-WATCH-002h` (SQL `status` OR with Watching outranking priority) and
+`T-WATCH-002i` (`status` parsing).
 `T-LIST-018a`/`c`/`e` cover short visible dates with full accessible/hover provenance;
 `T-UX-127h` covers two genres, Sci-Fi naming and overflow.
 `T-IMDB-008a` covers the decorative star and retained IMDb source.
@@ -5167,6 +5171,7 @@ The Review route's correction picker keeps its own card markup and behavior; sha
 | `T-NAV-001` | U | Owner-approved names in the route table and headings; no retired wording in copy constants; *Needs review* / *Import history* split by whether an import has a next step. | ui-refresh §6b |
 | `T-NAV-002` | E | *(Widths redefined in place: 1280 → 1023, the widest drawer width.)* At 320/390/640/1023 px in Chromium and Mobile Safari: hybrid bar, full drawer with hrefs and current page, no overflow, focus trap and return, link navigation closes the drawer, short-viewport scroll, and no serious or critical axe violation. | ui-refresh §6 REQ-117 |
 | `T-UX-167` | U | At `--bp-lg` the nav lists every destination with its href, in route order, each with an icon; there is no Menu button or drawer; the current page (and a child route's parent) is marked; widening past `--bp-lg` with the drawer open closes it, and narrowing again finds it closed; `--bp-lg`, the `@media` prelude and `SIDEBAR_VIEWPORT_QUERY` agree; the sidebar and content share one framed panel split by a content-side hairline. `apps/web/test/navigation.spec.tsx`. | ui-refresh §6 REQ-117 (sidebar) |
+| `T-UX-168` | U/E | *(TASK-254.)* a) an inactive quick-filter pill's name and text are just its dimension (never *All …*/*Any runtime*); b) an active pill keeps the name, adds the value tag and `data-active`; c) the runtime slider renders one `aria-hidden` tick per stop and marks those in range; d) Status is checkboxes writing one `status` per choice; e) the stylesheet pins the raised pill, accent active outline, option grid, tick rule, padded grid-card service marks and the sidebar `--color-surface`; f) *(E, 1280 px)* named pills, one-line options in at most two aligned columns inside the panel, multi-status URL, visible ticks, no overflow. `apps/web/test/filterBar.spec.tsx`, `apps/web/test/stylesheet.spec.ts`, `tests/e2e/refinedLibrary.spec.ts`. | ui.md §2.1, api.md §6.2 |
 | `T-NAV-003` | E | At 1280 px in Chromium and Mobile Safari: every destination is visible in the nav with its href and current page and there is no Menu; no horizontal overflow; the nav sits inside the frame, before the content, with a 1px divider; a sidebar link navigates and moves the marking; no serious or critical axe violation. `tests/e2e/navDrawer.spec.ts`. | ui-refresh §6 REQ-117 (sidebar) |
 
 ### 39.5 What is deliberately NOT asserted here

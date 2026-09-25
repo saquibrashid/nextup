@@ -56,6 +56,7 @@ import {
   type TitleCategory,
   type RuntimeBucket,
   type WatchPriority,
+  type WatchStatus,
   type WatchPreferences,
   type WatchPreferencesPatch,
   type TitlePresentation,
@@ -558,6 +559,12 @@ export interface TitlePageOptions {
   categories?: readonly TitleCategory[];
   watching?: boolean | undefined;
   priorities?: readonly WatchPriority[];
+  /**
+   * The unified watch status (`specs/api.md` §6.2 `status`), OR'd within the
+   * dimension. Watching outranks priority, so a Watching title never matches
+   * `up-next`/`normal`/`someday` here — the same rule the row badge uses.
+   */
+  statuses?: readonly WatchStatus[];
   q?: string | undefined;
   limit: number;
   dir: 'asc' | 'desc';
@@ -716,6 +723,7 @@ function baseTitleListWhere(
     q,
     watching,
     priorities = [],
+    statuses = [],
   }: TitleFilters,
 ): Prisma.Sql {
   const genreNames = genres.flatMap((genre) => storedGenreVariants(genre));
@@ -727,6 +735,7 @@ function baseTitleListWhere(
     ))
     ${watching === undefined ? Prisma.empty : Prisma.sql`AND COALESCE(wp.watching, 0) = ${watching}`}
     ${priorities.length === 0 ? Prisma.empty : Prisma.sql`AND COALESCE(wp.priority, N'normal') IN (${Prisma.join(priorities)})`}
+    ${statuses.length === 0 ? Prisma.empty : Prisma.sql`AND (CASE WHEN COALESCE(wp.watching, 0) = 1 THEN N'watching' ELSE COALESCE(wp.priority, N'normal') END) IN (${Prisma.join(statuses)})`}
     AND NOT EXISTS (
       SELECT 1 FROM suppression s
       WHERE s.owner_id = ${ownerId} AND s.work_identity = t.work_identity AND s.active = 1

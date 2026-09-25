@@ -4221,6 +4221,10 @@ button {
   font-size: var(--text-sm);
 }
 
+.filter-disclosure__name {
+  white-space: nowrap;
+}
+
 .filter-disclosure__value {
   min-width: 0;
   overflow-wrap: anywhere;
@@ -4400,6 +4404,37 @@ button {
 }
 
 /*
+ * Owner-reported: the options wrapped as ragged inline runs ("Movie TV series
+ * Anime" on one line, the next option half off the edge). Each option is a
+ * full-width row in a column grid instead, so the boxes line up and the whole
+ * row is the tap target. Long lists (genres) get as many columns as fit.
+ */
+.filter-disclosure__panel fieldset.field:has(.input--choice) {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0 var(--space-1);
+}
+
+.filter-disclosure__panel fieldset.field:has(.input--choice) > .field__legend {
+  margin-block-end: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.filter-disclosure__panel .field label:has(.input--choice) {
+  display: flex;
+  padding-inline: var(--space-2);
+  border-radius: var(--radius);
+}
+
+.filter-disclosure__panel .field label:has(.input--choice):hover {
+  background: var(--color-surface-raised);
+}
+
+.filter-disclosure__panel .field label:has(.input--choice:checked) {
+  font-weight: var(--weight-medium);
+}
+
+/*
  * #366 — two native range inputs share one track. Each input spans the track
  * but ignores the pointer; only its 44px thumb receives it, so either handle
  * can be grabbed without the other input covering it. The visible dot is
@@ -4466,6 +4501,28 @@ button {
   inset-inline-end: calc(
     var(--range-inset) + (100% - var(--tap-target-min)) * (1 - var(--range-end))
   );
+  background: var(--color-accent);
+}
+
+/* Owner-requested hash marks: one per stop a handle can snap to. */
+.range-slider__ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.range-slider__tick {
+  position: absolute;
+  inset-block-start: calc(50% + var(--space-2));
+  inset-inline-start: calc(var(--range-inset) + (100% - var(--tap-target-min)) * var(--tick));
+  inline-size: 2px;
+  block-size: var(--space-2);
+  margin-inline-start: -1px;
+  border-radius: 1px;
+  background: var(--color-text-muted);
+}
+
+.range-slider__tick[data-in-range] {
   background: var(--color-accent);
 }
 
@@ -4886,7 +4943,8 @@ button {
     grid-column: 1 / -1;
     grid-row: 4;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    /* The marks take what the date leaves, so two sit side by side. */
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: end;
     align-self: stretch;
     gap: var(--space-1) var(--space-2);
@@ -4908,8 +4966,9 @@ button {
     padding: 0;
   }
 
+  /* The mark keeps breathing room inside its box, as in the owner's mockup. */
   .title-list[data-view='grid'] .title-row__badges .badge {
-    padding: 0;
+    padding: var(--space-1) var(--space-2);
     max-width: 100%;
     overflow-wrap: anywhere;
   }
@@ -4936,7 +4995,8 @@ button {
     max-width: calc(var(--layout-max-width) - 2 * var(--space-6));
     margin: var(--space-6) auto;
     padding: 0;
-    background: var(--color-bg);
+    /* The sidebar's own surface: the page column paints over the rest. */
+    background: var(--color-surface);
     border: 1px solid var(--color-border-soft);
     border-radius: var(--radius-card);
   }
@@ -5168,9 +5228,44 @@ button {
     display: none;
   }
 
+  /*
+   * The owner's mockup dropdown: a soft raised pill reading just the dimension
+   * name, a chevron, and — only once it narrows the list — its value as a tag
+   * and an accent outline.
+   */
   .filter-bar[data-inline] .filter-disclosure > .btn {
+    gap: var(--space-2);
+    padding-inline: var(--space-4) var(--space-3);
     border-radius: 999px;
+    border-color: var(--color-border-soft);
+    background: var(--color-catalog-raised);
     font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
+  }
+
+  .filter-bar[data-inline] .filter-disclosure > .btn:hover {
+    border-color: var(--color-border);
+  }
+
+  .filter-bar[data-inline] .filter-disclosure > .btn[data-active] {
+    border-color: var(--color-accent);
+  }
+
+  .filter-bar[data-inline] .filter-disclosure > .btn .icon {
+    width: 1rem;
+    height: 1rem;
+    color: var(--color-text-muted);
+  }
+
+  .filter-bar[data-inline] .filter-disclosure__value {
+    max-width: 9rem;
+    overflow: hidden;
+    padding-inline: var(--space-2);
+    border-radius: 999px;
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .filter-bar[data-inline] .filter-controls > .filter-disclosure .filter-disclosure__panel {
@@ -5182,6 +5277,14 @@ button {
     background: var(--color-catalog-raised);
     box-shadow: var(--shadow-menu);
     inset-inline: 0 auto;
+  }
+
+  /* A long option list (genres) gets room for a second column. */
+  .filter-bar[data-inline]
+    .filter-controls
+    > .filter-disclosure
+    .filter-disclosure__panel:has(label:nth-of-type(9)) {
+    width: min(26rem, 75vw);
   }
 }
 

@@ -668,6 +668,32 @@ describe('T-WATCH-002 server filtering, rank ordering and pagination', () => {
     expect(await walk('?sort=watchPriority&watching=true&priority=someday', 1)).toEqual(['w-a']);
   });
 
+  it('T-WATCH-002h `status` is an OR multi-select in which Watching outranks its priority', async () => {
+    await rankingFixtures();
+    expect(await walk('?sort=watchPriority&status=watching&status=up-next', 1)).toEqual([
+      'w-a',
+      'w-b',
+      'w-c',
+      'u-a',
+      'u-b',
+    ]);
+    // `w-a` is Watching with priority `someday`: it is Watching, not Someday.
+    expect(await walk('?sort=watchPriority&status=someday', 1)).toEqual(['s-a', 's-b']);
+    expect(await walk('?sort=watchPriority&status=normal&status=someday', 2)).toEqual([
+      'n-a',
+      'n-b',
+      's-a',
+      's-b',
+    ]);
+    expect(
+      (
+        await list(
+          '?sort=watchPriority&status=watching&status=up-next&status=normal&status=someday',
+        )
+      ).items,
+    ).toHaveLength(9);
+  });
+
   it('T-WATCH-002d filters before page selection, unknown-runtime counts and eligible rating scope', async () => {
     await seed('excluded');
     await seed('eligible-a', { runtime: 20, service: 'max' });
@@ -719,6 +745,8 @@ describe('T-WATCH-002 server filtering, rank ordering and pagination', () => {
       '?watching=1',
       '?watching=true&watching=true',
       '?priority=next',
+      '?status=paused',
+      `?${Array<string>(21).fill('status=normal').join('&')}`,
       `?${Array<string>(21).fill('priority=normal').join('&')}`,
       `?sort=dateAdded&cursor=${body.nextCursor}`,
     ])

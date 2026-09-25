@@ -275,7 +275,7 @@ it.each(otherStatuses)('T-WATCH-003l %s stops Watching', async (label) => {
   );
 });
 
-it('T-WATCH-003m unified status filters exclude Watching from other priorities and clear as one chip', () => {
+it('T-WATCH-003m status filters are multi-select, replace a combined saved link and clear per chip', () => {
   render(
     <MemoryRouter initialEntries={['/?q=hello&sort=runtime&dir=asc&priority=someday']}>
       <ListPage items={[item]} />
@@ -285,24 +285,48 @@ it('T-WATCH-003m unified status filters exclude Watching from other priorities a
   fireEvent.click(screen.getByTestId('filters-trigger'));
   fireEvent.click(screen.getByRole('button', { name: 'Status Custom saved filter' }));
   expect(screen.getByText(/This saved link uses a combined/)).toBeVisible();
-  fireEvent.click(screen.getByRole('radio', { name: 'Up next' }));
+  expect(screen.queryAllByRole('radio')).toHaveLength(0);
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Up next' }));
   let params = new URLSearchParams(screen.getByTestId('watch-query').textContent ?? '');
-  expect(params.get('watching')).toBe('false');
-  expect(params.getAll('priority')).toEqual(['up-next']);
-  fireEvent.click(screen.getByRole('radio', { name: 'Watching' }));
-  params = new URLSearchParams(screen.getByTestId('watch-query').textContent ?? '');
-  expect(params.get('watching')).toBe('true');
-  expect(params.has('priority')).toBe(false);
-  fireEvent.click(screen.getByRole('radio', { name: 'All statuses' }));
-  expect(
-    screen.queryByRole('button', { name: 'Remove status filter: Watching' }),
-  ).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole('radio', { name: 'Normal' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Remove status filter: Normal' }));
-  params = new URLSearchParams(screen.getByTestId('watch-query').textContent ?? '');
   expect(params.has('watching')).toBe(false);
   expect(params.has('priority')).toBe(false);
+  expect(params.getAll('status')).toEqual(['up-next']);
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Watching' }));
+  params = new URLSearchParams(screen.getByTestId('watch-query').textContent ?? '');
+  expect(params.getAll('status')).toEqual(['up-next', 'watching']);
+  expect(screen.getByRole('button', { name: 'Status 2 selected' })).toBeVisible();
+  expect(screen.getByRole('checkbox', { name: 'Up next' })).toBeChecked();
+  expect(screen.getByRole('checkbox', { name: 'Watching' })).toBeChecked();
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Watching' }));
+  params = new URLSearchParams(screen.getByTestId('watch-query').textContent ?? '');
+  expect(params.getAll('status')).toEqual(['up-next']);
+  fireEvent.click(screen.getByRole('button', { name: 'Remove status filter: Up next' }));
+  params = new URLSearchParams(screen.getByTestId('watch-query').textContent ?? '');
+  expect(params.has('status')).toBe(false);
   expect(params.get('q')).toBe('hello');
   expect(params.get('sort')).toBe('runtime');
   expect(params.get('dir')).toBe('asc');
+  expect(screen.getByRole('button', { name: 'Status Any' })).toBeVisible();
+});
+
+it('T-WATCH-003n a one-status legacy link reads as that ticked box and extends instead of resetting', () => {
+  render(
+    <MemoryRouter initialEntries={['/?watching=false&priority=up-next&sort=name']}>
+      <ListPage items={[item]} />
+      <Location />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByTestId('filters-trigger'));
+  fireEvent.click(screen.getByRole('button', { name: 'Status Up next' }));
+  expect(screen.queryByText(/This saved link uses a combined/)).not.toBeInTheDocument();
+  expect(screen.getByRole('checkbox', { name: 'Up next' })).toBeChecked();
+  fireEvent.click(screen.getByRole('checkbox', { name: 'Watching' }));
+  const params = new URLSearchParams(screen.getByTestId('watch-query').textContent ?? '');
+  expect(params.getAll('status')).toEqual(['up-next', 'watching']);
+  expect(params.has('watching')).toBe(false);
+  expect(params.has('priority')).toBe(false);
+  expect(params.get('sort')).toBe('name');
+  expect(parseFilters(new URLSearchParams('status=watching&status=bogus&status=watching'))).toEqual(
+    { ...NO_FILTERS, statuses: ['watching'] },
+  );
 });

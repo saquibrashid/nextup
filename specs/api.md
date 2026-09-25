@@ -925,8 +925,18 @@ Query: `service` (`netflix|max|prime-video|disney-plus|apple-tv-plus|paramount-p
 `genre` (string, repeatable), `runtime` (`under30|30-60|60-90|90-120|over120`,
 repeatable), `sort` (`dateAdded` default | `name` | `releaseYear` | `runtime` |
 `rating` | `watchPriority`), `watching` (single `true|false`, optional),
-`priority` (`up-next|normal|someday`, repeatable), `dir` (`asc|desc`, default per key below), **`q`** (optional single
+`priority` (`up-next|normal|someday`, repeatable), **`status`**
+(`watching|up-next|normal|someday`, repeatable, OR — TASK-254), `dir` (`asc|desc`, default per key below), **`q`** (optional single
 title-search string, trimmed, at most 500 JavaScript string-length units), `limit`, `cursor`.
+
+**Status selection is OR within the dimension (TASK-254).** A title's status
+is `watching` when it is Watching, otherwise its stored priority (absent =
+`normal`) — Watching outranks priority, so a Watching title with priority
+`someday` matches `status=watching`, never `status=someday`. Repeated values
+are deduplicated; all four values normalize to no restriction; an unknown
+value is **400 `VALIDATION_FAILED`** (`field: "status"`). The legacy
+`watching`/`priority` pair keeps its exact semantics for old links and, if
+sent alongside `status`, is ANDed with it. `T-WATCH-002h`, `T-WATCH-002i`.
 
 **Type selection is OR within the dimension.** Repeated values are
 deduplicated; selecting both supported values, `type=movie&type=tv`,

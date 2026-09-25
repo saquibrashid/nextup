@@ -78,6 +78,12 @@ export interface ListFilters {
   readonly categories?: readonly TitleCategory[];
   readonly watching?: boolean | undefined;
   readonly priorities?: readonly WatchPriority[] | undefined;
+  /**
+   * The unified status filter, OR'd within the dimension (`api.md` §6.2
+   * `status`). The legacy `watching`/`priority` pair above is still read so an
+   * old link keeps working, but the panel only ever writes this.
+   */
+  readonly statuses?: readonly WatchStatus[] | undefined;
   /** OR within the dimension (`api.md` §6.2, US-019 AC-4). */
   readonly services: readonly Service[];
   readonly types: readonly MediaType[];
@@ -88,7 +94,21 @@ export interface ListFilters {
 
 export const NO_FILTERS: ListFilters = { services: [], types: [], genres: [], runtimes: [] };
 
+function isWatchStatus(value: string): value is WatchStatus {
+  return (WATCH_STATUSES as readonly string[]).includes(value);
+}
+
 function statusChips(filters: ListFilters) {
+  const statuses = (filters.statuses ?? []).map((value) => ({
+    dimension: 'status',
+    value,
+    label: WATCH_STATUS_LABELS[value],
+  }));
+  return [...statuses, ...legacyStatusChips(filters)];
+}
+
+/** The pre-`status` links: one status as `watching`/`priority`, or a custom AND. */
+function legacyStatusChips(filters: ListFilters) {
   const priorities = filters.priorities ?? [];
   if (filters.watching === true && priorities.length === 0) {
     return [{ dimension: 'status', value: 'watching', label: WATCH_STATUS_LABELS.watching }];
@@ -143,9 +163,11 @@ export function parseFilters(params: URLSearchParams): ListFilters {
   const priorities = [...new Set(params.getAll('priority'))].filter(
     (value): value is WatchPriority => (WATCH_PRIORITIES as readonly string[]).includes(value),
   );
+  const statuses = [...new Set(params.getAll('status'))].filter(isWatchStatus);
   return {
     ...(watching === 'true' || watching === 'false' ? { watching: watching === 'true' } : {}),
     ...(priorities.length > 0 ? { priorities } : {}),
+    ...(statuses.length > 0 ? { statuses } : {}),
     services: params.getAll('service').filter(isService),
     types: params.getAll('type').filter(isMediaType),
     ...(params.has('category')
@@ -174,8 +196,10 @@ export function applyFilters(params: URLSearchParams, filters: ListFilters): URL
   next.delete('runtime');
   next.delete('watching');
   next.delete('priority');
+  next.delete('status');
   if (filters.watching !== undefined) next.set('watching', String(filters.watching));
   for (const priority of filters.priorities ?? []) next.append('priority', priority);
+  for (const status of filters.statuses ?? []) next.append('status', status);
   for (const service of filters.services) next.append('service', service);
   for (const type of filters.types) next.append('type', type);
   for (const category of filters.categories ?? []) next.append('category', category);
@@ -188,6 +212,7 @@ export function isFiltered(filters: ListFilters): boolean {
   return (
     filters.watching !== undefined ||
     (filters.priorities?.length ?? 0) > 0 ||
+    (filters.statuses?.length ?? 0) > 0 ||
     (filters.categories?.length ?? 0) > 0 ||
     filters.services.length +
       filters.types.length +
@@ -215,9 +240,10 @@ function toggle<T>(values: readonly T[], value: T): readonly T[] {
   return values.includes(value) ? values.filter((item) => item !== value) : [...values, value];
 }
 
-function selectionSummary(labels: readonly string[], emptyLabel: string): string {
+/** One label, or a count once several are chosen. `''` when nothing is. */
+function selectionSummary(labels: readonly string[]): string {
   const selected = [...new Set(labels)];
-  return selected.length > 1 ? `${String(selected.length)} selected` : (selected[0] ?? emptyLabel);
+  return selected.length > 1 ? `${String(selected.length)} selected` : (selected[0] ?? '');
 }
 
 export interface FilterBarProps {
@@ -288,12 +314,14 @@ export function FilterBar({
   );
   const query = params.get('q') ?? '';
   const watchChips = statusChips(filters);
-  const watchSelection =
-    watchChips.length === 0
-      ? 'all'
-      : watchChips[0]?.dimension === 'status'
-        ? watchChips[0].value
-        : 'custom';
+  // Legacy one-status links are read as that status, so ticking a second box
+  // adds to it rather than silently replacing it.
+  const legacyChips = legacyStatusChips(filters);
+  const legacyCustom = legacyChips.some((chip) => chip.dimension !== 'status');
+  const checkedStatuses: readonly WatchStatus[] = [
+    ...(filters.statuses ?? []),
+    ...(legacyCustom ? [] : legacyChips.map((chip) => chip.value).filter(isWatchStatus)),
+  ];
   const chips = [
     ...watchChips,
     ...filters.services.map((value) => ({
@@ -333,8 +361,12 @@ export function FilterBar({
   function removeChip(dimension: string, value: string): void {
     const next = new URLSearchParams(params);
     if (dimension === 'status') {
-      next.delete('watching');
-      next.delete('priority');
+      next.delete('status', value);
+      // A legacy one-status link is its only status chip, so it goes whole.
+      if (!legacyCustom) {
+        next.delete('watching');
+        next.delete('priority');
+      }
     } else if (dimension === 'q') next.delete('q');
     else if (dimension === 'runtime') {
       // A legacy range may supply two chips; rewrite it so removing one sticks.
@@ -352,11 +384,13 @@ export function FilterBar({
     setParams(applyFilters(params, next));
   }
 
-  function selectStatus(status: WatchStatus | 'all'): void {
+  /** Multi-select: a toggled status replaces any legacy watching/priority pair. */
+  function toggleStatus(status: WatchStatus): void {
     update({
       ...filters,
-      watching: status === 'all' ? undefined : status === 'watching',
-      priorities: status === 'all' || status === 'watching' ? [] : [status],
+      watching: undefined,
+      priorities: [],
+      statuses: toggle([...new Set(checkedStatuses)], status),
     });
   }
 
@@ -428,9 +462,10 @@ export function FilterBar({
               <div className="filter-controls">
                 <FilterDisclosure
                   label="Services"
+                  compact={inline}
+                  active={filters.services.length > 0}
                   value={selectionSummary(
                     filters.services.map((service) => SERVICE_LABELS[service]),
-                    'All services',
                   )}
                 >
                   <Field label="Search services">
@@ -466,15 +501,14 @@ export function FilterBar({
 
                 <FilterDisclosure
                   label="Type"
-                  value={selectionSummary(
-                    [
-                      ...filters.types.map((type) => MEDIA_TYPE_LABELS[type]),
-                      ...(filters.categories ?? []).map(
-                        (category) => TITLE_CATEGORY_LABELS[category],
-                      ),
-                    ],
-                    'All types',
-                  )}
+                  compact={inline}
+                  active={filters.types.length + (filters.categories?.length ?? 0) > 0}
+                  value={selectionSummary([
+                    ...filters.types.map((type) => MEDIA_TYPE_LABELS[type]),
+                    ...(filters.categories ?? []).map(
+                      (category) => TITLE_CATEGORY_LABELS[category],
+                    ),
+                  ])}
                 >
                   <Field legend="Type" testId="filter-type">
                     {TITLE_CATEGORIES.map((type) => (
@@ -507,7 +541,9 @@ export function FilterBar({
                 {genreOptions.length > 0 && (
                   <FilterDisclosure
                     label="Genre"
-                    value={selectionSummary(filters.genres, 'All genres')}
+                    compact={inline}
+                    active={filters.genres.length > 0}
+                    value={selectionSummary(filters.genres)}
                   >
                     <Field legend="Genre" testId="filter-genre">
                       {genreOptions.map((genre) => (
@@ -542,6 +578,8 @@ export function FilterBar({
       */}
                 <FilterDisclosure
                   label="Runtime"
+                  compact={inline}
+                  active={filters.runtimes.length > 0}
                   value={
                     runtimeRange.contiguous
                       ? runtimeRangeSummary(
@@ -551,7 +589,6 @@ export function FilterBar({
                         )
                       : selectionSummary(
                           filters.runtimes.map((bucket) => RUNTIME_BUCKET_LABELS[bucket]),
-                          'Any runtime',
                         )
                   }
                 >
@@ -585,39 +622,31 @@ export function FilterBar({
                 </FilterDisclosure>
                 <FilterDisclosure
                   label="Status"
+                  compact={inline}
+                  active={watchChips.length > 0}
                   value={
-                    watchSelection === 'custom'
+                    legacyCustom && (filters.statuses?.length ?? 0) === 0
                       ? 'Custom saved filter'
-                      : selectionSummary(
-                          watchChips.map((chip) => chip.label),
-                          'All statuses',
-                        )
+                      : selectionSummary(checkedStatuses.map((value) => WATCH_STATUS_LABELS[value]))
                   }
                 >
-                  {watchSelection === 'custom' && (
+                  {legacyCustom && (
                     <p>
                       This saved link uses a combined watching/priority filter. Choose a status to
                       replace it.
                     </p>
                   )}
-                  <Field legend="Status">
-                    <label>
-                      <Input
-                        type="radio"
-                        name={`status-${headingId}`}
-                        checked={watchSelection === 'all'}
-                        onChange={() => selectStatus('all')}
-                      />
-                      All statuses
-                    </label>
+                  <Field legend="Status" testId="filter-status">
                     {WATCH_STATUSES.map((value) => (
                       <label key={value}>
                         <Input
-                          type="radio"
-                          name={`status-${headingId}`}
+                          type="checkbox"
+                          name="status"
                           value={value}
-                          checked={watchSelection === value}
-                          onChange={() => selectStatus(value)}
+                          checked={checkedStatuses.includes(value)}
+                          onChange={() => {
+                            toggleStatus(value);
+                          }}
                         />
                         {WATCH_STATUS_LABELS[value]}
                       </label>

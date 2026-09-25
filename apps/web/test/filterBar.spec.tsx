@@ -510,7 +510,7 @@ describe('T-UX-144 - labelled filter fields and split runtime options', () => {
     mount('/?sort=name&dir=asc');
     const trigger = screen.getByTestId('filters-trigger');
     await openFiltersWith(user);
-    await user.click(screen.getByRole('button', { name: 'Services All services' }));
+    await user.click(screen.getByRole('button', { name: 'Services Any' }));
     await user.click(screen.getByRole('checkbox', { name: 'Netflix' }));
     await user.click(panelDoneButton());
 
@@ -526,7 +526,7 @@ describe('T-UX-144 - labelled filter fields and split runtime options', () => {
     mount('/');
     const trigger = screen.getByTestId('filters-trigger');
     await openFiltersWith(user);
-    await user.click(screen.getByRole('button', { name: 'Services All services' }));
+    await user.click(screen.getByRole('button', { name: 'Services Any' }));
     await user.click(screen.getByRole('checkbox', { name: 'Netflix' }));
     clickDisclosureDone(screen.getByRole('button', { name: 'Services Netflix' }));
     await user.keyboard('{Escape}');
@@ -541,10 +541,11 @@ describe('T-UX-144 - labelled filter fields and split runtime options', () => {
     openFilters();
     expect(screen.getByRole('group', { name: 'Filter by', exact: true })).toBeVisible();
     for (const [category, value] of [
-      ['Services', 'All services'],
-      ['Type', 'All types'],
-      ['Genre', 'All genres'],
-      ['Runtime', 'Any runtime'],
+      ['Services', 'Any'],
+      ['Type', 'Any'],
+      ['Genre', 'Any'],
+      ['Runtime', 'Any'],
+      ['Status', 'Any'],
     ]) {
       const trigger = screen.getByRole('button', { name: `${category} ${value}`, exact: true });
       expect(trigger).toHaveTextContent(value ?? '');
@@ -570,7 +571,7 @@ describe('T-UX-144 - labelled filter fields and split runtime options', () => {
   it('T-UX-144c selecting a value updates the same named field while its picker remains open', () => {
     mount('/');
     openFilters();
-    const trigger = screen.getByRole('button', { name: 'Services All services' });
+    const trigger = screen.getByRole('button', { name: 'Services Any' });
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole('checkbox', { name: 'Netflix' }));
     expect(trigger).toHaveAccessibleName('Services Netflix');
@@ -584,7 +585,7 @@ describe('T-UX-144 - labelled filter fields and split runtime options', () => {
   it('T-UX-144d runtime slider stops keep the five split ranges, with independent 60-90 and 90-120 steps', () => {
     mount('/');
     openFilters();
-    fireEvent.click(screen.getByRole('button', { name: 'Runtime Any runtime' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Runtime Any' }));
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
     const handles = screen.getAllByRole('slider');
     expect(handles).toHaveLength(2);
@@ -626,12 +627,12 @@ describe('T-UX-144 - labelled filter fields and split runtime options', () => {
     ).toBeVisible();
   });
 
-  it('T-UX-144f clearing a legacy filter returns the field to Any runtime without an obsolete option', () => {
+  it('T-UX-144f clearing a legacy filter returns the field to Any without an obsolete option', () => {
     mount('/?runtime=60-120&dir=asc');
     fireEvent.click(screen.getByTestId('clear-filters'));
     expect(url()).toBe('/?dir=asc');
     openFilters();
-    fireEvent.click(screen.getByRole('button', { name: 'Runtime Any runtime' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Runtime Any' }));
     expect(runtimeHandle('min')).toHaveValue('0');
     expect(runtimeHandle('max')).toHaveValue('5');
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
@@ -1066,7 +1067,7 @@ describe('T-RANGE-002 the runtime range slider (#366)', () => {
     const written = new URLSearchParams(url().split('?')[1]);
     expect(written.has('runtime')).toBe(false);
     expect(written.get('service')).toBe('netflix');
-    expect(screen.getByRole('button', { name: 'Runtime Any runtime' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Runtime Any' })).toBeVisible();
   });
 
   it('T-RANGE-002e a saved selection with a gap is disclosed and kept until a handle moves', () => {
@@ -1099,5 +1100,89 @@ describe('T-RANGE-002 the runtime range slider (#366)', () => {
     expect(runtimeHandle('max')).toHaveValue('1');
     fireEvent.click(screen.getByRole('button', { name: 'Forward', hidden: true }));
     expect(runtimeHandle('max')).toHaveValue('2');
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+/* T-UX-168 — the owner's mockup dropdowns (plain names, tidy panels).       */
+/* ------------------------------------------------------------------------ */
+
+function mountInline(initial: string): HTMLElement {
+  const { container } = render(
+    <MemoryRouter initialEntries={[initial]}>
+      <FilterBar inline genres={['Drama', 'Comedy']} shown={1} total={10} />
+      <LocationProbe />
+    </MemoryRouter>,
+  );
+  const bar = container.querySelector<HTMLElement>('.filter-bar[data-inline]');
+  if (bar === null) throw new Error('inline filter bar missing');
+  return bar;
+}
+
+describe('T-UX-168 · the quick-filter dropdowns read as the owner mockup', () => {
+  it('T-UX-168a: an inactive quick filter is named by its dimension alone, never "All …"', () => {
+    const bar = mountInline('/');
+    for (const name of ['Type', 'Genre', 'Runtime', 'Status']) {
+      const trigger = within(bar).getByRole('button', { name, exact: true, hidden: true });
+      expect(trigger).toHaveTextContent(new RegExp(`^${name}$`));
+      expect(trigger).not.toHaveAttribute('data-active');
+      expect(trigger.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    }
+    expect(bar.textContent).not.toMatch(/All (types|genres|statuses|services)|Any runtime/);
+  });
+
+  it('T-UX-168b: an active quick filter keeps its name and adds the value as a tag', () => {
+    const bar = mountInline('/?category=movie&genre=Drama&genre=Comedy&status=watching');
+    for (const [name, value] of [
+      ['Type', 'Movie'],
+      ['Genre', '2 selected'],
+      ['Status', 'Watching'],
+    ] as const) {
+      const trigger = within(bar).getByRole('button', {
+        name: `${name} ${value}`,
+        exact: true,
+        hidden: true,
+      });
+      expect(trigger).toHaveAttribute('data-active', 'true');
+      expect(trigger.querySelector('.filter-disclosure__value')).toHaveTextContent(value);
+      expect(trigger.querySelector('.filter-disclosure__name')).toHaveAttribute(
+        'aria-hidden',
+        'true',
+      );
+    }
+    expect(
+      within(bar).getByRole('button', { name: 'Runtime', exact: true, hidden: true }),
+    ).not.toHaveAttribute('data-active');
+  });
+
+  it('T-UX-168c: the runtime slider marks every stop, and the stops inside the range', () => {
+    mount('/?runtime=60-90&runtime=90-120');
+    openFilters();
+    fireEvent.click(screen.getByRole('button', { name: /^Runtime / }));
+    const ticks = screen.getByTestId('range-ticks');
+    expect(ticks).toHaveAttribute('aria-hidden', 'true');
+    const marks = [...ticks.querySelectorAll('.range-slider__tick')];
+    expect(marks).toHaveLength(6);
+    expect(
+      marks
+        .map((mark, stop) => (mark.hasAttribute('data-in-range') ? stop : -1))
+        .filter((stop) => stop >= 0),
+    ).toEqual([2, 3, 4]);
+  });
+
+  it('T-UX-168d: status is a multi-select of checkboxes that writes one `status` per choice', () => {
+    mount('/?sort=name');
+    openFilters();
+    fireEvent.click(screen.getByRole('button', { name: 'Status Any' }));
+    expect(within(screen.getByTestId('filter-status')).queryAllByRole('radio')).toHaveLength(0);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Watching' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Someday' }));
+    const written = new URLSearchParams(url().split('?')[1]);
+    expect(written.getAll('status')).toEqual(['watching', 'someday']);
+    expect(written.get('sort')).toBe('name');
+    expect(parseFilters(written).statuses).toEqual(['watching', 'someday']);
+    expect(isFiltered(parseFilters(written))).toBe(true);
+    expect(activeFilterChips(parseFilters(written))).toEqual(['Watching', 'Someday']);
+    expect(applyFilters(written, NO_FILTERS).toString()).toBe('sort=name');
   });
 });

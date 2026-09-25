@@ -1537,9 +1537,11 @@ It **does not trap Tab or claim `aria-modal`**. Its classes are
 `filter-disclosure` / `filter-disclosure__panel`, with
 `filter-disclosure__label` / `filter-disclosure__value` for fields;
 `[hidden]` remains hidden. **Filter by** groups two columns on phones and
-three from 640 px and six from 1024 px. Empty values read All services / All types / All genres /
-Any runtime / All titles / All priorities; one selection shows its name, multiple distinct selections
-show N selected. Individual removable chips remain (`T-UX-144`).
+three from 640 px and six from 1024 px. An empty field reads **Any** in the panel; in the wide
+quick-filter row an empty pill reads only its dimension name, and an active one adds its value as an
+accent tag (`filter-disclosure__name`, `data-active`; TASK-254). ~~Empty values read All services /
+All types / All genres / Any runtime / All titles / All priorities.~~ One selection shows its name,
+multiple distinct selections show N selected. Individual removable chips remain (`T-UX-144`).
 
 ⚠ **A VARIANT IS A STATIC CLASS LOOKUP, NOT A COMPUTED STRING.** `T-CSS-001c`
 forbids `className={…}` so that `T-CSS-001`'s two directions remain an exact

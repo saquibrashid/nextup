@@ -251,8 +251,15 @@ restore, suppress, un-suppress or fix-match.
    sort, local view and unrelated query parameters. Picker option search
    never searches title rows. `T-UI-016`, `T-UX-139`.
 
-   Defaults read **All services / All types / All genres / Any runtime / All titles / All priorities**;
-   one selected value shows its name and multiple distinct values show
+   An unset field reads **Any** in the Filters panel, where its name sits
+   above it. In the wide quick-filter row an unset pill reads **only its
+   dimension name** — *Type*, *Genre*, *Runtime*, *Status* — with a chevron;
+   once it narrows the list the pill keeps the name, adds the value as an
+   accent tag and takes an accent outline (owner, TASK-254, `T-UX-168`).
+   ~~Defaults read All services / All types / All genres / Any runtime / All
+   titles / All priorities.~~ Panel options are one aligned row each in a
+   column grid (a long list such as genres gets two columns), never ragged
+   inline runs. One selected value shows its name and multiple distinct values show
    **N selected**, with individual selections still enumerated by the chips.
    The accessible trigger name includes category and value. Fields use two
    equal columns on phones, three from 640 px and six from 1024 px; panels stay within the
@@ -279,7 +286,9 @@ restore, suppress, un-suppress or fix-match.
    the bucket edges — *0m*, *30m*, *1h*, *1h 30m*, *2h*, *No limit* — so the
    handles select a contiguous run of *Under 30m*, *30m–1h*, *1h–1h 30m*,
    *1h 30m–2h*, *Over 2h* and still write those canonical `runtime=` tokens.
-   The full track is **Any runtime** and writes no `runtime` parameter. The
+   The full track is **Any** and writes no `runtime` parameter; a hash mark
+   sits under every stop, accent-coloured inside the selected range
+   (TASK-254). ~~The full track is Any runtime.~~ The
    accessibility objections that once ruled a slider out are met, not waived:
    the handles are two native range inputs with visible **Min**/**Max**
    labels, values with units, distinct accessible names (*Minimum runtime*,
@@ -436,11 +445,16 @@ Offline disables Save if the dialog is already open.
 Success closes the editor and refetches page one from the server; do not
 optimistically reorder, filter or reset list rows. Preserve the URL and local
 Grid/Compact choice. A refetch failure uses the existing list error/retry
-state. One Status filter offers All statuses / Watching / Up next / Normal /
-Someday. Watching maps to `watching=true` with no priority restriction;
-other statuses map to `watching=false&priority=<status>`. A status chip removes
-both parameters together. Existing combined links retain their exact semantics
-and show Custom saved filter until explicitly replaced or cleared.
+state. One Status filter is a **multi-select** of Watching / Up next / Normal /
+Someday checkboxes (TASK-254), OR'd together and written as one repeatable
+`status=` per choice (`api.md` §6.2); none ticked is no status filter. Each
+status chip removes only its value. A legacy one-status link
+(`watching=true`, or `watching=false&priority=<p>`) reads as that ticked box,
+and ticking another rewrites it as `status=`. Other combined legacy links
+retain their exact semantics and show Custom saved filter until a status is
+ticked or the filter is cleared. ~~One Status filter offers All statuses /
+Watching / Up next / Normal / Someday as a single choice; Watching maps to
+`watching=true`, other statuses to `watching=false&priority=<status>`.~~
 
 The sixth sort button, **Watch priority**, is opt-in: Watching first,
 then nonwatching Up next, Normal, Someday. Pressing it again selects
