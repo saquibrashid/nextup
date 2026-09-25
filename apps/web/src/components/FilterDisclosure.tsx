@@ -6,9 +6,27 @@ export interface FilterDisclosureProps {
   readonly label: string;
   readonly children: ReactNode;
   readonly value?: string;
+  /**
+   * Whether this dimension currently narrows the list. An inactive dimension
+   * reads as just its name ("Type"), never "All types" — the owner asked for
+   * the plain name, and "All …" on every pill was noise that hid which one
+   * was actually doing the filtering.
+   */
+  readonly active?: boolean;
+  /** The inline quick-filter row: the name sits in the pill, not above it. */
+  readonly compact?: boolean;
 }
 
-export function FilterDisclosure({ label, children, value }: FilterDisclosureProps) {
+/** What an inactive field says in the Filters dialog, where the name is above it. */
+export const FILTER_ANY_LABEL = 'Any';
+
+export function FilterDisclosure({
+  label,
+  children,
+  value,
+  active = false,
+  compact = false,
+}: FilterDisclosureProps) {
   const id = useId();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -133,7 +151,10 @@ export function FilterDisclosure({ label, children, value }: FilterDisclosurePro
         id={`${id}-trigger`}
         aria-expanded={open}
         aria-controls={`${id}-panel`}
-        aria-labelledby={value === undefined ? undefined : `${id}-label ${id}-value`}
+        aria-labelledby={
+          value === undefined || (compact && !active) ? undefined : `${id}-label ${id}-value`
+        }
+        data-active={(value !== undefined && active) || undefined}
         onClick={() => {
           setOpen(!open);
         }}
@@ -142,9 +163,16 @@ export function FilterDisclosure({ label, children, value }: FilterDisclosurePro
           label
         ) : (
           <>
-            <span className="filter-disclosure__value" id={`${id}-value`}>
-              {value}
-            </span>
+            {compact && (
+              <span className="filter-disclosure__name" aria-hidden={active || undefined}>
+                {label}
+              </span>
+            )}
+            {(active || !compact) && (
+              <span className="filter-disclosure__value" id={`${id}-value`}>
+                {active ? value : FILTER_ANY_LABEL}
+              </span>
+            )}
             <ChevronIcon />
           </>
         )}

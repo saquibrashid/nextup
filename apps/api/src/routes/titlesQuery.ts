@@ -21,11 +21,13 @@ import {
   RUNTIME_BUCKETS,
   SERVICES,
   WATCH_PRIORITIES,
+  WATCH_STATUSES,
   normalizeRuntimeBuckets,
   type MediaType,
   type RuntimeBucket,
   type Service,
   type WatchPriority,
+  type WatchStatus,
 } from '@nextup/domain';
 import type { Request } from 'express';
 
@@ -155,6 +157,8 @@ export interface TitleListQuery {
   categories: TitleCategory[];
   watching: boolean | undefined;
   priorities: WatchPriority[];
+  /** Unified watch status, OR'd within the dimension (`api.md` §6.2). */
+  statuses: WatchStatus[];
   q: string | undefined;
   services: Service[];
   mediaType: MediaType | undefined;
@@ -223,6 +227,11 @@ export function parseTitleListQuery(query: Request['query']): TitleListQuery {
     toStringArray(query['priority'], 'priority'),
     'priority',
     WATCH_PRIORITIES,
+  );
+  const statuses = requireEnumValues(
+    toStringArray(query['status'], 'status'),
+    'status',
+    WATCH_STATUSES,
   );
   const qRaw = query['q'];
   if (qRaw !== undefined && typeof qRaw !== 'string') {
@@ -299,6 +308,8 @@ export function parseTitleListQuery(query: Request['query']): TitleListQuery {
     categories,
     watching: watchingRaw === undefined ? undefined : watchingRaw === 'true',
     priorities,
+    // Every status selected is the whole dimension, so OR means no restriction.
+    statuses: statuses.length === WATCH_STATUSES.length ? [] : statuses,
     q,
     services,
     // Both supported types form the whole dimension, so OR means no restriction.

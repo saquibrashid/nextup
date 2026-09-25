@@ -338,6 +338,7 @@ export function registerTitleRoutes(router: Router): void {
         const sweepRows = await listTitleRatingRows(ownerId, {
           watching: query.watching,
           priorities: query.priorities,
+          statuses: query.statuses,
           q: query.q,
           services: query.services,
           mediaType: query.mediaType,
@@ -357,6 +358,7 @@ export function registerTitleRoutes(router: Router): void {
     const { rows, hasMore } = await listTitlePage(ownerId, {
       watching: query.watching,
       priorities: query.priorities,
+      statuses: query.statuses,
       q: query.q,
       limit: query.limit,
       dir: query.dir,
@@ -381,6 +383,7 @@ export function registerTitleRoutes(router: Router): void {
         : await countRuntimeUnknown(ownerId, {
             watching: query.watching,
             priorities: query.priorities,
+            statuses: query.statuses,
             q: query.q,
             services: query.services,
             mediaType: query.mediaType,

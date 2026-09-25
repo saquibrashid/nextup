@@ -755,3 +755,35 @@ describe('T-AI-041 - the cropped tile thumbnail clips, and is legible', () => {
     expect(inner).toMatch(/max-width:\s*none/);
   });
 });
+
+/* T-UX-168e — the stylesheet half of the owner's mockup dropdowns. */
+describe('T-UX-168e · filter pills, panels, ticks, card marks and the sidebar surface', () => {
+  function rule(selector: string): string {
+    const at = cssWithoutComments.indexOf(`${selector} {`);
+    expect(at, selector).toBeGreaterThanOrEqual(0);
+    return /\{([^}]*)\}/.exec(cssWithoutComments.slice(at))?.[1] ?? '';
+  }
+
+  it('T-UX-168e: every pinned declaration is present', () => {
+    const pill = rule('.filter-bar[data-inline] .filter-disclosure > .btn');
+    expect(pill).toMatch(/background:\s*var\(--color-catalog-raised\)/);
+    expect(pill).toMatch(/border-color:\s*var\(--color-border-soft\)/);
+    expect(rule('.filter-bar[data-inline] .filter-disclosure > .btn[data-active]')).toMatch(
+      /border-color:\s*var\(--color-accent\)/,
+    );
+    expect(rule('.filter-disclosure__panel fieldset.field:has(.input--choice)')).toMatch(
+      /display:\s*grid/,
+    );
+    expect(rule('.filter-disclosure__panel .field label:has(.input--choice)')).toMatch(
+      /display:\s*flex/,
+    );
+    expect(rule('.range-slider__tick')).toMatch(/--tick/);
+    const badge = rule("  .title-list[data-view='grid'] .title-row__badges .badge");
+    expect(badge).toMatch(/padding:\s*var\(--space-1\) var\(--space-2\)/);
+    const frame = cssWithoutComments.slice(
+      cssWithoutComments.lastIndexOf('grid-template-columns: 12rem minmax(0, 1fr)'),
+    );
+    const shell = /^[^}]*/.exec(frame)?.[0];
+    expect(shell).toMatch(/background:\s*var\(--color-surface\)/);
+  });
+});

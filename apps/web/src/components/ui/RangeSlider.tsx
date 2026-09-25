@@ -104,6 +104,17 @@ export function RangeSlider({
       </div>
       <div className="range-slider__track" style={track}>
         <span className="range-slider__fill" aria-hidden="true" />
+        {/* One hash mark per stop, so the steps a handle snaps to are visible. */}
+        <span className="range-slider__ticks" aria-hidden="true" data-testid="range-ticks">
+          {Array.from({ length: last + 1 }, (_, stop) => (
+            <span
+              key={stop}
+              className="range-slider__tick"
+              data-in-range={(stop >= shown.min && stop <= shown.max) || undefined}
+              style={{ '--tick': String(stop / last) } as CSSProperties}
+            />
+          ))}
+        </span>
         <Input
           id={minId}
           type="range"

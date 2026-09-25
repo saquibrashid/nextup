@@ -570,3 +570,21 @@ describe('the two NEW sort cursors are distinct shapes, not one nullable-int sha
     }
   });
 });
+
+describe('T-WATCH-002i · the `status` filter parameter', () => {
+  it('T-WATCH-002i: repeats OR together, de-duplicate, collapse to no filter when all chosen, and refuse unknowns', () => {
+    expect(parseTitleListQuery({}).statuses).toEqual([]);
+    expect(parseTitleListQuery({ status: 'watching' }).statuses).toEqual(['watching']);
+    expect(parseTitleListQuery({ status: ['up-next', 'watching', 'up-next'] }).statuses).toEqual([
+      'up-next',
+      'watching',
+    ]);
+    expect(
+      parseTitleListQuery({ status: ['watching', 'up-next', 'normal', 'someday'] }).statuses,
+    ).toEqual([]);
+    expect(thrown(() => parseTitleListQuery({ status: 'paused' })).details.field).toBe('status');
+    expect(thrown(() => parseTitleListQuery({ status: { a: 'watching' } })).details.field).toBe(
+      'status',
+    );
+  });
+});

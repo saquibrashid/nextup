@@ -107,7 +107,14 @@ function orderedTitles(
       (!params.has('watching') ||
         String(preference?.watching ?? false) === params.get('watching')) &&
       (!params.has('priority') ||
-        params.getAll('priority').includes(preference?.priority ?? 'normal'))
+        params.getAll('priority').includes(preference?.priority ?? 'normal')) &&
+      // `api.md` §6.2 `status`: Watching outranks the stored priority.
+      (!params.has('status') ||
+        params
+          .getAll('status')
+          .includes(
+            preference?.watching === true ? 'watching' : (preference?.priority ?? 'normal'),
+          ))
     );
   })
     .map((title) => ({ ...title, ...preferences.get(title.titleId) }))
@@ -976,7 +983,7 @@ test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone
   }
   const dialog = await openFiltersPanel(page);
   const controls = dialog.getByRole('group', { name: 'Filter by', exact: true });
-  await controls.getByRole('button', { name: 'Runtime Any runtime' }).click();
+  await controls.getByRole('button', { name: 'Runtime Any', exact: true }).click();
   const minimum = dialog.getByRole('slider', { name: 'Minimum runtime', exact: true });
   const maximum = dialog.getByRole('slider', { name: 'Maximum runtime', exact: true });
   await minimum.fill('3');
@@ -1269,17 +1276,24 @@ test('T-WATCH-003i: watch preferences save, survive reload, filter and sort in a
   await sortGroup.getByRole('button', { name: 'Watch priority', exact: true }).click();
   await expect(page.getByTestId('title-name').first()).toHaveText('Amber Harbor');
   const filterDialog = await openFiltersPanel(page);
-  await filterDialog.getByRole('button', { name: 'Status All statuses', exact: true }).click();
-  const watching = filterDialog.getByRole('radio', { name: 'Watching', exact: true });
+  await filterDialog.getByRole('button', { name: 'Status Any', exact: true }).click();
+  const watching = filterDialog.getByRole('checkbox', { name: 'Watching', exact: true });
   await chooseInput(watching);
-  await expect.poll(() => new URL(page.url()).searchParams.get('watching')).toBe('true');
+  await expect.poll(() => new URL(page.url()).searchParams.getAll('status')).toEqual(['watching']);
   await filterDialog
     .locator('.filter-disclosure__panel:visible')
     .getByRole('button', { name: 'Done', exact: true })
     .click();
   await expect(page.getByTestId('title-name')).toHaveText(['Amber Harbor']);
   await filterDialog.getByRole('button', { name: 'Status Watching', exact: true }).click();
-  await chooseInput(filterDialog.getByRole('radio', { name: 'Up next', exact: true }));
+  // Multi-select: adding Up next keeps Watching; removing Watching leaves none.
+  await chooseInput(filterDialog.getByRole('checkbox', { name: 'Up next', exact: true }));
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll('status'))
+    .toEqual(['watching', 'up-next']);
+  await expect(page.getByTestId('title-name')).toHaveText(['Amber Harbor']);
+  await chooseInput(filterDialog.getByRole('checkbox', { name: 'Watching', exact: true }));
+  await expect.poll(() => new URL(page.url()).searchParams.getAll('status')).toEqual(['up-next']);
   await filterDialog
     .locator('.filter-disclosure__panel:visible')
     .getByRole('button', { name: 'Done', exact: true })
@@ -1649,16 +1663,18 @@ for (const width of [390, 1280, 1440]) {
         await expect(quick.getByRole('checkbox', { name: 'Movie', exact: true })).not.toBeChecked();
         await page.keyboard.press('Escape');
         await quick.getByRole('button', { name: /^Status/ }).click();
-        await quick.getByRole('radio', { name: 'Normal', exact: true }).click();
-        await expect(quick.getByRole('radio', { name: 'Normal', exact: true })).toBeChecked();
+        await quick.getByRole('checkbox', { name: 'Normal', exact: true }).click();
+        await expect(quick.getByRole('checkbox', { name: 'Normal', exact: true })).toBeChecked();
         await page.getByTestId('filters-trigger').click();
         await dialog.getByRole('button', { name: /^Status/ }).click();
-        await expect(dialog.getByRole('radio', { name: 'Normal', exact: true })).toBeChecked();
+        await expect(dialog.getByRole('checkbox', { name: 'Normal', exact: true })).toBeChecked();
         await dialog.getByRole('button', { name: 'Close filters', exact: true }).click();
         await quick.getByRole('button', { name: /^Status/ }).click();
-        await expect(quick.getByRole('radio', { name: 'Normal', exact: true })).toBeChecked();
-        await quick.getByRole('radio', { name: 'All statuses', exact: true }).click();
-        await expect(quick.getByRole('radio', { name: 'All statuses', exact: true })).toBeChecked();
+        await expect(quick.getByRole('checkbox', { name: 'Normal', exact: true })).toBeChecked();
+        await quick.getByRole('checkbox', { name: 'Normal', exact: true }).click();
+        await expect(
+          quick.getByRole('checkbox', { name: 'Normal', exact: true }),
+        ).not.toBeChecked();
         await page.keyboard.press('Escape');
       } else {
         await expect(quick).toBeHidden();
@@ -2200,4 +2216,54 @@ describe('T-TOOLBAR-003 library toolbar', () => {
       });
     });
   }
+});
+
+test('T-UX-168f: at 1280px the quick-filter dropdowns are named pills with aligned option grids and a ticked slider', async ({
+  page,
+}, testInfo) => {
+  testInfo.setTimeout(60_000);
+  await mountLibrary(page, { width: 1280 });
+  const quick = page.getByRole('group', { name: 'Quick filters' });
+  for (const name of ['Type', 'Genre', 'Runtime', 'Status']) {
+    const pill = quick.getByRole('button', { name, exact: true });
+    await expect(pill).toBeVisible();
+    await expect(pill).toHaveText(name);
+  }
+  for (const name of ['Type', 'Genre', 'Status']) {
+    await quick.getByRole('button', { name, exact: true }).click();
+    const panel = quick.locator('.filter-disclosure__panel:visible');
+    const outer = await bounds(panel);
+    const options = await panel.locator('label:has(.input--choice)').all();
+    expect(options.length).toBeGreaterThan(1);
+    const columns = new Set<number>();
+    for (const option of options) {
+      const box = await bounds(option);
+      columns.add(Math.round(box.x));
+      // One line each: no option wraps or spills out of the panel.
+      expect(box.height).toBeLessThanOrEqual(48);
+      expect(box.x + box.width).toBeLessThanOrEqual(outer.x + outer.width + 0.5);
+    }
+    expect(columns.size).toBeLessThanOrEqual(2);
+    await page.screenshot({ path: testInfo.outputPath(`quick-${name}.png`) });
+    await page.keyboard.press('Escape');
+  }
+  await quick.getByRole('button', { name: 'Status', exact: true }).click();
+  await quick.getByRole('checkbox', { name: 'Watching', exact: true }).click();
+  await quick.getByRole('checkbox', { name: 'Up next', exact: true }).click();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll('status'))
+    .toEqual(['watching', 'up-next']);
+  await page.keyboard.press('Escape');
+  const status = quick.getByRole('button', { name: 'Status 2 selected', exact: true });
+  await expect(status).toHaveAttribute('data-active', 'true');
+  await quick.getByRole('button', { name: 'Runtime', exact: true }).click();
+  const ticks = quick.locator('.range-slider__tick');
+  await expect(ticks).toHaveCount(6);
+  const first = await bounds(ticks.first());
+  const last = await bounds(ticks.last());
+  expect(first.height).toBeGreaterThan(0);
+  expect(last.x).toBeGreaterThan(first.x);
+  await page.screenshot({ path: testInfo.outputPath('quick-runtime.png') });
+  await page.keyboard.press('Escape');
+  await noOverflow(page);
 });
