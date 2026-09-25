@@ -271,7 +271,7 @@ describe('T-PHONE-005 · the filters sheet', () => {
     return screen.getByTestId('filter-sheet');
   }
 
-  it('T-PHONE-005a: every chip is a native checkbox or radio that writes the URL', () => {
+  it('T-PHONE-005a: every chip is a native checkbox that writes the URL', () => {
     const panel = sheet('/');
     const netflix = within(panel).getByRole('checkbox', { name: /Netflix/ });
     fireEvent.click(netflix);
@@ -281,16 +281,19 @@ describe('T-PHONE-005 · the filters sheet', () => {
     fireEvent.click(within(panel).getByRole('checkbox', { name: 'TV Show' }));
     expect(screen.getByTestId('url')).toHaveTextContent('category=tv');
 
-    fireEvent.click(within(panel).getByRole('radio', { name: 'Up next' }));
-    expect(screen.getByTestId('url')).toHaveTextContent('priority=up-next');
-    expect(within(panel).getByRole('radio', { name: 'All statuses' })).not.toBeChecked();
+    // Status is multi-select (#384): a second chip adds to the first.
+    fireEvent.click(within(panel).getByRole('checkbox', { name: 'Up next' }));
+    expect(screen.getByTestId('url')).toHaveTextContent('status=up-next');
+    fireEvent.click(within(panel).getByRole('checkbox', { name: 'Watching' }));
+    expect(screen.getByTestId('url')).toHaveTextContent('status=up-next&status=watching');
+    expect(within(panel).getByRole('checkbox', { name: 'All statuses' })).not.toBeChecked();
   });
 
   it('T-PHONE-005b: Reset clears every filter but keeps the search text', () => {
     const panel = sheet('/?q=bear&service=max&priority=someday');
     fireEvent.click(within(panel).getByRole('button', { name: FILTERS_RESET_LABEL }));
     expect(screen.getByTestId('url')).toHaveTextContent(/^\/\?q=bear$/);
-    expect(within(panel).getByRole('radio', { name: 'All statuses' })).toBeChecked();
+    expect(within(panel).getByRole('checkbox', { name: 'All statuses' })).toBeChecked();
   });
 
   it('T-PHONE-005c: the primary button counts what it will show and closes the sheet', () => {

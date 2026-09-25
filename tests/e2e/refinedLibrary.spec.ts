@@ -1448,16 +1448,25 @@ test('T-WATCH-003i: watch preferences save, survive reload, filter and sort in a
   await sortGroup.getByRole('button', { name: 'Watch priority', exact: true }).click();
   await expect(page.getByTestId('title-name').first()).toHaveText('Amber Harbor');
   if (atPhoneWidth(page)) {
-    // TASK-255: the phone sheet's Status chips are the radios themselves.
+    // TASK-255: the phone sheet's Status chips are the multi-select checkboxes themselves.
     const sheet = await openFilterSheet(page);
     const status = sheet.getByRole('group', { name: 'Status', exact: true });
-    const watchingChip = sheetChip(status.getByRole('radio', { name: 'Watching', exact: true }));
+    const watchingChip = sheetChip(status.getByRole('checkbox', { name: 'Watching', exact: true }));
     await watchingChip.scrollIntoViewIfNeeded();
     await usableTarget(page, watchingChip);
     await watchingChip.click();
-    await expect.poll(() => new URL(page.url()).searchParams.get('watching')).toBe('true');
+    await expect
+      .poll(() => new URL(page.url()).searchParams.getAll('status'))
+      .toEqual(['watching']);
     await expect(page.getByTestId('title-name')).toHaveText(['Amber Harbor']);
-    await sheetChip(status.getByRole('radio', { name: 'Up next', exact: true })).click();
+    // Multi-select: adding Up next keeps Watching; removing Watching leaves Up next alone.
+    await sheetChip(status.getByRole('checkbox', { name: 'Up next', exact: true })).click();
+    await expect
+      .poll(() => new URL(page.url()).searchParams.getAll('status'))
+      .toEqual(['watching', 'up-next']);
+    await expect(page.getByTestId('title-name')).toHaveText(['Amber Harbor']);
+    await watchingChip.click();
+    await expect.poll(() => new URL(page.url()).searchParams.getAll('status')).toEqual(['up-next']);
     await expect(page.getByTestId('zero-match')).toBeVisible();
     await closeFilterSheet(page, sheet);
     await page.getByTestId('clear-filters').click();
