@@ -1036,8 +1036,31 @@ the same element; `T-UX-117d` asserts the `/` case directly.
 > the `@media` prelude (`T-UX-167e`). `useSidebarViewport` falls back to the
 > sidebar when `matchMedia` is unavailable, for the same "everything visible"
 > reason as `useWideViewport`. Tests: `T-UX-167`, `T-NAV-003`.
+
+> ✅ **CURRENT — TASK-255, the owner's mobile mockup (2026-09-25).** Below
+> `--bp-sm`, on every route **except the capture flow** (`/upload` and
+> `/batches/:id`, whose sticky actions own the bottom edge), the one header
+> `<nav>` becomes a **bottom-fixed tab bar** of four equal tabs, icon over
+> label: **Library** (a real link to `/`, `aria-current` when there),
+> **Search** and **Filters** (buttons that open the library's search and
+> filters sheet, navigating to `/` first from any other route), and the
+> **Menu** button, which still opens the drawer listing every destination
+> exactly as described in the box below. On the capture flow the phone nav is
+> the Menu button alone. The shell reserves the bar's height
+> (`--tab-bar-height`) plus the home-indicator inset below its content; the
+> old `--nav-bar-height` and `scroll-padding-bottom` stay withdrawn. The
+> header shows the wordmark and a static avatar initial (`role="img"`,
+> *Signed in as …*) — identity, never a control. `html[data-layout]` carries
+> the `useWideViewport` decision so the stylesheet and the markup cannot
+> disagree. From `--bp-sm` up nothing changes. Tests: `T-UX-132a/b`
+> (redefined in place), `T-PHONE-001`, `T-PHONE-002`.
 >
-> ✅ **CURRENT below `--bp-lg` — issue 369, owner decision 2026-09-25 (ADR-0013 Revision 4).**
+> ~~Superseded for phone width only: "Below `--bp-sm`, it shows **only the
+> Menu button**" and "**The bottom-fixed phone bar is withdrawn**" in the
+> issue-369 box below. The rest of that box — the drawer, its focus model and
+> its layout — is still current.~~
+
+> ✅ **CURRENT below `--bp-lg` (except as amended above) — issue 369, owner decision 2026-09-25 (ADR-0013 Revision 4).**
 > From `--bp-sm` up, the one header `<nav>` shows **Library (`/`), Import
 > (`/upload`) and Review (`/batches`)** inline, plus a **Menu** button. Below
 > `--bp-sm`, it shows **only the Menu button**. At every width below `--bp-lg`, Menu
@@ -1452,14 +1475,19 @@ Grid/Compact affordances, without importing an icon package.~~
   network request or a runtime dependency; the owner accepted icons explicitly
   on the basis that neither is incurred. NFR-004's small-tree preference and
   `T-CI-007`'s egress rule both stay intact.
-- The set is **closed at 23**: `list`, `upload`, `more`, `history`, `suppressed`,
+- The set is **closed at 24**: `list`, `upload`, `more`, `history`, `suppressed`,
   `rating`, `close`, `check`, `chevron`, `info`, `warning`, `search`, `image`,
   **`brand`, `grid`, `compact`**, the library sort-category icons
   **`alphabet`, `bookmark`, `calendar`, `clock`, `flag`**, the library
-  toolbar **`filter`** mark (ADR-0013 Revision 3, issue 370), and the header
-  **`menu`** mark (ADR-0013 Revision 4, issue 369) (`BrandIcon`,
-  `GridIcon`, `CompactIcon`, `AlphabetIcon`, `BookmarkIcon`, `CalendarIcon`,
-  `ClockIcon`, `FlagIcon`, `FilterIcon`, `MenuIcon`).
+  toolbar **`filter`** mark (ADR-0013 Revision 3, issue 370), the header
+  **`menu`** mark (ADR-0013 Revision 4, issue 369), and the phone library
+  heading's **`plus`** (Add title) mark (TASK-255, owner mobile mockup)
+  (`BrandIcon`, `GridIcon`, `CompactIcon`, `AlphabetIcon`, `BookmarkIcon`,
+  `CalendarIcon`, `ClockIcon`, `FlagIcon`, `FilterIcon`, `MenuIcon`,
+  `PlusIcon`).
+
+  ~~The set is **closed at 23**: … the header **`menu`** mark (ADR-0013
+  Revision 4, issue 369).~~ Superseded by TASK-255.
 
   ~~The set is **closed at 22**: `list`, `upload`, `more`, `history`, `suppressed`,
   `rating`, `close`, `check`, `chevron`, `info`, `warning`, `search`, `image`,

@@ -471,7 +471,10 @@ test.describe('T-A11Y-001 — the 320 px floor', () => {
     expect(small).toEqual([]);
     await expect(page.getByRole('group', { name: 'Quick filters' })).toBeHidden();
     await expect(page.getByRole('search', { name: 'Search your library' })).toBeHidden();
-    await expect(page.getByTestId('list-search-trigger')).toBeVisible();
+    // TASK-255: on the phone the Search tab is the search trigger; the
+    // toolbar draws no second one.
+    await expect(page.getByTestId('tab-search')).toBeVisible();
+    await expect(page.getByTestId('list-search-trigger')).toHaveCount(0);
     await expect(page.getByTestId('filters-trigger')).toBeVisible();
   });
 

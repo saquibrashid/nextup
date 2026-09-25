@@ -191,7 +191,10 @@ for (const width of [280, 390, 1440]) {
       await expect(page.getByTestId('draft-submit')).toBeEnabled();
       await page.locator('a[href="/"]:visible').first().click();
       await expect(page).toHaveURL('/');
-      await expect(page.getByRole('heading', { name: 'Library', exact: true })).toBeVisible();
+      // TASK-255: the phone library is headed "My Library", as the mockup draws it.
+      await expect(
+        page.getByRole('heading', { name: width < 640 ? 'My Library' : 'Library', exact: true }),
+      ).toBeVisible();
       await expect(leave).toHaveCount(0);
       expect(writes).toBe(2);
     });

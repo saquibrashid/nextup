@@ -16,7 +16,15 @@ import { Input } from './ui/Input';
 // opposite rule to filters. Stubbing it here would report it as shipped and
 // bake in the wrong persistence model.
 
-import { useCallback, useId, useState, type JSX, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useState,
+  type JSX,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from './ui/Button';
 import { Dialog } from './ui/Dialog';
@@ -49,7 +57,12 @@ import {
   FILTERS_CLOSE_LABEL,
   FILTERS_DONE_LABEL,
   FILTERS_PANEL_TITLE,
+  FILTERS_RESET_LABEL,
+  FILTERS_SHEET_TITLE,
   FILTERS_TRIGGER_LABEL,
+  SERVICE_FILTER_ALL_SHORT,
+  SHOW_TITLES_PENDING,
+  showTitlesLabel,
   RUNTIME_BUCKET_LABELS,
   RUNTIME_RANGE_MAX_CLAMPED,
   RUNTIME_RANGE_MAX_LABEL,
@@ -68,6 +81,10 @@ import {
 } from '../copy';
 import { ServiceMark } from './ServiceMark';
 import { RangeSlider } from './ui/RangeSlider';
+import type { LibraryCommand } from '../lib/libraryCommand';
+
+/** TASK-255 — how many genres the phone sheet shows before its More chip. */
+export const PHONE_GENRE_LIMIT = 8;
 
 /** `api.md` §6.2 — `type` is `movie|tv`. */
 export const MEDIA_TYPES = ['movie', 'tv'] as const;
@@ -288,6 +305,18 @@ export interface FilterBarProps {
    */
   readonly runtimeUnknownHidden?: number | null;
   readonly countPending?: boolean;
+  /**
+   * TASK-255 — the phone library splits the bar in two (owner mobile mockup).
+   * 	rigger is the icon-only Filters button in the heading and the chip
+   * sheet it opens; summary is the service chips, active filters and count
+   * under the heading. Omitted, the bar renders whole, as it always has.
+   */
+  readonly part?: 'trigger' | 'summary' | undefined;
+  /** The tab bar's Filters request; the 	rigger part opens its sheet on it. */
+  readonly openRequest?: LibraryCommand | null | undefined;
+  readonly onOpenRequestHandled?: ((seq: number) => void) | undefined;
+  /** Where focus returns when a request (not the trigger) opened the sheet. */
+  readonly requestReturnFocus?: RefObject<HTMLButtonElement | null> | undefined;
 }
 
 export function FilterBar({
@@ -298,12 +327,29 @@ export function FilterBar({
   totalIsLowerBound = false,
   runtimeUnknownHidden = null,
   countPending = false,
+  part,
+  openRequest = null,
+  onOpenRequestHandled,
+  requestReturnFocus,
 }: FilterBarProps): JSX.Element {
   const [params, setParams] = useSearchParams();
   const [open, setOpen] = useState(false);
+  const [openedByRequest, setOpenedByRequest] = useState(false);
+  const [allGenres, setAllGenres] = useState(false);
+  const showTrigger = !inline && part !== 'summary';
+  const showSummary = !inline && part !== 'trigger';
+  const phoneSheet = part === 'trigger';
+  const requestSeq = openRequest?.kind === 'filters' && showTrigger ? openRequest.seq : null;
+  useEffect(() => {
+    if (requestSeq === null) return;
+    setOpenedByRequest(true);
+    setOpen(true);
+    onOpenRequestHandled?.(requestSeq);
+  }, [requestSeq, onOpenRequestHandled]);
   const headingId = useId();
   const close = useCallback(() => {
     setOpen(false);
+    setOpenedByRequest(false);
   }, []);
   const filters = parseFilters(params);
   const runtimeRange = runtimeRangeFromBuckets(filters.runtimes);
@@ -384,6 +430,36 @@ export function FilterBar({
     setParams(applyFilters(params, next));
   }
 
+  const countText = `Showing ${String(shown)} of ${totalIsLowerBound ? AT_LEAST_PREFIX : ''}${String(total)}`;
+
+  const runtimeSlider = (
+    <RangeSlider
+      legend="Runtime"
+      testId="filter-runtime"
+      last={RUNTIME_RANGE_LAST_STOP}
+      value={runtimeRange}
+      minLabel={RUNTIME_RANGE_MIN_LABEL}
+      maxLabel={RUNTIME_RANGE_MAX_LABEL}
+      minName={RUNTIME_RANGE_MIN_NAME}
+      maxName={RUNTIME_RANGE_MAX_NAME}
+      formatValue={(stop) => RUNTIME_RANGE_STOP_LABELS[stop] ?? ''}
+      speakValue={(stop) => RUNTIME_RANGE_STOP_SPOKEN[stop] ?? ''}
+      move={moveRuntimeRangeHandle}
+      onChange={(range) => {
+        update({ ...filters, runtimes: runtimeBucketsForRange(range) });
+      }}
+      clampMessages={{
+        min: RUNTIME_RANGE_MIN_CLAMPED,
+        max: RUNTIME_RANGE_MAX_CLAMPED,
+      }}
+      description={
+        runtimeRange.contiguous
+          ? undefined
+          : runtimeRangeGapNotice(filters.runtimes.map((bucket) => RUNTIME_BUCKET_LABELS[bucket]))
+      }
+    />
+  );
+
   /** Multi-select: a toggled status replaces any legacy watching/priority pair. */
   function toggleStatus(status: WatchStatus): void {
     update({
@@ -394,6 +470,180 @@ export function FilterBar({
     });
   }
 
+  /**
+   * TASK-255 — the phone filters sheet, drawn to the owner's mobile mockup:
+   * a close X, the title and Reset across the top; every dimension as a row
+   * of chips; one full-width "Show N titles" at the foot.
+   *
+   * ⚠ THE CHIPS ARE NATIVE CHECKBOXES, visually replaced. A chip
+   * built from pressed buttons would look identical and drop the group
+   * semantics, the keyboard model and the checked state assistive technology
+   * reads — the same controls the desktop panel offers, restyled, not a
+   * second model of the selection. Every change still writes the URL at once.
+   *
+   * ⚠ RATING AND RELEASE YEAR ARE NOT HERE. The mockup draws them; the owner
+   * excluded both from this phase, and a chip row that filters nothing would
+   * be a lie the list could not explain.
+   */
+  function renderPhoneSheet(): JSX.Element {
+    const categories = filters.categories ?? [];
+    const genreChoices = allGenres ? genreOptions : genreOptions.slice(0, PHONE_GENRE_LIMIT);
+    const hiddenGenres = genreOptions.length - genreChoices.length;
+    return (
+      <div className="filter-sheet" data-testid="filter-sheet">
+        <div className="filter-sheet__head">
+          <Button variant="ghost" aria-label={FILTERS_CLOSE_LABEL} onClick={close}>
+            <CloseIcon />
+          </Button>
+          <h2 id={headingId}>{FILTERS_SHEET_TITLE}</h2>
+          <Button
+            variant="ghost"
+            data-testid="filter-sheet-reset"
+            disabled={!isFiltered(filters)}
+            onClick={() => {
+              setParams(applyFilters(params, NO_FILTERS));
+            }}
+          >
+            {FILTERS_RESET_LABEL}
+          </Button>
+        </div>
+        <div className="filter-sheet__body">
+          <Field legend="Services" testId="filter-service">
+            <div className="filter-sheet__chips">
+              {SERVICES.map((service) => (
+                <label key={service} className="filter-chip">
+                  <Input
+                    type="checkbox"
+                    name="service"
+                    value={service}
+                    checked={filters.services.includes(service)}
+                    onChange={() => {
+                      update({ ...filters, services: toggle(filters.services, service) });
+                    }}
+                  />
+                  <ServiceMark service={service} />
+                </label>
+              ))}
+            </div>
+          </Field>
+          <Field legend="Type" testId="filter-type">
+            <div className="filter-sheet__chips">
+              <label className="filter-chip">
+                <Input
+                  type="checkbox"
+                  name="category-all"
+                  checked={categories.length === 0 && filters.types.length === 0}
+                  onChange={() => {
+                    update({ ...filters, types: [], categories: [] });
+                  }}
+                />
+                All<span className="sr-only"> types</span>
+              </label>
+              {TITLE_CATEGORIES.map((type) => (
+                <label key={type} className="filter-chip">
+                  <Input
+                    type="checkbox"
+                    name="category"
+                    value={type}
+                    checked={categories.includes(type)}
+                    onChange={() => {
+                      update({ ...filters, types: [], categories: toggle(categories, type) });
+                    }}
+                  />
+                  {TITLE_CATEGORY_LABELS[type]}
+                </label>
+              ))}
+            </div>
+          </Field>
+          {genreOptions.length > 0 && (
+            <Field legend="Genre" testId="filter-genre">
+              <div className="filter-sheet__chips">
+                <label className="filter-chip">
+                  <Input
+                    type="checkbox"
+                    name="genre-all"
+                    checked={filters.genres.length === 0}
+                    onChange={() => {
+                      update({ ...filters, genres: [] });
+                    }}
+                  />
+                  All<span className="sr-only"> genres</span>
+                </label>
+                {genreChoices.map((genre) => (
+                  <label key={genre} className="filter-chip">
+                    <Input
+                      type="checkbox"
+                      name="genre"
+                      value={genre}
+                      checked={filters.genres.includes(genre)}
+                      onChange={() => {
+                        update({ ...filters, genres: toggle(filters.genres, genre) });
+                      }}
+                    />
+                    {genre}
+                  </label>
+                ))}
+                {hiddenGenres > 0 && (
+                  <span className="filter-sheet__more">
+                    <Button
+                      variant="secondary"
+                      aria-label={`Show ${String(hiddenGenres)} more ${hiddenGenres === 1 ? 'genre' : 'genres'}`}
+                      onClick={() => {
+                        setAllGenres(true);
+                      }}
+                    >
+                      + More
+                    </Button>
+                  </span>
+                )}
+              </div>
+            </Field>
+          )}
+          <Field legend="Status" testId="filter-status">
+            {legacyCustom && (
+              <p>
+                This saved link uses a combined watching/priority filter. Choose a status to replace
+                it.
+              </p>
+            )}
+            <div className="filter-sheet__chips">
+              <label className="filter-chip">
+                <Input
+                  type="checkbox"
+                  name="status-all"
+                  checked={watchChips.length === 0}
+                  onChange={() => {
+                    update({ ...filters, watching: undefined, priorities: [], statuses: [] });
+                  }}
+                />
+                All<span className="sr-only"> statuses</span>
+              </label>
+              {WATCH_STATUSES.map((value) => (
+                <label key={value} className="filter-chip">
+                  <Input
+                    type="checkbox"
+                    name="status"
+                    value={value}
+                    checked={checkedStatuses.includes(value)}
+                    onChange={() => {
+                      toggleStatus(value);
+                    }}
+                  />
+                  {WATCH_STATUS_LABELS[value]}
+                </label>
+              ))}
+            </div>
+          </Field>
+          <div className="filter-sheet__runtime">{runtimeSlider}</div>
+        </div>
+        <div className="filter-sheet__foot">
+          <Button variant="primary" data-testid="filter-sheet-show" onClick={close}>
+            {countPending ? SHOW_TITLES_PENDING : showTitlesLabel(shown, totalIsLowerBound)}
+          </Button>
+        </div>
+      </div>
+    );
+  }
   return (
     /*
       Owner-reported 2026-09-17: on a phone the trigger, the result count, the
@@ -412,15 +662,16 @@ export function FilterBar({
       deliberately stay OUTSIDE the panel (see below).
     */
     <>
-      <div
-        className="filter-bar"
-        data-inline={inline || undefined}
-        hidden={inline}
-        data-testid={inline ? undefined : 'filter-bar'}
-        role="group"
-        aria-label={inline ? 'Quick filters' : 'Filter the library'}
-      >
-        {/*
+      {(inline || showTrigger) && (
+        <div
+          className="filter-bar"
+          data-inline={inline || undefined}
+          hidden={inline}
+          data-testid={inline ? undefined : 'filter-bar'}
+          role="group"
+          aria-label={inline ? 'Quick filters' : 'Filter the library'}
+        >
+          {/*
         Owner-approved 2026-09-17 (`specs/ui.md` §2.1 item 2) — the six fields
         moved into a panel. ⚠ THE COUNT ON THE TRIGGER IS NOT DECORATION: with
         the panel shut it is the only thing that says the list is filtered at
@@ -429,142 +680,156 @@ export function FilterBar({
         the same reason — a count you can only see inside the control that
         changes it is not a count.
       */}
-        {!inline && (
-          <Button
-            aria-haspopup="dialog"
-            aria-expanded={open}
-            data-testid="filters-trigger"
-            data-active={activeCount > 0 || undefined}
-            onClick={() => {
-              setOpen(true);
-            }}
-          >
-            <FilterIcon />
-            <span>{FILTERS_TRIGGER_LABEL}</span>
-            {activeCount > 0 && (
-              <span className="filter-bar__count" aria-label={`${String(activeCount)} active`}>
-                {activeCount}
-              </span>
-            )}
-          </Button>
-        )}
-        {(open || inline) && (
-          <FilterPanel inline={inline} headingId={headingId} close={close}>
-            {!inline && (
-              <div className="panel-head">
-                <h2 id={headingId}>{FILTERS_PANEL_TITLE}</h2>
-                <Button variant="ghost" aria-label={FILTERS_CLOSE_LABEL} onClick={close}>
-                  <CloseIcon />
-                </Button>
-              </div>
-            )}
-            <Field legend="Filter by">
-              <div className="filter-controls">
-                <FilterDisclosure
-                  label="Services"
-                  compact={inline}
-                  active={filters.services.length > 0}
-                  value={selectionSummary(
-                    filters.services.map((service) => SERVICE_LABELS[service]),
-                  )}
-                >
-                  <Field label="Search services">
-                    {(control) => (
-                      <Input
-                        {...control}
-                        type="search"
-                        value={serviceQuery}
-                        onChange={(event) => {
-                          setServiceQuery(event.target.value);
-                        }}
-                      />
-                    )}
-                  </Field>
-                  <Field legend="Services" testId="filter-service">
-                    {services.map((service) => (
-                      <label key={service}>
-                        <Input
-                          type="checkbox"
-                          name="service"
-                          value={service}
-                          checked={filters.services.includes(service)}
-                          onChange={() => {
-                            update({ ...filters, services: toggle(filters.services, service) });
-                          }}
-                        />
-                        {SERVICE_LABELS[service]}
-                      </label>
-                    ))}
-                  </Field>
-                  {services.length === 0 && <p role="status">No services match your search.</p>}
-                </FilterDisclosure>
-
-                <FilterDisclosure
-                  label="Type"
-                  compact={inline}
-                  active={filters.types.length + (filters.categories?.length ?? 0) > 0}
-                  value={selectionSummary([
-                    ...filters.types.map((type) => MEDIA_TYPE_LABELS[type]),
-                    ...(filters.categories ?? []).map(
-                      (category) => TITLE_CATEGORY_LABELS[category],
-                    ),
-                  ])}
-                >
-                  <Field legend="Type" testId="filter-type">
-                    {TITLE_CATEGORIES.map((type) => (
-                      <label key={type}>
-                        <Input
-                          type="checkbox"
-                          name="category"
-                          value={type}
-                          checked={(filters.categories ?? []).includes(type)}
-                          onChange={() => {
-                            update({
-                              ...filters,
-                              types: [],
-                              categories: toggle(filters.categories ?? [], type),
-                            });
-                          }}
-                        />
-                        {TITLE_CATEGORY_LABELS[type]}
-                      </label>
-                    ))}
-                  </Field>
-                  {filters.types.length > 0 && (
-                    <p>
-                      Saved type filters use the catalogue Movie/TV type. Choosing a category
-                      replaces those filters with the displayed category.
-                    </p>
-                  )}
-                </FilterDisclosure>
-
-                {genreOptions.length > 0 && (
+          {showTrigger && (
+            <Button
+              aria-haspopup="dialog"
+              aria-expanded={open}
+              data-testid="filters-trigger"
+              data-active={activeCount > 0 || undefined}
+              onClick={() => {
+                setOpen(true);
+              }}
+            >
+              <FilterIcon />
+              {phoneSheet ? (
+                <span className="sr-only">{FILTERS_TRIGGER_LABEL}</span>
+              ) : (
+                <span>{FILTERS_TRIGGER_LABEL}</span>
+              )}
+              {activeCount > 0 && (
+                <span className="filter-bar__count" aria-label={`${String(activeCount)} active`}>
+                  {activeCount}
+                </span>
+              )}
+            </Button>
+          )}
+          {open && phoneSheet && (
+            <FilterPanel
+              inline={false}
+              headingId={headingId}
+              close={close}
+              returnFocus={openedByRequest ? requestReturnFocus : undefined}
+            >
+              {renderPhoneSheet()}
+            </FilterPanel>
+          )}
+          {(open || inline) && !phoneSheet && (
+            <FilterPanel inline={inline} headingId={headingId} close={close}>
+              {!inline && (
+                <div className="panel-head">
+                  <h2 id={headingId}>{FILTERS_PANEL_TITLE}</h2>
+                  <Button variant="ghost" aria-label={FILTERS_CLOSE_LABEL} onClick={close}>
+                    <CloseIcon />
+                  </Button>
+                </div>
+              )}
+              <Field legend="Filter by">
+                <div className="filter-controls">
                   <FilterDisclosure
-                    label="Genre"
+                    label="Services"
                     compact={inline}
-                    active={filters.genres.length > 0}
-                    value={selectionSummary(filters.genres)}
+                    active={filters.services.length > 0}
+                    value={selectionSummary(
+                      filters.services.map((service) => SERVICE_LABELS[service]),
+                    )}
                   >
-                    <Field legend="Genre" testId="filter-genre">
-                      {genreOptions.map((genre) => (
-                        <label key={genre}>
+                    <Field label="Search services">
+                      {(control) => (
+                        <Input
+                          {...control}
+                          type="search"
+                          value={serviceQuery}
+                          onChange={(event) => {
+                            setServiceQuery(event.target.value);
+                          }}
+                        />
+                      )}
+                    </Field>
+                    <Field legend="Services" testId="filter-service">
+                      {services.map((service) => (
+                        <label key={service}>
                           <Input
                             type="checkbox"
-                            name="genre"
-                            value={genre}
-                            checked={filters.genres.includes(genre)}
+                            name="service"
+                            value={service}
+                            checked={filters.services.includes(service)}
                             onChange={() => {
-                              update({ ...filters, genres: toggle(filters.genres, genre) });
+                              update({ ...filters, services: toggle(filters.services, service) });
                             }}
                           />
-                          {genre}
+                          {SERVICE_LABELS[service]}
                         </label>
                       ))}
                     </Field>
+                    {services.length === 0 && <p role="status">No services match your search.</p>}
                   </FilterDisclosure>
-                )}
 
-                {/*
+                  <FilterDisclosure
+                    label="Type"
+                    compact={inline}
+                    active={filters.types.length + (filters.categories?.length ?? 0) > 0}
+                    value={selectionSummary([
+                      ...filters.types.map((type) => MEDIA_TYPE_LABELS[type]),
+                      ...(filters.categories ?? []).map(
+                        (category) => TITLE_CATEGORY_LABELS[category],
+                      ),
+                    ])}
+                  >
+                    <Field legend="Type" testId="filter-type">
+                      {TITLE_CATEGORIES.map((type) => (
+                        <label key={type}>
+                          <Input
+                            type="checkbox"
+                            name="category"
+                            value={type}
+                            checked={(filters.categories ?? []).includes(type)}
+                            onChange={() => {
+                              update({
+                                ...filters,
+                                types: [],
+                                categories: toggle(filters.categories ?? [], type),
+                              });
+                            }}
+                          />
+                          {TITLE_CATEGORY_LABELS[type]}
+                        </label>
+                      ))}
+                    </Field>
+                    {filters.types.length > 0 && (
+                      <p>
+                        Saved type filters use the catalogue Movie/TV type. Choosing a category
+                        replaces those filters with the displayed category.
+                      </p>
+                    )}
+                  </FilterDisclosure>
+
+                  {genreOptions.length > 0 && (
+                    <FilterDisclosure
+                      label="Genre"
+                      compact={inline}
+                      active={filters.genres.length > 0}
+                      value={selectionSummary(filters.genres)}
+                    >
+                      <Field legend="Genre" testId="filter-genre">
+                        {genreOptions.map((genre) => (
+                          <label key={genre}>
+                            <Input
+                              type="checkbox"
+                              name="genre"
+                              value={genre}
+                              checked={filters.genres.includes(genre)}
+                              onChange={() => {
+                                update({ ...filters, genres: toggle(filters.genres, genre) });
+                              }}
+                            />
+                            {genre}
+                          </label>
+                        ))}
+                      </Field>
+                    </FilterDisclosure>
+                  )}
+
+                  {/*
         REQ-035 — the runtime filter. ALWAYS PRESENT, unlike the genre
         fieldset above, which is conditional on the list actually containing
         genres. The stops are fixed by `RUNTIME_BUCKET_BOUNDS` rather than
@@ -576,97 +841,74 @@ export function FilterBar({
         selection with a gap is shown as its covering range but is NOT
         rewritten until the owner moves a handle.
       */}
-                <FilterDisclosure
-                  label="Runtime"
-                  compact={inline}
-                  active={filters.runtimes.length > 0}
-                  value={
-                    runtimeRange.contiguous
-                      ? runtimeRangeSummary(
-                          runtimeRange.min,
-                          runtimeRange.max,
-                          RUNTIME_RANGE_LAST_STOP,
-                        )
-                      : selectionSummary(
-                          filters.runtimes.map((bucket) => RUNTIME_BUCKET_LABELS[bucket]),
-                        )
-                  }
-                >
-                  <RangeSlider
-                    legend="Runtime"
-                    testId="filter-runtime"
-                    last={RUNTIME_RANGE_LAST_STOP}
-                    value={runtimeRange}
-                    minLabel={RUNTIME_RANGE_MIN_LABEL}
-                    maxLabel={RUNTIME_RANGE_MAX_LABEL}
-                    minName={RUNTIME_RANGE_MIN_NAME}
-                    maxName={RUNTIME_RANGE_MAX_NAME}
-                    formatValue={(stop) => RUNTIME_RANGE_STOP_LABELS[stop] ?? ''}
-                    speakValue={(stop) => RUNTIME_RANGE_STOP_SPOKEN[stop] ?? ''}
-                    move={moveRuntimeRangeHandle}
-                    onChange={(range) => {
-                      update({ ...filters, runtimes: runtimeBucketsForRange(range) });
-                    }}
-                    clampMessages={{
-                      min: RUNTIME_RANGE_MIN_CLAMPED,
-                      max: RUNTIME_RANGE_MAX_CLAMPED,
-                    }}
-                    description={
+                  <FilterDisclosure
+                    label="Runtime"
+                    compact={inline}
+                    active={filters.runtimes.length > 0}
+                    value={
                       runtimeRange.contiguous
-                        ? undefined
-                        : runtimeRangeGapNotice(
+                        ? runtimeRangeSummary(
+                            runtimeRange.min,
+                            runtimeRange.max,
+                            RUNTIME_RANGE_LAST_STOP,
+                          )
+                        : selectionSummary(
                             filters.runtimes.map((bucket) => RUNTIME_BUCKET_LABELS[bucket]),
                           )
                     }
-                  />
-                </FilterDisclosure>
-                <FilterDisclosure
-                  label="Status"
-                  compact={inline}
-                  active={watchChips.length > 0}
-                  value={
-                    legacyCustom && (filters.statuses?.length ?? 0) === 0
-                      ? 'Custom saved filter'
-                      : selectionSummary(checkedStatuses.map((value) => WATCH_STATUS_LABELS[value]))
-                  }
-                >
-                  {legacyCustom && (
-                    <p>
-                      This saved link uses a combined watching/priority filter. Choose a status to
-                      replace it.
-                    </p>
-                  )}
-                  <Field legend="Status" testId="filter-status">
-                    {WATCH_STATUSES.map((value) => (
-                      <label key={value}>
-                        <Input
-                          type="checkbox"
-                          name="status"
-                          value={value}
-                          checked={checkedStatuses.includes(value)}
-                          onChange={() => {
-                            toggleStatus(value);
-                          }}
-                        />
-                        {WATCH_STATUS_LABELS[value]}
-                      </label>
-                    ))}
-                  </Field>
-                </FilterDisclosure>
-              </div>
-            </Field>
-            {!inline && (
-              <div className="panel-foot">
-                <Button variant="primary" onClick={close}>
-                  {FILTERS_DONE_LABEL}
-                </Button>
-              </div>
-            )}
-          </FilterPanel>
-        )}
-      </div>
+                  >
+                    {runtimeSlider}
+                  </FilterDisclosure>
+                  <FilterDisclosure
+                    label="Status"
+                    compact={inline}
+                    active={watchChips.length > 0}
+                    value={
+                      legacyCustom && (filters.statuses?.length ?? 0) === 0
+                        ? 'Custom saved filter'
+                        : selectionSummary(
+                            checkedStatuses.map((value) => WATCH_STATUS_LABELS[value]),
+                          )
+                    }
+                  >
+                    {legacyCustom && (
+                      <p>
+                        This saved link uses a combined watching/priority filter. Choose a status to
+                        replace it.
+                      </p>
+                    )}
+                    <Field legend="Status" testId="filter-status">
+                      {WATCH_STATUSES.map((value) => (
+                        <label key={value}>
+                          <Input
+                            type="checkbox"
+                            name="status"
+                            value={value}
+                            checked={checkedStatuses.includes(value)}
+                            onChange={() => {
+                              toggleStatus(value);
+                            }}
+                          />
+                          {WATCH_STATUS_LABELS[value]}
+                        </label>
+                      ))}
+                    </Field>
+                  </FilterDisclosure>
+                </div>
+              </Field>
+              {!inline && (
+                <div className="panel-foot">
+                  <Button variant="primary" onClick={close}>
+                    {FILTERS_DONE_LABEL}
+                  </Button>
+                </div>
+              )}
+            </FilterPanel>
+          )}
+        </div>
+      )}
 
-      {!inline && (
+      {showSummary && (
         <div
           className="service-filters"
           role="group"
@@ -678,9 +920,10 @@ export function FilterBar({
           <Button
             variant="secondary"
             aria-pressed={filters.services.length === 0}
+            aria-label={part === 'summary' ? 'All services' : undefined}
             onClick={() => update({ ...filters, services: [] })}
           >
-            All services
+            {part === 'summary' ? SERVICE_FILTER_ALL_SHORT : 'All services'}
           </Button>
           {SERVICES.map((service) => (
             <Button
@@ -689,13 +932,13 @@ export function FilterBar({
               aria-pressed={filters.services.includes(service)}
               onClick={() => update({ ...filters, services: toggle(filters.services, service) })}
             >
-              <ServiceMark service={service} />
+              <ServiceMark service={service} nameHidden={part === 'summary'} />
             </Button>
           ))}
         </div>
       )}
 
-      {!inline && (chips.length > 0 || isFiltered(filters) || query !== '') && (
+      {showSummary && (chips.length > 0 || isFiltered(filters) || query !== '') && (
         <div className="filter-bar__chips">
           {chips.length > 0 && (
             <ul className="active-filters" aria-label="Active filters">
@@ -742,16 +985,27 @@ export function FilterBar({
         </div>
       )}
 
-      {!inline && !countPending && (
+      {showSummary && !countPending && (
         <div className="filter-bar__status">
           {/*
         `role="status"` so the count is announced when filtering changes it -
         a sighted owner sees the list shrink, a screen-reader user otherwise
         gets no signal at all.
       */}
-          <p data-testid="filter-count" role="status">
-            {`Showing ${String(shown)} of ${totalIsLowerBound ? AT_LEAST_PREFIX : ''}${String(total)}`}
-          </p>
+          {/*
+            TASK-255 — on the phone the heading's subtitle SHOWS this count
+            (owner mobile mockup) and is hidden from assistive technology, so
+            this live region stays the one place it is announced from.
+          */}
+          {part === 'summary' ? (
+            <p data-testid="filter-count" role="status" className="sr-only">
+              {countText}
+            </p>
+          ) : (
+            <p data-testid="filter-count" role="status">
+              {countText}
+            </p>
+          )}
 
           {/*
         REQ-035 (`T-UX-124`) — PRODUCT INVARIANT 2 IN A NEW PLACE: nothing
@@ -783,17 +1037,24 @@ function FilterPanel({
   inline,
   headingId,
   close,
+  returnFocus,
   children,
 }: {
   readonly inline: boolean;
   readonly headingId: string;
   readonly close: () => void;
+  readonly returnFocus?: RefObject<HTMLButtonElement | null> | undefined;
   readonly children: ReactNode;
 }): JSX.Element {
   return inline ? (
     <>{children}</>
   ) : (
-    <Dialog variant="panel" aria-labelledby={headingId} onDismiss={close}>
+    <Dialog
+      variant="panel"
+      aria-labelledby={headingId}
+      onDismiss={close}
+      {...(returnFocus ? { returnFocus } : {})}
+    >
       {children}
     </Dialog>
   );

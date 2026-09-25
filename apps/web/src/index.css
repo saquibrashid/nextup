@@ -232,6 +232,19 @@
   --radius-card: 16px;
 
   /*
+   * TASK-255 — the owner's mobile mockup. The phone tab bar's height is the
+   * shell's bottom clearance, so the last row is never buried under it. The
+   * watching pill's tint is composite (translucent), so it is not a
+   * contrast-pair token; its text is `--color-success`, which is.
+   */
+  --tab-bar-height: 4rem;
+  --color-tab-bar: #17142a;
+  --color-chip: #1d1a31;
+  --color-status-watching: rgba(122, 220, 176, 0.14);
+  --color-status-watching-border: rgba(122, 220, 176, 0.5);
+  --radius-poster: 8px;
+
+  /*
    * No web font (NFR-005): a third-party request per page load, plus the
    * layout shift while it arrives. The system stack costs neither.
    */
@@ -5375,4 +5388,678 @@ button {
   .library-browser .list-search__control:focus-within .list-search__shortcut {
     display: none;
   }
+}
+
+/* -------------------------------------------------- phone mockup (255) -- */
+
+/*
+ * TASK-255 — the owner's mobile mockup for the library and its filters.
+ *
+ * ⚠ KEYED ON `html[data-layout='phone']`, NOT A MEDIA QUERY. `AppShell` sets
+ * the attribute from `useWideViewport`, the same decision that chooses which
+ * markup renders, so the stylesheet and the JavaScript cannot disagree about
+ * which layout is on screen. It is on the ROOT because the filters sheet is a
+ * dialog portalled to `<body>`, outside `.app-shell`. Every rule here is
+ * phone-only; the wide layout is untouched.
+ */
+
+html[data-layout='phone'] .app-shell[data-tab-bar] {
+  padding-bottom: calc(var(--tab-bar-height) + var(--space-4) + env(safe-area-inset-bottom));
+}
+
+html[data-layout='phone'] .app-shell__header {
+  border-bottom: 0;
+  margin-bottom: var(--space-3);
+  padding-bottom: 0;
+}
+
+html[data-layout='phone'] .app-shell__logo .icon {
+  display: none;
+}
+
+html[data-layout='phone'] .app-shell__avatar {
+  align-items: center;
+  background: var(--color-accent-soft);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  block-size: 2.25rem;
+  color: var(--color-text);
+  display: inline-flex;
+  font-weight: var(--weight-bold);
+  inline-size: 2.25rem;
+  justify-content: center;
+  margin-inline-start: auto;
+}
+
+/* The bottom tab bar: Library, Search, Filters, Menu — icon over label. */
+html[data-layout='phone'] .nav[data-tabs] {
+  background: var(--color-tab-bar);
+  border-top: 1px solid var(--color-border-soft);
+  bottom: 0;
+  inset-inline: 0;
+  margin: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  position: fixed;
+  z-index: 30;
+}
+
+html[data-layout='phone'] .nav[data-tabs] .nav__list {
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-block-size: var(--tab-bar-height);
+}
+
+html[data-layout='phone'] .nav[data-tabs] .nav__link,
+html[data-layout='phone'] .nav[data-tabs] .btn {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-text-muted);
+  flex-direction: column;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  gap: var(--space-1);
+  inline-size: 100%;
+  min-block-size: var(--tab-bar-height);
+  padding: var(--space-2) var(--space-1);
+}
+
+html[data-layout='phone'] .nav[data-tabs] .icon {
+  block-size: 1.5rem;
+  inline-size: 1.5rem;
+}
+
+/* ⚠ Never colour alone: the active tab is also bold and `aria-current`. */
+html[data-layout='phone'] .nav[data-tabs] .nav__link--active {
+  color: var(--color-accent);
+  font-weight: var(--weight-bold);
+}
+
+/* ------ the heading: "My Library", its count, and the tools at the right. */
+
+html[data-layout='phone'] .library-heading {
+  align-items: center;
+  column-gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+  row-gap: var(--space-1);
+}
+
+html[data-layout='phone'] .library-heading h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-normal);
+  line-height: var(--leading-tight);
+  white-space: nowrap;
+}
+
+html[data-layout='phone'] .library-heading__title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+html[data-layout='phone'] .library-heading__count {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin-top: var(--space-1);
+}
+
+/* The tools flatten into the heading's own line, so a notice they carry can
+   take a full line under it instead of squeezing "My Library" onto two. */
+html[data-layout='phone'] .library-heading__tools {
+  display: contents;
+}
+
+/* The tools are square icon buttons, as the mockup's filter button is. */
+html[data-layout='phone'] .library-heading__tools .btn {
+  background: none;
+  border: 0;
+  color: var(--color-text);
+  isolation: isolate;
+  padding: 0;
+  position: relative;
+}
+
+/* The 44 px target stays; the drawn square is the mockup's smaller one. */
+html[data-layout='phone'] .library-heading__tools .btn::before {
+  background: var(--color-chip);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  content: '';
+  inset: var(--space-1);
+  position: absolute;
+  z-index: -1;
+}
+
+html[data-layout='phone'] .library-heading__tools .filter-bar,
+html[data-layout='phone'] .library-heading__tools .freshness-strip {
+  display: contents;
+}
+
+html[data-layout='phone'] .library-heading__tools .freshness-strip__notice,
+html[data-layout='phone'] .library-heading__tools .offline-reason {
+  color: var(--color-text-muted);
+  flex-basis: 100%;
+  font-size: var(--text-sm);
+  margin: 0;
+  order: 9;
+}
+
+/* The active count rides the icon's corner rather than widening the button. */
+html[data-layout='phone'] .library-heading__tools .filter-bar__count {
+  inset-block-start: calc(-1 * var(--space-1));
+  inset-inline-end: calc(-1 * var(--space-1));
+  position: absolute;
+}
+
+/* ------ the toolbar under the heading: service chips, then sort and view. */
+
+html[data-layout='phone'] .list-controls {
+  background: none;
+  border-block: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0;
+}
+
+/* `position: relative` makes the scroller the containing block of the marks'
+   visually-hidden names, which are absolutely positioned: without it they
+   escape the clip and widen the whole page past the phone's viewport. */
+html[data-layout='phone'] .list-controls .service-filters {
+  flex-basis: 100%;
+  position: relative;
+  margin-inline: calc(-1 * var(--space-1));
+  order: 1;
+}
+
+html[data-layout='phone'] .list-controls .filter-bar__chips {
+  flex-basis: 100%;
+  order: 2;
+}
+
+html[data-layout='phone'] .list-controls .sort-control-group {
+  flex: 1 1 auto;
+  order: 3;
+}
+
+html[data-layout='phone'] .list-controls .list-secondary-controls {
+  flex: 0 1 auto;
+  max-width: 100%;
+  min-width: 0;
+  order: 4;
+}
+
+html[data-layout='phone'] .list-controls .filter-bar__status {
+  flex-basis: 100%;
+  order: 5;
+}
+
+html[data-layout='phone'] .list-controls form[role='search'] {
+  flex-basis: 100%;
+  order: 6;
+}
+
+html[data-layout='phone'] .list-controls .list-view-control .btn > span {
+  display: none;
+}
+
+/*
+ * ⚠ THE BUTTON IS 44 PX TALL; THE CHIP DRAWN ON IT IS NOT (NFR-006). The
+ * mockup's chips are slimmer than a tap target, so the button stays the
+ * target and a `::before` inset from its top and bottom draws the chip.
+ */
+html[data-layout='phone'] .service-filters > .btn {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  isolation: isolate;
+  min-inline-size: 3.5rem;
+  padding-inline: var(--space-3);
+  position: relative;
+}
+
+html[data-layout='phone'] .service-filters > .btn::before {
+  background: var(--color-chip);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  content: '';
+  inset: var(--space-1) 0;
+  position: absolute;
+  z-index: -1;
+}
+
+html[data-layout='phone'] .service-filters > .btn[aria-pressed='true'] {
+  background: none;
+  box-shadow: none;
+}
+
+html[data-layout='phone'] .service-filters > .btn[aria-pressed='true']::before {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+/* "All" is the mockup's filled lavender chip; dark text on the accent. */
+html[data-layout='phone'] .service-filters > .btn:first-child[aria-pressed='true'] {
+  color: var(--color-surface);
+  font-weight: var(--weight-bold);
+}
+
+html[data-layout='phone'] .service-filters > .btn:first-child[aria-pressed='true']::before {
+  background: var(--color-accent);
+  box-shadow: none;
+}
+
+/* ------ the rows: poster, then title with its status pill, facts, rating. */
+
+html[data-layout='phone'] .title-list,
+html[data-layout='phone'] .title-list[data-view='grid'],
+html[data-layout='phone'] .title-list[data-view='compact'] {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+html[data-layout='phone'] .title-list .title-row {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: clamp(4.5rem, 26vw, 6.5rem) minmax(0, 1fr);
+  padding: var(--space-2) 0;
+  position: relative;
+}
+
+html[data-layout='phone'] .title-list[data-view='compact'] .title-row {
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+}
+
+html[data-layout='phone'] .title-list .title-row__poster {
+  aspect-ratio: 10 / 11;
+  border-radius: var(--radius-poster);
+  object-fit: cover;
+  grid-column: 1;
+  grid-row: 1;
+  height: auto;
+  width: 100%;
+}
+
+html[data-layout='phone'] .title-list .title-row__body {
+  align-content: start;
+  display: grid;
+  /* A tight column gap: the rating's and the pill's columns are shared, and
+     at 280 px both must still fit beside a 72 px poster (T-UX-155c). */
+  gap: var(--space-2);
+  grid-column: 2;
+  grid-row: 1;
+  grid-template-areas:
+    'name name watch'
+    'meta meta meta'
+    'rating footer footer'
+    'date date date';
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 0;
+}
+
+/* Compact keeps every fact and only packs the lines tighter beside a smaller
+   poster, so the switch still buys a shorter list (T-UX-141f, T-UX-147c). */
+html[data-layout='phone'] .title-list[data-view='compact'] .title-row__body {
+  gap: var(--space-1) var(--space-2);
+}
+
+/* The identity box dissolves so the title can sit beside the pill while the
+   facts line runs the full width under both, as the mockup draws them. */
+html[data-layout='phone'] .title-list .title-row__identity {
+  display: contents;
+}
+
+html[data-layout='phone'] .title-list .title-row__heading {
+  align-self: start;
+  grid-area: name;
+  min-height: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding-inline-end: 0;
+}
+
+html[data-layout='phone'] .title-list .title-row__facts > .title-row__runtime::before {
+  content: '·';
+  margin-right: var(--space-2);
+}
+
+html[data-layout='phone'] .title-list .title-row__name {
+  font-size: var(--text-card-title);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+}
+
+html[data-layout='phone'] .title-list .title-row__meta {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  grid-area: meta;
+}
+
+/* The genres give way to the mockup's facts line — unless a genre filter is
+   on, when the genre that explains the match stays (§4.3, REQ-112). */
+html[data-layout='phone'] .title-list .genre-chips:not([data-filtered]) {
+  display: none;
+}
+
+/*
+ * The status pill. ⚠ THE BUTTON KEEPS ITS 44 PX TARGET (NFR-006); only the
+ * inner label is drawn as the mockup's small pill, so the tap area and the
+ * picture are not the same box.
+ */
+html[data-layout='phone'] .title-list .title-row__watch {
+  align-self: start;
+  grid-area: watch;
+  margin-block: calc(-1 * var(--space-2));
+}
+
+html[data-layout='phone'] .title-list .title-row__watch .btn {
+  background: none;
+  border: 0;
+  justify-content: flex-end;
+  padding: 0 0 0 var(--space-2);
+  width: auto;
+}
+
+html[data-layout='phone'] .title-list .title-row__watch .btn .icon {
+  display: none;
+}
+
+html[data-layout='phone'] .title-list .title-row__priority {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-poster);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  padding: var(--space-1) var(--space-2);
+  white-space: nowrap;
+}
+
+html[data-layout='phone']
+  .title-list
+  .title-row__watch[data-priority='watching']
+  .title-row__priority {
+  background: var(--color-status-watching);
+  border-color: var(--color-status-watching-border);
+  color: var(--color-success);
+}
+
+html[data-layout='phone']
+  .title-list
+  .title-row__watch[data-priority='up-next']
+  .title-row__priority {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+html[data-layout='phone']
+  .title-list
+  .title-row__watch[data-priority='someday']
+  .title-row__priority {
+  color: var(--color-text-muted);
+}
+
+/* Rating, a hairline, then the service marks — one line, as drawn. */
+html[data-layout='phone'] .title-list .title-row__rating {
+  align-items: center;
+  align-self: center;
+  display: inline-flex;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  gap: var(--space-1);
+  grid-area: rating;
+}
+
+html[data-layout='phone'] .title-list .title-row__footer {
+  display: contents;
+}
+
+/* The mockup draws no date; the owner kept it (2026-09-25): the Added date
+   is how an imported backlog stays honest, so it takes a small muted line. */
+html[data-layout='phone'] .title-list .title-row__date {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  grid-area: date;
+  margin: 0;
+  padding: 0;
+}
+
+/* The date line IS the row menu's line: exactly as tall as its 44 px target,
+   so the menu can never reach up into the marks, and stopping a full 44 px
+   short of the edge (not 44 px less the overhang — the body's column is
+   fractional, and a sub-pixel sliver is still an overlap, T-UX-155c). */
+html[data-layout='phone'] .title-list .title-row__date {
+  align-items: center;
+  display: flex;
+  margin-inline-end: 2.75rem;
+  min-block-size: 2.75rem;
+}
+
+html[data-layout='phone'] .title-list .title-row__badges {
+  align-self: center;
+  border: 0;
+  border-inline-start: 1px solid var(--color-border-soft);
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  grid-area: footer;
+  min-width: 0;
+  padding: 0 0 0 var(--space-2);
+}
+
+/* With no date (a work with no listings) the marks are the last line, so
+   they stop short of the menu instead. */
+html[data-layout='phone']
+  .title-list
+  .title-row__footer:not(:has(.title-row__date))
+  .title-row__badges {
+  margin-inline-end: 2.75rem;
+}
+
+html[data-layout='phone'] .title-list .title-row__badges .badge {
+  background: var(--color-chip);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--space-1);
+  padding: 0 var(--space-1);
+}
+
+html[data-layout='phone'] .title-list .title-row__badges .brand-mark {
+  block-size: 1.25rem;
+}
+
+/* The row menu sits faint at the line's end, keeping its 44 px target. */
+html[data-layout='phone'] .title-list .title-row__actions {
+  bottom: var(--space-2);
+  position: absolute;
+  right: calc(-1 * var(--space-3));
+}
+
+/* An unmatched row's "Find a match" is a worded button, far wider than the
+   menu's 44 px, so it takes its own line under the facts instead of hanging
+   over the date. */
+html[data-layout='phone'] .title-list .title-row__actions:not(:has(.title-row__menu)) {
+  grid-column: 2;
+  justify-self: start;
+  position: static;
+}
+
+html[data-layout='phone'] .title-list .title-row__menu > .btn {
+  background: none;
+  border: 0;
+  color: var(--color-text-muted);
+}
+
+/* ------ the filters sheet: X · Filters · Reset, chip rows, Show N titles. */
+
+html[data-layout='phone'] .dialog--panel:has(.filter-sheet) {
+  background: var(--color-tab-bar);
+  border-color: var(--color-border-soft);
+  border-radius: var(--radius-card);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-block-size: calc(100dvh - 2 * var(--space-4));
+  overflow: hidden;
+  padding: 0;
+}
+
+/* Only the body scrolls. A sticky foot would overlay the scroller's last
+   screenful, so anything scrolled into view — a focused chip, the runtime
+   handles — could land under "Show N titles"; a foot outside the scroller
+   cannot cover anything. */
+html[data-layout='phone'] .filter-sheet {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-block-size: 0;
+}
+
+html[data-layout='phone'] .filter-sheet__head {
+  align-items: center;
+  border-bottom: 1px solid var(--color-border-soft);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: var(--space-1) var(--space-2);
+}
+
+html[data-layout='phone'] .filter-sheet__head h2 {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+}
+
+html[data-layout='phone'] .filter-sheet__head .btn {
+  background: none;
+  border: 0;
+  color: var(--color-accent);
+}
+
+html[data-layout='phone'] .filter-sheet__head .btn:first-child {
+  color: var(--color-text);
+}
+
+html[data-layout='phone'] .filter-sheet__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-block-size: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--space-3) var(--space-4);
+}
+
+html[data-layout='phone'] .filter-sheet__body .field {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+html[data-layout='phone'] .filter-sheet__body .field__legend {
+  color: var(--color-text-muted);
+  font-size: var(--text-base);
+  margin-bottom: var(--space-2);
+  padding: 0;
+}
+
+html[data-layout='phone'] .filter-sheet__chips {
+  column-gap: var(--space-2);
+  display: flex;
+  flex-wrap: wrap;
+}
+
+/*
+ * A chip is a label around a native checkbox or radio. ⚠ THE INPUT IS MOVED
+ * OUT OF SIGHT, NOT REMOVED: it keeps the focus, the checked state and the
+ * keyboard model, and the label draws the ring when it has focus.
+ */
+/* As with the service chips, the label is the 44 px target and a `::before`
+   inset from its top and bottom draws the slimmer chip the mockup shows. */
+html[data-layout='phone'] .filter-chip {
+  align-items: center;
+  color: var(--color-text);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: var(--text-sm);
+  gap: var(--space-2);
+  isolation: isolate;
+  min-block-size: var(--tap-target-min);
+  padding: 0 var(--space-3);
+  position: relative;
+}
+
+html[data-layout='phone'] .filter-chip::before {
+  background: var(--color-chip);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  content: '';
+  inset: var(--space-1) 0;
+  position: absolute;
+  z-index: -1;
+}
+
+html[data-layout='phone'] .filter-chip .brand-mark {
+  block-size: 1rem;
+}
+
+html[data-layout='phone'] .filter-chip > .input {
+  block-size: 1px;
+  inline-size: 1px;
+  margin: 0;
+  opacity: 0;
+  position: absolute;
+}
+
+html[data-layout='phone'] .filter-chip:has(:checked) {
+  color: var(--color-surface);
+  font-weight: var(--weight-bold);
+}
+
+html[data-layout='phone'] .filter-chip:has(:checked)::before {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+html[data-layout='phone'] .filter-chip:has(:focus-visible)::before {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+html[data-layout='phone'] .filter-sheet__more .btn {
+  background: none;
+  border: 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  isolation: isolate;
+  padding: 0 var(--space-3);
+  position: relative;
+}
+
+html[data-layout='phone'] .filter-sheet__more .btn::before {
+  background: var(--color-chip);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  content: '';
+  inset: var(--space-1) 0;
+  position: absolute;
+  z-index: -1;
+}
+
+html[data-layout='phone'] .filter-sheet__runtime .field {
+  margin: 0;
+}
+
+html[data-layout='phone'] .filter-sheet__foot {
+  background: var(--color-tab-bar);
+  border-top: 1px solid var(--color-border-soft);
+  flex: 0 0 auto;
+  padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+}
+
+html[data-layout='phone'] .filter-sheet__foot .btn {
+  inline-size: 100%;
 }

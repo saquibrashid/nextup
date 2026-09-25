@@ -410,11 +410,20 @@ for (const width of [320, 1280]) {
       await page.getByTestId('sort-trigger').click();
       await page.getByRole('button', { name: 'Name A-Z', exact: true }).click();
       await page.getByTestId('filters-trigger').click();
-      await page.getByRole('button', { name: /^Services / }).click();
-      await page.getByRole('checkbox', { name: 'Netflix', exact: true }).click();
-      await expect(page.getByRole('checkbox', { name: 'Netflix', exact: true })).toBeChecked();
+      if (width < 640) {
+        // TASK-255: the phone sheet's service chips are the checkboxes.
+        const sheet = page.getByRole('dialog', { name: 'Filters', exact: true });
+        const netflix = sheet.getByRole('checkbox', { name: 'Netflix', exact: true });
+        await sheetChip(netflix).click();
+        await expect(netflix).toBeChecked();
+      } else {
+        await page.getByRole('button', { name: /^Services / }).click();
+        await page.getByRole('checkbox', { name: 'Netflix', exact: true }).click();
+        await expect(page.getByRole('checkbox', { name: 'Netflix', exact: true })).toBeChecked();
+      }
       await page.keyboard.press('Escape');
-      if (width < 1280) await page.getByTestId('list-search-trigger').click();
+      if (width < 640) await page.getByTestId('tab-search').click();
+      else if (width < 1280) await page.getByTestId('list-search-trigger').click();
       await page.getByRole('searchbox', { name: 'Search your library', exact: true }).fill('Orbit');
       await page.getByRole('search').getByRole('button', { name: 'Search', exact: true }).click();
       await expect(page.getByTestId('title-name')).toHaveText(['Quiet Orbit']);
@@ -477,7 +486,8 @@ for (const width of [320, 640, 1280]) {
       await expect(banner).toContainText('Netflix / Ready to review');
       const status = await bounds(banner);
       for (const control of [
-        page.getByRole('heading', { name: 'Library', exact: true }),
+        // TASK-255: the phone heading reads "My Library", as the mockup does.
+        page.getByRole('heading', { name: width < 640 ? 'My Library' : 'Library', exact: true }),
         page.getByRole('button', { name: 'Service updates', exact: true }),
         page.getByTestId('add-title-open'),
       ]) {
@@ -512,19 +522,31 @@ test('T-LIB-002d: responsive search preserves disclosure, desktop persistence an
   for (const width of [320, 1280]) {
     const requests = await mountLibrary(page, { width });
     const controls = page.getByTestId('list-controls');
-    const trigger = page.getByTestId('list-search-trigger');
+    /*
+     * TASK-255: on the phone the tab bar's Search tab is the trigger and the
+     * toolbar draws none; the tab sits in the bottom bar, not beside the sort
+     * control, and carries no expanded state of its own.
+     */
+    const phone = width < 640;
+    const trigger = page.getByTestId(phone ? 'tab-search' : 'list-search-trigger');
     const search = page.getByRole('searchbox', { name: 'Search your library', exact: true });
     if (width < 1280) {
       await expect(page.getByRole('search')).toHaveCount(0);
-      await expect(trigger).toHaveAttribute('aria-expanded', 'false');
       const compactHeight = (await bounds(controls)).height;
-      expect((await bounds(trigger)).y).toBeGreaterThanOrEqual(
-        (await bounds(page.getByTestId('sort-trigger'))).y,
-      );
+      if (phone) {
+        await expect(page.getByTestId('list-search-trigger')).toHaveCount(0);
+      } else {
+        await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+        expect((await bounds(trigger)).y).toBeGreaterThanOrEqual(
+          (await bounds(page.getByTestId('sort-trigger'))).y,
+        );
+      }
       await usableTarget(page, trigger);
       await trigger.focus();
       await page.keyboard.press('Enter');
-      expect((await bounds(controls)).height).toBeGreaterThan(compactHeight + 30);
+      await expect
+        .poll(async () => (await bounds(controls)).height)
+        .toBeGreaterThan(compactHeight + 30);
     } else {
       await expect(trigger).toBeHidden();
       await expect(search).toBeVisible();
@@ -545,7 +567,7 @@ test('T-LIB-002d: responsive search preserves disclosure, desktop persistence an
       await expect(search).toBeFocused();
       await expect(page.getByRole('search')).toBeVisible();
     }
-    await expect(trigger).toHaveText('Search active');
+    if (!phone) await expect(trigger).toHaveText('Search active');
     const chip = page.getByRole('button', { name: 'Remove search filter: Search: Orbit' });
     await expect(chip).toBeVisible();
     await noOverflow(page);
@@ -602,6 +624,36 @@ async function openFiltersPanel(page: Page): Promise<Locator> {
   const dialog = page.getByRole('dialog', { name: 'Filter your library', exact: true });
   await expect(dialog).toBeVisible();
   return dialog;
+}
+
+/**
+ * TASK-255 — below `--bp-sm` the filters are the owner's phone sheet (native
+ * chip inputs, named *Filters*), not the desktop panel of labelled dropdowns.
+ * Cases that measure the desktop panel's structure take a phone branch that
+ * measures the sheet instead; `T-PHONE-007` owns the sheet's own layout.
+ */
+function atPhoneWidth(page: Page): boolean {
+  return (page.viewportSize()?.width ?? 1280) < 640;
+}
+
+async function openFilterSheet(page: Page): Promise<Locator> {
+  const trigger = page.getByTestId('filters-trigger');
+  await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  const sheet = page.getByRole('dialog', { name: 'Filters', exact: true });
+  await expect(sheet).toBeVisible();
+  return sheet;
+}
+
+async function closeFilterSheet(page: Page, sheet: Locator): Promise<void> {
+  await sheet.getByTestId('filter-sheet-show').click();
+  await expect(sheet).toHaveCount(0);
+  await expect(page.getByTestId('filters-trigger')).toHaveAttribute('aria-expanded', 'false');
+}
+
+/** A sheet chip's own box: the native input is visually replaced by its label. */
+function sheetChip(input: Locator): Locator {
+  return input.locator('xpath=ancestor::label[contains(@class, "filter-chip")][1]');
 }
 
 async function closeFiltersPanel(page: Page, dialog: Locator): Promise<void> {
@@ -851,52 +903,76 @@ test('T-UX-143d: Services and service-update popovers are usable at 320px and 12
   await mountLibrary(page);
   for (const width of [320, 1280]) {
     await page.setViewportSize({ width, height: 900 });
-    const dialog = await openFiltersPanel(page);
-    const controls = dialog.getByRole('group', { name: 'Filter by', exact: true });
-    const trigger = controls.getByRole('button', { name: /^Services / });
-    await trigger.click();
-    await usableTarget(page, page.getByTestId('filters-trigger'));
-    const dialogBox = await bounds(dialog);
-    expect(dialogBox.x).toBeGreaterThanOrEqual(0);
-    expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(width + 1);
-    const panel = dialog.locator('.filter-disclosure__panel').filter({
-      has: page.getByRole('searchbox', { name: 'Search services', exact: true }),
-    });
-    const search = panel.getByRole('searchbox', { name: 'Search services', exact: true });
-    /*
-     * ⚠ THE SEARCH BOX IS AUTOFOCUSED ONLY ON A FINE POINTER (TASK-289).
-     *
-     * On a touch device, focusing it raises the on-screen keyboard over the
-     * checkboxes this very case then goes on to measure. The popover still
-     * takes focus, so the case still proves focus is contained.
-     */
-    if (testInfo.project.name === 'mobile-safari') {
-      await expect(panel).toBeFocused();
+    if (atPhoneWidth(page)) {
+      // TASK-255: the phone sheet shows every service as a chip at once.
+      const sheet = await openFilterSheet(page);
+      const sheetBox = await bounds(sheet);
+      expect(sheetBox.x).toBeGreaterThanOrEqual(0);
+      expect(sheetBox.x + sheetBox.width).toBeLessThanOrEqual(width + 1);
+      const group = sheet.getByRole('group', { name: 'Services', exact: true });
+      const boxes = group.getByRole('checkbox');
+      await expect(boxes).toHaveCount(SERVICES.length);
+      for (const checkbox of await boxes.all()) {
+        await sheetChip(checkbox).scrollIntoViewIfNeeded();
+        await usableTarget(page, sheetChip(checkbox));
+      }
+      const netflix = group.getByRole('checkbox', { name: 'Netflix', exact: true });
+      if (!(await netflix.isChecked())) await sheetChip(netflix).click();
+      await expect
+        .poll(() => new URL(page.url()).searchParams.getAll('service'))
+        .toContain('netflix');
+      await expect(sheet).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(sheet).toHaveCount(0);
+      await expect(page.getByTestId('filters-trigger')).toHaveAttribute('aria-expanded', 'false');
     } else {
-      await expect(search).toBeFocused();
+      const dialog = await openFiltersPanel(page);
+      const controls = dialog.getByRole('group', { name: 'Filter by', exact: true });
+      const trigger = controls.getByRole('button', { name: /^Services / });
+      await trigger.click();
+      await usableTarget(page, page.getByTestId('filters-trigger'));
+      const dialogBox = await bounds(dialog);
+      expect(dialogBox.x).toBeGreaterThanOrEqual(0);
+      expect(dialogBox.x + dialogBox.width).toBeLessThanOrEqual(width + 1);
+      const panel = dialog.locator('.filter-disclosure__panel').filter({
+        has: page.getByRole('searchbox', { name: 'Search services', exact: true }),
+      });
+      const search = panel.getByRole('searchbox', { name: 'Search services', exact: true });
+      /*
+       * ⚠ THE SEARCH BOX IS AUTOFOCUSED ONLY ON A FINE POINTER (TASK-289).
+       *
+       * On a touch device, focusing it raises the on-screen keyboard over the
+       * checkboxes this very case then goes on to measure. The popover still
+       * takes focus, so the case still proves focus is contained.
+       */
+      if (testInfo.project.name === 'mobile-safari') {
+        await expect(panel).toBeFocused();
+      } else {
+        await expect(search).toBeFocused();
+      }
+      await usableTarget(page, trigger);
+      await usableTarget(page, search);
+      for (const checkbox of await panel.getByRole('checkbox').all()) {
+        await expect(checkbox).toBeVisible();
+        await usableTarget(page, checkbox.locator('..'));
+      }
+      const done = panel.getByRole('button', { name: 'Done', exact: true });
+      await usableTarget(page, done);
+      await search.fill('Net');
+      await expect(panel.getByRole('checkbox', { name: 'Netflix', exact: true })).toBeVisible();
+      await expect(panel.getByRole('checkbox', { name: 'Max', exact: true })).toHaveCount(0);
+      const netflix = panel.getByRole('checkbox', { name: 'Netflix', exact: true });
+      if (!(await netflix.isChecked())) await chooseInput(netflix);
+      await expect
+        .poll(() => new URL(page.url()).searchParams.getAll('service'))
+        .toContain('netflix');
+      await done.click();
+      await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      await trigger.click();
+      await page.keyboard.press('Escape');
+      await expect(dialog).toHaveCount(0);
+      await expect(page.getByTestId('filters-trigger')).toHaveAttribute('aria-expanded', 'false');
     }
-    await usableTarget(page, trigger);
-    await usableTarget(page, search);
-    for (const checkbox of await panel.getByRole('checkbox').all()) {
-      await expect(checkbox).toBeVisible();
-      await usableTarget(page, checkbox.locator('..'));
-    }
-    const done = panel.getByRole('button', { name: 'Done', exact: true });
-    await usableTarget(page, done);
-    await search.fill('Net');
-    await expect(panel.getByRole('checkbox', { name: 'Netflix', exact: true })).toBeVisible();
-    await expect(panel.getByRole('checkbox', { name: 'Max', exact: true })).toHaveCount(0);
-    const netflix = panel.getByRole('checkbox', { name: 'Netflix', exact: true });
-    if (!(await netflix.isChecked())) await chooseInput(netflix);
-    await expect
-      .poll(() => new URL(page.url()).searchParams.getAll('service'))
-      .toContain('netflix');
-    await done.click();
-    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
-    await trigger.click();
-    await page.keyboard.press('Escape');
-    await expect(dialog).toHaveCount(0);
-    await expect(page.getByTestId('filters-trigger')).toHaveAttribute('aria-expanded', 'false');
 
     const updates = page.getByRole('button', { name: 'Service updates', exact: true });
     await updates.click();
@@ -930,6 +1006,32 @@ test('T-UX-144g: labelled dropdown fields and all five runtime options fit phone
   await mountLibrary(page);
   for (const width of [320, 640, 1280]) {
     await page.setViewportSize({ width, height: 900 });
+    if (atPhoneWidth(page)) {
+      /*
+       * TASK-255: the phone sheet has no dropdowns — each category is a
+       * labelled group of chips, and the runtime slider sits in the sheet.
+       */
+      const sheet = await openFilterSheet(page);
+      const sheetBox = await bounds(sheet);
+      expect(sheetBox.x).toBeGreaterThanOrEqual(0);
+      expect(sheetBox.x + sheetBox.width).toBeLessThanOrEqual(width + 1);
+      for (const category of ['Services', 'Type', 'Genre', 'Status']) {
+        const group = sheet.getByRole('group', { name: category, exact: true });
+        await group.scrollIntoViewIfNeeded();
+        await expect(group).toBeVisible();
+        await horizontallyBounded(page, group, width);
+      }
+      await expect(sheet.locator('.filter-disclosure')).toHaveCount(0);
+      for (const name of ['Minimum runtime', 'Maximum runtime']) {
+        const slider = sheet.getByRole('slider', { name, exact: true });
+        await slider.scrollIntoViewIfNeeded();
+        await usableTarget(page, slider);
+      }
+      await page.keyboard.press('Escape');
+      await expect(sheet).toHaveCount(0);
+      await noOverflow(page);
+      continue;
+    }
     let dialog = await openFiltersPanel(page);
     const dialogBox = await bounds(dialog);
     expect(dialogBox.x).toBeGreaterThanOrEqual(0);
@@ -1002,11 +1104,23 @@ async function handleCentre(slider: Locator, stop: number): Promise<{ x: number;
 }
 
 async function openRuntimeSlider(page: Page): Promise<{
-  trigger: Locator;
+  trigger: Locator | null;
   panel: Locator;
   minimum: Locator;
   maximum: Locator;
 }> {
+  if (atPhoneWidth(page)) {
+    // TASK-255: the phone sheet shows the slider itself, with no trigger.
+    const sheet = await openFilterSheet(page);
+    const panel = sheet.locator('.filter-sheet__runtime');
+    await panel.locator('.range-slider').scrollIntoViewIfNeeded();
+    return {
+      trigger: null,
+      panel,
+      minimum: panel.getByRole('slider', { name: 'Minimum runtime', exact: true }),
+      maximum: panel.getByRole('slider', { name: 'Maximum runtime', exact: true }),
+    };
+  }
   const dialog = await openFiltersPanel(page);
   const trigger = dialog.getByRole('button', { name: /^Runtime / });
   await trigger.click();
@@ -1071,6 +1185,10 @@ for (const width of [320, 640, 1280]) {
         'The maximum cannot go below the minimum.',
       );
 
+      // TASK-255: on the phone the slider lives in the sheet's scroller, and a
+      // keyboard focus need not scroll it into view (WebKit does not), so the
+      // pointer half brings it on screen first, as a thumb would.
+      await maximum.scrollIntoViewIfNeeded();
       const from = await handleCentre(maximum, 3);
       const to = await handleCentre(maximum, 5);
       await page.mouse.move(from.x, from.y);
@@ -1078,7 +1196,7 @@ for (const width of [320, 640, 1280]) {
       await page.mouse.move(to.x + 10, to.y, { steps: 8 });
       await page.mouse.up();
       await expect.poll(() => runtimeParams(page)).toEqual(['60-90', '90-120', 'over120']);
-      await expect(trigger).toHaveAccessibleName('Runtime Over 1h');
+      if (trigger !== null) await expect(trigger).toHaveAccessibleName('Runtime Over 1h');
       await noOverflow(page);
       expect(
         (await new AxeBuilder({ page }).include('.range-slider').analyze()).violations,
@@ -1128,6 +1246,43 @@ for (const width of [320, 1280]) {
           await expect(badges.getByText(SERVICE_LABELS[service], { exact: true })).toBeVisible();
         await noOverflow(page);
       }
+      if (atPhoneWidth(page)) {
+        // TASK-255: the phone sheet lists all eight at once — no search needed.
+        const sheet = await openFilterSheet(page);
+        const group = sheet.getByRole('group', { name: 'Services', exact: true });
+        for (const service of SERVICES) {
+          const choice = group.getByRole('checkbox', {
+            name: SERVICE_LABELS[service],
+            exact: true,
+          });
+          const chip = sheetChip(choice);
+          await chip.scrollIntoViewIfNeeded();
+          await expect(chip).toBeInViewport();
+          if (!(await choice.isChecked())) await chip.click();
+          await expect
+            .poll(() => new URL(page.url()).searchParams.getAll('service'))
+            .toContain(service);
+        }
+        await closeFilterSheet(page, sheet);
+        const reopened = await openFilterSheet(page);
+        for (const service of SERVICES)
+          await expect(
+            reopened.getByRole('checkbox', { name: SERVICE_LABELS[service], exact: true }),
+          ).toBeChecked();
+        await closeFilterSheet(page, reopened);
+        await expect
+          .poll(() =>
+            requests.some(
+              (request) =>
+                request.pathname === '/api/titles' &&
+                request.searchParams.getAll('service').length === 8,
+            ),
+          )
+          .toBe(true);
+        await page.getByTestId('clear-filters').click();
+        await noOverflow(page);
+        return;
+      }
       const dialog = await openFiltersPanel(page);
       await dialog.getByRole('button', { name: /^Services / }).click();
       const search = dialog.getByRole('searchbox', { name: 'Search services', exact: true });
@@ -1166,6 +1321,23 @@ for (const width of [320, 640, 1280]) {
   describe(`Empty genre facets at ${width}px`, () => {
     test('T-WATCH-003j: filter panels remain bounded without genre facets', async ({ page }) => {
       await mountLibrary(page, { width, withGenres: false });
+      if (atPhoneWidth(page)) {
+        // TASK-255: without facets the phone sheet simply has no Genre group.
+        const sheet = await openFilterSheet(page);
+        const sheetBox = await bounds(sheet);
+        expect(sheetBox.x).toBeGreaterThanOrEqual(0);
+        expect(sheetBox.x + sheetBox.width).toBeLessThanOrEqual(width + 1);
+        for (const category of ['Services', 'Type', 'Status']) {
+          const group = sheet.getByRole('group', { name: category, exact: true });
+          await group.scrollIntoViewIfNeeded();
+          await horizontallyBounded(page, group, width);
+        }
+        await expect(sheet.getByRole('group', { name: 'Genre', exact: true })).toHaveCount(0);
+        await page.keyboard.press('Escape');
+        await expect(sheet).toHaveCount(0);
+        await noOverflow(page);
+        return;
+      }
       let dialog = await openFiltersPanel(page);
       const controls = dialog.getByRole('group', { name: 'Filter by', exact: true });
       const dialogBox = await bounds(dialog);
@@ -1275,6 +1447,34 @@ test('T-WATCH-003i: watch preferences save, survive reload, filter and sort in a
   const sortGroup = await openSortPanel(page);
   await sortGroup.getByRole('button', { name: 'Watch priority', exact: true }).click();
   await expect(page.getByTestId('title-name').first()).toHaveText('Amber Harbor');
+  if (atPhoneWidth(page)) {
+    // TASK-255: the phone sheet's Status chips are the multi-select checkboxes themselves.
+    const sheet = await openFilterSheet(page);
+    const status = sheet.getByRole('group', { name: 'Status', exact: true });
+    const watchingChip = sheetChip(status.getByRole('checkbox', { name: 'Watching', exact: true }));
+    await watchingChip.scrollIntoViewIfNeeded();
+    await usableTarget(page, watchingChip);
+    await watchingChip.click();
+    await expect
+      .poll(() => new URL(page.url()).searchParams.getAll('status'))
+      .toEqual(['watching']);
+    await expect(page.getByTestId('title-name')).toHaveText(['Amber Harbor']);
+    // Multi-select: adding Up next keeps Watching; removing Watching leaves Up next alone.
+    await sheetChip(status.getByRole('checkbox', { name: 'Up next', exact: true })).click();
+    await expect
+      .poll(() => new URL(page.url()).searchParams.getAll('status'))
+      .toEqual(['watching', 'up-next']);
+    await expect(page.getByTestId('title-name')).toHaveText(['Amber Harbor']);
+    await watchingChip.click();
+    await expect.poll(() => new URL(page.url()).searchParams.getAll('status')).toEqual(['up-next']);
+    await expect(page.getByTestId('zero-match')).toBeVisible();
+    await closeFilterSheet(page, sheet);
+    await page.getByTestId('clear-filters').click();
+    await expect(page.getByTestId('title-name')).toHaveCount(TITLES.length);
+    expect(new URL(page.url()).searchParams.get('sort')).toBe('watchPriority');
+    await noOverflow(page);
+    return;
+  }
   const filterDialog = await openFiltersPanel(page);
   await filterDialog.getByRole('button', { name: 'Status Any', exact: true }).click();
   const watching = filterDialog.getByRole('checkbox', { name: 'Watching', exact: true });
@@ -1323,11 +1523,15 @@ test('T-UX-141g: default, popovers and Compact pass axe and honor reduced motion
     if (state === 'Compact') {
       await page.getByRole('button', { name: 'Compact view', exact: true }).click();
     } else if (state === 'Filters panel') {
-      await openFiltersPanel(page);
+      await (atPhoneWidth(page) ? openFilterSheet(page) : openFiltersPanel(page));
     } else if (state === 'Sort panel') {
       await openSortPanel(page);
     } else if (state !== 'default') {
-      if (state === 'Services') {
+      if (state === 'Services' && atPhoneWidth(page)) {
+        // TASK-255: the phone sheet has no Services popover; its chips are it.
+        const sheet = await openFilterSheet(page);
+        await sheet.getByRole('group', { name: 'Services', exact: true }).scrollIntoViewIfNeeded();
+      } else if (state === 'Services') {
         const dialog = await openFiltersPanel(page);
         await dialog.getByRole('button', { name: /^Services / }).click();
       } else {
@@ -1480,8 +1684,16 @@ for (const width of [390, 1024, 1440]) {
           expect(priority.y + priority.height).toBeLessThan(poster.y + poster.height);
         }
       } else {
-        expect(navigation.y + navigation.height).toBeLessThanOrEqual(content.y + 1);
-        await expect(page.getByRole('navigation').getByRole('link')).toHaveCount(0);
+        /*
+         * TASK-255: the phone nav is the mockup's bottom tab bar — fixed to the
+         * viewport's foot, over the scrolling content, with Library its one link.
+         * ~~Superseded: "the nav ends above the content and holds no links".~~
+         */
+        const viewport = page.viewportSize();
+        if (!viewport) throw new Error('Expected an explicit viewport');
+        expect(navigation.y).toBeGreaterThan(content.y);
+        expect(navigation.y + navigation.height).toBeLessThanOrEqual(viewport.height + 1);
+        await expect(page.getByRole('navigation').getByRole('link')).toHaveText(['Library']);
       }
       expect(
         await page
@@ -1510,7 +1722,8 @@ for (const width of [390, 1024, 1440]) {
         'true',
       );
       await page.getByTestId('filters-trigger').click();
-      await page.getByRole('button', { name: /^Services/ }).click();
+      // TASK-255: the phone sheet shows the service checkboxes directly.
+      if (width >= 640) await page.getByRole('button', { name: /^Services/ }).click();
       await expect(page.getByRole('checkbox', { name: 'Netflix' })).toBeChecked();
       await page.getByRole('button', { name: 'Close filters', exact: true }).click();
       await services.getByRole('button', { name: 'All services' }).click();
@@ -1679,7 +1892,8 @@ for (const width of [390, 1280, 1440]) {
       } else {
         await expect(quick).toBeHidden();
         await expect(input).toBeHidden();
-        await page.getByTestId('list-search-trigger').click();
+        // TASK-255: on the phone the tab bar's Search tab opens the field.
+        await page.getByTestId(width < 640 ? 'tab-search' : 'list-search-trigger').click();
       }
       await input.fill('Orbit');
       expect(new URL(page.url()).searchParams.has('q')).toBe(false);
@@ -1788,7 +2002,13 @@ test('T-UX-155c: library frame, priority geometry and portrait artwork stay inte
           };
         }),
       );
-      if (view === 'Compact' || width < 640) {
+      /*
+       * TASK-255: the phone draws the mockup's content-sized status pills, so
+       * uniform width is a wide-Compact property only; the 44 px height and
+       * the no-clipping checks below still hold everywhere.
+       * ~~Superseded: "`view === 'Compact' || width < 640` → one width".~~
+       */
+      if (view === 'Compact' && width >= 640) {
         expect(new Set(geometry.map((box) => box.width)).size).toBe(1);
       }
       for (const box of geometry) {
@@ -1799,17 +2019,23 @@ test('T-UX-155c: library frame, priority geometry and portrait artwork stay inte
       for (const row of await list.locator('li.title-row').all()) {
         const poster = await bounds(row.locator('.title-row__poster'));
         expect(poster.width).toBeGreaterThanOrEqual(72);
-        expect(poster.height / poster.width).toBeCloseTo(1.5, 1);
+        // TASK-255: the phone mockup crops artwork to a near-square 10:11.
+        expect(poster.height / poster.width).toBeCloseTo(width < 640 ? 1.1 : 1.5, 1);
         const box = await bounds(row);
         for (const part of [
-          '.title-row__identity',
+          // The phone dissolves the identity box (`display: contents`).
+          width < 640 ? '.title-row__heading' : '.title-row__identity',
           '.title-row__watch',
           '.title-row__badges',
           '.title-row__date',
         ]) {
           const child = await bounds(row.locator(part));
-          expect(child.x).toBeGreaterThanOrEqual(box.x);
-          expect(child.x + child.width).toBeLessThanOrEqual(box.x + box.width);
+          expect(child.x, `${view} ${width}: ${part} start`).toBeGreaterThanOrEqual(box.x);
+          // 1 px for sub-pixel rounding: the phone row has no inline padding,
+          // so its end column finishes exactly on the row's edge.
+          expect(child.x + child.width, `${view} ${width}: ${part} end`).toBeLessThanOrEqual(
+            box.x + box.width + 1,
+          );
         }
       }
       const overlaps = await list.locator('li.title-row').evaluateAll((rows) =>
@@ -1849,35 +2075,35 @@ test('T-UX-155c: library frame, priority geometry and portrait artwork stay inte
 test('T-UX-147b: Filters, the result count, the order and reverse share one phone line', async ({
   page,
 }) => {
+  /*
+   * TASK-255 — REDEFINED IN PLACE for the owner's phone mockup. The Filters
+   * tool moved up beside *My Library* and the count sits under the heading,
+   * so "one line" is now two: the heading line (heading, count block and its
+   * tools) and the toolbar line (order, reverse and the view switch). The
+   * point is unchanged: no control is pushed to a half-empty line of its own.
+   * ~~Superseded: "Filters, the count, the order and reverse share ONE line".~~
+   */
+  const sameRow = (a: { y: number; height: number }, b: { y: number; height: number }) =>
+    a.y < b.y + b.height && b.y < a.y + a.height;
   for (const width of [360, 390, 430]) {
     await mountLibrary(page, { width });
-    const parts = [
-      page.getByTestId('filters-trigger'),
-      page.getByTestId('filter-count'),
-      page.getByTestId('sort-trigger'),
-      page.getByTestId('sort-reverse'),
+    const title = await bounds(page.locator('.library-heading__title'));
+    const filters = await bounds(page.getByTestId('filters-trigger'));
+    expect(sameRow(title, filters)).toBe(true);
+    const toolbar = [
+      await bounds(page.getByTestId('sort-trigger')),
+      await bounds(page.getByTestId('sort-reverse')),
+      await bounds(page.locator('.list-view-control')),
     ];
-    const boxes = [];
-    for (const part of parts) boxes.push(await bounds(part));
-    /*
-     * One line = every part's vertical midpoint falls inside every other
-     * part's box. ⚠ NOT equal `y`: the count is text and the others are
-     * buttons, so their tops legitimately differ by a few pixels.
-     */
-    for (const box of boxes) {
-      const middle = box.y + box.height / 2;
-      for (const other of boxes) {
-        expect(middle).toBeGreaterThanOrEqual(other.y - 1);
-        expect(middle).toBeLessThanOrEqual(other.y + other.height + 1);
-      }
+    for (const box of toolbar) {
+      for (const other of toolbar) expect(sameRow(box, other)).toBe(true);
       expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
     }
     /* The count is the answer to "why is my list short" — it is never cut. */
+    const count = page.locator('.library-heading__count');
+    await expect(count).toHaveText(/^\d+ titles?$/);
+    expect(await count.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
     await expect(page.getByTestId('filter-count')).toHaveText(/^Showing \d+ of \d+$/);
-    expect(
-      await page.getByTestId('filter-count').evaluate((el) => el.scrollWidth - el.clientWidth),
-    ).toBeLessThanOrEqual(1);
-    /* Tighter padding bought the row — it must not cost the 44px target. */
     await usableTarget(page, page.getByTestId('sort-reverse'));
     await noOverflow(page);
   }
@@ -1924,11 +2150,24 @@ test('T-UX-147c: a phone compact row flows instead of stacking, and stays inside
    * The rating sharing the priority control's line is what proves the row
    * flows across, and the overflow check is what proves it flows the right way.
    */
-  const rating = await bounds(rows.first().locator('.title-row__rating'));
-  const watch = await bounds(rows.first().locator('.title-row__watch'));
-  expect(rating.y).toBeLessThan(watch.y + watch.height);
-  expect(rating.x).toBeGreaterThan(watch.x);
-  expect(rating.x + rating.width).toBeLessThanOrEqual(390 + 1);
+  /*
+   * TASK-255 — REDEFINED IN PLACE for the owner's phone mockup: the row is
+   * title-beside-pill, then the facts line, then rating beside the service
+   * marks. Rating and marks sharing ONE line, left to right, is what now
+   * proves the row flows across instead of wrapping into columns.
+   * ~~Superseded: "the rating shares the priority control's line".~~
+   */
+  const first = rows.first();
+  const rating = await bounds(first.locator('.title-row__rating'));
+  const marks = await bounds(first.getByTestId('badges'));
+  const facts = await bounds(first.getByTestId('title-meta'));
+  const watch = await bounds(first.locator('.title-row__watch'));
+  expect(rating.y).toBeGreaterThanOrEqual(facts.y + facts.height - 1);
+  expect(rating.y).toBeLessThan(marks.y + marks.height);
+  expect(marks.y).toBeLessThan(rating.y + rating.height);
+  expect(marks.x).toBeGreaterThan(rating.x + rating.width);
+  expect(marks.x + marks.width).toBeLessThanOrEqual(390 + 1);
+  expect(watch.x + watch.width).toBeLessThanOrEqual(390 + 1);
   await noOverflow(page);
 });
 
@@ -1943,7 +2182,13 @@ test('T-UX-147e: filter trigger labels stay on one line inside the filters panel
    * visible only on the big screen, while 320px stayed correct. The wide
    * widths here are the point of the test.
    */
-  for (const width of [390, 768, 1280, 1600]) {
+  /*
+   * TASK-255: below `--bp-sm` there is no panel of triggers — the phone sheet
+   * of chips replaces it (`T-PHONE-007`) — so the narrowest panel width
+   * measured here is the panel's own floor, 640 px.
+   * ~~Superseded: `[390, 768, 1280, 1600]`.~~
+   */
+  for (const width of [640, 768, 1280, 1600]) {
     await mountLibrary(page, { width });
     const dialog = await openFiltersPanel(page);
     const fields = dialog.locator('.filter-disclosure[data-filter-field]');
@@ -2000,8 +2245,25 @@ test('T-UX-147f: tapping a filter checkbox ticks it and leaves the popover open'
    * existing helpers use `dispatchEvent('click')`, which never moves focus at
    * all and so can never see this.
    */
-  await mountLibrary(page, { width: 390, allServices: true });
   const touch = testInfo.project.name === 'mobile-safari';
+  /*
+   * TASK-255: at 390 px the filters are the phone sheet, whose chips ARE the
+   * checkboxes. The same defect would shut the sheet on the tap that ticks a
+   * chip, so the phone half asserts exactly that; the disclosure half below
+   * runs at 640 px, the narrowest width that still has disclosures.
+   */
+  await mountLibrary(page, { width: 390, allServices: true });
+  const sheet = await openFilterSheet(page);
+  const sheetBox = sheet.getByRole('checkbox', { name: 'Max', exact: true });
+  if (touch) await sheetChip(sheetBox).tap();
+  else await sheetChip(sheetBox).click();
+  await expect(sheet).toBeVisible();
+  await expect(sheetBox).toBeChecked();
+  await expect.poll(() => new URL(page.url()).searchParams.getAll('service')).toContain('max');
+  await page.keyboard.press('Escape');
+  await expect(sheet).toHaveCount(0);
+
+  await mountLibrary(page, { width: 640, allServices: true });
   const dialog = await openFiltersPanel(page);
   const field = dialog.locator('.filter-disclosure[data-filter-field]').first();
   const openTrigger = field.locator('.btn');
@@ -2096,9 +2358,17 @@ test('T-UX-147g: with a filter active the toolbar rows are full, not half empty'
   const sameRow = (a: typeof trigger, b: typeof trigger): boolean =>
     a.y < b.y + b.height && b.y < a.y + a.height;
 
-  // The controls row is ONE row: Filters, the count and the order together.
-  expect(sameRow(trigger, count)).toBe(true);
-  expect(sameRow(trigger, sort)).toBe(true);
+  /*
+   * TASK-255 — REDEFINED IN PLACE for the owner's phone mockup. Filters and
+   * the count moved up into the heading, so the controls row is now the
+   * order beside the view switch; the heading keeps Filters on its line.
+   * ~~Superseded: "The controls row is ONE row: Filters, the count and the
+   * order together" (`sameRow(trigger, count)`, `sameRow(trigger, sort)`).~~
+   */
+  const heading = await bounds(page.locator('.library-heading__title'));
+  expect(count.width).toBeLessThanOrEqual(1); // the live count is sr-only here
+  expect(sameRow(heading, trigger)).toBe(true);
+  expect(sameRow(sort, view)).toBe(true);
 
   // The chips row is ONE row: the chip and the control that clears it.
   expect(sameRow(chipBox, clear)).toBe(true);

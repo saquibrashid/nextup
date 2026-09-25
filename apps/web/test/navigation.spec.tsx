@@ -101,9 +101,15 @@ function renderAt(path: string): HTMLElement {
 function atPhoneWidth(path: string): HTMLElement {
   stubMatchMedia(false);
   const nav = renderAt(path);
-  // ⚠ THE GUARD: at phone width the header holds NO links. If the stub failed
-  // to apply, the wide header renders three and this says so here.
-  expect(within(nav).queryAllByRole('link')).toHaveLength(0);
+  // ⚠ THE GUARD: at phone width the nav holds at most the tab bar's one link,
+  // Library (TASK-255) — never the wide bar's Import and Review. If the stub
+  // failed to apply, the wide header renders all three and this says so here.
+  // ~~Superseded: "at phone width the header holds NO links" (issue 369,
+  // before the owner's mobile mockup restored a bottom tab bar).~~
+  const linkLabels = within(nav)
+    .queryAllByRole('link')
+    .map((link) => link.textContent);
+  expect(linkLabels.filter((label) => label !== 'Library')).toStrictEqual([]);
   return nav;
 }
 
@@ -300,19 +306,28 @@ describe('T-UX-118 · ui-refresh.md §6 · the freshness strip still deep-links 
 /* ------------------------------------------------------------------------ */
 
 describe('T-UX-132 · ui-refresh.md §6 · the header navigation at each width', () => {
-  it('T-UX-132a: below --bp-sm the header renders exactly the Menu button', () => {
+  /*
+   * TASK-255 — the owner's mobile mockup puts a bottom tab bar back at phone
+   * width: Library, Search, Filters and the Menu. The Menu still holds every
+   * destination (132c); the tab bar adds the library's own tools beside it.
+   * ~~Superseded (issue 369): "below --bp-sm the header renders exactly the
+   * Menu button" and "no destination is rendered while the phone Menu is
+   * closed".~~
+   */
+  it('T-UX-132a: below --bp-sm the tab bar renders Library, Search, Filters and the Menu', () => {
     const nav = atPhoneWidth('/');
 
+    expect(labels(nav)).toStrictEqual(['Library']);
     expect(
       within(nav)
         .getAllByRole('button')
         .map((button) => button.textContent),
-    ).toStrictEqual([NAV_MENU_LABEL]);
+    ).toStrictEqual(['Search', 'Filters', NAV_MENU_LABEL]);
   });
 
-  it('T-UX-132b: no destination is rendered while the phone Menu is closed', () => {
+  it('T-UX-132b: no destination but Library is rendered while the phone Menu is closed', () => {
     const nav = atPhoneWidth('/');
-    for (const label of ALL_LABELS) {
+    for (const label of ALL_LABELS.filter((name) => name !== 'Library')) {
       expect(screen.queryByRole('link', { name: label, exact: true }), label).toBeNull();
     }
     expect(screen.queryByRole('dialog')).toBeNull();

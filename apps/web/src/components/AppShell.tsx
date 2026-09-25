@@ -46,15 +46,19 @@
  */
 
 import {
+  useCallback,
+  useContext,
   useEffect,
   useId,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ComponentType,
   type JSX,
   type RefObject,
 } from 'react';
-import { NavLink, Outlet, matchPath, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, matchPath, useLocation, useNavigate } from 'react-router-dom';
 
 import { ErrorBoundary } from './ErrorBoundary';
 import { OfflineBanner } from './OfflineBanner';
@@ -70,11 +74,13 @@ import {
   CheckIcon,
   ClockIcon,
   CloseIcon,
+  FilterIcon,
   HistoryIcon,
   InfoIcon,
   ListIcon,
   MenuIcon,
   RatingIcon,
+  SearchIcon,
   SuppressedIcon,
   UploadIcon,
 } from './icons';
@@ -82,7 +88,22 @@ import { Button } from './ui/Button';
 import { Dialog } from './ui/Dialog';
 import { useOnline } from '../lib/useOnline';
 import { useSidebarViewport, useWideViewport } from '../lib/useWideViewport';
-import { NAV_MENU_CLOSE_LABEL, NAV_MENU_LABEL, NAV_MENU_TITLE } from '../copy';
+import {
+  NAV_MENU_CLOSE_LABEL,
+  NAV_MENU_LABEL,
+  NAV_MENU_TITLE,
+  NAV_TAB_FILTERS_LABEL,
+  NAV_TAB_FILTERS_NAME,
+  NAV_TAB_SEARCH_LABEL,
+  NAV_TAB_SEARCH_NAME,
+  signedInAsLabel,
+} from '../copy';
+import {
+  LibraryCommandContext,
+  type LibraryCommand,
+  type LibraryCommandKind,
+} from '../lib/libraryCommand';
+import { OwnerNameContext, ownerInitial } from '../lib/ownerContext';
 import { ROUTES, type RouteDefinition } from '../routes';
 
 type NavRoute = RouteDefinition & { readonly navLabel: string };
@@ -259,8 +280,45 @@ export function AppShell(): JSX.Element {
     : wide
       ? NAV_ITEMS.filter((route) => BAR_PATHS.includes(route.path))
       : [];
+  const libraryRoute = NAV_ITEMS.find((route) => route.path === '/');
+  /*
+   * TASK-255 — the owner's mobile mockup puts a bottom tab bar under the
+   * library. ⚠ NOT ON THE CAPTURE ROUTES: /upload and a batch's review own
+   * a sticky bottom action (Continue, Start extraction, Apply) that a fixed
+   * bar would sit on top of, and the mockup's import screens show no bar.
+   * There the phone nav is the Menu button alone, as issue 369 left it.
+   */
+  const tabBar = !wide && !captureRoute && libraryRoute !== undefined;
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
+  const navigate = useNavigate();
+  const ownerName = useContext(OwnerNameContext);
+  const initial = ownerInitial(ownerName);
+  const [command, setCommand] = useState<LibraryCommand | null>(null);
+  const consume = useCallback((seq: number) => {
+    setCommand((current) => (current?.seq === seq ? null : current));
+  }, []);
+  const searchTabRef = useRef<HTMLButtonElement>(null);
+  const filtersTabRef = useRef<HTMLButtonElement>(null);
+  const channel = useMemo(
+    () => ({ command, consume, tabs: { search: searchTabRef, filters: filtersTabRef } }),
+    [command, consume],
+  );
+  const request = (kind: LibraryCommandKind): void => {
+    setCommand((current) => ({ kind, seq: (current?.seq ?? 0) + 1 }));
+    // Remembered library choices are restored by LibraryNavigation.
+    if (location.pathname !== '/') navigate('/');
+  };
+
+  // Phone-scoped styles key off the ROOT element because dialogs portal to
+  // <body>, outside .app-shell, and the filters sheet is one of them.
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.dataset.layout = wide ? 'wide' : 'phone';
+    return () => {
+      delete root.dataset.layout;
+    };
+  }, [wide]);
 
   // Back/Forward while the drawer is open closes it too.
   useEffect(() => {
@@ -273,7 +331,7 @@ export function AppShell(): JSX.Element {
   }, [sidebar]);
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-tab-bar={tabBar || undefined}>
       <header className="app-shell__header">
         <NavLink to="/" className="app-shell__logo">
           <BrandIcon />
@@ -281,13 +339,52 @@ export function AppShell(): JSX.Element {
             next<span className="app-shell__wordmark-accent">up</span>
           </span>
         </NavLink>
-        <nav aria-label="Primary" className="nav">
+        {!wide && initial !== null && ownerName !== null && (
+          <span className="app-shell__avatar" role="img" aria-label={signedInAsLabel(ownerName)}>
+            {initial}
+          </span>
+        )}
+        <nav aria-label="Primary" className="nav" data-tabs={tabBar || undefined}>
           <ul className="nav__list">
             {barItems.map((route) => (
               <li key={route.path} className="nav__item">
                 <NavTextLink route={route} active={isRouteActive(location.pathname, route.path)} />
               </li>
             ))}
+            {tabBar && (
+              <>
+                <li className="nav__item">
+                  <NavTextLink
+                    route={libraryRoute}
+                    active={isRouteActive(location.pathname, libraryRoute.path)}
+                  />
+                </li>
+                <li className="nav__item">
+                  <Button
+                    variant="ghost"
+                    ref={searchTabRef}
+                    aria-label={NAV_TAB_SEARCH_NAME}
+                    data-testid="tab-search"
+                    onClick={() => request('search')}
+                  >
+                    <SearchIcon />
+                    <span>{NAV_TAB_SEARCH_LABEL}</span>
+                  </Button>
+                </li>
+                <li className="nav__item">
+                  <Button
+                    variant="ghost"
+                    ref={filtersTabRef}
+                    aria-label={NAV_TAB_FILTERS_NAME}
+                    data-testid="tab-filters"
+                    onClick={() => request('filters')}
+                  >
+                    <FilterIcon />
+                    <span>{NAV_TAB_FILTERS_LABEL}</span>
+                  </Button>
+                </li>
+              </>
+            )}
             {!sidebar && (
               <li className="nav__menu">
                 <Button
@@ -320,9 +417,11 @@ export function AppShell(): JSX.Element {
 
         <main ref={mainRef} tabIndex={-1}>
           <ErrorBoundary resetKey={location.pathname}>
-            <LibraryNavigation>
-              <Outlet />
-            </LibraryNavigation>
+            <LibraryCommandContext.Provider value={channel}>
+              <LibraryNavigation>
+                <Outlet />
+              </LibraryNavigation>
+            </LibraryCommandContext.Provider>
           </ErrorBoundary>
         </main>
 
