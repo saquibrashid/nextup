@@ -313,6 +313,12 @@ ol {
 html {
   /* ⚠ Never a fixed px root size: it overrides the browser's text setting. */
   -webkit-text-size-adjust: 100%;
+  /*
+   * Reserve the scrollbar's width even when the page is short. A filter
+   * change swaps the list for a short skeleton; without this the scrollbar
+   * vanished and the whole layout jumped sideways and back (TASK-256).
+   */
+  scrollbar-gutter: stable;
 }
 
 body {

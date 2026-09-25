@@ -787,3 +787,11 @@ describe('T-UX-168e · filter pills, panels, ticks, card marks and the sidebar s
     expect(shell).toMatch(/background:\s*var\(--color-surface\)/);
   });
 });
+
+/* T-UX-169c — the page never jolts sideways when a short skeleton replaces the list. */
+describe('T-UX-169c · the root reserves the scrollbar gutter', () => {
+  it('T-UX-169c: `html` declares `scrollbar-gutter: stable`', () => {
+    const root = /(?:^|\n)html\s*\{([^}]*)\}/.exec(cssWithoutComments)?.[1] ?? '';
+    expect(root).toMatch(/scrollbar-gutter:\s*stable/);
+  });
+});

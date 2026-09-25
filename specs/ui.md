@@ -272,7 +272,9 @@ restore, suppress, un-suppress or fix-match.
    still write each stop. ~~Every stop crossed mid-drag wrote the URL and
    refetched the list.~~ The genre facet is **held across a refetch**, so
    the Genre pill never disappears while a filter change loads and the
-   pills after it never shift under an open panel (owner, TASK-255,
+   pills after it never shift under an open panel. The root reserves a
+   **stable scrollbar gutter**, so the short loading skeleton never drops
+   the scrollbar and jolts the page sideways (owner, TASK-256,
    `T-RANGE-002g`, `T-UX-169`).
 
    The labelled title-search form submits explicitly by Enter or its Search

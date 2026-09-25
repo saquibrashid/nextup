@@ -2578,3 +2578,40 @@ test('T-UX-169b: dragging a runtime handle previews without refetching, keeps th
   await expect(min).toHaveValue('0');
   await expect.poll(() => new URL(page.url()).searchParams.getAll('runtime')).toEqual([]);
 });
+
+test('T-UX-169d: the page does not shift sideways while a filter change shows the short loading skeleton', async ({
+  page,
+}, testInfo) => {
+  testInfo.setTimeout(60_000);
+  await mountLibrary(page, { width: 1280, varied: true });
+  // Headless browsers hide scrollbars, so the jolt itself cannot be seen here;
+  // the engine must still ACCEPT the gutter rule, and nothing else may move.
+  expect(
+    await page.evaluate(() => getComputedStyle(document.documentElement).scrollbarGutter),
+  ).toBe('stable');
+  const quick = page.getByRole('group', { name: 'Quick filters' });
+  const sidebar = page.locator('.app-shell__header');
+  const controls = page.getByTestId('list-controls');
+  const before = { sidebar: await bounds(sidebar), controls: await bounds(controls) };
+
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(
+    (url) => url.pathname === '/api/titles' && url.searchParams.has('status'),
+    async (route) => {
+      await held;
+      await route.fallback();
+    },
+  );
+  await quick.getByRole('button', { name: 'Status', exact: true }).click();
+  await quick.getByRole('checkbox', { name: 'Watching', exact: true }).click();
+  await expect(page.getByTestId('list-loading')).toBeVisible();
+  const during = { sidebar: await bounds(sidebar), controls: await bounds(controls) };
+  expect(Math.abs(during.sidebar.x - before.sidebar.x)).toBeLessThan(0.5);
+  expect(Math.abs(during.controls.x - before.controls.x)).toBeLessThan(0.5);
+  expect(Math.abs(during.controls.width - before.controls.width)).toBeLessThan(0.5);
+  release();
+  await expect(page.getByTestId('list-loading')).toHaveCount(0);
+});
