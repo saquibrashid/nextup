@@ -10,7 +10,7 @@
  * on an application that fetched nothing and had no CSS.
  */
 
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
@@ -308,6 +308,33 @@ describe('T-DATA-008 — no mutation on mount, including under StrictMode', () =
 });
 
 describe('collectGenres', () => {
+  it('T-UX-169a: the genre facet is held while a filter change refetches, so later filters do not shift', async () => {
+    let unfilteredReads = 0;
+    const { client } = stubClient({
+      getTitles: ((query: string) =>
+        query === '' && unfilteredReads++ === 0
+          ? Promise.resolve({ items: [item()], nextCursor: null, limit: 50 })
+          : new Promise(() => undefined)) as unknown as ApiClient['getTitles'],
+    });
+    renderRoute(client);
+    expect(await screen.findAllByText('The Matrix')).not.toHaveLength(0);
+    const genreTriggers = () => screen.queryAllByRole('button', { name: /^Genre/, hidden: true });
+    const before = genreTriggers().length;
+    expect(before).toBeGreaterThan(0);
+
+    const runtime = screen.getAllByRole('button', { name: /^Runtime/, hidden: true }).at(-1)!;
+    fireEvent.click(runtime);
+    const minHandle = screen.getAllByRole('slider', { name: /minimum/i, hidden: true }).at(-1)!;
+    fireEvent.change(minHandle, { target: { value: '1' } });
+
+    // Filtered and unfiltered reads are both pending (the unfiltered `all`
+    // request re-keys), yet the Genre filter stays mounted — so the open
+    // Runtime panel beside it does not move.
+    expect(await screen.findByTestId('list-loading')).toBeTruthy();
+    expect(genreTriggers()).toHaveLength(before);
+    expect(minHandle.isConnected).toBe(true);
+  });
+
   it('T-DATA-002g: the genre facet is derived from the rows, deduplicated and sorted', () => {
     expect(
       collectGenres([

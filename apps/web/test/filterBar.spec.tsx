@@ -1101,6 +1101,30 @@ describe('T-RANGE-002 the runtime range slider (#366)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Forward', hidden: true }));
     expect(runtimeHandle('max')).toHaveValue('2');
   });
+
+  it('T-RANGE-002g a pointer drag previews locally and writes the URL once, on release', () => {
+    mount('/?sort=name');
+    const min = runtimeHandle('min');
+    fireEvent.pointerDown(min);
+    moveRuntime('min', 1);
+    moveRuntime('min', 2);
+    moveRuntime('min', 1);
+    expect(min).toHaveValue('1');
+    expect(screen.getByTestId('range-min-value')).toHaveTextContent('30m');
+    expect(new URLSearchParams(url().split('?')[1]).has('runtime')).toBe(false);
+    fireEvent.pointerUp(window);
+    expect(new URLSearchParams(url().split('?')[1]).getAll('runtime')).toEqual([
+      '30-60',
+      '60-90',
+      '90-120',
+      'over120',
+    ]);
+    // A release with no movement writes nothing further.
+    fireEvent.pointerDown(min);
+    fireEvent.pointerUp(window);
+    expect(min).toHaveValue('1');
+    expect(new URLSearchParams(url().split('?')[1]).get('sort')).toBe('name');
+  });
 });
 
 /* ------------------------------------------------------------------------ */
