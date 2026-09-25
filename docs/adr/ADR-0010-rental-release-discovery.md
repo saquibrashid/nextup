@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Accepted; promoted to v1 at A52 (2026-09-08). Revised at #378 (Revision 2, below).** Implementation and remaining acceptance work are tracked in `docs/status.md`. |
+| **Status** | **Accepted; promoted to v1 at A52 (2026-09-08). Revised at #378 (Revision 2) and #380 (Revision 3, below).** Implementation and remaining acceptance work are tracked in `docs/status.md`. |
 | **Date** | 2026-08-20 |
 | **Deciders** | owner (`A48` — the requirement and both design choices), coordinator |
 | **Forced by** | **`A48`**, REQ-082…REQ-087, REQ-041, REQ-070/071/073, REQ-048, NFR-010, NFR-013, NFR-014, ADR-0007 |
@@ -148,6 +148,65 @@ makes `watch_intent.source_batch_id` nullable, adds `rent_on` and
 `streaming_since`, and adds `ck_intent_source_batch_coherent` (a search intent
 has no batch; every other intent has one), `ck_intent_rent_on_json` and
 `ck_intent_rent_on_coherent`. Test ids: `specs/testing.md` §38.4.
+
+## Revision 3 — when and where it will stream (#380, owner-approved 2026-09-27)
+
+The owner asked whether nextup could say **when** a waiting title will
+stream, and **where**. TMDB knows only current availability, so Revision 2
+cannot answer it. The owner chose both of the two sources that can, and three
+binding decisions: use whichever source is free and more accurate; show a
+month, with a range as the fallback; and **an estimate never affects order**.
+
+**Source 1 — announced dates, from Watchmode's free `/v1/releases` feed.**
+Chosen over the paid `/v1/title-release-dates` because it is on the free plan
+(2,500 credits a month, non-commercial, attribution required) and every row
+carries `tmdb_id`, so it joins on the identity nextup already stores. It is
+read in 15-day windows from 30 days back to 120 ahead (11 credits) and cached
+in-process for 12 hours. **It is sent a date window and nothing else** — no
+title, no id, nothing of the owner's. A spike on 2026-09-25 found the feed is
+mostly TV and service originals and announced none of the 40 most popular
+rent/buy movies, which is why source 2 exists.
+
+**Source 2 — a studio estimate, for movies only.** TMDB production companies
+map to the service the studio's pay-1 deal sends its films to
+(`STUDIO_STREAMING_HOMES` in `@nextup/domain`, e.g. Universal → Peacock,
+Warner Bros. → Max, Disney → Disney+), and each service has a typical window
+from rent/buy to streaming (`DAYS_FROM_DIGITAL_TO_STREAMING`). The estimate
+is the month of the rent/buy date plus that window; with only a theatrical
+date it is a range centred 30 days later again, ±45 days. An estimate
+already overdue reads as *"soon"*. No estimate is made when no studio is
+mapped or the mapped studios disagree. In the spike the estimate named the
+right service for every mapped studio among 22 movies already streaming.
+
+**Precedence and honesty.** An announced date always wins, for TV too. An
+estimate is **labelled "Estimate:" in words** and set in italic — never
+colour alone — because it is a guess nobody published. A forecast is shown
+only while the work is not streaming on any supported service, and it names
+the service as *"(not one of your services)"* when the owner does not use it.
+
+**Invariant 5 still holds, for the same reason as §4.** The forecast is read
+inside `GET /api/waiting`, after the availability refresh, for the same
+page of rows and at most 8 a request, and each row is re-read once a week
+(`WATCH_PROVIDER_MAX_AGE_DAYS`). It is not a new process: there is no timer,
+queue or sweep. It writes only facts — studio ids, release dates and the
+announced service and date — through `updateWatchIntentForecast`, and the
+forecast itself is computed on read. A failed or unconfigured feed keeps each
+row's last-known announcement; a failed TMDB lookup writes nothing.
+
+**NFR-010 is amended: Watchmode is the fifth outbound host**, declared
+`sends: 'date-window'` in `tools/check-outbound-hosts.mjs`, and only the two
+extractors are still ever sent image bytes (T18). Its key is the Container
+Apps secret `watchmode-api-key`, sent as the `X-API-Key` header. Watchmode's
+terms require cached data to be refreshed or deleted within 30 days; the
+weekly re-read satisfies that.
+
+**Migration 0018 (owner-approved)** adds six nullable columns to
+`watch_intent` — `forecast_checked_at`, `studio_company_ids`,
+`theatrical_release_on`, `digital_release_on`, `announced_service` and
+`announced_on` — with `ck_intent_announced_service`,
+`ck_intent_announced_coherent`, `ck_intent_studio_ids_json` and
+`ck_intent_forecast_coherent`. Additive only. Test ids: `specs/testing.md`
+§38.5.
 
 ## Consequences
 

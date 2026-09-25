@@ -423,6 +423,12 @@ export interface WaitingItem {
   streamingSince?: string | null;
   availabilityCheckedAt: string | null;
   availabilityRegion: string;
+  /**
+   * #380 — when and where it is expected to stream, or `null`/absent for no
+   * forecast. `estimate*` kinds are GUESSES and must be rendered as such.
+   * `yours` is whether the owner uses that service.
+   */
+  forecast?: (import('@nextup/domain').StreamingForecast & { yours: boolean }) | null;
 }
 
 /** `POST /api/waiting` (#378) — wait for a work found by search. */

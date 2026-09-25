@@ -24,15 +24,19 @@ import { type Router } from 'express';
 import {
   MEDIA_TYPES,
   SERVICES,
+  asService,
   parseEditionLabels,
+  streamingForecast,
   ulid,
   workIdentityForTmdb,
   type EditionLabel,
   type MediaType,
   type Service,
+  type StreamingForecast,
 } from '@nextup/domain';
 
 import { TmdbClient, TmdbWorkNotFoundError } from '../clients/tmdbClient.js';
+import { WatchmodeClient, earliestAnnouncements } from '../clients/watchmodeClient.js';
 import { AppError } from '../errors/AppError.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import {
@@ -49,7 +53,14 @@ import {
   listOwnerServices,
   listWaitingIntents,
   updateWatchIntentAvailability,
+  updateWatchIntentForecast,
 } from '../repository/watchIntents.js';
+import {
+  refreshForecast,
+  selectForForecastRefresh,
+  type AnnouncementSource,
+  type ForecastRow,
+} from '../services/streamingForecast.js';
 import {
   accessStateFor,
   flaggedProvidersFor,
@@ -101,6 +112,47 @@ export interface WaitingItem {
   /** When the answer above was computed, or `null` for never asked. */
   availabilityCheckedAt: string | null;
   availabilityRegion: string;
+  /**
+   * #380 — when and where it is expected to stream, or `null` for no
+   * forecast. Only for a work not streaming on any supported service.
+   * ⚠ An `estimate*` kind is a GUESS from the studio's usual window and the
+   * client must say so; `announced` is a date Watchmode published. Never a
+   * sort key (owner decision 3 on #380). `yours` is whether the owner uses
+   * that service.
+   */
+  forecast: (StreamingForecast & { yours: boolean }) | null;
+}
+
+/** ⚠ Defensive, as {@link parseAvailableOn}: anything unreadable is NOT KNOWN. */
+function parseCompanyIds(raw: string | null): number[] | null {
+  if (raw === null) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.filter(
+      (entry): entry is number => typeof entry === 'number' && Number.isInteger(entry) && entry > 0,
+    );
+  } catch {
+    return null;
+  }
+}
+
+const isoDay = (date: Date | null): string | null =>
+  date === null ? null : date.toISOString().slice(0, 10);
+const fromIsoDay = (day: string | null): Date | null =>
+  day === null ? null : new Date(`${day}T00:00:00Z`);
+
+/**
+ * The deployed announcement source: Watchmode's free releases feed, or `null`
+ * when no key is configured — in which case each row keeps its last-known
+ * announced date and estimates still render.
+ */
+function watchmodeAnnouncements(): AnnouncementSource | null {
+  const client = new WatchmodeClient({ apiKey: process.env['WATCHMODE_API_KEY'] ?? '' });
+  if (!client.configured) return null;
+  return {
+    announcements: async (now) => earliestAnnouncements(await client.listAnnouncedReleases(now)),
+  };
 }
 
 /**
@@ -170,8 +222,9 @@ function alreadyWaiting(workIdentity: string): AppError {
 
 export function registerWaitingRoutes(
   router: Router,
-  getTmdb: () => Pick<TmdbClient, 'getWatchOffers' | 'getWork'> = () =>
+  getTmdb: () => Pick<TmdbClient, 'getWatchOffers' | 'getWork' | 'getReleaseFacts'> = () =>
     new TmdbClient({ apiKey: process.env['TMDB_API_KEY'] ?? '' }),
+  getAnnouncements: () => AnnouncementSource | null = watchmodeAnnouncements,
 ): void {
   /**
    * `POST /api/waiting` — wait for ONE title found by search (#378).
@@ -339,6 +392,68 @@ export function registerWaitingRoutes(
       });
     }
 
+    const currentAvailableOn = (intent: (typeof stored)[number], index: number) =>
+      fresh.get(intent.id)?.availableOn ?? (rows[index] as IntentRow).availableOn;
+
+    // #380 — the same lazy, page-scoped, metadata-only shape as availability,
+    // and after it, so a work found streaming this render is not forecast.
+    const forecastRows: ForecastRow[] = stored.map((intent, index) => {
+      // ⚠ `?? null`: a row read before migration 0018's columns existed (or a
+      // test double) has them absent, which means "never checked".
+      const announcedService = asService(intent.announcedService ?? null);
+      const announcedOn = isoDay(intent.announcedOn ?? null);
+      return {
+        id: intent.id,
+        tmdbId: intent.title.tmdbId,
+        tmdbMediaType: intent.title.tmdbMediaType,
+        availabilityRegion: intent.availabilityRegion,
+        forecastCheckedAt: intent.forecastCheckedAt ?? null,
+        companyIds: parseCompanyIds(intent.studioCompanyIds ?? null),
+        theatricalOn: isoDay(intent.theatricalReleaseOn ?? null),
+        digitalOn: isoDay(intent.digitalReleaseOn ?? null),
+        announced:
+          announcedService === null || announcedOn === null
+            ? null
+            : { service: announcedService, on: announcedOn },
+        streamingOnAService:
+          (flaggedProvidersFor(currentAvailableOn(intent, index)) ?? []).length > 0,
+      };
+    });
+    const dueForecast = selectForForecastRefresh(forecastRows, now);
+    const forecastWrites =
+      dueForecast.length === 0
+        ? []
+        : (
+            await refreshForecast(
+              dueForecast,
+              { tmdb: getTmdb(), announcements: getAnnouncements() },
+              now,
+            )
+          ).writes;
+    const forecastById = new Map(forecastRows.map((row) => [row.id, row]));
+    for (const write of forecastWrites) {
+      await updateWatchIntentForecast(ownerId, write.id, {
+        forecastCheckedAt: write.forecastCheckedAt,
+        studioCompanyIds: write.companyIds === null ? null : JSON.stringify(write.companyIds),
+        theatricalReleaseOn: fromIsoDay(write.theatricalOn),
+        digitalReleaseOn: fromIsoDay(write.digitalOn),
+        announcedService: write.announced?.service ?? null,
+        announcedOn: fromIsoDay(write.announced?.on ?? null),
+      });
+      const row = forecastById.get(write.id);
+      if (row !== undefined) {
+        forecastById.set(write.id, {
+          ...row,
+          forecastCheckedAt: write.forecastCheckedAt,
+          companyIds: write.companyIds,
+          theatricalOn: write.theatricalOn,
+          digitalOn: write.digitalOn,
+          announced: write.announced,
+        });
+      }
+    }
+    const today = now.toISOString().slice(0, 10);
+
     const items: WaitingItem[] = stored.map((intent, index) => {
       const row = rows[index] as IntentRow;
       const write = fresh.get(intent.id);
@@ -369,6 +484,7 @@ export function registerWaitingRoutes(
         streamingSince: streamingSince === null ? null : streamingSince.toISOString(),
         availabilityCheckedAt: checkedAt === null ? null : checkedAt.toISOString(),
         availabilityRegion: intent.availabilityRegion,
+        forecast: forecastFor(forecastById.get(intent.id), today, yours),
       };
     });
 
@@ -383,4 +499,21 @@ export function registerWaitingRoutes(
       availabilityRefreshFailed: failedIds.length > 0,
     });
   });
+}
+
+function forecastFor(
+  row: ForecastRow | undefined,
+  today: string,
+  yours: readonly Service[],
+): WaitingItem['forecast'] {
+  if (row === undefined || row.streamingOnAService) return null;
+  const forecast = streamingForecast({
+    mediaType: row.tmdbMediaType,
+    companyIds: row.companyIds,
+    theatricalOn: row.theatricalOn,
+    digitalOn: row.digitalOn,
+    announced: row.announced,
+    today,
+  });
+  return forecast === null ? null : { ...forecast, yours: yours.includes(forecast.service) };
 }

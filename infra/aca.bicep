@@ -133,6 +133,10 @@ param tmdbApiKey string
 @secure()
 param omdbApiKey string
 
+@description('Watchmode API key for announced streaming dates (#380, ADR-0010 Rev 3). Required: same empty-secret note above. Sent only as the X-API-Key header, with a date window and nothing of the owner\'s.')
+@secure()
+param watchmodeApiKey string
+
 @description('Comma-separated Entra subject ids permitted by the NFR-017 allow-list. NOT a secret: knowing a subject id grants nothing. Plain config, so unlike the secret above it may legitimately be empty — the allow-list fails CLOSED.')
 param allowedSubjects string = ''
 
@@ -188,6 +192,7 @@ var entraClientSecretName = 'entra-client-secret'
 // once, referenced from both the `secrets` array and the matching `secretRef`.
 var tmdbApiKeySecretName = 'tmdb-api-key'
 var omdbApiKeySecretName = 'omdb-api-key'
+var watchmodeApiKeySecretName = 'watchmode-api-key'
 
 // Shared across both environments — one managed environment, one Log Analytics
 // workspace (ADR-0003 R2.4: "no separate Log Analytics workspace").
@@ -308,6 +313,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           name: omdbApiKeySecretName
           value: omdbApiKey
         }
+        {
+          name: watchmodeApiKeySecretName
+          value: watchmodeApiKey
+        }
       ]
     }
     template: {
@@ -351,6 +360,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'OMDB_API_KEY'
               secretRef: omdbApiKeySecretName
+            }
+            {
+              name: 'WATCHMODE_API_KEY'
+              secretRef: watchmodeApiKeySecretName
             }
             // May be empty, and empty DENIES everyone — `allowList.ts` fails
             // closed. That is the safe direction for a control whose failure

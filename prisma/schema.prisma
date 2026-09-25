@@ -287,6 +287,19 @@ model WatchIntent {
   /// ⚠ Explicit, never implicit (`T-AVAIL-010`, ASM-059, `A49`).
   availabilityRegion String @default("US", map: "df_intent_region") @map("availability_region") @db.NVarChar(8)
 
+  /// #380 forecast facts (migration 0018). NULL = never read; drives the
+  /// lazy refresh. The estimate is computed on read, never stored.
+  forecastCheckedAt   DateTime? @map("forecast_checked_at") @db.DateTime2
+  /// JSON array of TMDB production-company ids (`ck_intent_studio_ids_json`).
+  studioCompanyIds    String?   @map("studio_company_ids") @db.NVarChar(Max)
+  theatricalReleaseOn DateTime? @map("theatrical_release_on") @db.Date
+  /// US rent/buy (TMDB digital) date.
+  digitalReleaseOn    DateTime? @map("digital_release_on") @db.Date
+  /// A `SERVICES` member with an announced date, via Watchmode
+  /// (`ck_intent_announced_service`). Both or neither (`ck_intent_announced_coherent`).
+  announcedService    String?   @map("announced_service") @db.NVarChar(40)
+  announcedOn         DateTime? @map("announced_on") @db.Date
+
   /// ⚠ FILTERED to `state = 'waiting'`, so a historical satisfied row and a
   /// later re-discovery of the same work both remain possible. The filter is
   /// applied by raw SQL in the migration; Prisma cannot express it, so this

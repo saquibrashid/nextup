@@ -208,6 +208,7 @@ jobs:
           # Epic M (REQ-092). Required for the same reason and by the same
           # mechanism: no default, empty secret rejected, deploy fails loudly.
           NEXTUP_OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+          NEXTUP_WATCHMODE_API_KEY: ${{ secrets.WATCHMODE_API_KEY }}
           # Optional. Empty denies everyone; the allow-list fails closed.
           NEXTUP_ALLOWED_SUBJECTS: ${{ secrets.ALLOWED_SUBJECTS }}
         run: |
@@ -345,6 +346,7 @@ jobs:
           # A48 — see the staging job above.
           NEXTUP_TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           NEXTUP_OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+          NEXTUP_WATCHMODE_API_KEY: ${{ secrets.WATCHMODE_API_KEY }}
           NEXTUP_ALLOWED_SUBJECTS: ${{ secrets.ALLOWED_SUBJECTS }}
         run: |
           set -euo pipefail

@@ -349,6 +349,24 @@ export class TmdbClient {
     return { flatrate, rentOrBuy: readRentOrBuyProviders(body, region) ?? [] };
   }
 
+  /**
+   * #380 — the facts a streaming estimate is made from, for a MOVIE: its
+   * production companies and its US theatrical and rent/buy dates. ONE
+   * request (`release_dates` appended to the detail).
+   *
+   * ⚠ Returns `null` when TMDB does not know the work: that is an answer
+   * ("nothing to estimate from"), not a failure.
+   */
+  async getReleaseFacts(tmdbId: number, region: string): Promise<ReleaseFacts | null> {
+    const body = await this.#get<unknown>(
+      `/movie/${tmdbId}`,
+      { append_to_response: 'release_dates' },
+      () => null as never,
+    );
+    if (body === null) return null;
+    return readReleaseFacts(body, region);
+  }
+
   async getPresentation(
     mediaType: MediaType,
     tmdbId: number,
@@ -506,6 +524,62 @@ export class TmdbClient {
       gate.waiting.shift()?.();
     }
   }
+}
+
+/** #380 — what a streaming estimate is computed from. Dates are `YYYY-MM-DD`. */
+export interface ReleaseFacts {
+  companyIds: number[];
+  theatricalOn: string | null;
+  digitalOn: string | null;
+}
+
+/** TMDB release types: 2 limited theatrical, 3 theatrical, 4 digital (rent/buy). */
+const THEATRICAL_TYPES = [3, 2] as const;
+const DIGITAL_TYPE = 4;
+
+/**
+ * Read {@link ReleaseFacts} from a movie detail with `release_dates` appended.
+ *
+ * ⚠ Theatrical prefers a wide release (type 3) and falls back to limited (2);
+ * each date is the EARLIEST of its type in `region`. Anything unreadable is
+ * `null` or `[]` — never a guessed date.
+ */
+export function readReleaseFacts(body: unknown, region: string): ReleaseFacts {
+  const companyIds: number[] = [];
+  if (isRecord(body) && Array.isArray(body['production_companies'])) {
+    for (const company of body['production_companies']) {
+      if (isRecord(company) && isPositiveInteger(company['id'])) companyIds.push(company['id']);
+    }
+  }
+
+  const byType = new Map<number, string>();
+  const releaseDates = isRecord(body) ? body['release_dates'] : undefined;
+  const results = isRecord(releaseDates) ? releaseDates['results'] : undefined;
+  if (Array.isArray(results)) {
+    const forRegion = results.find(
+      (entry: unknown) => isRecord(entry) && entry['iso_3166_1'] === region,
+    );
+    const dates = isRecord(forRegion) ? forRegion['release_dates'] : undefined;
+    if (Array.isArray(dates)) {
+      for (const entry of dates) {
+        if (!isRecord(entry)) continue;
+        const type = entry['type'];
+        const date = entry['release_date'];
+        if (typeof type !== 'number' || typeof date !== 'string') continue;
+        const day = date.slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) continue;
+        const existing = byType.get(type);
+        if (existing === undefined || day < existing) byType.set(type, day);
+      }
+    }
+  }
+
+  const theatricalType = THEATRICAL_TYPES.find((type) => byType.has(type));
+  return {
+    companyIds,
+    theatricalOn: theatricalType === undefined ? null : (byType.get(theatricalType) ?? null),
+    digitalOn: byType.get(DIGITAL_TYPE) ?? null,
+  };
 }
 
 /** The metadata allow-list of US-007 AC-2/AC-6. Storage validation is TASK-061. */

@@ -129,6 +129,12 @@
         "description": "OMDb API key for IMDb ratings (REQ-092). Held as a Container Apps secret."
       }
     },
+    "watchmodeApiKey": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Watchmode API key for announced streaming dates (#380). Held as a Container Apps secret."
+      }
+    },
     "allowedSubjects": {
       "type": "string",
       "defaultValue": "",
@@ -906,6 +912,9 @@
           "omdbApiKey": {
             "value": "[parameters('omdbApiKey')]"
           },
+          "watchmodeApiKey": {
+            "value": "[parameters('watchmodeApiKey')]"
+          },
           "allowedSubjects": {
             "value": "[parameters('allowedSubjects')]"
           },
@@ -1024,6 +1033,12 @@
                 "description": "OMDb API key (8 hex chars) for IMDb ratings (REQ-092, ADR-0011). Required: same empty-secret note above — Container Apps has no absent state for a secret-backed setting."
               }
             },
+            "watchmodeApiKey": {
+              "type": "securestring",
+              "metadata": {
+                "description": "Watchmode API key for announced streaming dates (#380, ADR-0010 Rev 3). Required: same empty-secret note above. Sent only as the X-API-Key header, with a date window and nothing of the owner's."
+              }
+            },
             "allowedSubjects": {
               "type": "string",
               "defaultValue": "",
@@ -1060,7 +1075,8 @@
             "isProd": "[equals(parameters('environmentName'), 'prod')]",
             "entraClientSecretName": "entra-client-secret",
             "tmdbApiKeySecretName": "tmdb-api-key",
-            "omdbApiKeySecretName": "omdb-api-key"
+            "omdbApiKeySecretName": "omdb-api-key",
+            "watchmodeApiKeySecretName": "watchmode-api-key"
           },
           "resources": [
             {
@@ -1109,6 +1125,10 @@
                     {
                       "name": "[variables('omdbApiKeySecretName')]",
                       "value": "[parameters('omdbApiKey')]"
+                    },
+                    {
+                      "name": "[variables('watchmodeApiKeySecretName')]",
+                      "value": "[parameters('watchmodeApiKey')]"
                     }
                   ]
                 },
@@ -1153,6 +1173,10 @@
                         {
                           "name": "OMDB_API_KEY",
                           "secretRef": "[variables('omdbApiKeySecretName')]"
+                        },
+                        {
+                          "name": "WATCHMODE_API_KEY",
+                          "secretRef": "[variables('watchmodeApiKeySecretName')]"
                         },
                         {
                           "name": "NEXTUP_ALLOWED_SUBJECTS",

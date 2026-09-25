@@ -670,6 +670,8 @@ describe('T-CSS-007 — nothing shrinks content below the --text-sm floor', () =
     '.title-row__rating-source',
     '.tmdb-attribution',
     '.justwatch-attribution',
+    // #380 — a condition of Watchmode's free plan, the same kind of label.
+    '.watchmode-attribution',
   ] as const;
 
   /** Selector → the font-size it sets, for every rule in the sheet. */
