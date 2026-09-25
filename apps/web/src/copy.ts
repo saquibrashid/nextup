@@ -1675,6 +1675,23 @@ export const WAITING_STREAMING_SINCE = 'first seen streaming';
 export const WAITING_OTHER_SERVICES_PREFIX = 'Streaming on';
 export const WAITING_OTHER_SERVICES_SUFFIX = '(not one of your services)';
 
+/* ── #380 — when and where it is expected to stream ─────────────────────── */
+
+/**
+ * ⚠ **AN ESTIMATE MUST SAY IT IS ONE, IN WORDS** (#380). It is inferred from
+ * the studio's usual pay-1 window, not published by anyone, and a row that
+ * reads like a date would be believed. The italic style only reinforces the
+ * "Estimate:" prefix, never replaces it.
+ */
+export const WAITING_FORECAST_ANNOUNCED_PREFIX = 'Streaming on';
+export const WAITING_FORECAST_ANNOUNCED_FROM = 'from';
+export const WAITING_FORECAST_ANNOUNCED_PAST = 'Announced for';
+export const WAITING_FORECAST_ESTIMATE_PREFIX = 'Estimate: likely on';
+export const WAITING_FORECAST_ESTIMATE_AROUND = 'around';
+export const WAITING_FORECAST_ESTIMATE_SOON = 'soon';
+/** Watchmode's free plan requires attribution (ADR-0010 Rev 3). */
+export const WATCHMODE_ATTRIBUTION_LINK = 'watchmode.com';
+
 export const WAITING_SEARCH_LEGEND = 'Wait for a title';
 export const WAITING_SEARCH_HINT =
   'Search for something you would rather wait to stream than rent or buy.';

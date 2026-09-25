@@ -34,6 +34,8 @@ vi.mock('../../src/repository/watchIntents.js', async (importOriginal) => {
     updateWatchIntentAvailability: (...args: unknown[]) =>
       updateWatchIntentAvailability(...args) as unknown,
     listOwnerServices: (...args: unknown[]) => listOwnerServices(...args) as unknown,
+    // #380: the forecast writer, a no-op here — these suites are about availability.
+    updateWatchIntentForecast: () => Promise.resolve({ count: 1 }),
   };
 });
 
@@ -48,6 +50,11 @@ vi.mock('../../src/clients/tmdbClient.js', async (importOriginal) => {
     ): Promise<{ flatrate: string[]; rentOrBuy: string[] } | null> {
       const flatrate = (await getWatchProviders(...args)) as string[] | null;
       return flatrate === null ? null : { flatrate, rentOrBuy: [] };
+    }
+    // #380: the forecast refresh asks for release facts. These suites are about
+    // availability, so it knows nothing; `streamingForecast.spec.ts` covers it.
+    override getReleaseFacts(): Promise<null> {
+      return Promise.resolve(null);
     }
   }
   return { ...actual, TmdbClient: StubTmdbClient };

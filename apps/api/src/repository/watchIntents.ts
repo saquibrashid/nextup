@@ -95,6 +95,32 @@ export async function updateWatchIntentAvailability(
 }
 
 /**
+ * Record one streaming-forecast answer (#380). **Metadata-only, by construction.**
+ *
+ * ⚠ The separate writer the availability writer's comment asks for: its
+ * `data` shape reaches exactly the six FORECAST columns of migration 0018 —
+ * facts an estimate is computed from, never the estimate — so it cannot
+ * change an intent's `state`, `workIdentity` or `discoveredAt`, nor any
+ * availability column. `ck_intent_forecast_coherent` and
+ * `ck_intent_announced_coherent` refuse a half-written answer.
+ */
+export async function updateWatchIntentForecast(
+  ownerId: OwnerId,
+  id: string,
+  data: {
+    forecastCheckedAt: Date;
+    studioCompanyIds: string | null;
+    theatricalReleaseOn: Date | null;
+    digitalReleaseOn: Date | null;
+    announcedService: string | null;
+    announcedOn: Date | null;
+  },
+  tx?: Db,
+) {
+  return db(tx).watchIntent.updateMany({ where: { ownerId, id }, data });
+}
+
+/**
  * Satisfy every waiting intent for these works (US-043 AC-3, `T-WAIT-008`).
  *
  * ⚠ **GRADUATION IS A CONSEQUENCE OF THE ORDINARY CAPTURE PATH, NEVER A

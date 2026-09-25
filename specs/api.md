@@ -8,6 +8,21 @@ sourceOfTruth: docs/PRD.md, docs/architecture.md, docs/adr/ADR-0002, ADR-0006
 
 # specs/api.md — nextup HTTP API
 
+## Streaming forecast (TASK-252, #380)
+
+`GET /api/waiting` items additionally expose `forecast`: `null`, or one of
+`{kind: "announced", service, on}` (a date Watchmode published, `on` is
+`YYYY-MM-DD`), `{kind: "estimate", service, month}` (`YYYY-MM`),
+`{kind: "estimate-range", service, from, to}` (`YYYY-MM`) or
+`{kind: "estimate-soon", service}` — each with `yours: boolean` (whether the
+owner uses that service). `service` is a `SERVICES` member. It is `null` when
+the work is already streaming on a supported service, when TMDB has no studio
+the estimate can use, or for TV with no announced date. ⚠ The `estimate*`
+kinds are inferred from a studio's usual window and a client must present
+them as estimates. `forecast` never affects order. The facts behind it are
+read lazily in the same request as availability (at most 8 rows, each once a
+week); a Watchmode or TMDB failure never fails the request.
+
 ## Waiting to stream (TASK-251, #378)
 
 `GET /api/waiting` items additionally expose `accessState`

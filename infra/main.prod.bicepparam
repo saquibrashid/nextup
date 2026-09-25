@@ -69,6 +69,9 @@ param tmdbApiKey = readEnvironmentVariable('NEXTUP_TMDB_API_KEY')
 // state this parameter can occupy.
 param omdbApiKey = readEnvironmentVariable('NEXTUP_OMDB_API_KEY')
 
+// #380 (ADR-0010 Rev 3). No default, for the same reason as the two above.
+param watchmodeApiKey = readEnvironmentVariable('NEXTUP_WATCHMODE_API_KEY')
+
 // May be empty — the allow-list fails closed, so an empty value denies
 // everyone rather than admitting them. Empty is a locked door, not an open one.
 param allowedSubjects = readEnvironmentVariable('NEXTUP_ALLOWED_SUBJECTS', '')

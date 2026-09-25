@@ -4845,8 +4845,8 @@ a **backlog citation**, so if a task's "Done when" cell and this table ever
 disagree about who owns an id, the gate follows the backlog and this table
 becomes the misleading one. **They are edited together or not at all.** All 21
 ids are cited across `TASK-183` – `TASK-189`; none is unowned, and none is
-owned twice. The ten ids of §38.4 are owned by `TASK-251` alone and are not
-counted in those 21.
+owned twice. The ten ids of §38.4 are owned by `TASK-251` alone, and the
+eight of §38.5 by `TASK-252` alone; neither set is counted in those 21.
 
 ### 38.4 Waiting to stream — #378 (ADR-0010 Revision 2)
 
@@ -4862,6 +4862,24 @@ counted in those 21.
 | **`T-AVAIL-013`** (`a`–`g`) | U | `TASK-251` | The waiting route's partition and refresh. `a` streaming splits into the services the owner uses (`flaggedOn`) and everything else (`otherServicesOn` / `otherProvidersOn`); `b` before any import every `SERVICES` member counts as the owner's; `c` rent/buy offers alone are `rent-only`, recorded in `rentOn` and never availability; `d` a title only on a free or ad-supported tier is not streaming (owner decision 1); `e` the first subscription sighting (`streamingSince`) is kept, then cleared when it goes; `f` a row answered before rent offers were recorded is asked once more; `g` never-checked and not-known stay distinct from not-seen. |
 | **`T-AVAIL-014`** (`a`–`f`) | U | `TASK-251` | The TMDB and service halves. `a` rent and buy are read apart from `flatrate`, deduplicated, and `free`/`ads` are read by neither; `b` NOT KNOWN stays distinct from ASKED-AND-NOBODY; `c` `getWatchOffers` makes **one** request and returns both halves; `d` the access state follows `flatrate` alone; `e` streaming elsewhere is split into unused services and other providers; `f` the refresh records rent offers and the first streaming sighting. |
 | **`T-AVAIL-015`** (`a`–`e`) | U | `TASK-251` | Each access state reads as what it is: `a` rent-only names the storefronts, says "(rent/buy)" and "not streaming on your services yet", and is never the flag; `b` rent-only with no named storefront falls back to Trap 4's sentence; `c` a service the owner does not use is said in words, apart from the flag; `d` a row on the owner's service is badged, dated and leads; `e` the source line says "(rent/buy)" for a storefront and names a search add. |
+
+### 38.5 When and where it will stream — #380 (ADR-0010 Revision 3)
+
+The eight ids below are owned by `TASK-252` alone. ⚠ **`T-FORECAST-007b` is
+the one that matters most**: an estimate is inferred from a studio's usual
+window, not published by anyone, and a build that rendered it as a plain date
+would pass every other case here.
+
+| Id | Level | Owner | Claim |
+|---|---|---|---|
+| **`T-FORECAST-001`** (`a`–`f`) | U | `TASK-252` | The pure forecast (`@nextup/domain`). `a` an announced date wins over any estimate, for TV too; `b` the month is the rent/buy date plus the service's window; `c` a range centred on theatrical + 30 days + the window, ±45 days and clamped to this month, is the fallback when only the theatrical date is known; `d` an estimate already overdue reads as "soon", never a past month; `e` no estimate for TV, unmapped studios, studios that disagree, or no dates; `f` the reviewed studio map and windows only name supported services. |
+| **`T-FORECAST-002`** (`a`–`d`) | U | `TASK-252` | Migration 0018 is additive and guarded. `a` the migration gate finds nothing destructive and it touches no row; `b` every new column is nullable and mirrored in the Prisma schema; `c` the announced-service CHECK holds exactly the `SERVICES` enum; `d` announced service and date move together, studio ids must be JSON, and no fact is stored without a checked-at time. |
+| **`T-FORECAST-003`** (`a`–`f`) | U | `TASK-252` | The Watchmode releases client. `a` the key travels in the `X-API-Key` header, never the URL, and a date window is all that is sent; `b` 15-day windows cover 30 days back to 120 ahead with no gap, within 11 credits; `c` only well-formed rows on supported services are read; `d` the feed is cached in-process for 12 hours; `e` any failure throws, and an unconfigured client makes no request; `f` the earliest announced release per work wins. |
+| **`T-FORECAST-004`** (`a`–`c`) | U | `TASK-252` | TMDB release facts. `a` production companies, the earliest wide release and the earliest rent/buy date in the region; `b` a limited release stands in only when there is no wide one; `c` no region, or a malformed body, is nothing — never a guessed date. |
+| **`T-FORECAST-005`** (`a`–`d`) | U | `TASK-252` | The lazy refresh. `a` only unchecked or week-old rows not already streaming are due, at most 8 per request; `b` facts and the announced date are written, and a TV row asks TMDB nothing; `c` **a failed or unconfigured feed keeps the last-known announcement**, while a feed that answered without it clears it; `d` a failed TMDB lookup writes nothing for that row. |
+| **`T-FORECAST-006`** (`a`–`d`) | I | `TASK-252` | Through `GET /api/waiting` against the real store, clients stubbed at the module: `a` a studio estimate is rendered, its facts persisted, and a fresh row asks nothing; `b` an announced date wins and survives a failed feed; `c` a work already streaming on a service is not forecast and nothing is asked; `d` the refresh is metadata-only — no title, listing or suppression moves (invariant 5). |
+| **`T-FORECAST-007`** (`a`–`f`) | U | `TASK-252` | The forecast line. `a` an announced date reads as a fact, and a passed one says it was announced; `b` **every estimate kind leads with "Estimate:"**; `c` a service the owner does not use is named as not theirs; `d` the row styles an estimate apart without relying on colour, and shows no forecast once streaming; `e` no forecast, or a server that predates it, renders no line; `f` the Watchmode attribution is unconditional and links to Watchmode. |
+| **`T-FORECAST-008`** (`a`) | E | `TASK-252` | In a real browser at 280px: an estimate and an announcement read as such, the Watchmode attribution is visible and linked on both the populated and the empty view, and nothing overflows. |
 
 ---
 

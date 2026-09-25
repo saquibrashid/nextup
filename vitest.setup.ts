@@ -38,6 +38,16 @@ const SELF_TEST = 'noEgress.spec.ts';
 
 let installedHere = false;
 
+/**
+ * #380 — a developer's OWN Watchmode key must never switch a suite onto the
+ * live client. With the key present, `GET /api/waiting` would reach for the
+ * feed, the guard above would refuse it, and every waiting-route test would
+ * wait out the client's timeout — and on a machine without the guard it would
+ * spend the owner's 2,500-credit month. CI never has the key; this makes a
+ * laptop behave the same. Suites that exercise the client inject a stub fetch.
+ */
+delete process.env['WATCHMODE_API_KEY'];
+
 beforeAll(() => {
   const testPath = expect.getState().testPath ?? '';
   if (testPath.includes(SELF_TEST)) return;

@@ -20,7 +20,14 @@
 
 import { useState, type JSX } from 'react';
 import { Link } from 'react-router-dom';
-import { SERVICES, SERVICE_LABELS, intentSourceLabel, releaseYearText } from '@nextup/domain';
+import {
+  SERVICES,
+  SERVICE_LABELS,
+  WATCHMODE_ATTRIBUTION,
+  WATCHMODE_ATTRIBUTION_URL,
+  intentSourceLabel,
+  releaseYearText,
+} from '@nextup/domain';
 import { EditionLabels } from '../components/EditionLabels';
 import { WaitingSearchAdd } from '../components/WaitingSearchAdd';
 
@@ -31,6 +38,12 @@ import {
   WAITING_EMPTY_ACTION,
   WAITING_EMPTY_BODY,
   WAITING_EMPTY_TITLE,
+  WAITING_FORECAST_ANNOUNCED_FROM,
+  WAITING_FORECAST_ANNOUNCED_PAST,
+  WAITING_FORECAST_ANNOUNCED_PREFIX,
+  WAITING_FORECAST_ESTIMATE_AROUND,
+  WAITING_FORECAST_ESTIMATE_PREFIX,
+  WAITING_FORECAST_ESTIMATE_SOON,
   WAITING_LOADING,
   WAITING_NOT_CHECKED,
   WAITING_NOT_INTERESTED,
@@ -45,6 +58,7 @@ import {
   WAITING_RENT_ONLY_SUFFIX,
   WAITING_STREAMING_SINCE,
   WAITING_SUPPRESS_FAILED,
+  WATCHMODE_ATTRIBUTION_LINK,
 } from '../copy';
 import type { TmdbSearchResult, WaitingItem } from '../lib/apiClient';
 import { TMDB_IMAGE_BASE } from '../components/TitleRow';
@@ -111,6 +125,81 @@ export function otherServicesLine(item: WaitingItem): string | null {
   return `${WAITING_OTHER_SERVICES_PREFIX} ${names.join(', ')} ${WAITING_OTHER_SERVICES_SUFFIX}`;
 }
 
+const MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+] as const;
+
+/** `2027-01` → `Jan 2027`. Deterministic: no locale, no time zone. */
+function monthText(yearMonth: string): string {
+  const [year, month] = yearMonth.split('-');
+  return `${MONTHS[Number(month) - 1] ?? ''} ${year ?? ''}`.trim();
+}
+
+/** `2026-10-03` → `Oct 3, 2026`. */
+function dayText(isoDate: string): string {
+  const [year, month, day] = isoDate.split('-');
+  return `${MONTHS[Number(month) - 1] ?? ''} ${Number(day)}, ${year ?? ''}`;
+}
+
+/**
+ * #380 — when and where it is expected to stream, or `null` for no forecast.
+ *
+ * ⚠ An estimate LEADS with "Estimate:" — it is a guess from the studio's
+ * usual window and must never read like a published date. Exported so the
+ * sentence rule is asserted directly, as for {@link availabilityLine}.
+ */
+export function forecastLine(
+  item: WaitingItem,
+  today: string = new Date().toISOString().slice(0, 10),
+): { text: string; estimate: boolean } | null {
+  const forecast = item.forecast;
+  if (forecast == null) return null;
+  const service = serviceLabel(forecast.service);
+  const notYours = forecast.yours ? '' : ` ${WAITING_OTHER_SERVICES_SUFFIX}`;
+  switch (forecast.kind) {
+    case 'announced':
+      return {
+        estimate: false,
+        text:
+          forecast.on >= today
+            ? `${WAITING_FORECAST_ANNOUNCED_PREFIX} ${service}${notYours} ${WAITING_FORECAST_ANNOUNCED_FROM} ${dayText(forecast.on)}`
+            : `${WAITING_FORECAST_ANNOUNCED_PAST} ${service}${notYours} on ${dayText(forecast.on)}`,
+      };
+    case 'estimate':
+      return {
+        estimate: true,
+        text: `${WAITING_FORECAST_ESTIMATE_PREFIX} ${service}${notYours} ${WAITING_FORECAST_ESTIMATE_AROUND} ${monthText(forecast.month)}`,
+      };
+    case 'estimate-range':
+      return {
+        estimate: true,
+        text: `${WAITING_FORECAST_ESTIMATE_PREFIX} ${service}${notYours}, ${monthText(forecast.from)} – ${monthText(forecast.to)}`,
+      };
+    case 'estimate-soon':
+      return {
+        estimate: true,
+        text: `${WAITING_FORECAST_ESTIMATE_PREFIX} ${service}${notYours} ${WAITING_FORECAST_ESTIMATE_SOON}`,
+      };
+  }
+}
+
+/** A literal map, so the class vocabulary stays scannable (`T-CSS-001c`). */
+const FORECAST_CLASS = {
+  announced: 'waiting-row__forecast',
+  estimate: 'waiting-row__forecast waiting-row__forecast--estimate',
+} as const;
+
 /**
  * Rows that have reached one of the owner's services lead the list (#378):
  * noticing that moment is what the view is for. Stable within each group, so
@@ -143,6 +232,8 @@ function WaitingRow({
   const flagged = item.flaggedOn ?? [];
   const rentOnly = rentOnlyLine(item);
   const others = otherServicesLine(item);
+  const forecast = flagged.length > 0 ? null : forecastLine(item);
+  const forecastKind = forecast?.estimate === true ? 'estimate' : 'announced';
   const rowKind = flagged.length > 0 ? 'streaming' : 'waiting';
 
   function suppress(): void {
@@ -221,6 +312,12 @@ function WaitingRow({
         {others !== null && (
           <p className="waiting-row__other" data-testid="waiting-other-services">
             {others}
+          </p>
+        )}
+
+        {forecast !== null && (
+          <p className={FORECAST_CLASS[forecastKind]} data-testid="waiting-forecast">
+            {forecast.text}
           </p>
         )}
 
@@ -334,6 +431,13 @@ export function WaitingPage({
           for whichever rows happen to have provider data today. */}
       <p className="justwatch-attribution" data-testid="justwatch-attribution">
         {JUSTWATCH_ATTRIBUTION}
+      </p>
+      {/* #380 — also unconditional: a condition of Watchmode's free plan. */}
+      <p className="watchmode-attribution" data-testid="watchmode-attribution">
+        {WATCHMODE_ATTRIBUTION}{' '}
+        <a href={WATCHMODE_ATTRIBUTION_URL} target="_blank" rel="noopener noreferrer">
+          {WATCHMODE_ATTRIBUTION_LINK}
+        </a>
       </p>
     </>
   );

@@ -47,6 +47,9 @@ param entraClientSecret = readEnvironmentVariable('NEXTUP_ENTRA_CLIENT_SECRET')
 // staging silently unconfigured.
 param tmdbApiKey = readEnvironmentVariable('NEXTUP_TMDB_API_KEY')
 param omdbApiKey = readEnvironmentVariable('NEXTUP_OMDB_API_KEY')
+
+// #380 (ADR-0010 Rev 3). No default, for the same reason as the two above.
+param watchmodeApiKey = readEnvironmentVariable('NEXTUP_WATCHMODE_API_KEY')
 param allowedSubjects = readEnvironmentVariable('NEXTUP_ALLOWED_SUBJECTS', '')
 
 // ── AI provisioning (TASK-010), owner-approved 2026-08-19, STAGING FIRST ────

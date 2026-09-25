@@ -83,21 +83,22 @@ const TELEMETRY_HOSTS = [
   telemetryHost('mixpanel', 'com'),
 ];
 
-describe('T-SEC-031 · US-038 AC-2/AC-5 · exactly four outbound destinations (NFR-010)', () => {
-  it('T-SEC-031a · the repository as committed contacts no host outside the four', async () => {
+describe('T-SEC-031 · US-038 AC-2/AC-5 · exactly five outbound destinations (NFR-010)', () => {
+  it('T-SEC-031a · the repository as committed contacts no host outside the five', async () => {
     const findings = await checkOutboundHosts();
     expect(findings).toEqual([]);
   });
 
-  it('T-SEC-031b · the allow-list is exactly four entries', () => {
+  it('T-SEC-031b · the allow-list is exactly five entries', () => {
     // specs/security.md §7 T18 and specs/ai.md §11 both pin the number. This
     // asserts the number itself, so widening it cannot be a quiet diff line.
-    expect(ALLOWED_OUTBOUND_HOSTS).toHaveLength(4);
+    expect(ALLOWED_OUTBOUND_HOSTS).toHaveLength(5);
     expect(ALLOWED_OUTBOUND_HOSTS.map((h) => h.id).sort()).toEqual([
       'azure-ai-vision',
       'azure-openai',
       'omdb',
       'tmdb',
+      'watchmode',
     ]);
   });
 
@@ -114,6 +115,8 @@ describe('T-SEC-031 · US-038 AC-2/AC-5 · exactly four outbound destinations (N
 
     // OMDb is sent an opaque `tt…` id — not a title, not an image.
     expect(ALLOWED_OUTBOUND_HOSTS.find((h) => h.id === 'omdb')?.sends).toBe('imdb-id');
+    // Watchmode (#380) is sent a date window — nothing of the owner's at all.
+    expect(ALLOWED_OUTBOUND_HOSTS.find((h) => h.id === 'watchmode')?.sends).toBe('date-window');
   });
 
   it('T-SEC-031v · promoting a non-extractor to image-bytes is caught', () => {
@@ -134,14 +137,15 @@ describe('T-SEC-031 · US-038 AC-2/AC-5 · exactly four outbound destinations (N
     expect(checkAllowListShape(undeclared).some((f: string) => f.includes('sends='))).toBe(true);
   });
 
-  it('T-SEC-031c · each of the four actually matches its real endpoint host', () => {
+  it('T-SEC-031c · each of the five actually matches its real endpoint host', () => {
     // A pattern that matches nothing would make the whole gate a no-op that
-    // rejects the legitimate four along with everything else.
+    // rejects the legitimate five along with everything else.
     expect(isAllowed('nextup-aoai.openai.azure.com')).toBe(true);
     expect(isAllowed('nextup-vision.cognitiveservices.azure.com')).toBe(true);
     expect(isAllowed('api.themoviedb.org')).toBe(true);
     expect(isAllowed('image.tmdb.org')).toBe(true);
     expect(isAllowed('www.omdbapi.com')).toBe(true);
+    expect(isAllowed('api.watchmode.com')).toBe(true);
   });
 
   it('T-SEC-031d · an UNLISTED host in server source is caught', async () => {
@@ -194,21 +198,21 @@ describe('T-SEC-031 · US-038 AC-2/AC-5 · exactly four outbound destinations (N
     expect(SCANNED_ROOTS).toContain('apps/web/src');
   });
 
-  it('T-SEC-031h · REMOVING one of the four is caught, not silently accepted', () => {
+  it('T-SEC-031h · REMOVING one of the five is caught, not silently accepted', () => {
     // The reverse mutation, run through the real checker. A one-sided check
     // would let the allow-list shrink to empty and still report success —
     // permitting nothing, asserting nothing.
-    const shrunk = ALLOWED_OUTBOUND_HOSTS.slice(0, 3);
+    const shrunk = ALLOWED_OUTBOUND_HOSTS.slice(0, 4);
     const findings = checkAllowListShape(shrunk);
-    expect(findings.some((f: string) => f.includes('3 entries, not 4'))).toBe(true);
+    expect(findings.some((f: string) => f.includes('4 entries, not 5'))).toBe(true);
 
     expect(checkAllowListShape([]).length).toBeGreaterThan(0);
     // …and the committed list is the one that passes.
     expect(checkAllowListShape()).toEqual([]);
   });
 
-  it('T-SEC-031q · a FIFTH entry added to the allow-list is caught', () => {
-    // The forward mutation on the list itself, as distinct from a fourth host
+  it('T-SEC-031q · a SIXTH entry added to the allow-list is caught', () => {
+    // The forward mutation on the list itself, as distinct from a sixth host
     // appearing in source: someone "just adding" a destination here.
     const widened = [
       ...ALLOWED_OUTBOUND_HOSTS,
@@ -221,7 +225,7 @@ describe('T-SEC-031 · US-038 AC-2/AC-5 · exactly four outbound destinations (N
       },
     ];
     const findings = checkAllowListShape(widened);
-    expect(findings.some((f: string) => f.includes('5 entries, not 4'))).toBe(true);
+    expect(findings.some((f: string) => f.includes('6 entries, not 5'))).toBe(true);
   });
 
   it('T-SEC-031r · an allow-list entry whose pattern matches nothing is caught', () => {

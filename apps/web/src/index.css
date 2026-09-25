@@ -2100,6 +2100,20 @@ button {
   padding-inline-start: var(--space-2);
 }
 
+/*
+  #380 — when it is expected to stream. An announced date is a fact and reads
+  plainly; an estimate is a guess and says so in words ("Estimate:"), with the
+  italic only reinforcing that, never carrying it alone.
+*/
+.waiting-row__forecast {
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.waiting-row__forecast--estimate {
+  font-style: italic;
+}
+
 .waiting-search {
   display: flex;
   flex-direction: column;
@@ -2321,6 +2335,13 @@ button {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   margin-top: var(--space-4);
+}
+
+/* #380 — Watchmode's attribution sits directly under JustWatch's. */
+.watchmode-attribution {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  margin-top: var(--space-1);
 }
 
 /* ------------------------------------------------- the review pass (§5) -- */

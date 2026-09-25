@@ -231,3 +231,65 @@ test.describe('T-WAIT-018 — waiting to stream in a real browser (#378)', () =>
     expect(overflow).toBeLessThanOrEqual(0);
   });
 });
+
+/* ── #380 — when and where it is expected to stream ──────────────────── */
+
+const WAITING_FORECAST = {
+  count: 2,
+  availabilityRefreshFailed: false,
+  items: [
+    {
+      ...WAITING_WITH_ROWS.items[0],
+      intentId: 'wi_est',
+      name: 'Wicked: For Good',
+      availableOn: [],
+      flaggedOn: [],
+      accessState: 'rent-only',
+      rentOn: ['Apple TV'],
+      forecast: { kind: 'estimate', service: 'peacock', month: '2027-01', yours: false },
+    },
+    {
+      ...WAITING_WITH_ROWS.items[0],
+      intentId: 'wi_ann',
+      name: 'Zootopia 2',
+      availableOn: [],
+      flaggedOn: [],
+      forecast: { kind: 'announced', service: 'disney-plus', on: '2099-03-04', yours: true },
+    },
+  ],
+};
+
+test.describe('T-FORECAST-008 — the forecast on the waiting view', () => {
+  test('T-FORECAST-008a: an estimate says so, an announcement reads as a date, and Watchmode is credited', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 280, height: 900 });
+    for (const waiting of [WAITING_FORECAST, WAITING_EMPTY]) {
+      await stubApi(page, waiting);
+      await page.goto('/waiting');
+      await expect(page.locator('.app-shell')).toBeVisible();
+
+      if (waiting === WAITING_FORECAST) {
+        const lines = page.getByTestId('waiting-forecast');
+        await expect(lines).toHaveCount(2);
+        await expect(lines.first()).toHaveText(
+          'Estimate: likely on Peacock (not one of your services) around Jan 2027',
+        );
+        await expect(lines.nth(1)).toHaveText('Streaming on Disney+ from Mar 4, 2099');
+      }
+
+      // Unconditional, like JustWatch's: a condition of the free plan.
+      const attribution = page.getByTestId('watchmode-attribution');
+      await expect(attribution).toBeVisible();
+      await expect(attribution.getByRole('link')).toHaveAttribute(
+        'href',
+        'https://www.watchmode.com/',
+      );
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+      await page.unrouteAll();
+    }
+  });
+});

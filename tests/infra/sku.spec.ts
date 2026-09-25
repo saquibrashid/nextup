@@ -167,6 +167,9 @@ describe('T-INFRA-005 SKU pinning and the compute/guard pair', () => {
     // SECOND FOR EPIC M: `omdb-api-key` joins for exactly the same reason —
     // OMDb is a third-party HTTP API keyed on a query-string key with no
     // federated-identity path (ADR-0011). This is that second reviewable diff.
+    // THIRD FOR #380: `watchmode-api-key`, the same shape again — a
+    // third-party HTTP API with a header key and no federated path (ADR-0010
+    // Rev 3). Still an outbound API key, still no registry credential.
     //
     // ⚠ THE PROPERTY BEING PROTECTED IS "NO REGISTRY CREDENTIAL", NOT A COUNT.
     // Widening for an outbound third-party API key does not weaken it; the set
@@ -183,6 +186,7 @@ describe('T-INFRA-005 SKU pinning and the compute/guard pair', () => {
       "[variables('entraClientSecretName')]",
       "[variables('tmdbApiKeySecretName')]",
       "[variables('omdbApiKeySecretName')]",
+      "[variables('watchmodeApiKeySecretName')]",
     ];
     const secrets = app.properties.configuration.secrets ?? [];
     const authConfig = resourceOfType(template, 'Microsoft.App/containerApps/authConfigs');

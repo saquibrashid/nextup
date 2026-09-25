@@ -65,6 +65,11 @@ vi.mock('../../src/clients/tmdbClient.js', async (importOriginal) => {
         providerResult === null ? null : { flatrate: providerResult, rentOrBuy: [] },
       );
     }
+    // #380: the forecast refresh asks for release facts. These suites are about
+    // availability, so it knows nothing; `streamingForecast.spec.ts` covers it.
+    override getReleaseFacts(): Promise<null> {
+      return Promise.resolve(null);
+    }
   }
   return { ...actual, TmdbClient: StubTmdbClient };
 });

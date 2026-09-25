@@ -2568,6 +2568,12 @@ Mitigations, none of which fully restores the 35-day window:
 | `availableOn` | `nvarchar?` | JSON array of provider identifiers reported `flatrate` for the owner's region. `NULL` ≠ "not streaming anywhere" — it means *not known* (ADR-0010 Trap 4) |
 | `rentOn` | `nvarchar?` | JSON array of rent/buy provider names (0017). `NULL` = not known; `[]` = checked, none. `ISJSON` (`ck_intent_rent_on_json`) and only set once `availabilityCheckedAt` is (`ck_intent_rent_on_coherent`) |
 | `streamingSince` | `datetime2?` | When a subscription offer was first seen (0017); `NULL` = not streaming. Free and ad-supported offers never count |
+| `forecastCheckedAt` | `datetime2?` | When the streaming-forecast facts below were last read (0018, #380); `NULL` = never. Re-read after `WATCH_PROVIDER_MAX_AGE_DAYS`. No fact column may be set while it is `NULL` (`ck_intent_forecast_coherent`) |
+| `studioCompanyIds` | `nvarchar?` | JSON array of TMDB production-company ids (0018), `ISJSON` (`ck_intent_studio_ids_json`). Movies only; `[]` for TV |
+| `theatricalReleaseOn` | `date?` | Earliest US wide theatrical release, else limited (0018). A fact the estimate is computed from — the estimate itself is never stored |
+| `digitalReleaseOn` | `date?` | Earliest US rent/buy (digital) release (0018) |
+| `announcedService` | `nvarchar(40)?` | Service of the earliest release announced in Watchmode's feed (0018); a `SERVICES` member (`ck_intent_announced_service`). Set together with `announcedOn` or not at all (`ck_intent_announced_coherent`). Kept when a refresh cannot reach the feed |
+| `announcedOn` | `date?` | The announced date (0018) |
 | `availabilityRegion` | `nvarchar` | Explicit, never implicit. **`US`, confirmed by the owner at `A49`** (`ASM-059`) — a settled value, not an assumption. ⚠️ Still **stored on the row and passed explicitly**: a hard-coded `'US'` scattered through the availability path is unfindable the day it changes, and a stored row is also the only way to tell an availability answer computed for one region from one computed for another |
 
 **Constraints**
