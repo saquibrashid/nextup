@@ -1,4 +1,4 @@
-import { useId, useState, type CSSProperties, type JSX } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type JSX } from 'react';
 import { Input } from './Input';
 
 export interface RangeSliderValue {
@@ -72,12 +72,43 @@ export function RangeSlider({
     '--range-end': String(shown.max / last),
   } as CSSProperties;
 
+  // A pointer drag previews locally and commits once on release, so the list
+  // is not refetched (and re-laid out under the pointer) at every stop.
+  const dragging = useRef(false);
+  const dragRange = useRef<RangeSliderValue | null>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const detachDrag = useRef<(() => void) | null>(null);
+  useEffect(() => () => detachDrag.current?.(), []);
+
+  function startDrag(): void {
+    if (dragging.current) return;
+    dragging.current = true;
+    dragRange.current = null;
+    const detach = (): void => {
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', finish);
+      detachDrag.current = null;
+      dragging.current = false;
+    };
+    const finish = (): void => {
+      detach();
+      const range = dragRange.current;
+      dragRange.current = null;
+      if (range !== null) onChangeRef.current(range);
+    };
+    detachDrag.current = detach;
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', finish);
+  }
+
   function handle(which: 'min' | 'max', requested: number): void {
     const next = move(shown, which, requested);
     setNotice(next.clamped ? clampMessages[which] : '');
     if (next.range.min !== shown.min || next.range.max !== shown.max) {
       setPending(next.range);
-      onChange(next.range);
+      if (dragging.current) dragRange.current = next.range;
+      else onChange(next.range);
     }
   }
 
@@ -125,6 +156,7 @@ export function RangeSlider({
           aria-label={minName}
           aria-valuetext={speakValue(shown.min)}
           data-handle="min"
+          onPointerDown={startDrag}
           onChange={(event) => {
             handle('min', Number(event.target.value));
           }}
@@ -139,6 +171,7 @@ export function RangeSlider({
           aria-label={maxName}
           aria-valuetext={speakValue(shown.max)}
           data-handle="max"
+          onPointerDown={startDrag}
           onChange={(event) => {
             handle('max', Number(event.target.value));
           }}

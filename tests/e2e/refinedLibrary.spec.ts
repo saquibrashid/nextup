@@ -2537,3 +2537,44 @@ test('T-UX-168f: at 1280px the quick-filter dropdowns are named pills with align
   await page.keyboard.press('Escape');
   await noOverflow(page);
 });
+
+test('T-UX-169b: dragging a runtime handle previews without refetching, keeps the panel still and commits once on release', async ({
+  page,
+}, testInfo) => {
+  testInfo.setTimeout(60_000);
+  await mountLibrary(page, { width: 1280 });
+  const quick = page.getByRole('group', { name: 'Quick filters' });
+  await quick.getByRole('button', { name: 'Runtime', exact: true }).click();
+  const panel = quick.locator('.filter-disclosure__panel:visible');
+  const min = panel.getByRole('slider', { name: 'Minimum runtime' });
+  const track = await bounds(panel.locator('.range-slider__track'));
+  const y = track.y + track.height / 2;
+  const at = (stop: number) => track.x + 8 + ((track.width - 16) * stop) / 5;
+
+  const reads: string[] = [];
+  page.on('request', (request) => {
+    if (new URL(request.url()).pathname === '/api/titles') reads.push(request.url());
+  });
+  const before = await bounds(panel);
+
+  await page.mouse.move(at(0), y);
+  await page.mouse.down();
+  for (const stop of [1, 2, 1, 2]) await page.mouse.move(at(stop), y, { steps: 4 });
+  await expect(min).toHaveValue('2');
+  expect(reads).toEqual([]);
+  expect(new URL(page.url()).searchParams.getAll('runtime')).toEqual([]);
+  await page.mouse.up();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.getAll('runtime'))
+    .toEqual(['60-90', '90-120', 'over120']);
+
+  // The owner's report: sliding back to 0 moved the panel under the pointer.
+  await page.mouse.move(at(2), y);
+  await page.mouse.down();
+  await page.mouse.move(at(0), y, { steps: 8 });
+  const during = await bounds(panel);
+  expect(Math.abs(during.x - before.x)).toBeLessThan(1);
+  await page.mouse.up();
+  await expect(min).toHaveValue('0');
+  await expect.poll(() => new URL(page.url()).searchParams.getAll('runtime')).toEqual([]);
+});

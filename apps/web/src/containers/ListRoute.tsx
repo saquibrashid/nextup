@@ -13,7 +13,7 @@
  */
 
 import type { JSX } from 'react';
-import { useContext } from 'react';
+import { useContext, useRef } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 
 import { type AppliedBatch } from '../components/BatchAppliedNotice';
@@ -212,6 +212,9 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
     query,
   );
 
+  // Hooks may not follow the refusal return; see the genre facet below.
+  const heldGenres = useRef<readonly string[]>([]);
+
   // A refusal is the whole screen: there is nothing to show around it, and the
   // retry the failure state offers could never succeed here (§12.2).
   // `not-allowed` specifically — a 403 is the allow-list, never an expired
@@ -234,6 +237,16 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
   const allResponse =
     all.resource.kind === 'ok' && all.resource.value !== null ? all.resource.value : null;
   const unfiltered = allResponse !== null ? allResponse.items : items;
+
+  /*
+   * The genre facet is held across a refetch. While the unfiltered source is
+   * still loading, `unfiltered` is the (empty or filtered) page, so the Genre
+   * filter would vanish and shift every filter after it — moving an open
+   * Runtime panel out from under the owner's pointer mid-drag.
+   */
+  const genreSourceReady = filtered ? allResponse !== null : titles.resource.kind === 'ok';
+  if (genreSourceReady) heldGenres.current = collectGenres(unfiltered);
+  const genres = heldGenres.current;
 
   /**
    * ⚠ READ FROM THE SAME LIST THAT SUPPLIED `total`, not from `titles`
@@ -303,7 +316,7 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
       loadingMore={paged.loadingMore}
       loadMoreFailed={paged.loadMoreFailed}
       onLoadMore={paged.loadMore}
-      genres={collectGenres(unfiltered)}
+      genres={genres}
       suppressedCount={
         suppressions.resource.kind === 'ok' ? suppressions.resource.value.items.length : 0
       }

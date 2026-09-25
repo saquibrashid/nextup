@@ -267,6 +267,14 @@ restore, suppress, un-suppress or fix-match.
    remain unchanged (`T-UX-144`). This owner-approved 2026-09-16 refinement
    replaces the action-button appearance, not multi-selection semantics.
 
+   A **pointer drag** on the runtime slider previews the handle and its
+   value locally and writes the URL **once, on release**; keyboard steps
+   still write each stop. ~~Every stop crossed mid-drag wrote the URL and
+   refetched the list.~~ The genre facet is **held across a refetch**, so
+   the Genre pill never disappears while a filter change loads and the
+   pills after it never shift under an open panel (owner, TASK-255,
+   `T-RANGE-002g`, `T-UX-169`).
+
    The labelled title-search form submits explicitly by Enter or its Search
    button to **URL `q`**; typing alone does not fetch. A search chip removes
    only `q`. The server performs owner-scoped title matching before filters,
