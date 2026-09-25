@@ -5668,7 +5668,7 @@ html[data-layout='phone'] .title-list .title-row {
   box-shadow: none;
   display: grid;
   gap: var(--space-3);
-  grid-template-columns: clamp(4.5rem, 30vw, 6.5rem) minmax(0, 1fr);
+  grid-template-columns: clamp(4.5rem, 26vw, 6.5rem) minmax(0, 1fr);
   padding: var(--space-2) 0;
   position: relative;
 }
