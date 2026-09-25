@@ -28,9 +28,9 @@
 
 import { useEffect, useState } from 'react';
 
-import { WIDE_VIEWPORT_QUERY } from '../breakpoints';
+import { SIDEBAR_VIEWPORT_QUERY, WIDE_VIEWPORT_QUERY } from '../breakpoints';
 
-function readWideViewport(): boolean {
+function readViewport(mediaQuery: string): boolean {
   /*
    * ⚠ Probed defensively — `matchMedia` is absent in jsdom unless a test
    * stubs it, and `window` is absent entirely under a non-DOM renderer. The
@@ -38,16 +38,16 @@ function readWideViewport(): boolean {
    * reason: a bare call throws at render time and takes the whole shell down.
    */
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return true;
-  return window.matchMedia(WIDE_VIEWPORT_QUERY).matches;
+  return window.matchMedia(mediaQuery).matches;
 }
 
-export function useWideViewport(): boolean {
-  const [wide, setWide] = useState(readWideViewport);
+function useViewportQuery(mediaQuery: string): boolean {
+  const [wide, setWide] = useState(() => readViewport(mediaQuery));
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
 
-    const query = window.matchMedia(WIDE_VIEWPORT_QUERY);
+    const query = window.matchMedia(mediaQuery);
     const update = (): void => setWide(query.matches);
 
     /*
@@ -72,7 +72,20 @@ export function useWideViewport(): boolean {
 
     query.addListener(update);
     return () => query.removeListener(update);
-  }, []);
+  }, [mediaQuery]);
 
   return wide;
+}
+
+export function useWideViewport(): boolean {
+  return useViewportQuery(WIDE_VIEWPORT_QUERY);
+}
+
+/**
+ * Whether the viewport is at or above `--bp-lg`, where the header is a
+ * sidebar with room for every destination. Falls back to `true` for the same
+ * reason as above: without `matchMedia`, every destination is a link.
+ */
+export function useSidebarViewport(): boolean {
+  return useViewportQuery(SIDEBAR_VIEWPORT_QUERY);
 }

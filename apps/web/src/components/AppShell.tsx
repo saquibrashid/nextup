@@ -65,11 +65,23 @@ import { LibraryNavigation } from './LibraryNavigation';
 // is the REGISTER that makes REQ-124's set closed; importing a drawing
 // directly bypasses it, and an unregistered icon could then ship without ever
 // meeting `T-UI-030`'s count.
-import { BrandIcon, CloseIcon, HistoryIcon, ListIcon, MenuIcon, UploadIcon } from './icons';
+import {
+  BrandIcon,
+  CheckIcon,
+  ClockIcon,
+  CloseIcon,
+  HistoryIcon,
+  InfoIcon,
+  ListIcon,
+  MenuIcon,
+  RatingIcon,
+  SuppressedIcon,
+  UploadIcon,
+} from './icons';
 import { Button } from './ui/Button';
 import { Dialog } from './ui/Dialog';
 import { useOnline } from '../lib/useOnline';
-import { useWideViewport } from '../lib/useWideViewport';
+import { useSidebarViewport, useWideViewport } from '../lib/useWideViewport';
 import { NAV_MENU_CLOSE_LABEL, NAV_MENU_LABEL, NAV_MENU_TITLE } from '../copy';
 import { ROUTES, type RouteDefinition } from '../routes';
 
@@ -82,8 +94,9 @@ const NAV_ITEMS: readonly NavRoute[] = ROUTES.filter(
 /**
  * The owner's hybrid navigation (issue 369): at and above `--bp-sm` the bar
  * shows the three destinations of the value loop — Library, Import, Review —
- * beside a Menu button; below it the bar is the Menu button alone. The drawer
- * lists all destinations at every width.
+ * beside a Menu button; below it the bar is the Menu button alone. At and
+ * above `--bp-lg` the header is a sidebar with room for every destination,
+ * so it lists them all directly and there is no Menu button or drawer.
  */
 const BAR_PATHS: readonly string[] = ['/', '/upload', '/batches'];
 
@@ -91,7 +104,12 @@ const BAR_PATHS: readonly string[] = ['/', '/upload', '/batches'];
 const BAR_ICONS: Record<string, ComponentType<{ readonly label?: string | undefined }>> = {
   '/': ListIcon,
   '/upload': UploadIcon,
-  '/batches': HistoryIcon,
+  '/batches': CheckIcon,
+  '/removed': HistoryIcon,
+  '/not-interested': SuppressedIcon,
+  '/waiting': ClockIcon,
+  '/about': InfoIcon,
+  '/rating': RatingIcon,
 };
 
 /**
@@ -222,6 +240,7 @@ export function AppShell(): JSX.Element {
   const online = useOnline();
   const location = useLocation();
   const wide = useWideViewport();
+  const sidebar = useSidebarViewport();
   const mainRef = useRef<HTMLElement>(null);
   const captureRoute = location.pathname === '/upload' || location.pathname.startsWith('/batches/');
 
@@ -235,7 +254,11 @@ export function AppShell(): JSX.Element {
     }
   }, [location.pathname]);
 
-  const barItems = wide ? NAV_ITEMS.filter((route) => BAR_PATHS.includes(route.path)) : [];
+  const barItems = sidebar
+    ? NAV_ITEMS
+    : wide
+      ? NAV_ITEMS.filter((route) => BAR_PATHS.includes(route.path))
+      : [];
   const [menuOpen, setMenuOpen] = useState(false);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -243,6 +266,11 @@ export function AppShell(): JSX.Element {
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname]);
+
+  // Widening into the sidebar closes the drawer, so narrowing again finds it closed.
+  useEffect(() => {
+    if (sidebar) setMenuOpen(false);
+  }, [sidebar]);
 
   return (
     <div className="app-shell">
@@ -260,23 +288,25 @@ export function AppShell(): JSX.Element {
                 <NavTextLink route={route} active={isRouteActive(location.pathname, route.path)} />
               </li>
             ))}
-            <li className="nav__menu">
-              <Button
-                ref={menuButtonRef}
-                variant="ghost"
-                aria-expanded={menuOpen}
-                aria-controls="nav-drawer"
-                aria-haspopup="dialog"
-                onClick={() => setMenuOpen(true)}
-              >
-                <MenuIcon />
-                <span>{NAV_MENU_LABEL}</span>
-              </Button>
-            </li>
+            {!sidebar && (
+              <li className="nav__menu">
+                <Button
+                  ref={menuButtonRef}
+                  variant="ghost"
+                  aria-expanded={menuOpen}
+                  aria-controls="nav-drawer"
+                  aria-haspopup="dialog"
+                  onClick={() => setMenuOpen(true)}
+                >
+                  <MenuIcon />
+                  <span>{NAV_MENU_LABEL}</span>
+                </Button>
+              </li>
+            )}
           </ul>
         </nav>
       </header>
-      {menuOpen && (
+      {menuOpen && !sidebar && (
         <NavDrawer
           pathname={location.pathname}
           onClose={() => setMenuOpen(false)}

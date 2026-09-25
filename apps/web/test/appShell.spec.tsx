@@ -10,7 +10,7 @@
  * route set itself is the subject.
  */
 
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
@@ -98,9 +98,9 @@ describe('AppShell and routing', () => {
     renderAt('/');
 
     const nav = screen.getByRole('navigation', { name: 'Primary' });
-    // Issue 369 — every destination is listed in the Menu drawer.
-    fireEvent.click(within(nav).getByRole('button', { name: 'Menu' }));
-    const labels = within(screen.getByRole('dialog', { name: 'Menu' }))
+    // Without matchMedia the shell renders the --bp-lg sidebar, which lists
+    // every destination directly (below it, the Menu drawer does - T-UX-132c).
+    const labels = within(nav)
       .getAllByRole('link')
       .map((link) => link.textContent);
 

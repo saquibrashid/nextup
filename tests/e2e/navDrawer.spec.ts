@@ -52,7 +52,8 @@ async function openMenu(page: Page) {
   return { menu, drawer };
 }
 
-for (const width of [320, 390, 640, 1280]) {
+// 1023 is the widest drawer width; from --bp-lg (1024) the sidebar lists everything (T-NAV-003).
+for (const width of [320, 390, 640, 1023]) {
   describe(`The Menu drawer at ${String(width)} px`, () => {
     beforeEach(async ({ page }) => {
       await page.setViewportSize({ width, height: 800 });
@@ -157,3 +158,73 @@ for (const width of [320, 390, 640, 1280]) {
     });
   });
 }
+
+describe('T-NAV-003: the sidebar at 1280 px lists every destination directly', () => {
+  beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await stubApi(page);
+  });
+
+  test('T-NAV-003a: every destination is visible in the nav, with no Menu button or drawer', async ({
+    page,
+  }) => {
+    await page.goto('/about');
+    const nav = page.getByRole('navigation', { name: 'Primary' });
+    await expect(nav.getByRole('link')).toHaveText(DESTINATIONS.map(([name]) => name));
+    for (const [name, href] of DESTINATIONS) {
+      const link = nav.getByRole('link', { name, exact: true });
+      await expect(link).toBeVisible();
+      await expect(link).toHaveAttribute('href', href);
+    }
+    await expect(nav.getByRole('link', { name: 'About', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await expect(nav.getByRole('button', { name: 'Menu' })).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+      true,
+    );
+  });
+
+  test('T-NAV-003b: the sidebar and the page sit in one frame, split by a hairline', async ({
+    page,
+  }) => {
+    await page.goto('/about');
+    const frame = await page.locator('.app-shell').boundingBox();
+    const nav = await page.getByRole('navigation', { name: 'Primary' }).boundingBox();
+    const content = await page.locator('.app-shell__content').boundingBox();
+    expect(frame && nav && content).toBeTruthy();
+    if (!frame || !nav || !content) return;
+    expect(nav.x).toBeGreaterThanOrEqual(frame.x);
+    expect(nav.x + nav.width).toBeLessThanOrEqual(content.x);
+    expect(content.x + content.width).toBeLessThanOrEqual(frame.x + frame.width + 1);
+    const divider = await page
+      .locator('.app-shell__content')
+      .evaluate((element) => getComputedStyle(element).borderInlineStartWidth);
+    expect(divider).toBe('1px');
+  });
+
+  test('T-NAV-003c: a sidebar link navigates and moves the current-page marking', async ({
+    page,
+  }) => {
+    await page.goto('/about');
+    const nav = page.getByRole('navigation', { name: 'Primary' });
+    await nav.getByRole('link', { name: 'Removal history', exact: true }).click();
+    await expect(page).toHaveURL(/\/removed$/);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Removal history');
+    await expect(nav.getByRole('link', { name: 'Removal history', exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
+  test('T-NAV-003d: the sidebar has no serious or critical axe violations', async ({ page }) => {
+    await page.goto('/about');
+    const scan = await new AxeBuilder({ page })
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+      .analyze();
+    expect(
+      scan.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical'),
+    ).toEqual([]);
+  });
+});

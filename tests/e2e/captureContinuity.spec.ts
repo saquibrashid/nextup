@@ -124,6 +124,11 @@ for (const width of [280, 390, 1440]) {
       await page.goto('/about');
       const primary = page.getByRole('navigation', { name: 'Primary' });
       const inlineImport = primary.getByRole('link', { name: 'Import', exact: true });
+      // Wait for the nav to render before choosing a path: the sidebar has no Menu.
+      await inlineImport
+        .or(primary.getByRole('button', { name: 'Menu' }))
+        .first()
+        .waitFor();
       if ((await inlineImport.count()) > 0) {
         await inlineImport.click();
       } else {

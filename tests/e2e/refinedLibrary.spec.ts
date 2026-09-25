@@ -126,6 +126,10 @@ function orderedTitles(
 async function navigateTo(page: Page, name: string): Promise<void> {
   const nav = page.getByRole('navigation', { name: 'Primary' });
   const inline = nav.getByRole('link', { name, exact: true });
+  await inline
+    .or(nav.getByRole('button', { name: 'Menu' }))
+    .first()
+    .waitFor();
   if ((await inline.count()) > 0) {
     await inline.click();
     return;
@@ -1448,11 +1452,13 @@ for (const width of [390, 1024, 1440]) {
         const first = await bounds(links.nth(0));
         const second = await bounds(links.nth(1));
         expect(second.y).toBeGreaterThanOrEqual(first.y + first.height);
-        await page.getByRole('navigation').getByRole('button', { name: 'Menu' }).click();
+        // The sidebar lists every destination directly; there is no Menu drawer at this width.
         await expect(
-          page.getByRole('dialog', { name: 'Menu' }).getByRole('link', { name: 'About' }),
+          page.getByRole('navigation').getByRole('link', { name: 'About' }),
         ).toBeVisible();
-        await page.keyboard.press('Escape');
+        await expect(
+          page.getByRole('navigation').getByRole('button', { name: 'Menu' }),
+        ).toHaveCount(0);
         for (const row of await page.locator('li.title-row').all()) {
           const poster = await bounds(row.locator('.title-row__poster'));
           const priority = await bounds(row.locator('.title-row__watch'));
