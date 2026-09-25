@@ -1151,6 +1151,44 @@ page reads as a coarser scale.
 
 ---
 
+## 7b. `/waiting` — Waiting to stream (US-042/US-043, #378, #380, restyled at #382)
+
+`pages/WaitingPage.tsx`. Restyled at TASK-257 in the Library's visual language;
+**presentation only** — what is added, removed or refreshed, the access-state
+and forecast logic, and the API are unchanged.
+
+- **One page heading**, *"Waiting to stream"*, in the Library heading type, with
+  the helper as its subtitle (`WAITING_SUBTITLE`). The search box has no heading
+  of its own; its landmark is named *"Wait for a title"*.
+- **Search** is Library's field: a rounded control with the search icon as its
+  submit (accessible name *Search*), a visually hidden label and a placeholder.
+- **Cards** sit on the catalogue surface (`--color-catalog-raised`, soft border,
+  card radius and shadow, hover/focus border), one column, two from 1024 px.
+  Posters are the Library's 2:3 box: 72 × 108 px, 96 × 144 px from 640 px.
+- Each card: the name (`h2`), edition labels, a `2025 · Movie` meta line (type
+  from the work identity; the `·` is CSS-generated), then the access state:
+  - **Now streaming** — the badge, the service marks, and *"Now on Netflix —
+    add it to your library"* linking to that service's import.
+  - **Rent or buy only** — a tag, the storefronts as muted chips, and *"Not
+    streaming on your services yet, as of 24 Sep 2026."* Rental is marked by the
+    tag; the line no longer repeats "(rent/buy)".
+  - otherwise Trap 4's bounded sentence (*"Not seen on your services as of …"*).
+  - **Streaming elsewhere** — known services as marks, unknown providers as
+    chips, and *"(not one of your services)"* in words.
+- **Forecast** (#380) is the card's headline: an *Estimate* or *Announced* tag,
+  the service mark and the when (`Oct 2026`, `Nov 2026 – Feb 2027`, `Soon`,
+  `Nov 4, 2026`). ⚠ The headline is decorative (`aria-hidden`); the sentence
+  under it is unchanged and still **leads with "Estimate:"** for a guess, so an
+  estimate never reads as an announcement. An estimate's tag and frame are
+  dashed as a second, non-colour cue.
+- **Footer**: *"Seen on Fandango at Home (rent/buy) on 24 Sep 2026"* in the
+  Library date style, and **Not interested** as a small ghost control (44 px
+  target) whose accessible name includes the title — not a card-wide button.
+- The JustWatch and Watchmode attributions stay verbatim, unconditional and
+  quiet below the list.
+
+---
+
 ## 8. TMDB attribution (US-011, NFR-016) — compliance, and invisible when broken
 
 `components/TmdbAttribution.tsx` renders, in the **global footer of

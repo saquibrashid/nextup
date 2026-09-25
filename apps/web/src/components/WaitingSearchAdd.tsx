@@ -18,7 +18,6 @@ import {
   WAITING_SEARCH_ALREADY_LISTED,
   WAITING_SEARCH_ALREADY_WAITING,
   WAITING_SEARCH_FAILED,
-  WAITING_SEARCH_HINT,
   WAITING_SEARCH_LABEL,
   WAITING_SEARCH_LEGEND,
   WAITING_SEARCH_NO_RESULTS,
@@ -29,6 +28,7 @@ import {
 import { ApiError, type TmdbSearchResult } from '../lib/apiClient';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
+import { SearchIcon } from './icons';
 
 export interface WaitingSearchAddProps {
   readonly onSearch: (query: string) => Promise<readonly TmdbSearchResult[]>;
@@ -65,7 +65,6 @@ export function WaitingSearchAdd({
   const [pending, setPending] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<{ tone: 'status' | 'alert'; text: string } | null>(null);
   const inputId = useId();
-  const hintId = useId();
 
   function search(event: FormEvent): void {
     event.preventDefault();
@@ -103,21 +102,34 @@ export function WaitingSearchAdd({
       data-testid="waiting-search"
       aria-label={WAITING_SEARCH_LEGEND}
     >
-      <h2>{WAITING_SEARCH_LEGEND}</h2>
-      <p id={hintId}>{WAITING_SEARCH_HINT}</p>
+      {/*
+        #382 — Library's search field: a rounded field with the search icon as
+        its submit. The label stays in the DOM (visually hidden) so the input
+        keeps a real accessible name rather than relying on the placeholder.
+      */}
       <form className="waiting-search__form" onSubmit={search} role="search">
-        <label htmlFor={inputId}>{WAITING_SEARCH_LABEL}</label>
-        <Input
-          id={inputId}
-          type="search"
-          value={query}
-          aria-describedby={hintId}
-          data-testid="waiting-search-input"
-          onChange={(event) => setQuery(event.target.value)}
-        />
-        <Button type="submit" data-testid="waiting-search-submit" disabled={offline}>
-          {WAITING_SEARCH_ACTION}
-        </Button>
+        <label className="sr-only" htmlFor={inputId}>
+          {WAITING_SEARCH_LABEL}
+        </label>
+        <span className="list-search__control waiting-search__control">
+          <Button
+            type="submit"
+            variant="ghost"
+            aria-label={WAITING_SEARCH_ACTION}
+            data-testid="waiting-search-submit"
+            disabled={offline}
+          >
+            <SearchIcon />
+          </Button>
+          <Input
+            id={inputId}
+            type="search"
+            value={query}
+            placeholder={WAITING_SEARCH_LABEL}
+            data-testid="waiting-search-input"
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </span>
       </form>
 
       {phase.kind === 'searching' && <p role="status">{WAITING_SEARCH_SEARCHING}</p>}

@@ -1685,7 +1685,9 @@ export const JUSTWATCH_ATTRIBUTION = 'Streaming availability data provided by Ju
  * offer is how the owner can watch it NOW for money; the waiting view exists
  * for the moment it reaches a subscription. The sentence says both halves.
  */
-export const WAITING_RENT_ONLY_PREFIX = 'Rent or buy only (rent/buy) on';
+export const WAITING_RENT_ONLY_TAG = 'Rent or buy only';
+/** The accessible name of the storefront chips under the tag (#382). */
+export const WAITING_RENT_ONLY_LIST_LABEL = 'Rent or buy on';
 export const WAITING_RENT_ONLY_SUFFIX = 'Not streaming on your services yet, as of';
 /** The highlight on a row that has reached one of the owner's services. */
 export const WAITING_NOW_STREAMING_BADGE = 'Now streaming';
@@ -1697,6 +1699,10 @@ export const WAITING_STREAMING_SINCE = 'first seen streaming';
  */
 export const WAITING_OTHER_SERVICES_PREFIX = 'Streaming on';
 export const WAITING_OTHER_SERVICES_SUFFIX = '(not one of your services)';
+/** #382 — the forecast headline's tag. The sentence under it says it again in full. */
+export const WAITING_FORECAST_TAG_ESTIMATE = 'Estimate';
+export const WAITING_FORECAST_TAG_ANNOUNCED = 'Announced';
+export const WAITING_FORECAST_SOON = 'Soon';
 
 /* ── #380 — when and where it is expected to stream ─────────────────────── */
 
@@ -1715,10 +1721,12 @@ export const WAITING_FORECAST_ESTIMATE_SOON = 'soon';
 /** Watchmode's free plan requires attribution (ADR-0010 Rev 3). */
 export const WATCHMODE_ATTRIBUTION_LINK = 'watchmode.com';
 
+/** #382 — the one page heading's subtitle; the search box no longer has its own heading. */
+export const WAITING_SUBTITLE =
+  'Titles you would rather wait to stream than rent or buy. Each stays here until it reaches a streaming service.';
+/** The search landmark's name. */
 export const WAITING_SEARCH_LEGEND = 'Wait for a title';
-export const WAITING_SEARCH_HINT =
-  'Search for something you would rather wait to stream than rent or buy.';
-export const WAITING_SEARCH_LABEL = 'Title';
+export const WAITING_SEARCH_LABEL = 'Search for a title to wait for';
 export const WAITING_SEARCH_ACTION = 'Search';
 export const WAITING_SEARCH_SEARCHING = 'Searching…';
 export const WAITING_SEARCH_NO_RESULTS = 'No matches. Try a different spelling.';

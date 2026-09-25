@@ -24,6 +24,8 @@ import { ApiError, type TmdbSearchResult, type WaitingItem } from '../src/lib/ap
 import {
   WAITING_NOW_STREAMING_BADGE,
   WAITING_OTHER_SERVICES_SUFFIX,
+  WAITING_RENT_ONLY_LIST_LABEL,
+  WAITING_RENT_ONLY_TAG,
   WAITING_SEARCH_ADDED,
   WAITING_SEARCH_ALREADY_LISTED,
   WAITING_SEARCH_ALREADY_WAITING,
@@ -33,8 +35,8 @@ import {
 import {
   WaitingPage,
   orderWaiting,
-  otherServicesLine,
-  rentOnlyLine,
+  otherStreaming,
+  rentOnlyStores,
 } from '../src/pages/WaitingPage';
 import { UploadPage } from '../src/pages/UploadPage';
 import { searchAddRefusal } from '../src/components/WaitingSearchAdd';
@@ -67,15 +69,24 @@ function item(over: Partial<WaitingItem> = {}): WaitingItem {
 }
 
 describe('T-AVAIL-015 · #378 · each access state reads as what it is', () => {
-  it('T-AVAIL-015a · rent-only names the storefronts, says (rent/buy), and is never the flag', () => {
+  it('T-AVAIL-015a · rent-only names the storefronts, is marked as rental, and is never the flag', () => {
     const row = item({ accessState: 'rent-only', rentOn: ['Apple TV', 'Amazon Video'] });
     render(<WaitingPage items={[row]} />);
 
-    const line = screen.getByTestId('waiting-rent-only').textContent ?? '';
-    expect(line).toContain('Apple TV, Amazon Video');
-    expect(line).toContain('(rent/buy)');
+    const block = screen.getByTestId('waiting-rent-only');
+    const line = block.textContent ?? '';
+    // #382 — storefronts are chips under a "Rent or buy only" tag, and the
+    // redundant "(rent/buy)" no longer repeats the tag.
+    expect(line).toContain(WAITING_RENT_ONLY_TAG);
+    expect(
+      within(block)
+        .getAllByTestId('waiting-rent-store')
+        .map((chip) => chip.textContent),
+    ).toEqual(['Apple TV', 'Amazon Video']);
+    expect(within(block).getByRole('list', { name: WAITING_RENT_ONLY_LIST_LABEL })).toBeTruthy();
+    expect(line).not.toContain('(rent/buy)');
     expect(line).toContain('Not streaming on your services yet');
-    expect(line).toContain('2026-02-01');
+    expect(line).toContain('1 Feb 2026');
     expect(screen.queryByTestId('waiting-flag')).toBeNull();
     expect(screen.queryByTestId('waiting-streaming-badge')).toBeNull();
     // The rent line REPLACES the weaker sentence rather than sitting beside it.
@@ -83,8 +94,16 @@ describe('T-AVAIL-015 · #378 · each access state reads as what it is', () => {
   });
 
   it('T-AVAIL-015b · rent-only with no named storefront falls back to the bounded sentence', () => {
-    expect(rentOnlyLine(item({ accessState: 'rent-only', rentOn: [] }))).toBeNull();
-    expect(rentOnlyLine(item({ accessState: 'not-seen', rentOn: ['Apple TV'] }))).toBeNull();
+    expect(rentOnlyStores(item({ accessState: 'rent-only', rentOn: [] }))).toBeNull();
+    expect(rentOnlyStores(item({ accessState: 'not-seen', rentOn: ['Apple TV'] }))).toBeNull();
+    expect(
+      rentOnlyStores(
+        item({ accessState: 'rent-only', rentOn: ['Apple TV'], availabilityCheckedAt: null }),
+      ),
+    ).toBeNull();
+    render(<WaitingPage items={[item({ accessState: 'rent-only', rentOn: [] })]} />);
+    expect(screen.queryByTestId('waiting-rent-only')).toBeNull();
+    expect(screen.getByTestId('waiting-availability')).toBeTruthy();
   });
 
   it('T-AVAIL-015c · a service the owner does not use is said in words, apart from the flag', () => {
@@ -97,12 +116,17 @@ describe('T-AVAIL-015 · #378 · each access state reads as what it is', () => {
     render(<WaitingPage items={[row]} />);
 
     const other = screen.getByTestId('waiting-other-services');
-    expect(other.textContent).toContain('Max, Hulu');
+    // #382 — a known service is its mark (the name kept accessibly), an
+    // unknown provider is a named chip; the words still say "not yours".
+    expect(other.textContent).toContain('Max');
+    expect(other.querySelector('.brand-mark')).not.toBeNull();
+    expect(within(other).getByTestId('waiting-other-provider').textContent).toBe('Hulu');
     expect(other.textContent).toContain(WAITING_OTHER_SERVICES_SUFFIX);
     // Not the good-news line: no flag, no badge, no invitation to import.
     expect(screen.queryByTestId('waiting-flag')).toBeNull();
     expect(screen.queryByTestId('waiting-streaming-badge')).toBeNull();
-    expect(otherServicesLine(item())).toBeNull();
+    expect(otherStreaming(item())).toBeNull();
+    expect(otherStreaming(row)).toEqual({ services: ['max'], providers: ['Hulu'] });
   });
 
   it('T-AVAIL-015d · a row on the owner\u2019s services is badged, dated and leads the list', () => {
@@ -123,7 +147,7 @@ describe('T-AVAIL-015 · #378 · each access state reads as what it is', () => {
       WAITING_NOW_STREAMING_BADGE,
     );
     expect(within(rows[0]!).getByTestId('waiting-streaming-since').textContent).toContain(
-      '2026-02-03',
+      '3 Feb 2026',
     );
     expect(orderWaiting([waiting, streaming]).map((row) => row.intentId)).toEqual(['wi-b', 'wi-a']);
   });
@@ -138,8 +162,8 @@ describe('T-AVAIL-015 · #378 · each access state reads as what it is', () => {
       />,
     );
     const lines = screen.getAllByTestId('waiting-discovery').map((el) => el.textContent);
-    expect(lines).toContain('Seen on Apple TV (rent/buy) on 2026-01-04');
-    expect(lines).toContain('Added by search on 2026-01-04');
+    expect(lines).toContain('Seen on Apple TV (rent/buy) on 4 Jan 2026');
+    expect(lines).toContain('Added by search on 4 Jan 2026');
   });
 });
 

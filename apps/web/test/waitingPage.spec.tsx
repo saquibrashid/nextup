@@ -63,7 +63,9 @@ describe('T-AVAIL-006 · US-042 AC-6 · the sentence the data can support', () =
 
     const line = screen.getByTestId('waiting-availability').textContent ?? '';
     expect(line).toContain(WAITING_NOT_ON_YOUR_SERVICES);
-    expect(line).toContain('2026-02-01');
+    // #382 — the Library's date style, never a raw ISO date.
+    expect(line).toContain('1 Feb 2026');
+    expect(line).not.toContain('2026-02-01');
   });
 
   it('T-AVAIL-006b · ASKED-AND-NOBODY renders the SAME bounded sentence', () => {
@@ -97,7 +99,7 @@ describe('T-AVAIL-006 · US-042 AC-6 · the sentence the data can support', () =
 
   it('T-AVAIL-006e · the rule is decided by the sentence chooser, not by the DOM', () => {
     expect(availabilityLine(item({ availabilityCheckedAt: null }))).toBe(WAITING_NOT_CHECKED);
-    expect(availabilityLine(item())).toBe(`${WAITING_NOT_ON_YOUR_SERVICES} 2026-02-01.`);
+    expect(availabilityLine(item())).toBe(`${WAITING_NOT_ON_YOUR_SERVICES} 1 Feb 2026.`);
   });
 });
 
