@@ -27,9 +27,12 @@ import {
   WATCHMODE_ATTRIBUTION_URL,
   intentSourceLabel,
   releaseYearText,
+  type Service,
 } from '@nextup/domain';
 import { EditionLabels } from '../components/EditionLabels';
+import { ServiceMark } from '../components/ServiceMark';
 import { WaitingSearchAdd } from '../components/WaitingSearchAdd';
+import { SuppressedIcon } from '../components/icons';
 
 import {
   JUSTWATCH_ATTRIBUTION,
@@ -44,6 +47,9 @@ import {
   WAITING_FORECAST_ESTIMATE_AROUND,
   WAITING_FORECAST_ESTIMATE_PREFIX,
   WAITING_FORECAST_ESTIMATE_SOON,
+  WAITING_FORECAST_SOON,
+  WAITING_FORECAST_TAG_ANNOUNCED,
+  WAITING_FORECAST_TAG_ESTIMATE,
   WAITING_LOADING,
   WAITING_NOT_CHECKED,
   WAITING_NOT_INTERESTED,
@@ -54,16 +60,20 @@ import {
   WAITING_OTHER_SERVICES_PREFIX,
   WAITING_OTHER_SERVICES_SUFFIX,
   WAITING_REFRESH_FAILED,
-  WAITING_RENT_ONLY_PREFIX,
+  WAITING_RENT_ONLY_LIST_LABEL,
   WAITING_RENT_ONLY_SUFFIX,
+  WAITING_RENT_ONLY_TAG,
   WAITING_STREAMING_SINCE,
+  WAITING_SUBTITLE,
   WAITING_SUPPRESS_FAILED,
   WATCHMODE_ATTRIBUTION_LINK,
 } from '../copy';
 import type { TmdbSearchResult, WaitingItem } from '../lib/apiClient';
-import { TMDB_IMAGE_BASE } from '../components/TitleRow';
+import { TMDB_IMAGE_BASE, TMDB_IMAGE_BASE_2X } from '../components/TitleRow';
+import { formatDateShort } from './RemovedPage';
 import { useOnline } from '../lib/useOnline';
 import { Button } from '../components/ui/Button';
+import { Badge } from '../components/ui/Badge';
 
 export interface WaitingPageProps {
   readonly items?: readonly WaitingItem[];
@@ -78,9 +88,21 @@ export interface WaitingPageProps {
   readonly onSearchAdd?: (result: TmdbSearchResult) => Promise<unknown>;
 }
 
+function knownService(service: string): Service | undefined {
+  return SERVICES.find((candidate) => candidate === service);
+}
+
 function serviceLabel(service: string): string {
-  const known = SERVICES.find((candidate) => candidate === service);
+  const known = knownService(service);
   return known === undefined ? service : SERVICE_LABELS[known];
+}
+
+/**
+ * #382 — the Library's date style (`4 Jan 2026`) for every as-of and
+ * discovery date on the row, rather than a raw ISO `2026-01-04`.
+ */
+function friendlyDate(iso: string): string {
+  return formatDateShort(iso.slice(0, 10));
 }
 
 /**
@@ -92,37 +114,43 @@ function serviceLabel(service: string): string {
  */
 export function availabilityLine(item: WaitingItem): string {
   if (item.availabilityCheckedAt === null) return WAITING_NOT_CHECKED;
-  const asOf = item.availabilityCheckedAt.slice(0, 10);
-  return `${WAITING_NOT_ON_YOUR_SERVICES} ${asOf}.`;
+  return `${WAITING_NOT_ON_YOUR_SERVICES} ${friendlyDate(item.availabilityCheckedAt)}.`;
 }
 
 /**
- * #378 — the rent-only sentence, or `null` when the row is not rent-only.
+ * #378/#382 — the storefronts a rent-only row can be rented or bought on, or
+ * `null` when the row is not rent-only.
  *
- * ⚠ Says BOTH halves: where it can be rented or bought, and that it is not
- * streaming on the owner's services. A rental offer alone must never read
- * as the answer the waiting view exists to give.
+ * ⚠ The row renders BOTH halves: where it can be rented or bought, and that
+ * it is not streaming on the owner's services. A rental offer alone must
+ * never read as the answer the waiting view exists to give — which is why a
+ * rent-only row with no as-of date falls back to the bounded sentence.
  */
-export function rentOnlyLine(item: WaitingItem): string | null {
+export function rentOnlyStores(item: WaitingItem): readonly string[] | null {
   if (item.accessState !== 'rent-only') return null;
   const rentOn = item.rentOn ?? [];
   if (rentOn.length === 0 || item.availabilityCheckedAt === null) return null;
-  const asOf = item.availabilityCheckedAt.slice(0, 10);
-  return `${WAITING_RENT_ONLY_PREFIX} ${rentOn.join(', ')}. ${WAITING_RENT_ONLY_SUFFIX} ${asOf}.`;
+  return rentOn;
 }
 
 /**
  * #378, owner decision 3 — streaming somewhere the owner does not subscribe,
- * or `null`. Services nextup knows and providers it does not are one list
- * here: to the owner both are simply "not mine".
+ * or `null`. Services nextup knows are drawn as their marks; providers it
+ * does not know are named as chips. To the owner both are simply "not mine".
  */
-export function otherServicesLine(item: WaitingItem): string | null {
-  const names = [
-    ...(item.otherServicesOn ?? []).map(serviceLabel),
+export function otherStreaming(
+  item: WaitingItem,
+): { services: readonly Service[]; providers: readonly string[] } | null {
+  const services = (item.otherServicesOn ?? []).flatMap((service) => {
+    const known = knownService(service);
+    return known === undefined ? [] : [known];
+  });
+  const providers = [
+    ...(item.otherServicesOn ?? []).filter((service) => knownService(service) === undefined),
     ...(item.otherProvidersOn ?? []),
   ];
-  if (names.length === 0) return null;
-  return `${WAITING_OTHER_SERVICES_PREFIX} ${names.join(', ')} ${WAITING_OTHER_SERVICES_SUFFIX}`;
+  if (services.length === 0 && providers.length === 0) return null;
+  return { services, providers };
 }
 
 const MONTHS = [
@@ -194,10 +222,49 @@ export function forecastLine(
   }
 }
 
-/** A literal map, so the class vocabulary stays scannable (`T-CSS-001c`). */
+/**
+ * #382 — the forecast headline's "when": `Jan 2027`, `Nov 2026 – Feb 2027`,
+ * `Oct 3, 2026` or `Soon`. The same date wording as the sentence under it, so
+ * the two can never disagree.
+ */
+export function forecastWhen(forecast: NonNullable<WaitingItem['forecast']>): string {
+  switch (forecast.kind) {
+    case 'announced':
+      return dayText(forecast.on);
+    case 'estimate':
+      return monthText(forecast.month);
+    case 'estimate-range':
+      return `${monthText(forecast.from)} – ${monthText(forecast.to)}`;
+    case 'estimate-soon':
+      return WAITING_FORECAST_SOON;
+  }
+}
+
+/** `tmdb:movie:…` / `tmdb:tv:…` → the Library's type word, or `null`. */
+function mediaTypeText(workIdentity: string): string | null {
+  const kind = /^tmdb:(movie|tv):/.exec(workIdentity)?.[1];
+  return kind === 'movie' ? 'Movie' : kind === 'tv' ? 'TV' : null;
+}
+
+/** Literal maps, so the class vocabulary stays scannable (`T-CSS-001c`). */
 const FORECAST_CLASS = {
   announced: 'waiting-row__forecast',
   estimate: 'waiting-row__forecast waiting-row__forecast--estimate',
+} as const;
+
+const OUTLOOK_CLASS = {
+  announced: 'waiting-row__outlook',
+  estimate: 'waiting-row__outlook waiting-row__outlook--estimate',
+} as const;
+
+const TAG_CLASS = {
+  announced: 'waiting-row__tag waiting-row__tag--announced',
+  estimate: 'waiting-row__tag waiting-row__tag--estimate',
+} as const;
+
+const FORECAST_TAG = {
+  announced: WAITING_FORECAST_TAG_ANNOUNCED,
+  estimate: WAITING_FORECAST_TAG_ESTIMATE,
 } as const;
 
 /**
@@ -217,6 +284,28 @@ const ROW_CLASS = {
   waiting: 'waiting-row',
 } as const;
 
+/** Service marks as Library draws them. Decorative where words say the same. */
+function ServiceBadges({
+  services,
+  decorative = false,
+}: {
+  services: readonly Service[];
+  decorative?: boolean;
+}): JSX.Element | null {
+  if (services.length === 0) return null;
+  return (
+    <ul className="waiting-row__services" aria-hidden={decorative ? true : undefined}>
+      {services.map((service) => (
+        <li key={service}>
+          <Badge>
+            <ServiceMark service={service} nameHidden />
+          </Badge>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function WaitingRow({
   item,
   onSuppress,
@@ -230,11 +319,16 @@ function WaitingRow({
 }): JSX.Element {
   const [phase, setPhase] = useState<'idle' | 'submitting' | 'error'>('idle');
   const flagged = item.flaggedOn ?? [];
-  const rentOnly = rentOnlyLine(item);
-  const others = otherServicesLine(item);
+  const flaggedServices = flagged.flatMap((service) => {
+    const known = knownService(service);
+    return known === undefined ? [] : [known];
+  });
+  const rentStores = rentOnlyStores(item);
+  const others = otherStreaming(item);
   const forecast = flagged.length > 0 ? null : forecastLine(item);
   const forecastKind = forecast?.estimate === true ? 'estimate' : 'announced';
   const rowKind = flagged.length > 0 ? 'streaming' : 'waiting';
+  const mediaType = mediaTypeText(item.workIdentity);
 
   function suppress(): void {
     setPhase('submitting');
@@ -250,6 +344,7 @@ function WaitingRow({
         <img
           className="waiting-row__poster"
           src={`${TMDB_IMAGE_BASE}${item.posterPath}`}
+          srcSet={`${TMDB_IMAGE_BASE}${item.posterPath} 1x, ${TMDB_IMAGE_BASE_2X}${item.posterPath} 2x`}
           alt=""
           data-testid="waiting-poster"
         />
@@ -261,93 +356,158 @@ function WaitingRow({
       )}
 
       <div className="waiting-row__body">
-        {flagged.length > 0 && (
-          <span className="waiting-row__badge" data-testid="waiting-streaming-badge">
-            {WAITING_NOW_STREAMING_BADGE}
-          </span>
-        )}
-        <span data-testid="waiting-name">{item.name}</span>
-        <EditionLabels labels={item.editionLabels} />
-        {item.releaseYear !== null && (
-          <span data-testid="waiting-year">
-            {releaseYearText(item.releaseYear, (item.editionLabels?.length ?? 0) > 0)}
-          </span>
-        )}
+        <div className="waiting-row__heading">
+          {flagged.length > 0 && (
+            <span className="waiting-row__badge" data-testid="waiting-streaming-badge">
+              {WAITING_NOW_STREAMING_BADGE}
+            </span>
+          )}
+          <h2 className="waiting-row__name" data-testid="waiting-name">
+            {item.name}
+          </h2>
+          <EditionLabels labels={item.editionLabels} />
+        </div>
 
-        {/*
-          US-043 AC-1 — the discovery date and where it came from. The label
-          carries "(rent/buy)" for a storefront (#378), and a search add says
-          so rather than naming a storefront it never came from.
-        */}
-        <p data-testid="waiting-discovery">
-          {item.discoverySource === 'search'
-            ? `${intentSourceLabel(item.discoverySource)} on ${item.discoveredAt}`
-            : `Seen on ${intentSourceLabel(item.discoverySource)} on ${item.discoveredAt}`}
-        </p>
-
-        {flagged.length > 0 ? (
-          <p className="waiting-row__flag" data-testid="waiting-flag">
-            {`${WAITING_NOW_ON_PREFIX} ${flagged.map(serviceLabel).join(' and ')} — `}
-            {/* Straight to the import for that service, never an auto-add. */}
-            <Link
-              to={`/upload?service=${encodeURIComponent(flagged[0] ?? '')}`}
-              data-testid="waiting-flag-link"
-            >
-              {WAITING_NOW_ON_INVITATION}
-            </Link>
-            {item.streamingSince != null && (
-              <span data-testid="waiting-streaming-since">
-                {` (${WAITING_STREAMING_SINCE} ${item.streamingSince.slice(0, 10)})`}
+        {/* Library's `title-row__facts`: the `·` separators are CSS-generated. */}
+        {(item.releaseYear !== null || mediaType !== null) && (
+          <p className="waiting-row__meta" data-testid="waiting-meta">
+            {item.releaseYear !== null && (
+              <span data-testid="waiting-year">
+                {releaseYearText(item.releaseYear, (item.editionLabels?.length ?? 0) > 0)}
               </span>
             )}
+            {mediaType !== null && <span data-testid="waiting-media-type">{mediaType}</span>}
           </p>
-        ) : rentOnly !== null ? (
-          <p className="waiting-row__rent" data-testid="waiting-rent-only">
-            {rentOnly}
-          </p>
+        )}
+
+        {flagged.length > 0 ? (
+          <div className="waiting-row__status">
+            <ServiceBadges services={flaggedServices} decorative />
+            <p className="waiting-row__flag" data-testid="waiting-flag">
+              {`${WAITING_NOW_ON_PREFIX} ${flagged.map(serviceLabel).join(' and ')} — `}
+              {/* Straight to the import for that service, never an auto-add. */}
+              <Link
+                to={`/upload?service=${encodeURIComponent(flagged[0] ?? '')}`}
+                data-testid="waiting-flag-link"
+              >
+                {WAITING_NOW_ON_INVITATION}
+              </Link>
+              {item.streamingSince != null && (
+                <span className="waiting-row__since" data-testid="waiting-streaming-since">
+                  {` (${WAITING_STREAMING_SINCE} ${friendlyDate(item.streamingSince)})`}
+                </span>
+              )}
+            </p>
+          </div>
+        ) : rentStores !== null ? (
+          /*
+            #382 — the storefronts as compact chips under a "Rent or buy only"
+            tag, rather than one long sentence. ⚠ The second half — not
+            streaming on the owner's services, as of when — is still said in
+            words: a rental offer is never the answer this view exists for.
+          */
+          <div className="waiting-row__rent" data-testid="waiting-rent-only">
+            <span className="waiting-row__tag waiting-row__tag--rent">{WAITING_RENT_ONLY_TAG}</span>
+            <ul className="waiting-row__chips" aria-label={WAITING_RENT_ONLY_LIST_LABEL}>
+              {rentStores.map((store) => (
+                <li key={store} className="chip" data-testid="waiting-rent-store">
+                  {store}
+                </li>
+              ))}
+            </ul>
+            <p className="waiting-row__note">
+              {`${WAITING_RENT_ONLY_SUFFIX} ${friendlyDate(item.availabilityCheckedAt ?? '')}.`}
+            </p>
+          </div>
         ) : (
-          <p data-testid="waiting-availability">{availabilityLine(item)}</p>
+          <p className="waiting-row__note" data-testid="waiting-availability">
+            {availabilityLine(item)}
+          </p>
         )}
 
         {others !== null && (
-          <p className="waiting-row__other" data-testid="waiting-other-services">
-            {others}
-          </p>
+          <div className="waiting-row__other" data-testid="waiting-other-services">
+            <span>{WAITING_OTHER_SERVICES_PREFIX}</span>
+            <ServiceBadges services={others.services} />
+            {others.providers.length > 0 && (
+              <ul className="waiting-row__chips">
+                {others.providers.map((provider) => (
+                  <li key={provider} className="chip" data-testid="waiting-other-provider">
+                    {provider}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <span>{WAITING_OTHER_SERVICES_SUFFIX}</span>
+          </div>
         )}
 
-        {forecast !== null && (
-          <p className={FORECAST_CLASS[forecastKind]} data-testid="waiting-forecast">
-            {forecast.text}
-          </p>
+        {forecast !== null && item.forecast != null && (
+          /*
+            #382 — the most useful fact on the row, as a headline: a tag that
+            says Estimate or Announced, the service's mark and the "when".
+            ⚠ The headline is decorative (`aria-hidden`); the sentence under
+            it is the accessible truth and still LEADS with "Estimate:" for a
+            guess (#380), so an estimate never reads as an announcement.
+          */
+          <div className={OUTLOOK_CLASS[forecastKind]}>
+            <p className="waiting-row__outlook-head" aria-hidden="true">
+              <span className={TAG_CLASS[forecastKind]}>{FORECAST_TAG[forecastKind]}</span>
+              <Badge>
+                <ServiceMark service={item.forecast.service} nameHidden />
+              </Badge>
+              <span className="waiting-row__when">{forecastWhen(item.forecast)}</span>
+            </p>
+            <p className={FORECAST_CLASS[forecastKind]} data-testid="waiting-forecast">
+              {forecast.text}
+            </p>
+          </div>
         )}
 
-        {phase === 'idle' && (
-          <Button
-            variant="secondary"
-            data-testid="waiting-not-interested"
-            disabled={offline}
-            onClick={suppress}
-          >
-            {WAITING_NOT_INTERESTED}
-          </Button>
-        )}
+        <div className="waiting-row__footer">
+          {/*
+            US-043 AC-1 — the discovery date and where it came from. The label
+            carries "(rent/buy)" for a storefront (#378), and a search add says
+            so rather than naming a storefront it never came from.
+          */}
+          <p className="waiting-row__date" data-testid="waiting-discovery">
+            {item.discoverySource === 'search'
+              ? `${intentSourceLabel(item.discoverySource)} on ${friendlyDate(item.discoveredAt)}`
+              : `Seen on ${intentSourceLabel(item.discoverySource)} on ${friendlyDate(item.discoveredAt)}`}
+          </p>
+
+          <div className="waiting-row__actions">
+            {phase === 'idle' && (
+              <Button
+                variant="ghost"
+                data-testid="waiting-not-interested"
+                aria-label={`${WAITING_NOT_INTERESTED}: ${item.name}`}
+                disabled={offline}
+                onClick={suppress}
+              >
+                <SuppressedIcon />
+                {WAITING_NOT_INTERESTED}
+              </Button>
+            )}
+            {phase === 'submitting' && (
+              <Button variant="ghost" data-testid="waiting-suppressing" disabled>
+                {'Working…'}
+              </Button>
+            )}
+            {phase === 'error' && (
+              <Button variant="ghost" data-testid="waiting-not-interested" onClick={suppress}>
+                {RETRY_LABEL}
+              </Button>
+            )}
+          </div>
+        </div>
         {offline && phase === 'idle' && (
           <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>
         )}
-        {phase === 'submitting' && (
-          <Button variant="secondary" data-testid="waiting-suppressing" disabled>
-            {'Working…'}
-          </Button>
-        )}
         {phase === 'error' && (
-          <>
-            <p role="alert" data-testid="waiting-suppress-error">
-              {WAITING_SUPPRESS_FAILED}
-            </p>
-            <Button variant="secondary" data-testid="waiting-not-interested" onClick={suppress}>
-              {RETRY_LABEL}
-            </Button>
-          </>
+          <p role="alert" data-testid="waiting-suppress-error">
+            {WAITING_SUPPRESS_FAILED}
+          </p>
         )}
       </div>
     </li>
@@ -371,7 +531,13 @@ export function WaitingPage({
 
   return (
     <>
-      <h1>Waiting to stream</h1>
+      {/* #382 — one page heading, Library's type, with the helper as its subtitle. */}
+      <div className="waiting-heading">
+        <h1>Waiting to stream</h1>
+        <p className="waiting-heading__subtitle" data-testid="waiting-subtitle">
+          {WAITING_SUBTITLE}
+        </p>
+      </div>
 
       {onSearch !== undefined && onSearchAdd !== undefined && (
         <WaitingSearchAdd onSearch={onSearch} onAdd={onSearchAdd} offline={offline} />

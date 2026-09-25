@@ -2030,38 +2030,74 @@ button {
 }
 
 /*
- * TASK-188/189 (`specs/ui.md` §7). The waiting view reuses the suppressed-row
- * geometry so a work the owner is waiting for reads as the same kind of thing
- * as a work they have set aside — one poster, one body, the same weight.
+ * TASK-188/189 (`specs/ui.md` §7b), restyled at #382 in the Library's visual
+ * language: one page heading with a subtitle, poster-forward cards on the
+ * catalogue surface, the Library's meta line and service marks, and quiet
+ * footers. The breakpoints are the Library's (640 / 1024 px).
+ *
+ * ⚠ EVERY STATE IS STILL CARRIED BY WORDS. The tags, dashed rules and the
+ * success border only reinforce "Now streaming", "Rent or buy only",
+ * "(not one of your services)" and "Estimate:" — never replace them, so the
+ * view survives greyscale and forced colours (`specs/ui.md` §10.2).
  */
+.waiting-heading {
+  margin-bottom: var(--space-4);
+}
+
+.waiting-heading h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-medium);
+  letter-spacing: -0.015em;
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+.waiting-heading__subtitle {
+  color: var(--color-text-muted);
+  margin: var(--space-1) 0 0;
+  max-width: 52rem;
+}
+
 .waiting-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
+  isolation: isolate;
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
 .waiting-row {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  display: flex;
+  background: var(--color-catalog-raised);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  display: grid;
   gap: var(--space-3);
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  min-width: 0;
   padding: var(--space-3);
+  transition: border-color 140ms ease;
+}
+
+.waiting-row:hover,
+.waiting-row:focus-within {
+  border-color: var(--color-border);
 }
 
 .waiting-row[aria-busy='true'] {
   opacity: 0.6;
 }
 
+/* REQ-111's uniform 2:3 box, at the Library's sizes. */
 .waiting-row__poster {
-  border-radius: var(--radius);
-  flex: 0 0 auto;
-  height: 4.5rem;
+  aspect-ratio: 2 / 3;
+  border-radius: var(--radius-poster);
+  height: 6.75rem;
   object-fit: cover;
-  width: 3rem;
+  width: 4.5rem;
 }
 
 .waiting-row__poster--empty {
@@ -2071,15 +2107,206 @@ button {
 
 .waiting-row__body {
   display: flex;
-  flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
+  min-width: 0; /* ⚠ Without this a long title forces horizontal scroll at 320 px. */
+}
+
+.waiting-row__heading {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.waiting-row__name {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The Library's meta line: `2021 · Movie`, separators kept out of the accessible name. */
+.waiting-row__meta {
+  color: var(--color-text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--text-sm);
+  gap: 0 var(--space-2);
+  margin: 0;
+}
+
+.waiting-row__meta > span + span::before {
+  content: '·';
+  margin-right: var(--space-2);
+}
+
+.waiting-row__status,
+.waiting-row__rent,
+.waiting-row__other {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
   min-width: 0;
 }
 
 /* The flag is the one genuinely good-news line on the screen. */
 .waiting-row__flag {
   font-weight: var(--weight-medium);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.waiting-row__since {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-normal);
+}
+
+.waiting-row__services,
+.waiting-row__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  list-style: none;
+  margin: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.waiting-row__services .badge {
+  background: var(--color-bg);
+  color: var(--color-secondary);
+}
+
+.waiting-row__chips .chip {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.waiting-row__note {
+  color: var(--color-text-muted);
+  flex-basis: 100%;
+  font-size: var(--text-sm);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A small tracked label: "Rent or buy only", "Estimate", "Announced". */
+.waiting-row__tag {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.04em;
+  padding: 0 var(--space-2);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.waiting-row__tag--rent {
+  color: var(--color-text-muted);
+}
+
+/* An estimate's border is dashed: a second, non-colour cue that it is a guess. */
+.waiting-row__tag--estimate {
+  border-style: dashed;
+}
+
+.waiting-row__tag--announced {
+  border-color: var(--color-success);
+}
+
+/*
+  #378, owner decision 3 — streaming somewhere the owner does not subscribe.
+  The words already say "(not one of your services)"; the dashed rule is a
+  second, non-colour cue that this line is not the good news above it.
+*/
+.waiting-row__other {
+  border-inline-start: 2px dashed var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-style: italic;
+  padding-inline-start: var(--space-2);
+}
+
+/*
+  #380/#382 — when it is expected to stream, as the row's headline. An
+  announced date is a fact; an estimate is a guess and says so in words
+  ("Estimate:"), with the dashed frame and italic only reinforcing that.
+*/
+.waiting-row__outlook {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+}
+
+.waiting-row__outlook--estimate {
+  border-style: dashed;
+}
+
+.waiting-row__outlook-head {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+}
+
+.waiting-row__outlook-head .badge {
+  color: var(--color-secondary);
+}
+
+.waiting-row__when {
+  font-size: var(--text-card-title);
+  font-weight: var(--weight-bold);
+}
+
+.waiting-row__forecast {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.waiting-row__forecast--estimate {
+  font-style: italic;
+}
+
+.waiting-row__footer {
+  align-items: center;
+  border-top: 1px solid var(--color-border-soft);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.waiting-row__date {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A small secondary control, never the largest thing on the card. */
+.waiting-row__actions {
+  margin-inline-start: auto;
+}
+
+.waiting-row__actions .btn {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }
 
 /*
@@ -2093,44 +2320,32 @@ button {
 }
 
 .waiting-row__badge {
-  align-self: flex-start;
   border: 1px solid var(--color-success);
   border-radius: var(--radius);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
-  padding-inline: var(--space-1);
+  letter-spacing: 0.04em;
+  padding: 0 var(--space-2);
   text-transform: uppercase;
 }
 
-.waiting-row__rent,
-.waiting-row__other {
-  color: var(--color-text-muted);
-  overflow-wrap: anywhere;
+@media (min-width: 640px) {
+  .waiting-row {
+    gap: var(--space-4);
+    grid-template-columns: 6rem minmax(0, 1fr);
+    padding: var(--space-4);
+  }
+
+  .waiting-row__poster {
+    height: 9rem;
+    width: 6rem;
+  }
 }
 
-/*
-  #378, owner decision 3 — streaming somewhere the owner does not subscribe.
-  The sentence already says "(not one of your services)"; the dashed rule is
-  a second, non-colour cue that this line is not the good news above it.
-*/
-.waiting-row__other {
-  border-inline-start: 2px dashed var(--color-border);
-  font-style: italic;
-  padding-inline-start: var(--space-2);
-}
-
-/*
-  #380 — when it is expected to stream. An announced date is a fact and reads
-  plainly; an estimate is a guess and says so in words ("Estimate:"), with the
-  italic only reinforcing that, never carrying it alone.
-*/
-.waiting-row__forecast {
-  color: var(--color-text-muted);
-  overflow-wrap: anywhere;
-}
-
-.waiting-row__forecast--estimate {
-  font-style: italic;
+@media (min-width: 1024px) {
+  .waiting-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .waiting-search {
@@ -2140,45 +2355,48 @@ button {
   margin-block-end: var(--space-4);
 }
 
-.waiting-search h2,
 .waiting-search p {
   margin: 0;
 }
 
 .waiting-search__form {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+  max-width: 36rem;
 }
 
-.waiting-search__form .input {
-  flex: 1 1 12rem;
-  min-width: 0;
+/* Library's search field (`.list-search__control`), as a rounded pill. */
+.waiting-search__control > .input {
+  border-color: var(--color-border-soft);
+  border-radius: 999px;
+  flex: 1 1 auto;
+  width: 100%;
 }
 
 .waiting-search__results {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
   list-style: none;
   margin: 0;
+  max-width: 36rem;
   padding: 0;
 }
 
 .waiting-search__result {
   align-items: center;
+  background: var(--color-catalog-raised);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
   justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
 }
 
 .waiting-search__result span {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-
 .title-row--skeleton,
 .suppressed-row--skeleton,
 .removed-row--skeleton,

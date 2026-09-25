@@ -127,7 +127,7 @@ test.describe('T-WAIT-010 — the empty waiting view explains itself', () => {
     await expect(page.getByTestId('waiting-row')).toHaveCount(1);
     await expect(page.getByTestId('waiting-empty')).toHaveCount(0);
     await expect(page.getByTestId('waiting-availability')).toContainText(
-      'Not seen on your services as of 2026-02-01.',
+      'Not seen on your services as of 1 Feb 2026.',
     );
   });
 });
@@ -219,7 +219,7 @@ test.describe('T-WAIT-018 — waiting to stream in a real browser (#378)', () =>
       'href',
       '/upload?service=netflix',
     );
-    await expect(page.getByTestId('waiting-rent-only')).toContainText('(rent/buy)');
+    await expect(page.getByTestId('waiting-rent-only')).toContainText('Rent or buy only');
     await expect(page.getByTestId('waiting-other-services')).toContainText(
       '(not one of your services)',
     );
@@ -291,5 +291,75 @@ test.describe('T-FORECAST-008 — the forecast on the waiting view', () => {
       expect(overflow).toBeLessThanOrEqual(0);
       await page.unrouteAll();
     }
+  });
+});
+
+/* ── #382 — the Library look, at the owner's three widths ────────────── */
+
+const WAITING_RESTYLE = {
+  count: 3,
+  availabilityRefreshFailed: false,
+  items: [
+    WAITING_FORECAST.items[0],
+    WAITING_FORECAST.items[1],
+    { ...WAITING_EVERY_STATE.items[2], name: 'Arrived' },
+  ],
+};
+
+async function checkRestyle(page: Page, width: number): Promise<void> {
+  await page.setViewportSize({ width, height: 1000 });
+  await stubApi(page, WAITING_RESTYLE);
+  await page.goto('/waiting');
+  const rows = page.getByTestId('waiting-row');
+  await expect(rows).toHaveCount(3);
+
+  // One page heading; the helper is its subtitle.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Waiting to stream');
+  await expect(page.getByTestId('waiting-subtitle')).toBeVisible();
+
+  // Library poster sizes: 72 px on a phone, 96 px from 640 px.
+  const poster = await rows.first().locator('.waiting-row__poster').boundingBox();
+  expect(Math.round(poster?.width ?? 0)).toBe(width >= 640 ? 96 : 72);
+
+  // The forecast headline is visible and carries its tag in words.
+  const head = rows.nth(1).locator('.waiting-row__outlook-head');
+  await expect(head).toBeVisible();
+  await expect(head.locator('.waiting-row__tag')).toHaveText(/estimate/i);
+
+  // "Not interested" keeps the 44 px target but is no longer card-wide.
+  for (let index = 0; index < 3; index += 1) {
+    const row = await rows.nth(index).boundingBox();
+    const button = await rows.nth(index).getByTestId('waiting-not-interested').boundingBox();
+    expect(button?.height ?? 0).toBeGreaterThanOrEqual(44);
+    expect(button?.width ?? 0).toBeLessThan((row?.width ?? 0) * 0.6);
+  }
+
+  // Two cards side by side on a laptop, one column below 1024 px.
+  const first = await rows.nth(0).boundingBox();
+  const second = await rows.nth(1).boundingBox();
+  if (width >= 1024) expect(second?.y).toBe(first?.y);
+  else expect(second?.y ?? 0).toBeGreaterThan(first?.y ?? 0);
+
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+}
+
+test.describe('T-WAIT-021 — the restyled waiting view in a real browser (#382)', () => {
+  test('T-WAIT-021a: cards, posters, forecast headline and a small Not interested at 320px', async ({
+    page,
+  }) => {
+    await checkRestyle(page, 320);
+  });
+  test('T-WAIT-021b: cards, posters, forecast headline and a small Not interested at 640px', async ({
+    page,
+  }) => {
+    await checkRestyle(page, 640);
+  });
+  test('T-WAIT-021c: cards, posters, forecast headline and a small Not interested at 1280px', async ({
+    page,
+  }) => {
+    await checkRestyle(page, 1280);
   });
 });
