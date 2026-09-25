@@ -5667,7 +5667,7 @@ html[data-layout='phone'] .title-list .title-row {
   border-radius: 0;
   box-shadow: none;
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-3);
   grid-template-columns: clamp(4.5rem, 30vw, 6.5rem) minmax(0, 1fr);
   padding: var(--space-2) 0;
   position: relative;
@@ -5690,7 +5690,9 @@ html[data-layout='phone'] .title-list .title-row__poster {
 html[data-layout='phone'] .title-list .title-row__body {
   align-content: start;
   display: grid;
-  gap: var(--space-2) var(--space-3);
+  /* A tight column gap: the rating's and the pill's columns are shared, and
+     at 280 px both must still fit beside a 72 px poster (T-UX-155c). */
+  gap: var(--space-2);
   grid-column: 2;
   grid-row: 1;
   grid-template-areas:
@@ -5705,7 +5707,7 @@ html[data-layout='phone'] .title-list .title-row__body {
 /* Compact keeps every fact and only packs the lines tighter beside a smaller
    poster, so the switch still buys a shorter list (T-UX-141f, T-UX-147c). */
 html[data-layout='phone'] .title-list[data-view='compact'] .title-row__body {
-  gap: var(--space-1) var(--space-3);
+  gap: var(--space-1) var(--space-2);
 }
 
 /* The identity box dissolves so the title can sit beside the pill while the

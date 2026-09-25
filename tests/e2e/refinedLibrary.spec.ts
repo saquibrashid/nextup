@@ -2175,7 +2175,7 @@ test('T-UX-147e: filter trigger labels stay on one line inside the filters panel
    */
   /*
    * TASK-255: below `--bp-sm` there is no panel of triggers — the phone sheet
-   * of chips replaces it (`T-PHONE-007c`) — so the narrowest panel width
+   * of chips replaces it (`T-PHONE-007`) — so the narrowest panel width
    * measured here is the panel's own floor, 640 px.
    * ~~Superseded: `[390, 768, 1280, 1600]`.~~
    */
