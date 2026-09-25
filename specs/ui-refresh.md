@@ -1018,10 +1018,29 @@ the same element; `T-UX-117d` asserts the `/` case directly.
 
 ### REQ-117 (`should`) — a hybrid header with a Menu drawer
 
-> ✅ **CURRENT — issue 369, owner decision 2026-09-25 (ADR-0013 Revision 4).**
+> ✅ **CURRENT — the sidebar lists everything (owner decision 2026-09-25,
+> after issue 369).** At and above `--bp-lg` (1024 px) the header is a
+> sidebar with room for every destination, so it lists **all of them
+> directly**, in route-table order, each with a decorative icon beside its
+> visible label: Library `ListIcon`, Import `UploadIcon`, Review `CheckIcon`,
+> Removal history `HistoryIcon`, Not interested `SuppressedIcon`, Waiting to
+> stream `ClockIcon`, About `InfoIcon`, Rating lookup `RatingIcon`. **There is
+> no Menu button and no drawer at this width.** Widening past `--bp-lg` while
+> the drawer is open closes it. The sidebar and the page share **one framed
+> panel** (a `--color-border-soft` border and `--radius-card` corners, with
+> the frame's gutter as its margin). A 1px `--color-border-soft` hairline on
+> the content's inline-start edge separates the nav from the page. Below
+> `--bp-lg` the issue-369 design in the next box is unchanged, except that
+> "at every width" now means "below `--bp-lg`". `BP_LG` and
+> `SIDEBAR_VIEWPORT_QUERY` in `breakpoints.ts` must agree with `--bp-lg` and
+> the `@media` prelude (`T-UX-167e`). `useSidebarViewport` falls back to the
+> sidebar when `matchMedia` is unavailable, for the same "everything visible"
+> reason as `useWideViewport`. Tests: `T-UX-167`, `T-NAV-003`.
+>
+> ✅ **CURRENT below `--bp-lg` — issue 369, owner decision 2026-09-25 (ADR-0013 Revision 4).**
 > From `--bp-sm` up, the one header `<nav>` shows **Library (`/`), Import
 > (`/upload`) and Review (`/batches`)** inline, plus a **Menu** button. Below
-> `--bp-sm`, it shows **only the Menu button**. At every width, Menu
+> `--bp-sm`, it shows **only the Menu button**. At every width below `--bp-lg`, Menu
 > (`aria-expanded`, `aria-controls="nav-drawer"`, `aria-haspopup="dialog"`,
 > visible label *Menu*) opens a modal drawer on the `Dialog` primitive,
 > pinned to the inline-start edge. The drawer lists **every** nav route
@@ -1141,6 +1160,8 @@ focus restoration and untrapped Tab behavior.
 | `T-UX-137` | *(Redefined in place, issue 369.)* No rule at any width fixes the nav to the viewport. `--nav-bar-height` and `scroll-padding-bottom` are gone. The shell and the drawer honour the safe-area inset. The drawer scrolls within the viewport, pinned to the inline-start edge. `viewport-fit=cover` stays. The wide shell padding stays the shorthand. The Menu is present on every destination at phone width. Asserted against `index.css` and `index.html` as files. <br />~~Below `--bp-sm` the nav is fixed to the bottom of the viewport, the shell reserves matching bottom clearance, the `More` panel opens upward, the safe-area inset is honoured, and **all four are reset at or above `--bp-sm`** so the desktop nav returns to the header. ⚠ Asserted against `index.css` and `index.html` **as files** — jsdom performs no layout and applies no stylesheet, so every rendered assertion about position passes vacuously.~~ |
 | `T-NAV-001` | Issue 369: the route table carries the owner's names (Library, Import, Review, Rating lookup) and no retired one; Library, Review and Rating lookup open on a heading with that name; no owner-facing copy constant says *your list*, *this batch*, *Batch history* or *Check a rating*; the Review page shows imports with a next step under *Needs review* and everything else under *Import history*, with no *Needs review* heading when nothing is pending. |
 | `T-NAV-002` | Issue 369, in Chromium and Mobile Safari at 320, 390, 640 and 1280 px: the header shows the hybrid bar and the drawer lists every destination with its href and the current page; the drawer fits the viewport with no horizontal overflow; focus is trapped and Escape returns it to Menu; a drawer link navigates, closes the drawer and marks the new page; at 320 px height the drawer scrolls so the last destination is usable; the open drawer has no serious or critical axe violation. |
+| `T-UX-167` | Sidebar (`--bp-lg` and up): every destination listed directly with an icon, route order, hrefs and current-page marking; no Menu or drawer; the drawer closes on widening; `--bp-lg` agrees across `:root`, `@media` and `SIDEBAR_VIEWPORT_QUERY`; one framed panel with a content-side hairline. |
+| `T-NAV-003` | Sidebar in Chromium and Mobile Safari at 1280 px: all destinations visible, no Menu, no overflow, nav before content inside the frame with a 1px divider, link navigation moves the marking, axe clean. |
 
 ### 6b. Destination names (issue 369, owner decision 2026-09-25)
 

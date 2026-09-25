@@ -4921,24 +4921,39 @@ button {
 }
 
 @media (min-width: 1024px) {
+  /*
+   * ONE PANEL: the sidebar and the page share a single rounded frame, split by
+   * a hairline. The gutter is the frame's MARGIN, not its padding, because the
+   * border has to sit inside the gutter.
+   */
   .app-shell {
     display: grid;
-    grid-template-columns: 10rem minmax(0, 1fr);
-    gap: var(--space-5);
-    align-items: start;
+    grid-template-columns: 12rem minmax(0, 1fr);
+    align-items: stretch;
+    gap: 0;
+    width: calc(100% - 2 * var(--space-6));
+    /* The old padded shell's inner width, so the page column does not grow. */
+    max-width: calc(var(--layout-max-width) - 2 * var(--space-6));
+    margin: var(--space-6) auto;
+    padding: 0;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-card);
   }
 
   .app-shell__content {
     background: var(--color-catalog);
-    border: 1px solid var(--color-border-soft);
-    border-radius: var(--radius-card);
+    border-inline-start: 1px solid var(--color-border-soft);
+    border-start-end-radius: var(--radius-card);
+    border-end-end-radius: var(--radius-card);
     padding: var(--space-5);
-    min-height: calc(100dvh - 2 * var(--space-6));
+    min-height: calc(100dvh - 2 * var(--space-6) - 2px);
   }
 
   .app-shell__header {
     position: sticky;
     top: var(--space-6);
+    align-self: start;
     max-height: calc(100dvh - 2 * var(--space-6));
     overflow-y: auto;
     flex-direction: column;
@@ -4947,7 +4962,7 @@ button {
     gap: var(--space-6);
     border: 0;
     margin: 0;
-    padding: var(--space-3) 0;
+    padding: var(--space-5) var(--space-3);
   }
 
   .app-shell__logo {

@@ -3,8 +3,9 @@ import { join } from 'node:path';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, expect, it, onTestFinished, vi } from 'vitest';
 import { AppShell } from '../src/components/AppShell';
+import { WIDE_VIEWPORT_QUERY } from '../src/breakpoints';
 import { FreshnessStrip } from '../src/components/FreshnessStrip';
 import type { TitleListItem } from '../src/components/TitleRow';
 import { ListPage, type ListPageProps } from '../src/pages/ListPage';
@@ -242,6 +243,21 @@ it('T-UX-143a service updates are available on demand while unavailable data rem
 });
 
 it('T-UX-143b compact desktop navigation keeps landmarks and restores focus when the Menu drawer closes', async () => {
+  // Between --bp-sm and --bp-lg: the hybrid bar. At --bp-lg the sidebar lists everything.
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    value: (query: string) => ({
+      matches: query === WIDE_VIEWPORT_QUERY,
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+    }),
+  });
+  onTestFinished(() => {
+    Reflect.deleteProperty(window, 'matchMedia');
+  });
   const user = userEvent.setup();
   render(
     <MemoryRouter>

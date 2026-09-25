@@ -18,9 +18,9 @@
  * desktop rules and nothing anywhere reports an error. `T-UX-132d` parses
  * `index.css` and asserts all three agree.
  *
- * ⚠ **`--bp-md` AND `--bp-lg` ARE DELIBERATELY ABSENT.** They have no
- * JavaScript consumer; adding them here "for symmetry" creates two more values
- * that can drift with nothing reading them. `T-UX-132d` checks what is
+ * ⚠ **`--bp-md` IS DELIBERATELY ABSENT.** It has no
+ * JavaScript consumer; adding it here "for symmetry" creates one more value
+ * that can drift with nothing reading it. `T-UX-132d` checks what is
  * exported, so an unused export would weaken nothing — but an unused export
  * that later drifts is a trap set for whoever reaches for it.
  */
@@ -44,3 +44,14 @@ export const BP_SM = 640;
  * produces — the one place nobody tests.
  */
 export const WIDE_VIEWPORT_QUERY = `(min-width: ${String(BP_SM)}px)`;
+
+/**
+ * `--bp-lg`, in `px`, without the unit — where the header becomes a sidebar.
+ *
+ * At or above this width the navigation is a column beside the content with
+ * room for every destination, so the Menu drawer is not rendered at all.
+ */
+export const BP_LG = 1024;
+
+/** The media query the sidebar navigation is keyed on (`min-width`, as above). */
+export const SIDEBAR_VIEWPORT_QUERY = `(min-width: ${String(BP_LG)}px)`;

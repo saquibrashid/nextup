@@ -21,12 +21,12 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { App } from '../src/App';
-import { BP_SM, WIDE_VIEWPORT_QUERY } from '../src/breakpoints';
+import { BP_LG, BP_SM, SIDEBAR_VIEWPORT_QUERY, WIDE_VIEWPORT_QUERY } from '../src/breakpoints';
 import { FreshnessStrip, uploadPathFor } from '../src/components/FreshnessStrip';
 import type { ServiceFreshness } from '../src/components/FreshnessStrip';
 import { NAV_MENU_CLOSE_LABEL, NAV_MENU_LABEL, NAV_MENU_TITLE } from '../src/copy';
@@ -573,5 +573,99 @@ describe('T-UX-137 - ui-refresh.md 6 - the header nav is in flow and the drawer 
     // place it would stop every browser-driven scroll short of the page foot.
     expect(declarations(baseRuleBody('html'))).not.toMatch(/scroll-padding-bottom/);
     expect(declarations(CSS)).not.toMatch(/scroll-padding-bottom/);
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+/* T-UX-167 — at --bp-lg the sidebar lists every destination, no drawer.    */
+/* ------------------------------------------------------------------------ */
+
+/** A `matchMedia` whose sidebar answer can be flipped after mount. */
+function stubSidebar(initial: boolean): (sidebar: boolean) => void {
+  let sidebar = initial;
+  const listeners = new Set<() => void>();
+  Object.defineProperty(window, 'matchMedia', {
+    configurable: true,
+    writable: true,
+    value: (query: string) => ({
+      get matches() {
+        if (query === SIDEBAR_VIEWPORT_QUERY) return sidebar;
+        return query === WIDE_VIEWPORT_QUERY;
+      },
+      media: query,
+      onchange: null,
+      addEventListener: (_type: string, listener: () => void) => listeners.add(listener),
+      removeEventListener: (_type: string, listener: () => void) => listeners.delete(listener),
+      addListener: (listener: () => void) => listeners.add(listener),
+      removeListener: (listener: () => void) => listeners.delete(listener),
+      dispatchEvent: () => false,
+    }),
+  });
+  return (next) => {
+    sidebar = next;
+    act(() => {
+      for (const listener of listeners) listener();
+    });
+  };
+}
+
+describe('T-UX-167 · ui-refresh.md §6 · the sidebar shows every destination', () => {
+  it('T-UX-167a: at --bp-lg every destination is a link in the nav, in route order, with no Menu', () => {
+    stubSidebar(true);
+    const nav = renderAt('/about');
+    expect(labels(nav)).toStrictEqual([...ALL_LABELS]);
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href')),
+    ).toStrictEqual([...ALL_HREFS]);
+    expect(within(nav).queryByRole('button', { name: NAV_MENU_LABEL })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: NAV_MENU_TITLE })).toBeNull();
+  });
+
+  it('T-UX-167b: the current page is marked in the sidebar, and a child route keeps its parent', () => {
+    stubSidebar(true);
+    const nav = renderAt('/waiting');
+    expect(currentLinks(nav).map((link) => link.textContent)).toStrictEqual(['Waiting to stream']);
+    cleanup();
+    const nested = renderAt('/batches/b_1/review');
+    expect(currentLinks(nested).map((link) => link.textContent)).toStrictEqual(['Review']);
+  });
+
+  it('T-UX-167c: every sidebar destination carries a decorative icon beside its visible label', () => {
+    stubSidebar(true);
+    const nav = renderAt('/');
+    for (const link of within(nav).getAllByRole('link')) {
+      expect(link.querySelector('svg'), link.textContent ?? '').not.toBeNull();
+      expect(link.textContent?.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it('T-UX-167d: widening past --bp-lg with the drawer open closes it and shows the full list', () => {
+    const setSidebar = stubSidebar(false);
+    const nav = renderAt('/');
+    openDrawer(nav);
+    setSidebar(true);
+    expect(screen.queryByRole('dialog', { name: NAV_MENU_TITLE })).toBeNull();
+    expect(labels(nav)).toStrictEqual([...ALL_LABELS]);
+    setSidebar(false);
+    expect(labels(nav)).toStrictEqual([...BAR_LABELS]);
+    expect(menuButton(nav)).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('T-UX-167e: --bp-lg is ONE number, in :root, in the @media prelude and in TS', () => {
+    expect(/--bp-lg:\s*(\d+)px/.exec(CSS)?.[1]).toBe(String(BP_LG));
+    expect(CSS).toContain(`@media (min-width: ${String(BP_LG)}px)`);
+    expect(SIDEBAR_VIEWPORT_QUERY).toBe(`(min-width: ${String(BP_LG)}px)`);
+  });
+
+  it('T-UX-167f: the sidebar and the page share one framed panel, split by a hairline', () => {
+    const block = CSS.slice(CSS.lastIndexOf('grid-template-columns: 12rem minmax(0, 1fr)'));
+    const shell = /^[^}]*/.exec(block)?.[0] ?? '';
+    expect(shell).toMatch(/border:\s*1px solid var\(--color-border-soft\)/);
+    expect(shell).toMatch(/border-radius:\s*var\(--radius-card\)/);
+    const content = /\.app-shell__content\s*\{([^}]*)\}/.exec(block)?.[1] ?? '';
+    expect(content).toMatch(/border-inline-start:\s*1px solid var\(--color-border-soft\)/);
+    expect(content).not.toMatch(/(^|\s)border:/);
   });
 });
