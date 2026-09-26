@@ -73,20 +73,21 @@ describe('T-AVAIL-015 · #378 · each access state reads as what it is', () => {
     const row = item({ accessState: 'rent-only', rentOn: ['Apple TV', 'Amazon Video'] });
     render(<WaitingPage items={[row]} />);
 
+    // #382/#389 — storefronts are chips, the row carries a "Rent or buy only"
+    // pill, and the redundant "(rent/buy)" repeats neither.
     const block = screen.getByTestId('waiting-rent-only');
-    const line = block.textContent ?? '';
-    // #382 — storefronts are chips under a "Rent or buy only" tag, and the
-    // redundant "(rent/buy)" no longer repeats the tag.
-    expect(line).toContain(WAITING_RENT_ONLY_TAG);
+    expect(screen.getByTestId('waiting-rent-tag').textContent).toBe(WAITING_RENT_ONLY_TAG);
     expect(
       within(block)
         .getAllByTestId('waiting-rent-store')
         .map((chip) => chip.textContent),
     ).toEqual(['Apple TV', 'Amazon Video']);
-    expect(within(block).getByRole('list', { name: WAITING_RENT_ONLY_LIST_LABEL })).toBeTruthy();
-    expect(line).not.toContain('(rent/buy)');
-    expect(line).toContain('Not streaming on your services yet');
-    expect(line).toContain('1 Feb 2026');
+    expect(block).toBe(screen.getByRole('list', { name: WAITING_RENT_ONLY_LIST_LABEL }));
+    expect(screen.getByTestId('waiting-row').textContent).not.toContain('(rent/buy)');
+    // ⚠ The other half is still said in words: not streaming on your services.
+    const note = screen.getByTestId('waiting-rent-note').textContent ?? '';
+    expect(note).toContain('Not streaming on your services yet');
+    expect(note).toContain('1 Feb 2026');
     expect(screen.queryByTestId('waiting-flag')).toBeNull();
     expect(screen.queryByTestId('waiting-streaming-badge')).toBeNull();
     // The rent line REPLACES the weaker sentence rather than sitting beside it.
