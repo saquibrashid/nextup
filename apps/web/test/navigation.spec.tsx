@@ -134,6 +134,14 @@ function labels(scope: HTMLElement): (string | null)[] {
     .map((link) => link.textContent);
 }
 
+/**
+ * The drawer's destination list. TASK-261 put a Sign out link in the drawer too,
+ * below the list — an action, not a destination, so it is not counted here.
+ */
+function destinations(drawer: HTMLElement): HTMLElement {
+  return within(drawer).getByRole('list');
+}
+
 function currentLinks(scope: HTMLElement): HTMLElement[] {
   return within(scope)
     .queryAllByRole('link')
@@ -345,7 +353,7 @@ describe('T-UX-132 · ui-refresh.md §6 · the header navigation at each width',
     expect(button).toHaveAttribute('aria-expanded', 'true');
     expect(drawer).toHaveAttribute('aria-modal', 'true');
     // ⚠ NOTHING NESTED: every destination is a direct row of the drawer.
-    expect(labels(drawer)).toStrictEqual([...ALL_LABELS]);
+    expect(labels(destinations(drawer))).toStrictEqual([...ALL_LABELS]);
     expect(within(drawer).queryByRole('button', { name: /more/i })).toBeNull();
   });
 
@@ -369,7 +377,7 @@ describe('T-UX-132 · ui-refresh.md §6 · the header navigation at each width',
     expect(menuButton(nav)).toHaveAttribute('aria-expanded', 'false');
 
     const drawer = openDrawer(nav);
-    expect(labels(drawer)).toStrictEqual([...ALL_LABELS]);
+    expect(labels(destinations(drawer))).toStrictEqual([...ALL_LABELS]);
     expect(menuButton(nav)).toHaveAttribute('aria-expanded', 'true');
   });
 });
@@ -432,7 +440,7 @@ describe('T-UX-133 · ui-refresh.md §6 · a drawer destination keeps its URL an
     const drawer = openDrawer(atPhoneWidth('/'));
 
     expect(
-      within(drawer)
+      within(destinations(drawer))
         .getAllByRole('link')
         .map((link) => link.getAttribute('href')),
     ).toStrictEqual([...ALL_HREFS]);

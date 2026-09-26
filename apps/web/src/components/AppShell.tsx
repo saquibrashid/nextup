@@ -96,8 +96,10 @@ import {
   NAV_TAB_FILTERS_NAME,
   NAV_TAB_SEARCH_LABEL,
   NAV_TAB_SEARCH_NAME,
+  SIGN_OUT_LABEL,
   signedInAsLabel,
 } from '../copy';
+import { SIGN_OUT_URL } from '../pages/RefusalPage';
 import {
   LibraryCommandContext,
   type LibraryCommand,
@@ -217,12 +219,37 @@ function NavTextLink({
  * moved focus into the new page. Following the link to the page you are
  * already on closes it too, which a location effect alone never sees.
  */
+/**
+ * TASK-261 — `specs/ux-states.md` §10.5: the sign-out link is always present.
+ * The sidebar carries it under the nav; every narrower layout reaches it
+ * through the Menu drawer. A plain link, not a fetch: Easy Auth's logout is a
+ * top-level navigation that clears the session cookie and hands off to Entra.
+ */
+function AccountBlock({ ownerName }: { readonly ownerName: string | null }): JSX.Element {
+  return (
+    <div className="app-shell__account" data-testid="account">
+      {ownerName !== null && (
+        <p className="app-shell__account-name">{signedInAsLabel(ownerName)}</p>
+      )}
+      <a
+        className="btn btn--secondary app-shell__sign-out"
+        href={SIGN_OUT_URL}
+        data-testid="sign-out"
+      >
+        {SIGN_OUT_LABEL}
+      </a>
+    </div>
+  );
+}
+
 function NavDrawer({
   pathname,
+  ownerName,
   onClose,
   returnFocus,
 }: {
   readonly pathname: string;
+  readonly ownerName: string | null;
   readonly onClose: () => void;
   readonly returnFocus: RefObject<HTMLButtonElement | null>;
 }): JSX.Element {
@@ -253,6 +280,7 @@ function NavDrawer({
           </li>
         ))}
       </ul>
+      <AccountBlock ownerName={ownerName} />
     </Dialog>
   );
 }
@@ -402,10 +430,12 @@ export function AppShell(): JSX.Element {
             )}
           </ul>
         </nav>
+        {sidebar && <AccountBlock ownerName={ownerName} />}
       </header>
       {menuOpen && !sidebar && (
         <NavDrawer
           pathname={location.pathname}
+          ownerName={ownerName}
           onClose={() => setMenuOpen(false)}
           returnFocus={menuButtonRef}
         />

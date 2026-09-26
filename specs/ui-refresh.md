@@ -1036,6 +1036,13 @@ the same element; `T-UX-117d` asserts the `/` case directly.
 > the `@media` prelude (`T-UX-167e`). `useSidebarViewport` falls back to the
 > sidebar when `matchMedia` is unavailable, for the same "everything visible"
 > reason as `useWideViewport`. Tests: `T-UX-167`, `T-NAV-003`.
+>
+> **Sign out (TASK-261).** The sidebar ends with an account block under the
+> nav — *Signed in as {name}* and a secondary-button *Sign out* link to
+> `/.auth/logout` (`ux-states.md` §10.5). Below `--bp-lg` the same block closes
+> the Menu drawer, under the destination list. It is an action, not a
+> destination: it is never inside the Primary nav or the destination list, so
+> the destination counts above are unchanged. Tests: `T-NAV-004`.
 
 > ✅ **CURRENT — TASK-255, the owner's mobile mockup (2026-09-25).** Below
 > `--bp-sm`, on every route **except the capture flow** (`/upload` and
@@ -1185,6 +1192,7 @@ focus restoration and untrapped Tab behavior.
 | `T-NAV-002` | Issue 369, in Chromium and Mobile Safari at 320, 390, 640 and 1280 px: the header shows the hybrid bar and the drawer lists every destination with its href and the current page; the drawer fits the viewport with no horizontal overflow; focus is trapped and Escape returns it to Menu; a drawer link navigates, closes the drawer and marks the new page; at 320 px height the drawer scrolls so the last destination is usable; the open drawer has no serious or critical axe violation. |
 | `T-UX-167` | Sidebar (`--bp-lg` and up): every destination listed directly with an icon, route order, hrefs and current-page marking; no Menu or drawer; the drawer closes on widening; `--bp-lg` agrees across `:root`, `@media` and `SIDEBAR_VIEWPORT_QUERY`; one framed panel with a content-side hairline. |
 | `T-NAV-003` | Sidebar in Chromium and Mobile Safari at 1280 px: all destinations visible, no Menu, no overflow, nav before content inside the frame with a 1px divider, link navigation moves the marking, axe clean. |
+| `T-NAV-004` | TASK-261: *Sign out* (to `/.auth/logout`) with *Signed in as {name}* under the sidebar nav at `--bp-lg` and up, and under the drawer's destination list below it; never inside the nav or the list. |
 
 ### 6b. Destination names (issue 369, owner decision 2026-09-25)
 

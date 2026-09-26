@@ -71,7 +71,10 @@ for (const width of [320, 390, 640, 1023]) {
       else await expect(nav.getByRole('link')).toHaveText(['Library', 'Import', 'Review']);
 
       const { drawer } = await openMenu(page);
-      await expect(drawer.getByRole('link')).toHaveText(DESTINATIONS.map(([name]) => name));
+      // TASK-261: Sign out sits below the destination list, so count the list alone.
+      await expect(drawer.getByRole('list').getByRole('link')).toHaveText(
+        DESTINATIONS.map(([name]) => name),
+      );
       for (const [name, href] of DESTINATIONS) {
         await expect(drawer.getByRole('link', { name, exact: true })).toHaveAttribute('href', href);
       }
@@ -143,6 +146,18 @@ for (const width of [320, 390, 640, 1023]) {
       await expect(last).toBeInViewport();
       await last.click();
       await expect(page).toHaveURL(/\/rating$/);
+    });
+
+    test('T-NAV-004e: the drawer offers a visible Sign out link to /.auth/logout', async ({
+      page,
+    }) => {
+      await page.goto('/about');
+      await expect(page.getByRole('link', { name: 'Sign out' })).toHaveCount(0);
+      const { drawer } = await openMenu(page);
+      const signOut = drawer.getByRole('link', { name: 'Sign out', exact: true });
+      await signOut.scrollIntoViewIfNeeded();
+      await expect(signOut).toBeVisible();
+      await expect(signOut).toHaveAttribute('href', '/.auth/logout');
     });
 
     test('T-NAV-002e: the open drawer has no serious or critical axe violations', async ({
@@ -217,6 +232,18 @@ describe('T-NAV-003: the sidebar at 1280 px lists every destination directly', (
       'aria-current',
       'page',
     );
+  });
+
+  test('T-NAV-004f: the sidebar shows a visible Sign out link to /.auth/logout', async ({
+    page,
+  }) => {
+    await page.goto('/about');
+    const signOut = page.getByRole('banner').getByRole('link', { name: 'Sign out', exact: true });
+    await expect(signOut).toBeVisible();
+    await expect(signOut).toHaveAttribute('href', '/.auth/logout');
+    await expect(
+      page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Sign out' }),
+    ).toHaveCount(0);
   });
 
   test('T-NAV-003d: the sidebar has no serious or critical axe violations', async ({ page }) => {
