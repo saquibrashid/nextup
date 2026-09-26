@@ -367,3 +367,140 @@ test.describe('T-WAIT-021 — the restyled waiting view in a real browser (#382)
     await checkRestyle(page, 1280);
   });
 });
+
+/* ── #391 — Grid view, and a details page with the trailer ───────────── */
+
+const WAITING_VIEWS = {
+  count: 3,
+  availabilityRefreshFailed: false,
+  items: WAITING_RESTYLE.items.map((item, index) => ({
+    ...item,
+    titleId: `ttl_view_${String(index)}`,
+  })),
+};
+
+const WAITING_TITLE = {
+  titleId: 'ttl_view_0',
+  workIdentity: 'tmdb:movie:967941',
+  matchState: 'matched',
+  name: 'Wicked: For Good',
+  mediaType: 'movie',
+  releaseYear: 2025,
+  genres: ['Fantasy', 'Music'],
+  runtimeMinutes: 137,
+  posterPath: null,
+  imdbRating: 6.9,
+  listState: 'removed',
+  badges: [],
+  sortDateAdded: null,
+  dateAddedLabel: null,
+  presentation: {
+    status: 'available',
+    data: {
+      tmdbId: 967941,
+      mediaType: 'movie',
+      overview: 'The story continues.',
+      tagline: 'Everyone deserves a chance to fly.',
+      directors: ['Jon M. Chu'],
+      writers: ['Winnie Holzman', 'Dana Fox'],
+      creators: [],
+      cast: [{ name: 'Cynthia Erivo', character: 'Elphaba' }],
+      releaseDate: '2025-11-21',
+      status: 'Released',
+      certification: 'PG',
+      seasons: null,
+      episodes: null,
+      trailer: {
+        key: 'abcDEF12345',
+        name: 'Official Trailer',
+        kind: 'Trailer',
+        publishedAt: '2026-01-01T00:00:00.000Z',
+      },
+      fetchedAt: '2026-09-22T00:00:00.000Z',
+    },
+  },
+};
+
+async function stubViews(page: Page): Promise<void> {
+  await stubApi(page, WAITING_VIEWS);
+  await page.route('**/api/titles/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(WAITING_TITLE),
+    });
+  });
+}
+
+async function noOverflow(page: Page): Promise<void> {
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+}
+
+async function checkGrid(page: Page, width: number): Promise<void> {
+  await page.setViewportSize({ width, height: 1000 });
+  await stubViews(page);
+  await page.goto('/waiting');
+  await page.getByRole('button', { name: 'Grid view' }).click();
+  const list = page.getByTestId('waiting-list');
+  await expect(list).toHaveAttribute('data-view', 'grid');
+  const rows = page.getByTestId('waiting-row');
+  await expect(rows).toHaveCount(3);
+
+  // Tiles sit side by side — at least two across even at 320 px.
+  const first = await rows.nth(0).boundingBox();
+  const second = await rows.nth(1).boundingBox();
+  expect(Math.round(second?.y ?? -1)).toBe(Math.round(first?.y ?? -2));
+  expect(second?.x ?? 0).toBeGreaterThan((first?.x ?? 0) + (first?.width ?? 0) - 1);
+
+  // The answer and the 44 px Not interested survive the tile.
+  await expect(rows.nth(1).getByTestId('waiting-forecast')).toBeVisible();
+  for (let index = 0; index < 3; index += 1) {
+    const button = await rows.nth(index).getByTestId('waiting-not-interested').boundingBox();
+    expect(button?.height ?? 0).toBeGreaterThanOrEqual(44);
+  }
+  await noOverflow(page);
+
+  // The choice survives a reload.
+  await page.reload();
+  await expect(page.getByTestId('waiting-list')).toHaveAttribute('data-view', 'grid');
+}
+
+test.describe('T-WAIT-025 — Grid view and the waiting details page in a real browser (#391)', () => {
+  test('T-WAIT-025a: Grid tiles at 320px, two across, nothing overflows', async ({ page }) => {
+    await checkGrid(page, 320);
+  });
+  test('T-WAIT-025b: Grid tiles at 1280px, nothing overflows', async ({ page }) => {
+    await checkGrid(page, 1280);
+  });
+  test('T-WAIT-025c: a title opens its details page with every detail and a trailer link out', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 1000 });
+    await stubViews(page);
+    await page.goto('/waiting');
+    await page.getByRole('link', { name: 'Wicked: For Good' }).click();
+    await expect(page).toHaveURL(/\/waiting\/ttl_view_0$/);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Wicked: For Good');
+    await expect(page.getByText('2h 17m')).toBeVisible();
+    await expect(page.getByText('Jon M. Chu')).toBeVisible();
+    await expect(page.getByText('Cynthia Erivo')).toBeVisible();
+    await expect(page.getByTestId('title-facts')).toContainText('Winnie Holzman');
+    await expect(page.getByTestId('waiting-forecast')).toBeVisible();
+    await expect(page.getByTestId('justwatch-attribution')).toBeVisible();
+
+    const trailer = page.getByTestId('title-trailer');
+    await expect(trailer).toHaveAttribute('href', 'https://www.youtube.com/watch?v=abcDEF12345');
+    await expect(trailer).toHaveAttribute('target', '_blank');
+    await expect(trailer).toHaveAttribute('rel', 'noopener noreferrer');
+    expect((await trailer.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    await expect(page.locator('iframe')).toHaveCount(0);
+    await noOverflow(page);
+
+    await page.getByRole('link', { name: 'Back to Waiting to stream' }).click();
+    await expect(page).toHaveURL(/\/waiting$/);
+    await expect(page.getByTestId('waiting-row')).toHaveCount(3);
+  });
+});

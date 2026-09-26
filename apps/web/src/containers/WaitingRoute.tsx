@@ -25,7 +25,9 @@
  * error about something that already succeeded.
  */
 
-import type { JSX } from 'react';
+import { useState, type JSX } from 'react';
+
+import type { ListView } from '../components/ListViewControl';
 
 import { apiClient, type ApiClient } from '../lib/apiClient';
 import { useResource } from '../lib/useResource';
@@ -37,7 +39,22 @@ export interface WaitingRouteProps {
   readonly client?: ApiClient;
 }
 
+/**
+ * #391 — the owner's Grid / Compact choice for this page, kept apart from the
+ * Library's (`nextup.library.layout.v1`) so each page remembers its own.
+ */
+export const WAITING_LAYOUT_KEY = 'nextup.waiting.layout.v1';
+
+function readLayout(): ListView {
+  try {
+    return localStorage.getItem(WAITING_LAYOUT_KEY) === 'grid' ? 'grid' : 'compact';
+  } catch {
+    return 'compact';
+  }
+}
+
 export function WaitingRoute({ client = apiClient }: WaitingRouteProps = {}): JSX.Element {
+  const [view, setView] = useState<ListView>(readLayout);
   const waiting = useResource((signal) => client.getWaiting(signal), 'waiting');
 
   // A refusal is the whole screen: the owner is authenticated, so the retry a
@@ -53,6 +70,15 @@ export function WaitingRoute({ client = apiClient }: WaitingRouteProps = {}): JS
       loadFailed={waiting.resource.kind === 'failed'}
       refreshFailed={value?.availabilityRefreshFailed ?? false}
       onRetry={waiting.reload}
+      view={view}
+      onViewChange={(next) => {
+        setView(next);
+        try {
+          localStorage.setItem(WAITING_LAYOUT_KEY, next);
+        } catch {
+          // Still works for this visit; the choice is just not remembered.
+        }
+      }}
       onSuppress={(titleId) => client.suppressTitle(titleId)}
       onSearch={async (query) => (await client.searchTmdb(query)).items}
       onSearchAdd={async (result) => {

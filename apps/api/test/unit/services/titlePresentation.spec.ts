@@ -17,6 +17,7 @@ const data: TitlePresentation = {
   cast: [],
   directors: ['Avery Example'],
   creators: [],
+  trailer: null,
   fetchedAt: now.toISOString(),
 };
 const owner = asOwnerId('fixture-owner');
@@ -116,5 +117,25 @@ describe('T-DETAIL-002 presentation cache policy', () => {
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+});
+
+describe('T-DETAIL-007 #391 cache upgrade', () => {
+  it('T-DETAIL-007f: a fresh copy cached before #391 (no trailer key) is refetched once on access', async () => {
+    const { trailer: _unused, ...legacy } = data;
+    void _unused;
+    expect(
+      await readTitlePresentation(
+        owner,
+        { ...row, tmdbPresentation: JSON.stringify(legacy) },
+        deps,
+      ),
+    ).toEqual({ status: 'available', data });
+    expect(getPresentation).toHaveBeenCalledTimes(1);
+    expect(write).toHaveBeenCalledWith(owner, row.id, data);
+  });
+  it('T-DETAIL-007g: a fresh copy that says "no trailer" (null) is reused without a request', async () => {
+    await readTitlePresentation(owner, { ...row, tmdbPresentation: JSON.stringify(data) }, deps);
+    expect(getPresentation).not.toHaveBeenCalled();
   });
 });

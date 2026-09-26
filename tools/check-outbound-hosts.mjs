@@ -150,6 +150,25 @@ export const NON_DESTINATION_HOSTS = [
   /(^|\.)spdx\.org$/,
 ];
 
+/**
+ * Link-out destinations (#391): a host the OWNER navigates to by clicking a
+ * plain link that opens in a new tab. nextup never fetches it, sends it
+ * nothing of the owner's, and embeds nothing from it. Each entry is pinned to
+ * the ONE file allowed to name the host, so the same host anywhere else — a
+ * `fetch` in the API, a beacon in the SPA — is still a finding.
+ */
+export const LINK_OUT_HOSTS = [
+  {
+    host: 'www.youtube.com',
+    file: 'packages/domain/src/titlePresentation.ts',
+    why: 'the trailer link on the details pages (#391, `trailerUrl`)',
+  },
+];
+
+export function isLinkOut(host, rel) {
+  return LINK_OUT_HOSTS.some((entry) => entry.host === host && entry.file === rel);
+}
+
 const SKIP_DIRS = new Set([
   'node_modules',
   '.git',
@@ -304,7 +323,7 @@ export async function checkOutboundHosts(root = ROOT) {
       if (!SOURCE_EXT.has(path.extname(file))) continue;
 
       for (const host of extractHosts(readFileSync(file, 'utf8'))) {
-        if (isAllowed(host) || isExempt(host)) continue;
+        if (isAllowed(host) || isExempt(host) || isLinkOut(host, rel)) continue;
         findings.push(
           `${rel}: contacts host "${host}", which is not one of the five allow-listed outbound destinations (Azure OpenAI, Azure AI Vision, TMDB, OMDb, Watchmode). Screenshot bytes must never reach a further host — specs/security.md §7 T18, NFR-010, T-SEC-031.`,
         );

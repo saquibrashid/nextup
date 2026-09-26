@@ -26,11 +26,11 @@ function renderAt(path: string) {
 }
 
 describe('AppShell and routing', () => {
-  it('T-UI-023a · specs/ui.md §1 · the route table holds exactly the twelve specified screens', () => {
+  it('T-UI-023a · specs/ui.md §1 · the route table holds exactly the thirteen specified screens', () => {
     // ⚠ The EXACT PATH LIST is the assertion; the length is a redundant
     // restatement of it kept only so a diff reads clearly. Epic M added
     // `/rating` (REQ-092) and Epic L added `/waiting` (US-043), which is why
-    // TASK-238 adds the contextual title details page.
+    // TASK-238 adds the contextual title details page and #391 the waiting one.
     expect(ROUTES.map((route) => route.path)).toStrictEqual([
       '/',
       '/titles/:titleId',
@@ -41,11 +41,12 @@ describe('AppShell and routing', () => {
       '/removed',
       '/not-interested',
       '/waiting',
+      '/waiting/:titleId',
       '/about',
       '/rating',
       '*',
     ]);
-    expect(ROUTES).toHaveLength(12);
+    expect(ROUTES).toHaveLength(13);
   });
 
   it('T-UI-023b · specs/ui.md §1 · every route renders its own screen inside the shell', () => {

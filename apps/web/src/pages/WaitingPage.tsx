@@ -32,6 +32,7 @@ import {
 import { EditionLabels } from '../components/EditionLabels';
 import { ServiceMark } from '../components/ServiceMark';
 import { WaitingSearchAdd } from '../components/WaitingSearchAdd';
+import { ListViewControl, type ListView } from '../components/ListViewControl';
 import { BookmarkIcon, InfoIcon, SuppressedIcon } from '../components/icons';
 
 import {
@@ -86,6 +87,9 @@ export interface WaitingPageProps {
   /** #378 — search-to-add. The box renders only when both are supplied. */
   readonly onSearch?: (query: string) => Promise<readonly TmdbSearchResult[]>;
   readonly onSearchAdd?: (result: TmdbSearchResult) => Promise<unknown>;
+  /** #391 — Grid or Compact, as in the Library. Held by the page when omitted. */
+  readonly view?: ListView;
+  readonly onViewChange?: (view: ListView) => void;
 }
 
 function knownService(service: string): Service | undefined {
@@ -309,27 +313,178 @@ function ServiceBadges({
   );
 }
 
+/**
+ * #391 — the row's plain facts: storefront chips, other services, the
+ * availability line and the discovery line. `full` is false for a grid tile,
+ * which keeps only the availability answer; shared with the details page.
+ */
+export function WaitingFacts({
+  item,
+  full,
+}: {
+  readonly item: WaitingItem;
+  readonly full: boolean;
+}): JSX.Element {
+  const flagged = item.flaggedOn ?? [];
+  const rentStores = rentOnlyStores(item);
+  const others = otherStreaming(item);
+  // #389 — the discovery line, without "(rent/buy)" when the row's own pill
+  // already says rent or buy only. Any other row keeps it (T-AVAIL-015e).
+  const sourceLabel = intentSourceLabel(item.discoverySource);
+  const discovery =
+    item.discoverySource === 'search'
+      ? `${sourceLabel} on ${friendlyDate(item.discoveredAt)}`
+      : `Seen on ${rentStores !== null ? sourceLabel.replace(RENT_BUY_SUFFIX, '') : sourceLabel} on ${friendlyDate(item.discoveredAt)}`;
+  return (
+    <>
+      {/* #391 — a grid tile keeps the answer and leaves the detail to the details page. */}
+      {rentStores !== null && full && (
+        <ul
+          className="waiting-row__chips"
+          aria-label={WAITING_RENT_ONLY_LIST_LABEL}
+          data-testid="waiting-rent-only"
+        >
+          {rentStores.map((store) => (
+            <li key={store} className="chip" data-testid="waiting-rent-store">
+              {store}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {others !== null && full && (
+        <div className="waiting-row__other" data-testid="waiting-other-services">
+          <span>{WAITING_OTHER_SERVICES_PREFIX}</span>
+          <ServiceBadges services={others.services} />
+          {others.providers.length > 0 && (
+            <ul className="waiting-row__chips">
+              {others.providers.map((provider) => (
+                <li key={provider} className="chip" data-testid="waiting-other-provider">
+                  {provider}
+                </li>
+              ))}
+            </ul>
+          )}
+          <span>{WAITING_OTHER_SERVICES_SUFFIX}</span>
+        </div>
+      )}
+
+      {/*
+      #389 — the row's two plain facts as icon lines. ⚠ A rent-only row
+      still says, in words, that it is not streaming on the owner's
+      services: a rental offer is never the answer this view exists for.
+    */}
+      <ul className="waiting-row__facts">
+        {flagged.length === 0 && (
+          <li>
+            <InfoIcon />
+            {rentStores !== null ? (
+              <span data-testid="waiting-rent-note">
+                {`${WAITING_RENT_ONLY_SUFFIX} ${friendlyDate(item.availabilityCheckedAt ?? '')}.`}
+              </span>
+            ) : (
+              <span data-testid="waiting-availability">{availabilityLine(item)}</span>
+            )}
+          </li>
+        )}
+        {full && (
+          <li>
+            <BookmarkIcon />
+            {/* US-043 AC-1 — the discovery date and where it came from. */}
+            <span data-testid="waiting-discovery">{discovery}</span>
+          </li>
+        )}
+      </ul>
+    </>
+  );
+}
+
+/**
+ * #389/#391 — the row's panel: the streaming invitation or the forecast.
+ * Shared by the list, the grid and the details page.
+ */
+export function WaitingOutlook({ item }: { readonly item: WaitingItem }): JSX.Element | null {
+  const flagged = item.flaggedOn ?? [];
+  const flaggedServices = flagged.flatMap((service) => {
+    const known = knownService(service);
+    return known === undefined ? [] : [known];
+  });
+  const forecast = flagged.length > 0 ? null : forecastLine(item);
+  const forecastKind = forecast?.estimate === true ? 'estimate' : 'announced';
+  return (
+    <>
+      {flagged.length > 0 ? (
+        /*
+        #389 — the good news as the row's panel: the tag, the service's
+        mark as the headline, and the sentence with its invitation. Only
+        the mark is decorative; the words say the same.
+      */
+        <div className="waiting-row__outlook waiting-row__outlook--streaming">
+          <span
+            className="waiting-row__tag waiting-row__tag--streaming"
+            data-testid="waiting-streaming-badge"
+          >
+            {WAITING_NOW_STREAMING_BADGE}
+          </span>
+          <ServiceBadges services={flaggedServices} decorative />
+          <p className="waiting-row__flag" data-testid="waiting-flag">
+            {`${WAITING_NOW_ON_PREFIX} ${flagged.map(serviceLabel).join(' and ')} — `}
+            {/* Straight to the import for that service, never an auto-add. */}
+            <Link
+              to={`/upload?service=${encodeURIComponent(flagged[0] ?? '')}`}
+              data-testid="waiting-flag-link"
+            >
+              {WAITING_NOW_ON_INVITATION}
+            </Link>
+            {item.streamingSince != null && (
+              <span className="waiting-row__since" data-testid="waiting-streaming-since">
+                {` (${WAITING_STREAMING_SINCE} ${friendlyDate(item.streamingSince)})`}
+              </span>
+            )}
+          </p>
+        </div>
+      ) : (
+        forecast !== null &&
+        item.forecast != null && (
+          /*
+          #382/#389 — the forecast panel: a tag that says Estimate or
+          Announced and the "when" as its headline. ⚠ The headline is
+          decorative (`aria-hidden`); the sentence under it is the
+          accessible truth and still LEADS with "Estimate:" for a guess
+          (#380), so an estimate never reads as an announcement. It names
+          the service, so no mark repeats it.
+        */
+          <div className={OUTLOOK_CLASS[forecastKind]}>
+            <p className="waiting-row__outlook-head" aria-hidden="true">
+              <span className={TAG_CLASS[forecastKind]}>{FORECAST_TAG[forecastKind]}</span>
+              <span className="waiting-row__when">{forecastWhen(item.forecast)}</span>
+            </p>
+            <p className={FORECAST_CLASS[forecastKind]} data-testid="waiting-forecast">
+              {forecast.text}
+            </p>
+          </div>
+        )
+      )}
+    </>
+  );
+}
+
 function WaitingRow({
   item,
   onSuppress,
   onDone,
   offline,
+  view,
 }: {
   item: WaitingItem;
+  view: ListView;
   onSuppress: (titleId: string) => Promise<unknown>;
   onDone: (intentId: string) => void;
   offline: boolean;
 }): JSX.Element {
   const [phase, setPhase] = useState<'idle' | 'submitting' | 'error'>('idle');
   const flagged = item.flaggedOn ?? [];
-  const flaggedServices = flagged.flatMap((service) => {
-    const known = knownService(service);
-    return known === undefined ? [] : [known];
-  });
   const rentStores = rentOnlyStores(item);
-  const others = otherStreaming(item);
-  const forecast = flagged.length > 0 ? null : forecastLine(item);
-  const forecastKind = forecast?.estimate === true ? 'estimate' : 'announced';
   const rowKind = flagged.length > 0 ? 'streaming' : 'waiting';
   const mediaType = mediaTypeText(item.workIdentity);
 
@@ -340,14 +495,6 @@ function WaitingRow({
       () => setPhase('error'),
     );
   }
-
-  // #389 — the discovery line, without "(rent/buy)" when the row's own pill
-  // already says rent or buy only. Any other row keeps it (T-AVAIL-015e).
-  const sourceLabel = intentSourceLabel(item.discoverySource);
-  const discovery =
-    item.discoverySource === 'search'
-      ? `${sourceLabel} on ${friendlyDate(item.discoveredAt)}`
-      : `Seen on ${rentStores !== null ? sourceLabel.replace(RENT_BUY_SUFFIX, '') : sourceLabel} on ${friendlyDate(item.discoveredAt)}`;
 
   return (
     <li className={ROW_CLASS[rowKind]} data-testid="waiting-row" aria-busy={phase === 'submitting'}>
@@ -369,8 +516,15 @@ function WaitingRow({
       <div className="waiting-row__body">
         <div className="waiting-row__heading">
           <div className="waiting-row__title">
+            {/* #391 — the title opens its details page, as in the Library. */}
             <h2 className="waiting-row__name" data-testid="waiting-name">
-              {item.name}
+              <Link
+                className="title-row__link"
+                to={`/waiting/${encodeURIComponent(item.titleId)}`}
+                data-testid="waiting-details-link"
+              >
+                {item.name}
+              </Link>
             </h2>
             <EditionLabels labels={item.editionLabels} />
           </div>
@@ -393,116 +547,11 @@ function WaitingRow({
           </p>
         )}
 
-        {rentStores !== null && (
-          <ul
-            className="waiting-row__chips"
-            aria-label={WAITING_RENT_ONLY_LIST_LABEL}
-            data-testid="waiting-rent-only"
-          >
-            {rentStores.map((store) => (
-              <li key={store} className="chip" data-testid="waiting-rent-store">
-                {store}
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {others !== null && (
-          <div className="waiting-row__other" data-testid="waiting-other-services">
-            <span>{WAITING_OTHER_SERVICES_PREFIX}</span>
-            <ServiceBadges services={others.services} />
-            {others.providers.length > 0 && (
-              <ul className="waiting-row__chips">
-                {others.providers.map((provider) => (
-                  <li key={provider} className="chip" data-testid="waiting-other-provider">
-                    {provider}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <span>{WAITING_OTHER_SERVICES_SUFFIX}</span>
-          </div>
-        )}
-
-        {/*
-          #389 — the row's two plain facts as icon lines. ⚠ A rent-only row
-          still says, in words, that it is not streaming on the owner's
-          services: a rental offer is never the answer this view exists for.
-        */}
-        <ul className="waiting-row__facts">
-          {flagged.length === 0 && (
-            <li>
-              <InfoIcon />
-              {rentStores !== null ? (
-                <span data-testid="waiting-rent-note">
-                  {`${WAITING_RENT_ONLY_SUFFIX} ${friendlyDate(item.availabilityCheckedAt ?? '')}.`}
-                </span>
-              ) : (
-                <span data-testid="waiting-availability">{availabilityLine(item)}</span>
-              )}
-            </li>
-          )}
-          <li>
-            <BookmarkIcon />
-            {/* US-043 AC-1 — the discovery date and where it came from. */}
-            <span data-testid="waiting-discovery">{discovery}</span>
-          </li>
-        </ul>
+        <WaitingFacts item={item} full={view === 'compact'} />
       </div>
 
       <div className="waiting-row__aside">
-        {flagged.length > 0 ? (
-          /*
-            #389 — the good news as the row's panel: the tag, the service's
-            mark as the headline, and the sentence with its invitation. Only
-            the mark is decorative; the words say the same.
-          */
-          <div className="waiting-row__outlook waiting-row__outlook--streaming">
-            <span
-              className="waiting-row__tag waiting-row__tag--streaming"
-              data-testid="waiting-streaming-badge"
-            >
-              {WAITING_NOW_STREAMING_BADGE}
-            </span>
-            <ServiceBadges services={flaggedServices} decorative />
-            <p className="waiting-row__flag" data-testid="waiting-flag">
-              {`${WAITING_NOW_ON_PREFIX} ${flagged.map(serviceLabel).join(' and ')} — `}
-              {/* Straight to the import for that service, never an auto-add. */}
-              <Link
-                to={`/upload?service=${encodeURIComponent(flagged[0] ?? '')}`}
-                data-testid="waiting-flag-link"
-              >
-                {WAITING_NOW_ON_INVITATION}
-              </Link>
-              {item.streamingSince != null && (
-                <span className="waiting-row__since" data-testid="waiting-streaming-since">
-                  {` (${WAITING_STREAMING_SINCE} ${friendlyDate(item.streamingSince)})`}
-                </span>
-              )}
-            </p>
-          </div>
-        ) : (
-          forecast !== null &&
-          item.forecast != null && (
-            /*
-              #382/#389 — the forecast panel: a tag that says Estimate or
-              Announced and the "when" as its headline. ⚠ The headline is
-              decorative (`aria-hidden`); the sentence under it is the
-              accessible truth and still LEADS with "Estimate:" for a guess
-              (#380), so an estimate never reads as an announcement. It names
-              the service, so no mark repeats it.
-            */
-            <div className={OUTLOOK_CLASS[forecastKind]}>
-              <p className="waiting-row__outlook-head" aria-hidden="true">
-                <span className={TAG_CLASS[forecastKind]}>{FORECAST_TAG[forecastKind]}</span>
-                <span className="waiting-row__when">{forecastWhen(item.forecast)}</span>
-              </p>
-              <p className={FORECAST_CLASS[forecastKind]} data-testid="waiting-forecast">
-                {forecast.text}
-              </p>
-            </div>
-          )
-        )}
+        <WaitingOutlook item={item} />
 
         <div className="waiting-row__actions">
           {phase === 'idle' && (
@@ -549,8 +598,13 @@ export function WaitingPage({
   onSuppress = () => Promise.resolve(),
   onSearch,
   onSearchAdd,
+  view: controlledView,
+  onViewChange,
 }: WaitingPageProps = {}): JSX.Element {
   const offline = !useOnline();
+  const [localView, setLocalView] = useState<ListView>('compact');
+  const view = controlledView ?? localView;
+  const setView = onViewChange ?? setLocalView;
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
 
   const visible = orderWaiting(items.filter((item) => !dismissed.has(item.intentId)));
@@ -606,17 +660,23 @@ export function WaitingPage({
           </Link>
         </div>
       ) : (
-        <ul className="waiting-list" data-testid="waiting-list">
-          {visible.map((item) => (
-            <WaitingRow
-              key={item.intentId}
-              item={item}
-              offline={offline}
-              onSuppress={onSuppress}
-              onDone={(intentId) => setDismissed((previous) => new Set([...previous, intentId]))}
-            />
-          ))}
-        </ul>
+        <>
+          <div className="waiting-toolbar">
+            <ListViewControl view={view} onChange={setView} />
+          </div>
+          <ul className="waiting-list" data-testid="waiting-list" data-view={view}>
+            {visible.map((item) => (
+              <WaitingRow
+                key={item.intentId}
+                item={item}
+                view={view}
+                offline={offline}
+                onSuppress={onSuppress}
+                onDone={(intentId) => setDismissed((previous) => new Set([...previous, intentId]))}
+              />
+            ))}
+          </ul>
+        </>
       )}
 
       {/* Unconditional: the attribution is a condition of use, not a caption

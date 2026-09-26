@@ -210,6 +210,9 @@ describe('T-DETAIL-003 persisted owner-scoped presentation', () => {
       cast: [{ name: 'Avery Example', character: 'Keeper' }],
       directors: ['Morgan Example'],
       creators: [],
+      // #391 — the provider always answers `trailer` (null: TMDB has none);
+      // a copy without the key predates #391 and is refetched once.
+      trailer: null,
     };
     const provider = vi.spyOn(TmdbClient.prototype, 'getPresentation').mockResolvedValue(value);
     const response = await detail(title.id);
