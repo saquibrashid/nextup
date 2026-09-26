@@ -2398,6 +2398,12 @@ route, by refusing any source file that contacts a host outside the
 three-destination allow-list. **Do not treat the runtime guard as sufficient on
 its own** — the two gates are complementary and both must stay.
 
+⚠ **One link-out host (#391, TASK-259).** `LINK_OUT_HOSTS` in`nthe checker names `www.youtube.com`, and only in`n`packages/domain/src/titlePresentation.ts`, which builds the trailer link the
+owner clicks to open YouTube in a new tab. nextup never fetches it, sends it
+nothing and embeds nothing from it. `T-SEC-031w` pins the list to that one
+host in that one file; `T-SEC-031x` proves the same host in the API, the SPA
+or any other domain file is still a finding.
+
 ---
 
 ## 15. TASK-101 — suppression (`POST /api/titles/:titleId/suppress`)

@@ -26,6 +26,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   ALLOWED_OUTBOUND_HOSTS,
   NON_DESTINATION_HOSTS,
+  LINK_OUT_HOSTS,
   PLATFORM_HOSTS,
   SCANNED_ROOTS,
   checkAllowListShape,
@@ -236,6 +237,37 @@ describe('T-SEC-031 · US-038 AC-2/AC-5 · exactly five outbound destinations (N
     );
     const findings = checkAllowListShape(broken);
     expect(findings.some((f: string) => f.includes('does not match its own example'))).toBe(true);
+  });
+
+  it('T-SEC-031w · the one link-out host is YouTube, pinned to the file that builds the trailer link', async () => {
+    // #391. The owner clicks a plain link that opens YouTube in a new tab;
+    // nextup never fetches it and sends it nothing. The exemption is one host
+    // in one file, so it cannot quietly become a general allowance.
+    expect(LINK_OUT_HOSTS.map((entry) => [entry.host, entry.file])).toEqual([
+      ['www.youtube.com', 'packages/domain/src/titlePresentation.ts'],
+    ]);
+    const root = scratchRepo(
+      'link-out',
+      'packages/domain/src/titlePresentation.ts',
+      'export const trailerUrl = (key: string) => `https://www.youtube.com/watch?v=${key}`;',
+    );
+    expect(await checkOutboundHosts(root)).toEqual([]);
+  });
+
+  it('T-SEC-031x · the same host anywhere else is still caught, in the API and in the SPA', async () => {
+    for (const rel of [
+      'apps/api/src/leak.ts',
+      'apps/web/src/leak.ts',
+      'packages/domain/src/other.ts',
+    ]) {
+      const root = scratchRepo(
+        'link-out-leak',
+        rel,
+        "await fetch('https://www.youtube.com/youtubei/v1/player');",
+      );
+      const findings = await checkOutboundHosts(root);
+      expect(findings.some((f: string) => f.includes('www.youtube.com'))).toBe(true);
+    }
   });
 
   it('T-SEC-031i · Azure platform endpoints are exempt, and visibly so', () => {
