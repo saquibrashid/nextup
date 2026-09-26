@@ -87,7 +87,7 @@ describe('T-WAIT-020 · #382 · the waiting view in the Library look', () => {
     expect(metas[0]!.className).toBe('waiting-row__meta');
   });
 
-  it('T-WAIT-020c · the forecast leads with a tag, the service mark and the when', () => {
+  it('T-WAIT-020c · the forecast leads with a tag and the when', () => {
     render(
       <WaitingPage
         items={[
@@ -108,7 +108,6 @@ describe('T-WAIT-020 · #382 · the waiting view in the Library look', () => {
     expect(estimate!.querySelector('.waiting-row__tag')?.textContent).toBe(
       WAITING_FORECAST_TAG_ESTIMATE,
     );
-    expect(estimate!.querySelector('.brand-mark')).not.toBeNull();
     expect(estimate!.querySelector('.waiting-row__when')?.textContent).toBe('Oct 2026');
     expect(announced!.querySelector('.waiting-row__tag')?.textContent).toBe(
       WAITING_FORECAST_TAG_ANNOUNCED,
@@ -126,7 +125,7 @@ describe('T-WAIT-020 · #382 · the waiting view in the Library look', () => {
     const button = screen.getByTestId('waiting-not-interested');
     expect(button.className).toBe('btn btn--ghost tap-target');
     expect(button.getAttribute('aria-label')).toBe(`${WAITING_NOT_INTERESTED}: Wicked: For Good`);
-    expect(button.closest('.waiting-row__footer')).not.toBeNull();
+    expect(button.closest('.waiting-row__aside')).not.toBeNull();
   });
 
   it('T-WAIT-020e · the search is the Library field: an icon submit inside a rounded control', () => {
@@ -146,9 +145,9 @@ describe('T-WAIT-020 · #382 · the waiting view in the Library look', () => {
     const row = screen.getByTestId('waiting-row');
     expect(row.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}/);
     expect(screen.getByTestId('waiting-discovery').textContent).toBe(
-      'Seen on Fandango at Home (rent/buy) on 24 Sep 2026',
+      'Seen on Fandango at Home on 24 Sep 2026',
     );
-    expect(screen.getByTestId('waiting-rent-only').textContent).toContain('24 Sep 2026');
+    expect(screen.getByTestId('waiting-rent-note').textContent).toContain('24 Sep 2026');
   });
 
   it('T-WAIT-020g · the stylesheet uses the Library surface, poster sizes and breakpoints', () => {
@@ -166,7 +165,76 @@ describe('T-WAIT-020 · #382 · the waiting view in the Library look', () => {
     expect(poster).toContain('width: 4.5rem');
     const at640 = /@media \(min-width: 640px\) \{\s*\.waiting-row \{[\s\S]*?\n\}/.exec(css)?.[0];
     expect(at640).toContain('width: 6rem');
-    const at1024 = /@media \(min-width: 1024px\) \{\s*\.waiting-list \{([^}]*)\}/.exec(css)?.[1];
-    expect(at1024).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))');
+    const at1024 = /@media \(min-width: 1024px\) \{\s*\.waiting-row \{([^}]*)\}/.exec(css)?.[1];
+    expect(at1024).toContain("grid-template-areas: 'poster body aside'");
+  });
+});
+
+/**
+ * #389 — each fact once. The owner found every card repeating itself; these
+ * pin the de-duplication so a later edit cannot quietly bring it back.
+ */
+describe('T-WAIT-022 · #389 · each card says each thing once, in Library-style cards', () => {
+  it('T-WAIT-022a · the forecast panel names the service in its sentence only, never as a second mark', () => {
+    render(<WaitingPage items={[item()]} />);
+    const panel = document.querySelector('.waiting-row__outlook');
+    expect(panel?.querySelector('.brand-mark')).toBeNull();
+    expect(panel?.querySelectorAll('.waiting-row__tag')).toHaveLength(1);
+    expect(screen.getByTestId('waiting-forecast').textContent).toContain('Peacock');
+  });
+
+  it('T-WAIT-022b · a streaming row says "Now streaming" once, in its panel, with one mark', () => {
+    render(
+      <WaitingPage
+        items={[
+          item({
+            accessState: 'streaming',
+            flaggedOn: ['netflix'],
+            rentOn: [],
+            forecast: null,
+            streamingSince: '2026-09-20',
+          }),
+        ]}
+      />,
+    );
+    const row = screen.getByTestId('waiting-row');
+    const aside = row.querySelector('.waiting-row__aside')!;
+    expect(within(row).getAllByTestId('waiting-streaming-badge')).toHaveLength(1);
+    expect(aside.contains(screen.getByTestId('waiting-streaming-badge'))).toBe(true);
+    expect(aside.contains(screen.getByTestId('waiting-flag'))).toBe(true);
+    expect(row.querySelectorAll('.brand-mark')).toHaveLength(1);
+    // The heading holds the title and nothing that repeats the panel.
+    expect(row.querySelector('.waiting-row__heading')?.textContent).toBe('Wicked: For Good');
+    // Nor does an availability line argue with the good news.
+    expect(within(row).queryByTestId('waiting-availability')).toBeNull();
+  });
+
+  it('T-WAIT-022c · "(rent/buy)" is dropped only where the rent-only pill already says it', () => {
+    render(
+      <WaitingPage
+        items={[
+          item(),
+          item({ intentId: 'wi-2', accessState: 'not-seen', rentOn: [], forecast: null }),
+        ]}
+      />,
+    );
+    const lines = screen.getAllByTestId('waiting-discovery').map((line) => line.textContent);
+    expect(lines).toEqual([
+      'Seen on Fandango at Home on 24 Sep 2026',
+      'Seen on Fandango at Home (rent/buy) on 24 Sep 2026',
+    ]);
+    expect(screen.getAllByTestId('waiting-rent-tag')).toHaveLength(1);
+  });
+
+  it('T-WAIT-022d · one card per line, the panel beside the details from 1024 px', () => {
+    const rule = (selector: string): string => {
+      const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? '';
+    };
+    expect(rule('.waiting-list')).toContain('flex-direction: column');
+    expect(css).not.toMatch(/\.waiting-list \{[^}]*repeat\(2/);
+    expect(rule('.waiting-row')).toContain("'aside aside'");
+    expect(rule('.waiting-row__pill')).toContain('border-radius: 999px');
+    expect(rule('.waiting-row__pill')).not.toContain('nowrap');
   });
 });

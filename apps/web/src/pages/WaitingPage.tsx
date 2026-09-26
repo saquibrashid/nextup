@@ -32,7 +32,7 @@ import {
 import { EditionLabels } from '../components/EditionLabels';
 import { ServiceMark } from '../components/ServiceMark';
 import { WaitingSearchAdd } from '../components/WaitingSearchAdd';
-import { SuppressedIcon } from '../components/icons';
+import { BookmarkIcon, InfoIcon, SuppressedIcon } from '../components/icons';
 
 import {
   JUSTWATCH_ATTRIBUTION,
@@ -240,6 +240,9 @@ export function forecastWhen(forecast: NonNullable<WaitingItem['forecast']>): st
   }
 }
 
+/** The storefront marker `intentSourceLabel` appends (`Apple TV (rent/buy)`). */
+const RENT_BUY_SUFFIX = ' (rent/buy)';
+
 /** `tmdb:movie:…` / `tmdb:tv:…` → the Library's type word, or `null`. */
 function mediaTypeText(workIdentity: string): string | null {
   const kind = /^tmdb:(movie|tv):/.exec(workIdentity)?.[1];
@@ -338,6 +341,14 @@ function WaitingRow({
     );
   }
 
+  // #389 — the discovery line, without "(rent/buy)" when the row's own pill
+  // already says rent or buy only. Any other row keeps it (T-AVAIL-015e).
+  const sourceLabel = intentSourceLabel(item.discoverySource);
+  const discovery =
+    item.discoverySource === 'search'
+      ? `${sourceLabel} on ${friendlyDate(item.discoveredAt)}`
+      : `Seen on ${rentStores !== null ? sourceLabel.replace(RENT_BUY_SUFFIX, '') : sourceLabel} on ${friendlyDate(item.discoveredAt)}`;
+
   return (
     <li className={ROW_CLASS[rowKind]} data-testid="waiting-row" aria-busy={phase === 'submitting'}>
       {item.posterPath !== null ? (
@@ -357,15 +368,17 @@ function WaitingRow({
 
       <div className="waiting-row__body">
         <div className="waiting-row__heading">
-          {flagged.length > 0 && (
-            <span className="waiting-row__badge" data-testid="waiting-streaming-badge">
-              {WAITING_NOW_STREAMING_BADGE}
+          <div className="waiting-row__title">
+            <h2 className="waiting-row__name" data-testid="waiting-name">
+              {item.name}
+            </h2>
+            <EditionLabels labels={item.editionLabels} />
+          </div>
+          {rentStores !== null && (
+            <span className="waiting-row__pill" data-testid="waiting-rent-tag">
+              {WAITING_RENT_ONLY_TAG}
             </span>
           )}
-          <h2 className="waiting-row__name" data-testid="waiting-name">
-            {item.name}
-          </h2>
-          <EditionLabels labels={item.editionLabels} />
         </div>
 
         {/* Library's `title-row__facts`: the `·` separators are CSS-generated. */}
@@ -380,49 +393,18 @@ function WaitingRow({
           </p>
         )}
 
-        {flagged.length > 0 ? (
-          <div className="waiting-row__status">
-            <ServiceBadges services={flaggedServices} decorative />
-            <p className="waiting-row__flag" data-testid="waiting-flag">
-              {`${WAITING_NOW_ON_PREFIX} ${flagged.map(serviceLabel).join(' and ')} — `}
-              {/* Straight to the import for that service, never an auto-add. */}
-              <Link
-                to={`/upload?service=${encodeURIComponent(flagged[0] ?? '')}`}
-                data-testid="waiting-flag-link"
-              >
-                {WAITING_NOW_ON_INVITATION}
-              </Link>
-              {item.streamingSince != null && (
-                <span className="waiting-row__since" data-testid="waiting-streaming-since">
-                  {` (${WAITING_STREAMING_SINCE} ${friendlyDate(item.streamingSince)})`}
-                </span>
-              )}
-            </p>
-          </div>
-        ) : rentStores !== null ? (
-          /*
-            #382 — the storefronts as compact chips under a "Rent or buy only"
-            tag, rather than one long sentence. ⚠ The second half — not
-            streaming on the owner's services, as of when — is still said in
-            words: a rental offer is never the answer this view exists for.
-          */
-          <div className="waiting-row__rent" data-testid="waiting-rent-only">
-            <span className="waiting-row__tag waiting-row__tag--rent">{WAITING_RENT_ONLY_TAG}</span>
-            <ul className="waiting-row__chips" aria-label={WAITING_RENT_ONLY_LIST_LABEL}>
-              {rentStores.map((store) => (
-                <li key={store} className="chip" data-testid="waiting-rent-store">
-                  {store}
-                </li>
-              ))}
-            </ul>
-            <p className="waiting-row__note">
-              {`${WAITING_RENT_ONLY_SUFFIX} ${friendlyDate(item.availabilityCheckedAt ?? '')}.`}
-            </p>
-          </div>
-        ) : (
-          <p className="waiting-row__note" data-testid="waiting-availability">
-            {availabilityLine(item)}
-          </p>
+        {rentStores !== null && (
+          <ul
+            className="waiting-row__chips"
+            aria-label={WAITING_RENT_ONLY_LIST_LABEL}
+            data-testid="waiting-rent-only"
+          >
+            {rentStores.map((store) => (
+              <li key={store} className="chip" data-testid="waiting-rent-store">
+                {store}
+              </li>
+            ))}
+          </ul>
         )}
 
         {others !== null && (
@@ -442,64 +424,109 @@ function WaitingRow({
           </div>
         )}
 
-        {forecast !== null && item.forecast != null && (
+        {/*
+          #389 — the row's two plain facts as icon lines. ⚠ A rent-only row
+          still says, in words, that it is not streaming on the owner's
+          services: a rental offer is never the answer this view exists for.
+        */}
+        <ul className="waiting-row__facts">
+          {flagged.length === 0 && (
+            <li>
+              <InfoIcon />
+              {rentStores !== null ? (
+                <span data-testid="waiting-rent-note">
+                  {`${WAITING_RENT_ONLY_SUFFIX} ${friendlyDate(item.availabilityCheckedAt ?? '')}.`}
+                </span>
+              ) : (
+                <span data-testid="waiting-availability">{availabilityLine(item)}</span>
+              )}
+            </li>
+          )}
+          <li>
+            <BookmarkIcon />
+            {/* US-043 AC-1 — the discovery date and where it came from. */}
+            <span data-testid="waiting-discovery">{discovery}</span>
+          </li>
+        </ul>
+      </div>
+
+      <div className="waiting-row__aside">
+        {flagged.length > 0 ? (
           /*
-            #382 — the most useful fact on the row, as a headline: a tag that
-            says Estimate or Announced, the service's mark and the "when".
-            ⚠ The headline is decorative (`aria-hidden`); the sentence under
-            it is the accessible truth and still LEADS with "Estimate:" for a
-            guess (#380), so an estimate never reads as an announcement.
+            #389 — the good news as the row's panel: the tag, the service's
+            mark as the headline, and the sentence with its invitation. Only
+            the mark is decorative; the words say the same.
           */
-          <div className={OUTLOOK_CLASS[forecastKind]}>
-            <p className="waiting-row__outlook-head" aria-hidden="true">
-              <span className={TAG_CLASS[forecastKind]}>{FORECAST_TAG[forecastKind]}</span>
-              <Badge>
-                <ServiceMark service={item.forecast.service} nameHidden />
-              </Badge>
-              <span className="waiting-row__when">{forecastWhen(item.forecast)}</span>
-            </p>
-            <p className={FORECAST_CLASS[forecastKind]} data-testid="waiting-forecast">
-              {forecast.text}
+          <div className="waiting-row__outlook waiting-row__outlook--streaming">
+            <span
+              className="waiting-row__tag waiting-row__tag--streaming"
+              data-testid="waiting-streaming-badge"
+            >
+              {WAITING_NOW_STREAMING_BADGE}
+            </span>
+            <ServiceBadges services={flaggedServices} decorative />
+            <p className="waiting-row__flag" data-testid="waiting-flag">
+              {`${WAITING_NOW_ON_PREFIX} ${flagged.map(serviceLabel).join(' and ')} — `}
+              {/* Straight to the import for that service, never an auto-add. */}
+              <Link
+                to={`/upload?service=${encodeURIComponent(flagged[0] ?? '')}`}
+                data-testid="waiting-flag-link"
+              >
+                {WAITING_NOW_ON_INVITATION}
+              </Link>
+              {item.streamingSince != null && (
+                <span className="waiting-row__since" data-testid="waiting-streaming-since">
+                  {` (${WAITING_STREAMING_SINCE} ${friendlyDate(item.streamingSince)})`}
+                </span>
+              )}
             </p>
           </div>
+        ) : (
+          forecast !== null &&
+          item.forecast != null && (
+            /*
+              #382/#389 — the forecast panel: a tag that says Estimate or
+              Announced and the "when" as its headline. ⚠ The headline is
+              decorative (`aria-hidden`); the sentence under it is the
+              accessible truth and still LEADS with "Estimate:" for a guess
+              (#380), so an estimate never reads as an announcement. It names
+              the service, so no mark repeats it.
+            */
+            <div className={OUTLOOK_CLASS[forecastKind]}>
+              <p className="waiting-row__outlook-head" aria-hidden="true">
+                <span className={TAG_CLASS[forecastKind]}>{FORECAST_TAG[forecastKind]}</span>
+                <span className="waiting-row__when">{forecastWhen(item.forecast)}</span>
+              </p>
+              <p className={FORECAST_CLASS[forecastKind]} data-testid="waiting-forecast">
+                {forecast.text}
+              </p>
+            </div>
+          )
         )}
 
-        <div className="waiting-row__footer">
-          {/*
-            US-043 AC-1 — the discovery date and where it came from. The label
-            carries "(rent/buy)" for a storefront (#378), and a search add says
-            so rather than naming a storefront it never came from.
-          */}
-          <p className="waiting-row__date" data-testid="waiting-discovery">
-            {item.discoverySource === 'search'
-              ? `${intentSourceLabel(item.discoverySource)} on ${friendlyDate(item.discoveredAt)}`
-              : `Seen on ${intentSourceLabel(item.discoverySource)} on ${friendlyDate(item.discoveredAt)}`}
-          </p>
-
-          <div className="waiting-row__actions">
-            {phase === 'idle' && (
-              <Button
-                variant="ghost"
-                data-testid="waiting-not-interested"
-                aria-label={`${WAITING_NOT_INTERESTED}: ${item.name}`}
-                disabled={offline}
-                onClick={suppress}
-              >
-                <SuppressedIcon />
-                {WAITING_NOT_INTERESTED}
-              </Button>
-            )}
-            {phase === 'submitting' && (
-              <Button variant="ghost" data-testid="waiting-suppressing" disabled>
-                {'Working…'}
-              </Button>
-            )}
-            {phase === 'error' && (
-              <Button variant="ghost" data-testid="waiting-not-interested" onClick={suppress}>
-                {RETRY_LABEL}
-              </Button>
-            )}
-          </div>
+        <div className="waiting-row__actions">
+          {phase === 'idle' && (
+            <Button
+              variant="ghost"
+              data-testid="waiting-not-interested"
+              aria-label={`${WAITING_NOT_INTERESTED}: ${item.name}`}
+              disabled={offline}
+              onClick={suppress}
+            >
+              <SuppressedIcon />
+              {WAITING_NOT_INTERESTED}
+            </Button>
+          )}
+          {phase === 'submitting' && (
+            <Button variant="ghost" data-testid="waiting-suppressing" disabled>
+              {'Working…'}
+            </Button>
+          )}
+          {phase === 'error' && (
+            <Button variant="ghost" data-testid="waiting-not-interested" onClick={suppress}>
+              {RETRY_LABEL}
+            </Button>
+          )}
         </div>
         {offline && phase === 'idle' && (
           <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>
@@ -513,7 +540,6 @@ function WaitingRow({
     </li>
   );
 }
-
 export function WaitingPage({
   items = [],
   loading = false,

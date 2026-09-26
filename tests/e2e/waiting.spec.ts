@@ -219,7 +219,7 @@ test.describe('T-WAIT-018 — waiting to stream in a real browser (#378)', () =>
       'href',
       '/upload?service=netflix',
     );
-    await expect(page.getByTestId('waiting-rent-only')).toContainText('Rent or buy only');
+    await expect(page.getByTestId('waiting-rent-tag')).toHaveText('Rent or buy only');
     await expect(page.getByTestId('waiting-other-services')).toContainText(
       '(not one of your services)',
     );
@@ -334,11 +334,15 @@ async function checkRestyle(page: Page, width: number): Promise<void> {
     expect(button?.width ?? 0).toBeLessThan((row?.width ?? 0) * 0.6);
   }
 
-  // Two cards side by side on a laptop, one column below 1024 px.
+  // #389 — one card per line; the panel sits beside the details from 1024 px
+  // and under them below it.
   const first = await rows.nth(0).boundingBox();
   const second = await rows.nth(1).boundingBox();
-  if (width >= 1024) expect(second?.y).toBe(first?.y);
-  else expect(second?.y ?? 0).toBeGreaterThan(first?.y ?? 0);
+  expect(second?.y ?? 0).toBeGreaterThan((first?.y ?? 0) + (first?.height ?? 0) - 1);
+  const body = await rows.nth(1).locator('.waiting-row__body').boundingBox();
+  const aside = await rows.nth(1).locator('.waiting-row__aside').boundingBox();
+  if (width >= 1024) expect(aside?.x ?? 0).toBeGreaterThan((body?.x ?? 0) + (body?.width ?? 0) - 1);
+  else expect(aside?.y ?? 0).toBeGreaterThan(body?.y ?? 0);
 
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
