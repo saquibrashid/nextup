@@ -17,6 +17,8 @@ import {
   SUBMIT_LABEL,
 } from '../../apps/web/src/copy';
 
+import { confirmAllName, reviewHeading } from './phoneReviewSupport';
+
 /**
  * `T-PASTE-010` — TASK-164. **THE ADD-NOT-SWAP REGRESSION GUARD.**
  *
@@ -379,8 +381,8 @@ async function expectServiceUpload(page: Page, service: Service): Promise<void> 
     captureProtocol: 1,
     selectionRefusals: [],
   });
-  await expect(page.getByRole('heading', { name: 'Review this import' })).toBeVisible();
-  await page.getByRole('button', { name: 'Confirm all 1' }).click();
+  await expect(reviewHeading(page)).toBeVisible();
+  await page.getByRole('button', { name: confirmAllName(page, 1) }).click();
   await page.getByRole('button', { name: REVIEW_APPLY_LABEL }).click();
   await page.getByRole('dialog').getByRole('button', { name: REMOVAL_CONFIRM_LABEL }).click();
   await expect(page).toHaveURL('/');
@@ -561,8 +563,8 @@ test.describe('T-PASTE-010 — the add-not-swap regression guard', () => {
     });
     expect(state.submitted).toBe(true);
 
-    await expect(page.getByRole('heading', { name: 'Review this import' })).toBeVisible();
-    await page.getByRole('button', { name: 'Confirm all 1' }).click();
+    await expect(reviewHeading(page)).toBeVisible();
+    await page.getByRole('button', { name: confirmAllName(page, 1) }).click();
 
     await page.getByRole('button', { name: REVIEW_APPLY_LABEL }).click();
     await page.getByRole('dialog').getByRole('button', { name: REMOVAL_CONFIRM_LABEL }).click();

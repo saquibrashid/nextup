@@ -3,6 +3,8 @@ import { expect, test } from '@playwright/test';
 import { buildReviewResponse, type BatchMode, type ReviewCandidate } from '@nextup/domain';
 import type { BatchStatus } from '../../apps/web/src/lib/apiClient';
 
+import { isPhone, openCandidate, toOverview } from './phoneReviewSupport';
+
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jU1cAAAAASUVORK5CYII=',
   'base64',
@@ -281,34 +283,67 @@ for (const width of [280, 390, 1440]) {
         status = 'in-review';
         await resume.getByRole('link', { name: 'View progress' }).click();
         await expect(page).toHaveURL('/batches/journey/review');
-        const card = page.getByTestId('candidate-candidate-24');
-        const keep = card.getByTestId('addition-keep');
-        await keep.scrollIntoViewIfNeeded();
-        await keep.focus();
-        const before = await page.evaluate(() => scrollY);
-        expect(before).toBeGreaterThan(900);
-        await page.keyboard.press('Enter');
-        await expect.poll(() => releaseReview !== undefined).toBe(true);
-        await expect(card).toBeVisible();
-        await expect(page.getByTestId('review-loading')).toHaveCount(0);
-        expect(Math.abs((await page.evaluate(() => scrollY)) - before)).toBeLessThan(2);
-        holdReview = false;
-        releaseReview?.();
-        await expect(card.getByRole('button', { name: 'Change decision' })).toBeFocused();
-        expect(Math.abs((await page.evaluate(() => scrollY)) - before)).toBeLessThan(100);
-        expect(decisionWrites).toBe(1);
+        if (isPhone(page)) {
+          // TASK-262 — on phone the large review is decided one candidate at a
+          // time: the pager stays put while the decision is saved and re-read.
+          const card = await openCandidate(page, 'candidate-24');
+          const keep = card.getByTestId('addition-keep');
+          await keep.focus();
+          await page.keyboard.press('Enter');
+          await expect.poll(() => releaseReview !== undefined).toBe(true);
+          await expect(card).toBeVisible();
+          await expect(page.getByTestId('review-loading')).toHaveCount(0);
+          holdReview = false;
+          releaseReview?.();
+          await expect(card.getByTestId('addition-outcome')).toContainText('Confirmed');
+          await expect(keep).toHaveAttribute('aria-pressed', 'true');
+          expect(decisionWrites).toBe(1);
+          await toOverview(page);
+          await page.getByTestId('apply-changes-button').click();
+          const summary = page.getByRole('dialog', { name: 'Confirm changes' });
+          await expect(summary.getByRole('button', { name: 'Back to review' })).toBeFocused();
+          await expect(summary).toContainText(
+            mode === 'full-update' ? 'An older title' : 'Nothing will be removed',
+          );
+          await page.keyboard.press('Escape');
+          await expect(summary).toHaveCount(0);
+          const again = await openCandidate(page, 'candidate-24');
+          await expect(again.getByTestId('addition-outcome')).toContainText('Confirmed');
+          expect(closes).toBe(0);
+          await toOverview(page);
+        } else {
+          const card = page.getByTestId('candidate-candidate-24');
+          const keep = card.getByTestId('addition-keep');
+          await keep.scrollIntoViewIfNeeded();
+          await keep.focus();
+          const before = await page.evaluate(() => scrollY);
+          expect(before).toBeGreaterThan(900);
+          await page.keyboard.press('Enter');
+          await expect.poll(() => releaseReview !== undefined).toBe(true);
+          await expect(card).toBeVisible();
+          await expect(page.getByTestId('review-loading')).toHaveCount(0);
+          expect(Math.abs((await page.evaluate(() => scrollY)) - before)).toBeLessThan(2);
+          holdReview = false;
+          releaseReview?.();
+          await expect(card.getByRole('button', { name: 'Change decision' })).toBeFocused();
+          expect(Math.abs((await page.evaluate(() => scrollY)) - before)).toBeLessThan(100);
+          expect(decisionWrites).toBe(1);
+          await page.getByTestId('apply-changes-button').click();
+          const summary = page.getByRole('dialog', { name: 'Confirm changes' });
+          await expect(summary.getByRole('button', { name: 'Back to review' })).toBeFocused();
+          await expect(summary).toContainText(
+            mode === 'full-update' ? 'An older title' : 'Nothing will be removed',
+          );
+          await page.keyboard.press('Escape');
+          await expect(summary).toHaveCount(0);
+          await expect(card.getByTestId('addition-outcome')).toContainText('Confirmed');
+          expect(closes).toBe(0);
+        }
         await page.getByTestId('apply-changes-button').click();
-        const summary = page.getByRole('dialog', { name: 'Confirm changes' });
-        await expect(summary.getByRole('button', { name: 'Back to review' })).toBeFocused();
-        await expect(summary).toContainText(
-          mode === 'full-update' ? 'An older title' : 'Nothing will be removed',
-        );
-        await page.keyboard.press('Escape');
-        await expect(summary).toHaveCount(0);
-        await expect(card.getByTestId('addition-outcome')).toContainText('Confirmed');
-        expect(closes).toBe(0);
-        await page.getByTestId('apply-changes-button').click();
-        await summary.getByRole('button', { name: 'Apply changes' }).click();
+        await page
+          .getByRole('dialog', { name: 'Confirm changes' })
+          .getByRole('button', { name: 'Apply changes' })
+          .click();
         await expect(page).toHaveURL('/');
         await page.goto('/batches/journey/review');
         await expect(page.getByRole('heading', { name: 'Capture applied' })).toBeVisible();

@@ -1056,6 +1056,95 @@ export function reviewCounts(toAdd: number, toRemove: number, stillToReview: num
 export const REVIEW_TITLE = 'Review this import';
 
 /**
+ * TASK-262 — the phone review, drawn from the owner's mobile mockup. Below
+ * `--bp-sm` the review is an overview of groups (New, Uncertain, Saved,
+ * Other) with a pager for one candidate at a time (`specs/ui.md` §5.0a).
+ *
+ * ⚠ The words change; the rules do not. Every group comes from the server's
+ * sections, "Already on your list" is always offered in a full update, and
+ * the text read from the screenshot is on every card whose name differs.
+ */
+export const REVIEW_PHONE_TITLE = 'Review extracted titles';
+export function reviewPhoneSubtitle(count: number, source: string, mode: string): string {
+  return `${count} ${count === 1 ? 'candidate' : 'candidates'} from ${source} · ${mode}`;
+}
+export const REVIEW_PHONE_FILTERS = 'Show';
+export const REVIEW_PHONE_CHIP_ALL = 'All';
+export const REVIEW_PHONE_CHIP_NEW = 'New';
+export const REVIEW_PHONE_CHIP_UNCERTAIN = 'Uncertain';
+export const REVIEW_PHONE_CHIP_SAVED = 'Saved';
+export const REVIEW_PHONE_CHIP_OTHER = 'Other';
+export const REVIEW_PHONE_GROUP_NEW = 'New titles';
+export const REVIEW_PHONE_GROUP_UNCERTAIN = 'Uncertain matches';
+export const REVIEW_PHONE_GROUP_SAVED = 'Already in your library';
+export const REVIEW_PHONE_GROUP_OTHER = 'Other extracted items';
+export const REVIEW_PHONE_SEE_ALL = 'See all';
+export function reviewPhoneAddAll(count: number): string {
+  return `Add all ${count} clear ${count === 1 ? 'match' : 'matches'}`;
+}
+export const REVIEW_PHONE_EMPTY = 'No extracted titles are available to review';
+export const REVIEW_PHONE_GROUP_EMPTY = 'Nothing in this group.';
+export const REVIEW_PHONE_COVERAGE_TITLE = 'Incomplete screenshot coverage';
+export function reviewPhoneCoverage(located: number, detected: number): string {
+  const percent = detected === 0 ? 0 : Math.floor((located / detected) * 100);
+  return `${percent}% found (${located.toLocaleString('en-US')} of ${detected.toLocaleString('en-US')} tiles)`;
+}
+export const REVIEW_PHONE_COVERAGE_WITHHELD =
+  'Removals are disabled to prevent accidental changes.';
+export const REVIEW_PHONE_COVERAGE_CAVEAT =
+  'Located readings can include duplicates or misreads; this does not verify every title.';
+export const REVIEW_PHONE_COVERAGE_CHECK = 'Check the screenshots for titles that were missed.';
+export const REVIEW_PHONE_LEARN_MORE = 'Learn more';
+export const REVIEW_PHONE_SHOW_LESS = 'Show less';
+export const REVIEW_PHONE_BACK = 'Back to review';
+export const REVIEW_PHONE_FOCUS_UNCERTAIN = 'Uncertain match';
+export const REVIEW_PHONE_FOCUS_NEW = 'New title';
+export const REVIEW_PHONE_FOCUS_SAVED = 'Already in your library';
+export const REVIEW_PHONE_FOCUS_OTHER = 'Check this reading';
+export function reviewPhonePosition(index: number, total: number): string {
+  return `${index + 1} of ${total}`;
+}
+export function reviewPhoneQuestion(name: string | null): string {
+  return name === null ? 'Is this a title?' : `Is this ${name}?`;
+}
+export function reviewPhoneMatchScore(score: number): string {
+  return `${Math.round(score * 100)}% match`;
+}
+export const REVIEW_PHONE_LOW_CONFIDENCE = 'Low confidence';
+export const REVIEW_PHONE_NO_MATCH = 'No match';
+export const REVIEW_PHONE_READ_FROM = 'Read from screenshot';
+export function reviewPhoneRead(text: string): string {
+  return `Read “${text}”`;
+}
+export const REVIEW_PHONE_NOTHING_READ = 'No text was read from this tile.';
+export const REVIEW_PHONE_WHAT_NEXT = 'What would you like to do?';
+export const REVIEW_PHONE_YES_ADDITION = 'Yes, this is correct';
+export const REVIEW_PHONE_YES_UNMATCHED = 'Yes, keep it as an unidentified title';
+export const REVIEW_PHONE_YES_KNOWN = 'Yes, confirm this match';
+export const REVIEW_PHONE_YES_RESCUE = 'Yes, this is a title';
+export const REVIEW_PHONE_CHOOSE_INSTEAD = 'Not a match — choose instead:';
+export const REVIEW_PHONE_SEARCH = 'Search for a different title';
+export const REVIEW_PHONE_NOT_A_TITLE = 'Not a title (e.g. menu, ad)';
+export const REVIEW_PHONE_ADD_MANUALLY = 'Add manually';
+export const REVIEW_PHONE_PREVIOUS = 'Previous';
+export const REVIEW_PHONE_NEXT = 'Next';
+export function reviewPhoneAddLabel(name: string): string {
+  return `Add ${name}`;
+}
+export function reviewPhoneYesLabel(name: string): string {
+  return `Yes: ${name}`;
+}
+export function reviewPhoneNoLabel(name: string): string {
+  return `No: ${name}`;
+}
+export function reviewPhoneChangeLabel(name: string, outcome: string): string {
+  return `${name}: ${outcome} Change decision`;
+}
+export function reviewPhoneOpenLabel(name: string): string {
+  return `Review ${name}`;
+}
+
+/**
  * SD-11a, quoted from the `specs/ui.md` §5.2 wireframe (`[Confirm all 9]`).
  * `{n}` is the number of STILL-PENDING candidates in the section, not the
  * section's total — see `CandidateSection` for why that distinction matters.

@@ -2,6 +2,8 @@ import AxeBuilder from '@axe-core/playwright';
 import { test, expect } from '@playwright/test';
 import { buildReviewResponse, type ReviewCandidate } from '@nextup/domain';
 
+import { isPhone, openCandidate, toOverview } from './phoneReviewSupport';
+
 test('T-UX-162p: editable and offline decisions remain clear', async ({ page }, testInfo) => {
   for (const width of [280, 390, 1440]) {
     await page.unrouteAll();
@@ -85,10 +87,17 @@ test('T-UX-162p: editable and offline decisions remain clear', async ({ page }, 
     });
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/batches/review/review');
-    const card = page.getByTestId('candidate-one');
-    await card.getByRole('button', { name: 'Change decision' }).click();
+    // TASK-262 — on phone the decision is changed in the pager, whose options
+    // stay offered after a choice (there is no Change decision step).
+    const change = async () => {
+      const opened = await openCandidate(page, 'one');
+      if (!isPhone(page)) await opened.getByRole('button', { name: 'Change decision' }).click();
+      return opened;
+    };
+    const card = await change();
     await card.getByTestId('addition-discard').click();
     await expect(card.getByTestId('addition-outcome')).toContainText('Discarded');
+    await toOverview(page);
     await expect(page.getByRole('region', { name: 'Unsaved review choices' })).toHaveCount(0);
     await page.getByTestId('apply-changes-button').click();
     const summary = page.getByRole('dialog');
@@ -96,13 +105,15 @@ test('T-UX-162p: editable and offline decisions remain clear', async ({ page }, 
     await expect(summary.getByRole('button', { name: /Back/ })).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(summary).toHaveCount(0);
-    await expect(card.getByTestId('addition-outcome')).toContainText('Discarded');
+    await expect((await openCandidate(page, 'one')).getByTestId('addition-outcome')).toContainText(
+      'Discarded',
+    );
     await page.evaluate(() => {
       Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
       window.dispatchEvent(new Event('offline'));
     });
-    await card.getByRole('button', { name: 'Change decision' }).click();
-    await card.getByTestId('addition-keep').click();
+    await (await change()).getByTestId('addition-keep').click();
+    await toOverview(page);
     const unsaved = page.getByRole('region', { name: 'Unsaved review choices' });
     await expect(unsaved).toBeVisible();
     await expect(unsaved).toContainText('Not saved');
@@ -126,7 +137,9 @@ test('T-UX-162p: editable and offline decisions remain clear', async ({ page }, 
     expect(writes).toBe(1);
     await unsaved.getByRole('button', { name: 'Check and save choices' }).click();
     await expect(unsaved).toHaveCount(0);
-    await expect(card.getByTestId('addition-outcome')).toContainText('Confirmed');
+    await expect((await openCandidate(page, 'one')).getByTestId('addition-outcome')).toContainText(
+      'Confirmed',
+    );
     expect(writes).toBe(2);
   }
 });

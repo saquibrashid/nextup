@@ -2,6 +2,8 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { buildReviewResponse, type ReviewCandidate } from '@nextup/domain';
 
+import { openCandidate, reviewHeading, toOverview } from './phoneReviewSupport';
+
 const { describe } = test;
 
 for (const width of [280, 390, 1440]) {
@@ -120,6 +122,60 @@ for (const width of [280, 390, 1440]) {
       });
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/batches/review/review');
+      if (width < 640) {
+        // TASK-262 — the phone review lists every candidate in a group and
+        // decides it in the pager, over the same saved-decision API.
+        await expect(reviewHeading(page)).toBeVisible();
+        await expect(page.getByTestId('phone-review-coverage')).toContainText('4 of 5');
+        for (const id of ['c0', 'c1', 'c2', 'c3'])
+          await expect(page.getByTestId(`phone-review-row-${id}`)).toBeVisible();
+        await expect(page.getByTestId('phone-review-card-c4')).toBeVisible();
+        const known = await openCandidate(page, 'c0');
+        await expect(known.getByTestId('candidate-thumb-crop')).toBeVisible();
+        await expect(known.getByTestId('addition-keep')).toHaveCount(0);
+        await known.getByTestId('known-keep').click();
+        await expect(known.getByTestId('known-outcome')).toContainText(
+          'Match confirmed. Already saved; nothing will be added.',
+        );
+        await toOverview(page);
+        for (const id of ['c2', 'c3']) {
+          await page.getByTestId(`phone-review-yes-${id}`).click();
+          await expect(page.getByTestId(`phone-review-yes-${id}`)).toHaveCount(0);
+        }
+        const unreadable = await openCandidate(page, 'c4');
+        await expect(unreadable.getByTestId('unmatched-keep')).toHaveCount(0);
+        await unreadable.getByTestId('unmatched-discard').click();
+        await expect(unreadable.getByTestId('unmatched-outcome')).toContainText('Discarded');
+        await page.reload();
+        await expect(reviewHeading(page)).toBeVisible();
+        const saved = await openCandidate(page, 'c0');
+        await expect(saved.getByTestId('known-outcome')).toContainText('Match confirmed');
+        const added = await openCandidate(page, 'c2');
+        await expect(added.getByTestId('addition-outcome')).toContainText('Confirmed');
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+        ).toBe(true);
+        await toOverview(page);
+        const phoneScan = await new AxeBuilder({ page })
+          .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+          .analyze();
+        expect(
+          phoneScan.violations.filter(
+            (issue) => issue.impact === 'serious' || issue.impact === 'critical',
+          ),
+        ).toEqual([]);
+        await page.screenshot({
+          path: testInfo.outputPath(`tile-review-${width}.png`),
+          fullPage: true,
+        });
+        await page.getByTestId('apply-changes-button').click();
+        const phoneDialog = page.getByRole('dialog');
+        await expect(phoneDialog).toContainText('Title 2');
+        await expect(phoneDialog).toContainText('Title 3');
+        await expect(phoneDialog).not.toContainText('Title 0');
+        await page.keyboard.press('Escape');
+        return;
+      }
       await expect(
         page.getByRole('heading', { name: '5 tiles found · 2 already saved · 3 to review' }),
       ).toBeVisible();

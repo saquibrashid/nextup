@@ -50,6 +50,8 @@
 
 import { expect, test, type Page } from '@playwright/test';
 
+import { isPhone } from './phoneReviewSupport';
+
 /** §10.1's floor — the narrowest width NFR-006 mandates. */
 const NARROW = { width: 320, height: 720 };
 
@@ -159,12 +161,23 @@ async function openReview(page: Page): Promise<void> {
   await stubApi(page);
   await page.goto(`/batches/${BATCH_ID}/review`);
   await expect(page.locator('.app-shell')).toBeVisible();
-  await expect(page.getByTestId('review-additions')).toBeVisible();
+  if (isPhone(page)) {
+    // TASK-262 — the phone overview previews three rows; the New chip lists
+    // the whole group, which is where the window has to hold.
+    await expect(page.getByTestId('phone-review-group-new')).toBeVisible();
+    await page.getByTestId('phone-review-chip-new').click();
+  }
+  await expect(additions(page)).toBeVisible();
+}
+
+/** The additions section: the wide `<details>` or the phone New group. */
+function additions(page: Page) {
+  return page.getByTestId(isPhone(page) ? 'phone-review-group-new' : 'review-additions');
 }
 
 /** The rows actually mounted in the additions section, right now. */
 function rowCount(page: Page): Promise<number> {
-  return page.getByTestId('review-additions').locator('.review-section__row').count();
+  return additions(page).locator('.review-section__row').count();
 }
 
 test.describe('T-PERF-002 — a 500-candidate review stays usable', () => {
@@ -177,8 +190,10 @@ test.describe('T-PERF-002 — a 500-candidate review stays usable', () => {
     // The claim and the DOM, together. Either alone is satisfied by a bug:
     // the count alone by a list that renders nothing, the DOM alone by a list
     // that silently truncated the batch to a handful of candidates.
-    await expect(page.getByTestId('review-additions')).toContainText(
-      `New to your library (${String(CANDIDATE_COUNT)})`,
+    await expect(additions(page)).toContainText(
+      isPhone(page)
+        ? `New titles${String(CANDIDATE_COUNT)}`
+        : `New to your library (${String(CANDIDATE_COUNT)})`,
     );
     await expect(page.getByTestId('candidate-list-viewport')).toBeVisible();
 
@@ -198,11 +213,7 @@ test.describe('T-PERF-002 — a 500-candidate review stays usable', () => {
     await openReview(page);
 
     const viewport = page.getByTestId('candidate-list-viewport');
-    const firstBefore = await page
-      .getByTestId('review-additions')
-      .locator('.review-section__row')
-      .first()
-      .textContent();
+    const firstBefore = await additions(page).locator('.review-section__row').first().textContent();
 
     await viewport.evaluate((node) => {
       node.scrollTop = node.scrollHeight / 2;
@@ -212,8 +223,7 @@ test.describe('T-PERF-002 — a 500-candidate review stays usable', () => {
     // list every row is already mounted, so the first row never changes -- which
     // is precisely what this asserts against.
     await expect(async () => {
-      const firstAfter = await page
-        .getByTestId('review-additions')
+      const firstAfter = await additions(page)
         .locator('.review-section__row')
         .first()
         .textContent();
@@ -294,11 +304,11 @@ test.describe('T-PERF-002 — a 500-candidate review stays usable', () => {
     // and once as the raw extracted text -- so a bare `getByText` resolves to
     // two elements and fails Playwright's strict mode with a message that reads
     // exactly like "the row was never reached".
-    const lastRow = page.getByTestId('review-additions').getByText(last).first();
+    const lastRow = additions(page).getByText(last).first();
 
     // Absent from the DOM at the top of the list -- otherwise "reachable after
     // scrolling" would be true of a list that never scrolled at all.
-    await expect(page.getByTestId('review-additions').getByText(last)).toHaveCount(0);
+    await expect(additions(page).getByText(last)).toHaveCount(0);
 
     const viewport = page.getByTestId('candidate-list-viewport');
 

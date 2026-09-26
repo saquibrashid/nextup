@@ -36,6 +36,7 @@ import { Button } from '../components/ui/Button';
 import { ReviewRecovery } from '../components/ReviewRecovery';
 import { useCaptureLifetime } from '../lib/useCaptureLifetime';
 import { CaptureUnavailable } from '../components/CaptureUnavailable';
+import { useWideViewport } from '../lib/useWideViewport';
 
 export interface ReviewRouteProps {
   readonly client?: ApiClient;
@@ -85,6 +86,7 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
   const params = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const phone = !useWideViewport();
   const batchId = params['batchId'] ?? '';
 
   /**
@@ -473,6 +475,7 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
   if (unavailable) return <CaptureUnavailable />;
   return (
     <ReviewPage
+      phone={phone}
       controlled
       hasUnsaved={decisions.intents.length > 0}
       reviewTools={
