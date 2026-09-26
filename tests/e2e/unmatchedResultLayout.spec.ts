@@ -171,7 +171,9 @@ for (const size of [PHONE, WIDE_MIN]) {
 
       // Before the fix: 158x76 — four wrapped lines of `Use Good Luck, Have Fun,
       // Don't Die`. A control taller than it is wide is prose with a border.
-      expect(button.height).toBeLessThanOrEqual(56);
+      // The phone option is two lines by design — the title, then its year —
+      // so its ceiling is two lines, still well under the four-line defect.
+      expect(button.height).toBeLessThanOrEqual(phone ? 64 : 56);
       expect(button.width).toBeGreaterThan(button.height);
       // NFR-008 / T-A11Y-015: and it is still a real touch target.
       expect(button.height).toBeGreaterThanOrEqual(44);
