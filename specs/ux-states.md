@@ -265,7 +265,7 @@ cards stay mounted across refresh and summary cancellation. `T-UX-165g`–`k`.
 | **10.2 Authenticated, allow-listed** | The requested route, with the deep link preserved through the redirect (US-001 AC-2) | `T-AUTH-002` |
 | **10.3 Authenticated, NOT allow-listed** | Full-page refusal (§2.11). **No list data of any kind is fetched or rendered.** The highest-value test in the product | `T-SEC-010` |
 | **10.4 Session expired** | 401 → the sign-in-again state, returning to the current URL. In-progress review state is preserved (§6.18) | `T-AUTH-003` |
-| **10.5 Signed out** | Sign-out link is always present in the header; after sign-out the owner lands on the Entra signed-out page | `T-AUTH-004` |
+| **10.5 Signed out** | Sign-out link is always reachable from the header: at `--bp-lg` and up it sits in the sidebar under the nav with *Signed in as {name}*; below that it is in the Menu drawer, under the destination list (TASK-261). It is a plain link to `/.auth/logout`. After sign-out the owner lands on the Entra signed-out page | `T-NAV-004` (presence), `T-AUTH-004` (landing, manual) |
 
 > ⚠ **CORRECTION to §10.1 — the body is EMPTY, and that is the security
 > property.** This row previously read *"`/api/*` returns 401 JSON, never

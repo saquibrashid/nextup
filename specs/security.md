@@ -85,7 +85,7 @@ project a control nobody tests is a control nobody has.
 | Token handling | **Entirely outside the application.** The platform validates the token and injects the principal header. |
 | Application auth code | **Zero.** No OIDC client, no JWT library, no session store, no password path, no cookie signing. `T-SEC-011` asserts no `jsonwebtoken`, `passport`, `openid-client`, `next-auth` or equivalent appears in any `package.json`. |
 | Session lifetime | Platform default: refresh-token-backed, ~8-hour access token with silent refresh; the owner is re-prompted per Entra tenant policy. **nextup does not configure, extend or shorten it** — there is no session state to extend. Expiry surfaces as a 401, handled by `specs/ux-states.md` §10.4 with in-progress review state preserved. |
-| Sign-out | `/.auth/logout` — a platform URL, linked from the header. |
+| Sign-out | `/.auth/logout` — a platform URL, linked from the header: the sidebar at `--bp-lg` and up, the header's Menu drawer below it (TASK-261, `T-NAV-004`). |
 | Deep links | Easy Auth's `post_login_redirect_uri` preserves the requested path (US-001 AC-2). `T-AUTH-002`. |
 | HTTPS | Enforced by the Container Apps ingress (`allowInsecure: false`) with a managed certificate. HTTP is redirected. `T-SEC-012` asserts the Bicep sets `allowInsecure: false`. |
 
