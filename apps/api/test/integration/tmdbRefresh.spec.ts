@@ -369,12 +369,14 @@ describe('T-TMDB-004 · metadata older than 183 days refreshes on display', () =
     const item = await detail(seeded.id);
     expect(item.name).toBe('Dune');
     expect(item.metadataStale).toBe(false);
-    // Basic metadata and the separately cached display-only credits each refresh once.
+    // Basic metadata and the separately cached display-only presentation each
+    // refresh once; since #391 the presentation read also appends videos and
+    // release dates.
     expect(
       detailCalls().map((url) =>
         new URL(url, 'https://api.themoviedb.org').searchParams.get('append_to_response'),
       ),
-    ).toEqual(['external_ids,keywords', 'credits']);
+    ).toEqual(['external_ids,keywords', 'credits,videos,release_dates']);
   });
 });
 
