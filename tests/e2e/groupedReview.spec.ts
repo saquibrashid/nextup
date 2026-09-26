@@ -2,6 +2,8 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { buildReviewResponse, type ReviewCandidate } from '@nextup/domain';
 
+import { openCandidate, reviewHeading, toOverview } from './phoneReviewSupport';
+
 const candidate: ReviewCandidate = {
   candidateId: 'new',
   rawText: 'A LONG ORIGINAL SCREENSHOT READING',
@@ -77,6 +79,46 @@ describe('T-POL-003b review decision geometry', () => {
         );
         await page.setViewportSize({ width, height: 900 });
         await page.goto('/batches/grouped/review');
+        if (width < 640) {
+          // TASK-262 — the phone review: the same sections as groups, one
+          // candidate at a time in the pager, with the same evidence.
+          await expect(reviewHeading(page)).toBeVisible();
+          expect(
+            await reviewHeading(page).evaluate((el) => getComputedStyle(el).fontFamily),
+          ).toContain('Georgia');
+          await expect(page.getByTestId('phone-review-row-known')).toBeVisible();
+          await expect(page.getByTestId('phone-review-card-unknown')).toBeVisible();
+          await expect(page.getByTestId('phone-review-row-chrome')).toBeVisible();
+          const phoneCard = await openCandidate(page, 'new');
+          await expect(phoneCard.getByText('Read from screenshot', { exact: true })).toBeVisible();
+          await expect(phoneCard.getByTestId('candidate-raw-text')).toHaveText(candidate.rawText);
+          const options = phoneCard.locator('.phone-review__options button');
+          const heights = await options.evaluateAll((buttons) =>
+            buttons.map((button) => button.getBoundingClientRect().height),
+          );
+          expect(heights.length).toBeGreaterThanOrEqual(3);
+          expect(heights.every((height) => height >= 44)).toBe(true);
+          expect(
+            await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+          ).toBe(true);
+          await toOverview(page);
+          const phoneApply = page.getByTestId('apply-changes-button');
+          await phoneApply.scrollIntoViewIfNeeded();
+          await expect(phoneApply).toBeVisible();
+          const phoneScan = await new AxeBuilder({ page })
+            .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+            .analyze();
+          expect(
+            phoneScan.violations.filter(
+              (item) => item.impact === 'serious' || item.impact === 'critical',
+            ),
+          ).toEqual([]);
+          await page.screenshot({
+            path: testInfo.outputPath('grouped-review.png'),
+            fullPage: true,
+          });
+          return;
+        }
         await expect(
           page.getByRole('list', { name: 'Capture progress' }).locator('[aria-current="step"]'),
         ).toHaveText('Review');

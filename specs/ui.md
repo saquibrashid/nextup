@@ -965,6 +965,40 @@ shows the failure states in `specs/ux-states.md` §5.
 
 **Primary action.** Confirm what should happen, then close the batch.
 
+### 5.0a Phone layout — the owner's review mockup *(new, TASK-262)*
+
+Below `--bp-sm` (`html[data-layout='phone']`) the review is drawn as the
+owner's *Review Extracted Titles* mockup (`components/PhoneReview.tsx`),
+decided with the owner on 2026-09-28. Wider layouts keep §5.1 unchanged. The
+same decisions, counts, apply and removal rules hold at every width — only the
+presentation changes.
+
+1. **An overview, then a pager.** The overview has *Review extracted titles*,
+   a subtitle naming the service, mode and screenshot count, filter chips
+   (*All*, *New*, *Uncertain*, *Already in your library*, *Other*), a coverage
+   card and one group per kind. A group previews three rows (the *New* group a
+   carousel of cards) with *See all*. Choosing a row opens that candidate in a
+   pager (*Uncertain match* and the rest): the screenshot tile as the hero with
+   the poster inset, the reading, *What would you like to do?* and
+   Previous/Next. *Back to review* returns to the overview.
+2. **"+" confirms at once.** A matched row's ✓ confirms it without a second
+   step; ✗ opens the pager so the owner can see what is being discarded.
+   *Add all N clear matches* stays, confirming only clear matches.
+3. **An unreadable tile is never kept blind.** A tile with no reading sits
+   under *Uncertain*, offers *Find the right title* and *Discard*, and never
+   a Yes — the same rule as the wide card's hidden Keep. A *probably not a
+   title* row is under *Other* with the same rule.
+4. **Coverage is about tiles, not titles.** The card says how many detected
+   tiles were located; its caveat (*an unlocated tile is not necessarily
+   unread*) sits under *Learn more*.
+5. **The overview owns the tail.** Banners, review tools, unsaved choices,
+   removals (full update, all shown — invariant 2) and the apply bar render on
+   the overview only, never inside the pager.
+6. **Deliberate differences from the mockup:** no Review tab in the bottom bar
+   and no genre chips; no capture stepper; the hero is the screenshot, not a
+   backdrop; *Already in your library* and *Other* groups are added; the raw
+   read text is shown when it differs from the matched name.
+
 ### 5.1 Layout
 
 ```

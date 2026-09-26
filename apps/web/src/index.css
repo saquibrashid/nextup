@@ -296,6 +296,11 @@
   --color-chip: #1d1a31;
   --color-status-watching: rgba(122, 220, 176, 0.14);
   --color-status-watching-border: rgba(122, 220, 176, 0.5);
+
+  /* TASK-262 — the phone review's coverage card: the rating amber, tinted. */
+  --color-warning-tint: rgba(232, 200, 143, 0.1);
+  --color-warning-border: rgba(232, 200, 143, 0.55);
+  --color-badge: rgba(17, 21, 38, 0.8);
   --radius-poster: 8px;
 
   /*
@@ -7229,4 +7234,700 @@ html[data-layout='phone'] .upload-flow .dropzone__remove-label {
   overflow: hidden;
   position: absolute;
   white-space: nowrap;
+}
+
+/* ------------------------------------------------- phone review (262) -- */
+
+/*
+ * TASK-262 — the owner's mobile mockup for `/review/:batchId`: an overview of
+ * groups (chips, a coverage card, rows, a carousel) and a one-candidate pager.
+ * Scoped exactly like the TASK-255 and TASK-260 blocks; nothing here reaches
+ * the wide layout, which renders none of these classes anyway.
+ */
+
+html[data-layout='phone'] .review-flow--phone {
+  padding-block: 0 var(--space-6);
+}
+
+html[data-layout='phone'] .phone-review {
+  display: grid;
+  gap: var(--space-4);
+  min-inline-size: 0;
+}
+
+html[data-layout='phone'] .phone-review__head h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-normal);
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+html[data-layout='phone'] .phone-review__subtitle {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  margin: var(--space-1) 0 0;
+}
+
+/* The pager keeps the page's h1 for the heading outline, unseen. */
+html[data-layout='phone'] .phone-review__head[data-screen='focus'] {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  margin: 0;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------- the filter chips */
+
+html[data-layout='phone'] .phone-review__chips {
+  display: flex;
+  gap: var(--space-2);
+  margin-inline: calc(var(--space-4) * -1);
+  overflow-x: auto;
+  padding-inline: var(--space-4);
+  scrollbar-width: none;
+}
+
+html[data-layout='phone'] .phone-review__chips > .btn {
+  background: var(--color-chip);
+  border-color: var(--color-border-soft);
+  border-radius: 999px;
+  color: var(--color-text);
+  flex: none;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  min-block-size: 44px;
+  padding: var(--space-2) var(--space-4);
+}
+
+html[data-layout='phone'] .phone-review__chips > .btn[aria-pressed='true'] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-surface);
+}
+
+html[data-layout='phone'] .phone-review__count {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  line-height: var(--leading-tight);
+}
+
+html[data-layout='phone'] .phone-review__chips > .btn[aria-pressed='true'] .phone-review__count {
+  color: var(--color-accent-soft);
+}
+
+/* ------------------------------------------------- the coverage card */
+
+html[data-layout='phone'] .phone-review__coverage {
+  background: var(--color-warning-tint);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-card);
+  column-gap: var(--space-3);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: var(--space-3) var(--space-4);
+}
+
+html[data-layout='phone'] .phone-review__coverage > .icon {
+  block-size: 2rem;
+  color: var(--color-rating);
+  inline-size: 2rem;
+  margin-block-start: var(--space-1);
+}
+
+html[data-layout='phone'] .phone-review__coverage h2 {
+  color: var(--color-rating);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  margin: 0 0 var(--space-1);
+}
+
+html[data-layout='phone'] .phone-review__coverage p {
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  margin: 0 0 var(--space-1);
+}
+
+html[data-layout='phone'] .phone-review__coverage p + p {
+  color: var(--color-text-muted);
+}
+
+html[data-layout='phone'] .phone-review__coverage .btn {
+  background: none;
+  color: var(--color-rating);
+  display: flex;
+  margin-inline-start: auto;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  padding: var(--space-1) 0;
+  text-decoration: underline;
+}
+
+html[data-layout='phone'] .phone-review__coverage-list {
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  margin: var(--space-2) 0 0;
+  padding-inline-start: var(--space-4);
+}
+
+html[data-layout='phone'] .phone-review__empty {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  margin: 0;
+}
+
+/* ------------------------------------------------------------ groups */
+
+html[data-layout='phone'] .phone-review__group {
+  display: grid;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+html[data-layout='phone'] .phone-review__group-head {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2);
+}
+
+html[data-layout='phone'] .phone-review__group-head h2 {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+html[data-layout='phone'] .phone-review__group-head > .phone-review__count {
+  background: var(--color-chip);
+  border: 1px solid var(--color-border-soft);
+  border-radius: 999px;
+  color: var(--color-text);
+  padding: 0 var(--space-2);
+}
+
+html[data-layout='phone'] .phone-review__group-head > .btn {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  margin-inline-start: auto;
+  padding-inline: 0;
+  text-decoration: underline;
+}
+
+html[data-layout='phone'] .phone-review__group-mark {
+  align-items: center;
+  background: var(--color-accent);
+  block-size: 1.5rem;
+  border-radius: 50%;
+  color: var(--color-surface);
+  display: inline-flex;
+  flex: none;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  inline-size: 1.5rem;
+  justify-content: center;
+  line-height: var(--leading-tight);
+}
+
+html[data-layout='phone'] .phone-review__group[data-group='new'] .phone-review__group-mark {
+  background: var(--color-success);
+}
+
+html[data-layout='phone'] .phone-review__group-mark .icon {
+  block-size: 1rem;
+  inline-size: 1rem;
+}
+
+html[data-layout='phone'] .phone-review__group ul {
+  display: grid;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* -------------------------------------------------------------- rows */
+
+html[data-layout='phone'] .phone-review__row {
+  align-items: center;
+  column-gap: var(--space-3);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+html[data-layout='phone'] .phone-review__row .phone-review__poster,
+html[data-layout='phone'] .phone-review__row .phone-review__whole,
+html[data-layout='phone'] .phone-review__row .phone-review__tile {
+  block-size: 3rem;
+  inline-size: 4.5rem;
+}
+
+html[data-layout='phone'] .phone-review__poster,
+html[data-layout='phone'] .phone-review__whole {
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-poster);
+  display: block;
+  object-fit: cover;
+  object-position: center 20%;
+}
+
+/* No poster, no screenshot: an empty frame holds the row's rhythm. */
+html[data-layout='phone'] .phone-review__poster--empty {
+  border: 1px dashed var(--color-border-soft);
+  box-sizing: border-box;
+}
+
+html[data-layout='phone'] .phone-review__tile {
+  border-radius: var(--radius-poster);
+  display: block;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ⚠ The tile is the crop wrapper; here it fills the row's box, still cropped. */
+html[data-layout='phone'] .phone-review__tile .candidate-card__thumb--cropped {
+  block-size: 100%;
+  inline-size: 100%;
+  min-block-size: 0;
+  min-inline-size: 0;
+}
+
+html[data-layout='phone'] .phone-review__row-body {
+  display: grid;
+  gap: 2px;
+  min-inline-size: 0;
+}
+
+html[data-layout='phone'] .phone-review__row-body > .btn {
+  color: var(--color-text);
+  font-size: var(--text-base);
+  justify-content: flex-start;
+  min-block-size: 0;
+  overflow: hidden;
+  padding: 0;
+  text-align: start;
+  text-decoration: underline;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-layout='phone'] .phone-review__facts,
+html[data-layout='phone'] .phone-review__read {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-layout='phone'] .phone-review__read {
+  font-style: italic;
+}
+
+html[data-layout='phone'] .phone-review__failure {
+  color: var(--color-danger);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+html[data-layout='phone'] .phone-review__row-action > .btn,
+html[data-layout='phone'] .phone-review__card-actions > .btn {
+  block-size: var(--tap-target-min);
+  inline-size: var(--tap-target-min);
+  padding: 0;
+}
+
+html[data-layout='phone'] .phone-review__row-action > .btn .icon {
+  block-size: 1.5rem;
+  inline-size: 1.5rem;
+}
+
+html[data-layout='phone'] .phone-review__row-action > .btn[data-state],
+html[data-layout='phone'] .phone-review__card-actions > .btn[data-state] {
+  background: var(--color-status-watching);
+  border-color: var(--color-status-watching-border);
+  color: var(--color-success);
+}
+
+html[data-layout='phone'] .phone-review__row-action > .btn[data-state='discarded'],
+html[data-layout='phone'] .phone-review__card-actions > .btn[data-state='discarded'] {
+  background: var(--color-chip);
+  border-color: var(--color-border-soft);
+  color: var(--color-text-muted);
+}
+
+html[data-layout='phone'] .phone-review__add-all {
+  margin: 0;
+}
+
+html[data-layout='phone'] .phone-review__add-all > .btn {
+  inline-size: 100%;
+}
+
+/* ---------------------------------------------------------- carousel */
+
+html[data-layout='phone'] .phone-review__group ul.phone-review__cards {
+  display: flex;
+  margin-inline: calc(var(--space-4) * -1);
+  overflow-x: auto;
+  padding-inline: var(--space-4);
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+html[data-layout='phone'] .phone-review__cards > li {
+  flex: 0 0 9.5rem;
+  scroll-snap-align: start;
+}
+
+html[data-layout='phone'] .phone-review__card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-card);
+  block-size: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2);
+}
+
+html[data-layout='phone'] .phone-review__card-art {
+  margin-block-end: var(--space-1);
+  position: relative;
+}
+
+html[data-layout='phone'] .phone-review__card-art .phone-review__poster,
+html[data-layout='phone'] .phone-review__card-art .phone-review__whole,
+html[data-layout='phone'] .phone-review__card-art .phone-review__tile {
+  aspect-ratio: 16 / 10;
+  block-size: auto;
+  inline-size: 100%;
+}
+
+html[data-layout='phone'] .phone-review__badge {
+  background: var(--color-badge);
+  border: 1px solid var(--color-warning-border);
+  border-radius: 999px;
+  color: var(--color-rating);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  padding: 2px var(--space-2);
+  white-space: nowrap;
+}
+
+html[data-layout='phone'] .phone-review__card-art .phone-review__badge {
+  inset-block-end: var(--space-2);
+  inset-inline-end: var(--space-2);
+  position: absolute;
+}
+
+html[data-layout='phone'] .phone-review__card > .btn {
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  justify-content: flex-start;
+  min-block-size: 0;
+  padding: 0;
+  text-align: start;
+}
+
+html[data-layout='phone'] .phone-review__card-actions {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: 1fr 1fr;
+  margin-block-start: auto;
+  padding-block-start: var(--space-2);
+}
+
+html[data-layout='phone'] .phone-review__card-actions > .btn {
+  inline-size: 100%;
+}
+
+html[data-layout='phone'] .phone-review__card-actions > .btn:only-child {
+  grid-column: 1 / -1;
+}
+
+/* ------------------------------------------------------------- pager */
+
+html[data-layout='phone'] .phone-review__focus {
+  display: grid;
+  gap: var(--space-3);
+  min-inline-size: 0;
+}
+
+html[data-layout='phone'] .phone-review__focus:focus {
+  outline: none;
+}
+
+html[data-layout='phone'] .phone-review__focus-bar {
+  align-items: center;
+  column-gap: var(--space-2);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+html[data-layout='phone'] .phone-review__focus-bar > .btn {
+  block-size: var(--tap-target-min);
+  color: var(--color-text);
+  inline-size: var(--tap-target-min);
+  margin-inline-start: calc(var(--space-3) * -1);
+  padding: 0;
+}
+
+html[data-layout='phone'] .phone-review__focus-bar > .btn .icon {
+  transform: rotate(180deg);
+}
+
+html[data-layout='phone'] .phone-review__focus-bar h2 {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+html[data-layout='phone'] .phone-review__focus-bar h2:focus {
+  outline: none;
+}
+
+html[data-layout='phone'] .phone-review__position {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+}
+
+html[data-layout='phone'] .phone-review__hero {
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  position: relative;
+}
+
+html[data-layout='phone'] .phone-review__hero .candidate-card__thumb--cropped,
+html[data-layout='phone'] .phone-review__hero .phone-review__whole,
+html[data-layout='phone'] .phone-review__hero .phone-review__poster {
+  block-size: auto;
+  border-radius: 0;
+  inline-size: 100%;
+  max-block-size: 60vh;
+  min-block-size: 10rem;
+}
+
+html[data-layout='phone'] .phone-review__hero .phone-review__whole {
+  object-fit: contain;
+}
+
+html[data-layout='phone'] .phone-review__hero-poster {
+  border: 2px solid var(--color-surface);
+  border-radius: var(--radius-poster);
+  box-shadow: var(--shadow-card);
+  inline-size: 3.5rem;
+  inset-block-end: var(--space-3);
+  inset-inline-end: var(--space-3);
+  position: absolute;
+}
+
+html[data-layout='phone'] .phone-review__question {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: space-between;
+}
+
+html[data-layout='phone'] .phone-review__question h3 {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  margin: 0;
+  min-inline-size: 0;
+  overflow-wrap: anywhere;
+}
+
+html[data-layout='phone'] .phone-review__focus > .phone-review__facts {
+  font-size: var(--text-base);
+  white-space: normal;
+}
+
+html[data-layout='phone'] .phone-review__chips-static {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+html[data-layout='phone'] .phone-review__chips-static li {
+  background: var(--color-chip);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-poster);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  padding: var(--space-1) var(--space-2);
+}
+
+html[data-layout='phone'] .phone-review__evidence {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+}
+
+html[data-layout='phone'] .phone-review__evidence span {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.06em;
+  line-height: var(--leading-tight);
+  text-transform: uppercase;
+}
+
+html[data-layout='phone'] .phone-review__evidence p {
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  margin: var(--space-1) 0 0;
+  overflow-wrap: anywhere;
+}
+
+html[data-layout='phone'] .phone-review__reason {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  margin: 0;
+}
+
+html[data-layout='phone'] .phone-review__source {
+  color: var(--color-accent);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+}
+
+/* ----------------------------------------------- the options list */
+
+html[data-layout='phone'] .phone-review__options .field-group {
+  border: 0;
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  min-inline-size: 0;
+  padding: 0;
+}
+
+html[data-layout='phone'] .phone-review__options legend {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  margin-block-end: var(--space-2);
+  padding: 0;
+}
+
+html[data-layout='phone'] .phone-review__outcome {
+  color: var(--color-success);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+html[data-layout='phone'] .phone-review__options-label {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+  margin: var(--space-1) 0 0;
+}
+
+html[data-layout='phone'] .phone-review__options .btn[data-option] {
+  background: var(--color-surface);
+  border-color: var(--color-border-soft);
+  color: var(--color-text);
+  font-weight: var(--weight-normal);
+  justify-content: flex-start;
+  min-block-size: 48px;
+  text-align: start;
+}
+
+html[data-layout='phone'] .phone-review__options .btn[data-option] > span {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+}
+
+html[data-layout='phone'] .phone-review__options .btn[data-option='alternative'] .icon:last-child {
+  color: var(--color-text-muted);
+}
+
+html[data-layout='phone'] .phone-review__options .btn[data-option='yes'] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-surface);
+  font-weight: var(--weight-medium);
+}
+
+html[data-layout='phone'] .phone-review__options .btn[data-option='discard'] .icon {
+  color: var(--color-danger);
+}
+
+html[data-layout='phone'] .phone-review__options .btn[data-option='manual'] {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  justify-content: center;
+}
+
+html[data-layout='phone'] .phone-review__alt-art {
+  background: var(--color-surface-raised);
+  block-size: 2rem;
+  border-radius: 4px;
+  flex: none;
+  inline-size: 1.5rem;
+  object-fit: cover;
+}
+
+html[data-layout='phone'] .phone-review__search form {
+  display: grid;
+  gap: var(--space-2);
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+html[data-layout='phone'] .phone-review__search label {
+  font-size: var(--text-sm);
+  grid-column: 1 / -1;
+  line-height: var(--leading-tight);
+}
+
+html[data-layout='phone'] .phone-review__search {
+  display: grid;
+  gap: var(--space-2);
+}
+
+html[data-layout='phone'] .phone-review__pager {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: 1fr 1fr;
+  padding-block-start: var(--space-3);
+}
+
+html[data-layout='phone'] .phone-review__pager > .btn {
+  border-radius: 999px;
+  min-block-size: 48px;
+}
+
+/* The chevron points forward; Previous turns it round. */
+html[data-layout='phone'] .phone-review__pager > .btn:first-child .icon {
+  transform: rotate(180deg);
+}
+
+/* A tap leaves `:hover` behind on touch; the text links keep no fill. */
+html[data-layout='phone'] .phone-review__group-head > .btn:hover,
+html[data-layout='phone'] .phone-review__row-body > .btn:hover,
+html[data-layout='phone'] .phone-review__card > .btn:hover {
+  background: none;
 }

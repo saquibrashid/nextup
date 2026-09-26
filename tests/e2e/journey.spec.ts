@@ -44,6 +44,7 @@ import type {
   TitleListItem,
   TitleListResponse,
 } from '../../apps/web/src/lib/apiClient';
+import { confirmAllName, expectReviewGroup, isPhone, reviewHeading } from './phoneReviewSupport';
 
 /**
  * `T-E2E-001` — the single most valuable test in the suite (`specs/testing.md`
@@ -1037,27 +1038,24 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
   );
 
   await page.goto('/batches/bat_e2e_1/review');
-  await expect(page.getByRole('heading', { name: 'Review this import' })).toBeVisible();
+  await expect(reviewHeading(page)).toBeVisible();
   await attribution('/batches/:id/review (step 3, additions expanded)');
   await axeState('/batches/:id/review (step 3, additions expanded)');
   await noOverflow('/batches/:id/review (step 3)');
 
-  const additions1 = page.getByTestId('review-additions');
-  await expect(additions1.locator('summary')).toHaveText('New to your library (3)');
-  await expect(additions1.locator('details')).toHaveJSProperty('open', true);
-  for (const id of ['dune', 'arrival', 'arcane']) {
-    await expect(additions1.getByText(work(id).name).first()).toBeVisible();
-  }
-
-  const already1 = page.getByTestId('review-already-on-list');
-  await expect(already1.locator('summary')).toHaveText('Already in your library (0)');
-  await expect(already1.locator('details')).toHaveJSProperty('open', true);
+  await expectReviewGroup(
+    page,
+    'additions',
+    3,
+    ['dune', 'arrival', 'arcane'].map((id) => work(id).name),
+  );
+  await expectReviewGroup(page, 'saved', 0);
   // ⚠ Nothing on the list yet ⇒ nothing to remove ⇒ the removals section is ABSENT.
   await expect(page.getByTestId('review-removals')).toHaveCount(0);
   await expect(page.getByText(removalsLabel('netflix'))).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Confirm all 3' }).click();
-  await expect(page.getByRole('button', { name: 'Confirm all 3' })).toHaveCount(0);
+  await page.getByRole('button', { name: confirmAllName(page, 3) }).click();
+  await expect(page.getByRole('button', { name: confirmAllName(page, 3) })).toHaveCount(0);
   await expect.poll(() => be.confirmAllBodies[0]).toEqual({ section: 'additions' });
 
   await page.getByRole('button', { name: REVIEW_APPLY_LABEL }).click();
@@ -1090,15 +1088,11 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
     modeLabel: /Full update/,
     expectedBatchId: 'bat_e2e_2',
   });
-  await expect(page.getByRole('heading', { name: 'Review this import' })).toBeVisible();
+  await expect(reviewHeading(page)).toBeVisible();
 
   // One addition (Sinners), and Dune + Arcane already present (collapsed).
-  const additions2 = page.getByTestId('review-additions');
-  await expect(additions2.locator('summary')).toHaveText('New to your library (1)');
-  await expect(additions2.getByText('Sinners').first()).toBeVisible();
-
-  const already2 = page.getByTestId('review-already-on-list');
-  await expect(already2.locator('summary')).toHaveText('Already in your library (2)');
+  await expectReviewGroup(page, 'additions', 1, ['Sinners']);
+  await expectReviewGroup(page, 'saved', 2);
 
   // ⚠ Arrival — extracted from NO screenshot this batch — is proposed for
   // removal, ticked on arrival (REQ-055). This is the reconcile-with-removals
@@ -1122,8 +1116,8 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
   await expect(removalCards.first()).toContainText('Arrival');
   await expect(removalCards.first().locator('input[type="checkbox"]')).toBeChecked();
 
-  await page.getByRole('button', { name: 'Confirm all 1' }).click();
-  await expect(page.getByRole('button', { name: 'Confirm all 1' })).toHaveCount(0);
+  await page.getByRole('button', { name: confirmAllName(page, 1) }).click();
+  await expect(page.getByRole('button', { name: confirmAllName(page, 1) })).toHaveCount(0);
 
   // Apply opens the removal-confirmation dialog; nothing is removed until it
   // is confirmed as a group.
@@ -1217,13 +1211,11 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
     modeLabel: /Add only/,
     expectedBatchId: 'bat_e2e_3',
   });
-  await expect(page.getByRole('heading', { name: 'Review this import' })).toBeVisible();
+  await expect(reviewHeading(page)).toBeVisible();
   await noOverflow('/batches/:id/review (append-only, step 7)');
 
   // Arrival is a brand-new addition again (it was removed, not suppressed).
-  const additions3 = page.getByTestId('review-additions');
-  await expect(additions3.locator('summary')).toHaveText('New to your library (1)');
-  await expect(additions3.getByText('Arrival').first()).toBeVisible();
+  await expectReviewGroup(page, 'additions', 1, ['Arrival']);
 
   // ⚠ THE SUPPRESSION INVARIANT (REQ-071). Dune is in this batch's screenshots
   // too, but because suppression is keyed on WORK IDENTITY it is dropped
@@ -1231,10 +1223,12 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
   // list". A row-id-keyed suppression would have let this reappear.
   await expect(page.getByText('Dune'), 'a suppressed work must not reappear').toHaveCount(0);
   // Append-only retains known-title accounting but never proposes removals.
-  await expect(page.getByTestId('review-already-on-list')).toBeVisible();
+  await expect(
+    page.getByTestId(isPhone(page) ? 'phone-review-group-saved' : 'review-already-on-list'),
+  ).toBeVisible();
   await expect(page.getByTestId('review-removals')).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Confirm all 1' }).click();
+  await page.getByRole('button', { name: confirmAllName(page, 1) }).click();
   await page.getByTestId('apply-changes-button').click();
   await page.getByRole('dialog').getByRole('button', { name: REMOVAL_CONFIRM_LABEL }).click();
   await expect(page).toHaveURL('/');

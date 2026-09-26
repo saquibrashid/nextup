@@ -92,7 +92,7 @@ export interface CandidateCardProps {
  * The chips §5.3/§5.3a require. Order is fixed so a card never reshuffles its
  * own warnings between renders.
  */
-function chipsFor(candidate: ReviewCandidate, unidentified: boolean): readonly string[] {
+export function chipsFor(candidate: ReviewCandidate, unidentified: boolean): readonly string[] {
   const chips: string[] = [];
   if (unidentified) chips.push(CANDIDATE_UNIDENTIFIED_CHIP);
   if (candidate.verdict === 'low-confidence') chips.push(CANDIDATE_LOW_CONFIDENCE_CHIP);

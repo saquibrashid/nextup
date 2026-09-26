@@ -33,10 +33,13 @@
 
 import { expect, test, type Page } from '@playwright/test';
 
+import { isPhone, openCandidate } from './phoneReviewSupport';
+
 const BATCH_ID = 'bat_unmatched_layout';
 
 /** The narrowest phone the product commits to (`T-A11Y-015`, `T-UX-147d`). */
 const PHONE = { width: 390, height: 844 };
+const WIDE_MIN = { width: 640, height: 900 };
 
 /**
  * A real TMDB title long enough to reproduce the report. `Good Luck, Have Fun,
@@ -118,26 +121,34 @@ async function stubApi(page: Page): Promise<void> {
 }
 
 /**
- * Open the review, open the search on the unmatched row, run it, and return
- * the result row.
+ * Open the review, open the search on the unmatched candidate, run it, and
+ * return the first result row.
  *
  * ⚠ Waits for `.app-shell`, not merely for a `<main>`: `OwnerGate` settles
  * `GET /api/me` before the router mounts and its "checking your access" state
  * is itself a `<main>`, so every measurement would be taken against a
  * placeholder that trivially fits.
+ *
+ * TASK-262 — below 640 px the review is the phone pager, whose result is ONE
+ * control: a bordered row naming the title (`specs/ui.md` §5.0a). The wide
+ * card's `Use this` row is measured at 640 px, the narrowest width it is
+ * still drawn at.
  */
-async function searchedRow(page: Page) {
-  await page.setViewportSize(PHONE);
+async function searchedRow(page: Page, size: { width: number; height: number }) {
+  await page.setViewportSize(size);
   await stubApi(page);
   await page.goto(`/batches/${BATCH_ID}/review`);
   await expect(page.locator('.app-shell')).toBeVisible();
 
-  await page.getByTestId('unmatched-find').click();
-  await page.getByRole('searchbox').first().fill('good luck');
+  const card = await openCandidate(page, 'cnd_u');
+  await card.getByTestId('unmatched-find').click();
+  await card.getByRole('searchbox').first().fill('good luck');
   // The submit button, not the disclosure — the disclosure now reads "Cancel".
-  await page.getByRole('button', { name: /^find a match$/i }).click();
+  await card.getByRole('button', { name: /^find a match$/i }).click();
 
-  const row = page.locator('.unmatched-actions__result').first();
+  const row = isPhone(page)
+    ? card.locator('.phone-review__search button[data-option="alternative"]').first()
+    : page.locator('.unmatched-actions__result').first();
   await expect(row).toBeVisible();
   return row;
 }
@@ -148,56 +159,72 @@ async function box(locator: ReturnType<Page['locator']>) {
   return b;
 }
 
-test.describe('T-UX-152 — the fix-match result row reads as a control', () => {
-  test('T-UX-152a: the button is a compact target, not a paragraph of the title', async ({
-    page,
-  }) => {
-    const row = await searchedRow(page);
-    const button = await box(row.locator('button'));
+const { describe } = test;
+for (const size of [PHONE, WIDE_MIN]) {
+  const phone = size.width < 640;
+  describe(`T-UX-152 — the fix-match result row reads as a control at ${size.width}px`, () => {
+    test('T-UX-152a: the button is a compact target, not a paragraph of the title', async ({
+      page,
+    }) => {
+      const row = await searchedRow(page, size);
+      const button = await box(phone ? row : row.locator('button'));
 
-    // Before the fix: 158x76 — four wrapped lines of `Use Good Luck, Have Fun,
-    // Don't Die`. A control taller than it is wide is prose with a border.
-    expect(button.height).toBeLessThanOrEqual(56);
-    expect(button.width).toBeGreaterThan(button.height);
-    // NFR-008 / T-A11Y-015: and it is still a real touch target.
-    expect(button.height).toBeGreaterThanOrEqual(44);
+      // Before the fix: 158x76 — four wrapped lines of `Use Good Luck, Have Fun,
+      // Don't Die`. A control taller than it is wide is prose with a border.
+      expect(button.height).toBeLessThanOrEqual(56);
+      expect(button.width).toBeGreaterThan(button.height);
+      // NFR-008 / T-A11Y-015: and it is still a real touch target.
+      expect(button.height).toBeGreaterThanOrEqual(44);
+    });
+
+    test('T-UX-152b: the title gets the row, and the control does not take a column of it for the same words', async ({
+      page,
+    }) => {
+      const row = await searchedRow(page, size);
+      if (phone) {
+        // One control, the title inside it: nothing to overlap, nothing off
+        // the phone, and the title's line is the row's line.
+        const button = await box(row);
+        const label = await box(row.locator('span').first());
+        expect(label.x).toBeGreaterThanOrEqual(button.x);
+        expect(label.x + label.width).toBeLessThanOrEqual(button.x + button.width);
+        expect(label.width).toBeGreaterThan(button.width / 2);
+        expect(button.x + button.width).toBeLessThanOrEqual(size.width);
+        return;
+      }
+      const label = await box(row.locator('.unmatched-actions__result-label'));
+      const button = await box(row.locator('button'));
+
+      // Before the fix the row split into a 137 px column of title and a 158 px
+      // column of the SAME title with `Use ` in front of it — the control took
+      // more of the line than the thing it was about. The title now owns the
+      // width; the button takes only what `Use this` needs.
+      expect(label.width).toBeGreaterThan(button.width);
+
+      // Never overlapping, which is what "the text was covering the button"
+      // describes, and never off the screen.
+      const overlaps =
+        label.x < button.x + button.width &&
+        button.x < label.x + label.width &&
+        label.y < button.y + button.height &&
+        button.y < label.y + label.height;
+      expect(overlaps).toBe(false);
+      expect(button.x + button.width).toBeLessThanOrEqual(size.width);
+      expect(label.x + label.width).toBeLessThanOrEqual(size.width);
+    });
+
+    test('T-UX-152c: shortening the visible label did NOT cost the accessible name', async ({
+      page,
+    }) => {
+      const row = await searchedRow(page, size);
+      const button = phone ? row : row.locator('button');
+
+      // The eye reads this...
+      if (phone) await expect(button).toContainText(LONG_NAME);
+      else await expect(button).toHaveText('Use this');
+      // ...and a screen reader still hears WHICH title it applies to. Without
+      // this, three results would present as three buttons called "Use this".
+      await expect(button).toHaveAccessibleName(`Use ${LONG_NAME}`);
+    });
   });
-
-  test('T-UX-152b: the title gets the row, and the control does not take a column of it for the same words', async ({
-    page,
-  }) => {
-    const row = await searchedRow(page);
-    const label = await box(row.locator('.unmatched-actions__result-label'));
-    const button = await box(row.locator('button'));
-
-    // Before the fix the row split into a 137 px column of title and a 158 px
-    // column of the SAME title with `Use ` in front of it — the control took
-    // more of the line than the thing it was about. The title now owns the
-    // width; the button takes only what `Use this` needs.
-    expect(label.width).toBeGreaterThan(button.width);
-
-    // Never overlapping, which is what "the text was covering the button"
-    // describes, and never off the phone.
-    const overlaps =
-      label.x < button.x + button.width &&
-      button.x < label.x + label.width &&
-      label.y < button.y + button.height &&
-      button.y < label.y + label.height;
-    expect(overlaps).toBe(false);
-    expect(button.x + button.width).toBeLessThanOrEqual(PHONE.width);
-    expect(label.x + label.width).toBeLessThanOrEqual(PHONE.width);
-  });
-
-  test('T-UX-152c: shortening the visible label did NOT cost the accessible name', async ({
-    page,
-  }) => {
-    const row = await searchedRow(page);
-    const button = row.locator('button');
-
-    // The eye reads this...
-    await expect(button).toHaveText('Use this');
-    // ...and a screen reader still hears WHICH title it applies to. Without
-    // this, three results would present as three buttons called "Use this".
-    await expect(button).toHaveAccessibleName(`Use ${LONG_NAME}`);
-  });
-});
+}
