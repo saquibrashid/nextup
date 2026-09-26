@@ -53,6 +53,14 @@ export interface UploadStepProps {
   readonly onChange?: (() => void) | undefined;
   readonly onDone?: (() => void) | undefined;
   readonly testId: string;
+  /**
+   * TASK-260 — the phone import screen, where every question stays open.
+   *
+   * ⚠ An answered step does NOT collapse here, so its answer is the checked
+   * control itself and no `Change` is needed. The legend carries its own
+   * number (`1. Choose a service`), so the marker is not drawn.
+   */
+  readonly flat?: boolean;
   readonly children: ReactNode;
 }
 
@@ -66,19 +74,28 @@ export function UploadStep({
   onChange,
   onDone,
   testId,
+  flat = false,
   children,
 }: UploadStepProps): JSX.Element {
-  const done = state === 'done';
+  const done = state === 'done' && !flat;
   return (
-    <section className="upload-step" data-step={index} data-state={state} data-testid={testId}>
+    <section
+      className="upload-step"
+      data-step={index}
+      data-state={state}
+      data-flat={flat || undefined}
+      data-testid={testId}
+    >
       <div className="upload-step__head">
         {/*
           ⚠ `aria-hidden`: the number is a visual landmark, and announcing
           "1 ✓" before every heading is noise. The heading text is the step.
         */}
-        <span className="upload-step__index" aria-hidden="true">
-          {done ? '✓' : index}
-        </span>
+        {!flat && (
+          <span className="upload-step__index" aria-hidden="true">
+            {done ? '✓' : index}
+          </span>
+        )}
         <div className="upload-step__titles">
           <h2 className="upload-step__legend">{legend}</h2>
           {done && answer !== null && (
@@ -102,7 +119,7 @@ export function UploadStep({
             {STEP_CHANGE_LABEL}
           </Button>
         )}
-        {!done && onDone !== undefined && (
+        {!done && !flat && onDone !== undefined && (
           <Button
             variant="secondary"
             type="button"

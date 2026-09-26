@@ -691,7 +691,7 @@ export const STEP_DONE_LABEL = 'Done';
 export const UPLOAD_INTRO =
   'Bring your saved lists together. You will review every change before it reaches your library.';
 export const UPLOAD_LOCAL_NOTE =
-  'Screenshots stay on this device until you choose Extract titles. Leaving or reloading this page clears the selection.';
+  'Screenshots stay on this device until you choose Start extraction. Leaving or reloading this page clears the selection.';
 export const UPLOAD_SUMMARY_TITLE = 'Your capture';
 export const UPLOAD_NEXT_NOTE =
   'Next: review the extracted titles, then confirm exactly what changes. Nothing is removed without your approval.';
@@ -731,6 +731,46 @@ export const IMAGES_STEP_WAITING_HINT =
  */
 export const MODE_FULL_UPDATE_FLAG = 'removes';
 
+/*
+ * TASK-260 — the phone import, drawn from the owner's mobile mockup. Below
+ * `--bp-sm` `/upload` is two screens: Service and Mode, then Screenshots.
+ *
+ * ⚠ The step headings here are the phone's VISIBLE wording only. Each radio
+ * group keeps `SERVICE_STEP_LEGEND` / `MODE_STEP_LEGEND` as its accessible
+ * name, so the question a screen reader hears does not change with width.
+ */
+export const IMPORT_PHONE_TITLE = 'Import your watchlist';
+export const IMPORT_PHONE_INTRO = "Take a few screenshots. We'll do the rest.";
+export const IMPORT_CLOSE_LABEL = 'Close import';
+export const IMPORT_STEPPER_LABEL = 'Import steps';
+export const IMPORT_STEP_SERVICE = 'Service';
+export const IMPORT_STEP_MODE = 'Mode';
+export const IMPORT_STEP_SCREENSHOTS = 'Screenshots';
+export const IMPORT_SERVICE_HEADING = '1. Choose a service';
+export const IMPORT_MODE_HEADING = '2. Choose a mode';
+export const IMPORT_SCREENSHOTS_HEADING = 'Add screenshots';
+export const IMPORT_SCREENSHOTS_HINT = 'Paste, drop, or select files.';
+export const IMPORT_CONTINUE_LABEL = 'Continue';
+export const IMPORT_FORMATS_NOTE = 'PNG, JPEG, HEIC/HEIF supported';
+export const DROPZONE_TABS_LABEL = 'How to add screenshots';
+export const DROPZONE_TAB_PASTE = 'Paste';
+export const DROPZONE_TAB_FILES = 'Files';
+export const DROPZONE_TAB_DROP = 'Drop';
+export const PASTE_CARD_TITLE = 'Paste from your clipboard';
+export const FILES_ROW_LEAD = 'Or choose files';
+export const FILES_CARD_LEAD = 'Choose screenshots from Photos or Files';
+export const CLEAR_ALL_LABEL = 'Clear all';
+
+/** The totals line: `3 images added · 2.1 MB`. */
+export function imagesAddedLabel(count: number): string {
+  return `${String(count)} ${count === 1 ? 'image' : 'images'} added`;
+}
+
+/** The phone grid's overflow tile, named for what it reveals. */
+export function showMoreImagesLabel(count: number): string {
+  return `Show ${String(count)} more ${count === 1 ? 'screenshot' : 'screenshots'}`;
+}
+
 /**
  * §3.3 - step 3.
  *
@@ -744,7 +784,7 @@ export const MODE_FULL_UPDATE_FLAG = 'removes';
  * single source rather than typed into the markup - the same rule the mode
  * consequences follow.
  */
-export const SUBMIT_LABEL = 'Extract titles';
+export const SUBMIT_LABEL = 'Start extraction';
 export const SUBMIT_NEEDS_SELECTION = 'Choose a service and a mode first.';
 export const SUBMIT_NEEDS_IMAGES = 'Attach at least one screenshot first.';
 export const SUBMIT_IN_FLIGHT = "Don't close this tab.";

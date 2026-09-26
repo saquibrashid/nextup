@@ -21,7 +21,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   BATCH_SOURCES,
   batchSourceLabel,
@@ -64,6 +64,18 @@ import { useCaptureLifetime } from '../lib/useCaptureLifetime';
 import { Button } from '../components/ui/Button';
 import { Fieldset } from '../components/ui/Fieldset';
 import { UploadStep } from '../components/UploadStep';
+import { ImportStepper, type ImportStepState } from '../components/ImportStepper';
+import { CloseIcon, ImageIcon } from '../components/icons';
+import { useWideViewport } from '../lib/useWideViewport';
+import {
+  IMPORT_CLOSE_LABEL,
+  IMPORT_CONTINUE_LABEL,
+  IMPORT_FORMATS_NOTE,
+  IMPORT_PHONE_INTRO,
+  IMPORT_PHONE_TITLE,
+  IMPORT_SCREENSHOTS_HEADING,
+  IMPORT_SCREENSHOTS_HINT,
+} from '../copy';
 export { rejectionsFromError } from '../components/RejectionList';
 
 export interface UploadRouteProps {
@@ -109,6 +121,20 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
   const navigate = useNavigate();
   const isActive = useCaptureLifetime();
   const online = useOnline();
+  /*
+   * TASK-260 — below `--bp-sm` the owner's mockup splits `/upload` into two
+   * screens: Service and Mode, then Screenshots.
+   *
+   * ⚠ THE OWNER ACCEPTED THAT THIS SUSPENDS THE PASTE-FIRST RULE ON A PHONE
+   * (`specs/ui.md` §3.0 rule 5, amended 2026-09-26): the Paste button is on
+   * the second screen, so it cannot be tapped before both questions are
+   * answered. Nothing else about holding changes — the dropzone stays
+   * mounted on the first screen, so its queue, and a keyboard paste into it,
+   * survive the Continue and the way back.
+   */
+  const phone = !useWideViewport();
+  const [phoneScreen, setPhoneScreen] = useState<'setup' | 'screenshots'>('setup');
+  const screenshotsHeading = useRef<HTMLHeadingElement>(null);
   const [params] = useSearchParams();
   /*
    * `?service=netflix` or `?source=fandango-at-home` (#378). Either names a
@@ -348,6 +374,20 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
   const blocked = submitBlockedReason(selection, queue.length, !online);
   const ready = selection.service !== null && selection.mode !== null;
   const showCheckpoint = batchId === null && !entryReady;
+  /*
+   * ⚠ A width change can take the owner to the two-screen layout with the
+   * questions unanswered (a rotated phone, a narrowed window), so the second
+   * screen is shown only while both answers hold. Otherwise the first screen
+   * is, and Continue says why it cannot go on.
+   */
+  const onScreenshots = phone && phoneScreen === 'screenshots' && ready;
+  const onSetup = phone && !onScreenshots;
+  const stepState = (answered: boolean, current: boolean): ImportStepState =>
+    answered ? 'done' : current ? 'current' : 'upcoming';
+  const clearSelection = (): void => {
+    setQueue([]);
+    setLocalRefusals([]);
+  };
 
   return (
     <div className="upload-flow">
@@ -371,85 +411,169 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
       {!showCheckpoint && conflictMessage !== null && <p role="status">{conflictMessage}</p>}
       {!showCheckpoint && checkpointError !== null && <p role="alert">{checkpointError}</p>}
       <div hidden={showCheckpoint}>
-        <div className="upload-flow__layout">
+        {phone && (
+          <div className="import-head">
+            {/*
+              ⚠ THE PAGE KEEPS ONE `h1` ON BOTH SCREENS. The mockup draws the
+              title on the first screen only, so on the second it is visually
+              hidden rather than removed, and the heading outline a screen
+              reader navigates by does not change shape between the screens.
+            */}
+            <div
+              className="import-head__title"
+              data-screen={onScreenshots ? 'screenshots' : 'setup'}
+            >
+              <h1>{IMPORT_PHONE_TITLE}</h1>
+              <p>{IMPORT_PHONE_INTRO}</p>
+              {!onScreenshots && (
+                <Link
+                  to="/"
+                  className="import-head__close tap-target"
+                  aria-label={IMPORT_CLOSE_LABEL}
+                  data-testid="import-close"
+                >
+                  <CloseIcon />
+                </Link>
+              )}
+            </div>
+            <ImportStepper
+              service={stepState(selection.service !== null, true)}
+              mode={stepState(selection.mode !== null, selection.service !== null)}
+              screenshots={onScreenshots ? 'current' : 'upcoming'}
+              onBack={
+                onScreenshots
+                  ? () => {
+                      setPhoneScreen('setup');
+                    }
+                  : undefined
+              }
+            />
+          </div>
+        )}
+        <div
+          className="upload-flow__layout"
+          data-phone-screen={phone ? (onScreenshots ? 'screenshots' : 'setup') : undefined}
+        >
           <Fieldset
             legend="Prepare screenshots"
             hideLegend
             disabled={busy || batchId !== null || !entryReady}
           >
-            <UploadPage initialService={initialService} onSelectionChange={setSelection} />
-
-            <UploadStep
-              index={3}
-              legend={IMAGES_STEP_LEGEND}
-              /*
-               * ⚠ ALWAYS `active`, NEVER LOCKED — and that is deliberate, not an
-               * oversight of the progressive reveal. `ImageDropzone` and
-               * `PasteButton` HOLD what arrives before the two questions are
-               * answered (`ux-states.md` §4.3), because the owner's primary path is
-               * pasting the moment they have a screenshot. Dimming or disabling this
-               * step would advertise the opposite of what it does and would lose
-               * exactly that paste.
-               */
-              state="active"
-              hint={ready ? null : IMAGES_STEP_WAITING_HINT}
-              testId="images-step-panel"
-            >
-              <ImageDropzone
-                images={queue}
-                uploadStates={uploadStates}
-                batchReady={ready}
-                offline={!online}
-                disabled={busy || batchId !== null}
-                serverRejected={serverRejected}
-                onQueueChange={setQueue}
-                onSelectionRejected={recordRefusals}
+            <div hidden={onScreenshots}>
+              <UploadPage
+                initialService={initialService}
+                onSelectionChange={setSelection}
+                phone={phone}
               />
-              {localRefusals.length > 0 && (
-                <p role="status">
-                  {localRefusals.length} rejected inputs remain part of this capture. After upload,
-                  choose saved replacements or continue with additions only.
-                </p>
+              {onSetup && (
+                <div className="import-continue">
+                  {!ready && (
+                    <p className="upload-submit__reason" data-testid="import-continue-reason">
+                      {SUBMIT_NEEDS_SELECTION}
+                    </p>
+                  )}
+                  <Button
+                    variant="primary"
+                    type="button"
+                    data-testid="import-continue"
+                    disabled={!ready}
+                    onClick={() => {
+                      setPhoneScreen('screenshots');
+                      window.scrollTo({ top: 0 });
+                      requestAnimationFrame(() => {
+                        screenshotsHeading.current?.focus();
+                      });
+                    }}
+                  >
+                    {IMPORT_CONTINUE_LABEL}
+                  </Button>
+                </div>
               )}
-              {(queue.length > 0 || localRefusals.length > 0) && batchId === null && (
-                <Button
-                  variant="secondary"
-                  disabled={busy}
-                  onClick={() => {
-                    setQueue([]);
-                    setLocalRefusals([]);
-                  }}
-                >
-                  Discard local selection and start fresh
-                </Button>
-              )}
-              {busy && <p role="status">{SUBMIT_IN_FLIGHT}</p>}
-              <p className="upload-flow__note">{UPLOAD_LOCAL_NOTE}</p>
-            </UploadStep>
+            </div>
+
+            <div hidden={onSetup}>
+              <UploadStep
+                index={3}
+                legend={IMAGES_STEP_LEGEND}
+                /*
+                 * ⚠ ALWAYS `active`, NEVER LOCKED — and that is deliberate, not an
+                 * oversight of the progressive reveal. `ImageDropzone` and
+                 * `PasteButton` HOLD what arrives before the two questions are
+                 * answered (`ux-states.md` §4.3), because the owner's primary path is
+                 * pasting the moment they have a screenshot. Dimming or disabling this
+                 * step would advertise the opposite of what it does and would lose
+                 * exactly that paste.
+                 */
+                state="active"
+                hint={phone ? null : ready ? null : IMAGES_STEP_WAITING_HINT}
+                testId="images-step-panel"
+                flat={phone}
+              >
+                {phone && (
+                  <div className="import-screenshots-head">
+                    <h2 ref={screenshotsHeading} tabIndex={-1}>
+                      {IMPORT_SCREENSHOTS_HEADING}
+                    </h2>
+                    <p>{IMPORT_SCREENSHOTS_HINT}</p>
+                  </div>
+                )}
+                <ImageDropzone
+                  images={queue}
+                  uploadStates={uploadStates}
+                  batchReady={ready}
+                  offline={!online}
+                  disabled={busy || batchId !== null}
+                  serverRejected={serverRejected}
+                  onQueueChange={setQueue}
+                  onSelectionRejected={recordRefusals}
+                  onClearAll={phone ? clearSelection : undefined}
+                />
+                {localRefusals.length > 0 && (
+                  <p role="status">
+                    {localRefusals.length} rejected inputs remain part of this capture. After
+                    upload, choose saved replacements or continue with additions only.
+                  </p>
+                )}
+                {(phone
+                  ? queue.length === 0 && localRefusals.length > 0
+                  : queue.length > 0 || localRefusals.length > 0) &&
+                  batchId === null && (
+                    <Button variant="secondary" disabled={busy} onClick={clearSelection}>
+                      Discard local selection and start fresh
+                    </Button>
+                  )}
+                {busy && <p role="status">{SUBMIT_IN_FLIGHT}</p>}
+                <p className="upload-flow__note">{UPLOAD_LOCAL_NOTE}</p>
+              </UploadStep>
+            </div>
           </Fieldset>
-          <aside className="upload-summary" aria-label={UPLOAD_SUMMARY_TITLE}>
-            <h2>{UPLOAD_SUMMARY_TITLE}</h2>
-            <dl>
-              <dt>Service</dt>
-              <dd>
-                {selection.service === null
-                  ? 'Choose a service'
-                  : isDiscoverySource(selection.service)
-                    ? batchSourceLabel({ service: null, discoverySource: selection.service })
-                    : batchSourceLabel({ service: selection.service })}
-              </dd>
-              <dt>Update mode</dt>
-              <dd>
-                {selection.mode === null
-                  ? 'Choose an update mode'
-                  : selection.mode === 'append-only'
-                    ? 'Add only'
-                    : 'Full update'}
-              </dd>
-              <dt>Screenshots</dt>
-              <dd>{queue.length}</dd>
-            </dl>
-            <p>{UPLOAD_NEXT_NOTE}</p>
+          <aside className="upload-summary" aria-label={UPLOAD_SUMMARY_TITLE} hidden={onSetup}>
+            {!phone && (
+              <>
+                <h2>{UPLOAD_SUMMARY_TITLE}</h2>
+                <dl>
+                  <dt>Service</dt>
+                  <dd>
+                    {selection.service === null
+                      ? 'Choose a service'
+                      : isDiscoverySource(selection.service)
+                        ? batchSourceLabel({ service: null, discoverySource: selection.service })
+                        : batchSourceLabel({ service: selection.service })}
+                  </dd>
+                  <dt>Update mode</dt>
+                  <dd>
+                    {selection.mode === null
+                      ? 'Choose an update mode'
+                      : selection.mode === 'append-only'
+                        ? 'Add only'
+                        : 'Full update'}
+                  </dd>
+                  <dt>Screenshots</dt>
+                  <dd>{queue.length}</dd>
+                </dl>
+                <p>{UPLOAD_NEXT_NOTE}</p>
+              </>
+            )}
             <section className="upload-submit" data-testid="submit-step">
               {/*
             ⚠ THE REASON IS TEXT, ALWAYS, AND SITS BESIDE THE CONTROL (§3.3). A
@@ -470,6 +594,12 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
               >
                 {SUBMIT_LABEL}
               </Button>
+              {phone && (
+                <p className="import-formats">
+                  <ImageIcon />
+                  {IMPORT_FORMATS_NOTE}
+                </p>
+              )}
               {busy && (
                 <p aria-live="polite" data-testid="submit-busy">
                   {SUBMIT_IN_FLIGHT}

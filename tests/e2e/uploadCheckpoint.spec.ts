@@ -95,9 +95,19 @@ for (const width of [280, 390, 1440]) {
       await page.screenshot({ path: testInfo.outputPath('upload-checkpoint.png') });
       await dialog.getByRole('button', { name: 'Discard saved import' }).click();
       await expect(dialog).toHaveCount(0);
-      await expect(page.getByRole('button', { name: 'Remove held.png' })).toBeVisible();
-      await expect(page.getByTestId('service-step-panel-answer')).toContainText('Netflix');
-      await expect(page.getByTestId('submit-button')).toBeDisabled();
+      if (width < 640) {
+        // TASK-260: the phone questions are flat and the held paste waits on
+        // the second screen, which opens once a mode is chosen.
+        await expect(page.getByRole('radio', { name: 'Netflix', exact: true })).toBeChecked();
+        await expect(page.getByTestId('import-continue')).toBeDisabled();
+        await page.getByTestId('mode-card-append-only').getByRole('radio').check();
+        await page.getByTestId('import-continue').click();
+        await expect(page.getByRole('button', { name: 'Remove held.png' })).toBeVisible();
+      } else {
+        await expect(page.getByRole('button', { name: 'Remove held.png' })).toBeVisible();
+        await expect(page.getByTestId('service-step-panel-answer')).toContainText('Netflix');
+        await expect(page.getByTestId('submit-button')).toBeDisabled();
+      }
       expect(writes).toEqual(['/api/batches/checkpoint/discard']);
     });
   });

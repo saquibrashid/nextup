@@ -903,15 +903,27 @@ async function attachGoldenScreenshots(page: Page, service: Service): Promise<vo
   );
 }
 
+/**
+ * TASK-260: below --bp-sm the questions and the screenshots are two screens,
+ * and Continue is the way from one to the other. A no-op on wider layouts.
+ */
+async function continueIfPhone(page: Page): Promise<void> {
+  const next = page.getByTestId('import-continue');
+  if (await next.isVisible()) await next.click();
+}
+
 /** Upload three screenshots and submit, landing on the batch's review screen. */
 async function uploadAndSubmit(
   page: Page,
   opts: { service: Service; modeLabel: RegExp; expectedBatchId: string },
 ): Promise<void> {
   await page.goto('/upload');
-  await expect(page.getByRole('heading', { name: 'Import screenshots' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: /^Import (screenshots|your watchlist)$/ }),
+  ).toBeVisible();
   await page.getByRole('radio', { name: /Netflix/ }).check();
   await page.getByRole('radio', { name: opts.modeLabel }).check();
+  await continueIfPhone(page);
   await attachGoldenScreenshots(page, opts.service);
   await expect(page.getByTestId('accepted-file')).toHaveCount(3);
   await page.getByRole('button', { name: SUBMIT_LABEL }).click();
@@ -989,7 +1001,9 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
 
   await page.goto('/upload');
   await expect(page.locator('.app-shell')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Import screenshots' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: /^Import (screenshots|your watchlist)$/ }),
+  ).toBeVisible();
   await attribution('/upload');
   await noOverflow('/upload (initial)');
 
@@ -997,9 +1011,10 @@ async function runOwnerJourney(page: Page, opts: JourneyOptions): Promise<void> 
   await expect(page.getByText(modeExplanation('full-update', 'netflix'))).toBeVisible();
   await expect(page.getByText(modeExplanation('append-only', 'netflix'))).toBeVisible();
   await page.getByRole('radio', { name: /Full update/ }).check();
+  await continueIfPhone(page);
   await attachGoldenScreenshots(page, 'netflix');
   await expect(page.getByTestId('accepted-file')).toHaveCount(3);
-  await expect(page.getByTestId('dropzone-totals')).toContainText('3 screenshots');
+  await expect(page.getByTestId('dropzone-totals')).toContainText('3 images added');
   await noOverflow('/upload (service + mode chosen, files attached)');
   expect(be.createdBodies).toHaveLength(0);
 

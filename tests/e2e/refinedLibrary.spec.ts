@@ -376,7 +376,9 @@ for (const width of [320, 1280]) {
       expect(page.url()).toBe(url);
       expect(requests.filter((request) => request.pathname === '/api/titles')).toHaveLength(reads);
       await navigateTo(page, 'Import');
-      await expect(page.getByRole('heading', { name: 'Import screenshots' })).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: /^Import (screenshots|your watchlist)$/ }),
+      ).toBeVisible();
       await navigateTo(page, 'Library');
       await expect(page.getByTestId('title-list')).toHaveAttribute('data-view', 'compact');
       expect(page.url()).toBe(url);
@@ -429,7 +431,9 @@ for (const width of [320, 1280]) {
       await expect(page.getByTestId('title-name')).toHaveText(['Quiet Orbit']);
       const saved = `?${await page.evaluate(() => localStorage.getItem('nextup.library.v1'))}`;
       await navigateTo(page, 'Import');
-      await expect(page.getByRole('heading', { name: 'Import screenshots' })).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: /^Import (screenshots|your watchlist)$/ }),
+      ).toBeVisible();
       requests.length = 0;
       await navigateTo(page, 'Library');
       await expect(page.getByTestId('title-name')).toHaveText(['Quiet Orbit']);

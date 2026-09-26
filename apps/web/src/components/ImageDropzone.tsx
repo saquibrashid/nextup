@@ -29,6 +29,16 @@ import { IMAGE_UPLOAD_LABELS, type ImageUploadState } from '../lib/uploadSelecti
 
 import {
   CHOOSE_FILES_LABEL,
+  CLEAR_ALL_LABEL,
+  DROPZONE_TABS_LABEL,
+  DROPZONE_TAB_DROP,
+  DROPZONE_TAB_FILES,
+  DROPZONE_TAB_PASTE,
+  FILES_CARD_LEAD,
+  FILES_ROW_LEAD,
+  PASTE_CARD_TITLE,
+  imagesAddedLabel,
+  showMoreImagesLabel,
   DROPZONE_HELD_BODY,
   DROPZONE_ACTIVE_LABEL,
   DROPZONE_IDLE_LABEL,
@@ -40,6 +50,7 @@ import {
 import { PasteButton, type PasteFailure } from './PasteButton';
 import { PasteCapture } from './PasteCapture';
 import { Button } from './ui/Button';
+import { ClipboardIcon, FolderIcon } from './icons';
 import {
   RejectionList,
   mergeRejections,
@@ -63,6 +74,23 @@ export interface DropzoneReview {
 }
 
 const MEGABYTE = 1024 * 1024;
+
+/**
+ * TASK-260 — the phone grid shows this many screenshots before a `+n` tile.
+ * Five thumbnails and the tile fill two rows of three, as the mockup does.
+ */
+export const PHONE_THUMBNAIL_LIMIT = 5;
+
+/**
+ * The phone screen's Paste / Files / Drop tabs (owner mobile mockup).
+ *
+ * ⚠ A TAB CHOOSES WHICH AFFORDANCE IS DRAWN LARGEST, NEVER WHICH ONE EXISTS.
+ * Invariant 16 keeps all three: the Choose files control is on screen under
+ * every tab, the whole target accepts a drop under every tab, and the
+ * `paste` listener is mounted regardless. The tabs are drawn only on the phone
+ * screen; wider layouts show the three affordances together as before.
+ */
+type DropzoneTab = 'paste' | 'files' | 'drop';
 
 /** Whole megabytes, rounded up - the number the ceiling message names. */
 function megabytes(bytes: number): number {
@@ -224,6 +252,12 @@ export interface ImageDropzoneProps {
    * the viewport."~~
    */
   readonly touch?: boolean;
+  /**
+   * TASK-260 — the phone screen's `Clear all`, beside the count. The
+   * container passes its own discard, so the one action clears both the
+   * selection and any refusals it holds.
+   */
+  readonly onClearAll?: (() => void) | undefined;
 }
 
 /**
@@ -246,7 +280,11 @@ export function ImageDropzone({
   onPasteFailed,
   serverRejected = [],
   touch,
+  onClearAll,
 }: ImageDropzoneProps = {}): JSX.Element {
+  const pasteSupported = isPasteSupported();
+  const [tab, setTab] = useState<DropzoneTab>(pasteSupported ? 'paste' : 'files');
+  const [showAll, setShowAll] = useState(false);
   const [localQueue, setLocalQueue] = useState<readonly QueuedImage[]>([]);
   const accepted = (images ?? localQueue).map((image) => image.file);
   const queue = useRef<readonly QueuedImage[]>([]);
@@ -340,9 +378,20 @@ export function ImageDropzone({
   }
 
   const totalBytes = accepted.reduce((sum, file) => sum + file.size, 0);
+  const collapsed = !showAll && accepted.length > PHONE_THUMBNAIL_LIMIT + 1;
+  const tabs: readonly { id: DropzoneTab; label: string }[] = [
+    ...(pasteSupported ? [{ id: 'paste' as const, label: DROPZONE_TAB_PASTE }] : []),
+    { id: 'files', label: DROPZONE_TAB_FILES },
+    { id: 'drop', label: DROPZONE_TAB_DROP },
+  ];
 
   return (
-    <section className="dropzone" data-testid="dropzone" aria-label="Attach screenshots">
+    <section
+      className="dropzone"
+      data-testid="dropzone"
+      data-tab={tab}
+      aria-label="Attach screenshots"
+    >
       {/*
         Primitive 1 (TASK-159). Mounted HERE, not globally, so the listener's
         lifetime is exactly the attach area's — on `/upload` and on the
@@ -350,6 +399,23 @@ export function ImageDropzone({
         paste meant for the fix-match search box.
       */}
       {!disabled && <PasteCapture onImagesPasted={pastedByListener} />}
+
+      <div className="dropzone__tabs" role="group" aria-label={DROPZONE_TABS_LABEL}>
+        {tabs.map(({ id, label }) => (
+          <Button
+            key={id}
+            variant="ghost"
+            type="button"
+            aria-pressed={tab === id}
+            data-testid={`dropzone-tab-${id}`}
+            onClick={() => {
+              setTab(id);
+            }}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
 
       <div
         className="dropzone__target"
@@ -373,37 +439,55 @@ export function ImageDropzone({
           is - which includes every `http://` origin, so on a LAN IP this slot
           is simply not there and the other two affordances carry the load.
         */}
-        <PasteButton
-          batchReady
-          offline={offline}
-          onImagesPasted={(files) => {
-            addFiles(files, 'paste');
-          }}
-          {...(onPasteFailed === undefined ? {} : { onPasteFailed })}
-          {...(touch === undefined ? {} : { touch })}
-        />
+        {pasteSupported && (
+          <div className="dropzone__paste-card">
+            <span className="dropzone__paste-icon" aria-hidden="true">
+              <ClipboardIcon />
+            </span>
+            <p className="dropzone__paste-title">{PASTE_CARD_TITLE}</p>
+            <PasteButton
+              batchReady
+              offline={offline}
+              onImagesPasted={(files) => {
+                addFiles(files, 'paste');
+              }}
+              {...(onPasteFailed === undefined ? {} : { onPasteFailed })}
+              {...(touch === undefined ? {} : { touch })}
+            />
+          </div>
+        )}
 
         {/*
           ⚠ ALWAYS PRESENT, never behind a menu, never replaced by paste. This
           is the only route raw HEIC from iOS Photos can take, and the only one
           left once the screenshot preview's "Copy" has gone.
         */}
-        <label className="dropzone__choose tap-target" htmlFor={inputId}>
-          {CHOOSE_FILES_LABEL}
-        </label>
-        <Input
-          id={inputId}
-          type="file"
-          disabled={disabled}
-          multiple
-
-          data-testid="file-input"
-          accept={IMAGE_ACCEPT_ATTRIBUTE}
-          onChange={(event) => {
-            addFiles([...(event.target.files ?? [])], 'upload');
-            event.target.value = '';
-          }}
-        />
+        <div className="dropzone__files">
+          <span className="dropzone__files-lead" data-lead="row">
+            {FILES_ROW_LEAD}
+          </span>
+          <span className="dropzone__files-lead" data-lead="card">
+            {FILES_CARD_LEAD}
+          </span>
+          <label className="dropzone__choose tap-target" htmlFor={inputId}>
+            <span className="dropzone__choose-icon" aria-hidden="true">
+              <FolderIcon />
+            </span>
+            {CHOOSE_FILES_LABEL}
+          </label>
+          <Input
+            id={inputId}
+            type="file"
+            disabled={disabled}
+            multiple
+            data-testid="file-input"
+            accept={IMAGE_ACCEPT_ATTRIBUTE}
+            onChange={(event) => {
+              addFiles([...(event.target.files ?? [])], 'upload');
+              event.target.value = '';
+            }}
+          />
+        </div>
       </div>
 
       {!batchReady && accepted.length > 0 && (
@@ -414,12 +498,26 @@ export function ImageDropzone({
 
       {accepted.length > 0 && (
         <>
-          <p aria-live="polite" data-testid="dropzone-totals">
-            {`${String(accepted.length)} screenshots · ${(totalBytes / MEGABYTE).toFixed(1)} MB`}
-          </p>
-          <ul data-testid="accepted-list">
+          <div className="dropzone__summary">
+            <p aria-live="polite" data-testid="dropzone-totals">
+              {imagesAddedLabel(accepted.length)}
+              <span className="dropzone__bytes">{` · ${(totalBytes / MEGABYTE).toFixed(1)} MB`}</span>
+            </p>
+            {onClearAll !== undefined && (
+              <Button
+                variant="ghost"
+                type="button"
+                disabled={disabled}
+                data-testid="dropzone-clear-all"
+                onClick={onClearAll}
+              >
+                {CLEAR_ALL_LABEL}
+              </Button>
+            )}
+          </div>
+          <ul data-testid="accepted-list" data-collapsed={collapsed || undefined}>
             {accepted.map((file, index) => (
-              <li key={index} data-testid="accepted-file">
+              <li key={index} className="dropzone__item" data-testid="accepted-file">
                 <ScreenshotPreview source={file} name={file.name} unsupported={isHeic(file)} />
                 <div className="capture-image-details">
                   <span data-testid="accepted-name">{file.name}</span>
@@ -443,10 +541,25 @@ export function ImageDropzone({
                     onQueueChange?.(queue.current);
                   }}
                 >
-                  {`Remove ${file.name}`}
+                  <span className="dropzone__remove-label">{`Remove ${file.name}`}</span>
                 </Button>
               </li>
             ))}
+            {collapsed && (
+              <li className="dropzone__more">
+                <Button
+                  variant="ghost"
+                  type="button"
+                  aria-label={showMoreImagesLabel(accepted.length - PHONE_THUMBNAIL_LIMIT)}
+                  data-testid="dropzone-show-more"
+                  onClick={() => {
+                    setShowAll(true);
+                  }}
+                >
+                  {`+${String(accepted.length - PHONE_THUMBNAIL_LIMIT)}`}
+                </Button>
+              </li>
+            )}
           </ul>
         </>
       )}

@@ -1475,16 +1475,21 @@ Grid/Compact affordances, without importing an icon package.~~
   network request or a runtime dependency; the owner accepted icons explicitly
   on the basis that neither is incurred. NFR-004's small-tree preference and
   `T-CI-007`'s egress rule both stay intact.
-- The set is **closed at 24**: `list`, `upload`, `more`, `history`, `suppressed`,
+- The set is **closed at 27**: `list`, `upload`, `more`, `history`, `suppressed`,
   `rating`, `close`, `check`, `chevron`, `info`, `warning`, `search`, `image`,
   **`brand`, `grid`, `compact`**, the library sort-category icons
   **`alphabet`, `bookmark`, `calendar`, `clock`, `flag`**, the library
   toolbar **`filter`** mark (ADR-0013 Revision 3, issue 370), the header
-  **`menu`** mark (ADR-0013 Revision 4, issue 369), and the phone library
-  heading's **`plus`** (Add title) mark (TASK-255, owner mobile mockup)
+  **`menu`** mark (ADR-0013 Revision 4, issue 369), the phone library
+  heading's **`plus`** (Add title) mark (TASK-255, owner mobile mockup), and
+  the phone import's **`clipboard`** (paste card), **`folder`** (Choose files)
+  and **`refresh`** (Full update) marks (TASK-260, owner mobile mockup)
   (`BrandIcon`, `GridIcon`, `CompactIcon`, `AlphabetIcon`, `BookmarkIcon`,
   `CalendarIcon`, `ClockIcon`, `FlagIcon`, `FilterIcon`, `MenuIcon`,
-  `PlusIcon`).
+  `PlusIcon`, `ClipboardIcon`, `FolderIcon`, `RefreshIcon`).
+
+  ~~The set is **closed at 24**: … and the phone library heading's **`plus`**
+  (Add title) mark (TASK-255, owner mobile mockup).~~ Superseded by TASK-260.
 
   ~~The set is **closed at 23**: … the header **`menu`** mark (ADR-0013
   Revision 4, issue 369).~~ Superseded by TASK-255.

@@ -235,6 +235,8 @@ for (const width of [280, 390, 1440]) {
         await expect(page.getByRole('main')).toBeFocused();
         await page.getByRole('radio', { name: /Netflix/ }).check();
         await page.getByTestId(`mode-card-${mode}`).getByRole('radio').check();
+        // TASK-260: below --bp-sm the screenshots are the second screen.
+        if (width < 640) await page.getByTestId('import-continue').click();
         await page
           .getByTestId('file-input')
           .setInputFiles({ name: 'capture.png', mimeType: 'image/png', buffer: png });

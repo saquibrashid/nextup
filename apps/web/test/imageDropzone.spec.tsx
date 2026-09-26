@@ -210,7 +210,7 @@ describe('T-UX-042 - partial acceptance names every rejected file and its reason
     // Product invariant 15 at the UI layer: one bad image fails alone. Both
     // lists are visible together - a rejection list that replaced the grid
     // would read as "everything failed".
-    expect(screen.getByTestId('dropzone-totals')).toHaveTextContent('1 screenshots · 2.0 MB');
+    expect(screen.getByTestId('dropzone-totals')).toHaveTextContent('1 image added · 2.0 MB');
     const rejections = screen.getAllByTestId('rejected-file');
     expect(rejections).toHaveLength(2);
     expect(within(rejections[0] as HTMLElement).getByTestId('rejected-name')).toHaveTextContent(
