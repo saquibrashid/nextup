@@ -124,7 +124,7 @@ blocking; it introduces no loaders, actions or automatic mutation replay.
 | Route | Component file | Purpose | Optimises for |
 |---|---|---|---|
 | `/` | `pages/ListPage.tsx` | The combined list — **the value loop** | Seeing everything you can watch, fast |
-| `/titles/:titleId` | `pages/TitleDetailsPage.tsx` | Synopsis, cast and directors/creators, saved services and existing actions | Recognising a work without losing library browsing choices; `title-details.md` |
+| `/titles/:titleId` | `pages/TitleDetailsPage.tsx` | Synopsis, cast and directors/creators, every other TMDB detail and a trailer link (#391), saved services and existing actions | Recognising a work without losing library browsing choices; `title-details.md` |
 | `/upload` | `pages/UploadPage.tsx` | Create a batch and attach screenshots | Getting the mode choice right before any work is done |
 | `/batches/:batchId` | `pages/BatchStatusPage.tsx` | Extraction progress and failure | Knowing whether it worked, and what to do if not |
 | `/batches/:batchId/review` | `pages/ReviewPage.tsx` | The review pass — **the safety gate** | Not losing anything you didn't mean to lose |
@@ -133,6 +133,8 @@ blocking; it introduces no loaders, actions or automatic mutation replay.
 | `/batches` | `pages/BatchHistoryPage.tsx` | Batch history, provenance, undo | Understanding and reversing one import |
 | `/about` | `pages/AboutPage.tsx` | Attribution and retention statements | Compliance and honesty |
 | `/rating` | `pages/RatingLookupPage.tsx` | Look up any title's IMDb rating (REQ-092, US-045) | Answering "is it any good?" **without adding anything** |
+| `/waiting` | `pages/WaitingPage.tsx` | Titles waiting to reach a streaming service, in Grid or Compact (§7b) | Knowing when a title can be streamed |
+| `/waiting/:titleId` | `pages/WaitingDetailsPage.tsx` | One waiting title: the full waiting answer and the Library details (#391, §7b) | Deciding whether to keep waiting |
 | `*` | `pages/NotFoundPage.tsx` | Unknown route | Getting back to `/` |
 
 ⚠ **THERE ARE TEN SCREENS, NOT NINE.** `/rating` was added by Epic M
@@ -1198,6 +1200,23 @@ and forecast logic, and the API are unchanged.
 - The JustWatch and Watchmode attributions stay verbatim, unconditional and
   quiet below the list.
 
+- **Grid and Compact** (#391, TASK-259): the Library's *List layout* switch
+  sits above the list, right-aligned. **Compact** is the default and is the
+  card list above. **Grid** is poster tiles that wrap (`auto-fill`, an 8rem
+  floor so a 320 px phone gets two across, 11rem from 640 px), each stacking
+  poster, details and panel. A tile keeps the answer — name, meta, rent-only
+  pill, the availability line, the panel and *Not interested* — and leaves the
+  storefront chips, other services and discovery line to the details page.
+  The choice is kept per device in `nextup.waiting.layout.v1`, apart from the
+  Library's.
+- **The name links to `/waiting/:titleId`** (`pages/WaitingDetailsPage.tsx`),
+  in both views. It reads `GET /api/waiting` and `GET /api/titles/:titleId` —
+  no new endpoint — and shows *Back to Waiting to stream*; the Library's hero
+  (poster, `Movie · 2025` eyebrow, `h1`, runtime, genres, IMDb, trailer); a
+  *Where to watch* section with the rent pill, the panel and every card fact;
+  *Not interested* (which returns to `/waiting`); the Library's synopsis,
+  credits and *Details* sections; and both attributions. It carries none of
+  the Library's saved-title actions. A title no longer waiting says so.
 ~~Superseded at #389 (TASK-258): "one column, two from 1024 px"; "the badge,
 the service marks, and *Now on Netflix*…" in the details; "the forecast… the
 service mark and the when"; "**Footer**: *Seen on Fandango at Home (rent/buy)…*

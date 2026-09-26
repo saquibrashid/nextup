@@ -1,14 +1,13 @@
 import { useEffect, useRef, useState, type JSX, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  formatRuntime,
-  normaliseGenres,
-  releaseYearText,
-  watchStatus,
-  TITLE_CATEGORY_LABELS,
-} from '@nextup/domain';
+import { releaseYearText, watchStatus, TITLE_CATEGORY_LABELS } from '@nextup/domain';
 import { TitleCategoryDialog } from '../components/TitleCategoryDialog';
 import { EditionLabels } from '../components/EditionLabels';
+import {
+  TitleDetailSections,
+  TitleHeroFacts,
+  TrailerLink,
+} from '../components/TitleDetailSections';
 import type { ApiClient, TitleDetailResponse } from '../lib/apiClient';
 import { Button } from '../components/ui/Button';
 import { ServiceMark } from '../components/ServiceMark';
@@ -48,7 +47,6 @@ export function TitleDetailsPage({
     null,
   );
   const [changed, setChanged] = useState(false);
-  const [allCast, setAllCast] = useState(false);
   const [artFailed, setArtFailed] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -58,7 +56,6 @@ export function TitleDetailsPage({
   const data = presentation.data;
   const active = item.listState !== 'removed' && item.listState !== 'suppressed';
   const unidentified = item.matchState === 'unmatched';
-  const cast = data?.cast ?? [];
   const close = (): void => {
     setDialog(null);
     if (changed) onReload();
@@ -110,13 +107,13 @@ export function TitleDetailsPage({
               separately catalogued edition.
             </p>
           )}
-          <p>{formatRuntime(item.runtimeMinutes, item.mediaType) ?? 'Runtime not available'}</p>
-          {item.genres.length > 0 && <p>{normaliseGenres(item.genres).join(' · ')}</p>}
-          <p className="title-details__rating">
-            {item.imdbRating == null
-              ? 'IMDb rating not available'
-              : `IMDb ${item.imdbRating.toFixed(1)} / 10`}
-          </p>
+          <TitleHeroFacts
+            runtimeMinutes={item.runtimeMinutes}
+            mediaType={item.mediaType}
+            genres={item.genres}
+            imdbRating={item.imdbRating}
+          />
+          <TrailerLink data={data} name={item.name} />
           {item.metadataStale === true && (
             <p>Basic metadata is cached and could not be refreshed.</p>
           )}
@@ -171,56 +168,12 @@ export function TitleDetailsPage({
           </p>
         </section>
       ) : (
-        <>
-          {(presentation.status === 'stale' || presentation.status === 'unavailable') && (
-            <div className="title-details__notice" role="status">
-              <p>
-                {presentation.status === 'stale'
-                  ? 'Showing cached synopsis and credits. They could not be refreshed.'
-                  : 'Synopsis and credits are temporarily unavailable. Your saved title is unchanged.'}
-              </p>
-              <Button variant="secondary" onClick={onReload} disabled={offline}>
-                Retry details
-              </Button>
-            </div>
-          )}
-          <section className="title-details__section">
-            <h2>Synopsis</h2>
-            <p className="title-details__synopsis">{data?.overview ?? 'No synopsis available.'}</p>
-          </section>
-          <section className="title-details__section">
-            <h2>{item.mediaType === 'tv' ? 'Creators' : 'Directors'}</h2>
-            <p>
-              {(item.mediaType === 'tv' ? data?.creators : data?.directors)?.join(', ') ||
-                'No credits available.'}
-            </p>
-          </section>
-          <section className="title-details__section">
-            <h2>Cast</h2>
-            {cast.length === 0 ? (
-              <p>No cast information available.</p>
-            ) : (
-              <ul className="title-details__cast" id="title-cast">
-                {(allCast ? cast : cast.slice(0, 8)).map((person, index) => (
-                  <li key={`${person.name}:${String(index)}`}>
-                    <strong>{person.name}</strong>
-                    <span>{person.character ?? 'Character not listed'}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {cast.length > 8 && (
-              <Button
-                variant="secondary"
-                aria-expanded={allCast}
-                aria-controls="title-cast"
-                onClick={() => setAllCast((shown) => !shown)}
-              >
-                {allCast ? 'Show less cast' : `Show all ${String(cast.length)} cast members`}
-              </Button>
-            )}
-          </section>
-        </>
+        <TitleDetailSections
+          presentation={presentation}
+          mediaType={item.mediaType}
+          offline={offline}
+          onReload={onReload}
+        />
       )}
       {active && dialog === 'watch' && (
         <WatchPreferencesDialog

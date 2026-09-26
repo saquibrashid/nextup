@@ -33,6 +33,7 @@ import {
   normaliseTitleText,
   type EditionLabel,
   isKnownRuntime,
+  pickTrailer,
   titlePresentationSchema,
   type TitlePresentation,
   type MediaType,
@@ -373,7 +374,10 @@ export class TmdbClient {
   ): Promise<Omit<TitlePresentation, 'fetchedAt'>> {
     const body = await this.#get<unknown>(
       `/${mediaType}/${tmdbId}`,
-      { append_to_response: 'credits' },
+      {
+        append_to_response:
+          mediaType === 'movie' ? 'credits,videos,release_dates' : 'credits,videos,content_ratings',
+      },
       () => {
         throw new TmdbWorkNotFoundError(mediaType, tmdbId);
       },
@@ -404,6 +408,9 @@ export class TmdbClient {
               .map((person: Record<string, unknown>) => person['name'])
           : [],
       creators: creators.map((person: unknown) => (isRecord(person) ? person['name'] : person)),
+      // #391 — every further detail is best-effort: an unreadable one is
+      // `null`, never a reason to lose the synopsis and cast above.
+      ...presentationExtras(mediaType, body),
     };
     const result = titlePresentationSchema.omit({ fetchedAt: true }).safeParse(projected);
     if (!result.success) {
@@ -789,6 +796,84 @@ function readRuntime(body: TmdbDetailResponse): number | null {
         : null;
 
   return isKnownRuntime(raw) ? raw : null;
+}
+
+/** #391 — the US rating region for `certification`, as for release facts. */
+const CERTIFICATION_REGION = 'US';
+
+const WRITER_JOBS = new Set(['Screenplay', 'Writer', 'Story', 'Novel', 'Author']);
+
+const text = (value: unknown): string | null =>
+  typeof value === 'string' && value.trim() !== '' ? value.trim() : null;
+const count = (value: unknown): number | null =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
+const day = (value: unknown): string | null =>
+  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+
+function usCertification(mediaType: MediaType, body: Record<string, unknown>): string | null {
+  const block = body[mediaType === 'movie' ? 'release_dates' : 'content_ratings'];
+  const results = isRecord(block) ? block['results'] : null;
+  if (!Array.isArray(results)) return null;
+  const us = results.find(
+    (entry: unknown) => isRecord(entry) && entry['iso_3166_1'] === CERTIFICATION_REGION,
+  );
+  if (!isRecord(us)) return null;
+  if (mediaType === 'tv') return text(us['rating']);
+  const dates = us['release_dates'];
+  if (!Array.isArray(dates)) return null;
+  // Theatrical (3) first, then any release that carries a rating.
+  const rated = dates.filter((entry: unknown) => isRecord(entry) && text(entry['certification']));
+  const theatrical = rated.find((entry: Record<string, unknown>) => entry['type'] === 3);
+  return text((theatrical ?? rated[0])?.['certification']);
+}
+
+/**
+ * #391 — the display-only details beyond synopsis and credits. Each is
+ * best-effort and independently `null`: a malformed field loses that field,
+ * never the page.
+ */
+function presentationExtras(
+  mediaType: MediaType,
+  body: Record<string, unknown>,
+): Pick<
+  TitlePresentation,
+  | 'tagline'
+  | 'writers'
+  | 'releaseDate'
+  | 'status'
+  | 'certification'
+  | 'seasons'
+  | 'episodes'
+  | 'trailer'
+> {
+  const credits = isRecord(body['credits']) ? body['credits'] : {};
+  const crew = Array.isArray(credits['crew']) ? credits['crew'] : [];
+  const writers =
+    mediaType === 'movie'
+      ? [
+          ...new Set(
+            crew.flatMap((person: unknown) =>
+              isRecord(person) &&
+              typeof person['job'] === 'string' &&
+              WRITER_JOBS.has(person['job']) &&
+              text(person['name']) !== null
+                ? [text(person['name']) as string]
+                : [],
+            ),
+          ),
+        ]
+      : [];
+  const videos = isRecord(body['videos']) ? body['videos']['results'] : null;
+  return {
+    tagline: text(body['tagline']),
+    writers,
+    releaseDate: day(mediaType === 'movie' ? body['release_date'] : body['first_air_date']),
+    status: text(body['status']),
+    certification: usCertification(mediaType, body),
+    seasons: mediaType === 'tv' ? count(body['number_of_seasons']) : null,
+    episodes: mediaType === 'tv' ? count(body['number_of_episodes']) : null,
+    trailer: pickTrailer(videos),
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

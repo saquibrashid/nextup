@@ -9,7 +9,8 @@
  * and would drift SILENTLY - the suite would keep passing while no longer
  * covering the new screen.
  *
- * Contextual routes include `/titles/:titleId` (TASK-238). Enumerating this
+ * Contextual routes include `/titles/:titleId` (TASK-238) and
+ * `/waiting/:titleId` (#391). Enumerating this
  * table keeps attribution and accessibility coverage aligned with the app.
  *
  * ~~⚠ TEN ROUTES SINCE EPIC M, not nine. `/rating` (REQ-092) was added~~
@@ -31,6 +32,7 @@ import { RemovedRoute } from './containers/RemovedRoute';
 import { ReviewRoute } from './containers/ReviewRoute';
 import { SuppressedRoute } from './containers/SuppressedRoute';
 import { UploadRoute } from './containers/UploadRoute';
+import { WaitingDetailsRoute } from './containers/WaitingDetailsRoute';
 import { WaitingRoute } from './containers/WaitingRoute';
 
 export interface RouteDefinition {
@@ -99,6 +101,12 @@ export const ROUTES: readonly RouteDefinition[] = [
     Component: WaitingRoute,
     examplePath: '/waiting',
     navLabel: 'Waiting to stream',
+  },
+  {
+    path: '/waiting/:titleId',
+    Component: WaitingDetailsRoute,
+    examplePath: '/waiting/example-title',
+    navLabel: null,
   },
   {
     path: '/about',

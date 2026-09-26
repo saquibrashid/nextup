@@ -1305,7 +1305,10 @@ Same item shape plus `removedListings[]` (state, service, `removedAt`),
 `createdByBatchId`, `createdAt`, `listState` (`active`, `removed`, `suppressed`)
 and `presentation` (`status`, nullable validated `data`). The display-only
 synopsis/credits cache, its provider identity checks and explicit unavailable
-states are specified in `title-details.md` (TASK-238 / #327). Only this detail
+states are specified in `title-details.md` (TASK-238 / #327); since #391
+(TASK-259) `data` also carries the optional `tagline`, `writers`, `releaseDate`,
+`status`, `certification`, `seasons`, `episodes` and `trailer` (a YouTube key).
+The waiting details page reads this same endpoint. Only this detail
 read fetches rich presentation metadata; list and extraction responses do not.
 
 ### 6.4 Lazy TMDB refresh (REQ-076, NFR-014) — no scheduler exists

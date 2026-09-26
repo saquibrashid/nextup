@@ -48,7 +48,11 @@ export async function readTitlePresentation(
       log('tmdb.presentation_invalid_cache', { titleId: row.id });
     }
   }
-  if (cached !== null && !isMetadataStale(new Date(cached.fetchedAt), now)) {
+  // #391 — a copy cached before the trailer and extra details existed has no
+  // `trailer` key at all (`null` means "TMDB has none"). It is refetched once,
+  // on access, so the new details appear on the next view.
+  const current = cached !== null && cached.trailer !== undefined;
+  if (cached !== null && current && !isMetadataStale(new Date(cached.fetchedAt), now)) {
     return { status: 'available', data: cached };
   }
   try {
