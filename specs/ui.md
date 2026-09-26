@@ -613,9 +613,13 @@ Rules, each of which a named test pins:
    `display: none` or an unmounted branch takes the question out of the
    accessibility tree, so a screen-reader owner never learns the step exists or
    why it cannot be answered (`T-UX-148a`).
-3. **`hidden` is used in exactly one place: the body of an ANSWERED step**,
+3. **`hidden` is used in exactly two places: the body of an ANSWERED step**,
    whose answer and a labelled `Change` control are both on screen
-   (`T-UX-148b`).
+   (`T-UX-148b`), **and the off-screen half of the phone import (§3.0a)**,
+   whose way back is on screen as the stepper's answered steps.
+   ~~Superseded (TASK-260): "`hidden` is used in exactly one place: the body of
+   an ANSWERED step, whose answer and a labelled `Change` control are both on
+   screen (`T-UX-148b`)."~~
 4. **Changing the service clears the mode** (`T-UX-148d`). The full-update
    consequence *names* the service; carrying the agreement to another service
    silently re-points a destructive choice while the collapsed summary still
@@ -626,14 +630,19 @@ Rules, each of which a named test pins:
    arrive before the questions are answered (`ux-states.md` §4.3) and the
    owner's primary path is pasting immediately, so a dimmed step would
    advertise the opposite of what it does and lose exactly that paste. It
-   carries a waiting hint instead of a lock.
+   carries a waiting hint instead of a lock. **Below `--bp-sm` it is still
+   never locked, but it is the second screen of §3.0a**: it stays mounted, so
+   a keyboard paste on the first screen is still held, and the visible paste
+   button is reached after Continue — the owner accepted that trade at
+   TASK-260.
+   ~~Superseded (TASK-260): the same rule with no phone exception.~~
 
 Each step's heading is the question, so the underlying `fieldset` legend is
 rendered **visually hidden rather than dropped** — the radio group keeps its
 accessible name and the sighted reader sees the question once.
 
 **Upload timing (TASK-222):** `/upload` keeps all selected screenshots local
-until the explicit Extract titles action. Changing service re-asks mode consent
+until the explicit Start extraction action. Changing service re-asks mode consent
 without losing the queue; removing a local file guarantees it is not uploaded.
 The page states that leaving/reloading clears the unsubmitted selection.
 The action freezes setup, creates one batch, uploads images serially with their
@@ -667,6 +676,38 @@ ignore it, so never promise reload persistence. Completed/saved-only work
 does not trigger a blanket warning. PNG/JPEG previews use revocable local
 object URLs; HEIC/HEIF has an explicit placeholder until the server returns
 its transcoded image. No screenshot data is written to web storage.
+
+### 3.0a Phone layout — the owner's import mockup *(new, TASK-260)*
+
+Below `--bp-sm` (`html[data-layout='phone']`) `/upload` is drawn as the
+owner's two-screen mockup, decided with the owner on 2026-09-26. Wider layouts
+are unchanged.
+
+1. **Two screens, one page.** Screen 1 has the title *Import your watchlist*, a
+   close control back to the library, a Service → Mode → Screenshots stepper,
+   and the two questions as flat tiles (`1. Choose a service`,
+   `2. Choose a mode`) that never collapse, so there is no `Change` / `Done`.
+   Screen 2 has *Add screenshots*, the dropzone and *Start extraction*. The
+   off-screen half is `hidden` but stays **mounted**, so the queue and the
+   keyboard `paste` listener survive both directions (`T-PHONE-008`).
+2. **Continue says why it waits.** It is disabled until both questions are
+   answered, with the reason as text beside it (§3.3). Pressing it opens
+   screen 2 and moves focus to its heading.
+3. **No mode is pre-chosen.** Rule 1 above holds on the phone as well: the
+   mockup draws *Add only* already selected, and that is deliberately not
+   copied (US-003).
+4. **The stepper reports answers and never gives them.** On screen 2 its
+   answered steps are buttons back to screen 1, where both answers are still
+   checked and nothing held is cleared.
+5. **The dropzone's Paste / Files / Drop tabs choose which affordance is drawn
+   largest. They never choose which one exists** (invariant 16): *Choose
+   files* is on screen under every tab and the whole target accepts a drop
+   under every tab (`T-PHONE-009`, `T-PHONE-010`). The count reads
+   *"n images added"* and sits beside *Clear all*. Past six screenshots, five
+   thumbnails and a `+n` tile stand for the rest, and the tile reveals them.
+6. **The Menu stays.** The mockup draws no Menu on the import screens, but
+   `T-UX-137h` keeps it on every phone destination so that no route can
+   strand the owner.
 
 ### 3.1 Step 1 — service and mode
 
@@ -741,8 +782,9 @@ the file name, size, and a small *"HEIC — preview after upload"* label) rather
 than a broken image, until the server has transcoded it. PNG/JPEG selections
 render a normal client thumbnail. Selected images render as a thumbnail/
 placeholder grid with file name, size, and a **remove** control per image,
-available until submit (US-004 AC-4). Running totals *"7 screenshots · 5.7 MB
-of 60 MB"*. Rejections are listed **per file, by name, with the reason**
+available until submit (US-004 AC-4). Running totals *"7 images added · 5.7 MB"*
+(TASK-260; the phone draws the count alone, beside *Clear all*).
+~~Superseded: *"7 screenshots · 5.7 MB of 60 MB"*.~~ Rejections are listed **per file, by name, with the reason**
 (US-004 AC-3/AC-6) and never replace the accepted list. Once uploaded, the
 `/batches/:batchId` thumbnail strip (§4) is fed by `GET /api/images/:id`, which
 serves the **transcoded PNG** — so those thumbnails render in every browser.
@@ -852,16 +894,19 @@ The rejection card for these three codes shows, in this order:
    second half of what makes the failure non-frightening.
 
 **The batch remains usable.** These rejections never clear the accepted list,
-never close the batch, and never disable the **"Extract titles"** button while
+never close the batch, and never disable the **"Start extraction"** button while
 `accepted.length > 0`. The owner may submit the images that worked and
 re-attach the failed file later (`api.md` §5.2.5 — a re-attach, **not**
 re-extract, because nothing was stored). `T-UI-013`.
 
 ### 3.3 Step 3 — submit
 
-A single primary **"Extract titles"** button, disabled at zero images with the
+A single primary **"Start extraction"** button, disabled at zero images with the
 reason shown as text (never a silent disabled button). Submitting navigates to
-`/batches/:batchId`.
+`/batches/:batchId`. On the phone (§3.0a) a *PNG, JPEG, HEIC/HEIF supported*
+note sits under it.
+~~Superseded (TASK-260, owner mockup): the button was labelled **"Extract
+titles"**.~~
 
 **Batch immutability** (US-003 AC-6): after submit, service and mode render as
 read-only text with the note *"Locked for this batch. Discard and start again

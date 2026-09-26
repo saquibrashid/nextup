@@ -156,6 +156,8 @@ for (const width of [280, 390, 1440]) {
       await expect(page.getByTestId('accepted-name')).toHaveCount(2);
       await page.getByRole('radio', { name: 'Netflix', exact: true }).check();
       await page.getByTestId('mode-card-full-update').getByRole('radio').check();
+      // TASK-260: below --bp-sm the held files wait on the second screen.
+      if (width < 640) await page.getByTestId('import-continue').click();
       await page.getByTestId('submit-button').click();
       await page.getByRole('button', { name: 'Open saved import' }).click();
       await expect(

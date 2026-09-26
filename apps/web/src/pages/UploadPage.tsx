@@ -47,8 +47,11 @@ import {
   type BatchSource,
 } from '@nextup/domain';
 import { CaptureProgress } from '../components/CaptureProgress';
+import { PlusIcon, RefreshIcon } from '../components/icons';
 
 import {
+  IMPORT_MODE_HEADING,
+  IMPORT_SERVICE_HEADING,
   MODE_APPEND_ONLY_LABEL,
   MODE_FULL_UPDATE_FLAG,
   MODE_FULL_UPDATE_LABEL,
@@ -79,7 +82,18 @@ export interface UploadPageProps {
   readonly initialService?: BatchSource | null;
   /** Notified on every change so step 2 can enable itself. */
   readonly onSelectionChange?: (selection: BatchDraftSelection) => void;
+  /**
+   * TASK-260 — the phone import's first screen. The container draws the
+   * heading and the stepper, so this renders only the two questions, both
+   * open, under the mockup's numbered headings.
+   */
+  readonly phone?: boolean;
 }
+
+const MODE_ICONS: Readonly<Record<BatchMode, () => JSX.Element>> = {
+  'append-only': () => <PlusIcon />,
+  'full-update': () => <RefreshIcon />,
+};
 
 const MODE_LABELS: Readonly<Record<BatchMode, string>> = {
   'append-only': MODE_APPEND_ONLY_LABEL,
@@ -114,6 +128,7 @@ export function modeConsequence(mode: BatchMode, service: BatchSource | null): s
 export function UploadPage({
   onSelectionChange,
   initialService = null,
+  phone = false,
 }: UploadPageProps = {}): JSX.Element {
   const [service, setService] = useState<BatchSource | null>(initialService);
   /*
@@ -180,13 +195,18 @@ export function UploadPage({
 
   return (
     <>
-      <h1>Import screenshots</h1>
-      <p className="upload-flow__intro">{UPLOAD_INTRO}</p>
-      <CaptureProgress stage="prepare" />
+      {!phone && (
+        <>
+          <h1>Import screenshots</h1>
+          <p className="upload-flow__intro">{UPLOAD_INTRO}</p>
+          <CaptureProgress stage="prepare" />
+        </>
+      )}
 
       <UploadStep
         index={1}
-        legend={SERVICE_STEP_LEGEND}
+        legend={phone ? IMPORT_SERVICE_HEADING : SERVICE_STEP_LEGEND}
+        flat={phone}
         state={serviceState}
         answer={service === null ? null : batchSourceLabel(splitSource(service))}
         onChange={() => {
@@ -198,7 +218,11 @@ export function UploadPage({
         {/* Native radios: real group semantics and roving focus for free. */}
         <SegmentedControl legend={SERVICE_STEP_LEGEND} testId="service-step" hideLegend>
           {SERVICES.map((candidate) => (
-            <label key={candidate} data-testid={`service-option-${candidate}`}>
+            <label
+              key={candidate}
+              data-service={candidate}
+              data-testid={`service-option-${candidate}`}
+            >
               <Input
                 type="radio"
                 name={serviceGroup}
@@ -259,7 +283,8 @@ export function UploadPage({
 
       <UploadStep
         index={2}
-        legend={MODE_STEP_LEGEND}
+        legend={phone ? IMPORT_MODE_HEADING : MODE_STEP_LEGEND}
+        flat={phone}
         state={modeState}
         answer={mode === null || service === null ? null : modeConsequence(mode, service)}
         hint={modeLocked ? MODE_STEP_LOCKED_HINT : null}
@@ -273,6 +298,10 @@ export function UploadPage({
         <SegmentedControl legend={MODE_STEP_LEGEND} testId="mode-step" hideLegend>
           {BATCH_MODES.map((candidate) => (
             <label key={candidate} data-testid={`mode-card-${candidate}`}>
+              {/* Drawn only on the phone screen; the words carry the choice. */}
+              <span className="mode-card__icon" aria-hidden="true">
+                {MODE_ICONS[candidate]()}
+              </span>
               <Input
                 type="radio"
                 name={modeGroup}

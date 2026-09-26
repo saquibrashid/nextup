@@ -186,14 +186,13 @@ test.describe('T-WAIT-018 — waiting to stream in a real browser (#378)', () =>
     await page.goto('/waiting');
     await page.getByTestId('waiting-empty').getByRole('link').click();
 
-    await expect(page.getByTestId('service-step-panel-answer')).toContainText(
-      'Fandango at Home (rent/buy)',
-    );
+    // TASK-260: at 280 px the import is the owner's phone mockup, whose
+    // questions are flat — the answer is the checked choice itself, never a
+    // collapsed summary behind `Change`.
     await expect(page.getByTestId('mode-card-append-only').locator('input')).toBeChecked();
     await expect(page.getByTestId('mode-card-full-update').locator('input')).toBeDisabled();
-    // Reopened, the chosen storefront is shown in its own group, apart from
-    // the services.
-    await page.getByTestId('service-step-panel-change').click();
+    // The chosen storefront is shown in its own group, apart from the services.
+    await expect(page.getByTestId('service-step-panel-answer')).toHaveCount(0);
     await expect(page.getByTestId('storefront-step')).toBeVisible();
     await expect(
       page.getByTestId('storefront-option-fandango-at-home').locator('input'),

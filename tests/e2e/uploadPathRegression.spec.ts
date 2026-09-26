@@ -317,20 +317,52 @@ function freshState(): UploadState {
     0x68, 0x65, 0x69, 0x63, 0x6d, 0x69, 0x66, 0x31,
   ]);
 
+/**
+ * TASK-260: below --bp-sm the questions and the screenshots are two screens,
+ * and Continue is the way from one to the other. A no-op on wider layouts.
+ */
+async function continueIfPhone(page: Page): Promise<void> {
+  const next = page.getByTestId('import-continue');
+  if (await next.isVisible()) await next.click();
+}
+
+/**
+ * TASK-260: on the phone, the ingest affordances live on the second screen,
+ * so reaching them means answering both questions first. Wider layouts show
+ * them on arrival, and this does nothing there.
+ */
+async function openIntakeIfPhone(page: Page): Promise<void> {
+  const next = page.getByTestId('import-continue');
+  await page.getByRole('radio', { name: 'Netflix', exact: true }).waitFor();
+  if (!(await next.isVisible())) return;
+  await page.getByRole('radio', { name: 'Netflix', exact: true }).check();
+  await page.getByTestId('mode-card-append-only').getByRole('radio').check();
+  await next.click();
+}
+
 async function expectServiceUpload(page: Page, service: Service): Promise<void> {
   const state = freshState();
   await stubApi(page, state, service);
   await page.goto(`/upload?service=${service}`);
   // A deep-linked service arrives ANSWERED, so step 1 is collapsed to its
   // summary; the preselection is real behind `Change` (`specs/ui.md` §3.0).
-  await expect(page.getByTestId('service-step-panel-answer')).toHaveText(SERVICE_LABELS[service]);
-  await page.getByTestId('service-step-panel-change').click();
+  // TASK-260: the phone's flat tiles never collapse — the checked tile is it.
+  await page
+    .getByTestId('service-step-panel-answer')
+    .or(page.getByRole('radio', { name: SERVICE_LABELS[service], exact: true }))
+    .first()
+    .waitFor();
+  if (await page.getByTestId('service-step-panel-answer').isVisible()) {
+    await expect(page.getByTestId('service-step-panel-answer')).toHaveText(SERVICE_LABELS[service]);
+    await page.getByTestId('service-step-panel-change').click();
+  }
   await expect(
     page.getByRole('radio', { name: SERVICE_LABELS[service], exact: true }),
   ).toBeChecked();
   await expect(page.getByTestId('mode-step').getByRole('radio', { checked: true })).toHaveCount(0);
   expect(state.batchCreatedWith).toBeNull();
   await page.getByRole('radio', { name: /Full update/ }).check();
+  await continueIfPhone(page);
   await page
     .getByTestId('file-input')
     .setInputFiles([
@@ -413,6 +445,7 @@ test.describe('T-PASTE-010 — the add-not-swap regression guard', () => {
     // ⚠ The visible affordance is the LABEL bound to this input; the input
     // itself is clipped. Both must be present — the label is what the owner
     // taps, the input is what keyboard focus lands on.
+    await openIntakeIfPhone(page);
     const label = page.getByText('Choose files', { exact: true });
     await expect(label).toBeVisible();
     const box = await label.boundingBox();
@@ -468,6 +501,7 @@ test.describe('T-PASTE-010 — the add-not-swap regression guard', () => {
       });
     });
     await page.goto('/upload');
+    await openIntakeIfPhone(page);
 
     await expect(page.getByTestId('paste-button')).toBeVisible();
     await expect(page.getByTestId('file-input')).toHaveCount(1);
@@ -481,6 +515,7 @@ test.describe('T-PASTE-010 — the add-not-swap regression guard', () => {
 
     await page.getByRole('radio', { name: /Netflix/ }).check();
     await page.getByRole('radio', { name: /Full update/ }).check();
+    await continueIfPhone(page);
     await page.getByTestId('file-input').setInputFiles([
       {
         name: 'ios-photo.heic',
@@ -507,6 +542,7 @@ test.describe('T-PASTE-010 — the add-not-swap regression guard', () => {
 
     await page.getByRole('radio', { name: /Netflix/ }).check();
     await page.getByRole('radio', { name: /Full update/ }).check();
+    await continueIfPhone(page);
     await page
       .getByTestId('file-input')
       .setInputFiles([

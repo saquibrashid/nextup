@@ -290,6 +290,8 @@
    * contrast-pair token; its text is `--color-success`, which is.
    */
   --tab-bar-height: 4rem;
+  /* TASK-260 — the chosen service tile's glow in the phone import. */
+  --shadow-selected: 0 0 0 1px var(--color-accent), 0 0 18px rgb(179 160 255 / 35%);
   --color-tab-bar: #17142a;
   --color-chip: #1d1a31;
   --color-status-watching: rgba(122, 220, 176, 0.14);
@@ -4072,6 +4074,30 @@ button {
   }
 }
 
+/*
+ * TASK-260 — pieces of the phone import that only its screen draws. Wider
+ * layouts keep the three affordances side by side, so the wrappers step out
+ * of the box tree there and the old arrangement is unchanged.
+ */
+.dropzone__paste-card,
+.dropzone__files,
+.dropzone__summary {
+  display: contents;
+}
+
+.dropzone__tabs,
+.dropzone__paste-icon,
+.dropzone__paste-title,
+.dropzone__files-lead,
+.dropzone__choose-icon,
+.mode-card__icon {
+  display: none;
+}
+
+.dropzone > ul > li.dropzone__more {
+  display: none;
+}
+
 .capture-preview {
   inline-size: 5rem;
   block-size: 5rem;
@@ -6441,4 +6467,745 @@ html[data-layout='phone'] .filter-sheet__foot {
 
 html[data-layout='phone'] .filter-sheet__foot .btn {
   inline-size: 100%;
+}
+/* ------------------------------------------------- phone import (260) -- */
+
+/*
+ * TASK-260 — the owner's mobile mockup for `/upload`: two screens, Service
+ * and Mode, then Screenshots, under a three-step stepper. Scoped exactly like
+ * the TASK-255 block above; nothing here reaches the wide layout.
+ */
+
+html[data-layout='phone'] .import-head {
+  margin-bottom: var(--space-4);
+}
+
+html[data-layout='phone'] .import-head__title {
+  column-gap: var(--space-3);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-bottom: var(--space-4);
+}
+
+html[data-layout='phone'] .import-head__title h1 {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-normal);
+  grid-column: 1;
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+html[data-layout='phone'] .import-head__title p {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  grid-column: 1;
+  margin: var(--space-1) 0 0;
+}
+
+/* The second screen keeps the page's h1 for the heading outline, unseen. */
+html[data-layout='phone'] .import-head__title[data-screen='screenshots'] {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  margin: 0;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+
+html[data-layout='phone'] .import-head__close {
+  align-items: center;
+  align-self: start;
+  color: var(--color-text-muted);
+  display: inline-flex;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  isolation: isolate;
+  justify-content: center;
+  margin-inline-end: calc(var(--space-2) * -1);
+  position: relative;
+}
+
+html[data-layout='phone'] .import-head__close::before {
+  background: var(--color-chip);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  content: '';
+  inset: var(--space-1);
+  position: absolute;
+  z-index: -1;
+}
+
+html[data-layout='phone'] .import-head__close .icon {
+  block-size: 1.25rem;
+  inline-size: 1.25rem;
+}
+
+/* ------------------------------------------------ the stepper, 1 · 2 · 3 */
+
+html[data-layout='phone'] .import-stepper {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+html[data-layout='phone'] .import-stepper__step {
+  display: flex;
+  justify-content: center;
+  position: relative;
+}
+
+/* The rule joining each marker to the one before it. */
+html[data-layout='phone'] .import-stepper__step + .import-stepper__step::before {
+  background: var(--color-border-soft);
+  block-size: 2px;
+  content: '';
+  inset-inline: calc(-50% + 1.5rem) calc(50% + 1.5rem);
+  position: absolute;
+  top: calc(1rem - 1px);
+}
+
+html[data-layout='phone'] .import-stepper__step[data-state='done'] + .import-stepper__step::before {
+  background: var(--color-accent);
+}
+
+html[data-layout='phone'] .import-stepper__static,
+html[data-layout='phone'] .import-stepper__step > .btn {
+  align-items: center;
+  background: none;
+  border: 0;
+  color: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+  gap: var(--space-1);
+  padding: 0;
+}
+
+html[data-layout='phone'] .import-stepper__marker {
+  align-items: center;
+  block-size: 2rem;
+  border: 1.5px solid var(--color-border);
+  border-radius: 50%;
+  display: inline-flex;
+  font-weight: var(--weight-bold);
+  inline-size: 2rem;
+  justify-content: center;
+}
+
+html[data-layout='phone'] .import-stepper__marker .icon {
+  block-size: 1.125rem;
+  inline-size: 1.125rem;
+  stroke-width: 2.5;
+}
+
+html[data-layout='phone'] .import-stepper__step[data-state='current'] .import-stepper__marker {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-selected);
+  color: var(--color-surface);
+}
+
+html[data-layout='phone'] .import-stepper__step[data-state='done'] .import-stepper__marker {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* ⚠ Never colour alone: the current step's label is also bold. */
+html[data-layout='phone'] .import-stepper__step[data-state='current'] .import-stepper__label {
+  color: var(--color-text);
+  font-weight: var(--weight-bold);
+}
+
+/* ---------------------------------------------- screen 1: the questions */
+
+html[data-layout='phone'] .upload-flow .upload-step[data-flat] {
+  margin-bottom: var(--space-5);
+}
+
+html[data-layout='phone'] .upload-step[data-flat] .upload-step__legend {
+  font-family: var(--font-stack);
+  font-size: var(--text-card-title);
+  font-weight: var(--weight-medium);
+}
+
+html[data-layout='phone'] .upload-step[data-flat] .upload-step__body {
+  margin-block-start: var(--space-3);
+}
+
+html[data-layout='phone'] .upload-flow .upload-step[data-step='1'] .segmented {
+  gap: var(--space-2);
+  grid-auto-rows: 4.5rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+html[data-layout='phone'] .upload-flow .upload-step[data-step='1'] .segmented > label {
+  align-content: center;
+  background: var(--color-catalog-raised);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  grid-template-rows: auto;
+  min-block-size: 4.5rem;
+  padding: var(--space-2);
+  row-gap: 2px;
+}
+
+/* The radio fills its tile: the whole tile is the target, the ring its focus. */
+html[data-layout='phone'] .upload-flow .upload-step[data-step='1'] .segmented > label > input {
+  block-size: 100%;
+  cursor: pointer;
+  inline-size: 100%;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+}
+
+html[data-layout='phone']
+  .upload-flow
+  .upload-step[data-step='1']
+  .segmented
+  > label
+  > .brand-mark {
+  block-size: 2rem;
+  inline-size: 5rem;
+}
+
+html[data-layout='phone']
+  .upload-flow
+  .upload-step[data-step='1']
+  .segmented
+  > label
+  > .service-mark__name {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+}
+
+/*
+ * These five marks spell the service's name, so the tile shows the mark
+ * alone, as the mockup does. The name stays in the accessible name.
+ */
+html[data-layout='phone'] .segmented > label[data-service='prime-video'] > .service-mark__name,
+html[data-layout='phone'] .segmented > label[data-service='disney-plus'] > .service-mark__name,
+html[data-layout='phone'] .segmented > label[data-service='apple-tv-plus'] > .service-mark__name,
+html[data-layout='phone'] .segmented > label[data-service='peacock'] > .service-mark__name,
+html[data-layout='phone'] .segmented > label[data-service='starz'] > .service-mark__name {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+
+html[data-layout='phone']
+  .upload-flow
+  .upload-step[data-step='1']
+  .segmented
+  > label:has(:checked) {
+  background: var(--color-surface-raised);
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-selected);
+}
+
+html[data-layout='phone'] .upload-flow__storefronts {
+  font-size: var(--text-sm);
+  gap: 0 var(--space-2);
+}
+
+html[data-layout='phone'] .upload-flow .upload-step[data-step='2'] .segmented {
+  gap: var(--space-3);
+  grid-template-columns: minmax(0, 1fr);
+}
+
+html[data-layout='phone'] .upload-flow .upload-step[data-step='2'] .segmented > label {
+  align-items: center;
+  background: var(--color-catalog-raised);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-card);
+  column-gap: var(--space-3);
+  display: grid;
+  grid-template-areas:
+    'icon title radio'
+    'icon text radio';
+  grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+  line-height: var(--leading-tight);
+  min-block-size: 0;
+  padding: var(--space-3) var(--space-4);
+  row-gap: 0;
+}
+
+html[data-layout='phone']
+  .upload-flow
+  .upload-step[data-step='2']
+  .segmented
+  > label:has(:checked) {
+  background: var(--color-accent-soft);
+  box-shadow: var(--shadow-selected);
+}
+
+html[data-layout='phone'] .upload-flow .upload-step[data-step='2'] .mode-card__icon {
+  align-items: center;
+  align-self: center;
+  background: var(--color-surface-raised);
+  block-size: 2.75rem;
+  border-radius: 50%;
+  display: flex;
+  grid-area: icon;
+  inline-size: 2.75rem;
+  justify-content: center;
+}
+
+html[data-layout='phone'] .upload-flow .upload-step[data-step='2'] .mode-card__icon .icon {
+  block-size: 1.5rem;
+  inline-size: 1.5rem;
+}
+
+html[data-layout='phone'] .upload-flow .upload-step[data-step='2'] .segmented > label > input {
+  appearance: none;
+  block-size: 1.5rem;
+  border: 2px solid var(--color-border);
+  align-self: start;
+  border-radius: 50%;
+  grid-area: radio;
+  inline-size: 1.5rem;
+  margin: 0;
+}
+
+html[data-layout='phone']
+  .upload-flow
+  .upload-step[data-step='2']
+  .segmented
+  > label
+  > input:checked {
+  background: radial-gradient(circle, var(--color-accent) 0 40%, var(--color-surface) 46%);
+  border-color: var(--color-accent);
+}
+
+html[data-layout='phone']
+  .upload-flow
+  .upload-step[data-step='2']
+  .segmented
+  > label
+  > input:disabled {
+  opacity: 0.5;
+}
+
+html[data-layout='phone']
+  .upload-flow
+  .upload-step[data-step='2']
+  .segmented
+  > label
+  > span:not(.mode-card__icon) {
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  grid-area: title;
+}
+
+html[data-layout='phone'] .upload-flow .upload-step[data-step='2'] .segmented > label > p {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  grid-area: text;
+  margin: 0;
+}
+
+html[data-layout='phone'] .upload-flow .mode-card__flag {
+  display: none;
+}
+
+/* Continue stays reachable under the questions without covering them. */
+html[data-layout='phone'] .import-continue {
+  background: var(--color-bg);
+  bottom: 0;
+  display: grid;
+  gap: var(--space-2);
+  padding-block: var(--space-3);
+  position: sticky;
+  z-index: 5;
+}
+
+html[data-layout='phone'] .import-continue > .btn,
+html[data-layout='phone'] .upload-submit > .btn--primary {
+  border-radius: var(--radius-card);
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  inline-size: 100%;
+  min-block-size: 3.25rem;
+}
+
+/* ------------------------------------------- screen 2: the screenshots */
+
+html[data-layout='phone'] .upload-flow .upload-step[data-step='3'] > .upload-step__head {
+  display: none;
+}
+
+html[data-layout='phone'] .upload-flow .upload-step[data-step='3'] > .upload-step__body {
+  margin-block-start: 0;
+}
+
+html[data-layout='phone'] .import-screenshots-head h2 {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-normal);
+  margin: 0;
+}
+
+html[data-layout='phone'] .import-screenshots-head p {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: var(--space-1) 0 var(--space-4);
+}
+
+html[data-layout='phone'] .dropzone__tabs {
+  background: var(--color-catalog-raised);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  display: grid;
+  gap: var(--space-1);
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  padding: var(--space-1);
+}
+
+html[data-layout='phone'] .dropzone__tabs > .btn {
+  background: none;
+  border: 0;
+  border-radius: calc(var(--radius) - 3px);
+  color: var(--color-text-muted);
+  font-weight: var(--weight-medium);
+}
+
+/* ⚠ Never colour alone: the chosen tab is also filled and `aria-pressed`. */
+html[data-layout='phone'] .dropzone__tabs > .btn[aria-pressed='true'] {
+  background: var(--color-accent);
+  color: var(--color-surface);
+}
+
+html[data-layout='phone'] .dropzone__target {
+  align-items: stretch;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: start;
+}
+
+/* The Drop tab draws the target as the mockup's dashed area. */
+html[data-layout='phone'] .dropzone[data-tab='drop'] .dropzone__target,
+html[data-layout='phone'] .dropzone__target[data-dragging='true'] {
+  background: var(--color-catalog-raised);
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-4);
+  text-align: center;
+}
+
+html[data-layout='phone'] .dropzone__target[data-dragging='true'] {
+  border-color: var(--color-accent);
+  border-style: solid;
+}
+
+html[data-layout='phone']
+  .dropzone:not([data-tab='drop'])
+  .dropzone__target:not([data-dragging])
+  > p {
+  display: none;
+}
+
+html[data-layout='phone'] .dropzone__paste-card {
+  align-items: center;
+  background: var(--color-catalog-raised);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-card);
+  column-gap: var(--space-3);
+  display: grid;
+  grid-template-areas:
+    'icon title'
+    'icon button';
+  grid-template-columns: 3.5rem minmax(0, 1fr);
+  padding: var(--space-4);
+  row-gap: var(--space-2);
+}
+
+html[data-layout='phone'] .dropzone:not([data-tab='paste']) .dropzone__paste-card {
+  display: none;
+}
+
+html[data-layout='phone'] .dropzone__paste-icon {
+  align-items: center;
+  align-self: start;
+  background: var(--color-surface-raised);
+  block-size: 3.5rem;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  color: var(--color-accent);
+  display: flex;
+  grid-area: icon;
+  inline-size: 3.5rem;
+  justify-content: center;
+}
+
+html[data-layout='phone'] .dropzone__paste-icon .icon {
+  block-size: 1.75rem;
+  inline-size: 1.75rem;
+}
+
+html[data-layout='phone'] .dropzone__paste-title {
+  display: block;
+  font-weight: var(--weight-medium);
+  grid-area: title;
+  margin: 0;
+}
+
+html[data-layout='phone'] .dropzone__paste {
+  display: grid;
+  gap: var(--space-1);
+  grid-area: button;
+}
+
+html[data-layout='phone'] .dropzone__paste > button {
+  background: var(--color-accent);
+  border: 0;
+  color: var(--color-surface);
+  font-weight: var(--weight-bold);
+  inline-size: 100%;
+}
+
+html[data-layout='phone'] .dropzone__paste > p {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+html[data-layout='phone'] .dropzone__files {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+}
+
+html[data-layout='phone'] .dropzone__files-lead[data-lead='row'] {
+  display: block;
+}
+
+html[data-layout='phone'] .dropzone__choose {
+  align-items: center;
+  background: var(--color-catalog-raised);
+  display: inline-flex;
+  font-weight: var(--weight-medium);
+  gap: var(--space-2);
+  justify-content: center;
+  padding-inline: var(--space-4);
+}
+
+html[data-layout='phone'] .dropzone__choose-icon {
+  display: inline-flex;
+}
+
+html[data-layout='phone'] .dropzone__choose-icon .icon {
+  block-size: 1.25rem;
+  inline-size: 1.25rem;
+}
+
+/* The Files tab turns the row into the card, with Choose files as its action. */
+html[data-layout='phone'] .dropzone[data-tab='files'] .dropzone__files {
+  align-items: stretch;
+  background: var(--color-catalog-raised);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-card);
+  flex-direction: column;
+  padding: var(--space-4);
+  text-align: center;
+}
+
+html[data-layout='phone'] .dropzone[data-tab='files'] .dropzone__files-lead[data-lead='row'] {
+  display: none;
+}
+
+html[data-layout='phone'] .dropzone[data-tab='files'] .dropzone__files-lead[data-lead='card'] {
+  display: block;
+  font-weight: var(--weight-medium);
+}
+
+html[data-layout='phone'] .dropzone[data-tab='files'] .dropzone__choose {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-surface);
+  font-weight: var(--weight-bold);
+}
+
+html[data-layout='phone'] .dropzone[data-tab='drop'] .dropzone__files {
+  text-align: start;
+}
+
+html[data-layout='phone'] .dropzone__summary {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2);
+  justify-content: space-between;
+  margin-block-start: var(--space-2);
+}
+
+html[data-layout='phone'] .dropzone__summary > p {
+  font-weight: var(--weight-medium);
+  margin: 0;
+}
+
+html[data-layout='phone'] .dropzone__bytes {
+  display: none;
+}
+
+html[data-layout='phone'] .dropzone__summary > .btn {
+  background: none;
+  border: 0;
+  color: var(--color-accent);
+  font-size: var(--text-sm);
+  padding-inline: var(--space-2);
+}
+
+/* ------ the thumbnails: three across, a remove mark on each, then `+n`. */
+
+html[data-layout='phone'] .upload-flow .dropzone > ul {
+  gap: var(--space-2);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+}
+
+html[data-layout='phone'] .upload-flow .dropzone > ul > li {
+  aspect-ratio: 4 / 3;
+  background: var(--color-catalog-raised);
+  display: block;
+  overflow: hidden;
+  padding: 0;
+  position: relative;
+}
+
+html[data-layout='phone'] .upload-flow .dropzone > ul > li .capture-preview {
+  block-size: 100%;
+  border: 0;
+  border-radius: 0;
+  inline-size: 100%;
+}
+
+html[data-layout='phone'] .upload-flow .dropzone > ul > li .capture-preview img {
+  object-fit: cover;
+}
+
+/* The name and state stay announced; the tile is the picture. */
+html[data-layout='phone'] .upload-flow .dropzone > ul > li .capture-image-details {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
+}
+
+/* The 44 px target stays; the drawn mark is the mockup's small circle. */
+html[data-layout='phone'] .upload-flow .dropzone > ul > li.dropzone__item > .btn {
+  background: none;
+  border: 0;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  isolation: isolate;
+  min-inline-size: var(--tap-target-min);
+  padding: 0;
+  position: absolute;
+}
+
+html[data-layout='phone'] .upload-flow .dropzone > ul > li.dropzone__item > .btn::before {
+  background: var(--color-artwork-control);
+  block-size: 1.5rem;
+  border: 1px solid var(--color-artwork-control-border);
+  border-radius: 50%;
+  color: var(--color-text);
+  content: '×';
+  display: grid;
+  font-size: var(--text-base);
+  inline-size: 1.5rem;
+  line-height: var(--leading-tight);
+  place-items: center;
+}
+
+html[data-layout='phone']
+  .upload-flow
+  .dropzone
+  > ul[data-collapsed]
+  > .dropzone__item:nth-child(n + 6) {
+  display: none;
+}
+
+html[data-layout='phone'] .upload-flow .dropzone > ul > li.dropzone__more {
+  display: block;
+}
+
+html[data-layout='phone'] .dropzone__more > .btn {
+  background: var(--color-surface-raised);
+  block-size: 100%;
+  border: 0;
+  border-radius: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  inline-size: 100%;
+}
+
+/* ------------------------------------------- the submit and its footnote */
+
+html[data-layout='phone'] .upload-summary {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+html[data-layout='phone'] .import-formats {
+  align-items: center;
+  color: var(--color-text-muted);
+  display: flex;
+  font-size: var(--text-sm);
+  gap: var(--space-1);
+  justify-content: center;
+  margin: var(--space-2) 0 0;
+}
+
+html[data-layout='phone'] .import-formats .icon {
+  block-size: 1rem;
+  inline-size: 1rem;
+}
+html[data-layout='phone'] .nav:not(:has(li)) {
+  display: none;
+}
+
+html[data-layout='phone'] main[tabindex='-1']:focus-visible {
+  outline: none;
+}
+
+html[data-layout='phone'] .upload-flow__storefronts > p {
+  display: none;
+}
+
+html[data-layout='phone'] .upload-flow .upload-flow__note {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: var(--space-3) 0 0;
+}
+
+html[data-layout='phone'] .upload-summary > .upload-submit {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+/* The name stays the button's accessible name; only the drawn mark shows. */
+html[data-layout='phone'] .upload-flow .dropzone__remove-label {
+  block-size: 1px;
+  clip-path: inset(50%);
+  inline-size: 1px;
+  overflow: hidden;
+  position: absolute;
+  white-space: nowrap;
 }

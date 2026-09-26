@@ -65,6 +65,12 @@ for (const width of [280, 390, 1440]) {
         if (!logo.name) throw new Error('Empty service name');
         const option = page.getByRole('radio', { name: logo.name, exact: true });
         await option.check();
+        // TASK-260: below --bp-sm the questions are flat tiles that never
+        // collapse, so the answer is the checked tile itself — no summary.
+        if (width < 640) {
+          await expect(option).toBeChecked();
+          continue;
+        }
         await expect(page.getByTestId('service-step-panel-answer')).toHaveText(logo.name);
         await page.getByTestId('service-step-panel-change').click();
         await expect(option).toBeChecked();
@@ -118,14 +124,24 @@ describe('T-POL-003a calm capture framing', () => {
         });
         await page.setViewportSize({ width, height: 900 });
         await page.goto('/upload');
-        await expect(page.getByRole('heading', { level: 1 })).toHaveText('Import screenshots');
+        // TASK-260: below --bp-sm the owner's mockup replaces the heading and
+        // the capture progress with its own title and Service/Mode/Screenshots
+        // stepper; T-PHONE-010 carries that screen's geometry.
+        const phone = width < 640;
+        await expect(page.getByRole('heading', { level: 1 })).toHaveText(
+          phone ? 'Import your watchlist' : 'Import screenshots',
+        );
         expect(
           await page
             .getByRole('heading', { level: 1 })
             .evaluate((el) => getComputedStyle(el).fontFamily),
         ).toContain('Georgia');
-        const progress = page.getByRole('list', { name: 'Capture progress' });
-        await expect(progress.locator('[aria-current="step"]')).toHaveText('Prepare');
+        const progress = page.getByRole('list', {
+          name: phone ? 'Import steps' : 'Capture progress',
+        });
+        await expect(progress.locator('[aria-current="step"]')).toHaveText(
+          phone ? /Service$/ : 'Prepare',
+        );
         const stages = await progress.getByRole('listitem').evaluateAll((items) =>
           items.map((item) => {
             const rect = item.getBoundingClientRect();
@@ -134,10 +150,12 @@ describe('T-POL-003a calm capture framing', () => {
         );
         expect(new Set(stages.map((item) => Math.round(item.bottom))).size).toBe(1);
         expect(Math.max(...stages.map((item) => item.height))).toBeLessThanOrEqual(120);
-        const markers = await progress
-          .getByRole('listitem')
-          .evaluateAll((items) => items.map((item) => getComputedStyle(item, '::before').width));
-        expect(markers).toEqual(Array<string>(3).fill(width >= 640 ? '36px' : '24px'));
+        if (!phone) {
+          const markers = await progress
+            .getByRole('listitem')
+            .evaluateAll((items) => items.map((item) => getComputedStyle(item, '::before').width));
+          expect(markers).toEqual(Array<string>(3).fill('36px'));
+        }
         expect(
           Math.max(...stages.map((item) => item.width)) -
             Math.min(...stages.map((item) => item.width)),
@@ -171,11 +189,18 @@ describe('T-POL-003a calm capture framing', () => {
           if (ready) {
             await page.getByRole('radio', { name: 'Netflix' }).check();
             await page.getByTestId('mode-card-append-only').getByRole('radio').check();
+            if (phone) await page.getByTestId('import-continue').click();
           }
           await expect(page.getByTestId('file-input')).toBeEnabled();
-          await expect(
-            page.getByRole('button', { name: 'Paste screenshot', exact: true }),
-          ).toBeVisible();
+          if (phone && !ready) {
+            // The owner-approved paged phone flow: Continue waits, and says why.
+            await expect(page.getByTestId('import-continue')).toBeDisabled();
+            await expect(page.getByTestId('import-continue-reason')).toBeVisible();
+          } else {
+            await expect(
+              page.getByRole('button', { name: 'Paste screenshot', exact: true }),
+            ).toBeVisible();
+          }
           expect(
             await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
           ).toBe(true);
@@ -223,6 +248,7 @@ test('T-MOCK-006: import groups choices, intake and bottom summary without prese
     path: testInfo.outputPath('import-composition.png'),
     fullPage: true,
   });
+  await expect(page.getByRole('list', { name: 'Capture progress' })).toBeVisible();
   const heading = await page.getByRole('heading', { level: 1 }).boundingBox();
   const progress = await page.getByRole('list', { name: 'Capture progress' }).boundingBox();
   if (!heading || !progress) throw new Error('Missing import heading or progress');

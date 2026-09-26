@@ -386,6 +386,9 @@ async function focusByTab(page: Page, locator: ReturnType<Page['locator']>): Pro
 async function chooseUploadDraft(page: Page): Promise<void> {
   await page.getByLabel('Netflix').check();
   await page.getByLabel('Add only').check();
+  // TASK-260: below --bp-sm the questions and the screenshots are two screens.
+  const next = page.getByTestId('import-continue');
+  if (await next.isVisible()) await next.click();
 }
 
 test.describe('T-A11Y-001 — the 320 px floor', () => {
