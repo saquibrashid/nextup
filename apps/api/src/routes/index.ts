@@ -25,6 +25,7 @@ import { errorEnvelope } from '../middleware/errorEnvelope.js';
 import { attachOwnerScope, makeRequirePrincipal } from '../middleware/ownerScope.js';
 import type { PrincipalReader } from '../auth/principal.js';
 import { AppError } from '../errors/AppError.js';
+import { registerAvailabilityMoveRoutes } from './availabilityMoves.js';
 import { registerBatchCandidateRoutes } from './batchCandidates.js';
 import { registerBatchCloseRoutes } from './batchClose.js';
 import { registerBatchDetailRoutes } from './batchDetail.js';
@@ -169,6 +170,10 @@ export function createApiRouter(): Router {
   // in-process cache dies with the request and can never accumulate into a
   // mirror of the TMDB catalogue.
   registerWaitingRoutes(apiRouter);
+  // §6.40–§6.44 (US-063, PRD `A54`) — the owner's one-tap availability moves.
+  // Registered after the waiting and listing routes whose rows they write;
+  // none of them calls TMDB, so they need no client.
+  registerAvailabilityMoveRoutes(apiRouter);
   registerServiceStateRoutes(apiRouter);
   // TASK-045 (`specs/api.md` §6.29). The client is built PER REQUEST on
   // purpose: its in-process search cache then dies with the request and can

@@ -2,12 +2,14 @@
  * Mutating-route registry vs the REQ-041 closed enumeration
  * (TASK-121 — `T-MUT-001`, `T-MUT-002`).
  *
- * **REQ-041 is a CLOSED list.** PRD §7.4 enumerates exactly twelve owner-
+ * **REQ-041 is a CLOSED list.** PRD §7.4 enumerates exactly seventeen owner-
  * initiated operations that may change user-visible list state, and exactly
  * four non-owner processes that may exist at all — none of which changes
  * list state. *"Anything not on these lists is forbidden by default. REQ-041
- * has already been widened five times during requirements work; widening it
+ * has already been widened seven times during requirements work; widening it
  * again is an explicit amendment, not an implementation decision."*
+ * ~~Superseded at `A54`: "exactly twelve owner-initiated operations" and
+ * "widened five times".~~
  *
  * That sentence is unenforceable by review. A convenience endpoint reads as a
  * feature in a diff and as a breach of G-4 only if someone remembers REQ-041.
@@ -36,8 +38,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * PRD §7.4 — the twelve owner-initiated operations that may change
+ * PRD §7.4 — the seventeen owner-initiated operations that may change
  * user-visible list state. **This list is closed.**
+ *
+ * Items 13–17 were added at `A54` (2026-09-29, owner-approved; #397, #410,
+ * US-063): the one-tap answers to an availability change. The refresh that
+ * reveals the change may never act on it (invariant 5), so each move is an
+ * owner action here — synchronous, soft, and reversible.
+ * ~~Superseded at `A54`: "the twelve owner-initiated operations."~~
  *
  * ~~Superseded: "the eight owner-initiated operations."~~ US-047 and US-048
  * added the standalone manual add and manual removal, approved by the owner
@@ -96,6 +104,36 @@ export const REQ_041_OPERATIONS = [
     story: 'US-062',
     what: 'Saving the owner title category override',
   },
+  {
+    id: 13,
+    op: 'remove-badge',
+    story: 'US-063',
+    what: 'Removing ONE service badge from a title, restorable from the removed view',
+  },
+  {
+    id: 14,
+    op: 'promote-waiting',
+    story: 'US-063',
+    what: 'Adding a now-streaming waiting title to the library, satisfying its waiting intent',
+  },
+  {
+    id: 15,
+    op: 'move-to-waiting',
+    story: 'US-063',
+    what: 'Moving a library title no longer streaming on any owner service to Waiting',
+  },
+  {
+    id: 16,
+    op: 'keep-availability',
+    story: 'US-063',
+    what: 'Keeping a title as it is, dismissing the marker for exactly that availability change',
+  },
+  {
+    id: 17,
+    op: 'add-badge',
+    story: 'US-063',
+    what: 'Adding a service badge for a service a library title is now also streaming on',
+  },
 ];
 
 /**
@@ -118,6 +156,12 @@ export const REQ_041_OPERATIONS = [
  * `ServiceListing`, so it cannot put a waiting work into the combined list —
  * graduation happens by the ordinary capture path (US-042 AC-4, TASK-189).
  *
+ * Widened in SCOPE, not in kind, at `A54` (ADR-0010 Rev 4): the same refresh
+ * also runs, on access, for the Library titles a list page or a details page
+ * renders, writing the availability columns on `title`. It still adds,
+ * removes, reorders and re-badges nothing — the moves it reveals are §7.4
+ * items 13–17, owner actions.
+ *
  * ~~Superseded (Epic M): "the only two non-owner-initiated processes."~~
  * ADR-0011 added the IMDb rating refresh, which is the same shape as the TMDB
  * one it sits beside.
@@ -137,7 +181,7 @@ export const PERMITTED_BACKGROUND_PROCESSES = [
   },
   {
     op: 'watch-availability-refresh',
-    why: 'lazy watch-availability refresh, triggered ONLY by opening the waiting view — metadata-only, writes three columns on watch_intent, creates no listing and satisfies no intent (REQ-086, US-042 AC-2/AC-4, ADR-0010, approved at A52)',
+    why: 'lazy watch-availability refresh, triggered ONLY by opening the waiting view or — widened at A54 — a library page or title details page, page-scoped and capped — metadata-only, writes availability columns on watch_intent or title, creates and removes no listing and satisfies no intent (REQ-086, US-042 AC-2/AC-4, US-063 AC-1, ADR-0010 Rev 4, approved at A52/A54)',
   },
 ];
 
@@ -206,6 +250,36 @@ export const MUTATING_ROUTE_REGISTRY = [
     op: 'set-title-category',
   },
   { method: 'POST', path: '/api/titles/:titleId/suppress', changesListState: true, op: 'suppress' },
+  {
+    method: 'DELETE',
+    path: '/api/listings/:listingId',
+    changesListState: true,
+    op: 'remove-badge',
+  },
+  {
+    method: 'POST',
+    path: '/api/waiting/:intentId/promote',
+    changesListState: true,
+    op: 'promote-waiting',
+  },
+  {
+    method: 'POST',
+    path: '/api/titles/:titleId/move-to-waiting',
+    changesListState: true,
+    op: 'move-to-waiting',
+  },
+  {
+    method: 'POST',
+    path: '/api/titles/:titleId/availability/keep',
+    changesListState: true,
+    op: 'keep-availability',
+  },
+  {
+    method: 'POST',
+    path: '/api/titles/:titleId/badges',
+    changesListState: true,
+    op: 'add-badge',
+  },
   {
     method: 'POST',
     path: '/api/suppressions/:suppressionId/unsuppress',
@@ -479,9 +553,9 @@ export function checkRegistryAgainstReq041(registry = MUTATING_ROUTE_REGISTRY) {
   // ⚠ The literal is the CLOSEDNESS, restated where a widening would be made.
   // ~~Superseded: 8, before US-047/US-048 added the manual add and removal.~~
   // Changing it is an amendment to PRD §7.4, not a build fix.
-  if (REQ_041_OPERATIONS.length !== 12) {
+  if (REQ_041_OPERATIONS.length !== 17) {
     findings.push(
-      `REQ-041 §7.4 enumerates 12 owner-initiated operations; this list has ${REQ_041_OPERATIONS.length}. The list is CLOSED (T-MUT-001).`,
+      `REQ-041 §7.4 enumerates 17 owner-initiated operations; this list has ${REQ_041_OPERATIONS.length}. The list is CLOSED (T-MUT-001).`,
     );
   }
 

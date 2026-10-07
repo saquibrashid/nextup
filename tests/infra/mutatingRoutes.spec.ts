@@ -121,18 +121,25 @@ describe('T-MUT-001 · US-036 AC-1/AC-3 · REQ-041 is a closed enumeration (PRD 
     expect(findings).toEqual([]);
   });
 
-  it('T-MUT-001e · the enumeration holds exactly the twelve REQ-041 operations', () => {
+  it('T-MUT-001e · the enumeration holds exactly the seventeen REQ-041 operations', () => {
     // ⚠ The count is not the point — the CLOSEDNESS is. Widening REQ-041 is an
     // amendment to PRD §7.4, so this test failing means someone must decide,
     // not that someone must bump a number.
     // ~~Superseded: eight, before US-047/US-048 added the manual add and the
     // manual removal.~~
-    expect(REQ_041_OPERATIONS).toHaveLength(12);
+    // ~~Superseded at `A54`: twelve, before US-063 added the five one-tap
+    // availability moves (§7.4 items 13–17).~~
+    expect(REQ_041_OPERATIONS).toHaveLength(17);
     expect(REQ_041_OPERATIONS.map((o: { op: string }) => o.op).sort()).toEqual([
+      'add-badge',
       'add-title',
       'close-batch',
       'confirm-removal-group',
       'fix-match',
+      'keep-availability',
+      'move-to-waiting',
+      'promote-waiting',
+      'remove-badge',
       'remove-title',
       'restore-listing',
       'set-title-category',
@@ -153,9 +160,10 @@ describe('T-MUT-001 · US-036 AC-1/AC-3 · REQ-041 is a closed enumeration (PRD 
     // ⚠ The count is the tripwire, not the rule. Each of the four is
     // permitted because it cannot add, remove, reorder or re-badge a row —
     // the rating is display-only (ADR-0011 OQ-A: no sort by rating), and the
-    // availability refresh writes three `watch_intent` metadata columns,
-    // creates no listing and satisfies no intent (US-042 AC-4), which is what
-    // keeps both on this side of invariant 5.
+    // availability refresh writes availability metadata columns (on
+    // `watch_intent`, and since `A54` on `title` for Library pages), creates
+    // and removes no listing and satisfies no intent (US-042 AC-4, US-063
+    // AC-1), which is what keeps both on this side of invariant 5.
     expect(PERMITTED_BACKGROUND_PROCESSES).toHaveLength(4);
     expect(PERMITTED_BACKGROUND_PROCESSES.map((p: { op: string }) => p.op).sort()).toEqual([
       'imdb-rating-refresh',
@@ -262,6 +270,11 @@ describe('T-MUT-001 · US-036 AC-1/AC-3 · REQ-041 is a closed enumeration (PRD 
       'POST /api/batches/:id/re-extract',
       'POST /api/batches/:id/undo',
       'POST /api/removal-groups/:id/undo',
+      'DELETE /api/listings/:id',
+      'POST /api/waiting/:id/promote',
+      'POST /api/titles/:id/move-to-waiting',
+      'POST /api/titles/:id/availability/keep',
+      'POST /api/titles/:id/badges',
     ].map((s) => {
       const [method, p] = s.split(' ');
       return `${method as string} ${normalisePath(p as string)}`;

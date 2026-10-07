@@ -123,11 +123,15 @@ export async function updateWatchIntentForecast(
 /**
  * Satisfy every waiting intent for these works (US-043 AC-3, `T-WAIT-008`).
  *
- * ⚠ **GRADUATION IS A CONSEQUENCE OF THE ORDINARY CAPTURE PATH, NEVER A
- * SPECIAL CASE.** This is called from the service close, inside its
+ * ⚠ **GRADUATION IS A CONSEQUENCE OF A LISTING BEING WRITTEN BY THE OWNER,
+ * NEVER A SPECIAL CASE.** This is called from the service close, inside its
  * transaction, after the listings it describes have been written — the work
  * reached a service the normal way, and the intent is closing because of that
  * fact rather than because anything went looking for intents to close.
+ * Since `A54` (US-063 AC-2) the owner's one-tap "Add to Library" from a
+ * Now-streaming waiting row is the second caller, on exactly the same terms:
+ * inside its own transaction, after it has written the listing. ~~Superseded:
+ * "the ordinary capture path" as the only caller.~~
  *
  * ⚠ **THE ROW IS RETAINED, NOT DELETED** (REQ-028, US-043 AC-5). There is no
  * TTL and no scheduled deletion; a satisfied intent is history the owner can
@@ -171,4 +175,56 @@ export async function listOwnerServices(ownerId: OwnerId, tx?: Db): Promise<stri
     }),
   ]);
   return [...new Set([...states, ...listings].map((row) => row.service))];
+}
+
+/**
+ * Record one LIBRARY availability answer (#410, `A54`). **Metadata-only, by
+ * construction** — the twin of {@link updateWatchIntentAvailability}.
+ *
+ * ⚠ The `data` shape reaches exactly the four availability columns migration
+ * 0019 added to `title`, so the on-access refresh cannot change a title's
+ * `state`, its listings, its date or its identity even by mistake. That is
+ * what keeps PRD §7.4 process 4 admissible after its widening to Library
+ * titles. Never widen it; add a separate writer instead.
+ */
+export async function updateTitleAvailability(
+  ownerId: OwnerId,
+  id: string,
+  data: {
+    availableOn: string | null;
+    rentOn: string | null;
+    availabilityCheckedAt: Date;
+    availabilityRegion: string;
+  },
+  tx?: Db,
+) {
+  return db(tx).title.updateMany({ where: { ownerId, id }, data });
+}
+
+/**
+ * The owner's "Keep" (US-063 AC-6): remember WHICH change was dismissed, so
+ * the marker stays hidden until the provider set yields a different one.
+ * Touches one column and nothing else.
+ */
+export async function keepTitleAvailabilityChange(
+  ownerId: OwnerId,
+  id: string,
+  signature: string,
+  tx?: Db,
+) {
+  return db(tx).title.updateMany({
+    where: { ownerId, id },
+    data: { availabilityKeptSignature: signature },
+  });
+}
+
+/**
+ * One WAITING intent with its whole title, for the owner's "Add to Library"
+ * (US-063 AC-2). `null` for a missing, foreign or no-longer-waiting intent.
+ */
+export async function findWaitingIntent(ownerId: OwnerId, id: string, tx?: Db) {
+  return db(tx).watchIntent.findFirst({
+    where: { ownerId, id, state: 'waiting' },
+    include: { title: true },
+  });
 }

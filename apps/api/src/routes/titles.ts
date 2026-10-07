@@ -23,6 +23,7 @@ import {
   parseEditionLabels,
   watchPriorityRank,
   titleCategory,
+  type Service,
   type TitleCategory,
   type WatchPriority,
 } from '@nextup/domain';
@@ -59,6 +60,20 @@ import {
 import { requireOwnerId } from '../middleware/requestContext.js';
 import { parseTitleListQuery } from './titlesQuery.js';
 import { readTitlePresentation } from '../services/titlePresentation.js';
+import { TmdbClient } from '../clients/tmdbClient.js';
+import { listOwnerServices, updateTitleAvailability } from '../repository/watchIntents.js';
+import {
+  libraryAvailabilityFor,
+  parseProviderList,
+  yourServicesFrom,
+} from '../services/libraryAvailability.js';
+import {
+  refreshAvailability,
+  selectForAvailabilityRefresh,
+  type AvailabilityWrite,
+  type IntentRow,
+  type WatchProviderSource,
+} from '../services/watchAvailability.js';
 
 /** `date` columns come back as a `Date` at UTC midnight; we want `YYYY-MM-DD`. */
 export function toIsoDate(value: Date): string {
@@ -115,6 +130,12 @@ interface TitleRow {
   imdbId?: string | null;
   imdbRatingTenths?: number | null;
   imdbRatingFetchedAt?: Date | null;
+  /** #410, migration 0019 — Library availability. Metadata only. */
+  availabilityCheckedAt?: Date | null;
+  availableOn?: string | null;
+  rentOn?: string | null;
+  availabilityRegion?: string;
+  availabilityKeptSignature?: string | null;
   listings: ListingRow[];
 }
 
@@ -168,7 +189,11 @@ export function applyRefresh<T extends TitleRow>(row: T, refresh: MetadataRefres
  * placeholder would hide from the owner that the title never matched — which
  * is the state the fix-match flow exists to resolve.
  */
-export function toListItem(row: TitleRow, metadataStale = false): Record<string, unknown> {
+export function toListItem(
+  row: TitleRow,
+  metadataStale = false,
+  yours: readonly Service[] | null = null,
+): Record<string, unknown> {
   const badges = row.listings.map((listing) => ({
     service: listing.service,
     listingId: listing.listingId,
@@ -209,7 +234,107 @@ export function toListItem(row: TitleRow, metadataStale = false): Record<string,
     // Computed server-side so REQ-061's "to nextup" wording has exactly one
     // implementation; the SPA renders this verbatim (`specs/ui.md` §row).
     dateAddedLabel: sortDateAdded === null ? null : dateAddedLabel(sortDateAdded),
+    // #410 (US-063). Present only when the handler resolved the owner's
+    // services; a fact to show, never a decision taken (invariant 8a).
+    ...(yours === null || row.availabilityRegion === undefined
+      ? {}
+      : {
+          availability: libraryAvailabilityFor({
+            listedServices: row.listings.map((listing) => listing.service),
+            availableOn: parseProviderList(row.availableOn),
+            rentOn: parseProviderList(row.rentOn),
+            checkedAt: row.availabilityCheckedAt ?? null,
+            region: row.availabilityRegion,
+            yourServices: yours,
+            keptSignature: row.availabilityKeptSignature ?? null,
+          }),
+        }),
   };
+}
+
+/**
+ * Overlay what the Library availability refresh just wrote. ⚠ Only the four
+ * columns `updateTitleAvailability` may write — the same narrowness as
+ * {@link applyRefresh}.
+ */
+export function applyAvailability<T extends TitleRow>(
+  row: T,
+  written: ReadonlyMap<string, AvailabilityWrite>,
+): T {
+  const write = written.get(row.id);
+  if (write === undefined) return row;
+  return {
+    ...row,
+    availableOn: write.availableOn === null ? null : JSON.stringify(write.availableOn),
+    rentOn: write.rentOn === null ? null : JSON.stringify(write.rentOn),
+    availabilityCheckedAt: write.availabilityCheckedAt,
+    availabilityRegion: write.availabilityRegion,
+  };
+}
+
+/** The availability refresh's narrow view of a Library title. */
+export function toAvailabilityRow(row: TitleRow): IntentRow | null {
+  if (row.availabilityRegion === undefined || row.listings.length === 0) return null;
+  return {
+    id: row.id,
+    workIdentity: row.workIdentity,
+    tmdbId: row.tmdbId ?? null,
+    tmdbMediaType: row.tmdbMediaType,
+    availabilityRegion: row.availabilityRegion,
+    availabilityCheckedAt: row.availabilityCheckedAt ?? null,
+    availableOn: parseProviderList(row.availableOn),
+    rentOn: parseProviderList(row.rentOn),
+    streamingSince: null,
+  };
+}
+
+/**
+ * PRD §7.4 process 4 as widened at `A54` (US-063 AC-1, ADR-0010 Rev 4): the
+ * lazy, on-access availability refresh for the LIBRARY titles this request is
+ * about to render.
+ *
+ * ⚠ **THE PAGE, NEVER A TABLE SCAN, AND CAPPED.** `rows` is exactly what this
+ * response serves, and `selectForAvailabilityRefresh` takes at most
+ * `AVAILABILITY_REFRESH_PER_REQUEST` of them. Serial. A failed lookup writes
+ * nothing and the stored answer is served as last-known.
+ *
+ * ⚠ **METADATA ONLY (invariant 5).** It writes four availability columns
+ * through `updateTitleAvailability`. It never adds, removes, reorders or
+ * re-badges a row — the moves it reveals are the owner's to make.
+ *
+ * ⚠ **IT CANNOT FAIL THE LIST.** The library is the owner's own data; TMDB is
+ * an enrichment. Any failure answers `yours: null`, and the items are served
+ * without an availability block.
+ */
+export async function libraryAvailabilityPass(
+  ownerId: Parameters<typeof listOwnerServices>[0],
+  rows: readonly TitleRow[],
+  getSource: () => WatchProviderSource,
+  now: Date,
+): Promise<{ yours: Service[] | null; written: Map<string, AvailabilityWrite> }> {
+  const written = new Map<string, AvailabilityWrite>();
+  const candidates = rows.map(toAvailabilityRow).filter((row): row is IntentRow => row !== null);
+  // Nothing on this page can carry an availability block: skip the read.
+  if (candidates.length === 0) return { yours: null, written };
+  try {
+    const yours = yourServicesFrom(await listOwnerServices(ownerId));
+    const due = selectForAvailabilityRefresh(candidates, now);
+    if (due.length > 0) {
+      const { writes } = await refreshAvailability(due, getSource(), now);
+      for (const write of writes) {
+        await updateTitleAvailability(ownerId, write.id, {
+          availableOn: write.availableOn === null ? null : JSON.stringify(write.availableOn),
+          rentOn: write.rentOn === null ? null : JSON.stringify(write.rentOn),
+          availabilityCheckedAt: write.availabilityCheckedAt,
+          availabilityRegion: write.availabilityRegion,
+        });
+        written.set(write.id, write);
+      }
+    }
+    return { yours, written };
+  } catch {
+    return { yours: null, written };
+  }
 }
 
 /**
@@ -267,19 +392,29 @@ interface TitleDetailRow extends Omit<TitleRow, 'listings'> {
  * getting it wrong would put a removed service's badge back on the row in the
  * one view that shows removals next to it.
  */
-export function toDetailItem(row: TitleDetailRow, metadataStale = false): Record<string, unknown> {
+export function toDetailItem(
+  row: TitleDetailRow,
+  metadataStale = false,
+  yours: readonly Service[] | null = null,
+): Record<string, unknown> {
   const active = row.listings.filter((listing) => listing.state === 'active');
   const removed = row.listings.filter((listing) => listing.state !== 'active');
 
   return {
-    ...toListItem({ ...row, listings: active }, metadataStale),
+    ...toListItem({ ...row, listings: active }, metadataStale, yours),
     removedListings: removed.map(toRemovedListing),
     createdByBatchId: row.createdByBatchId,
     createdAt: row.createdAt.toISOString(),
   };
 }
 
-export function registerTitleRoutes(router: Router): void {
+const defaultWatchSource = (): WatchProviderSource =>
+  new TmdbClient({ apiKey: process.env['TMDB_API_KEY'] ?? '' });
+
+export function registerTitleRoutes(
+  router: Router,
+  getWatchSource: () => WatchProviderSource = defaultWatchSource,
+): void {
   router.get('/titles', async (req, res) => {
     const ownerId = requireOwnerId(req);
 
@@ -404,9 +539,19 @@ export function registerTitleRoutes(router: Router): void {
             refreshed: new Map(),
           }
         : await refreshStaleMetadata(ownerId, refreshable);
+    // #410 / `A54` — the Library availability refresh, for THIS page only.
+    const availability = await libraryAvailabilityPass(
+      ownerId,
+      rows.map((row) => row as unknown as TitleRow),
+      getWatchSource,
+      new Date(),
+    );
     const items = rows.map((row) => {
-      const typed = applyRefresh(row as unknown as TitleRow, refresh);
-      return toListItem(typed, refresh.stale.has(typed.id));
+      const typed = applyAvailability(
+        applyRefresh(row as unknown as TitleRow, refresh),
+        availability.written,
+      );
+      return toListItem(typed, refresh.stale.has(typed.id), availability.yours);
     });
     // The cursor is built from the LAST ROW RETURNED, never from a count or an
     // index. That is what makes it a position rather than an offset, and it is
@@ -512,11 +657,24 @@ export function registerTitleRoutes(router: Router): void {
 
     const presentation = await readTitlePresentation(ownerId, row);
     const suppression = await findActiveSuppression(ownerId, row.workIdentity);
+    const listState =
+      suppression !== null ? 'suppressed' : row.state === 'active' ? 'active' : 'removed';
+    // #410 / `A54` — the same lazy availability refresh, for the one row this
+    // view renders, and only while it is IN the library: a removed or
+    // suppressed title has no badge for availability to be compared with.
+    const active = { ...typed, listings: typed.listings.filter((l) => l.state === 'active') };
+    const availability =
+      listState === 'active'
+        ? await libraryAvailabilityPass(ownerId, [active], getWatchSource, new Date())
+        : { yours: null, written: new Map<string, AvailabilityWrite>() };
     res.status(200).json({
-      ...toDetailItem(applyRefresh(typed, refresh), refresh.stale.has(typed.id)),
+      ...toDetailItem(
+        applyAvailability(applyRefresh(typed, refresh), availability.written),
+        refresh.stale.has(typed.id),
+        availability.yours,
+      ),
       presentation,
-      listState:
-        suppression !== null ? 'suppressed' : row.state === 'active' ? 'active' : 'removed',
+      listState,
     });
   });
 }

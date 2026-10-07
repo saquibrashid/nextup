@@ -193,6 +193,21 @@ model Title {
   /// rating without this timestamp is rejected by `ck_title_imdb_rating_dated`.
   imdbRatingFetchedAt DateTime? @map("imdb_rating_fetched_at") @db.DateTime2
 
+  /// #397/#410, migration 0019, PRD `A54`. Library availability — METADATA
+  /// ONLY. No membership, ordering or badge ever reads these columns
+  /// (invariant 5); they feed the "Left Starz" / "Now also on Netflix" marker.
+  /// NULL = never checked. Drives the lazy on-access Library refresh.
+  availabilityCheckedAt     DateTime? @map("availability_checked_at") @db.DateTime2
+  /// JSON array of `flatrate` providers. ⚠ NULL = NOT KNOWN (ADR-0010 Trap 4).
+  availableOn               String?   @map("available_on") @db.NVarChar(Max)
+  /// JSON array of rent/buy storefronts. ⚠ Never availability (US-042 AC-5).
+  rentOn                    String?   @map("rent_on") @db.NVarChar(Max)
+  /// ⚠ Explicit, never implicit (`T-AVAIL-010`, ASM-059, `A49`).
+  availabilityRegion        String    @default("US", map: "df_title_region") @map("availability_region") @db.NVarChar(8)
+  /// The change signature the owner chose to Keep. The marker reappears only
+  /// when the provider set yields a different signature (US-063 AC-6).
+  availabilityKeptSignature String?   @map("availability_kept_signature") @db.NVarChar(400)
+
   createdAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_title_created") @map("created_at") @db.DateTime2
   updatedAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_title_updated") @map("updated_at") @db.DateTime2
 
@@ -299,6 +314,10 @@ model WatchIntent {
   /// (`ck_intent_announced_service`). Both or neither (`ck_intent_announced_coherent`).
   announcedService    String?   @map("announced_service") @db.NVarChar(40)
   announcedOn         DateTime? @map("announced_on") @db.Date
+
+  /// #410, migration 0019. Set only by the owner's "Move to Waiting"
+  /// (US-063 AC-4). The source stays `search` (`ck_intent_moved_from_library_search`).
+  movedFromLibraryAt DateTime? @map("moved_from_library_at") @db.DateTime2
 
   /// ⚠ FILTERED to `state = 'waiting'`, so a historical satisfied row and a
   /// later re-discovery of the same work both remain possible. The filter is

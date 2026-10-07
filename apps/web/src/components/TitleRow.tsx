@@ -18,6 +18,7 @@ import { ServiceMark } from './ServiceMark';
 import { ChevronIcon, MoreIcon, RatingIcon } from './icons';
 import { GenreChips } from './GenreChips';
 import { EditionLabels } from './EditionLabels';
+import { AvailabilityChip } from './AvailabilityMarker';
 import { releaseYearText } from '@nextup/domain';
 
 import {
@@ -82,8 +83,31 @@ export interface TitleBadge {
   readonly dateAdded: string;
 }
 
+/**
+ * #397/#410 (US-063, PRD `A54`) — what TMDB's watch-provider data last said
+ * about a Library title, against the badges it holds. Facts only; the client
+ * decides nothing from it except which sentence and which offers to show.
+ */
+export interface TitleAvailability {
+  readonly accessState: 'not-checked' | 'unknown' | 'streaming' | 'rent-only' | 'not-seen';
+  readonly checkedAt: string | null;
+  readonly region: string;
+  readonly streamingOn: readonly Service[] | null;
+  readonly rentOn: readonly string[] | null;
+  /** Badged services that no longer stream it. */
+  readonly left: readonly Service[];
+  /** The owner's services that now stream it without a badge. */
+  readonly joined: readonly Service[];
+  /** The change, as the string a Keep records, or `null` for none. */
+  readonly signature: string | null;
+  readonly kept: boolean;
+  readonly canMoveToWaiting: boolean;
+}
+
 /** An item of `GET /api/titles` (`specs/api.md` §6.2). */
 export interface TitleListItem {
+  /** US-063 — absent from older payloads and from fixtures, read as "nothing to say". */
+  readonly availability?: TitleAvailability | null;
   readonly category?: import('@nextup/domain').TitleCategory | null;
   readonly categoryOverride?: import('@nextup/domain').TitleCategory | null;
   readonly automaticCategory?: import('@nextup/domain').TitleCategory | null;
@@ -276,6 +300,8 @@ export function TitleRow({
                   {METADATA_STALE_CHIP}
                 </span>
               )}
+              {/* US-063 AC-2 — the compact marker: a fact, never a nag (8a). */}
+              <AvailabilityChip availability={item.availability} />
             </span>
           </div>
 

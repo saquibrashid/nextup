@@ -80,6 +80,8 @@ export function WaitingRoute({ client = apiClient }: WaitingRouteProps = {}): JS
         }
       }}
       onSuppress={(titleId) => client.suppressTitle(titleId)}
+      // US-063 AC-4 — an owner tap, never a consequence of the refresh above.
+      onPromote={(intentId, service) => client.promoteWaiting(intentId, service)}
       onSearch={async (query) => (await client.searchTmdb(query)).items}
       onSearchAdd={async (result) => {
         await client.addWaiting({ tmdbId: result.tmdbId, mediaType: result.mediaType });

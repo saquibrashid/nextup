@@ -1,4 +1,4 @@
-import type { JSX } from 'react';
+import { useState, type JSX } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { apiClient, ApiError, type ApiClient } from '../lib/apiClient';
 import { useResource } from '../lib/useResource';
@@ -38,6 +38,9 @@ export function TitleDetailsRoute({
     }
   }, `title:${titleId}`);
   const online = useOnline();
+  // US-063 — survives the reload a move triggers, which remounts the page.
+  // Keyed on the title, so a notice never follows the owner to another one.
+  const [notice, setNotice] = useState<{ titleId: string; text: string } | null>(null);
   const phase = useSlowRequest(resource.kind === 'loading');
 
   if (resource.kind === 'refused') return <RefusalPage reason="not-allowed" />;
@@ -50,6 +53,11 @@ export function TitleDetailsRoute({
         actions={client}
         offline={!online}
         onReload={reload}
+        notice={notice?.titleId === titleId ? notice.text : null}
+        onAvailabilityMoved={(next) => {
+          setNotice({ titleId, text: next });
+          reload();
+        }}
       />
     );
   }
