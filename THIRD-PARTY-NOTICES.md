@@ -16,16 +16,16 @@ so they do not relicense this work — but their notices must be retained.
 
 | Package | Version | Licence |
 |---|---|---|
-| `@img/sharp-libvips-darwin-arm64` | 1.3.3 | **LGPL-3.0-or-later** |
-| `@img/sharp-libvips-darwin-x64` | 1.3.3 | **LGPL-3.0-or-later** |
-| `@img/sharp-libvips-linux-arm` | 1.3.3 | **LGPL-3.0-or-later** |
-| `@img/sharp-libvips-linux-arm64` | 1.3.3 | **LGPL-3.0-or-later** |
-| `@img/sharp-libvips-linux-ppc64` | 1.3.3 | **LGPL-3.0-or-later** |
-| `@img/sharp-libvips-linux-riscv64` | 1.3.3 | **LGPL-3.0-or-later** |
-| `@img/sharp-libvips-linux-s390x` | 1.3.3 | **LGPL-3.0-or-later** |
-| `@img/sharp-libvips-linux-x64` | 1.3.3 | **LGPL-3.0-or-later** |
-| `@img/sharp-libvips-linuxmusl-arm64` | 1.3.3 | **LGPL-3.0-or-later** |
-| `@img/sharp-libvips-linuxmusl-x64` | 1.3.3 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-darwin-arm64` | 1.3.4 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-darwin-x64` | 1.3.4 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-linux-arm` | 1.3.4 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-linux-arm64` | 1.3.4 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-linux-ppc64` | 1.3.4 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-linux-riscv64` | 1.3.4 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-linux-s390x` | 1.3.4 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-linux-x64` | 1.3.4 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-linuxmusl-arm64` | 1.3.4 | **LGPL-3.0-or-later** |
+| `@img/sharp-libvips-linuxmusl-x64` | 1.3.4 | **LGPL-3.0-or-later** |
 | `libheif-js` | 1.19.8 | **LGPL-3.0** |
 
 ## All production dependencies
@@ -63,32 +63,32 @@ so they do not relicense this work — but their notices must be retained.
 | `@babel/types` | 7.29.8 | MIT |
 | `@emnapi/runtime` | 1.11.3 | MIT |
 | `@img/colour` | 1.1.0 | MIT |
-| `@img/sharp-darwin-arm64` | 0.35.4 | Apache-2.0 |
-| `@img/sharp-darwin-x64` | 0.35.4 | Apache-2.0 |
-| `@img/sharp-freebsd-wasm32` | 0.35.4 | Apache-2.0 |
-| `@img/sharp-libvips-darwin-arm64` | 1.3.3 | LGPL-3.0-or-later |
-| `@img/sharp-libvips-darwin-x64` | 1.3.3 | LGPL-3.0-or-later |
-| `@img/sharp-libvips-linux-arm` | 1.3.3 | LGPL-3.0-or-later |
-| `@img/sharp-libvips-linux-arm64` | 1.3.3 | LGPL-3.0-or-later |
-| `@img/sharp-libvips-linux-ppc64` | 1.3.3 | LGPL-3.0-or-later |
-| `@img/sharp-libvips-linux-riscv64` | 1.3.3 | LGPL-3.0-or-later |
-| `@img/sharp-libvips-linux-s390x` | 1.3.3 | LGPL-3.0-or-later |
-| `@img/sharp-libvips-linux-x64` | 1.3.3 | LGPL-3.0-or-later |
-| `@img/sharp-libvips-linuxmusl-arm64` | 1.3.3 | LGPL-3.0-or-later |
-| `@img/sharp-libvips-linuxmusl-x64` | 1.3.3 | LGPL-3.0-or-later |
-| `@img/sharp-linux-arm` | 0.35.4 | Apache-2.0 |
-| `@img/sharp-linux-arm64` | 0.35.4 | Apache-2.0 |
-| `@img/sharp-linux-ppc64` | 0.35.4 | Apache-2.0 |
-| `@img/sharp-linux-riscv64` | 0.35.4 | Apache-2.0 |
-| `@img/sharp-linux-s390x` | 0.35.4 | Apache-2.0 |
-| `@img/sharp-linux-x64` | 0.35.4 | Apache-2.0 |
-| `@img/sharp-linuxmusl-arm64` | 0.35.4 | Apache-2.0 |
-| `@img/sharp-linuxmusl-x64` | 0.35.4 | Apache-2.0 |
-| `@img/sharp-wasm32` | 0.35.4 | Apache-2.0 AND LGPL-3.0-or-later AND MIT |
-| `@img/sharp-webcontainers-wasm32` | 0.35.4 | Apache-2.0 |
-| `@img/sharp-win32-arm64` | 0.35.4 | Apache-2.0 AND LGPL-3.0-or-later |
-| `@img/sharp-win32-ia32` | 0.35.4 | Apache-2.0 AND LGPL-3.0-or-later |
-| `@img/sharp-win32-x64` | 0.35.4 | Apache-2.0 AND LGPL-3.0-or-later |
+| `@img/sharp-darwin-arm64` | 0.35.5 | Apache-2.0 |
+| `@img/sharp-darwin-x64` | 0.35.5 | Apache-2.0 |
+| `@img/sharp-freebsd-wasm32` | 0.35.5 | Apache-2.0 |
+| `@img/sharp-libvips-darwin-arm64` | 1.3.4 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-darwin-x64` | 1.3.4 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-linux-arm` | 1.3.4 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-linux-arm64` | 1.3.4 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-linux-ppc64` | 1.3.4 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-linux-riscv64` | 1.3.4 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-linux-s390x` | 1.3.4 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-linux-x64` | 1.3.4 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-linuxmusl-arm64` | 1.3.4 | LGPL-3.0-or-later |
+| `@img/sharp-libvips-linuxmusl-x64` | 1.3.4 | LGPL-3.0-or-later |
+| `@img/sharp-linux-arm` | 0.35.5 | Apache-2.0 |
+| `@img/sharp-linux-arm64` | 0.35.5 | Apache-2.0 |
+| `@img/sharp-linux-ppc64` | 0.35.5 | Apache-2.0 |
+| `@img/sharp-linux-riscv64` | 0.35.5 | Apache-2.0 |
+| `@img/sharp-linux-s390x` | 0.35.5 | Apache-2.0 |
+| `@img/sharp-linux-x64` | 0.35.5 | Apache-2.0 |
+| `@img/sharp-linuxmusl-arm64` | 0.35.5 | Apache-2.0 |
+| `@img/sharp-linuxmusl-x64` | 0.35.5 | Apache-2.0 |
+| `@img/sharp-wasm32` | 0.35.5 | Apache-2.0 AND LGPL-3.0-or-later AND MIT |
+| `@img/sharp-webcontainers-wasm32` | 0.35.5 | Apache-2.0 |
+| `@img/sharp-win32-arm64` | 0.35.5 | Apache-2.0 AND LGPL-3.0-or-later |
+| `@img/sharp-win32-ia32` | 0.35.5 | Apache-2.0 AND LGPL-3.0-or-later |
+| `@img/sharp-win32-x64` | 0.35.5 | Apache-2.0 AND LGPL-3.0-or-later |
 | `@js-joda/core` | 5.7.0 | BSD-3-Clause |
 | `@noble/hashes` | 2.4.0 | MIT |
 | `@nodable/entities` | 3.0.0 | MIT |
@@ -243,7 +243,7 @@ so they do not relicense this work — but their notices must be retained.
 | `pngjs` | 6.0.0 | MIT |
 | `prisma` | 6.19.3 | Apache-2.0 |
 | `process` | 0.11.10 | MIT |
-| `proxy-addr` | 2.0.7 | MIT |
+| `proxy-addr` | 2.0.8 | MIT |
 | `pure-rand` | 6.1.0 | MIT |
 | `qs` | 6.16.0 | BSD-3-Clause |
 | `range-parser` | 1.3.0 | MIT |
@@ -266,12 +266,12 @@ so they do not relicense this work — but their notices must be retained.
 | `serve-static` | 2.2.1 | MIT |
 | `set-cookie-parser` | 2.7.2 | MIT |
 | `setprototypeof` | 1.2.0 | ISC |
-| `sharp` | 0.35.4 | Apache-2.0 |
+| `sharp` | 0.35.5 | Apache-2.0 |
 | `side-channel` | 1.1.1 | MIT |
 | `side-channel-list` | 1.0.1 | MIT |
 | `side-channel-map` | 1.0.1 | MIT |
 | `side-channel-weakmap` | 1.0.2 | MIT |
-| `source-map-js` | 1.2.1 | BSD-3-Clause |
+| `source-map-js` | 1.2.2 | BSD-3-Clause |
 | `sprintf-js` | 1.1.3 | BSD-3-Clause |
 | `statuses` | 2.0.2 | MIT |
 | `streamsearch` | 1.1.0 | MIT |
