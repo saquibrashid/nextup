@@ -2633,6 +2633,44 @@ suppressed `WatchIntent` is retained forever. There is no TTL and no scheduled
 deletion, here or anywhere. `T-INV-012` (the sanctioned-hard-delete gate) must
 continue to show exactly one sanctioned hard delete after this epic ships.
 
+### 17.5 Library availability and the owner's moves (`A54`, migration `0019_library_availability`)
+
+Owner-approved at `A54` (#397/#410, US-063, ADR-0010 Rev 4). **Additive only**
+— `T-MIG-001` and `T-MOVE-013a` pass; no existing row is touched.
+
+| Table.column | Type | Meaning |
+|---|---|---|
+| `title.availability_checked_at` | `DATETIME2 NULL` | When the Library availability was last read; `NULL` = never. Drives the lazy on-access refresh (PRD §7.4 process 4). |
+| `title.available_on` | `NVARCHAR(MAX) NULL`, `ck_title_available_on_json` (`ISJSON`) | JSON array of TMDB `flatrate` provider names. `NULL` = NOT KNOWN (ADR-0010 Trap 4), `[]` = asked and nobody. |
+| `title.rent_on` | `NVARCHAR(MAX) NULL`, `ck_title_rent_on_json` (`ISJSON`) | JSON array of rent/buy storefront names. Never availability (US-042 AC-5). |
+| `title.availability_region` | `NVARCHAR(8) NOT NULL DEFAULT 'US'` (`df_title_region`) | The region the answer was computed for, stored and passed explicitly (A49). |
+| `title.availability_kept_signature` | `NVARCHAR(400) NULL` | The change the owner chose to **Keep** (`left=starz;joined=netflix`). The marker stays hidden until the computed signature differs. |
+| `watch_intent.moved_from_library_at` | `DATETIME2 NULL`, `ck_intent_moved_from_library_search` | Set only by the owner's *Move to Waiting* (`api.md` §6.42). Only on a `discovery_source = 'search'` intent. |
+
+`ck_title_availability_coherent` holds `availability_checked_at IS NOT NULL OR
+(available_on IS NULL AND rent_on IS NULL)` — an answer always has an as-of
+date. The CHECKs naming new columns run through `EXEC`, because SQL Server
+compiles a batch before the `ADD` has created the column; the file has no `GO`.
+
+⚠️ **None of these is a list column.** No membership, ordering or badge query
+reads them, and the refresh writes only the first three through
+`updateTitleAvailability`. The Keep signature is written only by
+`keepTitleAvailabilityChange` (`api.md` §6.43).
+
+⚠️ **`INTENT_SOURCES` gains no `library` member.** Widening `ck_intent_source`
+would need a `DROP CONSTRAINT` that `T-MIG-001` forbids, so a moved title is a
+`search`-sourced intent whose provenance is `moved_from_library_at`.
+
+**The moves' row effects** (all owner-initiated, PRD §7.4 items 13–17):
+removing one badge soft-removes one `service_listing` and re-derives the title;
+*Move to Waiting* soft-removes every active listing, re-derives the title
+(`removed`, `sort_date_added = NULL`) and inserts one waiting `watch_intent`
+unless one exists (`ux_intent_owner_title_waiting`); *Add to Library* creates
+an active `title` dated today (or reuses an active one) plus a manual
+`service_listing`, and marks the intent `satisfied` in the same transaction;
+*Add badge* inserts a manual `service_listing` dated today, keeping the
+earliest `sort_date_added`. `date_added` stays write-once on every path.
+
 ---
 
 ## 18. Owner watch preferences (REQ-126, US-060)

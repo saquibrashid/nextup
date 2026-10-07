@@ -1807,6 +1807,43 @@ export const WAITING_REFRESH_FAILED =
 /** US-042 AC-9 / REQ-087. A condition of using TMDB's watch-provider data. */
 export const JUSTWATCH_ATTRIBUTION = 'Streaming availability data provided by JustWatch.';
 
+/* ── #397/#410 — availability moves (PRD `A54`, US-063) ────────────────── */
+
+/**
+ * ⚠ **SHOW THE FACT, NEVER NAG (invariant 8a).** Every marker sentence states
+ * what TMDB's watch-provider data said and when; none of them tells the owner
+ * what to do. The one-tap answers sit beside the fact on the details page and
+ * are offered, never pressed for the owner.
+ *
+ * ⚠ **RENT-ONLY IS NOT STREAMING (US-042 AC-5)** — "Left Starz — now rent-only
+ * on Apple TV" says both halves, as the waiting view does.
+ */
+export const AVAILABILITY_LEFT_PREFIX = 'Left';
+export const AVAILABILITY_RENT_ONLY_ON = 'now rent-only on';
+export const AVAILABILITY_NOT_SEEN_ON = 'Not seen on';
+export const AVAILABILITY_AS_OF = 'as of';
+export const AVAILABILITY_NOW_ALSO_ON = 'Now also on';
+/** The details-page panel's accessible name. */
+export const AVAILABILITY_PANEL_LABEL = 'Availability change';
+export const AVAILABILITY_REMOVE_BADGE = 'Remove badge';
+export const AVAILABILITY_ADD_BADGE = 'Add badge';
+export const AVAILABILITY_MOVE_TO_WAITING = 'Move to Waiting';
+export const AVAILABILITY_KEEP = 'Keep as is';
+export const AVAILABILITY_WORKING = 'Working…';
+export const AVAILABILITY_ACTION_FAILED = "Couldn't make that change. Nothing was changed.";
+/** After a one-tap move — each says where the reversal lives (REQ-028). */
+export const AVAILABILITY_BADGE_REMOVED = 'Badge removed. You can restore it from removal history.';
+export const AVAILABILITY_MOVED_TO_WAITING =
+  'Moved to Waiting. Its badges are in removal history if you change your mind.';
+export const AVAILABILITY_KEPT = 'Kept as is. This change will not be shown again.';
+export const AVAILABILITY_BADGE_ADDED = 'Badge added.';
+/** US-063 AC-4 — the waiting row's one-tap promote. */
+export const WAITING_ADD_TO_LIBRARY = 'Add to Library';
+export const WAITING_ADD_TO_LIBRARY_FAILED =
+  "Couldn't add it to your library. Nothing was changed.";
+/** US-063 AC-8 — a fact on a waiting row that came from the Library. */
+export const WAITING_MOVED_FROM_LIBRARY = 'Moved from your Library on';
+
 /* ── #378 — waiting to stream: access states, search-to-add ─────────────── */
 
 /**

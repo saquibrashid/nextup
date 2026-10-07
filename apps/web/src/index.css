@@ -1989,6 +1989,44 @@ button {
   font-style: italic;
 }
 
+/*
+  US-063 AC-2 (#397/#410) — the availability marker. A fact, not a warning
+  (invariant 8a): the muted-text treatment of the stale chip's family, with a
+  solid accent edge so it is findable on a long list without reading as an
+  error. Wraps on the phone layout rather than truncating, because a cut-off
+  "Left Starz — now rent-…" would hide the half that matters.
+*/
+.title-row__chip--availability {
+  border-left: 3px solid var(--color-accent);
+  overflow-wrap: anywhere;
+}
+
+/* US-063 AC-3..AC-7 — the details page's marker with its one-tap answers. */
+.availability-panel {
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  margin-block: var(--space-3);
+}
+
+.availability-panel__fact {
+  font-weight: var(--weight-medium);
+  margin: 0 0 var(--space-2);
+}
+
+.availability-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* US-063 AC-8 — a waiting row that came from the Library says so, quietly. */
+.waiting-row__moved {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
 .title-row__rating {
   color: var(--color-rating);
   font-size: var(--text-sm);

@@ -12,7 +12,12 @@
  * ⚠ **THE REFRESH IS METADATA-ONLY.** It writes five availability columns on
  * `watch_intent` through `updateWatchIntentAvailability` and nothing else: no
  * `Title`, no `ServiceListing`, no `Suppression`, and it satisfies no intent.
- * Graduation happens by the ordinary capture path (TASK-189), never here.
+ * Graduation happens by the ordinary capture path (TASK-189) or — since `A54`
+ * (US-063, TASK-264) — by the owner's explicit one-tap "Add to Library"
+ * (`POST /api/waiting/:intentId/promote`, PRD §7.4 item 14). Never by this
+ * refresh, and never by any read.
+ * ~~Superseded at `A54`: "Graduation happens by the ordinary capture path
+ * (TASK-189), never here."~~
  *
  * ⚠ **A REFRESH FAILURE IS NEVER AN ERROR PAGE.** The waiting list is the
  * owner's data and it renders from the store; TMDB is an enrichment. A
@@ -23,7 +28,6 @@
 import { type Router } from 'express';
 import {
   MEDIA_TYPES,
-  SERVICES,
   asService,
   parseEditionLabels,
   streamingForecast,
@@ -70,6 +74,7 @@ import {
   type AccessState,
   type IntentRow,
 } from '../services/watchAvailability.js';
+import { yourServicesFrom } from '../services/libraryAvailability.js';
 import { tmdbUnavailableAppError } from './tmdb.js';
 import { toIsoDate } from './titles.js';
 
@@ -84,6 +89,11 @@ export interface WaitingItem {
   posterPath: string | null;
   discoveredAt: string;
   discoverySource: string;
+  /**
+   * `A54` (US-063 AC-8) — when the owner moved it here from the Library with
+   * "Move to Waiting", or `null`. A fact for the row to show, nothing more.
+   */
+  movedFromLibraryAt: string | null;
   /**
    * ⚠ `null` means NOT KNOWN, and the client must render it as *"not seen on
    * your services as of &lt;date&gt;"* — never *"not streaming anywhere"*
@@ -169,19 +179,6 @@ function parseAvailableOn(raw: string | null): string[] | null {
   } catch {
     return null;
   }
-}
-
-/**
- * The services a streaming offer counts as "yours" on (#378, owner decision 3).
- *
- * ⚠ An owner who has imported nothing yet has no services to tell apart, and
- * treating every offer as "not yours" would hide the one invitation this view
- * exists to make. Until the first import, every supported service is treated
- * as the owner's — which is exactly the behaviour before #378.
- */
-function yourServices(used: readonly string[]): Service[] {
-  const known = SERVICES.filter((service) => used.includes(service));
-  return known.length > 0 ? known : [...SERVICES];
 }
 
 /** One `POST /api/waiting` body (#378, owner decision 2). Closed field set. */
@@ -358,7 +355,8 @@ export function registerWaitingRoutes(
       listWaitingIntents(ownerId),
       listOwnerServices(ownerId),
     ]);
-    const yours = yourServices(used);
+    // Shared with the Library marker since `A54` (one definition of "yours").
+    const yours = yourServicesFrom(used);
 
     const rows: IntentRow[] = stored.map((intent) => ({
       id: intent.id,
@@ -475,6 +473,8 @@ export function registerWaitingRoutes(
         posterPath: intent.title.tmdbPosterPath,
         discoveredAt: toIsoDate(intent.discoveredAt),
         discoverySource: intent.discoverySource,
+        movedFromLibraryAt:
+          intent.movedFromLibraryAt == null ? null : intent.movedFromLibraryAt.toISOString(),
         availableOn,
         flaggedOn: flagged === null ? null : flagged.filter((service) => yours.includes(service)),
         otherServicesOn: other === null ? null : other.services,

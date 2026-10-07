@@ -68,6 +68,9 @@ import {
   WAITING_SUBTITLE,
   WAITING_SUPPRESS_FAILED,
   WATCHMODE_ATTRIBUTION_LINK,
+  WAITING_ADD_TO_LIBRARY,
+  WAITING_ADD_TO_LIBRARY_FAILED,
+  WAITING_MOVED_FROM_LIBRARY,
 } from '../copy';
 import type { TmdbSearchResult, WaitingItem } from '../lib/apiClient';
 import { TMDB_IMAGE_BASE, TMDB_IMAGE_BASE_2X } from '../components/TitleRow';
@@ -84,6 +87,11 @@ export interface WaitingPageProps {
   readonly refreshFailed?: boolean;
   readonly onRetry?: () => void;
   readonly onSuppress?: (titleId: string) => Promise<unknown>;
+  /**
+   * US-063 AC-4 — "Add to Library" for a row now streaming on one of the
+   * owner's services. The button renders only when this is supplied.
+   */
+  readonly onPromote?: (intentId: string, service: Service) => Promise<unknown>;
   /** #378 — search-to-add. The box renders only when both are supplied. */
   readonly onSearch?: (query: string) => Promise<readonly TmdbSearchResult[]>;
   readonly onSearchAdd?: (result: TmdbSearchResult) => Promise<unknown>;
@@ -472,6 +480,7 @@ export function WaitingOutlook({ item }: { readonly item: WaitingItem }): JSX.El
 function WaitingRow({
   item,
   onSuppress,
+  onPromote,
   onDone,
   offline,
   view,
@@ -479,14 +488,29 @@ function WaitingRow({
   item: WaitingItem;
   view: ListView;
   onSuppress: (titleId: string) => Promise<unknown>;
+  onPromote: ((intentId: string, service: Service) => Promise<unknown>) | undefined;
   onDone: (intentId: string) => void;
   offline: boolean;
 }): JSX.Element {
   const [phase, setPhase] = useState<'idle' | 'submitting' | 'error'>('idle');
+  const [promote, setPromote] = useState<'idle' | 'submitting' | 'error'>('idle');
   const flagged = item.flaggedOn ?? [];
+  const promotable = flagged.flatMap((service) => {
+    const known = knownService(service);
+    return known === undefined ? [] : [known];
+  });
   const rentStores = rentOnlyStores(item);
   const rowKind = flagged.length > 0 ? 'streaming' : 'waiting';
   const mediaType = mediaTypeText(item.workIdentity);
+
+  function addToLibrary(service: Service): void {
+    if (onPromote === undefined) return;
+    setPromote('submitting');
+    onPromote(item.intentId, service).then(
+      () => onDone(item.intentId),
+      () => setPromote('error'),
+    );
+  }
 
   function suppress(): void {
     setPhase('submitting');
@@ -548,12 +572,32 @@ function WaitingRow({
         )}
 
         <WaitingFacts item={item} full={view === 'compact'} />
+        {item.movedFromLibraryAt != null && (
+          <p className="waiting-row__moved" data-testid="waiting-moved-from-library">
+            {`${WAITING_MOVED_FROM_LIBRARY} ${friendlyDate(item.movedFromLibraryAt)}.`}
+          </p>
+        )}
       </div>
 
       <div className="waiting-row__aside">
         <WaitingOutlook item={item} />
 
         <div className="waiting-row__actions">
+          {onPromote !== undefined &&
+            promotable.map((service) => (
+              <Button
+                key={service}
+                variant="primary"
+                data-testid={`waiting-promote-${service}`}
+                aria-label={`${WAITING_ADD_TO_LIBRARY} on ${serviceLabel(service)}: ${item.name}`}
+                disabled={offline || promote === 'submitting' || phase === 'submitting'}
+                onClick={() => addToLibrary(service)}
+              >
+                {promotable.length > 1
+                  ? `${WAITING_ADD_TO_LIBRARY} (${serviceLabel(service)})`
+                  : WAITING_ADD_TO_LIBRARY}
+              </Button>
+            ))}
           {phase === 'idle' && (
             <Button
               variant="ghost"
@@ -580,6 +624,11 @@ function WaitingRow({
         {offline && phase === 'idle' && (
           <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>
         )}
+        {promote === 'error' && (
+          <p role="alert" data-testid="waiting-promote-error">
+            {WAITING_ADD_TO_LIBRARY_FAILED}
+          </p>
+        )}
         {phase === 'error' && (
           <p role="alert" data-testid="waiting-suppress-error">
             {WAITING_SUPPRESS_FAILED}
@@ -596,6 +645,7 @@ export function WaitingPage({
   refreshFailed = false,
   onRetry,
   onSuppress = () => Promise.resolve(),
+  onPromote,
   onSearch,
   onSearchAdd,
   view: controlledView,
@@ -672,6 +722,7 @@ export function WaitingPage({
                 view={view}
                 offline={offline}
                 onSuppress={onSuppress}
+                onPromote={onPromote}
                 onDone={(intentId) => setDismissed((previous) => new Set([...previous, intentId]))}
               />
             ))}

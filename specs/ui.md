@@ -19,6 +19,45 @@ three override choices, Save/Cancel and visible failure/pending/offline states.
 Category-filtered lists disclose incomplete classification and offer Retry
 classification; no timer or automatic re-capture reminder is introduced.
 
+## Availability moves (TASK-265, #397/#410, PRD `A54`, US-063)
+
+**The fact, never a nag (invariant 8a).** When a Library title's
+`availability` (`api.md`, *Availability moves*) carries an un-kept change,
+`components/AvailabilityMarker.tsx` states it in words:
+
+- *"Left Starz — now rent-only on Apple TV"* (at most three storefronts named);
+- *"Not seen on Starz as of 29 Sep 2026"* when nothing streams or rents it;
+- *"Now also on Netflix"* for an owner service with no badge yet.
+
+Nothing is shown for no change, a kept change, or NOT KNOWN. No threshold,
+reminder, colour-only state or *"you should"* wording exists.
+
+- **Library card/row (both Grid and Compact, wide and phone).** `TitleRow`
+  adds one compact chip (`availability-chip`, `.title-row__chip--availability`)
+  with that sentence. It is text, wraps, and never displaces the service marks.
+- **Title details (`/titles/:titleId`).** An `Availability change` panel
+  (`availability-panel`) under the watch status repeats the fact, carries the
+  JustWatch attribution (REQ-087), and offers the one-tap answers as `Button`s
+  (each ≥ 44 px, `tap-target`), wrapping onto their own lines on a phone:
+  *Remove badge* per service that left (`availability-remove-<service>`),
+  *Add badge* per service it joined (`availability-add-<service>`),
+  *Move to Waiting* only when `canMoveToWaiting` (`availability-move-to-waiting`)
+  and *Keep as is* (`availability-keep`). While one runs every action shows
+  *Working…* and is disabled; offline disables them all. A failure reads
+  *"Couldn't make that change. Nothing was changed."* (`availability-error`).
+  Success shows a notice (`availability-notice`) that names where the reversal
+  lives — removal history for a removed badge or a move to Waiting — and links
+  there. The notice survives the details reload the move triggers.
+- **Waiting (`/waiting`).** A row now streaming on one of the owner's services
+  offers a primary *Add to Library* button per such service
+  (`waiting-promote-<service>`, suffixed with the service name when there are
+  several). Success removes the row from the list; failure keeps it with
+  *"Couldn't add it to your library. Nothing was changed."*
+  (`waiting-promote-error`). A row moved from the Library states *"Moved from
+  your Library on <date>."* (`waiting-moved-from-library`).
+
+Bulk review of many changes at once is **not** part of this UI (a later item).
+
 ## Modal context contract (owner correction, 2026-09-21)
 
 Remove from list, Not interested, Add title, Fix match, Stop ignoring, restore

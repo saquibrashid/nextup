@@ -27,6 +27,46 @@ Collected locations: `packages/domain/test/titleCategory.spec.ts`;
 `apps/web/test/titleDetails.spec.tsx`, `filterBar.spec.tsx`;
 `tests/e2e/titleDetails.spec.ts`.
 
+### US-063 — Availability moves (TASK-263 – TASK-265, #397/#410, `A54`)
+
+| AC | Level | Test IDs | Assertion |
+| --- | --- | --- | --- |
+| AC-1 | U/I | `T-MOVE-001`, `T-MOVE-002`, `T-MOVE-009`, `T-MOVE-014`, `T-MOVE-013` | Library availability is refreshed lazily by the list/details read, page-scoped, capped at `AVAILABILITY_REFRESH_PER_REQUEST`, serial, region `US`; a failed lookup writes nothing; membership, ordering and badges are unchanged; the additive `0019` columns and CHECKs exist. |
+| AC-2 | U/C/E | `T-MOVE-001`, `T-MOVE-010`, `T-MOVE-016` | The change is stated as a fact (left / rent-only / not seen as of / now also on); rent-only is not streaming; nothing shows for no change, a kept change or NOT KNOWN; the chip shows on desktop and phone. |
+| AC-3 | U/C/I | `T-MOVE-004`, `T-MOVE-011`, `T-MOVE-015` | Removing one badge soft-removes one listing, restorable from the Removed log; the last badge removes the title. |
+| AC-4 | U/C/I/E | `T-MOVE-006`, `T-MOVE-012`, `T-MOVE-015`, `T-MOVE-016` | Add to Library from Waiting creates a listing dated today with manual-add gates and satisfies the intent in the same transaction. |
+| AC-5 | U/C/I/E | `T-MOVE-007`, `T-MOVE-011`, `T-MOVE-015`, `T-MOVE-016` | Move to Waiting soft-removes every active listing and opens one waiting intent marked as moved from the Library. |
+| AC-6 | U/C/I | `T-MOVE-001`, `T-MOVE-002`, `T-MOVE-008`, `T-MOVE-011`, `T-MOVE-014` | Keep stores the change signature; the marker stays hidden until the provider set changes again. |
+| AC-7 | U/C/I | `T-MOVE-005`, `T-MOVE-011`, `T-MOVE-015` | Add badge adds a listing for the joined service dated today with manual-add semantics. |
+| AC-8 | U/C | `T-MOVE-007`, `T-MOVE-012`, `T-MOVE-003` | Every move is a registered owner-initiated mutation with a parsed service, and a moved intent states when it left the Library. |
+
+| Id | Level | Owner | Claim |
+|---|---|---|---|
+| **`T-MOVE-001`** (`a`–`g`) | U | `TASK-263` | Pure rules in `services/libraryAvailability.ts`: owner-service streaming from aliases, rent-only is not streaming, left/joined detection against badges, NOT KNOWN yields no change, and the sentence chosen. |
+| **`T-MOVE-002`** (`a`–`d`) | U | `TASK-263` | The dismissal signature is stable, order-independent, and changes only when the provider set changes. |
+| **`T-MOVE-003`** (`a`) | U | `TASK-264` | Service bodies parse against the closed `SERVICES` list and reject anything else with 400. |
+| **`T-MOVE-004`** (`a`–`c`) | U | `TASK-264` | `DELETE /api/listings/:listingId` soft-removes one listing, removes the title with its last badge, and refuses unknown, suppressed or already-removed rows. |
+| **`T-MOVE-005`** (`a`–`c`) | U | `TASK-264` | `POST /api/titles/:titleId/badges` adds a listing dated today; duplicate, suppressed, inactive, unknown and malformed adds are refused. |
+| **`T-MOVE-006`** (`a`–`c`) | U | `TASK-264` | `POST /api/waiting/:intentId/promote` creates the listing and satisfies the intent in one transaction; suppression and duplicate gates hold. |
+| **`T-MOVE-007`** (`a`–`c`) | U | `TASK-264` | `POST /api/titles/:titleId/move-to-waiting` soft-removes every active listing and opens one waiting intent with `movedFromLibraryAt`. |
+| **`T-MOVE-008`** (`a`–`b`) | U | `TASK-264` | `POST /api/titles/:titleId/availability/keep` records exactly the kept signature; a malformed signature or unknown title is refused. |
+| **`T-MOVE-009`** (`a`–`d`) | U | `TASK-263` | The Library refresh pass in `routes/titles.ts`: page-scoped, capped, serial, failed lookup writes nothing, and the list response is unchanged apart from `availability`. |
+| **`T-MOVE-010`** (`a`–`d`) | C | `TASK-265` | `AvailabilityMarker` sentences and the `TitleRow` chip; nothing renders for no change. |
+| **`T-MOVE-011`** (`a`–`f`) | C | `TASK-265` | The details panel actions, pending/offline/error states, attribution, and a notice that survives the reload. |
+| **`T-MOVE-012`** (`a`–`c`) | C | `TASK-265` | Waiting *Add to Library* per streaming service and the moved-from-Library fact. |
+| **`T-MOVE-013`** (`a`–`c`) | S | `TASK-263` | Migration `0019_library_availability` is additive (no DROP/rename), adds the columns, the `ISJSON` and coherence CHECKs, and matches `schema.prisma`. |
+| **`T-MOVE-014`** (`a`–`b`) | I | `TASK-263` | Against the real store: opening the Library refreshes availability without changing membership, ordering or badges; Keep hides the marker until the set changes. |
+| **`T-MOVE-015`** (`a`–`d`) | I | `TASK-264` | Against the real store: remove one badge + the existing restore, move to Waiting (one intent), Add to Library (new row dated today, intent satisfied in one request), and Add badge (dated today, earliest sort date kept). |
+| **`T-MOVE-016`** (`a`–`b`) | E | `TASK-265` | End to end at 390 px and 1440 px: `a` the Library row shows the fact and details moves it to Waiting; `b` a now-streaming waiting row is added to the Library with one tap. |
+
+Collected locations: `apps/api/test/unit/services/libraryAvailability.spec.ts`,
+`apps/api/test/unit/routes/availabilityMoves.spec.ts`,
+`apps/api/test/integration/availabilityMoves.spec.ts`,
+`apps/web/test/availabilityMoves.spec.tsx`,
+`tests/infra/libraryAvailabilityMigration.spec.ts`,
+`tests/e2e/availabilityMoves.spec.ts`. The bulk review of many availability
+changes at once is a later item and has no tests here.
+
 **Current mapping:** all current PRD story/AC keys, including US-062, are mapped
 below. The original 39-story / 241-AC counts in
 dated revision history describe that revision, not the current release.
@@ -4444,7 +4484,10 @@ long the work takes. Raise the count in the commit that makes the process real,
 which is the only moment anyone can check it is genuinely metadata-only and
 access-triggered. `T-CI-005h` is the half that checks it: it enumerates the
 lazy-refresh modules, proves none contains a timer, and proves
-`refreshAvailability` is reached only from the waiting route.
+`refreshAvailability` is reached only from READ handlers — `GET /api/waiting`
+and, widened at `A54` (US-063 AC-1), the library list and title details in
+`routes/titles.ts`. ~~Superseded at `A54`: "reached only from the waiting
+route."~~
 
 **The wrong response is to relax the gate into counting nothing in
 particular.** Its entire value is that the number is exact and small; a

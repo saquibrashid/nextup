@@ -16,6 +16,7 @@ import { WatchPreferencesDialog } from '../components/WatchPreferencesDialog';
 import { FixMatchDialog } from '../components/FixMatchDialog';
 import { SuppressDialog } from '../components/SuppressDialog';
 import { RemoveTitleDialog } from '../components/RemoveTitleDialog';
+import { AvailabilityNotice, AvailabilityPanel } from '../components/AvailabilityMarker';
 import { OFFLINE_DISABLED_REASON, WATCH_STATUS_LABELS } from '../copy';
 
 interface TitleDetailsPageProps {
@@ -33,7 +34,17 @@ interface TitleDetailsPageProps {
     | 'removeTitle'
     | 'restoreListing'
     | 'updateTitleCategory'
+    | 'removeBadge'
+    | 'moveToWaiting'
+    | 'keepAvailability'
+    | 'addBadge'
   >;
+  /**
+   * US-063 — the confirmation of the last availability move. Held by the
+   * route, because the reload that follows a move remounts this page.
+   */
+  readonly notice?: string | null;
+  readonly onAvailabilityMoved?: (notice: string) => void;
 }
 
 export function TitleDetailsPage({
@@ -42,11 +53,15 @@ export function TitleDetailsPage({
   offline,
   onReload,
   actions,
+  notice: heldNotice,
+  onAvailabilityMoved,
 }: TitleDetailsPageProps): JSX.Element {
   const [dialog, setDialog] = useState<'watch' | 'fix' | 'suppress' | 'remove' | 'category' | null>(
     null,
   );
   const [changed, setChanged] = useState(false);
+  const [localNotice, setLocalNotice] = useState<string | null>(null);
+  const notice = heldNotice ?? localNotice;
   const [artFailed, setArtFailed] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -126,6 +141,7 @@ export function TitleDetailsPage({
             {item.badges.length === 0 && <p>No active saved services.</p>}
           </div>
           {item.dateAddedLabel !== null && <p>{item.dateAddedLabel}</p>}
+          {notice !== null && <AvailabilityNotice notice={notice} />}
           {item.listState === 'suppressed' ? (
             <p>
               Marked Not interested. <Link to="/not-interested">Manage Not interested</Link>
@@ -137,6 +153,23 @@ export function TitleDetailsPage({
           ) : (
             <>
               <p>{WATCH_STATUS_LABELS[watchStatus(item)]}</p>
+              {/* US-063 AC-3..AC-7 — the availability fact and its one-tap answers. */}
+              <AvailabilityPanel
+                titleId={item.titleId}
+                name={item.name}
+                badges={item.badges}
+                availability={item.availability}
+                offline={offline}
+                actions={actions}
+                onMoved={(next) => {
+                  if (onAvailabilityMoved !== undefined) {
+                    onAvailabilityMoved(next);
+                    return;
+                  }
+                  setLocalNotice(next);
+                  onReload();
+                }}
+              />
               <div className="title-details__actions" aria-label="Title actions">
                 <Button variant="secondary" onClick={open('category')} disabled={offline}>
                   Title category

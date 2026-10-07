@@ -277,10 +277,23 @@ describe('T-CI-005 · no scheduler anywhere (US-010 AC-5, US-036 AC-2/AC-5)', ()
     expect(titles).toContain('refreshStaleMetadata');
     expect(titles).toContain('beginRatingRefresh');
 
-    // The availability refresh has exactly one caller, and it is the handler
-    // for `GET /api/waiting`. That is the whole of its access trigger.
+    // The availability refresh has exactly two callers, both READ handlers:
+    // `GET /api/waiting` and — widened at `A54` (US-063 AC-1, ADR-0010 Rev 4)
+    // — the library list and title details in `titles.ts`. That is the whole
+    // of its access trigger.
+    // ~~Superseded at `A54`: "exactly one caller … `GET /api/waiting`".~~
     const waiting = readFileSync(path.join(ROOT, 'apps/api/src/routes/waiting.ts'), 'utf8');
     expect(waiting).toContain('refreshAvailability');
+    expect(titles).toContain('refreshAvailability');
+    const callers = read('apps/api/src', ['.ts'])
+      .filter(({ text }) => /\brefreshAvailability\(/.test(text))
+      .map(({ file }) => file)
+      .sort();
+    expect(callers).toEqual([
+      'apps/api/src/routes/titles.ts',
+      'apps/api/src/routes/waiting.ts',
+      'apps/api/src/services/watchAvailability.ts',
+    ]);
   });
 
   it('T-CI-005i: `setTimeout` alone is NOT a finding — the gate stays precise', () => {

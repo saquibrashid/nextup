@@ -23,6 +23,43 @@ them as estimates. `forecast` never affects order. The facts behind it are
 read lazily in the same request as availability (at most 8 rows, each once a
 week); a Watchmode or TMDB failure never fails the request.
 
+## Availability moves (TASK-263 – TASK-265, #397/#410, PRD `A54`, US-063)
+
+`GET /api/titles` items and `GET /api/titles/:titleId` additionally expose an
+optional `availability` object for an **active** title once the owner's
+services are known (absent otherwise):
+
+```jsonc
+{ "accessState": "rent-only",            // as the waiting view (§ above)
+  "checkedAt": "2026-09-29T10:00:00.000Z", // null = never checked
+  "region": "US",                          // stored, passed explicitly (A49)
+  "streamingOn": [],                       // SERVICES members; null = not known
+  "rentOn": ["Apple TV"],                  // null = not known
+  "left": ["starz"],                       // badged services no longer streaming it
+  "joined": [],                            // owner services streaming it, no badge yet
+  "signature": "left=starz;joined=",       // null = no change
+  "kept": false,                           // owner chose Keep for exactly this signature
+  "canMoveToWaiting": true }               // no owner service streams it any more
+```
+
+Both reads run the **lazy availability refresh** (PRD §7.4 process 4, widened
+at `A54`; ADR-0010 Rev 4) over the active titles on the page being served:
+at most `AVAILABILITY_REFRESH_PER_REQUEST` (8) lookups, serial, only rows never
+checked or older than `WATCH_PROVIDER_MAX_AGE_DAYS`. It writes only
+`title.availability_checked_at`, `available_on` and `rent_on`; a failed lookup
+writes nothing and the last-known answer is served. It never changes the
+items, their order or their badges, and a refresh failure never fails the read.
+Rent/buy is never streaming, and NOT KNOWN (`checkedAt: null` or
+`streamingOn: null`) never produces `left`/`joined`.
+
+`GET /api/waiting` items additionally expose `movedFromLibraryAt` (ISO time or
+`null`) — set only by §6.42.
+
+The five owner-initiated answers are §6.40 – §6.44 (PRD §7.4 items 13–17).
+Every one is synchronous, owner-scoped (a foreign id is a 404), refuses a
+suppressed work with `409 WORK_SUPPRESSED` and `details.unsuppressHref` before
+any write, writes no suppression and is reversible.
+
 ## Waiting to stream (TASK-251, #378)
 
 `GET /api/waiting` items additionally expose `accessState`
@@ -412,6 +449,11 @@ typed data and never re-check it.
 | GET | `/api/tmdb/search` | US-007, US-009, US-030 |
 | POST | `/api/titles` | US-047 |
 | DELETE | `/api/titles/:titleId` | US-048 |
+| DELETE | `/api/listings/:listingId` | US-063 |
+| POST | `/api/waiting/:intentId/promote` | US-063 |
+| POST | `/api/titles/:titleId/move-to-waiting` | US-063 |
+| POST | `/api/titles/:titleId/availability/keep` | US-063 |
+| POST | `/api/titles/:titleId/badges` | US-063 |
 
 ---
 
@@ -2234,6 +2276,87 @@ it without re-deriving it. Refusal order is **suppression → not-active**, as
 refused even when its listings are still `active`, because removing them would
 be invisible until un-suppression and would then silently redirect the work
 from the combined list (US-029 AC-3) to the removed view (AC-4).
+
+
+### 6.40 `DELETE /api/listings/:listingId` — remove ONE service badge (US-063 AC-3)
+
+No body. Soft-removes exactly that `ServiceListing` (`state='removed'`,
+`removedByBatchId` and `removedByGroupId` both `null`, so §6.9 reads it as
+*Removed by you*), then re-derives the title's state and earliest date from
+its listings, as §6.10 and §6.32 do. If it was the last active badge the title
+becomes `removed` — the same outcome as §6.32. Restore is the **existing**
+§6.10; there is no second undo path. No suppression is written.
+
+| Status | Code | When |
+|---|---|---|
+| 200 | — | removed: `{listingId, titleId, service, titleState: "active" \| "removed", removedAt}` |
+| 404 | `NOT_FOUND` | no such listing for this owner |
+| 409 | `WORK_SUPPRESSED` | the work is suppressed; `details.unsuppressHref` |
+| 409 | `TITLE_NOT_ACTIVE` | the listing is already removed |
+
+### 6.41 `POST /api/waiting/:intentId/promote` — Add to Library (US-063 AC-4)
+
+Body `{service}` — one `SERVICES` member. Manual-add semantics (§6.30) **and**
+the waiting intent is satisfied **in the same transaction** — the second
+satisfaction path besides capture (TASK-189). A waiting work's title is stored
+`removed` with no listing, so this normally creates a **new** active title
+dated today (invariant 7) carrying the intent's TMDB fields and last-known
+availability; a work that already has an active title gains the listing and
+keeps its earliest sort date.
+
+| Status | Code | When |
+|---|---|---|
+| 201 | — | `{intentId, titleId, listingId, service, dateAdded, titleWasCreated}` |
+| 400 | `VALIDATION_FAILED` | `service` missing or outside `SERVICES` |
+| 404 | `NOT_FOUND` | no **waiting** intent with that id for this owner |
+| 409 | `WORK_SUPPRESSED` | the work is suppressed — nothing is satisfied |
+| 409 | `DUPLICATE_WORK_IDENTITY` | the work already has an active listing for that service (filtered unique index); the intent stays waiting |
+
+### 6.42 `POST /api/titles/:titleId/move-to-waiting` — Move to Waiting (US-063 AC-5)
+
+No body. Soft-removes **every** active listing (each a §6.9 entry, each
+restorable through §6.10), re-derives the title, and opens one waiting intent
+(`discoverySource: "search"`, no source batch, `movedFromLibraryAt` set,
+carrying the title's last-known availability). A work that already has a
+waiting intent keeps that one (`ux_intent_owner_title_waiting`) and
+`intentId` is `null`. The client offers it only when
+`availability.canMoveToWaiting`, but the server does not depend on that.
+
+| Status | Code | When |
+|---|---|---|
+| 200 | — | `{titleId, intentId: string \| null, removedListingIds, removedAt}` |
+| 404 | `NOT_FOUND` | no such title for this owner |
+| 409 | `WORK_SUPPRESSED` | the work is suppressed |
+| 409 | `TITLE_NOT_ACTIVE` | the title has no active listing |
+
+### 6.43 `POST /api/titles/:titleId/availability/keep` — Keep as is (US-063 AC-6)
+
+Body `{signature}` — the `availability.signature` being dismissed, matching
+`left=<services>;joined=<services>` over `SERVICES` with at least one side
+non-empty, ≤ 400 characters. Writes only `title.availability_kept_signature`;
+no membership, date or badge changes. The marker returns when the provider set
+yields a **different** signature.
+
+| Status | Code | When |
+|---|---|---|
+| 200 | — | `{titleId, keptSignature}` |
+| 400 | `VALIDATION_FAILED` | malformed signature |
+| 404 | `NOT_FOUND` | no such title for this owner |
+
+### 6.44 `POST /api/titles/:titleId/badges` — Add badge (US-063 AC-7)
+
+Body `{service}`. Adds an active manual listing (`createdByBatchId: null`)
+dated today; the title's `sortDateAdded` only moves if it was later than today
+or `null`, so the row keeps its place (invariant 6).
+
+| Status | Code | When |
+|---|---|---|
+| 201 | — | `{titleId, listingId, service, dateAdded}` |
+| 400 | `VALIDATION_FAILED` | `service` missing or outside `SERVICES` |
+| 404 | `NOT_FOUND` | no such title for this owner |
+| 409 | `WORK_SUPPRESSED` | the work is suppressed |
+| 409 | `TITLE_NOT_ACTIVE` | the title is not in the Library |
+| 409 | `DUPLICATE_WORK_IDENTITY` | it already has an active listing for that service |
 
 ---
 

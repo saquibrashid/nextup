@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Accepted; promoted to v1 at A52 (2026-09-08). Revised at #378 (Revision 2) and #380 (Revision 3, below).** Implementation and remaining acceptance work are tracked in `docs/status.md`. |
+| **Status** | **Accepted; promoted to v1 at A52 (2026-09-08). Revised at #378 (Revision 2), #380 (Revision 3) and #397/#410 (Revision 4, `A54`, below).** ~~"Revised at #378 (Revision 2) and #380 (Revision 3, below)."~~ Implementation and remaining acceptance work are tracked in `docs/status.md`. |
 | **Date** | 2026-08-20 |
 | **Deciders** | owner (`A48` — the requirement and both design choices), coordinator |
 | **Forced by** | **`A48`**, REQ-082…REQ-087, REQ-041, REQ-070/071/073, REQ-048, NFR-010, NFR-013, NFR-014, ADR-0007 |
@@ -208,6 +208,67 @@ weekly re-read satisfies that.
 `ck_intent_forecast_coherent`. Additive only. Test ids: `specs/testing.md`
 §38.5.
 
+## Revision 4 — availability moves for Library titles (#397, #410, `A54`, owner-approved 2026-09-29)
+
+Revisions 1–3 only ever asked TMDB about **waiting** titles. The owner hit
+the opposite case: *"The Housemaid"* was saved on Starz and is now rent-only,
+and nothing in nextup said so. The owner approved four decisions (PRD `A54`,
+US-063, REQ-129):
+
+**1. The lazy refresh widens to Library titles — it is the same process, not
+a fifth one.** `GET /api/titles` (the Library page) and `GET
+/api/titles/:titleId` (details) now run the same `refreshAvailability`
+pass over the **active titles on the page being served**: never a table
+scan, at most `AVAILABILITY_REFRESH_PER_REQUEST` (8) lookups, serial, and only
+for rows never checked or older than `WATCH_PROVIDER_MAX_AGE_DAYS`. Same
+source (TMDB `/watch/providers`, JustWatch-attributed), same stored region
+passed explicitly (`US`, A49), same rule that a failed lookup writes nothing.
+It writes only `title.availability_checked_at`, `available_on` and `rent_on`
+through `updateTitleAvailability`. §4's three conditions all still hold —
+**on access only, metadata only, and every move is an owner action** — so
+PRD §7.4 process 4 is widened in place and US-036 AC-2's count stays at
+**four**. `T-CI-005h` names `routes/titles.ts` as the third permitted caller
+of `refreshAvailability`.
+
+**2. What the owner is told — facts, never nags (invariant 8a).** The pure
+rule `libraryAvailabilityFor` (`apps/api/src/services/libraryAvailability.ts`)
+compares the title's active badges with the providers TMDB reports:
+
+- **left** — a badged service that no longer streams it (*"Left Starz — now
+  rent-only on Apple TV"*, or *"Not seen on Starz as of <date>"*);
+- **joined** — one of the owner's services that now streams it and carries no
+  badge (*"Now also on Netflix"*).
+
+Rent/buy never counts as streaming (US-042 AC-5), and NOT KNOWN is never a
+change (Trap 4): an unchecked title, or one with no provider data, shows
+nothing. The change is reduced to a stable **signature**
+(`left=starz;joined=netflix`, each side in `SERVICES` order).
+
+**3. Five owner-initiated answers (PRD §7.4 items 13–17).** Remove one badge
+(`DELETE /api/listings/:listingId`), Add to Library from Waiting (`POST
+/api/waiting/:intentId/promote` — a listing dated today **and** the intent
+satisfied in the same transaction, the second satisfaction path besides
+step 7's capture), Move to Waiting (`POST
+/api/titles/:titleId/move-to-waiting`), Keep (`POST
+/api/titles/:titleId/availability/keep`, storing the signature) and Add badge
+(`POST /api/titles/:titleId/badges`). Every removal is soft and restorable
+from the removed log; none writes a suppression; each re-checks suppression
+on the work identity first. **§4 point 3 is unchanged** — the refresh still
+graduates nothing; only the owner's tap does.
+
+**4. Bulk review of many changes at once is out of scope** and is a future
+backlog item.
+
+**Migration 0019 (owner-approved)** adds `title.availability_checked_at`,
+`available_on`, `rent_on`, `availability_region` (default `'US'`) and
+`availability_kept_signature`, plus `watch_intent.moved_from_library_at`,
+with `ck_title_available_on_json`, `ck_title_rent_on_json`,
+`ck_title_availability_coherent` and `ck_intent_moved_from_library_search`.
+Additive only. ⚠ A moved title's intent keeps `discovery_source = 'search'`:
+adding a `library` source would mean replacing `ck_intent_source`, a `DROP
+CONSTRAINT` `T-MIG-001` forbids, so the provenance is the new nullable
+column instead. Test ids: `specs/testing.md`, US-063 (`T-MOVE-*`).
+
 ## Consequences
 
 ### The loop, end to end
@@ -230,6 +291,9 @@ weekly re-read satisfies that.
 7. The owner adds it in the real app; the next Netflix capture picks it up and
    it enters the combined list through the ordinary path. The `WatchIntent` is
    then satisfied and drops out of the waiting view.
+   **Since Revision 4**, the owner may instead tap *Add to Library* on the
+   now-streaming row: a listing dated today is created and the intent is
+   satisfied in the same transaction. Still an owner action, never the refresh.
 
 Step 7 is the whole point: **the waiting view is a staging area that feeds the
 existing loop, not a second parallel list.**

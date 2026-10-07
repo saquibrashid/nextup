@@ -484,6 +484,11 @@ describe('T-AVAIL-003 · US-042 AC-3 · flagged is an invitation, not an additio
           tmdbName: name,
           tmdbReleaseYear: 2016 + index,
           sortDateAdded: new Date(Date.UTC(2026, 0, 10 + index)),
+          // Fresh Library availability (`A54`, US-063 AC-1), so the only
+          // provider lookup here is the WAITING refresh under test.
+          availabilityCheckedAt: new Date(),
+          availableOn: JSON.stringify(['Netflix']),
+          rentOn: JSON.stringify([]),
         },
       });
       await testPrisma().serviceListing.create({

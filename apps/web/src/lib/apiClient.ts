@@ -404,6 +404,8 @@ export interface WaitingItem {
   posterPath: string | null;
   discoveredAt: string;
   discoverySource: string;
+  /** `A54` (US-063 AC-8) — when it was moved here from the Library, if it was. */
+  movedFromLibraryAt?: string | null;
   availableOn: string[] | null;
   /** Which of the owner's own services carry it, or `null` for not known. */
   flaggedOn: string[] | null;
@@ -539,6 +541,43 @@ export interface RemoveTitleResponse {
   removedAt: string;
   /** Always `false`; §6.32 writes no suppression. Named so the copy can say so. */
   suppressed: boolean;
+}
+
+/** §6.40 (US-063 AC-3) — one badge removed; restorable from the removed view. */
+export interface RemoveBadgeResponse {
+  listingId: string;
+  titleId: string;
+  service: string;
+  /** `removed` when that was the title's last badge. */
+  titleState: 'active' | 'removed';
+  removedAt: string;
+}
+
+/** §6.41 (US-063 AC-4) — a waiting title added to the library. */
+export interface PromoteWaitingResponse {
+  intentId: string;
+  titleId: string;
+  listingId: string;
+  service: string;
+  dateAdded: string;
+  titleWasCreated: boolean;
+}
+
+/** §6.42 (US-063 AC-5) — a library title moved to Waiting. */
+export interface MoveToWaitingResponse {
+  titleId: string;
+  /** `null` when the work was already waiting. */
+  intentId: string | null;
+  removedListingIds: string[];
+  removedAt: string;
+}
+
+/** §6.44 (US-063 AC-7) — a badge added for a service it is now also on. */
+export interface AddBadgeResponse {
+  titleId: string;
+  listingId: string;
+  service: string;
+  dateAdded: string;
 }
 
 export interface MeResponse {
@@ -890,6 +929,49 @@ export function createApiClient(deps: ApiClientDeps = {}) {
       request<RemoveTitleResponse>(
         `/api/titles/${encodeURIComponent(titleId)}`,
         { method: 'DELETE' },
+        deps,
+      ),
+
+    /**
+     * §6.40 (US-063 AC-3) — remove ONE service badge. Soft; `restoreListing`
+     * with the same listing id undoes it.
+     */
+    removeBadge: (listingId: string) =>
+      request<RemoveBadgeResponse>(
+        `/api/listings/${encodeURIComponent(listingId)}`,
+        { method: 'DELETE' },
+        deps,
+      ),
+
+    /** §6.41 (US-063 AC-4) — "Add to Library" for a now-streaming waiting title. */
+    promoteWaiting: (intentId: string, service: string) =>
+      request<PromoteWaitingResponse>(
+        `/api/waiting/${encodeURIComponent(intentId)}/promote`,
+        { method: 'POST', body: { service } },
+        deps,
+      ),
+
+    /** §6.42 (US-063 AC-5) — "Move to Waiting". Every badge goes to the removed log. */
+    moveToWaiting: (titleId: string) =>
+      request<MoveToWaitingResponse>(
+        `/api/titles/${encodeURIComponent(titleId)}/move-to-waiting`,
+        { method: 'POST', body: {} },
+        deps,
+      ),
+
+    /** §6.43 (US-063 AC-6) — "Keep": dismiss the marker for exactly this change. */
+    keepAvailability: (titleId: string, signature: string) =>
+      request<{ titleId: string; keptSignature: string }>(
+        `/api/titles/${encodeURIComponent(titleId)}/availability/keep`,
+        { method: 'POST', body: { signature } },
+        deps,
+      ),
+
+    /** §6.44 (US-063 AC-7) — "Add badge" for a service it is now also on. */
+    addBadge: (titleId: string, service: string) =>
+      request<AddBadgeResponse>(
+        `/api/titles/${encodeURIComponent(titleId)}/badges`,
+        { method: 'POST', body: { service } },
         deps,
       ),
 

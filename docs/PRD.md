@@ -2,7 +2,7 @@
 
 **Project:** nextup
 **Version:** Current v1 scope, including subsequent owner-approved promotions; remaining deferrals are in §11.2.
-**Status:** Approved scope with recorded amendments through US-062 / REQ-128. Implementation status is in `docs/status.md`; it does not replace release acceptance.
+**Status:** Approved scope with recorded amendments through US-063 / REQ-129 (`A54`). ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
 **Inputs:** `docs/BRD.md`, the recorded owner decisions in the ADRs, and the original authoring-tree `Context/` documents. **The `Context/` tree is not supplied in this repository.** Its citations preserve provenance, not an instruction to invent missing source text. See `docs/current-release.md` for the owner decisions applied on 2026-09-17 and `docs/requirement-index.md` for reconciled reference authority.
 **Audience:** the implementer. Implementation will be performed by GitHub Copilot in autopilot mode (ASM-028, ASM-029, NFR-002, NFR-003, NFR-004). This document, together with the specs, IS the implementation input. Acceptance criteria are written to be executable and verifiable without asking a question.
 **No timeline.** Per A19 / ASM-027 this document contains no dates, durations, or sequencing commitments beyond dependency order.
@@ -61,6 +61,21 @@
 > ⚠ **Amended again at `A46`: 242 → 241.** The list-staleness-nudge concept (REQ-040, ASM-038) is dropped entirely per the owner's verbatim answer — *"Drop the concept entirely — no staleness nudge."* US-022 AC-2 is deleted outright (not struck through — it was an instruction, not rationale). US-022's remaining ACs keep their existing numbers (AC-1, AC-3, AC-4, AC-5); the sequence deliberately skips AC-2 and MUST NOT be renumbered. REQ-039 (the factual last-updated date), NFR-014 (TMDB metadata staleness) and NFR-019 (image retention) are untouched. **`specs/testing.md`'s reconciliation banner is being updated to 241 by another agent.**
 >
 > ⚠ **Goal/metric check (done, result: no metric changes).** G-3 is amended to name paste, but **M5 is unaffected**: M5 measures whether the *review pass* was tolerable, and paste saves roughly one tap **per image at capture time**, not one second of review. Anyone hoping A45 answers the M5 kill risk should be told plainly that it does not.
+
+---
+
+> ## ⚠ AMENDMENT — 2026-09-29 — `A54` (owner-approved): availability moves (#397, #410)
+>
+> **The owner approved, for GitHub issues #397 and #410:** a Library title can change service (*"The Housemaid" was on Starz, now rent-only*), and a Waiting title can start streaming on one of the owner's services. nextup now **tells** the owner both facts and offers **one-tap, owner-initiated, reversible** answers. It never acts on them by itself (invariant 5).
+>
+> | Decision | What it changes | Kind |
+> |---|---|---|
+> | **1. §7.4 non-owner process 4 widened** | The lazy availability refresh now also covers **Library titles**, lazily on access (the Library page load and title details), page-scoped, capped at `AVAILABILITY_REFRESH_PER_REQUEST = 8` per request, serial and **metadata-only**. It never changes membership, ordering or service badges. A failed lookup writes nothing and the last-known answer is shown. Same TMDB watch-provider source, region `US` stored and passed explicitly, `WATCH_PROVIDER_MAX_AGE_DAYS` freshness, JustWatch attribution wherever provider data is shown. ADR-0010 **Revision 4**. US-036 AC-2 is corrected in place; **the count stays four** — the process is widened, not added. | **Instruction** |
+> | **2. Migration `0019_library_availability`** | Additive only: `title.availability_checked_at`, `available_on` (JSON, `ISJSON` CHECK), `rent_on` (JSON, `ISJSON` CHECK), `availability_region` (default `'US'`), `availability_kept_signature`; `watch_intent.moved_from_library_at`. `T-MIG-001` passes. `specs/data-model.md` §17.6. | **Instruction** |
+> | **3. Five new owner-initiated mutations** | §7.4 closed list items **13–17**: remove ONE service badge; *Add to Library* from a now-streaming Waiting title (a **second satisfaction path** besides capture); *Move to Waiting*; *Keep* (dismiss this exact change); *Add badge* for "Now also on <service>". REQ-041 is widened a **seventh** time. `T-MUT-001` pins the extended list. | **Instruction** |
+> | **4. Bulk review of availability changes** | **Not in this work.** Recorded as a future backlog item only. | Scope |
+>
+> **New in this document:** **US-063 / REQ-129** (Epic L), eight acceptance criteria. **Corrected in place:** §7.4, US-036 AC-2/AC-3, US-043 (the graduation note), US-048's out-of-scope line and the *Graduation* glossary entry. Markers follow invariant 8a — **show the fact, never nag**: *"Left Starz — now rent-only on Apple TV"*, *"Not seen on Starz as of <date>"*, *"Now also on Netflix"*. Rent-only is not streaming (US-042 AC-5).
 
 ---
 
@@ -253,7 +268,7 @@ Added at `A48` for **Epic L (v1.1)** — these terms have no meaning in v1:
 - **Discovery source** — a place the owner *browses*, whose contents are editorial rather than curated by them (e.g. a rental storefront's new-release page). ⚠ **Not a service:** no `SERVICES` member, no badge, no `ServiceListing`, no reconciliation, append-only always (ADR-0010 D-1/D-2).
 - **WatchIntent** — a per-owner record meaning *"I want to watch this and it is not on a service I have."* It has **no service** and its date is a **discovery** date, not a date-added. It is not a `ServiceListing` and must never be modelled as one (ADR-0010 Trap 3).
 - **Availability** — a **cached, region-specific** answer from TMDB's watch-provider (JustWatch-sourced) data about where a work can be streamed. It is a lagging cache, never a fact, and is always rendered with its as-of date (ADR-0010 Trap 4).
-- **Graduation** — a `WatchIntent` being satisfied because the owner added the work on a real service and a capture picked it up. Always owner-initiated; never an automatic consequence of an availability refresh.
+- **Graduation** — a `WatchIntent` being satisfied because the owner added the work on a real service, either when a capture picked it up or — since `A54` — when the owner tapped *Add to Library* on a now-streaming Waiting row (US-063 AC-4). Always owner-initiated; never an automatic consequence of an availability refresh. ~~"…added the work on a real service and a capture picked it up."~~
 
 ### Epic A — Access and ownership
 
@@ -1124,7 +1139,7 @@ anything the service still lists. Removing says only *this is not on my list*.
 | AC-6 (failure) | A title already removed, or one the owner has suppressed | The owner tries to remove it | It is refused and nothing changes. A suppressed work is refused with its un-suppress escape hatch named — removing its listings would be invisible until un-suppression and would then silently redirect it from the combined list (US-029 AC-3) to the removed view (AC-4) (`T-MANUAL-012`) |
 | AC-7 | A row carrying two service badges | The owner removes it | Both services go in one action, because the row is the unit the owner acts on (the US-027 AC-5 analogue). Two removed-view entries are logged, each independently restorable (`T-MANUAL-013`) |
 
-**Out of scope for this story:** removing a single badge from a two-badge row, and any hard delete — there is none, and REQ-028 forbids adding one.
+**Out of scope for this story:** any hard delete — there is none, and REQ-028 forbids adding one. Removing a single badge from a two-badge row is **US-063 AC-3** (`A54`), a separate owner action. ~~"removing a single badge from a two-badge row, and any hard delete"~~
 **Open questions:** none.
 
 ### Epic K — Platform guarantees
@@ -1142,8 +1157,8 @@ anything the service still lists. Removing says only *this is not on my list*.
 | # | Given | When | Then |
 |---|---|---|---|
 | AC-1 | The set of operations that mutate user-visible list state | The system is inspected | It is exactly the closed enumeration in §7.4, all of them owner-initiated (REQ-041) |
-| AC-2 | Non-owner-initiated processes | The system is inspected | Exactly **four** exist: the lazy TMDB metadata refresh on access (REQ-076, US-010), the screenshot image purge (NFR-019, US-035), the lazy IMDb rating refresh on access (REQ-093, Epic M), and the lazy watch-availability refresh triggered by opening the waiting view (REQ-086, Epic L). None changes user-visible list state (REQ-041) — ⚠ **the rating clause here was REVISED at `A53` (2026-09-14):** ~~"the rating in particular is display-only and is never sorted or filtered on (ADR-0011 OQ-A)"~~ the rating **is** now a sort key (ADR-0011 Rev 1), and what keeps it compliant is that under `sort=rating` the refresh is **swept synchronously inside the request, before the ordering** — never after the response; it is still never filtered on — and the availability refresh writes only `watch_intent` metadata columns, creates no listing and satisfies no intent, so a waiting work still reaches the combined list only by the ordinary capture path (US-042 AC-4, ADR-0010; approved at A52). ~~Superseded (Epic L): "Exactly three exist: the lazy TMDB metadata refresh on access (REQ-076, US-010), the screenshot image purge (NFR-019, US-035), and the lazy IMDb rating refresh on access (REQ-093, Epic M)."~~ ~~Superseded (Epic M): "Exactly two exist: the lazy TMDB metadata refresh on access (REQ-076, US-010) and the screenshot image purge (NFR-019, US-035). Neither changes user-visible list state (REQ-041)."~~ |
-| AC-3 | Any operation not in the §7.4 enumeration | It is proposed | It is **forbidden by default**. The enumeration is closed; extending it is an explicit amendment to REQ-041, which has already been widened six times ~~Superseded: "five times."~~ |
+| AC-2 | Non-owner-initiated processes | The system is inspected | Exactly **four** exist: the lazy TMDB metadata refresh on access (REQ-076, US-010), the screenshot image purge (NFR-019, US-035), the lazy IMDb rating refresh on access (REQ-093, Epic M), and the lazy watch-availability refresh triggered by opening the waiting view **or, since `A54`, the Library list or a title's details** (REQ-086, REQ-129, Epic L). ~~"triggered by opening the waiting view (REQ-086, Epic L)"~~ None changes user-visible list state (REQ-041) — ⚠ **the rating clause here was REVISED at `A53` (2026-09-14):** ~~"the rating in particular is display-only and is never sorted or filtered on (ADR-0011 OQ-A)"~~ the rating **is** now a sort key (ADR-0011 Rev 1), and what keeps it compliant is that under `sort=rating` the refresh is **swept synchronously inside the request, before the ordering** — never after the response; it is still never filtered on — and the availability refresh writes only availability metadata columns (`watch_intent`, and since `A54` the `title` availability columns), creates no listing, removes no badge and satisfies no intent, so a waiting work reaches the combined list only by an owner-initiated path — a capture, or the owner's *Add to Library* tap (US-042 AC-4, US-063 AC-1/AC-4, ADR-0010 Rev 4). ~~"writes only `watch_intent` metadata columns … only by the ordinary capture path (US-042 AC-4, ADR-0010; approved at A52)."~~ ~~Superseded (Epic L): "Exactly three exist: the lazy TMDB metadata refresh on access (REQ-076, US-010), the screenshot image purge (NFR-019, US-035), and the lazy IMDb rating refresh on access (REQ-093, Epic M)."~~ ~~Superseded (Epic M): "Exactly two exist: the lazy TMDB metadata refresh on access (REQ-076, US-010) and the screenshot image purge (NFR-019, US-035). Neither changes user-visible list state (REQ-041)."~~ |
+| AC-3 | Any operation not in the §7.4 enumeration | It is proposed | It is **forbidden by default**. The enumeration is closed; extending it is an explicit amendment to REQ-041, which has already been widened seven times ~~Superseded: "five times."~~ ~~Superseded at `A54`: "six times."~~ |
 | AC-4 (edge) | A convenience feature that would auto-confirm, auto-restore, auto-merge or auto-clean anything | It is considered | It is prohibited, regardless of how safe it seems |
 | AC-5 (failure) | Any scheduled job, webhook, timer or background worker that writes list state | Automated verification runs | The test fails (NFR-003, NFR-005) |
 | AC-6 | Telemetry, analytics and usage tracking | The system is inspected | None exists (NFR-005, REQ-052) |
@@ -1336,6 +1351,48 @@ building this as that is a data-loss defect, not a shortcut.
 | AC-6 (failure) | An empty waiting list | The view renders | It explains what the view is for and how to fill it, rather than rendering an unexplained empty state (§9) |
 
 **Out of scope for this story:** sorting and filtering beyond date; promote from `roadmap.md` if the list grows past roughly fifty rows.
+**Open questions:** none.
+
+⚠ **Amended at `A54`:** AC-3's capture path is no longer the only way a waiting work graduates — the owner's one-tap *Add to Library* on a now-streaming row (US-063 AC-4) satisfies the intent too, in the same transaction as the listing it creates. Both remain owner-initiated; the refresh still graduates nothing.
+
+#### US-063 — Notice when a title changes service, and move it in one tap
+
+**REQ-129 (`must`, owner-approved `A54`, 2026-09-29, #397/#410).** A Library
+title can leave one of the owner's services (*"The Housemaid" was on Starz and
+is now rent-only*) or join another, and a Waiting title can start streaming on
+one of the owner's services. nextup **tells** the owner the fact on the
+Library card/row and on the title details page, and offers one-tap answers.
+Every answer is owner-initiated, synchronous, audited by the listing and
+intent rows it writes, and reversible (§7.4 items 13–17). Nothing moves by
+itself (invariant 5), and nothing nags (invariant 8a).
+
+**As** the owner
+**I want** to see when a title I saved stops (or starts) streaming on a service I have
+**So that** my Library says where I can actually watch it, without me checking each service
+
+**Traces to:** REQ-129, REQ-086, REQ-087, REQ-041
+**Priority:** must
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | A Library title whose availability was never checked or is older than `WATCH_PROVIDER_MAX_AGE_DAYS` | The owner opens the Library list or that title's details | Its availability is refreshed from TMDB watch-provider data for its **stored** region (`US`), at most `AVAILABILITY_REFRESH_PER_REQUEST` (8) rows a request, serially, for the page being served only. It writes availability metadata **only** — no membership, ordering or badge changes — and a failed lookup writes nothing and the last-known answer is served (§7.4 process 4, ADR-0010 Rev 4) |
+| AC-2 | A Library title badged on a service that no longer streams it, or streaming on another of the owner's services it has no badge for | The Library card/row and the details page render | A compact fact is shown — *"Left Starz — now rent-only on Apple TV"*, *"Not seen on Starz as of <date>"*, *"Now also on Netflix"*. It states the fact and its as-of date and never instructs or nags (invariant 8a). Rent-only never counts as streaming (US-042 AC-5); NOT KNOWN is never a change (ADR-0010 Trap 4); JustWatch attribution accompanies it on the details page (REQ-087) |
+| AC-3 | A badge whose service no longer streams the title | The owner taps *Remove badge* | Exactly that one `ServiceListing` is soft-removed, attributed to the owner, and restorable from the removed log through the **existing** restore path. If it was the last active badge the title leaves the Library exactly as a whole-title remove would (US-048). No suppression is written |
+| AC-4 | A Waiting title that is now streaming on one of the owner's services | The owner taps *Add to Library* | A listing for that service dated **today** is created with manual-add semantics (suppression gate on work identity, `DUPLICATE_WORK_IDENTITY`, earliest sort date kept, reappearance is a brand-new row dated today) **and** the waiting intent is satisfied **in the same transaction** — a second satisfaction path besides capture |
+| AC-5 | A Library title no owner service streams any more (rent-only or not seen) | The owner taps *Move to Waiting* | All its active listings are soft-removed into the removed log (each restorable) and one waiting intent is opened for the work — a work already waiting keeps its one intent |
+| AC-6 | An availability change shown on a title | The owner taps *Keep as is* | Only the dismissal of **that exact change** is recorded; no list state changes. The marker stays hidden until the provider set produces a **different** change, when it is shown again |
+| AC-7 | A Library title now also streaming on another of the owner's services | The owner taps *Add badge* | A listing for that service dated today is added with manual-add semantics; the title's earliest sort date is kept, so it does not move in the list |
+| AC-8 | A Waiting row that came from the Library by AC-5 | The Waiting view renders | It states *"Moved from your Library on <date>"* — a fact, not a prompt — and the AC-4 *Add to Library* action is offered once it streams on an owner service again |
+
+All one-tap actions work on both the desktop and the phone layouts with 44 px
+touch targets (`specs/ui.md` §5.0a), and are refused with nothing changed if
+the work is suppressed (invariant 1), the row is no longer active, or the
+service is outside `SERVICES`.
+
+**Out of scope for this story:** a bulk review screen for many availability
+changes at once (a later backlog item); any automatic move, reminder or
+notification; and treating rent/buy offers as streaming.
 **Open questions:** none.
 
 #### Required amendment to Epic K — completed at TASK-187
@@ -1901,6 +1958,19 @@ Implementation contract: `specs/title-category.md`; named tests in `specs/testin
 12. Saving or clearing an owner category override (US-062, REQ-128), synchronously
     affecting display/category filters only. Canonical identity, membership,
     dates and badges do not change.
+13. Removing ONE service badge from a title (US-063 AC-3, REQ-129, `A54`):
+    soft-removes a single `ServiceListing`, restorable through item 4. The last
+    badge going leaves the title removed, exactly as item 10 would.
+14. Adding a now-streaming Waiting title to the Library (US-063 AC-4, `A54`):
+    a listing dated today with item 9's semantics, and the waiting intent
+    satisfied in the same transaction.
+15. Moving a Library title to Waiting (US-063 AC-5, `A54`): soft-removes every
+    active listing (each restorable through item 4) and opens one waiting intent.
+16. Keeping a title as it is after an availability change (US-063 AC-6, `A54`):
+    records the dismissed change signature only; no membership, date or badge
+    changes.
+17. Adding a badge for a service the title is now also on (US-063 AC-7, `A54`):
+    a listing dated today with item 9's semantics; the earliest date is kept.
 
 ~~Superseded: entries 1–8 only, before the manual list edits were added.~~ The
 amendment was made because a **false extraction** — a title the services never
@@ -1918,12 +1988,13 @@ owner-initiated, synchronous, visible in the removed log, and reversible.
 2. Screenshot image purge at 30 days (NFR-019, US-035) — touches image bytes only.
 3. Lazy IMDb rating refresh on access (REQ-093, ADR-0011) — touches one numeric field and its timestamp. It is admissible here for the same reason as (1): access-triggered and metadata-only. ⚠ **REVISED at `A53` (2026-09-14): the third reason given below no longer holds and has been replaced, not merely softened.** ~~"and — decisively — the rating is **never sorted or filtered on** (ADR-0011 OQ-A), so it cannot change membership, ordering or service badges."~~ The rating **is** now a sort key (ADR-0011 Rev 1), so it *could* change ordering — and what prevents that is the refresh's **synchrony**: under `sort=rating` the sweep runs inside the request and before the `ORDER BY`, so no write outside an owner-initiated request ever reorders the list. It is still never *filtered* on. ⚠ **If anyone reverts that sweep to the post-response path, this entry becomes false and REQ-041 is breached** — which is why `T-IMDB-005b` guards the ordering, not the absence of a sort.
 
-4. Lazy waiting-view availability refresh (REQ-086, Epic L, approved at A52) — updates watch-intent availability metadata only, on access. It creates no service listing and satisfies no watch intent. Satisfaction follows the ordinary owner-initiated capture path.
+4. Lazy availability refresh (REQ-086, REQ-129, Epic L; approved at A52, **widened to Library titles at `A54`**, ADR-0010 Rev 4) — on access only: opening the waiting view, the Library list, or a title's details. Page-scoped, at most `AVAILABILITY_REFRESH_PER_REQUEST` (8) lookups a request, serial. Updates availability metadata only (`watch_intent` and `title` availability columns). It creates no service listing, removes no badge, changes no ordering and satisfies no watch intent; a failed lookup writes nothing. Every move it reveals is made only by an owner-initiated item 13–17 or a capture.
+   ~~"4. Lazy waiting-view availability refresh (REQ-086, Epic L, approved at A52) — updates watch-intent availability metadata only, on access. It creates no service listing and satisfies no watch intent. Satisfaction follows the ordinary owner-initiated capture path."~~ *(Superseded at `A54`.)*
 
 ~~Superseded before Epic L: exactly three processes, with entries 1–3 only.~~
 ~~Superseded (Epic M): "exactly two, and neither changes user-visible list state," with entries 1 and 2 only.~~
 
-Anything not on these lists is **forbidden by default**. REQ-041 has already been widened six times during requirements work; widening it again is an explicit amendment, not an implementation decision. ~~Superseded: "widened five times."~~
+Anything not on these lists is **forbidden by default**. REQ-041 has already been widened seven times during requirements work; widening it again is an explicit amendment, not an implementation decision. ~~Superseded: "widened five times."~~ ~~Superseded at `A54`: "widened six times."~~
 
 ### 7.5 Validation and input rules
 

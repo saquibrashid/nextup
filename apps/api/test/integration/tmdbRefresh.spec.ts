@@ -101,8 +101,13 @@ function startTmdb(options: ReplayOptions = {}): void {
   });
 }
 
-/** Requests the client actually made to a TMDB DETAIL path. */
-const detailCalls = (): string[] => calls.filter((c) => !c.includes('/search/'));
+/**
+ * Requests the client actually made to a TMDB DETAIL path. Watch-provider
+ * lookups are the separate availability refresh widened to Library titles at
+ * `A54` (US-063 AC-1, `T-MOVE-014`); this file is about METADATA only.
+ */
+const detailCalls = (): string[] =>
+  calls.filter((c) => !c.includes('/search/') && !c.includes('/watch/providers'));
 
 let seq = 0;
 async function seedTitle(options: {
