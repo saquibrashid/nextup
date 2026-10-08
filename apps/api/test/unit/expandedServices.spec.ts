@@ -51,7 +51,13 @@ describe('T-SVC-001 API service dimensions', () => {
         'Prime Video with Ads',
       ],
       'disney-plus': ['Disney Plus', 'Disney+', 'Disney+ with Ads', 'Disney Plus Premium'],
-      'apple-tv-plus': ['Apple TV Plus', 'Apple TV+', 'Apple TV+ Amazon Channel'],
+      'apple-tv-plus': [
+        'Apple TV Plus',
+        'Apple TV+',
+        'Apple TV+ Amazon Channel',
+        'Apple TV',
+        'Apple TV Amazon Channel',
+      ],
       'paramount-plus': [
         'Paramount Plus',
         'Paramount+',
@@ -92,7 +98,7 @@ describe('T-SVC-001 API service dimensions', () => {
         'Hulu',
         'Amazon Video',
         'Amazon',
-        'Apple TV',
+        'Apple TV Store',
         'Paramount Network',
         'Starzplay unrelated',
         'Peacock Premium unrelated',
@@ -119,5 +125,23 @@ describe('T-SVC-001 API service dimensions', () => {
     };
     expect(flaggedProvidersFor(readFlatrateProviders(body, 'US'))).toEqual(['paramount-plus']);
     expect(flaggedProvidersFor(readFlatrateProviders(null, 'US'))).toBeNull();
+  });
+
+  it('T-SVC-001g reads the post-rebrand "Apple TV" subscription as Apple TV+, never the store', () => {
+    // Since Oct 2025 TMDB names the subscription (350) and the store (2) both
+    // "Apple TV"; only the subscription can be in flatrate.
+    const subscribed = {
+      results: {
+        US: {
+          flatrate: [{ provider_id: 350, provider_name: 'Apple TV' }],
+          buy: [{ provider_id: 2, provider_name: 'Apple TV' }],
+        },
+      },
+    };
+    expect(flaggedProvidersFor(readFlatrateProviders(subscribed, 'US'))).toEqual(['apple-tv-plus']);
+    const storeOnly = {
+      results: { US: { rent: [{ provider_id: 2, provider_name: 'Apple TV' }] } },
+    };
+    expect(flaggedProvidersFor(readFlatrateProviders(storeOnly, 'US'))).toEqual([]);
   });
 });
