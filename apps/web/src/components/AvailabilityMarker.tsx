@@ -110,6 +110,11 @@ export interface AvailabilityPanelProps {
   readonly actions: MoveActions;
   /** Called after a move succeeded, with the sentence to confirm it. */
   readonly onMoved: (notice: string) => void;
+  /**
+   * US-064 — the review screen states the JustWatch credit once for the whole
+   * screen rather than once per row (REQ-087 is met either way).
+   */
+  readonly showAttribution?: boolean;
 }
 
 /**
@@ -125,6 +130,7 @@ export function AvailabilityPanel({
   offline,
   actions,
   onMoved,
+  showAttribution = true,
 }: AvailabilityPanelProps): JSX.Element | null {
   const [phase, setPhase] = useState<'idle' | 'submitting' | 'error'>('idle');
   const text = availabilityMarkerText(availability);
@@ -150,7 +156,7 @@ export function AvailabilityPanel({
   return (
     <section
       className="availability-panel"
-      aria-label={AVAILABILITY_PANEL_LABEL}
+      aria-label={`${AVAILABILITY_PANEL_LABEL}: ${name}`}
       data-testid="availability-panel"
       aria-busy={phase === 'submitting' ? true : undefined}
     >
@@ -206,9 +212,11 @@ export function AvailabilityPanel({
           {AVAILABILITY_ACTION_FAILED}
         </p>
       )}
-      <p className="justwatch-attribution" data-testid="availability-attribution">
-        {JUSTWATCH_ATTRIBUTION}
-      </p>
+      {showAttribution && (
+        <p className="justwatch-attribution" data-testid="availability-attribution">
+          {JUSTWATCH_ATTRIBUTION}
+        </p>
+      )}
     </section>
   );
 }

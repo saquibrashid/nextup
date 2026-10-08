@@ -21,6 +21,7 @@ const DESTINATIONS = [
   ['Removal history', '/removed'],
   ['Not interested', '/not-interested'],
   ['Waiting to stream', '/waiting'],
+  ['Availability changes', '/availability'],
   ['About', '/about'],
   ['Rating lookup', '/rating'],
 ] as const;

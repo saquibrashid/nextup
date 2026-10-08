@@ -1844,6 +1844,61 @@ export const WAITING_ADD_TO_LIBRARY_FAILED =
 /** US-063 AC-8 — a fact on a waiting row that came from the Library. */
 export const WAITING_MOVED_FROM_LIBRARY = 'Moved from your Library on';
 
+/* ── US-064 — the "Availability changes" screen (PRD `A55`) ────────────── */
+
+/**
+ * ⚠ **SHOW THE FACT, NEVER NAG (invariant 8a).** The screen and the Library's
+ * count line state how many changes there are and what each one is. None of
+ * this copy says what the owner should do, and the count is never coloured as
+ * an alarm. "Not checked recently" is a count of rows, never a reminder.
+ */
+export const AVREV_HEADING = 'Availability changes';
+export const AVREV_INTRO =
+  'Library titles whose streaming services changed, and waiting titles now streaming on your services, in one place.';
+export const AVREV_LIBRARY_HEADING = 'Library titles that changed';
+export const AVREV_WAITING_HEADING = 'Waiting titles now streaming';
+export const AVREV_SECTION_EMPTY = 'None right now.';
+export const AVREV_EMPTY =
+  'No availability changes right now. This screen gathers Library titles whose streaming services changed and waiting titles now streaming on your services, so you can answer them in one place.';
+export const AVREV_LOADING = 'Loading availability changes…';
+export const AVREV_LOAD_FAILED = "Couldn't load availability changes.";
+export const AVREV_RETRY = 'Try again';
+export const AVREV_CHECKED_ON = 'Checked';
+export const AVREV_NOW_STREAMING_ON = 'Now streaming on';
+/** "142 titles checked · 37 not checked recently" — facts, no threshold named. */
+export const AVREV_TITLES_CHECKED = 'titles checked';
+export const AVREV_NOT_CHECKED_RECENTLY = 'not checked recently';
+export const AVREV_CHECK_MORE = 'Check more titles';
+export const AVREV_CHECK_WORKING = 'Working…';
+export const AVREV_CHECK_FAILED = "Couldn't check just now. Nothing was changed.";
+export const AVREV_CHECKED_NOW = 'Checked';
+export const AVREV_CHECK_SOME_FAILED = "couldn't be checked just now";
+export const AVREV_SELECT_ALL_LIBRARY = 'Select all Library titles that changed';
+export const AVREV_SELECT_ALL_WAITING = 'Select all waiting titles now streaming';
+export const AVREV_SELECT_PREFIX = 'Select';
+export const AVREV_SELECTED = 'selected';
+export const AVREV_CLEAR_SELECTION = 'Clear selection';
+export const AVREV_BULK_KEEP = 'Keep as is';
+export const AVREV_BULK_REMOVE = 'Remove badges that left';
+export const AVREV_BULK_MOVE = 'Move to Waiting';
+export const AVREV_BULK_ADD = 'Add to Library';
+/** US-064 AC-4 — the bulk add's one decided rule, said where it applies. */
+export const AVREV_BULK_ADD_RULE =
+  'Add to Library uses the first of your services each title streams on.';
+export const AVREV_CONFIRM_REMOVE_BODY =
+  'Remove the badges that left from these titles? They go to removal history, where you can restore them.';
+export const AVREV_CONFIRM_MOVE_BODY =
+  'Move these titles to Waiting? Their badges go to removal history, where you can restore them.';
+export const AVREV_CANCEL = 'Cancel';
+export const AVREV_DONE = 'done';
+export const AVREV_NOT_CHANGED = "couldn't be changed";
+export const AVREV_APPLY_FAILED = "Couldn't make those changes. Nothing was changed.";
+export const AVREV_ADDED_TO_LIBRARY = 'Added to your Library.';
+export const AVREV_VIEW_REMOVED = 'View removal history';
+/** The Library page's factual line (US-064 AC-6). Shown only when N > 0. */
+export const AVREV_LIBRARY_COUNT_ONE = 'availability change';
+export const AVREV_LIBRARY_COUNT_MANY = 'availability changes';
+
 /* ── #378 — waiting to stream: access states, search-to-add ─────────────── */
 
 /**

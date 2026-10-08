@@ -191,6 +191,21 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
   const serviceState = useResource((signal) => client.getServiceState(signal), 'service-state');
 
   /**
+   * US-064 AC-6 — the "N availability changes" line. A read of STORED data
+   * (§6.46), made after the list read settles because that read is what
+   * refreshes availability lazily (§6.1). Informational like the strip: a
+   * failure, or a client without the method, simply hides the line.
+   */
+  const titlesSettled = titles.resource.kind === 'ok';
+  const availabilitySummary = useResource(
+    (signal) =>
+      titlesSettled && typeof client.getAvailabilityReviewSummary === 'function'
+        ? client.getAvailabilityReviewSummary(signal)
+        : Promise.resolve(null),
+    `availability-summary:${query}:${String(titlesSettled)}`,
+  );
+
+  /**
    * The pages after the first (`specs/ui.md` §2.1 item 4).
    *
    * ⚠ CALLED BEFORE THE REFUSAL RETURN BELOW, because hooks may not be
@@ -305,6 +320,11 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
       items={items}
       serviceState={
         serviceState.resource.kind === 'ok' ? serviceState.resource.value.services : null
+      }
+      availabilityChangeCount={
+        availabilitySummary.resource.kind === 'ok'
+          ? (availabilitySummary.resource.value?.count ?? 0)
+          : 0
       }
       total={unfiltered.length}
       totalIsLowerBound={totalIsLowerBound}

@@ -80,6 +80,7 @@ import {
   ListIcon,
   MenuIcon,
   RatingIcon,
+  RefreshIcon,
   SearchIcon,
   SuppressedIcon,
   UploadIcon,
@@ -131,6 +132,7 @@ const BAR_ICONS: Record<string, ComponentType<{ readonly label?: string | undefi
   '/removed': HistoryIcon,
   '/not-interested': SuppressedIcon,
   '/waiting': ClockIcon,
+  '/availability': RefreshIcon,
   '/about': InfoIcon,
   '/rating': RatingIcon,
 };

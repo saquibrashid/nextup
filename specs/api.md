@@ -60,6 +60,16 @@ Every one is synchronous, owner-scoped (a foreign id is a 404), refuses a
 suppressed work with `409 WORK_SUPPRESSED` and `details.unsuppressHref` before
 any write, writes no suppression and is reversible.
 
+## Availability changes screen (TASK-266 – TASK-268, PRD `A55`, US-064)
+
+Four routes, §6.45 – §6.48. The two reads use **stored** availability only and
+make no provider lookup. `POST /api/availability/check` is the owner's
+*Check more titles* tap (an owner-initiated metadata refresh, PRD §7.4) and
+`POST /api/availability/review/apply` is PRD §7.4 item 18 — one answer for
+several rows, **each row its own transaction** with its one-tap guards. Both
+POSTs are in the mutating-route registry (`tools/check-mutating-routes.mjs`).
+No migration: everything reads and writes the `A54` columns.
+
 ## Waiting to stream (TASK-251, #378)
 
 `GET /api/waiting` items additionally expose `accessState`
@@ -454,6 +464,10 @@ typed data and never re-check it.
 | POST | `/api/titles/:titleId/move-to-waiting` | US-063 |
 | POST | `/api/titles/:titleId/availability/keep` | US-063 |
 | POST | `/api/titles/:titleId/badges` | US-063 |
+| GET | `/api/availability/review` | US-064 |
+| GET | `/api/availability/review/summary` | US-064 |
+| POST | `/api/availability/check` | US-064 |
+| POST | `/api/availability/review/apply` | US-064 |
 
 ---
 
@@ -2358,6 +2372,89 @@ or `null`, so the row keeps its place (invariant 6).
 | 409 | `TITLE_NOT_ACTIVE` | the title is not in the Library |
 | 409 | `DUPLICATE_WORK_IDENTITY` | it already has an active listing for that service |
 
+### 6.45 `GET /api/availability/review` — the "Availability changes" screen (US-064 AC-1/AC-2)
+
+Reads **stored data only** — no provider lookup, not even the page-scoped
+§6.2 pass. Owner-scoped.
+
+```jsonc
+{ "library": [            // active, unsuppressed titles with an UN-KEPT change
+    { "titleId": "…", "workIdentity": "tmdb:movie:1100", "name": "The Housemaid",
+      "releaseYear": 2025, "posterPath": "/p.jpg",
+      "badges": [{ "service": "starz", "listingId": "…", "dateAdded": "2026-01-05" }],
+      "availability": { /* the US-063 object above; signature non-null, kept false */ } } ],
+  "nowStreaming": [       // active waiting intents streaming on an owner service
+    { "intentId": "…", "titleId": "…", "workIdentity": "…", "name": "…",
+      "releaseYear": 2025, "posterPath": null,
+      "flaggedOn": ["netflix"],       // owner services, SERVICES order
+      "service": "netflix",           // the one a bulk Add to Library uses (first of flaggedOn)
+      "availabilityCheckedAt": "…", "availabilityRegion": "US" } ],
+  "check": { "checked": 142, "notCheckedRecently": 37 } }
+```
+
+`check` counts the Library titles (with a TMDB id and media type) and active
+waiting intents whose availability is recent (`checked`) or never-checked /
+older than `WATCH_PROVIDER_MAX_AGE_DAYS` (`notCheckedRecently`). A suppressed
+work is never listed (invariant 1: keyed on `workIdentity`).
+
+| Status | Code | When |
+|---|---|---|
+| 200 | — | the body above (both lists may be empty) |
+
+### 6.46 `GET /api/availability/review/summary` — the Library count line (US-064 AC-6)
+
+The same stored read as §6.45, answering only `{ "count": N }` —
+`library.length + nowStreaming.length`. No provider lookup. The Library page
+shows its link only when `N > 0`.
+
+| Status | Code | When |
+|---|---|---|
+| 200 | — | `{count}` |
+
+### 6.47 `POST /api/availability/check` — "Check more titles" (US-064 AC-3)
+
+Body `{}`. One **owner-initiated** metadata refresh: synchronously looks up at
+most `AVAILABILITY_CHECK_BATCH` (20, `apps/api/src/services/availabilityReview.ts`,
+declared independently of `AVAILABILITY_REFRESH_PER_REQUEST`) Library titles
+and waiting intents that are never-checked or older than
+`WATCH_PROVIDER_MAX_AGE_DAYS` — never-checked first, then oldest first —
+**serially**, for each row's stored region. Writes availability columns only
+(`title.availability_checked_at`/`available_on`/`rent_on`/`availability_region`,
+the equivalent `watch_intent` columns); a failed lookup writes nothing. Never
+changes membership, ordering, badges or intents (PRD §7.4; ADR-0010 Rev 5).
+With nothing due it asks TMDB nothing.
+
+| Status | Code | When |
+|---|---|---|
+| 200 | — | `{lookedUp, failed, checked, notCheckedRecently}` — answers written, lookups that failed, and the counts after this tap |
+
+### 6.48 `POST /api/availability/review/apply` — one answer, several rows (US-064 AC-4/AC-5)
+
+Body `{action, items}`; `action` ∈ `keep`, `remove-left-badges`,
+`move-to-waiting`, `add-to-library`; `items` is 1 – `AVAILABILITY_REVIEW_APPLY_MAX`
+(50) of `{id, signature?}` — a title id with the `signature` the owner saw for
+the first three, an intent id for `add-to-library`. A malformed body is refused
+**whole** with `400 VALIDATION_FAILED` and nothing is written.
+
+Items are applied **serially, each in its own transaction**, with the guards of
+the matching one-tap route; a refused item changes nothing and never rolls
+back or blocks another:
+
+| Action | Applies | Per-item refusal |
+|---|---|---|
+| `keep` | §6.43, storing `signature` | `NOT_FOUND`; `TITLE_NOT_ACTIVE`; `AVAILABILITY_CHANGED` (current signature ≠ `signature`) |
+| `remove-left-badges` | §6.40 to **every** active badge in `left` | `NOT_FOUND`; `WORK_SUPPRESSED`; `TITLE_NOT_ACTIVE`; `AVAILABILITY_CHANGED` (signature differs, or nothing left) |
+| `move-to-waiting` | §6.42 | `NOT_FOUND`; `WORK_SUPPRESSED`; `TITLE_NOT_ACTIVE`; `AVAILABILITY_CHANGED` (signature differs, or an owner service streams it) |
+| `add-to-library` | §6.41 on the **first owner service in `SERVICES` order** the work streams on | `NOT_FOUND`; `WORK_SUPPRESSED`; `DUPLICATE_WORK_IDENTITY`; `AVAILABILITY_CHANGED` (no owner service streams it any more) |
+
+An unexpected error refuses only its item, as `INTERNAL_ERROR` with
+*"Couldn't make that change. Nothing was changed."* — never the raw error.
+
+| Status | Code | When |
+|---|---|---|
+| 200 | — | `{action, results: [{id, outcome: "done", …the one-tap result} \| {id, outcome: "refused", code, message}], done, refused}` |
+| 400 | `VALIDATION_FAILED` | bad `action`, empty or oversized `items`, an item without a string `id`, or a missing `signature` where required |
+
 ---
 
 ## 7. Status-code policy
@@ -2422,9 +2519,12 @@ IMAGE_TOO_LARGE_TO_DECODE, IMAGE_DECODE_OOM, IMAGE_DECODE_FAILED,
 IMAGE_EXPIRED, IMAGES_PURGED,
 DUPLICATE_WORK_IDENTITY, WORK_SUPPRESSED, TARGET_WORK_SUPPRESSED,
 LISTING_NOT_REMOVED, TITLE_NOT_ACTIVE, GROUP_ALREADY_REVERSED,
-PARTIAL_FAILURE_PREVENTED,
+PARTIAL_FAILURE_PREVENTED, AVAILABILITY_CHANGED,
 TMDB_WORK_NOT_FOUND, TMDB_UNAVAILABLE
 ```
+`AVAILABILITY_CHANGED` (`A55`, §6.48) is **per-item only**: the row's
+availability change is no longer the one the owner answered. It is never a
+whole-request status.
 ~~Superseded: the same union without `TITLE_NOT_ACTIVE`, added with §6.32
 (US-048). It is deliberately NOT `LISTING_NOT_REMOVED`: that one answers "this
 listing is already active", the opposite condition.~~
@@ -2555,5 +2655,6 @@ Binding rules, all asserted by `T-IMG-021`:
 | REQ-070/071/072 | §6.6, §6.7, §6.8, `specs/ai.md` §5 |
 | REQ-074 | §6.24, **§5.2.5 (which failures it can and cannot recover — R5)** |
 | REQ-076 | §6.4 |
+| REQ-130 (`A55`) | §6.45, §6.46, §6.47, §6.48 |
 | NFR-019/020 | §6.27 |
 | **RSK-016 / `A43-M1`…`M3`/`M5`** *(R5)* | **§5.0** (pre-decode pixel guard), **§5.2** (isolation, both OOM paths, exact error text), **§8** (the three codes), **§9.1** (decode sentinel) |

@@ -85,7 +85,7 @@ export function parseServiceBody(body: unknown): Service {
   return service as Service;
 }
 
-async function refuseIfSuppressed(
+export async function refuseIfSuppressed(
   ownerId: Parameters<typeof findActiveSuppression>[0],
   workIdentity: string,
   details: Record<string, unknown>,
@@ -131,6 +131,33 @@ async function rederiveTitle(
   return state;
 }
 
+/**
+ * Soft-remove these listings of ONE title and re-derive it, in ONE
+ * transaction. Shared by §6.40, §6.42 and the bulk §6.48 so no path can
+ * remove a badge differently from another.
+ */
+export async function softRemoveListings(
+  ownerId: Parameters<typeof softDeleteServiceListing>[0],
+  titleId: string,
+  listingIds: readonly string[],
+  removedAt: Date,
+): Promise<'active' | 'removed'> {
+  return runInTransaction(async (tx) => {
+    for (const listingId of listingIds) {
+      await softDeleteServiceListing(
+        ownerId,
+        listingId,
+        // Both NULL — "Removed by you" in the removed log (§6.9).
+        { removedByBatchId: null, removedByGroupId: null, removedAt },
+        tx,
+      );
+    }
+    // The last badge going takes the row with it — the same outcome as a
+    // whole-title remove, derived rather than assigned.
+    return rederiveTitle(ownerId, titleId, tx);
+  });
+}
+
 const duplicate = (workIdentity: string, service: Service) => (error: unknown) => {
   // `listing_one_per_service` / `title_one_active_per_work` — filtered unique
   // indexes; only the store sees the race, exactly as in §6.30.
@@ -144,6 +171,166 @@ const duplicate = (workIdentity: string, service: Service) => (error: unknown) =
   }
   throw error;
 };
+
+type WaitingIntent = NonNullable<Awaited<ReturnType<typeof findWaitingIntent>>>;
+
+/**
+ * §6.41's write, shared with the bulk §6.48: suppression first, then the
+ * listing and the intent's satisfaction in ONE transaction.
+ */
+export async function promoteIntent(
+  ownerId: Parameters<typeof findWaitingIntent>[0],
+  intent: WaitingIntent,
+  service: Service,
+) {
+  const workIdentity = intent.workIdentity;
+  await refuseIfSuppressed(ownerId, workIdentity, { intentId: intent.id });
+
+  const now = new Date();
+  const today = dateOnlyUtc(now);
+  const result = await runInTransaction(async (tx) => {
+    // The §6.30 rule, transcribed: a new title only when the work has none
+    // or its newest is not active. A waiting work's title is stored
+    // `removed` with no listing, so this normally creates a NEW row dated
+    // today — reappearance is a brand-new row (invariant 7).
+    const existing = await findTitleByWorkIdentity(ownerId, workIdentity, tx);
+    let titleId: string;
+    let titleWasCreated: boolean;
+    if (existing === null || existing.state !== 'active') {
+      const source = intent.title;
+      titleId = ulid();
+      titleWasCreated = true;
+      await createTitle(
+        ownerId,
+        {
+          id: titleId,
+          workIdentity,
+          state: 'active',
+          matchState: 'matched',
+          tmdbId: source.tmdbId,
+          tmdbMediaType: source.tmdbMediaType,
+          tmdbName: source.tmdbName,
+          tmdbReleaseYear: source.tmdbReleaseYear,
+          tmdbRuntimeMinutes: source.tmdbRuntimeMinutes,
+          tmdbGenres: source.tmdbGenres,
+          tmdbComedyShow: source.tmdbComedyShow,
+          tmdbPosterPath: source.tmdbPosterPath,
+          tmdbFetchedAt: source.tmdbFetchedAt,
+          imdbId: source.imdbId,
+          editionLabels: source.editionLabels,
+          // The intent's last-known answer comes along, so the new row does
+          // not need a fresh lookup to show where it streams.
+          availableOn: intent.availableOn,
+          rentOn: intent.rentOn,
+          availabilityCheckedAt: intent.availabilityCheckedAt,
+          availabilityRegion: intent.availabilityRegion,
+          sortDateAdded: today,
+          createdByBatchId: null,
+        },
+        tx,
+      );
+    } else {
+      titleId = existing.id;
+      titleWasCreated = false;
+      if (existing.sortDateAdded === null || existing.sortDateAdded > today) {
+        await updateTitle(ownerId, titleId, { sortDateAdded: today }, tx);
+      }
+    }
+    const listingId = ulid();
+    await createServiceListing(
+      ownerId,
+      { listingId, titleId, service, state: 'active', dateAdded: today, createdByBatchId: null },
+      tx,
+    );
+    // The waiting intent ends HERE, in the same transaction as the listing
+    // that satisfies it — never half-promoted.
+    await satisfyWaitingIntents(ownerId, [workIdentity], now, tx);
+    return { titleId, listingId, titleWasCreated };
+  }).catch(duplicate(workIdentity, service));
+
+  return {
+    intentId: intent.id,
+    titleId: result.titleId,
+    listingId: result.listingId,
+    service,
+    dateAdded: toIsoDate(today),
+    titleWasCreated: result.titleWasCreated,
+  };
+}
+
+type StoredTitle = NonNullable<Awaited<ReturnType<typeof findTitle>>>;
+export type TitleListing = Awaited<ReturnType<typeof listListingsForTitle>>[number];
+
+/**
+ * §6.42's guards and write, shared with the bulk §6.48. `check` runs after the
+ * suppression and not-active guards and before any write, so the bulk path can
+ * refuse a title whose change is no longer the one the owner answered.
+ */
+export async function moveTitleToWaiting(
+  ownerId: Parameters<typeof findTitle>[0],
+  title: StoredTitle,
+  check?: (active: readonly TitleListing[]) => void,
+) {
+  const titleId = title.id;
+  await refuseIfSuppressed(ownerId, title.workIdentity, { titleId });
+  const active = (await listListingsForTitle(ownerId, titleId)).filter(
+    (row: { state: string }) => row.state === 'active',
+  );
+  if (active.length === 0) {
+    throw new AppError(
+      'TITLE_NOT_ACTIVE',
+      409,
+      'That title is not in your library. Nothing was changed.',
+      { titleId },
+    );
+  }
+
+  check?.(active);
+  const removedAt = new Date();
+  const intentId = await runInTransaction(async (tx) => {
+    for (const listing of active) {
+      await softDeleteServiceListing(
+        ownerId,
+        listing.listingId,
+        { removedByBatchId: null, removedByGroupId: null, removedAt },
+        tx,
+      );
+    }
+    await rederiveTitle(ownerId, titleId, tx);
+    // One waiting intent per work: a work already waiting keeps its intent.
+    if ((await listWaitingWorkIdentities(ownerId, tx)).has(title.workIdentity)) return null;
+    const id = ulid();
+    await createWatchIntent(
+      ownerId,
+      {
+        id,
+        titleId,
+        workIdentity: title.workIdentity,
+        sourceBatchId: null,
+        // ⚠ `ck_intent_source` is closed and widening it needs a DROP
+        // CONSTRAINT that T-MIG-001 forbids, so a moved title is a
+        // `search`-sourced intent marked by `moved_from_library_at`
+        // (`ck_intent_moved_from_library_search`, migration 0019).
+        discoverySource: 'search',
+        state: 'waiting',
+        availableOn: title.availableOn,
+        rentOn: title.rentOn,
+        availabilityCheckedAt: title.availabilityCheckedAt,
+        availabilityRegion: title.availabilityRegion,
+        movedFromLibraryAt: removedAt,
+      },
+      tx,
+    );
+    return id;
+  });
+
+  return {
+    titleId,
+    intentId,
+    removedListingIds: active.map((row: { listingId: string }) => row.listingId),
+    removedAt: removedAt.toISOString(),
+  };
+}
 
 export function registerAvailabilityMoveRoutes(router: Router): void {
   /** §6.40 — remove ONE service badge (PRD §7.4 item 13, US-063 AC-3). */
@@ -164,18 +351,7 @@ export function registerAvailabilityMoveRoutes(router: Router): void {
     }
 
     const removedAt = new Date();
-    const titleState = await runInTransaction(async (tx) => {
-      await softDeleteServiceListing(
-        ownerId,
-        listingId,
-        // Both NULL — "Removed by you" in the removed log (§6.9).
-        { removedByBatchId: null, removedByGroupId: null, removedAt },
-        tx,
-      );
-      // The last badge going takes the row with it — the same outcome as a
-      // whole-title remove, derived rather than assigned.
-      return rederiveTitle(ownerId, listing.titleId, tx);
-    });
+    const titleState = await softRemoveListings(ownerId, listing.titleId, [listingId], removedAt);
 
     res.status(200).json({
       listingId,
@@ -230,79 +406,8 @@ export function registerAvailabilityMoveRoutes(router: Router): void {
     const intent = await findWaitingIntent(ownerId, intentId);
     if (intent === null) throw new AppError('NOT_FOUND', 404, 'No such waiting title.');
     const service = parseServiceBody(req.body);
-    const workIdentity = intent.workIdentity;
-    await refuseIfSuppressed(ownerId, workIdentity, { intentId });
-
-    const now = new Date();
-    const today = dateOnlyUtc(now);
-    const result = await runInTransaction(async (tx) => {
-      // The §6.30 rule, transcribed: a new title only when the work has none
-      // or its newest is not active. A waiting work's title is stored
-      // `removed` with no listing, so this normally creates a NEW row dated
-      // today — reappearance is a brand-new row (invariant 7).
-      const existing = await findTitleByWorkIdentity(ownerId, workIdentity, tx);
-      let titleId: string;
-      let titleWasCreated: boolean;
-      if (existing === null || existing.state !== 'active') {
-        const source = intent.title;
-        titleId = ulid();
-        titleWasCreated = true;
-        await createTitle(
-          ownerId,
-          {
-            id: titleId,
-            workIdentity,
-            state: 'active',
-            matchState: 'matched',
-            tmdbId: source.tmdbId,
-            tmdbMediaType: source.tmdbMediaType,
-            tmdbName: source.tmdbName,
-            tmdbReleaseYear: source.tmdbReleaseYear,
-            tmdbRuntimeMinutes: source.tmdbRuntimeMinutes,
-            tmdbGenres: source.tmdbGenres,
-            tmdbComedyShow: source.tmdbComedyShow,
-            tmdbPosterPath: source.tmdbPosterPath,
-            tmdbFetchedAt: source.tmdbFetchedAt,
-            imdbId: source.imdbId,
-            editionLabels: source.editionLabels,
-            // The intent's last-known answer comes along, so the new row does
-            // not need a fresh lookup to show where it streams.
-            availableOn: intent.availableOn,
-            rentOn: intent.rentOn,
-            availabilityCheckedAt: intent.availabilityCheckedAt,
-            availabilityRegion: intent.availabilityRegion,
-            sortDateAdded: today,
-            createdByBatchId: null,
-          },
-          tx,
-        );
-      } else {
-        titleId = existing.id;
-        titleWasCreated = false;
-        if (existing.sortDateAdded === null || existing.sortDateAdded > today) {
-          await updateTitle(ownerId, titleId, { sortDateAdded: today }, tx);
-        }
-      }
-      const listingId = ulid();
-      await createServiceListing(
-        ownerId,
-        { listingId, titleId, service, state: 'active', dateAdded: today, createdByBatchId: null },
-        tx,
-      );
-      // The waiting intent ends HERE, in the same transaction as the listing
-      // that satisfies it — never half-promoted.
-      await satisfyWaitingIntents(ownerId, [workIdentity], now, tx);
-      return { titleId, listingId, titleWasCreated };
-    }).catch(duplicate(workIdentity, service));
-
-    res.status(201).json({
-      intentId,
-      titleId: result.titleId,
-      listingId: result.listingId,
-      service,
-      dateAdded: toIsoDate(today),
-      titleWasCreated: result.titleWasCreated,
-    });
+    const result = await promoteIntent(ownerId, intent, service);
+    res.status(201).json(result);
   });
 
   /** §6.42 — "Move to Waiting" (§7.4 item 15, US-063 AC-5). */
@@ -312,63 +417,7 @@ export function registerAvailabilityMoveRoutes(router: Router): void {
 
     const title = await findTitle(ownerId, titleId);
     if (title === null) throw new AppError('NOT_FOUND', 404, 'No such title.');
-    await refuseIfSuppressed(ownerId, title.workIdentity, { titleId });
-    const active = (await listListingsForTitle(ownerId, titleId)).filter(
-      (row: { state: string }) => row.state === 'active',
-    );
-    if (active.length === 0) {
-      throw new AppError(
-        'TITLE_NOT_ACTIVE',
-        409,
-        'That title is not in your library. Nothing was changed.',
-        { titleId },
-      );
-    }
-
-    const removedAt = new Date();
-    const intentId = await runInTransaction(async (tx) => {
-      for (const listing of active) {
-        await softDeleteServiceListing(
-          ownerId,
-          listing.listingId,
-          { removedByBatchId: null, removedByGroupId: null, removedAt },
-          tx,
-        );
-      }
-      await rederiveTitle(ownerId, titleId, tx);
-      // One waiting intent per work: a work already waiting keeps its intent.
-      if ((await listWaitingWorkIdentities(ownerId, tx)).has(title.workIdentity)) return null;
-      const id = ulid();
-      await createWatchIntent(
-        ownerId,
-        {
-          id,
-          titleId,
-          workIdentity: title.workIdentity,
-          sourceBatchId: null,
-          // ⚠ `ck_intent_source` is closed and widening it needs a DROP
-          // CONSTRAINT that T-MIG-001 forbids, so a moved title is a
-          // `search`-sourced intent marked by `moved_from_library_at`
-          // (`ck_intent_moved_from_library_search`, migration 0019).
-          discoverySource: 'search',
-          state: 'waiting',
-          availableOn: title.availableOn,
-          rentOn: title.rentOn,
-          availabilityCheckedAt: title.availabilityCheckedAt,
-          availabilityRegion: title.availabilityRegion,
-          movedFromLibraryAt: removedAt,
-        },
-        tx,
-      );
-      return id;
-    });
-
-    res.status(200).json({
-      titleId,
-      intentId,
-      removedListingIds: active.map((row: { listingId: string }) => row.listingId),
-      removedAt: removedAt.toISOString(),
-    });
+    res.status(200).json(await moveTitleToWaiting(ownerId, title));
   });
 
   /** §6.43 — "Keep": dismiss this exact change (§7.4 item 16, US-063 AC-6). */

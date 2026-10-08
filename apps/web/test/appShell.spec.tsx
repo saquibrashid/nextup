@@ -26,7 +26,7 @@ function renderAt(path: string) {
 }
 
 describe('AppShell and routing', () => {
-  it('T-UI-023a · specs/ui.md §1 · the route table holds exactly the thirteen specified screens', () => {
+  it('T-UI-023a · specs/ui.md §1 · the route table holds exactly the fourteen specified screens', () => {
     // ⚠ The EXACT PATH LIST is the assertion; the length is a redundant
     // restatement of it kept only so a diff reads clearly. Epic M added
     // `/rating` (REQ-092) and Epic L added `/waiting` (US-043), which is why
@@ -42,11 +42,13 @@ describe('AppShell and routing', () => {
       '/not-interested',
       '/waiting',
       '/waiting/:titleId',
+      // US-064 (`A55`) — the availability review screen.
+      '/availability',
       '/about',
       '/rating',
       '*',
     ]);
-    expect(ROUTES).toHaveLength(13);
+    expect(ROUTES).toHaveLength(14);
   });
 
   it('T-UI-023b · specs/ui.md §1 · every route renders its own screen inside the shell', () => {
@@ -95,7 +97,7 @@ describe('AppShell and routing', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Review');
   });
 
-  it('T-UI-023f · specs/ui.md §1 · the nav exposes the eight top-level destinations', () => {
+  it('T-UI-023f · specs/ui.md §1 · the nav exposes the nine top-level destinations', () => {
     renderAt('/');
 
     const nav = screen.getByRole('navigation', { name: 'Primary' });
@@ -114,6 +116,9 @@ describe('AppShell and routing', () => {
       // Epic L (US-043). The waiting view is a top-level destination, not a
       // filter of the list: nothing in it is on a service the owner has.
       'Waiting to stream',
+      // US-064 (`A55`). A destination, not a filter: it gathers the changes
+      // the Library and Waiting markers already show one at a time.
+      'Availability changes',
       'About',
       // Epic M (REQ-092). Reachable from the nav rather than only from a row,
       // because US-045 is about checking something the owner has NOT saved -

@@ -580,6 +580,73 @@ export interface AddBadgeResponse {
   dateAdded: string;
 }
 
+/** §6.45 (US-064) — a Library title with an un-kept availability change. */
+export interface AvailabilityReviewLibraryItem {
+  titleId: string;
+  workIdentity: string;
+  name: string;
+  releaseYear: number | null;
+  posterPath: string | null;
+  badges: import('../components/TitleRow').TitleBadge[];
+  availability: import('../components/TitleRow').TitleAvailability;
+}
+
+/** §6.45 (US-064) — a waiting title now streaming on an owner service. */
+export interface AvailabilityReviewWaitingItem {
+  intentId: string;
+  titleId: string;
+  workIdentity: string;
+  name: string;
+  releaseYear: number | null;
+  posterPath: string | null;
+  /** The owner's services it streams on, in `SERVICES` order. */
+  flaggedOn: import('@nextup/domain').Service[];
+  /** The one a bulk "Add to Library" uses: the first of `flaggedOn`. */
+  service: import('@nextup/domain').Service | null;
+  availabilityCheckedAt: string | null;
+  availabilityRegion: string;
+}
+
+/** How many checkable titles have a recent answer, and how many do not. */
+export interface AvailabilityCheckCounts {
+  checked: number;
+  notCheckedRecently: number;
+}
+
+/** §6.45 — the "Availability changes" screen, from stored data only. */
+export interface AvailabilityReviewResponse {
+  library: AvailabilityReviewLibraryItem[];
+  nowStreaming: AvailabilityReviewWaitingItem[];
+  check: AvailabilityCheckCounts;
+}
+
+/** §6.47 — one "Check more titles" tap. */
+export interface AvailabilityCheckResponse extends AvailabilityCheckCounts {
+  /** Answers written by this tap. */
+  lookedUp: number;
+  /** Lookups that failed and wrote nothing. */
+  failed: number;
+}
+
+export type AvailabilityReviewAction =
+  'keep' | 'remove-left-badges' | 'move-to-waiting' | 'add-to-library';
+
+/** One row's outcome in §6.48. A refusal carries the API's reason. */
+export interface AvailabilityReviewItemResult {
+  id: string;
+  outcome: 'done' | 'refused';
+  code?: string;
+  message?: string;
+}
+
+/** §6.48 — one answer applied to several rows, each its own transaction. */
+export interface AvailabilityReviewApplyResponse {
+  action: AvailabilityReviewAction;
+  results: AvailabilityReviewItemResult[];
+  done: number;
+  refused: number;
+}
+
 export interface MeResponse {
   ownerId: string;
   displayName: string | null;
@@ -972,6 +1039,33 @@ export function createApiClient(deps: ApiClientDeps = {}) {
       request<AddBadgeResponse>(
         `/api/titles/${encodeURIComponent(titleId)}/badges`,
         { method: 'POST', body: { service } },
+        deps,
+      ),
+
+    /** §6.45 (US-064) — the "Availability changes" screen. Asks TMDB nothing. */
+    getAvailabilityReview: (signal?: AbortSignal) =>
+      request<AvailabilityReviewResponse>('/api/availability/review', { signal }, deps),
+
+    /** §6.46 (US-064 AC-6) — the Library page's "N availability changes". */
+    getAvailabilityReviewSummary: (signal?: AbortSignal) =>
+      request<{ count: number }>('/api/availability/review/summary', { signal }, deps),
+
+    /** §6.47 (US-064 AC-3) — "Check more titles": one owner tap, one capped batch. */
+    checkMoreAvailability: () =>
+      request<AvailabilityCheckResponse>(
+        '/api/availability/check',
+        { method: 'POST', body: {} },
+        deps,
+      ),
+
+    /** §6.48 (US-064 AC-4) — one answer for several rows; per-row results. */
+    applyAvailabilityReview: (
+      action: AvailabilityReviewAction,
+      items: readonly { id: string; signature?: string }[],
+    ) =>
+      request<AvailabilityReviewApplyResponse>(
+        '/api/availability/review/apply',
+        { method: 'POST', body: { action, items } },
         deps,
       ),
 

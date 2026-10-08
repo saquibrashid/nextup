@@ -102,6 +102,9 @@ async function mock(page: Page) {
       case '/api/removed':
         json = { items: [] };
         break;
+      case '/api/availability/review/summary':
+        json = { count: 0 };
+        break;
       default:
         throw new Error(`Unexpected API request: ${request.method()} ${path}`);
     }
