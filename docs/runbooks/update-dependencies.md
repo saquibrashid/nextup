@@ -55,19 +55,45 @@ step, not the check.
 
 ## 2. Draining the dependabot queue
 
-The queue does not drain itself. Land the safe bumps together, in one commit,
-with notices regenerated once (harmless for a dev-only batch, and correct the
-moment one production package is in it):
+⚠ **Do not land bumps by running `npm install` locally. Let dependabot own
+the lockfile.** Merge its pull requests — one per bump, or one per group —
+and let the notices workflow regenerate `THIRD-PARTY-NOTICES.md` on its own
+branch. Dependabot resolves against `registry.npmjs.org`; a local
+`npm install` on a Microsoft-managed machine resolves through
+`packagefeedproxy.microsoft.io` and rewrites `resolved` for every package it
+touches, which publishes internal feed URLs from a public repository **and
+silently disables dependabot for every package it rewrote** (§6a, issue
+#417). That is how 442 entries were contaminated and four bumps stopped
+updating for nine days with every CI job green. `T-CI-011` now fails CI on it,
+so a batched local install will not merge — it will just waste the run.
 
-```powershell
-npm install --no-audit --no-fund <pkg>@<version> [...]   # add --save-dev for dev deps
-npm run notices
-```
+**Safe locally:** `npm ci` and `npm ci --dry-run`. Neither writes the
+lockfile.
 
-Then close the superseded dependabot PRs by referencing them in the commit or
-PR body — dependabot closes its own PR once the same version reaches `main`.
+**If a bump genuinely cannot be taken as a dependabot PR** (it needs a source
+change in the same commit — an entry-point migration, a renamed option), make
+the source change on your branch and let dependabot's lockfile land
+separately, or edit the `version` in `package.json` and take the resulting
+lockfile from a `npm install` **on a machine with the public registry
+configured**. If neither is possible, rewrite the hosts afterwards with the
+§6a repair and verify with `npm run check:lockfile` before pushing.
 
-**Bumps that must NOT be batched this way:**
+~~Superseded (this is the instruction that caused the defect in issue #417 —
+it was written before §6a was understood, and it contradicts §6/§6a):~~
+
+> ~~The queue does not drain itself. Land the safe bumps together, in one
+> commit, with notices regenerated once:~~
+>
+> ```powershell
+> npm install --no-audit --no-fund <pkg>@<version> [...]   # add --save-dev for dev deps
+> npm run notices
+> ```
+
+Dependabot closes its own PR once the same version reaches `main`, so a
+superseded PR needs no manual close — reference it in the commit or PR body
+and it will clean itself up.
+
+**Bumps that must NOT be batched at all:**
 
 - **A major version of a runtime dependency.** `@prisma/adapter-mssql`
   6 → 7 changes the database adapter, and nothing in the unit or web suites
@@ -91,6 +117,7 @@ npm run typecheck
 npm run lint
 npm run check:licences     # T-LICENSE-001
 npm run check:deps         # the runtime allow-list (NFR-004) + action SHA pinning
+npm run check:lockfile     # T-CI-011 — no proxy-feed resolved URLs, no committed .npmrc
 npx vitest run --project unit --project web --project meta --project infra
 ```
 
@@ -102,12 +129,20 @@ already-allow-listed package needs no justification.
 
 ## 4. If a bump breaks something
 
-Revert the single package rather than the whole batch:
+Revert the single package rather than the whole batch. ⚠ **Not with a local
+`npm install`** — see §2 and §6a. Revert the commit that landed that one
+package (`git revert`), or if it rode in on a group PR, edit `package.json`
+back and take the lockfile change from a fresh dependabot run. Then add a
+version cap to `.github/dependabot.yml` with the evidence, so the queue does
+not hand you the same bump next week, and record it in §5.
 
-```powershell
-npm install --no-audit --no-fund <pkg>@<previous-version>
-npm run notices
-```
+~~Superseded (issue #417 — a local `npm install` rewrites every `resolved`
+URL through the internal proxy feed and disables dependabot):~~
+
+> ```powershell
+> npm install --no-audit --no-fund <pkg>@<previous-version>
+> npm run notices
+> ```
 
 Then re-run the gates in §3. Do not pin a transitive dependency by hand in
 `package-lock.json` — the next `npm install` will undo it silently.
@@ -492,16 +527,44 @@ real install against the public registry can, which is what §6 explains is
 impossible from here. The two problems share a cause and have different
 remedies.
 
-**No CI gate.** A check that failed on any `sha1-` would fail today on ~525
-entries with no available remedy — a broken gate, not a safety net. A ratchet
-(fail if `sha1-` count rises / `sha512-` count falls) would at most catch an
-accidental full-lockfile regeneration, but the count is not monotonic — a
-legitimate bump can drop a transitive `sha512-` dependency — so it would raise
-false positives, and the regeneration it guards against already shows up as an
-enormous lockfile diff in review. The review expectation is the mitigation: a
-dependency PR should **add or keep `sha512-`/`registry.npmjs.org`** entries;
-one that **adds `sha1-`** entries or repoints `resolved` at `ms-feed-*`
-(especially a full regen) is the red flag to inspect by hand.
+**There IS a CI gate on the `resolved` URL — `npm run check:lockfile`,
+`T-CI-011`, added for issue #417.** Every `resolved` URL in every lockfile
+must name `registry.npmjs.org`, and no `.npmrc` may be committed. It is an
+**allow-list**, not an `ms-feed-*` denylist: the next proxy to leak in will
+have a different hostname. Run it before pushing any dependency change.
+
+**There is still NO gate on `sha1-`, deliberately, and the two are not the
+same question.** A `sha1-` check would fail today on ~525 entries with **no
+available remedy** — only a real install against the public registry can fix
+those, which §6 explains is impossible from here — so it would be a broken
+gate rather than a safety net. A ratchet on the count would raise false
+positives, because a legitimate bump can drop a transitive `sha512-` entry.
+The `resolved` URL is the opposite case on every axis: the violation arrives
+one commit at a time, the clean state is reachable (`main` is clean after
+#416), and the remedy is the mechanical, offline host rewrite above. ⚠ **So
+do not "complete" the gate by extending it to `sha1-`** — after #416 the two
+populations no longer correlate (~412 `sha1-` hashes, zero proxy URLs), and
+doing so would fail the clean tree.
+
+~~Superseded by issue #417 (the argument below is sound for `sha1-` and was
+wrongly extended to the `resolved` URL, which is remediable and was costing
+nine days of dependabot silence at the time it was written):~~
+
+> ~~**No CI gate.** A check that failed on any `sha1-` would fail today on
+> ~525 entries with no available remedy — a broken gate, not a safety net. A
+> ratchet (fail if `sha1-` count rises / `sha512-` count falls) would at most
+> catch an accidental full-lockfile regeneration, but the count is not
+> monotonic — a legitimate bump can drop a transitive `sha512-` dependency —
+> so it would raise false positives, and the regeneration it guards against
+> already shows up as an enormous lockfile diff in review. The review
+> expectation is the mitigation: a dependency PR should **add or keep
+> `sha512-`/`registry.npmjs.org`** entries; one that **adds `sha1-`** entries
+> or repoints `resolved` at `ms-feed-*` (especially a full regen) is the red
+> flag to inspect by hand.~~
+
+The review expectation still applies to the half that has no gate: a
+dependency PR that **adds `sha1-`** entries (especially a full regen) is the
+red flag to inspect by hand.
 
 ## 7. `npm ci` fails with a 404 for a version that certainly exists
 
