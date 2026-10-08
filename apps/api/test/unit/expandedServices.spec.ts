@@ -127,7 +127,7 @@ describe('T-SVC-001 API service dimensions', () => {
     expect(flaggedProvidersFor(readFlatrateProviders(null, 'US'))).toBeNull();
   });
 
-  it('T-SVC-001g reads the post-rebrand "Apple TV" subscription as Apple TV+, never the store', () => {
+  it('T-SVC-001j reads the post-rebrand "Apple TV" subscription as Apple TV+, never the store', () => {
     // Since Oct 2025 TMDB names the subscription (350) and the store (2) both
     // "Apple TV"; only the subscription can be in flatrate.
     const subscribed = {
