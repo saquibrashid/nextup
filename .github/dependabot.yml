@@ -48,11 +48,16 @@ updates:
     # it, because an `ignore` with no exit criterion silently becomes permanent.
     ignore:
       # RELEASED - the runtime moved to Node 22 and the first production deploy
-      # on it succeeded, which was the exit criterion recorded here. `jsdom` and
+      # on it succeeded, which was the exit criterion recorded here.
       # `@testing-library/jest-dom` majors need Node >= 22 and nothing else, so
-      # they carry no ignore now; Dependabot raises them against
+      # it carries no ignore now; Dependabot raises it against
       # registry.npmjs.org, which is also the only correct way to regenerate
       # `package-lock.json` here (docs/runbooks/update-dependencies.md 6 and 7).
+      # `jsdom` was released by the same step but has since been re-held for an
+      # UNRELATED reason - see its own entry below.
+      # ~~Superseded (jsdom re-held 2026-10-08, accessible-name regression):
+      # "`jsdom` and `@testing-library/jest-dom` majors need Node >= 22 and
+      # nothing else, so they carry no ignore now".~~
       #
       # `@types/node` is NOT released outright, and must not be. It is the type
       # view of the runtime, so it is capped at the major actually running
@@ -71,6 +76,41 @@ updates:
       # typescript-eslint/typescript-eslint#10940.
       - dependency-name: 'typescript'
         versions: ['>=7.0.0 <7.1.0']
+      # jsdom >= 28 computes ACCESSIBLE NAMES non-conformantly: it drops the
+      # separator space between a text node and an adjacent inline element, so
+      # `All<span class="sr-only"> statuses</span>` is named "Allstatuses" and
+      # the filters trigger is named "Filters4 active". accname 1.2 step 2I
+      # says to append with a space; Chrome, Firefox and Safari all do.
+      #
+      #   • ⚠ THE PRODUCT MARKUP IS CORRECT, AND CI PROVES IT. On the very
+      #     commit where `4 - test:unit + coverage` and `6 - test:web` went red
+      #     (5 tests: T-PHONE-005a/b, T-UX-145c, T-TOOLBAR-002b, T-AVREV-009a),
+      #     `9 - test:a11y` PASSED - that suite is Playwright against real
+      #     browsers. Read a split like that as "the test engine is wrong",
+      #     not "the component is wrong", and do NOT reshape `FilterBar.tsx`
+      #     to satisfy jsdom: it would make the real-browser name worse to
+      #     make a non-conformant simulation agree.
+      #
+      #   • There is NO dependency that fixes this. The space logic lives in
+      #     `dom-accessibility-api`, not jsdom; its latest release (0.7.1,
+      #     2025-11-27) is a publishing change with no fix, and
+      #     `@testing-library/dom` pins `^0.5.9` so 0.7.x is unreachable
+      #     anyway. Bumping testing-library will NOT clear this.
+      #
+      #   • Upstream jsdom#4091 is closed `not_planned`, but on PROCESS
+      #     grounds ("uses a third-party library... please open a new issue
+      #     with a minimal reproduction case with no third-party libraries"),
+      #     NOT on the merits. It is unadjudicated, not rejected.
+      #
+      # Capped by VERSION rather than update-type, like `@types/node` above:
+      # 26 is known good (the upstream report reproduces clean on 26.1.0), so
+      # refusing only >= 28 keeps the cap as small as the evidence supports.
+      # UNBLOCKED BY: jsdom restoring accname 1.2 step 2I space separation, or
+      # `dom-accessibility-api` stopping relying on the old `display` default
+      # AND `@testing-library/dom` widening its pin to take that release.
+      # Verify by rebasing the bump and watching those 5 tests specifically.
+      - dependency-name: 'jsdom'
+        versions: ['>=28']
       # Prisma 7 is a migration, not a bump — and as of 2026-08-25 it is held
       # for a REASON THAT IS NOT ABOUT EFFORT. Measured on a full v7 branch
       # (`prisma`, `@prisma/client`, `@prisma/adapter-mssql` all at 7.9.1)

@@ -220,6 +220,80 @@ places… **Unblocked by** a deliberate Node 20 → 22 upgrade, which is worth
 doing on its own merits — **Node 20 reached end of life on 2026-04-30** and
 receives no further security patches."~~
 
+### jsdom 30 (`jsdom`) — HELD, and **not** for the reason the red PR suggests
+
+PR #405 (`jsdom` 25.0.1 → 30.1.2) was investigated twice and held both times.
+⚠ **The two failures look identical from the PR page — both are "jobs 4 and 6
+are red" — and they are completely unrelated.** Do not assume the second is a
+recurrence of the first.
+
+**Round 1 — `TypeError: Cannot read properties of undefined (reading '_bytes')`
+— FIXED, not held.** jsdom 30.1 moved `Blob` internals behind private fields
+while vitest's jsdom-compat shim still read `_bytes`. 10 tests failed, every
+one of them on an ingest path (`pasteCapture`, `imageDropzone`, `guidedUpload`,
+`uploadCheckpoint`, `captureIntake`), because **every ingest affordance renders
+a preview** — so the cluster is a symptom of product invariant 16, not a hint
+that ingest is broken. The innermost nextup frame was
+`components/ScreenshotPreview.tsx` calling `URL.createObjectURL`, which is
+**correct as written**. The real fix was upstream and one patch away:
+`vitest@5.0.3`, "Support Blob on jsdom 30.1" (vitest-dev/vitest#11379), taken
+in #420. ⚠ The obvious-looking local fixes were both wrong and were rejected:
+mocking `URL.createObjectURL` in the web setup would have blinded every ingest
+preview assertion while turning the suite green, and pinning jsdom to 30.0.x
+would have traded an ordering problem for a permanent pin with no exit
+criterion.
+
+**Round 2 — accessible-name whitespace — THIS is the hold.** With vitest 5.0.3
+in place the `_bytes` failures vanished and a different, smaller set appeared:
+5 tests, one root cause.
+
+```
+Expected element to have accessible name:
+  Filters 4 active
+Received:
+  Filters4 active
+```
+
+jsdom **>= 28** drops the separator space between a text node and an adjacent
+inline element when an accessible name is computed, so
+`All<span class="sr-only"> statuses</span>` (`FilterBar.tsx`, three sites) is
+named `Allstatuses`. accname 1.2 step 2I says to append with a space, and
+Chrome, Firefox and Safari all do.
+
+⚠ **The markup is correct, and the same CI run proves it.** On the identical
+commit that failed `4 · test:unit + coverage` and `6 · test:web`
+(`T-PHONE-005a`, `T-PHONE-005b`, `T-UX-145c`, `T-TOOLBAR-002b`,
+`T-AVREV-009a`), **`9 · test:a11y` passed** — that suite is Playwright driving
+real browsers. A split of that exact shape — jsdom red, real browsers green, on
+one commit — is evidence that **the test engine is wrong**, and reshaping
+`FilterBar.tsx` to satisfy it would make the real-browser accessible name worse
+in order to make a non-conformant simulation agree.
+
+**No dependency bump clears this**, which is the part most likely to be
+rediscovered the hard way: the space logic lives in `dom-accessibility-api`,
+not in jsdom. Its latest release (0.7.1, 2025-11-27) is a trusted-publishing
+change containing no fix, and `@testing-library/dom@10.4.1` pins
+`dom-accessibility-api@^0.5.9`, so 0.7.x is not even reachable from this tree.
+Bumping testing-library will not help.
+
+Upstream `jsdom/jsdom#4091` is closed `not_planned`, **but on process grounds**
+— "this issue uses a third-party library (`@testing-library/dom`), which we
+cannot provide support for… please consider opening a new issue… with no
+third-party libraries involved" — **not on the merits**. The behaviour is
+unadjudicated, not rejected, so a clean no-third-party repro is a live path to
+reopening it.
+
+The ignore in `.github/dependabot.yml` is capped at `versions: ['>=28']`
+rather than by update-type, the same way `@types/node` is: 26 is known good
+(the upstream report reproduces clean on 26.1.0), so the cap stays as small as
+the evidence supports.
+
+**UNBLOCKED BY:** jsdom restoring accname 1.2 step 2I space separation, or
+`dom-accessibility-api` no longer depending on the old `display` default *and*
+`@testing-library/dom` widening its pin far enough to take that release. To
+re-test, raise the cap, let Dependabot rebase the bump, and watch those five
+named tests specifically.
+
 
 ## 6. `package-lock.json` carries `sha1-` integrity — investigated, nothing to do
 
