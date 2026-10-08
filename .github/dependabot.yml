@@ -111,6 +111,39 @@ updates:
       # Verify by rebasing the bump and watching those 5 tests specifically.
       - dependency-name: 'jsdom'
         versions: ['>=28']
+      # msw 3 is UNINSTALLABLE here, and the error does not say so. Every job
+      # on #424 died at `npm ci` with `EUSAGE ... Missing: msw@2.15.0 from
+      # lock file` — which reads like a stale lockfile and is not one. The
+      # lockfile on that branch is correct: it resolves `msw@3.0.2` and
+      # nothing anywhere declares 2.15.0.
+      #
+      #   • THE CAUSE IS A PEER RANGE WE DO NOT OWN. `@vitest/mocker` (pulled
+      #     by `vitest`, latest 5.0.3) declares an OPTIONAL peer
+      #     `msw: '^2.4.9'`. msw 3 does not satisfy it, so npm must nest an
+      #     `msw@2.15.0` beside the mocker — a tree Dependabot's lockfile does
+      #     not contain, hence EUSAGE.
+      #
+      #   • ⚠ IT REPRODUCES ONLY ON CI'S npm. npm 11 (local) tolerates the
+      #     unsatisfied optional peer and `npm ci --dry-run` SUCCEEDS on the
+      #     exact merge commit CI rejects; npm 10.9.x, which is what Node
+      #     22.23.3 bundles in `1 · lint` and every other job, does not. Do
+      #     not conclude "works locally, so the PR is fine" — pin the npm
+      #     version before believing a local install here.
+      #
+      #   • A second, independent blocker sits behind the first: msw 3 moved
+      #     its entry points, so `import { http, HttpResponse, passthrough }
+      #     from 'msw'` becomes `'msw/http'`, and `onUnhandledRequest` becomes
+      #     `onUnhandledFrame`. That is a real migration across the four
+      #     `tests/fixtures/msw/*` servers and the ~12 specs that start them —
+      #     a version-only Dependabot bump can never be green, even after the
+      #     peer range is fixed.
+      #
+      # UNBLOCKED BY: `@vitest/mocker` widening its `msw` peer range to accept
+      # 3.x. Re-check with `npm view @vitest/mocker@latest peerDependencies`;
+      # while it still prints `msw: '^2.4.9'`, this hold stands. Taking it
+      # then is a migration task, not a queue drain.
+      - dependency-name: 'msw'
+        versions: ['>=3']
       # Prisma 7 is a migration, not a bump — and as of 2026-08-25 it is held
       # for a REASON THAT IS NOT ABOUT EFFORT. Measured on a full v7 branch
       # (`prisma`, `@prisma/client`, `@prisma/adapter-mssql` all at 7.9.1)

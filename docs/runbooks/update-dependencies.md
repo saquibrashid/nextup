@@ -295,6 +295,71 @@ re-test, raise the cap, let Dependabot rebase the bump, and watch those five
 named tests specifically.
 
 
+### msw 3 (`msw`) — HELD: blocked by a peer range we do not own
+
+`#424` (2.15.0 → 3.0.2) failed **all twelve jobs in under 15 seconds**, every
+one of them at `npm ci`:
+
+```
+npm error code EUSAGE
+npm error Missing: msw@2.15.0 from lock file
+npm error Missing: @mswjs/interceptors@0.41.9 from lock file   (+ ~25 more)
+```
+
+⚠ **This reads like a stale lockfile and is not one.** It survived two
+`@dependabot rebase` rounds and a close/reopen. The lockfile on that branch is
+correct — `node_modules/msw` resolves `3.0.2`, the root manifest declares
+`"msw": "3.0.2"`, and **no** manifest or lock entry anywhere mentions
+`2.15.0`.
+
+**The cause is an optional peer dependency.** `@vitest/mocker` — pulled in by
+`vitest`, and still at `5.0.3`, the latest — declares:
+
+```json
+"peerDependencies": { "msw": "^2.4.9" },
+"peerDependenciesMeta": { "msw": { "optional": true } }
+```
+
+`msw@3.0.2` does not satisfy `^2.4.9`, so npm wants to nest an `msw@2.15.0`
+next to the mocker. Dependabot's lockfile has no such nested entry, so the
+tree npm computes and the tree the lockfile describes disagree → `EUSAGE`.
+
+⚠ **It only reproduces on CI's npm, and that is the trap.** `npm ci
+--dry-run` on the *exact* merge commit CI rejected (`2bed305`) **succeeds**
+under npm 11.11.0; the same command under `npx npm@10.9.4` fails with the
+identical error. CI runs Node 22.23.3, which bundles npm 10.9.x. So "it
+installs fine locally" proves nothing here — pin the npm version before
+trusting a local install:
+
+```powershell
+npx -y npm@10.9.4 ci --dry-run
+```
+
+**A second blocker sits behind the first.** msw 3 moved its entry points, so
+even once the peer range is fixed this is a migration, not a bump:
+
+| v2                                             | v3                        |
+| ---------------------------------------------- | ------------------------- |
+| `import { http, HttpResponse, passthrough } from 'msw'` | `from 'msw/http'` |
+| `server.listen({ onUnhandledRequest })`        | `{ onUnhandledFrame }`    |
+
+That touches the four fixture servers in `tests/fixtures/msw/*` (`aoai`,
+`ruleA`, `tmdb`, `vision`) and the ~12 specs that start them. Node 22 is
+already satisfied (msw 3 needs `>=22.12.0`; `.nvmrc` is `22`), so the engine
+is **not** part of this hold.
+
+**UNBLOCKED BY:** `@vitest/mocker` widening its `msw` peer range to accept
+3.x. Check it with:
+
+```powershell
+npm view "@vitest/mocker@latest" peerDependencies
+```
+
+While that still prints `msw: '^2.4.9'`, the hold stands. When it changes,
+raise the cap in `.github/dependabot.yml` and schedule the import migration as
+its own task — a version-only Dependabot PR can never be green on its own.
+
+
 ## 6. `package-lock.json` carries `sha1-` integrity — investigated, nothing to do
 
 Most of the lockfile's `integrity` hashes are **`sha1-`**, not `sha512-`. This
