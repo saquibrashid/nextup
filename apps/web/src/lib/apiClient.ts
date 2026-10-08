@@ -345,7 +345,15 @@ export interface CloseBatchResult {
     readonly listingsRemoved: number;
     readonly removalGroupId: string | null;
   };
-  readonly serviceState: { readonly service: Service };
+  /**
+   * ⚠ `null` for a discovery or auto-detect close (#396): neither refreshes a
+   * named service's saved list, so there is no freshness fact (REQ-039).
+   */
+  readonly serviceState: { readonly service: Service } | null;
+  /** Present only for a discovery close (US-040). */
+  readonly discovery?: { readonly intentsCreated: number };
+  /** Present only for an auto-detect close (#396, US-066). */
+  readonly autoDetect?: { readonly intentsCreated: number; readonly titlesListed: number };
   readonly undoable: boolean;
 }
 
@@ -698,6 +706,8 @@ export interface BatchStatus {
   /** `null` for a rental-storefront batch; `discoverySource` names it (#378). */
   service: Service | null;
   discoverySource?: string | null;
+  /** #396 — `true` only for an auto-detect capture: no service, no storefront. */
+  autoDetect?: boolean;
   mode: string;
   status: string;
   derivedFromBatchId: string | null;
@@ -758,6 +768,8 @@ export interface BatchHistoryItem {
   /** `null` for a rental-storefront batch; `discoverySource` names it (#378). */
   service: Service | null;
   discoverySource?: string | null;
+  /** #396 — `true` only for an auto-detect capture: no service, no storefront. */
+  autoDetect?: boolean;
   mode: string;
   status: string;
   createdAt: string;
@@ -808,6 +820,17 @@ export interface CreatedBatch {
  * section the owner has already worked through reads as a failure; the pair
  * is what distinguishes "nothing to do" from "nothing happened".
  */
+/** §6.50 (#396) — how many auto-detect candidates were looked up again. */
+export interface ServiceLookupResult {
+  readonly lookedUp: number;
+}
+
+/** §6.51 (#396) — the owner's destination for one auto-detect title. */
+export type AutoDestinationBody =
+  | { readonly kind: 'services'; readonly services: readonly Service[] }
+  | { readonly kind: 'waiting' }
+  | { readonly kind: null };
+
 export interface ConfirmAllResult {
   section: string;
   confirmed: number;
@@ -1165,6 +1188,25 @@ export function createApiClient(deps: ApiClientDeps = {}) {
      * to do when the third of five is refused — which is precisely the
      * half-applied state REQ-014 forbids.
      */
+    /**
+     * §6.50 (#396) — the owner's "Look up again" for auto-detect titles whose
+     * lookup failed. Owner-initiated; there is no automatic retry (REQ-100).
+     */
+    lookUpServices: (batchId: string, candidateIds?: readonly string[]) =>
+      request<ServiceLookupResult>(
+        `/api/batches/${encodeURIComponent(batchId)}/service-lookup`,
+        { method: 'POST', body: candidateIds === undefined ? {} : { candidateIds } },
+        deps,
+      ),
+
+    /** §6.51 (#396) — where one auto-detect title goes: services or Waiting. */
+    setCandidateDestination: (batchId: string, candidateId: string, body: AutoDestinationBody) =>
+      request<unknown>(
+        `/api/batches/${encodeURIComponent(batchId)}/candidates/${encodeURIComponent(candidateId)}/destination`,
+        { method: 'PATCH', body },
+        deps,
+      ),
+
     patchCandidate: (batchId: string, candidateId: string, body: CandidatePatchBody) =>
       request<PatchedCandidate>(
         `/api/batches/${encodeURIComponent(batchId)}/candidates/${encodeURIComponent(candidateId)}`,

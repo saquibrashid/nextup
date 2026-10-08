@@ -21,6 +21,7 @@
 
 import {
   createsOnlyRefusalReason,
+  isAutoDetectBatch,
   requireServiceOf,
   deriveSortDateAdded,
   detectLaterOwnerEdits,
@@ -69,7 +70,11 @@ export interface UndoResult {
   status: 'undone';
   undoneAt: string;
   reversed: { titlesDeleted: number; listingsRemoved: number };
-  serviceState: { service: string; lastCompletedBatchAt: string | null };
+  /**
+   * NULL for an auto-detect batch (#396): its close wrote no `ServiceState`,
+   * so its undo has none to revert.
+   */
+  serviceState: { service: string; lastCompletedBatchAt: string | null } | null;
 }
 
 /**
@@ -150,6 +155,28 @@ export async function undoBatch(ownerId: OwnerId, batchId: string): Promise<Undo
     );
   }
 
+  // #396 — an auto-detect batch that routed any title to Waiting to stream is
+  // refused: the intent it created carries no batch link, so undo could
+  // neither reverse it nor discard its title without orphaning it. The close
+  // persisted every applied candidate's destination for exactly this read.
+  const autoDetect = isAutoDetectBatch(batch);
+  if (autoDetect) {
+    const candidates = await listCandidatesForBatch(ownerId, batchId);
+    const routedToWaiting = candidates.some(
+      (row) =>
+        row.destinationKind === 'waiting' &&
+        (row.reviewDisposition === 'confirmed' || row.reviewDisposition === 'corrected'),
+    );
+    if (routedToWaiting) {
+      throw new AppError(
+        'BATCH_NOT_CREATES_ONLY',
+        409,
+        'This import can\u2019t be undone in one step, because it sent titles to Waiting to stream.',
+        await buildRefusalDetails(ownerId, batchId, provenance, 'waiting-routed'),
+      );
+    }
+  }
+
   const plan = planCreatesOnlyUndo(provenance);
   // ⚠ SERVICE-SCOPED, AND `requireServiceOf` IS THE POINT (ADR-0010 D-1).
   //
@@ -159,12 +186,17 @@ export async function undoBatch(ownerId: OwnerId, batchId: string): Promise<Undo
   // Undoing one is a `WatchIntent` reversal, which TASK-185 owns. Until then
   // this throws loudly rather than reverting the wrong service's state, and
   // the compiler is what forced the decision to be made here at all.
-  const service = requireServiceOf(batch);
+  //
+  // #396 — an auto-detect batch wrote no `ServiceState` (its close leaves the
+  // per-service date alone), so there is nothing to revert and no service to
+  // require.
+  const service = autoDetect ? null : requireServiceOf(batch);
   // ⚠ Read the predecessor BEFORE the transaction moves this batch out of
   // `applied`. Doing it inside would still be correct today because the query
   // excludes this batch by id, but it makes the revert depend on that
   // exclusion staying exactly as written.
-  const previous = await findPreviousAppliedBatch(ownerId, service, batchId);
+  const previous =
+    service === null ? null : await findPreviousAppliedBatch(ownerId, service, batchId);
   const revertedTo = previous?.completedAt ?? null;
 
   const undoneAt = new Date();
@@ -205,15 +237,17 @@ export async function undoBatch(ownerId: OwnerId, batchId: string): Promise<Undo
 
     await rederiveSurvivors(ownerId, plan.titleIdsToRederive, tx);
 
-    await upsertServiceState(
-      ownerId,
-      service,
-      {
-        lastCompletedBatchId: previous?.id ?? null,
-        lastCompletedBatchAt: revertedTo,
-      },
-      tx,
-    );
+    if (service !== null) {
+      await upsertServiceState(
+        ownerId,
+        service,
+        {
+          lastCompletedBatchId: previous?.id ?? null,
+          lastCompletedBatchAt: revertedTo,
+        },
+        tx,
+      );
+    }
 
     return {
       batchId,
@@ -225,10 +259,10 @@ export async function undoBatch(ownerId: OwnerId, batchId: string): Promise<Undo
         // owner counts rows that left their list, not rows this code named.
         listingsRemoved: listingsUnderTitles.length + listingsDeleted,
       },
-      serviceState: {
-        service: service,
-        lastCompletedBatchAt: revertedTo?.toISOString() ?? null,
-      },
+      serviceState:
+        service === null
+          ? null
+          : { service, lastCompletedBatchAt: revertedTo?.toISOString() ?? null },
     };
   });
 }

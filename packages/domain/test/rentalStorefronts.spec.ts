@@ -32,7 +32,11 @@ describe('T-WAIT-013 — rental storefronts are discovery sources, and say so', 
       expect(forcedModeFor(source), source).toBe('append-only');
       expect(modeRefusalFor(source, 'append-only'), source).toBeNull();
       expect(modeRefusalFor(source, 'full-update'), source).toContain('always append-only');
-      expect(splitBatchSource(source)).toEqual({ service: null, discoverySource: source });
+      expect(splitBatchSource(source)).toEqual({
+        service: null,
+        discoverySource: source,
+        autoDetect: false,
+      });
     }
     // The discriminating half: a subscription service is not forced.
     expect(forcedModeFor('prime-video')).toBeNull();

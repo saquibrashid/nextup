@@ -8,6 +8,9 @@ export * from './attribution.js';
 // structurally append-only, and how a source splits into the two exclusive
 // store columns. Pure, so the refusal is testable without a route.
 export * from './batchSource.js';
+// #396 — auto-detect import: what a review-time service lookup proposes and
+// what the close may write (ADR-0010 Rev 6, `A57`).
+export * from './autoDetect.js';
 export * from './captureIntake.js';
 export * from './watchIntent.js';
 export * from './watchPreferences.js';

@@ -31,6 +31,8 @@ import {
   type CandidatePatch,
   type ManualEntry,
   type ReviewCandidate,
+  isAutoDetectBatch,
+  parseAutoDestination,
   requireServiceOf,
 } from '@nextup/domain';
 import { type Router } from 'express';
@@ -45,16 +47,23 @@ import {
   findUploadBatch,
   listActiveSuppressions,
   listCandidatesForBatch,
+  setCandidateDestination,
   updateCandidateDisposition,
 } from '../repository/ownerData.js';
-import { loadReviewCandidates } from './batchReview.js';
+import { loadReviewCandidates, lookUpAutoDetectServices } from './batchReview.js';
 import { tmdbUnavailableAppError } from './tmdb.js';
 
 /** Loads the batch and refuses anything that is not open for review. */
 async function requireReviewableBatch(
   ownerId: ReturnType<typeof requireOwnerId>,
   batchId: string,
-): Promise<{ id: string; service: string | null; discoverySource: string | null; status: string }> {
+): Promise<{
+  id: string;
+  service: string | null;
+  discoverySource: string | null;
+  autoDetect: boolean;
+  status: string;
+}> {
   const batch = await findUploadBatch(ownerId, batchId);
   if (batch === null) {
     throw new AppError('NOT_FOUND', 404, 'No such batch.');
@@ -339,7 +348,15 @@ export function registerBatchCandidateRoutes(
       parseConfirmAllSection(req.body),
     );
 
-    const { candidates } = await loadReviewCandidates(ownerId, batch.id, requireServiceOf(batch));
+    // #396 — an auto-detect batch has no single service; its candidates are
+    // classified the way the review response classifies them.
+    const autoDetect = isAutoDetectBatch(batch);
+    const { candidates } = await loadReviewCandidates(
+      ownerId,
+      batch.id,
+      autoDetect ? null : requireServiceOf(batch),
+      { autoDetect },
+    );
 
     // ⚠ Sections are decided by the SAME code the review response uses. A
     // second, simpler rule here — "everything with classification 'new'", say
@@ -364,6 +381,98 @@ export function registerBatchCandidateRoutes(
       // "confirmed: 0" on a section the owner has already worked through is
       // distinguishable from "confirmed: 0" on an empty one.
       skipped: inSection.length - count,
+    });
+  });
+
+  /**
+   * §6.50 (#396, `A57`) — "Look up again". The owner's explicit retry of the
+   * review-time service lookup for an auto-detect batch: every title whose
+   * lookup failed, came back inconclusive or went stale (the match was
+   * corrected), or only `candidateIds` when given.
+   *
+   * ⚠ Owner-triggered and capped (invariant 5): this is the ONLY way a lookup
+   * re-runs besides opening the review. Writes lookup columns only — never a
+   * disposition, an identity or the owner's chosen destination.
+   */
+  router.post('/batches/:batchId/service-lookup', async (req, res) => {
+    const ownerId = requireOwnerId(req);
+    const batchId = req.params.batchId ?? '';
+    const batch = await requireReviewableBatch(ownerId, batchId);
+    if (!isAutoDetectBatch(batch)) {
+      throw new AppError(
+        'BATCH_NOT_AUTO_DETECT',
+        409,
+        "This capture's service was chosen when it was uploaded, so there is nothing to look up.",
+      );
+    }
+    const body: unknown = req.body ?? {};
+    const raw = (body as { candidateIds?: unknown }).candidateIds;
+    if (
+      raw !== undefined &&
+      (!Array.isArray(raw) || raw.some((id) => typeof id !== 'string' || id === ''))
+    ) {
+      throw new AppError(
+        'VALIDATION_FAILED',
+        400,
+        'candidateIds must be a list of candidate ids.',
+        {
+          field: 'candidateIds',
+        },
+      );
+    }
+    const only = raw === undefined ? undefined : new Set(raw as string[]);
+    const lookedUp = await lookUpAutoDetectServices(
+      ownerId,
+      batch.id,
+      getTmdbClient(),
+      'retry',
+      new Date(),
+      only,
+    );
+    res.status(200).json({ lookedUp });
+  });
+
+  /**
+   * §6.51 (#396, `A57`) — the owner's destination for one auto-detect title:
+   * the services it lands on (one badge each), Waiting to stream, or `null` to
+   * follow the lookup's proposal again. Nothing lands until close.
+   */
+  router.patch('/batches/:batchId/candidates/:candidateId/destination', async (req, res) => {
+    const ownerId = requireOwnerId(req);
+    const batchId = req.params.batchId ?? '';
+    const candidateId = req.params.candidateId ?? '';
+    const batch = await requireReviewableBatch(ownerId, batchId);
+    const row = await findExtractionCandidate(ownerId, candidateId);
+    if (row === null || row.batchId !== batch.id) {
+      throw new AppError('NOT_FOUND', 404, 'No such candidate.');
+    }
+    if (!isAutoDetectBatch(batch)) {
+      throw new AppError(
+        'BATCH_NOT_AUTO_DETECT',
+        409,
+        "This capture's service was chosen when it was uploaded; its titles all land there.",
+      );
+    }
+    const parsed = parseAutoDestination(req.body);
+    if (!parsed.ok) {
+      throw new AppError('VALIDATION_FAILED', 400, parsed.message, parsed.details);
+    }
+    const destination = parsed.destination;
+    await setCandidateDestination(ownerId, batch.id, candidateId, {
+      destinationKind: destination === null ? null : destination.kind,
+      destinationServices:
+        destination !== null && destination.kind === 'services'
+          ? JSON.stringify(destination.services)
+          : null,
+    });
+    const { candidates } = await loadReviewCandidates(ownerId, batch.id, null, {
+      autoDetect: true,
+    });
+    const updated = candidates.find((candidate) => candidate.candidateId === candidateId);
+    res.status(200).json({
+      candidateId,
+      destination: updated?.destination ?? null,
+      effectiveDestination: updated?.effectiveDestination ?? null,
     });
   });
 

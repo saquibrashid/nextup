@@ -40,7 +40,12 @@ import { Input } from '../components/ui/Input';
 // reads as a route that fell through to the catch-all.
 
 import { useEffect, useState, type JSX, type ReactNode } from 'react';
-import type { ReviewCandidate, ReviewResponse, ReviewSection } from '@nextup/domain';
+import type {
+  AutoDestination as AutoDestinationValue,
+  ReviewCandidate,
+  ReviewResponse,
+  ReviewSection,
+} from '@nextup/domain';
 import { batchSourceLabel, canBulkConfirm } from '@nextup/domain';
 
 import type { TmdbSearchResult } from '../lib/apiClient';
@@ -50,6 +55,7 @@ import { CandidateList } from '../components/CandidateList';
 import { TileReview, alreadySaved, tileNextStep } from '../components/TileReview';
 import { ManualEntryPanel } from '../components/ManualEntryPanel';
 import { PhoneReview } from '../components/PhoneReview';
+import { AutoDestination } from '../components/AutoDestination';
 import { RemovalConfirmDialog } from '../components/RemovalConfirmDialog';
 import { ReviewSkeleton } from '../components/ReviewSkeleton';
 import { UnmatchedActions } from '../components/UnmatchedActions';
@@ -195,6 +201,16 @@ export interface ReviewPageProps {
   readonly onDiscardUnmatched?: (candidateId: string) => Promise<void>;
   /** TASK-068 — §6.18 `{ disposition: 'corrected', tmdbId, mediaType }`. */
   readonly onMatchUnmatched?: (candidateId: string, result: TmdbSearchResult) => Promise<void>;
+  /**
+   * #396 (US-066) — an auto-detect review's per-title destination (§6.51)
+   * and the owner's "Look up again" (§6.50). Rendered only when the review
+   * says `autoDetect`; a named-service review never shows either.
+   */
+  readonly onSetDestination?: (
+    candidateId: string,
+    destination: AutoDestinationValue,
+  ) => Promise<void>;
+  readonly onLookUpServices?: (candidateId: string) => Promise<void>;
   /**
    * SD-11e. Injectable so the persistence rule is testable, and OPTIONAL so a
    * environment without one (SSR, a locked-down browser) renders normally
@@ -412,6 +428,8 @@ export function ReviewPage({
   onKeepUnmatched,
   onDiscardUnmatched,
   onMatchUnmatched,
+  onSetDestination,
+  onLookUpServices,
   storage = typeof sessionStorage === 'undefined' ? undefined : sessionStorage,
 }: ReviewPageProps): JSX.Element {
   // ⚠ Declared before the early returns: hooks must run unconditionally, and
@@ -614,6 +632,26 @@ export function ReviewPage({
               : item.disposition) === 'pending',
         )
         .map((item) => item.candidateId);
+      // #396 (US-066 AC-6) — an applied auto-detect title with nowhere to go
+      // would be refused by the close (`AUTO_DESTINATION_REQUIRED`); stop
+      // here and take the owner to it instead.
+      if (latest.autoDetect === true) {
+        for (const item of [
+          ...latest.sections.additions.items,
+          ...latest.sections.unmatched.items,
+        ]) {
+          const disposition =
+            onPrepare === undefined
+              ? effectiveDisposition(item.disposition, local[item.candidateId])
+              : item.disposition;
+          if (
+            (disposition === 'confirmed' || disposition === 'corrected') &&
+            (item.effectiveDestination ?? null) === null
+          ) {
+            undecided.push(item.candidateId);
+          }
+        }
+      }
       if (undecided.length > 0) {
         setLocalPending(undecided);
         return;
@@ -647,6 +685,21 @@ export function ReviewPage({
         onDiscard={onDiscardU}
         onMatch={onMatchU}
         onSearch={onSearchU}
+      />
+    ) : null;
+  /**
+   * #396 — the looked-up destination control, for every title the owner has
+   * not discarded. ⚠ Never for a named-service review: its service is the
+   * one the owner chose up front, and nothing is looked up.
+   */
+  const autoControl = (candidate: ReviewCandidate): JSX.Element | null =>
+    review.autoDetect === true &&
+    effectiveDisposition(candidate.disposition, local[candidate.candidateId]) !== 'discarded' ? (
+      <AutoDestination
+        candidate={candidate}
+        disabled={offline && !controlled}
+        onChange={onSetDestination}
+        onRetry={onLookUpServices}
       />
     ) : null;
   const extracted =
@@ -706,6 +759,7 @@ export function ReviewPage({
         actions={
           unmatchedWired ? (
             <>
+              {autoControl(current)}
               <UnmatchedActions
                 controlled={controlled}
                 candidateId={candidate.candidateId}
@@ -742,7 +796,9 @@ export function ReviewPage({
                 </Button>
               )}
             </>
-          ) : null
+          ) : (
+            autoControl(current)
+          )
         }
       />
     );
@@ -1025,6 +1081,7 @@ export function ReviewPage({
                     })
             }
             onManualEntry={onManualEntry}
+            renderExtra={autoControl}
             pendingIds={pendingIds}
             lead={reviewLead}
             tail={reviewFoot}
@@ -1121,22 +1178,25 @@ export function ReviewPage({
                    whole batch. `unmatchedWired` is reused deliberately: the
                    same four handlers serve both sections, and all-four-or-none
                    still applies. */
-                      unmatchedWired ? (
-                        <UnmatchedActions
-                          controlled={controlled}
-                          candidateId={candidate.candidateId}
-                          correctedName={candidate.match?.name ?? null}
-                          disposition={effectiveDisposition(
-                            candidate.disposition,
-                            local[candidate.candidateId],
-                          )}
-                          onDiscard={onDiscardU}
-                          onKeep={onKeepU}
-                          onMatch={onMatchU}
-                          onSearch={onSearchU}
-                          variant="addition"
-                        />
-                      ) : null
+                      <>
+                        {autoControl(candidate)}
+                        {unmatchedWired ? (
+                          <UnmatchedActions
+                            controlled={controlled}
+                            candidateId={candidate.candidateId}
+                            correctedName={candidate.match?.name ?? null}
+                            disposition={effectiveDisposition(
+                              candidate.disposition,
+                              local[candidate.candidateId],
+                            )}
+                            onDiscard={onDiscardU}
+                            onKeep={onKeepU}
+                            onMatch={onMatchU}
+                            onSearch={onSearchU}
+                            variant="addition"
+                          />
+                        ) : null}
+                      </>
                     }
                   />
                 )}
@@ -1168,21 +1228,24 @@ export function ReviewPage({
                       : REVIEW_CONSEQUENCE_UNMATCHED
                   }
                   actions={
-                    unmatchedWired ? (
-                      <UnmatchedActions
-                        controlled={controlled}
-                        candidateId={candidate.candidateId}
-                        correctedName={candidate.match?.name ?? null}
-                        disposition={effectiveDisposition(
-                          candidate.disposition,
-                          local[candidate.candidateId],
-                        )}
-                        onDiscard={onDiscardU}
-                        onKeep={onKeepU}
-                        onMatch={onMatchU}
-                        onSearch={onSearchU}
-                      />
-                    ) : null
+                    <>
+                      {autoControl(candidate)}
+                      {unmatchedWired ? (
+                        <UnmatchedActions
+                          controlled={controlled}
+                          candidateId={candidate.candidateId}
+                          correctedName={candidate.match?.name ?? null}
+                          disposition={effectiveDisposition(
+                            candidate.disposition,
+                            local[candidate.candidateId],
+                          )}
+                          onDiscard={onDiscardU}
+                          onKeep={onKeepU}
+                          onMatch={onMatchU}
+                          onSearch={onSearchU}
+                        />
+                      ) : null}
+                    </>
                   }
                 />
               )}

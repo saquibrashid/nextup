@@ -49,6 +49,9 @@ const MUTATING = [
   'unsuppress',
   'confirmAllCandidates',
   'closeBatch',
+  // #396 — the review's own owner actions; never fired by a mount.
+  'lookUpServices',
+  'setCandidateDestination',
 ];
 
 function attachResult(imageCount: number, rejected: unknown[] = []) {
@@ -670,6 +673,11 @@ describe('T-UX-045 — submit states its reason rather than sitting grey', () =>
 
     // §3.3: "never a silent disabled button". A tooltip would not exist at all
     // on the touch device this product is designed for first.
+    // #396 (`A57`): /upload now opens on Auto-detect, which answers both
+    // questions, so naming a service is what re-opens the mode question.
+    await waitFor(() => expect(screen.getByTestId('service-step')).toBeVisible());
+    expect(screen.getByTestId('submit-reason')).toHaveTextContent(SUBMIT_NEEDS_IMAGES);
+    fireEvent.click(screen.getByTestId('service-option-netflix').querySelector('input')!);
     expect(screen.getByTestId('submit-button')).toBeDisabled();
     expect(screen.getByTestId('submit-reason')).toHaveTextContent(SUBMIT_NEEDS_SELECTION);
     await Promise.resolve();

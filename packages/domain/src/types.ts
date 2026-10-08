@@ -178,6 +178,13 @@ export interface UploadBatch {
    */
   discoverySource: DiscoverySource | null;
   /**
+   * #396 — `true` for an AUTO-DETECT capture: BOTH `service` and
+   * `discoverySource` are `null`, and each title's service is looked up at
+   * review (`ck_batch_source_kind`). Always append-only. Absent or `false` on
+   * every other batch.
+   */
+  autoDetect?: boolean | undefined;
+  /**
    * IMMUTABLE after submit (US-003 AC-6).
    *
    * ⚠ Always `'append-only'` when `discoverySource` is set — forced, and an

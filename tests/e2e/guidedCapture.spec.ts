@@ -18,7 +18,9 @@ for (const width of [280, 390, 1440]) {
       );
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/upload');
-      const choices = page.getByTestId('service-step').locator('label');
+      // #396 (`A57`): the first choice is Auto-detect, which has no service
+      // artwork by design; the eight service cards are the subject here.
+      const choices = page.getByTestId('service-step').locator('label:not([data-service="auto"])');
       const logos = choices.locator('img.brand-mark');
       await expect(logos).toHaveCount(8);
       await expect
@@ -139,9 +141,11 @@ describe('T-POL-003a calm capture framing', () => {
         const progress = page.getByRole('list', {
           name: phone ? 'Import steps' : 'Capture progress',
         });
-        await expect(progress.locator('[aria-current="step"]')).toHaveText(
-          phone ? /Service$/ : 'Prepare',
-        );
+        // #396 (`A57`): the phone flow opens on Auto-detect (add only), so both
+        // first-screen questions are already answered and no step is current
+        // until Continue — the same state as answering both by hand.
+        if (phone) await expect(progress.locator('[aria-current="step"]')).toHaveCount(0);
+        else await expect(progress.locator('[aria-current="step"]')).toHaveText('Prepare');
         const stages = await progress.getByRole('listitem').evaluateAll((items) =>
           items.map((item) => {
             const rect = item.getBoundingClientRect();
@@ -161,8 +165,15 @@ describe('T-POL-003a calm capture framing', () => {
             Math.min(...stages.map((item) => item.width)),
         ).toBeLessThan(1);
         await page.screenshot({ path: testInfo.outputPath('capture-setup.png'), fullPage: true });
-        const cards = page.getByTestId('service-step').locator('label');
+        // #396: the Auto-detect choice is checked separately below.
+        const cards = page.getByTestId('service-step').locator('label:not([data-service="auto"])');
         await expect(cards).toHaveCount(8);
+        const auto = await page.getByTestId('service-option-auto').evaluate((node) => ({
+          height: node.getBoundingClientRect().height,
+          overflow: node.scrollWidth > node.clientWidth + 1,
+        }));
+        expect(auto.height).toBeGreaterThanOrEqual(44);
+        expect(auto.overflow).toBe(false);
         if (width >= 1280) {
           const positions = await cards.evaluateAll((nodes) =>
             nodes.map((node) => Math.round(node.getBoundingClientRect().top)),
@@ -193,9 +204,9 @@ describe('T-POL-003a calm capture framing', () => {
           }
           await expect(page.getByTestId('file-input')).toBeEnabled();
           if (phone && !ready) {
-            // The owner-approved paged phone flow: Continue waits, and says why.
-            await expect(page.getByTestId('import-continue')).toBeDisabled();
-            await expect(page.getByTestId('import-continue-reason')).toBeVisible();
+            // #396 (`A57`): Auto-detect (add only) is a complete answer, so
+            // Continue is ready at once; T-PHONE-010a covers the wait.
+            await expect(page.getByTestId('import-continue')).toBeEnabled();
           } else {
             await expect(
               page.getByRole('button', { name: 'Paste screenshot', exact: true }),
@@ -229,7 +240,7 @@ describe('T-POL-003a calm capture framing', () => {
   }
 });
 
-test('T-MOCK-006: import groups choices, intake and bottom summary without preselecting answers', async ({
+test('T-MOCK-006: import groups choices, intake and bottom summary preselecting only Auto-detect (add only)', async ({
   page,
 }, testInfo) => {
   await page.route('**/api/me', (route) =>
@@ -253,13 +264,19 @@ test('T-MOCK-006: import groups choices, intake and bottom summary without prese
   const progress = await page.getByRole('list', { name: 'Capture progress' }).boundingBox();
   if (!heading || !progress) throw new Error('Missing import heading or progress');
   expect(progress.y).toBeGreaterThanOrEqual(heading.y + heading.height);
-  const serviceCards = page.getByTestId('service-step').locator('label');
+  const serviceCards = page.getByTestId('service-step').locator('label:not([data-service="auto"])');
   await expect(serviceCards).toHaveCount(8);
   const tops = await serviceCards.evaluateAll((nodes) =>
     nodes.map((node) => Math.round(node.getBoundingClientRect().top)),
   );
   expect(new Set(tops).size).toBe(1);
-  await expect(page.getByRole('radio', { checked: true })).toHaveCount(0);
+  // #396 (`A57`): the ONE default is Auto-detect, add only by source. A full
+  // update is never preselected, and no named service is.
+  await expect(page.getByRole('radio', { checked: true })).toHaveCount(1);
+  await expect(page.getByTestId('service-option-auto').getByRole('radio')).toBeChecked();
+  await expect(
+    page.getByTestId('mode-card-full-update').getByRole('radio', { includeHidden: true }),
+  ).not.toBeChecked();
   await expect(page.getByTestId('submit-button')).toBeDisabled();
   const target = await page.locator('.dropzone__target').boundingBox();
   const summary = await page.locator('.upload-summary').boundingBox();
@@ -296,7 +313,9 @@ test('T-MOCK-003a: mockup upload framing retains real choices and a readable num
   expect(
     await choices.first().evaluate((el) => el.getBoundingClientRect().height),
   ).toBeGreaterThanOrEqual(96);
-  await expect(page.getByRole('radio', { checked: true })).toHaveCount(0);
+  // #396 (`A57`): only Auto-detect is preselected (its add-only mode is folded).
+  await expect(page.getByRole('radio', { checked: true })).toHaveCount(1);
+  await expect(page.getByTestId('service-option-auto').getByRole('radio')).toBeChecked();
   await expect(page.getByTestId('file-input')).toBeEnabled();
   await expect(page.getByTestId('submit-button')).toBeDisabled();
 });

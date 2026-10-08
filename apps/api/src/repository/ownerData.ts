@@ -2165,6 +2165,44 @@ export async function updateCandidateDisposition(
 }
 
 /**
+ * #396 — record one review-time service lookup on its candidate.
+ *
+ * ⚠ Reaches ONLY the five lookup columns migration 0020 added. A lookup is
+ * metadata about a proposal: it must not be able to change a disposition, an
+ * identity or the owner's chosen destination even by mistake.
+ */
+export async function writeCandidateServiceLookup(
+  ownerId: OwnerId,
+  batchId: string,
+  id: string,
+  data: {
+    serviceLookupStatus: string;
+    serviceLookupIdentity: string;
+    serviceLookupAt: Date;
+    lookedUpAvailableOn: string | null;
+    lookedUpRentOn: string | null;
+  },
+  tx?: Db,
+) {
+  return db(tx).extractionCandidate.updateMany({ where: { ownerId, batchId, id }, data });
+}
+
+/**
+ * #396 — the owner's destination for one auto-detect candidate: `services`
+ * with a JSON list, `waiting`, or `null` for both to follow the proposal.
+ * Touches the two destination columns and nothing else.
+ */
+export async function setCandidateDestination(
+  ownerId: OwnerId,
+  batchId: string,
+  id: string,
+  data: { destinationKind: string | null; destinationServices: string | null },
+  tx?: Db,
+) {
+  return db(tx).extractionCandidate.updateMany({ where: { ownerId, batchId, id }, data });
+}
+
+/**
  * Bulk `pending` → `confirmed` for the ids given (`specs/api.md` §6.19).
  *
  * ⚠ `reviewDisposition: 'pending'` is in the WHERE, not just in the caller's

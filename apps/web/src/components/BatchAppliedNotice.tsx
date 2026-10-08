@@ -38,7 +38,18 @@ import { Button } from './ui/Button';
 /** The §6.22 close response, as much of it as this notice reads. */
 export interface AppliedBatch {
   readonly batchId: string;
-  readonly service: Service;
+  /**
+   * `null` for an auto-detect or storefront close (#396): no single service's
+   * list was captured, so the sentence names none.
+   */
+  readonly service: Service | null;
+  /** Titles this close sent to Waiting to stream. Absent reads as none. */
+  readonly waitingCreated?: number;
+  /**
+   * Titles an auto-detect close listed. One title on two looked-up services
+   * is two listings but one title, so the sourceless sentence counts this.
+   */
+  readonly titlesListed?: number;
   readonly summary: {
     readonly listingsCreated: number;
     readonly listingsRemoved: number;
@@ -90,6 +101,7 @@ function titles(count: number): string {
  * that failed.
  */
 export function appliedSummary(applied: AppliedBatch): string {
+  if (applied.service === null) return sourcelessSummary(applied);
   const service = SERVICE_LABELS[applied.service];
   const added = applied.summary.listingsCreated;
   const removed = applied.summary.listingsRemoved;
@@ -100,6 +112,21 @@ export function appliedSummary(applied: AppliedBatch): string {
   if (added > 0) return `Added ${titles(added)} from ${service}.`;
   if (removed > 0) return `Removed ${titles(removed)} from ${service}.`;
   return `Nothing changed on your ${service} list.`;
+}
+
+/**
+ * #396 (US-066 AC-8) — the sentence for a close that captured no single
+ * service's list: an auto-detect capture lands on whichever services were
+ * looked up, and may send titles to Waiting to stream. Never removes.
+ */
+function sourcelessSummary(applied: AppliedBatch): string {
+  const added = applied.titlesListed ?? applied.summary.listingsCreated;
+  const waiting = applied.waitingCreated ?? 0;
+  const toWaiting = `sent ${titles(waiting)} to Waiting to stream`;
+  if (added > 0 && waiting > 0) return `Added ${titles(added)} to the Library and ${toWaiting}.`;
+  if (added > 0) return `Added ${titles(added)} to the Library.`;
+  if (waiting > 0) return `${toWaiting.charAt(0).toUpperCase()}${toWaiting.slice(1)}.`;
+  return 'Nothing changed in the Library.';
 }
 
 /**

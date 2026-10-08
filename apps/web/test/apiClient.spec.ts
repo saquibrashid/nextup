@@ -119,6 +119,9 @@ describe('T-DATA-003 — every method sends credentials', () => {
       getReview: () => client.getReview('bat_1'),
       confirmAllCandidates: () => client.confirmAllCandidates('bat_1', 'additions'),
       patchCandidate: () => client.patchCandidate('bat_1', 'cand_1', { disposition: 'confirmed' }),
+      lookUpServices: () => client.lookUpServices('bat_1'),
+      setCandidateDestination: () =>
+        client.setCandidateDestination('bat_1', 'cand_1', { kind: 'waiting' }),
       searchTmdb: () => client.searchTmdb('dune'),
       fixMatch: () =>
         client.fixMatch('ttl_1', { tmdbId: 438631, mediaType: 'movie', confirmDuplicate: false }),

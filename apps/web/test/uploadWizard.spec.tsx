@@ -140,6 +140,11 @@ describe('T-UX-148 — /upload progressive reveal', () => {
       </MemoryRouter>,
     );
     await waitFor(() => expect(screen.getByTestId('dropzone')).toBeVisible());
+    // #396 (`A57`): /upload opens on Auto-detect, which answers both
+    // questions; naming a service re-asks the mode, leaving one unanswered.
+    await userEvent
+      .setup()
+      .click(within(screen.getByTestId('service-step')).getByRole('radio', { name: 'Netflix' }));
 
     /*
      * ⚠ A DOCUMENTED DEVIATION from the progressive reveal, and it must stay

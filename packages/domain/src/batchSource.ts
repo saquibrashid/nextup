@@ -16,9 +16,10 @@
 import {
   DISCOVERY_SOURCES,
   SERVICES,
+  isAutoDetectSource,
   isDiscoverySource,
   type BatchMode,
-  type BatchSource,
+  type CaptureSource,
   type DiscoverySource,
   type Service,
 } from './enums.js';
@@ -31,8 +32,8 @@ import { SERVICE_LABELS } from './copy.js';
  * title from a later capture of the same page means only that it is no longer
  * new, never that the owner removed it.
  */
-export function forcedModeFor(source: BatchSource): BatchMode | null {
-  return isDiscoverySource(source) ? 'append-only' : null;
+export function forcedModeFor(source: CaptureSource): BatchMode | null {
+  return isDiscoverySource(source) || isAutoDetectSource(source) ? 'append-only' : null;
 }
 
 /**
@@ -43,9 +44,13 @@ export function forcedModeFor(source: BatchSource): BatchMode | null {
  * developer reading it) has to understand that this is a property of the
  * source, not a temporary limitation they can retry past.
  */
-export function modeRefusalFor(source: BatchSource, mode: BatchMode): string | null {
-  if (!isDiscoverySource(source)) return null;
+export function modeRefusalFor(source: CaptureSource, mode: BatchMode): string | null {
   if (mode === 'append-only') return null;
+  // #396 (`A57`, ADR-0010 Rev 6). Refused by SOURCE TYPE exactly as a
+  // storefront is: a full update reconciles ONE service's saved list, and an
+  // auto-detect capture has no single service whose list it could be.
+  if (isAutoDetectSource(source)) return AUTO_DETECT_FULL_UPDATE_REFUSAL;
+  if (!isDiscoverySource(source)) return null;
   return (
     `A ${DISCOVERY_SOURCE_LABELS[source]} capture is always append-only. ` +
     'Its new-release page is an editorial feed, not a list you curated, so a ' +
@@ -65,17 +70,33 @@ export function modeRefusalFor(source: BatchSource, mode: BatchMode): string | n
  * cast is exactly how the two columns would eventually both get written.
  */
 export type SplitBatchSource =
-  { service: Service; discoverySource: null } | { service: null; discoverySource: DiscoverySource };
+  | { service: Service; discoverySource: null; autoDetect: false }
+  | { service: null; discoverySource: DiscoverySource; autoDetect: false }
+  | { service: null; discoverySource: null; autoDetect: true };
 
 /**
- * ⚠ Exactly one is non-null. A discovery batch has NO truthful service and
- * must never borrow one: `service` is what the combined list, the REQ-025
- * badge count and full-update reconciliation all filter on.
+ * ⚠ At most one is non-null, and NEITHER is exactly the auto-detect shape
+ * (#396, `ck_batch_source_kind`). A discovery batch has NO truthful service
+ * and must never borrow one: `service` is what the combined list, the REQ-025
+ * badge count and full-update reconciliation all filter on. An auto-detect
+ * batch has neither, and must not borrow either.
  */
-export function splitBatchSource(source: BatchSource): SplitBatchSource {
+export function splitBatchSource(source: CaptureSource): SplitBatchSource {
+  if (isAutoDetectSource(source)) return { service: null, discoverySource: null, autoDetect: true };
   return isDiscoverySource(source)
-    ? { service: null, discoverySource: source }
-    : { service: source as Service, discoverySource: null };
+    ? { service: null, discoverySource: source, autoDetect: false }
+    : { service: source as Service, discoverySource: null, autoDetect: false };
+}
+
+/**
+ * Is this stored batch an auto-detect capture (#396)?
+ *
+ * ⚠ Reads the stored FLAG, not "both columns null": the store makes the two
+ * equivalent (`ck_batch_source_kind`), but a caller handed a partial row must
+ * not be able to manufacture an auto-detect batch by omitting a field.
+ */
+export function isAutoDetectBatch(batch: { autoDetect?: boolean | null }): boolean {
+  return batch.autoDetect === true;
 }
 
 /**
@@ -95,7 +116,14 @@ export function requireServiceOf(batch: {
   id: string;
   service: string | null;
   discoverySource: string | null;
+  autoDetect?: boolean | null;
 }): Service {
+  if (batch.service === null && isAutoDetectBatch(batch)) {
+    throw new Error(
+      `Batch ${batch.id} is an auto-detect batch and has no single service. This code path is ` +
+        'service-scoped and must not run for an auto-detect batch (ADR-0010 Rev 6, #396).',
+    );
+  }
   if (batch.service === null) {
     throw new Error(
       `Batch ${batch.id} is a discovery batch (${String(batch.discoverySource)}) and has no ` +
@@ -185,7 +213,9 @@ export function intentSourceLabel(source: string): string {
 export function batchSourceLabel(batch: {
   service: string | null;
   discoverySource?: string | null;
+  autoDetect?: boolean | null;
 }): string {
+  if (isAutoDetectBatch(batch)) return AUTO_DETECT_LABEL;
   if (batch.service !== null) {
     return (SERVICES as readonly string[]).includes(batch.service)
       ? SERVICE_LABELS[batch.service as Service]
@@ -209,6 +239,35 @@ export function discoveryModeExplanation(source: DiscoverySource): string {
     `Only adds what's in these screenshots. Nothing you're waiting for will be ` +
     `removed, and this capture never changes your combined list — ` +
     `${DISCOVERY_SOURCE_LABELS[source]} is a place to browse, not a list you saved.`
+  );
+}
+
+/** What the source picker and every batch surface call an auto-detect capture (#396). */
+export const AUTO_DETECT_LABEL = 'Auto-detect';
+
+/**
+ * Why `full-update` is refused for an auto-detect capture (#396, `A57`).
+ *
+ * The reason, not just the fact: removals are proposed against ONE service's
+ * saved list, so a capture that names no service has no list to compare with.
+ */
+export const AUTO_DETECT_FULL_UPDATE_REFUSAL =
+  'An auto-detect capture is always add-only. A full update removes titles that are no ' +
+  "longer on one service's saved list, so it needs you to name that service. Pick the " +
+  'service to run a full update.';
+
+/**
+ * The `modeExplanation` an auto-detect batch answers with (#396, US-066).
+ *
+ * ⚠ Says that the service is LOOKED UP and that the owner confirms it, because
+ * that is the difference from a named-service capture the owner must hear
+ * before uploading: nothing lands on a service they did not see proposed.
+ */
+export function autoDetectModeExplanation(): string {
+  return (
+    "Only adds what's in these screenshots. Nothing will be removed. We'll look up " +
+    'which of your services streams each title, and you confirm or change it before ' +
+    'anything is added. Titles on none of your services are offered for Waiting to stream.'
   );
 }
 

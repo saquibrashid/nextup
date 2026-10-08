@@ -50,6 +50,7 @@ const REASONS: readonly UndoRefusalReason[] = [
   'modified-or-removed',
   'later-owner-edits',
   'provenance-unavailable',
+  'waiting-routed',
 ];
 
 function reasonOf(value: unknown): UndoRefusalReason {

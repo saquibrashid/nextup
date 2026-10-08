@@ -48,11 +48,23 @@ import {
   type ReviewDisposition,
   type ReviewTileCoverage,
   type Service,
+  type CandidateServiceLookup,
+  effectiveDestinationFor,
+  isAutoDetectBatch,
+  storedDestination,
   requireServiceOf,
   discoverySourceOf,
 } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
+import {
+  needsServiceLookup,
+  runServiceLookups,
+  storedLookupOutcome,
+} from '../services/autoDetectLookup.js';
+import { yourServicesFrom } from '../services/libraryAvailability.js';
+import type { WatchProviderSource } from '../services/watchAvailability.js';
+import { listOwnerServices } from '../repository/watchIntents.js';
 import { readCaptureIntake } from '../services/captureIntake.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import {
@@ -63,6 +75,7 @@ import {
   listCandidatesForReview,
   listImagesForBatch,
   listRemovalDecisions,
+  writeCandidateServiceLookup,
 } from '../repository/ownerData.js';
 
 /** `YYYY-MM-DD` in UTC. The listing's `dateAdded` is a DATE column already. */
@@ -320,6 +333,7 @@ export async function loadReviewCandidates(
   ownerId: ReturnType<typeof requireOwnerId>,
   batchId: string,
   service: Service | null,
+  options: { autoDetect?: boolean } = {},
 ): Promise<{
   candidates: ReviewCandidate[];
   suppressed: Set<string>;
@@ -335,7 +349,8 @@ export async function loadReviewCandidates(
    */
   rows: Awaited<ReturnType<typeof listCandidatesForReview>>;
 }> {
-  const [rows, suppressions, activeListings, listedIdentities] = await Promise.all([
+  const autoDetect = options.autoDetect === true;
+  const [rows, suppressions, activeListings, listedIdentities, usedServices] = await Promise.all([
     listCandidatesForReview(ownerId, batchId),
     listActiveSuppressions(ownerId),
     // ⚠ A discovery batch has NO service (ADR-0010 D-1), so there is no
@@ -348,7 +363,11 @@ export async function loadReviewCandidates(
     // The combined-list membership question a discovery review asks instead
     // (US-040 AC-5). Loaded only when it is the question being asked.
     listListedWorkIdentities(ownerId),
+    // #396 — whose services a looked-up provider counts as. Only asked for an
+    // auto-detect batch, the one kind that proposes services per title.
+    autoDetect ? listOwnerServices(ownerId) : Promise.resolve([] as string[]),
   ]);
+  const yourServices = yourServicesFrom(usedServices);
 
   // The suppression gate. Keyed on WORK IDENTITY, never on a row id
   // (REQ-071, product invariant 1), and with NO branch on the `tmdb:` vs
@@ -439,16 +458,98 @@ export async function loadReviewCandidates(
         }),
         disposition: row.reviewDisposition as ReviewDisposition,
         collapsedIntoCandidateId: row.collapsedIntoCandidateId,
+        // ⚠ #396 — an auto-detect batch classifies EVERY matched title as an
+        // addition, including one already in the Library: the capture may be
+        // the first sighting of it on ANOTHER service, which the close adds as
+        // one more badge. `alreadyInLibrary` still tells the owner, and the
+        // close treats an existing listing on the same service as a no-op.
         classification:
-          service === null
-            ? classifyDiscoveryWorkIdentity(row.resolvedWorkIdentity, listedIdentities)
-            : classifyWorkIdentity(row.resolvedWorkIdentity, service, index),
+          service !== null
+            ? classifyWorkIdentity(row.resolvedWorkIdentity, service, index)
+            : classifyDiscoveryWorkIdentity(
+                row.resolvedWorkIdentity,
+                autoDetect ? new Set<string>() : listedIdentities,
+              ),
         alreadyInLibrary:
           row.resolvedWorkIdentity !== null && listedIdentities.has(row.resolvedWorkIdentity),
+        ...(autoDetect ? autoDetectFieldsFor(row, yourServices) : {}),
       };
     });
 
   return { candidates: withReviewEvidence(candidates), suppressed, activeListings, rows };
+}
+
+/**
+ * #396 — one auto-detect candidate's lookup, choice and effective destination.
+ *
+ * ⚠ A lookup answered for a DIFFERENT work than the candidate now resolves to
+ * (the owner corrected the match) is served `stale` and proposes nothing
+ * until it is looked up again.
+ */
+export function autoDetectFieldsFor(
+  row: {
+    resolvedWorkIdentity: string | null;
+    serviceLookupStatus: string | null;
+    serviceLookupIdentity: string | null;
+    serviceLookupAt: Date | null;
+    lookedUpAvailableOn: string | null;
+    destinationKind: string | null;
+    destinationServices: string | null;
+  },
+  yourServices: readonly Service[],
+): Pick<ReviewCandidate, 'serviceLookup' | 'destination' | 'effectiveDestination'> {
+  const outcome = storedLookupOutcome(row, yourServices);
+  const serviceLookup: CandidateServiceLookup | null =
+    outcome === null || row.serviceLookupAt === null
+      ? null
+      : {
+          status: outcome.status,
+          services: outcome.services,
+          checkedAt: row.serviceLookupAt.toISOString(),
+          stale: row.serviceLookupIdentity !== row.resolvedWorkIdentity,
+        };
+  const destination = storedDestination(row.destinationKind, row.destinationServices);
+  return {
+    serviceLookup,
+    destination,
+    effectiveDestination: effectiveDestinationFor({ serviceLookup, destination }),
+  };
+}
+
+/**
+ * #396 — look up the auto-detect candidates that need it, and store the
+ * answers. Owner-triggered: called only from the owner's review load and the
+ * owner's "Look up again" tap, never from a timer (invariant 5).
+ *
+ * ⚠ Suppressed works are skipped: review never shows them, so asking TMDB
+ * about them spends the per-request budget on nothing.
+ */
+export async function lookUpAutoDetectServices(
+  ownerId: ReturnType<typeof requireOwnerId>,
+  batchId: string,
+  source: WatchProviderSource,
+  mode: 'missing' | 'retry',
+  now: Date,
+  onlyCandidateIds?: ReadonlySet<string>,
+): Promise<number> {
+  const [rows, suppressions, usedServices] = await Promise.all([
+    listCandidatesForReview(ownerId, batchId),
+    listActiveSuppressions(ownerId),
+    listOwnerServices(ownerId),
+  ]);
+  const suppressed = new Set(suppressions.map((s) => s.workIdentity));
+  const due = rows.filter(
+    (row) =>
+      (onlyCandidateIds === undefined || onlyCandidateIds.has(row.id)) &&
+      (row.resolvedWorkIdentity === null || !suppressed.has(row.resolvedWorkIdentity)) &&
+      needsServiceLookup(row, mode),
+  );
+  const writes = await runServiceLookups(due, source, yourServicesFrom(usedServices), now);
+  for (const write of writes) {
+    const { id, ...data } = write;
+    await writeCandidateServiceLookup(ownerId, batchId, id, data);
+  }
+  return writes.length;
 }
 
 /**
@@ -492,7 +593,10 @@ export function proposedRemovalsFrom(
   }).removals;
 }
 
-export function registerBatchReviewRoutes(router: Router): void {
+export function registerBatchReviewRoutes(
+  router: Router,
+  getWatchSource: () => WatchProviderSource,
+): void {
   router.get('/batches/:batchId/review', async (req, res) => {
     const ownerId = requireOwnerId(req);
     const batchId = req.params.batchId ?? '';
@@ -511,10 +615,18 @@ export function registerBatchReviewRoutes(router: Router): void {
     // (`requireServiceOf`). TASK-186 / `T-WAIT-005`: the review pass has to
     // render for a discovery capture, so the question asked here is "which
     // kind of batch is this", not "which service is this".
+    //
+    // #396 — nor does an auto-detect batch, which has neither column. Its
+    // titles' services are looked up HERE, inside the owner's own review load
+    // (owner-triggered, capped, metadata-only), before the candidates are read.
+    const autoDetect = isAutoDetectBatch(batch);
     const discoverySource = discoverySourceOf(batch);
-    const service = discoverySource === null ? requireServiceOf(batch) : null;
+    const service = discoverySource === null && !autoDetect ? requireServiceOf(batch) : null;
+    if (autoDetect) {
+      await lookUpAutoDetectServices(ownerId, batchId, getWatchSource(), 'missing', new Date());
+    }
     const [{ candidates, suppressed, activeListings }, images] = await Promise.all([
-      loadReviewCandidates(ownerId, batchId, service),
+      loadReviewCandidates(ownerId, batchId, service, { autoDetect }),
       listImagesForBatch(ownerId, batchId),
     ]);
     const decisions = await listRemovalDecisions(ownerId, batchId);
@@ -549,6 +661,7 @@ export function registerBatchReviewRoutes(router: Router): void {
       batchId: batch.id,
       service,
       discoverySource,
+      autoDetect,
       mode: batch.mode as BatchMode,
       lowYield: batch.lowYield,
       degradedExtraction: batch.degradedExtraction,

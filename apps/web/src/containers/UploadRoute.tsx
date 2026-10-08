@@ -23,9 +23,11 @@
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  BATCH_SOURCES,
+  AUTO_DETECT_SOURCE,
+  CAPTURE_SOURCES,
   batchSourceLabel,
-  isDiscoverySource,
+  forcedModeFor,
+  splitBatchSource,
   ulid,
   type CaptureSelectionRefusal,
 } from '@nextup/domain';
@@ -141,11 +143,19 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
    * batch source; anything unrecognised is ignored rather than guessed at.
    */
   const requestedSource = params.get('source') ?? params.get('service');
-  const initialService = BATCH_SOURCES.find((source) => source === requestedSource) ?? null;
+  /*
+   * #396 (US-066 AC-1, `A57`) — with no source named, the capture starts on
+   * AUTO-DETECT: each title's service is looked up at review. That default is
+   * add-only by source, so nothing a default can remove; a full update still
+   * needs the owner to name the service. `?service=` (the freshness strip)
+   * still pre-selects that service exactly as before.
+   */
+  const initialService =
+    CAPTURE_SOURCES.find((source) => source === requestedSource) ?? AUTO_DETECT_SOURCE;
 
   const [selection, setSelection] = useState<BatchDraftSelection>({
     service: initialService,
-    mode: initialService !== null && isDiscoverySource(initialService) ? 'append-only' : null,
+    mode: forcedModeFor(initialService),
   });
   const [batchId, setBatchId] = useState<string | null>(null);
   const [queue, setQueue] = useState<readonly QueuedImage[]>([]);
@@ -462,6 +472,7 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
             <div hidden={onScreenshots}>
               <UploadPage
                 initialService={initialService}
+                initialDefaulted={initialService !== requestedSource}
                 onSelectionChange={setSelection}
                 phone={phone}
               />
@@ -556,9 +567,7 @@ export function UploadRoute({ client = apiClient }: UploadRouteProps = {}): JSX.
                   <dd>
                     {selection.service === null
                       ? 'Choose a service'
-                      : isDiscoverySource(selection.service)
-                        ? batchSourceLabel({ service: null, discoverySource: selection.service })
-                        : batchSourceLabel({ service: selection.service })}
+                      : batchSourceLabel(splitBatchSource(selection.service))}
                   </dd>
                   <dt>Update mode</dt>
                   <dd>

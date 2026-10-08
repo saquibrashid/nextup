@@ -8,6 +8,23 @@ sourceOfTruth: docs/PRD.md, docs/architecture.md, docs/adr/ADR-0002, ADR-0006
 
 # specs/api.md — nextup HTTP API
 
+## Auto-detect import (TASK-272 – TASK-275, #396, PRD `A57`, US-066)
+
+`POST /api/batches` (§6.11) accepts `source: "auto"`: the owner names no
+service, the batch stores neither `service` nor `discoverySource` and answers
+`autoDetect: true`, and it is **append-only by source type** — a full update is
+`400 FULL_UPDATE_NOT_AVAILABLE_FOR_SOURCE`, decided from `source`, never from a
+client flag. `GET /api/batches/:batchId/review` (§6.17) on such a batch looks up
+each matched title's providers (owner-triggered, at most 20 a request, serial,
+ADR-0010's alias mapping) and adds `autoDetect: true` and, per candidate,
+`serviceLookup`, `destination` and `effectiveDestination`. *Look up again* is
+§6.50; the owner's per-title choice is §6.51. The close (§6.22) writes listings
+per confirmed service and Waiting intents, refuses with `409
+AUTO_DESTINATION_REQUIRED` while a confirmed title has no destination, and
+answers `serviceState: null` — **an auto close never changes a service's
+last-updated date** (REQ-039, ADR-0010 Rev 6 Q5b). Undo (§6.25) refuses a batch
+that sent anything to Waiting (`reason: "waiting-routed"`).
+
 ## Streaming forecast (TASK-252, #380)
 
 `GET /api/waiting` items additionally expose `forecast`: `null`, or one of
@@ -448,6 +465,8 @@ typed data and never re-check it.
 | POST | `/api/batches/:batchId/submit` | US-005, US-006 |
 | POST | `/api/batches/:batchId/retry-extraction` | US-006 |
 | GET | `/api/batches/:batchId/review` | US-012, US-013, US-014 |
+| POST | `/api/batches/:batchId/service-lookup` | US-066 |
+| PATCH | `/api/batches/:batchId/candidates/:candidateId/destination` | US-066 |
 | PATCH | `/api/batches/:batchId/candidates/:candidateId` | US-007, US-008, US-012 |
 | POST | `/api/batches/:batchId/candidates/confirm-all` | US-012 |
 | POST | `/api/batches/:batchId/manual-entry` | US-009 |
@@ -1500,6 +1519,15 @@ Body: `{ "service": "netflix", "mode": "full-update", "captureProtocol": 1,
 there is **no default mode** (US-003 AC-5). Omitting either is 400
 `VALIDATION_FAILED`.
 
+**Auto-detect (`A57`, US-066).** `{ "source": "auto", "mode": "append-only" }`
+creates a batch with `service: null`, `discoverySource: null` and
+`autoDetect: true`; its `modeExplanation` says each title's service will be
+looked up and confirmed at review. `mode` is forced append-only by the
+source: `"full-update"` is **400 `FULL_UPDATE_NOT_AVAILABLE_FOR_SOURCE`** with
+the reason (a full update needs the one service whose list it compares), and
+no other body field — `autoDetect`, `allowFullUpdate`, `service` — changes
+that. A named service or a storefront is unchanged.
+
 **201**
 ```jsonc
 { "batchId": "01J8ZF...", "service": "netflix", "mode": "full-update",
@@ -1774,6 +1802,18 @@ and `message`, including when every image failed. Partial memory/decode failures
 withhold full-update removals rather than treating unread screenshots as absence.
 
 ### 6.17 `GET /api/batches/:batchId/review` (US-012, US-013, US-014)
+
+**Auto-detect (`A57`, US-066 AC-3–AC-6).** For an auto-detect batch the
+response adds `"autoDetect": true`, and opening it first looks up, serially, at
+most `REVIEW_SERVICE_LOOKUP_PER_REQUEST` (20) matched candidates never looked
+up or whose match changed since (TMDB `/watch/providers`, the ADR-0010
+`flaggedProvidersFor` mapping, region `US`). Each candidate adds
+`serviceLookup: { status: "found" | "none" | "unknown" | "failed", services,
+checkedAt, stale } | null`, `destination` (the owner's §6.51 choice, or `null`)
+and `effectiveDestination` (`{kind: "services", services}` or `{kind:
+"waiting"}`, or `null`): `found` proposes every matching owner service, `none`
+proposes Waiting, and `unknown`, `failed` or `stale` propose nothing. A lookup
+failure never fails the request. No other batch carries these fields.
 
 **409 `BATCH_NOT_IN_REVIEW`** unless `status === 'in-review'`.
 
@@ -2054,6 +2094,19 @@ Body:
 | 409 | `PENDING_ADDITIONS` | any `additions` or `unmatched` item is still `pending`; `details.pendingCandidateIds` (US-012 AC-3) |
 | 409 | `REMOVALS_NOT_CONFIRMED` | full-update, `removals.count > 0`, `confirmRemovals !== true` (REQ-020, US-016 AC-2) |
 | 409 | `BATCH_NOT_IN_REVIEW` | wrong status |
+| 409 | `AUTO_DESTINATION_REQUIRED` | auto-detect batch only (`A57`): a confirmed or corrected title has neither a looked-up proposal nor an owner choice; `details.candidateIds`. Checked after `PENDING_ADDITIONS`, before anything is written |
+
+**Auto-detect close (`A57`, US-066 AC-7–AC-9).** One transaction. Per applied
+title, its effective destination (the owner's choice, else the lookup's
+proposal): a listing dated today for each service — an existing active listing
+on that service is a no-op and a new service adds a badge, the earliest date
+kept — or a waiting intent (search-shaped: `discoverySource: "search"`, no
+source batch). A work suppressed on its work identity lands nowhere. The
+looked-up providers are stored as the title's availability. The response adds
+`autoDetect: { titlesListed, intentsCreated, alreadyOnService, alreadyListed,
+alreadyWaiting }`, `serviceState` is **`null`** (no `ServiceState` is written:
+REQ-039, ADR-0010 Rev 6), and `undoable` is `false` when any title went to
+Waiting.
 
 **Removal is never a side effect of closing.** `confirmRemovals: true` is the
 owner's single group confirmation (REQ-020). `T-REV-005` asserts a close
@@ -2100,6 +2153,11 @@ Valid from `draft`, `in-review`, `extraction-failed`. Images are **retained**
 ```
 **409 `BATCH_NOT_CREATES_ONLY`** with the full enumeration — data-model §8.4.
 **409 `BATCH_ALREADY_UNDONE`**. **409 `BATCH_NOT_APPLIED`**.
+
+An auto-detect batch (`A57`) answers `serviceState: null` — its close wrote
+none — and one that routed any title to Waiting to stream is refused with
+`BATCH_NOT_CREATES_ONLY`, `details.reason: "waiting-routed"`: the intents carry
+no batch link, so undo could not reverse them.
 
 ### 6.26 `POST /api/removal-groups/:groupId/undo` (US-017)
 
@@ -2492,6 +2550,37 @@ computed for the request, in `apps/api/src/services/waitingSort.ts`:
 | 200 | — | `{items, count, availabilityRefreshFailed}` in that order |
 | 400 | `VALIDATION_FAILED` | unknown or repeated `sort` or `dir` (`details.field`, `details.permitted`) |
 
+### 6.50 `POST /api/batches/:batchId/service-lookup` — *Look up again* (US-066 AC-6, `A57`)
+
+Body `{}` or `{ "candidateIds": ["..."] }`. The owner's explicit retry of the
+review-time lookup for an `in-review` auto-detect batch: every matched
+candidate whose lookup failed, was not known, or went stale after a match
+correction — or only the named ones — at most
+`REVIEW_SERVICE_LOOKUP_PER_REQUEST` (20), serially. Writes candidate lookup
+columns only; a failure is stored as `failed`, never thrown.
+
+| Status | Code | When |
+|---|---|---|
+| 200 | — | `{ "lookedUp": 2 }` |
+| 400 | `VALIDATION_FAILED` | `candidateIds` is not a list of ids |
+| 409 | `BATCH_NOT_AUTO_DETECT` | the batch names a service or a storefront |
+| 409 | `BATCH_NOT_IN_REVIEW` | wrong status |
+
+### 6.51 `PATCH /api/batches/:batchId/candidates/:candidateId/destination` (US-066 AC-4/AC-5, `A57`)
+
+Body: `{ "kind": "services", "services": ["max", "netflix"] }`,
+`{ "kind": "waiting" }`, or `{ "kind": null }` to follow the lookup's proposal
+again. `services` must be non-empty `SERVICES` members. Nothing lands until
+close.
+
+**200** `{ "candidateId": "...", "destination": {...} | null, "effectiveDestination": {...} | null }`
+
+| Status | Code | When |
+|---|---|---|
+| 400 | `VALIDATION_FAILED` | unknown `kind`, empty or unknown `services` (`details.field`, `details.permitted`) |
+| 404 | `NOT_FOUND` | the candidate is not in this batch |
+| 409 | `BATCH_NOT_AUTO_DETECT` | the batch names a service or a storefront |
+
 ---
 
 ## 7. Status-code policy
@@ -2557,8 +2646,19 @@ IMAGE_EXPIRED, IMAGES_PURGED,
 DUPLICATE_WORK_IDENTITY, WORK_SUPPRESSED, TARGET_WORK_SUPPRESSED,
 LISTING_NOT_REMOVED, TITLE_NOT_ACTIVE, GROUP_ALREADY_REVERSED,
 PARTIAL_FAILURE_PREVENTED, AVAILABILITY_CHANGED,
+FULL_UPDATE_NOT_AVAILABLE_FOR_SOURCE,
+AUTO_DESTINATION_REQUIRED, BATCH_NOT_AUTO_DETECT,
 TMDB_WORK_NOT_FOUND, TMDB_UNAVAILABLE
 ```
+`AUTO_DESTINATION_REQUIRED` (409, `A57`, §6.22) refuses closing an auto-detect
+batch while any non-skipped title has no destination; `details.candidateIds`
+names them. `BATCH_NOT_AUTO_DETECT` (409, `A57`, §6.50–§6.51) refuses a
+service lookup or a per-title destination on a batch whose source is a named
+service or a storefront. A full update with source `auto` is refused with the
+existing `FULL_UPDATE_NOT_AVAILABLE_FOR_SOURCE` (400), by source type.
+~~Superseded at `A57`: the union above without `FULL_UPDATE_NOT_AVAILABLE_FOR_SOURCE`
+(already a member of `errorCodes.ts` since Epic L, missing from this list),
+`AUTO_DESTINATION_REQUIRED` and `BATCH_NOT_AUTO_DETECT`.~~
 `AVAILABILITY_CHANGED` (`A55`, §6.48) is **per-item only**: the row's
 availability change is no longer the one the owner answered. It is never a
 whole-request status.

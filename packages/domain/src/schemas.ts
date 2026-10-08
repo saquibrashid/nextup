@@ -299,6 +299,9 @@ export const uploadBatchSchema = z
     // asserting both or neither.
     service: serviceSchema.nullable(),
     discoverySource: z.enum(DISCOVERY_SOURCES).nullable(),
+    // #396 — an auto-detect capture. Optional so a payload predating it reads
+    // as an ordinary batch; `true` is the only value that changes anything.
+    autoDetect: z.boolean().optional(),
     mode: batchModeSchema,
     status: batchStatusSchema,
     derivedFromBatchId: idSchema.nullable(),
@@ -327,9 +330,25 @@ export const uploadBatchSchema = z
   // Exactly one origin — mirrors `ck_batch_source_exclusive`. Neither set is a
   // batch with no provenance; both set is a batch that is simultaneously a
   // curated saved list and an editorial feed.
-  .refine((b) => (b.service === null) !== (b.discoverySource === null), {
-    message: 'exactly one of service and discoverySource must be set',
-    path: ['discoverySource'],
+  //
+  // #396 — mirrors `ck_batch_source_kind`: an auto-detect batch sets NEITHER
+  // (its services are looked up per title at review), every other batch sets
+  // exactly one.
+  .refine(
+    (b) =>
+      b.autoDetect === true
+        ? b.service === null && b.discoverySource === null
+        : (b.service === null) !== (b.discoverySource === null),
+    {
+      message:
+        'exactly one of service and discoverySource must be set (neither for an auto-detect batch)',
+      path: ['discoverySource'],
+    },
+  )
+  // #396 — mirrors `ck_batch_auto_append_only`: removals need a named service.
+  .refine((b) => b.autoDetect !== true || b.mode === 'append-only', {
+    message: 'an auto-detect batch is always append-only',
+    path: ['mode'],
   })
   // ⚠ ADR-0010 D-2, mirroring `ck_batch_discovery_append_only`. The API
   // boundary refuses this (`T-WAIT-001`); this is the parser refusing to

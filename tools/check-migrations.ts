@@ -20,6 +20,12 @@
 // 2026-09-24). Each is pinned by exact path and full SQL hash below, with the
 // exact DROP lines it may hold; changing either approval requires another
 // visible diff here.
+//
+// #396 adds `NOCHECK CONSTRAINT` to the patterns: disabling a CHECK repeals
+// it exactly as dropping one does, just reversibly. 0020 is the one file
+// pinned to hold such a line — it disables `ck_batch_source_exclusive` only
+// after installing `ck_batch_source_kind`, its trusted superset, WITH CHECK
+// (ADR-0010 Revision 6). No DROP is involved.
 
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -31,7 +37,8 @@ interface PinnedException {
   path: string;
   // Normalize CRLF only, not whitespace/comments/literals: none may hide added SQL.
   sha256: string;
-  drops: ReadonlySet<string>;
+  /** The exact `DROP CONSTRAINT` / `NOCHECK CONSTRAINT` lines this file may hold. */
+  allowed: ReadonlySet<string>;
 }
 
 const PINNED_EXCEPTIONS: readonly PinnedException[] = [
@@ -39,7 +46,7 @@ const PINNED_EXCEPTIONS: readonly PinnedException[] = [
     label: 'service expansion',
     path: 'prisma/migrations/0012_expand_services/migration.sql',
     sha256: '7c357e70ae71ffa2d703aeb60ae271d6cebfebcd1b322f36fbdcb9eb9312bdb5',
-    drops: new Set([
+    allowed: new Set([
       'ALTER TABLE [dbo].[upload_batch] DROP CONSTRAINT [ck_batch_service];',
       'ALTER TABLE [dbo].[service_listing] DROP CONSTRAINT [ck_listing_service];',
       'ALTER TABLE [dbo].[service_state] DROP CONSTRAINT [ck_state_service];',
@@ -49,12 +56,23 @@ const PINNED_EXCEPTIONS: readonly PinnedException[] = [
     label: 'discovery source expansion',
     path: 'prisma/migrations/0017_waiting_to_stream/migration.sql',
     sha256: '72148643cbad9a7737f411c5f7338e71fa4716fa058cf2ffa82c3f4dcd405371',
-    drops: new Set([
+    allowed: new Set([
       'ALTER TABLE [dbo].[upload_batch] DROP CONSTRAINT [ck_batch_discovery_source];',
       'ALTER TABLE [dbo].[watch_intent] DROP CONSTRAINT [ck_intent_source];',
     ]),
   },
+  {
+    label: 'auto-detect source',
+    path: 'prisma/migrations/0020_auto_detect_source/migration.sql',
+    sha256: '751deff4c548ee53e001411e1104374737acbaeeb7ff951fe9b4da4a1e23e6f8',
+    allowed: new Set([
+      'ALTER TABLE [dbo].[upload_batch] NOCHECK CONSTRAINT [ck_batch_source_exclusive];',
+    ]),
+  },
 ];
+
+/** The statements a pinned exception may name line by line. */
+const PINNABLE_STATEMENTS: ReadonlySet<string> = new Set(['DROP CONSTRAINT', 'NOCHECK CONSTRAINT']);
 
 /** Statements that destroy data or repeal an enforced invariant. */
 export const DESTRUCTIVE_PATTERNS = [
@@ -83,6 +101,12 @@ export const DESTRUCTIVE_PATTERNS = [
     name: 'DROP CONSTRAINT',
     pattern: /\bDROP\s+CONSTRAINT\b/i,
     why: 'repeals a CHECK or UNIQUE constraint the database was enforcing',
+  },
+  {
+    // `WITH NOCHECK ADD CONSTRAINT` does not match: `ADD` sits between.
+    name: 'NOCHECK CONSTRAINT',
+    pattern: /\bNOCHECK\s+CONSTRAINT\b/i,
+    why: 'disables a CHECK or FOREIGN KEY the database was enforcing — a repeal, however reversible',
   },
   {
     name: "sp_rename ... 'COLUMN'",
@@ -173,7 +197,7 @@ export function scanSql(file: string, sql: string): MigrationViolation[] {
     for (const match of uncommented.matchAll(new RegExp(pattern, `${pattern.flags}g`))) {
       const line = uncommented.slice(0, match.index).split('\n').length;
       const text = uncommented.split(/\r?\n/)[line - 1]?.trim() ?? '';
-      if (approved && name === 'DROP CONSTRAINT' && pinned.drops.has(text)) {
+      if (approved && PINNABLE_STATEMENTS.has(name) && pinned.allowed.has(text)) {
         continue;
       }
       violations.push({ file, line, statement: name, text, why });
