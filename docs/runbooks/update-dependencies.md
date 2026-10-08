@@ -233,7 +233,8 @@ Microsoft IT; npm is globally pointed at `https://packagefeedproxy.microsoft.io/
 whose tarballs resolve to `ms-feed-*.pkgs.visualstudio.com`. That Azure DevOps
 Artifacts feed publishes only the **legacy `dist.shasum` (sha1)** for a
 package — it returns **no `dist.integrity` (sha512)** — so npm records the sha1
-it is given. The correlation is exact:
+it is given. The correlation **was** exact, and §6a has since broken it — read
+this as the origin story, and §6a for what the lockfile looks like now:
 
 - **`sha1-` ⟺ the `ms-feed-*` proxy** — the whole population, ~525 entries, and
   it is **not** dev-only: it covers the entire production tree, including
@@ -244,6 +245,12 @@ it is given. The correlation is exact:
   stronger hash plus a `registry.npmjs.org` URL; on this machine npm's
   `replace-registry-host` rewrites that host to the proxy for the actual
   download and verifies the identical tarball against the sha512.
+
+⚠ **Do not use the first bullet as a test for anything today.** The 442
+`ms-feed-*` URLs were rewritten to `registry.npmjs.org` (§6a) without touching
+their hashes, so `sha1-` and a public `resolved` URL now coexist on the same
+entry. **A `sha1-` hash no longer implies a proxy URL**, and an audit that
+assumes it does will mis-report a healthy lockfile.
 
 **Does npm still verify a `sha1-` hash?** Yes — measured, not assumed, against
 npm 11's own verifier (`ssri` 12): good data verifies as `sha1`, a single
@@ -274,6 +281,67 @@ source of sha512 is `registry.npmjs.org`, which is **IT-blocked**; do not add an
 **The supported remediation is dependabot itself.** Each bump arrives
 sha512/`registry.npmjs.org`, so the sha1 population shrinks on its own over
 time; no manual step exists or is wanted.
+
+### 6a. ⚠ A `resolved` URL pointing at `ms-feed-*` LOCKS DEPENDABOT OUT
+
+⚠ **This is a different defect from the `sha1-` hashes above, it is NOT
+cosmetic, and it does not heal on its own — it actively stops the remediation
+in the previous paragraph from working.**
+
+The `integrity` hash and the `resolved` URL fail in different ways. A `sha1-`
+hash still verifies (measured above). A `resolved` URL naming
+`ms-feed-N.pkgs.visualstudio.com` is a **private registry** as far as
+dependabot is concerned, and dependabot has no credential for it, so it gives
+up on the whole update:
+
+```
+Dependabot can't authenticate to a private package registry.
+Because of this, Dependabot cannot update this pull request.
+```
+
+⚠ **CI going green proves nothing about this.** The `1es-public` feed is
+anonymously readable, so GitHub runners install from it perfectly happily. The
+only visible symptom is dependabot PRs that will not rebase or recreate, and
+`Dependabot Updates` workflow runs that end in `failure` — never a red check
+on the PR itself. Read a dependabot PR that refuses to rebase as *this*, not as
+a merge-conflict problem.
+
+**How it gets in.** A local `npm install` on a Microsoft-managed machine
+resolves through the proxy and rewrites `resolved` for every package it
+touches. Committing that lockfile publishes internal feed URLs to a public
+repository **and** disables dependabot for every affected package. This
+happened once already and was found only after four bumps silently stopped
+updating.
+
+**The repair — mechanical, and the one lockfile edit that is allowed here.**
+Rewrite the host prefix only. No `npm install`, no version change, and
+crucially **no `integrity` change**: it is the same tarball at its public
+address, so the recorded hash stays valid.
+
+```powershell
+$p   = 'package-lock.json'
+$raw = [System.IO.File]::ReadAllText($p)
+$new = [regex]::Replace(
+  $raw,
+  'https://ms-feed-[0-9]+\.pkgs\.visualstudio\.com/1es-public/_packaging/npm-public/npm/registry/',
+  'https://registry.npmjs.org/')
+[System.IO.File]::WriteAllText($p, $new)
+node -e "require('./package-lock.json'); console.log('parsed OK')"
+```
+
+Verify before pushing — **every changed line must be a `resolved` line**, and
+the two integrity populations must be untouched:
+
+```powershell
+git diff -U0 -- package-lock.json |
+  Select-String '^[+-][^+-]' | ? { $_.Line -notmatch '^\s*[+-]\s*"resolved":' }
+# must print nothing
+```
+
+⚠ **This does NOT fix the `sha1-` hashes and must not be expected to** — only a
+real install against the public registry can, which is what §6 explains is
+impossible from here. The two problems share a cause and have different
+remedies.
 
 **No CI gate.** A check that failed on any `sha1-` would fail today on ~525
 entries with no available remedy — a broken gate, not a safety net. A ratchet
