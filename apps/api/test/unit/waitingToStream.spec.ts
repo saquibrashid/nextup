@@ -129,6 +129,7 @@ function stored(over: StoredOver = {}): Record<string, unknown> {
 }
 
 interface Item {
+  intentId: string;
   flaggedOn: string[] | null;
   otherServicesOn: string[] | null;
   otherProvidersOn: string[] | null;
@@ -313,7 +314,12 @@ describe('T-AVAIL-013 · where a waiting title can be watched', () => {
     getWatchOffers.mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('down'));
 
     const items = await getItems();
-    expect(items.map((item) => item.accessState)).toEqual(['unknown', 'not-checked']);
+    // Order is #415's concern (T-WSORT-002); key by intent so this asserts states only.
+    const byId = new Map(items.map((item) => [item.intentId, item]));
+    expect(['wi-unknown', 'wi-never'].map((id) => byId.get(id)?.accessState)).toEqual([
+      'unknown',
+      'not-checked',
+    ]);
     expect(items.map((item) => item.otherServicesOn)).toEqual([null, null]);
   });
 });

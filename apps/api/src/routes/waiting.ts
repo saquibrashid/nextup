@@ -75,8 +75,10 @@ import {
   type IntentRow,
 } from '../services/watchAvailability.js';
 import { yourServicesFrom } from '../services/libraryAvailability.js';
+import { sortWaiting } from '../services/waitingSort.js';
 import { tmdbUnavailableAppError } from './tmdb.js';
 import { toIsoDate } from './titles.js';
+import { parseWaitingQuery } from './waitingQuery.js';
 
 /** One row of the waiting view. Shaped field by field, never spread. */
 export interface WaitingItem {
@@ -126,8 +128,10 @@ export interface WaitingItem {
    * #380 — when and where it is expected to stream, or `null` for no
    * forecast. Only for a work not streaming on any supported service.
    * ⚠ An `estimate*` kind is a GUESS from the studio's usual window and the
-   * client must say so; `announced` is a date Watchmode published. Never a
-   * sort key (owner decision 3 on #380). `yours` is whether the owner uses
+   * client must say so; `announced` is a date Watchmode published. Since #415
+   * (`A56`) it orders `sort=expected` — announced dates before estimates, no
+   * forecast last — and is still always shown as what it is. ~~"Never a sort
+   * key (owner decision 3 on #380)."~~ `yours` is whether the owner uses
    * that service.
    */
   forecast: (StreamingForecast & { yours: boolean }) | null;
@@ -349,6 +353,8 @@ export function registerWaitingRoutes(
 
   router.get('/waiting', async (req, res) => {
     const ownerId = requireOwnerId(req);
+    // #415: validated before any store read, so a bad sort costs nothing.
+    const { sort, dir } = parseWaitingQuery(req.query);
     const now = new Date();
 
     const [stored, used] = await Promise.all([
@@ -452,7 +458,7 @@ export function registerWaitingRoutes(
     }
     const today = now.toISOString().slice(0, 10);
 
-    const items: WaitingItem[] = stored.map((intent, index) => {
+    const built: WaitingItem[] = stored.map((intent, index) => {
       const row = rows[index] as IntentRow;
       const write = fresh.get(intent.id);
       const availableOn = write === undefined ? row.availableOn : write.availableOn;
@@ -487,6 +493,25 @@ export function registerWaitingRoutes(
         forecast: forecastFor(forecastById.get(intent.id), today, yours),
       };
     });
+    // #415: in memory, because the forecast is computed in this request.
+    const intentById = new Map(stored.map((intent) => [intent.id, intent]));
+    const items = sortWaiting(
+      built,
+      (item) => {
+        const intent = intentById.get(item.intentId) as (typeof stored)[number];
+        return {
+          intentId: item.intentId,
+          tmdbName: intent.title.tmdbName,
+          rawExtractedText: intent.title.rawExtractedText,
+          discoveredAt: intent.discoveredAt,
+          releaseYear: item.releaseYear,
+          forecast: item.forecast,
+          onYourServices: (item.flaggedOn ?? []).length > 0,
+        };
+      },
+      sort,
+      dir,
+    );
 
     res.status(200).json({
       items,

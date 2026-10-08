@@ -132,10 +132,25 @@ test.describe('T-WAIT-010 — the empty waiting view explains itself', () => {
   });
 });
 
+// #415 — the server orders the list; a row on the owner's services leads in
+// every order (T-WSORT-002h), so the stub answers in that order.
 const WAITING_EVERY_STATE = {
   count: 3,
   availabilityRefreshFailed: false,
   items: [
+    {
+      ...WAITING_WITH_ROWS.items[0],
+      intentId: 'wi_yours',
+      titleId: 'ttl_3',
+      discoverySource: 'prime-video-store',
+      availableOn: ['Netflix'],
+      flaggedOn: ['netflix'],
+      otherServicesOn: [],
+      otherProvidersOn: [],
+      rentOn: [],
+      accessState: 'streaming',
+      streamingSince: '2026-02-03T00:00:00.000Z',
+    },
     {
       ...WAITING_WITH_ROWS.items[0],
       intentId: 'wi_rent',
@@ -160,19 +175,6 @@ const WAITING_EVERY_STATE = {
       rentOn: [],
       accessState: 'streaming',
       streamingSince: '2026-02-01T00:00:00.000Z',
-    },
-    {
-      ...WAITING_WITH_ROWS.items[0],
-      intentId: 'wi_yours',
-      titleId: 'ttl_3',
-      discoverySource: 'prime-video-store',
-      availableOn: ['Netflix'],
-      flaggedOn: ['netflix'],
-      otherServicesOn: [],
-      otherProvidersOn: [],
-      rentOn: [],
-      accessState: 'streaming',
-      streamingSince: '2026-02-03T00:00:00.000Z',
     },
   ],
 };
@@ -299,9 +301,10 @@ const WAITING_RESTYLE = {
   count: 3,
   availabilityRefreshFailed: false,
   items: [
+    // #415 — in the server's order: the streaming row leads.
+    { ...WAITING_EVERY_STATE.items[0], name: 'Arrived' },
     WAITING_FORECAST.items[0],
     WAITING_FORECAST.items[1],
-    { ...WAITING_EVERY_STATE.items[2], name: 'Arrived' },
   ],
 };
 
@@ -379,7 +382,7 @@ const WAITING_VIEWS = {
 };
 
 const WAITING_TITLE = {
-  titleId: 'ttl_view_0',
+  titleId: 'ttl_view_1',
   workIdentity: 'tmdb:movie:967941',
   matchState: 'matched',
   name: 'Wicked: For Good',
@@ -481,7 +484,7 @@ test.describe('T-WAIT-025 — Grid view and the waiting details page in a real b
     await stubViews(page);
     await page.goto('/waiting');
     await page.getByRole('link', { name: 'Wicked: For Good' }).click();
-    await expect(page).toHaveURL(/\/waiting\/ttl_view_0$/);
+    await expect(page).toHaveURL(/\/waiting\/ttl_view_1$/);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Wicked: For Good');
     await expect(page.getByText('2h 17m')).toBeVisible();
     await expect(page.getByText('Jon M. Chu')).toBeVisible();
@@ -501,5 +504,129 @@ test.describe('T-WAIT-025 — Grid view and the waiting details page in a real b
     await page.getByRole('link', { name: 'Back to Waiting to stream' }).click();
     await expect(page).toHaveURL(/\/waiting$/);
     await expect(page.getByTestId('waiting-row')).toHaveCount(3);
+  });
+});
+
+/* ── #414 — Grid cards share their rows ──────────────────────────────── */
+
+async function checkAligned(page: Page, width: number): Promise<void> {
+  await page.setViewportSize({ width, height: 1200 });
+  await stubViews(page);
+  await page.goto('/waiting');
+  await page.getByRole('button', { name: 'Grid view' }).click();
+  await expect(page.getByTestId('waiting-list')).toHaveAttribute('data-view', 'grid');
+  const rows = page.getByTestId('waiting-row');
+  await expect(rows).toHaveCount(3);
+
+  // The cards that share the first line of the grid.
+  const firstTop = Math.round((await rows.nth(0).boundingBox())?.y ?? -1);
+  const sameLine: number[] = [];
+  for (let index = 0; index < 3; index += 1) {
+    const box = await rows.nth(index).boundingBox();
+    if (Math.round(box?.y ?? -2) === firstTop) sameLine.push(index);
+  }
+  expect(sameLine.length).toBeGreaterThanOrEqual(2);
+
+  const tops = async (selector: string): Promise<number[]> => {
+    const values: number[] = [];
+    for (const index of sameLine) {
+      const box = await rows.nth(index).locator(selector).first().boundingBox();
+      values.push(Math.round(box?.y ?? -1));
+    }
+    return values;
+  };
+  const heights = async (selector: string): Promise<number[]> => {
+    const values: number[] = [];
+    for (const index of sameLine) {
+      const box = await rows.nth(index).locator(selector).first().boundingBox();
+      values.push(Math.round(box?.height ?? -1));
+    }
+    return values;
+  };
+  const allEqual = (values: number[]): void => {
+    for (const value of values) expect(Math.abs(value - (values[0] ?? 0))).toBeLessThanOrEqual(1);
+  };
+
+  // One fixed poster box, then every row on one line across the cards —
+  // whether or not a card has the rent chip or a date block.
+  allEqual(await heights('.waiting-row__poster'));
+  allEqual(await tops("[data-grid-slot='title']"));
+  allEqual(await tops("[data-grid-slot='availability']"));
+  allEqual(await tops("[data-grid-slot='date']"));
+  // Not interested sits on one baseline at the bottom of every card.
+  allEqual(await tops("[data-testid='waiting-not-interested']"));
+  for (const index of sameLine) {
+    const card = await rows.nth(index).boundingBox();
+    const button = await rows.nth(index).getByTestId('waiting-not-interested').boundingBox();
+    const cardBottom = (card?.y ?? 0) + (card?.height ?? 0);
+    const buttonBottom = (button?.y ?? 0) + (button?.height ?? 0);
+    expect(cardBottom - buttonBottom).toBeLessThanOrEqual(24);
+  }
+  await noOverflow(page);
+}
+
+test.describe('T-WGRID-002 — Grid cards line up row by row in a real browser (#414)', () => {
+  test('T-WGRID-002a: at 1280px posters, rows and Not interested line up across a grid line', async ({
+    page,
+  }) => {
+    await checkAligned(page, 1280);
+  });
+  test('T-WGRID-002b: at 320px the two-across tiles line up the same way', async ({ page }) => {
+    await checkAligned(page, 320);
+  });
+});
+
+/* ── #415 — the server's order, chosen with the Library's control ────── */
+
+/** A stand-in for the API's sort: name only, which is all this test asks. */
+async function stubSorted(page: Page, requests: string[]): Promise<void> {
+  await stubViews(page);
+  await page.route('**/api/waiting**', async (route) => {
+    const url = new URL(route.request().url());
+    requests.push(url.search);
+    const items = [...WAITING_VIEWS.items];
+    const sort = url.searchParams.get('sort');
+    if (sort === 'name') {
+      const nameOf = (item: (typeof items)[number]): string =>
+        'name' in item && typeof item.name === 'string' ? item.name : '';
+      items.sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+      if (url.searchParams.get('dir') === 'desc') items.reverse();
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ ...WAITING_VIEWS, items }),
+    });
+  });
+}
+
+test.describe('T-WSORT-005 — sorting Waiting to stream in a real browser (#415)', () => {
+  test('T-WSORT-005a: choosing an order and reversing it reorders the list from the server', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 320, height: 1000 });
+    const requests: string[] = [];
+    await stubSorted(page, requests);
+    await page.goto('/waiting');
+    const names = page.getByTestId('waiting-name');
+    await expect(names).toHaveText(['Arrived', 'Wicked: For Good', 'Zootopia 2']);
+    await expect(page.getByTestId('sort-trigger')).toContainText('Streaming soonest');
+
+    await page.getByTestId('sort-trigger').click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Name A-Z' }).click();
+    await expect(page).toHaveURL(/\/waiting\?sort=name&dir=asc$/);
+    await expect(names).toHaveText(['Arrived', 'Wicked: For Good', 'Zootopia 2']);
+
+    // The reverse button is one press with nothing open.
+    await page.getByTestId('sort-reverse').click();
+    await expect(page).toHaveURL(/\/waiting\?sort=name&dir=desc$/);
+    await expect(names).toHaveText(['Zootopia 2', 'Wicked: For Good', 'Arrived']);
+    expect(requests).toContain('?sort=name&dir=asc');
+    expect(requests).toContain('?sort=name&dir=desc');
+
+    // The order holds in Grid too.
+    await page.getByRole('button', { name: 'Grid view' }).click();
+    await expect(names).toHaveText(['Zootopia 2', 'Wicked: For Good', 'Arrived']);
+    await noOverflow(page);
   });
 });

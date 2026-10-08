@@ -17,7 +17,7 @@
 // #328: LibraryNavigation now persists the complete destination. This control
 // reads only the URL, so a later preference cannot rewrite a history entry.
 
-import { useCallback, useId, useState, type JSX } from 'react';
+import { useCallback, useId, useState, type ComponentType, type JSX } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Button } from './ui/Button';
 import { Dialog } from './ui/Dialog';
@@ -40,6 +40,10 @@ import {
   SORT_PANEL_HELP,
   SORT_PANEL_TITLE,
   SORT_TRIGGER_LABEL,
+  WAITING_SORT_DIRECTION_LABELS,
+  WAITING_SORT_KEY_NAMES,
+  WAITING_SORT_ORDER_LABELS,
+  WAITING_SORT_PANEL_TITLE,
 } from '../copy';
 
 export type SortDir = 'desc' | 'asc';
@@ -83,53 +87,121 @@ const SORT_KEY_ICONS = {
 
 /** Both field and direction come from the authoritative URL. */
 export function readSortKey(params: URLSearchParams): SortKey {
-  const fromUrl = params.get('sort');
-  return (SORT_KEYS as readonly string[]).includes(fromUrl ?? '')
-    ? (fromUrl as SortKey)
-    : DEFAULT_SORT;
+  return readSortKeyIn(LIBRARY_SORT, params);
 }
 
 /** Missing directions mean the field default, including during Back/Forward. */
 export function readSortDir(params: URLSearchParams): SortDir {
-  const fromUrl = params.get('dir');
-  if (fromUrl === 'desc' || fromUrl === 'asc') return fromUrl;
-  return defaultDirFor(readSortKey(params));
+  return readSortDirIn(LIBRARY_SORT, params);
 }
 
-export function SortControl(): JSX.Element {
+type Labelled<K extends string, V> = Readonly<Record<K, V>>;
+type DirLabels = Readonly<Record<SortDir, string>>;
+
+/**
+ * #415 (US-065, `A56`) — one control, two lists. Everything that differs
+ * between the Library and Waiting to stream is data: the keys (the API's own
+ * spellings), the default key, each key's default direction, the icons and
+ * the words. The URL contract (`?sort=` omitted for the default key, `?dir=`
+ * always written) and the toolbar reverse button are the same for both.
+ */
+export interface SortConfig<K extends string> {
+  keys: readonly K[];
+  defaultKey: K;
+  defaultDirs: Labelled<K, SortDir>;
+  icons: Labelled<K, ComponentType>;
+  keyNames: Labelled<K, string>;
+  directionLabels: Labelled<K, DirLabels>;
+  orderLabels: Labelled<K, DirLabels>;
+  panelTitle: string;
+}
+
+export const LIBRARY_SORT: SortConfig<SortKey> = {
+  keys: SORT_KEYS,
+  defaultKey: DEFAULT_SORT,
+  defaultDirs: DEFAULT_DIR_BY_KEY,
+  icons: SORT_KEY_ICONS,
+  keyNames: SORT_KEY_NAMES,
+  directionLabels: SORT_DIRECTION_LABELS,
+  orderLabels: SORT_ORDER_LABELS,
+  panelTitle: SORT_PANEL_TITLE,
+};
+
+// The API's own spellings; mirrors apps/api/src/services/waitingSort.ts.
+export const WAITING_SORT_KEYS = ['expected', 'discovered', 'name', 'releaseYear'] as const;
+export type WaitingSortKey = (typeof WAITING_SORT_KEYS)[number];
+
+export const WAITING_SORT: SortConfig<WaitingSortKey> = {
+  keys: WAITING_SORT_KEYS,
+  defaultKey: 'expected',
+  defaultDirs: { expected: 'asc', discovered: 'desc', name: 'asc', releaseYear: 'desc' },
+  icons: {
+    expected: ClockIcon,
+    discovered: BookmarkIcon,
+    name: AlphabetIcon,
+    releaseYear: CalendarIcon,
+  },
+  keyNames: WAITING_SORT_KEY_NAMES,
+  directionLabels: WAITING_SORT_DIRECTION_LABELS,
+  orderLabels: WAITING_SORT_ORDER_LABELS,
+  panelTitle: WAITING_SORT_PANEL_TITLE,
+};
+
+/** A key outside the config is the config's default, as the Library does. */
+export function readSortKeyIn<K extends string>(config: SortConfig<K>, params: URLSearchParams): K {
+  const fromUrl = params.get('sort');
+  return (config.keys as readonly string[]).includes(fromUrl ?? '')
+    ? (fromUrl as K)
+    : config.defaultKey;
+}
+
+export function readSortDirIn<K extends string>(
+  config: SortConfig<K>,
+  params: URLSearchParams,
+): SortDir {
+  const fromUrl = params.get('dir');
+  if (fromUrl === 'desc' || fromUrl === 'asc') return fromUrl;
+  return config.defaultDirs[readSortKeyIn(config, params)];
+}
+
+/** With no `config`, the Library's control, exactly as before #415. */
+export function SortControl({ config }: { config?: SortConfig<string> } = {}): JSX.Element {
+  return <SortControlWith config={config ?? (LIBRARY_SORT as SortConfig<string>)} />;
+}
+
+function SortControlWith<K extends string>({ config }: { config: SortConfig<K> }): JSX.Element {
   const [params, setParams] = useSearchParams();
   const [open, setOpen] = useState(false);
   const headingId = useId();
-  const dir = readSortDir(params);
-  const sort = readSortKey(params);
+  const dir = readSortDirIn(config, params);
+  const sort = readSortKeyIn(config, params);
 
   const close = useCallback(() => {
     setOpen(false);
   }, []);
 
   const chooseOrder = useCallback(
-    (key: SortKey) => {
-      const nextDir = key === sort ? (dir === 'desc' ? 'asc' : 'desc') : defaultDirFor(key);
-      // One navigation sets both values. ListRoute owns cursor state and
-      // resets paging when this query changes; no client-side sorting occurs.
+    (key: K) => {
+      const nextDir = key === sort ? (dir === 'desc' ? 'asc' : 'desc') : config.defaultDirs[key];
+      // One navigation sets both values. The route owns the fetch and resets
+      // paging when this query changes; no client-side sorting occurs.
       setParams((prev) => {
         const updated = new URLSearchParams(prev);
-        if (key === DEFAULT_SORT) updated.delete('sort');
+        if (key === config.defaultKey) updated.delete('sort');
         else updated.set('sort', key);
         updated.set('dir', nextDir);
         return updated;
       });
     },
-    [dir, sort, setParams],
+    [config, dir, sort, setParams],
   );
 
   const reverse = useCallback(() => {
     chooseOrder(sort);
   }, [chooseOrder, sort]);
 
-  const label = SORT_ORDER_LABELS[sort][dir];
-  const reversedLabel = SORT_ORDER_LABELS[sort][dir === 'desc' ? 'asc' : 'desc'];
-
+  const label = config.orderLabels[sort][dir];
+  const reversedLabel = config.orderLabels[sort][dir === 'desc' ? 'asc' : 'desc'];
   return (
     <div className="sort-control-group" data-testid="sort-control-group">
       <Button
@@ -167,7 +239,7 @@ export function SortControl(): JSX.Element {
         <Dialog variant="panel" aria-labelledby={headingId} onDismiss={close}>
           <div className="panel-head">
             <div>
-              <h2 id={headingId}>{SORT_PANEL_TITLE}</h2>
+              <h2 id={headingId}>{config.panelTitle}</h2>
               <p className="panel-help">{SORT_PANEL_HELP}</p>
             </div>
             <Button variant="ghost" aria-label={SORT_CLOSE_LABEL} onClick={close}>
@@ -180,12 +252,12 @@ export function SortControl(): JSX.Element {
             role="group"
             aria-label={SORT_KEY_LEGEND}
           >
-            {SORT_KEYS.map((key) => {
+            {config.keys.map((key) => {
               const selected = sort === key;
-              const shownDir = selected ? dir : defaultDirFor(key);
-              const Icon = SORT_KEY_ICONS[key];
-              const orderLabel = SORT_ORDER_LABELS[key][shownDir];
-              const nextLabel = SORT_ORDER_LABELS[key][shownDir === 'desc' ? 'asc' : 'desc'];
+              const shownDir = selected ? dir : config.defaultDirs[key];
+              const Icon: ComponentType = config.icons[key];
+              const orderLabel = config.orderLabels[key][shownDir];
+              const nextLabel = config.orderLabels[key][shownDir === 'desc' ? 'asc' : 'desc'];
               return (
                 <span key={key} className="sort-option">
                   <Button
@@ -201,12 +273,12 @@ export function SortControl(): JSX.Element {
                     <span className="sort-option__icon">
                       <Icon />
                     </span>
-                    <span className="sort-option__name">{SORT_KEY_NAMES[key]}</span>
+                    <span className="sort-option__name">{config.keyNames[key]}</span>
                     <span className="sort-option__dir">
                       <span className="sort-arrow" data-dir={shownDir}>
                         <ChevronIcon />
                       </span>
-                      {SORT_DIRECTION_LABELS[key][shownDir]}
+                      {config.directionLabels[key][shownDir]}
                     </span>
                   </Button>
                 </span>

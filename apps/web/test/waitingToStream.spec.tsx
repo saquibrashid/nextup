@@ -32,12 +32,7 @@ import {
   WAITING_SEARCH_FAILED,
   WAITING_SEARCH_SUPPRESSED,
 } from '../src/copy';
-import {
-  WaitingPage,
-  orderWaiting,
-  otherStreaming,
-  rentOnlyStores,
-} from '../src/pages/WaitingPage';
+import { WaitingPage, otherStreaming, rentOnlyStores } from '../src/pages/WaitingPage';
 import { UploadPage } from '../src/pages/UploadPage';
 import { searchAddRefusal } from '../src/components/WaitingSearchAdd';
 
@@ -130,7 +125,9 @@ describe('T-AVAIL-015 · #378 · each access state reads as what it is', () => {
     expect(otherStreaming(row)).toEqual({ services: ['max'], providers: ['Hulu'] });
   });
 
-  it('T-AVAIL-015d · a row on the owner\u2019s services is badged, dated and leads the list', () => {
+  // #415 — the server orders the list (a streaming row leads in every sort,
+  // T-WSORT-002h); the page keeps the order it is given and never re-sorts.
+  it('T-AVAIL-015d · a row on the owner\u2019s services is badged, dated and keeps the lead the server gives it', () => {
     const waiting = item({ intentId: 'wi-a', name: 'Still waiting' });
     const streaming = item({
       intentId: 'wi-b',
@@ -140,7 +137,7 @@ describe('T-AVAIL-015 · #378 · each access state reads as what it is', () => {
       accessState: 'streaming',
       streamingSince: '2026-02-03T10:00:00.000Z',
     });
-    render(<WaitingPage items={[waiting, streaming]} />);
+    const { unmount } = render(<WaitingPage items={[streaming, waiting]} />);
 
     const rows = screen.getAllByTestId('waiting-row');
     expect(within(rows[0]!).getByTestId('waiting-name').textContent).toBe('Arrived');
@@ -150,7 +147,13 @@ describe('T-AVAIL-015 · #378 · each access state reads as what it is', () => {
     expect(within(rows[0]!).getByTestId('waiting-streaming-since').textContent).toContain(
       '3 Feb 2026',
     );
-    expect(orderWaiting([waiting, streaming]).map((row) => row.intentId)).toEqual(['wi-b', 'wi-a']);
+    unmount();
+    // No client-side sort: whatever order arrives is the order shown.
+    render(<WaitingPage items={[waiting, streaming]} />);
+    expect(screen.getAllByTestId('waiting-name').map((name) => name.textContent)).toEqual([
+      'Still waiting',
+      'Arrived',
+    ]);
   });
 
   it('T-AVAIL-015e · the source line says (rent/buy) for a storefront and names a search add', () => {

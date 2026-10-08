@@ -725,6 +725,9 @@ finished, so the exception cannot outlive its reason.
 | `TASK-266` | `done` | Availability changes, part 1 (`A55`, US-064): `GET /api/availability/review` and `/summary` read stored data only; owner-initiated `POST /api/availability/check` checks up to `AVAILABILITY_CHECK_BATCH` (20) never-checked or over-age titles and intents, oldest first, serial, metadata-only (PRD §7.4 item 18); `POST /api/availability/review/apply` applies one answer to up to `AVAILABILITY_REVIEW_APPLY_MAX` (50) rows, each its own transaction with the one-tap guards, per-row results; both POSTs registered as mutating routes. No migration. Test ids: `T-AVREV-001`, `T-AVREV-002`, `T-AVREV-003`, `T-AVREV-004`, `T-AVREV-005`, `T-AVREV-006`, `T-AVREV-007`, `T-AVREV-008`. |
 | `TASK-267` | `done` | Availability changes, part 2 (`A55`): the `/availability` screen — two sections, per-row one-tap answers, labelled checkboxes and a wrapping selection bar, `Dialog` confirmation for destructive answers, *N done, M couldn't be changed* results with refused rows kept, *Check more titles* with the factual counts line, attribution; the nav item and the Library *N availability changes* line (only when N > 0). Test ids: `T-AVREV-009`, `T-AVREV-010`, `T-AVREV-011`, `T-AVREV-012`, `T-AVREV-013`, `T-AVREV-014`, `T-AVREV-015`. |
 | `TASK-268` | `done` | Availability changes, part 3 (`A55`): end-to-end at 390 px and 1440 px with axe, and the PRD/spec/backlog record. Test ids: `T-AVREV-016`. |
+| `TASK-269` | `done` | Waiting sort, part 1 (#415, `A56`, US-065): `GET /api/waiting` accepts `?sort=` (`expected`, `discovered`, `name`, `releaseYear`) and `?dir=`, each key with its own default direction (expected soonest first by default); an unknown or repeated value is `400 VALIDATION_FAILED` before any read, as `GET /api/titles` (no new error code). Ordered in memory in `services/waitingSort.ts` after the forecast is computed: announced before estimated, no forecast or year last in both directions, a row on the owner's services leading every order, ties by sort name then intent id. No migration. Test ids: `T-WSORT-001`, `T-WSORT-002`, `T-WSORT-003`. |
+| `TASK-270` | `done` | Waiting sort, part 2 (#415, `A56`): `SortControl` generalised by a `SortConfig` (keys, labels, default key and directions) with the Library's configuration unchanged; `/waiting` shows it with the waiting configuration beside the layout switch, passes `sort`/`dir` verbatim to `GET /api/waiting`, and renders the API's order untouched in Grid and Compact (the client-side `orderWaiting` is gone). Test ids: `T-WSORT-004`, `T-WSORT-005`. |
+| `TASK-271` | `done` | #414, row-aligned Grid cards on `/waiting`: in Grid only, each card is an 8-row subgrid of the list (fixed 2:3 poster box; title, rent chip, meta, availability, moved note, date block, action), absent optional blocks keep an empty reserved row, and *Not interested* sits on one line at the bottom. Compact and phone layouts unchanged; no copy or availability-sentence change. Test ids: `T-WGRID-001`, `T-WGRID-002`. |
 <!-- STATUS-LEDGER:END -->
 
 ### Approved availability moves (#397/#410), 2026-09-29
@@ -740,6 +743,14 @@ availability changes at once is TASK-266 – TASK-268 below. ~~"**Later, not
 scheduled:** a bulk review screen for many availability changes at once
 (#397/#410 follow-up). It is a separate future PR and is not part of TASK-263 –
 TASK-265."~~
+
+### Approved waiting sort and Grid alignment (`A56`, #415, #414), 2026-10-08
+
+| Task | Work | Size | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| TASK-269 | Server-side ordering for `GET /api/waiting` (PRD `A56`, US-065 / REQ-131): `?sort=`/`?dir=` validated like `GET /api/titles`, four keys with per-key default directions, default expected-availability soonest first, absent values last in both directions, streaming-on-your-services rows lead, deterministic tie-breakers. In memory over the forecast computed per request. No migration, no new error code. | 1 agent-run + 10 owner-review-minutes | TASK-252 | `T-WSORT-001`, `T-WSORT-002`, `T-WSORT-003`; `T-WAIT-011`, `T-AVAIL-011`, `T-FORECAST-006` still pass |
+| TASK-270 | Reuse the Library `SortControl` on `/waiting` through a `SortConfig`, URL-driven (`?sort=`, `?dir=`) with the toolbar reverse button; no client-side sorting. | 1 agent-run + 10 owner-review-minutes | TASK-269 | `T-WSORT-004`, `T-WSORT-005`; `T-UI-024`, `T-AVAIL-015`, `T-WAIT-023`, `T-WAIT-025` still pass |
+| TASK-271 | Fix #414: row-aligned Grid cards on `/waiting` (subgrid rows, fixed poster box, reserved empty rows, action on the last row). Grid only. | 1 agent-run + 5 owner-review-minutes | TASK-259 | `T-WGRID-001`, `T-WGRID-002`; `T-WAIT-021`, `T-WAIT-022`, `T-WAIT-023`, `T-WAIT-025` still pass |
 
 ### Approved availability changes screen (`A55`), 2026-10-07
 

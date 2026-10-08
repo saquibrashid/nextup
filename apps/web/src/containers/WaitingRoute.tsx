@@ -26,6 +26,7 @@
  */
 
 import { useState, type JSX } from 'react';
+import { useSearchParams } from 'react-router-dom';
 
 import type { ListView } from '../components/ListViewControl';
 
@@ -55,7 +56,20 @@ function readLayout(): ListView {
 
 export function WaitingRoute({ client = apiClient }: WaitingRouteProps = {}): JSX.Element {
   const [view, setView] = useState<ListView>(readLayout);
-  const waiting = useResource((signal) => client.getWaiting(signal), 'waiting');
+  const [params] = useSearchParams();
+  // #415: the order is the server's (US-065). Only `sort` and `dir` are passed
+  // on, verbatim, so a bad value meets the API's 400 rather than a silent
+  // client fallback, and a new order is one new read — never a poll.
+  const query = new URLSearchParams();
+  for (const name of ['sort', 'dir']) {
+    const value = params.get(name);
+    if (value !== null) query.set(name, value);
+  }
+  const queryString = query.toString();
+  const waiting = useResource(
+    (signal) => client.getWaiting(signal, queryString),
+    `waiting?${queryString}`,
+  );
 
   // A refusal is the whole screen: the owner is authenticated, so the retry a
   // failure state offers could never succeed.

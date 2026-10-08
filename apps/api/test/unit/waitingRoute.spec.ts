@@ -92,13 +92,15 @@ interface StoredOver {
   tmdbId?: number | null;
   tmdbName?: string | null;
   rawExtractedText?: string | null;
+  discoveredAt?: Date;
+  releaseYear?: number | null;
 }
 
 function stored(over: StoredOver = {}): Record<string, unknown> {
   return {
     id: over.id ?? 'wi-1',
     workIdentity: 'tmdb:movie:438631',
-    discoveredAt: new Date('2026-01-02T00:00:00.000Z'),
+    discoveredAt: over.discoveredAt ?? new Date('2026-01-02T00:00:00.000Z'),
     discoverySource: 'fandango-at-home',
     availabilityRegion: over.region ?? 'US',
     availabilityCheckedAt: over.checkedAt === undefined ? OLD : over.checkedAt,
@@ -111,7 +113,7 @@ function stored(over: StoredOver = {}): Record<string, unknown> {
       tmdbId: over.tmdbId === undefined ? 438_631 : over.tmdbId,
       tmdbMediaType: over.tmdbId === null ? null : 'movie',
       tmdbName: over.tmdbName === undefined ? 'Dune' : over.tmdbName,
-      tmdbReleaseYear: 2021,
+      tmdbReleaseYear: over.releaseYear === undefined ? 2021 : over.releaseYear,
       tmdbPosterPath: '/p.jpg',
       rawExtractedText: over.rawExtractedText === undefined ? 'dune raw' : over.rawExtractedText,
     },
@@ -137,8 +139,8 @@ interface Body {
   availabilityRefreshFailed: boolean;
 }
 
-const get = async (): Promise<{ status: number; body: Body }> => {
-  const res = await fetch(`${origin}/api/waiting`, {
+const get = async (search = ''): Promise<{ status: number; body: Body }> => {
+  const res = await fetch(`${origin}/api/waiting${search}`, {
     headers: { [CLIENT_PRINCIPAL_HEADER]: principalHeader },
   });
   return { status: res.status, body: (await res.json()) as Body };
@@ -222,8 +224,11 @@ describe('T-AVAIL-011 · GET /api/waiting without a store', () => {
 
     const { status, body } = await get();
     expect(status).toBe(200);
-    expect(body.items.map((i) => i.availableOn)).toEqual([null, null, ['Netflix']]);
-    expect(body.items.map((i) => i.flaggedOn)).toEqual([null, null, ['netflix']]);
+    // #415: a row on the owner's services now leads server-side, so read by id.
+    const byId = new Map(body.items.map((i) => [i.intentId, i]));
+    const ids = ['wi-bad', 'wi-obj', 'wi-mixed'];
+    expect(ids.map((id) => byId.get(id)?.availableOn)).toEqual([null, null, ['Netflix']]);
+    expect(ids.map((id) => byId.get(id)?.flaggedOn)).toEqual([null, null, ['netflix']]);
   });
 
   it('T-AVAIL-011d · a TMDB failure is a 200 with the last-known answer, not an error page', async () => {
@@ -284,5 +289,79 @@ describe('T-AVAIL-011 · GET /api/waiting without a store', () => {
 
     const { body } = await get();
     expect(body.items[0]?.name).toBe('');
+  });
+});
+
+describe('T-WSORT-003 · GET /api/waiting?sort=&dir= (#415, US-065)', () => {
+  const ids = (body: Body): string[] => body.items.map((item) => item.intentId);
+
+  beforeEach(() => {
+    // No owner services, nothing streaming: the key alone decides the order.
+    getWatchProviders.mockResolvedValue([]);
+    listWaitingIntents.mockResolvedValue([
+      stored({
+        id: 'wi-mid',
+        checkedAt: RECENT,
+        availableOn: '[]',
+        tmdbName: 'Middle',
+        releaseYear: 2024,
+        discoveredAt: new Date('2026-02-01T00:00:00Z'),
+      }),
+      stored({
+        id: 'wi-old',
+        checkedAt: RECENT,
+        availableOn: '[]',
+        tmdbName: 'The Apple',
+        releaseYear: null,
+        discoveredAt: new Date('2026-01-01T00:00:00Z'),
+      }),
+      stored({
+        id: 'wi-new',
+        checkedAt: RECENT,
+        availableOn: '[]',
+        tmdbName: 'Zebra',
+        releaseYear: 2026,
+        discoveredAt: new Date('2026-03-01T00:00:00Z'),
+      }),
+    ]);
+  });
+
+  it('T-WSORT-003a · an unknown sort is a 400 VALIDATION_FAILED before any store read', async () => {
+    const res = await fetch(`${origin}/api/waiting?sort=dateAdded`, {
+      headers: { [CLIENT_PRINCIPAL_HEADER]: principalHeader },
+    });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string; details: unknown } };
+    expect(body.error.code).toBe('VALIDATION_FAILED');
+    expect(body.error.details).toMatchObject({ field: 'sort' });
+    expect(listWaitingIntents).not.toHaveBeenCalled();
+  });
+
+  it('T-WSORT-003b · an unknown dir is a 400 VALIDATION_FAILED', async () => {
+    const { status } = await get('?dir=sideways');
+    expect(status).toBe(400);
+    expect(listWaitingIntents).not.toHaveBeenCalled();
+  });
+
+  it('T-WSORT-003c · each key and its reverse reach the response order', async () => {
+    expect(ids((await get('?sort=name')).body)).toEqual(['wi-old', 'wi-mid', 'wi-new']);
+    expect(ids((await get('?sort=name&dir=desc')).body)).toEqual(['wi-new', 'wi-mid', 'wi-old']);
+    expect(ids((await get('?sort=discovered')).body)).toEqual(['wi-new', 'wi-mid', 'wi-old']);
+    expect(ids((await get('?sort=discovered&dir=asc')).body)).toEqual([
+      'wi-old',
+      'wi-mid',
+      'wi-new',
+    ]);
+    expect(ids((await get('?sort=releaseYear')).body)).toEqual(['wi-new', 'wi-mid', 'wi-old']);
+    expect(ids((await get('?sort=releaseYear&dir=asc')).body)).toEqual([
+      'wi-mid',
+      'wi-new',
+      'wi-old',
+    ]);
+  });
+
+  it('T-WSORT-003d · the default (expected, no forecasts here) falls back to the name tie-breaker', async () => {
+    expect(ids((await get()).body)).toEqual(['wi-old', 'wi-mid', 'wi-new']);
+    expect(ids((await get('?dir=desc')).body)).toEqual(['wi-old', 'wi-mid', 'wi-new']);
   });
 });

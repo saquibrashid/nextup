@@ -19,7 +19,7 @@ owner uses that service). `service` is a `SERVICES` member. It is `null` when
 the work is already streaming on a supported service, when TMDB has no studio
 the estimate can use, or for TV with no announced date. ⚠ The `estimate*`
 kinds are inferred from a studio's usual window and a client must present
-them as estimates. `forecast` never affects order. The facts behind it are
+them as estimates. `forecast` orders the list only through `?sort=expected` (§6.49, `A56`). ~~"`forecast` never affects order."~~ The facts behind it are
 read lazily in the same request as availability (at most 8 rows, each once a
 week); a Watchmode or TMDB failure never fails the request.
 
@@ -90,6 +90,9 @@ badge. Refusals: `400 VALIDATION_FAILED`; `404 TMDB_WORK_NOT_FOUND`;
 `409 WORK_SUPPRESSED` (with `suppressionId`); `409 DUPLICATE_WORK_IDENTITY`
 with `details.reason` `already-waiting` or `already-listed`; TMDB outages map
 as for other TMDB reads.
+
+`GET /api/waiting` is ordered by the API, never by the client — see §6.49
+(`?sort=` / `?dir=`, #415, `A56`).
 
 Batch list and detail responses expose `discoverySource` (nullable). A
 storefront batch has `service: null` and is always `append-only`.
@@ -2455,6 +2458,40 @@ An unexpected error refuses only its item, as `INTERNAL_ERROR` with
 | 200 | — | `{action, results: [{id, outcome: "done", …the one-tap result} \| {id, outcome: "refused", code, message}], done, refused}` |
 | 400 | `VALIDATION_FAILED` | bad `action`, empty or oversized `items`, an item without a string `id`, or a missing `signature` where required |
 
+### 6.49 `GET /api/waiting?sort=&dir=` — the waiting list's order (US-065, REQ-131, `A56`)
+
+`sort` ∈ `expected` (default), `discovered`, `name`, `releaseYear`; `dir` ∈
+`asc`, `desc`. An absent `dir` is the key's own default: `expected` **asc**
+(soonest first), `discovered` **desc** (newest first), `name` **asc** (A→Z),
+`releaseYear` **desc** (newest first). Both are validated **before** anything is
+read, exactly as `GET /api/titles` validates its own: an unknown value, or
+either parameter given twice, is `400 VALIDATION_FAILED` with
+`details: {field, permitted}`. Any other query parameter is ignored. No new
+error code.
+
+The order is applied in memory after the forecast (§ *Streaming forecast*) is
+computed for the request, in `apps/api/src/services/waitingSort.ts`:
+
+1. A row streaming on one of the owner's services (`flaggedOn` non-empty)
+   leads, in every key and direction (#378).
+2. The key, in the direction:
+   - `expected` — an **announced** date (`on`) before any estimate; an
+     `estimate` at the first day of its `month`, an `estimate-range` at the
+     first day of `from`, an `estimate-soon` as the soonest estimate. `desc`
+     is the exact mirror over the dated rows.
+   - `discovered` — the stored discovery instant.
+   - `name` — the Library's sort name (`deriveSortName`), compared
+     case- and accent-insensitively.
+   - `releaseYear` — the release year.
+   A row with no forecast, or no release year, sorts **last in both
+   directions**.
+3. Ties: the sort name A→Z, then `intentId` — fixed whatever the direction.
+
+| Status | Code | When |
+|---|---|---|
+| 200 | — | `{items, count, availabilityRefreshFailed}` in that order |
+| 400 | `VALIDATION_FAILED` | unknown or repeated `sort` or `dir` (`details.field`, `details.permitted`) |
+
 ---
 
 ## 7. Status-code policy
@@ -2656,5 +2693,6 @@ Binding rules, all asserted by `T-IMG-021`:
 | REQ-074 | §6.24, **§5.2.5 (which failures it can and cannot recover — R5)** |
 | REQ-076 | §6.4 |
 | REQ-130 (`A55`) | §6.45, §6.46, §6.47, §6.48 |
+| REQ-131 (`A56`) | §6.49 |
 | NFR-019/020 | §6.27 |
 | **RSK-016 / `A43-M1`…`M3`/`M5`** *(R5)* | **§5.0** (pre-decode pixel guard), **§5.2** (isolation, both OOM paths, exact error text), **§8** (the three codes), **§9.1** (decode sentinel) |
