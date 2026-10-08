@@ -55,7 +55,7 @@ so they do not relicense this work — but their notices must be retained.
 | `@azure/msal-common` | 16.12.0 | MIT |
 | `@azure/msal-common` | 16.14.1 | MIT |
 | `@azure/msal-node` | 6.0.1 | MIT |
-| `@azure/storage-blob` | 12.33.0 | MIT |
+| `@azure/storage-blob` | 12.34.0 | MIT |
 | `@azure/storage-common` | 12.5.0 | MIT |
 | `@babel/helper-string-parser` | 7.29.7 | MIT |
 | `@babel/helper-validator-identifier` | 7.29.7 | MIT |
@@ -106,12 +106,14 @@ so they do not relicense this work — but their notices must be retained.
 | `@tanstack/virtual-core` | 3.17.11 | MIT |
 | `@tediousjs/connection-string` | 0.5.0 | MIT |
 | `@types/node` | 22.20.5 | MIT |
+| `@types/node` | 25.9.9 | MIT |
 | `@types/readable-stream` | 4.0.24 | MIT |
 | `@typespec/ts-http-runtime` | 0.3.8 | MIT |
 | `abort-controller` | 3.0.0 | MIT |
 | `accepts` | 2.0.0 | MIT |
 | `agent-base` | 7.1.4 | MIT |
 | `anynum` | 1.0.1 | MIT |
+| `apache-arrow` | 21.2.0 | Apache-2.0 |
 | `append-field` | 1.0.0 | MIT |
 | `async-mutex` | 0.5.0 | MIT |
 | `base64-js` | 1.5.1 | MIT |
@@ -167,6 +169,7 @@ so they do not relicense this work — but their notices must be retained.
 | `fast-xml-builder` | 1.3.0 | MIT |
 | `fast-xml-parser` | 5.10.1 | MIT |
 | `finalhandler` | 2.1.1 | MIT |
+| `flatbuffers` | 25.9.23 | Apache-2.0 |
 | `forwarded` | 0.2.0 | MIT |
 | `fresh` | 2.0.0 | MIT |
 | `function-bind` | 1.1.2 | MIT |
@@ -195,6 +198,7 @@ so they do not relicense this work — but their notices must be retained.
 | `jiti` | 2.7.0 | MIT |
 | `jpeg-js` | 0.4.4 | BSD-3-Clause |
 | `js-md4` | 0.3.2 | MIT |
+| `json-with-bigint` | 3.5.12 | MIT |
 | `jsonwebtoken` | 9.0.3 | MIT |
 | `jwa` | 2.0.1 | MIT |
 | `jws` | 4.0.1 | MIT |
@@ -286,6 +290,7 @@ so they do not relicense this work — but their notices must be retained.
 | `type-is` | 2.1.0 | MIT |
 | `typescript` | 6.0.3 | Apache-2.0 |
 | `undici-types` | 6.21.0 | MIT |
+| `undici-types` | 7.24.6 | MIT |
 | `unpipe` | 1.0.0 | MIT |
 | `vary` | 1.1.2 | MIT |
 | `wrappy` | 1.0.2 | ISC |
