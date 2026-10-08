@@ -104,13 +104,24 @@ updates:
       #
       # Capped by VERSION rather than update-type, like `@types/node` above:
       # 26 is known good (the upstream report reproduces clean on 26.1.0), so
-      # refusing only >= 28 keeps the cap as small as the evidence supports.
+      # the cap stays as small as the evidence supports.
+      #
+      #   • ⚠ THE CAP IS `>=27`, MEASURED, NOT GUESSED. It was first written
+      #     as `>=28` on the assumption that 27 was unaffected, which let
+      #     Dependabot raise #427 (25.0.1 -> 27.4.0). That PR failed `4` and
+      #     `6` with the SAME FIVE TESTS - T-UX-145c, T-AVREV-009a,
+      #     T-PHONE-005a, T-PHONE-005b, T-TOOLBAR-002b - while all ten other
+      #     jobs, `9 - test:a11y` among them, passed. So the regression is
+      #     present in 27 and the first bad major is 27, not 28.
+      #     ~~Superseded: "refusing only >= 28 keeps the cap as small as the
+      #     evidence supports" - 28 was never evidence, it was an assumption.~~
+      #
       # UNBLOCKED BY: jsdom restoring accname 1.2 step 2I space separation, or
       # `dom-accessibility-api` stopping relying on the old `display` default
       # AND `@testing-library/dom` widening its pin to take that release.
       # Verify by rebasing the bump and watching those 5 tests specifically.
       - dependency-name: 'jsdom'
-        versions: ['>=28']
+        versions: ['>=27']
       # msw 3 is UNINSTALLABLE here, and the error does not say so. Every job
       # on #424 died at `npm ci` with `EUSAGE ... Missing: msw@2.15.0 from
       # lock file` — which reads like a stale lockfile and is not one. The
