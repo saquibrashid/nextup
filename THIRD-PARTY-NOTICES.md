@@ -289,12 +289,12 @@ so they do not relicense this work — but their notices must be retained.
 | `type-is` | 1.6.18 | MIT |
 | `type-is` | 2.1.0 | MIT |
 | `typescript` | 6.0.3 | Apache-2.0 |
+| `undici` | 8.11.2 | MIT |
 | `undici-types` | 6.21.0 | MIT |
 | `undici-types` | 7.24.6 | MIT |
 | `unpipe` | 1.0.0 | MIT |
 | `vary` | 1.1.2 | MIT |
 | `wrappy` | 1.0.2 | ISC |
-| `ws` | 8.21.2 | MIT |
 | `wsl-utils` | 0.1.0 | MIT |
 | `xml-naming` | 0.3.0 | MIT |
 | `zod` | 4.6.5 | MIT |
