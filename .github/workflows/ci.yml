@@ -151,6 +151,28 @@ jobs:
       - name: Dependency allow-list (T-SEC-009, T-CI-006)
         run: npm run check:deps
 
+      # T-CI-011, issue #417. Every lockfile `resolved` URL must name
+      # registry.npmjs.org, and no .npmrc may be committed.
+      #
+      # ⚠ THIS GATE EXISTS BECAUSE CI CANNOT OTHERWISE SEE THE DEFECT, AND
+      # GREEN JOBS ARE NOT EVIDENCE AGAINST IT. `main` once carried 442
+      # `resolved` URLs pointing at ms-feed-*.pkgs.visualstudio.com, written
+      # by a local `npm install` on a Microsoft-managed machine. That both
+      # published an internal host from a public repository AND silently
+      # disabled dependabot for every affected package ("Dependabot can't
+      # authenticate to a private package registry") — #403/#404/#405 could
+      # neither rebase nor recreate for nine days. Nothing here went red: the
+      # 1es-public feed is anonymously readable, so runners installed from it
+      # perfectly happily. The only symptom was off-PR, in Dependabot Updates
+      # run history, where nobody was looking.
+      #
+      # ⚠ It keys on the URL, never on `sha1-`. Those were the same defect's
+      # two symptoms, but after the #416 repair they no longer correlate (~412
+      # sha1- hashes remain, with zero proxy URLs), so a sha1- gate would fail
+      # the clean tree with no available remedy — see runbook §6.
+      - name: Lockfiles resolve to the public registry (T-CI-011)
+        run: npm run check:lockfile
+
       # T-LICENSE-001. The behavioural assertions live in tests/infra, but the
       # CLI runs here too: when THIRD-PARTY-NOTICES.md drifts, this prints the
       # one-line remedy ("run npm run notices") instead of a byte-comparison
