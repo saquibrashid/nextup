@@ -261,7 +261,8 @@ describe('T-WAIT-023 · #391 · Grid and Compact on Waiting to stream, as in the
         />
       </MemoryRouter>,
     );
-    const [arrived, rent] = screen.getAllByTestId('waiting-row');
+    // The page keeps the given order (#415: the server sorts).
+    const [rent, arrived] = screen.getAllByTestId('waiting-row');
     // The answer stays: the flag and its import link, the forecast sentence,
     // the rent-only pill and the bounded "not streaming on your services".
     expect(within(arrived!).getByTestId('waiting-flag-link')).toHaveAttribute(
@@ -314,8 +315,10 @@ describe('T-WAIT-023 · #391 · Grid and Compact on Waiting to stream, as in the
     expect(css).toMatch(
       /\.waiting-list\[data-view='grid'\]\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(min\(100%,\s*8rem\),\s*1fr\)\)/,
     );
+    // #414 — one column of shared (subgrid) rows replaced the poster/body/aside
+    // areas; T-WGRID-001 owns the row-by-row assertions.
     expect(css).toMatch(
-      /\.waiting-list\[data-view='grid'\] \.waiting-row\s*\{[^}]*'poster'\s*'body'\s*'aside'/,
+      /\.waiting-list\[data-view='grid'\] \.waiting-row\s*\{[^}]*grid-template-rows:\s*subgrid/,
     );
     expect(css).toMatch(/\.waiting-toolbar\s*\{[^}]*justify-content:\s*flex-end/);
   });

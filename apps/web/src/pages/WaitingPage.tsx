@@ -33,6 +33,7 @@ import { EditionLabels } from '../components/EditionLabels';
 import { ServiceMark } from '../components/ServiceMark';
 import { WaitingSearchAdd } from '../components/WaitingSearchAdd';
 import { ListViewControl, type ListView } from '../components/ListViewControl';
+import { SortControl, WAITING_SORT } from '../components/SortControl';
 import { BookmarkIcon, InfoIcon, SuppressedIcon } from '../components/icons';
 
 import {
@@ -283,14 +284,12 @@ const FORECAST_TAG = {
 } as const;
 
 /**
- * Rows that have reached one of the owner's services lead the list (#378):
- * noticing that moment is what the view is for. Stable within each group, so
- * the server's order is otherwise kept.
+ * #414 — an absent optional block's reserved Grid row. Grid view only: the
+ * card's rows are a subgrid of the list, so every slot sits on the same line
+ * in every card of a row, present or not. Empty, so it says nothing.
  */
-export function orderWaiting(items: readonly WaitingItem[]): WaitingItem[] {
-  const streaming = items.filter((item) => (item.flaggedOn ?? []).length > 0);
-  const rest = items.filter((item) => (item.flaggedOn ?? []).length === 0);
-  return [...streaming, ...rest];
+function EmptySlot({ slot }: { slot: string }): JSX.Element {
+  return <span className="waiting-row__slot-empty" data-grid-slot={slot} aria-hidden="true" />;
 }
 
 /** A literal map, so the class vocabulary stays scannable (`T-CSS-001c`). */
@@ -502,6 +501,7 @@ function WaitingRow({
   const rentStores = rentOnlyStores(item);
   const rowKind = flagged.length > 0 ? 'streaming' : 'waiting';
   const mediaType = mediaTypeText(item.workIdentity);
+  const grid = view === 'grid';
 
   function addToLibrary(service: Service): void {
     if (onPromote === undefined) return;
@@ -529,17 +529,19 @@ function WaitingRow({
           srcSet={`${TMDB_IMAGE_BASE}${item.posterPath} 1x, ${TMDB_IMAGE_BASE_2X}${item.posterPath} 2x`}
           alt=""
           data-testid="waiting-poster"
+          data-grid-slot="poster"
         />
       ) : (
         <div
           className="waiting-row__poster waiting-row__poster--empty"
           data-testid="waiting-poster-placeholder"
+          data-grid-slot="poster"
         />
       )}
 
       <div className="waiting-row__body">
         <div className="waiting-row__heading">
-          <div className="waiting-row__title">
+          <div className="waiting-row__title" data-grid-slot="title">
             {/* #391 — the title opens its details page, as in the Library. */}
             <h2 className="waiting-row__name" data-testid="waiting-name">
               <Link
@@ -552,16 +554,22 @@ function WaitingRow({
             </h2>
             <EditionLabels labels={item.editionLabels} />
           </div>
-          {rentStores !== null && (
-            <span className="waiting-row__pill" data-testid="waiting-rent-tag">
+          {rentStores !== null ? (
+            <span
+              className="waiting-row__pill"
+              data-testid="waiting-rent-tag"
+              data-grid-slot="chip"
+            >
               {WAITING_RENT_ONLY_TAG}
             </span>
+          ) : (
+            grid && <EmptySlot slot="chip" />
           )}
         </div>
 
         {/* Library's `title-row__facts`: the `·` separators are CSS-generated. */}
-        {(item.releaseYear !== null || mediaType !== null) && (
-          <p className="waiting-row__meta" data-testid="waiting-meta">
+        {item.releaseYear !== null || mediaType !== null ? (
+          <p className="waiting-row__meta" data-testid="waiting-meta" data-grid-slot="meta">
             {item.releaseYear !== null && (
               <span data-testid="waiting-year">
                 {releaseYearText(item.releaseYear, (item.editionLabels?.length ?? 0) > 0)}
@@ -569,71 +577,94 @@ function WaitingRow({
             )}
             {mediaType !== null && <span data-testid="waiting-media-type">{mediaType}</span>}
           </p>
+        ) : (
+          grid && <EmptySlot slot="meta" />
         )}
 
-        <WaitingFacts item={item} full={view === 'compact'} />
-        {item.movedFromLibraryAt != null && (
-          <p className="waiting-row__moved" data-testid="waiting-moved-from-library">
+        {grid ? (
+          <div className="waiting-row__slot" data-grid-slot="availability">
+            <WaitingFacts item={item} full={false} />
+          </div>
+        ) : (
+          <WaitingFacts item={item} full />
+        )}
+        {item.movedFromLibraryAt != null ? (
+          <p
+            className="waiting-row__moved"
+            data-testid="waiting-moved-from-library"
+            data-grid-slot="moved"
+          >
             {`${WAITING_MOVED_FROM_LIBRARY} ${friendlyDate(item.movedFromLibraryAt)}.`}
           </p>
+        ) : (
+          grid && <EmptySlot slot="moved" />
         )}
       </div>
 
       <div className="waiting-row__aside">
-        <WaitingOutlook item={item} />
+        {grid ? (
+          <div className="waiting-row__slot" data-grid-slot="date">
+            <WaitingOutlook item={item} />
+          </div>
+        ) : (
+          <WaitingOutlook item={item} />
+        )}
 
-        <div className="waiting-row__actions">
-          {onPromote !== undefined &&
-            promotable.map((service) => (
+        {/* #414 — one box in Grid, so the action sits on the card's last row. */}
+        <div className="waiting-row__footer" data-grid-slot="action">
+          <div className="waiting-row__actions">
+            {onPromote !== undefined &&
+              promotable.map((service) => (
+                <Button
+                  key={service}
+                  variant="primary"
+                  data-testid={`waiting-promote-${service}`}
+                  aria-label={`${WAITING_ADD_TO_LIBRARY} on ${serviceLabel(service)}: ${item.name}`}
+                  disabled={offline || promote === 'submitting' || phase === 'submitting'}
+                  onClick={() => addToLibrary(service)}
+                >
+                  {promotable.length > 1
+                    ? `${WAITING_ADD_TO_LIBRARY} (${serviceLabel(service)})`
+                    : WAITING_ADD_TO_LIBRARY}
+                </Button>
+              ))}
+            {phase === 'idle' && (
               <Button
-                key={service}
-                variant="primary"
-                data-testid={`waiting-promote-${service}`}
-                aria-label={`${WAITING_ADD_TO_LIBRARY} on ${serviceLabel(service)}: ${item.name}`}
-                disabled={offline || promote === 'submitting' || phase === 'submitting'}
-                onClick={() => addToLibrary(service)}
+                variant="ghost"
+                data-testid="waiting-not-interested"
+                aria-label={`${WAITING_NOT_INTERESTED}: ${item.name}`}
+                disabled={offline}
+                onClick={suppress}
               >
-                {promotable.length > 1
-                  ? `${WAITING_ADD_TO_LIBRARY} (${serviceLabel(service)})`
-                  : WAITING_ADD_TO_LIBRARY}
+                <SuppressedIcon />
+                {WAITING_NOT_INTERESTED}
               </Button>
-            ))}
-          {phase === 'idle' && (
-            <Button
-              variant="ghost"
-              data-testid="waiting-not-interested"
-              aria-label={`${WAITING_NOT_INTERESTED}: ${item.name}`}
-              disabled={offline}
-              onClick={suppress}
-            >
-              <SuppressedIcon />
-              {WAITING_NOT_INTERESTED}
-            </Button>
+            )}
+            {phase === 'submitting' && (
+              <Button variant="ghost" data-testid="waiting-suppressing" disabled>
+                {'Working…'}
+              </Button>
+            )}
+            {phase === 'error' && (
+              <Button variant="ghost" data-testid="waiting-not-interested" onClick={suppress}>
+                {RETRY_LABEL}
+              </Button>
+            )}
+          </div>
+          {offline && phase === 'idle' && (
+            <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>
           )}
-          {phase === 'submitting' && (
-            <Button variant="ghost" data-testid="waiting-suppressing" disabled>
-              {'Working…'}
-            </Button>
+          {promote === 'error' && (
+            <p role="alert" data-testid="waiting-promote-error">
+              {WAITING_ADD_TO_LIBRARY_FAILED}
+            </p>
           )}
           {phase === 'error' && (
-            <Button variant="ghost" data-testid="waiting-not-interested" onClick={suppress}>
-              {RETRY_LABEL}
-            </Button>
+            <p role="alert" data-testid="waiting-suppress-error">
+              {WAITING_SUPPRESS_FAILED}
+            </p>
           )}
         </div>
-        {offline && phase === 'idle' && (
-          <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>
-        )}
-        {promote === 'error' && (
-          <p role="alert" data-testid="waiting-promote-error">
-            {WAITING_ADD_TO_LIBRARY_FAILED}
-          </p>
-        )}
-        {phase === 'error' && (
-          <p role="alert" data-testid="waiting-suppress-error">
-            {WAITING_SUPPRESS_FAILED}
-          </p>
-        )}
       </div>
     </li>
   );
@@ -657,7 +688,15 @@ export function WaitingPage({
   const setView = onViewChange ?? setLocalView;
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
 
-  const visible = orderWaiting(items.filter((item) => !dismissed.has(item.intentId)));
+  // #415 — the server's order, untouched: no client-side sorting (US-065).
+  const visible = items.filter((item) => !dismissed.has(item.intentId));
+  // The toolbar stays while a new order loads, so the control never vanishes.
+  const toolbar = (
+    <div className="waiting-toolbar">
+      <SortControl config={WAITING_SORT} />
+      <ListViewControl view={view} onChange={setView} />
+    </div>
+  );
 
   return (
     <>
@@ -689,18 +728,21 @@ export function WaitingPage({
           )}
         </div>
       ) : loading ? (
-        <div role="status" data-testid="waiting-loading" aria-label={WAITING_LOADING}>
-          <ul className="waiting-list waiting-list--loading">
-            {[0, 1, 2].map((index) => (
-              <li
-                key={index}
-                className="waiting-row waiting-row--skeleton"
-                data-testid="waiting-row-skeleton"
-                aria-hidden="true"
-              />
-            ))}
-          </ul>
-        </div>
+        <>
+          {toolbar}
+          <div role="status" data-testid="waiting-loading" aria-label={WAITING_LOADING}>
+            <ul className="waiting-list waiting-list--loading">
+              {[0, 1, 2].map((index) => (
+                <li
+                  key={index}
+                  className="waiting-row waiting-row--skeleton"
+                  data-testid="waiting-row-skeleton"
+                  aria-hidden="true"
+                />
+              ))}
+            </ul>
+          </div>
+        </>
       ) : visible.length === 0 ? (
         <div data-testid="waiting-empty">
           <p>{WAITING_EMPTY_TITLE}</p>
@@ -711,9 +753,7 @@ export function WaitingPage({
         </div>
       ) : (
         <>
-          <div className="waiting-toolbar">
-            <ListViewControl view={view} onChange={setView} />
-          </div>
+          {toolbar}
           <ul className="waiting-list" data-testid="waiting-list" data-view={view}>
             {visible.map((item) => (
               <WaitingRow

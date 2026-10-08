@@ -1330,12 +1330,36 @@ and forecast logic, and the API are unchanged.
 - **Grid and Compact** (#391, TASK-259): the Library's *List layout* switch
   sits above the list, right-aligned. **Compact** is the default and is the
   card list above. **Grid** is poster tiles that wrap (`auto-fill`, an 8rem
-  floor so a 320 px phone gets two across, 11rem from 640 px), each stacking
-  poster, details and panel. A tile keeps the answer — name, meta, rent-only
+  floor so a 320 px phone gets two across, 11rem from 640 px). ⚠ **Row-aligned
+  (#414, TASK-271):** each tile is an **8-row subgrid** of the list
+  (`grid-row: span 8; grid-template-rows: subgrid`), the Library grid's
+  treatment, so corresponding parts line up across every tile on a line:
+  (1) a fixed 2:3 poster box whatever the image's shape, (2) name and edition
+  labels, (3) the rent-only pill, (4) the meta line, (5) the availability
+  answer, (6) the moved-from-Library fact, (7) the panel (forecast date block
+  or *Now streaming*), (8) the action — *Not interested* (and *Add to
+  Library*) pushed to the bottom, so it sits on one line in every tile. Each
+  part carries `data-grid-slot`; an absent optional part renders an empty,
+  `aria-hidden` slot so its row is reserved and nothing below it moves. Grid
+  only: Compact and the phone card list render no empty slots and are
+  unchanged. ~~"each stacking poster, details and panel."~~ A tile keeps the answer — name, meta, rent-only
   pill, the availability line, the panel and *Not interested* — and leaves the
   storefront chips, other services and discovery line to the details page.
   The choice is kept per device in `nextup.waiting.layout.v1`, apart from the
   Library's.
+- **Order** (#415, US-065, `A56`, TASK-270): the Library's `SortControl`
+  (§10.1) sits in the same toolbar, left of the layout switch, with the
+  **waiting configuration** (`WAITING_SORT` in `components/SortControl.tsx`):
+  *Expected to stream* (default, *Soonest first* / *Latest first*), *Date
+  discovered* (*Newest first*), *Title* (*A to Z*), *Release date* (*Newest
+  first*); the panel is titled *Sort your waiting list*. Same URL contract as the
+  Library — `?sort=` omitted for the default key, `?dir=` written on every
+  choice — and the same toolbar **reverse button** (REQ-038's floor rule,
+  invariant 6). The route passes only `sort` and `dir` to `GET /api/waiting`
+  (`specs/api.md` §6.49), which orders the list; the page renders that order
+  in both views and **never re-sorts** (the former client-side
+  `orderWaiting` is gone — a streaming row still leads because the API puts
+  it first). The toolbar stays visible while a new order loads.
 - **The name links to `/waiting/:titleId`** (`pages/WaitingDetailsPage.tsx`),
   in both views. It reads `GET /api/waiting` and `GET /api/titles/:titleId` —
   no new endpoint — and shows *Back to Waiting to stream*; the Library's hero
@@ -1559,7 +1583,7 @@ Touch targets: minimum **44×44 CSS px** for every interactive element
 | Focus order | DOM order = visual order. Dialogs trap focus, restore it to the trigger on close, and close on `Escape` | `T-A11Y-006` |
 | Contrast | ≥ 4.5:1 body text, ≥ 3:1 large text and UI boundaries | `T-A11Y-007` (`axe-core` `color-contrast`) |
 | Non-colour meaning | Service badges, low-confidence and ticked-removal all carry text or an icon, never colour alone | `T-A11Y-008` |
-| **Sort control** *(new, `A44`)* | `SortControl.tsx` is a real, labelled, keyboard-operable control (same treatment as every other control in this table — reachable via the standard keyboard path, focus ring, 44×44 px target) that renders on the combined list and toggles `dir` **and selects `sort` (`A48`)**. From 2026-09-17 the six orders live in a labelled chooser dialog opened from the toolbar, and **a dedicated reverse-order button on the toolbar keeps `dir` reversible in one tap with nothing open** (§2.1 item 2, §10.1) | **`T-UI-024`** |
+| **Sort control** *(new, `A44`)* | `SortControl.tsx` is a real, labelled, keyboard-operable control (same treatment as every other control in this table — reachable via the standard keyboard path, focus ring, 44×44 px target) that renders on the combined list and toggles `dir` **and selects `sort` (`A48`)**. From 2026-09-17 the six orders live in a labelled chooser dialog opened from the toolbar, and **a dedicated reverse-order button on the toolbar keeps `dir` reversible in one tap with nothing open** (§2.1 item 2, §10.1). From `A56` (#415) the same control, with the waiting configuration's four orders, also renders on `/waiting` (§7b) — one component, not a second widget | **`T-UI-024`**, **`T-WSORT-004`** |
 | **Runtime filter** *(new, `A48`; slider at #366)* | The two-handle range slider is a real labelled control on the same terms — native keyboard path (one stop per arrow key), focus ring on the focused thumb, 44×44 px thumb targets, a distinct accessible name and spoken value per handle — and its stops are the bucket edges, so no value requires pointer precision. ~~Superseded: "The bucket control is a real labelled control on the same terms … and **not a range slider**, which cannot meet any of the three."~~ The hidden-unknowns disclosure is rendered in the same live region as the result count, so a screen-reader user is told the list shortened rather than discovering it by absence | **`T-UI-029`** (reserved), `T-RANGE-002`, `T-RANGE-003` |
 | Live regions | Filter result count, review counters and toasts in `aria-live="polite"`; errors in `role="alert"` | `T-A11Y-009` |
 | **Paste is never the only way in** *(A45)* | The **"Paste screenshot"** button is a real `<button>` in tab order with a 44×44 px target; the `paste` listener is a **shortcut, not a requirement**, and every image can also be attached with **"Choose files"** by keyboard alone. A clipboard result is announced in the `aria-live="polite"` region (*"Added 1 screenshot — 3 in this batch."*); a clipboard failure renders in `role="alert"`. Drag-and-drop is **never** the only route to any capability | `T-UI-014`, `T-A11Y-005` |

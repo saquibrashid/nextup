@@ -944,8 +944,8 @@ export function createApiClient(deps: ApiClientDeps = {}) {
      * revalidation loop anywhere on the client, and adding one here would turn
      * a lazy refresh into the background sweep REQ-041 forbids.
      */
-    getWaiting: (signal?: AbortSignal) =>
-      request<WaitingResponse>('/api/waiting', { signal }, deps),
+    getWaiting: (signal?: AbortSignal, query = '') =>
+      request<WaitingResponse>(`/api/waiting${query ? `?${query}` : ''}`, { signal }, deps),
 
     /**
      * #378 — wait for a work found by search, with no screenshot. Never

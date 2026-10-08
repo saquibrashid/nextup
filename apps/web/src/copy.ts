@@ -495,6 +495,35 @@ export const SORT_ORDER_LABELS = {
   watchPriority: { asc: 'Watch priority', desc: 'Lower priority first' },
 } as const;
 
+/**
+ * #415 (US-065, `A56`) — the waiting list's orders, shown by the SAME
+ * `SortControl` as the Library's. Keys are `GET /api/waiting`'s spellings.
+ * ⚠ The expected key's words say "expected", never a promise: an estimate is
+ * still a guess and the cards still say so.
+ */
+export const WAITING_SORT_KEY_NAMES = {
+  expected: 'Expected to stream',
+  discovered: 'Date discovered',
+  name: 'Title',
+  releaseYear: 'Release date',
+} as const;
+
+export const WAITING_SORT_DIRECTION_LABELS = {
+  expected: { asc: 'Soonest first', desc: 'Latest first' },
+  discovered: { desc: 'Newest first', asc: 'Oldest first' },
+  name: { asc: 'A to Z', desc: 'Z to A' },
+  releaseYear: { desc: 'Newest first', asc: 'Oldest first' },
+} as const;
+
+export const WAITING_SORT_ORDER_LABELS = {
+  expected: { asc: 'Streaming soonest', desc: 'Streaming latest' },
+  discovered: { desc: 'Recently discovered', asc: 'Oldest discoveries' },
+  name: { asc: 'Name A-Z', desc: 'Name Z-A' },
+  releaseYear: { desc: 'Newest releases', asc: 'Oldest releases' },
+} as const;
+
+export const WAITING_SORT_PANEL_TITLE = 'Sort your waiting list';
+
 export const WATCH_PRIORITY_LABELS = {
   'up-next': 'Up next',
   normal: 'Normal',

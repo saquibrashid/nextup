@@ -2,7 +2,7 @@
 
 **Project:** nextup
 **Version:** Current v1 scope, including subsequent owner-approved promotions; remaining deferrals are in §11.2.
-**Status:** Approved scope with recorded amendments through US-064 / REQ-130 (`A55`). ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
+**Status:** Approved scope with recorded amendments through US-065 / REQ-131 (`A56`). ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
 **Inputs:** `docs/BRD.md`, the recorded owner decisions in the ADRs, and the original authoring-tree `Context/` documents. **The `Context/` tree is not supplied in this repository.** Its citations preserve provenance, not an instruction to invent missing source text. See `docs/current-release.md` for the owner decisions applied on 2026-09-17 and `docs/requirement-index.md` for reconciled reference authority.
 **Audience:** the implementer. Implementation will be performed by GitHub Copilot in autopilot mode (ASM-028, ASM-029, NFR-002, NFR-003, NFR-004). This document, together with the specs, IS the implementation input. Acceptance criteria are written to be executable and verifiable without asking a question.
 **No timeline.** Per A19 / ASM-027 this document contains no dates, durations, or sequencing commitments beyond dependency order.
@@ -92,6 +92,21 @@
 >
 > **New in this document:** **US-064 / REQ-130** (Epic L), seven acceptance criteria. **Corrected in place:** the `A54` table's decision 4, US-063's out-of-scope line, §7.4 (item 18 and the owner-initiated metadata refresh list), US-036 AC-3 ("eight times"). **No migration** — the screen reads and writes the `A54` columns only.
 
+
+---
+
+> ## ⚠ AMENDMENT — 2026-10-08 — `A56` (owner-approved): ordering on *Waiting to stream* (#415), and row-aligned Grid cards (#414)
+>
+> **The owner approved** (#415) letting the waiting list be put in order, with the Library's own sort control, and asked (#414) for the waiting Grid's cards to line up row by row as the Library grid's do. Neither changes what a row *says*, which availability sentence is chosen (ADR-0010 Trap 4), or any list state.
+>
+> | Decision | What it changes | Kind |
+> |---|---|---|
+> | **1. Four orders, server-side** | `GET /api/waiting` accepts `?sort=` (`expected`, `discovered`, `name`, `releaseYear`) and `?dir=` (`asc`/`desc`), each key with its own default direction; an unknown or repeated value is a `400 VALIDATION_FAILED` naming the field, as `GET /api/titles` does. The order is applied by the API; the page never re-sorts. No new error code. | **Instruction** |
+> | **2. Default: expected to stream, soonest first** | Announced dates lead estimated ones, soonest first; a row with no forecast sorts **last in both directions**, as does a missing release year. A row already streaming on one of the owner's services still leads in every order (#378, US-042). Ties fall back to the title A→Z (the Library's sort name), then the intent id, so the order is deterministic. | **Instruction** |
+> | **3. One control, two lists** | `SortControl` is generalised by a configuration (keys, labels, default key and per-key default direction); the Library's keys, labels, defaults and URL behaviour are unchanged. The toolbar reverse button — REQ-038's floor rule (invariant 6) — is the same control on both pages. | **Instruction** |
+> | **4. Row-aligned Grid cards (#414, a defect fix)** | In Grid only, each waiting card is a subgrid of the list: a fixed 2:3 poster box, then title, rent chip, meta, availability, moved note, date block and the action on shared rows. An absent optional block leaves its row empty, so *Not interested* sits on one line at the bottom of every card in a row. Compact and the phone card list are unchanged. | Fix |
+>
+> **New in this document:** **US-065 / REQ-131** (Epic L), seven acceptance criteria. **Corrected in place:** US-043's out-of-scope line. **No migration** — the forecast is computed per request, so the order is applied in memory over the rows the waiting read already returns.
 ---
 
 ## 1. Overview
@@ -1365,7 +1380,7 @@ building this as that is a data-loss defect, not a shortcut.
 | AC-5 (edge) | A `WatchIntent` satisfied by AC-3 | The removed/history surfaces render | The satisfied intent is retained, never hard-deleted — REQ-028 applies to `WatchIntent` exactly as to every other record |
 | AC-6 (failure) | An empty waiting list | The view renders | It explains what the view is for and how to fill it, rather than rendering an unexplained empty state (§9) |
 
-**Out of scope for this story:** sorting and filtering beyond date; promote from `roadmap.md` if the list grows past roughly fifty rows.
+**Out of scope for this story:** filtering; promote from `roadmap.md` if the list grows past roughly fifty rows. Ordering is **US-065** (`A56`). ~~"sorting and filtering beyond date; promote from `roadmap.md` if the list grows past roughly fifty rows."~~
 **Open questions:** none.
 
 ⚠ **Amended at `A54`:** AC-3's capture path is no longer the only way a waiting work graduates — the owner's one-tap *Add to Library* on a now-streaming row (US-063 AC-4) satisfies the intent too, in the same transaction as the listing it creates. Both remain owner-initiated; the refresh still graduates nothing.
@@ -1444,6 +1459,39 @@ exactly as its one-tap form (§7.4 items 13–16, 18). Nothing moves by itself
 **Out of scope for this story:** any automatic answer, reminder or
 notification; a background or scheduled availability check; a list-state
 change made by *Check more titles*.
+**Open questions:** none.
+
+#### US-065 — Put the waiting list in order
+
+**REQ-131 (`must`, owner-approved `A56`, 2026-10-08, #415).** *Waiting to
+stream* can be ordered by when each title is expected to stream (the
+default, soonest first), when it was discovered, its title, or its release
+year, with the Library's own sort control and its one-press reverse. The API
+applies the order; the page shows rows in the order it is given. Ordering
+never changes list state, and never changes which availability sentence a row
+shows (ADR-0010 Trap 4).
+
+**As** the owner
+**I want** to put the titles I'm waiting on in an order that answers my question
+**So that** the ones about to stream, or the ones I found most recently, are at the top
+
+**Traces to:** REQ-131, REQ-038, REQ-084, REQ-086
+**Priority:** must
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | The waiting view with no order chosen | It renders | It is ordered by *expected to stream*, soonest first: rows with an **announced** date before rows with an **estimate**, each soonest first (an estimate month counts from its first day; an estimate range from its start; an estimate already due *soon* is the soonest estimate); rows with no forecast last. The sort control reads *Streaming soonest* |
+| AC-2 | The sort control | The owner opens it | It offers exactly four orders — *Expected to stream*, *Date discovered*, *Title*, *Release date* — each with its own default direction: soonest first, newest first, A→Z, newest first. Choosing one writes `?sort=` (omitted for the default key) and `?dir=` to the URL, as the Library does, and the list is re-read from the API |
+| AC-3 | Any order | The owner presses the toolbar reverse button | The order reverses in that one press with nothing open (REQ-038 floor rule, invariant 6), and its accessible name states the order it produces |
+| AC-4 (edge) | Rows with no forecast, or no release year | The list is ordered by *expected to stream* or *release date*, in either direction | Those rows sort **last in both directions**. A row streaming on one of the owner's services leads in every order and direction (US-042) |
+| AC-5 (edge) | Two rows equal on the chosen key | The list is ordered | The tie is broken by title A→Z (leading articles, case and accents ignored, as the Library's name order), then by the intent id — the same in both directions, so the order is deterministic |
+| AC-6 (failure) | `GET /api/waiting` with an unknown `sort` or `dir`, or either given twice | It is requested | It answers `400 VALIDATION_FAILED` naming the field and the permitted values, before anything is read — the `GET /api/titles` convention, with no new error code |
+| AC-7 | Grid and Compact | The owner switches view | The order is the same in both; the page never re-sorts what the API returns |
+
+**Out of scope for this story:** filtering the waiting list; a remembered
+waiting order across visits (the URL carries it, as in the Library); any
+change to which availability sentence a row shows.
 **Open questions:** none.
 
 #### Required amendment to Epic K — completed at TASK-187

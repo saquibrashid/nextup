@@ -7,8 +7,11 @@
  *    releases feed. A fact.
  * 2. **Estimate** — a guess from the studio's current first-streaming ("pay-1")
  *    deal and the US rent/buy date, both from TMDB. ⚠ ALWAYS labelled as an
- *    estimate, never sorted on (owner decision 3 on #380), and never shown as
- *    a fact. An announced date always replaces it.
+ *    estimate, never shown as a fact, and an announced date always replaces
+ *    it. Since #415 (PRD `A56`) the waiting list can be ORDERED by it —
+ *    announced dates first, then estimates — which changes no wording.
+ *    ~~"ALWAYS labelled as an estimate, never sorted on (owner decision 3 on
+ *    #380), and never shown as a fact."~~
  *
  * ⚠ **"No estimate" is the answer whenever the studio is unknown or two mapped
  * studios disagree.** The #380 spike found that every mapped studio's movies

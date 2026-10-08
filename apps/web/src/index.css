@@ -2681,20 +2681,105 @@ button {
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 8rem), 1fr));
 }
 
+/*
+  #414 — row-aligned tiles, the Library grid's treatment: each card's rows are
+  a SUBGRID of the list, so poster, title, rent chip, meta, availability,
+  moved note, date block and action sit on the same line in every card of a
+  row. An absent optional block leaves its row empty (an `EmptySlot`), so
+  nothing below it moves, and *Not interested* ends every card on one line.
+  Grid view only: Compact and the phone card list keep their own layout.
+*/
 .waiting-list[data-view='grid'] .waiting-row {
   align-content: start;
-  gap: var(--space-2);
-  grid-template-areas:
-    'poster'
-    'body'
-    'aside';
+  gap: 0;
+  grid-row: span 8;
+  grid-template-areas: none;
   grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: subgrid;
   padding: var(--space-2);
 }
 
+/*
+  The streaming card's 4 px edge would narrow its column and so shorten its
+  2:3 poster; the padding gives the 3 px back, so every poster box matches.
+*/
+.waiting-list[data-view='grid'] .waiting-row--streaming {
+  padding-inline-start: calc(var(--space-2) - 3px);
+}
+
+.waiting-list[data-view='grid'] .waiting-row__body,
+.waiting-list[data-view='grid'] .waiting-row__heading,
+.waiting-list[data-view='grid'] .waiting-row__aside {
+  display: contents;
+}
+
+.waiting-list[data-view='grid'] [data-grid-slot] {
+  grid-column: 1;
+  margin-top: var(--space-2);
+  min-width: 0;
+}
+
+.waiting-list[data-view='grid'] [data-grid-slot]:empty {
+  margin-top: 0;
+}
+
+/* A fixed 2:3 box whatever the image's own shape. */
 .waiting-list[data-view='grid'] .waiting-row__poster {
+  align-self: start;
+  aspect-ratio: 2 / 3;
+  grid-row: 1;
   height: auto;
+  margin-top: 0;
+  object-fit: cover;
   width: 100%;
+}
+
+.waiting-list[data-view='grid'] [data-grid-slot='title'] {
+  grid-row: 2;
+}
+
+.waiting-list[data-view='grid'] [data-grid-slot='chip'] {
+  align-self: start;
+  grid-row: 3;
+  justify-self: start;
+}
+
+.waiting-list[data-view='grid'] [data-grid-slot='meta'] {
+  grid-row: 4;
+}
+
+.waiting-list[data-view='grid'] [data-grid-slot='availability'] {
+  grid-row: 5;
+}
+
+.waiting-list[data-view='grid'] [data-grid-slot='moved'] {
+  grid-row: 6;
+}
+
+.waiting-list[data-view='grid'] [data-grid-slot='date'] {
+  grid-row: 7;
+}
+
+/* The last row, its content pushed to the bottom: one line for the action. */
+.waiting-list[data-view='grid'] [data-grid-slot='action'] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  grid-row: 8;
+  justify-content: flex-end;
+}
+
+/* Outside Grid the footer is no box at all, so Compact is unchanged. */
+.waiting-row__footer {
+  display: contents;
+}
+
+.waiting-row__slot {
+  min-width: 0;
+}
+
+.waiting-row__slot-empty {
+  display: block;
 }
 
 .waiting-list[data-view='grid'] .waiting-row__name {
