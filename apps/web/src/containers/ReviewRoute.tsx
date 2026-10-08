@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 
-import type { ReviewResponse } from '@nextup/domain';
+import type { AutoDestination, ReviewResponse } from '@nextup/domain';
 
 import {
   apiClient,
@@ -54,7 +54,11 @@ export interface ReviewRouteProps {
 export function toAppliedBatch(result: CloseBatchResult): AppliedBatch {
   return {
     batchId: result.batchId,
-    service: result.serviceState.service,
+    // #396 — `null` for a capture that refreshed no named service's list;
+    // the notice then names Waiting to stream instead of a service.
+    service: result.serviceState?.service ?? null,
+    waitingCreated: result.autoDetect?.intentsCreated ?? result.discovery?.intentsCreated ?? 0,
+    ...(result.autoDetect ? { titlesListed: result.autoDetect.titlesListed } : {}),
     summary: {
       listingsCreated: result.summary.listingsCreated,
       listingsRemoved: result.summary.listingsRemoved,
@@ -309,6 +313,16 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
               setPendingAdditionIds(pendingCandidateIdsFrom(error.details));
               return;
             }
+            // #396 (US-066 AC-6) — same treatment: nothing was applied, and
+            // the owner is taken to the titles that still need a destination.
+            if (error.code === 'AUTO_DESTINATION_REQUIRED') {
+              closing.current = false;
+              const ids = error.details['candidateIds'];
+              setPendingAdditionIds(
+                Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : [],
+              );
+              return;
+            }
             if (error.code === 'REMOVALS_NOT_CONFIRMED') {
               setSaving(true);
               void refresh()
@@ -384,6 +398,25 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
       await decide(() =>
         client.addManualEntry(batchId, result.tmdbId, result.mediaType, result.edition),
       );
+    },
+    [batchId, client, decide],
+  );
+
+  /**
+   * #396 (US-066) — an auto-detect title's destination (§6.51) and the
+   * owner's "Look up again" (§6.50). Both re-read the review, so the card
+   * shows what the server holds, and both re-throw so the card can say the
+   * choice did not stick.
+   */
+  const setDestination = useCallback(
+    async (candidateId: string, destination: AutoDestination): Promise<void> => {
+      await decide(() => client.setCandidateDestination(batchId, candidateId, destination));
+    },
+    [batchId, client, decide],
+  );
+  const lookUpServices = useCallback(
+    async (candidateId: string): Promise<void> => {
+      await decide(() => client.lookUpServices(batchId, [candidateId]));
     },
     [batchId, client, decide],
   );
@@ -619,6 +652,8 @@ function ReviewContent({ client = apiClient }: ReviewRouteProps): JSX.Element {
       onKeepUnmatched={keepUnmatched}
       onDiscardUnmatched={discardUnmatched}
       onMatchUnmatched={matchUnmatched}
+      onSetDestination={setDestination}
+      onLookUpServices={lookUpServices}
     />
   );
 }

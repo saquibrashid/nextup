@@ -694,6 +694,29 @@ export const STOREFRONT_GROUP_LEGEND = 'Or a rental storefront (rent/buy)';
 export const STOREFRONT_GROUP_HINT =
   'Found something to rent or buy that you would rather wait to stream?';
 export const STOREFRONT_GROUP_TOGGLE = 'Import from a rental storefront';
+/**
+ * #396 (US-066 AC-1) — the Auto-detect source option, the default. The hint
+ * says what will happen, so "Auto-detect" is never a guess the owner has to
+ * decode: nothing lands until they confirm each looked-up service at review.
+ */
+export const AUTO_DETECT_OPTION_HINT = "We'll look up each title's service. You confirm it.";
+/**
+ * #396 (US-066 AC-3…AC-5) — the per-title destination at an auto-detect
+ * review. "Looked up" / "Couldn't look up" themselves are the domain's
+ * `LOOKED_UP_LABEL` / `LOOKUP_FAILED_LABEL`, so the label the owner reads and
+ * the one the tests assert cannot drift.
+ */
+export const AUTO_DESTINATION_LEGEND = 'Where should it go?';
+export const AUTO_DESTINATION_WAITING = 'Waiting to stream';
+export const AUTO_DESTINATION_NONE =
+  "Not streaming on your services. We'll send it to Waiting to stream unless you pick a service.";
+export const AUTO_DESTINATION_PICK = 'Pick a service, or send it to Waiting to stream.';
+export const AUTO_DESTINATION_SAVE_FAILED = 'That choice was not saved. Try again.';
+export const AUTO_LOOKUP_RETRY = 'Look up again';
+export const AUTO_LOOKUP_RETRY_FAILED = "Still couldn't look it up. Pick where it goes instead.";
+/** #396 (US-066 AC-2) — under the disabled full-update card for Auto-detect. */
+export const AUTO_DETECT_FULL_UPDATE_HINT =
+  'To do a full update, choose the service these screenshots came from.';
 export const MODE_STEP_LEGEND = 'Is this a complete capture of that list?';
 
 /* -------------------------------------------------------------------------- */
@@ -1516,6 +1539,14 @@ export const BATCHES_UNDO_FAILED_RETRY_LABEL = 'Try again';
  * §9.8 body, verbatim — the framing sentence the panel leads with when the
  * refusal reason is `modified-or-removed` (or `later-owner-edits`).
  */
+/**
+ * #396 (US-066 AC-9) — an auto-detect import that sent titles to Waiting to
+ * stream. Those are watch intents, which a batch undo does not reverse; the
+ * owner removes them from Waiting to stream instead.
+ */
+export const UNDO_REFUSAL_WAITING_ROUTED_BODY =
+  'This import can\u2019t be undone in one step, because it sent titles to Waiting to stream. ' +
+  'Remove those from Waiting to stream, and remove any titles it added from the Library.';
 export const UNDO_REFUSAL_BODY =
   'This import can\u2019t be undone in one step, because it changed things as well as adding them. ' +
   'Here\u2019s everything it touched, and how to fix each one.';

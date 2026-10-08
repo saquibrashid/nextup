@@ -39,6 +39,7 @@ import {
   findUploadBatch,
   listBatchChanges,
   listBatchHistory,
+  listCandidatesForBatch,
   listImagesForBatch,
   listTitleNames,
 } from '../repository/ownerData.js';
@@ -193,6 +194,9 @@ export function registerBatchDetailRoutes(router: Router): void {
           batchId: batch.id,
           service: batch.service,
           discoverySource: batch.discoverySource,
+          // #396 — present only for an auto-detect capture, so every existing
+          // response is byte-identical.
+          ...(batch.autoDetect ? { autoDetect: true as const } : {}),
           mode: batch.mode,
           status: batch.status,
           createdAt: batch.createdAt.toISOString(),
@@ -228,11 +232,20 @@ export function registerBatchDetailRoutes(router: Router): void {
     const progress = readProgress(batch.extractionStats);
     const settled = batch.status === 'applied' || batch.status === 'undone';
     const removalGroup = settled ? await findBatchRemovalGroup(ownerId, batchId) : null;
+    const routedToWaiting =
+      settled && batch.autoDetect
+        ? (await listCandidatesForBatch(ownerId, batchId)).some(
+            (row) =>
+              row.destinationKind === 'waiting' &&
+              (row.reviewDisposition === 'confirmed' || row.reviewDisposition === 'corrected'),
+          )
+        : false;
 
     res.status(200).json({
       batchId: batch.id,
       service: batch.service,
       discoverySource: batch.discoverySource,
+      ...(batch.autoDetect ? { autoDetect: true as const } : {}),
       mode: batch.mode,
       status: batch.status,
       derivedFromBatchId: batch.derivedFromBatchId,
@@ -240,8 +253,11 @@ export function registerBatchDetailRoutes(router: Router): void {
       createdAt: batch.createdAt.toISOString(),
       submittedAt: batch.submittedAt?.toISOString() ?? null,
       completedAt: batch.completedAt?.toISOString() ?? null,
+      // #396 — an auto-detect batch writes listings too, so it has an
+      // application summary. Its undo is refused when it routed a title to
+      // Waiting to stream (`waiting-routed`), and `undoable` says so up front.
       application:
-        settled && batch.service !== null
+        settled && (batch.service !== null || batch.autoDetect)
           ? {
               summary: {
                 listingsCreated: changes.filter((change) => change.kind === 'listing_added').length,
@@ -249,7 +265,7 @@ export function registerBatchDetailRoutes(router: Router): void {
                   .length,
                 removalGroupId: removalGroup?.undoneAt === null ? removalGroup.id : null,
               },
-              undoable: batch.status === 'applied' && isCreatesOnly(provenance),
+              undoable: batch.status === 'applied' && isCreatesOnly(provenance) && !routedToWaiting,
               removalsUndone: removalGroup != null && removalGroup.undoneAt !== null,
             }
           : null,

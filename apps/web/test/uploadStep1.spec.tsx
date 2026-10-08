@@ -86,7 +86,9 @@ describe('/upload step 1 - service and mode', () => {
     for (const radio of screen.getAllByRole('radio')) {
       expect(radio).not.toBeChecked();
     }
-    expect(screen.getAllByRole('radio')).toHaveLength(SERVICES.length + BATCH_MODES.length);
+    // #396 (`A57`): plus the Auto-detect source. The PAGE still pre-checks
+    // nothing; the /upload route passes Auto-detect in as its default (T-AUTO-020a).
+    expect(screen.getAllByRole('radio')).toHaveLength(SERVICES.length + 1 + BATCH_MODES.length);
   });
 
   it('T-UI-003f · US-003 AC-1 · exactly one supported service can be chosen', async () => {

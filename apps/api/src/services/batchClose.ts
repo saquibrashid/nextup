@@ -65,6 +65,9 @@ import {
   type DiscoverySource,
   planWatchIntents,
   discoverySourceOf,
+  effectiveDestinationFor,
+  isAutoDetectBatch,
+  missingDestinationIds,
   requireServiceOf,
 } from '@nextup/domain';
 
@@ -87,6 +90,7 @@ import {
   reactivateSuppression,
   recordBatchChange,
   runInTransaction,
+  setCandidateDestination,
   setCandidateResolvedTitles,
   softDeleteServiceListing,
   updateTitle,
@@ -94,7 +98,12 @@ import {
   type Db,
   type OwnerId,
 } from '../repository/ownerData.js';
-import { satisfyWaitingIntents } from '../repository/watchIntents.js';
+import {
+  satisfyWaitingIntents,
+  updateTitleAvailability,
+  updateWatchIntentAvailability,
+} from '../repository/watchIntents.js';
+import { DEFAULT_AVAILABILITY_REGION } from './watchAvailability.js';
 import { canTransition, loadOwnedBatch, transitionBatch } from './batchLifecycle.js';
 import { applyConfirmedEditions } from './titleEditions.js';
 
@@ -125,6 +134,22 @@ export interface CloseResult {
      * did not happen.
      */
     suppressionsCreated: number;
+  };
+  /**
+   * Present only for an auto-detect batch (#396, US-066). `serviceState` is
+   * null for one too: see `closeAutoDetectBatch`.
+   */
+  autoDetect?: {
+    /** Titles that landed on at least one service. */
+    titlesListed: number;
+    /** Titles routed to Waiting to stream (a new intent each). */
+    intentsCreated: number;
+    /** Services skipped because the title was already active there (a no-op). */
+    alreadyOnService: number;
+    /** Waiting-routed titles already in the Library — nothing to wait for. */
+    alreadyListed: number;
+    /** Waiting-routed titles already waiting — never doubled. */
+    alreadyWaiting: number;
   };
   undoable: boolean;
 }
@@ -643,6 +668,386 @@ async function closeDiscoveryBatch(
 }
 
 /**
+ * Apply a reviewed AUTO-DETECT batch (#396, US-066, ADR-0010 Rev 6).
+ *
+ * Each applied title goes where its EFFECTIVE destination says: the owner's
+ * choice, else the looked-up proposal the owner saw and confirmed — one
+ * `ServiceListing` per service (one badge each), or one Waiting-to-stream
+ * intent. All of it in ONE transaction.
+ *
+ * ⚠ WHAT IT DOES NOT DO:
+ *
+ * - **No removals, ever.** An auto-detect batch is append-only by source
+ *   (`modeRefusalFor`), and this path has no removal code to reach.
+ * - **No `ServiceState` write — `serviceState: null`.** REQ-039's
+ *   "Netflix updated today" says the owner captured THAT SERVICE'S saved
+ *   list. An auto-detect capture captured screenshots whose services were
+ *   looked up afterwards; it is a partial, add-only sighting of a title on a
+ *   service, not a refresh of the service's list. Writing the date here would
+ *   hide exactly the staleness RSK-007 exists to surface. (A named-service
+ *   append-only batch DOES write it: that capture IS of the service's list.)
+ * - **No suppression from discards.** As on the service path: these are the
+ *   owner's own list screenshots, so a discard means "not this time", not
+ *   "never" (US-041 AC-5 scopes discard-suppresses to storefronts).
+ *
+ * ⚠ A destination-less applied title REFUSES the whole close with 409
+ * `AUTO_DESTINATION_REQUIRED` before anything is opened (US-066 AC-6):
+ * landing it anywhere would be a choice the owner never saw.
+ */
+async function closeAutoDetectBatch(
+  ownerId: OwnerId,
+  batch: Awaited<ReturnType<typeof loadOwnedBatch>>,
+  now: Date,
+): Promise<CloseResult> {
+  const loaded = await loadReviewCandidates(ownerId, batch.id, null, { autoDetect: true });
+  const { candidates, rows, suppressed } = loaded;
+
+  const pending = pendingAdditionIds(candidates);
+  if (pending.length > 0) {
+    throw new AppError(
+      'PENDING_ADDITIONS',
+      409,
+      pending.length === 1
+        ? '1 title still needs a decision.'
+        : `${pending.length} titles still need a decision.`,
+      { batchId: batch.id, pendingCandidateIds: pending },
+    );
+  }
+
+  const missing = missingDestinationIds(candidates);
+  if (missing.length > 0) {
+    throw new AppError(
+      'AUTO_DESTINATION_REQUIRED',
+      409,
+      missing.length === 1
+        ? "1 title still needs a service or Waiting to stream. We couldn't look it up."
+        : `${missing.length} titles still need a service or Waiting to stream. We couldn't look them up.`,
+      { batchId: batch.id, candidateIds: missing },
+    );
+  }
+
+  const applicable = applicableCandidates(candidates);
+  const discarded = discardedCount(candidates);
+  const suppressedGated = rows.filter(
+    (row) => row.resolvedWorkIdentity !== null && suppressed.has(row.resolvedWorkIdentity),
+  ).length;
+  const rowById = new Map(rows.map((row) => [row.id, row]));
+  const today = dateOnly(now);
+  // Undo is refused for a batch that routed anything to Waiting to stream
+  // (`waiting-routed`): the close response must not offer what undo refuses.
+  const routedToWaiting = applicable.some(
+    ({ candidate }) => effectiveDestinationFor(candidate)?.kind === 'waiting',
+  );
+
+  const result = await runInTransaction(async (tx) => {
+    // Sequential: one transaction is one connection.
+    const listed = await listListedWorkIdentities(ownerId, tx);
+    const waiting = await listWaitingWorkIdentities(ownerId, tx);
+
+    let titlesCreated = 0;
+    let listingsCreated = 0;
+    let unresolvedKept = 0;
+    let gatedInTransaction = 0;
+    let titlesListed = 0;
+    let intentsCreated = 0;
+    let alreadyOnService = 0;
+    let alreadyListed = 0;
+    let alreadyWaiting = 0;
+    const resolvedTitleLinks: { candidateId: string; titleId: string }[] = [];
+    const listedWorkIdentities: string[] = [];
+    /** Works this close has already written, and their title (TASK-289). */
+    const titleByIdentity = new Map<string, string>();
+
+    for (const { candidate, kind } of applicable) {
+      // The same derivation `missingDestinationIds` refused on, never a copy.
+      const destination = effectiveDestinationFor(candidate);
+      /* c8 ignore next -- `missingDestinationIds` refused this before the transaction */
+      if (destination === null || destination === undefined) continue;
+      const workIdentity = identityFor(candidate);
+
+      // The APPLIED destination is persisted on the candidate, the owner's
+      // choice or the proposal they confirmed. The lookup is re-derivable
+      // against the owner's current services and so can drift; this cannot.
+      // Undo reads it (`waiting-routed`) and batch detail can show it.
+      if (candidate.destination === null || candidate.destination === undefined) {
+        await setCandidateDestination(
+          ownerId,
+          batch.id,
+          candidate.candidateId,
+          {
+            destinationKind: destination.kind,
+            destinationServices:
+              destination.kind === 'services' ? JSON.stringify(destination.services) : null,
+          },
+          tx,
+        );
+      }
+
+      // Property 3, re-checked in the transaction: keyed on WORK IDENTITY.
+      if ((await findActiveSuppression(ownerId, workIdentity, tx)) !== null) {
+        gatedInTransaction += 1;
+        continue;
+      }
+
+      const seen = titleByIdentity.get(workIdentity);
+      if (seen !== undefined && destination.kind === 'waiting') {
+        // A second read of a work this close already placed: linked, not doubled.
+        resolvedTitleLinks.push({ candidateId: candidate.candidateId, titleId: seen });
+        continue;
+      }
+
+      if (destination.kind === 'waiting') {
+        // US-040 AC-5 on this path too: a work already in the Library is not
+        // something to wait for, and an existing intent is never doubled.
+        if (listed.has(workIdentity) || waiting.has(workIdentity)) {
+          if (listed.has(workIdentity)) alreadyListed += 1;
+          else alreadyWaiting += 1;
+          const existing = await findTitleByWorkIdentity(ownerId, workIdentity, tx);
+          if (existing !== null) {
+            resolvedTitleLinks.push({ candidateId: candidate.candidateId, titleId: existing.id });
+          }
+          continue;
+        }
+        const existing = await findTitleByWorkIdentity(ownerId, workIdentity, tx);
+        let titleId: string;
+        if (existing === null) {
+          titleId = await insertTitle(
+            ownerId,
+            tx,
+            candidate,
+            kind,
+            workIdentity,
+            batch.id,
+            today,
+            'waiting',
+          );
+          titlesCreated += 1;
+          await recordBatchChange(
+            ownerId,
+            {
+              batchId: batch.id,
+              kind: 'title_created',
+              titleId,
+              nextValue: jsonScalar(workIdentity),
+            },
+            tx,
+          );
+        } else {
+          // Reused as it stands, exactly as the discovery path does.
+          titleId = existing.id;
+        }
+        if (kind === 'unresolved') unresolvedKept += 1;
+        const intentId = ulid();
+        // ⚠ `search`, with NO source batch: `ck_intent_source` admits only the
+        // storefronts and `search`, and `ck_intent_source_batch_coherent`
+        // ties a storefront intent to a storefront batch. Widening either is
+        // a DROP CONSTRAINT T-MIG-001 forbids. "Added by the owner, looked up
+        // by TMDB" IS the search-add shape; the batch link survives in the
+        // `title_created` change and the candidate's resolved title.
+        await createWatchIntent(
+          ownerId,
+          {
+            id: intentId,
+            titleId,
+            workIdentity,
+            sourceBatchId: null,
+            discoverySource: 'search',
+            state: 'waiting',
+          },
+          tx,
+        );
+        const lookup = lookupToStore(rowById.get(candidate.candidateId), workIdentity);
+        if (lookup !== null) {
+          const { streaming, ...intentLookup } = lookup;
+          await updateWatchIntentAvailability(
+            ownerId,
+            intentId,
+            {
+              ...intentLookup,
+              // #378: the first sighting on ANY subscription, as the refresh sets it.
+              streamingSince: streaming ? lookup.availabilityCheckedAt : null,
+            },
+            tx,
+          );
+        }
+        waiting.add(workIdentity);
+        intentsCreated += 1;
+        titleByIdentity.set(workIdentity, titleId);
+        resolvedTitleLinks.push({ candidateId: candidate.candidateId, titleId });
+        continue;
+      }
+
+      // ── services: one listing per confirmed service ──────────────────────
+      let titleId: string;
+      if (seen !== undefined) {
+        titleId = seen;
+      } else {
+        const existing = await findTitleByWorkIdentity(ownerId, workIdentity, tx);
+        if (existing === null || existing.state !== 'active') {
+          // Invariant 7: a reappearance is a brand-new row dated today.
+          titleId = await insertTitle(ownerId, tx, candidate, kind, workIdentity, batch.id, today);
+          titlesCreated += 1;
+          await recordBatchChange(
+            ownerId,
+            {
+              batchId: batch.id,
+              kind: 'title_created',
+              titleId,
+              nextValue: jsonScalar(workIdentity),
+            },
+            tx,
+          );
+        } else {
+          titleId = existing.id;
+          // Invariant 6: the EARLIEST date across listings is kept.
+          if (existing.sortDateAdded === null || existing.sortDateAdded > today) {
+            await updateTitle(ownerId, titleId, { sortDateAdded: today }, tx);
+          }
+        }
+        if (kind === 'unresolved') unresolvedKept += 1;
+      }
+
+      // ⚠ An existing ACTIVE listing on the same service is a no-op — never a
+      // second listing (`listing_one_per_service`) and never a re-date
+      // (REQ-030: `dateAdded` is write-once).
+      const activeOn = new Set(
+        (await listListingsForTitle(ownerId, titleId, tx))
+          .filter((row) => row.state === 'active')
+          .map((row) => row.service),
+      );
+      let landed = false;
+      for (const service of destination.services) {
+        if (activeOn.has(service)) {
+          alreadyOnService += 1;
+          continue;
+        }
+        const listingId = ulid();
+        await createServiceListing(
+          ownerId,
+          {
+            listingId,
+            titleId,
+            service,
+            state: 'active',
+            dateAdded: today,
+            createdByBatchId: batch.id,
+          },
+          tx,
+        );
+        await recordBatchChange(
+          ownerId,
+          { batchId: batch.id, kind: 'listing_added', titleId, listingId },
+          tx,
+        );
+        listingsCreated += 1;
+        landed = true;
+      }
+
+      // The looked-up providers are the Library's availability answer, stored
+      // the way the Library refresh stores it (#410), so the Library does not
+      // re-flag the title the moment it lands. Only for the work it answered.
+      const lookup = lookupToStore(rowById.get(candidate.candidateId), workIdentity);
+      if (lookup !== null) {
+        await updateTitleAvailability(
+          ownerId,
+          titleId,
+          {
+            availableOn: lookup.availableOn,
+            rentOn: lookup.rentOn,
+            availabilityCheckedAt: lookup.availabilityCheckedAt,
+            availabilityRegion: lookup.availabilityRegion,
+          },
+          tx,
+        );
+      }
+
+      if (seen === undefined && (landed || activeOn.size > 0)) titlesListed += 1;
+      listed.add(workIdentity);
+      listedWorkIdentities.push(workIdentity);
+      titleByIdentity.set(workIdentity, titleId);
+      resolvedTitleLinks.push({ candidateId: candidate.candidateId, titleId });
+    }
+
+    await setCandidateResolvedTitles(ownerId, resolvedTitleLinks, tx);
+    await applyConfirmedEditions(ownerId, batch.id, candidates, tx);
+    // Graduation (TASK-189): a work the owner was waiting on that this close
+    // put on a service is satisfied, in the same transaction.
+    await satisfyWaitingIntents(ownerId, listedWorkIdentities, now, tx);
+
+    await transitionBatch(
+      ownerId,
+      batch,
+      'applied',
+      'BATCH_NOT_IN_REVIEW',
+      'That batch is not in review.',
+      { completedAt: now },
+      tx,
+    );
+
+    return {
+      summary: {
+        titlesCreated,
+        listingsCreated,
+        listingsRemoved: 0,
+        unresolvedKept,
+        discarded,
+        suppressedGated: suppressedGated + gatedInTransaction,
+        removalGroupId: null,
+      } satisfies CloseSummary,
+      autoDetect: { titlesListed, intentsCreated, alreadyOnService, alreadyListed, alreadyWaiting },
+    };
+  });
+
+  return {
+    batchId: batch.id,
+    status: 'applied',
+    completedAt: now.toISOString(),
+    summary: result.summary,
+    // ⚠ NULL — see the doc comment. No service's list was refreshed.
+    serviceState: null,
+    autoDetect: result.autoDetect,
+    undoable: !routedToWaiting && canTransition('applied', 'undone'),
+  };
+}
+
+/**
+ * The candidate's stored lookup as an availability write, or `null` when there
+ * is nothing truthful to store: never looked up, failed, or answered for a
+ * different work than the one being written (the owner corrected the match).
+ */
+function lookupToStore(
+  row:
+    | {
+        serviceLookupStatus: string | null;
+        serviceLookupIdentity: string | null;
+        serviceLookupAt: Date | null;
+        lookedUpAvailableOn: string | null;
+        lookedUpRentOn: string | null;
+      }
+    | undefined,
+  workIdentity: string,
+): {
+  availableOn: string | null;
+  rentOn: string | null;
+  availabilityCheckedAt: Date;
+  availabilityRegion: string;
+  streaming: boolean;
+} | null {
+  if (row === undefined || row.serviceLookupAt === null) return null;
+  if (row.serviceLookupStatus === null || row.serviceLookupStatus === 'failed') return null;
+  if (row.serviceLookupIdentity !== workIdentity) return null;
+  const flatrate: unknown =
+    row.lookedUpAvailableOn === null ? null : JSON.parse(row.lookedUpAvailableOn);
+  return {
+    availableOn: row.lookedUpAvailableOn,
+    rentOn: row.lookedUpRentOn,
+    availabilityCheckedAt: row.serviceLookupAt,
+    availabilityRegion: DEFAULT_AVAILABILITY_REGION,
+    streaming: Array.isArray(flatrate) && flatrate.length > 0,
+  };
+}
+
+/**
  * Apply a reviewed batch.
  *
  * Throws `PENDING_ADDITIONS` (409), `REMOVALS_NOT_CONFIRMED` (409) or
@@ -673,6 +1078,11 @@ export async function closeBatch(
   const discoverySource = discoverySourceOf(batch);
   if (discoverySource !== null) {
     return closeDiscoveryBatch(ownerId, batch, discoverySource, now);
+  }
+  // #396 — the same structural branch for an auto-detect batch: it has no
+  // single service, so the service path (and its removals) is unreachable.
+  if (isAutoDetectBatch(batch)) {
+    return closeAutoDetectBatch(ownerId, batch, now);
   }
 
   const service = requireServiceOf(batch);

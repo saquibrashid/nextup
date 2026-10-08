@@ -42,7 +42,8 @@ it('T-SVC-002a all eight services use correct labels and exclusive nondefault up
   render(<UploadPage onSelectionChange={choose} />);
   expect(SERVICES.map((service) => SERVICE_LABELS[service])).toEqual(EXPECTED_LABELS);
   const group = screen.getByTestId('service-step');
-  expect(within(group).getAllByRole('radio')).toHaveLength(8);
+  // #396 (`A57`): the eight services plus the Auto-detect source.
+  expect(within(group).getAllByRole('radio')).toHaveLength(9);
   expect(within(group).queryAllByRole('radio', { checked: true })).toHaveLength(0);
   for (const service of SERVICES) {
     fireEvent.click(

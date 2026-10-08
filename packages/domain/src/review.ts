@@ -51,6 +51,7 @@ import type {
   ReviewDisposition,
   Service,
 } from './enums.js';
+import type { AutoDestination, CandidateServiceLookup } from './autoDetect.js';
 import { CANDIDATE_CLASSIFICATIONS } from './enums.js';
 import { mediaTypeForWorkIdentity } from './identity.js';
 import type { EditionLabel } from './editions.js';
@@ -235,6 +236,15 @@ export interface ReviewCandidate {
   /** `null` for an unmatched candidate (`T-CLS-013`). */
   classification: ReviewClassification | null;
   alreadyInLibrary?: boolean;
+  /**
+   * #396 — AUTO-DETECT BATCHES ONLY. The review-time service lookup, or
+   * `null` when none has run for this candidate. Absent on every other batch.
+   */
+  serviceLookup?: CandidateServiceLookup | null;
+  /** #396 — the owner's own choice, or `null` to follow the lookup's proposal. */
+  destination?: AutoDestination | null;
+  /** #396 — what the close will write: the choice, else the proposal, else nothing. */
+  effectiveDestination?: AutoDestination | null;
 }
 
 /** Relationships explain competing evidence; they never change identity or transfer geometry. */
@@ -369,6 +379,8 @@ export interface BuildReviewInput {
   service: Service | null;
   /** Which storefront this capture came from, or `null` for a service batch. */
   discoverySource?: DiscoverySource | null;
+  /** #396 — an auto-detect capture: no service and no storefront. */
+  autoDetect?: boolean;
   mode: BatchMode;
   lowYield: boolean;
   degradedExtraction: boolean;
@@ -441,6 +453,11 @@ export interface ReviewResponse {
   /** `null` for a discovery capture — see `BuildReviewInput.service`. */
   service: Service | null;
   discoverySource: DiscoverySource | null;
+  /**
+   * #396 — present (and `true`) only for an auto-detect capture, whose
+   * candidates carry `serviceLookup` / `destination` / `effectiveDestination`.
+   */
+  autoDetect?: true;
   mode: BatchMode;
   lowYield: boolean;
   degradedExtraction: boolean;
@@ -891,6 +908,7 @@ export function buildReviewResponse(input: BuildReviewInput): ReviewResponse {
     tileCoverage: [...(input.tileCoverage ?? [])],
     service: input.service,
     discoverySource: input.discoverySource ?? null,
+    ...(input.autoDetect === true ? { autoDetect: true as const } : {}),
     mode: input.mode,
     lowYield: input.lowYield,
     degradedExtraction: input.degradedExtraction,

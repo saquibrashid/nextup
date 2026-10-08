@@ -43,6 +43,7 @@ import {
   UNDO_REFUSAL_ACTION_NOT_INTERESTED,
   UNDO_REFUSAL_ACTION_RESTORE,
   UNDO_REFUSAL_BODY,
+  UNDO_REFUSAL_WAITING_ROUTED_BODY,
   UNDO_REFUSAL_CHIP_REMOVED,
   UNDO_REFUSAL_CHIP_SUPPRESSED,
   UNDO_REFUSAL_CLOSE_LABEL,
@@ -336,7 +337,11 @@ export function UndoRefusalPanel({
   const title = provenanceUnavailable
     ? UNDO_REFUSAL_PROVENANCE_UNAVAILABLE_TITLE
     : UNDO_REFUSAL_TITLE;
-  const body = provenanceUnavailable ? UNDO_REFUSAL_PROVENANCE_UNAVAILABLE_BODY : UNDO_REFUSAL_BODY;
+  const body = provenanceUnavailable
+    ? UNDO_REFUSAL_PROVENANCE_UNAVAILABLE_BODY
+    : details.reason === 'waiting-routed'
+      ? UNDO_REFUSAL_WAITING_ROUTED_BODY
+      : UNDO_REFUSAL_BODY;
 
   return (
     <div className="undo-refusal" data-testid="undo-refusal-panel" data-reason={details.reason}>

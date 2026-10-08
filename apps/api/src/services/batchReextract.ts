@@ -141,6 +141,10 @@ export async function reextractBatch(
         // reject at the store, correctly but obscurely.
         service: source.service,
         discoverySource: source.discoverySource,
+        // #396 — and an auto-detect capture stays one. Dropping the flag would
+        // leave a batch with neither column, which `ck_batch_source_kind`
+        // refuses.
+        autoDetect: source.autoDetect,
         mode: source.mode,
         derivedFromBatchId: source.id,
         // Straight to `submitted`: there is nothing to attach, so a `draft` state

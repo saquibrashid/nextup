@@ -77,10 +77,58 @@ export type IntentSource = (typeof INTENT_SOURCES)[number];
 export const BATCH_SOURCES = [...SERVICES, ...DISCOVERY_SOURCES] as const;
 export type BatchSource = (typeof BATCH_SOURCES)[number];
 
+/**
+ * #396 (ADR-0010 Revision 6, PRD `A57`) — "Auto-detect": the owner imports
+ * WITHOUT naming a service first, and each title's service is looked up during
+ * review from TMDB watch providers.
+ *
+ * ⚠ **NOT A `BATCH_SOURCES` MEMBER, AND NOT A SERVICE OR A STOREFRONT.** An
+ * auto-detect batch has no truthful single service and no storefront, so it
+ * writes neither column: it is stored as `upload_batch.auto_detect = 1` with
+ * `service` and `discovery_source` both NULL (migration 0020,
+ * `ck_batch_source_kind`). Keeping it out of `BATCH_SOURCES` keeps that union
+ * meaning "a column value" — `T-SVC-001`/`T-WAIT-014b` pin it to exactly the
+ * services and the storefronts.
+ *
+ * ⚠ **APPEND-ONLY BY SOURCE TYPE.** A full update needs a named service,
+ * because removals are computed against ONE service's saved list (invariant
+ * 3). `modeRefusalFor('auto', 'full-update')` refuses it at the API boundary,
+ * and `ck_batch_auto_append_only` refuses it in the store.
+ */
+export const AUTO_DETECT_SOURCE = 'auto';
+export type AutoDetectSource = typeof AUTO_DETECT_SOURCE;
+
+/** Every value `POST /api/batches` accepts as `source`/`service` (#396). */
+export const CAPTURE_SOURCES = [...BATCH_SOURCES, AUTO_DETECT_SOURCE] as const;
+export type CaptureSource = (typeof CAPTURE_SOURCES)[number];
+
 /** Narrows a validated batch source to a discovery source (ADR-0010 D-2). */
-export function isDiscoverySource(source: BatchSource): source is DiscoverySource {
+export function isDiscoverySource(source: CaptureSource): source is DiscoverySource {
   return (DISCOVERY_SOURCES as readonly string[]).includes(source);
 }
+
+/** Narrows a validated capture source to auto-detect (#396). */
+export function isAutoDetectSource(source: CaptureSource): source is AutoDetectSource {
+  return source === AUTO_DETECT_SOURCE;
+}
+
+/**
+ * The outcome of one review-time service lookup (#396, `A57`), stored on
+ * `extraction_candidate.service_lookup_status`.
+ *
+ *  - `found`   TMDB lists at least one of the owner's services as streaming it.
+ *  - `none`    TMDB answered, and none of the owner's services streams it.
+ *  - `unknown` TMDB has no provider data for it — NOT KNOWN (ADR-0010 Trap 4),
+ *              so nothing is proposed and the owner picks.
+ *  - `failed`  the lookup threw (TMDB unreachable, timeout). Nothing proposed;
+ *              the owner picks or retries.
+ */
+export const SERVICE_LOOKUP_STATUSES = ['found', 'none', 'unknown', 'failed'] as const;
+export type ServiceLookupStatus = (typeof SERVICE_LOOKUP_STATUSES)[number];
+
+/** Where the owner sends an auto-detect title at review (#396). */
+export const AUTO_DESTINATION_KINDS = ['services', 'waiting'] as const;
+export type AutoDestinationKind = (typeof AUTO_DESTINATION_KINDS)[number];
 
 /**
  * `WatchIntent.state` — `specs/data-model.md` §17.1.

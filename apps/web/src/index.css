@@ -6100,6 +6100,84 @@ button {
   }
 }
 
+/*
+ * #396 (US-066 AC-1) — the Auto-detect source option. It leads the service
+ * picker in the same option style, on its own row at every width so the
+ * eight service tiles keep their grid (and the phone mockup's) underneath it.
+ */
+.service-option__auto {
+  display: grid;
+  row-gap: 2px;
+}
+
+/* Its own row at every width, so the eight services keep their grid below it. */
+.upload-flow .upload-step[data-step='1'] .segmented > label[data-service='auto'] {
+  grid-column: 1 / -1;
+}
+
+.service-option__auto-name {
+  font-weight: var(--weight-medium);
+}
+
+.service-option__auto-hint {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+}
+
+.mode-card__hint {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.auto-destination {
+  display: grid;
+  gap: var(--space-2);
+  margin-block-start: var(--space-2);
+}
+
+.auto-destination__lookup {
+  margin: 0;
+}
+
+.auto-destination__label,
+.auto-destination__tag {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  font-size: var(--text-sm);
+  padding-inline: var(--space-1);
+}
+
+.auto-destination__tag {
+  color: var(--color-text-muted);
+  margin-inline-start: var(--space-1);
+}
+
+.auto-destination__choices {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.auto-destination__services {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.auto-destination__waiting {
+  display: inline-flex;
+  gap: var(--space-1);
+  margin-block-start: var(--space-2);
+}
+
+.auto-destination__error {
+  margin: 0;
+}
+
 /* -------------------------------------------------- phone mockup (255) -- */
 
 /*
@@ -8209,4 +8287,15 @@ html[data-layout='phone'] .phone-review__group-head > .btn:hover,
 html[data-layout='phone'] .phone-review__row-body > .btn:hover,
 html[data-layout='phone'] .phone-review__card > .btn:hover {
   background: none;
+}
+
+/* #396 (US-066 AC-1) — on the phone the Auto-detect option spans the tile row. */
+html[data-layout='phone']
+  .upload-flow
+  .upload-step[data-step='1']
+  .segmented
+  > label[data-service='auto'] {
+  grid-column: 1 / -1;
+  justify-items: start;
+  text-align: start;
 }

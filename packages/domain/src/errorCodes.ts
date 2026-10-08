@@ -79,6 +79,22 @@ export const ERROR_CODES = [
   // refused just as firmly as the SPA. `T-WAIT-001b`/`c`.
   'FULL_UPDATE_NOT_AVAILABLE_FOR_SOURCE',
 
+  // ── Auto-detect capture (#396, `A57`, ADR-0010 Rev 6) ────────────────────
+  // ⚠ A full update with source `auto` reuses
+  // `FULL_UPDATE_NOT_AVAILABLE_FOR_SOURCE` above: it is the same refusal BY
+  // SOURCE TYPE, so it is the same code.
+  //
+  // Close refused: a non-skipped auto-detect title has no destination yet (its
+  // lookup failed, was inconclusive or went stale, and the owner has not
+  // picked services or Waiting to stream). 409 with `details.candidateIds`.
+  // Landing it anywhere would be a guess the owner never saw (US-066 AC-6).
+  'AUTO_DESTINATION_REQUIRED',
+  // A lookup or destination write sent to a batch that is not an auto-detect
+  // capture. A named-service or storefront batch has its destination fixed by
+  // its source; letting a per-title destination be written there would let one
+  // row land on a service the batch never captured.
+  'BATCH_NOT_AUTO_DETECT',
+
   // ── Upstream ─────────────────────────────────────────────────────────────
   'TMDB_WORK_NOT_FOUND',
   'TMDB_UNAVAILABLE',

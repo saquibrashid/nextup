@@ -315,6 +315,11 @@ export interface PhoneReviewProps {
   readonly onSearch?: ((query: string) => Promise<TmdbSearchResult[]>) | undefined;
   readonly onRescue?: ((candidateId: string) => Promise<void>) | undefined;
   readonly onManualEntry?: ((result: TmdbSearchResult) => Promise<void>) | undefined;
+  /**
+   * #396 (US-066) — extra per-title controls for the focused candidate: the
+   * auto-detect destination. Absent for every other review.
+   */
+  readonly renderExtra?: ((candidate: ReviewCandidate) => ReactNode) | undefined;
   /** §6.14 — a refused close opens the first still-pending candidate. */
   readonly pendingIds?: readonly string[] | null;
   /** Banners and recovery tools, drawn under the coverage card. */
@@ -367,6 +372,7 @@ export function PhoneReview({
   onSearch,
   onRescue,
   onManualEntry,
+  renderExtra,
   pendingIds = null,
   lead = null,
   tail = null,
@@ -504,6 +510,7 @@ export function PhoneReview({
             onSearch,
             onRescue,
             onManualEntry,
+            renderExtra,
             service,
             thumbnailUrlFor,
             focusHeading,
@@ -840,6 +847,7 @@ interface FocusContext {
   readonly onSearch: PhoneReviewProps['onSearch'];
   readonly onRescue: PhoneReviewProps['onRescue'];
   readonly onManualEntry: PhoneReviewProps['onManualEntry'];
+  readonly renderExtra: PhoneReviewProps['renderExtra'];
   readonly service: string | null;
   readonly thumbnailUrlFor: (candidate: ReviewCandidate) => string | null;
   readonly focusHeading: RefObject<HTMLHeadingElement | null>;
@@ -873,6 +881,7 @@ interface FocusContext {
     onSearch,
     onRescue,
     onManualEntry,
+    renderExtra,
     service,
     thumbnailUrlFor,
     focusHeading,
@@ -994,6 +1003,7 @@ interface FocusContext {
           {candidate.rawText === '' ? REVIEW_PHONE_NOTHING_READ : candidate.rawText}
         </p>
       </div>
+      {renderExtra?.(candidate)}
       {current === 'pending' && reason !== null && <p className="phone-review__reason">{reason}</p>}
       {thumbnailUrl !== null && (
         <a className="phone-review__source" href={thumbnailUrl} target="_blank" rel="noreferrer">

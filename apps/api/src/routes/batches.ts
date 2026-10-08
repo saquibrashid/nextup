@@ -22,6 +22,11 @@
  *      waiting list for removal on the second capture, every time, so a caller
  *      posting the request directly must be refused just as firmly as the SPA.
  *      `T-WAIT-001c` is the case that fails a UI-only guard.
+ *   4. **Auto-detect is append-only by source type too** (#396, ADR-0010
+ *      Rev 6, `A57`). `source: 'auto'` names no service, so a full update —
+ *      which removes against ONE service's saved list — is refused here the
+ *      same way (`T-AUTO-010`). An auto batch writes NEITHER source column
+ *      and sets `auto_detect` instead (`ck_batch_source_kind`).
  *
  * ⚠ `source` NAMES EITHER KIND OF ORIGIN, AND `service` IS THE LEGACY ALIAS.
  * A service batch and a discovery batch are the same shape at this endpoint;
@@ -35,7 +40,8 @@
 import { type Router } from 'express';
 import {
   BATCH_MODES,
-  BATCH_SOURCES,
+  CAPTURE_SOURCES,
+  autoDetectModeExplanation,
   discoveryModeExplanation,
   forcedModeFor,
   modeExplanation,
@@ -43,7 +49,7 @@ import {
   splitBatchSource,
   ulid,
   type BatchMode,
-  type BatchSource,
+  type CaptureSource,
 } from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
@@ -106,14 +112,14 @@ export function registerBatchRoutes(router: Router): void {
     // ⚠ `service` remains accepted as the field name so every existing client
     // and test keeps working; `source` is the name that can also carry a
     // discovery source. They are the same field, validated once against
-    // `BATCH_SOURCES`.
+    // `CAPTURE_SOURCES` — the batch sources plus `auto` (#396).
     //
     // ⚠ THE ERROR STILL NAMES `service`, DELIBERATELY. That is the field
     // `specs/api.md` §6.11 documents and the one `T-BATCH-010i`/`j` assert on.
     // Epic L needs this endpoint to ACCEPT a discovery source; renaming the
     // field it reports would be unrequested churn in a documented contract.
     const rawSource = body.source ?? body.service;
-    const source = requireEnum<BatchSource>(rawSource, 'service', BATCH_SOURCES);
+    const source = requireEnum<CaptureSource>(rawSource, 'service', CAPTURE_SOURCES);
     const mode = requireEnum<BatchMode>(body.mode, 'mode', BATCH_MODES);
     if (body.captureProtocol !== undefined && body.captureProtocol !== 1) {
       throw new AppError('VALIDATION_FAILED', 400, 'Unknown capture protocol.');
@@ -133,7 +139,7 @@ export function registerBatchRoutes(router: Router): void {
       });
     }
 
-    const { service, discoverySource } = splitBatchSource(source);
+    const { service, discoverySource, autoDetect } = splitBatchSource(source);
 
     const open = await findOpenUploadBatch(ownerId);
     if (open) {
@@ -144,7 +150,13 @@ export function registerBatchRoutes(router: Router): void {
         'OPEN_BATCH_EXISTS',
         409,
         'You already have a batch in progress. Finish or discard it before starting another.',
-        { batchId: open.id, service: open.service, mode: open.mode, status: open.status },
+        {
+          batchId: open.id,
+          service: open.service,
+          ...(open.autoDetect ? { autoDetect: true } : {}),
+          mode: open.mode,
+          status: open.status,
+        },
       );
     }
 
@@ -155,6 +167,7 @@ export function registerBatchRoutes(router: Router): void {
           id: ulid(),
           service,
           discoverySource,
+          autoDetect,
           mode,
           status: INITIAL_BATCH_STATUS,
           captureTracking: body.captureProtocol === 1 ? 'tracked' : 'unverified',
@@ -169,6 +182,7 @@ export function registerBatchRoutes(router: Router): void {
       batchId: batch.id,
       service,
       discoverySource,
+      ...(autoDetect ? { autoDetect: true } : {}),
       mode: batch.mode,
       status: batch.status,
       createdAt: batch.createdAt.toISOString(),
@@ -182,7 +196,9 @@ export function registerBatchRoutes(router: Router): void {
       modeExplanation:
         service !== null
           ? modeExplanation(mode, service)
-          : discoveryModeExplanation(discoverySource),
+          : discoverySource !== null
+            ? discoveryModeExplanation(discoverySource)
+            : autoDetectModeExplanation(),
     });
   });
 

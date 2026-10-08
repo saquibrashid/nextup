@@ -47,6 +47,11 @@ model UploadBatch {
   /// The rental storefront browsed, e.g. `fandango-at-home`.
   /// ⚠ NOT a `SERVICES` member and never to be widened into one.
   discoverySource String? @map("discovery_source") @db.NVarChar(64)
+  /// #396 — an AUTO-DETECT capture (migration `0020_auto_detect_source`):
+  /// BOTH `service` and `discoverySource` are NULL, and each title's service
+  /// is looked up at review. Always append-only (`ck_batch_auto_append_only`);
+  /// `ck_batch_source_kind` replaces the disabled `ck_batch_source_exclusive`.
+  autoDetect      Boolean @default(false, map: "df_batch_auto_detect") @map("auto_detect")
   status          String  @db.NVarChar(24)
   captureTracking String  @default("unverified", map: "df_batch_capture_tracking") @map("capture_tracking") @db.NVarChar(24)
 
@@ -603,6 +608,21 @@ model ExtractionCandidate {
   /// self-FK on the same table gives SQL Server a cascade path it refuses, and
   /// the pointer is only ever read within an already-loaded batch.
   collapsedIntoCandidateId String? @map("collapsed_into_candidate_id") @db.NVarChar(200)
+
+  /// #396 — AUTO-DETECT BATCHES ONLY (migration `0020_auto_detect_source`).
+  /// The review-time service lookup: `found` | `none` | `unknown` | `failed`,
+  /// NULL = never looked up. `serviceLookupIdentity` is the work it answered
+  /// for; a later match correction makes the answer stale, not wrong.
+  serviceLookupStatus   String?   @map("service_lookup_status") @db.NVarChar(16)
+  serviceLookupIdentity String?   @map("service_lookup_identity") @db.NVarChar(200)
+  serviceLookupAt       DateTime? @map("service_lookup_at") @db.DateTime2
+  /// The TMDB answer as JSON, written onto `title` at close (0019 columns).
+  lookedUpAvailableOn   String?   @map("looked_up_available_on") @db.NVarChar(Max)
+  lookedUpRentOn        String?   @map("looked_up_rent_on") @db.NVarChar(Max)
+  /// The OWNER'S choice: `services` + a JSON list, or `waiting`. NULL = follow
+  /// the looked-up proposal. ⚠ A proposal is never written here.
+  destinationKind       String?   @map("destination_kind") @db.NVarChar(16)
+  destinationServices   String?   @map("destination_services") @db.NVarChar(Max)
 
   createdAt DateTime @default(dbgenerated("SYSUTCDATETIME()"), map: "df_candidate_created") @map("created_at") @db.DateTime2
 

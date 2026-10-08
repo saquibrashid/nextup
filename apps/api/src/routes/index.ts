@@ -109,7 +109,12 @@ export function createApiRouter(): Router {
   // §6.17 — the review pass. Its own file: the batch lifecycle routes and the
   // review assembly share nothing but the batch id, and `batches.ts` is a
   // contended file that several lanes need to keep small.
-  registerBatchReviewRoutes(apiRouter);
+  // #396 — an auto-detect review looks each title's service up while the
+  // owner loads it: the owner's own request, never a timer (`T-CI-005`).
+  registerBatchReviewRoutes(
+    apiRouter,
+    () => new TmdbClient({ apiKey: process.env['TMDB_API_KEY'] ?? '' }),
+  );
   registerBatchRemovalRoutes(apiRouter);
   // §6.18/§6.19 — per-candidate disposition, correction and the bulk confirm.
   // Needs a TMDB client for the `reclassifyAsTitle` re-match; same per-request

@@ -2,7 +2,7 @@
 
 **Project:** nextup
 **Version:** Current v1 scope, including subsequent owner-approved promotions; remaining deferrals are in §11.2.
-**Status:** Approved scope with recorded amendments through US-065 / REQ-131 (`A56`). ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
+**Status:** Approved scope with recorded amendments through US-066 / REQ-132 (`A57`). ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
 **Inputs:** `docs/BRD.md`, the recorded owner decisions in the ADRs, and the original authoring-tree `Context/` documents. **The `Context/` tree is not supplied in this repository.** Its citations preserve provenance, not an instruction to invent missing source text. See `docs/current-release.md` for the owner decisions applied on 2026-09-17 and `docs/requirement-index.md` for reconciled reference authority.
 **Audience:** the implementer. Implementation will be performed by GitHub Copilot in autopilot mode (ASM-028, ASM-029, NFR-002, NFR-003, NFR-004). This document, together with the specs, IS the implementation input. Acceptance criteria are written to be executable and verifiable without asking a question.
 **No timeline.** Per A19 / ASM-027 this document contains no dates, durations, or sequencing commitments beyond dependency order.
@@ -107,6 +107,22 @@
 > | **4. Row-aligned Grid cards (#414, a defect fix)** | In Grid only, each waiting card is a subgrid of the list: a fixed 2:3 poster box, then title, rent chip, meta, availability, moved note, date block and the action on shared rows. An absent optional block leaves its row empty, so *Not interested* sits on one line at the bottom of every card in a row. Compact and the phone card list are unchanged. | Fix |
 >
 > **New in this document:** **US-065 / REQ-131** (Epic L), seven acceptance criteria. **Corrected in place:** US-043's out-of-scope line. **No migration** — the forecast is computed per request, so the order is applied in memory over the rows the waiting read already returns.
+---
+
+> ## ⚠ AMENDMENT — 2026-10-08 — `A57` (owner-approved): import without choosing a service — Auto-detect (#396)
+>
+> **The owner approved** (#396) uploading screenshots **without naming a service first**, with each title's service looked up afterwards — the way *Waiting to stream* already resolves availability (ADR-0010 Rev 2/3) and the Library flags moves (Rev 4). Design and rationale: ADR-0010 **Revision 6**.
+>
+> | Decision | What it changes | Kind |
+> |---|---|---|
+> | **1. Auto-detect is append-only, by source type** | `POST /api/batches` accepts `source: "auto"`. It is forced append-only; a full update is refused with `400 FULL_UPDATE_NOT_AVAILABLE_FOR_SOURCE` by the request's source, never by a client flag, and again by the store. A full update still needs a named service, because removals need one (invariant 3). Naming a service is unchanged. | **Instruction** |
+> | **2. The lookup runs during review, before commit** | Opening an auto-detect review looks up each matched title's providers (TMDB, the ADR-0010 alias mapping), at most 20 a request, serially; *Look up again* retries. Each proposed service is labelled **Looked up**. A failed lookup never blocks review: the title reads *Couldn't look up*, and the owner picks by hand or retries. Nothing lands until the owner closes the batch. | **Instruction** |
+> | **3. Several matches: every one pre-selected** | One listing and badge per confirmed service; the owner can untick any but the last. | **Instruction** |
+> | **4. No match: Waiting to stream is proposed** | A title on none of the owner's services is proposed for *Waiting to stream*; the owner can pick a service instead. TMDB having no provider data proposes nothing (not known, ADR-0010 Trap 4). | **Instruction** |
+> | **5. Auto-detect is the default source** | On desktop and the phone import, `/upload` opens on *Auto-detect, add only*. A named service is one tap away and still has no default mode; a full update is never a default. **US-003 AC-1/AC-2/AC-5 and §7.5 are amended in place.** | **Instruction** |
+> | **6. Close and freshness** | One transaction: a listing dated today per confirmed service (an existing one is a no-op), a waiting intent per title routed to Waiting, suppression re-checked on the work identity, the looked-up availability stored on the title. A confirmed title with no destination refuses the close (`409 AUTO_DESTINATION_REQUIRED`). **An auto close does not change any service's *last updated* date** (REQ-039): a partial, looked-up capture is not a refresh of a saved list, and marking it one would hide RSK-007. | **Instruction** |
+>
+> **New in this document:** **US-066 / REQ-132** (Epic B), nine acceptance criteria. **Corrected in place:** US-003 AC-1, AC-2 and AC-5; §7.4 (an owner-initiated metadata lookup — the non-owner process count stays **four**, because the lookup runs only inside the owner's request); §7.5 *Batch service*, *Batch mode* and *Service inference from image content*. **Migration `0020_auto_detect_source`** (additive). New error codes `AUTO_DESTINATION_REQUIRED` and `BATCH_NOT_AUTO_DETECT`.
 ---
 
 ## 1. Overview
@@ -358,11 +374,11 @@ Added at `A48` for **Epic L (v1.1)** — these terms have no meaning in v1:
 
 | # | Given | When | Then |
 |---|---|---|---|
-| AC-1 | The owner starts a new upload | The batch is being created | They must select exactly one supported service (US-061); the batch cannot be submitted without it (REQ-002). A factual service-update link may preselect its explicit service, never the mode |
-| AC-2 | The owner starts a new upload | The batch is being created | They must select exactly one mode from {append-only, full update}; there is no default that could be accepted by inaction, and the meaning of each mode is stated in the UI at the point of choice (REQ-003) |
+| AC-1 | The owner starts a new upload | The batch is being created | They must select exactly one supported service (US-061) **or Auto-detect** (US-066, `A57`); the batch cannot be submitted without one (REQ-002). Auto-detect is the preselected default; a factual service-update link may preselect its explicit service instead, never the mode. ~~"They must select exactly one supported service (US-061); the batch cannot be submitted without it (REQ-002). A factual service-update link may preselect its explicit service, never the mode"~~ *(superseded at `A57`)* |
+| AC-2 | The owner starts a new upload | The batch is being created | For a named service they must select exactly one mode from {append-only, full update}; there is no default that could be accepted by inaction, and the meaning of each mode is stated in the UI at the point of choice (REQ-003). Auto-detect (the default, `A57`) is always append-only by source — it can only add, and every title is reviewed before anything lands — so it answers the mode; a full update is never a default. ~~"They must select exactly one mode from {append-only, full update}; there is no default that could be accepted by inaction …"~~ *(superseded at `A57`)* |
 | AC-3 | A batch in `full update` mode | It is submitted | Its reconciliation affects only listings for the single selected service (REQ-002) |
 | AC-4 (edge) | Screenshots from two different services attached to one batch | The batch is processed | All extracted candidates are attributed to the one selected service; the owner is expected to discard the foreign ones during review. nextup does not detect or split them |
-| AC-5 (failure) | Any image whose content identifies a service | Extraction runs | The service assignment is taken **only** from the owner's selection. nextup MUST NOT infer, override, or warn-and-change the service based on image content (REQ-058) |
+| AC-5 (failure) | Any image whose content identifies a service | Extraction runs | The service assignment is taken **only** from the owner's selection — for Auto-detect, the services the owner confirms at review from a TMDB provider lookup of the matched work (US-066). nextup MUST NOT infer, override, or warn-and-change the service based on image content (REQ-058) |
 | AC-6 | A batch already submitted | The owner attempts to change its service or mode | The change is rejected; service and mode are immutable after submission |
 
 **Out of scope for this story:** services outside US-061's closed eight-service set (REQ-127), per-image service assignment.
@@ -1494,6 +1510,41 @@ waiting order across visits (the URL carries it, as in the Library); any
 change to which availability sentence a row shows.
 **Open questions:** none.
 
+#### US-066 — Import without choosing a service first (Auto-detect)
+
+**REQ-132 (`must`, owner-approved `A57`, 2026-10-08, #396).** The owner can
+upload screenshots without naming a service. Each extracted title's service is
+looked up from TMDB watch providers during review, before commit, labelled as
+looked up, and confirmed or changed by the owner; a title on none of the
+owner's services is proposed for *Waiting to stream*. Auto-detect is
+append-only by source type and is the default upload source. Design:
+ADR-0010 Revision 6.
+
+**As** the owner
+**I want** to drop in screenshots without first saying which service they came from
+**So that** a mixed or unlabelled capture still lands on the right services, with me confirming each one
+
+**Traces to:** REQ-132, REQ-002, REQ-003, REQ-039, REQ-058, REQ-071, REQ-084
+**Priority:** must
+**Epic:** B
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | The owner opens `/upload` (desktop or phone) with no service in the URL | It renders | *Auto-detect* is selected and the mode reads *add only*; the eight named services are still offered, and choosing one asks the mode as before (US-003). A service-update link still preselects its service, not Auto-detect |
+| AC-2 (failure) | Auto-detect is the source | The owner looks at the modes, or a client sends `source: "auto"` with `mode: "full-update"` | *Full update* is disabled with the reason (it needs the one service whose list is compared). The API refuses with `400 FULL_UPDATE_NOT_AVAILABLE_FOR_SOURCE` by the request's source, whatever else the body says; the store refuses it again |
+| AC-3 | An auto-detect batch's review | It opens | Each matched title's providers are looked up (at most 20 a request, serially), and every proposed service is shown labelled **Looked up**, never as captured. Nothing is added to the list |
+| AC-4 | A title streaming on several of the owner's services | The review shows it | Every one is pre-selected; the owner can untick any but the last; each confirmed service becomes its own listing and badge on close |
+| AC-5 | A title on none of the owner's services | The review shows it | *Waiting to stream* is proposed; the owner can pick a service instead. A title with no provider data at all proposes nothing (not known, ADR-0010 Trap 4) |
+| AC-6 (failure) | A lookup fails or times out | The review shows the title | It reads *Couldn't look up*; the review is not blocked; the owner picks a service or Waiting by hand, or presses *Look up again*, which retries only titles that need it, on the owner's request |
+| AC-7 | The owner closes an auto-detect batch | Every confirmed title has a destination | In one transaction: a listing dated today per confirmed service (an existing active listing on that service is a no-op), a waiting intent per title routed to Waiting, suppressed works (by work identity) neither listed nor sent to Waiting, the looked-up availability stored on the title |
+| AC-8 (failure) | A confirmed title has neither a looked-up proposal nor an owner choice | The owner closes the batch | The close is refused whole with `409 AUTO_DESTINATION_REQUIRED` naming the titles; nothing is written. A discarded title needs no destination |
+| AC-9 (edge) | An auto-detect batch has closed | The FreshnessStrip and undo are read | No service's *last updated* date changes (REQ-039: a partial, looked-up capture is not a refresh). Undo of a batch that sent any title to Waiting is refused with the reason |
+
+**Out of scope for this story:** full update without a named service; reading
+the service from the image (REQ-058 stays prohibited); a background or
+scheduled lookup; changing a closed batch's destinations.
+**Open questions:** none.
+
 #### Required amendment to Epic K — completed at TASK-187
 
 US-036 AC-2 and the closed process enumeration now permit **four** processes,
@@ -2088,6 +2139,13 @@ Implementation contract: `specs/title-category.md`; named tests in `specs/testin
   It runs only inside the owner's request, so it is **not** a non-owner process
   and the count below stays four. It is in the mutating-route registry because
   it writes.
+- *Auto-detect service lookup* (US-066 AC-3/AC-6, REQ-132, `A57`, ADR-0010
+  Rev 6): opening an auto-detect review, or the owner's *Look up again*,
+  synchronously looks up at most `REVIEW_SERVICE_LOOKUP_PER_REQUEST` (20)
+  candidates' providers, serially, and writes that batch's candidate lookup
+  columns only. It creates no listing or intent, changes no ordering or badge,
+  and proposes only — what lands is decided by the owner and applied by item 1.
+  It runs only inside the owner's request, so the count below stays four.
 
 ~~Superseded: entries 1–8 only, before the manual list edits were added.~~ The
 amendment was made because a **false extraction** — a title the services never
@@ -2117,15 +2175,15 @@ Anything not on these lists is **forbidden by default**. REQ-041 has already bee
 
 | Input | Rule | On violation |
 |---|---|---|
-| Batch service | Required, exactly one supported service from US-061 (REQ-002/127) | Batch cannot be submitted |
-| Batch mode | Required, exactly one of {append-only, full update}, no accept-by-inaction default (REQ-003) | Batch cannot be submitted |
+| Batch service | Required: exactly one supported service from US-061 (REQ-002/127), **or Auto-detect** (`source: "auto"`, US-066, `A57`) — the default, storing neither a service nor a storefront. ~~"Required, exactly one supported service from US-061 (REQ-002/127)"~~ | Batch cannot be submitted |
+| Batch mode | Required, exactly one of {append-only, full update}, no accept-by-inaction default for a named service (REQ-003). Auto-detect and storefront sources are forced append-only by source type (`A57`, `A48`) | Batch cannot be submitted; a full update with Auto-detect or a storefront is `400 FULL_UPDATE_NOT_AVAILABLE_FOR_SOURCE` |
 | Images | At least one; PNG, JPEG or HEIC/HEIF (ASM-058, A42 — was PNG/JPEG only under falsified ASM-034); multiple permitted (REQ-004). HEIC/HEIF is transcoded to PNG server-side on ingest (neither reader accepts it), and EXIF/GPS is stripped on ingest (US-004 AC-7, AC-8) | Non-conforming file rejected at attach time, with the accepted formats named |
 | **Input path** *(new — A45, US-004 AC-1/AC-12/AC-13/AC-14)* | An image may enter a batch by **clipboard paste** (primary), **file selection**, or **drag-and-drop**. All three MUST be available where the platform supports them, MUST be mixable within one batch, and MUST converge on the **same server-side ingest pipeline** (US-004 AC-17). **File selection MUST remain a complete path on its own** — paste is an addition, never a replacement | A paste that yields no image representation is refused with the same named-formats message as a bad file (US-004 AC-4, AC-15); the batch is unchanged |
 | **Clipboard read availability** *(new — A45, US-004 AC-16)* | `navigator.clipboard` requires a **secure context — HTTPS**. Every deployed environment MUST be HTTPS. iOS clipboard read requires **iOS 13.4+** | The paste affordance is hidden or disabled with a stated reason; **file selection remains fully functional**. Never a dead button, never a state with no way to add an image |
 | **Clipboard read rejection** *(new — A45, US-004 AC-15)* | An iOS clipboard read **rejects silently** on any stray tap, tab switch or backgrounding, and the system callout is **never remembered** | The pending state MUST be exited within a bounded time, the outcome stated plainly, and both paste and upload re-offered. **No indefinite spinner, no generic error, no automatic retry** |
 | **Image pixel dimensions** *(new — A43, US-004 AC-9)* | `width × height` MUST be `≤ NEXTUP_MAX_DECODE_PIXELS` — **25,000,000 at the as-designed 0.25 vCPU / 0.5 GiB**, 50,000,000 only if the memory remedy has been taken — and each dimension MUST be `≥ 50` and `≤ 16,000`. Read from the container header (HEIF `ispe` / PNG IHDR / JPEG SOFn) **before any decode buffer is allocated**. A byte ceiling is NOT a substitute. **The pixel limit and the container memory size move together, always** (`runbooks/scale-up-memory.md` §2) | That **one** file rejected with `IMAGE_TOO_LARGE_TO_DECODE`, naming its megapixels, the limit, the cause (container memory) and the remedy. **The rest of the batch still processes** (US-004 AC-10, AC-11) |
 | **Unparseable image header** *(new — A43)* | The header MUST be parseable to obtain dimensions | That one file rejected. Never "decode and find out" |
-| Service inference from image content | **Prohibited** (REQ-058) | N/A — the capability must not be built |
+| Service inference from image content | **Prohibited** (REQ-058). Auto-detect's TMDB provider lookup of the matched work (US-066) is not image inference: nothing about the service is read from the image | N/A — the capability must not be built |
 | Removal group confirmation | Explicit; never implied by closing the batch (REQ-020) | Removals are not applied |
 | Fix-match target | Must be a TMDB work | Refused with the reason (US-030 AC-4, AC-5) |
 

@@ -88,25 +88,34 @@ for (const width of [390, 320]) {
       ).toBeVisible();
       const stepper = page.getByRole('list', { name: 'Import steps' });
       await expect(stepper).toBeVisible();
-      await expect(stepper.locator('[aria-current="step"]')).toContainText('Service');
+      // #396 (`A57`): the screen opens on Auto-detect (add only) — both
+      // questions answered — so no step is current until Continue.
+      await expect(stepper.locator('[aria-current="step"]')).toHaveCount(0);
 
       // The screenshots screen is not on this one: it waits behind Continue.
       await expect(page.getByTestId('dropzone')).toBeHidden();
       await expect(page.getByTestId('submit-button')).toBeHidden();
-      await expect(page.getByRole('radio', { checked: true })).toHaveCount(0);
+      await expect(page.getByTestId('service-option-auto').getByRole('radio')).toBeChecked();
+      await expect(page.getByTestId('mode-card-append-only').getByRole('radio')).toBeChecked();
+      await expect(page.getByTestId('mode-card-full-update').getByRole('radio')).toBeDisabled();
+      await expect(page.getByTestId('auto-detect-full-update-hint')).toBeVisible();
 
       const next = page.getByTestId('import-continue');
-      await expect(next).toBeDisabled();
-      await expect(page.getByTestId('import-continue-reason')).toBeVisible();
+      await expect(next).toBeEnabled();
       await expectTarget(page.getByTestId('import-close'));
 
+      // Eight services plus Auto-detect, every one a full-size target.
       const tiles = page.getByTestId('service-step').locator('label');
-      await expect(tiles).toHaveCount(8);
+      await expect(tiles).toHaveCount(9);
       for (const tile of await tiles.all()) await expectTarget(tile);
       await expectNoSeriousAxe(page);
       await expectNoOverflow(page);
 
+      // Naming a service asks the mode question again; Continue waits, and says why.
       await page.getByRole('radio', { name: 'Netflix', exact: true }).check();
+      await expect(stepper.locator('[aria-current="step"]')).toContainText('Mode');
+      await expect(next).toBeDisabled();
+      await expect(page.getByTestId('import-continue-reason')).toBeVisible();
       await page.getByTestId('mode-card-append-only').getByRole('radio').check();
       await expect(next).toBeEnabled();
       await expect(page.getByTestId('import-continue-reason')).toHaveCount(0);

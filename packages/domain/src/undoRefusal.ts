@@ -17,9 +17,16 @@
  */
 export type UndoRefusalCurrentState = 'active' | 'removed' | 'suppressed';
 
-/** Why the batch could not be undone in one step. */
+/**
+ * Why the batch could not be undone in one step.
+ *
+ * `waiting-routed` (#396, `A57`): an auto-detect import sent at least one
+ * title to Waiting to stream. That intent is a search-shaped row with no batch
+ * link (`ck_intent_source_batch_coherent`), so undo cannot find it to reverse
+ * it, and discarding its title would orphan it. Refused, never half-undone.
+ */
 export type UndoRefusalReason =
-  'modified-or-removed' | 'later-owner-edits' | 'provenance-unavailable';
+  'modified-or-removed' | 'later-owner-edits' | 'provenance-unavailable' | 'waiting-routed';
 
 export interface UndoRefusalCreatedEntry {
   titleId: string;

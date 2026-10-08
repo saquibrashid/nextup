@@ -17,7 +17,7 @@
  * before picking a service, and the screenshot is often no longer on the
  * clipboard to paste again.
  */
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -67,6 +67,9 @@ describe('T-UX-040 /upload initial state', () => {
     // submit — so asserting the sentence alone would pass under BOTH the old
     // and the new wording. Its location is the whole point.
     await mountInitial();
+    // #396 (`A57`): /upload opens on Auto-detect (add only); naming a service
+    // re-asks the mode, which is the unanswered state this case is about.
+    fireEvent.click(screen.getByTestId('service-option-netflix').querySelector('input')!);
 
     const reason = screen.getByTestId('submit-reason');
     expect(reason).toHaveTextContent(SUBMIT_NEEDS_SELECTION);

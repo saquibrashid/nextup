@@ -1,10 +1,15 @@
 import { Input } from '../components/ui/Input';
 // `/upload` step 1 - service and mode (specs/ui.md §3.1, TASK-049).
 //
-// Two required choices, NEITHER defaulted (US-003 AC-1/AC-2, REQ-002/REQ-003).
-// A default here would be accepted by inaction, and the default that would
-// matter - full update - proposes removals. So both controls start empty and
-// step 2 stays shut until each is answered.
+// Two required choices. The SOURCE defaults to Auto-detect (#396, US-066 AC-1,
+// PRD `A57`), and Auto-detect is add-only BY SOURCE (`forcedModeFor`), so the
+// default answers the mode too — and the answer it gives can remove nothing.
+// The MODE is never defaulted for a named service (US-003 AC-1/AC-2,
+// REQ-002/REQ-003): the default that would matter - full update - proposes
+// removals, so for a named service the mode starts empty and must be answered.
+//
+// ~~Superseded at `A57`: "Two required choices, NEITHER defaulted. … both
+// controls start empty and step 2 stays shut until each is answered."~~
 //
 // ── Why the mode control is two cards and not a bare radio ──────────────────
 //
@@ -34,22 +39,30 @@ import { Button } from '../components/ui/Button';
 import { UploadStep, type UploadStepState } from '../components/UploadStep';
 import { ServiceMark } from '../components/ServiceMark';
 import {
+  AUTO_DETECT_LABEL,
+  AUTO_DETECT_SOURCE,
   BATCH_MODES,
   DISCOVERY_SOURCES,
   SERVICES,
   SERVICE_LABELS,
+  autoDetectModeExplanation,
   batchSourceLabel,
   discoveryModeExplanation,
+  forcedModeFor,
+  isAutoDetectSource,
   isDiscoverySource,
   modeExplanation,
   modeRefusalFor,
+  splitBatchSource,
   type BatchMode,
-  type BatchSource,
+  type CaptureSource,
 } from '@nextup/domain';
 import { CaptureProgress } from '../components/CaptureProgress';
 import { PlusIcon, RefreshIcon } from '../components/icons';
 
 import {
+  AUTO_DETECT_OPTION_HINT,
+  AUTO_DETECT_FULL_UPDATE_HINT,
   IMPORT_MODE_HEADING,
   IMPORT_SERVICE_HEADING,
   MODE_APPEND_ONLY_LABEL,
@@ -74,12 +87,20 @@ import {
  * than inventing a second field the server would have to reconcile.
  */
 export interface BatchDraftSelection {
-  readonly service: BatchSource | null;
+  /** #396 — may be `'auto'`: no service named, each title is looked up. */
+  readonly service: CaptureSource | null;
   readonly mode: BatchMode | null;
 }
 
 export interface UploadPageProps {
-  readonly initialService?: BatchSource | null;
+  readonly initialService?: CaptureSource | null;
+  /**
+   * #396 — `initialService` is the DEFAULT (Auto-detect), not a source the
+   * owner or a link named. The default is selected but its step stays open,
+   * so the named services are on screen beside it rather than behind a
+   * `Change`; the first explicit choice answers the step as usual.
+   */
+  readonly initialDefaulted?: boolean;
   /** Notified on every change so step 2 can enable itself. */
   readonly onSelectionChange?: (selection: BatchDraftSelection) => void;
   /**
@@ -112,7 +133,12 @@ const MODE_LABELS: Readonly<Record<BatchMode, string>> = {
  * Append-only names no service at all, so the replace is a no-op for it by
  * construction rather than by a branch that could rot.
  */
-export function modeConsequence(mode: BatchMode, service: BatchSource | null): string {
+export function modeConsequence(mode: BatchMode, service: CaptureSource | null): string {
+  if (service !== null && isAutoDetectSource(service)) {
+    return mode === 'append-only'
+      ? autoDetectModeExplanation()
+      : (modeRefusalFor(service, mode) ?? '');
+  }
   if (service !== null && isDiscoverySource(service)) {
     return mode === 'append-only'
       ? discoveryModeExplanation(service)
@@ -128,9 +154,11 @@ export function modeConsequence(mode: BatchMode, service: BatchSource | null): s
 export function UploadPage({
   onSelectionChange,
   initialService = null,
+  initialDefaulted = false,
   phone = false,
 }: UploadPageProps = {}): JSX.Element {
-  const [service, setService] = useState<BatchSource | null>(initialService);
+  const [service, setService] = useState<CaptureSource | null>(initialService);
+  const [defaulted, setDefaulted] = useState(initialDefaulted);
   /*
    * ⚠ A storefront has exactly one permitted mode (ADR-0010 D-2), so it is
    * answered for the owner rather than asked. The server refuses anything
@@ -138,7 +166,7 @@ export function UploadPage({
    * question with one legal answer.
    */
   const [mode, setMode] = useState<BatchMode | null>(
-    initialService !== null && isDiscoverySource(initialService) ? 'append-only' : null,
+    initialService !== null ? forcedModeFor(initialService) : null,
   );
   const [storefrontsOpen, setStorefrontsOpen] = useState(
     initialService !== null && isDiscoverySource(initialService),
@@ -172,26 +200,24 @@ export function UploadPage({
      */
     const changedService = next.service !== undefined && next.service !== service;
     const nextService = next.service !== undefined ? next.service : service;
+    const forced = nextService !== null ? forcedModeFor(nextService) : null;
     const nextMode =
-      nextService !== null && isDiscoverySource(nextService)
-        ? 'append-only'
-        : next.mode !== undefined
-          ? next.mode
-          : changedService
-            ? null
-            : mode;
+      forced !== null ? forced : next.mode !== undefined ? next.mode : changedService ? null : mode;
     setService(nextService);
     setMode(nextMode);
+    setDefaulted(false);
     setReopened(null);
     onSelectionChange?.({ service: nextService, mode: nextMode });
   }
 
   const serviceState: UploadStepState =
-    service !== null && reopened !== 'service' ? 'done' : 'active';
+    service !== null && !defaulted && reopened !== 'service' ? 'done' : 'active';
   const modeState: UploadStepState =
     service === null ? 'locked' : mode !== null && reopened !== 'mode' ? 'done' : 'active';
   const modeLocked = modeState === 'locked';
-  const storefront = service !== null && isDiscoverySource(service);
+  /** A storefront or auto-detect source has one legal mode (`forcedModeFor`). */
+  const forcedMode = service !== null ? forcedModeFor(service) : null;
+  const autoDetect = service !== null && isAutoDetectSource(service);
 
   return (
     <>
@@ -208,7 +234,7 @@ export function UploadPage({
         legend={phone ? IMPORT_SERVICE_HEADING : SERVICE_STEP_LEGEND}
         flat={phone}
         state={serviceState}
-        answer={service === null ? null : batchSourceLabel(splitSource(service))}
+        answer={service === null ? null : batchSourceLabel(splitBatchSource(service))}
         onChange={() => {
           setReopened('service');
         }}
@@ -217,6 +243,31 @@ export function UploadPage({
       >
         {/* Native radios: real group semantics and roving focus for free. */}
         <SegmentedControl legend={SERVICE_STEP_LEGEND} testId="service-step" hideLegend>
+          {/*
+            #396 (US-066 AC-1) — FIRST and the default: "I don't know / it's
+            several", answered by a lookup at review. Same option style as the
+            services beside it, so the picker keeps its look on the phone.
+          */}
+          <label
+            data-service={AUTO_DETECT_SOURCE}
+            data-testid={`service-option-${AUTO_DETECT_SOURCE}`}
+          >
+            <Input
+              type="radio"
+              name={serviceGroup}
+              value={AUTO_DETECT_SOURCE}
+              checked={service === AUTO_DETECT_SOURCE}
+              onChange={() => {
+                choose({ service: AUTO_DETECT_SOURCE });
+              }}
+            />
+            <span className="service-option__auto">
+              <span className="service-option__auto-name">{AUTO_DETECT_LABEL}</span>
+              <span className="service-option__auto-hint" data-testid="auto-detect-hint">
+                {AUTO_DETECT_OPTION_HINT}
+              </span>
+            </span>
+          </label>
           {SERVICES.map((candidate) => (
             <label
               key={candidate}
@@ -261,7 +312,7 @@ export function UploadPage({
                     choose({ service: candidate });
                   }}
                 />
-                <span>{batchSourceLabel(splitSource(candidate))}</span>
+                <span>{batchSourceLabel(splitBatchSource(candidate))}</span>
               </label>
             ))}
           </SegmentedControl>
@@ -307,7 +358,7 @@ export function UploadPage({
                 name={modeGroup}
                 value={candidate}
                 checked={mode === candidate}
-                disabled={modeLocked || (storefront && candidate !== 'append-only')}
+                disabled={modeLocked || (forcedMode !== null && candidate !== forcedMode)}
                 aria-describedby={modeLocked ? modeHintId : undefined}
                 onChange={() => {
                   choose({ mode: candidate });
@@ -331,19 +382,19 @@ export function UploadPage({
               <p data-testid={`mode-card-${candidate}-consequence`}>
                 {modeConsequence(candidate, service)}
               </p>
+              {/*
+                #396 — why the full update is unavailable, and the way out:
+                name the service. Always visible, like the consequence.
+              */}
+              {autoDetect && candidate === 'full-update' && (
+                <p className="mode-card__hint" data-testid="auto-detect-full-update-hint">
+                  {AUTO_DETECT_FULL_UPDATE_HINT}
+                </p>
+              )}
             </label>
           ))}
         </SegmentedControl>
       </UploadStep>
     </>
   );
-}
-
-function splitSource(source: BatchSource): {
-  service: string | null;
-  discoverySource: string | null;
-} {
-  return isDiscoverySource(source)
-    ? { service: null, discoverySource: source }
-    : { service: source, discoverySource: null };
 }

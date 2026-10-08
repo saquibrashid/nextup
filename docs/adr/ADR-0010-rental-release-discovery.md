@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Accepted; promoted to v1 at A52 (2026-09-08). Revised at #378 (Revision 2), #380 (Revision 3), #397/#410 (Revision 4, `A54`) and `A55` (Revision 5, below).** ~~"Revised at #378 (Revision 2) and #380 (Revision 3, below)."~~ ~~"… and #397/#410 (Revision 4, `A54`, below)."~~ Implementation and remaining acceptance work are tracked in `docs/status.md`. |
+| **Status** | **Accepted; promoted to v1 at A52 (2026-09-08). Revised at #378 (Revision 2), #380 (Revision 3), #397/#410 (Revision 4, `A54`), `A55` (Revision 5) and #396 (Revision 6, `A57`, below).** ~~"… and `A55` (Revision 5, below)."~~ ~~"Revised at #378 (Revision 2) and #380 (Revision 3, below)."~~ ~~"… and #397/#410 (Revision 4, `A54`, below)."~~ Implementation and remaining acceptance work are tracked in `docs/status.md`. |
 | **Date** | 2026-08-20 |
 | **Deciders** | owner (`A48` — the requirement and both design choices), coordinator |
 | **Forced by** | **`A48`**, REQ-082…REQ-087, REQ-041, REQ-070/071/073, REQ-048, NFR-010, NFR-013, NFR-014, ADR-0007 |
@@ -305,6 +305,110 @@ the work identity, active rows, an unchanged signature). A refused row changes
 nothing and blocks no other. Bulk *Add to Library* uses the first owner service
 in `SERVICES` order the title streams on. **No migration.** Test ids:
 `specs/testing.md`, US-064 (`T-AVREV-*`).
+
+## Revision 6 — import without choosing a service (#396, `A57`, owner-approved 2026-10-08)
+
+The owner approved (#396, PRD `A57`, US-066, REQ-132) uploading screenshots
+**without naming a service first** and resolving each title's service
+afterwards by lookup — the way *Waiting to stream* already resolves
+availability (Revision 2/3) and the Library flags moves (Revision 4). The new
+upload source is **Auto-detect**. The issue's seven questions, answered:
+
+**Q1 — Mode. Auto-detect is append-only, by source type.** A full update
+reconciles ONE service's saved list (invariant 3), and an auto-detect capture
+has no single service whose list it could be, so removals have nothing to be
+proposed against. `forcedModeFor('auto')` is `append-only` and
+`modeRefusalFor('auto', 'full-update')` refuses with the reason —
+exactly the storefront rule (Revision 1, `T-WAIT-001c`). The API refuses a full
+update **by the request's `source`**, never by a client flag, with the existing
+`400 FULL_UPDATE_NOT_AVAILABLE_FOR_SOURCE` (`T-AUTO-010`), and the store
+refuses it again (`ck_batch_auto_append_only`, `T-AUTO-012b`). Naming a
+service stays fully available and unchanged, for both modes.
+
+**Q2 — When the lookup runs. During review, before commit, on the owner's
+request.** Opening the review of an auto-detect batch looks up, serially, at
+most `REVIEW_SERVICE_LOOKUP_PER_REQUEST` (20) matched candidates that were
+never looked up or whose match was corrected since; *Look up again*
+(`POST /api/batches/:batchId/service-lookup`) retries the failed and
+inconclusive ones. It is the same TMDB `/watch/providers` call, in the same
+stored region, through the same `flaggedProvidersFor` alias mapping as
+Revisions 2–5 — no second provider-mapping path — with the TMDB client's own
+timeouts and budget. A thrown or timed-out call is stored as `failed` and never
+fails the review. The cap is declared on its own, not derived from
+`AVAILABILITY_REFRESH_PER_REQUEST` or `AVAILABILITY_CHECK_BATCH` (Trap 5).
+
+**Q3 — Several matches. Every match is pre-selected.** A title streaming on
+two of the owner's services proposes both, in `SERVICES` order; each confirmed
+service becomes its own `ServiceListing` and badge. The owner can untick any,
+but not the last — clearing every service is not a destination; the owner
+chooses *Waiting to stream* instead.
+
+**Q4 — No match. Waiting to stream is proposed.** `none` (TMDB has provider
+data and none of it is the owner's) proposes *Waiting to stream*, as a
+storefront capture would. ⚠ `unknown` (TMDB has **no** provider data) proposes
+**nothing**: it is NOT KNOWN (Trap 4), and proposing Waiting would claim "on
+none of your services". A `failed`, `unknown` or stale lookup reads *Couldn't
+look up*; the owner picks a service or Waiting by hand, or retries.
+
+**Q5 — Data model. One additive migration (`0020_auto_detect_source`).**
+`upload_batch.auto_detect BIT NOT NULL DEFAULT 0`; an auto batch stores
+**neither** `service` nor `discovery_source`. The old rule
+`ck_batch_source_exclusive` (exactly one is set) cannot be dropped
+(`T-MIG-001`), so the migration adds `ck_batch_source_kind` — the old rule for
+every `auto_detect = 0` row plus "both null" for `auto_detect = 1` — **WITH
+CHECK** over every existing row, and only then sets the old constraint
+`NOCHECK`. It stays in the catalog; nothing it refused becomes writable except
+the auto shape (`T-AUTO-006c`). Seven nullable columns on
+`extraction_candidate` hold the lookup (`service_lookup_status`,
+`service_lookup_identity`, `service_lookup_at`, `looked_up_available_on`,
+`looked_up_rent_on`) and the owner's choice (`destination_kind`,
+`destination_services`), each shape enforced by a CHECK (`ISJSON` for the
+lists). The domain value `auto` is a **capture source** (`CAPTURE_SOURCES`), not
+a stored `BatchSource`. Every service-scoped call site (`requireServiceOf`,
+reconciliation, the full-update path) refuses an auto batch loudly rather than
+borrowing a service.
+
+**Q5a — Close.** One transaction, after `PENDING_ADDITIONS` and before any
+write: a confirmed title with no destination refuses the **whole** close with
+`409 AUTO_DESTINATION_REQUIRED` naming the candidates. Then, per title, a
+listing dated today for each confirmed service (an existing active listing on
+that service is a no-op; a new service adds a badge and keeps the earliest
+date), or a waiting intent shaped as the search path's (`discovery_source =
+'search'`, no source batch, since the intent CHECKs cannot be widened
+additively). Suppression is re-checked on the work identity (invariant 1). The
+looked-up answer is written onto `title` (and the intent) through
+`updateTitleAvailability` / `updateWatchIntentAvailability`, so the Library
+does not immediately re-flag a title the owner just placed. Undo of a batch
+that sent anything to Waiting is refused (`waiting-routed`): the intents are
+not batch-scoped and are removed from the Waiting view, never by undo.
+
+**Q5b — FreshnessStrip (REQ-039). An auto close writes NO `ServiceState`.**
+The per-service "last updated" date is a claim that the owner refreshed that
+service's saved list. An auto-detect capture is a partial, add-only set of
+titles whose services were looked up, not read from any saved list; marking
+those services updated would hide exactly the staleness RSK-007 exists to
+show. The storefront batch is the precedent (it writes none either). A named
+append-only batch still writes it, unchanged.
+
+**Q6 — Background processes. None added.** Both lookups run only inside the
+owner's own request (opening the review, *Look up again*). They write candidate
+lookup columns only — no listing, intent, ordering or badge — and nothing is
+added to the list until the owner closes the batch. PRD §7.4 lists them as an
+owner-initiated metadata lookup; the count of non-owner processes stays
+**four** (`T-CI-005`).
+
+**Q7 — Trust and labelling. Looked up, never captured.** Every proposed service
+carries the label *Looked up* — never presented as read from the screenshot —
+and a failed lookup reads *Couldn't look up*; the owner confirms or changes
+every destination before close. ⚠ This is **not**
+service inference from image content (REQ-058 stays prohibited): the service
+comes from a provider lookup for the matched work, never from logos, colours
+or layout in the image. Auto-detect is the **default** source on the upload
+screen (desktop and phone), because it can only add, and every title is
+reviewed before anything lands; a full update is never a default, and a named
+service still has no default mode (US-003 AC-2, amended at `A57`).
+
+Test ids: `specs/testing.md`, US-066 (`T-AUTO-*`).
 
 ## Consequences
 

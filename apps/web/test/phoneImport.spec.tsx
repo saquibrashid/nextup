@@ -95,11 +95,22 @@ function stepStates(): (string | null)[] {
 }
 
 describe('T-PHONE-008 — the phone import is two screens, and Continue says why it waits', () => {
-  it('T-PHONE-008a: the first screen asks the two questions with nothing pre-chosen', async () => {
+  it('T-PHONE-008a: the first screen asks the two questions, starting on Auto-detect (add only)', async () => {
     mountUpload();
     expect(await screen.findByRole('heading', { level: 1, name: IMPORT_PHONE_TITLE })).toBeTruthy();
-    expect(stepStates()).toEqual(['current', 'upcoming', 'upcoming']);
-    // ⚠ No mode is agreed to by default (US-003): the owner taps one.
+    /*
+     * #396 (`A57`, US-066 AC-1) — the capture starts on Auto-detect, which is
+     * add-only BY SOURCE: nothing a default can remove. A full update is still
+     * never agreed to by default (US-003): it needs a named service first.
+     */
+    expect(stepStates()).toEqual(['done', 'done', 'upcoming']);
+    expect(screen.getByTestId('service-option-auto').querySelector('input')).toBeChecked();
+    expect(within(screen.getByTestId('mode-card-append-only')).getByRole('radio')).toBeChecked();
+    expect(within(screen.getByTestId('mode-card-full-update')).getByRole('radio')).toBeDisabled();
+    expect(screen.getByTestId('images-step-panel').closest('[hidden]')).not.toBeNull();
+    // Naming a service re-asks the mode, and Continue says why it waits.
+    fireEvent.click(screen.getByRole('radio', { name: 'Netflix' }));
+    expect(stepStates()).toEqual(['done', 'current', 'upcoming']);
     const modes = screen
       .getAllByRole('radio')
       .filter((radio) => radio.closest('[data-testid^="mode-card-"]'));
@@ -107,7 +118,6 @@ describe('T-PHONE-008 — the phone import is two screens, and Continue says why
     for (const mode of modes) expect(mode).not.toBeChecked();
     expect(screen.getByTestId('import-continue')).toBeDisabled();
     expect(screen.getByTestId('import-continue-reason')).toHaveTextContent(SUBMIT_NEEDS_SELECTION);
-    expect(screen.getByTestId('images-step-panel').closest('[hidden]')).not.toBeNull();
   });
 
   it('T-PHONE-008b: Continue opens the screenshots screen and focuses its heading', async () => {

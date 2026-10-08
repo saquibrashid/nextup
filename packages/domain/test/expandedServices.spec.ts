@@ -50,7 +50,11 @@ describe('T-SVC-001 expanded subscription services', () => {
     for (const service of SERVICES) {
       expect(isService(service)).toBe(true);
       expect(serviceSchema.parse(service)).toBe(service);
-      expect(splitBatchSource(service)).toEqual({ service, discoverySource: null });
+      expect(splitBatchSource(service)).toEqual({
+        service,
+        discoverySource: null,
+        autoDetect: false,
+      });
       expect(requireServiceOf({ id: 'batch', service, discoverySource: null })).toBe(service);
     }
     for (const value of [

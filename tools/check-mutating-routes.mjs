@@ -369,6 +369,18 @@ export const MUTATING_ROUTE_REGISTRY = [
     why: 'edits a REVIEW candidate; the list is untouched until close (US-007, US-012)',
   },
   {
+    method: 'PATCH',
+    path: '/api/batches/:batchId/candidates/:candidateId/destination',
+    changesListState: false,
+    why: "records an auto-detect title's destination (services or Waiting to stream) on its REVIEW candidate; nothing lands until close (US-066, A57)",
+  },
+  {
+    method: 'POST',
+    path: '/api/batches/:batchId/service-lookup',
+    changesListState: false,
+    why: 'owner-initiated "Look up again": re-asks TMDB for auto-detect review candidates and writes candidate lookup columns only — no listing, intent, order or badge changes (US-066, A57)',
+  },
+  {
     method: 'POST',
     path: '/api/batches/:batchId/candidates/confirm-all',
     changesListState: false,

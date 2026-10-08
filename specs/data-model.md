@@ -817,7 +817,9 @@ export interface ServiceState {
 
 Written **only** when a batch reaches `applied` (US-022 AC-4) and rewritten to
 the previous applied batch when a batch is undone (US-032 AC-2). Abandoned,
-discarded and failed batches never touch it.
+discarded and failed batches never touch it. ⚠ **Neither do storefront or
+auto-detect batches** (`A57`, §21): neither names a service whose saved list
+it refreshed, so neither may move a FreshnessStrip date (REQ-039, RSK-007).
 
 ---
 
@@ -1196,7 +1198,7 @@ under §8.4**, enumerating those titles.
     "message": "This batch cannot be undone as a whole.",
     "details": {
       "batchId": "01J...",
-      "reason": "modified-or-removed" | "later-owner-edits" | "provenance-unavailable",
+      "reason": "modified-or-removed" | "later-owner-edits" | "provenance-unavailable" | "waiting-routed",
       "created":  [{ "titleId": "...", "name": "Dune", "releaseYear": 2021, "posterPath": "/d.jpg", "currentState": "active",     "remedy": "not-interested",   "remedyHref": "/api/titles/.../suppress" }],
       "modified": [{ "titleId": "...", "name": "Andor", "releaseYear": 2022, "posterPath": "/a.jpg", "attr": "workIdentity", "before": "tmdb:tv:1", "currentState": "active", "remedy": "fix-match", "remedyHref": "/api/titles/.../fix-match" }],
       "removed":  [{ "titleId": "...", "listingId": "...", "name": "Heat", "releaseYear": 1995, "posterPath": "/h.jpg", "currentState": "removed", "remedy": "restore", "remedyHref": "/api/listings/.../restore" }],
@@ -1214,6 +1216,9 @@ under §8.4**, enumerating those titles.
 - `reason: 'provenance-unavailable'` is returned when provenance is missing
   (US-033 AC-7). US-031 AC-6 makes this unreachable in practice; the branch
   exists and is tested with a hand-crafted fixture (`T-UNDO-007`).
+- `reason: 'waiting-routed'` (`A57`, §21) refuses an auto-detect batch that
+  sent any title to Waiting to stream: the intent it created carries no batch
+  link, so undo could not reverse it (`T-AUTO-015a`, `T-AUTO-022a`).
 - **Nothing is written.** `T-UNDO-005` snapshots the whole partition before and
   after and asserts equality.
 
@@ -2785,3 +2790,58 @@ quality, review decisions and owner confirmation remain independently required.
 Missing intake permits additions but never full-update removal. See
 `docs/proposals/capture-lifecycle.md` §6.1 for rollout/rollback constraints and
 `specs/testing.md` for `T-UX-164a`–`ab`.
+
+---
+
+## 21. Auto-detect import (`A57`, #396, US-066, migration `0020_auto_detect_source`)
+
+Owner-approved at `A57` (ADR-0010 Rev 6). **Additive only** — `T-MIG-001` and
+`T-AUTO-006` pass; no existing row is touched.
+
+| Table.column | Type | Meaning |
+|---|---|---|
+| `upload_batch.auto_detect` | `BIT NOT NULL DEFAULT 0` (`df_batch_auto_detect`) | `1` = an auto-detect capture: `service` and `discovery_source` are **both** `NULL` — it has no truthful single service and no storefront. |
+| `extraction_candidate.service_lookup_status` | `NVARCHAR(16) NULL`, `ck_candidate_lookup_status` | `found` \| `none` \| `unknown` \| `failed`; `NULL` = never looked up. |
+| `extraction_candidate.service_lookup_identity` | `NVARCHAR(200) NULL` | The work identity the answer is for; a later match correction makes it stale (proposes nothing). |
+| `extraction_candidate.service_lookup_at` | `DATETIME2 NULL` | When it was looked up. |
+| `extraction_candidate.looked_up_available_on` / `looked_up_rent_on` | `NVARCHAR(MAX) NULL`, `ISJSON` CHECKs | The TMDB answer, so the close writes it onto `title` as §17.5 does. |
+| `extraction_candidate.destination_kind` | `NVARCHAR(16) NULL`, `ck_candidate_destination_kind` | The **owner's** choice: `services` or `waiting`; `NULL` = follow the proposal. |
+| `extraction_candidate.destination_services` | `NVARCHAR(MAX) NULL`, `ck_candidate_destination_coherent` | JSON list of `SERVICES` members, present iff `destination_kind = 'services'`. |
+
+⚠ **Widening `ck_batch_source_exclusive` without dropping it.** 0006's rule
+(exactly one of `service` and `discovery_source`) refuses the auto shape, and
+replacing it needs a `DROP CONSTRAINT` that `T-MIG-001` forbids. The migration
+adds `ck_batch_source_kind` — the old rule for every `auto_detect = 0` row,
+plus "both `NULL`" for `auto_detect = 1` — `WITH CHECK` over every existing
+row, and only then sets the old constraint `NOCHECK`. It stays in the catalog;
+nothing it refused becomes writable except the auto shape. The single `NOCHECK
+CONSTRAINT` statement is the one pinned for this file in
+`tools/check-migrations.ts`. `ck_batch_auto_append_only` (`auto_detect = 0 OR
+mode = 'append-only'`) is invariant 3 in the store, behind the API refusal.
+`ck_candidate_lookup_coherent` keeps a lookup's status, time and identity
+together.
+
+**The domain value `auto` is a capture source, not a column value.** It is in
+`CAPTURE_SOURCES`, not `BATCH_SOURCES`; `splitBatchSource('auto')` returns
+`{service: null, discoverySource: null, autoDetect: true}`, and
+`requireServiceOf` refuses an auto batch loudly. Every service-scoped path —
+full-update reconciliation, `ServiceState`, removal groups — is unreachable for
+it.
+
+**Effective destination** = the owner's choice, else the proposal: `found` →
+every matching owner service; `none` → Waiting; `unknown`, `failed` or stale →
+nothing (the close refuses `AUTO_DESTINATION_REQUIRED`). **The close's row
+effects** (one transaction, §16.5): per applied title, an active `title` (new or
+reused) and a `service_listing` dated today per destination service, skipping
+one already active on that service, with `sort_date_added` kept at the earliest
+date; or a waiting `watch_intent` with `discovery_source = 'search'` and no
+`source_batch_id` — `ck_intent_source` and the batch-link CHECKs cannot be
+widened additively. A suppressed work identity lands nowhere. The looked-up
+answer is written through `updateTitleAvailability` /
+`updateWatchIntentAvailability`. **No `service_state` row is written.** The
+close persists each applied candidate's effective destination, so undo can
+refuse a batch that routed to Waiting (`reason: "waiting-routed"`, §8.4).
+
+⚠️ **None of the candidate columns is a list column.** They are review state,
+written by the review-time lookup (owner-triggered) and the owner's
+destination choice, and read only by the review and the close.

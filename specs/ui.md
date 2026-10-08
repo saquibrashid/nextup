@@ -656,7 +656,10 @@ Rules, each of which a named test pins:
 1. **Revealing a step never answers it.** US-003 AC-1/AC-2 and
    REQ-002/REQ-003 forbid a default that can be accepted by inaction, and the
    step that matters proposes removals. Unlocking step 2 leaves both radios
-   unchecked (`T-UX-148c`).
+   unchecked (`T-UX-148c`). ⚠ **The one default is the source itself
+   (`A57`, §3.0b):** `/upload` opens on *Auto-detect*, which is add-only by
+   source, so step 2 shows *Add only* answered. Naming a service is a real
+   answer and re-asks the mode with both radios unchecked, exactly as before.
 2. **A locked step is dimmed and disabled, never removed.** `hidden`,
    `display: none` or an unmounted branch takes the question out of the
    accessibility tree, so a screen-reader owner never learns the step exists or
@@ -725,6 +728,23 @@ does not trigger a blanket warning. PNG/JPEG previews use revocable local
 object URLs; HEIC/HEIF has an explicit placeholder until the server returns
 its transcoded image. No screenshot data is written to web storage.
 
+### 3.0b Auto-detect — the default source *(new, `A57`, #396, US-066)*
+
+1. **One more option, in the existing picker.** *Auto-detect* is a tile in
+   step 1 / the phone's *Choose a service*, in the same tile style as the
+   services, on its own full-width row above the eight services, with the hint
+   *"We'll look up each title's service. You confirm it."* It is **checked by
+   default** unless the URL names a service (`?service=` from a FreshnessStrip
+   link still pre-selects that service, `T-AUTO-020c`).
+2. **Add only, by source.** With *Auto-detect*, *Add only* is checked and
+   *Full update* is **disabled, never hidden**, with the reason beneath it:
+   *"To do a full update, choose the service these screenshots came from."*
+   Picking a named service enables it and clears the mode (rule 4).
+3. **On desktop** the service step stays open at the default (so the eight
+   services are in view) and the mode step shows its answer folded.
+4. Submit sends `source: "auto"`; the server refuses a full update by source
+   anyway (`api.md` §6.11).
+
 ### 3.0a Phone layout — the owner's import mockup *(new, TASK-260)*
 
 Below `--bp-sm` (`html[data-layout='phone']`) `/upload` is drawn as the
@@ -741,9 +761,13 @@ are unchanged.
 2. **Continue says why it waits.** It is disabled until both questions are
    answered, with the reason as text beside it (§3.3). Pressing it opens
    screen 2 and moves focus to its heading.
-3. **No mode is pre-chosen.** Rule 1 above holds on the phone as well: the
-   mockup draws *Add only* already selected, and that is deliberately not
-   copied (US-003).
+3. **No mode is pre-chosen for a named service.** Rule 1 above holds on the
+   phone as well (US-003). At the *Auto-detect* default (`A57`, §3.0b) the
+   phone shows *Auto-detect* and *Add only* checked, no step current, full
+   update disabled with its reason, and Continue enabled; tapping a named
+   service makes Mode the current step and Continue waits again.
+   ~~"No mode is pre-chosen … the mockup draws *Add only* already selected,
+   and that is deliberately not copied (US-003)."~~
 4. **The stepper reports answers and never gives them.** On screen 2 its
    answered steps are buttons back to screen 1, where both answers are still
    checked and nothing held is cleared.
@@ -759,7 +783,9 @@ are unchanged.
 
 ### 3.1 Step 1 — service and mode
 
-Two required choices, **no default for either** (US-003 AC-5). The mode control
+Two required choices, **no default for either** (US-003 AC-5) — except that the
+source defaults to *Auto-detect*, which answers the mode as *Add only*
+(`A57`, §3.0b). A named service still has no default mode. The mode control
 is two large radio cards, each carrying `modeExplanation` from the API
 verbatim:
 
@@ -1046,6 +1072,30 @@ presentation changes.
    and no genre chips; no capture stepper; the hero is the screenshot, not a
    backdrop; *Already in your library* and *Other* groups are added; the raw
    read text is shown when it differs from the matched name.
+
+### 5.0b Auto-detect review — where each title goes *(new, `A57`, #396, US-066)*
+
+When the review answers `autoDetect: true`, every title the owner has not
+discarded carries `components/AutoDestination.tsx` (*Where should it go?*) —
+under the card on wide layouts, in the pager on the phone. A named-service or
+storefront review never shows it.
+
+1. **Looked up, never captured.** Each pre-ticked service carries the label
+   *Looked up*; nothing on the card says it was read from the screenshot.
+2. **Several matches:** every matching service is ticked (one badge each); any
+   can be unticked except the last — *Waiting to stream* is the way to "none
+   of these".
+3. **No match:** *Waiting to stream* is selected, with *"Not streaming on your
+   services. We'll send it to Waiting to stream unless you pick a service."*;
+   ticking a service overrides it.
+4. **Couldn't look up** (a failure, no provider data, or a match corrected
+   since): nothing is pre-selected; the owner ticks a service or *Waiting to
+   stream*, or presses *Look up again*. A failed save is rolled back and says
+   so.
+5. **Apply waits for a destination.** A confirmed title with no destination
+   is pointed out the way a pending title is (`PENDING_ADDITIONS`), and no
+   close is sent; a server refusal (`AUTO_DESTINATION_REQUIRED`) is shown the
+   same way. The applied notice counts titles listed and sent to Waiting.
 
 ### 5.1 Layout
 
