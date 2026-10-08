@@ -65,6 +65,11 @@ export const ERROR_CODES = [
   'TITLE_NOT_ACTIVE',
   'GROUP_ALREADY_REVERSED',
   'PARTIAL_FAILURE_PREVENTED',
+  // US-064 (`A55`). A bulk availability answer whose row no longer shows the
+  // change the owner saw: the stored signature differs, nothing left, or no
+  // owner service streams it any more. Per-item only (§6.48) — the other
+  // items of the same request still apply.
+  'AVAILABILITY_CHANGED',
 
   // ── Discovery sources (Epic L, ADR-0010) ─────────────────────────────────
   // ⚠ Refused BY SOURCE TYPE at the API boundary, never merely hidden in the

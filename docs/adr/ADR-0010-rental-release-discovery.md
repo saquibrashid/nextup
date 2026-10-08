@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | **Accepted; promoted to v1 at A52 (2026-09-08). Revised at #378 (Revision 2), #380 (Revision 3) and #397/#410 (Revision 4, `A54`, below).** ~~"Revised at #378 (Revision 2) and #380 (Revision 3, below)."~~ Implementation and remaining acceptance work are tracked in `docs/status.md`. |
+| **Status** | **Accepted; promoted to v1 at A52 (2026-09-08). Revised at #378 (Revision 2), #380 (Revision 3), #397/#410 (Revision 4, `A54`) and `A55` (Revision 5, below).** ~~"Revised at #378 (Revision 2) and #380 (Revision 3, below)."~~ ~~"… and #397/#410 (Revision 4, `A54`, below)."~~ Implementation and remaining acceptance work are tracked in `docs/status.md`. |
 | **Date** | 2026-08-20 |
 | **Deciders** | owner (`A48` — the requirement and both design choices), coordinator |
 | **Forced by** | **`A48`**, REQ-082…REQ-087, REQ-041, REQ-070/071/073, REQ-048, NFR-010, NFR-013, NFR-014, ADR-0007 |
@@ -256,8 +256,8 @@ from the removed log; none writes a suppression; each re-checks suppression
 on the work identity first. **§4 point 3 is unchanged** — the refresh still
 graduates nothing; only the owner's tap does.
 
-**4. Bulk review of many changes at once is out of scope** and is a future
-backlog item.
+**4. Bulk review of many changes at once** is built at Revision 5 (`A55`,
+US-064). ~~"is out of scope and is a future backlog item."~~
 
 **Migration 0019 (owner-approved)** adds `title.availability_checked_at`,
 `available_on`, `rent_on`, `availability_region` (default `'US'`) and
@@ -268,6 +268,43 @@ Additive only. ⚠ A moved title's intent keeps `discovery_source = 'search'`:
 adding a `library` source would mean replacing `ck_intent_source`, a `DROP
 CONSTRAINT` `T-MIG-001` forbids, so the provenance is the new nullable
 column instead. Test ids: `specs/testing.md`, US-063 (`T-MOVE-*`).
+
+## Revision 5 — the "Availability changes" screen and "Check more titles" (`A55`, owner-approved 2026-10-07)
+
+The owner approved one screen (PRD `A55`, US-064, REQ-130) gathering every
+change Revision 4 detects, with one answer for several rows at once, and a
+button to look up more titles than the page-scoped refresh reaches.
+
+**1. The screen reads stored data only.** `GET /api/availability/review` and
+its count, `GET /api/availability/review/summary`, apply the same
+`libraryAvailabilityFor` rule to the **stored** `title` availability columns
+and the stored `watch_intent` availability. They make **no** provider lookup —
+not even the page-scoped Revision 4 pass — so opening the screen or the Library
+count line never widens process 4.
+
+**2. "Check more titles" is an owner-initiated metadata refresh, not a fifth
+process.** `POST /api/availability/check` looks up, synchronously and serially,
+at most `AVAILABILITY_CHECK_BATCH` (20) Library titles and waiting intents whose
+availability is never-checked or older than `WATCH_PROVIDER_MAX_AGE_DAYS`,
+never-checked first, then oldest first. Same source, same stored region, same
+rule that a failed lookup writes nothing; it writes availability columns only
+through `refreshAvailability` (waiting intents) and `updateTitleAvailability`
+(titles). §4's conditions hold
+because it **is the owner's tap**: there is no timer, no queue and no work after
+the response. It is therefore listed in PRD §7.4 as an owner-initiated metadata
+refresh, the count of non-owner processes stays **four** (`T-CI-005`), and
+`T-CI-005h` names `routes/availabilityReview.ts` as a permitted caller of
+`refreshAvailability`. `AVAILABILITY_CHECK_BATCH` is declared on its own and is
+not derived from `AVAILABILITY_REFRESH_PER_REQUEST` (Trap 5's reasoning, applied
+to batch sizes).
+
+**3. Bulk answers are the one-tap answers, item by item.** `POST
+/api/availability/review/apply` (PRD §7.4 item 18) answers each selected row
+in its **own** transaction with the guards of its one-tap form (suppression on
+the work identity, active rows, an unchanged signature). A refused row changes
+nothing and blocks no other. Bulk *Add to Library* uses the first owner service
+in `SERVICES` order the title streams on. **No migration.** Test ids:
+`specs/testing.md`, US-064 (`T-AVREV-*`).
 
 ## Consequences
 

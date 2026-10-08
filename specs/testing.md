@@ -65,7 +65,45 @@ Collected locations: `apps/api/test/unit/services/libraryAvailability.spec.ts`,
 `apps/web/test/availabilityMoves.spec.tsx`,
 `tests/infra/libraryAvailabilityMigration.spec.ts`,
 `tests/e2e/availabilityMoves.spec.ts`. The bulk review of many availability
-changes at once is a later item and has no tests here.
+changes at once is US-064 below (`A55`). ~~"The bulk review of many
+availability changes at once is a later item and has no tests here."~~
+
+### US-064 — Availability changes (TASK-266 – TASK-268, `A55`)
+
+| AC | Level | Test IDs | Assertion |
+| --- | --- | --- | --- |
+| AC-1 | U/C/E | `T-AVREV-004`, `T-AVREV-009`, `T-AVREV-016` | The screen lists every Library title with an un-kept change and every waiting title now streaming on an owner service, in two sections, from stored data only (no provider call on load), with attribution and an explanatory empty state. |
+| AC-2 | U/C/E | `T-AVREV-004`, `T-AVREV-009`, `T-AVREV-012`, `T-AVREV-016` | Each row shows the poster, title, year, the factual sentence with its as-of date and the same one-tap answers as the details panel. |
+| AC-3 | U/C/I/E | `T-AVREV-001`, `T-AVREV-005`, `T-AVREV-008`, `T-AVREV-013`, `T-AVREV-016` | *Check more titles* checks at most `AVAILABILITY_CHECK_BATCH` never-checked or older-than-max-age titles and intents, oldest first, serially, metadata only; a failed lookup writes nothing; the counts line re-renders; the button is disabled while working and offline. |
+| AC-4 | U/C | `T-AVREV-002`, `T-AVREV-003`, `T-AVREV-006`, `T-AVREV-010` | Rows can be selected individually or per section; each bulk answer applies only to rows it fits; *Add to Library* uses the first owner service in `SERVICES` order. |
+| AC-5 | U/C/I/E | `T-AVREV-006`, `T-AVREV-007`, `T-AVREV-011`, `T-AVREV-012`, `T-AVREV-016` | A bulk answer is one request whose items are each their own transaction with the one-tap guards; one refusal never blocks the others; destructive answers confirm in the shared `Dialog`; the result reads *N done, M couldn't be changed* and refused rows stay with their reason; removals link to the removal history. |
+| AC-6 | U/C/E | `T-AVREV-004`, `T-AVREV-015`, `T-AVREV-016`, `T-UX-132`, `T-UX-167` | The nav lists *Availability changes*; the Library shows *N availability changes* from a stored-data count only when N > 0, never as a nag. |
+| AC-7 | C/E | `T-AVREV-010`, `T-AVREV-014`, `T-AVREV-016` | Desktop and phone layouts: 44 px targets, labelled checkboxes, section headings, a live region, the selection bar wraps, no sideways scroll, no serious axe violation. |
+
+| Id | Level | Owner | Claim |
+|---|---|---|---|
+| **`T-AVREV-001`** (`a`–`d`) | U | `TASK-266` | `selectForAvailabilityCheck` picks never-checked and over-age rows (titles and intents) oldest first, capped at `AVAILABILITY_CHECK_BATCH` = 20, a constant declared on its own; `checkCounts` counts checked vs not-checked-recently. |
+| **`T-AVREV-002`** (`a`) | U | `TASK-266` | `firstOwnerService` returns the first owner service in `SERVICES` order. |
+| **`T-AVREV-003`** (`a`–`b`) | U | `TASK-266` | The apply body parses against the closed action list, requires ids (and signatures for *keep*), and refuses more than `AVAILABILITY_REVIEW_APPLY_MAX` items with 400. |
+| **`T-AVREV-004`** (`a`–`c`) | U | `TASK-266` | `GET /api/availability/review` reads stored data only (no provider call), filters suppressed works and kept changes; `GET /api/availability/review/summary` returns the same count. |
+| **`T-AVREV-005`** (`a`–`d`) | U | `TASK-266` | `POST /api/availability/check` looks up the selected batch serially, stores the region, writes nothing for a failed lookup, and returns the counts. |
+| **`T-AVREV-006`** (`a`–`g`) | U | `TASK-266` | `POST /api/availability/review/apply` for each action: per-item results, each item guarded like its one-tap endpoint, a changed signature refused with `AVAILABILITY_CHANGED`, an unexpected error refused as `INTERNAL_ERROR` without stopping the rest. |
+| **`T-AVREV-007`** (`a`–`c`) | I | `TASK-266` | Against the real store: one failing item leaves the others applied; *keep* records signatures; move to Waiting then Add to Library round-trips. |
+| **`T-AVREV-008`** (`a`) | I | `TASK-266` | Against the real store: *Check more titles* updates at most 20 oldest rows' availability metadata only — membership, listings and badges are untouched. |
+| **`T-AVREV-009`** (`a`–`d`) | C | `TASK-267` | The page renders both sections, the empty state, a partially empty section, and loading/failure states. |
+| **`T-AVREV-010`** (`a`–`c`) | C | `TASK-267` | Row and section selection, and the per-answer eligible counts and disabled states. |
+| **`T-AVREV-011`** (`a`–`b`) | C | `TASK-267` | The destructive confirmation: Cancel has initial focus, Cancel/Escape change nothing, confirm applies. |
+| **`T-AVREV-012`** (`a`–`f`) | C | `TASK-267` | Results reporting, refusal fallback text, the removal-history link only after removals, request failure, 50-item chunking, and the per-row one-tap answers. |
+| **`T-AVREV-013`** (`a`–`c`) | C | `TASK-267` | *Check more titles*: Working… while running, counts re-render, failure and offline states. |
+| **`T-AVREV-014`** (`a`–`b`) | C | `TASK-267` | The route container loads once, reloads after a change, and reports a failed load. |
+| **`T-AVREV-015`** (`a`–`c`) | C | `TASK-267` | The Library count line: singular/plural link to `/availability`, hidden at 0 and when the summary is unavailable. |
+| **`T-AVREV-016`** (`a`–`b`) | E | `TASK-268` | End to end at 390 px and 1440 px: `a` the Library line leads to the screen with both sections, no sideways scroll and no axe violation, and a confirmed bulk removal reports one refusal per row and links to the removal history; `b` one *Check more titles* tap is one request and the counts re-render. |
+
+Collected locations: `apps/api/test/unit/services/availabilityReview.spec.ts`,
+`apps/api/test/unit/routes/availabilityReview.spec.ts`,
+`apps/api/test/integration/availabilityReview.spec.ts`,
+`apps/web/test/availabilityReview.spec.tsx`,
+`tests/e2e/availabilityReview.spec.ts`.
 
 **Current mapping:** all current PRD story/AC keys, including US-062, are mapped
 below. The original 39-story / 241-AC counts in

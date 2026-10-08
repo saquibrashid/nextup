@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 260 |
+| ✅ done | 263 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **263** |
+| **total** | **266** |
 
 ## Ready to start
 
@@ -301,3 +301,6 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-263` | Availability moves, part 1 (#410, `A54`): the lazy watch-availability refresh is widened to Library titles on access (list page and title details), page-scoped, capped at `AVAILABILITY_REFRESH_PER_REQUEST`, serial, metadata-only; additive migration `0019_library_availability`; pure change detection and the Keep signature. Test ids: `T-MOVE-001`, `T-MOVE-002`, `T-MOVE-009`, `T-MOVE-013`, `T-MOVE-014`. | `T-AVAIL-001`, `T-AVAIL-004`, `T-CI-005`, `T-MIG-001`, `T-MOVE-001`, `T-MOVE-002`, `T-MOVE-009`, `T-MOVE-013`, `T-MOVE-014` |
 | `TASK-264` | Availability moves, part 2 (#397/#410, `A54`): five owner-initiated one-tap mutations (PRD §7.4 items 13–17) — remove one badge, Add to Library from Waiting, Move to Waiting, Keep, Add badge — each audited, reversible and registered in the mutating-route list. Test ids: `T-MOVE-003`, `T-MOVE-004`, `T-MOVE-005`, `T-MOVE-006`, `T-MOVE-007`, `T-MOVE-008`, `T-MOVE-015`. | `T-MOVE-003`, `T-MOVE-004`, `T-MOVE-005`, `T-MOVE-006`, `T-MOVE-007`, `T-MOVE-008`, `T-MOVE-015`, `T-MUT-001` |
 | `TASK-265` | Availability moves, part 3 (`A54`): the fact-not-nag marker on Library cards/rows and title details with the one-tap actions and JustWatch attribution, Waiting's *Add to Library* and moved-from-Library fact, on wide and phone layouts. Test ids: `T-MOVE-010`, `T-MOVE-011`, `T-MOVE-012`, `T-MOVE-016`. | `T-MOVE-010`, `T-MOVE-011`, `T-MOVE-012`, `T-MOVE-016` |
+| `TASK-266` | Availability changes, part 1 (`A55`, US-064): `GET /api/availability/review` and `/summary` read stored data only; owner-initiated `POST /api/availability/check` checks up to `AVAILABILITY_CHECK_BATCH` (20) never-checked or over-age titles and intents, oldest first, serial, metadata-only (PRD §7.4 item 18); `POST /api/availability/review/apply` applies one answer to up to `AVAILABILITY_REVIEW_APPLY_MAX` (50) rows, each its own transaction with the one-tap guards, per-row results; both POSTs registered as mutating routes. No migration. Test ids: `T-AVREV-001`, `T-AVREV-002`, `T-AVREV-003`, `T-AVREV-004`, `T-AVREV-005`, `T-AVREV-006`, `T-AVREV-007`, `T-AVREV-008`. | `T-AVREV-001`, `T-AVREV-008`, `T-CI-005` |
+| `TASK-267` | Availability changes, part 2 (`A55`): the `/availability` screen — two sections, per-row one-tap answers, labelled checkboxes and a wrapping selection bar, `Dialog` confirmation for destructive answers, *N done, M couldn't be changed* results with refused rows kept, *Check more titles* with the factual counts line, attribution; the nav item and the Library *N availability changes* line (only when N > 0). Test ids: `T-AVREV-009`, `T-AVREV-010`, `T-AVREV-011`, `T-AVREV-012`, `T-AVREV-013`, `T-AVREV-014`, `T-AVREV-015`. | `T-AVREV-009`, `T-AVREV-015`, `T-UX-132`, `T-UX-167` |
+| `TASK-268` | Availability changes, part 3 (`A55`): end-to-end at 390 px and 1440 px with axe, and the PRD/spec/backlog record. Test ids: `T-AVREV-016`. | `T-AVREV-016` |

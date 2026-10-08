@@ -56,7 +56,15 @@ reminder, colour-only state or *"you should"* wording exists.
   (`waiting-promote-error`). A row moved from the Library states *"Moved from
   your Library on <date>."* (`waiting-moved-from-library`).
 
-Bulk review of many changes at once is **not** part of this UI (a later item).
+- **Library page line (`A55`, US-064 AC-6).** When the stored-data count
+  (`GET /api/availability/review/summary`) is above zero, the Library heading
+  (wide and phone) carries a plain link *"N availability changes"* /
+  *"1 availability change"* (`library-availability-count`) to `/availability`.
+  At zero it is absent. It is never colour-alarmed and never an instruction.
+
+Bulk review of many changes at once is the *Availability changes* screen,
+§7c (`A55`, US-064). ~~"Bulk review of many changes at once is **not** part
+of this UI (a later item)."~~
 
 ## Modal context contract (owner correction, 2026-09-21)
 
@@ -174,6 +182,7 @@ blocking; it introduces no loaders, actions or automatic mutation replay.
 | `/rating` | `pages/RatingLookupPage.tsx` | Look up any title's IMDb rating (REQ-092, US-045) | Answering "is it any good?" **without adding anything** |
 | `/waiting` | `pages/WaitingPage.tsx` | Titles waiting to reach a streaming service, in Grid or Compact (§7b) | Knowing when a title can be streamed |
 | `/waiting/:titleId` | `pages/WaitingDetailsPage.tsx` | One waiting title: the full waiting answer and the Library details (#391, §7b) | Deciding whether to keep waiting |
+| `/availability` | `pages/AvailabilityReviewPage.tsx` | Every availability change in one place, with one answer for several rows (US-064, §7c) | Keeping the Library honest without opening each title |
 | `*` | `pages/NotFoundPage.tsx` | Unknown route | Getting back to `/` |
 
 ⚠ **THERE ARE TEN SCREENS, NOT NINE.** `/rating` was added by Epic M
@@ -1339,6 +1348,57 @@ and forecast logic, and the API are unchanged.
 the service marks, and *Now on Netflix*…" in the details; "the forecast… the
 service mark and the when"; "**Footer**: *Seen on Fandango at Home (rent/buy)…*
 and **Not interested**" as a card footer.~~
+
+## 7c. `/availability` — Availability changes (US-064, PRD `A55`)
+
+Container `containers/AvailabilityReviewRoute.tsx` (one read on mount, no
+polling), page `pages/AvailabilityReviewPage.tsx`. Nav item *Availability
+changes* in the wide nav and the phone Menu drawer (route table order, after
+`/waiting/:titleId`). h1 *Availability changes*.
+
+**Facts, never a nag (invariant 8a).** The intro says what the screen gathers.
+No count is colour-alarmed; nothing says *"you should"*. The empty state
+(`avrev-empty`) explains what the screen is for.
+
+- **Check line.** *"142 titles checked · 37 not checked recently"*
+  (`avrev-check-counts`) beside a secondary *Check more titles* button
+  (`avrev-check-more`, ≥ 44 px). A tap shows *Working…* and disables it until
+  the one request (`POST /api/availability/check`) answers; the counts then
+  re-render and the live region says *"Checked N."* (plus *"· M couldn't be
+  checked just now"* when some failed). Disabled offline (with the standard
+  offline reason) and when nothing is due. A failure reads *"Couldn't check
+  just now. Nothing was changed."*
+- **Selection bar** (`avrev-bar`, a labelled group that **wraps** on a phone):
+  *N selected*, then *Keep as is (n)*, *Remove badges that left (n)*, *Move to
+  Waiting (n)*, *Add to Library (n)* — each count is the selected rows that
+  answer applies to, and a button with 0 is disabled — and *Clear selection*.
+  A line under it states the rule *"Add to Library uses the first of your
+  services each title streams on."*
+- **Two sections**, each an `h2`-labelled region with a *Select all…*
+  checkbox: *Library titles that changed* and *Waiting titles now streaming*.
+  An empty section says *"None right now."* Each row: a checkbox labelled
+  *"Select <title>"* inside a 44 px label, the poster, the title (linking to its
+  details) and year; Library rows then carry the §*Availability moves* panel
+  (same sentence and one-tap answers, attribution suppressed per row) and
+  *"Checked <date> (<region>)"*; waiting rows state *"Now streaming on
+  <services> · Checked <date> (<region>)"* and an *Add to Library (<service>)*
+  button per service.
+- **Confirmation.** *Remove badges that left* and *Move to Waiting* open the
+  shared `Dialog` (modal context contract above): heading = the answer, the
+  consequence and where it is reversible, the titles affected, a danger
+  confirm button and *Cancel* — Cancel has initial focus, Escape/backdrop
+  cancel. *Keep as is* and *Add to Library* apply without a dialog.
+- **Results.** One request per 50 rows. The live region (`avrev-live`,
+  `aria-live="polite"`) reads *"N done, M couldn't be changed."*; after a
+  removal or move with N > 0 it links *View removal history* (`/removed`).
+  Refused rows are listed by name with their reason (`avrev-refused`), stay on
+  screen with the reason under them (`avrev-row-reason`) and stay selected.
+  A request failure reads *"Couldn't make those changes. Nothing was changed."*
+- **Attribution.** One JustWatch attribution line for the screen
+  (`avrev-attribution`, REQ-087).
+- **Layout.** Desktop and phone (§5.0a): every button and checkbox label is a
+  44 px target, nothing scrolls sideways at 390 px, and the bar and row
+  actions wrap.
 
 ---
 ## 8. TMDB attribution (US-011, NFR-016) — compliance, and invisible when broken

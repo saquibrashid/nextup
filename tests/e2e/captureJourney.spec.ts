@@ -229,6 +229,8 @@ for (const width of [280, 390, 1440]) {
             await route.fulfill({ json: { services: [] } });
           } else if (path === '/api/suppressions' || path === '/api/removed') {
             await route.fulfill({ json: { items: [], nextCursor: null, limit: 50 } });
+          } else if (path === '/api/availability/review/summary') {
+            await route.fulfill({ json: { count: 0 } });
           } else throw new Error(`Unexpected request: ${request.method()} ${path}`);
         });
 

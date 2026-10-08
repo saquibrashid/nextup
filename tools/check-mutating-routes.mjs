@@ -2,12 +2,14 @@
  * Mutating-route registry vs the REQ-041 closed enumeration
  * (TASK-121 — `T-MUT-001`, `T-MUT-002`).
  *
- * **REQ-041 is a CLOSED list.** PRD §7.4 enumerates exactly seventeen owner-
+ * **REQ-041 is a CLOSED list.** PRD §7.4 enumerates exactly eighteen owner-
  * initiated operations that may change user-visible list state, and exactly
  * four non-owner processes that may exist at all — none of which changes
  * list state. *"Anything not on these lists is forbidden by default. REQ-041
- * has already been widened seven times during requirements work; widening it
+ * has already been widened eight times during requirements work; widening it
  * again is an explicit amendment, not an implementation decision."*
+ * ~~Superseded at `A55`: "exactly seventeen owner-initiated operations" and
+ * "widened seven times".~~
  * ~~Superseded at `A54`: "exactly twelve owner-initiated operations" and
  * "widened five times".~~
  *
@@ -38,8 +40,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * PRD §7.4 — the seventeen owner-initiated operations that may change
+ * PRD §7.4 — the eighteen owner-initiated operations that may change
  * user-visible list state. **This list is closed.**
+ *
+ * Item 18 was added at `A55` (2026-10-07, owner-approved, US-064): one answer
+ * from the "Availability changes" screen applied to several rows. Each row is
+ * its own transaction with the one-tap route's guards (items 13–16), so it
+ * widens HOW MANY rows one tap answers, never what an answer may do.
+ * ~~Superseded at `A55`: "the seventeen owner-initiated operations."~~
  *
  * Items 13–17 were added at `A54` (2026-09-29, owner-approved; #397, #410,
  * US-063): the one-tap answers to an availability change. The refresh that
@@ -133,6 +141,12 @@ export const REQ_041_OPERATIONS = [
     op: 'add-badge',
     story: 'US-063',
     what: 'Adding a service badge for a service a library title is now also streaming on',
+  },
+  {
+    id: 18,
+    op: 'apply-availability-review',
+    story: 'US-064',
+    what: 'Applying one availability answer (keep, remove badges that left, move to Waiting, add to Library) to several selected rows, each in its own transaction',
   },
 ];
 
@@ -282,12 +296,24 @@ export const MUTATING_ROUTE_REGISTRY = [
   },
   {
     method: 'POST',
+    path: '/api/availability/review/apply',
+    changesListState: true,
+    op: 'apply-availability-review',
+  },
+  {
+    method: 'POST',
     path: '/api/suppressions/:suppressionId/unsuppress',
     changesListState: true,
     op: 'unsuppress',
   },
 
   // — Mutating, but NOT list state. Draft/batch scaffolding only. —
+  {
+    method: 'POST',
+    path: '/api/availability/check',
+    changesListState: false,
+    why: 'owner-initiated metadata refresh ("Check more titles"): looks up at most AVAILABILITY_CHECK_BATCH stale rows and writes availability columns only — adds, removes, reorders and re-badges nothing (US-064 AC-3, PRD §7.4, A55)',
+  },
   {
     method: 'POST',
     path: '/api/batches/:batchId/intake-refusals',
@@ -553,9 +579,9 @@ export function checkRegistryAgainstReq041(registry = MUTATING_ROUTE_REGISTRY) {
   // ⚠ The literal is the CLOSEDNESS, restated where a widening would be made.
   // ~~Superseded: 8, before US-047/US-048 added the manual add and removal.~~
   // Changing it is an amendment to PRD §7.4, not a build fix.
-  if (REQ_041_OPERATIONS.length !== 17) {
+  if (REQ_041_OPERATIONS.length !== 18) {
     findings.push(
-      `REQ-041 §7.4 enumerates 17 owner-initiated operations; this list has ${REQ_041_OPERATIONS.length}. The list is CLOSED (T-MUT-001).`,
+      `REQ-041 §7.4 enumerates 18 owner-initiated operations; this list has ${REQ_041_OPERATIONS.length}. The list is CLOSED (T-MUT-001).`,
     );
   }
 

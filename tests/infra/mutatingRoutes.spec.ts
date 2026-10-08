@@ -121,7 +121,7 @@ describe('T-MUT-001 · US-036 AC-1/AC-3 · REQ-041 is a closed enumeration (PRD 
     expect(findings).toEqual([]);
   });
 
-  it('T-MUT-001e · the enumeration holds exactly the seventeen REQ-041 operations', () => {
+  it('T-MUT-001e · the enumeration holds exactly the eighteen REQ-041 operations', () => {
     // ⚠ The count is not the point — the CLOSEDNESS is. Widening REQ-041 is an
     // amendment to PRD §7.4, so this test failing means someone must decide,
     // not that someone must bump a number.
@@ -129,10 +129,13 @@ describe('T-MUT-001 · US-036 AC-1/AC-3 · REQ-041 is a closed enumeration (PRD 
     // manual removal.~~
     // ~~Superseded at `A54`: twelve, before US-063 added the five one-tap
     // availability moves (§7.4 items 13–17).~~
-    expect(REQ_041_OPERATIONS).toHaveLength(17);
+    // ~~Superseded at `A55`: seventeen, before US-064 added the bulk answer
+    // from the "Availability changes" screen (§7.4 item 18).~~
+    expect(REQ_041_OPERATIONS).toHaveLength(18);
     expect(REQ_041_OPERATIONS.map((o: { op: string }) => o.op).sort()).toEqual([
       'add-badge',
       'add-title',
+      'apply-availability-review',
       'close-batch',
       'confirm-removal-group',
       'fix-match',
@@ -275,6 +278,8 @@ describe('T-MUT-001 · US-036 AC-1/AC-3 · REQ-041 is a closed enumeration (PRD 
       'POST /api/titles/:id/move-to-waiting',
       'POST /api/titles/:id/availability/keep',
       'POST /api/titles/:id/badges',
+      'POST /api/availability/check',
+      'POST /api/availability/review/apply',
     ].map((s) => {
       const [method, p] = s.split(' ');
       return `${method as string} ${normalisePath(p as string)}`;

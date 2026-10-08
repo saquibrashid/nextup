@@ -102,6 +102,11 @@ describe('T-DATA-003 — every method sends credentials', () => {
       moveToWaiting: () => client.moveToWaiting('ttl_1'),
       keepAvailability: () => client.keepAvailability('ttl_1', 'v1|starz|'),
       addBadge: () => client.addBadge('ttl_1', 'netflix'),
+      getAvailabilityReview: () => client.getAvailabilityReview(),
+      getAvailabilityReviewSummary: () => client.getAvailabilityReviewSummary(),
+      checkMoreAvailability: () => client.checkMoreAvailability(),
+      applyAvailabilityReview: () =>
+        client.applyAvailabilityReview('keep', [{ id: 'ttl_1', signature: 'v1|starz|' }]),
       getRemoved: () => client.getRemoved(''),
       suppressTitle: () => client.suppressTitle('ttl_1'),
       unsuppress: () => client.unsuppress('sup_1'),

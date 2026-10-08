@@ -97,6 +97,7 @@ async function fixture(page: Page) {
         nextCursor: null,
         limit: 50,
       };
+    else if (path === '/api/availability/review/summary') body = { count: 0 };
     else throw new Error(`Unexpected request: ${path}`);
     await route.fulfill({ json: body });
   });

@@ -2021,6 +2021,162 @@ button {
   gap: var(--space-2);
 }
 
+/*
+ * US-064 — the "Availability changes" review (`specs/ui.md` §7c).
+ * ⚠ NOTHING HERE IS COLOURED AS AN ALARM (invariant 8a): the rows reuse the
+ * marker panel's quiet accent edge, and the selection bar WRAPS on a phone so
+ * every bulk action stays reachable at 390 px without sideways scrolling.
+ */
+.avrev {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.avrev h1,
+.avrev h2,
+.avrev p {
+  margin: 0;
+}
+
+.avrev__intro {
+  color: var(--color-text-muted);
+}
+
+.avrev__check {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+}
+
+.avrev__live:empty {
+  display: none;
+}
+
+.avrev__refused {
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+.avrev__bar {
+  align-items: center;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+
+.avrev__bar .btn {
+  min-width: 0;
+}
+
+.avrev__rule {
+  color: var(--color-text-muted);
+  flex: 1 1 100%;
+  font-size: var(--text-sm);
+}
+
+.avrev__select-all {
+  gap: var(--space-2);
+  justify-content: flex-start;
+  padding-left: 0;
+}
+
+.avrev__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.avrev__confirm-list {
+  margin: 0 0 var(--space-3);
+  max-height: 12rem;
+  overflow-y: auto;
+  padding-left: var(--space-5);
+}
+
+.avrev-row {
+  border-bottom: 1px solid var(--color-border-soft);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
+}
+
+.avrev-row__head {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.avrev-row__select {
+  flex: 0 0 auto;
+  padding: 0;
+}
+
+.avrev-row__select input,
+.avrev__select-all input {
+  height: 1.25rem;
+  width: 1.25rem;
+}
+
+.avrev-row__poster {
+  border-radius: var(--radius);
+  flex: 0 0 auto;
+  height: 4.5rem;
+  object-fit: cover;
+  width: 3rem;
+}
+
+.avrev-row__poster--empty {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+
+.avrev-row__name {
+  align-items: center;
+  display: inline-flex;
+  flex-wrap: wrap;
+  font-weight: var(--weight-medium);
+  min-height: var(--tap-target-min);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.avrev-row__year,
+.avrev-row__asof {
+  color: var(--color-text-muted);
+}
+
+.avrev-row__asof {
+  font-size: var(--text-sm);
+}
+
+.avrev-row__reason {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.avrev .availability-panel {
+  margin-block: 0;
+}
+
+/* US-064 AC-6 — the Library's count line: a plain link, not a warning. */
+.library-availability-link {
+  align-items: center;
+  display: inline-flex;
+  font-size: var(--text-sm);
+  min-height: var(--tap-target-min);
+}
+
 /* US-063 AC-8 — a waiting row that came from the Library says so, quietly. */
 .waiting-row__moved {
   color: var(--color-text-muted);

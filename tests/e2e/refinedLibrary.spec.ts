@@ -325,6 +325,9 @@ async function mountLibrary(
           })),
         };
         break;
+      case '/api/availability/review/summary':
+        body = { count: 0 };
+        break;
       default:
         await route.abort();
         throw new Error(`Unstubbed API request: ${request.url()}`);

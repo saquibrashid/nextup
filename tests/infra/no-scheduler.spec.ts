@@ -282,6 +282,12 @@ describe('T-CI-005 · no scheduler anywhere (US-010 AC-5, US-036 AC-2/AC-5)', ()
     // — the library list and title details in `titles.ts`. That is the whole
     // of its access trigger.
     // ~~Superseded at `A54`: "exactly one caller … `GET /api/waiting`".~~
+    //
+    // `A55` (US-064 AC-3) adds ONE caller that is not a read and not a timer:
+    // `POST /api/availability/check`, the owner's explicit "Check more titles"
+    // tap — owner-initiated, capped, metadata-only. It is listed here so a
+    // FOURTH caller still fails this test.
+    // ~~Superseded at `A55`: "exactly two callers, both READ handlers".~~
     const waiting = readFileSync(path.join(ROOT, 'apps/api/src/routes/waiting.ts'), 'utf8');
     expect(waiting).toContain('refreshAvailability');
     expect(titles).toContain('refreshAvailability');
@@ -290,6 +296,7 @@ describe('T-CI-005 · no scheduler anywhere (US-010 AC-5, US-036 AC-2/AC-5)', ()
       .map(({ file }) => file)
       .sort();
     expect(callers).toEqual([
+      'apps/api/src/routes/availabilityReview.ts',
       'apps/api/src/routes/titles.ts',
       'apps/api/src/routes/waiting.ts',
       'apps/api/src/services/watchAvailability.ts',

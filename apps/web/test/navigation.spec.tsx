@@ -44,6 +44,8 @@ const ALL_LABELS = [
   'Removal history',
   'Not interested',
   'Waiting to stream',
+  // US-064 (`A55`) — the availability review, beside the waiting view.
+  'Availability changes',
   'About',
   'Rating lookup',
 ] as const;
@@ -54,6 +56,7 @@ const ALL_HREFS = [
   '/removed',
   '/not-interested',
   '/waiting',
+  '/availability',
   '/about',
   '/rating',
 ] as const;

@@ -26,6 +26,7 @@ import { attachOwnerScope, makeRequirePrincipal } from '../middleware/ownerScope
 import type { PrincipalReader } from '../auth/principal.js';
 import { AppError } from '../errors/AppError.js';
 import { registerAvailabilityMoveRoutes } from './availabilityMoves.js';
+import { registerAvailabilityReviewRoutes } from './availabilityReview.js';
 import { registerBatchCandidateRoutes } from './batchCandidates.js';
 import { registerBatchCloseRoutes } from './batchClose.js';
 import { registerBatchDetailRoutes } from './batchDetail.js';
@@ -174,6 +175,14 @@ export function createApiRouter(): Router {
   // Registered after the waiting and listing routes whose rows they write;
   // none of them calls TMDB, so they need no client.
   registerAvailabilityMoveRoutes(apiRouter);
+  // §6.45–§6.48 (US-064, PRD `A55`) — the "Availability changes" screen. Its
+  // reads ask TMDB nothing; the client is used ONLY by the owner's explicit
+  // "Check more titles" tap (§6.47), per request for the same reason as
+  // `registerTmdbRoutes` below. Not a background process (`T-CI-005`).
+  registerAvailabilityReviewRoutes(
+    apiRouter,
+    () => new TmdbClient({ apiKey: process.env['TMDB_API_KEY'] ?? '' }),
+  );
   registerServiceStateRoutes(apiRouter);
   // TASK-045 (`specs/api.md` §6.29). The client is built PER REQUEST on
   // purpose: its in-process search cache then dies with the request and can

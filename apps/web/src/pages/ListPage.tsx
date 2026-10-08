@@ -54,6 +54,8 @@ import { useWideViewport } from '../lib/useWideViewport';
 import {
   ADD_TITLE_LABEL,
   AT_LEAST_PREFIX,
+  AVREV_LIBRARY_COUNT_MANY,
+  AVREV_LIBRARY_COUNT_ONE,
   LIBRARY_PHONE_HEADING,
   libraryTitleCount,
   LIST_LOADING_BODY,
@@ -159,6 +161,11 @@ export interface ListPageProps {
   readonly onAddTitle?: (body: AddTitleRequest) => Promise<AddTitleResult>;
   /** Refetch after a manual add so the new row appears without a reload. */
   readonly onReload?: () => void;
+  /**
+   * US-064 AC-6 — how many availability changes are waiting for a decision,
+   * from STORED data (§6.46). The line is a fact, shown only when > 0.
+   */
+  readonly availabilityChangeCount?: number;
 }
 
 /** `POST /api/titles/:titleId/suppress` — `specs/api.md` §6.6. */
@@ -219,6 +226,7 @@ export function ListPage({
   onAddTitle,
   onReload,
   onWatchPreferences,
+  availabilityChangeCount = 0,
 }: ListPageProps): JSX.Element {
   const [params, setParams] = useSearchParams();
   const filters = parseFilters(params);
@@ -346,6 +354,20 @@ export function ListPage({
     </>
   );
 
+  /*
+    US-064 AC-6 — a plain link, never coloured as an alarm and never phrased
+    as advice (invariant 8a): the count is the fact, the link is the way in.
+  */
+  const availabilityLine = availabilityChangeCount > 0 && (
+    <Link
+      className="library-availability-link"
+      data-testid="library-availability-count"
+      to="/availability"
+    >
+      {`${String(availabilityChangeCount)} ${availabilityChangeCount === 1 ? AVREV_LIBRARY_COUNT_ONE : AVREV_LIBRARY_COUNT_MANY}`}
+    </Link>
+  );
+
   return (
     <>
       <div className="library-browser">
@@ -353,6 +375,7 @@ export function ListPage({
           <>
             <div className="library-heading">
               <h1>Library</h1>
+              {availabilityLine}
             </div>
             <div className="library-actions">
               <FreshnessStrip services={serviceState} />
@@ -378,6 +401,7 @@ export function ListPage({
                     : libraryTitleCount(unfilteredTotal, totalIsLowerBound)}
                 </p>
               )}
+              {availabilityLine}
             </div>
             <div className="library-heading__tools">
               {addControl}

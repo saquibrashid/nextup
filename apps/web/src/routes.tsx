@@ -22,6 +22,7 @@
 import type { ComponentType } from 'react';
 
 import { AboutPage } from './pages/AboutPage';
+import { AvailabilityReviewRoute } from './containers/AvailabilityReviewRoute';
 import { BatchHistoryRoute } from './containers/BatchHistoryRoute';
 import { BatchStatusRoute } from './containers/BatchStatusRoute';
 import { ListRoute } from './containers/ListRoute';
@@ -107,6 +108,12 @@ export const ROUTES: readonly RouteDefinition[] = [
     Component: WaitingDetailsRoute,
     examplePath: '/waiting/example-title',
     navLabel: null,
+  },
+  {
+    path: '/availability',
+    Component: AvailabilityReviewRoute,
+    examplePath: '/availability',
+    navLabel: 'Availability changes',
   },
   {
     path: '/about',
