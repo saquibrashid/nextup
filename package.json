@@ -86,6 +86,6 @@
   },
   "dependencies": {
     "@azure/identity": "^4.13.3",
-    "openai": "^7.14.0"
+    "openai": "^7.28.0"
   }
 }
