@@ -151,6 +151,12 @@ function normaliseProvider(name: string): string {
 
 // Exact normalized names, not service prefixes: "Maxwell" is not Max, and
 // Amazon Video / Apple TV storefront offers do not imply a subscription.
+//
+// ⚠ "Apple TV" is BOTH names since Apple's Oct 2025 rebrand: TMDB provider
+// 350 (the subscription, formerly "Apple TV Plus") and provider 2 (the
+// rent/buy store). These aliases are only ever matched against the FLATRATE
+// list, where only the subscription can appear, so "apple tv" here is the
+// subscription. Without it every Apple TV+ title reads as having left.
 const SUBSCRIPTION_PROVIDER_ALIASES: Readonly<Record<Service, readonly string[]>> = {
   netflix: ['netflix', 'netflix standard with ads', 'netflix kids'],
   max: [
@@ -172,7 +178,12 @@ const SUBSCRIPTION_PROVIDER_ALIASES: Readonly<Record<Service, readonly string[]>
     'prime video with ads',
   ],
   'disney-plus': ['disney plus', 'disney plus with ads', 'disney plus premium'],
-  'apple-tv-plus': ['apple tv plus', 'apple tv plus amazon channel'],
+  'apple-tv-plus': [
+    'apple tv plus',
+    'apple tv plus amazon channel',
+    'apple tv',
+    'apple tv amazon channel',
+  ],
   'paramount-plus': [
     'paramount plus',
     'paramount plus with ads',
