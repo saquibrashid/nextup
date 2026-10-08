@@ -283,10 +283,20 @@ third-party libraries involved" — **not on the merits**. The behaviour is
 unadjudicated, not rejected, so a clean no-third-party repro is a live path to
 reopening it.
 
-The ignore in `.github/dependabot.yml` is capped at `versions: ['>=28']`
+The ignore in `.github/dependabot.yml` is capped at `versions: ['>=27']`
 rather than by update-type, the same way `@types/node` is: 26 is known good
 (the upstream report reproduces clean on 26.1.0), so the cap stays as small as
 the evidence supports.
+
+⚠ **The cap is `>=27` because 27 was measured, not assumed.** It was first
+written as `>=28`, which let Dependabot raise `#427` (25.0.1 → 27.4.0). That
+PR failed jobs `4` and `6` with **exactly the same five tests** — `T-UX-145c`,
+`T-AVREV-009a`, `T-PHONE-005a`, `T-PHONE-005b`, `T-TOOLBAR-002b` — while the
+other ten jobs, `9 · test:a11y` included, passed. jsdom 27 carries the
+regression, so the first bad major is 27.
+
+~~Superseded: "The ignore … is capped at `versions: ['>=28']`" — 28 was an
+assumption about where the regression began, not a measurement.~~
 
 **UNBLOCKED BY:** jsdom restoring accname 1.2 step 2I space separation, or
 `dom-accessibility-api` no longer depending on the old `display` default *and*
