@@ -11,18 +11,20 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 0 |
+| ⬜ todo | 3 |
 | 🚧 doing | 0 |
 | ✅ done | 270 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **273** |
+| **total** | **276** |
 
 ## Ready to start
 
 Not done, and every task they depend on is done.
 
-_Nothing is ready: every unfinished task is waiting on a dependency._
+| Task | Size | Section |
+|---|---|---|
+| `TASK-276` | 1 agent-run + 15 owner-review-minutes | Approved auto-detect import (`A57`, #396), 2026-10-08 |
 
 ## Waiting on the owner
 
@@ -34,8 +36,12 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 
 ## Blocked by a dependency
 
-0 tasks cannot start yet.
+2 tasks cannot start yet.
 
+| Task | Waiting on |
+|---|---|
+| `TASK-277` | `TASK-276` |
+| `TASK-278` | `TASK-277` |
 
 ## Done
 
