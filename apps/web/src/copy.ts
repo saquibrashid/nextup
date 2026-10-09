@@ -985,7 +985,7 @@ export const LOAD_MORE_FAILED = "Couldn't load more titles. The ones above are s
  * empty star row, so this string may be reworded but may not become blank.
  */
 export const IMDB_RATING_SOURCE = 'IMDb';
-export const IMDB_RATING_ABSENT = 'No IMDb rating';
+export const IMDB_RATING_ABSENT = 'No rating';
 
 /*
   `specs/ux-states.md` §2.13 **Submitting (row action)** (`T-UX-021`).

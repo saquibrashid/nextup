@@ -5593,7 +5593,7 @@ button {
     justify-self: end;
     align-self: start;
     font-size: var(--text-sm);
-    max-width: 6rem;
+    white-space: nowrap;
     text-align: right;
   }
 
@@ -5649,6 +5649,7 @@ button {
   .title-list[data-view='grid'] .genre-chips {
     grid-column: 1;
     grid-row: 2;
+    flex-wrap: nowrap;
     column-gap: calc(var(--space-1) / 2);
   }
 
