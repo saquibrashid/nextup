@@ -5657,6 +5657,12 @@ button {
     padding: 0 var(--space-1);
     font-size: var(--text-sm);
     line-height: var(--leading-normal);
+    /* Never break inside a genre: truncate the word instead. */
+    min-width: 0;
+    overflow: hidden;
+    overflow-wrap: normal;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .title-list[data-view='grid'] .genre-chips .btn {
