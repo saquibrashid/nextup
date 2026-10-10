@@ -2,7 +2,7 @@
 
 **Project:** nextup
 **Version:** Current v1 scope, including subsequent owner-approved promotions; remaining deferrals are in §11.2.
-**Status:** Approved scope with recorded amendments through US-066 / REQ-132 (`A57`). ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
+**Status:** Approved scope with recorded amendments through US-067 / REQ-133 (`A58`). ~~"through US-066 / REQ-132 (`A57`)"~~ ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
 **Inputs:** `docs/BRD.md`, the recorded owner decisions in the ADRs, and the original authoring-tree `Context/` documents. **The `Context/` tree is not supplied in this repository.** Its citations preserve provenance, not an instruction to invent missing source text. See `docs/current-release.md` for the owner decisions applied on 2026-09-17 and `docs/requirement-index.md` for reconciled reference authority.
 **Audience:** the implementer. Implementation will be performed by GitHub Copilot in autopilot mode (ASM-028, ASM-029, NFR-002, NFR-003, NFR-004). This document, together with the specs, IS the implementation input. Acceptance criteria are written to be executable and verifiable without asking a question.
 **No timeline.** Per A19 / ASM-027 this document contains no dates, durations, or sequencing commitments beyond dependency order.
@@ -109,6 +109,22 @@
 > **New in this document:** **US-065 / REQ-131** (Epic L), seven acceptance criteria. **Corrected in place:** US-043's out-of-scope line. **No migration** — the forecast is computed per request, so the order is applied in memory over the rows the waiting read already returns.
 ---
 
+> ## ⚠ AMENDMENT — 2026-10-09 — `A58` (owner-approved): permanent delete from the Removed view — a narrow, owner-initiated exception to REQ-028 (#398)
+>
+> **The owner approved** (#398) permanently deleting entries from the Removed view. The motive is **privacy: the record must be truly gone** — a reversible hide does not meet it. ADR-0015 records the decision.
+>
+> | Decision | What it changes | Kind |
+> |---|---|---|
+> | **1. Only owner-initiated, only from Removed** | Permanent delete exists only as an explicit owner action on a listing already in the `removed` state, behind a confirmation that names what is lost. No scheduler, TTL or job ever deletes (US-023 AC-3, `T-INV-013` stand). | **Instruction** |
+> | **2. Scope** | One removed listing, plus a separate explicit *Delete all history for this work*. | **Instruction** |
+> | **3. Related records** | The `ExtractionCandidate` rows that produced the deleted listing are deleted (they hold raw extracted text). `UploadBatch` rows are kept but the batch becomes non-undoable for that work. | **Instruction** |
+> | **4. The Title** | Deleted too, but only when no listing of any state remains and nothing else references it. | **Instruction** |
+> | **5. Suppression is never deleted** | Invariant 1 stands: "not interested" is keyed on work identity and survives. | **Invariant** |
+> | **6. No tombstone** | A deleted work that reappears is a brand-new title (L1/A33). | **Instruction** |
+> | **7. Backups** | Azure SQL 7-day PITR retains deleted data until it ages out; the confirmation says so. | **Disclosure** |
+>
+> **New in this document:** **US-067 / REQ-133** (Epic H). **Corrected in place:** G-5, US-023 AC-1, AC-3 and AC-5 (superseded text struck through).
+
 > ## ⚠ AMENDMENT — 2026-10-08 — `A57` (owner-approved): import without choosing a service — Auto-detect (#396)
 >
 > **The owner approved** (#396) uploading screenshots **without naming a service first**, with each title's service looked up afterwards — the way *Waiting to stream* already resolves availability (ADR-0010 Rev 2/3) and the Library flags moves (Rev 4). Design and rationale: ADR-0010 **Revision 6**.
@@ -164,7 +180,7 @@ The feeder loop's ergonomics are the single largest adoption risk (M5, OQ-011). 
 | G-2 | Make the combined list actually decidable: filter by service, type and genre, sort by when the title entered nextup. | OBJ-2, REQ-032, REQ-033, REQ-034, REQ-036 |
 | G-3 *(amended by **A45**)* | Make feeding the list cheap enough to keep doing: **get the capture in by the shortest path the platform allows — clipboard paste as the primary interaction, with file selection and drag-and-drop equally supported** — then multi-image batching, batch review, group confirmation. ⚠ The capture-entry saving is real but **small and honest: roughly one tap per image** (§7.8 KL-2). **The dominant cost in this goal remains the review pass, and paste does not reduce it** — so this goal is still measured by M5, and M5's kill criterion is untouched by A45. | OBJ-3, M5, REQ-004, REQ-020 |
 | G-4 | Never mutate list state without the owner seeing and approving the change first. | OBJ-4, REQ-013, REQ-020, REQ-041 |
-| G-5 | Never lose data. Nothing is hard-deleted; removals are reversible; batches are reversible where safe and explicitly refused with a full enumeration where they are not. | OBJ-5, REQ-028, REQ-056, REQ-063, REQ-067, REQ-075 |
+| G-5 | Never lose data. Nothing is hard-deleted **except by the owner's explicit permanent delete from the Removed view (US-067, `A58`)**; ~~Nothing is hard-deleted;~~ removals are reversible; batches are reversible where safe and explicitly refused with a full enumeration where they are not. | OBJ-5, REQ-028, REQ-056, REQ-063, REQ-067, REQ-075 |
 | G-6 | Make absence meaningful only where the owner has said it is meaningful: inside a closed full-update batch for exactly one service. | OBJ-4, REQ-002, REQ-005, REQ-022, REQ-023 |
 | G-7 | Let the owner permanently stop caring about a work, in a way that survives that work reappearing in a later capture. | OBJ-6, REQ-070, REQ-071 |
 | G-8 | Keep the owner's data private to the owner and keep third-party obligations met (TMDB attribution, no streaming credentials, no automated requests to streaming services). | OBJ-7, NFR-001, NFR-009, NFR-010, NFR-013, NFR-015 |
@@ -852,11 +868,11 @@ Nullable keys sort last in both directions.
 
 | # | Given | When | Then |
 |---|---|---|---|
-| AC-1 | Any Title, ServiceListing, Suppression, UploadBatch or ExtractionCandidate | Any owner action, including removal, batch undo and suppression | The record is state-changed, never deleted. No hard delete of a list record exists anywhere in nextup (REQ-028) |
+| AC-1 | Any Title, ServiceListing, Suppression, UploadBatch or ExtractionCandidate | Any owner action, including removal, batch undo and suppression | The record is state-changed, never deleted. **The one exception is the owner's explicit permanent delete from the Removed view (US-067, `A58`); no other hard delete of a list record exists anywhere in nextup (REQ-028).** ~~No hard delete of a list record exists anywhere in nextup (REQ-028)~~ |
 | AC-2 | A Title with no active listings | The combined list renders | It is hidden from the combined list but retained in storage indefinitely (REQ-031, REQ-028) |
-| AC-3 | The system at any time | It is inspected | There is no purge, archive, retention or clean-up job affecting list records. The **only** automatic deletion in the whole product is the screenshot image purge in NFR-019 (US-035) |
+| AC-3 | The system at any time | It is inspected | There is no purge, archive, retention or clean-up job affecting list records. **Permanent delete (US-067) is never automatic: it runs only on an owner request.** The **only** automatic deletion in the whole product is the screenshot image purge in NFR-019 (US-035) |
 | AC-4 (edge) | Storage growth over years of use | It accumulates | It is accepted. There is no cap, no eviction and no oldest-first trimming of list records |
-| AC-5 (failure) | Any code path, migration or admin script that hard-deletes a list record | Automated verification runs | The test fails (NFR-003) |
+| AC-5 (failure) | Any code path, migration or admin script that hard-deletes a list record **outside the allow-listed US-067 module** | Automated verification runs | The test fails (NFR-003). ~~Any code path ... that hard-deletes a list record~~ |
 
 **Out of scope for this story:** the screenshot images themselves, which are the sole exception and are covered by US-035.
 **Open questions:** none.
@@ -1551,6 +1567,32 @@ US-036 AC-2 and the closed process enumeration now permit **four** processes,
 including the waiting-view availability refresh. Do not increment the count
 again for this already-approved feature. Epic M historically raised it from
 two to three; Epic L raised it from three to four.
+
+#### US-067 — Permanently delete a removed entry (`A58`, #398)
+
+**As** the owner
+**I want** to permanently delete an entry from the Removed view
+**So that** a record I want gone for privacy is truly gone, not merely hidden
+
+**Traces to:** REQ-133 (amends REQ-028; ADR-0015)
+**Priority:** must
+**Epic:** H
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | A listing in the Removed view | The owner chooses *Delete permanently* and confirms | That one listing row is hard-deleted and leaves the Removed view. A listing that is not in the `removed` state cannot be deleted (`409 LISTING_NOT_REMOVED`). |
+| AC-2 | The owner chooses *Delete permanently* | The confirmation appears | It names what is lost (the listing, its extraction records for it, its undo), says it cannot be undone, and says backups keep it for up to 7 days. Nothing is deleted until the owner confirms. |
+| AC-3 | A work with several removed rows | The owner chooses *Delete all history for this work* and confirms | Every `removed` row of that work is deleted in one transaction. If any row of the work is active, the action is refused whole (`409 WORK_HAS_ACTIVE_LISTING`). |
+| AC-4 | The deleted listing | The delete commits | The `ExtractionCandidate` rows that produced it are deleted. The `UploadBatch` row is kept and the batch is non-undoable for that work, refused through the US-033 enumeration. |
+| AC-5 | A Title left with no listings of any state and referenced by no other record | The delete commits | The Title is deleted in the same transaction. Otherwise it is kept. |
+| AC-6 (invariant) | A `Suppression` for the work | Any permanent delete runs | The suppression is untouched. It is never deleted (invariant 1). |
+| AC-7 (edge) | A deleted work reappears in a later capture | The batch closes | It is a brand-new title dated today. No tombstone exists (L1/A33). |
+| AC-8 (failure) | Any step of a delete fails | The transaction runs | Nothing is deleted. |
+| AC-9 (invariant) | The code base | `T-INV-012` and `T-INV-013` run | Only the allow-listed single-purpose module deletes, and nothing deletes without an owner request. No scheduler, TTL or job is added. |
+| AC-10 (security) | An id belonging to another owner | A delete is requested | The refusal is byte-identical to not-found, and nothing is deleted (`ownerId` predicate). |
+
+**Out of scope:** deleting active listings; a bulk *empty the Removed view*; deleting suppression; deleting `UploadBatch` rows.
+**Open questions:** none.
 
 ---
 

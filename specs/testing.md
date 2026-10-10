@@ -1453,7 +1453,21 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 | AC-2 | I | `T-LIST-013` | Hidden from the list, present in the removed view |
 | AC-3 | S | **`T-INV-013`** | **(R4)** No **Azure SQL Agent job, no Elastic Job**, no delete trigger, no scheduled job, no `TRUNCATE` in any migration, and `DELETE` in exactly one module; Bicep + source-tree + migrations assertion (`specs/data-model.md` §16.7). *(R3 wording: "no `pg_cron`"; the analogue is the Agent/Elastic-Job prohibition.)* |
 | AC-4 | M/§10 | `T-PERF-001` | Growth is accepted; scale-invariance of the removed view is the enforceable half |
-| AC-5 | S | **`T-INV-012`** | No hard delete outside the creates-only-undo call site and pre-submit draft images |
+| AC-5 | S | **`T-INV-012`** | No hard delete outside the creates-only-undo call site, pre-submit draft images **and the allow-listed US-067 module `purgeRemoved.ts` (`A58`)** |
+
+### US-067 — Permanently delete a removed entry (TASK-276 – TASK-278, #398, `A58`)
+| AC | L | Test | Assertion |
+|---|---|---|---|
+| AC-1 | I | `T-PURGE-001` | A `removed` listing is hard-deleted; an active or foreign one is refused (`LISTING_NOT_REMOVED`, byte-identical not-found) |
+| AC-2 | C/E | `T-PURGE-020` | The confirmation names what is lost, states irreversibility and the 7-day backup window; cancelling deletes nothing |
+| AC-3 | I | `T-PURGE-002` | *Delete all history for this work* deletes every removed row in one transaction; any active row refuses whole |
+| AC-4 | I | `T-PURGE-003` | Producing `ExtractionCandidate` rows are deleted; the `UploadBatch` survives and its undo is refused for that work |
+| AC-5 | I | `T-PURGE-004` | The Title is deleted only with no listings left and no reference; otherwise kept |
+| AC-6 | I | `T-PURGE-005` | `Suppression` is untouched |
+| AC-7 | I | `T-PURGE-006` | A later capture of the deleted work creates a brand-new title dated today |
+| AC-8 | I | `T-PURGE-007` | A forced mid-transaction failure deletes nothing |
+| AC-9 | S | `T-INV-012`, `T-INV-013` | Only the allow-listed module deletes; no scheduler, TTL or job was added |
+| AC-10 | I | `T-PURGE-001` | Another owner's id is refused and nothing is deleted |
 
 ### US-024 — Browse the removed view as a historical log
 | AC | L | Test | Assertion |

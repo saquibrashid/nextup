@@ -38,7 +38,8 @@ meanings. Original story coverage is also recorded in PRD Appendix A.1.
 | REQ-015, REQ-019, REQ-020, REQ-021, REQ-055 | Propose disappeared listings, default ticks, individual rescue and group confirmation | BRD 6.1; PRD US-014, US-015 |
 | REQ-022, REQ-023 | Append-only cannot remove; full-update affects only its own service | BRD 6.1; PRD US-014, US-016 |
 | REQ-024, REQ-025, REQ-026 | Work identity, one listing per service and active-service badges, with explicit duplicate-confirmation exceptions | BRD 6.1; PRD US-018, US-025 AC-5, US-030 AC-4 |
-| REQ-027, REQ-028 | Removal state and indefinite soft-delete retention; not an infrastructure recovery guarantee | BRD 6.1; PRD US-016, US-023; [restore runbook](restore.md) |
+| REQ-027, REQ-028 | Removal state and indefinite soft-delete retention; not an infrastructure recovery guarantee. **Amended at `A58`: one owner-initiated permanent delete of removed entries (REQ-133).** | BRD 6.1; PRD US-016, US-023, US-067; [ADR-0015](adr/ADR-0015-permanent-delete.md); [restore runbook](restore.md) |
+| REQ-133 | Owner-initiated permanent delete from the Removed view (privacy) | PRD US-067; ADR-0015 |
 | REQ-030, REQ-060, REQ-061 | Record date-added once and label it honestly | BRD 6.1; PRD US-021 |
 | REQ-031 | Combined-list membership and the separate removed view | BRD 6.1; PRD US-018, US-023 |
 | REQ-032, REQ-033, REQ-034 | Service, type and genre filters | BRD 6.1; PRD US-019 |

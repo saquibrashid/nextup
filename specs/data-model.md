@@ -146,6 +146,7 @@ REQ-060…REQ-076, NFR-001, NFR-008, NFR-011, NFR-014, NFR-018, NFR-019, NFR-020
 | **SD-05** | The unmatched fallback identity **excludes the extracted year**, contrary to ADR-0007 normalisation rule 6. Rationale in §2.3.2. | Amendment to ADR-0007 |
 | **SD-06** | Fix-match **migrates** an active `suppression` from the old `workIdentity` to the new one and reports the migration to the owner. (§6.3) | Amendment to ADR-0007, new AC |
 | **SD-16** *(new, A45)* | **A pasted image gets a synthesised DISPLAY name `pasted-YYYYMMDD-HHMMSS-NN.<ext>`; its STORAGE identity is unchanged (server ULID), and `ingestSource` records `paste`/`upload`/`drop`.** Paste is an **additional** ingest affordance onto the **existing** multi-image batch model, not a parallel one. (§3.1, §3.8, §3.8.1) | Decided here |
+| **SD-18** *(new, A58)* | **Owner-initiated permanent delete of a `removed` listing is a second sanctioned hard delete** (US-067, ADR-0015, §8.5). It is the narrow exception to I-7 and REQ-028; suppression is never deleted and nothing deletes automatically. |
 | **SD-17** *(new, A45)* | **The HEIC→PNG transcode becomes CONDITIONAL on the sniffed `uploadedFormat` and is NOT deleted.** The paste path always delivers PNG so it skips the stage as a no-op; the iOS Photos **file-upload** path still delivers raw HEIC and still requires it. (§3.8, `api.md` §5.1) | Decided here |
 
 ---
@@ -922,7 +923,7 @@ asserts nulls sort last under both `dir=desc` and `dir=asc`.
 | **I-4** | `title.state` and `title.sortDateAdded` equal the values `derive.ts` computes from `listings` | `T-INV-010` |
 | **I-5** | `matchState === 'matched'` ⟺ `workIdentity` starts `tmdb:` ⟺ `tmdb !== null` | `T-INV-011` |
 | **I-6** | No `title.listings[].dateAdded` changes after creation | `T-INV-006` |
-| **I-7** | No document type is ever hard-deleted **except** by creates-only batch undo (§8.3) | `T-INV-012` |
+| **I-7** | No document type is ever hard-deleted **except** by creates-only batch undo (§8.3) **and the owner's permanent delete of a `removed` listing (§8.5, SD-18, `A58`)** ~~No document type is ever hard-deleted except by creates-only batch undo (§8.3)~~ | `T-INV-012` |
 | **I-8** | **No mechanism exists that could expire or schedule the deletion of list data** — no TTL, no `pg_cron`, no Azure SQL Agent job, no Elastic Job, no trigger (§16.7). ~~No Cosmos container, database or document carries a TTL~~ | `T-INV-013` |
 
 **I-1 permits duplicates deliberately.** US-025 AC-5 and US-030 AC-4 both allow
@@ -1221,6 +1222,20 @@ under §8.4**, enumerating those titles.
   link, so undo could not reverse it (`T-AUTO-015a`, `T-AUTO-022a`).
 - **Nothing is written.** `T-UNDO-005` snapshots the whole partition before and
   after and asserts equality.
+
+### 8.5 Permanent delete of a removed listing (SD-18, US-067, `A58`)
+
+A single-purpose module, `apps/api/src/repository/purgeRemoved.ts`, modelled on `undoDiscard.ts` (a local `db()`, `deleteMany`, an `ownerId` predicate), is the only code that performs this delete. `T-INV-012` allow-lists it by `file::model`.
+
+One transaction, owner-scoped, runs for a listing id (or, for *Delete all history for this work*, every `removed` listing of one `workIdentity`):
+
+1. Refuse unless every target listing is `removed` (`409 LISTING_NOT_REMOVED`; `409 WORK_HAS_ACTIVE_LISTING` for the work-wide action). A foreign or unknown id is the byte-identical not-found refusal.
+2. Delete the `ExtractionCandidate` rows that produced the listing; null the listing references on `BatchChange` rows, and mark the batch non-undoable for that work so US-033 refuses it with the existing enumeration.
+3. Delete the `ServiceListing` rows.
+4. Delete the `Title` only if no listing of any state remains and no `WatchIntent` or other row references it.
+5. Never touch `Suppression`. No tombstone is written.
+
+Any failure rolls back everything. `UploadBatch` rows are never deleted. Backups keep the data until 7-day PITR ages out (stated in the confirmation).
 
 ---
 
