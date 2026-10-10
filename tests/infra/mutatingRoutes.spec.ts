@@ -279,6 +279,8 @@ describe('T-MUT-001 · US-036 AC-1/AC-3 · REQ-041 is a closed enumeration (PRD 
       'POST /api/titles/:id/availability/keep',
       'POST /api/titles/:id/badges',
       'POST /api/availability/check',
+      'POST /api/titles/:id/availability/check',
+      'POST /api/waiting/:id/availability/check',
       'POST /api/availability/review/apply',
     ].map((s) => {
       const [method, p] = s.split(' ');

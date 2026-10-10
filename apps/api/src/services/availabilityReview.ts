@@ -95,6 +95,127 @@ export function selectForAvailabilityCheck(
 }
 
 /**
+ * "Re-check everything" (US-068, PRD `A59`) — a position in the walk.
+ *
+ * ⚠ **THE CURSOR IS THE WHOLE STATE, AND THE SERVER KEEPS NONE.** One tap looks
+ * up the next `AVAILABILITY_CHECK_BATCH` rows ordered by (stored checked-at
+ * ascending, never-checked as 0, then id) that are (a) older than `since`, the
+ * instant the owner began, and (b) strictly after `after`, the last row the
+ * previous tap ATTEMPTED. (a) drops every row a tap has answered, because a
+ * success stamps `checkedAt >= since`; (b) is what stops a row whose lookup
+ * FAILED — which keeps its old stamp, by design — from being the first pick of
+ * every later tap and starving the rest. No loop is possible: each tap moves
+ * `after` strictly forward.
+ */
+export interface RecheckCursor {
+  checkedAtMs: number;
+  id: string;
+}
+
+const CURSOR_PATTERN = /^(\d{1,16}):([A-Za-z0-9_-]{1,64})$/;
+
+export const formatRecheckCursor = (cursor: RecheckCursor): string =>
+  `${String(cursor.checkedAtMs)}:${cursor.id}`;
+
+export function parseRecheckCursor(raw: string): RecheckCursor | null {
+  const match = CURSOR_PATTERN.exec(raw);
+  if (match === null) return null;
+  return { checkedAtMs: Number(match[1]), id: match[2] as string };
+}
+
+const recheckKey = (candidate: CheckCandidate): RecheckCursor => ({
+  checkedAtMs: candidate.row.availabilityCheckedAt?.getTime() ?? 0,
+  id: candidate.row.id,
+});
+
+const compareKeys = (a: RecheckCursor, b: RecheckCursor): number =>
+  a.checkedAtMs - b.checkedAtMs || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+/** Only rows with something to ask TMDB about can be re-checked. */
+const askable = (candidate: CheckCandidate): boolean =>
+  candidate.row.tmdbId !== null && candidate.row.tmdbMediaType !== null;
+
+function recheckRemainingRows(
+  rows: readonly CheckCandidate[],
+  since: Date,
+  after: RecheckCursor | null,
+): CheckCandidate[] {
+  return rows
+    .filter(askable)
+    .filter((candidate) => {
+      const key = recheckKey(candidate);
+      if (key.checkedAtMs >= since.getTime()) return false;
+      return after === null || compareKeys(key, after) > 0;
+    })
+    .sort((a, b) => compareKeys(recheckKey(a), recheckKey(b)));
+}
+
+/** The next rows a "Re-check everything" tap looks up, least recently checked first. */
+export function selectForRecheckAll(
+  rows: readonly CheckCandidate[],
+  since: Date,
+  after: RecheckCursor | null,
+  limit: number = AVAILABILITY_CHECK_BATCH,
+): CheckCandidate[] {
+  return recheckRemainingRows(rows, since, after).slice(0, limit);
+}
+
+/**
+ * Where the walk stands. `total` is every askable row, `remaining` the ones the
+ * walk has yet to attempt, so `total - remaining` is "N of M looked at" —
+ * attempted failures included, because they will not be retried this walk.
+ */
+export function recheckProgress(
+  rows: readonly CheckCandidate[],
+  since: Date,
+  after: RecheckCursor | null,
+): { total: number; remaining: number } {
+  return {
+    total: rows.filter(askable).length,
+    remaining: recheckRemainingRows(rows, since, after).length,
+  };
+}
+
+export type CheckRequest =
+  { scope: 'stale' } | { scope: 'all'; since: Date | null; after: RecheckCursor | null };
+
+/** Parse and validate the §6.47 body. Throws `400 VALIDATION_FAILED`. */
+export function parseCheckBody(body: unknown, now: Date): CheckRequest {
+  const invalid = (message: string, field: string): AppError =>
+    new AppError('VALIDATION_FAILED', 400, message, { field });
+  const record =
+    typeof body === 'object' && body !== null && !Array.isArray(body)
+      ? (body as Record<string, unknown>)
+      : {};
+  const scope = record['scope'] ?? 'stale';
+  if (scope === 'stale') {
+    if (record['since'] !== undefined || record['cursor'] !== undefined) {
+      throw invalid('"since" and "cursor" belong to the "all" scope.', 'scope');
+    }
+    return { scope: 'stale' };
+  }
+  if (scope !== 'all') throw invalid('"scope" is not one of the permitted values.', 'scope');
+
+  let since: Date | null = null;
+  const rawSince = record['since'];
+  if (rawSince !== undefined && rawSince !== null) {
+    since = typeof rawSince === 'string' ? new Date(rawSince) : new Date(Number.NaN);
+    // A little slack for clock drift; a future start would re-check nothing.
+    if (Number.isNaN(since.getTime()) || since.getTime() > now.getTime() + 60_000) {
+      throw invalid('"since" must be the ISO time the re-check began.', 'since');
+    }
+  }
+  let after: RecheckCursor | null = null;
+  const rawCursor = record['cursor'];
+  if (rawCursor !== undefined && rawCursor !== null) {
+    after = typeof rawCursor === 'string' ? parseRecheckCursor(rawCursor) : null;
+    if (after === null) throw invalid('"cursor" is not one this server issued.', 'cursor');
+    if (since === null) throw invalid('"cursor" needs the "since" it belongs to.', 'since');
+  }
+  return { scope: 'all', since, after };
+}
+
+/**
  * The service a bulk "Add to Library" uses for a waiting row (US-064 AC-4):
  * the FIRST owner service it streams on, in `SERVICES` order. `null` when no
  * owner service streams it, which refuses that item.

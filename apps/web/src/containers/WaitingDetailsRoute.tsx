@@ -58,6 +58,7 @@ export function WaitingDetailsRoute({
         onReload={reload}
         onSuppress={(id) => client.suppressTitle(id)}
         onSuppressed={() => navigate('/waiting')}
+        onCheckNow={(id) => client.checkWaitingAvailabilityNow(id)}
       />
     );
   }

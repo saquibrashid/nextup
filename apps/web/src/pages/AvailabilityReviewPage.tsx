@@ -38,6 +38,12 @@ import {
   AVREV_CANCEL,
   AVREV_CHECK_FAILED,
   AVREV_CHECK_MORE,
+  AVREV_RECHECK_ALL,
+  AVREV_RECHECK_CONTINUE,
+  AVREV_RECHECK_DONE,
+  AVREV_RECHECK_HINT,
+  AVREV_RECHECK_PROGRESS_OF,
+  AVREV_RECHECK_PROGRESS_SUFFIX,
   AVREV_CHECK_SOME_FAILED,
   AVREV_CHECK_WORKING,
   AVREV_CHECKED_NOW,
@@ -72,6 +78,7 @@ import {
 import type {
   ApiClient,
   AvailabilityCheckResponse,
+  AvailabilityRecheckProgress,
   AvailabilityReviewAction,
   AvailabilityReviewLibraryItem,
   AvailabilityReviewResponse,
@@ -279,6 +286,8 @@ export function AvailabilityReviewPage({
   const [outcome, setOutcome] = useState<BulkOutcome | null>(null);
   const [checkPhase, setCheckPhase] = useState<'idle' | 'working' | 'error'>('idle');
   const [lastCheck, setLastCheck] = useState<AvailabilityCheckResponse | null>(null);
+  // US-068 AC-3 — the open "Re-check everything" walk; held here so each tap continues it.
+  const [walk, setWalk] = useState<AvailabilityRecheckProgress | null>(null);
   const confirmHeadingId = useId();
   const libraryHeadingId = useId();
   const waitingHeadingId = useId();
@@ -353,6 +362,22 @@ export function AvailabilityReviewPage({
     setCheckPhase('working');
     actions.checkMoreAvailability().then(
       (result) => {
+        setWalk(null);
+        setLastCheck(result);
+        setCheckPhase('idle');
+        onChanged();
+      },
+      () => setCheckPhase('error'),
+    );
+  };
+
+  const recheckAll = (): void => {
+    setCheckPhase('working');
+    const next =
+      walk !== null && !walk.done ? { since: walk.since, cursor: walk.cursor } : ('all' as const);
+    actions.checkMoreAvailability(next).then(
+      (result) => {
+        setWalk(result.recheck ?? null);
         setLastCheck(result);
         setCheckPhase('idle');
         onChanged();
@@ -410,6 +435,23 @@ export function AvailabilityReviewPage({
         >
           {checkPhase === 'working' ? AVREV_CHECK_WORKING : AVREV_CHECK_MORE}
         </Button>
+        <Button
+          variant="secondary"
+          data-testid="avrev-recheck-all"
+          disabled={offline || checkPhase === 'working' || (walk !== null && walk.done)}
+          aria-busy={checkPhase === 'working' ? true : undefined}
+          onClick={recheckAll}
+        >
+          {walk !== null && !walk.done ? AVREV_RECHECK_CONTINUE : AVREV_RECHECK_ALL}
+        </Button>
+        <p className="avrev__hint">{AVREV_RECHECK_HINT}</p>
+        {walk !== null && (
+          <p data-testid="avrev-recheck-progress">
+            {walk.done
+              ? AVREV_RECHECK_DONE
+              : `${String(walk.processed)} ${AVREV_RECHECK_PROGRESS_OF} ${String(walk.total)} ${AVREV_RECHECK_PROGRESS_SUFFIX}`}
+          </p>
+        )}
       </div>
       {offline && (
         <p className="offline-reason" data-testid="avrev-offline">

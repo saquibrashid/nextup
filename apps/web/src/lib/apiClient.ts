@@ -628,12 +628,38 @@ export interface AvailabilityReviewResponse {
   check: AvailabilityCheckCounts;
 }
 
-/** §6.47 — one "Check more titles" tap. */
+/**
+ * §6.47 (US-068 AC-3) — where a "Re-check everything" walk stands. `since` and
+ * `cursor` are handed back unchanged on the next tap; `processed` of `total`
+ * counts every title attempted, failures included.
+ */
+export interface AvailabilityRecheckProgress {
+  since: string;
+  cursor: string | null;
+  total: number;
+  remaining: number;
+  processed: number;
+  done: boolean;
+}
+
+/** §6.47 — one "Check more titles" or "Re-check everything" tap. */
 export interface AvailabilityCheckResponse extends AvailabilityCheckCounts {
   /** Answers written by this tap. */
   lookedUp: number;
   /** Lookups that failed and wrote nothing. */
   failed: number;
+  /** Present only for `scope: 'all'`. */
+  recheck?: AvailabilityRecheckProgress;
+}
+
+/** §6.52 / §6.53 (US-068 AC-1/AC-2) — the answer one "Check now" wrote. */
+export interface AvailabilityCheckNowResponse {
+  id: string;
+  checkedAt: string;
+  region: string;
+  availableOn: string[] | null;
+  rentOn: string[] | null;
+  accessState: 'not-checked' | 'unknown' | 'streaming' | 'rent-only' | 'not-seen';
 }
 
 export type AvailabilityReviewAction =
@@ -1074,9 +1100,39 @@ export function createApiClient(deps: ApiClientDeps = {}) {
       request<{ count: number }>('/api/availability/review/summary', { signal }, deps),
 
     /** §6.47 (US-064 AC-3) — "Check more titles": one owner tap, one capped batch. */
-    checkMoreAvailability: () =>
+    checkMoreAvailability: (walk?: { since?: string; cursor?: string | null } | 'all') =>
       request<AvailabilityCheckResponse>(
         '/api/availability/check',
+        {
+          method: 'POST',
+          body:
+            walk === undefined
+              ? {}
+              : {
+                  scope: 'all',
+                  ...(walk === 'all' || walk.since === undefined
+                    ? {}
+                    : {
+                        since: walk.since,
+                        ...(walk.cursor == null ? {} : { cursor: walk.cursor }),
+                      }),
+                },
+        },
+        deps,
+      ),
+
+    /** §6.52 (US-068 AC-1) — "Check now" for one Library title, whatever its age. */
+    checkTitleAvailabilityNow: (titleId: string) =>
+      request<AvailabilityCheckNowResponse>(
+        `/api/titles/${encodeURIComponent(titleId)}/availability/check`,
+        { method: 'POST', body: {} },
+        deps,
+      ),
+
+    /** §6.53 (US-068 AC-2) — "Check now" for one waiting title. */
+    checkWaitingAvailabilityNow: (intentId: string) =>
+      request<AvailabilityCheckNowResponse>(
+        `/api/waiting/${encodeURIComponent(intentId)}/availability/check`,
         { method: 'POST', body: {} },
         deps,
       ),

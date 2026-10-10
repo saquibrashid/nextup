@@ -262,6 +262,20 @@ cards stay mounted across refresh and summary cancellation. `T-UX-165g`–`k`.
 
 ---
 
+## 9a. Availability re-check — *Check now* and *Re-check everything* (US-068, `A59`)
+
+| State | Owner sees | Can do | Test |
+|---|---|---|---|
+| **9a.1 Idle** | *Check now* and *"Checked <just now / today / date>"* or *"Not checked yet"* on the title details | Press it | `T-RECHECK-007` |
+| **9a.2 Checking** | Button reads *Checking…*, disabled, `aria-busy` | Wait | `T-RECHECK-007` |
+| **9a.3 Done** | *"Checked just now"*; any *left X* / *Now also on Y* + *Add* marker appears without a reload | Answer the marker as before | `T-RECHECK-007`, `T-RECHECK-008`, `T-RECHECK-010` |
+| **9a.4 Failed (502 `TMDB_UNAVAILABLE`)** | *"Couldn't reach TMDB. The last answer is unchanged. Try again in a moment."* + **Try again**; the stored fact is unchanged | Try again | `T-RECHECK-007` |
+| **9a.5 No TMDB match** | Button disabled; *"No TMDB match to check. Find a match first."* | Find a match | `T-RECHECK-007`, `T-RECHECK-008` |
+| **9a.6 Offline** | Button disabled with the standard offline reason | Reconnect | `T-RECHECK-007` |
+| **9a.7 Re-check everything — in progress** | *"20 of 50 re-checked"* and **Continue re-check** | Continue, or leave | `T-RECHECK-009`, `T-RECHECK-010` |
+| **9a.8 Re-check everything — done** | *"Everything has been re-checked."*; the button is disabled | Read the screen | `T-RECHECK-009`, `T-RECHECK-010` |
+| **9a.9 Re-check everything — a tap fails** | *"Couldn't check just now. Nothing was changed."* (the existing line) | Tap again; the walk continues from the same point | `T-RECHECK-009` |
+
 ## 10. Authentication states (US-001, US-002)
 
 | State | Owner sees | Test |

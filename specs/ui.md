@@ -1442,6 +1442,15 @@ No count is colour-alarmed; nothing says *"you should"*. The empty state
   checked just now"* when some failed). Disabled offline (with the standard
   offline reason) and when nothing is due. A failure reads *"Couldn't check
   just now. Nothing was changed."*
+- **Re-check everything** (US-068 AC-3, `A59`). A second secondary button
+  (`avrev-recheck-all`, ≥ 44 px) under the check line, with a one-line hint
+  that it asks about every title, 20 at a time, however recently checked. It
+  is enabled whenever the owner is online — including when nothing is stale.
+  Each tap is one `POST /api/availability/check` with `scope: "all"`; the line
+  `avrev-recheck-progress` reads *"20 of 50 re-checked"* and the button becomes
+  *Continue re-check* until the server says `done`, then the line reads
+  *"Everything has been re-checked."* and the button is disabled. *Check more
+  titles* is unchanged and abandons an open walk.
 - **Selection bar** (`avrev-bar`, a labelled group that **wraps** on a phone):
   *N selected*, then *Keep as is (n)*, *Remove badges that left (n)*, *Move to
   Waiting (n)*, *Add to Library (n)* — each count is the selected rows that
@@ -1473,6 +1482,29 @@ No count is colour-alarmed; nothing says *"you should"*. The empty state
 - **Layout.** Desktop and phone (§5.0a): every button and checkbox label is a
   44 px target, nothing scrolls sideways at 390 px, and the bar and row
   actions wrap.
+
+---
+## 7d. *Check now* on a title's details (US-068, PRD `A59`)
+
+`components/CheckNowControl.tsx`, rendered on the **Library title details**
+(after the availability panel, before the title actions) and on the **Waiting
+details** *Where to watch* section. Not on Library rows or cards — the phone
+layout is unchanged.
+
+- A secondary *Check now* button (`check-now-button`, ≥ 44 px) and a factual
+  line (`check-now-fact`, `role="status"`): *Checked just now* (under 2 minutes),
+  *Checked today*, *Checked 4 Oct*, or *Not checked yet*. It is derived from
+  the stored `checkedAt`, so it stays true after the reload a success triggers.
+  Invariant 8a: a fact, never an *overdue*.
+- Pressing it shows *Checking…* (disabled), calls `POST
+  /api/titles/:titleId/availability/check` (or the waiting equivalent), then
+  re-reads the details, so a *left X* marker or *Now also on Y* with its *Add*
+  badge appears without a reload. It moves nothing by itself.
+- Failure: the button reads *Try again* and `check-now-error` says *"Couldn't
+  reach TMDB. The last answer is unchanged. Try again in a moment."*
+- A title with no TMDB match: the button is disabled and
+  `check-now-reason` says *"No TMDB match to check. Find a match first."*
+  Offline: disabled with the standard offline reason.
 
 ---
 ## 8. TMDB attribution (US-011, NFR-016) — compliance, and invisible when broken
