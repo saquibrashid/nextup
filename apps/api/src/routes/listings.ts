@@ -34,6 +34,7 @@ import {
   restoreServiceListing,
   updateTitle,
 } from '../repository/ownerData.js';
+import { satisfyWaitingIntents } from '../repository/watchIntents.js';
 import { toIsoDate } from './titles.js';
 
 interface RestoreBody {
@@ -119,6 +120,8 @@ export function registerListingRoutes(router: Router): void {
       sortDateAdded: nextDate === null ? null : new Date(`${nextDate}T00:00:00.000Z`),
       ...(existingActive !== null ? { duplicateAckSeq: listing.titleId } : {}),
     });
+    // The work is back in the library, so it is no longer waiting (US-043 AC-3).
+    await satisfyWaitingIntents(ownerId, [workIdentity], new Date());
 
     const restored = await findServiceListing(ownerId, listingId);
     if (restored === null)

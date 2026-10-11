@@ -31,6 +31,15 @@ const restoreServiceListing = vi.fn();
 const findServiceListing = vi.fn();
 const listListingsForTitle = vi.fn();
 const updateTitle = vi.fn();
+const satisfyWaitingIntents = vi.fn();
+
+vi.mock('../../../src/repository/watchIntents.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/repository/watchIntents.js')>();
+  return {
+    ...actual,
+    satisfyWaitingIntents: (...args: unknown[]) => satisfyWaitingIntents(...args) as unknown,
+  };
+});
 
 vi.mock('../../../src/repository/ownerData.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/repository/ownerData.js')>();
@@ -256,5 +265,18 @@ describe('POST /api/listings/:listingId/restore — normal path', () => {
     expect(data.listingId).toBe(LISTING_ID);
     expect(data.state).toBe('active');
     expect(restoreServiceListing).toHaveBeenCalledWith(expect.anything(), LISTING_ID);
+    // T-WAIT-008e: the work is back in the library, so it is no longer waiting.
+    expect(satisfyWaitingIntents).toHaveBeenCalledTimes(1);
+    expect(satisfyWaitingIntents.mock.calls[0]?.[1]).toEqual([WORK_IDENTITY]);
+  });
+
+  it('T-WAIT-008f: a refused restore does not end the wait', async () => {
+    findServiceListingWithWork.mockResolvedValue(removedListingWithWork());
+    findActiveSuppression.mockResolvedValue({ id: 's-1' });
+
+    const res = await postRestore(LISTING_ID);
+    expect(res.status).toBe(409);
+    expect(restoreServiceListing).not.toHaveBeenCalled();
+    expect(satisfyWaitingIntents).not.toHaveBeenCalled();
   });
 });

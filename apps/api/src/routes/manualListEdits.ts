@@ -65,6 +65,7 @@ import {
   softDeleteServiceListing,
   updateTitle,
 } from '../repository/ownerData.js';
+import { satisfyWaitingIntents } from '../repository/watchIntents.js';
 import { tmdbUnavailableAppError } from './tmdb.js';
 import { toIsoDate } from './titles.js';
 import { addTitleEdition, verifyEditionSelection } from '../services/titleEditions.js';
@@ -286,6 +287,9 @@ export function registerManualListEditRoutes(router: Router, getClient: () => Tm
         },
         tx,
       );
+      // A work now in the library is no longer waiting (US-043 AC-3): the same
+      // consequence as a capture, in the same transaction as the listing.
+      await satisfyWaitingIntents(ownerId, [workIdentity], new Date(), tx);
 
       return { titleId, listingId, titleWasCreated };
     }).catch((error: unknown) => {
