@@ -105,6 +105,8 @@ describe('T-DATA-003 — every method sends credentials', () => {
       getAvailabilityReview: () => client.getAvailabilityReview(),
       getAvailabilityReviewSummary: () => client.getAvailabilityReviewSummary(),
       checkMoreAvailability: () => client.checkMoreAvailability(),
+      checkTitleAvailabilityNow: () => client.checkTitleAvailabilityNow('t'),
+      checkWaitingAvailabilityNow: () => client.checkWaitingAvailabilityNow('i'),
       applyAvailabilityReview: () =>
         client.applyAvailabilityReview('keep', [{ id: 'ttl_1', signature: 'v1|starz|' }]),
       getRemoved: () => client.getRemoved(''),

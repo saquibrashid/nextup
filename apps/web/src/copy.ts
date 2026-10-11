@@ -1929,6 +1929,26 @@ export const AVREV_NOW_STREAMING_ON = 'Now streaming on';
 export const AVREV_TITLES_CHECKED = 'titles checked';
 export const AVREV_NOT_CHECKED_RECENTLY = 'not checked recently';
 export const AVREV_CHECK_MORE = 'Check more titles';
+/** US-068 AC-3 — the owner-started walk over every title, whatever its age. */
+export const AVREV_RECHECK_ALL = 'Re-check everything';
+export const AVREV_RECHECK_CONTINUE = 'Continue re-check';
+export const AVREV_RECHECK_PROGRESS_OF = 'of';
+export const AVREV_RECHECK_PROGRESS_SUFFIX = 're-checked';
+export const AVREV_RECHECK_DONE = 'Everything has been re-checked.';
+export const AVREV_RECHECK_HINT =
+  'Asks TMDB about every title, 20 at a time, however recently it was checked. Tap again to continue.';
+
+/** US-068 AC-1/AC-2 — "Check now" on one title's details. */
+export const CHECK_NOW_LABEL = 'Check now';
+export const CHECK_NOW_WORKING = 'Checking…';
+export const CHECK_NOW_RETRY = 'Try again';
+export const CHECK_NOW_JUST_NOW = 'Checked just now';
+export const CHECK_NOW_TODAY = 'Checked today';
+export const CHECK_NOW_ON = 'Checked';
+export const CHECK_NOW_NEVER = 'Not checked yet';
+export const CHECK_NOW_FAILED =
+  "Couldn't reach TMDB. The last answer is unchanged. Try again in a moment.";
+export const CHECK_NOW_NO_MATCH = 'No TMDB match to check. Find a match first.';
 export const AVREV_CHECK_WORKING = 'Working…';
 export const AVREV_CHECK_FAILED = "Couldn't check just now. Nothing was changed.";
 export const AVREV_CHECKED_NOW = 'Checked';

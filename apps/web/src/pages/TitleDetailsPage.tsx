@@ -17,6 +17,7 @@ import { FixMatchDialog } from '../components/FixMatchDialog';
 import { SuppressDialog } from '../components/SuppressDialog';
 import { RemoveTitleDialog } from '../components/RemoveTitleDialog';
 import { AvailabilityNotice, AvailabilityPanel } from '../components/AvailabilityMarker';
+import { CheckNowControl } from '../components/CheckNowControl';
 import { OFFLINE_DISABLED_REASON, WATCH_STATUS_LABELS } from '../copy';
 
 interface TitleDetailsPageProps {
@@ -38,6 +39,7 @@ interface TitleDetailsPageProps {
     | 'moveToWaiting'
     | 'keepAvailability'
     | 'addBadge'
+    | 'checkTitleAvailabilityNow'
   >;
   /**
    * US-063 — the confirmation of the last availability move. Held by the
@@ -169,6 +171,14 @@ export function TitleDetailsPage({
                   setLocalNotice(next);
                   onReload();
                 }}
+              />
+              <CheckNowControl
+                name={item.name}
+                checkedAt={item.availability?.checkedAt ?? null}
+                hasMatch={!unidentified}
+                offline={offline}
+                check={() => actions.checkTitleAvailabilityNow(item.titleId)}
+                onChecked={onReload}
               />
               <div className="title-details__actions" aria-label="Title actions">
                 <Button variant="secondary" onClick={open('category')} disabled={offline}>

@@ -105,6 +105,36 @@ Collected locations: `apps/api/test/unit/services/availabilityReview.spec.ts`,
 `apps/web/test/availabilityReview.spec.tsx`,
 `tests/e2e/availabilityReview.spec.ts`.
 
+### US-068 — Check now and Re-check everything (TASK-279 – TASK-281, `A59`)
+
+| AC | Level | Test IDs | Assertion |
+| --- | --- | --- | --- |
+| AC-1 | U/I/C/E | `T-RECHECK-001`, `T-RECHECK-005`, `T-RECHECK-007`, `T-RECHECK-008`, `T-RECHECK-010` | *Check now* on a Library title asks TMDB even when it was checked a minute ago, writes only the four availability columns, and the details then show the refreshed marker and *Add* badge without a reload and *Checked just now*. |
+| AC-2 | U/I/C | `T-RECHECK-002`, `T-RECHECK-005`, `T-RECHECK-008` | The same for a waiting title; no intent is satisfied and no listing created. |
+| AC-3 | U/I/C/E | `T-RECHECK-003`, `T-RECHECK-004`, `T-RECHECK-006`, `T-RECHECK-009`, `T-RECHECK-010` | *Re-check everything* ignores age, takes the least recently checked first in batches of `AVAILABILITY_CHECK_BATCH`, never repeats a row across taps, reports *N of M* and ends; *Check more titles* is unchanged. |
+| AC-4 | U/I/C | `T-RECHECK-001`, `T-RECHECK-002`, `T-RECHECK-003`, `T-RECHECK-005`, `T-RECHECK-007`, `T-RECHECK-008` | A failed lookup writes nothing, keeps the stored answer, says so and offers *Try again*; in the walk it does not starve later titles; a title with no TMDB id is refused and its button is disabled with the reason. |
+| AC-5 | U/I | `T-RECHECK-001`, `T-RECHECK-002`, `T-RECHECK-005` | Another owner's id is a 404 byte-identical to not-found; a removed Library title is `409 TITLE_NOT_ACTIVE`; nothing is looked up or written. |
+| AC-6 | S | `T-RECHECK-003`, `T-CI-005` | Both routes are registered mutating routes with `changesListState: false` (`npm run check:mutating-routes`); the non-owner process list and the `refreshAvailability` caller list are unchanged; bad bodies are 400. |
+
+| Id | Level | Owner | Claim |
+|---|---|---|---|
+| **`T-RECHECK-001`** (`a`–`f`) | U | `TASK-279` | `POST /api/titles/:titleId/availability/check`: forced regardless of age, writes the answer, a failed lookup is 502 and writes nothing, no TMDB id is 404, a foreign id is 404, a removed title is 409, nothing but the availability write is called. |
+| **`T-RECHECK-002`** (`a`–`c`) | U | `TASK-279` | `POST /api/waiting/:intentId/availability/check`: forced, a failed lookup writes nothing, a missing or foreign intent and a title without a TMDB id are 404. |
+| **`T-RECHECK-003`** (`a`–`e`) | U | `TASK-279` | `POST /api/availability/check` with `scope: "all"`: 20 per tap with progress 20/40/50, ignores age, failures do not starve later taps, invalid bodies are 400, the default stays stale-only. |
+| **`T-RECHECK-004`** (`a`–`e`) | U | `TASK-279` | `selectForRecheckAll`, `recheckProgress`, the cursor format and parse, and `parseCheckBody`: ordering, age ignored, strictly after the cursor. |
+| **`T-RECHECK-005`** (`a`–`d`) | I | `TASK-279` | Against the real store: only the availability columns change, the review then shows the joined service, a waiting check, a foreign owner is 404, no TMDB id is refused. |
+| **`T-RECHECK-006`** (`a`) | I | `TASK-279` | Against the real store: 25 titles across taps are each attempted once with the list state unchanged. |
+| **`T-RECHECK-007`** (`a`–`d`) | C | `TASK-280` | `CheckNowControl`: the label states the fact, idle → checking → *Checked just now*, failure with *Try again* keeping the stored fact, disabled with a reason when unmatched or offline. |
+| **`T-RECHECK-008`** (`a`–`c`) | C | `TASK-280` | On the Library details a successful check reveals the *Add* badge without a reload; an unmatched title is disabled with its reason; on the waiting details it checks by intent id and reloads. |
+| **`T-RECHECK-009`** (`a`) | C | `TASK-281` | *Re-check everything* works when nothing is stale, shows *N of M re-checked*, continues with `since` and `cursor`, and ends disabled. |
+| **`T-RECHECK-010`** (`a`–`b`) | E | `TASK-281` | End to end at 390 px and 1440 px: `a` *Check now* is one request, a 44 px target with no axe violation, and the *Add* badge appears with no reload; `b` *Re-check everything* walks two taps with *N of M*. |
+
+Collected locations: `apps/api/test/unit/routes/availabilityRecheck.spec.ts`,
+`apps/api/test/unit/services/availabilityRecheck.spec.ts`,
+`apps/api/test/integration/availabilityRecheck.spec.ts`,
+`apps/web/test/availabilityRecheck.spec.tsx`,
+`tests/e2e/availabilityRecheck.spec.ts`.
+
 ### US-065 — Ordering on Waiting to stream (TASK-269 – TASK-270, #415, `A56`), and row-aligned Grid cards (TASK-271, #414)
 
 | AC | Level | Test IDs | Assertion |

@@ -2,7 +2,7 @@
 
 **Project:** nextup
 **Version:** Current v1 scope, including subsequent owner-approved promotions; remaining deferrals are in §11.2.
-**Status:** Approved scope with recorded amendments through US-067 / REQ-133 (`A58`). ~~"through US-066 / REQ-132 (`A57`)"~~ ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
+**Status:** Approved scope with recorded amendments through US-068 / REQ-134 (`A59`). ~~"through US-067 / REQ-133 (`A58`)"~~ ~~"through US-066 / REQ-132 (`A57`)"~~ ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
 **Inputs:** `docs/BRD.md`, the recorded owner decisions in the ADRs, and the original authoring-tree `Context/` documents. **The `Context/` tree is not supplied in this repository.** Its citations preserve provenance, not an instruction to invent missing source text. See `docs/current-release.md` for the owner decisions applied on 2026-09-17 and `docs/requirement-index.md` for reconciled reference authority.
 **Audience:** the implementer. Implementation will be performed by GitHub Copilot in autopilot mode (ASM-028, ASM-029, NFR-002, NFR-003, NFR-004). This document, together with the specs, IS the implementation input. Acceptance criteria are written to be executable and verifiable without asking a question.
 **No timeline.** Per A19 / ASM-027 this document contains no dates, durations, or sequencing commitments beyond dependency order.
@@ -108,6 +108,21 @@
 >
 > **New in this document:** **US-065 / REQ-131** (Epic L), seven acceptance criteria. **Corrected in place:** US-043's out-of-scope line. **No migration** — the forecast is computed per request, so the order is applied in memory over the rows the waiting read already returns.
 ---
+
+> ## ⚠ AMENDMENT — 2026-10-10 — `A59` (owner-approved): "Check now" and "Re-check everything" — an answer sooner than the 7-day staleness
+>
+> **The owner reported** a title (*The Housemaid*) added to the Library while on Starz, which later left Starz and appeared on Max, yet the Library still showed Starz with no *left* marker and no *Now also on Max* prompt. TMDB already knew; nextup only re-asks when its stored answer is `WATCH_PROVIDER_MAX_AGE_DAYS` (7) or more days old, and only for the page being rendered. **The owner approved** two owner-pressed ways to get an answer right now. ADR-0010 Revision 7 records the decision.
+>
+> | Decision | What it changes | Kind |
+> |---|---|---|
+> | **1. *Check now*, per title** | A button on a Library title's details and on a Waiting title's details asks TMDB about that one title immediately, **whatever the stored answer's age**, through the same lookup the lazy refresh uses. It writes the same four availability columns and nothing else. A failed lookup writes nothing, keeps the stored answer and offers *Try again*. A title with no TMDB match has the button disabled with the reason. | **Instruction** |
+> | **2. It reveals; the owner moves** | The marker (*left X*, *Now also on Y* with its *Add* badge, rent-only) appears without a manual reload and the control says when it was last checked (*Checked just now*). It never adds, removes or re-badges anything; the existing US-063 answers do. | **Invariant** |
+> | **3. *Re-check everything*, on `/availability`** | An owner-started walk over every title and waiting intent that has a TMDB id, **regardless of age**, least recently checked first, in batches of `AVAILABILITY_CHECK_BATCH` (20) a tap. The screen shows *N of M re-checked*, and the button becomes *Continue re-check* until the walk is done. *Check more titles* (stale only) is unchanged. | **Instruction** |
+> | **4. It terminates** | The walk is stateless on the server: the first tap fixes a `since` instant and each tap carries `since` plus a cursor naming the last row attempted. A row is eligible only if its stored check is older than `since`, and only rows after the cursor are taken, so a row is attempted once per walk and a failing lookup cannot hold up the rest. | **Instruction** |
+> | **5. Not a non-owner process** | Every lookup runs inside the owner's own request, synchronously and serially, and writes availability metadata only. §7.4's four-process list is **unchanged**; both new routes are in the mutating-route registry with `changesListState: false`. | **Invariant** |
+> | **6. No new code, no migration** | Failures reuse `TMDB_UNAVAILABLE`, `TMDB_WORK_NOT_FOUND`, `TITLE_NOT_ACTIVE`, `NOT_FOUND` and `VALIDATION_FAILED`. No schema change. | **Instruction** |
+>
+> **New in this document:** **US-068 / REQ-134** (Epic L), six acceptance criteria. **Corrected in place:** §7.4 (two more owner-initiated metadata refreshes; the process count stays four).
 
 > ## ⚠ AMENDMENT — 2026-10-09 — `A58` (owner-approved): permanent delete from the Removed view — a narrow, owner-initiated exception to REQ-028 (#398)
 >
@@ -1594,6 +1609,39 @@ two to three; Epic L raised it from three to four.
 **Out of scope:** deleting active listings; a bulk *empty the Removed view*; deleting suppression; deleting `UploadBatch` rows.
 **Open questions:** none.
 
+
+#### US-068 — Ask TMDB about a title right now (`A59`)
+
+**REQ-134 (`must`, owner-approved `A59`, 2026-10-10).** The owner can press
+*Check now* on one Library or Waiting title, or *Re-check everything* on
+*Availability changes*, and get TMDB's current answer without waiting for the
+7-day staleness. Each lookup is the existing one, runs inside the owner's own
+request, and writes availability metadata only (§7.4). Nothing moves by itself
+(invariant 5); nothing nags (invariant 8a).
+
+**As** the owner
+**I want** to re-check a title, or all of them, on demand
+**So that** a service change I know about shows up now, not up to a week later
+
+**Traces to:** REQ-134, REQ-086, REQ-129, REQ-130, REQ-041
+**Priority:** must
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | A Library title with a TMDB match, checked one minute ago or never | The owner presses *Check now* on its details | TMDB is asked immediately, ignoring the stored age; the four availability columns (answer, rent list, region, checked-at) are written and nothing else. The details re-read, so a *left X* marker or *Now also on Y* with its *Add* badge appears with no manual reload, and the control reads *Checked just now* |
+| AC-2 | A Waiting title with a TMDB match | The owner presses *Check now* on its details | The same forced lookup runs for its intent and writes the intent's availability columns only; no intent is satisfied and no listing is created |
+| AC-3 | Any number of titles and intents with a TMDB id | The owner taps *Re-check everything* and keeps tapping | Each tap re-checks at most `AVAILABILITY_CHECK_BATCH` (20) rows, least recently checked first, serially, regardless of age; the screen reads *N of M re-checked*; the walk never repeats a row and ends (*Everything has been re-checked.*). *Check more titles* is unchanged |
+| AC-4 (failure) | The lookup fails or times out; or the title has no TMDB id | *Check now* is pressed or shown | A failed single lookup writes nothing, keeps the stored answer, says so and offers *Try again* (`502 TMDB_UNAVAILABLE`); in the walk it is counted as not looked up and the walk still passes it. A title with no match refuses (`404 TMDB_WORK_NOT_FOUND`) and its button is disabled with the reason |
+| AC-5 (security) | An id belonging to another owner, or a Library title with no active listing | *Check now* is requested | The refusal is byte-identical to not-found (`404 NOT_FOUND`) for the foreign id, `409 TITLE_NOT_ACTIVE` for a removed title; nothing is looked up or written |
+| AC-6 (invariant) | Both new routes | The code base and registry are checked | Both are registered as mutating routes with `changesListState: false`; no scheduler, timer or on-access path triggers either; the no-scheduler spec and §7.4's four-process list are unchanged; they add no listing, badge, ordering, intent or freshness change |
+
+**Out of scope for this story:** any automatic or scheduled re-check; changing
+membership or badges as a result; a per-row *Check now* on Library rows or
+cards (the details view and the Availability screen only); a "last checked
+more than N days ago" prompt (invariant 8a).
+**Open questions:** none.
+
 ---
 
 ### Epic M — IMDb ratings — **v1**
@@ -2181,6 +2229,15 @@ Implementation contract: `specs/title-category.md`; named tests in `specs/testin
   It runs only inside the owner's request, so it is **not** a non-owner process
   and the count below stays four. It is in the mutating-route registry because
   it writes.
+- *Check now* and *Re-check everything* (US-068, REQ-134, `A59`, ADR-0010
+  Rev 7): one owner press asks TMDB about one Library or Waiting title
+  immediately, or one tap of the owner's walk re-checks at most
+  `AVAILABILITY_CHECK_BATCH` (20) titles and intents regardless of age, least
+  recently checked first, serially. Both write availability metadata columns
+  only, through the same lookup as the lazy refresh; a failed lookup writes
+  nothing. They run only inside the owner's request, so they are **not**
+  non-owner processes and the count below stays four. Both routes are in the
+  mutating-route registry because they write.
 - *Auto-detect service lookup* (US-066 AC-3/AC-6, REQ-132, `A57`, ADR-0010
   Rev 6): opening an auto-detect review, or the owner's *Look up again*,
   synchronously looks up at most `REVIEW_SERVICE_LOOKUP_PER_REQUEST` (20)

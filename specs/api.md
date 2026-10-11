@@ -490,6 +490,8 @@ typed data and never re-check it.
 | GET | `/api/availability/review/summary` | US-064 |
 | POST | `/api/availability/check` | US-064 |
 | POST | `/api/availability/review/apply` | US-064 |
+| POST | `/api/titles/:titleId/availability/check` | US-068 |
+| POST | `/api/waiting/:intentId/availability/check` | US-068 |
 
 ---
 
@@ -2474,7 +2476,8 @@ shows its link only when `N > 0`.
 
 ### 6.47 `POST /api/availability/check` — "Check more titles" (US-064 AC-3)
 
-Body `{}`. One **owner-initiated** metadata refresh: synchronously looks up at
+Body `{}` (stale-only, the default) or `{ "scope": "all", "since"?: ISO, "cursor"?: "<ms>:<id>" }`
+(*Re-check everything*, US-068, `A59`, see below). One **owner-initiated** metadata refresh: synchronously looks up at
 most `AVAILABILITY_CHECK_BATCH` (20, `apps/api/src/services/availabilityReview.ts`,
 declared independently of `AVAILABILITY_REFRESH_PER_REQUEST`) Library titles
 and waiting intents that are never-checked or older than
@@ -2487,7 +2490,20 @@ With nothing due it asks TMDB nothing.
 
 | Status | Code | When |
 |---|---|---|
-| 200 | — | `{lookedUp, failed, checked, notCheckedRecently}` — answers written, lookups that failed, and the counts after this tap |
+| 200 | — | `{lookedUp, failed, checked, notCheckedRecently}` — answers written, lookups that failed, and the counts after this tap. With `scope: "all"` also `recheck: {since, cursor, total, remaining, processed, done}` |
+| 400 | `VALIDATION_FAILED` | unknown `scope`, `since` not an ISO instant or more than 60 s in the future, `cursor` malformed or sent without `since` |
+
+**`scope: "all"` — *Re-check everything* (US-068 AC-3, `A59`, ADR-0010 Rev 7).**
+Ignores age. Eligible rows are titles with an active listing and a TMDB id, and
+waiting intents whose title has a TMDB id, whose stored `availabilityCheckedAt`
+(never = 0) is older than `since`. They are ordered by stored check time, then
+id, and the next `AVAILABILITY_CHECK_BATCH` rows strictly after `cursor` are
+looked up serially. `since` defaults to now on the first tap and is returned
+with `cursor` (the last row *attempted*, so a failed lookup is passed over) for
+the client to send back unchanged. `total` counts eligible rows,
+`processed = total - remaining`, `done` is `remaining === 0`. A successful
+write stamps the row at or after `since`, so a row is attempted once per walk
+and the walk ends. Same four columns, same write rule, same registry entry.
 
 ### 6.48 `POST /api/availability/review/apply` — one answer, several rows (US-064 AC-4/AC-5)
 
@@ -2580,6 +2596,31 @@ close.
 | 400 | `VALIDATION_FAILED` | unknown `kind`, empty or unknown `services` (`details.field`, `details.permitted`) |
 | 404 | `NOT_FOUND` | the candidate is not in this batch |
 | 409 | `BATCH_NOT_AUTO_DETECT` | the batch names a service or a storefront |
+
+### 6.52 `POST /api/titles/:titleId/availability/check` — "Check now" (US-068 AC-1, `A59`)
+
+Body `{}`. One **owner-initiated** lookup for one Library title, **whatever the
+stored answer's age**, through `refreshAvailability` (the same code as §6.47 and
+the lazy refresh). Writes the four availability columns
+(`availability_checked_at`/`available_on`/`rent_on`/`availability_region`) and
+nothing else; never changes membership, badges, ordering or intents.
+
+**200** `{ "id": "<titleId>", "checkedAt": ISO, "region": "US", "availableOn": [...] | null, "rentOn": [...] | null, "accessState": "streaming" | "rent-only" | "not-seen" | "unknown" | "not-checked" }`
+
+| Status | Code | When |
+|---|---|---|
+| 404 | `NOT_FOUND` | the title is not this owner's (byte-identical to an unknown id) |
+| 404 | `TMDB_WORK_NOT_FOUND` | the title has no TMDB id; nothing is looked up |
+| 409 | `TITLE_NOT_ACTIVE` | the title has no active listing |
+| 502 | `TMDB_UNAVAILABLE` | the lookup failed or timed out; **nothing is written**, the stored answer is kept |
+
+### 6.53 `POST /api/waiting/:intentId/availability/check` — "Check now" for a waiting title (US-068 AC-2, `A59`)
+
+Same contract as §6.52 for a waiting intent, writing the intent's availability
+columns only; the intent is not satisfied and no listing is created. The
+response `id` is the intent id. A missing or foreign intent is `404 NOT_FOUND`;
+a title with no TMDB id is `404 TMDB_WORK_NOT_FOUND`; a failed lookup is
+`502 TMDB_UNAVAILABLE` and writes nothing.
 
 ---
 

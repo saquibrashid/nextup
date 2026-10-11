@@ -312,7 +312,19 @@ export const MUTATING_ROUTE_REGISTRY = [
     method: 'POST',
     path: '/api/availability/check',
     changesListState: false,
-    why: 'owner-initiated metadata refresh ("Check more titles"): looks up at most AVAILABILITY_CHECK_BATCH stale rows and writes availability columns only — adds, removes, reorders and re-badges nothing (US-064 AC-3, PRD §7.4, A55)',
+    why: 'owner-initiated metadata refresh ("Check more titles"): looks up at most AVAILABILITY_CHECK_BATCH rows — stale ones, or with scope "all" every row regardless of age, least recently checked first (US-068 AC-3) — and writes availability columns only — adds, removes, reorders and re-badges nothing (US-064 AC-3, PRD §7.4, A55)',
+  },
+  {
+    method: 'POST',
+    path: '/api/titles/:titleId/availability/check',
+    changesListState: false,
+    why: 'owner-initiated "Check now": one forced TMDB lookup for one Library title, regardless of age; writes the four availability columns only — adds, removes, reorders and re-badges nothing (US-068 AC-1, PRD §7.4, A59)',
+  },
+  {
+    method: 'POST',
+    path: '/api/waiting/:intentId/availability/check',
+    changesListState: false,
+    why: 'owner-initiated "Check now": one forced TMDB lookup for one waiting title, regardless of age; writes the availability columns only and satisfies no intent (US-068 AC-1, PRD §7.4, A59)',
   },
   {
     method: 'POST',

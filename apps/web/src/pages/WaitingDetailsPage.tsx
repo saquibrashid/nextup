@@ -17,6 +17,7 @@ import { useEffect, useRef, useState, type JSX } from 'react';
 import { Link } from 'react-router-dom';
 import { WATCHMODE_ATTRIBUTION, WATCHMODE_ATTRIBUTION_URL, releaseYearText } from '@nextup/domain';
 
+import { CheckNowControl } from '../components/CheckNowControl';
 import { EditionLabels } from '../components/EditionLabels';
 import {
   TitleDetailSections,
@@ -45,6 +46,8 @@ export interface WaitingDetailsPageProps {
   readonly onReload: () => void;
   readonly onSuppress: (titleId: string) => Promise<unknown>;
   readonly onSuppressed: () => void;
+  /** US-068 AC-2 — "Check now" for this waiting title; absent hides the control. */
+  readonly onCheckNow?: (intentId: string) => Promise<unknown>;
 }
 
 export function WaitingDetailsPage({
@@ -54,6 +57,7 @@ export function WaitingDetailsPage({
   onReload,
   onSuppress,
   onSuppressed,
+  onCheckNow,
 }: WaitingDetailsPageProps): JSX.Element {
   const [artFailed, setArtFailed] = useState(false);
   const [phase, setPhase] = useState<'idle' | 'submitting' | 'error'>('idle');
@@ -115,6 +119,16 @@ export function WaitingDetailsPage({
             )}
             <WaitingOutlook item={item} />
             <WaitingFacts item={item} full />
+            {onCheckNow !== undefined && (
+              <CheckNowControl
+                name={item.name}
+                checkedAt={item.availabilityCheckedAt ?? null}
+                hasMatch={title.matchState !== 'unmatched'}
+                offline={offline}
+                check={() => onCheckNow(item.intentId)}
+                onChecked={onReload}
+              />
+            )}
           </section>
 
           <div className="title-details__actions" aria-label="Title actions">

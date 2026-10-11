@@ -410,6 +410,57 @@ service still has no default mode (US-003 AC-2, amended at `A57`).
 
 Test ids: `specs/testing.md`, US-066 (`T-AUTO-*`).
 
+## Revision 7 — "Check now" and "Re-check everything" (`A59`, owner-approved 2026-10-10)
+
+The owner reported a title that left Starz and joined Max while the Library
+still showed Starz with no marker: the stored answer was under 7 days old, and
+only the rendered page is ever re-asked (Revision 4). The owner approved two
+owner-pressed ways to ask TMDB now (PRD `A59`, US-068, REQ-134).
+
+**1. Not a fifth process.** *Check now* (`POST /api/titles/:titleId/availability/check`,
+`POST /api/waiting/:intentId/availability/check`) and *Re-check everything*
+(`POST /api/availability/check` with `scope: "all"`) run synchronously and
+serially inside the owner's own request, like Revision 5's *Check more titles*.
+There is no timer, queue or work after the response, so §4's conditions hold,
+PRD §7.4's process list stays **four** (`T-CI-005`), and both new routes are in
+the mutating-route registry with `changesListState: false`. `T-CI-005h`'s
+permitted-caller list for `refreshAvailability` is unchanged: the new routes
+live in `routes/availabilityReview.ts`.
+
+**2. The same lookup, the same four columns.** Each lookup is
+`refreshAvailability` over `flaggedProvidersFor` with the stored region, the
+shared TMDB client and its timeouts; the answer is written by
+`updateTitleAvailability` (titles) or the watch-intent writer. **Only the four
+availability columns change.** Selection is the only difference from the lazy
+refresh: a forced check does not consult `isAvailabilityStale`. There is no
+second provider-mapping path. A failed lookup writes nothing and keeps the
+stored answer (`502 TMDB_UNAVAILABLE`); a title with no TMDB id is refused
+(`404 TMDB_WORK_NOT_FOUND`); a foreign id is `404 NOT_FOUND`; a Library title
+with no active listing is `409 TITLE_NOT_ACTIVE`. **No new error code and no
+migration.**
+
+**3. It reveals; the owner moves.** The check never adds, removes or re-badges.
+The marker (*left X*, *Now also on Y* with *Add*, rent-only) is derived from the
+stored columns, so after the write the client re-reads the title and the
+existing US-063 answers are the only way anything moves (invariant 5). The
+control states *Checked just now* / the date as a fact, never a nag
+(invariant 8a).
+
+**4. "Re-check everything" is a stateless walk.** Order is the stored
+`availabilityCheckedAt` ascending (never-checked first), then id. The first tap
+sends `{scope:"all"}`; the server fixes `since` (now) and each response returns
+`{since, cursor, total, remaining, processed, done}`. Later taps send
+`{scope:"all", since, cursor}`. A row is eligible only if it has a TMDB id and
+its stored check is older than `since`, and only rows strictly after the cursor
+(the last row *attempted*) are taken. A successful write stamps the row at or
+after `since`, which removes it from later taps, and the cursor skips a row
+whose lookup failed, so a failing title cannot starve the rest and the walk
+always ends. Batches are `AVAILABILITY_CHECK_BATCH` (20). `since` more than 60
+seconds in the future, or a cursor without `since`, is `400 VALIDATION_FAILED`.
+The existing stale-only *Check more titles* (`scope` omitted) is unchanged.
+
+Test ids: `specs/testing.md`, US-068 (`T-RECHECK-*`).
+
 ## Consequences
 
 ### The loop, end to end

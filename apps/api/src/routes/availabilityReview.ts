@@ -47,8 +47,12 @@ import {
 import {
   checkCounts,
   firstOwnerService,
+  formatRecheckCursor,
   parseApplyBody,
+  parseCheckBody,
+  recheckProgress,
   selectForAvailabilityCheck,
+  selectForRecheckAll,
   type ApplyItem,
   type CheckCandidate,
   type ReviewAction,
@@ -60,8 +64,10 @@ import {
   type LibraryAvailability,
 } from '../services/libraryAvailability.js';
 import {
+  accessStateFor,
   flaggedProvidersFor,
   refreshAvailability,
+  type AvailabilityWrite,
   type WatchProviderSource,
 } from '../services/watchAvailability.js';
 import {
@@ -87,8 +93,22 @@ const WAITING_READ_MAX = 2000;
 const json = (list: readonly string[] | null): string | null =>
   list === null ? null : JSON.stringify(list);
 
+type CheckableTitle = Pick<
+  LibraryTitle,
+  | 'id'
+  | 'workIdentity'
+  | 'tmdbId'
+  | 'tmdbMediaType'
+  | 'availabilityRegion'
+  | 'availabilityCheckedAt'
+  | 'availableOn'
+  | 'rentOn'
+>;
+
 /** A Library title as the check sees it; `null` when it has no badge. */
-function titleCandidate(title: LibraryTitle): CheckCandidate | null {
+function titleCandidate(
+  title: CheckableTitle & { listings: readonly unknown[] },
+): CheckCandidate | null {
   if (title.listings.length === 0) return null;
   return {
     kind: 'title',
@@ -120,6 +140,73 @@ function intentCandidate(intent: WaitingIntentRow): CheckCandidate {
       rentOn: parseProviderList(intent.rentOn),
       streamingSince: intent.streamingSince,
     },
+  };
+}
+
+/** Write one answer through the narrow writer for its kind. */
+async function persistWrite(
+  ownerId: OwnerId,
+  kind: CheckCandidate['kind'] | undefined,
+  write: AvailabilityWrite,
+): Promise<void> {
+  if (kind === 'title') {
+    await updateTitleAvailability(ownerId, write.id, {
+      availableOn: json(write.availableOn),
+      rentOn: json(write.rentOn),
+      availabilityCheckedAt: write.availabilityCheckedAt,
+      availabilityRegion: write.availabilityRegion,
+    });
+  } else {
+    await updateWatchIntentAvailability(ownerId, write.id, {
+      availableOn: json(write.availableOn),
+      rentOn: json(write.rentOn),
+      streamingSince: write.streamingSince,
+      availabilityCheckedAt: write.availabilityCheckedAt,
+      availabilityRegion: write.availabilityRegion,
+    });
+  }
+}
+
+/**
+ * One forced lookup. ⚠ Refuses a work with no TMDB id (nothing to ask), and a
+ * FAILED lookup writes nothing and answers 502 — the stored answer is kept.
+ */
+async function checkOne(
+  ownerId: OwnerId,
+  candidate: CheckCandidate | null,
+  getSource: () => WatchProviderSource,
+  id: string,
+): Promise<AvailabilityWrite> {
+  if (candidate === null) throw notActive(id);
+  const { writes, failedIds } =
+    candidate.row.tmdbId === null || candidate.row.tmdbMediaType === null
+      ? { writes: [], failedIds: [] }
+      : await refreshAvailability([candidate.row], getSource(), new Date());
+  const write = writes[0];
+  if (write === undefined) {
+    if (failedIds.length > 0) {
+      throw new AppError(
+        'TMDB_UNAVAILABLE',
+        502,
+        "Couldn't reach TMDB. The last answer is unchanged. Try again in a moment.",
+      );
+    }
+    throw new AppError('TMDB_WORK_NOT_FOUND', 404, 'This title has no TMDB match to check.', {
+      id,
+    });
+  }
+  await persistWrite(ownerId, candidate.kind, write);
+  return write;
+}
+
+function checkNowBody(id: string, write: AvailabilityWrite): Record<string, unknown> {
+  return {
+    id,
+    checkedAt: write.availabilityCheckedAt.toISOString(),
+    region: write.availabilityRegion,
+    availableOn: write.availableOn,
+    rentOn: write.rentOn,
+    accessState: accessStateFor(write.availableOn, write.rentOn, write.availabilityCheckedAt),
   };
 }
 
@@ -320,16 +407,26 @@ export function registerAvailabilityReviewRoutes(
     res.status(200).json({ count: library.length + nowStreaming.length });
   });
 
-  /** §6.47 — "Check more titles": ONE owner tap, ≤ `AVAILABILITY_CHECK_BATCH`. */
+  /**
+   * §6.47 — "Check more titles" and "Re-check everything": ONE owner tap, at
+   * most `AVAILABILITY_CHECK_BATCH` lookups. `scope: 'stale'` (the default)
+   * picks stale rows; `scope: 'all'` walks every askable row regardless of age
+   * with the stateless cursor of `selectForRecheckAll`.
+   */
   router.post('/availability/check', async (req, res) => {
     const ownerId = requireOwnerId(req);
     const now = new Date();
-    const { titles, intents, check } = await readReview(ownerId, now);
+    const request = parseCheckBody(req.body, now);
+    const { titles, intents } = await readReview(ownerId, now);
     const candidates = [
       ...titles.map(titleCandidate).filter((row): row is CheckCandidate => row !== null),
       ...intents.map(intentCandidate),
     ];
-    const due = selectForAvailabilityCheck(candidates, now);
+    const since = request.scope === 'all' ? (request.since ?? now) : null;
+    const due =
+      request.scope === 'all' && since !== null
+        ? selectForRecheckAll(candidates, since, request.after)
+        : selectForAvailabilityCheck(candidates, now);
     const kindById = new Map(due.map((candidate) => [candidate.row.id, candidate.kind]));
     const { writes, failedIds } =
       due.length === 0
@@ -339,30 +436,76 @@ export function registerAvailabilityReviewRoutes(
             getSource(),
             now,
           );
-    for (const write of writes) {
-      if (kindById.get(write.id) === 'title') {
-        await updateTitleAvailability(ownerId, write.id, {
-          availableOn: json(write.availableOn),
-          rentOn: json(write.rentOn),
-          availabilityCheckedAt: write.availabilityCheckedAt,
-          availabilityRegion: write.availabilityRegion,
-        });
-      } else {
-        await updateWatchIntentAvailability(ownerId, write.id, {
-          availableOn: json(write.availableOn),
-          rentOn: json(write.rentOn),
-          streamingSince: write.streamingSince,
-          availabilityCheckedAt: write.availabilityCheckedAt,
-          availabilityRegion: write.availabilityRegion,
-        });
-      }
-    }
+    for (const write of writes) await persistWrite(ownerId, kindById.get(write.id), write);
+
+    const written = new Map(writes.map((write) => [write.id, write]));
+    const after = candidates.map((candidate): CheckCandidate => {
+      const write = written.get(candidate.row.id);
+      return write === undefined
+        ? candidate
+        : {
+            kind: candidate.kind,
+            row: {
+              ...candidate.row,
+              availableOn: write.availableOn,
+              rentOn: write.rentOn,
+              availabilityCheckedAt: write.availabilityCheckedAt,
+            },
+          };
+    });
+    const counts = checkCounts(after, now);
+    const last = due[due.length - 1];
+    const recheck =
+      request.scope === 'all' && since !== null
+        ? (() => {
+            const cursor =
+              last === undefined
+                ? request.after
+                : { checkedAtMs: last.row.availabilityCheckedAt?.getTime() ?? 0, id: last.row.id };
+            const progress = recheckProgress(after, since, cursor);
+            return {
+              since: since.toISOString(),
+              cursor: cursor === null ? null : formatRecheckCursor(cursor),
+              total: progress.total,
+              remaining: progress.remaining,
+              processed: progress.total - progress.remaining,
+              done: progress.remaining === 0,
+            };
+          })()
+        : undefined;
     res.status(200).json({
       lookedUp: writes.length,
       failed: failedIds.length,
-      checked: check.checked + writes.length,
-      notCheckedRecently: check.notCheckedRecently - writes.length,
+      checked: counts.checked,
+      notCheckedRecently: counts.notCheckedRecently,
+      ...(recheck === undefined ? {} : { recheck }),
     });
+  });
+
+  /**
+   * §6.52 — "Check now" for one Library title. ⚠ OWNER-INITIATED, regardless
+   * of age, metadata-only: it writes the four availability columns and nothing
+   * else, and the moves it reveals stay the owner's to make.
+   */
+  router.post('/titles/:titleId/availability/check', async (req, res) => {
+    const ownerId = requireOwnerId(req);
+    const title = await requireTitle(ownerId, req.params.titleId ?? '');
+    const active = (await listListingsForTitle(ownerId, title.id)).filter(
+      (row) => row.state === 'active',
+    );
+    if (active.length === 0) throw notActive(title.id);
+    const candidate = titleCandidate({ ...title, listings: active });
+    const write = await checkOne(ownerId, candidate, getSource, title.id);
+    res.status(200).json(checkNowBody(title.id, write));
+  });
+
+  /** §6.53 — "Check now" for one waiting title. Same contract as §6.52. */
+  router.post('/waiting/:intentId/availability/check', async (req, res) => {
+    const ownerId = requireOwnerId(req);
+    const intent = await findWaitingIntent(ownerId, req.params.intentId ?? '');
+    if (intent === null) throw new AppError('NOT_FOUND', 404, 'No such waiting title.');
+    const write = await checkOne(ownerId, intentCandidate(intent), getSource, intent.id);
+    res.status(200).json(checkNowBody(intent.id, write));
   });
 
   /** §6.48 — one answer, several rows, each its own transaction. */
