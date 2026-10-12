@@ -520,29 +520,14 @@ describe('T-AVAIL-003 · US-042 AC-3 · flagged is an invitation, not an additio
 
 describe('T-WAIT-008 · a work in the Library is not also waiting', () => {
   it('T-WAIT-008g · an active listing hides the waiting intent without writing, and it returns when the listing is removed', async () => {
-    const { intentId } = await makeWaitingIntent({ tmdbId: 438_631, name: 'Dune' });
+    const { intentId, titleId } = await makeWaitingIntent({ tmdbId: 438_631, name: 'Dune' });
     await makeWaitingIntent({ tmdbId: 438_632, name: 'Other' });
 
-    // A brand-new title row for the same work, as a reappearance creates.
-    await testPrisma().title.create({
-      data: {
-        id: 'title-av-lib',
-        ownerId,
-        workIdentity: 'tmdb:movie:438631',
-        state: 'active',
-        matchState: 'matched',
-        tmdbId: 438_631,
-        tmdbMediaType: 'movie',
-        tmdbName: 'Dune',
-        tmdbReleaseYear: 2021,
-        sortDateAdded: new Date(Date.UTC(2026, 0, 10)),
-      },
-    });
     await testPrisma().serviceListing.create({
       data: {
         listingId: 'listing-av-lib',
         ownerId,
-        titleId: 'title-av-lib',
+        titleId,
         service: 'netflix',
         state: 'active',
         dateAdded: new Date(Date.UTC(2026, 0, 10)),
