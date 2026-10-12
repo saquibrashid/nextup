@@ -39,6 +39,12 @@ function db(tx?: Db): Db {
  * intent is retained for ever (REQ-028, TASK-189) and reading it here would
  * both re-check availability for a work that already graduated and put it back
  * in front of the owner.
+ *
+ * ⚠ A work with an ACTIVE listing is hidden, matched on `workIdentity` because a
+ * reappearing work is a brand-new title row (invariant 7). This is a read-time
+ * filter and nothing is written: a work cannot be in the Library and waiting at
+ * once, and invariant 5 forbids "healing" the intent from a read. The intent
+ * stays `waiting` and shows again if the work later leaves the Library.
  */
 export async function listWaitingIntents(
   ownerId: OwnerId,
@@ -46,6 +52,21 @@ export async function listWaitingIntents(
   tx?: Db,
 ) {
   const { take = 200 } = options;
+  const intents = await findWaitingIntents(ownerId, take, tx);
+  if (intents.length === 0) return intents;
+  const inLibrary = await db(tx).serviceListing.findMany({
+    where: {
+      ownerId,
+      state: 'active',
+      title: { workIdentity: { in: intents.map((intent) => intent.workIdentity) } },
+    },
+    select: { title: { select: { workIdentity: true } } },
+  });
+  const hidden = new Set(inLibrary.map((listing) => listing.title.workIdentity));
+  return intents.filter((intent) => !hidden.has(intent.workIdentity));
+}
+
+function findWaitingIntents(ownerId: OwnerId, take: number, tx?: Db) {
   return db(tx).watchIntent.findMany({
     where: { ownerId, state: 'waiting' },
     orderBy: { discoveredAt: 'asc' },
