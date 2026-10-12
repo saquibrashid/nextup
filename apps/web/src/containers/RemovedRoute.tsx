@@ -104,6 +104,8 @@ export function RemovedRoute({ client = apiClient }: RemovedRouteProps = {}): JS
       }}
       onRestore={(listingId, opts) => client.restoreListing(listingId, opts ?? {})}
       onUnsuppress={(suppressionId) => client.unsuppress(suppressionId)}
+      onPurgeListing={(listingId) => client.permanentlyDeleteListing(listingId)}
+      onPurgeWork={(workIdentity) => client.deleteWorkHistory(workIdentity)}
     />
   );
 }

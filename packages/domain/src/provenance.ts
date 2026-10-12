@@ -58,6 +58,21 @@ export function jsonScalar(value: unknown): string | null {
   return value === undefined || value === null ? null : JSON.stringify(value);
 }
 
+/**
+ * US-067 (`A58`). Written to `batch_change.attr` on every row whose listing or
+ * title the owner permanently deleted. Those rows keep their batch but lose
+ * the pointer the database can no longer honour, so on their own they would
+ * read as a smaller, creates-only batch. This marker is what lets undo refuse
+ * the batch instead (US-033, `provenance-unavailable`). No real modified
+ * attribute is ever named this.
+ */
+export const PURGED_CHANGE_ATTR = 'purged';
+
+/** True when any provenance row of a batch was detached by a permanent delete. */
+export function hasPurgedProvenance(rows: readonly Pick<BatchChangeRow, 'attr'>[]): boolean {
+  return rows.some((row) => row.attr === PURGED_CHANGE_ATTR);
+}
+
 function parseScalar(value: string | null): unknown {
   if (value === null) return null;
   try {

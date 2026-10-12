@@ -226,7 +226,9 @@ cards stay mounted across refresh and summary cancellation. `T-UX-165g`–`k`.
 | **7.8 Error — 409 `DUPLICATE_WORK_IDENTITY`** | §3.5's dialog | Keep both / cancel | `T-UX-034` |
 | **7.9 Error — 409 `WORK_SUPPRESSED`** | §3.6's dialog | Stop ignoring and continue | `T-UX-035` |
 | **7.10 Error — 409 `LISTING_NOT_REMOVED`** | *"'{name}' is already back on your list."* + refresh | Refresh | `T-UX-076` |
-| **7.11 Offline** | Banner; restore disabled with reason | Browse | `T-UX-003` |
+| **7.11 Offline** | Banner; restore and both delete controls disabled with reason | Browse | `T-UX-003`, `T-PURGE-020` |
+| **7.12 Delete permanently — confirm** *(US-067, `A58`)* | Dialog opened from the row's *Delete permanently* or *Delete all history for this work*. Names the title and service, says what is lost, that it **can't be undone**, and that the 7-day Azure SQL backup keeps it until it ages out. Opens focused on **Cancel**; Cancel/Escape deletes nothing and returns focus to the trigger | Delete permanently / Cancel | `T-PURGE-020` |
+| **7.13 Delete — submitting / success / error** | Buttons disabled, *Deleting…*; on success the row (every row of the work for *all history*) leaves without a reload and a status region announces it. 409 `LISTING_NOT_REMOVED` / `WORK_HAS_ACTIVE_LISTING` and any other failure show an inline alert (*Nothing was deleted.*) and keep the row | Dismiss | `T-PURGE-020` |
 
 ---
 

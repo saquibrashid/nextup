@@ -172,6 +172,26 @@ describe('T-DATA-002 — the removed view reads its data from the API', () => {
     });
   });
 
+  it('T-PURGE-020i: both permanent-delete controls reach the API only after confirming', async () => {
+    const user = userEvent.setup();
+    const { client, calls } = stubClient({
+      permanentlyDeleteListing: async () => {
+        calls.push('permanentlyDeleteListing');
+        return { listingsDeleted: 1, candidatesDeleted: 0, titlesDeleted: 0 };
+      },
+    });
+    renderRoute(client);
+
+    await screen.findByText('The Matrix');
+    await user.click(screen.getByTestId('purge-button'));
+    expect(calls).not.toContain('permanentlyDeleteListing');
+    await user.click(screen.getByTestId('purge-confirm'));
+
+    await waitFor(() => {
+      expect(calls).toContain('permanentlyDeleteListing');
+    });
+  });
+
   it('T-DATA-002aa: restore is NOT fired by rendering, only by pressing', async () => {
     // REQ-102 / product invariant 7: restore is an explicit user action. React
     // 19 double-invokes effects under StrictMode, so the same call placed in

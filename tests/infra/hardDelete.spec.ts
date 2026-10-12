@@ -47,6 +47,10 @@ const SOURCE_ROOTS = ['apps/api/src', 'apps/web/src', 'packages/domain/src'];
  *    exemption is narrow by construction: `undoDiscard.ts` exists ONLY to
  *    hold these two deletes, so the blast radius stays the size of the
  *    exemption. Evidence (candidates, images) and provenance are RETAINED.
+ * 3. US-067 / A58 owner-initiated permanent delete of listings ALREADY in the
+ *    removed state (ADR-0015, data-model.md §8.5). Held in purgeRemoved.ts,
+ *    which contains nothing else, and only ever reached from an explicit
+ *    owner request - never from a schedule, a TTL or reconciliation.
  *
  * ⚠ KEYED ON FILE **AND MODEL**, not on file alone. A file-scoped exemption
  * silently pre-authorises every future delete written into that file, and
@@ -70,6 +74,18 @@ const SANCTIONED = new Map<string, string>([
   [
     'apps/api/src/repository/undoDiscard.ts::serviceListing',
     'discardCreatedListings - SD-03 creates-only undo (data-model.md §8.3, TASK-112)',
+  ],
+  [
+    'apps/api/src/repository/purgeRemoved.ts::extractionCandidate',
+    'deleteProducingCandidates - US-067 owner-initiated permanent delete (data-model.md §8.5, A58, TASK-276)',
+  ],
+  [
+    'apps/api/src/repository/purgeRemoved.ts::serviceListing',
+    'deleteRemovedListings - US-067 owner-initiated permanent delete (data-model.md §8.5, A58, TASK-276)',
+  ],
+  [
+    'apps/api/src/repository/purgeRemoved.ts::title',
+    'deleteTitleIfUnreferenced - US-067 owner-initiated permanent delete (data-model.md §8.5, A58, TASK-276)',
   ],
 ]);
 
@@ -196,6 +212,26 @@ describe('T-INV-012 no hard delete outside the sanctioned exemption', () => {
     );
     // And the plan - never the caller - decides WHICH rows go.
     expect(service).toContain('planCreatesOnlyUndo');
+  });
+
+  it('T-INV-012r: the US-067 purge is guarded by a removed-state check inside the same transaction', () => {
+    const source = readFileSync(
+      path.join(ROOT, 'apps/api/src/services/permanentDelete.ts'),
+      'utf8',
+    );
+    const single = source.slice(source.indexOf('export async function permanentlyDeleteListing'));
+    const work = source.slice(source.indexOf('export async function permanentlyDeleteWorkHistory'));
+
+    expect(single).toContain('runInTransaction');
+    expect(single.indexOf('LISTING_NOT_REMOVED')).toBeGreaterThan(-1);
+    expect(single.indexOf('LISTING_NOT_REMOVED')).toBeLessThan(single.indexOf('purge('));
+    expect(work).toContain('runInTransaction');
+    expect(work.indexOf('WORK_HAS_ACTIVE_LISTING')).toBeGreaterThan(-1);
+    expect(work.indexOf('WORK_HAS_ACTIVE_LISTING')).toBeLessThan(work.indexOf('purge('));
+
+    // Suppression is never deleted by the purge module (invariant 1).
+    const purge = readFileSync(path.join(ROOT, 'apps/api/src/repository/purgeRemoved.ts'), 'utf8');
+    expect(purge).not.toMatch(/\.suppression\./);
   });
 
   it('T-INV-012j: the scan finds Prisma deletes and ignores Map/Set deletes', () => {

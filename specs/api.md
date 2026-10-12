@@ -2622,6 +2622,34 @@ response `id` is the intent id. A missing or foreign intent is `404 NOT_FOUND`;
 a title with no TMDB id is `404 TMDB_WORK_NOT_FOUND`; a failed lookup is
 `502 TMDB_UNAVAILABLE` and writes nothing.
 
+### 6.54 `DELETE /api/listings/:listingId/permanent` — permanently delete one removed listing (US-067, `A58`, ADR-0015)
+
+Owner-initiated only; there is no body. The listing must already be in the
+`removed` state. One transaction (`data-model.md` §8.5): the listing's producing
+`ExtractionCandidate` rows (their source-image links cascade; `UploadedImage`
+rows stay), then the listing, then the `Title` only if no listing of any state,
+`WatchIntent` or candidate still references it. `Suppression` is never deleted
+and the `UploadBatch` row is kept. The batch's `BatchChange` rows for the
+deleted listing are marked `attr = 'purged'` (ids and values nulled), which
+makes the batch non-undoable for that work (§6.25 answers `409
+BATCH_NOT_CREATES_ONLY` with `details.reason = 'provenance-unavailable'`, and
+the batch detail reports `undoable: false`).
+
+`200 { "listingsDeleted": 1, "candidatesDeleted": n, "titlesDeleted": 0|1 }`.
+`404 NOT_FOUND` for an unknown or another owner's listing (byte-identical);
+`409 LISTING_NOT_REMOVED` when the listing is active (nothing deleted);
+a failure mid-transaction is `500` and nothing is deleted. Mutating route, but
+it changes no list state (REQ-041 list unchanged).
+
+### 6.55 `DELETE /api/works/:workIdentity/history` — "Delete all history for this work" (US-067)
+
+Same rules as §6.54 applied to every listing of the work (`workIdentity`
+URL-encoded). **Refused whole** with `409 WORK_HAS_ACTIVE_LISTING` if any listing
+of that work is active; nothing is deleted. Response
+`200 { "listingsDeleted": n, "candidatesDeleted": n, "titlesDeleted": 0|1 }`.
+An unknown or foreign work is `404 NOT_FOUND`. No tombstone: a reappearing work
+is a brand-new title (L1/A33).
+
 ---
 
 ## 7. Status-code policy
@@ -2685,7 +2713,7 @@ PAYLOAD_TOO_LARGE, UNSUPPORTED_IMAGE_FORMAT, IMAGE_DIMENSIONS_UNSUPPORTED,
 IMAGE_TOO_LARGE_TO_DECODE, IMAGE_DECODE_OOM, IMAGE_DECODE_FAILED,
 IMAGE_EXPIRED, IMAGES_PURGED,
 DUPLICATE_WORK_IDENTITY, WORK_SUPPRESSED, TARGET_WORK_SUPPRESSED,
-LISTING_NOT_REMOVED, TITLE_NOT_ACTIVE, GROUP_ALREADY_REVERSED,
+LISTING_NOT_REMOVED, WORK_HAS_ACTIVE_LISTING, TITLE_NOT_ACTIVE, GROUP_ALREADY_REVERSED,
 PARTIAL_FAILURE_PREVENTED, AVAILABILITY_CHANGED,
 FULL_UPDATE_NOT_AVAILABLE_FOR_SOURCE,
 AUTO_DESTINATION_REQUIRED, BATCH_NOT_AUTO_DETECT,

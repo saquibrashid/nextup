@@ -2496,3 +2496,15 @@ export async function markRemovalGroupUndone(
     data: { undoneAt },
   });
 }
+
+/**
+ * Every listing, of any state, on every title of one work (US-067). Feeds the
+ * *Delete all history for this work* guard, which must see the active ones to
+ * refuse whole.
+ */
+export async function listListingsForWork(ownerId: OwnerId, workIdentity: string, tx?: Db) {
+  return db(tx).serviceListing.findMany({
+    where: { ownerId, title: { workIdentity } },
+    select: { listingId: true, titleId: true, state: true, createdByBatchId: true },
+  });
+}

@@ -27,7 +27,12 @@
  */
 
 import { type Router } from 'express';
-import { isCreatesOnly, toBatchProvenance, type BatchProvenance } from '@nextup/domain';
+import {
+  hasPurgedProvenance,
+  isCreatesOnly,
+  toBatchProvenance,
+  type BatchProvenance,
+} from '@nextup/domain';
 
 import { AppError } from '../errors/AppError.js';
 import { readCaptureIntake } from '../services/captureIntake.js';
@@ -265,7 +270,11 @@ export function registerBatchDetailRoutes(router: Router): void {
                   .length,
                 removalGroupId: removalGroup?.undoneAt === null ? removalGroup.id : null,
               },
-              undoable: batch.status === 'applied' && isCreatesOnly(provenance) && !routedToWaiting,
+              undoable:
+                batch.status === 'applied' &&
+                isCreatesOnly(provenance) &&
+                !routedToWaiting &&
+                !hasPurgedProvenance(changes),
               removalsUndone: removalGroup != null && removalGroup.undoneAt !== null,
             }
           : null,

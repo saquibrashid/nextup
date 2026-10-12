@@ -11,7 +11,12 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { toBatchProvenance, type BatchChangeRow } from '../src/provenance.js';
+import {
+  hasPurgedProvenance,
+  PURGED_CHANGE_ATTR,
+  toBatchProvenance,
+  type BatchChangeRow,
+} from '../src/provenance.js';
 
 const row = (over: Partial<BatchChangeRow>): BatchChangeRow => ({
   kind: 'title_created',
@@ -140,5 +145,13 @@ describe('T-PROV-012 · modified', () => {
     expect(provenance.modified).toEqual([
       { titleId: 't1', attr: 'workIdentity', before: 'not json', after: null },
     ]);
+  });
+});
+
+describe('purged marker', () => {
+  it('T-PURGE-003j: detects a row detached by a permanent delete and nothing else', () => {
+    expect(hasPurgedProvenance([{ attr: PURGED_CHANGE_ATTR }])).toBe(true);
+    expect(hasPurgedProvenance([{ attr: 'workIdentity' }, { attr: null }])).toBe(false);
+    expect(hasPurgedProvenance([])).toBe(false);
   });
 });

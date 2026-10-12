@@ -26,6 +26,7 @@ import {
   deriveSortDateAdded,
   detectLaterOwnerEdits,
   deriveTitleState,
+  hasPurgedProvenance,
   isCreatesOnly,
   planCreatesOnlyUndo,
   toBatchProvenance,
@@ -109,6 +110,18 @@ export async function undoBatch(ownerId: OwnerId, batchId: string): Promise<Undo
 
   const changeRows = await listBatchChanges(ownerId, batchId);
   const provenance = toBatchProvenance(changeRows);
+
+  // US-067 (A58) — the owner permanently deleted part of what this batch wrote.
+  // What is left would read as a smaller creates-only batch and undo would do
+  // nothing while reporting success, so it is refused and enumerated instead.
+  if (hasPurgedProvenance(changeRows)) {
+    throw new AppError(
+      'BATCH_NOT_CREATES_ONLY',
+      409,
+      'This import cannot be undone as a whole.',
+      await buildRefusalDetails(ownerId, batchId, provenance, 'provenance-unavailable'),
+    );
+  }
 
   // §8.4 `provenance-unavailable` (US-033 AC-7). No `batch_change` rows can mean
   // one of two things that look identical here: a batch that legitimately
