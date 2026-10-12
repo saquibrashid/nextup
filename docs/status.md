@@ -11,9 +11,9 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 | Status | Count |
 |---|---|
-| ⬜ todo | 3 |
+| ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 273 |
+| ✅ done | 276 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
 | **total** | **279** |
@@ -22,9 +22,7 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 
 Not done, and every task they depend on is done.
 
-| Task | Size | Section |
-|---|---|---|
-| `TASK-276` | 1 agent-run + 15 owner-review-minutes | Approved auto-detect import (`A57`, #396), 2026-10-08 |
+_Nothing is ready: every unfinished task is waiting on a dependency._
 
 ## Waiting on the owner
 
@@ -36,12 +34,8 @@ Not done, and every task they depend on is done.
 
 ## Blocked by a dependency
 
-2 tasks cannot start yet.
+0 tasks cannot start yet.
 
-| Task | Waiting on |
-|---|---|
-| `TASK-277` | `TASK-276` |
-| `TASK-278` | `TASK-277` |
 
 ## Done
 
@@ -317,6 +311,9 @@ Not done, and every task they depend on is done.
 | `TASK-273` | Auto-detect source, part 2: the review-time service lookup (owner-triggered on review load, `REVIEW_SERVICE_LOOKUP_PER_REQUEST` = 20, serial, through `flaggedProvidersFor`; a failure stored, never thrown), *Look up again* (`POST /api/batches/:id/service-lookup`) and the per-title destination (`PATCH …/candidates/:id/destination`); `409 BATCH_NOT_AUTO_DETECT` for a named-service batch. Test ids: `T-AUTO-002`, `T-AUTO-004`, `T-AUTO-011`, `T-AUTO-013`, `T-AUTO-014`. | `T-AUTO-002`, `T-AUTO-004`, `T-AUTO-011`, `T-AUTO-013`, `T-AUTO-014`, `T-CI-005` |
 | `TASK-274` | Auto-detect source, part 3: the close in one transaction (listings per confirmed service dated today, an existing listing a no-op, Waiting intents, suppression by work identity, availability stored on the title, **no `ServiceState`**), `409 AUTO_DESTINATION_REQUIRED` with `details.candidateIds`; undo refused `waiting-routed` when anything went to Waiting. Test ids: `T-AUTO-003`, `T-AUTO-015`, `T-AUTO-022`. | `T-AUTO-003`, `T-AUTO-015`, `T-AUTO-022` |
 | `TASK-275` | Auto-detect source, part 4: *Auto-detect* is the default source on `/upload` (desktop and the phone import, in the existing picker style), full update disabled with its reason; the review shows each title's *Looked up* services (multi-select), *Waiting to stream*, *Couldn't look up* with *Look up again*, desktop and phone. Existing upload tests updated for the new default. Test ids: `T-AUTO-020`, `T-AUTO-021`. | `T-AUTO-020`, `T-AUTO-021`, `T-BRAND-003`, `T-MOCK-003`, `T-MOCK-006`, `T-PHONE-008`, `T-PHONE-010`, `T-UX-040`, `T-UX-045`, `T-UX-148`, `T-UX-156` |
+| `TASK-276` | Permanent delete, part 1 (#398, `A58`): `apps/api/src/repository/purgeRemoved.ts` (removed-only guard, producing candidates, `purged` provenance marker on the batch's changes, listings, then the Title only when nothing references it; one transaction; suppression, batches and images untouched) and its three `file::model` `T-INV-012` allow-list entries plus the `T-INV-012r` guard. No migration. Test ids: `T-PURGE-001`..`T-PURGE-007`. | `T-INV-012`, `T-INV-013`, `T-PURGE-001`, `T-PURGE-002`, `T-PURGE-003`, `T-PURGE-004`, `T-PURGE-005`, `T-PURGE-006`, `T-PURGE-007` |
+| `TASK-277` | Permanent delete, part 2: `DELETE /api/listings/:listingId/permanent` and `DELETE /api/works/:workIdentity/history` (`specs/api.md` §6.54/§6.55; `LISTING_NOT_REMOVED`, new `WORK_HAS_ACTIVE_LISTING`; foreign ids 404), registered in the mutating-route registry, and a batch whose work was purged is refused undo as `BATCH_NOT_CREATES_ONLY` / `provenance-unavailable` and reported `undoable: false`. | `T-PURGE-001`, `T-PURGE-003`, `T-UNDO-006` |
+| `TASK-278` | Permanent delete, part 3: *Delete permanently* and *Delete all history for this work* on every Removed row (wrapping on a phone), a confirmation dialog opening on Cancel that names what is lost, the irreversibility and the 7-day backup window, announced results and rows leaving without a reload. Test id: `T-PURGE-020`. | `T-PURGE-020` |
 | `TASK-279` | Check now and Re-check everything, part 1 (`A59`, US-068 / REQ-134, ADR-0010 Rev 7): `POST /api/titles/:titleId/availability/check`, `POST /api/waiting/:intentId/availability/check` and `scope: "all"` with a stateless `since` + cursor walk on `POST /api/availability/check`; registry entries; no new error code, no migration. Test ids: `T-RECHECK-001`..`T-RECHECK-006`. | `T-RECHECK-001`, `T-RECHECK-006` |
 | `TASK-280` | Check now, part 2: `CheckNowControl` on the Library and Waiting details. Test ids: `T-RECHECK-007`, `T-RECHECK-008`. | `T-RECHECK-007`, `T-RECHECK-008` |
 | `TASK-281` | Re-check everything, part 2: the `/availability` button, *N of M re-checked* and *Continue re-check*. Test ids: `T-RECHECK-009`, `T-RECHECK-010`. | `T-RECHECK-009`, `T-RECHECK-010` |

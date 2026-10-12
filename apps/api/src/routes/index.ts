@@ -36,6 +36,7 @@ import { registerBatchRemovalRoutes } from './batchRemovals.js';
 import { registerBatchReviewRoutes } from './batchReview.js';
 import { registerBatchUndoRoutes } from './batchUndo.js';
 import { registerListingRoutes } from './listings.js';
+import { registerPermanentDeleteRoutes } from './permanentDelete.js';
 import { registerManualListEditRoutes } from './manualListEdits.js';
 import { registerFixMatchRoutes } from './fixMatch.js';
 import { registerImageRoutes } from './images.js';
@@ -147,6 +148,8 @@ export function createApiRouter(): Router {
   // §6.10 (US-025) — explicit restore from the removed view. Registered next
   // to the removed view route it complements.
   registerListingRoutes(apiRouter);
+  // §6.54/§6.55 (US-067) — explicit permanent delete from the removed view.
+  registerPermanentDeleteRoutes(apiRouter);
   // §6.30/§6.32 (US-047, US-048) — the owner adds or removes a title by hand,
   // outside any batch. Registered after `registerTitleRoutes` so `POST
   // /titles` and `DELETE /titles/:id` sit beside the reads they mutate, and

@@ -237,14 +237,6 @@ const KNOWN_PHANTOM_CITATIONS: readonly string[] = [
   // Justification (A58, #398): US-067 is an owner-approved spec amendment that
   // lands BEFORE its implementation (TASK-276 – TASK-278). Each id leaves this
   // list in the task that implements it; the list is back to empty then.
-  'T-PURGE-001',
-  'T-PURGE-002',
-  'T-PURGE-003',
-  'T-PURGE-004',
-  'T-PURGE-005',
-  'T-PURGE-006',
-  'T-PURGE-007',
-  'T-PURGE-020',
 ];
 
 /**

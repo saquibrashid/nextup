@@ -1274,6 +1274,11 @@ the interface, or repeated rows read as a bug (L1/A33).
 - A row whose work is actively suppressed shows a **"Not interested"** chip and
   its Restore button opens the un-suppress-first flow (`specs/ux-states.md`
   §3.6) rather than failing.
+- **Delete permanently** and **Delete all history for this work** (US-067,
+  `A58`): two secondary buttons on every row, wrapping on a phone. Each opens a
+  confirmation dialog (focus starts on Cancel) naming what is lost, that it can't
+  be undone, and the 7-day backup window. Copy: `PURGE_*` in `copy.ts`. The row
+  (or every row of that work) leaves without a reload. `T-PURGE-020`.
 
 ---
 

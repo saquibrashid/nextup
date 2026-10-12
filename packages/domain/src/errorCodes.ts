@@ -57,6 +57,10 @@ export const ERROR_CODES = [
   'WORK_SUPPRESSED',
   'TARGET_WORK_SUPPRESSED',
   'LISTING_NOT_REMOVED',
+  // US-067 (`A58`). *Delete all history for this work* is refused WHOLE when
+  // any listing of the work is active: a permanent delete never reaches a work
+  // that is still on the owner's list. Nothing is deleted.
+  'WORK_HAS_ACTIVE_LISTING',
   // US-048. The owner asked to remove a title that holds no active listing —
   // it is already removed, or it is a waiting work that was never on a
   // service. Distinct from `LISTING_NOT_REMOVED`, which is its exact mirror on

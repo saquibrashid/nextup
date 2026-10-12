@@ -1362,6 +1362,36 @@ export const RESTORE_SUPPRESSED_ACTION = 'Stop ignoring and continue';
 export const RESTORE_SUPPRESSED_CANCEL = 'Cancel';
 
 /**
+ * US-067 (A58, ADR-0015) — permanent delete from the Removed view. The
+ * confirmation must name what is lost, say it cannot be undone, and state that
+ * backups keep the data for up to 7 days (Azure SQL point-in-time restore,
+ * `specs/security.md`). `{name}` is the title's name.
+ */
+export const PURGE_LABEL = 'Delete permanently';
+export const PURGE_WORK_LABEL = 'Delete all history for this work';
+export const PURGE_TITLE = 'Delete permanently?';
+export const PURGE_WORK_TITLE = 'Delete all history for this work?';
+export const PURGE_BODY =
+  'This permanently deletes \u2018{name}\u2019 on {service} from your removal history, ' +
+  'along with the extraction records the import made for it. That import can no longer be ' +
+  'undone for this title.';
+export const PURGE_WORK_BODY =
+  'This permanently deletes every removal of \u2018{name}\u2019 from your removal history, ' +
+  'along with the extraction records the imports made for it. Those imports can no longer be ' +
+  'undone for this title.';
+export const PURGE_IRREVERSIBLE = 'This can\u2019t be undone.';
+export const PURGE_BACKUP_NOTE = 'Backups keep deleted data for up to 7 days before it ages out.';
+export const PURGE_CONFIRM = 'Delete permanently';
+export const PURGE_CANCEL = 'Cancel';
+export const PURGE_SUBMITTING = 'Deleting\u2026';
+export const PURGE_SUCCESS = '\u2018{name}\u2019 was permanently deleted.';
+export const PURGE_WORK_SUCCESS = 'All history for \u2018{name}\u2019 was permanently deleted.';
+export const PURGE_NOT_REMOVED =
+  '\u2018{name}\u2019 is active again, so it can\u2019t be deleted permanently. Nothing was deleted.';
+export const PURGE_WORK_ACTIVE =
+  '\u2018{name}\u2019 still has an active listing, so its history can\u2019t be deleted. Nothing was deleted.';
+export const PURGE_FAILED = 'Could not delete this. Nothing was deleted.';
+/**
  * §7.10 — 409 `LISTING_NOT_REMOVED`. The listing is already back on the list.
  */
 export const RESTORE_ALREADY_ACTIVE = '\u2018{name}\u2019 is already back in your library.';

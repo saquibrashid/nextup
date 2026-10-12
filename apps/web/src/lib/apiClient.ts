@@ -504,6 +504,13 @@ export interface RemovedItem {
   suppressed: boolean;
 }
 
+/** §6.54 / §6.55 (US-067) — what a permanent delete removed. */
+export interface PermanentDeleteResponse {
+  listingsDeleted: number;
+  candidatesDeleted: number;
+  titlesDeleted: number;
+}
+
 export interface RemovedResponse {
   items: RemovedItem[];
   nextCursor: string | null;
@@ -1420,6 +1427,28 @@ export function createApiClient(deps: ApiClientDeps = {}) {
      */
     getRemoved: (query: string, signal?: AbortSignal) =>
       request<RemovedResponse>(`/api/removed${query ? `?${query}` : ''}`, { signal }, deps),
+
+    /**
+     * §6.54 (US-067) — permanently delete ONE removed listing. Irreversible; the
+     * caller must have confirmed. 409 LISTING_NOT_REMOVED when it is active.
+     */
+    permanentlyDeleteListing: (listingId: string) =>
+      request<PermanentDeleteResponse>(
+        `/api/listings/${encodeURIComponent(listingId)}/permanent`,
+        { method: 'DELETE' },
+        deps,
+      ),
+
+    /**
+     * §6.55 (US-067) — permanently delete every removed listing of one work.
+     * 409 WORK_HAS_ACTIVE_LISTING refuses the whole request.
+     */
+    deleteWorkHistory: (workIdentity: string) =>
+      request<PermanentDeleteResponse>(
+        `/api/works/${encodeURIComponent(workIdentity)}/history`,
+        { method: 'DELETE' },
+        deps,
+      ),
 
     /** §6.10 — restore one removed listing back to active. */
     restoreListing: (listingId: string, opts: { confirmDuplicate?: boolean } = {}) =>

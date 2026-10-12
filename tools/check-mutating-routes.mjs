@@ -358,6 +358,18 @@ export const MUTATING_ROUTE_REGISTRY = [
   },
   {
     method: 'DELETE',
+    path: '/api/listings/:listingId/permanent',
+    changesListState: false,
+    why: 'erases a listing that is already removed, on an explicit owner request; removed listings are not list state (US-067, A58)',
+  },
+  {
+    method: 'DELETE',
+    path: '/api/works/:workIdentity/history',
+    changesListState: false,
+    why: 'erases every removed listing of a work with none active, on an explicit owner request (US-067, A58)',
+  },
+  {
+    method: 'DELETE',
     path: '/api/batches/:batchId/images/:imageId',
     changesListState: false,
     why: 'detaches an image from an OPEN batch before submission (US-004)',

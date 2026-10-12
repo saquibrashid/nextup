@@ -40,6 +40,22 @@ import { EditionLabels } from '../components/EditionLabels';
 
 import {
   OFFLINE_DISABLED_REASON,
+  PURGE_BACKUP_NOTE,
+  PURGE_BODY,
+  PURGE_CANCEL,
+  PURGE_CONFIRM,
+  PURGE_FAILED,
+  PURGE_IRREVERSIBLE,
+  PURGE_LABEL,
+  PURGE_NOT_REMOVED,
+  PURGE_SUBMITTING,
+  PURGE_SUCCESS,
+  PURGE_TITLE,
+  PURGE_WORK_ACTIVE,
+  PURGE_WORK_BODY,
+  PURGE_WORK_LABEL,
+  PURGE_WORK_SUCCESS,
+  PURGE_WORK_TITLE,
   REMOVED_BY_OWNER,
   REMOVED_CLEAR_SEARCH_LABEL,
   REMOVED_EMPTY_BODY,
@@ -82,6 +98,10 @@ export interface RemovedPageProps {
     opts?: { confirmDuplicate?: boolean },
   ) => Promise<RestoreResponse>;
   readonly onUnsuppress?: (suppressionId: string) => Promise<unknown>;
+  /** US-067 — permanent delete of one removed listing. Controls render only when wired. */
+  readonly onPurgeListing?: (listingId: string) => Promise<unknown>;
+  /** US-067 — *Delete all history for this work*. */
+  readonly onPurgeWork?: (workIdentity: string) => Promise<unknown>;
   /** The load-more sentinel (§7.4). Defaults leave it unrendered. */
   readonly hasMore?: boolean;
   readonly loadingMore?: boolean;
@@ -368,17 +388,169 @@ function RestoreControl({
   );
 }
 
+type PurgeScope = 'listing' | 'work';
+
+/**
+ * US-067 (A58, ADR-0015) — the two permanent-delete actions on one row.
+ *
+ * ⚠ NOTHING IS DELETED UNTIL THE OWNER CONFIRMS IN THE DIALOG, and the dialog
+ * opens focused on Cancel, so Enter never deletes by accident. The destructive
+ * call stays in an event handler (never an effect). A 409 means the server
+ * refused and deleted nothing; the row stays and the alert says why.
+ */
+function PurgeControl({
+  item,
+  onPurgeListing,
+  onPurgeWork,
+  onPurged,
+  offline,
+}: {
+  item: RemovedItem;
+  onPurgeListing?: (listingId: string) => Promise<unknown>;
+  onPurgeWork?: (workIdentity: string) => Promise<unknown>;
+  onPurged: (msg: string, scope: PurgeScope) => void;
+  offline: boolean;
+}): JSX.Element | null {
+  const [scope, setScope] = useState<PurgeScope | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const headingId = useId();
+  const listingTrigger = useRef<HTMLButtonElement>(null);
+  const workTrigger = useRef<HTMLButtonElement>(null);
+
+  if (onPurgeListing === undefined && onPurgeWork === undefined) return null;
+
+  async function confirm(): Promise<void> {
+    if (scope === null) return;
+    const run = scope === 'listing' ? onPurgeListing : onPurgeWork;
+    if (run === undefined) return;
+    setSubmitting(true);
+    setFailure(null);
+    try {
+      await run(scope === 'listing' ? item.listingId : item.workIdentity);
+      onPurged(
+        withName(scope === 'listing' ? PURGE_SUCCESS : PURGE_WORK_SUCCESS, item.name),
+        scope,
+      );
+    } catch (err) {
+      setScope(null);
+      setSubmitting(false);
+      if (err instanceof ApiError && err.status === 409 && err.code === 'LISTING_NOT_REMOVED') {
+        setFailure(withName(PURGE_NOT_REMOVED, item.name));
+      } else if (
+        err instanceof ApiError &&
+        err.status === 409 &&
+        err.code === 'WORK_HAS_ACTIVE_LISTING'
+      ) {
+        setFailure(withName(PURGE_WORK_ACTIVE, item.name));
+      } else {
+        setFailure(PURGE_FAILED);
+      }
+    }
+  }
+
+  const returnFocus = scope === 'work' ? workTrigger : listingTrigger;
+
+  return (
+    <div className="removed-row__purge">
+      {onPurgeListing !== undefined && (
+        <Button
+          variant="secondary"
+          data-testid="purge-button"
+          ref={listingTrigger}
+          disabled={offline || submitting}
+          onClick={() => {
+            setFailure(null);
+            setScope('listing');
+          }}
+        >
+          {PURGE_LABEL}
+        </Button>
+      )}
+      {onPurgeWork !== undefined && (
+        <Button
+          variant="secondary"
+          data-testid="purge-work-button"
+          ref={workTrigger}
+          disabled={offline || submitting}
+          onClick={() => {
+            setFailure(null);
+            setScope('work');
+          }}
+        >
+          {PURGE_WORK_LABEL}
+        </Button>
+      )}
+      {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
+      {failure !== null && (
+        <p role="alert" data-testid="purge-failure">
+          {failure}
+        </p>
+      )}
+      {scope !== null && (
+        <Dialog
+          returnFocus={returnFocus}
+          aria-labelledby={headingId}
+          data-testid="purge-dialog"
+          onDismiss={() => {
+            if (submitting) return;
+            setScope(null);
+          }}
+        >
+          <h2 id={headingId}>{scope === 'listing' ? PURGE_TITLE : PURGE_WORK_TITLE}</h2>
+          <p data-testid="purge-body">
+            {(scope === 'listing' ? PURGE_BODY : PURGE_WORK_BODY)
+              .replace('{name}', item.name)
+              .replace('{service}', SERVICE_LABELS[item.service])}
+          </p>
+          <p data-testid="purge-irreversible">
+            <strong>{PURGE_IRREVERSIBLE}</strong> {PURGE_BACKUP_NOTE}
+          </p>
+          {submitting && (
+            <p role="status" data-testid="purge-submitting">
+              {PURGE_SUBMITTING}
+            </p>
+          )}
+          <Button
+            variant="secondary"
+            data-dialog-initial-focus
+            data-testid="purge-cancel"
+            disabled={submitting}
+            onClick={() => setScope(null)}
+          >
+            {PURGE_CANCEL}
+          </Button>
+          <Button
+            variant="danger"
+            data-testid="purge-confirm"
+            disabled={offline || submitting}
+            onClick={() => void confirm()}
+          >
+            {PURGE_CONFIRM}
+          </Button>
+        </Dialog>
+      )}
+    </div>
+  );
+}
+
 function RemovedRow({
   item,
   onRestore,
   onUnsuppress,
+  onPurgeListing,
+  onPurgeWork,
   onDismiss,
+  onPurged,
   offline,
 }: {
   item: RemovedItem;
   onRestore: (listingId: string, opts?: { confirmDuplicate?: boolean }) => Promise<RestoreResponse>;
   onUnsuppress: (suppressionId: string) => Promise<unknown>;
+  onPurgeListing?: (listingId: string) => Promise<unknown>;
+  onPurgeWork?: (workIdentity: string) => Promise<unknown>;
   onDismiss: (msg: string) => void;
+  onPurged: (msg: string, scope: PurgeScope) => void;
   offline: boolean;
 }): JSX.Element {
   const ordinal = removalOrdinalLabel(item);
@@ -439,6 +611,13 @@ function RemovedRow({
           onDismiss={onDismiss}
           offline={offline}
         />
+        <PurgeControl
+          item={item}
+          {...(onPurgeListing !== undefined ? { onPurgeListing } : {})}
+          {...(onPurgeWork !== undefined ? { onPurgeWork } : {})}
+          onPurged={onPurged}
+          offline={offline}
+        />
       </div>
     </li>
   );
@@ -453,6 +632,8 @@ export function RemovedPage({
   onClearSearch,
   onRestore,
   onUnsuppress,
+  onPurgeListing,
+  onPurgeWork,
   hasMore = false,
   loadingMore = false,
   loadMoreFailed = false,
@@ -465,6 +646,15 @@ export function RemovedPage({
   const [announcement, setAnnouncement] = useState<string | null>(null);
 
   const visible = items.filter((i) => !dismissed.has(i.listingId));
+
+  function handlePurged(item: RemovedItem, msg: string, scope: PurgeScope): void {
+    const ids =
+      scope === 'work'
+        ? items.filter((i) => i.workIdentity === item.workIdentity).map((i) => i.listingId)
+        : [item.listingId];
+    setDismissed((prev) => new Set([...prev, ...ids]));
+    setAnnouncement(msg);
+  }
 
   function handleDismiss(listingId: string, msg: string): void {
     setDismissed((prev) => new Set([...prev, listingId]));
@@ -533,7 +723,10 @@ export function RemovedPage({
               item={item}
               onRestore={doRestore}
               onUnsuppress={doUnsuppress}
+              {...(onPurgeListing !== undefined ? { onPurgeListing } : {})}
+              {...(onPurgeWork !== undefined ? { onPurgeWork } : {})}
               onDismiss={(msg) => handleDismiss(item.listingId, msg)}
+              onPurged={(msg, scope) => handlePurged(item, msg, scope)}
               offline={offline}
             />
           ))}
