@@ -41,6 +41,15 @@ const updateTitle = vi.fn();
 const listListingsForTitle = vi.fn();
 const softDeleteServiceListing = vi.fn();
 const getWork = vi.fn();
+const satisfyWaitingIntents = vi.fn();
+
+vi.mock('../../../src/repository/watchIntents.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/repository/watchIntents.js')>();
+  return {
+    ...actual,
+    satisfyWaitingIntents: (...args: unknown[]) => satisfyWaitingIntents(...args) as unknown,
+  };
+});
 
 vi.mock('../../../src/repository/ownerData.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/repository/ownerData.js')>();
@@ -166,6 +175,7 @@ beforeEach(async () => {
   findTitle.mockResolvedValue({ id: 't-0001', workIdentity: WORK_IDENTITY, state: 'active' });
   createTitle.mockResolvedValue(undefined);
   createServiceListing.mockResolvedValue(undefined);
+  satisfyWaitingIntents.mockResolvedValue({ count: 0 });
   updateTitle.mockResolvedValue({ count: 1 });
   softDeleteServiceListing.mockResolvedValue(undefined);
   listListingsForTitle.mockResolvedValue([
@@ -259,6 +269,15 @@ describe('POST /api/titles — §6.30 add by hand', () => {
     expect(listing['service']).toBe('netflix');
     expect(listing['state']).toBe('active');
     expect(listing['createdByBatchId']).toBeNull();
+  });
+
+  it('T-WAIT-008d · adding a waiting work by hand closes its waiting intent', async () => {
+    const response = await add();
+    expect(response.status).toBe(201);
+
+    expect(satisfyWaitingIntents).toHaveBeenCalledTimes(1);
+    const [, works] = satisfyWaitingIntents.mock.calls[0] as [unknown, string[]];
+    expect(works).toEqual([WORK_IDENTITY]);
   });
 
   it('T-MANUAL-034b · a work ALREADY on another service gains a badge, never a second row', async () => {
