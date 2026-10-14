@@ -102,8 +102,8 @@ so they do not relicense this work — but their notices must be retained.
 | `@prisma/fetch-engine` | 6.19.3 | Apache-2.0 |
 | `@prisma/get-platform` | 6.19.3 | Apache-2.0 |
 | `@standard-schema/spec` | 1.1.0 | MIT |
-| `@tanstack/react-virtual` | 3.14.13 | MIT |
-| `@tanstack/virtual-core` | 3.17.11 | MIT |
+| `@tanstack/react-virtual` | 3.14.15 | MIT |
+| `@tanstack/virtual-core` | 3.19.0 | MIT |
 | `@tediousjs/connection-string` | 0.5.0 | MIT |
 | `@types/node` | 22.20.5 | MIT |
 | `@types/node` | 25.9.9 | MIT |
