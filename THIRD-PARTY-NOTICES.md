@@ -133,10 +133,8 @@ so they do not relicense this work — but their notices must be retained.
 | `commander` | 11.1.0 | MIT |
 | `confbox` | 0.2.4 | MIT |
 | `consola` | 3.4.2 | MIT |
-| `content-disposition` | 1.1.0 | MIT |
-| `content-type` | 1.0.5 | MIT |
-| `content-type` | 2.0.0 | MIT |
-| `content-type` | 2.0.0 | MIT |
+| `content-disposition` | 2.0.1 | MIT |
+| `content-type` | 2.1.0 | MIT |
 | `cookie` | 0.7.2 | MIT |
 | `cookie` | 1.1.1 | MIT |
 | `cookie-signature` | 1.2.2 | MIT |
@@ -163,7 +161,7 @@ so they do not relicense this work — but their notices must be retained.
 | `etag` | 1.8.1 | MIT |
 | `event-target-shim` | 5.0.1 | MIT |
 | `events` | 3.3.0 | MIT |
-| `express` | 5.2.1 | MIT |
+| `express` | 5.3.0 | MIT |
 | `exsolve` | 1.1.1 | MIT |
 | `fast-check` | 3.23.2 | MIT |
 | `fast-xml-builder` | 1.3.0 | MIT |
