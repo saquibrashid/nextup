@@ -59,7 +59,7 @@ so they do not relicense this work — but their notices must be retained.
 | `@azure/storage-common` | 12.5.0 | MIT |
 | `@babel/helper-string-parser` | 7.29.7 | MIT |
 | `@babel/helper-validator-identifier` | 7.29.7 | MIT |
-| `@babel/parser` | 7.29.8 | MIT |
+| `@babel/parser` | 7.29.9 | MIT |
 | `@babel/types` | 7.29.8 | MIT |
 | `@emnapi/runtime` | 1.11.3 | MIT |
 | `@img/colour` | 1.1.0 | MIT |
@@ -208,7 +208,6 @@ so they do not relicense this work — but their notices must be retained.
 | `lodash.isplainobject` | 4.0.6 | MIT |
 | `lodash.isstring` | 4.0.1 | MIT |
 | `lodash.once` | 4.1.1 | MIT |
-| `magicast` | 0.5.4 | MIT |
 | `math-intrinsics` | 1.1.0 | MIT |
 | `media-typer` | 0.3.0 | MIT |
 | `media-typer` | 1.1.1 | MIT |
@@ -281,7 +280,7 @@ so they do not relicense this work — but their notices must be retained.
 | `strnum` | 2.4.1 | MIT |
 | `tarn` | 3.1.2 | MIT |
 | `tedious` | 18.6.2 | MIT |
-| `tinyexec` | 1.3.0 | MIT |
+| `tinyexec` | 1.3.1 | MIT |
 | `toidentifier` | 1.0.1 | MIT |
 | `tslib` | 2.8.1 | 0BSD |
 | `type-is` | 1.6.18 | MIT |
