@@ -16,14 +16,14 @@ const ME = { ownerId: 'o_test', email: 'owner@example.com' };
 
 const DESTINATIONS = [
   ['Library', '/'],
+  ['Waiting to stream', '/waiting'],
+  ['Availability changes', '/availability'],
   ['Import', '/upload'],
   ['Review', '/batches'],
   ['Removal history', '/removed'],
   ['Not interested', '/not-interested'],
-  ['Waiting to stream', '/waiting'],
-  ['Availability changes', '/availability'],
-  ['About', '/about'],
   ['Rating lookup', '/rating'],
+  ['About', '/about'],
 ] as const;
 
 /** `OwnerGate` settles `/api/me` before the router mounts, so it must be served. */
@@ -247,6 +247,46 @@ describe('T-NAV-003: the sidebar at 1280 px lists every destination directly', (
     ).toHaveCount(0);
   });
 
+  test('T-NAVG-020: no sidebar label wraps and a long email truncates with a tooltip', async ({
+    page,
+  }) => {
+    await page.route('**/api/**', async (route) => {
+      const url = route.request().url();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          url.includes('/me')
+            ? { ...ME, displayName: 'a.very.long.address.for.the.owner@outlook.example.com' }
+            : { items: [] },
+        ),
+      });
+    });
+    await page.goto('/about');
+    const nav = page.getByRole('navigation', { name: 'Primary' });
+    await expect(nav.getByRole('link')).toHaveCount(DESTINATIONS.length);
+    const heights = await nav
+      .getByRole('link')
+      .evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height));
+    expect(new Set(heights.map((height) => Math.round(height))).size).toBe(1);
+    const overflowing = await nav
+      .locator('.nav__label')
+      .evaluateAll((labels) =>
+        labels
+          .filter((label) => label.scrollWidth - label.clientWidth > 1)
+          .map(
+            (label) => `${label.textContent ?? ''}: ${label.scrollWidth} > ${label.clientWidth}`,
+          ),
+      );
+    expect(overflowing).toEqual([]);
+    const name = page.getByTestId('account').locator('.app-shell__account-name');
+    await expect(name).toHaveAttribute('title', /a\.very\.long\.address/);
+    expect(await name.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+    expect(await name.evaluate((element) => element.getBoundingClientRect().height)).toBeLessThan(
+      30,
+    );
+  });
+
   test('T-NAV-003d: the sidebar has no serious or critical axe violations', async ({ page }) => {
     await page.goto('/about');
     const scan = await new AxeBuilder({ page })
@@ -255,5 +295,23 @@ describe('T-NAV-003: the sidebar at 1280 px lists every destination directly', (
     expect(
       scan.violations.filter((item) => item.impact === 'serious' || item.impact === 'critical'),
     ).toEqual([]);
+  });
+});
+
+describe('T-NAVG-021: the grouped drawer at 280 px', () => {
+  test('T-NAVG-021: the sections fit and every link is reachable', async ({ page }) => {
+    await page.setViewportSize({ width: 280, height: 640 });
+    await stubApi(page);
+    await page.goto('/about');
+    const { drawer } = await openMenu(page);
+    await expect(drawer.getByRole('list', { name: 'Library' })).toBeVisible();
+    await drawer.getByRole('link', { name: 'About', exact: true }).scrollIntoViewIfNeeded();
+    await expect(drawer.getByRole('link', { name: 'About', exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(
+      true,
+    );
+    expect(await drawer.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(
+      true,
+    );
   });
 });

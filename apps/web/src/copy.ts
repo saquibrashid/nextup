@@ -55,6 +55,12 @@ export { TMDB_DISCLAIMER } from '@nextup/domain';
 export const NAV_MENU_LABEL = 'Menu';
 export const NAV_MENU_TITLE = 'Menu';
 export const NAV_MENU_CLOSE_LABEL = 'Close menu';
+/** US-073 (`A65`) — the section headings of the sidebar and the Menu drawer. */
+export const NAV_GROUP_LIBRARY_LABEL = 'Library';
+export const NAV_GROUP_CAPTURE_LABEL = 'Capture';
+export const NAV_GROUP_HISTORY_LABEL = 'History';
+export const NAV_GROUP_TOOLS_LABEL = 'Tools';
+export const NAV_GROUP_HELP_LABEL = 'Help';
 /**
  * TASK-255 — the phone tab bar (owner mobile mockup). The visible label is the
  * mockup's single word; the accessible name starts with it (WCAG 2.5.3) and

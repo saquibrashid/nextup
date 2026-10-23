@@ -1190,9 +1190,60 @@ button {
   padding: 0;
 }
 
-.nav-drawer__list .nav__link {
+.nav-drawer__list {
+  gap: var(--space-3);
+}
+
+/*
+ * US-073 (`A65`) — the sidebar and the drawer list their destinations in
+ * labelled sections. The heading is a quiet label, not a nag: small, muted,
+ * uppercase, and never the only carrier of meaning (each list is named by it
+ * through `aria-labelledby`).
+ */
+.nav__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.nav__group-label {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.04em;
+  margin: 0;
+  padding-inline: var(--space-2);
+  text-transform: uppercase;
+}
+
+.nav__group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nav__group-list .nav__link {
   justify-content: flex-start;
+  min-width: 0;
   width: 100%;
+}
+
+/* The label, not the flex link, is the element that ellipsises. */
+.nav__group-list .nav__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* About sits last, under a hairline, above the account block. */
+.nav__group--footer {
+  border-top: 1px solid var(--color-border-soft);
+  padding-top: var(--space-3);
 }
 
 /* TASK-261 — the always-present sign-out (ux-states §10.5). */
@@ -1205,11 +1256,18 @@ button {
   padding-top: var(--space-4);
 }
 
+.app-shell__account {
+  min-width: 0;
+}
+
 .app-shell__account-name {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
   margin: 0;
-  overflow-wrap: anywhere;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-shell__sign-out {
@@ -5793,7 +5851,7 @@ button {
    */
   .app-shell {
     display: grid;
-    grid-template-columns: 12rem minmax(0, 1fr);
+    grid-template-columns: 14rem minmax(0, 1fr);
     align-items: stretch;
     gap: 0;
     width: calc(100% - 2 * var(--space-6));
@@ -5823,9 +5881,11 @@ button {
     max-height: calc(100dvh - 2 * var(--space-6));
     overflow-y: auto;
     flex-direction: column;
+    /* A column that wraps spills into a second column once the sections are tall. */
+    flex-wrap: nowrap;
     align-items: stretch;
     justify-content: flex-start;
-    gap: var(--space-6);
+    gap: var(--space-5);
     border: 0;
     margin: 0;
     padding: var(--space-5) var(--space-3);
@@ -5849,6 +5909,38 @@ button {
   .nav__list {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .app-shell__header,
+  .nav {
+    min-width: 0;
+  }
+
+  .nav {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+
+  /* Short windows scroll the sections, never the account block off the screen. */
+  .app-shell__header .app-shell__account {
+    background: var(--color-surface);
+    bottom: calc(-1 * var(--space-5));
+    margin-top: auto;
+    padding-bottom: var(--space-5);
+    position: sticky;
+  }
+
+  /* Tight rows: a 14rem sidebar must hold "Availability changes" on one line. */
+  .nav__group-list .nav__link {
+    gap: var(--space-2);
+    padding-inline: var(--space-1);
+  }
+
+  .nav__group-list .nav__link .icon {
+    flex: none;
+    height: 1rem;
+    width: 1rem;
   }
 
   .nav__link,

@@ -751,6 +751,8 @@ finished, so the exception cannot outlive its reason.
 | `TASK-292` | `done` | Track new seasons, backend (`A64`, US-072 / REQ-138): additive migration `0022`, `TmdbClient.getNextSeason`, the two tracking routes, the bounded lazy re-check and offers on `GET /api/waiting`, season intents held out of "now streaming". Test ids: `T-SEAS-001`, `T-SEAS-010`, `T-SEAS-020`, `T-SEAS-030`, `T-SEAS-040`, `T-SEAS-050`, `T-SEAS-070`. |
 | `TASK-293` | `done` | Track new seasons, web: the Waiting season panel and *New season announced* offers, and the Removal history *Track new seasons* control. Test ids: `T-SEAS-060`, `T-SEAS-063`. |
 | `TASK-294` | `done` | The season panel and offers at 280 px in a real browser. Test id: `T-SEAS-080`. |
+| `TASK-295` | `done` | Grouped left navigation (#463, `A65`, US-073 / REQ-139): the sidebar and Menu drawer list the nine destinations in labelled sections with About in a footer section; rows never wrap; the signed-in address truncates with a tooltip. Test ids: `T-NAVG-001`, `T-NAVG-002`, `T-NAVG-003`, `T-NAVG-004`. |
+| `TASK-296` | `done` | The grouped sidebar and drawer in a real browser at 1280 px and 280 px. Test ids: `T-NAVG-020`, `T-NAVG-021`. |
 <!-- STATUS-LEDGER:END -->
 
 ### Approved availability moves (#397/#410), 2026-09-29
@@ -804,6 +806,8 @@ TASK-265."~~
 | TASK-292 | Track a removed show for a new season, backend (PRD `A64`, US-072 / REQ-138): additive migration `0022_track_new_seasons`; `getNextSeason`; `POST /api/titles/:titleId/new-season-tracking` and `/stop`; the bounded lazy re-check and `newSeasonOffers` on `GET /api/waiting`; a future season is never "now streaming". No scheduler, no fifth process. | 2 agent-runs + 20 owner-review-minutes | TASK-290 | `T-SEAS-001`; `T-SEAS-010`; `T-SEAS-020`; `T-SEAS-030`; `T-SEAS-040`; `T-SEAS-050`; `T-SEAS-070`; `T-CI-005` still passes |
 | TASK-293 | Track new seasons, web: season panel and *New season announced* offers on Waiting; *Track new seasons* / *Stop tracking* on Removal history. | 1 agent-run + 15 owner-review-minutes | TASK-292 | `T-SEAS-060`; `T-SEAS-063` |
 | TASK-294 | The season panel and offers at 280 px in a real browser. | 1 agent-run + 5 owner-review-minutes | TASK-293 | `T-SEAS-080` |
+| TASK-295 | Grouped left navigation (PRD `A65`, US-073 / REQ-139): sections *Library*, *Capture*, *History*, *Tools* and a footer *Help* (About) in the sidebar and the Menu drawer, each a list named by its heading; no label wraps; the signed-in address truncates with a `title` tooltip. No route, label or behaviour changes, no counts. | 1 agent-run + 10 owner-review-minutes | TASK-294 | `T-NAVG-001`; `T-NAVG-002`; `T-NAVG-003`; `T-NAVG-004`; `T-UX-167`, `T-UX-132`, `T-NAV-003` still pass as amended |
+| TASK-296 | The grouped sidebar and drawer in a real browser at 1280 px and 280 px. | 1 agent-run + 5 owner-review-minutes | TASK-295 | `T-NAVG-020`; `T-NAVG-021` |
 
 ### Approved waiting sort and Grid alignment (`A56`, #415, #414), 2026-10-08
 

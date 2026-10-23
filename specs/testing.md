@@ -27,6 +27,22 @@ Collected locations: `packages/domain/test/titleCategory.spec.ts`;
 `apps/web/test/titleDetails.spec.tsx`, `filterBar.spec.tsx`;
 `tests/e2e/titleDetails.spec.ts`.
 
+### US-073 — Grouped left navigation (TASK-295, TASK-296, #463, `A65`)
+
+| AC | Level | Test IDs | Assertion |
+| --- | --- | --- | --- |
+| AC-1 | U | `T-NAVG-001`, `T-NAVG-002` | Sidebar and drawer sections are lists named by their headings with the expected links; About is last; `aria-current` is kept; a drawer link still closes it. |
+| AC-2 | U/E | `T-NAVG-003`, `T-NAVG-004`, `T-NAVG-020` | Rows do not wrap, share a height and fit; the address truncates and keeps its full text in a `title`. |
+| AC-3 | E | `T-NAVG-021` | The drawer at 280 px has no horizontal overflow and its links are reachable. |
+
+| Id | Level | Owner | Claim |
+|---|---|---|---|
+| **`T-NAVG-001`** | U | `TASK-295` | `apps/web/test/navigation.spec.tsx`: sidebar sections, About last. |
+| **`T-NAVG-002`** | U | `TASK-295` | Same file: drawer sections. |
+| **`T-NAVG-003`** | U | `TASK-295` | Same file: nowrap rows and an ellipsised address (stylesheet). |
+| **`T-NAVG-004`** | U | `TASK-295` | `apps/web/test/signOut.spec.tsx`: full address in the `title`. |
+| **`T-NAVG-020`** | E | `TASK-296` | `tests/e2e/navDrawer.spec.ts`: one row height, no clipped label, truncated address at 1280 px. |
+| **`T-NAVG-021`** | E | `TASK-296` | Same file: the drawer at 280 px. |
 ### US-072 — Track a removed show for a new season (TASK-292 – TASK-294, #454, `A64`)
 
 | AC | Level | Test IDs | Assertion |

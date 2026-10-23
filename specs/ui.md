@@ -19,6 +19,19 @@ four override choices (Movie, TV Show, Comedy Show, Documentary), Save/Cancel an
 Category-filtered lists disclose incomplete classification and offer Retry
 classification; no timer or automatic re-capture reminder is introduced.
 
+## Grouped navigation (#463, PRD `A65`, US-073)
+
+The sidebar (from `--bp-lg`) and the Menu drawer list the nine destinations in
+five sections, in this order: **Library** (Library, Waiting to stream,
+Availability changes), **Capture** (Import, Review), **History** (Removal
+history, Not interested), **Tools** (Rating lookup) and a footer section
+**Help** (About, under a hairline above the account block). A section is a
+`<p>` heading plus a `<ul aria-labelledby>`; no landmark or heading level is
+added, and the labels are the route table's. The wide bar (three links and
+Menu) and the phone tab bar are unchanged. Rows are one line (`white-space:
+nowrap`, ellipsis); the sidebar header never wraps into a second column (it
+scrolls). The signed-in address is one ellipsised line whose `title` carries
+the full text. No count badges: they would need a read on every route.
 ## Availability moves (TASK-265, #397/#410, PRD `A54`, US-063)
 
 **The fact, never a nag (invariant 8a).** When a Library title's
