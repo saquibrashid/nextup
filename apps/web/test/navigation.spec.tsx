@@ -40,25 +40,28 @@ const CSS = readFileSync(join(WEB_ROOT, 'src', 'index.css'), 'utf8');
 const BAR_LABELS = ['Library', 'Import', 'Review'] as const;
 /** Every destination, in the drawer's order (the route table's). */
 const ALL_LABELS = [
-  ...BAR_LABELS,
+  // US-073 (`A65`) — the sidebar and the drawer list destinations by section:
+  // Library, Capture, History, Tools, then About in the footer group.
+  'Library',
+  'Waiting to stream',
+  'Availability changes',
+  'Import',
+  'Review',
   'Removal history',
   'Not interested',
-  'Waiting to stream',
-  // US-064 (`A55`) — the availability review, beside the waiting view.
-  'Availability changes',
-  'About',
   'Rating lookup',
+  'About',
 ] as const;
 const ALL_HREFS = [
   '/',
+  '/waiting',
+  '/availability',
   '/upload',
   '/batches',
   '/removed',
   '/not-interested',
-  '/waiting',
-  '/availability',
-  '/about',
   '/rating',
+  '/about',
 ] as const;
 
 /**
@@ -142,7 +145,9 @@ function labels(scope: HTMLElement): (string | null)[] {
  * below the list — an action, not a destination, so it is not counted here.
  */
 function destinations(drawer: HTMLElement): HTMLElement {
-  return within(drawer).getByRole('list');
+  const list = drawer.querySelector<HTMLElement>('.nav-drawer__list');
+  if (list === null) throw new Error('the drawer has no destination list');
+  return list;
 }
 
 function currentLinks(scope: HTMLElement): HTMLElement[] {
@@ -693,5 +698,55 @@ describe('T-UX-167 · ui-refresh.md §6 · the sidebar shows every destination',
     const content = /\.app-shell__content\s*\{([^}]*)\}/.exec(block)?.[1] ?? '';
     expect(content).toMatch(/border-inline-start:\s*1px solid var\(--color-border-soft\)/);
     expect(content).not.toMatch(/(^|\s)border:/);
+  });
+});
+
+describe('T-NAVG · US-073 (A65) · the sidebar and the drawer group destinations', () => {
+  const SECTIONS = [
+    ['Library', ['Library', 'Waiting to stream', 'Availability changes']],
+    ['Capture', ['Import', 'Review']],
+    ['History', ['Removal history', 'Not interested']],
+    ['Tools', ['Rating lookup']],
+    ['Help', ['About']],
+  ] as const;
+
+  function expectSections(scope: HTMLElement): void {
+    for (const [heading, names] of SECTIONS) {
+      const list = within(scope).getByRole('list', { name: heading });
+      expect(
+        within(list)
+          .getAllByRole('link')
+          .map((link) => link.textContent),
+      ).toStrictEqual([...names]);
+    }
+  }
+
+  it('T-NAVG-001: the sidebar sections are lists named by their headings, About last', () => {
+    stubSidebar(true);
+    const nav = renderAt('/about');
+    expectSections(nav);
+    expect(within(nav).getAllByRole('list')).toHaveLength(SECTIONS.length);
+    expect(labels(nav).at(-1)).toBe('About');
+    expect(within(nav).getByRole('link', { name: 'About' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+  });
+
+  it('T-NAVG-002: the Menu drawer has the same sections and still closes on a link', () => {
+    stubSidebar(false);
+    const nav = renderAt('/');
+    const drawer = openDrawer(nav);
+    expectSections(drawer);
+    fireEvent.click(within(drawer).getByRole('link', { name: 'Rating lookup' }));
+    expect(screen.queryByRole('dialog', { name: NAV_MENU_TITLE })).toBeNull();
+  });
+
+  it('T-NAVG-003: rows never wrap and the email truncates instead of breaking mid-word', () => {
+    expect(ruleBody('.nav__group-list .nav__link')).toMatch(/white-space:\s*nowrap/);
+    const name = ruleBody('.app-shell__account-name') ?? '';
+    expect(name).toMatch(/text-overflow:\s*ellipsis/);
+    expect(name).toMatch(/white-space:\s*nowrap/);
+    expect(name).not.toMatch(/overflow-wrap:\s*anywhere/);
   });
 });

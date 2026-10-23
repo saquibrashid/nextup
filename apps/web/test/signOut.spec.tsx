@@ -89,7 +89,12 @@ describe('T-NAV-004 · ux-states.md §10.5 · the sign-out link is always reacha
       expect(link).toHaveAttribute('href', '/.auth/logout');
       expect(within(drawer).getByText('Signed in as owner@example.com')).toBeInTheDocument();
       expect(
-        within(within(drawer).getByRole('list')).queryByRole('link', { name: SIGN_OUT_LABEL }),
+        within(drawer.querySelector<HTMLElement>('.nav-drawer__list') ?? drawer).queryByRole(
+          'link',
+          {
+            name: SIGN_OUT_LABEL,
+          },
+        ),
       ).toBeNull();
     },
   );
@@ -111,5 +116,13 @@ describe('T-NAV-004 · ux-states.md §10.5 · the sign-out link is always reacha
     expect(link).not.toHaveAttribute('aria-current');
     expect(link).not.toHaveAttribute('target');
     expect(link.className).not.toMatch(/nav__link/);
+  });
+});
+
+describe('T-NAVG · US-073 (A65) · the signed-in address', () => {
+  it('T-NAVG-004: the address is full text with a title tooltip, so truncation loses nothing', () => {
+    const header = renderShell('sidebar', 'a.very.long.address@outlook.example.com');
+    const name = within(header).getByText('Signed in as a.very.long.address@outlook.example.com');
+    expect(name).toHaveAttribute('title', 'Signed in as a.very.long.address@outlook.example.com');
   });
 });

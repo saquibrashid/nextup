@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 289 |
+| ✅ done | 291 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **292** |
+| **total** | **294** |
 
 ## Ready to start
 
@@ -330,3 +330,5 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-292` | Track new seasons, backend (`A64`, US-072 / REQ-138): additive migration `0022`, `TmdbClient.getNextSeason`, the two tracking routes, the bounded lazy re-check and offers on `GET /api/waiting`, season intents held out of "now streaming". Test ids: `T-SEAS-001`, `T-SEAS-010`, `T-SEAS-020`, `T-SEAS-030`, `T-SEAS-040`, `T-SEAS-050`, `T-SEAS-070`. | `T-CI-005`, `T-SEAS-001`, `T-SEAS-010`, `T-SEAS-020`, `T-SEAS-030`, `T-SEAS-040`, `T-SEAS-050`, `T-SEAS-070` |
 | `TASK-293` | Track new seasons, web: the Waiting season panel and *New season announced* offers, and the Removal history *Track new seasons* control. Test ids: `T-SEAS-060`, `T-SEAS-063`. | `T-SEAS-060`, `T-SEAS-063` |
 | `TASK-294` | The season panel and offers at 280 px in a real browser. Test id: `T-SEAS-080`. | `T-SEAS-080` |
+| `TASK-295` | Grouped left navigation (#463, `A65`, US-073 / REQ-139): the sidebar and Menu drawer list the nine destinations in labelled sections with About in a footer section; rows never wrap; the signed-in address truncates with a tooltip. Test ids: `T-NAVG-001`, `T-NAVG-002`, `T-NAVG-003`, `T-NAVG-004`. | `T-NAV-003`, `T-NAVG-001`, `T-NAVG-002`, `T-NAVG-003`, `T-NAVG-004`, `T-UX-132`, `T-UX-167` |
+| `TASK-296` | The grouped sidebar and drawer in a real browser at 1280 px and 280 px. Test ids: `T-NAVG-020`, `T-NAVG-021`. | `T-NAVG-020`, `T-NAVG-021` |

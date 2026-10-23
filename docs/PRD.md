@@ -2,7 +2,7 @@
 
 **Project:** nextup
 **Version:** Current v1 scope, including subsequent owner-approved promotions; remaining deferrals are in §11.2.
-**Status:** Approved scope with recorded amendments through US-072 / REQ-138 (`A64`). ~~"through US-071 / REQ-137 (`A63` amends US-070)"~~ ~~"through US-071 / REQ-137 (`A62`)"~~ ~~"through US-070 / REQ-136 (`A61`)"~~ ~~"through US-069 / REQ-135 (`A60`)"~~ ~~"through US-068 / REQ-134 (`A59`)"~~ ~~"through US-067 / REQ-133 (`A58`)"~~ ~~"through US-066 / REQ-132 (`A57`)"~~ ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
+**Status:** Approved scope with recorded amendments through US-073 / REQ-139 (`A65`). ~~"through US-072 / REQ-138 (`A64`)"~~ ~~"through US-071 / REQ-137 (`A63` amends US-070)"~~ ~~"through US-071 / REQ-137 (`A62`)"~~ ~~"through US-070 / REQ-136 (`A61`)"~~ ~~"through US-069 / REQ-135 (`A60`)"~~ ~~"through US-068 / REQ-134 (`A59`)"~~ ~~"through US-067 / REQ-133 (`A58`)"~~ ~~"through US-066 / REQ-132 (`A57`)"~~ ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
 **Inputs:** `docs/BRD.md`, the recorded owner decisions in the ADRs, and the original authoring-tree `Context/` documents. **The `Context/` tree is not supplied in this repository.** Its citations preserve provenance, not an instruction to invent missing source text. See `docs/current-release.md` for the owner decisions applied on 2026-09-17 and `docs/requirement-index.md` for reconciled reference authority.
 **Audience:** the implementer. Implementation will be performed by GitHub Copilot in autopilot mode (ASM-028, ASM-029, NFR-002, NFR-003, NFR-004). This document, together with the specs, IS the implementation input. Acceptance criteria are written to be executable and verifiable without asking a question.
 **No timeline.** Per A19 / ASM-027 this document contains no dates, durations, or sequencing commitments beyond dependency order.
@@ -109,6 +109,20 @@
 > **New in this document:** **US-065 / REQ-131** (Epic L), seven acceptance criteria. **Corrected in place:** US-043's out-of-scope line. **No migration** — the forecast is computed per request, so the order is applied in memory over the rows the waiting read already returns.
 ---
 
+> ## ⚠ AMENDMENT — 2026-10-24 — `A65` (owner-reported, #463): the left navigation is grouped into sections
+
+> **The owner observed** (#463) that the sidebar was one undifferentiated stack of nine links: *Availability changes* wrapped to two lines, the signed-in address broke mid-word, About sat between working destinations, and nothing said what belonged together. **Decision:** the sidebar and the Menu drawer list the same nine destinations in labelled sections. This is presentation only — no route, URL, label or behaviour changes.
+>
+> | Decision | What it changes | Kind |
+> |---|---|---|
+> | **1. Five sections** | *Library* (Library, Waiting to stream, Availability changes), *Capture* (Import, Review), *History* (Removal history, Not interested), *Tools* (Rating lookup), and a footer section *Help* (About), under a hairline just above the account block. Each section is a list named by its heading through `aria-labelledby`; no landmark is added. | **Instruction** |
+> | **2. No wrapping, no mid-word breaks** | A row never wraps (it truncates with an ellipsis rather than reflow); the signed-in address truncates with an ellipsis and carries the full text as a `title` tooltip, and the full text stays in the DOM for assistive technology. | **Instruction** |
+> | **3. Unchanged** | The wide bar (three links and Menu), the phone tab bar, `aria-current`, the active cue, focus states and the skip link. Hiding a route from the bar never hides it from the drawer. | **Invariant** |
+> | **4. No counts** | Count badges (for example pending Review items) are not added: the sidebar renders on every route and a count would need a new read, or a background poll, on each. *Show the fact; never nag.* | **Decision** |
+>
+> **New in this document:** **US-073 / REQ-139** (Epic O), three acceptance criteria. **Amended in place:** `specs/ui.md` (navigation sections), `specs/testing.md` US-073; `T-UX-167`, `T-UX-132` and `T-NAV-003` now expect the grouped order.
+
+---
 > ## ⚠ AMENDMENT — 2026-10-24 — `A64` (owner-requested, #454): a removed TV show whose next season is announced waits in Waiting to stream
 
 > **The owner observed** that after finishing a season and removing a show (for example *The Lord of the Rings: The Rings of Power*), nextup never tells them a new season has been announced. **Decision:** the owner may **track a removed TV show for a new season**. When TMDB announces a dated season, the show is offered to Waiting to stream with that season's date, and once that season is out it uses the existing *Add to Library* path. Nothing moves without a tap.
@@ -2346,6 +2360,28 @@ no existing data is rewritten, and the canonical Movie/TV type is unchanged.
 **Out of scope:** separating Documentary movies from Documentary series; a Documentary badge distinct from the type label; classifying from keywords or titles.
 **Open questions:** none.
 
+#### US-073 — Grouped left navigation (`A65`)
+
+**REQ-139 (`should`, owner-reported #463, `A65`).** The sidebar and the Menu drawer
+list the nine destinations in labelled sections, never wrap a label, and truncate
+the signed-in address with a tooltip. Presentation only.
+
+**As** the owner
+**I want** the navigation grouped by what I am doing
+**So that** I can find a destination at a glance
+
+**Traces to:** REQ-116, REQ-117, REQ-139
+**Priority:** should
+**Epic:** O
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | The sidebar or the Menu drawer is open | The owner reads it | Library, Waiting to stream and Availability changes sit under *Library*; Import and Review under *Capture*; Removal history and Not interested under *History*; Rating lookup under *Tools*; About last under *Help*. Each section is a list named by its heading; every link keeps its href, label and `aria-current`. |
+| AC-2 | The sidebar is at 1280 px | Labels and a long signed-in address render | No row wraps, rows share one height, and the address is one truncated line whose `title` and DOM text hold the full address. |
+| AC-3 | The Menu drawer is used at 280 px | It opens | Nothing overflows horizontally and every link is reachable. |
+
+**Out of scope:** count badges; collapsing sections; reordering the wide bar or the phone tab bar.
+**Open questions:** none.
 #### US-072 — Track a removed show for a new season (`A64`)
 
 **REQ-138 (`must`, owner-requested #454, `A64`).** The owner can ask nextup to

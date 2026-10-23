@@ -109,21 +109,17 @@ describe('AppShell and routing', () => {
 
     expect(labels).toStrictEqual([
       'Library',
+      // Epic L (US-043) and US-064 (`A55`): destinations, not filters; they sit
+      // with the Library in the sidebar's first section (US-073).
+      'Waiting to stream',
+      'Availability changes',
       'Import',
       'Review',
       'Removal history',
       'Not interested',
-      // Epic L (US-043). The waiting view is a top-level destination, not a
-      // filter of the list: nothing in it is on a service the owner has.
-      'Waiting to stream',
-      // US-064 (`A55`). A destination, not a filter: it gathers the changes
-      // the Library and Waiting markers already show one at a time.
-      'Availability changes',
-      'About',
-      // Epic M (REQ-092). Reachable from the nav rather than only from a row,
-      // because US-045 is about checking something the owner has NOT saved -
-      // so there is no row to start from.
+      // Epic M (REQ-092). Reachable from the nav rather than only from a row.
       'Rating lookup',
+      'About',
     ]);
   });
 

@@ -90,6 +90,11 @@ import { Dialog } from './ui/Dialog';
 import { useOnline } from '../lib/useOnline';
 import { useSidebarViewport, useWideViewport } from '../lib/useWideViewport';
 import {
+  NAV_GROUP_CAPTURE_LABEL,
+  NAV_GROUP_HELP_LABEL,
+  NAV_GROUP_HISTORY_LABEL,
+  NAV_GROUP_LIBRARY_LABEL,
+  NAV_GROUP_TOOLS_LABEL,
   NAV_MENU_CLOSE_LABEL,
   NAV_MENU_LABEL,
   NAV_MENU_TITLE,
@@ -208,7 +213,77 @@ function NavTextLink({
 }
 
 /**
- * The Menu drawer: every destination, directly, in route order.
+ * US-073 (`A65`) — the sidebar and the Menu drawer group the destinations by
+ * what the owner is doing. Presentation only: every route, URL and label is
+ * the route table's, and About sits last, in the footer group.
+ */
+const NAV_GROUPS: readonly {
+  readonly id: string;
+  readonly label: string;
+  readonly paths: readonly string[];
+  readonly footer?: true;
+}[] = [
+  {
+    id: 'library',
+    label: NAV_GROUP_LIBRARY_LABEL,
+    paths: ['/', '/waiting', '/availability'],
+  },
+  { id: 'capture', label: NAV_GROUP_CAPTURE_LABEL, paths: ['/upload', '/batches'] },
+  { id: 'history', label: NAV_GROUP_HISTORY_LABEL, paths: ['/removed', '/not-interested'] },
+  { id: 'tools', label: NAV_GROUP_TOOLS_LABEL, paths: ['/rating'] },
+  { id: 'help', label: NAV_GROUP_HELP_LABEL, paths: ['/about'], footer: true },
+];
+
+const NAV_GROUP_CLASS: Record<'body' | 'footer', string> = {
+  body: 'nav__group',
+  footer: 'nav__group nav__group--footer',
+};
+
+/**
+ * Every destination in labelled sections. Each section is a list named by its
+ * heading through `aria-labelledby`; the sections sit in whichever landmark
+ * contains them, so no landmark is added.
+ */
+function NavGroups({
+  pathname,
+  onNavigate,
+}: {
+  readonly pathname: string;
+  readonly onNavigate?: () => void;
+}): JSX.Element {
+  const prefix = useId();
+  return (
+    <>
+      {NAV_GROUPS.map((group) => {
+        const labelId = `${prefix}-${group.id}`;
+        const groupKey = group.footer ? 'footer' : 'body';
+        return (
+          <div key={group.id} className={NAV_GROUP_CLASS[groupKey]}>
+            <p id={labelId} className="nav__group-label">
+              {group.label}
+            </p>
+            <ul className="nav__group-list" aria-labelledby={labelId}>
+              {group.paths
+                .flatMap((path) => NAV_ITEMS.filter((item) => item.path === path))
+                .map((route) => (
+                  <li key={route.path} className="nav__item">
+                    <NavTextLink
+                      route={route}
+                      active={isRouteActive(pathname, route.path)}
+                      {...(onNavigate ? { onNavigate } : {})}
+                    />
+                  </li>
+                ))}
+            </ul>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+/**
+ * The Menu drawer: every destination, directly, in sections.
  *
  * ⚠ BUILT ON THE `Dialog` PRIMITIVE, NOT A SECOND FOCUS IMPLEMENTATION. The
  * drawer covers the page, so it is modal: focus moves in and is trapped,
@@ -231,7 +306,9 @@ function AccountBlock({ ownerName }: { readonly ownerName: string | null }): JSX
   return (
     <div className="app-shell__account" data-testid="account">
       {ownerName !== null && (
-        <p className="app-shell__account-name">{signedInAsLabel(ownerName)}</p>
+        <p className="app-shell__account-name" title={signedInAsLabel(ownerName)}>
+          {signedInAsLabel(ownerName)}
+        </p>
       )}
       <a
         className="btn btn--secondary app-shell__sign-out"
@@ -271,17 +348,9 @@ function NavDrawer({
           <CloseIcon />
         </Button>
       </div>
-      <ul className="nav-drawer__list">
-        {NAV_ITEMS.map((route) => (
-          <li key={route.path} className="nav__item">
-            <NavTextLink
-              route={route}
-              active={isRouteActive(pathname, route.path)}
-              onNavigate={onClose}
-            />
-          </li>
-        ))}
-      </ul>
+      <div className="nav-drawer__list">
+        <NavGroups pathname={pathname} onNavigate={onClose} />
+      </div>
       <AccountBlock ownerName={ownerName} />
     </Dialog>
   );
@@ -305,11 +374,7 @@ export function AppShell(): JSX.Element {
     }
   }, [location.pathname]);
 
-  const barItems = sidebar
-    ? NAV_ITEMS
-    : wide
-      ? NAV_ITEMS.filter((route) => BAR_PATHS.includes(route.path))
-      : [];
+  const barItems = wide ? NAV_ITEMS.filter((route) => BAR_PATHS.includes(route.path)) : [];
   const libraryRoute = NAV_ITEMS.find((route) => route.path === '/');
   /*
    * TASK-255 — the owner's mobile mockup puts a bottom tab bar under the
@@ -375,8 +440,9 @@ export function AppShell(): JSX.Element {
           </span>
         )}
         <nav aria-label="Primary" className="nav" data-tabs={tabBar || undefined}>
-          <ul className="nav__list">
-            {barItems.map((route) => (
+          {sidebar && <NavGroups pathname={location.pathname} />}
+          <ul className="nav__list" hidden={sidebar || undefined}>
+            {(sidebar ? [] : barItems).map((route) => (
               <li key={route.path} className="nav__item">
                 <NavTextLink route={route} active={isRouteActive(location.pathname, route.path)} />
               </li>
