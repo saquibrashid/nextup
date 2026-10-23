@@ -13,7 +13,7 @@
  * ⚠ The year/type separator is CSS-generated, as in the title row
  * (`T-UX-102`/`T-UX-103`), so no "middot" enters the accessible text.
  *
- * ⚠ The Select button keeps its short accessible name and is DESCRIBED by the
+ * #457: rows also carry genres, lead cast and a clamped overview when the\n * server sent them; each is simply omitted when absent.\n *\n * ⚠ The Select button keeps its short accessible name and is DESCRIBED by the
  * row's title and metadata. Renaming it per row would change the name every
  * existing test and assistive-technology user relies on, while a bare
  * repeated "Select" gives no context when moving between buttons.
@@ -21,6 +21,7 @@
 import { useId, type JSX } from 'react';
 import { releaseYearText } from '@nextup/domain';
 
+import { TITLE_SEARCH_CAST_PREFIX, TITLE_SEARCH_SELECT } from '../copy';
 import { EditionLabels } from './EditionLabels';
 import type { TmdbSearchResult } from './FixMatchDialog';
 import { Button } from './ui/Button';
@@ -59,7 +60,11 @@ export function TitleSearchThumb({
 
 export interface TitleSearchResultTestIds {
   list: string;
+  item?: string | undefined;
   name: string;
+  genres?: string | undefined;
+  cast?: string | undefined;
+  overview?: string | undefined;
   year?: string | undefined;
   type?: string | undefined;
   poster?: string | undefined;
@@ -70,10 +75,20 @@ export function TitleSearchResults({
   results,
   onSelect,
   testIds,
+  actionLabel = TITLE_SEARCH_SELECT,
+  disabled = false,
+  pendingLabel,
+  pendingKey = null,
 }: {
   results: readonly TmdbSearchResult[];
   onSelect: (result: TmdbSearchResult) => void;
   testIds: TitleSearchResultTestIds;
+  /** The Waiting add names its action for what it does ('Wait for it'). */
+  actionLabel?: string;
+  disabled?: boolean;
+  /** Label of the row whose pendingKey (mediaType:tmdbId) is in flight. */
+  pendingLabel?: string;
+  pendingKey?: string | null;
 }): JSX.Element {
   const baseId = useId();
   return (
@@ -81,8 +96,11 @@ export function TitleSearchResults({
       {results.map((result, index) => {
         const detailsId = `${baseId}-${index}`;
         const year = releaseYearText(result.releaseYear, result.edition !== undefined);
+        const rowKey = `${result.mediaType}:${String(result.tmdbId)}`;
+        const genres = result.genres?.join(', ') ?? '';
+        const cast = result.cast?.join(', ') ?? '';
         return (
-          <li key={`${result.mediaType}:${result.tmdbId}`} className="title-search-result">
+          <li key={rowKey} className="title-search-result" data-testid={testIds.item}>
             <TitleSearchThumb posterPath={result.posterPath} testId={testIds.poster} />
             <div className="title-search-result__body" id={detailsId}>
               <span className="title-search-result__name" data-testid={testIds.name}>
@@ -93,15 +111,31 @@ export function TitleSearchResults({
                 {year !== null && <span data-testid={testIds.year}>{year}</span>}
                 <span data-testid={testIds.type}>{mediaTypeLabel(result.mediaType)}</span>
               </span>
+              {genres !== '' && (
+                <span className="title-search-result__genres" data-testid={testIds.genres}>
+                  {genres}
+                </span>
+              )}
+              {cast !== '' && (
+                <span className="title-search-result__cast" data-testid={testIds.cast}>
+                  {TITLE_SEARCH_CAST_PREFIX} {cast}
+                </span>
+              )}
+              {result.overview !== undefined && result.overview !== '' && (
+                <span className="title-search-result__overview" data-testid={testIds.overview}>
+                  {result.overview}
+                </span>
+              )}
             </div>
             <div className="title-search-result__action">
               <Button
                 variant="secondary"
                 aria-describedby={detailsId}
                 data-testid={testIds.select(result)}
+                disabled={disabled}
                 onClick={() => onSelect(result)}
               >
-                Select
+                {pendingKey === rowKey && pendingLabel !== undefined ? pendingLabel : actionLabel}
               </Button>
             </div>
           </li>

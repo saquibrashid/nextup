@@ -1344,9 +1344,14 @@ and forecast logic, and the API are unchanged.
 
 - **One page heading**, *"Waiting to stream"*, in the Library heading type, with
   the helper as its subtitle (`WAITING_SUBTITLE`). The search box has no heading
-  of its own; its landmark is named *"Wait for a title"*.
-- **Search** is Library's field: a rounded control with the search icon as its
-  submit (accessible name *Search*), a visually hidden label and a placeholder.
+  of its own; its landmark is named *"Add a title to wait for"* (~~*"Wait for a title"*~~).
+- **Add (`A61`, #457)** is an explicit *Add title* button with the Library's plus
+  icon (`aria-expanded`); there is no always-visible *Search*, because search
+  reads as filtering the page. It opens Library's rounded lookup field with the
+  search icon as its submit (accessible name *Look up*, ~~*Search*~~), a visually
+  hidden label and a placeholder. Results are the shared `TitleSearchResults`
+  rows: small poster (neutral placeholder if none), name, year, type, genres,
+  *With* lead cast and a two-line overview, each optional.
 - **Cards** sit on the catalogue surface (`--color-catalog-raised`, border, card
   radius and shadow, accent border on hover/focus), **one card per line** at
   every width. Posters are the Library's 2:3 box: 72 × 108 px, 96 × 144 px from

@@ -139,6 +139,9 @@ export const REMOVED_BY_OWNER = 'Removed by you';
 /** §2.2 row menu — the third item. */
 export const ROW_MENU_REMOVE_LABEL = 'Remove from library';
 
+/** #457 — shared lookup-result row copy. */
+export const TITLE_SEARCH_SELECT = 'Select';
+export const TITLE_SEARCH_CAST_PREFIX = 'With';
 /** US-047 — the standalone add affordance on the list. */
 export const ADD_TITLE_LABEL = 'Add title';
 export const ADD_TITLE_HEADING = 'Add a title';
@@ -2072,10 +2075,11 @@ export const WATCHMODE_ATTRIBUTION_LINK = 'watchmode.com';
 /** #382 — the one page heading's subtitle; the search box no longer has its own heading. */
 export const WAITING_SUBTITLE =
   'Titles you would rather wait to stream than rent or buy. Each stays here until it reaches a streaming service.';
-/** The search landmark's name. */
-export const WAITING_SEARCH_LEGEND = 'Wait for a title';
-export const WAITING_SEARCH_LABEL = 'Search for a title to wait for';
-export const WAITING_SEARCH_ACTION = 'Search';
+/** #457 — the explicit Add (+) entry point; 'Search' read as a list filter. The add landmark's name follows. */
+export const WAITING_ADD_OPEN = 'Add title';
+export const WAITING_SEARCH_LEGEND = 'Add a title to wait for';
+export const WAITING_SEARCH_LABEL = 'Look up a title to add';
+export const WAITING_SEARCH_ACTION = 'Look up';
 export const WAITING_SEARCH_SEARCHING = 'Searching…';
 export const WAITING_SEARCH_NO_RESULTS = 'No matches. Try a different spelling.';
 export const WAITING_SEARCH_UNAVAILABLE = "Search isn't available right now. Try again later.";

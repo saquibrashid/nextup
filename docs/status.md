@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 278 |
+| ✅ done | 282 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **281** |
+| **total** | **285** |
 
 ## Ready to start
 
@@ -319,3 +319,7 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-281` | Re-check everything, part 2: the `/availability` button, *N of M re-checked* and *Continue re-check*. Test ids: `T-RECHECK-009`, `T-RECHECK-010`. | `T-RECHECK-009`, `T-RECHECK-010` |
 | `TASK-282` | Add title infers the service, part 1 (`A60`, US-069 / REQ-135, ADR-0010 Rev 8): `service` optional on `POST /api/titles` with `destination`, `GET /api/tmdb/service-lookup` (§6.56) over the Auto-detect lookup, and the Waiting add extracted for reuse; no migration. Test ids: `T-ADDINF-001`..`T-ADDINF-005`, `T-ADDINF-020`. | `T-ADDINF-001`, `T-ADDINF-005`, `T-ADDINF-020`, `T-MANUAL-001` |
 | `TASK-283` | Add title infers the service, part 2: the dialog looks up, pre-selects matches (or Waiting), keeps a manual override and falls back on failure. Test ids: `T-ADDINF-010`..`T-ADDINF-016`. | `T-ADDINF-010`, `T-ADDINF-016`, `T-MANUAL-024`, `T-MANUAL-025` |
+| `TASK-284` | Richer lookup results, API (`A61`, US-070 / REQ-136): optional `overview`, `genres`, `cast` on `GET /api/tmdb/search` items; genres from the row's ids, cast from a credits call capped at 8 rows; matching keeps its allow-list. Test ids: `T-WADD-001`, `T-WADD-002`. | `T-TMDB-010`, `T-WADD-001`, `T-WADD-002` |
+| `TASK-285` | Shared result rows: `TitleSearchResults` shows genres, lead cast, overview and the poster placeholder for the Waiting add, Library *Add title* and *Fix match*. Test ids: `T-WADD-011`, `T-WADD-012`. | `T-WADD-011`, `T-WADD-012` |
+| `TASK-286` | Waiting add: the explicit *Add title* (+) button replaces the *Search* entry point and opens the lookup; copy in `copy.ts`. Test ids: `T-WADD-010`. | `T-WADD-010`, `T-WAIT-019`, `T-WAIT-020` |
+| `TASK-287` | The Waiting add at 280 px in a real browser. Test id: `T-WADD-020`. | `T-WADD-020` |

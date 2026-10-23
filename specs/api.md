@@ -2220,6 +2220,12 @@ staleness threshold, no nag, no derived "stale" state. ASM-038 is retired.)*
 Query: `q` (1..100, required), `type` (`movie|tv`, optional), `limit` (1..20,
 default 10).
 **200** `{ "items": [ { "tmdbId": 438631, "mediaType": "movie", "name": "Dune", "releaseYear": 2021, "posterPath": "/d5NXS.jpg" } ] }`
+**Amended at `A61` (#457, US-070):** each item may also carry **optional**
+`overview` (≤ 300 chars), `genres` (≤ 3 names) and `cast` (≤ 3 lead actors),
+omitted when TMDB has none — additive, existing callers are unaffected. `cast`
+costs one credits call per row, so only the **first 8 rows** are enriched, in
+parallel under the shared TMDB gate; a failed credits call omits `cast` for that
+row and **never fails the search**. Nothing is stored.
 **502 `TMDB_UNAVAILABLE`** when TMDB cannot be reached — *"Couldn't reach TMDB.
 Try again in a moment."* The API key is never proxied to the client.
 

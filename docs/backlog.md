@@ -740,6 +740,10 @@ finished, so the exception cannot outlive its reason.
 | `TASK-281` | `done` | Re-check everything, part 2: the `/availability` button, *N of M re-checked* and *Continue re-check*. Test ids: `T-RECHECK-009`, `T-RECHECK-010`. |
 | `TASK-282` | `done` | Add title infers the service, part 1 (`A60`, US-069 / REQ-135, ADR-0010 Rev 8): `service` optional on `POST /api/titles` with `destination`, `GET /api/tmdb/service-lookup` (§6.56) over the Auto-detect lookup, and the Waiting add extracted for reuse; no migration. Test ids: `T-ADDINF-001`..`T-ADDINF-005`, `T-ADDINF-020`. |
 | `TASK-283` | `done` | Add title infers the service, part 2: the dialog looks up, pre-selects matches (or Waiting), keeps a manual override and falls back on failure. Test ids: `T-ADDINF-010`..`T-ADDINF-016`. |
+| `TASK-284` | `done` | Richer lookup results, API (`A61`, US-070 / REQ-136): optional `overview`, `genres`, `cast` on `GET /api/tmdb/search` items; genres from the row's ids, cast from a credits call capped at 8 rows; matching keeps its allow-list. Test ids: `T-WADD-001`, `T-WADD-002`. |
+| `TASK-285` | `done` | Shared result rows: `TitleSearchResults` shows genres, lead cast, overview and the poster placeholder for the Waiting add, Library *Add title* and *Fix match*. Test ids: `T-WADD-011`, `T-WADD-012`. |
+| `TASK-286` | `done` | Waiting add: the explicit *Add title* (+) button replaces the *Search* entry point and opens the lookup; copy in `copy.ts`. Test ids: `T-WADD-010`. |
+| `TASK-287` | `done` | The Waiting add at 280 px in a real browser. Test id: `T-WADD-020`. |
 <!-- STATUS-LEDGER:END -->
 
 ### Approved availability moves (#397/#410), 2026-09-29
@@ -772,7 +776,10 @@ TASK-265."~~
 | TASK-281 | *Re-check everything* on `/availability` with *N of M re-checked* and *Continue re-check*, and the end-to-end cases at 390 px and 1440 px. | 1 agent-run + 10 owner-review-minutes | TASK-279 | `T-RECHECK-009`, `T-RECHECK-010` |
 | TASK-282 | Add title infers the service, API (PRD `A60`, US-069 / REQ-135, ADR-0010 Revision 8): optional `service` and a `destination` on `POST /api/titles` (no destination infers and acts only on `none`), the shared `lookupServicesForWork` and `addSearchWaitingIntent`, and read-only `GET /api/tmdb/service-lookup`. | 1 agent-run + 15 owner-review-minutes | TASK-279 | `T-ADDINF-001`..`T-ADDINF-005`, `T-ADDINF-020`; `T-MANUAL-001` still passes |
 | TASK-283 | Add title dialog: busy lookup, pre-selected checkboxes (or Waiting), manual override, lookup-failure fallback, accessible announcements and focus. | 1 agent-run + 10 owner-review-minutes | TASK-282 | `T-ADDINF-010`..`T-ADDINF-016`; `T-MANUAL-024`, `T-MANUAL-025` |
-
+| TASK-284 | Richer lookup results, API (PRD `A61`, US-070 / REQ-136): optional `overview`, `genres` and `cast` on `GET /api/tmdb/search` items (`includeDisplay` on `searchMulti`, `getLeadCast`, cast capped at 8 rows, best-effort, no new process). | 1 agent-run + 10 owner-review-minutes | TASK-045 | `T-WADD-001`, `T-WADD-002`; `T-TMDB-010` still passes |
+| TASK-285 | Shared `TitleSearchResults` rows with genres, lead cast, clamped overview and poster placeholder, used by the Waiting add, Library *Add title* and *Fix match*. | 1 agent-run + 10 owner-review-minutes | TASK-284 | `T-WADD-011`, `T-WADD-012` |
+| TASK-286 | The Waiting add behind an explicit *Add title* (+) button (`aria-expanded`), the *Search* entry point gone, copy in `copy.ts`. | 1 agent-run + 10 owner-review-minutes | TASK-285 | `T-WADD-010`; `T-WAIT-019`, `T-WAIT-020` still pass as amended |
+| TASK-287 | The Waiting add and its rows at 280 px in a real browser, no overflow. | 1 agent-run + 5 owner-review-minutes | TASK-286 | `T-WADD-020` |
 ### Approved waiting sort and Grid alignment (`A56`, #415, #414), 2026-10-08
 
 | Task | Work | Size | Depends on | Done when |

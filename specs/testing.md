@@ -152,6 +152,24 @@ Collected locations: `apps/api/test/unit/routes/availabilityRecheck.spec.ts`,
 | **`T-ADDINF-010`–`016`** | C | `TASK-283` | The dialog, through `ListPage`, in `apps/web/test/addTitleInfer.spec.tsx`. |
 | **`T-ADDINF-020`** (`a`–`c`) | I | `TASK-282` | Against the real store, in `apps/api/test/integration/manualListEdits.spec.ts`: multi-service writes one row, Waiting writes an intent and no listing, no destination writes nothing unconfirmed. |
 
+### US-070 — Waiting add: explicit Add button and richer results (TASK-284 – TASK-287, #457, `A61`)
+
+| AC | Level | Test IDs | Assertion |
+| --- | --- | --- | --- |
+| AC-1 | C | `T-WADD-010a`, `T-WADD-010b` | An *Add title* button with a plus icon is present and nothing is looked up until pressed; no control or field is named *Search*. |
+| AC-2 | C | `T-WADD-010c`, `T-WADD-010d` | Pressing it opens the lookup focused and toggles `aria-expanded`; nothing is added until a result's action is pressed, then the panel closes. |
+| AC-3 | C | `T-WADD-011a`, `T-WADD-011c`, `T-WADD-011d`, `T-WADD-020` | Rows show type, year, genres, lead cast and overview; a missing field is absent; the Waiting add uses the shared rows; the rows fit at 280 px. |
+| AC-4 | C | `T-WADD-011b`, `T-WADD-011c` | The poster is decorative (`alt=""`) from the cards' image host; no poster gives the neutral placeholder. |
+| AC-5 | U/C | `T-WADD-001a`–`T-WADD-001d`, `T-WADD-002a`–`T-WADD-002c`, `T-WADD-012a`, `T-WADD-012b` | `overview`/`genres`/`cast` are optional and additive, matching keeps its allow-list; cast is fetched for at most 8 rows and a failing credits call never fails the search; the action is a button described by title, year and type and is chosen by keyboard. |
+
+| Id | Level | Owner | Claim |
+|---|---|---|---|
+| **`T-WADD-001`** (`a`–`d`) | U | `TASK-284` | The search item shape: optional `overview`/`genres`/`cast`, lead cast from `/credits`, matching keeps its allow-list, in `apps/api/test/unit/routes/waitingAddResults.spec.ts`. |
+| **`T-WADD-002`** (`a`–`c`) | U | `TASK-284` | Cast enrichment is capped at 8 rows, best-effort, and copies the cached items, in the same file. |
+| **`T-WADD-010`** (`a`–`d`) | C | `TASK-286` | The Add button, no *Search*, open and confirm, in `apps/web/test/waitingAdd.spec.tsx`. |
+| **`T-WADD-011`** (`a`–`d`) | C | `TASK-285` | The shared rows: fields, poster, placeholder, omitted fields, in the same file. |
+| **`T-WADD-012`** (`a`–`b`) | C | `TASK-285` | The action's description and keyboard selection, in the same file. |
+| **`T-WADD-020`** | E | `TASK-287` | The Waiting add at 280 px, in `tests/e2e/waiting.spec.ts`. |
 ### US-065 — Ordering on Waiting to stream (TASK-269 – TASK-270, #415, `A56`), and row-aligned Grid cards (TASK-271, #414)
 
 | AC | Level | Test IDs | Assertion |

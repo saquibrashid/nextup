@@ -11,7 +11,7 @@
 
 import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { render as rtlRender, screen, within } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
@@ -21,6 +21,7 @@ import {
   WAITING_FORECAST_TAG_ANNOUNCED,
   WAITING_FORECAST_TAG_ESTIMATE,
   WAITING_NOT_INTERESTED,
+  WAITING_SEARCH_ACTION,
   WAITING_SEARCH_LABEL,
   WAITING_SUBTITLE,
 } from '../src/copy';
@@ -130,10 +131,11 @@ describe('T-WAIT-020 · #382 · the waiting view in the Library look', () => {
 
   it('T-WAIT-020e · the search is the Library field: an icon submit inside a rounded control', () => {
     render(<WaitingPage items={[]} onSearch={noop} onSearchAdd={noop} />);
+    fireEvent.click(screen.getByTestId('waiting-add-open'));
     const input = screen.getByRole('searchbox', { name: WAITING_SEARCH_LABEL });
     expect(input.closest('.list-search__control')).not.toBeNull();
     const submit = screen.getByTestId('waiting-search-submit');
-    expect(submit.getAttribute('aria-label')).toBe('Search');
+    expect(submit.getAttribute('aria-label')).toBe(WAITING_SEARCH_ACTION);
     expect(submit.querySelector('svg')).not.toBeNull();
     expect(document.querySelector(`label[for="${input.id}"]`)?.classList.contains('sr-only')).toBe(
       true,

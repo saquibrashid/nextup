@@ -2,7 +2,7 @@
 
 **Project:** nextup
 **Version:** Current v1 scope, including subsequent owner-approved promotions; remaining deferrals are in §11.2.
-**Status:** Approved scope with recorded amendments through US-069 / REQ-135 (`A60`). ~~"through US-068 / REQ-134 (`A59`)"~~ ~~"through US-067 / REQ-133 (`A58`)"~~ ~~"through US-066 / REQ-132 (`A57`)"~~ ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
+**Status:** Approved scope with recorded amendments through US-070 / REQ-136 (`A61`). ~~"through US-069 / REQ-135 (`A60`)"~~ ~~"through US-068 / REQ-134 (`A59`)"~~ ~~"through US-067 / REQ-133 (`A58`)"~~ ~~"through US-066 / REQ-132 (`A57`)"~~ ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
 **Inputs:** `docs/BRD.md`, the recorded owner decisions in the ADRs, and the original authoring-tree `Context/` documents. **The `Context/` tree is not supplied in this repository.** Its citations preserve provenance, not an instruction to invent missing source text. See `docs/current-release.md` for the owner decisions applied on 2026-09-17 and `docs/requirement-index.md` for reconciled reference authority.
 **Audience:** the implementer. Implementation will be performed by GitHub Copilot in autopilot mode (ASM-028, ASM-029, NFR-002, NFR-003, NFR-004). This document, together with the specs, IS the implementation input. Acceptance criteria are written to be executable and verifiable without asking a question.
 **No timeline.** Per A19 / ASM-027 this document contains no dates, durations, or sequencing commitments beyond dependency order.
@@ -109,6 +109,21 @@
 > **New in this document:** **US-065 / REQ-131** (Epic L), seven acceptance criteria. **Corrected in place:** US-043's out-of-scope line. **No migration** — the forecast is computed per request, so the order is applied in memory over the rows the waiting read already returns.
 ---
 
+> ## ⚠ AMENDMENT — 2026-10-22 — `A61` (owner-requested, #457): the Waiting add is an explicit Add (+) button, and lookup results show poster, genres, lead cast and an overview
+>
+> **The owner observed** that the Waiting-to-stream page entered the add flow through a control labelled *Search*, which normally filters what is already on a page, and that lookup results showed only a name and year, so similar titles could not be told apart. **Decision:** an explicit *Add title* (+) control, and richer result rows shared with the Library's *Add title*.
+>
+> | Decision | What it changes | Kind |
+> |---|---|---|
+> | **1. Explicit Add (+)** | `/waiting` shows an *Add title* button with the Library's plus icon (`aria-expanded`); it opens the lookup. ~~A *Search* field and *Search* submit were always visible.~~ The lookup field and its submit are named *Look up a title to add* / *Look up*. No list filter exists on `/waiting` and none is invented. | **Instruction** |
+> | **2. Richer rows** | Each result shows a small poster (neutral placeholder when none), name, year, type, up to three genres, up to three lead actors and an overview clamped to two lines. Every extra field is optional and omitted when TMDB has none. The one shared `TitleSearchResults` component renders them for the Waiting add, the Library *Add title* and *Fix match*. | **Instruction** |
+> | **3. Contract** | `GET /api/tmdb/search` items gain optional `overview`, `genres` and `cast` (additive). Cast costs one credits call per row, **capped at 8 rows** and best-effort: a failed credits call omits `cast` for that row and never fails the search. Genres come from the search row's genre ids. Matching (`searchMulti` without `includeDisplay`) keeps its allow-list unchanged. | **Instruction** |
+> | **4. Still the owner's decision** | Nothing is added until the owner presses the row's action; the Waiting action still says *Wait for it*. | **Invariant** |
+> | **5. Not a process** | Credits are read inside the owner's search request, are never stored, and add no scheduler, dependency, telemetry or migration; §7.4's four-process list is unchanged. Posters use the image host the cards already use. | **Invariant** |
+>
+> **New in this document:** **US-070 / REQ-136** (Epic L), five acceptance criteria. **Corrected in place:** `specs/api.md` §6.29 and `specs/ui.md` §7b. No ADR changes: nothing here is load-bearing beyond the above.
+
+---
 > ## ⚠ AMENDMENT — 2026-10-11 — `A60` (owner-requested, #455): *Add title* infers the service from availability — the service is optional
 >
 > **The owner observed** that after Auto-detect import (`A57`) and the availability lookup, *Add title* on the Library page still forced a service choice. **Decision:** the choice becomes optional and inferred, from the same lookup Auto-detect uses. ADR-0010 Revision 8 records it.
@@ -1692,6 +1707,35 @@ so it is not a silent default. *Unknown* and *failed* lookups pre-select
 **Out of scope for this story:** a scheduled or background lookup; choosing the
 date; rent/buy availability pre-selecting a service (flat-rate only, as
 Auto-detect); a second lookup path.
+**Open questions:** none.
+
+---
+
+#### US-070 — Add a title to Waiting with an explicit Add button and richer results (`A61`)
+
+**REQ-136 (`must`, owner-requested #457, `A61`).** The Waiting-to-stream page
+adds a title through an explicit **Add title (+)** button, not a *Search*
+control, because search reads as filtering the page. Lookup results show enough
+to tell similar titles apart — a small poster, genres, lead actors, type, year
+and a short overview — on the Waiting add and on the Library's *Add title*
+alike. Nothing is added until the owner confirms a row.
+
+**As** the owner
+**I want** a clear Add button and results I can tell apart
+**So that** I add the right title to Waiting without guessing from a name and year
+
+**Traces to:** REQ-136, REQ-135, REQ-127, REQ-129
+**Priority:** must
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | The Waiting page | It renders | An *Add title* button with a plus icon is present (`aria-expanded`), no control or field is named *Search*, and nothing is looked up until it is pressed |
+| AC-2 | The Add button | The owner presses it | The lookup field opens focused; confirming a result still adds nothing until its action is pressed, then the panel closes and the outcome is announced |
+| AC-3 | A lookup that returned results | They render | Each row shows type, year, genres, lead cast and an overview line when known, truncated; a missing field is simply absent; the Library *Add title* and *Fix match* rows are the same component |
+| AC-4 | A result with a poster / without | It renders | A small decorative (`alt=""`) poster from the cards' image host / a neutral placeholder; no new external origin |
+| AC-5 | A search | The API enriches it | `overview`, `genres` and `cast` are optional additions; cast is fetched for at most 8 rows in parallel under the shared TMDB gate; a failed credits call never fails the search; keyboard selection and the row's accessible description (title, year, type) work |
+**Out of scope for this story:** a list filter on /waiting (none exists, none is added), a shared Add-title dialog for both pages, and storing cast or overview.
 **Open questions:** none.
 
 ---
