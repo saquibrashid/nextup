@@ -155,8 +155,8 @@ describe('T-VIEWED-090 — the viewing record persists (US-074)', () => {
     const work = await seedListed('m1', 1);
     await seedListed('m2', 2);
     const ids = async (): Promise<string[]> =>
-      ((await (await get('/api/titles')).json()) as { items: { id: string }[] }).items
-        .map((item) => item.id)
+      ((await (await get('/api/titles')).json()) as { items: { titleId: string }[] }).items
+        .map((item) => item.titleId)
         .sort();
     expect(await ids()).toEqual(['m1', 'm2']);
 

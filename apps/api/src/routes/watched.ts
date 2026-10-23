@@ -27,7 +27,6 @@ import { AppError } from '../errors/AppError.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import { findTitle, listListedWorkIdentities } from '../repository/ownerData.js';
 import {
-  findWatchRecord,
   isLibraryHidden,
   latestTitlesByIdentity,
   listFinishedRecords,
@@ -90,6 +89,19 @@ function parseSeasonParam(raw: string | undefined): number {
   return value;
 }
 
+/** Owner-scoped lookup FIRST, so a foreign or malformed key is the same 404 as a missing one. */
+async function requireRecord(
+  ownerId: Parameters<typeof findTitle>[0],
+  workIdentity: string,
+  rawSeason: string | undefined,
+) {
+  const records = await listWatchRecords(ownerId, workIdentity);
+  if (records.length === 0) throw new AppError('NOT_FOUND', 404, 'No such watched record.');
+  const seasonNumber = parseSeasonParam(rawSeason);
+  const existing = records.find((record) => record.seasonNumber === seasonNumber);
+  if (existing === undefined) throw new AppError('NOT_FOUND', 404, 'No such watched record.');
+  return { existing, seasonNumber };
+}
 export function registerWatchedRoutes(
   router: Router,
   getTmdb: () => WatchedTmdb = () => new TmdbClient({ apiKey: process.env['TMDB_API_KEY'] ?? '' }),
@@ -189,11 +201,13 @@ export function registerWatchedRoutes(
   router.patch('/watched/:workIdentity/:seasonNumber', async (req, res) => {
     const ownerId = requireOwnerId(req);
     const workIdentity = req.params.workIdentity ?? '';
-    const seasonNumber = parseSeasonParam(req.params.seasonNumber);
+    const { existing, seasonNumber } = await requireRecord(
+      ownerId,
+      workIdentity,
+      req.params.seasonNumber,
+    );
     const parsed = parseWatchedPatch(req.body);
     if (!parsed.ok) throw new AppError('VALIDATION_FAILED', 400, parsed.message);
-    const existing = await findWatchRecord(ownerId, workIdentity, seasonNumber);
-    if (existing === null) throw new AppError('NOT_FOUND', 404, 'No such watched record.');
     const saved = await writeWatchRecord(
       ownerId,
       workIdentity,
@@ -207,9 +221,11 @@ export function registerWatchedRoutes(
   router.post('/watched/:workIdentity/:seasonNumber/unfinish', async (req, res) => {
     const ownerId = requireOwnerId(req);
     const workIdentity = req.params.workIdentity ?? '';
-    const seasonNumber = parseSeasonParam(req.params.seasonNumber);
-    const existing = await findWatchRecord(ownerId, workIdentity, seasonNumber);
-    if (existing === null) throw new AppError('NOT_FOUND', 404, 'No such watched record.');
+    const { existing, seasonNumber } = await requireRecord(
+      ownerId,
+      workIdentity,
+      req.params.seasonNumber,
+    );
     // The date and rating are kept: the owner can mark it finished again.
     const saved = await writeWatchRecord(
       ownerId,

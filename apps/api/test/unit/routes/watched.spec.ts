@@ -16,7 +16,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const findTitle = vi.fn();
 const listListedWorkIdentities = vi.fn();
 const listWatchRecords = vi.fn();
-const findWatchRecord = vi.fn();
 const writeWatchRecord = vi.fn();
 const listFinishedRecords = vi.fn();
 const isLibraryHidden = vi.fn();
@@ -39,7 +38,6 @@ vi.mock('../../../src/repository/watchRecords.js', async (importOriginal) => {
   return {
     ...actual,
     listWatchRecords: (...args: unknown[]) => listWatchRecords(...args) as unknown,
-    findWatchRecord: (...args: unknown[]) => findWatchRecord(...args) as unknown,
     writeWatchRecord: (...args: unknown[]) => writeWatchRecord(...args) as unknown,
     listFinishedRecords: (...args: unknown[]) => listFinishedRecords(...args) as unknown,
     isLibraryHidden: (...args: unknown[]) => isLibraryHidden(...args) as unknown,
@@ -127,7 +125,6 @@ beforeEach(async () => {
   findTitle.mockResolvedValue(MOVIE);
   listListedWorkIdentities.mockResolvedValue(new Set([MOVIE.workIdentity, SHOW.workIdentity]));
   listWatchRecords.mockResolvedValue([]);
-  findWatchRecord.mockResolvedValue(RECORD);
   writeWatchRecord.mockImplementation((_o, work: string, season: number) =>
     Promise.resolve({ ...RECORD, workIdentity: work, seasonNumber: season }),
   );
@@ -260,6 +257,7 @@ describe('T-VIEWED-041 · POST /api/titles/:titleId/finished', () => {
 describe('T-VIEWED-042 · edit, unfinish and history', () => {
   it('T-VIEWED-042a · editing changes only the supplied fields; none stored is a 404', async () => {
     const id = encodeURIComponent('tmdb:movie:603');
+    listWatchRecords.mockResolvedValue([RECORD]);
     expect((await call('PATCH', `/api/watched/${id}/0`, { rating: null })).status).toBe(200);
     expect(writeWatchRecord).toHaveBeenCalledWith(
       expect.anything(),
@@ -270,12 +268,15 @@ describe('T-VIEWED-042 · edit, unfinish and history', () => {
     );
     expect((await call('PATCH', `/api/watched/${id}/0`, { rating: 9 })).status).toBe(400);
     expect((await call('PATCH', `/api/watched/${id}/x`, { rating: 3 })).status).toBe(400);
-    findWatchRecord.mockResolvedValue(null);
+    listWatchRecords.mockResolvedValue([]);
     expect((await call('PATCH', `/api/watched/${id}/0`, { rating: 3 })).status).toBe(404);
+    // Existence is decided before validation, so a foreign key is never a 400.
+    expect((await call('PATCH', `/api/watched/${id}/x`, {})).status).toBe(404);
   });
 
   it('T-VIEWED-042b · unfinishing clears only the flag, so the date and rating survive', async () => {
     const id = encodeURIComponent('tmdb:movie:603');
+    listWatchRecords.mockResolvedValue([RECORD]);
     expect((await call('POST', `/api/watched/${id}/0/unfinish`)).status).toBe(200);
     expect(writeWatchRecord).toHaveBeenCalledWith(
       expect.anything(),
@@ -284,7 +285,7 @@ describe('T-VIEWED-042 · edit, unfinish and history', () => {
       { finished: false },
       expect.anything(),
     );
-    findWatchRecord.mockResolvedValue(null);
+    listWatchRecords.mockResolvedValue([]);
     expect((await call('POST', `/api/watched/${id}/0/unfinish`)).status).toBe(404);
   });
 
