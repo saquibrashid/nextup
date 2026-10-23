@@ -79,6 +79,13 @@ async function fixture(page: Page) {
         })),
       };
     else if (path === '/api/tmdb/search') body = { items: [] };
+    else if (path === '/api/tmdb/service-lookup')
+      body = {
+        status: 'found',
+        services: ['netflix'],
+        destination: { kind: 'services', services: ['netflix'] },
+        checkedAt: '2026-09-01T00:00:00Z',
+      };
     else if (path === '/api/removed')
       body = {
         items: titles.map((title) => ({

@@ -492,7 +492,7 @@ typed data and never re-check it.
 | POST | `/api/availability/review/apply` | US-064 |
 | POST | `/api/titles/:titleId/availability/check` | US-068 |
 | POST | `/api/waiting/:intentId/availability/check` | US-068 |
-
+| GET | `/api/tmdb/service-lookup` | US-069 |
 ---
 
 ## 5. Ceilings (ADR-0006 handover; NFR-012)
@@ -2260,10 +2260,18 @@ as well as an active one — a work sitting in the log IS already known.
 here — it degrades to `"imdbRating": null` and the lookup still answers
 (US-045 AC-5).
 
-### 6.30 `POST /api/titles` — add a title by hand (US-047)
+### 6.30 `POST /api/titles` — add a title by hand (US-047, amended by US-069 / `A60`)
 
-Body: `{ "tmdbId": 438631, "mediaType": "movie", "service": "netflix" }` — all
-three required.
+Body: `{ "tmdbId": 438631, "mediaType": "movie", "service": "netflix" }` —
+`tmdbId` and `mediaType` required. **Amended at `A60` (#455): the service is
+optional.** Send **either** `service` (unchanged), **or** `destination`
+(`{"kind":"services","services":["netflix","max"]}` or `{"kind":"waiting"}`, the
+Auto-detect shape) — both is `400`. With **neither**, the server runs the §6.56
+lookup and acts **only** on `none` (→ Waiting to stream, a `search` intent, the
+same code as `POST /api/waiting`); `found`, `unknown` and `failed` are
+`400 VALIDATION_FAILED` with `details {field:"destination", lookup, services}`.
+A service is therefore never written the owner did not confirm, and *unknown* is
+never read as Waiting (ADR-0010 Trap 4). ~~Body: all three required.~~
 
 ⚠ **THE ACCEPTED FIELD SET IS CLOSED, and the omissions are the specification:**
 
@@ -2286,10 +2294,19 @@ three required.
 
 **201**
 ```jsonc
-{ "titleId": "01J8ZC…", "listingId": "01J8ZD…",
-  "workIdentity": "tmdb:movie:438631", "service": "netflix",
+{ "destination": "services", "titleId": "01J8ZC…", "listingId": "01J8ZD…",
+  "listingIds": ["01J8ZD…"], "workIdentity": "tmdb:movie:438631",
+  "service": "netflix", "services": ["netflix"],
   "name": "Dune", "dateAdded": "2026-04-02", "titleWasCreated": false }
+// or, for a Waiting destination:
+{ "destination": "waiting", "intentId": "…", "titleId": "…",
+  "workIdentity": "tmdb:movie:438631", "name": "Dune",
+  "discoverySource": "search", "titleWasCreated": true }
 ```
+
+A multi-service destination writes one listing per service in one transaction.
+A service the work already holds **active** is skipped; if none remain it is the
+same `409 DUPLICATE_WORK_IDENTITY` (`details.services`).
 
 **Gate order is suppression → TMDB**, the same as §6.5 fix-match and for the
 same reasons: suppression needs no network, so a TMDB outage must not stop it
@@ -2649,6 +2666,19 @@ of that work is active; nothing is deleted. Response
 `200 { "listingsDeleted": n, "candidatesDeleted": n, "titlesDeleted": 0|1 }`.
 An unknown or foreign work is `404 NOT_FOUND`. No tombstone: a reappearing work
 is a brand-new title (L1/A33).
+
+### 6.56 `GET /api/tmdb/service-lookup?tmdbId&mediaType` — which services stream a work (US-069, `A60`)
+
+Read-only. `tmdbId` a positive integer, `mediaType` `movie|tv`, else
+`400 VALIDATION_FAILED` (`details.field`). It is the Auto-detect lookup
+(`lookupServicesForWork`, ADR-0010 Rev 8), not a second one, and it only
+**proposes**: it writes nothing, runs only inside the owner's request, and is
+not a mutating route.
+
+**200** `{ "status": "found|none|unknown|failed", "services": ["netflix", …], "destination": {"kind":"services",…} | {"kind":"waiting"} | null, "checkedAt": "…" }`.
+`found` lists every matching flat-rate service among the owner's; `none` proposes
+Waiting; `unknown` and `failed` propose nothing (a thrown lookup is a **200**
+with `failed`, so the dialog can fall back to a manual choice).
 
 ---
 

@@ -108,12 +108,16 @@ it.each(SERVICES)(
     fireEvent.change(screen.getByTestId('add-title-search-input'), { target: { value: 'Dune' } });
     fireEvent.click(await screen.findByTestId('add-select-438631'));
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getAllByRole('radio')).toHaveLength(8);
-    expect(within(dialog).queryAllByRole('radio', { checked: true })).toHaveLength(0);
+    expect(within(dialog).getAllByRole('checkbox')).toHaveLength(9);
+    expect(within(dialog).queryAllByRole('checkbox', { checked: true })).toHaveLength(0);
     fireEvent.click(screen.getByTestId(`add-service-${service}`));
     fireEvent.click(screen.getByTestId('confirm-add-title'));
     await waitFor(() =>
-      expect(add).toHaveBeenCalledExactlyOnceWith({ tmdbId: 438631, mediaType: 'movie', service }),
+      expect(add).toHaveBeenCalledExactlyOnceWith({
+        tmdbId: 438631,
+        mediaType: 'movie',
+        destination: { kind: 'services', services: [service] },
+      }),
     );
   },
 );

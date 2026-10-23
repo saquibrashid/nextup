@@ -115,6 +115,44 @@ export function lookupOutcome(
 }
 
 /**
+ * One TMDB watch-offers read. A thrown read is `failed`, never an exception.
+ *
+ * ⚠ The region is the one every availability answer uses (`A49`), passed
+ * explicitly (`T-AVAIL-010`). Shared by the review lookup and the Add title
+ * lookup (`A60`) so there is one read of TMDB, not two.
+ */
+export async function fetchWatchOffers(
+  source: WatchProviderSource,
+  ref: { mediaType: 'movie' | 'tv'; tmdbId: number },
+): Promise<{ offers: { flatrate: string[]; rentOrBuy: string[] } | null; failed: boolean }> {
+  try {
+    return {
+      offers: await source.getWatchOffers(ref.mediaType, ref.tmdbId, DEFAULT_AVAILABILITY_REGION),
+      failed: false,
+    };
+  } catch {
+    return { offers: null, failed: true };
+  }
+}
+
+/**
+ * The Add title lookup (#455, PRD `A60`): one work's services, by the SAME
+ * mapping an auto-detect review uses (`lookupOutcome`).
+ *
+ * ⚠ It only PROPOSES. `found` pre-selects every matching service and `none`
+ * proposes Waiting to stream; `unknown` and `failed` propose nothing
+ * (ADR-0010 Trap 4) and the owner picks. Nothing is written by asking.
+ */
+export async function lookupServicesForWork(
+  source: WatchProviderSource,
+  ref: { mediaType: 'movie' | 'tv'; tmdbId: number },
+  yourServices: readonly Service[],
+): Promise<{ status: ServiceLookupStatus; services: Service[] }> {
+  const { offers, failed } = await fetchWatchOffers(source, ref);
+  return failed ? { status: 'failed', services: [] } : lookupOutcome(offers, yourServices);
+}
+
+/**
  * Look up the given candidates, serially, up to `limit`, and return what to
  * write. A thrown lookup is a `failed` write, never an exception.
  */
@@ -129,16 +167,7 @@ export async function runServiceLookups(
   for (const row of rows.slice(0, limit)) {
     const ref = tmdbRefFor(row.resolvedWorkIdentity);
     if (ref === null || row.resolvedWorkIdentity === null) continue;
-    let offers: { flatrate: string[]; rentOrBuy: string[] } | null;
-    let failed = false;
-    try {
-      // ⚠ The region is the one every availability answer uses (`A49`),
-      // passed explicitly (`T-AVAIL-010`).
-      offers = await source.getWatchOffers(ref.mediaType, ref.tmdbId, DEFAULT_AVAILABILITY_REGION);
-    } catch {
-      offers = null;
-      failed = true;
-    }
+    const { offers, failed } = await fetchWatchOffers(source, ref);
     writes.push({
       id: row.id,
       serviceLookupStatus: failed ? 'failed' : lookupOutcome(offers, yourServices).status,

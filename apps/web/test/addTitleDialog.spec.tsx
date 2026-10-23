@@ -175,8 +175,8 @@ describe('T-ADDUI-001 — Add a title result rows and states', () => {
     expect(screen.queryByTestId('add-title-done')).toBeNull();
     expect(screen.queryByRole('button', { name: ADD_TITLE_CLOSE_LABEL })).toBeNull();
     expect(addTitle.mock.calls).toEqual([
-      [{ tmdbId: 603, mediaType: 'movie', service: 'max' }],
-      [{ tmdbId: 603, mediaType: 'movie', service: 'max' }],
+      [{ tmdbId: 603, mediaType: 'movie', destination: { kind: 'services', services: ['max'] } }],
+      [{ tmdbId: 603, mediaType: 'movie', destination: { kind: 'services', services: ['max'] } }],
     ]);
 
     pending.resolve?.({ titleId: 't1', name: 'The Matrix', titleWasCreated: true });

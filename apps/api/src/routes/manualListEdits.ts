@@ -38,6 +38,7 @@
 
 import {
   editionLabelSchema,
+  type AutoDestination,
   type EditionLabel,
   type MediaType,
   type Service,
@@ -45,6 +46,8 @@ import {
   SERVICES,
   deriveSortDateAdded,
   deriveTitleState,
+  parseAutoDestination,
+  proposedDestinationFor,
   ulid,
   workIdentityForTmdb,
 } from '@nextup/domain';
@@ -65,16 +68,22 @@ import {
   softDeleteServiceListing,
   updateTitle,
 } from '../repository/ownerData.js';
-import { satisfyWaitingIntents } from '../repository/watchIntents.js';
+import { satisfyWaitingIntents, listOwnerServices } from '../repository/watchIntents.js';
+import { lookupServicesForWork } from '../services/autoDetectLookup.js';
+import { yourServicesFrom } from '../services/libraryAvailability.js';
 import { tmdbUnavailableAppError } from './tmdb.js';
 import { toIsoDate } from './titles.js';
+import { addSearchWaitingIntent } from './waiting.js';
 import { addTitleEdition, verifyEditionSelection } from '../services/titleEditions.js';
 
 export interface AddTitleRequest {
   edition?: EditionLabel;
   tmdbId: number;
   mediaType: MediaType;
-  service: Service;
+  /** The legacy single explicit service. Never combined with `destination`. */
+  service?: Service;
+  /** The owner's confirmed destination (#455). Absent means "infer it". */
+  destination?: AutoDestination;
 }
 
 export type AddTitleParseResult =
@@ -129,13 +138,40 @@ export function parseAddTitleRequest(body: unknown): AddTitleParseResult {
     };
   }
 
+  // ⚠ #455 (PRD `A60`): the service is OPTIONAL. Absent, the server infers it
+  // from the availability lookup — but only to PROPOSE; see the handler.
   const service = record['service'];
-  if (typeof service !== 'string' || !(SERVICES as readonly string[]).includes(service)) {
+  const rawDestination = record['destination'];
+  const hasService = service !== undefined && service !== null;
+  const hasDestination = rawDestination !== undefined && rawDestination !== null;
+  if (hasService && hasDestination) {
+    return {
+      ok: false,
+      message: 'Send either "service" or "destination", not both.',
+      details: { field: 'destination' },
+    };
+  }
+  if (
+    hasService &&
+    (typeof service !== 'string' || !(SERVICES as readonly string[]).includes(service))
+  ) {
     return {
       ok: false,
       message: '"service" is not one of the permitted values.',
       details: { field: 'service', permitted: [...SERVICES] },
     };
+  }
+  let destination: AutoDestination | undefined;
+  if (hasDestination) {
+    const parsedDestination = parseAutoDestination(rawDestination);
+    if (!parsedDestination.ok) {
+      return {
+        ok: false,
+        message: parsedDestination.message,
+        details: { ...parsedDestination.details, field: 'destination' },
+      };
+    }
+    destination = parsedDestination.destination ?? undefined;
   }
 
   return {
@@ -143,15 +179,43 @@ export function parseAddTitleRequest(body: unknown): AddTitleParseResult {
     value: {
       tmdbId,
       mediaType: mediaType as MediaType,
-      service: service as Service,
+      ...(hasService ? { service: service as Service } : {}),
+      ...(destination === undefined ? {} : { destination }),
       ...(edition.data === undefined ? {} : { edition: edition.data }),
     },
   };
 }
 
+export type ServiceLookupQueryResult =
+  | { ok: true; mediaType: MediaType; tmdbId: number }
+  | { ok: false; message: string; field: string };
+
+/** The query of `GET /api/tmdb/service-lookup` — both fields strictly validated. */
+export function parseServiceLookupQuery(raw: Record<string, unknown>): ServiceLookupQueryResult {
+  const tmdbId = typeof raw['tmdbId'] === 'string' ? Number(raw['tmdbId']) : Number.NaN;
+  if (!Number.isInteger(tmdbId) || tmdbId <= 0) {
+    return { ok: false, message: '"tmdbId" must be a positive integer.', field: 'tmdbId' };
+  }
+  const mediaType = raw['mediaType'];
+  if (typeof mediaType !== 'string' || !(MEDIA_TYPES as readonly string[]).includes(mediaType)) {
+    return { ok: false, message: '"mediaType" must be "movie" or "tv".', field: 'mediaType' };
+  }
+  return { ok: true, mediaType: mediaType as MediaType, tmdbId };
+}
+
 /** Midnight UTC for the `@db.Date` column — the same shape `batchClose` writes. */
 export function dateOnlyUtc(now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+}
+
+/** The one 409 for "already on that service", from the pre-check and the index alike. */
+function duplicateForService(workIdentity: string, services: readonly Service[]): AppError {
+  return new AppError(
+    'DUPLICATE_WORK_IDENTITY',
+    409,
+    'That title is already in your library for that service.',
+    { workIdentity, service: services[0], services: [...services] },
+  );
 }
 
 export function registerManualListEditRoutes(router: Router, getClient: () => TmdbClient): void {
@@ -170,7 +234,7 @@ export function registerManualListEditRoutes(router: Router, getClient: () => Tm
     if (!parsed.ok) {
       throw new AppError('VALIDATION_FAILED', 400, parsed.message, parsed.details);
     }
-    const { tmdbId, mediaType, service } = parsed.value;
+    const { tmdbId, mediaType } = parsed.value;
     const workIdentity = workIdentityForTmdb(mediaType, tmdbId);
 
     // GATE 1 — suppression, on WORK IDENTITY (REQ-071).
@@ -212,6 +276,50 @@ export function registerManualListEditRoutes(router: Router, getClient: () => Tm
       if (mapped) throw mapped;
       throw error;
     }
+
+    // ⚠ THE DESTINATION IS THE OWNER'S, OR IT IS NOT WRITTEN (US-047 AC-4,
+    // amended by #455 / `A60`). An explicit `service` or `destination` is the
+    // owner's confirmed choice. Absent, the availability lookup may only
+    // decide ONE thing on its own: that the work streams on none of the
+    // owner's services, so it goes to Waiting to stream. A found service is
+    // never written unconfirmed, and an unknown or failed lookup is refused —
+    // "not known" is not "on none" (ADR-0010 Trap 4).
+    let destination: AutoDestination;
+    if (parsed.value.service !== undefined) {
+      destination = { kind: 'services', services: [parsed.value.service] };
+    } else if (parsed.value.destination !== undefined) {
+      destination = parsed.value.destination;
+    } else {
+      const inferred = await lookupServicesForWork(
+        getClient(),
+        { mediaType, tmdbId },
+        yourServicesFrom(await listOwnerServices(ownerId)),
+      );
+      if (inferred.status !== 'none') {
+        throw new AppError(
+          'VALIDATION_FAILED',
+          400,
+          'Choose where this title goes: a service, or Waiting to stream.',
+          { field: 'destination', lookup: inferred.status, services: inferred.services },
+        );
+      }
+      destination = { kind: 'waiting' };
+    }
+
+    if (destination.kind === 'waiting') {
+      const waiting = await addSearchWaitingIntent(ownerId, workIdentity, detail);
+      res.status(201).json({
+        destination: 'waiting',
+        intentId: waiting.intentId,
+        titleId: waiting.titleId,
+        workIdentity,
+        name: detail.name,
+        discoverySource: 'search',
+        titleWasCreated: waiting.titleWasCreated,
+      });
+      return;
+    }
+    const requested = destination.services;
 
     const today = dateOnlyUtc(new Date());
     const edition = await verifyEditionSelection(
@@ -272,26 +380,41 @@ export function registerManualListEditRoutes(router: Router, getClient: () => Tm
         }
       }
 
-      const listingId = ulid();
+      const listingIds: string[] = [];
+      let toWrite: Service[] = [...requested];
+      if (existing !== null && existing.state === 'active') {
+        // A service the work already has ACTIVE is skipped, not written twice:
+        // a multi-service add must not fail whole because one box was already
+        // true. If nothing is left, it is the same 409 as before.
+        const heldActive = (await listListingsForTitle(ownerId, existing.id, tx))
+          .filter((row: { state: string }) => row.state === 'active')
+          .map((row: { service: string }) => row.service);
+        toWrite = toWrite.filter((candidate) => !heldActive.includes(candidate));
+        if (toWrite.length === 0) throw duplicateForService(workIdentity, requested);
+      }
       if (edition !== undefined)
         await addTitleEdition(ownerId, titleId, edition, tx, undefined, workIdentity);
-      await createServiceListing(
-        ownerId,
-        {
-          listingId,
-          titleId,
-          service,
-          state: 'active',
-          dateAdded: today,
-          createdByBatchId: null,
-        },
-        tx,
-      );
+      for (const service of toWrite) {
+        const listingId = ulid();
+        listingIds.push(listingId);
+        await createServiceListing(
+          ownerId,
+          {
+            listingId,
+            titleId,
+            service,
+            state: 'active',
+            dateAdded: today,
+            createdByBatchId: null,
+          },
+          tx,
+        );
+      }
       // A work now in the library is no longer waiting (US-043 AC-3): the same
       // consequence as a capture, in the same transaction as the listing.
       await satisfyWaitingIntents(ownerId, [workIdentity], new Date(), tx);
 
-      return { titleId, listingId, titleWasCreated };
+      return { titleId, listingIds, services: toWrite, titleWasCreated };
     }).catch((error: unknown) => {
       // ⚠ `listing_one_per_service` is a FILTERED unique index on
       // `(owner, title, service) WHERE state='active'`. It fires when the work
@@ -307,24 +430,52 @@ export function registerManualListEditRoutes(router: Router, getClient: () => Tm
       // both entries are true. A later `/restore` of the old one answers
       // `DUPLICATE_WORK_IDENTITY` (§6.10), which is confirmable.
       if (isUniqueViolation(error)) {
-        throw new AppError(
-          'DUPLICATE_WORK_IDENTITY',
-          409,
-          'That title is already in your library for that service.',
-          { workIdentity, service },
-        );
+        throw duplicateForService(workIdentity, requested);
       }
       throw error;
     });
 
     res.status(201).json({
+      destination: 'services',
       titleId: result.titleId,
-      listingId: result.listingId,
+      listingId: result.listingIds[0],
+      listingIds: result.listingIds,
       workIdentity,
-      service,
+      service: result.services[0],
+      services: result.services,
       name: detail.name,
       dateAdded: toIsoDate(today),
       titleWasCreated: result.titleWasCreated,
+    });
+  });
+
+  /**
+   * §6.56 `GET /api/tmdb/service-lookup` (#455, PRD `A60`) — which of the
+   * owner's services stream a work, for the Add title dialog to PRE-SELECT.
+   *
+   * ⚠ **IT ONLY PROPOSES.** It writes nothing and changes no list state, and
+   * runs only inside the owner's own request, never on a timer (`T-CI-005`).
+   * It is the Auto-detect review's lookup (`lookupServicesForWork` →
+   * `lookupOutcome`), not a second one. A lookup that throws is a 200 with
+   * `status: 'failed'`: the dialog must still let the owner add by hand.
+   */
+  router.get('/tmdb/service-lookup', async (req, res) => {
+    const ownerId = requireOwnerId(req);
+    const parsed = parseServiceLookupQuery(req.query as Record<string, unknown>);
+    if (!parsed.ok) {
+      throw new AppError('VALIDATION_FAILED', 400, parsed.message, { field: parsed.field });
+    }
+    const outcome = await lookupServicesForWork(
+      getClient(),
+      { mediaType: parsed.mediaType, tmdbId: parsed.tmdbId },
+      yourServicesFrom(await listOwnerServices(ownerId)),
+    );
+    const checkedAt = new Date().toISOString();
+    res.json({
+      status: outcome.status,
+      services: outcome.services,
+      destination: proposedDestinationFor({ ...outcome, checkedAt, stale: false }),
+      checkedAt,
     });
   });
 

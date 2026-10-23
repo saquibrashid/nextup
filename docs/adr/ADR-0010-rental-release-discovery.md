@@ -461,6 +461,40 @@ The existing stale-only *Check more titles* (`scope` omitted) is unchanged.
 
 Test ids: `specs/testing.md`, US-068 (`T-RECHECK-*`).
 
+## Revision 8 — *Add title* infers the service (`A60`, owner-requested #455)
+
+*Add title* (the Library **+**) still forced a service choice although Revision
+6's lookup can say where a work streams. PRD `A60`, US-069, REQ-135.
+
+**1. One lookup, not two.** `GET /api/tmdb/service-lookup?tmdbId&mediaType`
+runs `lookupServicesForWork` — `fetchWatchOffers` + `lookupOutcome`, the same
+mapping and aliases (`Max`/`HBO Max`, `Apple TV`) an auto-detect review uses,
+with the owner's services from `yourServicesFrom`. It returns
+`{status: found|none|unknown|failed, services, destination, checkedAt}`, writes
+nothing, and runs only inside the owner's request, so §4 and `T-CI-005` (four
+processes) hold. A thrown lookup is a `200` with `failed`, so the dialog can
+fall back to a manual choice.
+
+**2. It proposes; the owner confirms.** `found` pre-selects every matching
+service, `none` proposes *Waiting to stream* (via the existing Waiting add,
+`addSearchWaitingIntent`), and `unknown`/`failed` propose nothing (Trap 4: not
+known is not "on none"). US-047 AC-4's "the service has no default" is amended:
+that rule protects against a badge the owner never chose. A pre-selection from
+real availability data is shown and confirmed, so the owner still chose it; the
+dialog refuses an empty choice rather than guess.
+
+**3. The write contract.** `POST /api/titles` keeps `service` (unchanged) and
+adds `destination` (`{kind:'services', services}` or `{kind:'waiting'}`, the
+Auto-detect shape). Both together is `400`. With neither it infers server-side
+but acts **only** on `none` (→ Waiting); `found`/`unknown`/`failed` are
+`400 VALIDATION_FAILED` on `destination`, so no service is written unconfirmed.
+Suppression still runs before TMDB; a service the title already holds active is
+skipped, and if none remain it is the same `409 DUPLICATE_WORK_IDENTITY`.
+`ADD_TITLE_SERVICE_REQUIRED` now means "pick a service or Waiting". **No new
+error code and no migration.**
+
+Test ids: `specs/testing.md`, US-069 (`T-ADDINF-*`).
+
 ## Consequences
 
 ### The loop, end to end

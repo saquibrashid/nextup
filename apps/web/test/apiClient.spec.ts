@@ -141,6 +141,7 @@ describe('T-DATA-003 — every method sends credentials', () => {
       permanentlyDeleteListing: () => client.permanentlyDeleteListing('lst_1'),
       deleteWorkHistory: () => client.deleteWorkHistory('tmdb:movie:603'),
       addTitle: () => client.addTitle({ tmdbId: 438631, mediaType: 'movie', service: 'netflix' }),
+      lookupAddTitleServices: () => client.lookupAddTitleServices(438631, 'movie'),
       removeTitle: () => client.removeTitle('ttl_1'),
       lookupImdb: () => client.lookupImdb('The Matrix'),
     };

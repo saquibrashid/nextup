@@ -234,11 +234,10 @@ describe('US-047 — adding a title by hand, outside any batch', () => {
     expect(screen.getByTestId('add-title-open')).toBeTruthy();
   });
 
-  it('T-MANUAL-024: the service picker has NO DEFAULT and refuses to submit without one', async () => {
+  it('T-MANUAL-024: with no lookup the picker has NO DEFAULT and refuses to submit without a choice', async () => {
     // ⚠ A default would silently put the title on whichever service was
-    // pre-selected. `POST /api/titles` writes a listing for exactly one
-    // service, so a wrong default is a wrong badge the owner never chose —
-    // the same reasoning as US-003 AC-5's no-default mode.
+    // pre-selected. Since #455 a service is pre-selected ONLY from a real
+    // lookup (T-ADDINF-*); with none, nothing is chosen and nothing is sent.
     const user = userEvent.setup();
     const props = mount();
     await user.click(screen.getByTestId('add-title-open'));
@@ -253,7 +252,7 @@ describe('US-047 — adding a title by hand, outside any batch', () => {
     expect(props.onAddTitle).not.toHaveBeenCalled();
   });
 
-  it('T-MANUAL-025: a chosen result plus a chosen service POSTS tmdbId, mediaType and service — and nothing else', async () => {
+  it('T-MANUAL-025: a chosen result plus a chosen service POSTS tmdbId, mediaType and the confirmed destination — and nothing else', async () => {
     // ⚠ The closed body of §6.30. No `name` (SD-05: the display name is TMDB's)
     // and no `dateAdded` (write-once, `T-INV-006`; NG-8 defers editing to v1.1).
     const user = userEvent.setup();
@@ -268,7 +267,7 @@ describe('US-047 — adding a title by hand, outside any batch', () => {
       expect(props.onAddTitle).toHaveBeenCalledWith({
         tmdbId: 438631,
         mediaType: 'movie',
-        service: 'max',
+        destination: { kind: 'services', services: ['max'] },
       });
     });
     expect(await screen.findByTestId('add-title-done')).toBeTruthy();

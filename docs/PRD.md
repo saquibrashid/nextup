@@ -2,7 +2,7 @@
 
 **Project:** nextup
 **Version:** Current v1 scope, including subsequent owner-approved promotions; remaining deferrals are in §11.2.
-**Status:** Approved scope with recorded amendments through US-068 / REQ-134 (`A59`). ~~"through US-067 / REQ-133 (`A58`)"~~ ~~"through US-066 / REQ-132 (`A57`)"~~ ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
+**Status:** Approved scope with recorded amendments through US-069 / REQ-135 (`A60`). ~~"through US-068 / REQ-134 (`A59`)"~~ ~~"through US-067 / REQ-133 (`A58`)"~~ ~~"through US-066 / REQ-132 (`A57`)"~~ ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
 **Inputs:** `docs/BRD.md`, the recorded owner decisions in the ADRs, and the original authoring-tree `Context/` documents. **The `Context/` tree is not supplied in this repository.** Its citations preserve provenance, not an instruction to invent missing source text. See `docs/current-release.md` for the owner decisions applied on 2026-09-17 and `docs/requirement-index.md` for reconciled reference authority.
 **Audience:** the implementer. Implementation will be performed by GitHub Copilot in autopilot mode (ASM-028, ASM-029, NFR-002, NFR-003, NFR-004). This document, together with the specs, IS the implementation input. Acceptance criteria are written to be executable and verifiable without asking a question.
 **No timeline.** Per A19 / ASM-027 this document contains no dates, durations, or sequencing commitments beyond dependency order.
@@ -108,6 +108,20 @@
 >
 > **New in this document:** **US-065 / REQ-131** (Epic L), seven acceptance criteria. **Corrected in place:** US-043's out-of-scope line. **No migration** — the forecast is computed per request, so the order is applied in memory over the rows the waiting read already returns.
 ---
+
+> ## ⚠ AMENDMENT — 2026-10-11 — `A60` (owner-requested, #455): *Add title* infers the service from availability — the service is optional
+>
+> **The owner observed** that after Auto-detect import (`A57`) and the availability lookup, *Add title* on the Library page still forced a service choice. **Decision:** the choice becomes optional and inferred, from the same lookup Auto-detect uses. ADR-0010 Revision 8 records it.
+>
+> | Decision | What it changes | Kind |
+> |---|---|---|
+> | **1. Infer and pre-select** | After a result is chosen, the dialog asks `GET /api/tmdb/service-lookup` and pre-ticks every matching service. | **Instruction** |
+> | **2. No match → Waiting** | A work on none of the owner's services is proposed for *Waiting to stream*, through the existing Waiting add. | **Instruction** |
+> | **3. Still the owner's decision** | Nothing is written until confirm; the owner can change, clear or choose by hand. US-047 AC-4's "no default" is amended: a pre-selection from real availability data is visible and confirmed, so it is not a silent default. *Unknown*/*failed* pre-select nothing. | **Invariant** |
+> | **4. Contract** | `POST /api/titles` accepts `service` (unchanged), or `destination` (`services` / `waiting`). With neither it infers, but only a `none` lookup is acted on; anything else is `400`. | **Instruction** |
+> | **5. Not a process** | The lookup runs inside the owner's request and writes nothing; §7.4's four-process list is unchanged. No migration. | **Invariant** |
+>
+> **New in this document:** **US-069 / REQ-135** (Epic L), six acceptance criteria. **Corrected in place:** US-047 AC-1 and its out-of-scope line.
 
 > ## ⚠ AMENDMENT — 2026-10-10 — `A59` (owner-approved): "Check now" and "Re-check everything" — an answer sooner than the 7-day staleness
 >
@@ -1177,7 +1191,7 @@ Nullable keys sort last in both directions.
 
 | # | Given | When | Then |
 |---|---|---|---|
-| AC-1 | A work found on TMDB, and a service | The owner confirms the add | A row appears on the combined list carrying that service's badge, dated today (`T-MANUAL-001`) |
+| AC-1 | A work found on TMDB, and a service **the owner confirms** (US-069 `A60`: pre-selected from the availability lookup, or chosen by hand) | The owner confirms the add | A row appears on the combined list carrying that service's badge, dated today (`T-MANUAL-001`) |
 | AC-2 (failure) | A work already on the list for that service | The owner adds it again | It is refused and named as already present. No second listing and no orphaned title are written (`T-MANUAL-002`) |
 | AC-3 | A work already on the list for a **different** service | The owner adds it on the second service | The existing row gains a **badge**. A second row is never created — REQ-024 is one row per work, and the owner has no way to merge two (`T-MANUAL-003`) |
 | AC-4 (failure) | A work the owner has marked not interested | The owner tries to add it | It is refused, and the message names un-suppressing as the way forward. TMDB is **not** consulted — suppression needs no network, so an outage must not stop this answering (REQ-071, `T-MANUAL-004`) |
@@ -1185,7 +1199,7 @@ Nullable keys sort last in both directions.
 | AC-6 | Any manual add | It succeeds | Its date-added is **today**, always. A `dateAdded` supplied in the request cannot override it: `date_added` is write-once (`T-INV-006`) and editing it stays deferred to v1.1 (NG-8, REQ-059, `T-MANUAL-006`) |
 | AC-7 | A row held since an earlier date, gaining a second badge today | The add succeeds | The row keeps its **earliest** date and does not move in the default newest-first sort (REQ-038, product invariant 6, `T-MANUAL-007`) |
 
-**Out of scope for this story:** choosing the date, entering a work TMDB does not hold, and adding to more than one service in a single action.
+**Out of scope for this story:** choosing the date and entering a work TMDB does not hold. **Amended at `A60` (US-069):** adding to more than one service in a single action is now supported, and the service is pre-selected from the availability lookup. ~~choosing the date, entering a work TMDB does not hold, and adding to more than one service in a single action.~~
 **Open questions:** none.
 
 #### US-048 — Remove a title from my list by hand
@@ -1640,6 +1654,44 @@ request, and writes availability metadata only (§7.4). Nothing moves by itself
 membership or badges as a result; a per-row *Check now* on Library rows or
 cards (the details view and the Availability screen only); a "last checked
 more than N days ago" prompt (invariant 8a).
+**Open questions:** none.
+
+#### US-069 — Add a title without choosing the service first (`A60`)
+
+**REQ-135 (`must`, owner-requested #455, `A60`).** In *Add title* the service is
+**optional and inferred**. After the owner picks a lookup result, nextup asks
+TMDB which of the owner's services stream it, through the same lookup and
+mapping Auto-detect import uses (US-066, `lookupOutcome`), and **pre-selects
+every match**. A title that streams on none of the owner's services is proposed
+for *Waiting to stream*. The owner can change or clear the proposal, or choose
+by hand, and **nothing is written until they confirm**.
+
+**US-047 AC-4's "the service has no default" is amended, not broken.** The badge
+is a factual claim and must never be written on a guess. A pre-selection from
+real availability data is visible, editable and confirmed — the owner decides —
+so it is not a silent default. *Unknown* and *failed* lookups pre-select
+**nothing** (ADR-0010 Trap 4: not known is not "on none"). ~~The service picker has no default and refuses to submit without one.~~
+
+**As** the owner
+**I want** *Add title* to work out where a title streams
+**So that** I confirm one proposal instead of looking the service up myself
+
+**Traces to:** REQ-135, REQ-132, REQ-005, REQ-071, REQ-129
+**Priority:** must
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | A chosen result that streams (flat-rate) on one or more of the owner's services | The dialog finishes the lookup | Every matching service is pre-ticked and the dialog says so; a busy status is shown meanwhile; **nothing is written** until the owner presses confirm, and the request then carries exactly the shown choice |
+| AC-2 | A chosen result that streams on none of the owner's services | The dialog finishes the lookup | *Waiting to stream* is pre-selected with *Not found on any service, so it will be added to Waiting to stream*; the confirm button says *Add to Waiting to stream*; confirming creates the same Waiting intent as the Waiting add, not a Library row; a service can still be ticked instead |
+| AC-3 | A proposal | The owner unticks it, ticks other services, or ticks Waiting | The choice is what is sent. Services and Waiting are mutually exclusive; an empty choice is refused with a message and sends nothing |
+| AC-4 (failure) | The lookup is unknown, fails, or the request is rejected | The dialog (or the API) handles it | Nothing is pre-selected and the owner is told why; the owner picks by hand and the add still works. The API refuses a request with no destination unless the lookup finds none (`400 VALIDATION_FAILED`, field `destination`), so a service is never written unconfirmed and *unknown* is never read as Waiting |
+| AC-5 | A request with an explicit `service`, or a `destination` | `POST /api/titles` | The existing contract is unchanged for `service`; a `destination` (`services` or `waiting`) is the owner's confirmed choice. A service the work already holds active is skipped; if none remain it is `409 DUPLICATE_WORK_IDENTITY`. Suppression still runs before TMDB; work identity de-duplication and the one-per-service index are unchanged |
+| AC-6 (invariant) | The lookup | It runs | It is `GET /api/tmdb/service-lookup`, inside the owner's request, writes nothing, is not a non-owner process (§7.4 stays four), and an a11y pass finds the busy and result notes as `role=status`, the services as labelled checkboxes and focus moved to the summary |
+
+**Out of scope for this story:** a scheduled or background lookup; choosing the
+date; rent/buy availability pre-selecting a service (flat-rate only, as
+Auto-detect); a second lookup path.
 **Open questions:** none.
 
 ---

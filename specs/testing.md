@@ -135,6 +135,23 @@ Collected locations: `apps/api/test/unit/routes/availabilityRecheck.spec.ts`,
 `apps/web/test/availabilityRecheck.spec.tsx`,
 `tests/e2e/availabilityRecheck.spec.ts`.
 
+### US-069 — Add title infers the service (TASK-282 – TASK-283, #455, `A60`)
+
+| AC | Level | Test IDs | Assertion |
+| --- | --- | --- | --- |
+| AC-1 | U/C | `T-ADDINF-005a`, `T-ADDINF-010a`, `T-ADDINF-010b` | A found lookup pre-ticks every matching service with a busy `role=status` meanwhile; confirm is disabled while looking up; nothing is written before confirm and the body carries exactly the shown choice; the lookup route writes nothing. |
+| AC-2 | U/I/C | `T-ADDINF-002a`, `T-ADDINF-002b`, `T-ADDINF-011a`, `T-ADDINF-016a`, `T-ADDINF-020b` | No match pre-selects Waiting with the explanatory note and the *Add to Waiting to stream* button; confirming creates a search Waiting intent and no listing; the done message says Waiting. |
+| AC-3 | C | `T-ADDINF-012a`, `T-ADDINF-012b` | The owner can untick the proposal and choose another service by hand; Waiting and services are mutually exclusive; an empty choice sends nothing. |
+| AC-4 | U/C | `T-ADDINF-001b`, `T-ADDINF-001c`, `T-ADDINF-005b`, `T-ADDINF-013a`, `T-ADDINF-013b`, `T-ADDINF-014a` | Unknown, failed and rejected lookups pre-select nothing and explain why; adding by hand still works; the API refuses no-destination unless the lookup says none, so no service is written unconfirmed and unknown is never Waiting; a stale lookup is ignored. |
+| AC-5 | U/I | `T-ADDINF-001a`, `T-ADDINF-003a`, `T-ADDINF-003b`, `T-ADDINF-004a`, `T-ADDINF-004b`, `T-ADDINF-020a`, `T-ADDINF-020c`, `T-MANUAL-001` | An explicit `service` is unchanged and runs no lookup; a multi-service destination writes one badge per service on one row; an already-held service is skipped and all-held is 409; `service` with `destination` is 400; suppression still runs before any lookup. |
+| AC-6 | C/S | `T-ADDINF-015a`, `T-CI-005` | The result note is `role=status`, services are labelled checkboxes and focus moves to the summary; the non-owner process list is unchanged. |
+
+| Id | Level | Owner | Claim |
+|---|---|---|---|
+| **`T-ADDINF-001`–`005`** | U | `TASK-282` | `POST /api/titles` destination handling and `GET /api/tmdb/service-lookup`, in `apps/api/test/unit/routes/manualListEdits.spec.ts`. |
+| **`T-ADDINF-010`–`016`** | C | `TASK-283` | The dialog, through `ListPage`, in `apps/web/test/addTitleInfer.spec.tsx`. |
+| **`T-ADDINF-020`** (`a`–`c`) | I | `TASK-282` | Against the real store, in `apps/api/test/integration/manualListEdits.spec.ts`: multi-service writes one row, Waiting writes an intent and no listing, no destination writes nothing unconfirmed. |
+
 ### US-065 — Ordering on Waiting to stream (TASK-269 – TASK-270, #415, `A56`), and row-aligned Grid cards (TASK-271, #414)
 
 | AC | Level | Test IDs | Assertion |
@@ -1641,7 +1658,7 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 | AC-6 | I | **`T-MANUAL-006`** | A body carrying `dateAdded: '2019-01-01'` still stores today. The dangerous shape is accepting the field and dropping it, so the STORED value is asserted |
 | AC-7 | I | `T-MANUAL-007` | A row seeded at `2026-04-02` gaining a badge today keeps `sortDateAdded: '2026-04-02'` (product invariant 6) |
 | — | U | **`T-MANUAL-023`**, `T-MANUAL-030` | *(reachability)* The affordance is on the LIST page — not in the empty state, not in `/upload` — and is not rendered at all when the container wired no handler. ⚠ Present-but-dead is indistinguishable from working to every other kind of test, so the absence is what is asserted |
-| — | U | **`T-MANUAL-024`**, `T-MANUAL-025` | The service picker has **no default** and refuses to submit without one, and the body carries `tmdbId`/`mediaType`/`service` and nothing else. A default would write a badge the owner never chose |
+| — | U | **`T-MANUAL-024`**, `T-MANUAL-025` | The service choice has **no silent default** — with no lookup nothing is pre-selected and an empty choice is refused — and the body carries `tmdbId`/`mediaType`/the confirmed `destination` and nothing else. A pre-selection from a real availability lookup is allowed since `A60` (`T-ADDINF-*`, US-069) because the owner sees and confirms it. ~~The service picker has **no default** and refuses to submit without one, and the body carries `tmdbId`/`mediaType`/`service` and nothing else.~~ |
 | — | U | `T-MANUAL-026`, `T-MANUAL-027`, `T-MANUAL-028`, `T-MANUAL-029` | Success refetches the list; a 409 duplicate does **not** (nothing was written); a 409 suppression renders the `unsuppressHref` way out; offline the button is disabled with the reason as text |
 | — | U | **`T-MANUAL-032`**, `T-MANUAL-033` | The §6.30 body parser accepts a CLOSED field set — `name` and `dateAdded` are not merely dropped, they are never read — and refuses a non-object body, a non-positive-integer `tmdbId`, and a `mediaType`/`service` outside its permitted set. `dateOnlyUtc` truncates to **midnight UTC**, asserted on a late-evening instant, the only case where a local-time truncation shifts the day. Implemented in `apps/api/test/unit/routes/manualListEdits.spec.ts` |
 | — | U | **`T-MANUAL-034`**, `T-MANUAL-035` | The handler's arms over real HTTP with the store and TMDB mocked: a new work writes a title **and** a listing with `createdByBatchId: null` on both; a work already on another service gains a **badge, never a second row**; a long-held `sortDateAdded` is **not** pulled forward (product invariant 6) while a later or null one is; a `removed` title is re-created rather than resurrected (invariant 7); the **suppression gate runs before TMDB is ever called**; a TMDB miss and a TMDB outage both write nothing; a raced unique violation is a 409 `DUPLICATE_WORK_IDENTITY` rather than a 500, and a store error that is **not** a unique violation is not disguised as one. ⚠ `isUniqueViolation` is kept REAL and driven with a genuine SQL `number: 2627` — stubbing it would make that fork pass whatever was thrown. Implemented in `apps/api/test/unit/routes/manualListEdits.spec.ts` |
