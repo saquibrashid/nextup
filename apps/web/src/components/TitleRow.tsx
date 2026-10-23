@@ -11,7 +11,13 @@
 // provenance remains available in accessible text, hover text and details.
 
 import type { JSX, ReactNode } from 'react';
-import { formatRuntime, watchStatus, type Service, type WatchPriority } from '@nextup/domain';
+import {
+  formatRuntime,
+  watchStatus,
+  TITLE_CATEGORY_LABELS,
+  type Service,
+  type WatchPriority,
+} from '@nextup/domain';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { ServiceMark } from './ServiceMark';
@@ -320,8 +326,8 @@ export function TitleRow({
                 </span>
               )}
               <span data-testid="media-type">
-                {item.category === 'comedy-show'
-                  ? 'Comedy Show'
+                {item.category === 'comedy-show' || item.category === 'documentary'
+                  ? TITLE_CATEGORY_LABELS[item.category]
                   : MEDIA_TYPE_LABELS[item.category ?? item.mediaType]}
               </span>
               {/*

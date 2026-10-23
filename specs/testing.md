@@ -27,6 +27,24 @@ Collected locations: `packages/domain/test/titleCategory.spec.ts`;
 `apps/web/test/titleDetails.spec.tsx`, `filterBar.spec.tsx`;
 `tests/e2e/titleDetails.spec.ts`.
 
+### US-071 — Documentary media type (TASK-288 – TASK-289, #456, `A62`)
+
+| AC | Level | Test IDs | Assertion |
+| --- | --- | --- | --- |
+| AC-1 | U/I | `T-DOC-001a`, `T-DOC-001b`, `T-DOC-002a`, `T-DOC-002b`, `T-DOC-005` | Genre 99 classifies movies and series and leaves `mediaType` alone; non-documentaries and malformed genres are unaffected; Comedy Show outranks it; real-store filter and detail agree. |
+| AC-2 | U/I/C | `T-DOC-001b`, `T-DOC-001c`, `T-DOC-003c`, `T-DOC-005`, `T-CATEGORY-002e` | The override wins both ways and Automatic restores the derived category; the payload accepts `documentary` only exactly; the dialog offers and saves it explicitly; a wrongly cased value is 400. |
+| AC-3 | U/C/I | `T-DOC-002c`, `T-DOC-003b`, `T-DOC-005` | `?category=documentary` validates, round-trips and filters in SQL; unknown values are rejected by the API and dropped from the URL; `type=` stays movie/tv. |
+| AC-4 | C | `T-DOC-003a`, `T-DOC-001c`, `T-CATEGORY-004d` | The row label and the picker option read *Documentary* from the shared registry; Movie/TV rows are unchanged. |
+| AC-5 | U/S/I | `T-DOC-004a`, `T-DOC-004b`, `T-MIG-001a`, `T-DOC-005` | Migration 0021 is additive, hash-pinned, a strict superset installed WITH CHECK before the old rule is disabled; existing titles with genres classify without a rewrite. |
+
+| Id | Level | Owner | Claim |
+|---|---|---|---|
+| **`T-DOC-001`** (`a`–`c`) | U | `TASK-288` | `packages/domain/test/documentaryCategory.spec.ts`: classification, precedence and the registry/override payload. |
+| **`T-DOC-002`** (`a`–`c`) | U | `TASK-288` | `apps/api/test/unit/documentaryCategory.spec.ts`: list projection and `category=` query validation. |
+| **`T-DOC-003`** (`a`–`c`) | C | `TASK-289` | `apps/web/test/documentaryCategory.spec.tsx`: row label, URL parameter and chips, the override dialog. |
+| **`T-DOC-004`** (`a`–`b`) | U | `TASK-288` | `tests/infra/documentaryMigration.spec.ts` on `0021_documentary_category`. |
+| **`T-DOC-005`** | I | `TASK-288` | `apps/api/test/integration/watchPreferences.spec.ts` against SQL Server: genre-derived category, SQL filter, both override directions. |
+
 ### US-063 — Availability moves (TASK-263 – TASK-265, #397/#410, `A54`)
 
 | AC | Level | Test IDs | Assertion |

@@ -19,6 +19,15 @@ No canonical identity, MediaType enum, row dates or listing fields change.
 Override is owner/work-scoped and follows the preference row across reappearance
 and correction; the explicit destination row wins. See `title-category.md`.
 
+### Documentary category (#456, `A62`, migration `0021_documentary_category`)
+
+No column is added: Documentary is derived at read time from `title.tmdb_genres`
+(`"Documentary"`, TMDB genre 99). The only schema change widens the override
+allow-list: `ck_watch_preference_category_v2` (movie, tv, comedy-show,
+documentary) is added WITH CHECK, then the 0016 `ck_watch_preference_category`
+is set NOCHECK (never dropped, T-MIG-001). `Title.mediaType` and the `MediaType`
+enum are unchanged. See `title-category.md`.
+
 ## Owner-approved edition labels (TASK-244, 2026-09-23)
 
 An edition such as **Vrach Frankenshteyn — director's cut** remains part of its

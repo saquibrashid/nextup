@@ -211,9 +211,19 @@ export function toListItem(
     matchState: row.matchState,
     name: row.tmdbName ?? row.rawExtractedText ?? '',
     mediaType: row.tmdbMediaType,
-    category: titleCategory(row.tmdbMediaType, row.tmdbComedyShow, row.categoryOverride),
+    category: titleCategory(
+      row.tmdbMediaType,
+      row.tmdbComedyShow,
+      row.categoryOverride,
+      parseGenres(row.tmdbGenres),
+    ),
     categoryOverride: row.categoryOverride ?? null,
-    automaticCategory: titleCategory(row.tmdbMediaType, row.tmdbComedyShow),
+    automaticCategory: titleCategory(
+      row.tmdbMediaType,
+      row.tmdbComedyShow,
+      null,
+      parseGenres(row.tmdbGenres),
+    ),
     categoryPending:
       row.categoryOverride == null && row.tmdbId != null && row.tmdbComedyShow == null,
     releaseYear: row.tmdbReleaseYear,

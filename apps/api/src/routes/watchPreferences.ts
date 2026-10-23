@@ -31,7 +31,7 @@ export function registerWatchPreferenceRoutes(router: Router): void {
         throw new AppError(
           'VALIDATION_FAILED',
           400,
-          'Choose Automatic, Movie, TV Show or Comedy Show.',
+          'Choose Automatic, Movie, TV Show, Comedy Show or Documentary.',
         );
       }
       const blocking = await findActiveSuppression(ownerId, title.workIdentity, tx);

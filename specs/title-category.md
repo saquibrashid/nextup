@@ -1,4 +1,4 @@
-# Comedy Show category (#364, TASK-247)
+# Comedy Show and Documentary categories (#364, TASK-247; #456, TASK-288)
 
 Owner decision, 2026-09-23: Comedy Show covers stand-up specials and live comedy
 performances, not ordinary comedy films or sitcoms. Metadata assigns the category;
@@ -31,9 +31,30 @@ Overrides live on the owner/work preference row, independently of watching and
 priority. They survive removal/reappearance and follow the existing explicit
 destination-wins preference policy on match correction. PATCH
 `/api/titles/:titleId/category` accepts exactly `{categoryOverride: null | "movie" |
-"tv" | "comedy-show"}`. It requires an active owned title and refuses suppression;
+"tv" | "comedy-show" | "documentary"}`. It requires an active owned title and refuses suppression;
 the title is locked against concurrent identity correction. No optimistic save:
 errors retain the draft, Cancel changes nothing, and offline disables saving.
+
+## Documentary (#456, PRD `A62`, US-071, ADR-0016, TASK-288 – TASK-289)
+
+Documentary is a fourth display category, `documentary`. It is **derived at read
+time** from the TMDB genre names already stored in `title.tmdb_genres` (genre 99,
+movie and tv; the stored English name is `Documentary`), never stored. Precedence:
+owner override, then Comedy Show (explicit performance evidence), then Documentary,
+then the catalogue Movie/TV type. `titleCategory(mediaType, comedyPerformance,
+override, genres)` in `packages/domain` is the single rule; the list SQL
+`EFFECTIVE_CATEGORY` mirrors it (`tmdb_genres LIKE '%"Documentary"%'`) so filtering
+before pagination agrees with the projected category. The canonical `mediaType` is
+unchanged everywhere it is functionally needed.
+
+Existing titles are not rewritten. A title with stored genres is Documentary at
+once; one without stored genres (a freshly closed batch) is classified when the
+existing on-access metadata refresh fills `tmdb_genres`. No new scheduler or
+metadata field. The override CHECK is widened by additive migration
+`0021_documentary_category` (`ck_watch_preference_category_v2` WITH CHECK, then
+NOCHECK on the 0016 constraint; pinned in `tools/check-migrations.ts`).
+`categoryOverride` and `?category=` accept `documentary`; `?type=` remains movie/tv.
+Tests: `T-DOC-001` – `T-DOC-005` (`specs/testing.md`, US-071).
 
 Named acceptance tests: `T-CATEGORY-001` domain classification and validation;
 `T-CATEGORY-002` provider metadata and refresh; `T-CATEGORY-003` real SQL

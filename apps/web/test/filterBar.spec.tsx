@@ -831,6 +831,8 @@ describe('REQ-035 - the runtime filter (`specs/ui-refresh.md` §5a)', () => {
       await user.tab();
       expect(screen.getByRole('checkbox', { name: 'Comedy Show' })).toHaveFocus();
       await user.tab();
+      expect(screen.getByRole('checkbox', { name: 'Documentary' })).toHaveFocus();
+      await user.tab();
       expect(within(disclosurePanel(trigger)).getByRole('button', { name: 'Done' })).toHaveFocus();
       await user.tab();
       expect(screen.getByRole('button', { name: /^Genre / })).toHaveFocus();

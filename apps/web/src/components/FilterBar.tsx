@@ -167,7 +167,8 @@ function isMediaType(value: string): value is MediaType {
  * URL → filters.
  *
  * ⚠ Unknown values are DROPPED, not passed through. A hand-edited
- * `?type=documentary` would otherwise reach the API and come back
+ * `?type=documentary` (the catalogue type stays Movie/TV; Documentary is a
+ * `category`) would otherwise reach the API and come back
  * `400 VALIDATION_FAILED`, turning a typo in a shared link into an error
  * screen. Dropping it shows an unfiltered-on-that-dimension list, which is the
  * honest reading of "no valid type was asked for".
