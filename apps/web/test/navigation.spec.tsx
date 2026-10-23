@@ -691,7 +691,7 @@ describe('T-UX-167 · ui-refresh.md §6 · the sidebar shows every destination',
   });
 
   it('T-UX-167f: the sidebar and the page share one framed panel, split by a hairline', () => {
-    const block = CSS.slice(CSS.lastIndexOf('grid-template-columns: 12rem minmax(0, 1fr)'));
+    const block = CSS.slice(CSS.lastIndexOf('grid-template-columns: 14rem minmax(0, 1fr)'));
     const shell = /^[^}]*/.exec(block)?.[0] ?? '';
     expect(shell).toMatch(/border:\s*1px solid var\(--color-border-soft\)/);
     expect(shell).toMatch(/border-radius:\s*var\(--radius-card\)/);

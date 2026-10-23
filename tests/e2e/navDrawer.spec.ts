@@ -271,10 +271,14 @@ describe('T-NAV-003: the sidebar at 1280 px lists every destination directly', (
     expect(new Set(heights.map((height) => Math.round(height))).size).toBe(1);
     const overflowing = await nav
       .locator('.nav__label')
-      .evaluateAll(
-        (labels) => labels.filter((label) => label.scrollWidth - label.clientWidth > 1).length,
+      .evaluateAll((labels) =>
+        labels
+          .filter((label) => label.scrollWidth - label.clientWidth > 1)
+          .map(
+            (label) => `${label.textContent ?? ''}: ${label.scrollWidth} > ${label.clientWidth}`,
+          ),
       );
-    expect(overflowing).toBe(0);
+    expect(overflowing).toEqual([]);
     const name = page.getByTestId('account').locator('.app-shell__account-name');
     await expect(name).toHaveAttribute('title', /a\.very\.long\.address/);
     expect(await name.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);

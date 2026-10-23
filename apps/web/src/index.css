@@ -5851,7 +5851,7 @@ button {
    */
   .app-shell {
     display: grid;
-    grid-template-columns: 12rem minmax(0, 1fr);
+    grid-template-columns: 14rem minmax(0, 1fr);
     align-items: stretch;
     gap: 0;
     width: calc(100% - 2 * var(--space-6));
@@ -5931,7 +5931,7 @@ button {
     position: sticky;
   }
 
-  /* Tight rows: a 12rem sidebar must hold "Availability changes" on one line. */
+  /* Tight rows: a 14rem sidebar must hold "Availability changes" on one line. */
   .nav__group-list .nav__link {
     gap: var(--space-2);
     padding-inline: var(--space-1);
