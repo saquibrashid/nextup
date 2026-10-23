@@ -738,6 +738,8 @@ finished, so the exception cannot outlive its reason.
 | `TASK-279` | `done` | Check now and Re-check everything, part 1 (`A59`, US-068 / REQ-134, ADR-0010 Rev 7): `POST /api/titles/:titleId/availability/check`, `POST /api/waiting/:intentId/availability/check` and `scope: "all"` with a stateless `since` + cursor walk on `POST /api/availability/check`; registry entries; no new error code, no migration. Test ids: `T-RECHECK-001`..`T-RECHECK-006`. |
 | `TASK-280` | `done` | Check now, part 2: `CheckNowControl` on the Library and Waiting details. Test ids: `T-RECHECK-007`, `T-RECHECK-008`. |
 | `TASK-281` | `done` | Re-check everything, part 2: the `/availability` button, *N of M re-checked* and *Continue re-check*. Test ids: `T-RECHECK-009`, `T-RECHECK-010`. |
+| `TASK-282` | `done` | Add title infers the service, part 1 (`A60`, US-069 / REQ-135, ADR-0010 Rev 8): `service` optional on `POST /api/titles` with `destination`, `GET /api/tmdb/service-lookup` (§6.56) over the Auto-detect lookup, and the Waiting add extracted for reuse; no migration. Test ids: `T-ADDINF-001`..`T-ADDINF-005`, `T-ADDINF-020`. |
+| `TASK-283` | `done` | Add title infers the service, part 2: the dialog looks up, pre-selects matches (or Waiting), keeps a manual override and falls back on failure. Test ids: `T-ADDINF-010`..`T-ADDINF-016`. |
 <!-- STATUS-LEDGER:END -->
 
 ### Approved availability moves (#397/#410), 2026-09-29
@@ -768,6 +770,8 @@ TASK-265."~~
 | TASK-279 | Owner-pressed re-check API (PRD `A59`, US-068 / REQ-134, ADR-0010 Revision 7): the two per-title *Check now* routes through `refreshAvailability`, and `scope: "all"` on `POST /api/availability/check` as a stateless `since` + cursor walk of `AVAILABILITY_CHECK_BATCH` rows a tap, least recently checked first, regardless of age; registry entries with `changesListState: false`. | 1 agent-run + 15 owner-review-minutes | TASK-266 | `T-RECHECK-001`..`T-RECHECK-006` |
 | TASK-280 | *Check now* on the Library and Waiting details (`CheckNowControl`): states idle, checking, *Checked just now*, failed with *Try again*, disabled with a reason. | 1 agent-run + 10 owner-review-minutes | TASK-279 | `T-RECHECK-007`, `T-RECHECK-008` |
 | TASK-281 | *Re-check everything* on `/availability` with *N of M re-checked* and *Continue re-check*, and the end-to-end cases at 390 px and 1440 px. | 1 agent-run + 10 owner-review-minutes | TASK-279 | `T-RECHECK-009`, `T-RECHECK-010` |
+| TASK-282 | Add title infers the service, API (PRD `A60`, US-069 / REQ-135, ADR-0010 Revision 8): optional `service` and a `destination` on `POST /api/titles` (no destination infers and acts only on `none`), the shared `lookupServicesForWork` and `addSearchWaitingIntent`, and read-only `GET /api/tmdb/service-lookup`. | 1 agent-run + 15 owner-review-minutes | TASK-279 | `T-ADDINF-001`..`T-ADDINF-005`, `T-ADDINF-020`; `T-MANUAL-001` still passes |
+| TASK-283 | Add title dialog: busy lookup, pre-selected checkboxes (or Waiting), manual override, lookup-failure fallback, accessible announcements and focus. | 1 agent-run + 10 owner-review-minutes | TASK-282 | `T-ADDINF-010`..`T-ADDINF-016`; `T-MANUAL-024`, `T-MANUAL-025` |
 
 ### Approved waiting sort and Grid alignment (`A56`, #415, #414), 2026-10-08
 

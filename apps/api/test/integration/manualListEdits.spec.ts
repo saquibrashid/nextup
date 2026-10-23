@@ -291,6 +291,42 @@ describe('§6.30 POST /api/titles — US-047, adding a title by hand', () => {
     expect(badgeServices(items[0])).toEqual(['netflix']);
   });
 
+  it('T-ADDINF-020a: US-069 · a confirmed multi-service destination writes one badge per service on ONE row', async () => {
+    const res = await addTitle({
+      tmdbId: DUNE_TMDB_ID,
+      mediaType: 'movie',
+      destination: { kind: 'services', services: ['netflix', 'max'] },
+    });
+    expect(res.status).toBe(201);
+
+    const items = await listTitles();
+    expect(items).toHaveLength(1);
+    expect(badgeServices(items[0])).toEqual(['max', 'netflix']);
+  });
+
+  it('T-ADDINF-020b: US-069 · a confirmed Waiting destination writes a search intent and no listing', async () => {
+    const res = await addTitle({
+      tmdbId: DUNE_TMDB_ID,
+      mediaType: 'movie',
+      destination: { kind: 'waiting' },
+    });
+    expect(res.status).toBe(201);
+    expect(((await res.json()) as { destination: string }).destination).toBe('waiting');
+
+    expect(await listTitles()).toHaveLength(0);
+    expect(await testPrisma().serviceListing.count()).toBe(0);
+    expect(await testPrisma().watchIntent.count()).toBe(1);
+  });
+
+  it('T-ADDINF-020c: US-069 · a request that names no destination is refused unless the lookup finds none, and writes nothing', async () => {
+    const res = await addTitle({ tmdbId: DUNE_TMDB_ID, mediaType: 'movie' });
+    // The replayed lookup either finds a service (400, owner must confirm) or
+    // finds none (201, Waiting) — never a library row the owner did not choose.
+    expect([201, 400]).toContain(res.status);
+    expect(await listTitles()).toHaveLength(0);
+    expect(await testPrisma().serviceListing.count()).toBe(0);
+  });
+
   it('T-MANUAL-002: US-047 AC-2 · the same work on the same service is refused, and nothing changes', async () => {
     await seedTitle({ services: ['netflix'] });
     const before = await listTitles();

@@ -39,6 +39,7 @@ import { ListViewControl, type ListView } from '../components/ListViewControl';
 import { ListSearch } from '../components/ListSearch';
 import {
   AddTitleDialog,
+  type AddTitleDialogProps,
   type AddTitleRequest,
   type AddTitleResult,
 } from '../components/AddTitleDialog';
@@ -159,6 +160,8 @@ export interface ListPageProps {
   readonly onRestoreListing?: (listingId: string) => Promise<unknown>;
   /** §6.30 (US-047) — the standalone add. Needs `onSearchTmdb` to be useful. */
   readonly onAddTitle?: (body: AddTitleRequest) => Promise<AddTitleResult>;
+  /** #455 — pre-selects the add dialog's services; absent means choose by hand. */
+  readonly onLookupAddServices?: AddTitleDialogProps['lookupServices'];
   /** Refetch after a manual add so the new row appears without a reload. */
   readonly onReload?: () => void;
   /**
@@ -224,6 +227,7 @@ export function ListPage({
   onRemoveTitle,
   onRestoreListing,
   onAddTitle,
+  onLookupAddServices,
   onReload,
   onWatchPreferences,
   availabilityChangeCount = 0,
@@ -347,6 +351,7 @@ export function ListPage({
         <AddTitleDialog
           searchTmdb={searchFn}
           addTitle={addFn}
+          {...(onLookupAddServices === undefined ? {} : { lookupServices: onLookupAddServices })}
           onClose={closeAll}
           {...(onReload === undefined ? {} : { onAdded: onReload })}
         />

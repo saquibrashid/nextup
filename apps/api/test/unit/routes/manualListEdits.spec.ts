@@ -41,13 +41,19 @@ const updateTitle = vi.fn();
 const listListingsForTitle = vi.fn();
 const softDeleteServiceListing = vi.fn();
 const getWork = vi.fn();
+const getWatchOffers = vi.fn();
 const satisfyWaitingIntents = vi.fn();
+const listOwnerServices = vi.fn();
+const listListedWorkIdentities = vi.fn();
+const listWaitingWorkIdentities = vi.fn();
+const createWatchIntent = vi.fn();
 
 vi.mock('../../../src/repository/watchIntents.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/repository/watchIntents.js')>();
   return {
     ...actual,
     satisfyWaitingIntents: (...args: unknown[]) => satisfyWaitingIntents(...args) as unknown,
+    listOwnerServices: (...args: unknown[]) => listOwnerServices(...args) as unknown,
   };
 });
 
@@ -60,6 +66,10 @@ vi.mock('../../../src/repository/ownerData.js', async (importOriginal) => {
     findActiveSuppression: (...args: unknown[]) => findActiveSuppression(...args) as unknown,
     createTitle: (...args: unknown[]) => createTitle(...args) as unknown,
     createServiceListing: (...args: unknown[]) => createServiceListing(...args) as unknown,
+    createWatchIntent: (...args: unknown[]) => createWatchIntent(...args) as unknown,
+    listListedWorkIdentities: (...args: unknown[]) => listListedWorkIdentities(...args) as unknown,
+    listWaitingWorkIdentities: (...args: unknown[]) =>
+      listWaitingWorkIdentities(...args) as unknown,
     updateTitle: (...args: unknown[]) => updateTitle(...args) as unknown,
     listListingsForTitle: (...args: unknown[]) => listListingsForTitle(...args) as unknown,
     softDeleteServiceListing: (...args: unknown[]) => softDeleteServiceListing(...args) as unknown,
@@ -79,6 +89,7 @@ vi.mock('../../../src/clients/tmdbClient.js', async (importOriginal) => {
     // threw.
     TmdbClient: class {
       getWork = (...args: unknown[]) => getWork(...args) as unknown;
+      getWatchOffers = (...args: unknown[]) => getWatchOffers(...args) as unknown;
     },
   };
 });
@@ -182,6 +193,11 @@ beforeEach(async () => {
     { listingId: 'l-a', service: 'netflix', state: 'active', dateAdded: new Date('2026-04-02') },
   ]);
   getWork.mockResolvedValue(DETAIL);
+  getWatchOffers.mockResolvedValue({ flatrate: ['Netflix'], rentOrBuy: [] });
+  listOwnerServices.mockResolvedValue([]);
+  listListedWorkIdentities.mockResolvedValue(new Set());
+  listWaitingWorkIdentities.mockResolvedValue(new Set());
+  createWatchIntent.mockResolvedValue(undefined);
 
   await new Promise<void>((resolve) => {
     app = createApp({ webRoot: '/nonexistent-web-root' });
@@ -539,5 +555,138 @@ describe('DELETE /api/titles/:titleId — §6.32 remove by hand', () => {
     const [, , patch] = updateTitle.mock.calls[0] as [unknown, unknown, Record<string, unknown>];
     expect(patch['state']).toBe('active');
     expect(patch['sortDateAdded']).toEqual(new Date('2026-05-09T00:00:00.000Z'));
+  });
+});
+
+describe('POST /api/titles — optional service, inferred from availability (#455, A60)', () => {
+  const lookup = (): Promise<Response> =>
+    fetch(`${origin}/api/tmdb/service-lookup?tmdbId=438631&mediaType=movie`, {
+      headers: { [CLIENT_PRINCIPAL_HEADER]: principalHeader },
+    });
+  const bare = { tmdbId: 438631, mediaType: 'movie' };
+
+  it("T-ADDINF-001a · an explicit service is still the owner's confirmed choice and no lookup runs", async () => {
+    expect((await add(GOOD)).status).toBe(201);
+    expect(getWatchOffers).not.toHaveBeenCalled();
+    expect(createServiceListing).toHaveBeenCalledTimes(1);
+  });
+
+  it('T-ADDINF-001b · no destination and a FOUND lookup writes nothing and names the services', async () => {
+    const response = await add(bare);
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as ErrorBody;
+    expect(body.error.code).toBe('VALIDATION_FAILED');
+    expect(body.error.details).toMatchObject({
+      field: 'destination',
+      lookup: 'found',
+      services: ['netflix'],
+    });
+    expect(createTitle).not.toHaveBeenCalled();
+    expect(createServiceListing).not.toHaveBeenCalled();
+  });
+
+  it('T-ADDINF-001c · UNKNOWN and FAILED lookups are refused too, never read as Waiting', async () => {
+    for (const arrange of [
+      () => getWatchOffers.mockResolvedValue(null),
+      () => getWatchOffers.mockRejectedValue(new Error('tmdb down')),
+    ]) {
+      arrange();
+      const response = await add(bare);
+      expect(response.status).toBe(400);
+      expect(createWatchIntent).not.toHaveBeenCalled();
+      expect(createServiceListing).not.toHaveBeenCalled();
+    }
+  });
+
+  it('T-ADDINF-002a · no destination and a NONE lookup proposes Waiting to stream', async () => {
+    getWatchOffers.mockResolvedValue({ flatrate: [], rentOrBuy: [] });
+    const response = await add(bare);
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as Record<string, unknown>;
+    expect(body).toMatchObject({ destination: 'waiting', discoverySource: 'search' });
+    expect(createServiceListing).not.toHaveBeenCalled();
+  });
+
+  it('T-ADDINF-002b · an explicit waiting destination skips the lookup', async () => {
+    const response = await add({ ...bare, destination: { kind: 'waiting' } });
+    expect(response.status).toBe(201);
+    expect(getWatchOffers).not.toHaveBeenCalled();
+    expect(createServiceListing).not.toHaveBeenCalled();
+  });
+
+  it('T-ADDINF-003a · an explicit multi-service destination writes one listing per service', async () => {
+    const response = await add({
+      ...bare,
+      destination: { kind: 'services', services: ['netflix', 'max'] },
+    });
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as { services: string[]; listingIds: string[] };
+    expect(body.services).toEqual(['netflix', 'max']);
+    expect(body.listingIds).toHaveLength(2);
+    expect(createServiceListing).toHaveBeenCalledTimes(2);
+  });
+
+  it('T-ADDINF-003b · a service the work already holds is skipped; all held is a 409', async () => {
+    findTitleByWorkIdentity.mockResolvedValue({
+      id: 't-0001',
+      state: 'active',
+      sortDateAdded: new Date('2020-01-01T00:00:00.000Z'),
+    });
+    const ok = await add({
+      ...bare,
+      destination: { kind: 'services', services: ['netflix', 'max'] },
+    });
+    expect(ok.status).toBe(201);
+    expect(((await ok.json()) as { services: string[] }).services).toEqual(['max']);
+
+    createServiceListing.mockClear();
+    const dup = await add({ ...bare, destination: { kind: 'services', services: ['netflix'] } });
+    expect(dup.status).toBe(409);
+    expect(((await dup.json()) as ErrorBody).error.code).toBe('DUPLICATE_WORK_IDENTITY');
+    expect(createServiceListing).not.toHaveBeenCalled();
+  });
+
+  it('T-ADDINF-004a · the parser refuses service together with destination, and a bad destination', () => {
+    const both = parseAddTitleRequest({
+      ...GOOD,
+      destination: { kind: 'waiting' },
+    });
+    expect(both.ok).toBe(false);
+    const bad = parseAddTitleRequest({ ...GOOD, service: undefined, destination: { kind: 'x' } });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.details['field']).toBe('destination');
+    const none = parseAddTitleRequest({ tmdbId: 1, mediaType: 'tv' });
+    expect(none).toEqual({ ok: true, value: { tmdbId: 1, mediaType: 'tv' } });
+  });
+
+  it('T-ADDINF-004b · the suppression gate still runs before any lookup', async () => {
+    findActiveSuppression.mockResolvedValue({ id: 'supp-2' });
+    expect((await add(bare)).status).toBe(409);
+    expect(getWork).not.toHaveBeenCalled();
+    expect(getWatchOffers).not.toHaveBeenCalled();
+  });
+
+  it('T-ADDINF-005a · GET /tmdb/service-lookup proposes and writes nothing', async () => {
+    const response = await lookup();
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { status: string; services: string[] };
+    expect(body).toMatchObject({ status: 'found', services: ['netflix'] });
+    expect(createTitle).not.toHaveBeenCalled();
+    expect(createServiceListing).not.toHaveBeenCalled();
+    expect(createWatchIntent).not.toHaveBeenCalled();
+  });
+
+  it('T-ADDINF-005b · a failing lookup is a 200 with status failed, and a bad query is a 400', async () => {
+    getWatchOffers.mockRejectedValue(new Error('tmdb down'));
+    const failed = await lookup();
+    expect(failed.status).toBe(200);
+    expect(((await failed.json()) as { status: string }).status).toBe('failed');
+
+    for (const query of ['tmdbId=x&mediaType=movie', 'tmdbId=5&mediaType=book']) {
+      const response = await fetch(`${origin}/api/tmdb/service-lookup?${query}`, {
+        headers: { [CLIENT_PRINCIPAL_HEADER]: principalHeader },
+      });
+      expect(response.status).toBe(400);
+    }
   });
 });

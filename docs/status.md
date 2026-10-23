@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 276 |
+| ✅ done | 278 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **279** |
+| **total** | **281** |
 
 ## Ready to start
 
@@ -317,3 +317,5 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-279` | Check now and Re-check everything, part 1 (`A59`, US-068 / REQ-134, ADR-0010 Rev 7): `POST /api/titles/:titleId/availability/check`, `POST /api/waiting/:intentId/availability/check` and `scope: "all"` with a stateless `since` + cursor walk on `POST /api/availability/check`; registry entries; no new error code, no migration. Test ids: `T-RECHECK-001`..`T-RECHECK-006`. | `T-RECHECK-001`, `T-RECHECK-006` |
 | `TASK-280` | Check now, part 2: `CheckNowControl` on the Library and Waiting details. Test ids: `T-RECHECK-007`, `T-RECHECK-008`. | `T-RECHECK-007`, `T-RECHECK-008` |
 | `TASK-281` | Re-check everything, part 2: the `/availability` button, *N of M re-checked* and *Continue re-check*. Test ids: `T-RECHECK-009`, `T-RECHECK-010`. | `T-RECHECK-009`, `T-RECHECK-010` |
+| `TASK-282` | Add title infers the service, part 1 (`A60`, US-069 / REQ-135, ADR-0010 Rev 8): `service` optional on `POST /api/titles` with `destination`, `GET /api/tmdb/service-lookup` (§6.56) over the Auto-detect lookup, and the Waiting add extracted for reuse; no migration. Test ids: `T-ADDINF-001`..`T-ADDINF-005`, `T-ADDINF-020`. | `T-ADDINF-001`, `T-ADDINF-005`, `T-ADDINF-020`, `T-MANUAL-001` |
+| `TASK-283` | Add title infers the service, part 2: the dialog looks up, pre-selects matches (or Waiting), keeps a manual override and falls back on failure. Test ids: `T-ADDINF-010`..`T-ADDINF-016`. | `T-ADDINF-010`, `T-ADDINF-016`, `T-MANUAL-024`, `T-MANUAL-025` |

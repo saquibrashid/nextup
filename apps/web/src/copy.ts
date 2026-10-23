@@ -143,19 +143,36 @@ export const ROW_MENU_REMOVE_LABEL = 'Remove from library';
 export const ADD_TITLE_LABEL = 'Add title';
 export const ADD_TITLE_HEADING = 'Add a title';
 export const ADD_TITLE_SEARCH_LABEL = 'Search TMDB';
-export const ADD_TITLE_SERVICE_LABEL = 'Which service is it saved on?';
+export const ADD_TITLE_SERVICE_LABEL = 'Where should it go?';
+// ~~Superseded: 'Which service is it saved on?'~~
 export const ADD_TITLE_CLOSE_LABEL = 'Close add a title';
 
 /**
- * US-047 AC-4 — the service is REQUIRED and has no default.
+ * US-047 AC-4 as amended by #455 (PRD `A60`, US-068) — the destination is
+ * PRE-SELECTED from the availability lookup, never silently defaulted.
  *
- * ⚠ Defaulting it would be a silent data error: the badge is a factual claim
- * about where the owner saved the title, and a wrong one makes the next
+ * ⚠ The owner SEES what was looked up and must confirm it. A destination the
+ * owner has not seen is still a silent data error: the badge is a factual
+ * claim about where the title is saved, and a wrong one makes the next
  * full-update reconciliation of that service propose the title for removal.
- * The same reasoning as `POST /api/batches` having no default mode
- * (US-003 AC-5).
+ * ~~US-047 AC-4 — the service is REQUIRED and has no default.~~
  */
-export const ADD_TITLE_SERVICE_REQUIRED = 'Pick the service it’s saved on.';
+export const ADD_TITLE_LOOKING_UP = 'Looking up where it streams…';
+export const ADD_TITLE_LOOKED_UP_FOUND =
+  'Looked up: streaming on {services}. Change it if that is not where you saved it.';
+export const ADD_TITLE_LOOKED_UP_NONE =
+  'Looked up: not streaming on your services. It will go to Waiting to stream unless you pick a service.';
+export const ADD_TITLE_LOOKUP_UNKNOWN =
+  'We could not tell where it streams. Pick a service, or send it to Waiting to stream.';
+export const ADD_TITLE_LOOKUP_FAILED =
+  "Couldn't look up where it streams. Pick a service, or send it to Waiting to stream.";
+export const ADD_TITLE_WAITING_OPTION = 'Waiting to stream (not in your library)';
+export const ADD_TITLE_SERVICE_REQUIRED = 'Pick a service, or send it to Waiting to stream.';
+// ~~Superseded: 'Pick the service it’s saved on.'~~
+export const ADD_TITLE_CONFIRM_LIBRARY = 'Add to library';
+export const ADD_TITLE_CONFIRM_WAITING = 'Add to Waiting to stream';
+export const ADD_TITLE_DONE_WAITING =
+  'Added to Waiting to stream. "{name}" is not in your library.';
 
 /** US-047 AC-3 — the outcome, both shapes. */
 export const ADD_TITLE_DONE = 'Added. "{name}" is in your library.';

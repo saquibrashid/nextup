@@ -531,11 +531,34 @@ export interface RestoreResponse {
 }
 
 /** §6.30 (US-047) — the standalone manual add. */
-export interface AddTitleResponse {
+export type AddTitleResponse = AddTitleLibraryResponse | AddTitleWaitingResponse;
+
+/** §6.56 (#455) — what `GET /api/tmdb/service-lookup` proposes for one work. */
+export interface ServiceLookupResponse {
+  status: 'found' | 'none' | 'unknown' | 'failed';
+  services: Service[];
+  destination: { kind: 'services'; services: Service[] } | { kind: 'waiting' } | null;
+  checkedAt: string;
+}
+
+export interface AddTitleWaitingResponse {
+  destination: 'waiting';
+  intentId: string;
+  titleId: string;
+  workIdentity: string;
+  name: string;
+  titleWasCreated: boolean;
+}
+
+export interface AddTitleLibraryResponse {
+  destination?: 'services';
   titleId: string;
   listingId: string;
+  listingIds?: string[];
   workIdentity: string;
   service: string;
+  /** The services actually written; one already held active is left out. */
+  services?: string[];
   name: string;
   dateAdded: string;
   /**
@@ -1030,9 +1053,18 @@ export function createApiClient(deps: ApiClientDeps = {}) {
     addTitle: (body: {
       tmdbId: number;
       mediaType: 'movie' | 'tv';
-      service: string;
+      service?: string;
+      destination?: { kind: 'services'; services: Service[] } | { kind: 'waiting' };
       edition?: import('@nextup/domain').EditionLabel;
     }) => request<AddTitleResponse>('/api/titles', { method: 'POST', body }, deps),
+
+    /** §6.56 (#455) — which services stream a work. Proposes only; writes nothing. */
+    lookupAddTitleServices: (tmdbId: number, mediaType: 'movie' | 'tv') =>
+      request<ServiceLookupResponse>(
+        `/api/tmdb/service-lookup?tmdbId=${String(tmdbId)}&mediaType=${mediaType}`,
+        {},
+        deps,
+      ),
 
     /**
      * §6.32 (US-048) — take a title off the list by hand.

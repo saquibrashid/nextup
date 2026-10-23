@@ -39,7 +39,7 @@ import {
   type StreamingForecast,
 } from '@nextup/domain';
 
-import { TmdbClient, TmdbWorkNotFoundError } from '../clients/tmdbClient.js';
+import { TmdbClient, TmdbWorkNotFoundError, type TmdbWorkDetail } from '../clients/tmdbClient.js';
 import { WatchmodeClient, earliestAnnouncements } from '../clients/watchmodeClient.js';
 import { AppError } from '../errors/AppError.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
@@ -221,6 +221,87 @@ function alreadyWaiting(workIdentity: string): AppError {
   });
 }
 
+/**
+ * Create ONE search-sourced waiting intent (#378), shared by `POST /api/waiting` and the Add title flow (#455, `A60`).
+ *
+ * ⚠ Never adds to the Library: the title is stored `removed`, with no listing and no sort date, and a work already listed or already waited for is refused.
+ */
+export async function addSearchWaitingIntent(
+  ownerId: ReturnType<typeof requireOwnerId>,
+  workIdentity: string,
+  detail: TmdbWorkDetail,
+): Promise<{ intentId: string; titleId: string; titleWasCreated: boolean }> {
+  return await runInTransaction(async (tx) => {
+    // Sequential: one transaction is one connection.
+    const listed = await listListedWorkIdentities(ownerId, tx);
+    const waiting = await listWaitingWorkIdentities(ownerId, tx);
+    // US-040 AC-5, on this path too: a work already in the library is not
+    // something to wait for. Refused, never doubled (#378 acceptance).
+    if (listed.has(workIdentity)) {
+      throw new AppError(
+        'DUPLICATE_WORK_IDENTITY',
+        409,
+        "That title is already in your library, so there's nothing to wait for.",
+        { workIdentity, reason: 'already-listed' },
+      );
+    }
+    if (waiting.has(workIdentity)) throw alreadyWaiting(workIdentity);
+
+    const existing = await findTitleByWorkIdentity(ownerId, workIdentity, tx);
+    let titleId: string;
+    if (existing === null) {
+      titleId = ulid();
+      await createTitle(
+        ownerId,
+        {
+          id: titleId,
+          workIdentity,
+          // ⚠ `removed` with NO list date (the column is left unset, so
+          // NULL): the waiting shape, never `active` (see
+          // `presenceFields` in batchClose.ts). It is not written here by
+          // name because this file also reads discovery dates (T-WAIT-011).
+          state: 'removed',
+          matchState: 'matched',
+          tmdbId: detail.tmdbId,
+          tmdbMediaType: detail.mediaType,
+          tmdbName: detail.name,
+          tmdbReleaseYear: detail.releaseYear,
+          tmdbRuntimeMinutes: detail.runtimeMinutes,
+          tmdbGenres: JSON.stringify(detail.genres),
+          tmdbComedyShow: detail.comedyShow ?? null,
+          tmdbPosterPath: detail.posterPath,
+          tmdbFetchedAt: new Date(),
+          imdbId: detail.imdbId,
+          createdByBatchId: null,
+        },
+        tx,
+      );
+    } else {
+      // Reused as it stands — a work in the removed log stays there.
+      titleId = existing.id;
+    }
+
+    const intentId = ulid();
+    await createWatchIntent(
+      ownerId,
+      {
+        id: intentId,
+        titleId,
+        workIdentity,
+        sourceBatchId: null,
+        discoverySource: 'search',
+        state: 'waiting',
+      },
+      tx,
+    );
+    return { intentId, titleId, titleWasCreated: existing === null };
+  }).catch((error: unknown) => {
+    // Two adds racing: only `ux_intent_owner_title_waiting` sees both.
+    if (isUniqueViolation(error)) throw alreadyWaiting(workIdentity);
+    throw error;
+  });
+}
+
 export function registerWaitingRoutes(
   router: Router,
   getTmdb: () => Pick<TmdbClient, 'getWatchOffers' | 'getWork' | 'getReleaseFacts'> = () =>
@@ -271,76 +352,7 @@ export function registerWaitingRoutes(
       throw error;
     }
 
-    const result = await runInTransaction(async (tx) => {
-      // Sequential: one transaction is one connection.
-      const listed = await listListedWorkIdentities(ownerId, tx);
-      const waiting = await listWaitingWorkIdentities(ownerId, tx);
-      // US-040 AC-5, on this path too: a work already in the library is not
-      // something to wait for. Refused, never doubled (#378 acceptance).
-      if (listed.has(workIdentity)) {
-        throw new AppError(
-          'DUPLICATE_WORK_IDENTITY',
-          409,
-          "That title is already in your library, so there's nothing to wait for.",
-          { workIdentity, reason: 'already-listed' },
-        );
-      }
-      if (waiting.has(workIdentity)) throw alreadyWaiting(workIdentity);
-
-      const existing = await findTitleByWorkIdentity(ownerId, workIdentity, tx);
-      let titleId: string;
-      if (existing === null) {
-        titleId = ulid();
-        await createTitle(
-          ownerId,
-          {
-            id: titleId,
-            workIdentity,
-            // ⚠ `removed` with NO list date (the column is left unset, so
-            // NULL): the waiting shape, never `active` (see
-            // `presenceFields` in batchClose.ts). It is not written here by
-            // name because this file also reads discovery dates (T-WAIT-011).
-            state: 'removed',
-            matchState: 'matched',
-            tmdbId: detail.tmdbId,
-            tmdbMediaType: detail.mediaType,
-            tmdbName: detail.name,
-            tmdbReleaseYear: detail.releaseYear,
-            tmdbRuntimeMinutes: detail.runtimeMinutes,
-            tmdbGenres: JSON.stringify(detail.genres),
-            tmdbComedyShow: detail.comedyShow ?? null,
-            tmdbPosterPath: detail.posterPath,
-            tmdbFetchedAt: new Date(),
-            imdbId: detail.imdbId,
-            createdByBatchId: null,
-          },
-          tx,
-        );
-      } else {
-        // Reused as it stands — a work in the removed log stays there.
-        titleId = existing.id;
-      }
-
-      const intentId = ulid();
-      await createWatchIntent(
-        ownerId,
-        {
-          id: intentId,
-          titleId,
-          workIdentity,
-          sourceBatchId: null,
-          discoverySource: 'search',
-          state: 'waiting',
-        },
-        tx,
-      );
-      return { intentId, titleId, titleWasCreated: existing === null };
-    }).catch((error: unknown) => {
-      // Two adds racing: only `ux_intent_owner_title_waiting` sees both.
-      if (isUniqueViolation(error)) throw alreadyWaiting(workIdentity);
-      throw error;
-    });
-
+    const result = await addSearchWaitingIntent(ownerId, workIdentity, detail);
     res.status(201).json({
       intentId: result.intentId,
       titleId: result.titleId,

@@ -39,7 +39,7 @@ describe('T-MOD-001 shared modal context', () => {
       await user.click(
         await screen.findByTestId(action === 'add' ? 'add-select-1' : 'select-result-1'),
       );
-      if (action === 'add') await user.click(screen.getByRole('radio', { name: 'Netflix' }));
+      if (action === 'add') await user.click(screen.getByRole('checkbox', { name: 'Netflix' }));
       await user.click(
         screen.getByTestId(action === 'add' ? 'confirm-add-title' : 'confirm-fix-match'),
       );
