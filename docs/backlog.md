@@ -746,6 +746,8 @@ finished, so the exception cannot outlive its reason.
 | `TASK-287` | `done` | The Waiting add at 280 px in a real browser. Test id: `T-WADD-020`. |
 | `TASK-288` | `done` | Documentary media type, part 1 (#456, `A62`, US-071 / REQ-137, ADR-0016): `documentary` in `TITLE_CATEGORIES`/`TITLE_CATEGORY_LABELS`, `titleCategory` derives it from stored TMDB genres, `EFFECTIVE_CATEGORY` mirrors it in SQL, the override and `?category=` accept it, additive migration `0021_documentary_category` pinned in `tools/check-migrations.ts`. Test ids: `T-DOC-001`, `T-DOC-002`, `T-DOC-004`, `T-DOC-005`. |
 | `TASK-289` | `done` | Documentary media type, part 2: the row label, Type picker option and *Title category* choice from the shared registry. Test ids: `T-DOC-003`. |
+| `TASK-290` | `done` | Waiting add in a modal dialog (`A63`, US-070 / REQ-136): `WaitingSearchAdd` opens the lookup in the shared `ui/Dialog` (`aria-haspopup`), focus returns to *Add title*, an add closes it and announces; dead inline-panel CSS removed. Test ids: `T-WADM-001`. |
+| `TASK-291` | `done` | The Waiting add dialog at 280 px in a real browser. Test id: `T-WADM-020`. |
 <!-- STATUS-LEDGER:END -->
 
 ### Approved availability moves (#397/#410), 2026-09-29
@@ -789,6 +791,13 @@ TASK-265."~~
 | --- | --- | --- | --- | --- |
 | TASK-288 | Documentary category, API and store (PRD `A62`, US-071 / REQ-137, ADR-0016): derived from stored TMDB genre 99 ahead of the Movie/TV type (Comedy Show and the owner override outrank it), mirrored in the list SQL, accepted by `categoryOverride` and `?category=`; additive migration `0021_documentary_category`. | 1 agent-run + 10 owner-review-minutes | TASK-247 | `T-DOC-001`, `T-DOC-002`, `T-DOC-004`, `T-DOC-005`; `T-MIG-001`, `T-CATEGORY-001`..`T-CATEGORY-003` still pass |
 | TASK-289 | Documentary in the web app: row label, Type picker option and override choice from `TITLE_CATEGORY_LABELS`. | 1 agent-run + 5 owner-review-minutes | TASK-288 | `T-DOC-003`; `T-CATEGORY-004` still passes |
+
+### Approved Waiting add modal (`A63`), 2026-10-23
+
+| Task | Work | Size | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| TASK-290 | The Waiting add lookup opens in the shared modal `Dialog` (PRD `A63`, US-070 / REQ-136): `aria-haspopup="dialog"`, focus in and returned, Escape/backdrop/close, inert background, add closes and announces. | 1 agent-run + 10 owner-review-minutes | TASK-286 | `T-WADM-001`; `T-WADD-010`, `T-WAIT-019`, `T-WAIT-020` still pass as amended |
+| TASK-291 | The Waiting add dialog at 280 px in a real browser. | 1 agent-run + 5 owner-review-minutes | TASK-290 | `T-WADM-020` |
 
 ### Approved waiting sort and Grid alignment (`A56`, #415, #414), 2026-10-08
 

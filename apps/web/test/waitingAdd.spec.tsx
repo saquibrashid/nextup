@@ -7,7 +7,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { TitleSearchResults } from '../src/components/TitleSearchResults';
 import { WaitingSearchAdd } from '../src/components/WaitingSearchAdd';
-import { WAITING_ADD_OPEN, WAITING_SEARCH_ACTION, WAITING_SEARCH_LABEL } from '../src/copy';
+import {
+  WAITING_ADD_CLOSE_LABEL,
+  WAITING_ADD_OPEN,
+  WAITING_SEARCH_ACTION,
+  WAITING_SEARCH_LABEL,
+  WAITING_SEARCH_LEGEND,
+} from '../src/copy';
 import type { TmdbSearchResult } from '../src/lib/apiClient';
 
 const rich: TmdbSearchResult = {
@@ -57,7 +63,8 @@ describe('T-WADD-010 · the explicit Add (+) entry point', () => {
 
     const add = screen.getByRole('button', { name: WAITING_ADD_OPEN });
     expect(add.querySelector('svg')).not.toBeNull();
-    expect(add.getAttribute('aria-expanded')).toBe('false');
+    expect(add.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(add.getAttribute('aria-expanded')).toBeNull();
     expect(screen.queryByRole('searchbox')).toBeNull();
     expect(onSearch).not.toHaveBeenCalled();
   });
@@ -72,26 +79,83 @@ describe('T-WADD-010 · the explicit Add (+) entry point', () => {
     expect(screen.getByRole('button', { name: WAITING_SEARCH_ACTION })).toBeTruthy();
   });
 
-  it('T-WADD-010c · pressing it opens the add flow, focuses the field and exposes aria-expanded', async () => {
+  it('T-WADD-010c · pressing it opens the add dialog and focuses the field', async () => {
     render(<WaitingSearchAdd onSearch={vi.fn()} onAdd={vi.fn()} />);
-    const add = screen.getByTestId('waiting-add-open');
-    fireEvent.click(add);
+    fireEvent.click(screen.getByTestId('waiting-add-open'));
 
-    expect(add.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('dialog')).toBeTruthy();
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('searchbox')));
-    fireEvent.click(add);
-    expect(screen.queryByRole('searchbox')).toBeNull();
   });
-
   it('T-WADD-010d · nothing is added until the owner confirms a result', async () => {
     const { onAdd } = await openAndSearch([rich]);
     expect(onAdd).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId('waiting-search-add'));
     await waitFor(() => expect(onAdd).toHaveBeenCalledWith(rich));
-    await waitFor(() => expect(screen.queryByTestId('waiting-add-panel')).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 });
 
+describe('T-WADM-001 · the Add flow is a modal dialog', () => {
+  function open() {
+    const onAdd = vi.fn(() => Promise.resolve());
+    render(
+      <main>
+        <WaitingSearchAdd onSearch={() => Promise.resolve([rich])} onAdd={onAdd} />
+      </main>,
+    );
+    const button = screen.getByTestId('waiting-add-open');
+    button.focus();
+    fireEvent.click(button);
+    return { button, onAdd };
+  }
+
+  it('T-WADM-001a · it opens as a named modal dialog, with focus inside', async () => {
+    open();
+    const dialog = screen.getByRole('dialog', { name: WAITING_SEARCH_LEGEND });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+    expect(document.activeElement).toBe(screen.getByRole('searchbox'));
+  });
+
+  it('T-WADM-001b · the background is inert while open and restored after', () => {
+    const { button } = open();
+    expect(document.querySelector('main')?.parentElement?.hasAttribute('inert')).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: WAITING_ADD_CLOSE_LABEL }));
+    expect(document.querySelector('main')?.parentElement?.hasAttribute('inert')).toBe(false);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(button).toBeTruthy();
+  });
+
+  it('T-WADM-001c · Escape closes it and focus returns to the Add title button', async () => {
+    const { button } = open();
+    await waitFor(() => expect(screen.getByRole('searchbox')).toBe(document.activeElement));
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.activeElement).toBe(button);
+  });
+
+  it('T-WADM-001d · a backdrop press closes it; a press inside does not', () => {
+    open();
+    fireEvent.click(screen.getByRole('dialog'));
+    expect(screen.getByRole('dialog')).toBeTruthy();
+    fireEvent.click(document.querySelector('.dialog-backdrop') as Element);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('T-WADM-001e · a successful add closes the dialog, returns focus and announces it', async () => {
+    const { button, onAdd } = open();
+    fireEvent.change(screen.getByTestId('waiting-search-input'), { target: { value: 'dune' } });
+    fireEvent.click(screen.getByTestId('waiting-search-submit'));
+    fireEvent.click(await screen.findByTestId('waiting-search-add'));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(onAdd).toHaveBeenCalledWith(rich);
+    expect(document.activeElement).toBe(button);
+    const outcome = screen.getByTestId('waiting-search-outcome');
+    expect(outcome.getAttribute('role')).toBe('status');
+    expect(outcome.textContent).toBe('Added to Waiting to stream: Dune');
+  });
+});
 describe('T-WADD-011 · richer lookup results', () => {
   it('T-WADD-011a · a row shows type, year, genres, lead cast and the overview', () => {
     render(<TitleSearchResults results={[rich]} onSelect={vi.fn()} testIds={ids} />);

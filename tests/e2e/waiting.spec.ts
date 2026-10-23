@@ -268,6 +268,47 @@ test.describe('T-WAIT-018 — waiting to stream in a real browser (#378)', () =>
     await expect(row.getByTestId('waiting-search-result-overview')).toBeVisible();
     await noOverflow(page);
   });
+
+  test('T-WADM-020: at 280px the lookup is a modal dialog that fits, closes on Escape and returns focus', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 280, height: 700 });
+    await stubApi(page, WAITING_EVERY_STATE);
+    await page.route('**/api/tmdb/search?*', (route) =>
+      route.fulfill({
+        json: {
+          items: [
+            { tmdbId: 1, mediaType: 'movie', name: 'Dune', releaseYear: 2021, posterPath: null },
+          ],
+        },
+      }),
+    );
+    await page.goto('/waiting');
+
+    const add = page.getByRole('button', { name: 'Add title' });
+    await expect(add).toHaveAttribute('aria-haspopup', 'dialog');
+    await add.click();
+    const dialog = page.getByRole('dialog', { name: 'Add a title to wait for' });
+    await expect(dialog).toBeVisible();
+    await expect(page.getByRole('searchbox')).toBeFocused();
+    const box = await dialog.boundingBox();
+    expect(box?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect((box?.x ?? 0) + (box?.width ?? 999)).toBeLessThanOrEqual(280);
+
+    await page.getByRole('searchbox').fill('dune');
+    await page.getByRole('button', { name: 'Look up' }).click();
+    await expect(dialog.getByTestId('waiting-search-result')).toBeVisible();
+    await noOverflow(page);
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(add).toBeFocused();
+
+    await add.click();
+    await page.mouse.click(2, 2);
+    await expect(dialog).toHaveCount(0);
+    await expect(add).toBeFocused();
+  });
 });
 
 /* ── #380 — when and where it is expected to stream ──────────────────── */

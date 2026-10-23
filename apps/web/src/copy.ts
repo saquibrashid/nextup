@@ -2077,6 +2077,7 @@ export const WAITING_SUBTITLE =
   'Titles you would rather wait to stream than rent or buy. Each stays here until it reaches a streaming service.';
 /** #457 — the explicit Add (+) entry point; 'Search' read as a list filter. The add landmark's name follows. */
 export const WAITING_ADD_OPEN = 'Add title';
+export const WAITING_ADD_CLOSE_LABEL = 'Close add a title to wait for';
 export const WAITING_SEARCH_LEGEND = 'Add a title to wait for';
 export const WAITING_SEARCH_LABEL = 'Look up a title to add';
 export const WAITING_SEARCH_ACTION = 'Look up';
