@@ -76,9 +76,17 @@ import {
   RESTORE_SUPPRESSED_BODY,
   RESTORE_SUPPRESSED_CANCEL,
   RETRY_LABEL,
+  SEASON_TRACK,
+  SEASON_TRACKING,
+  SEASON_TRACK_FAILED,
+  SEASON_TRACK_LOOKUP_FAILED,
+  SEASON_TRACK_ON,
+  SEASON_TRACK_STOP,
+  SEASON_TRACK_STOPPED,
+  SEASON_TRACK_WAITING,
 } from '../copy';
 import { ApiError } from '../lib/apiClient';
-import type { RemovedItem, RestoreResponse } from '../lib/apiClient';
+import type { NewSeasonTrackingResult, RemovedItem, RestoreResponse } from '../lib/apiClient';
 import { TMDB_IMAGE_BASE } from '../components/TitleRow';
 import { LoadMoreSentinel } from '../components/LoadMoreSentinel';
 import { useOnline } from '../lib/useOnline';
@@ -102,6 +110,9 @@ export interface RemovedPageProps {
   readonly onPurgeListing?: (listingId: string) => Promise<unknown>;
   /** US-067 — *Delete all history for this work*. */
   readonly onPurgeWork?: (workIdentity: string) => Promise<unknown>;
+  /** #454 — track a removed show for a new season. Controls render only when wired. */
+  readonly onTrackSeason?: (titleId: string) => Promise<NewSeasonTrackingResult>;
+  readonly onStopSeason?: (titleId: string) => Promise<unknown>;
   /** The load-more sentinel (§7.4). Defaults leave it unrendered. */
   readonly hasMore?: boolean;
   readonly loadingMore?: boolean;
@@ -534,12 +545,116 @@ function PurgeControl({
   );
 }
 
+/**
+ * #454 — opt in to hearing about a new season of a removed show. Tracking is
+ * metadata only: it never restores the row or changes the Library.
+ */
+function SeasonControl({
+  item,
+  onTrack,
+  onStop,
+  offline,
+}: {
+  item: RemovedItem;
+  onTrack: (titleId: string) => Promise<NewSeasonTrackingResult>;
+  onStop: (titleId: string) => Promise<unknown>;
+  offline: boolean;
+}): JSX.Element | null {
+  type Phase = 'off' | 'busy' | 'on' | 'waiting' | 'lookup-failed' | 'error';
+  const [phase, setPhase] = useState<Phase>(item.trackingNewSeason === true ? 'on' : 'off');
+  const [stopped, setStopped] = useState(false);
+  if (item.mediaType !== 'tv') return null;
+
+  function track(): void {
+    setPhase('busy');
+    setStopped(false);
+    onTrack(item.titleId).then(
+      (result) =>
+        setPhase(
+          result.status === 'waiting'
+            ? 'waiting'
+            : result.lookupFailed === true
+              ? 'lookup-failed'
+              : 'on',
+        ),
+      () => setPhase('error'),
+    );
+  }
+
+  function stop(): void {
+    setPhase('busy');
+    onStop(item.titleId).then(
+      () => {
+        setStopped(true);
+        setPhase('off');
+      },
+      () => setPhase('error'),
+    );
+  }
+
+  const tracking = phase === 'on' || phase === 'lookup-failed';
+  return (
+    <span className="removed-row__season" data-testid="removed-season">
+      {phase === 'waiting' ? (
+        <span role="status" data-testid="removed-season-waiting">
+          {SEASON_TRACK_WAITING}
+        </span>
+      ) : tracking ? (
+        <>
+          <span data-testid="removed-season-tracking">{SEASON_TRACKING}</span>
+          <Button
+            variant="ghost"
+            data-testid="removed-season-stop"
+            aria-label={`${SEASON_TRACK_STOP}: ${item.name}`}
+            disabled={offline}
+            onClick={stop}
+          >
+            {SEASON_TRACK_STOP}
+          </Button>
+        </>
+      ) : (
+        <Button
+          variant="secondary"
+          data-testid="removed-season-track"
+          aria-label={`${SEASON_TRACK}: ${item.name}`}
+          disabled={offline || phase === 'busy'}
+          onClick={track}
+        >
+          {SEASON_TRACK}
+        </Button>
+      )}
+      {phase === 'on' && item.trackingNewSeason !== true && (
+        <span role="status" data-testid="removed-season-note">
+          {SEASON_TRACK_ON}
+        </span>
+      )}
+      {phase === 'lookup-failed' && (
+        <span role="status" data-testid="removed-season-note">
+          {SEASON_TRACK_LOOKUP_FAILED}
+        </span>
+      )}
+      {stopped && (
+        <span role="status" data-testid="removed-season-stopped">
+          {SEASON_TRACK_STOPPED}
+        </span>
+      )}
+      {phase === 'error' && (
+        <span role="alert" data-testid="removed-season-error">
+          {SEASON_TRACK_FAILED}
+        </span>
+      )}
+    </span>
+  );
+}
+
 function RemovedRow({
   item,
   onRestore,
   onUnsuppress,
   onPurgeListing,
   onPurgeWork,
+  onTrackSeason,
+  onStopSeason,
   onDismiss,
   onPurged,
   offline,
@@ -549,6 +664,8 @@ function RemovedRow({
   onUnsuppress: (suppressionId: string) => Promise<unknown>;
   onPurgeListing?: (listingId: string) => Promise<unknown>;
   onPurgeWork?: (workIdentity: string) => Promise<unknown>;
+  onTrackSeason?: (titleId: string) => Promise<NewSeasonTrackingResult>;
+  onStopSeason?: (titleId: string) => Promise<unknown>;
   onDismiss: (msg: string) => void;
   onPurged: (msg: string, scope: PurgeScope) => void;
   offline: boolean;
@@ -618,6 +735,14 @@ function RemovedRow({
           onPurged={onPurged}
           offline={offline}
         />
+        {onTrackSeason !== undefined && onStopSeason !== undefined && (
+          <SeasonControl
+            item={item}
+            onTrack={onTrackSeason}
+            onStop={onStopSeason}
+            offline={offline}
+          />
+        )}
       </div>
     </li>
   );
@@ -634,6 +759,8 @@ export function RemovedPage({
   onUnsuppress,
   onPurgeListing,
   onPurgeWork,
+  onTrackSeason,
+  onStopSeason,
   hasMore = false,
   loadingMore = false,
   loadMoreFailed = false,
@@ -725,6 +852,8 @@ export function RemovedPage({
               onUnsuppress={doUnsuppress}
               {...(onPurgeListing !== undefined ? { onPurgeListing } : {})}
               {...(onPurgeWork !== undefined ? { onPurgeWork } : {})}
+              {...(onTrackSeason !== undefined ? { onTrackSeason } : {})}
+              {...(onStopSeason !== undefined ? { onStopSeason } : {})}
               onDismiss={(msg) => handleDismiss(item.listingId, msg)}
               onPurged={(msg, scope) => handlePurged(item, msg, scope)}
               offline={offline}

@@ -300,6 +300,20 @@ describe('T-AVREV-004 · US-064 AC-1/AC-2 · GET /api/availability/review reads 
     expect(updateWatchIntentAvailability).not.toHaveBeenCalled();
   });
 
+  it('T-SEAS-050: a show waiting on a NEW season is not "now streaming" until that date arrives (#454)', async () => {
+    listLibraryAvailability.mockResolvedValue([]);
+    listWaitingIntents.mockResolvedValue([
+      intent('future', { seasonNumber: 3, seasonAirOn: new Date(Date.now() + 30 * 86_400_000) }),
+      intent('out', { seasonNumber: 3, seasonAirOn: new Date(Date.now() - 86_400_000) }),
+      intent('plain'),
+    ]);
+    const body = await json(await call('GET', '/api/availability/review'));
+    expect((body['nowStreaming'] as Json[]).map((row) => row['intentId'])).toEqual([
+      'out',
+      'plain',
+    ]);
+  });
+
   it('T-AVREV-004b: a suppressed work is not listed — suppression is keyed on work identity', async () => {
     listLibraryAvailability.mockResolvedValue([libraryTitle('s'), libraryTitle('k')]);
     listActiveSuppressions.mockResolvedValue([{ id: 'sup-1', workIdentity: 'tmdb:movie:s' }]);

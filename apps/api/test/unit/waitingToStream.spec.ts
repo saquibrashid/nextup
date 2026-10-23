@@ -15,6 +15,17 @@ import type { Express } from 'express';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const listWaitingIntents = vi.fn();
+const listTrackedSeasonWorks = vi.fn();
+const recordSeasonFacts = vi.fn();
+
+vi.mock('../../src/repository/seasonTracking.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/repository/seasonTracking.js')>();
+  return {
+    ...actual,
+    listTrackedSeasonWorks: (...args: unknown[]) => listTrackedSeasonWorks(...args) as unknown,
+    recordSeasonFacts: (...args: unknown[]) => recordSeasonFacts(...args) as unknown,
+  };
+});
 const updateWatchIntentAvailability = vi.fn();
 const listOwnerServices = vi.fn();
 const getWatchOffers = vi.fn();
@@ -67,6 +78,9 @@ vi.mock('../../src/clients/tmdbClient.js', async (importOriginal) => {
     // #380: the forecast refresh asks for release facts. These suites are about
     // availability, so it knows nothing; `streamingForecast.spec.ts` covers it.
     override getReleaseFacts(): Promise<null> {
+      return Promise.resolve(null);
+    }
+    override getNextSeason(): Promise<null> {
       return Promise.resolve(null);
     }
   }
@@ -186,6 +200,7 @@ beforeEach(async () => {
   process.env['NEXTUP_ALLOWED_SUBJECTS'] = SUBJECT;
   process.env['TMDB_API_KEY'] = 'test-key';
   updateWatchIntentAvailability.mockResolvedValue({ count: 1 });
+  listTrackedSeasonWorks.mockResolvedValue([]);
   listOwnerServices.mockResolvedValue(['netflix']);
   getWatchOffers.mockResolvedValue({ flatrate: [], rentOrBuy: [] });
   getWork.mockResolvedValue(DETAIL);

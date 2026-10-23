@@ -2675,6 +2675,9 @@ Owner-approved at `A54` (#397/#410, US-063, ADR-0010 Rev 4). **Additive only**
 | `title.availability_region` | `NVARCHAR(8) NOT NULL DEFAULT 'US'` (`df_title_region`) | The region the answer was computed for, stored and passed explicitly (A49). |
 | `title.availability_kept_signature` | `NVARCHAR(400) NULL` | The change the owner chose to **Keep** (`left=starz;joined=netflix`). The marker stays hidden until the computed signature differs. |
 | `watch_intent.moved_from_library_at` | `DATETIME2 NULL`, `ck_intent_moved_from_library_search` | Set only by the owner's *Move to Waiting* (`api.md` §6.42). Only on a `discovery_source = 'search'` intent. |
+| `watch_preference.track_new_season` | `BIT NOT NULL DEFAULT 0` (`df_watch_preference_track_season`) | `A64`: the owner's opt-in to hear about a new season of a removed TV show, by work identity. Not a list column. |
+| `watch_preference.season_checked_at` / `season_number` / `season_air_on` | `DATETIME2 NULL` / `INT NULL` / `DATE NULL`, `ck_watch_preference_season_coherent` | Last lazy TMDB check, and the next announced season it found (`NULL` = none). Number and date are all-or-nothing. |
+| `watch_intent.season_number` / `season_air_on` | `INT NULL` / `DATE NULL`, `ck_intent_season_coherent` | Set only on an intent the owner opened from a new-season offer. Before `season_air_on` the row is held out of "now streaming". |
 
 `ck_title_availability_coherent` holds `availability_checked_at IS NOT NULL OR
 (available_on IS NULL AND rent_on IS NULL)` — an answer always has an as-of

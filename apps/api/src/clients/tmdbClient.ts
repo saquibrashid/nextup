@@ -434,6 +434,18 @@ export class TmdbClient {
     return readReleaseFacts(body, region);
   }
 
+  /**
+   * #454 — the next DATED, unaired season of a TV show on or after `today`
+   * (`YYYY-MM-DD`), or `null` when none is announced. ONE request.
+   *
+   * ⚠ `null` means TMDB answered and no season is dated. Anything that stops
+   * TMDB answering — including a 404 — throws, so the caller can tell "not
+   * announced" from "could not ask" and never records a guess.
+   */
+  async getNextSeason(tmdbId: number, today: string): Promise<NextSeason | null> {
+    return readNextSeason(await this.#get<unknown>(`/tv/${tmdbId}`, {}), today);
+  }
+
   async getPresentation(
     mediaType: MediaType,
     tmdbId: number,
@@ -653,6 +665,41 @@ export function readReleaseFacts(body: unknown, region: string): ReleaseFacts {
     theatricalOn: theatricalType === undefined ? null : (byType.get(theatricalType) ?? null),
     digitalOn: byType.get(DIGITAL_TYPE) ?? null,
   };
+}
+
+/** #454 — a TV show's next announced season. `airsOn` is `YYYY-MM-DD`. */
+export interface NextSeason {
+  seasonNumber: number;
+  airsOn: string;
+}
+
+function readDay(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const day = value.slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+}
+
+/**
+ * Read the next season from a TV detail: the earliest `seasons[]` entry
+ * (season 1 and up, never "Specials") dated on/after `today`, else the
+ * `next_episode_to_air` season. A season with no date is NOT announced.
+ */
+export function readNextSeason(body: unknown, today: string): NextSeason | null {
+  if (!isRecord(body)) return null;
+  let best: NextSeason | null = null;
+  const consider = (seasonNumber: unknown, airDate: unknown): void => {
+    const airsOn = readDay(airDate);
+    if (!isPositiveInteger(seasonNumber) || airsOn === null || airsOn < today) return;
+    if (best === null || airsOn < best.airsOn) best = { seasonNumber, airsOn };
+  };
+  if (Array.isArray(body['seasons'])) {
+    for (const season of body['seasons']) {
+      if (isRecord(season)) consider(season['season_number'], season['air_date']);
+    }
+  }
+  const next = body['next_episode_to_air'];
+  if (best === null && isRecord(next)) consider(next['season_number'], next['air_date']);
+  return best;
 }
 
 /** The metadata allow-list of US-007 AC-2/AC-6. Storage validation is TASK-061. */

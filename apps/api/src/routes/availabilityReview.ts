@@ -273,6 +273,12 @@ async function readReview(ownerId: OwnerId, now: Date) {
     .sort(byName);
 
   const nowStreaming = intents
+    // #454 (`A64`): earlier seasons of a show waiting on a NEW season are not
+    // "now streaming" until that season's date arrives.
+    .filter((intent) => {
+      const airsOn = intent.seasonAirOn ?? null;
+      return airsOn === null || airsOn.toISOString().slice(0, 10) <= now.toISOString().slice(0, 10);
+    })
     .map((intent) => {
       const flagged = (flaggedProvidersFor(parseProviderList(intent.availableOn)) ?? []).filter(
         (service) => yours.includes(service),

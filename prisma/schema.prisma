@@ -243,6 +243,16 @@ model WatchPreference {
   watching         Boolean @default(false, map: "df_watch_preference_watching")
   priority         String  @default("normal", map: "df_watch_preference_priority") @db.NVarChar(16)
 
+  /// #454, migration 0022, PRD `A64`. The owner's opt-in to hear about a new
+  /// season of a removed TV show. An owner CHOICE, so it lives beside the other
+  /// choices that survive removal. The three `season*` columns are the last
+  /// TMDB answer (METADATA ONLY — no membership, ordering or badge reads them):
+  /// both `seasonNumber` and `seasonAirOn` are NULL when nothing is announced.
+  trackNewSeason  Boolean   @default(false, map: "df_watch_preference_track_season") @map("track_new_season")
+  seasonCheckedAt DateTime? @map("season_checked_at") @db.DateTime2
+  seasonNumber    Int?      @map("season_number")
+  seasonAirOn     DateTime? @map("season_air_on") @db.Date
+
   @@id([ownerId, workIdentity], map: "pk_watch_preference")
   @@map("watch_preference")
 }
@@ -323,6 +333,13 @@ model WatchIntent {
   /// #410, migration 0019. Set only by the owner's "Move to Waiting"
   /// (US-063 AC-4). The source stays `search` (`ck_intent_moved_from_library_search`).
   movedFromLibraryAt DateTime? @map("moved_from_library_at") @db.DateTime2
+
+  /// #454, migration 0022, PRD `A64`. Set only when the owner put a REMOVED
+  /// TV show here to wait for a new season: the season and its TMDB air date.
+  /// Both or neither (`ck_intent_season_coherent`). Until the date arrives the
+  /// show's earlier seasons must not read as "now streaming".
+  seasonNumber Int?      @map("season_number")
+  seasonAirOn  DateTime? @map("season_air_on") @db.Date
 
   /// ⚠ FILTERED to `state = 'waiting'`, so a historical satisfied row and a
   /// later re-discovery of the same work both remain possible. The filter is

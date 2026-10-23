@@ -254,6 +254,7 @@ describe('toRemovedItem', () => {
       removalTotalForWork: 3,
       restorable: true,
       suppressed: false,
+      trackingNewSeason: false,
     });
   });
 

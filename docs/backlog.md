@@ -748,6 +748,9 @@ finished, so the exception cannot outlive its reason.
 | `TASK-289` | `done` | Documentary media type, part 2: the row label, Type picker option and *Title category* choice from the shared registry. Test ids: `T-DOC-003`. |
 | `TASK-290` | `done` | Waiting add in a modal dialog (`A63`, US-070 / REQ-136): `WaitingSearchAdd` opens the lookup in the shared `ui/Dialog` (`aria-haspopup`), focus returns to *Add title*, an add closes it and announces; dead inline-panel CSS removed. Test ids: `T-WADM-001`. |
 | `TASK-291` | `done` | The Waiting add dialog at 280 px in a real browser. Test id: `T-WADM-020`. |
+| `TASK-292` | `done` | Track new seasons, backend (`A64`, US-072 / REQ-138): additive migration `0022`, `TmdbClient.getNextSeason`, the two tracking routes, the bounded lazy re-check and offers on `GET /api/waiting`, season intents held out of "now streaming". Test ids: `T-SEAS-001`, `T-SEAS-010`, `T-SEAS-020`, `T-SEAS-030`, `T-SEAS-040`, `T-SEAS-050`, `T-SEAS-070`. |
+| `TASK-293` | `done` | Track new seasons, web: the Waiting season panel and *New season announced* offers, and the Removal history *Track new seasons* control. Test ids: `T-SEAS-060`, `T-SEAS-063`. |
+| `TASK-294` | `done` | The season panel and offers at 280 px in a real browser. Test id: `T-SEAS-080`. |
 <!-- STATUS-LEDGER:END -->
 
 ### Approved availability moves (#397/#410), 2026-09-29
@@ -798,6 +801,9 @@ TASK-265."~~
 | --- | --- | --- | --- | --- |
 | TASK-290 | The Waiting add lookup opens in the shared modal `Dialog` (PRD `A63`, US-070 / REQ-136): `aria-haspopup="dialog"`, focus in and returned, Escape/backdrop/close, inert background, add closes and announces. | 1 agent-run + 10 owner-review-minutes | TASK-286 | `T-WADM-001`; `T-WADD-010`, `T-WAIT-019`, `T-WAIT-020` still pass as amended |
 | TASK-291 | The Waiting add dialog at 280 px in a real browser. | 1 agent-run + 5 owner-review-minutes | TASK-290 | `T-WADM-020` |
+| TASK-292 | Track a removed show for a new season, backend (PRD `A64`, US-072 / REQ-138): additive migration `0022_track_new_seasons`; `getNextSeason`; `POST /api/titles/:titleId/new-season-tracking` and `/stop`; the bounded lazy re-check and `newSeasonOffers` on `GET /api/waiting`; a future season is never "now streaming". No scheduler, no fifth process. | 2 agent-runs + 20 owner-review-minutes | TASK-290 | `T-SEAS-001`; `T-SEAS-010`; `T-SEAS-020`; `T-SEAS-030`; `T-SEAS-040`; `T-SEAS-050`; `T-SEAS-070`; `T-CI-005` still passes |
+| TASK-293 | Track new seasons, web: season panel and *New season announced* offers on Waiting; *Track new seasons* / *Stop tracking* on Removal history. | 1 agent-run + 15 owner-review-minutes | TASK-292 | `T-SEAS-060`; `T-SEAS-063` |
+| TASK-294 | The season panel and offers at 280 px in a real browser. | 1 agent-run + 5 owner-review-minutes | TASK-293 | `T-SEAS-080` |
 
 ### Approved waiting sort and Grid alignment (`A56`, #415, #414), 2026-10-08
 

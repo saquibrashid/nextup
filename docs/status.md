@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 286 |
+| ✅ done | 289 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **289** |
+| **total** | **292** |
 
 ## Ready to start
 
@@ -327,3 +327,6 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-289` | Documentary media type, part 2: the row label, Type picker option and *Title category* choice from the shared registry. Test ids: `T-DOC-003`. | `T-CATEGORY-004`, `T-DOC-003` |
 | `TASK-290` | Waiting add in a modal dialog (`A63`, US-070 / REQ-136): `WaitingSearchAdd` opens the lookup in the shared `ui/Dialog` (`aria-haspopup`), focus returns to *Add title*, an add closes it and announces; dead inline-panel CSS removed. Test ids: `T-WADM-001`. | `T-WADD-010`, `T-WADM-001`, `T-WAIT-019`, `T-WAIT-020` |
 | `TASK-291` | The Waiting add dialog at 280 px in a real browser. Test id: `T-WADM-020`. | `T-WADM-020` |
+| `TASK-292` | Track new seasons, backend (`A64`, US-072 / REQ-138): additive migration `0022`, `TmdbClient.getNextSeason`, the two tracking routes, the bounded lazy re-check and offers on `GET /api/waiting`, season intents held out of "now streaming". Test ids: `T-SEAS-001`, `T-SEAS-010`, `T-SEAS-020`, `T-SEAS-030`, `T-SEAS-040`, `T-SEAS-050`, `T-SEAS-070`. | `T-CI-005`, `T-SEAS-001`, `T-SEAS-010`, `T-SEAS-020`, `T-SEAS-030`, `T-SEAS-040`, `T-SEAS-050`, `T-SEAS-070` |
+| `TASK-293` | Track new seasons, web: the Waiting season panel and *New season announced* offers, and the Removal history *Track new seasons* control. Test ids: `T-SEAS-060`, `T-SEAS-063`. | `T-SEAS-060`, `T-SEAS-063` |
+| `TASK-294` | The season panel and offers at 280 px in a real browser. Test id: `T-SEAS-080`. | `T-SEAS-080` |

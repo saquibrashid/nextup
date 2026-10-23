@@ -83,6 +83,12 @@ export function WaitingRoute({ client = apiClient }: WaitingRouteProps = {}): JS
       loading={waiting.resource.kind === 'loading'}
       loadFailed={waiting.resource.kind === 'failed'}
       refreshFailed={value?.availabilityRefreshFailed ?? false}
+      newSeasonOffers={value?.newSeasonOffers ?? []}
+      onTrackSeason={async (titleId) => {
+        await client.startNewSeasonTracking(titleId);
+        waiting.reload();
+      }}
+      onStopSeason={(titleId) => client.stopNewSeasonTracking(titleId)}
       onRetry={waiting.reload}
       view={view}
       onViewChange={(next) => {

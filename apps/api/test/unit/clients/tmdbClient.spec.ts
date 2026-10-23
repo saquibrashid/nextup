@@ -702,3 +702,73 @@ describe('T-IMDB-009 the IMDb id survives both media types', () => {
     ).toMatchObject({ imdbId: 'tt1375666' });
   });
 });
+
+describe('T-SEAS-020 · the next announced season of a TV show (#454, US-072)', () => {
+  function clientServing(body: unknown, status = 200): { client: TmdbClient; urls: string[] } {
+    const urls: string[] = [];
+    const client = new TmdbClient({
+      apiKey: 'fixture-key-not-a-real-secret',
+      fetch: ((input: RequestInfo | URL) => {
+        urls.push(String(input));
+        return Promise.resolve(
+          new Response(JSON.stringify(body), {
+            status,
+            headers: { 'content-type': 'application/json' },
+          }),
+        );
+      }) as typeof globalThis.fetch,
+      sleep: () => Promise.resolve(),
+    });
+    return { client, urls };
+  }
+
+  it('T-SEAS-020a · the earliest dated season on or after today wins, in one request', async () => {
+    const { client, urls } = clientServing({
+      seasons: [
+        { season_number: 0, air_date: '2030-01-01' },
+        { season_number: 1, air_date: '2022-09-01' },
+        { season_number: 3, air_date: '2027-03-01' },
+        { season_number: 2, air_date: '2026-10-23' },
+      ],
+    });
+    expect(await client.getNextSeason(84_773, '2026-10-23')).toEqual({
+      seasonNumber: 2,
+      airsOn: '2026-10-23',
+    });
+    expect(urls).toHaveLength(1);
+    expect(urls[0]).toContain('/3/tv/84773');
+  });
+
+  it('T-SEAS-020b · an undated season, "Specials" and past seasons are not announced', async () => {
+    const { client } = clientServing({
+      seasons: [
+        { season_number: 0, air_date: '2030-01-01' },
+        { season_number: 2, air_date: null },
+        { season_number: 3 },
+        { season_number: 1, air_date: '2022-09-01' },
+        'junk',
+        { season_number: 4, air_date: 'soon' },
+      ],
+      next_episode_to_air: null,
+    });
+    expect(await client.getNextSeason(1, '2026-10-23')).toBeNull();
+  });
+
+  it('T-SEAS-020c · next_episode_to_air is the fallback when no season carries a date', async () => {
+    const { client } = clientServing({
+      seasons: [{ season_number: 2, air_date: null }],
+      next_episode_to_air: { season_number: 2, air_date: '2026-12-01T00:00:00Z' },
+    });
+    expect(await client.getNextSeason(1, '2026-10-23')).toEqual({
+      seasonNumber: 2,
+      airsOn: '2026-12-01',
+    });
+  });
+
+  it('T-SEAS-020d · an unreadable body is "not announced"; a 404 is a failed lookup, never a guess', async () => {
+    expect(await clientServing('nope').client.getNextSeason(1, '2026-10-23')).toBeNull();
+    await expect(clientServing({}, 404).client.getNextSeason(1, '2026-10-23')).rejects.toThrow(
+      TmdbUnavailableError,
+    );
+  });
+});

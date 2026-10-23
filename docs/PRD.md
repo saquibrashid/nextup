@@ -2,7 +2,7 @@
 
 **Project:** nextup
 **Version:** Current v1 scope, including subsequent owner-approved promotions; remaining deferrals are in §11.2.
-**Status:** Approved scope with recorded amendments through US-071 / REQ-137 (`A63` amends US-070). ~~"through US-071 / REQ-137 (`A62`)"~~ ~~"through US-070 / REQ-136 (`A61`)"~~ ~~"through US-069 / REQ-135 (`A60`)"~~ ~~"through US-068 / REQ-134 (`A59`)"~~ ~~"through US-067 / REQ-133 (`A58`)"~~ ~~"through US-066 / REQ-132 (`A57`)"~~ ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
+**Status:** Approved scope with recorded amendments through US-072 / REQ-138 (`A64`). ~~"through US-071 / REQ-137 (`A63` amends US-070)"~~ ~~"through US-071 / REQ-137 (`A62`)"~~ ~~"through US-070 / REQ-136 (`A61`)"~~ ~~"through US-069 / REQ-135 (`A60`)"~~ ~~"through US-068 / REQ-134 (`A59`)"~~ ~~"through US-067 / REQ-133 (`A58`)"~~ ~~"through US-066 / REQ-132 (`A57`)"~~ ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
 **Inputs:** `docs/BRD.md`, the recorded owner decisions in the ADRs, and the original authoring-tree `Context/` documents. **The `Context/` tree is not supplied in this repository.** Its citations preserve provenance, not an instruction to invent missing source text. See `docs/current-release.md` for the owner decisions applied on 2026-09-17 and `docs/requirement-index.md` for reconciled reference authority.
 **Audience:** the implementer. Implementation will be performed by GitHub Copilot in autopilot mode (ASM-028, ASM-029, NFR-002, NFR-003, NFR-004). This document, together with the specs, IS the implementation input. Acceptance criteria are written to be executable and verifiable without asking a question.
 **No timeline.** Per A19 / ASM-027 this document contains no dates, durations, or sequencing commitments beyond dependency order.
@@ -107,6 +107,23 @@
 > | **4. Row-aligned Grid cards (#414, a defect fix)** | In Grid only, each waiting card is a subgrid of the list: a fixed 2:3 poster box, then title, rent chip, meta, availability, moved note, date block and the action on shared rows. An absent optional block leaves its row empty, so *Not interested* sits on one line at the bottom of every card in a row. Compact and the phone card list are unchanged. | Fix |
 >
 > **New in this document:** **US-065 / REQ-131** (Epic L), seven acceptance criteria. **Corrected in place:** US-043's out-of-scope line. **No migration** — the forecast is computed per request, so the order is applied in memory over the rows the waiting read already returns.
+---
+
+> ## ⚠ AMENDMENT — 2026-10-24 — `A64` (owner-requested, #454): a removed TV show whose next season is announced waits in Waiting to stream
+
+> **The owner observed** that after finishing a season and removing a show (for example *The Lord of the Rings: The Rings of Power*), nextup never tells them a new season has been announced. **Decision:** the owner may **track a removed TV show for a new season**. When TMDB announces a dated season, the show is offered to Waiting to stream with that season's date, and once that season is out it uses the existing *Add to Library* path. Nothing moves without a tap.
+>
+> | Decision | What it changes | Kind |
+> |---|---|---|
+> | **1. Opt-in, per show** | The Removal history view gains *Track new seasons* on a removed TV show (and *Stop tracking*). The choice is stored on the work's existing `watch_preference` row, keyed by work identity (invariant 1), so it survives reappearance and removal. Nothing is tracked by default and removal itself is unchanged. | **Instruction** |
+> | **2. Offered, never moved** | Opening Waiting re-checks tracked shows (below). A tracked show with an announced season is listed under *New season announced* with its date; *Add to Waiting* is the owner's tap and opens a `search`-source waiting intent carrying the season number and date. Tracking then stops. A show that is in the Library, suppressed, or already waiting is never offered. | **Instruction** |
+> | **3. Date and "out"** | A waiting row carrying a season shows *Season N premieres {date}* until that date, then *Season N is out*. Before the date it is never "now streaming" and never in the availability review's *now streaming* list, whatever TMDB says about earlier seasons (TMDB's providers are per show). From the date, a flatrate offer on one of the owner's services restores the ordinary *Add to Library* (US-063 AC-4) — the owner's tap, the existing promote path. | **Instruction** |
+> | **4. The lazy re-check** | `GET /api/waiting` asks TMDB `/tv/{id}` for at most 4 tracked shows per request, those never checked or checked more than `WATCH_PROVIDER_MAX_AGE_DAYS` ago, serially; an answer (even "not announced") stamps the check, a failure writes nothing and the page still renders. It writes only the season columns of `watch_preference`. It is the lazy watch-availability refresh's access trigger (§7.4 process 4) extended to this metadata; **no fifth process exists** and `refreshAvailability` has no new caller. | **Invariant** |
+> | **5. Additive migration** | `0022_track_new_seasons` adds four columns to `watch_preference` and two to `watch_intent`, plus all-or-nothing CHECKs. It holds no destructive statement and needs no hash pin. | **Invariant** |
+> | **6. Still true** | No scheduler changes list state; removal stays soft for ever; no scraping or credentials; the owner's *Add to Library* tap is the only way back. | **Invariant** |
+>
+> **New in this document:** **US-072 / REQ-138** (Epic L), six acceptance criteria. **Amended in place:** `specs/api.md` §6.57–§6.59 and §6.9/§6.38, `specs/data-model.md`, `specs/ui.md` §7b, `specs/testing.md` US-072.
+
 ---
 
 > ## ⚠ AMENDMENT — 2026-10-23 — `A63` (owner feedback on #457): the Waiting add lookup opens in a modal dialog, not an inline panel
@@ -2328,6 +2345,35 @@ no existing data is rewritten, and the canonical Movie/TV type is unchanged.
 
 **Out of scope:** separating Documentary movies from Documentary series; a Documentary badge distinct from the type label; classifying from keywords or titles.
 **Open questions:** none.
+
+#### US-072 — Track a removed show for a new season (`A64`)
+
+**REQ-138 (`must`, owner-requested #454, `A64`).** The owner can ask nextup to
+track a removed TV show. When TMDB announces a dated season, the show is offered
+to Waiting to stream with that season's date; once the season is out, the
+existing *Add to Library* returns it to the Library. Tracking is an opt-in on the
+work, offers are owner-confirmed, and the re-check is metadata only, lazy, on
+opening Waiting — no scheduler, no fifth process, no list change without a tap.
+
+**As** the owner
+**I want** a show I removed after finishing a season to come back to Waiting when its next season is announced
+**So that** I do not have to remember to look
+
+**Traces to:** REQ-138, REQ-041, REQ-086, REQ-129
+**Priority:** must
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | A removed TV show | The owner taps *Track new seasons* | Tracking is stored by work identity; a movie, unmatched, listed or suppressed show is refused; *Stop tracking* turns it off. |
+| AC-2 | A tracked show has a dated season on or after today | Waiting is opened | It is listed under *New season announced* with the date; nothing is created until the owner taps *Add to Waiting*, which opens one waiting intent carrying the season and stops tracking. |
+| AC-3 | A waiting row carries a season | The row is read | Before the date it says *Season N premieres {date}* and is not "now streaming" nor in the availability review's *now streaming*; from the date it says *Season N is out*, and a flatrate offer on an owner service restores *Add to Library* (the existing promote path). |
+| AC-4 | Tracked shows are due | Waiting is opened | At most 4 are re-checked serially and only season columns are written; a failed lookup writes nothing and the page still renders; no process other than the four of §7.4 exists. |
+| AC-5 | The migration runs on an existing store | Rows exist | `0022_track_new_seasons` is additive, rewrites no row and needs no pin. |
+| AC-6 | The views are used at 280 px | Offers, the season panel and the Removed control render | Nothing overflows and every control has an accessible name. |
+
+**Out of scope:** automatic tracking on removal; tracking from the Library's remove dialog; per-season provider data (TMDB's is per show); notifying outside the app; offering a season whose date passed while it was never confirmed (it is shown as not announced until a later one is).
+**Open questions:** whether removal itself should prompt to track (kept as an explicit opt-in on the Removal history view for now).
 
 ### 7.4 Closed enumeration of permitted mutations (REQ-041)
 
