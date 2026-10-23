@@ -44,6 +44,7 @@ import {
   type AddTitleResult,
 } from '../components/AddTitleDialog';
 import { RemoveTitleDialog, type RemoveTitleResult } from '../components/RemoveTitleDialog';
+import { FinishedWatchingDialog, type FinishedApi } from '../components/FinishedWatchingDialog';
 import { LoadMoreSentinel } from '../components/LoadMoreSentinel';
 import { SlowResponseNotice } from '../components/SlowResponseNotice';
 import { useSlowRequest } from '../lib/useSlowRequest';
@@ -158,6 +159,8 @@ export interface ListPageProps {
    */
   readonly onRemoveTitle?: (titleId: string) => Promise<RemoveTitleResult>;
   readonly onRestoreListing?: (listingId: string) => Promise<unknown>;
+  /** US-074 — the finished-watching calls; absent hides the row-menu item. */
+  readonly onFinished?: FinishedApi;
   /** §6.30 (US-047) — the standalone add. Needs `onSearchTmdb` to be useful. */
   readonly onAddTitle?: (body: AddTitleRequest) => Promise<AddTitleResult>;
   /** #455 — pre-selects the add dialog's services; absent means choose by hand. */
@@ -184,6 +187,7 @@ type OpenDialog =
   | { readonly kind: 'suppress'; readonly item: TitleListItem }
   | { readonly kind: 'fix-match'; readonly item: TitleListItem }
   | { readonly kind: 'remove'; readonly item: TitleListItem }
+  | { readonly kind: 'finished'; readonly item: TitleListItem }
   | { readonly kind: 'add' };
 
 /**
@@ -226,6 +230,7 @@ export function ListPage({
   onFixMatch,
   onRemoveTitle,
   onRestoreListing,
+  onFinished,
   onAddTitle,
   onLookupAddServices,
   onReload,
@@ -590,6 +595,7 @@ export function ListPage({
                   item={menuFor}
                   offline={offline}
                   canRemove={removeWired}
+                  canFinish={onFinished !== undefined}
                   onDismiss={closeAll}
                   onChoose={(choice) => {
                     setMenuFor(null);
@@ -598,7 +604,9 @@ export function ListPage({
                         ? { kind: 'suppress', item }
                         : choice === 'remove'
                           ? { kind: 'remove', item }
-                          : { kind: 'fix-match', item },
+                          : choice === 'finished'
+                            ? { kind: 'finished', item }
+                            : { kind: 'fix-match', item },
                     );
                   }}
                 />
@@ -692,6 +700,21 @@ export function ListPage({
               restoreListing={restoreFn}
               onRowState={(state) => {
                 setRowStates((prev) => ({ ...prev, [dialog.item.titleId]: state }));
+              }}
+              onClose={closeAll}
+            />
+          )}
+          {dialog !== null && dialog.kind === 'finished' && onFinished !== undefined && (
+            <FinishedWatchingDialog
+              titleId={dialog.item.titleId}
+              name={dialog.item.name}
+              api={onFinished}
+              offline={offline}
+              onLibraryChange={(hidden) => {
+                setRowStates((prev) => ({
+                  ...prev,
+                  [dialog.item.titleId]: hidden ? 'suppressed' : 'present',
+                }));
               }}
               onClose={closeAll}
             />

@@ -25,10 +25,10 @@
 import { useEffect, useRef, type JSX } from 'react';
 
 import type { TitleListItem } from './TitleRow';
-import { OFFLINE_DISABLED_REASON, ROW_MENU_REMOVE_LABEL } from '../copy';
+import { OFFLINE_DISABLED_REASON, ROW_MENU_FINISHED_LABEL, ROW_MENU_REMOVE_LABEL } from '../copy';
 import { Button } from './ui/Button';
 
-export type RowMenuChoice = 'suppress' | 'fix-match' | 'remove';
+export type RowMenuChoice = 'suppress' | 'fix-match' | 'remove' | 'finished';
 
 export interface RowMenuProps {
   readonly item: TitleListItem;
@@ -50,6 +50,13 @@ export interface RowMenuProps {
    * gaining an inert one, which is not.
    */
   readonly canRemove?: boolean;
+  /**
+   * US-074 — "Finished watching", rendered only when `ListPage` can mount its
+   * dialog. ⚠ It is LAST, nearest Cancel: it is the least destructive item
+   * (nothing leaves the Library without a further confirm), and the more
+   * destructive items sit further from the thumb.
+   */
+  readonly canFinish?: boolean;
   readonly onChoose: (choice: RowMenuChoice) => void;
   readonly onDismiss: () => void;
 }
@@ -62,6 +69,7 @@ export function RowMenu({
   item,
   offline = false,
   canRemove = false,
+  canFinish = false,
   onChoose,
   onDismiss,
 }: RowMenuProps): JSX.Element {
@@ -155,6 +163,19 @@ export function RowMenu({
           }}
         >
           {ROW_MENU_REMOVE_LABEL}
+        </Button>
+      )}
+      {canFinish && (
+        <Button
+          variant="secondary"
+          role="menuitem"
+          data-testid="row-menu-finished"
+          disabled={offline}
+          onClick={() => {
+            choose('finished');
+          }}
+        >
+          {ROW_MENU_FINISHED_LABEL}
         </Button>
       )}
       {offline && (

@@ -38,6 +38,7 @@ Collected locations: `packages/domain/test/titleCategory.spec.ts`;
 | AC-5 | U | `T-VIEWED-042` | History ordering, paging and fields. |
 | AC-6 | U | `T-VIEWED-001`, `T-VIEWED-040`, `T-VIEWED-041` | Invalid rating, date, season and unknown title are refused. |
 | AC-7 | S | `T-VIEWED-070` | Migration 0023 is additive and mirrored in the Prisma schema. |
+| AC-8 | W/E | `T-VIEWED-060`, `T-VIEWED-061`, `T-VIEWED-062`, `T-VIEWED-063`, `T-VIEWED-064`, `T-VIEWED-080` | The dialog, per-season list, ask-before-remove step, history view, edit dialog, row menu, details button and nav entry; 280 px, axe and no-overflow in a real browser. |
 
 | Id | Level | Owner | Claim |
 |---|---|---|---|
@@ -50,6 +51,12 @@ Collected locations: `packages/domain/test/titleCategory.spec.ts`;
 | **`T-VIEWED-043`** (`a`–`d`) | U | `TASK-297` | Same file: `POST /api/titles/:id/library-hidden`. |
 | **`T-VIEWED-070`** (`a`–`c`) | S | `TASK-297` | `tests/infra/watchedHistoryMigration.spec.ts` on `0023_watched_history`. |
 | **`T-VIEWED-090`** (`a`–`e`) | I | `TASK-297` | `apps/api/test/integration/watchRecords.spec.ts`: the repository against SQL Server. |
+| **`T-VIEWED-060`** (`a`–`l`) | W | `TASK-298` | `apps/web/test/watchedHistory.spec.tsx`: the Finished watching dialog — movie and per-season forms, mark all, ask-before-remove, undo, unfinish, focus and failure states. |
+| **`T-VIEWED-061`** (`a`–`f`) | W | `TASK-299` | Same file: the Recently watched page, the edit dialog and `WatchedRoute`. |
+| **`T-VIEWED-062`** (`a`–`b`) | W | `TASK-298` | Same file: the row-menu item (ordering) and its ListPage wiring. |
+| **`T-VIEWED-063`** (`a`) | W | `TASK-298` | Same file: the details-page button. |
+| **`T-VIEWED-064`** (`a`) | W | `TASK-299` | Same file: the `/watched` route and its nav label. |
+| **`T-VIEWED-080`** (`a`–`b`) | E | `TASK-300` | `tests/e2e/finishedWatching.spec.ts`: the flow and the history view at 280 px and 1024 px, no overflow, no axe violations. |
 
 ### US-073 — Grouped left navigation (TASK-295, TASK-296, #463, `A65`)
 

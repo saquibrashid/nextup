@@ -136,6 +136,7 @@ const BAR_ICONS: Record<string, ComponentType<{ readonly label?: string | undefi
   '/batches': CheckIcon,
   '/removed': HistoryIcon,
   '/not-interested': SuppressedIcon,
+  '/watched': CheckIcon,
   '/waiting': ClockIcon,
   '/availability': RefreshIcon,
   '/about': InfoIcon,
@@ -229,7 +230,11 @@ const NAV_GROUPS: readonly {
     paths: ['/', '/waiting', '/availability'],
   },
   { id: 'capture', label: NAV_GROUP_CAPTURE_LABEL, paths: ['/upload', '/batches'] },
-  { id: 'history', label: NAV_GROUP_HISTORY_LABEL, paths: ['/removed', '/not-interested'] },
+  {
+    id: 'history',
+    label: NAV_GROUP_HISTORY_LABEL,
+    paths: ['/watched', '/removed', '/not-interested'],
+  },
   { id: 'tools', label: NAV_GROUP_TOOLS_LABEL, paths: ['/rating'] },
   { id: 'help', label: NAV_GROUP_HELP_LABEL, paths: ['/about'], footer: true },
 ];

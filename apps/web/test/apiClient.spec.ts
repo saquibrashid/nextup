@@ -146,6 +146,12 @@ describe('T-DATA-003 — every method sends credentials', () => {
       lookupAddTitleServices: () => client.lookupAddTitleServices(438631, 'movie'),
       removeTitle: () => client.removeTitle('ttl_1'),
       lookupImdb: () => client.lookupImdb('The Matrix'),
+      getWatched: () => client.getWatched('ttl_1'),
+      markFinished: () => client.markFinished('ttl_1', { seasons: [0], watchedOn: null }),
+      editWatched: () => client.editWatched('tmdb:movie:603', 0, { rating: 4 }),
+      unfinishWatched: () => client.unfinishWatched('tmdb:movie:603', 0),
+      getWatchedHistory: () => client.getWatchedHistory(null),
+      setLibraryHidden: () => client.setLibraryHidden('ttl_1', false),
     };
 
     // The client's surface and the list above must not drift apart.

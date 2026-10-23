@@ -452,6 +452,60 @@ export interface NewSeasonOffer {
   season: { number: number; airsOn: string };
 }
 
+/** One finished-watching record (`specs/api.md` §6.61–§6.62); season 0 is a whole title. */
+export interface WatchRecord {
+  workIdentity: string;
+  seasonNumber: number;
+  finished: boolean;
+  watchedOn: string | null;
+  rating: number | null;
+}
+
+/** `GET /api/titles/:titleId/watched` (§6.60, US-074). */
+export interface WatchedState {
+  titleId: string;
+  workIdentity: string;
+  mediaType: 'movie' | 'tv' | null;
+  inLibrary: boolean;
+  hidden: boolean;
+  perSeason: boolean;
+  seasonsUnavailable: boolean;
+  seasons: {
+    seasonNumber: number;
+    airDate: string | null;
+    aired: boolean;
+    finished: boolean;
+    watchedOn: string | null;
+    rating: number | null;
+  }[];
+  allAiredFinished: boolean;
+  whole: { finished: boolean; watchedOn: string | null; rating: number | null } | null;
+}
+
+/** `POST /api/titles/:titleId/finished` body (§6.61). Omitted fields are left as they are. */
+export interface FinishedRequest {
+  seasons: number[];
+  watchedOn?: string | null;
+  rating?: number | null;
+}
+
+/** One row of `GET /api/watched` (§6.63). */
+export interface WatchedHistoryItem extends WatchRecord {
+  titleName: string;
+  releaseYear: number | null;
+  mediaType: string | null;
+  posterPath: string | null;
+  titleId: string | null;
+  imdbRatingTenths: number | null;
+  leftLibrary: boolean;
+}
+
+export interface WatchedHistoryResponse {
+  items: WatchedHistoryItem[];
+  nextCursor: string | null;
+  limit: number;
+}
+
 /** `POST /api/titles/:titleId/new-season-tracking` (#454). */
 export interface NewSeasonTrackingResult {
   titleId: string;
@@ -1489,6 +1543,61 @@ export function createApiClient(deps: ApiClientDeps = {}) {
       request<unknown>(
         `/api/removal-groups/${encodeURIComponent(groupId)}/undo`,
         { method: 'POST', body: {} },
+        deps,
+      ),
+
+    /**
+     * §6.60 (US-074) — a title's finished-watching state, per season for a
+     * show. A read; TMDB is asked only to list seasons.
+     */
+    getWatched: (titleId: string, signal?: AbortSignal) =>
+      request<WatchedState>(`/api/titles/${encodeURIComponent(titleId)}/watched`, { signal }, deps),
+
+    /** §6.61 — record finishing a movie (`[0]`) or the chosen aired seasons. */
+    markFinished: (titleId: string, body: FinishedRequest) =>
+      request<{ titleId: string; records: WatchRecord[] }>(
+        `/api/titles/${encodeURIComponent(titleId)}/finished`,
+        { method: 'POST', body },
+        deps,
+      ),
+
+    /** §6.62 — correct the date or rating of an existing record. `null` clears. */
+    editWatched: (
+      workIdentity: string,
+      seasonNumber: number,
+      body: { watchedOn?: string | null; rating?: number | null },
+    ) =>
+      request<WatchRecord>(
+        `/api/watched/${encodeURIComponent(workIdentity)}/${String(seasonNumber)}`,
+        { method: 'PATCH', body },
+        deps,
+      ),
+
+    /** §6.62 — mark a record not finished; the date and rating are kept. */
+    unfinishWatched: (workIdentity: string, seasonNumber: number) =>
+      request<WatchRecord>(
+        `/api/watched/${encodeURIComponent(workIdentity)}/${String(seasonNumber)}/unfinish`,
+        { method: 'POST', body: {} },
+        deps,
+      ),
+
+    /** §6.63 — Recently watched, newest first. `cursor` is the opaque offset. */
+    getWatchedHistory: (cursor: string | null, signal?: AbortSignal) =>
+      request<WatchedHistoryResponse>(
+        `/api/watched${cursor === null ? '' : `?cursor=${encodeURIComponent(cursor)}`}`,
+        { signal },
+        deps,
+      ),
+
+    /**
+     * §6.64 (REQ-041 item 19) — set a finished title aside from the Library, or
+     * return it. ⚠ NOT a removal and NOT suppression: nothing is written to the
+     * removal log, and the caller must have asked the owner first.
+     */
+    setLibraryHidden: (titleId: string, hidden: boolean) =>
+      request<{ titleId: string; workIdentity: string; hidden: boolean }>(
+        `/api/titles/${encodeURIComponent(titleId)}/library-hidden`,
+        { method: 'POST', body: { hidden } },
         deps,
       ),
 

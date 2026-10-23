@@ -18,7 +18,8 @@ import { SuppressDialog } from '../components/SuppressDialog';
 import { RemoveTitleDialog } from '../components/RemoveTitleDialog';
 import { AvailabilityNotice, AvailabilityPanel } from '../components/AvailabilityMarker';
 import { CheckNowControl } from '../components/CheckNowControl';
-import { OFFLINE_DISABLED_REASON, WATCH_STATUS_LABELS } from '../copy';
+import { OFFLINE_DISABLED_REASON, ROW_MENU_FINISHED_LABEL, WATCH_STATUS_LABELS } from '../copy';
+import { FinishedWatchingDialog } from '../components/FinishedWatchingDialog';
 
 interface TitleDetailsPageProps {
   readonly item: TitleDetailResponse;
@@ -40,6 +41,10 @@ interface TitleDetailsPageProps {
     | 'keepAvailability'
     | 'addBadge'
     | 'checkTitleAvailabilityNow'
+    | 'getWatched'
+    | 'markFinished'
+    | 'unfinishWatched'
+    | 'setLibraryHidden'
   >;
   /**
    * US-063 — the confirmation of the last availability move. Held by the
@@ -58,9 +63,9 @@ export function TitleDetailsPage({
   notice: heldNotice,
   onAvailabilityMoved,
 }: TitleDetailsPageProps): JSX.Element {
-  const [dialog, setDialog] = useState<'watch' | 'fix' | 'suppress' | 'remove' | 'category' | null>(
-    null,
-  );
+  const [dialog, setDialog] = useState<
+    'watch' | 'fix' | 'suppress' | 'remove' | 'category' | 'finished' | null
+  >(null);
   const [changed, setChanged] = useState(false);
   const [localNotice, setLocalNotice] = useState<string | null>(null);
   const notice = heldNotice ?? localNotice;
@@ -187,6 +192,9 @@ export function TitleDetailsPage({
                 <Button variant="secondary" onClick={open('watch')} disabled={offline}>
                   Watch status
                 </Button>
+                <Button variant="secondary" onClick={open('finished')} disabled={offline}>
+                  {ROW_MENU_FINISHED_LABEL}
+                </Button>
                 <Button variant="secondary" onClick={open('fix')} disabled={offline}>
                   {unidentified ? 'Find a match' : 'Fix match'}
                 </Button>
@@ -277,6 +285,18 @@ export function TitleDetailsPage({
           restoreListing={actions.restoreListing}
           onRowState={(state) => {
             if (state !== 'pending') setChanged(true);
+          }}
+          onClose={close}
+        />
+      )}
+      {active && dialog === 'finished' && (
+        <FinishedWatchingDialog
+          titleId={item.titleId}
+          name={item.name}
+          api={actions}
+          offline={offline}
+          onLibraryChange={() => {
+            setChanged(true);
           }}
           onClose={close}
         />

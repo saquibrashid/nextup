@@ -2731,7 +2731,8 @@ TV show lists TMDB seasons 1+ (Specials excluded); if TMDB cannot answer,
 Body `{ seasons: number[], watchedOn?: "YYYY-MM-DD" | null, rating?: 1..5 | null }`. A movie or
 unmatched title requires exactly `[0]`; a matched show requires aired seasons ≥ 1 (validation is
 skipped, not failed, when TMDB is down). One record per season is written (a rewatch overwrites
-the date). `200` with the §6.60 body; `400 VALIDATION_FAILED`; `404`. Changes no list state.
+the date). `200 { titleId, records: [{ workIdentity, seasonNumber, finished, watchedOn, rating }] }`;
+`400 VALIDATION_FAILED`; `404`. Changes no list state.
 
 ### 6.62 `PATCH /api/watched/:workIdentity/:seasonNumber` and `POST …/unfinish` (US-074, `A66`)
 

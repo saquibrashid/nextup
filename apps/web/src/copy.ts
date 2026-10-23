@@ -2126,3 +2126,48 @@ export const WAITING_SEARCH_FAILED = "Couldn't add that. Nothing was changed.";
 /** US-043 AC-4 — the same suppression as anywhere else, keyed on identity. */
 export const WAITING_NOT_INTERESTED = 'Not interested';
 export const WAITING_SUPPRESS_FAILED = "Couldn't do that. Nothing was changed.";
+
+/** US-074 (`A66`) — Finished watching, per-season tracking and Recently watched. */
+export const NAV_WATCHED_LABEL = 'Recently watched';
+export const ROW_MENU_FINISHED_LABEL = 'Finished watching';
+export const FINISHED_LOADING = 'Loading what you have watched…';
+export const FINISHED_LOAD_FAILED = "Couldn't load your watched history. Nothing was changed.";
+export const FINISHED_SAVE_FAILED = "Couldn't save that. Nothing was changed.";
+export const FINISHED_SEASONS_UNAVAILABLE =
+  "Season details aren't available right now, so nothing can be marked finished. Try again later.";
+export const FINISHED_NO_SEASONS_AIRED = 'No seasons have aired yet.';
+export const FINISHED_DATE_LABEL = 'Date watched';
+export const FINISHED_DATE_UNKNOWN_LABEL = 'Date unknown';
+export const FINISHED_RATING_LEGEND = 'Your rating';
+export const FINISHED_NOT_RATED = 'Not rated';
+export const FINISHED_MARK_MOVIE = 'Mark as finished';
+export const FINISHED_SAVE_CHANGES = 'Save changes';
+export const FINISHED_MARK_SELECTED = 'Mark selected seasons finished';
+export const FINISHED_MARK_ALL = 'Mark all seasons finished';
+export const FINISHED_NOT_FINISHED = 'Not finished';
+export const FINISHED_SAVED = 'Saved.';
+export const FINISHED_UNFINISHED = 'Marked as not finished. Your date and rating are kept.';
+export const FINISHED_ASK_REMOVE = 'Also remove “{name}” from your Library?';
+export const FINISHED_ASK_REMOVE_HINT =
+  'It stays in Recently watched, and you can return it to your Library any time.';
+export const FINISHED_REMOVE_ACTION = 'Remove from Library';
+export const FINISHED_KEEP_ACTION = 'Keep in Library';
+export const FINISHED_REMOVED = '“{name}” is out of your Library and stays in Recently watched.';
+export const FINISHED_RETURN_ACTION = 'Return to Library';
+export const FINISHED_RETURNED = '“{name}” is back in your Library.';
+export const FINISHED_NOT_IN_LIBRARY =
+  "That title isn't in your Library any more. Nothing changed.";
+export const WATCHED_PAGE_TITLE = 'Recently watched';
+export const WATCHED_PAGE_SUBTITLE = 'What you finished, newest first, with your own ratings.';
+export const WATCHED_EMPTY_TITLE = 'Nothing marked as finished yet.';
+export const WATCHED_EMPTY_BODY =
+  'Use “Finished watching” in a title’s menu and it will appear here.';
+export const WATCHED_DATE_UNKNOWN = 'Date unknown';
+export const WATCHED_LEFT_LIBRARY = 'Out of your Library';
+export const WATCHED_EDIT_ACTION = 'Edit';
+export const WATCHED_YOUR_RATING = 'Your rating';
+export const WATCHED_COMMUNITY_RATING = 'IMDb';
+export const WATCHED_UNRATED = 'Not rated';
+export const WATCHED_EDIT_TITLE = 'Edit watched record';
+export const WATCHED_SEASON_LABEL = 'Season {n}';
+export const WATCHED_SEASON_PREMIERES = 'Premieres {date}';

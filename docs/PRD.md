@@ -126,7 +126,7 @@
 > | **7. Additive migration** | `0023_watched_history` adds `watch_record` and `watch_preference.library_hidden`. It holds no destructive statement and needs no hash pin. No scheduler, no fifth process, no new dependency, no telemetry. | **Invariant** |
 > | **8. Not in scope** | Copy/share recommendation text, public profiles or links, multi-user; per-viewing history; Library-row progress chips (progress shows on the title details and in the dialog). | **Decision** |
 >
-> **New in this document:** **US-074 / REQ-140** (Epic L), eight acceptance criteria. **Amended in place:** §7.4 (item 19 and the count), `specs/api.md` §6.60–§6.64, `specs/data-model.md`, `specs/ui.md` §7d, `specs/testing.md` US-074; `T-MUT-001e` now expects nineteen.
+> **New in this document:** **US-074 / REQ-140** (Epic L), eight acceptance criteria. **Amended in place:** §7.4 (item 19 and the count), `specs/api.md` §6.60–§6.64, `specs/data-model.md`, `specs/ui.md` §7e, `specs/testing.md` US-074; `T-MUT-001e` now expects nineteen.
 
 ---
 
@@ -2460,6 +2460,7 @@ introduced.
 | AC-5 | The owner opens *Recently watched* (`/watched`, History group of the left navigation) | It loads | Finished records are listed newest first (unknown dates last) with poster, title, season, date or *date unknown*, *Your rating* beside the community score, and whether it left the Library; it pages; each row can be edited, marked *Not finished* or returned to the Library; an empty history says so. |
 | AC-6 | An invalid input | A star rating outside 1–5, a non-calendar date, an unaired or unknown season, or another owner's title | It is refused (`400`/`404`) and nothing is written. |
 | AC-7 | The migration runs on an existing store | Rows exist | `0023_watched_history` is additive, rewrites no row and needs no pin; §7.4 item 19 is the only new list-state operation and no process beyond the four exists. |
+| AC-8 | The owner uses Finished watching, the per-season list, the rating/date editor or Recently watched, at a 280 px viewport | Any step of the flow | Nothing overflows the viewport; every control has an accessible name; finishing a movie or a show's last aired season only ever *asks* whether to remove it from the Library (Keep is the first choice) and the removal is undoable; "Recently watched" sits in the History nav group without a wrapped label. |
 
 **Out of scope:** copy/share recommendation text; public profiles, links or multi-user; per-viewing history; progress chips on Library rows; automatic finishing; reminders to finish or to rate; reading Specials.
 **Open questions:** none.
