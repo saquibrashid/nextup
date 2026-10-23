@@ -207,7 +207,7 @@ function NavTextLink({
       onClick={onNavigate}
     >
       {Icon ? <Icon /> : null}
-      {route.navLabel}
+      <span className="nav__label">{route.navLabel}</span>
     </NavLink>
   );
 }

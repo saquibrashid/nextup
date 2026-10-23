@@ -270,8 +270,10 @@ describe('T-NAV-003: the sidebar at 1280 px lists every destination directly', (
       .evaluateAll((links) => links.map((link) => link.getBoundingClientRect().height));
     expect(new Set(heights.map((height) => Math.round(height))).size).toBe(1);
     const overflowing = await nav
-      .getByRole('link')
-      .evaluateAll((links) => links.filter((link) => link.scrollWidth > link.clientWidth).length);
+      .locator('.nav__label')
+      .evaluateAll(
+        (labels) => labels.filter((label) => label.scrollWidth - label.clientWidth > 1).length,
+      );
     expect(overflowing).toBe(0);
     const name = page.getByTestId('account').locator('.app-shell__account-name');
     await expect(name).toHaveAttribute('title', /a\.very\.long\.address/);

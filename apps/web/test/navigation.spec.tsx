@@ -743,7 +743,7 @@ describe('T-NAVG · US-073 (A65) · the sidebar and the drawer group destination
   });
 
   it('T-NAVG-003: rows never wrap and the email truncates instead of breaking mid-word', () => {
-    expect(ruleBody('.nav__group-list .nav__link')).toMatch(/white-space:\s*nowrap/);
+    expect(ruleBody('.nav__group-list .nav__label')).toMatch(/white-space:\s*nowrap/);
     const name = ruleBody('.app-shell__account-name') ?? '';
     expect(name).toMatch(/text-overflow:\s*ellipsis/);
     expect(name).toMatch(/white-space:\s*nowrap/);
