@@ -231,6 +231,43 @@ test.describe('T-WAIT-018 — waiting to stream in a real browser (#378)', () =>
     );
     expect(overflow).toBeLessThanOrEqual(0);
   });
+
+  test('T-WADD-020: Add opens the lookup; rows carry genre, cast and overview with no overflow at 280px', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 280, height: 900 });
+    await stubApi(page, WAITING_EVERY_STATE);
+    await page.route('**/api/tmdb/search?*', (route) =>
+      route.fulfill({
+        json: {
+          items: [
+            {
+              tmdbId: 1,
+              mediaType: 'movie',
+              name: 'Dune',
+              releaseYear: 2021,
+              posterPath: null,
+              overview: 'A noble family takes charge of a desert planet. '.repeat(6),
+              genres: ['Science Fiction', 'Adventure'],
+              cast: ['Timothée Chalamet', 'Zendaya', 'Rebecca Ferguson'],
+            },
+          ],
+        },
+      }),
+    );
+    await page.goto('/waiting');
+
+    await expect(page.getByRole('button', { name: 'Search', exact: true })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Add title' }).click();
+    await page.getByRole('searchbox').fill('dune');
+    await page.getByRole('button', { name: 'Look up' }).click();
+
+    const row = page.getByTestId('waiting-search-result');
+    await expect(row).toContainText('Science Fiction, Adventure');
+    await expect(row).toContainText('With Timothée Chalamet, Zendaya, Rebecca Ferguson');
+    await expect(row.getByTestId('waiting-search-result-overview')).toBeVisible();
+    await noOverflow(page);
+  });
 });
 
 /* ── #380 — when and where it is expected to stream ──────────────────── */

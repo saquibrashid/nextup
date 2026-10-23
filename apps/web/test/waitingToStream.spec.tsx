@@ -245,6 +245,7 @@ describe('T-WAIT-019 · #378 · search-to-add', () => {
     const onSearchAdd = vi.fn(() => Promise.resolve());
     render(<WaitingPage items={[]} onSearch={onSearch} onSearchAdd={onSearchAdd} />);
 
+    fireEvent.click(screen.getByTestId('waiting-add-open'));
     fireEvent.change(screen.getByTestId('waiting-search-input'), { target: { value: 'dune' } });
     fireEvent.click(screen.getByTestId('waiting-search-submit'));
     await waitFor(() => expect(screen.getByTestId('waiting-search-results')).toBeTruthy());
@@ -280,6 +281,7 @@ describe('T-WAIT-019 · #378 · search-to-add', () => {
     render(
       <WaitingPage items={[]} onSearch={() => Promise.resolve([dune])} onSearchAdd={onSearchAdd} />,
     );
+    fireEvent.click(screen.getByTestId('waiting-add-open'));
     fireEvent.change(screen.getByTestId('waiting-search-input'), { target: { value: 'dune' } });
     fireEvent.click(screen.getByTestId('waiting-search-submit'));
     await waitFor(() => expect(screen.getByTestId('waiting-search-add')).toBeTruthy());

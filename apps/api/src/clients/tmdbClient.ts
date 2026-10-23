@@ -53,6 +53,43 @@ export const TMDB_MIN_SPACING_MS = 30;
 export const TMDB_RETRY_BACKOFF_MS: readonly number[] = [1_000, 4_000];
 export const TMDB_TIMEOUT_MS = 10_000;
 
+/** #457 — result-row enrichment bounds; the credits call is capped, not N+1. */
+export const SEARCH_CAST_MAX = 3;
+export const SEARCH_GENRES_MAX = 3;
+export const SEARCH_OVERVIEW_MAX = 300;
+export const SEARCH_ENRICH_MAX = 8;
+
+/** TMDB's fixed genre ids (movie and tv lists), so search needs no extra call. */
+const TMDB_GENRES: Readonly<Record<number, string>> = {
+  12: 'Adventure',
+  14: 'Fantasy',
+  16: 'Animation',
+  18: 'Drama',
+  27: 'Horror',
+  28: 'Action',
+  35: 'Comedy',
+  36: 'History',
+  37: 'Western',
+  53: 'Thriller',
+  80: 'Crime',
+  99: 'Documentary',
+  878: 'Science Fiction',
+  9648: 'Mystery',
+  10402: 'Music',
+  10749: 'Romance',
+  10751: 'Family',
+  10752: 'War',
+  10759: 'Action & Adventure',
+  10762: 'Kids',
+  10763: 'News',
+  10764: 'Reality',
+  10765: 'Sci-Fi & Fantasy',
+  10766: 'Soap',
+  10767: 'Talk',
+  10768: 'War & Politics',
+  10770: 'TV Movie',
+};
+
 /**
  * The §4.1 rate-limit gate, deliberately at MODULE scope rather than on the
  * class.
@@ -93,6 +130,10 @@ export interface TmdbSearchItem {
   name: string;
   releaseYear: number | null;
   posterPath: string | null;
+  /** #457 — optional, additive display fields; omitted when TMDB has none. */
+  overview?: string;
+  genres?: string[];
+  cast?: string[];
 }
 
 /**
@@ -135,6 +176,12 @@ export interface TmdbClientOptions {
 }
 
 export interface TmdbSearchOptions {
+  /**
+   * #457 — also keep the display-only overview and genres of each hit, for
+   * the owner-facing result row. Never set by matching, which must stay on the
+   * allow-list (US-007 AC-6): these are shown, never stored.
+   */
+  includeDisplay?: boolean;
   evidenceText?: string;
   type?: MediaType;
   limit?: number;
@@ -159,6 +206,7 @@ export class TmdbClient {
    */
   readonly #searchCache = new Map<string, TmdbSearchItem[]>();
   readonly #editionCache = new Map<number, EditionLabel[]>();
+  readonly #castCache = new Map<string, string[]>();
 
   constructor(options: TmdbClientOptions) {
     this.#apiKey = options.apiKey;
@@ -189,7 +237,7 @@ export class TmdbClient {
     });
 
     const items = (Array.isArray(body.results) ? body.results : [])
-      .map(toSearchItem)
+      .map((row) => toSearchItem(row, options.includeDisplay === true))
       .filter((item): item is TmdbSearchItem => item !== null)
       .filter((item) => options.type === undefined || item.mediaType === options.type)
       .slice(0, limit);
@@ -206,6 +254,24 @@ export class TmdbClient {
     }
     this.#searchCache.set(cacheKey, items);
     return items;
+  }
+
+  /**
+   * #457 — the top billed actors of one work, for the search result row.
+   * Cached per client; a failure is the caller's to degrade on.
+   */
+  async getLeadCast(mediaType: MediaType, tmdbId: number): Promise<string[]> {
+    const key = `${mediaType}:${tmdbId}`;
+    const cached = this.#castCache.get(key);
+    if (cached !== undefined) return cached;
+    const body = await this.#get<unknown>(`/${mediaType}/${tmdbId}/credits`, {});
+    const cast = isRecord(body) && Array.isArray(body['cast']) ? body['cast'] : [];
+    const names = cast
+      .map((person: unknown) => (isRecord(person) ? person['name'] : null))
+      .filter((name): name is string => typeof name === 'string' && name !== '')
+      .slice(0, SEARCH_CAST_MAX);
+    this.#castCache.set(key, names);
+    return names;
   }
 
   async getEditionLabels(tmdbId: number): Promise<EditionLabel[]> {
@@ -734,7 +800,7 @@ export function readRentOrBuyProviders(
   return names;
 }
 
-function toSearchItem(raw: unknown): TmdbSearchItem | null {
+function toSearchItem(raw: unknown, includeDisplay: boolean): TmdbSearchItem | null {
   if (typeof raw !== 'object' || raw === null) return null;
   const row = raw as Record<string, unknown>;
 
@@ -747,13 +813,27 @@ function toSearchItem(raw: unknown): TmdbSearchItem | null {
   const name = readName(row);
   if (name === null || name === '') return null;
 
-  return {
+  const item: TmdbSearchItem = {
     tmdbId,
     mediaType,
     name,
     releaseYear: readYear(row),
     posterPath: typeof row['poster_path'] === 'string' ? row['poster_path'] : null,
   };
+  if (!includeDisplay) return item;
+  const overview = row['overview'];
+  if (typeof overview === 'string' && overview.trim() !== '') {
+    item.overview = overview.trim().slice(0, SEARCH_OVERVIEW_MAX);
+  }
+  const genreIds = row['genre_ids'];
+  if (Array.isArray(genreIds)) {
+    const genres = genreIds
+      .map((id) => (typeof id === 'number' ? TMDB_GENRES[id] : undefined))
+      .filter((genre): genre is string => genre !== undefined)
+      .slice(0, SEARCH_GENRES_MAX);
+    if (genres.length > 0) item.genres = genres;
+  }
+  return item;
 }
 
 /** `title` for a film, `name` for a series — TMDB uses different keys. */

@@ -87,6 +87,8 @@ describe('T-TMDB-010 GET /api/tmdb/search', () => {
           name: 'Dune',
           releaseYear: 2021,
           posterPath: '/d5NXSklXo0qyIYkgV94XAgMIckC.jpg',
+          // #457: the route also returns the display-only overview (no genre ids in the recording).
+          overview: expect.any(String) as unknown,
         },
         {
           tmdbId: 41733,
@@ -94,6 +96,8 @@ describe('T-TMDB-010 GET /api/tmdb/search', () => {
           name: 'Dune',
           releaseYear: 1984,
           posterPath: '/aRSuC2fS5Q3q2ZK7Bg5aQZKvVSk.jpg',
+          // #457: the route also returns the display-only overview (no genre ids in the recording).
+          overview: expect.any(String) as unknown,
         },
         {
           tmdbId: 66732,
@@ -101,6 +105,8 @@ describe('T-TMDB-010 GET /api/tmdb/search', () => {
           name: 'Dune: Prophecy',
           releaseYear: 2024,
           posterPath: '/gZ4dNYIBIbBRuBGRUcXvHMYaFmm.jpg',
+          // #457: the route also returns the display-only overview (no genre ids in the recording).
+          overview: expect.any(String) as unknown,
         },
       ],
     });

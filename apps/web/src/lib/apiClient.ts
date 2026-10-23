@@ -910,6 +910,10 @@ export interface TmdbSearchResult {
   name: string;
   releaseYear: number | null;
   posterPath: string | null;
+  /** #457 — optional display fields; absent when TMDB had none. */
+  overview?: string;
+  genres?: string[];
+  cast?: string[];
 }
 
 export interface TmdbSearchResults {

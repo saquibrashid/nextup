@@ -3,15 +3,17 @@
 // ⚠ **THIS NEVER TOUCHES THE COMBINED LIST.** `POST /api/waiting` records a
 // `WatchIntent` with `discoverySource: 'search'` and no batch; the combined
 // list is still entered only by a capture (US-042 AC-3). The button therefore
-// says "Wait for it", never "Add".
+// says "Wait for it", never "Add". #457: the entry point IS an explicit Add (+)
+// control (not a "Search" that reads as a list filter); it only opens the lookup.
 //
 // ⚠ A refusal is an ANSWER, not a failure. "Already waiting", "already in
 // your library" and "not interested" each say which fact stopped it, so the
 // owner is never left wondering whether pressing again would help.
 
-import { useId, useState, type FormEvent, type JSX } from 'react';
+import { useEffect, useId, useState, type FormEvent, type JSX } from 'react';
 
 import {
+  WAITING_ADD_OPEN,
   WAITING_SEARCH_ACTION,
   WAITING_SEARCH_ADD,
   WAITING_SEARCH_ADDED,
@@ -28,7 +30,21 @@ import {
 import { ApiError, type TmdbSearchResult } from '../lib/apiClient';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
-import { SearchIcon } from './icons';
+import { PlusIcon, SearchIcon } from './icons';
+import { TitleSearchResults, type TitleSearchResultTestIds } from './TitleSearchResults';
+
+const WAITING_RESULT_TEST_IDS: TitleSearchResultTestIds = {
+  list: 'waiting-search-results',
+  item: 'waiting-search-result',
+  name: 'waiting-search-result-name',
+  genres: 'waiting-search-result-genres',
+  cast: 'waiting-search-result-cast',
+  overview: 'waiting-search-result-overview',
+  year: 'waiting-search-result-year',
+  type: 'waiting-search-result-type',
+  poster: 'waiting-search-result-poster',
+  select: () => 'waiting-search-add',
+};
 
 export interface WaitingSearchAddProps {
   readonly onSearch: (query: string) => Promise<readonly TmdbSearchResult[]>;
@@ -64,7 +80,13 @@ export function WaitingSearchAdd({
   const [phase, setPhase] = useState<Phase>({ kind: 'idle' });
   const [pending, setPending] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<{ tone: 'status' | 'alert'; text: string } | null>(null);
+  const [open, setOpen] = useState(false);
   const inputId = useId();
+  const panelId = useId();
+
+  useEffect(() => {
+    if (open) document.getElementById(inputId)?.focus();
+  }, [open, inputId]);
 
   function search(event: FormEvent): void {
     event.preventDefault();
@@ -87,6 +109,7 @@ export function WaitingSearchAdd({
         setPending(null);
         setPhase({ kind: 'idle' });
         setQuery('');
+        setOpen(false);
         setOutcome({ tone: 'status', text: `${WAITING_SEARCH_ADDED} ${result.name}` });
       },
       (error: unknown) => {
@@ -102,63 +125,67 @@ export function WaitingSearchAdd({
       data-testid="waiting-search"
       aria-label={WAITING_SEARCH_LEGEND}
     >
-      {/*
+      <Button
+        variant="secondary"
+        data-testid="waiting-add-open"
+        aria-expanded={open}
+        aria-controls={panelId}
+        disabled={offline}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <PlusIcon />
+        <span>{WAITING_ADD_OPEN}</span>
+      </Button>
+      {open && (
+        <div id={panelId} className="waiting-search__panel" data-testid="waiting-add-panel">
+          {/*
         #382 — Library's search field: a rounded field with the search icon as
         its submit. The label stays in the DOM (visually hidden) so the input
         keeps a real accessible name rather than relying on the placeholder.
       */}
-      <form className="waiting-search__form" onSubmit={search} role="search">
-        <label className="sr-only" htmlFor={inputId}>
-          {WAITING_SEARCH_LABEL}
-        </label>
-        <span className="list-search__control waiting-search__control">
-          <Button
-            type="submit"
-            variant="ghost"
-            aria-label={WAITING_SEARCH_ACTION}
-            data-testid="waiting-search-submit"
-            disabled={offline}
-          >
-            <SearchIcon />
-          </Button>
-          <Input
-            id={inputId}
-            type="search"
-            value={query}
-            placeholder={WAITING_SEARCH_LABEL}
-            data-testid="waiting-search-input"
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </span>
-      </form>
+          <form className="waiting-search__form" onSubmit={search} role="search">
+            <label className="sr-only" htmlFor={inputId}>
+              {WAITING_SEARCH_LABEL}
+            </label>
+            <span className="list-search__control waiting-search__control">
+              <Button
+                type="submit"
+                variant="ghost"
+                aria-label={WAITING_SEARCH_ACTION}
+                data-testid="waiting-search-submit"
+                disabled={offline}
+              >
+                <SearchIcon />
+              </Button>
+              <Input
+                id={inputId}
+                type="search"
+                value={query}
+                placeholder={WAITING_SEARCH_LABEL}
+                data-testid="waiting-search-input"
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </span>
+          </form>
 
-      {phase.kind === 'searching' && <p role="status">{WAITING_SEARCH_SEARCHING}</p>}
-      {phase.kind === 'unavailable' && <p role="alert">{WAITING_SEARCH_UNAVAILABLE}</p>}
-      {phase.kind === 'results' && phase.items.length === 0 && (
-        <p role="status">{WAITING_SEARCH_NO_RESULTS}</p>
-      )}
-      {phase.kind === 'results' && phase.items.length > 0 && (
-        <ul className="waiting-search__results" data-testid="waiting-search-results">
-          {phase.items.map((item) => {
-            const key = `${item.mediaType}:${String(item.tmdbId)}`;
-            return (
-              <li key={key} className="waiting-search__result" data-testid="waiting-search-result">
-                <span>
-                  {item.name}
-                  {item.releaseYear !== null && ` (${String(item.releaseYear)})`}
-                </span>
-                <Button
-                  data-testid="waiting-search-add"
-                  disabled={offline || pending !== null}
-                  onClick={() => add(item)}
-                >
-                  {pending === key ? 'Working…' : WAITING_SEARCH_ADD}
-                </Button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+          {phase.kind === 'searching' && <p role="status">{WAITING_SEARCH_SEARCHING}</p>}
+          {phase.kind === 'unavailable' && <p role="alert">{WAITING_SEARCH_UNAVAILABLE}</p>}
+          {phase.kind === 'results' && phase.items.length === 0 && (
+            <p role="status">{WAITING_SEARCH_NO_RESULTS}</p>
+          )}
+          {phase.kind === 'results' && phase.items.length > 0 && (
+            <TitleSearchResults
+              results={phase.items}
+              onSelect={add}
+              actionLabel={WAITING_SEARCH_ADD}
+              pendingLabel="Working…"
+              pendingKey={pending}
+              disabled={offline || pending !== null}
+              testIds={WAITING_RESULT_TEST_IDS}
+            />
+          )}
+        </div>
+      )}{' '}
       {outcome !== null && (
         <p role={outcome.tone} data-testid="waiting-search-outcome">
           {outcome.text}

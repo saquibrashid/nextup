@@ -22,6 +22,7 @@ import { type MediaType, MEDIA_TYPES } from '@nextup/domain';
 import {
   type TmdbClient,
   type TmdbSearchItem,
+  SEARCH_ENRICH_MAX,
   TMDB_QUERY_MAX_LENGTH,
   TMDB_SEARCH_LIMIT_DEFAULT,
   TMDB_SEARCH_LIMIT_MAX,
@@ -122,16 +123,43 @@ export async function searchTmdb(
   client: TmdbClient,
   query: TmdbSearchQuery,
 ): Promise<TmdbSearchItem[]> {
+  let items: TmdbSearchItem[];
   try {
-    return await client.searchMulti(
+    items = await client.searchMulti(
       query.q,
-      query.type === undefined ? { limit: query.limit } : { type: query.type, limit: query.limit },
+      query.type === undefined
+        ? { limit: query.limit, includeDisplay: true }
+        : { type: query.type, limit: query.limit, includeDisplay: true },
     );
   } catch (error) {
     const mapped = tmdbUnavailableAppError(error);
     if (mapped) throw mapped;
     throw error;
   }
+  return enrichWithCast(client, items);
+}
+
+/**
+ * #457 — lead cast for the first `SEARCH_ENRICH_MAX` rows, fetched in parallel
+ * (the client's shared gate bounds in-flight calls). Best-effort: a failed
+ * credits call omits `cast` for that row and never fails the search. Returns
+ * copies so the client's cached search items are never mutated.
+ */
+async function enrichWithCast(
+  client: TmdbClient,
+  items: readonly TmdbSearchItem[],
+): Promise<TmdbSearchItem[]> {
+  return Promise.all(
+    items.map(async (item, index) => {
+      if (index >= SEARCH_ENRICH_MAX) return item;
+      try {
+        const cast = await client.getLeadCast(item.mediaType, item.tmdbId);
+        return cast.length > 0 ? { ...item, cast } : item;
+      } catch {
+        return item;
+      }
+    }),
+  );
 }
 
 /**
