@@ -14,6 +14,8 @@ export * from './autoDetect.js';
 export * from './captureIntake.js';
 export * from './watchIntent.js';
 export * from './watchPreferences.js';
+// #325/#465 — the viewing record's pure rules (PRD `A66`).
+export * from './watched.js';
 // TASK-064 — new vs already-present, PER SERVICE (`specs/ai.md` §6.1, REQ-010).
 export * from './classify.js';
 export * from './copy.js';

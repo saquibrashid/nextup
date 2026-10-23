@@ -80,6 +80,7 @@ export async function resetDatabase(db = testPrisma()): Promise<void> {
     DELETE FROM removal_decision;
     DELETE FROM watch_intent;
     DELETE FROM watch_preference;
+    DELETE FROM watch_record;
     DELETE FROM title;
     DELETE FROM upload_batch;
   `);

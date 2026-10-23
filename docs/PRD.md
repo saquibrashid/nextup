@@ -109,6 +109,27 @@
 > **New in this document:** **US-065 / REQ-131** (Epic L), seven acceptance criteria. **Corrected in place:** US-043's out-of-scope line. **No migration** — the forecast is computed per request, so the order is applied in memory over the rows the waiting read already returns.
 ---
 
+> ## ⚠ AMENDMENT — 2026-10-25 — `A66` (owner-requested, #325 and #465): finishing a title is recorded separately from removing it
+
+> **The owner observed** (#465) that the only way to say "I watched this" was *Remove*, which tells nextup the title is gone for good, and (#325) that nothing remembers what was watched, when, or how it was liked. **Decision:** a **Finished watching** record, per movie and per TV-show season, with an optional date and an optional 1–5 star rating, in a *Recently watched* history. Finishing never removes anything on its own: when a movie, or a show's last aired season, is finished the owner is **asked** whether to take it off the Library, and nothing leaves without that confirmation.
+>
+> **Audit of existing support (#325 AC 1) — reused where it exists, otherwise a new relation.** `WatchIntent` `satisfied` means "now streaming on an owner service" (availability), so overloading it would make a finished title look like an available one. `Suppression` is "not interested" (rejection) and the removal log records a service dropping a title; both mean the opposite of "I watched and liked this". `Title.imdbRatingTenths` and the TMDB score are provider scores, not the owner's. `watch_preference` already survives removal and fix-match keyed by work identity, so the "set aside from the Library" flag lives there; nothing else records viewing or a personal rating, so `watch_record` is new.
+>
+> | Decision | What it changes | Kind |
+> |---|---|---|
+> | **1. One record per movie / per season** | `watch_record` is keyed by (owner, work identity, season number): season `0` is a movie (or a show TMDB cannot list), seasons `1`+ are TV seasons. Specials are never recorded and never count toward "all seasons". It holds `finished`, an optional `watched_on` date (unknown is allowed), an optional `rating` 1–5, and a title/year/type/poster snapshot so history still reads with no title row. A rewatch overwrites the date; no per-viewing history. | **Instruction** |
+> | **2. Never lost, never nagged** | A record is **never deleted**: *Not finished* clears the flag and keeps the date and rating. No reminder, no streak, no prompt to rate. | **Invariant** |
+> | **3. Keyed on work identity** | Not on a row id: a re-capture, a removal, a reappearance, a permanent delete of a title row or a fix-match cannot reset or duplicate it (fix-match carries the records exactly as it carries `watch_preference`; an existing destination record wins). | **Invariant** |
+> | **4. Per-season, TMDB-listed** | A show's seasons (number and air date) come from TMDB `/tv/{id}` inside the owner's request. Only aired seasons can be finished; a season added later is simply unwatched, so the show is no longer complete. *Mark all seasons finished* applies to the aired, not-yet-finished seasons. If TMDB cannot answer, the dialog says so and records nothing it cannot validate. | **Instruction** |
+> | **5. Ask, never automatic** | After a movie, or a show's last aired season, is finished, a confirm prompt offers *Remove from Library*. Confirming sets `watch_preference.library_hidden`; no listing is touched, so a re-capture finds the existing title and it stays off the list. It is **not** a removal (no removal-log entry), **not** a suppression, and *Return to Library* (or Waiting's *Add to Library*) reverses it. | **Instruction** |
+> | **6. REQ-041 item 19** | Setting a finished title aside (or returning it) is an owner-initiated list-state change, so §7.4 gains item 19 and `T-MUT-001e` now pins nineteen. Recording, editing and unfinishing change no list state and are registry entries with `changesListState: false`. | **Amendment** |
+> | **7. Additive migration** | `0023_watched_history` adds `watch_record` and `watch_preference.library_hidden`. It holds no destructive statement and needs no hash pin. No scheduler, no fifth process, no new dependency, no telemetry. | **Invariant** |
+> | **8. Not in scope** | Copy/share recommendation text, public profiles or links, multi-user; per-viewing history; Library-row progress chips (progress shows on the title details and in the dialog). | **Decision** |
+>
+> **New in this document:** **US-074 / REQ-140** (Epic L), eight acceptance criteria. **Amended in place:** §7.4 (item 19 and the count), `specs/api.md` §6.60–§6.64, `specs/data-model.md`, `specs/ui.md` §7d, `specs/testing.md` US-074; `T-MUT-001e` now expects nineteen.
+
+---
+
 > ## ⚠ AMENDMENT — 2026-10-24 — `A65` (owner-reported, #463): the left navigation is grouped into sections
 
 > **The owner observed** (#463) that the sidebar was one undifferentiated stack of nine links: *Availability changes* wrapped to two lines, the signed-in address broke mid-word, About sat between working destinations, and nothing said what belonged together. **Decision:** the sidebar and the Menu drawer list the same nine destinations in labelled sections. This is presentation only — no route, URL, label or behaviour changes.
@@ -2411,6 +2432,38 @@ opening Waiting — no scheduler, no fifth process, no list change without a tap
 **Out of scope:** automatic tracking on removal; tracking from the Library's remove dialog; per-season provider data (TMDB's is per show); notifying outside the app; offering a season whose date passed while it was never confirmed (it is shown as not announced until a later one is).
 **Open questions:** whether removal itself should prompt to track (kept as an explicit opt-in on the Removal history view for now).
 
+#### US-074 — Finished watching, per-season tracking and Recently watched (`A66`)
+
+**REQ-140 (`must`, owner-requested #325 and #465, `A66`).** The owner can record that
+they finished a movie or a TV-show season, with an optional date and an optional
+1–5 star rating of their own, and see those records in *Recently watched*.
+Finishing is separate from removing: nextup only *asks* whether to take a finished
+movie, or a show whose last aired season is finished, off the Library, and the
+owner confirms. The record is keyed by canonical work identity, survives
+re-capture, removal and fix-match, is never deleted, and no scheduler or nag is
+introduced.
+
+**As** the owner
+**I want** to mark what I finished, season by season for shows, and rate it
+**So that** I can see what I watched and how I liked it without losing the title from my records
+
+**Traces to:** REQ-140, REQ-041, REQ-071, REQ-028, REQ-129
+**Priority:** must
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | A movie (or any title that has no season list) | The owner chooses *Finished watching* in the row menu or on the details page | One record for the whole title is written with an optional date (or *date unknown*) and an optional rating; the Library is unchanged; *Not finished* clears the flag and keeps the date and rating; editing the date or rating updates the same record (no history of viewings). |
+| AC-2 | A TV show with seasons on TMDB | The owner opens the dialog | Aired seasons (never Specials) are listed with their finished state, date and rating; unaired seasons are disabled; *Mark selected seasons finished* and *Mark all seasons finished* write one record per season; a season that premieres later is simply unwatched; if TMDB cannot answer the dialog says so and writes nothing. |
+| AC-3 | A movie, or a show whose every aired season is now finished, is in the Library | The finish is recorded | The owner is asked *Also remove from your Library?*; only *Remove* sets it aside (no listing, suppression or removal-log row is written) and an *Undo* returns it; *Keep* changes nothing; nothing is ever set aside without that confirmation. |
+| AC-4 | A finished title | It is re-captured, removed, reappears, is deleted permanently, or is fix-matched | Its records are keyed by work identity so it is not resurrected as unwatched, an identity change carries the records (an existing destination record wins, none is duplicated), and a set-aside title stays off the combined list until the owner returns it. |
+| AC-5 | The owner opens *Recently watched* (`/watched`, History group of the left navigation) | It loads | Finished records are listed newest first (unknown dates last) with poster, title, season, date or *date unknown*, *Your rating* beside the community score, and whether it left the Library; it pages; each row can be edited, marked *Not finished* or returned to the Library; an empty history says so. |
+| AC-6 | An invalid input | A star rating outside 1–5, a non-calendar date, an unaired or unknown season, or another owner's title | It is refused (`400`/`404`) and nothing is written. |
+| AC-7 | The migration runs on an existing store | Rows exist | `0023_watched_history` is additive, rewrites no row and needs no pin; §7.4 item 19 is the only new list-state operation and no process beyond the four exists. |
+
+**Out of scope:** copy/share recommendation text; public profiles, links or multi-user; per-viewing history; progress chips on Library rows; automatic finishing; reminders to finish or to rate; reading Specials.
+**Open questions:** none.
+
 ### 7.4 Closed enumeration of permitted mutations (REQ-041)
 
 **Owner-initiated operations that may change user-visible list state — this list is closed:**
@@ -2452,6 +2505,13 @@ opening Waiting — no scheduler, no fifth process, no list change without a tap
     **each in its own transaction** with that item's guards; a refused row
     changes nothing and does not block the others. Destructive answers are
     confirmed first; every removal is restorable through item 4.
+19. Setting a finished title aside from the Library, or returning it (US-074
+    AC-3/AC-4, REQ-140, `A66`): one owner-confirmed route that flips
+    `watch_preference.library_hidden`. No listing, suppression or removal-log
+    row is written, so it is neither item 10 nor item 7, and it is reversed by
+    the same route. ~~Superseded at `A66`: "this list is closed" at eighteen
+    items.~~ Recording, editing and un-finishing a viewing record change no list
+    state and are `changesListState: false` registry entries.
 
 **Owner-initiated metadata refreshes — permitted, and NOT list-state mutations:**
 

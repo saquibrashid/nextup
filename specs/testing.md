@@ -27,6 +27,30 @@ Collected locations: `packages/domain/test/titleCategory.spec.ts`;
 `apps/web/test/titleDetails.spec.tsx`, `filterBar.spec.tsx`;
 `tests/e2e/titleDetails.spec.ts`.
 
+### US-074 — Finished watching, per-season tracking and Recently watched (TASK-297, #325, #465, `A66`)
+
+| AC | Level | Test IDs | Assertion |
+| --- | --- | --- | --- |
+| AC-1 | U/I | `T-VIEWED-001`, `T-VIEWED-040`, `T-VIEWED-042`, `T-VIEWED-090` | One whole-title record per movie; optional date and rating; edit updates the same record; unfinish keeps date and rating. |
+| AC-2 | U | `T-VIEWED-002`, `T-VIEWED-020`, `T-VIEWED-041` | Aired seasons only, Specials excluded, unaired refused, TMDB failure degrades and writes nothing. |
+| AC-3 | U/I | `T-VIEWED-043`, `T-VIEWED-090` | The set-aside route writes no listing, suppression or removal row and is reversible. |
+| AC-4 | U/I | `T-VIEWED-090` | Records survive re-capture and carry through fix-match without loss or duplication. |
+| AC-5 | U | `T-VIEWED-042` | History ordering, paging and fields. |
+| AC-6 | U | `T-VIEWED-001`, `T-VIEWED-040`, `T-VIEWED-041` | Invalid rating, date, season and unknown title are refused. |
+| AC-7 | S | `T-VIEWED-070` | Migration 0023 is additive and mirrored in the Prisma schema. |
+
+| Id | Level | Owner | Claim |
+|---|---|---|---|
+| **`T-VIEWED-001`** (`a`–`e`) | U | `TASK-297` | `packages/domain/test/watched.spec.ts`: request and patch parsing. |
+| **`T-VIEWED-002`** (`a`–`b`) | U | `TASK-297` | Same file: season progress and "all aired finished". |
+| **`T-VIEWED-020`** (`a`–`b`) | U | `TASK-297` | `apps/api/test/unit/clients/tmdbClient.spec.ts`: `getSeasons`. |
+| **`T-VIEWED-040`** (`a`–`e`) | U | `TASK-297` | `apps/api/test/unit/routes/watched.spec.ts`: `GET /api/titles/:id/watched`. |
+| **`T-VIEWED-041`** (`a`–`e`) | U | `TASK-297` | Same file: `POST /api/titles/:id/finished`. |
+| **`T-VIEWED-042`** (`a`–`d`) | U | `TASK-297` | Same file: edit, unfinish and `GET /api/watched`. |
+| **`T-VIEWED-043`** (`a`–`d`) | U | `TASK-297` | Same file: `POST /api/titles/:id/library-hidden`. |
+| **`T-VIEWED-070`** (`a`–`c`) | S | `TASK-297` | `tests/infra/watchedHistoryMigration.spec.ts` on `0023_watched_history`. |
+| **`T-VIEWED-090`** (`a`–`e`) | I | `TASK-297` | `apps/api/test/integration/watchRecords.spec.ts`: the repository against SQL Server. |
+
 ### US-073 — Grouped left navigation (TASK-295, TASK-296, #463, `A65`)
 
 | AC | Level | Test IDs | Assertion |

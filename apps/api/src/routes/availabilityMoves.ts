@@ -64,6 +64,7 @@ import {
   keepTitleAvailabilityChange,
   satisfyWaitingIntents,
 } from '../repository/watchIntents.js';
+import { setLibraryHidden } from '../repository/watchRecords.js';
 import { isAvailabilitySignature } from '../services/libraryAvailability.js';
 import { dateOnlyUtc } from './manualListEdits.js';
 import { toIsoDate } from './titles.js';
@@ -245,6 +246,8 @@ export async function promoteIntent(
     // The waiting intent ends HERE, in the same transaction as the listing
     // that satisfies it — never half-promoted.
     await satisfyWaitingIntents(ownerId, [workIdentity], now, tx);
+    // A finished show the owner brings back is in the Library again.
+    await setLibraryHidden(ownerId, workIdentity, false, tx);
     return { titleId, listingId, titleWasCreated };
   }).catch(duplicate(workIdentity, service));
 

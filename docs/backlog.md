@@ -753,6 +753,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-294` | `done` | The season panel and offers at 280 px in a real browser. Test id: `T-SEAS-080`. |
 | `TASK-295` | `done` | Grouped left navigation (#463, `A65`, US-073 / REQ-139): the sidebar and Menu drawer list the nine destinations in labelled sections with About in a footer section; rows never wrap; the signed-in address truncates with a tooltip. Test ids: `T-NAVG-001`, `T-NAVG-002`, `T-NAVG-003`, `T-NAVG-004`. |
 | `TASK-296` | `done` | The grouped sidebar and drawer in a real browser at 1280 px and 280 px. Test ids: `T-NAVG-020`, `T-NAVG-021`. |
+| `TASK-297` | `done` | Watched history data model and API (#325/#465, `A66`, US-074 / REQ-140): `watch_record` per work identity and season, `watch_preference.library_hidden`, TMDB season list, the finished/edit/unfinish/history/library-hidden routes, fix-match carry, REQ-041 item 19. Test ids: `T-VIEWED-001`, `T-VIEWED-002`, `T-VIEWED-020`, `T-VIEWED-040`, `T-VIEWED-041`, `T-VIEWED-042`, `T-VIEWED-043`, `T-VIEWED-070`, `T-VIEWED-090`. |
 <!-- STATUS-LEDGER:END -->
 
 ### Approved availability moves (#397/#410), 2026-09-29
@@ -808,6 +809,7 @@ TASK-265."~~
 | TASK-294 | The season panel and offers at 280 px in a real browser. | 1 agent-run + 5 owner-review-minutes | TASK-293 | `T-SEAS-080` |
 | TASK-295 | Grouped left navigation (PRD `A65`, US-073 / REQ-139): sections *Library*, *Capture*, *History*, *Tools* and a footer *Help* (About) in the sidebar and the Menu drawer, each a list named by its heading; no label wraps; the signed-in address truncates with a `title` tooltip. No route, label or behaviour changes, no counts. | 1 agent-run + 10 owner-review-minutes | TASK-294 | `T-NAVG-001`; `T-NAVG-002`; `T-NAVG-003`; `T-NAVG-004`; `T-UX-167`, `T-UX-132`, `T-NAV-003` still pass as amended |
 | TASK-296 | The grouped sidebar and drawer in a real browser at 1280 px and 280 px. | 1 agent-run + 5 owner-review-minutes | TASK-295 | `T-NAVG-020`; `T-NAVG-021` |
+| TASK-297 | Watched history data model and API: `watch_record`, `library_hidden`, TMDB seasons, routes, fix-match carry, REQ-041 item 19 (US-074). | 2 agent-runs + 20 owner-review-minutes | TASK-296 | `T-VIEWED-001`; `T-VIEWED-002`; `T-VIEWED-020`; `T-VIEWED-040`; `T-VIEWED-041`; `T-VIEWED-042`; `T-VIEWED-043`; `T-VIEWED-070`; `T-VIEWED-090` |
 
 ### Approved waiting sort and Grid alignment (`A56`, #415, #414), 2026-10-08
 

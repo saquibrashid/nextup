@@ -2718,6 +2718,38 @@ season columns; a failed lookup writes nothing and the response is still 200.
 `GET /api/availability/review` omits a waiting row whose season date is in the future
 from `nowStreaming`.
 
+### 6.60 `GET /api/titles/:titleId/watched` (US-074, `A66`)
+
+`200 { titleId, workIdentity, mediaType, inLibrary, hidden, perSeason, seasonsUnavailable,
+seasons: [{ seasonNumber, airDate, aired, finished, watchedOn, rating }], allAiredFinished,
+whole }`. `whole` is the season-0 record (`{ finished, watchedOn, rating } | null`). A matched
+TV show lists TMDB seasons 1+ (Specials excluded); if TMDB cannot answer,
+`seasonsUnavailable` is true and the seasons are the recorded ones. `404` unknown title.
+
+### 6.61 `POST /api/titles/:titleId/finished` (US-074, `A66`)
+
+Body `{ seasons: number[], watchedOn?: "YYYY-MM-DD" | null, rating?: 1..5 | null }`. A movie or
+unmatched title requires exactly `[0]`; a matched show requires aired seasons ≥ 1 (validation is
+skipped, not failed, when TMDB is down). One record per season is written (a rewatch overwrites
+the date). `200` with the §6.60 body; `400 VALIDATION_FAILED`; `404`. Changes no list state.
+
+### 6.62 `PATCH /api/watched/:workIdentity/:seasonNumber` and `POST …/unfinish` (US-074, `A66`)
+
+PATCH `{ watchedOn?, rating? }` edits the existing record; unfinish sets `finished = false` and
+keeps the date and rating (a record is never deleted). `404` when no record exists.
+
+### 6.63 `GET /api/watched?limit&cursor` (US-074, `A66`)
+
+`200 { items: [{ workIdentity, seasonNumber, finished, watchedOn, rating, titleName, releaseYear,
+mediaType, posterPath, titleId, imdbRatingTenths, leftLibrary }], nextCursor, limit }`, finished
+records newest first (`watchedOn` descending, unknown last, then last update).
+
+### 6.64 `POST /api/titles/:titleId/library-hidden` (US-074, `A66`, REQ-041 item 19)
+
+Body `{ hidden: boolean }`. `hidden: true` sets the title aside (requires an active title with a
+visible listing, else `409 TITLE_NOT_ACTIVE`); `hidden: false` returns it. Flips
+`watch_preference.library_hidden` only: no listing, suppression or removal-log row is written.
+
 ---
 
 ## 7. Status-code policy

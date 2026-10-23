@@ -76,6 +76,11 @@ vi.mock('../../../src/repository/watchIntents.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../../../src/repository/watchRecords.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/repository/watchRecords.js')>();
+  return { ...actual, setLibraryHidden: vi.fn().mockResolvedValue(undefined) };
+});
+
 const { createApp } = await import('../../../src/app.js');
 const { CLIENT_PRINCIPAL_HEADER } = await import('../../../src/auth/principal.js');
 const { resetAllowListWarning } = await import('../../../src/middleware/allowList.js');

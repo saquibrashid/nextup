@@ -241,7 +241,7 @@ export async function addSearchWaitingIntent(
 ): Promise<{ intentId: string; titleId: string; titleWasCreated: boolean }> {
   return await runInTransaction(async (tx) => {
     // Sequential: one transaction is one connection.
-    const listed = await listListedWorkIdentities(ownerId, tx);
+    const listed = await listListedWorkIdentities(ownerId, tx, { visibleOnly: true });
     const waiting = await listWaitingWorkIdentities(ownerId, tx);
     // US-040 AC-5, on this path too: a work already in the library is not
     // something to wait for. Refused, never doubled (#378 acceptance).

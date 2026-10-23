@@ -57,6 +57,11 @@ vi.mock('../../../src/repository/ownerData.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../../../src/repository/watchRecords.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/repository/watchRecords.js')>();
+  return { ...actual, carryWatchRecords: vi.fn().mockResolvedValue(undefined) };
+});
+
 vi.mock('../../../src/clients/tmdbClient.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/clients/tmdbClient.js')>();
   return {

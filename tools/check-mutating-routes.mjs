@@ -2,7 +2,7 @@
  * Mutating-route registry vs the REQ-041 closed enumeration
  * (TASK-121 — `T-MUT-001`, `T-MUT-002`).
  *
- * **REQ-041 is a CLOSED list.** PRD §7.4 enumerates exactly eighteen owner-
+ * **REQ-041 is a CLOSED list.** PRD §7.4 enumerates exactly nineteen owner-
  * initiated operations that may change user-visible list state, and exactly
  * four non-owner processes that may exist at all — none of which changes
  * list state. *"Anything not on these lists is forbidden by default. REQ-041
@@ -40,8 +40,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /**
- * PRD §7.4 — the eighteen owner-initiated operations that may change
+ * PRD §7.4 — the nineteen owner-initiated operations that may change
  * user-visible list state. **This list is closed.**
+ *
+ * Item 19 was added at `A66` (US-074, #325/#465): setting a FINISHED title
+ * aside from the Library, or returning it, one route, only after the owner
+ * confirms. It hides the work with a flag on the choice row; no listing, no
+ * suppression and no removal-log entry is written.
+ * ~~Superseded at `A66`: "the eighteen owner-initiated operations."~~
  *
  * Item 18 was added at `A55` (2026-10-07, owner-approved, US-064): one answer
  * from the "Availability changes" screen applied to several rows. Each row is
@@ -147,6 +153,12 @@ export const REQ_041_OPERATIONS = [
     op: 'apply-availability-review',
     story: 'US-064',
     what: 'Applying one availability answer (keep, remove badges that left, move to Waiting, add to Library) to several selected rows, each in its own transaction',
+  },
+  {
+    id: 19,
+    op: 'finished-watching-library',
+    story: 'US-074',
+    what: 'Setting a finished title aside from the Library (or returning it), only after the owner confirms; the listings and the viewing record are untouched',
   },
 ];
 
@@ -302,6 +314,12 @@ export const MUTATING_ROUTE_REGISTRY = [
   },
   {
     method: 'POST',
+    path: '/api/titles/:titleId/library-hidden',
+    changesListState: true,
+    op: 'finished-watching-library',
+  },
+  {
+    method: 'POST',
     path: '/api/suppressions/:suppressionId/unsuppress',
     changesListState: true,
     op: 'unsuppress',
@@ -349,6 +367,24 @@ export const MUTATING_ROUTE_REGISTRY = [
     path: '/api/titles/:titleId/new-season-tracking',
     changesListState: false,
     why: "records the owner opt-in and may open a Waiting entry for a removed TV show; the title stays `removed` and never joins the list — Waiting's own Add to Library returns it (#454, US-072)",
+  },
+  {
+    method: 'POST',
+    path: '/api/titles/:titleId/finished',
+    changesListState: false,
+    why: 'records that the owner finished a movie or seasons; the Library is untouched — only the confirmed leave-library route sets a title aside (#325, #465, US-074)',
+  },
+  {
+    method: 'PATCH',
+    path: '/api/watched/:workIdentity/:seasonNumber',
+    changesListState: false,
+    why: 'edits the date or star rating of a viewing record; no list effect (US-074)',
+  },
+  {
+    method: 'POST',
+    path: '/api/watched/:workIdentity/:seasonNumber/unfinish',
+    changesListState: false,
+    why: 'clears the finished flag and keeps the date and rating; no list effect (US-074)',
   },
   {
     method: 'POST',
@@ -627,9 +663,9 @@ export function checkRegistryAgainstReq041(registry = MUTATING_ROUTE_REGISTRY) {
   // ⚠ The literal is the CLOSEDNESS, restated where a widening would be made.
   // ~~Superseded: 8, before US-047/US-048 added the manual add and removal.~~
   // Changing it is an amendment to PRD §7.4, not a build fix.
-  if (REQ_041_OPERATIONS.length !== 18) {
+  if (REQ_041_OPERATIONS.length !== 19) {
     findings.push(
-      `REQ-041 §7.4 enumerates 18 owner-initiated operations; this list has ${REQ_041_OPERATIONS.length}. The list is CLOSED (T-MUT-001).`,
+      `REQ-041 §7.4 enumerates 19 owner-initiated operations; this list has ${REQ_041_OPERATIONS.length}. The list is CLOSED (T-MUT-001).`,
     );
   }
 
