@@ -2,7 +2,7 @@
 
 **Project:** nextup
 **Version:** Current v1 scope, including subsequent owner-approved promotions; remaining deferrals are in §11.2.
-**Status:** Approved scope with recorded amendments through US-071 / REQ-137 (`A62`). ~~"through US-070 / REQ-136 (`A61`)"~~ ~~"through US-069 / REQ-135 (`A60`)"~~ ~~"through US-068 / REQ-134 (`A59`)"~~ ~~"through US-067 / REQ-133 (`A58`)"~~ ~~"through US-066 / REQ-132 (`A57`)"~~ ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
+**Status:** Approved scope with recorded amendments through US-071 / REQ-137 (`A63` amends US-070). ~~"through US-071 / REQ-137 (`A62`)"~~ ~~"through US-070 / REQ-136 (`A61`)"~~ ~~"through US-069 / REQ-135 (`A60`)"~~ ~~"through US-068 / REQ-134 (`A59`)"~~ ~~"through US-067 / REQ-133 (`A58`)"~~ ~~"through US-066 / REQ-132 (`A57`)"~~ ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
 **Inputs:** `docs/BRD.md`, the recorded owner decisions in the ADRs, and the original authoring-tree `Context/` documents. **The `Context/` tree is not supplied in this repository.** Its citations preserve provenance, not an instruction to invent missing source text. See `docs/current-release.md` for the owner decisions applied on 2026-09-17 and `docs/requirement-index.md` for reconciled reference authority.
 **Audience:** the implementer. Implementation will be performed by GitHub Copilot in autopilot mode (ASM-028, ASM-029, NFR-002, NFR-003, NFR-004). This document, together with the specs, IS the implementation input. Acceptance criteria are written to be executable and verifiable without asking a question.
 **No timeline.** Per A19 / ASM-027 this document contains no dates, durations, or sequencing commitments beyond dependency order.
@@ -109,6 +109,19 @@
 > **New in this document:** **US-065 / REQ-131** (Epic L), seven acceptance criteria. **Corrected in place:** US-043's out-of-scope line. **No migration** — the forecast is computed per request, so the order is applied in memory over the rows the waiting read already returns.
 ---
 
+> ## ⚠ AMENDMENT — 2026-10-23 — `A63` (owner feedback on #457): the Waiting add lookup opens in a modal dialog, not an inline panel
+>
+> **The owner observed** that the Waiting page's *Add title* button expanded an inline panel under itself, whereas the Library's *Add title* opens a modal dialog. **Decision:** the Waiting lookup opens in the same modal `Dialog` shell the Library add uses.
+>
+> | Decision | What it changes | Kind |
+> |---|---|---|
+> | **1. Modal, not inline** | *Add title* has `aria-haspopup="dialog"` and opens a `role="dialog"` `aria-modal` dialog named *Add a title to wait for*, holding the lookup field, its submit, a close button and the shared result rows. ~~It toggled `aria-expanded` and expanded an inline panel under the button.~~ Focus moves to the field; Escape, the close button or a backdrop press close it; focus returns to *Add title*; the background is inert and page scroll is locked (the shared `ui/Dialog` contract, `T-A11Y-006`, `T-UI-031f`). | **Instruction** |
+> | **2. After an add** | A successful add closes the dialog, returns focus to *Add title* and announces *Added to Waiting to stream: {name}* (`role="status"`) on the page. A refusal stays in the dialog as an alert and the result stays. | **Instruction** |
+> | **3. Unchanged** | Nothing is added until the owner presses the row's *Wait for it*; shared rows, API shape, caps and the four-process list are as at `A61`. No dependency, scheduler, telemetry or migration. | **Invariant** |
+>
+> **Amended in place:** US-070 / REQ-136, `specs/ui.md` §7b, `specs/ux-states.md` §3.13, `specs/testing.md` US-070. No ADR changes.
+
+---
 > ## ⚠ AMENDMENT — 2026-10-22 — `A61` (owner-requested, #457): the Waiting add is an explicit Add (+) button, and lookup results show poster, genres, lead cast and an overview
 >
 > **The owner observed** that the Waiting-to-stream page entered the add flow through a control labelled *Search*, which normally filters what is already on a page, and that lookup results showed only a name and year, so similar titles could not be told apart. **Decision:** an explicit *Add title* (+) control, and richer result rows shared with the Library's *Add title*.
@@ -1734,7 +1747,7 @@ adds a title through an explicit **Add title (+)** button, not a *Search*
 control, because search reads as filtering the page. Lookup results show enough
 to tell similar titles apart — a small poster, genres, lead actors, type, year
 and a short overview — on the Waiting add and on the Library's *Add title*
-alike. Nothing is added until the owner confirms a row.
+alike. Nothing is added until the owner confirms a row. The lookup opens in a modal dialog like the Library's *Add title* (A63); ~~it expands as an inline panel under the button~~.
 
 **As** the owner
 **I want** a clear Add button and results I can tell apart

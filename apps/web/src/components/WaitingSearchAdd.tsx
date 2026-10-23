@@ -5,14 +5,16 @@
 // list is still entered only by a capture (US-042 AC-3). The button therefore
 // says "Wait for it", never "Add". #457: the entry point IS an explicit Add (+)
 // control (not a "Search" that reads as a list filter); it only opens the lookup.
+// A63: the lookup opens in the shared modal Dialog, like Library's Add title.
 //
 // ⚠ A refusal is an ANSWER, not a failure. "Already waiting", "already in
 // your library" and "not interested" each say which fact stopped it, so the
 // owner is never left wondering whether pressing again would help.
 
-import { useEffect, useId, useState, type FormEvent, type JSX } from 'react';
+import { useId, useRef, useState, type FormEvent, type JSX } from 'react';
 
 import {
+  WAITING_ADD_CLOSE_LABEL,
   WAITING_ADD_OPEN,
   WAITING_SEARCH_ACTION,
   WAITING_SEARCH_ADD,
@@ -29,8 +31,9 @@ import {
 } from '../copy';
 import { ApiError, type TmdbSearchResult } from '../lib/apiClient';
 import { Button } from './ui/Button';
+import { Dialog } from './ui/Dialog';
 import { Input } from './ui/Input';
-import { PlusIcon, SearchIcon } from './icons';
+import { CloseIcon, PlusIcon, SearchIcon } from './icons';
 import { TitleSearchResults, type TitleSearchResultTestIds } from './TitleSearchResults';
 
 const WAITING_RESULT_TEST_IDS: TitleSearchResultTestIds = {
@@ -82,11 +85,8 @@ export function WaitingSearchAdd({
   const [outcome, setOutcome] = useState<{ tone: 'status' | 'alert'; text: string } | null>(null);
   const [open, setOpen] = useState(false);
   const inputId = useId();
-  const panelId = useId();
-
-  useEffect(() => {
-    if (open) document.getElementById(inputId)?.focus();
-  }, [open, inputId]);
+  const headingId = useId();
+  const trigger = useRef<HTMLButtonElement | null>(null);
 
   function search(event: FormEvent): void {
     event.preventDefault();
@@ -119,6 +119,10 @@ export function WaitingSearchAdd({
     );
   }
 
+  function close(): void {
+    if (pending === null) setOpen(false);
+  }
+
   return (
     <section
       className="waiting-search"
@@ -126,47 +130,62 @@ export function WaitingSearchAdd({
       aria-label={WAITING_SEARCH_LEGEND}
     >
       <Button
+        ref={trigger}
         variant="secondary"
         data-testid="waiting-add-open"
-        aria-expanded={open}
-        aria-controls={panelId}
+        aria-haspopup="dialog"
         disabled={offline}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => setOpen(true)}
       >
         <PlusIcon />
         <span>{WAITING_ADD_OPEN}</span>
       </Button>
       {open && (
-        <div id={panelId} className="waiting-search__panel" data-testid="waiting-add-panel">
-          {/*
-        #382 — Library's search field: a rounded field with the search icon as
-        its submit. The label stays in the DOM (visually hidden) so the input
-        keeps a real accessible name rather than relying on the placeholder.
-      */}
-          <form className="waiting-search__form" onSubmit={search} role="search">
-            <label className="sr-only" htmlFor={inputId}>
-              {WAITING_SEARCH_LABEL}
-            </label>
-            <span className="list-search__control waiting-search__control">
+        <Dialog onDismiss={close} returnFocus={trigger} aria-labelledby={headingId}>
+          <div className="title-search-head" data-testid="waiting-add-panel">
+            <div className="panel-head">
+              <h2 id={headingId}>{WAITING_SEARCH_LEGEND}</h2>
               <Button
-                type="submit"
                 variant="ghost"
-                aria-label={WAITING_SEARCH_ACTION}
-                data-testid="waiting-search-submit"
-                disabled={offline}
+                aria-label={WAITING_ADD_CLOSE_LABEL}
+                data-testid="waiting-add-close"
+                disabled={pending !== null}
+                onClick={close}
               >
-                <SearchIcon />
+                <CloseIcon />
               </Button>
-              <Input
-                id={inputId}
-                type="search"
-                value={query}
-                placeholder={WAITING_SEARCH_LABEL}
-                data-testid="waiting-search-input"
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </span>
-          </form>
+            </div>
+            {/*
+              #382 — Library's search field: a rounded field with the search icon as
+              its submit. The label stays in the DOM (visually hidden) so the input
+              keeps a real accessible name rather than relying on the placeholder.
+            */}
+            <form className="waiting-search__form" onSubmit={search} role="search">
+              <label className="sr-only" htmlFor={inputId}>
+                {WAITING_SEARCH_LABEL}
+              </label>
+              <span className="list-search__control waiting-search__control">
+                <Button
+                  type="submit"
+                  variant="ghost"
+                  aria-label={WAITING_SEARCH_ACTION}
+                  data-testid="waiting-search-submit"
+                  disabled={offline}
+                >
+                  <SearchIcon />
+                </Button>
+                <Input
+                  id={inputId}
+                  type="search"
+                  value={query}
+                  placeholder={WAITING_SEARCH_LABEL}
+                  data-testid="waiting-search-input"
+                  data-dialog-initial-focus=""
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </span>
+            </form>
+          </div>
 
           {phase.kind === 'searching' && <p role="status">{WAITING_SEARCH_SEARCHING}</p>}
           {phase.kind === 'unavailable' && <p role="alert">{WAITING_SEARCH_UNAVAILABLE}</p>}
@@ -184,10 +203,15 @@ export function WaitingSearchAdd({
               testIds={WAITING_RESULT_TEST_IDS}
             />
           )}
-        </div>
-      )}{' '}
-      {outcome !== null && (
-        <p role={outcome.tone} data-testid="waiting-search-outcome">
+          {outcome?.tone === 'alert' && (
+            <p role="alert" data-testid="waiting-search-outcome">
+              {outcome.text}
+            </p>
+          )}
+        </Dialog>
+      )}
+      {outcome?.tone === 'status' && (
+        <p role="status" data-testid="waiting-search-outcome">
           {outcome.text}
         </p>
       )}

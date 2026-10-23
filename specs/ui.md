@@ -1346,8 +1346,11 @@ and forecast logic, and the API are unchanged.
   the helper as its subtitle (`WAITING_SUBTITLE`). The search box has no heading
   of its own; its landmark is named *"Add a title to wait for"* (~~*"Wait for a title"*~~).
 - **Add (`A61`, #457)** is an explicit *Add title* button with the Library's plus
-  icon (`aria-expanded`); there is no always-visible *Search*, because search
-  reads as filtering the page. It opens Library's rounded lookup field with the
+  icon (`aria-haspopup="dialog"`, ~~`aria-expanded`~~); there is no always-visible *Search*, because search
+  reads as filtering the page. At A63 it opens a modal `Dialog` (the shared `ui/Dialog` shell,
+  ~~an inline panel~~) named *Add a title to wait for* with a close button; focus moves to the field
+  and returns to the button on close or after an add, the background is inert, and
+  a successful add is announced on the page. The dialog holds Library's rounded lookup field with the
   search icon as its submit (accessible name *Look up*, ~~*Search*~~), a visually
   hidden label and a placeholder. Results are the shared `TitleSearchResults`
   rows: small poster (neutral placeholder if none), name, year, type, genres,

@@ -170,12 +170,12 @@ Collected locations: `apps/api/test/unit/routes/availabilityRecheck.spec.ts`,
 | **`T-ADDINF-010`–`016`** | C | `TASK-283` | The dialog, through `ListPage`, in `apps/web/test/addTitleInfer.spec.tsx`. |
 | **`T-ADDINF-020`** (`a`–`c`) | I | `TASK-282` | Against the real store, in `apps/api/test/integration/manualListEdits.spec.ts`: multi-service writes one row, Waiting writes an intent and no listing, no destination writes nothing unconfirmed. |
 
-### US-070 — Waiting add: explicit Add button and richer results (TASK-284 – TASK-287, #457, `A61`)
+### US-070 — Waiting add: explicit Add button and richer results (TASK-284 – TASK-287, #457, `A61`; modal dialog TASK-290 – TASK-291, `A63`)
 
 | AC | Level | Test IDs | Assertion |
 | --- | --- | --- | --- |
 | AC-1 | C | `T-WADD-010a`, `T-WADD-010b` | An *Add title* button with a plus icon is present and nothing is looked up until pressed; no control or field is named *Search*. |
-| AC-2 | C | `T-WADD-010c`, `T-WADD-010d` | Pressing it opens the lookup focused and toggles `aria-expanded`; nothing is added until a result's action is pressed, then the panel closes. |
+| AC-2 | C | `T-WADD-010c`, `T-WADD-010d` | Pressing it opens the lookup dialog focused (`aria-haspopup="dialog"`, ~~toggles `aria-expanded`~~); nothing is added until a result's action is pressed, then the dialog closes. |
 | AC-3 | C | `T-WADD-011a`, `T-WADD-011c`, `T-WADD-011d`, `T-WADD-020` | Rows show type, year, genres, lead cast and overview; a missing field is absent; the Waiting add uses the shared rows; the rows fit at 280 px. |
 | AC-4 | C | `T-WADD-011b`, `T-WADD-011c` | The poster is decorative (`alt=""`) from the cards' image host; no poster gives the neutral placeholder. |
 | AC-5 | U/C | `T-WADD-001a`–`T-WADD-001d`, `T-WADD-002a`–`T-WADD-002c`, `T-WADD-012a`, `T-WADD-012b` | `overview`/`genres`/`cast` are optional and additive, matching keeps its allow-list; cast is fetched for at most 8 rows and a failing credits call never fails the search; the action is a button described by title, year and type and is chosen by keyboard. |
@@ -188,6 +188,8 @@ Collected locations: `apps/api/test/unit/routes/availabilityRecheck.spec.ts`,
 | **`T-WADD-011`** (`a`–`d`) | C | `TASK-285` | The shared rows: fields, poster, placeholder, omitted fields, in the same file. |
 | **`T-WADD-012`** (`a`–`b`) | C | `TASK-285` | The action's description and keyboard selection, in the same file. |
 | **`T-WADD-020`** | E | `TASK-287` | The Waiting add at 280 px, in `tests/e2e/waiting.spec.ts`. |
+| **`T-WADM-001`** (`a`–`e`) | C | `TASK-290` | The Add flow is a named modal dialog: focus in, background inert, Escape, backdrop, close button, add closes and returns focus, in `apps/web/test/waitingAdd.spec.tsx`. |
+| **`T-WADM-020`** | E | `TASK-291` | At 280 px the lookup dialog fits, closes on Escape and backdrop and returns focus, in `tests/e2e/waiting.spec.ts`. |
 ### US-065 — Ordering on Waiting to stream (TASK-269 – TASK-270, #415, `A56`), and row-aligned Grid cards (TASK-271, #414)
 
 | AC | Level | Test IDs | Assertion |
@@ -1225,6 +1227,7 @@ Levels: **U** unit · **I** integration · **C** component · **E** e2e ·
 | AC-2 | E | `T-AUTH-002` | Sign-in completes; deep link preserved; lands on the combined list |
 | AC-3 | S | `T-SEC-011` | No auth library, no password field, no credential column anywhere |
 | AC-4 | I/E | **`T-SEC-010` `T-SEC-017` `T-SEC-018`** | Allow-listed-out principal → 403 on every route; browser shows refusal; no `/api/titles` 200 in the network log |
+| AC-6 | C/E | `T-WADM-001a`–`T-WADM-001e`, `T-WADM-020` | (`A63`) The lookup is a named modal dialog: focus enters and returns to *Add title*, Escape/backdrop/close dismiss it, the background is inert, an add closes it and announces the result, and it fits at 280 px. |
 | AC-5 | C | `T-UX-019` | IdP failure renders the sign-in-again state; no partial app UI |
 | AC-6 | E | `T-AUTH-003` | Returning within session lifetime does not re-prompt; expiry yields the 401 state |
 
@@ -1468,6 +1471,7 @@ ends up unmapped.
 | AC-2 | I | `T-LIST-011` | Two active listings → two badges on one row |
 | AC-3 | I | `T-LIST-012` | A removed listing's badge is absent |
 | AC-4 | I | `T-LIST-013` | A work with no active listings has no row |
+| AC-6 | C/E | `T-WADM-001a`–`T-WADM-001e`, `T-WADM-020` | (`A63`) The lookup is a named modal dialog: focus enters and returns to *Add title*, Escape/backdrop/close dismiss it, the background is inert, an add closes it and announces the result, and it fits at 280 px. |
 | AC-5 | C | `T-UI-010`, `T-UI-012` | The row shows poster, name, type, year, date-added label and badges, with no service-level or direct-title launch links (owner decision 2026-09-17). `T-UI-012b` rejects streaming URLs and `d` permits only the TMDB poster as a remote row URL. |
 | AC-6 | I | `T-LIST-019` | The same work confirmed in two batches for two services yields one row, two badges |
 | AC-7 | C | `T-UX-012`/`T-UX-014` | Two distinct empty states: never-uploaded vs everything-removed |
@@ -1480,6 +1484,7 @@ ends up unmapped.
 | AC-2 | I | `T-LIST-021` | Type filter |
 | AC-3 | I | `T-LIST-022` | Genre filter |
 | AC-4 | I/C | `T-LIST-023`, `T-UI-016`, `T-UX-139`, `T-UX-144` | AND across dimensions, OR within a dimension; labelled dropdown fields expose current selections, and URL-driven pickers/chips preserve unrelated selections and ordering |
+| AC-6 | C/E | `T-WADM-001a`–`T-WADM-001e`, `T-WADM-020` | (`A63`) The lookup is a named modal dialog: focus enters and returns to *Add title*, Escape/backdrop/close dismiss it, the background is inert, an add closes it and announces the result, and it fits at 280 px. |
 | AC-5 | C | `T-UX-013`, `T-UX-139` | Zero-match is distinct from an empty library; chips remain visible with nonzero results, each removes only its dimension/value, and Clear filters removes dimensions plus q without resetting sort/view |
 | AC-6 | I | **`T-LIST-024`** | A title with `genres: []` is excluded from genre-filtered results and included when unfiltered; never defaulted |
 | AC-7 | E | `T-A11Y-001` | Filters fully operable at 320 px with no horizontal scroll |
@@ -1511,6 +1516,7 @@ ends up unmapped.
 | AC-1 | I/C | `T-FRESH-010`, `T-UX-143` | Service updates exposes each factual last-completed date and service-preselected upload link |
 | AC-3 | I/C | `T-FRESH-012` | Opening Service updates shows "never updated", not an error |
 | AC-4 | I | `T-FRESH-013` | Abandoned/failed batches never update `serviceState` |
+| AC-6 | C/E | `T-WADM-001a`–`T-WADM-001e`, `T-WADM-020` | (`A63`) The lookup is a named modal dialog: focus enters and returns to *Add title*, Escape/backdrop/close dismiss it, the background is inert, an add closes it and announces the result, and it fits at 280 px. |
 | AC-5 | C | `T-FRESH-014`, `T-UX-143` | If dates cannot be computed, the list renders and degradation remains visible outside the closed disclosure; every service link is still reachable inside |
 | — | U | **`T-FRESH-015`** | **A46 regression guard:** the freshness labels state a FACT and never nag |
 
@@ -1612,6 +1618,7 @@ age — a threshold cannot be reintroduced without a visible failure.)*
 | AC-2 | I | `T-SUP-021` | Un-suppress sets `active: false`; the document is **not** deleted |
 | AC-3 | I | `T-SUP-022` | Un-suppressing a work with active listings makes the row visible again |
 | AC-4 | I/C | **`T-SUP-023`** | Un-suppressing a work whose listings are all removed restores **nothing**; the copy says so |
+| AC-6 | C/E | `T-WADM-001a`–`T-WADM-001e`, `T-WADM-020` | (`A63`) The lookup is a named modal dialog: focus enters and returns to *Add title*, Escape/backdrop/close dismiss it, the background is inert, an add closes it and announces the result, and it fits at 280 px. |
 | AC-5 | C | `T-UX-022` | An undo affordance is offered immediately after suppressing |
 | AC-6 | C | `T-UX-085` | Load failure renders an error, not an empty list |
 

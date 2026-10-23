@@ -2873,15 +2873,8 @@ button {
   gap: var(--space-2);
 }
 
-.waiting-search__panel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  max-width: 36rem;
-}
-
 .waiting-search__form {
-  max-width: 36rem;
+  min-width: 0;
 }
 
 /* Library's search field (`.list-search__control`), as a rounded pill. */
@@ -2892,9 +2885,6 @@ button {
   width: 100%;
 }
 
-.waiting-search .title-search-results {
-  max-width: 36rem;
-}
 .title-row--skeleton,
 .suppressed-row--skeleton,
 .removed-row--skeleton,
