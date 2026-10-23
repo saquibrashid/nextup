@@ -53,6 +53,23 @@ export const EXCEPTIONS = [
       'not unfixed. npm\u2019s suggested "fix" is a DOWNGRADE to prisma 6.12.0 ' +
       'from the installed 6.19.3 and must not be taken.',
   },
+  {
+    id: 'GHSA-27r3-jxmh-p828',
+    package: 'body-parser',
+    accepted: '2026-10-23',
+    reason:
+      'Process crash when a request with a Content-Encoding (e.g. gzip) body carries ' +
+      'trailing bytes after one valid compressed frame. Fixed in body-parser 2.4.0, ' +
+      'which is not yet published to the registry we install from (2.3.0 is the ' +
+      'latest there), so the finding is unfixable today, not unfixed. It cannot ' +
+      'hurt this product: body parsing is mounted AFTER authentication, so an ' +
+      'anonymous caller is refused with a 401 before any body is read; only the ' +
+      'single allow-listed owner behind Easy Auth reaches it, and the owner has ' +
+      'no reason to send a compressed body. The advisory\u2019s own workaround is ' +
+      'applied as well: express.json is mounted with inflate: false, so an encoded ' +
+      'request is rejected before a decompression stream is created. Remove this ' +
+      'entry once body-parser >= 2.4.0 is installable (the gate fails when stale).',
+  },
 ];
 
 function runAudit() {

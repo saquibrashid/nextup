@@ -246,7 +246,9 @@ export function mountApi(app: Express, readPrincipal: PrincipalReader): void {
   // caller's body is never buffered or parsed, so an unauthenticated request
   // costs nothing beyond the 401. `express.json()` only claims
   // `application/json`, so the multipart image route (§6.12) is untouched.
-  app.use('/api', express.json({ limit: JSON_BODY_LIMIT }));
+  // `inflate: false` refuses any `Content-Encoding` body before a decompression
+  // stream exists (GHSA-27r3-jxmh-p828); the web client never compresses one.
+  app.use('/api', express.json({ limit: JSON_BODY_LIMIT, inflate: false }));
   app.use('/api', mapBodyParserError);
 
   app.use('/api', createApiRouter());
