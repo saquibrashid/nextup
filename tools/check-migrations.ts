@@ -25,7 +25,9 @@
 // it exactly as dropping one does, just reversibly. 0020 is the one file
 // pinned to hold such a line — it disables `ck_batch_source_exclusive` only
 // after installing `ck_batch_source_kind`, its trusted superset, WITH CHECK
-// (ADR-0010 Revision 6). No DROP is involved.
+// (ADR-0010 Revision 6). No DROP is involved. #456's 0021 is pinned the same
+// way: it disables ck_watch_preference_category only after installing its
+// superset ck_watch_preference_category_v2 WITH CHECK.
 
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
@@ -67,6 +69,14 @@ const PINNED_EXCEPTIONS: readonly PinnedException[] = [
     sha256: '751deff4c548ee53e001411e1104374737acbaeeb7ff951fe9b4da4a1e23e6f8',
     allowed: new Set([
       'ALTER TABLE [dbo].[upload_batch] NOCHECK CONSTRAINT [ck_batch_source_exclusive];',
+    ]),
+  },
+  {
+    label: 'documentary category',
+    path: 'prisma/migrations/0021_documentary_category/migration.sql',
+    sha256: '61d2f5ca37bde9b72c420384d6fbbd38b4c2b0b033d20c7d4462d66925b62517',
+    allowed: new Set([
+      'ALTER TABLE [dbo].[watch_preference] NOCHECK CONSTRAINT [ck_watch_preference_category];',
     ]),
   },
 ];

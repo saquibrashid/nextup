@@ -1,9 +1,10 @@
-export const TITLE_CATEGORIES = ['movie', 'tv', 'comedy-show'] as const;
+export const TITLE_CATEGORIES = ['movie', 'tv', 'comedy-show', 'documentary'] as const;
 export type TitleCategory = (typeof TITLE_CATEGORIES)[number];
 export const TITLE_CATEGORY_LABELS: Record<TitleCategory, string> = {
   movie: 'Movie',
   tv: 'TV Show',
   'comedy-show': 'Comedy Show',
+  documentary: 'Documentary',
 };
 
 export function isTitleCategory(value: unknown): value is TitleCategory {
@@ -19,14 +20,30 @@ export function isComedyPerformance(keywords: readonly string[]): boolean {
   );
 }
 
+/** TMDB genre 99 (movie and tv); the stored name is the English TMDB name. */
+export const DOCUMENTARY_GENRE_NAME = 'Documentary';
+
+export function isDocumentaryGenre(genres: readonly string[] | null | undefined): boolean {
+  return (genres ?? []).some((genre) => genre.trim().toLowerCase() === 'documentary');
+}
+
+/**
+ * Precedence: owner override, then Comedy Show (explicit performance
+ * evidence), then Documentary (TMDB genre 99), then the catalogue Movie/TV
+ * type. The stored media type itself is never changed.
+ */
 export function titleCategory(
   mediaType: string | null,
   comedyPerformance: boolean | null | undefined,
   override?: TitleCategory | null,
+  genres?: readonly string[] | null,
 ): TitleCategory | null {
-  return (
-    override ?? (comedyPerformance ? 'comedy-show' : isTitleCategory(mediaType) ? mediaType : null)
-  );
+  if (override != null) return override;
+  if (comedyPerformance) return 'comedy-show';
+  if (isDocumentaryGenre(genres)) return 'documentary';
+  return isTitleCategory(mediaType) && (mediaType === 'movie' || mediaType === 'tv')
+    ? mediaType
+    : null;
 }
 
 export function parseCategoryOverride(

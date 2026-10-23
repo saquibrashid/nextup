@@ -2,7 +2,7 @@
 
 **Project:** nextup
 **Version:** Current v1 scope, including subsequent owner-approved promotions; remaining deferrals are in §11.2.
-**Status:** Approved scope with recorded amendments through US-070 / REQ-136 (`A61`). ~~"through US-069 / REQ-135 (`A60`)"~~ ~~"through US-068 / REQ-134 (`A59`)"~~ ~~"through US-067 / REQ-133 (`A58`)"~~ ~~"through US-066 / REQ-132 (`A57`)"~~ ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
+**Status:** Approved scope with recorded amendments through US-071 / REQ-137 (`A62`). ~~"through US-070 / REQ-136 (`A61`)"~~ ~~"through US-069 / REQ-135 (`A60`)"~~ ~~"through US-068 / REQ-134 (`A59`)"~~ ~~"through US-067 / REQ-133 (`A58`)"~~ ~~"through US-066 / REQ-132 (`A57`)"~~ ~~"through US-065 / REQ-131 (`A56`)"~~ ~~"through US-064 / REQ-130 (`A55`)"~~ ~~"through US-063 / REQ-129 (`A54`)"~~ ~~"through US-062 / REQ-128"~~ Implementation status is in `docs/status.md`; it does not replace release acceptance.
 **Inputs:** `docs/BRD.md`, the recorded owner decisions in the ADRs, and the original authoring-tree `Context/` documents. **The `Context/` tree is not supplied in this repository.** Its citations preserve provenance, not an instruction to invent missing source text. See `docs/current-release.md` for the owner decisions applied on 2026-09-17 and `docs/requirement-index.md` for reconciled reference authority.
 **Audience:** the implementer. Implementation will be performed by GitHub Copilot in autopilot mode (ASM-028, ASM-029, NFR-002, NFR-003, NFR-004). This document, together with the specs, IS the implementation input. Acceptance criteria are written to be executable and verifiable without asking a question.
 **No timeline.** Per A19 / ASM-027 this document contains no dates, durations, or sequencing commitments beyond dependency order.
@@ -122,6 +122,22 @@
 > | **5. Not a process** | Credits are read inside the owner's search request, are never stored, and add no scheduler, dependency, telemetry or migration; §7.4's four-process list is unchanged. Posters use the image host the cards already use. | **Invariant** |
 >
 > **New in this document:** **US-070 / REQ-136** (Epic L), five acceptance criteria. **Corrected in place:** `specs/api.md` §6.29 and `specs/ui.md` §7b. No ADR changes: nothing here is load-bearing beyond the above.
+
+---
+
+> ## ⚠ AMENDMENT — 2026-10-22 — `A62` (owner-requested, #456): Documentary as a media type (display category)
+>
+> **The owner asked** for Documentary alongside the existing media types. The Library's filterable media-type axis is the *display category* (US-062: Movie, TV Show, Comedy Show), kept separate from the canonical Movie/TV type, so Documentary joins **that** axis. ADR-0016 records it.
+>
+> | Decision | What it changes | Kind |
+> |---|---|---|
+> | **1. Derived from TMDB genre** | A title whose stored TMDB genres include *Documentary* (TMDB genre 99, movie and tv) is categorised Documentary, ahead of the Movie/TV base type. Comedy Show (explicit performance evidence) still outranks it; the owner override outranks both. | **Instruction** |
+> | **2. Read-time, no rewrite** | Nothing is stored for it and no existing row is rewritten: the category is computed from `title.tmdb_genres` on every read, so existing titles with genres become Documentary at once and titles without them on the existing lazy metadata refresh. | **Invariant** |
+> | **3. Canonical type is untouched** | `mediaType`, work identity, runtime units, season logic, availability and TMDB endpoints keep the real movie/tv kind. | **Invariant** |
+> | **4. Owner override** | Documentary is selectable (and clearable to Automatic) in *Title category*; `PATCH /api/titles/:titleId/category` and `?category=` accept `documentary`. | **Instruction** |
+> | **5. Additive migration** | `0021_documentary_category` widens the override CHECK without dropping it. No scheduler; §7.4's four-process list is unchanged. | **Invariant** |
+>
+> **New in this document:** **US-071 / REQ-137** (Epic L), five acceptance criteria. **Corrected in place:** US-062's category list.
 
 ---
 > ## ⚠ AMENDMENT — 2026-10-11 — `A60` (owner-requested, #455): *Add title* infers the service from availability — the service is optional
@@ -2261,7 +2277,7 @@ The reason full update shows already-known titles (REQ-057) is the product's mos
 **REQ-128 (`must`, owner-approved #364).** Comedy Show is a user-facing category
 for stand-up specials and live comedy performances, not ordinary comedy movies
 or sitcoms. Explicit TMDB keyword evidence assigns it automatically; the owner
-can choose Movie, TV Show, Comedy Show or Automatic in title details.
+can choose Movie, TV Show, Comedy Show, Documentary or Automatic in title details. ~~can choose Movie, TV Show, Comedy Show or Automatic in title details.~~ (Documentary added at `A62`, US-071.)
 
 | AC | Given / when | Then |
 | --- | --- | --- |
@@ -2271,6 +2287,34 @@ can choose Movie, TV Show, Comedy Show or Automatic in title details.
 | AC-4 | Existing cached titles have no category evidence or metadata fails | An access-triggered bounded refresh attempts classification before filtering; pending results are disclosed and manually retryable, without a scheduler. |
 
 Implementation contract: `specs/title-category.md`; named tests in `specs/testing.md`.
+
+#### US-071 — Documentary as a media type (`A62`)
+
+**REQ-137 (`must`, owner-requested #456, `A62`).** Documentary is a user-facing
+display category alongside Movie, TV Show and Comedy Show. A title whose TMDB
+genres include Documentary (genre 99, for movies and series) is categorised
+Documentary automatically; the owner can still choose any category, or
+Automatic, in title details. It is derived at read time from stored metadata, so
+no existing data is rewritten, and the canonical Movie/TV type is unchanged.
+
+**As** the owner
+**I want** documentaries to be their own category
+**So that** I can filter to or away from them without tagging each one
+
+**Traces to:** REQ-137, REQ-128, REQ-041
+**Priority:** must
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | A movie or series whose stored TMDB genres include Documentary | The list or details are read | Its category is Documentary and its `mediaType`, work identity, badges and dates are unchanged; a title without the genre keeps Movie/TV (or Comedy Show), and Comedy Show outranks Documentary. |
+| AC-2 | The owner opens *Title category* | They choose Documentary, another category, or Automatic and save | It persists by work identity like any override (Documentary over a non-documentary, or Movie over a documentary); Automatic restores the derived category; the unknown value is refused with 400. |
+| AC-3 | `?category=documentary` | The list is requested | SQL filters before pagination, OR with other categories and AND with other filters; an unknown `category` is refused by the API and dropped from a hand-edited URL; `type=` stays Movie/TV. |
+| AC-4 | A Documentary title is listed | The row and the filter are rendered | The row's type label and the Type picker option read *Documentary*, from the shared label registry. |
+| AC-5 | The migration runs on an existing store | Titles already hold genres | The migration is additive (T-MIG-001 passes it pinned), no row is rewritten, no scheduler is added, and existing titles with genres are Documentary immediately; titles without genres pick it up on the existing lazy refresh. |
+
+**Out of scope:** separating Documentary movies from Documentary series; a Documentary badge distinct from the type label; classifying from keywords or titles.
+**Open questions:** none.
 
 ### 7.4 Closed enumeration of permitted mutations (REQ-041)
 

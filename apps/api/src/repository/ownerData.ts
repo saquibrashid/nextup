@@ -627,7 +627,9 @@ const WATCH_PREFERENCE_JOIN = Prisma.sql`
     AND wp.work_identity = t.work_identity`;
 
 const EFFECTIVE_CATEGORY = Prisma.sql`COALESCE(wp.category_override,
-  CASE WHEN t.tmdb_comedy_show = 1 THEN N'comedy-show' ELSE t.tmdb_media_type END)`;
+  CASE WHEN t.tmdb_comedy_show = 1 THEN N'comedy-show'
+    WHEN t.tmdb_genres LIKE N'%"Documentary"%' THEN N'documentary'
+    ELSE t.tmdb_media_type END)`;
 
 const WATCH_PRIORITY_RANK = Prisma.sql`CASE WHEN wp.watching = 1 THEN 0
   WHEN wp.priority = N'up-next' THEN 1

@@ -72,6 +72,7 @@ describe('T-CATEGORY-002 owner category mutation', () => {
   });
   it('T-CATEGORY-002e rejects malformed, unavailable and suppressed titles without saving', async () => {
     expect((await category({})).status).toBe(400);
+    expect((await category({ categoryOverride: 'Documentary' })).status).toBe(400);
     findTitleDetail.mockResolvedValueOnce(null);
     expect((await category({ categoryOverride: null })).status).toBe(404);
     findTitleDetail.mockResolvedValueOnce({ state: 'removed', listings: [] });

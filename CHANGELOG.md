@@ -8,6 +8,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **Documentary media type (#456, `A62`, US-071 / REQ-137).** Documentary is a new
+  display category beside Movie, TV Show and Comedy Show: derived at read time from
+  a title's stored TMDB genres (never stored, nothing rewritten), filterable with
+  `?category=documentary`, shown on the row, and selectable in _Title category_.
+  Additive migration `0021_documentary_category`.
 - **REQ-119 / REQ-035 / REQ-037 — runtime on the row, a runtime filter, and a
   runtime sort.** The runtime was already fetched from TMDB and stored on every
   title; nothing ever rendered it. It now sits last in the row's meta line

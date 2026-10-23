@@ -27,6 +27,7 @@ the retained original, and the status is updated.
 | [ADR-0012](ADR-0012-spa-data-access.md) | SPA data access: **one typed `fetch` client**, no data-fetching library. Forced by the discovery that every screen was a hardcoded stub while every gate was green. | Accepted |
 | [ADR-0013](ADR-0013-ui-refresh.md) | The UI refresh: a **hybrid poster-grid/compact-list** layout, an **indigo `#4338ca`** accent (all ratios computed), and filters + sort as one control group whose two persistence models stay separate. ⚠ **Spec only — not built, not scheduled.** Detail in [`specs/ui-refresh.md`](../../specs/ui-refresh.md). | Accepted (spec only) |
 | [ADR-0015](ADR-0015-permanent-delete.md) | Owner-initiated **permanent delete** from the Removed view: a narrow exception to REQ-028 for privacy. Removed rows only, explicit confirmation, suppression never deleted, no scheduler. |
+| [ADR-0016](ADR-0016-documentary-category.md) | **Documentary** as a derived display category: computed at read time from stored TMDB genres, never stored; owner override wins; additive CHECK widening. | Accepted |
 
 See [../architecture.md](../architecture.md) for the system design that these
 decisions compose into.

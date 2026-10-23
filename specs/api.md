@@ -116,7 +116,7 @@ storefront batch has `service: null` and is always `append-only`.
 
 ## Display category (TASK-247, #364)
 
-`GET /api/titles` accepts repeated `category=movie|tv|comedy-show`, OR within
+`GET /api/titles` accepts repeated `category=movie|tv|comedy-show|documentary` (`documentary` added at `A62`, #456; derived from stored TMDB genres), OR within
 category and AND with other filters. Existing `type=movie|tv` still filters
 canonical media type. List/detail items additionally expose `category`,
 `automaticCategory`, `categoryOverride` (nullable category values) and
@@ -127,7 +127,7 @@ refresh budget before SQL pagination; they do not reclassify after selection.
 Cached results remain usable, with a visible incomplete-results warning.
 
 `PATCH /api/titles/:titleId/category` accepts exactly
-`{categoryOverride: null | "movie" | "tv" | "comedy-show"}` and returns
+`{categoryOverride: null | "movie" | "tv" | "comedy-show" | "documentary"}` and returns
 `{titleId, categoryOverride}`. Owner scope, active visibility, suppression
 refusal, explicit-save/error/offline behavior follow watch preferences.
 `null` means Automatic, not an omitted edit. See `title-category.md`.

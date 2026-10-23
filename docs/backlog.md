@@ -744,6 +744,8 @@ finished, so the exception cannot outlive its reason.
 | `TASK-285` | `done` | Shared result rows: `TitleSearchResults` shows genres, lead cast, overview and the poster placeholder for the Waiting add, Library *Add title* and *Fix match*. Test ids: `T-WADD-011`, `T-WADD-012`. |
 | `TASK-286` | `done` | Waiting add: the explicit *Add title* (+) button replaces the *Search* entry point and opens the lookup; copy in `copy.ts`. Test ids: `T-WADD-010`. |
 | `TASK-287` | `done` | The Waiting add at 280 px in a real browser. Test id: `T-WADD-020`. |
+| `TASK-288` | `done` | Documentary media type, part 1 (#456, `A62`, US-071 / REQ-137, ADR-0016): `documentary` in `TITLE_CATEGORIES`/`TITLE_CATEGORY_LABELS`, `titleCategory` derives it from stored TMDB genres, `EFFECTIVE_CATEGORY` mirrors it in SQL, the override and `?category=` accept it, additive migration `0021_documentary_category` pinned in `tools/check-migrations.ts`. Test ids: `T-DOC-001`, `T-DOC-002`, `T-DOC-004`, `T-DOC-005`. |
+| `TASK-289` | `done` | Documentary media type, part 2: the row label, Type picker option and *Title category* choice from the shared registry. Test ids: `T-DOC-003`. |
 <!-- STATUS-LEDGER:END -->
 
 ### Approved availability moves (#397/#410), 2026-09-29
@@ -780,6 +782,14 @@ TASK-265."~~
 | TASK-285 | Shared `TitleSearchResults` rows with genres, lead cast, clamped overview and poster placeholder, used by the Waiting add, Library *Add title* and *Fix match*. | 1 agent-run + 10 owner-review-minutes | TASK-284 | `T-WADD-011`, `T-WADD-012` |
 | TASK-286 | The Waiting add behind an explicit *Add title* (+) button (`aria-expanded`), the *Search* entry point gone, copy in `copy.ts`. | 1 agent-run + 10 owner-review-minutes | TASK-285 | `T-WADD-010`; `T-WAIT-019`, `T-WAIT-020` still pass as amended |
 | TASK-287 | The Waiting add and its rows at 280 px in a real browser, no overflow. | 1 agent-run + 5 owner-review-minutes | TASK-286 | `T-WADD-020` |
+
+### Approved Documentary media type (`A62`, #456), 2026-10-22
+
+| Task | Work | Size | Depends on | Done when |
+| --- | --- | --- | --- | --- |
+| TASK-288 | Documentary category, API and store (PRD `A62`, US-071 / REQ-137, ADR-0016): derived from stored TMDB genre 99 ahead of the Movie/TV type (Comedy Show and the owner override outrank it), mirrored in the list SQL, accepted by `categoryOverride` and `?category=`; additive migration `0021_documentary_category`. | 1 agent-run + 10 owner-review-minutes | TASK-247 | `T-DOC-001`, `T-DOC-002`, `T-DOC-004`, `T-DOC-005`; `T-MIG-001`, `T-CATEGORY-001`..`T-CATEGORY-003` still pass |
+| TASK-289 | Documentary in the web app: row label, Type picker option and override choice from `TITLE_CATEGORY_LABELS`. | 1 agent-run + 5 owner-review-minutes | TASK-288 | `T-DOC-003`; `T-CATEGORY-004` still passes |
+
 ### Approved waiting sort and Grid alignment (`A56`, #415, #414), 2026-10-08
 
 | Task | Work | Size | Depends on | Done when |

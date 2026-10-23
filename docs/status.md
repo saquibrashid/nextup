@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 282 |
+| ✅ done | 284 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **285** |
+| **total** | **287** |
 
 ## Ready to start
 
@@ -323,3 +323,5 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-285` | Shared result rows: `TitleSearchResults` shows genres, lead cast, overview and the poster placeholder for the Waiting add, Library *Add title* and *Fix match*. Test ids: `T-WADD-011`, `T-WADD-012`. | `T-WADD-011`, `T-WADD-012` |
 | `TASK-286` | Waiting add: the explicit *Add title* (+) button replaces the *Search* entry point and opens the lookup; copy in `copy.ts`. Test ids: `T-WADD-010`. | `T-WADD-010`, `T-WAIT-019`, `T-WAIT-020` |
 | `TASK-287` | The Waiting add at 280 px in a real browser. Test id: `T-WADD-020`. | `T-WADD-020` |
+| `TASK-288` | Documentary media type, part 1 (#456, `A62`, US-071 / REQ-137, ADR-0016): `documentary` in `TITLE_CATEGORIES`/`TITLE_CATEGORY_LABELS`, `titleCategory` derives it from stored TMDB genres, `EFFECTIVE_CATEGORY` mirrors it in SQL, the override and `?category=` accept it, additive migration `0021_documentary_category` pinned in `tools/check-migrations.ts`. Test ids: `T-DOC-001`, `T-DOC-002`, `T-DOC-004`, `T-DOC-005`. | `T-CATEGORY-001`, `T-CATEGORY-003`, `T-DOC-001`, `T-DOC-002`, `T-DOC-004`, `T-DOC-005`, `T-MIG-001` |
+| `TASK-289` | Documentary media type, part 2: the row label, Type picker option and *Title category* choice from the shared registry. Test ids: `T-DOC-003`. | `T-CATEGORY-004`, `T-DOC-003` |

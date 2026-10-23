@@ -48,6 +48,7 @@ let msw: ReturnType<typeof tmdbMswServer>;
 
 interface Item extends WatchPreferences {
   category?: string;
+  mediaType?: string | null;
   categoryOverride?: string | null;
   titleId: string;
   workIdentity: string;
@@ -227,7 +228,7 @@ describe('T-CATEGORY-003 real SQL category persistence and filtering', () => {
   it('T-CATEGORY-003d the database rejects unknown and wrongly cased override values', async () => {
     const title = await classified('constraint', false);
     expect((await category(title.id, 'comedy-show')).status).toBe(200);
-    for (const invalid of ['Comedy-Show', 'documentary']) {
+    for (const invalid of ['Comedy-Show', 'Documentary', 'documentaries']) {
       await expect(
         testPrisma().watchPreference.updateMany({
           where: { ownerId: owner, workIdentity: title.workIdentity },
@@ -250,6 +251,40 @@ describe('T-CATEGORY-003 real SQL category persistence and filtering', () => {
     });
     return title;
   }
+  it('T-DOC-005 Documentary is derived from stored TMDB genres, filterable in SQL, and overridable both ways', async () => {
+    const genres = (id: string, value: string[]) =>
+      testPrisma().title.updateMany({
+        where: { ownerId: owner, id },
+        data: { tmdbGenres: JSON.stringify(value) },
+      });
+    await classified('doc-movie', false);
+    await classified('doc-show', false, 'tv');
+    await classified('plain', false);
+    await classified('doc-special', true);
+    await genres('doc-movie', ['Documentary', 'History']);
+    await genres('doc-show', ['Documentary']);
+    await genres('plain', ['Drama']);
+    await genres('doc-special', ['Documentary']);
+    const items = (await list('?category=documentary&sort=name&dir=asc')).items;
+    expect(items.map((item) => item.titleId)).toEqual(['doc-movie', 'doc-show']);
+    expect(items.every((item) => item.category === 'documentary')).toBe(true);
+    expect((await detail('doc-movie')).mediaType).toBe('movie');
+    expect((await detail('doc-show')).mediaType).toBe('tv');
+    expect((await detail('doc-special')).category).toBe('comedy-show');
+    expect((await list('?category=movie')).items.map((item) => item.titleId)).toEqual(['plain']);
+    expect((await list('?category=tv')).items).toEqual([]);
+
+    expect((await category('plain', 'documentary')).status).toBe(200);
+    expect(await detail('plain')).toMatchObject({
+      category: 'documentary',
+      categoryOverride: 'documentary',
+    });
+    expect((await category('doc-movie', 'movie')).status).toBe(200);
+    expect((await detail('doc-movie')).category).toBe('movie');
+    expect((await category('doc-movie', null)).status).toBe(200);
+    expect((await detail('doc-movie')).category).toBe('documentary');
+    expect((await category('plain', 'Documentary')).status).toBe(400);
+  });
   it('T-CATEGORY-003a owner overrides survive refresh and reappearance without changing title or listing facts', async () => {
     const title = await classified('special', true);
     await seed('foreign', { owner: other, identity: title.workIdentity });
