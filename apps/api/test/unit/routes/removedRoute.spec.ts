@@ -21,6 +21,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const listRemovedView = vi.fn();
 const countRemovalsForWorks = vi.fn();
 const findActiveSuppressedWorks = vi.fn();
+const listTrackedWorkIdentities = vi.fn();
+
+vi.mock('../../../src/repository/seasonTracking.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/repository/seasonTracking.js')>();
+  return {
+    ...actual,
+    listTrackedWorkIdentities: (...args: unknown[]) =>
+      listTrackedWorkIdentities(...args) as unknown,
+  };
+});
 
 vi.mock('../../../src/repository/ownerData.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/repository/ownerData.js')>();
@@ -115,6 +125,7 @@ beforeEach(async () => {
   listRemovedView.mockResolvedValue([]);
   countRemovalsForWorks.mockResolvedValue([]);
   findActiveSuppressedWorks.mockResolvedValue(new Set());
+  listTrackedWorkIdentities.mockResolvedValue(new Set());
   app = createApp();
   server = app.listen(0);
   await new Promise((resolve) => server.once('listening', resolve));
@@ -126,6 +137,20 @@ afterEach(async () => {
 });
 
 describe('GET /api/removed (handler)', () => {
+  it('T-SEAS-010: a tracked work is flagged trackingNewSeason, an untracked one is not', async () => {
+    listRemovedView.mockResolvedValue([
+      storeRow({ listing_id: 'l-1', work_identity: 'tmdb:tv:84773' }),
+      storeRow({ listing_id: 'l-2' }),
+    ]);
+    listTrackedWorkIdentities.mockResolvedValue(new Set(['tmdb:tv:84773']));
+
+    const body = await page();
+
+    expect(
+      body.items.map((i) => (i as unknown as { trackingNewSeason: boolean }).trackingNewSeason),
+    ).toEqual([true, false]);
+  });
+
   it('T-REM-020i: an empty log is an empty page, not an error', async () => {
     const body = await page();
     expect(body).toEqual({ items: [], nextCursor: null, limit: 50 });

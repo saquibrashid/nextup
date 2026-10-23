@@ -27,6 +27,43 @@ Collected locations: `packages/domain/test/titleCategory.spec.ts`;
 `apps/web/test/titleDetails.spec.tsx`, `filterBar.spec.tsx`;
 `tests/e2e/titleDetails.spec.ts`.
 
+### US-072 — Track a removed show for a new season (TASK-292 – TASK-294, #454, `A64`)
+
+| AC | Level | Test IDs | Assertion |
+| --- | --- | --- | --- |
+| AC-1 | U/C | `T-SEAS-040a`–`T-SEAS-040e`, `T-SEAS-041a`, `T-SEAS-042a`, `T-SEAS-042b`, `T-SEAS-010`, `T-SEAS-063a`–`T-SEAS-063g` | Refusals (unknown, movie/unmatched, listed, suppressed, already waiting); tracking is stored and stopped; the Removed view flags and drives it. |
+| AC-2 | U/C | `T-SEAS-004`, `T-SEAS-006`, `T-SEAS-041b`, `T-SEAS-061a`–`T-SEAS-061c`, `T-SEAS-062a` | A due tracked show is offered with its date and nothing is created until the tap, which opens one intent carrying the season. |
+| AC-3 | U/C | `T-SEAS-001`, `T-SEAS-002`, `T-SEAS-003`, `T-SEAS-030a`, `T-SEAS-050`, `T-SEAS-060a`–`T-SEAS-060c` | Before the date not "now streaming" (Waiting and availability review); from it, *Season N is out* and the ordinary Add to Library. |
+| AC-4 | U | `T-SEAS-005`, `T-SEAS-007`, `T-SEAS-020a`–`T-SEAS-020d`, `T-SEAS-031a`, `T-SEAS-031b`, `T-SEAS-032a`, `T-SEAS-041c` | One TMDB request per show, at most 4 per open, season columns only, failure writes nothing; `T-CI-005` still finds four processes. |
+| AC-5 | S | `T-SEAS-070a`–`T-SEAS-070c` | Migration 0022 is additive and mirrored in the Prisma schema. |
+| AC-6 | E | `T-SEAS-080a` | The season panel and offer fit and are reachable at 280, 390 and 1024 px. |
+
+| Id | Level | Owner | Claim |
+|---|---|---|---|
+| **`T-SEAS-001`** | U | `TASK-292` | `apps/api/test/unit/waitingRoute.spec.ts`: season rows and offers on `GET /api/waiting`. |
+| **`T-SEAS-002`** | U | `TASK-292` | Same file: a tracked show with an announced season gains an offer. |
+| **`T-SEAS-003`** | U | `TASK-292` | Same file: an untracked or Library show gains no offer. |
+| **`T-SEAS-004`** | U | `TASK-292` | Same file: the lazy re-check is bounded per request. |
+| **`T-SEAS-005`** | U | `TASK-292` | Same file: one TMDB request per due show. |
+| **`T-SEAS-006`** | U | `TASK-292` | Same file: a failed lookup writes nothing. |
+| **`T-SEAS-007`** | U | `TASK-292` | Same file: membership and ordering are unchanged by the re-check. |
+| **`T-SEAS-010`** | U | `TASK-292` | `apps/api/test/unit/routes/removedRoute.spec.ts`: `trackingNewSeason`. |
+| **`T-SEAS-020`** (`a`–`d`) | U | `TASK-292` | `apps/api/test/unit/clients/tmdbClient.spec.ts`: `getNextSeason`. |
+| **`T-SEAS-030`** | U | `TASK-292` | `apps/api/test/unit/services/newSeason.spec.ts`: out, due, bounded refresh. |
+| **`T-SEAS-031`** | U | `TASK-292` | Same file: due selection. |
+| **`T-SEAS-032`** | U | `TASK-292` | Same file: the refresh writes season columns only. |
+| **`T-SEAS-040`** | U | `TASK-292` | `apps/api/test/unit/routes/newSeasons.spec.ts`: the two tracking routes. |
+| **`T-SEAS-041`** | U | `TASK-292` | Same file: starting tracking and adding to Waiting. |
+| **`T-SEAS-042`** | U | `TASK-292` | Same file: stopping tracking. |
+| **`T-SEAS-050`** | U | `TASK-292` | `apps/api/test/unit/routes/availabilityReview.spec.ts`: a future season is not "now streaming". |
+| **`T-SEAS-060`** | C | `TASK-293` | `apps/web/test/newSeasons.spec.tsx` `T-SEAS-060`–`T-SEAS-062`: season panel, offers, route wiring. |
+| **`T-SEAS-061`** | C | `TASK-293` | Same file: the season offers section. |
+| **`T-SEAS-062`** | C | `TASK-293` | Same file: route wiring of track and stop. |
+| **`T-SEAS-063`** | C | `TASK-293` | Same file: the Removal history *Track new seasons* control. |
+| **`T-SEAS-070`** (`a`–`c`) | S | `TASK-292` | `tests/infra/trackNewSeasonsMigration.spec.ts` on `0022_track_new_seasons`. |
+| **`T-SEAS-090`** (`a`–`c`) | I | `TASK-292` | `apps/api/test/integration/seasonTracking.spec.ts`: the repository against SQL Server. |
+| **`T-SEAS-080`** (`a`) | E | `TASK-294` | `tests/e2e/waiting.spec.ts`: 280/390/1024 px. |
+
 ### US-071 — Documentary media type (TASK-288 – TASK-289, #456, `A62`)
 
 | AC | Level | Test IDs | Assertion |

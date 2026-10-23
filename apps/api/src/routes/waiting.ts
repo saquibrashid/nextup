@@ -75,6 +75,8 @@ import {
   type IntentRow,
 } from '../services/watchAvailability.js';
 import { yourServicesFrom } from '../services/libraryAvailability.js';
+import { recordSeasonFacts, listTrackedSeasonWorks } from '../repository/seasonTracking.js';
+import { refreshNewSeasons, selectForSeasonRefresh } from '../services/newSeason.js';
 import { sortWaiting } from '../services/waitingSort.js';
 import { tmdbUnavailableAppError } from './tmdb.js';
 import { toIsoDate } from './titles.js';
@@ -82,6 +84,11 @@ import { parseWaitingQuery } from './waitingQuery.js';
 
 /** One row of the waiting view. Shaped field by field, never spread. */
 export interface WaitingItem {
+  /**
+   * #454 (`A64`) — set only for a removed TV show the owner is waiting on a
+   * new season of; `out` once its air date has arrived. `null` otherwise.
+   */
+  season: { number: number; airsOn: string; out: boolean } | null;
   editionLabels?: EditionLabel[];
   intentId: string;
   titleId: string;
@@ -230,6 +237,7 @@ export async function addSearchWaitingIntent(
   ownerId: ReturnType<typeof requireOwnerId>,
   workIdentity: string,
   detail: TmdbWorkDetail,
+  season?: { seasonNumber: number; airsOn: string },
 ): Promise<{ intentId: string; titleId: string; titleWasCreated: boolean }> {
   return await runInTransaction(async (tx) => {
     // Sequential: one transaction is one connection.
@@ -291,6 +299,10 @@ export async function addSearchWaitingIntent(
         sourceBatchId: null,
         discoverySource: 'search',
         state: 'waiting',
+        // #454 (`A64`): a removed show waiting for a new season.
+        ...(season === undefined
+          ? {}
+          : { seasonNumber: season.seasonNumber, seasonAirOn: fromIsoDay(season.airsOn) }),
       },
       tx,
     );
@@ -304,8 +316,10 @@ export async function addSearchWaitingIntent(
 
 export function registerWaitingRoutes(
   router: Router,
-  getTmdb: () => Pick<TmdbClient, 'getWatchOffers' | 'getWork' | 'getReleaseFacts'> = () =>
-    new TmdbClient({ apiKey: process.env['TMDB_API_KEY'] ?? '' }),
+  getTmdb: () => Pick<
+    TmdbClient,
+    'getWatchOffers' | 'getWork' | 'getReleaseFacts' | 'getNextSeason'
+  > = () => new TmdbClient({ apiKey: process.env['TMDB_API_KEY'] ?? '' }),
   getAnnouncements: () => AnnouncementSource | null = watchmodeAnnouncements,
 ): void {
   /**
@@ -470,6 +484,37 @@ export function registerWaitingRoutes(
     }
     const today = now.toISOString().slice(0, 10);
 
+    // #454 (`A64`) — the same lazy, page-bounded, metadata-only shape again,
+    // for REMOVED TV shows the owner asked to track. It writes the preference
+    // row's season columns and nothing else; an announced season is only ever
+    // OFFERED below, never turned into an intent or a listing here.
+    const tracked = await listTrackedSeasonWorks(ownerId);
+    const dueSeasons = selectForSeasonRefresh(tracked, now);
+    const seasonWrites =
+      dueSeasons.length === 0 ? [] : (await refreshNewSeasons(dueSeasons, getTmdb(), now)).writes;
+    const seasonByWork = new Map(seasonWrites.map((write) => [write.workIdentity, write.season]));
+    for (const write of seasonWrites) {
+      await recordSeasonFacts(ownerId, write.workIdentity, write);
+    }
+    const newSeasonOffers: NewSeasonOffer[] = [];
+    for (const work of tracked) {
+      const season = seasonByWork.has(work.workIdentity)
+        ? (seasonByWork.get(work.workIdentity) ?? null)
+        : work.seasonNumber === null || work.seasonAirOn === null
+          ? null
+          : {
+              seasonNumber: work.seasonNumber,
+              airsOn: work.seasonAirOn.toISOString().slice(0, 10),
+            };
+      if (season === null || season.airsOn < today) continue;
+      newSeasonOffers.push({
+        titleId: work.titleId,
+        name: work.name,
+        seasonNumber: season.seasonNumber,
+        airsOn: season.airsOn,
+      });
+    }
+
     const built: WaitingItem[] = stored.map((intent, index) => {
       const row = rows[index] as IntentRow;
       const write = fresh.get(intent.id);
@@ -480,8 +525,13 @@ export function registerWaitingRoutes(
         write === undefined ? intent.availabilityCheckedAt : write.availabilityCheckedAt;
       const flagged = flaggedProvidersFor(availableOn);
       const other = otherStreamingFor(availableOn, yours);
+      const season = seasonOf(intent, today);
+      // ⚠ Until the new season's date arrives, the show's EARLIER seasons
+      // streaming is not news: no "Now on X" invitation (US-072 AC-3).
+      const seasonPending = season !== null && !season.out;
 
       return {
+        season,
         intentId: intent.id,
         titleId: intent.titleId,
         workIdentity: intent.workIdentity,
@@ -494,12 +544,17 @@ export function registerWaitingRoutes(
         movedFromLibraryAt:
           intent.movedFromLibraryAt == null ? null : intent.movedFromLibraryAt.toISOString(),
         availableOn,
-        flaggedOn: flagged === null ? null : flagged.filter((service) => yours.includes(service)),
+        flaggedOn: seasonPending
+          ? []
+          : flagged === null
+            ? null
+            : flagged.filter((service) => yours.includes(service)),
         otherServicesOn: other === null ? null : other.services,
         otherProvidersOn: other === null ? null : other.providers,
         rentOn,
-        accessState: accessStateFor(availableOn, rentOn, checkedAt),
-        streamingSince: streamingSince === null ? null : streamingSince.toISOString(),
+        accessState: seasonPending ? 'not-seen' : accessStateFor(availableOn, rentOn, checkedAt),
+        streamingSince:
+          seasonPending || streamingSince === null ? null : streamingSince.toISOString(),
         availabilityCheckedAt: checkedAt === null ? null : checkedAt.toISOString(),
         availabilityRegion: intent.availabilityRegion,
         forecast: forecastFor(forecastById.get(intent.id), today, yours),
@@ -528,6 +583,7 @@ export function registerWaitingRoutes(
     res.status(200).json({
       items,
       count: items.length,
+      newSeasonOffers,
       // ⚠ US-042 AC-7. `true` means at least one lookup this render THREW, so
       // the rows above may be showing a last-known answer with an older as-of
       // date. It is a note the client renders unobtrusively — never a non-200,
@@ -536,6 +592,25 @@ export function registerWaitingRoutes(
       availabilityRefreshFailed: failedIds.length > 0,
     });
   });
+}
+
+/** #454 — the show a removed, tracked work now has a dated new season for. */
+export interface NewSeasonOffer {
+  titleId: string;
+  name: string;
+  seasonNumber: number;
+  airsOn: string;
+}
+
+/** ⚠ `?? null`: a row from a test double or before migration 0022 has no season. */
+function seasonOf(
+  intent: { seasonNumber?: number | null; seasonAirOn?: Date | null },
+  today: string,
+): WaitingItem['season'] {
+  const number = intent.seasonNumber ?? null;
+  const airsOn = isoDay(intent.seasonAirOn ?? null);
+  if (number === null || airsOn === null) return null;
+  return { number, airsOn, out: airsOn <= today };
 }
 
 function forecastFor(

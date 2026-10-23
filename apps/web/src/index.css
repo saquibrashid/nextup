@@ -2380,6 +2380,49 @@ button {
   max-width: 52rem;
 }
 
+/* #454 — shows with an announced new season, offered rather than moved. */
+.season-offers {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+}
+
+.season-offers h2 {
+  font-size: var(--text-lg);
+  margin: 0 0 var(--space-1);
+}
+
+.season-offers__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+}
+
+.season-offers__item,
+.removed-row__season {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.season-offers__name {
+  font-weight: var(--weight-medium);
+}
+
+.season-offers__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 /* #389 — one card per line, as on Library's list: the row is wide enough for its panel. */
 .waiting-list {
   display: flex;

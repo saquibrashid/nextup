@@ -106,6 +106,8 @@ export function RemovedRoute({ client = apiClient }: RemovedRouteProps = {}): JS
       onUnsuppress={(suppressionId) => client.unsuppress(suppressionId)}
       onPurgeListing={(listingId) => client.permanentlyDeleteListing(listingId)}
       onPurgeWork={(workIdentity) => client.deleteWorkHistory(workIdentity)}
+      onTrackSeason={(titleId) => client.startNewSeasonTracking(titleId)}
+      onStopSeason={(titleId) => client.stopNewSeasonTracking(titleId)}
     />
   );
 }

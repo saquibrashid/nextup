@@ -22,6 +22,18 @@ import type { Express } from 'express';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const listWaitingIntents = vi.fn();
+const listTrackedSeasonWorks = vi.fn();
+const recordSeasonFacts = vi.fn();
+const getNextSeason = vi.fn();
+
+vi.mock('../../src/repository/seasonTracking.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../src/repository/seasonTracking.js')>();
+  return {
+    ...actual,
+    listTrackedSeasonWorks: (...args: unknown[]) => listTrackedSeasonWorks(...args) as unknown,
+    recordSeasonFacts: (...args: unknown[]) => recordSeasonFacts(...args) as unknown,
+  };
+});
 const updateWatchIntentAvailability = vi.fn();
 const listOwnerServices = vi.fn();
 const getWatchProviders = vi.fn();
@@ -55,6 +67,9 @@ vi.mock('../../src/clients/tmdbClient.js', async (importOriginal) => {
     // availability, so it knows nothing; `streamingForecast.spec.ts` covers it.
     override getReleaseFacts(): Promise<null> {
       return Promise.resolve(null);
+    }
+    override getNextSeason(...args: unknown[]) {
+      return getNextSeason(...args) as Promise<{ seasonNumber: number; airsOn: string } | null>;
     }
   }
   return { ...actual, TmdbClient: StubTmdbClient };
@@ -152,6 +167,8 @@ beforeEach(async () => {
   process.env['NEXTUP_ALLOWED_SUBJECTS'] = SUBJECT;
   process.env['TMDB_API_KEY'] = 'test-key';
   updateWatchIntentAvailability.mockResolvedValue({ count: 1 });
+  listTrackedSeasonWorks.mockResolvedValue([]);
+  recordSeasonFacts.mockResolvedValue(undefined);
   listOwnerServices.mockResolvedValue([]);
   getWatchProviders.mockResolvedValue(['Netflix']);
   app = createApp();
@@ -268,7 +285,12 @@ describe('T-AVAIL-011 · GET /api/waiting without a store', () => {
 
     const { status, body } = await get();
     expect(status).toBe(200);
-    expect(body).toEqual({ items: [], count: 0, availabilityRefreshFailed: false });
+    expect(body).toEqual({
+      items: [],
+      count: 0,
+      newSeasonOffers: [],
+      availabilityRefreshFailed: false,
+    });
     expect(getWatchProviders).not.toHaveBeenCalled();
   });
 
@@ -363,5 +385,130 @@ describe('T-WSORT-003 · GET /api/waiting?sort=&dir= (#415, US-065)', () => {
   it('T-WSORT-003d · the default (expected, no forecasts here) falls back to the name tie-breaker', async () => {
     expect(ids((await get()).body)).toEqual(['wi-old', 'wi-mid', 'wi-new']);
     expect(ids((await get('?dir=desc')).body)).toEqual(['wi-old', 'wi-mid', 'wi-new']);
+  });
+});
+
+interface SeasonBody {
+  items: {
+    season: { number: number; airsOn: string; out: boolean } | null;
+    flaggedOn: string[] | null;
+    streamingSince: string | null;
+    accessState: string;
+  }[];
+  newSeasonOffers: { titleId: string; name: string; seasonNumber: number; airsOn: string }[];
+}
+
+const dayFromNow = (days: number): Date =>
+  new Date(`${new Date(Date.now() + days * MS_PER_DAY).toISOString().slice(0, 10)}T00:00:00Z`);
+const day = (date: Date): string => date.toISOString().slice(0, 10);
+
+const tracked = (over: Record<string, unknown> = {}) => ({
+  workIdentity: 'tmdb:tv:84773',
+  titleId: 'title-tv',
+  name: 'The Rings of Power',
+  tmdbId: 84_773,
+  seasonCheckedAt: null,
+  seasonNumber: null,
+  seasonAirOn: null,
+  ...over,
+});
+
+describe('T-SEAS · GET /api/waiting — a removed show waiting for a new season (#454, US-072)', () => {
+  const seasonIntent = (airsOn: Date) => ({
+    ...stored({ checkedAt: RECENT, availableOn: JSON.stringify(['Netflix']) }),
+    seasonNumber: 3,
+    seasonAirOn: airsOn,
+    streamingSince: RECENT,
+  });
+
+  it('T-SEAS-001 · before the season date the show is NOT flagged "now streaming"', async () => {
+    listWaitingIntents.mockResolvedValue([seasonIntent(dayFromNow(30))]);
+
+    const { body } = (await get()) as unknown as { body: SeasonBody };
+
+    expect(body.items[0]).toMatchObject({
+      season: { number: 3, airsOn: day(dayFromNow(30)), out: false },
+      flaggedOn: [],
+      streamingSince: null,
+      accessState: 'not-seen',
+    });
+  });
+
+  it('T-SEAS-002 · once the date has arrived and a service carries it, the Add to Library invitation returns', async () => {
+    listWaitingIntents.mockResolvedValue([seasonIntent(dayFromNow(-1))]);
+
+    const { body } = (await get()) as unknown as { body: SeasonBody };
+
+    expect(body.items[0]).toMatchObject({
+      season: { number: 3, out: true },
+      flaggedOn: ['netflix'],
+      accessState: 'streaming',
+    });
+    expect(body.items[0]?.streamingSince).not.toBeNull();
+  });
+
+  it('T-SEAS-003 · a plain waiting row has no season', async () => {
+    listWaitingIntents.mockResolvedValue([stored({ checkedAt: RECENT, availableOn: '[]' })]);
+    const { body } = (await get()) as unknown as { body: SeasonBody };
+    expect(body.items[0]?.season).toBeNull();
+    expect(body.newSeasonOffers).toEqual([]);
+  });
+
+  it('T-SEAS-004 · opening Waiting re-checks a tracked show, stores the answer and OFFERS it — nothing is created', async () => {
+    listWaitingIntents.mockResolvedValue([]);
+    listTrackedSeasonWorks.mockResolvedValue([tracked()]);
+    getNextSeason.mockResolvedValue({ seasonNumber: 3, airsOn: day(dayFromNow(40)) });
+
+    const { body } = (await get()) as unknown as { body: SeasonBody };
+
+    expect(getNextSeason).toHaveBeenCalledWith(84_773, day(new Date()));
+    expect(recordSeasonFacts).toHaveBeenCalledTimes(1);
+    expect(body.newSeasonOffers).toEqual([
+      {
+        titleId: 'title-tv',
+        name: 'The Rings of Power',
+        seasonNumber: 3,
+        airsOn: day(dayFromNow(40)),
+      },
+    ]);
+    expect(body.items).toEqual([]);
+  });
+
+  it('T-SEAS-005 · a show with no dated season is re-checked, recorded as not announced, and not offered', async () => {
+    listWaitingIntents.mockResolvedValue([]);
+    listTrackedSeasonWorks.mockResolvedValue([tracked()]);
+    getNextSeason.mockResolvedValue(null);
+
+    const { body } = (await get()) as unknown as { body: SeasonBody };
+
+    expect(recordSeasonFacts).toHaveBeenCalledTimes(1);
+    expect(body.newSeasonOffers).toEqual([]);
+  });
+
+  it('T-SEAS-006 · a fresh check is not repeated, and its stored season is still offered', async () => {
+    listWaitingIntents.mockResolvedValue([]);
+    listTrackedSeasonWorks.mockResolvedValue([
+      tracked({ seasonCheckedAt: RECENT, seasonNumber: 2, seasonAirOn: dayFromNow(10) }),
+    ]);
+
+    const { body } = (await get()) as unknown as { body: SeasonBody };
+
+    expect(getNextSeason).not.toHaveBeenCalled();
+    expect(body.newSeasonOffers).toMatchObject([{ seasonNumber: 2 }]);
+  });
+
+  it('T-SEAS-007 · a stored season whose date has passed is not offered; a failed lookup is a 200 that writes nothing', async () => {
+    listWaitingIntents.mockResolvedValue([]);
+    listTrackedSeasonWorks.mockResolvedValue([
+      tracked({ seasonCheckedAt: RECENT, seasonNumber: 2, seasonAirOn: dayFromNow(-5) }),
+      tracked({ workIdentity: 'tmdb:tv:2', titleId: 'title-2', tmdbId: 2 }),
+    ]);
+    getNextSeason.mockRejectedValue(new Error('TMDB down'));
+
+    const { status, body } = (await get()) as unknown as { status: number; body: SeasonBody };
+
+    expect(status).toBe(200);
+    expect(recordSeasonFacts).not.toHaveBeenCalled();
+    expect(body.newSeasonOffers).toEqual([]);
   });
 });

@@ -2686,6 +2686,38 @@ not a mutating route.
 Waiting; `unknown` and `failed` propose nothing (a thrown lookup is a **200**
 with `failed`, so the dialog can fall back to a manual choice).
 
+### 6.57 `POST /api/titles/:titleId/new-season-tracking` — track a removed show for a new season (US-072, `A64`)
+
+Owner action only, `changesListState: false`. Sets the opt-in on the work's
+`watch_preference` (keyed by work identity) and asks TMDB `/tv/{id}` once, inside
+the request.
+
+**Refusals:** `404` unknown title; `400 VALIDATION_FAILED` not a matched TV show;
+`409 TITLE_NOT_ACTIVE` the show is in the Library; `409 WORK_SUPPRESSED`.
+**200** `{ titleId, status: "waiting", season: null, lookupFailed: false }` it is
+already waiting (nothing changes); `{ …, status: "tracking", season: null, lookupFailed }`
+tracking is on and no dated season is announced (or the lookup failed — a thrown
+lookup is a **200**, never a 502, and the next open of Waiting asks again).
+**201** `{ titleId, status: "waiting", season: { number, airsOn }, intentId }` a dated
+season is announced: one `search`-source waiting intent carrying it is created and
+tracking is switched off.
+
+### 6.58 `POST /api/titles/:titleId/new-season-tracking/stop` (US-072, `A64`)
+
+Turns tracking off. `200 { titleId, status: "stopped" }`; `404` unknown title.
+
+### 6.59 `GET /api/waiting` — season fields (US-072, `A64`)
+
+Additive. Each item gains `season: { number, airsOn, out } | null`; the response
+gains `newSeasonOffers: [{ titleId, workIdentity, name, posterPath, season: { number, airsOn } }]`.
+A season intent not yet out has `flaggedOn: []`, `accessState: "not-seen"` and no
+`streamingSince`. The request first re-checks at most 4 due tracked shows (never
+checked, or older than `WATCH_PROVIDER_MAX_AGE_DAYS`), serially, writing only the
+season columns; a failed lookup writes nothing and the response is still 200.
+`GET /api/removed` items gain `trackingNewSeason: boolean`, and
+`GET /api/availability/review` omits a waiting row whose season date is in the future
+from `nowStreaming`.
+
 ---
 
 ## 7. Status-code policy

@@ -44,6 +44,7 @@ import { registerImdbRoutes } from './imdb.js';
 import { registerMeRoutes } from './me.js';
 import { registerRemovalGroupRoutes } from './removalGroups.js';
 import { registerRemovedRoutes } from './removed.js';
+import { registerNewSeasonRoutes } from './newSeasons.js';
 import { registerServiceStateRoutes } from './serviceState.js';
 import { registerSuppressionRoutes } from './suppressions.js';
 import { registerTitleRoutes } from './titles.js';
@@ -179,6 +180,9 @@ export function createApiRouter(): Router {
   // in-process cache dies with the request and can never accumulate into a
   // mirror of the TMDB catalogue.
   registerWaitingRoutes(apiRouter);
+  // (US-072, PRD `A64`) — track a removed TV show for a new season. Owner
+  // actions; they ask TMDB only when tapped.
+  registerNewSeasonRoutes(apiRouter);
   // §6.40–§6.44 (US-063, PRD `A54`) — the owner's one-tap availability moves.
   // Registered after the waiting and listing routes whose rows they write;
   // none of them calls TMDB, so they need no client.

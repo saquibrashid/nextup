@@ -1436,6 +1436,24 @@ the service marks, and *Now on Netflix*…" in the details; "the forecast… the
 service mark and the when"; "**Footer**: *Seen on Fandango at Home (rent/buy)…*
 and **Not interested**" as a card footer.~~
 
+**New seasons (#454, `A64`, US-072).**
+
+- A row whose intent carries a season shows a panel in the forecast's place:
+  tag *New season* (or *Season out*), the date as its headline (decorative), and
+  the sentence *Season N premieres 1 Feb 2027.* / *Season N is out. …* as the
+  accessible text. Before the date it is never the streaming panel; from the
+  date, a flatrate offer on an owner service shows the streaming panel and
+  *Add to Library* as usual.
+- **New season announced** (`data-testid="season-offers"`) sits above the list:
+  one line per offered show — name, *Season N premieres {date}.*, *Add to
+  Waiting* and *Stop tracking*, each named with the show. Both are the owner's
+  taps; a failure shows an alert and keeps the offer. The section renders only
+  when there is an offer. It wraps at 280 px.
+- **Removal history** (`/removed`): a removed TV row carries *Track new seasons*;
+  once on it reads *Tracking for a new season* with *Stop tracking*, and says
+  plainly when TMDB could not be asked just now, or that the season is already
+  in Waiting. The Library's remove dialog is unchanged.
+
 ## 7c. `/availability` — Availability changes (US-064, PRD `A55`)
 
 Container `containers/AvailabilityReviewRoute.tsx` (one read on mount, no

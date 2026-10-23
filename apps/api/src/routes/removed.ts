@@ -34,6 +34,7 @@ import {
   type WorkRemovalRow,
 } from '../repository/ownerData.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
+import { listTrackedWorkIdentities } from '../repository/seasonTracking.js';
 import { toIsoDate } from './titles.js';
 import { encodeRemovedCursor, parseRemovedListQuery } from './removedQuery.js';
 
@@ -103,6 +104,7 @@ export function toRemovedItem(
   row: RemovedViewRow,
   rank: RemovalRank,
   suppressed: boolean,
+  tracking = false,
 ): Record<string, unknown> {
   return {
     listingId: row.listing_id,
@@ -131,6 +133,8 @@ export function toRemovedItem(
     removalTotalForWork: rank.total,
     restorable: !suppressed,
     suppressed,
+    // #454 (`A64`): whether the owner asked to hear about a new season.
+    trackingNewSeason: tracking,
   };
 }
 
@@ -162,9 +166,10 @@ export function registerRemovedRoutes(router: Router): void {
     const rows = hasMore ? fetched.slice(0, query.limit) : fetched;
 
     const works = [...new Set(rows.map((row) => row.work_identity))];
-    const [removals, suppressed] = await Promise.all([
+    const [removals, suppressed, tracked] = await Promise.all([
       countRemovalsForWorks(ownerId, works),
       findActiveSuppressedWorks(ownerId, works),
+      listTrackedWorkIdentities(ownerId, works),
     ]);
     const ranks = rankRemovals(removals);
 
@@ -176,6 +181,7 @@ export function registerRemovedRoutes(router: Router): void {
         // the honest answer for a row we can see exactly once.
         ranks.get(row.listing_id) ?? { ordinal: 1, total: 1 },
         suppressed.has(row.work_identity),
+        tracked.has(row.work_identity),
       ),
     );
 

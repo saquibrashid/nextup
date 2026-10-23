@@ -1954,6 +1954,32 @@ export const WAITING_ADD_TO_LIBRARY_FAILED =
 /** US-063 AC-8 — a fact on a waiting row that came from the Library. */
 export const WAITING_MOVED_FROM_LIBRARY = 'Moved from your Library on';
 
+/** #454 — tracking a removed show for a new season. */
+export const SEASON_TAG_ANNOUNCED = 'New season';
+export const SEASON_TAG_OUT = 'Season out';
+export function seasonPremieresText(season: number, date: string): string {
+  return `Season ${season} premieres ${date}.`;
+}
+export function seasonOutText(season: number): string {
+  return `Season ${season} is out. Add it to your Library when you are ready.`;
+}
+export const SEASON_OFFERS_HEADING = 'New season announced';
+export const SEASON_OFFERS_BODY =
+  'You removed these shows and asked to hear about a new season. Nothing is added until you say so.';
+export const SEASON_OFFER_ADD = 'Add to Waiting';
+export const SEASON_OFFER_STOP = 'Stop tracking';
+export const SEASON_OFFER_FAILED = 'Couldn\u2019t update that. Nothing has changed. Try again.';
+export const SEASON_TRACK = 'Track new seasons';
+export const SEASON_TRACKING = 'Tracking for a new season';
+export const SEASON_TRACK_STOP = 'Stop tracking';
+export const SEASON_TRACK_ON =
+  'We will tell you in Waiting to stream when a new season is announced.';
+export const SEASON_TRACK_WAITING = 'A new season is announced. It is now in Waiting to stream.';
+export const SEASON_TRACK_LOOKUP_FAILED =
+  'Couldn\u2019t check for a new season just now. We will look again when you open Waiting to stream.';
+export const SEASON_TRACK_STOPPED = 'Stopped tracking for a new season.';
+export const SEASON_TRACK_FAILED = 'Couldn\u2019t update tracking. Nothing has changed. Try again.';
+
 /* ── US-064 — the "Availability changes" screen (PRD `A55`) ────────────── */
 
 /**

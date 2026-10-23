@@ -439,6 +439,26 @@ export interface WaitingItem {
    * `yours` is whether the owner uses that service.
    */
   forecast?: (import('@nextup/domain').StreamingForecast & { yours: boolean }) | null;
+  /** #454 — the NEW season this show is waiting on, or `null`/absent for none. */
+  season?: { number: number; airsOn: string; out: boolean } | null;
+}
+
+/** #454 — a tracked show with an announced season, OFFERED to the owner. */
+export interface NewSeasonOffer {
+  titleId: string;
+  workIdentity: string;
+  name: string;
+  posterPath: string | null;
+  season: { number: number; airsOn: string };
+}
+
+/** `POST /api/titles/:titleId/new-season-tracking` (#454). */
+export interface NewSeasonTrackingResult {
+  titleId: string;
+  status: 'tracking' | 'waiting';
+  lookupFailed?: boolean;
+  season?: { number: number; airsOn: string } | null;
+  intentId?: string;
 }
 
 /** `POST /api/waiting` (#378) — wait for a work found by search. */
@@ -460,6 +480,8 @@ export interface WaitingResponse {
    * the as-of dates may be older than expected. It is never an error page.
    */
   availabilityRefreshFailed: boolean;
+  /** #454 — optional so a server that predates it still renders. */
+  newSeasonOffers?: NewSeasonOffer[];
 }
 
 /**
@@ -502,6 +524,8 @@ export interface RemovedItem {
   removalTotalForWork: number;
   restorable: boolean;
   suppressed: boolean;
+  /** #454 — the owner asked to be told of a new season of this show. */
+  trackingNewSeason?: boolean;
 }
 
 /** §6.54 / §6.55 (US-067) — what a permanent delete removed. */
@@ -1107,6 +1131,22 @@ export function createApiClient(deps: ApiClientDeps = {}) {
       request<PromoteWaitingResponse>(
         `/api/waiting/${encodeURIComponent(intentId)}/promote`,
         { method: 'POST', body: { service } },
+        deps,
+      ),
+
+    /** #454 — track a removed show for a new season (also "Add to Waiting"). */
+    startNewSeasonTracking: (titleId: string) =>
+      request<NewSeasonTrackingResult>(
+        `/api/titles/${encodeURIComponent(titleId)}/new-season-tracking`,
+        { method: 'POST', body: {} },
+        deps,
+      ),
+
+    /** #454 — stop tracking a show for a new season. */
+    stopNewSeasonTracking: (titleId: string) =>
+      request<{ titleId: string; status: 'stopped' }>(
+        `/api/titles/${encodeURIComponent(titleId)}/new-season-tracking/stop`,
+        { method: 'POST', body: {} },
         deps,
       ),
 

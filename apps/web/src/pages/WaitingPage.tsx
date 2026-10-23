@@ -72,8 +72,17 @@ import {
   WAITING_ADD_TO_LIBRARY,
   WAITING_ADD_TO_LIBRARY_FAILED,
   WAITING_MOVED_FROM_LIBRARY,
+  SEASON_OFFERS_BODY,
+  SEASON_OFFERS_HEADING,
+  SEASON_OFFER_ADD,
+  SEASON_OFFER_FAILED,
+  SEASON_OFFER_STOP,
+  SEASON_TAG_ANNOUNCED,
+  SEASON_TAG_OUT,
+  seasonOutText,
+  seasonPremieresText,
 } from '../copy';
-import type { TmdbSearchResult, WaitingItem } from '../lib/apiClient';
+import type { NewSeasonOffer, TmdbSearchResult, WaitingItem } from '../lib/apiClient';
 import { TMDB_IMAGE_BASE, TMDB_IMAGE_BASE_2X } from '../components/TitleRow';
 import { formatDateShort } from './RemovedPage';
 import { useOnline } from '../lib/useOnline';
@@ -99,6 +108,85 @@ export interface WaitingPageProps {
   /** #391 — Grid or Compact, as in the Library. Held by the page when omitted. */
   readonly view?: ListView;
   readonly onViewChange?: (view: ListView) => void;
+  /** #454 — tracked shows with an announced season, offered to the owner. */
+  readonly newSeasonOffers?: readonly NewSeasonOffer[];
+  readonly onTrackSeason?: (titleId: string) => Promise<unknown>;
+  readonly onStopSeason?: (titleId: string) => Promise<unknown>;
+}
+
+/**
+ * #454 — OFFERS, never moves: a removed show whose new season is announced is
+ * only listed here. Adding it to Waiting is the owner's tap.
+ */
+function NewSeasonOffers({
+  offers,
+  onTrack,
+  onStop,
+  offline,
+}: {
+  readonly offers: readonly NewSeasonOffer[];
+  readonly onTrack: (titleId: string) => Promise<unknown>;
+  readonly onStop: (titleId: string) => Promise<unknown>;
+  readonly offline: boolean;
+}): JSX.Element | null {
+  const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
+  const [failed, setFailed] = useState(false);
+  const visible = offers.filter((offer) => !gone.has(offer.titleId));
+  if (visible.length === 0) return null;
+
+  function act(handler: (titleId: string) => Promise<unknown>, titleId: string): void {
+    setFailed(false);
+    handler(titleId).then(
+      () => setGone((previous) => new Set([...previous, titleId])),
+      () => setFailed(true),
+    );
+  }
+
+  return (
+    <section
+      className="season-offers"
+      data-testid="season-offers"
+      aria-labelledby="season-offers-h"
+    >
+      <h2 id="season-offers-h">{SEASON_OFFERS_HEADING}</h2>
+      <p>{SEASON_OFFERS_BODY}</p>
+      <ul className="season-offers__list">
+        {visible.map((offer) => (
+          <li key={offer.titleId} className="season-offers__item" data-testid="season-offer">
+            <span className="season-offers__name">{offer.name}</span>
+            <span data-testid="season-offer-date">
+              {seasonPremieresText(offer.season.number, friendlyDate(offer.season.airsOn))}
+            </span>
+            <span className="season-offers__actions">
+              <Button
+                variant="primary"
+                data-testid="season-offer-add"
+                aria-label={`${SEASON_OFFER_ADD}: ${offer.name}`}
+                disabled={offline}
+                onClick={() => act(onTrack, offer.titleId)}
+              >
+                {SEASON_OFFER_ADD}
+              </Button>
+              <Button
+                variant="ghost"
+                data-testid="season-offer-stop"
+                aria-label={`${SEASON_OFFER_STOP}: ${offer.name}`}
+                disabled={offline}
+                onClick={() => act(onStop, offer.titleId)}
+              >
+                {SEASON_OFFER_STOP}
+              </Button>
+            </span>
+          </li>
+        ))}
+      </ul>
+      {failed && (
+        <p role="alert" data-testid="season-offer-error">
+          {SEASON_OFFER_FAILED}
+        </p>
+      )}
+    </section>
+  );
 }
 
 function knownService(service: string): Service | undefined {
@@ -416,10 +504,27 @@ export function WaitingOutlook({ item }: { readonly item: WaitingItem }): JSX.El
     const known = knownService(service);
     return known === undefined ? [] : [known];
   });
-  const forecast = flagged.length > 0 ? null : forecastLine(item);
+  const season = flagged.length === 0 ? (item.season ?? null) : null;
+  const seasonKind = 'announced';
+  const forecast = flagged.length > 0 || season !== null ? null : forecastLine(item);
   const forecastKind = forecast?.estimate === true ? 'estimate' : 'announced';
   return (
     <>
+      {season !== null && (
+        <div className={OUTLOOK_CLASS[seasonKind]} data-testid="waiting-season">
+          <p className="waiting-row__outlook-head" aria-hidden="true">
+            <span className={TAG_CLASS[seasonKind]}>
+              {season.out ? SEASON_TAG_OUT : SEASON_TAG_ANNOUNCED}
+            </span>
+            <span className="waiting-row__when">{friendlyDate(season.airsOn)}</span>
+          </p>
+          <p className={FORECAST_CLASS[seasonKind]} data-testid="waiting-season-text">
+            {season.out
+              ? seasonOutText(season.number)
+              : seasonPremieresText(season.number, friendlyDate(season.airsOn))}
+          </p>
+        </div>
+      )}
       {flagged.length > 0 ? (
         /*
         #389 — the good news as the row's panel: the tag, the service's
@@ -681,6 +786,9 @@ export function WaitingPage({
   onSearchAdd,
   view: controlledView,
   onViewChange,
+  newSeasonOffers = [],
+  onTrackSeason,
+  onStopSeason,
 }: WaitingPageProps = {}): JSX.Element {
   const offline = !useOnline();
   const [localView, setLocalView] = useState<ListView>('compact');
@@ -716,6 +824,15 @@ export function WaitingPage({
         <p role="status" data-testid="waiting-refresh-failed">
           {WAITING_REFRESH_FAILED}
         </p>
+      )}
+
+      {!loading && !loadFailed && onTrackSeason !== undefined && onStopSeason !== undefined && (
+        <NewSeasonOffers
+          offers={newSeasonOffers}
+          onTrack={onTrackSeason}
+          onStop={onStopSeason}
+          offline={offline}
+        />
       )}
 
       {loadFailed ? (

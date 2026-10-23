@@ -708,3 +708,57 @@ test.describe('T-WSORT-005 — sorting Waiting to stream in a real browser (#415
     await noOverflow(page);
   });
 });
+
+const WAITING_SEASONS = {
+  count: 1,
+  availabilityRefreshFailed: false,
+  items: [
+    {
+      intentId: 'wi_s',
+      titleId: 'ttl_s',
+      workIdentity: 'tmdb:tv:84773',
+      name: 'The Lord of the Rings: The Rings of Power',
+      releaseYear: 2022,
+      posterPath: null,
+      discoveredAt: '2026-09-01',
+      discoverySource: 'search',
+      availableOn: [],
+      flaggedOn: [],
+      accessState: 'not-seen',
+      availabilityCheckedAt: '2026-09-20T00:00:00.000Z',
+      availabilityRegion: 'US',
+      season: { number: 3, airsOn: '2027-02-01', out: false },
+    },
+  ],
+  newSeasonOffers: [
+    {
+      titleId: 'ttl_o',
+      workIdentity: 'tmdb:tv:1',
+      name: 'Severance',
+      posterPath: null,
+      season: { number: 3, airsOn: '2027-03-05' },
+    },
+  ],
+};
+
+test.describe('T-SEAS-080 — a new season in Waiting, in a real browser (#454)', () => {
+  test('T-SEAS-080a: the season panel and the offer fit and are reachable at 280, 390 and 1024px', async ({
+    page,
+  }) => {
+    for (const width of [280, 390, 1024]) {
+      await page.setViewportSize({ width, height: 900 });
+      await stubApi(page, WAITING_SEASONS);
+      await page.goto('/waiting');
+      await expect(page.getByTestId('waiting-season-text')).toHaveText(
+        'Season 3 premieres 1 Feb 2027.',
+      );
+      await expect(page.getByTestId('season-offer-date')).toHaveText(
+        'Season 3 premieres 5 Mar 2027.',
+      );
+      await expect(page.getByTestId('season-offer-add')).toBeVisible();
+      await expect(page.getByTestId('season-offer-stop')).toBeVisible();
+      await noOverflow(page);
+      await page.unrouteAll();
+    }
+  });
+});

@@ -346,6 +346,18 @@ export const MUTATING_ROUTE_REGISTRY = [
   },
   {
     method: 'POST',
+    path: '/api/titles/:titleId/new-season-tracking',
+    changesListState: false,
+    why: "records the owner opt-in and may open a Waiting entry for a removed TV show; the title stays `removed` and never joins the list — Waiting's own Add to Library returns it (#454, US-072)",
+  },
+  {
+    method: 'POST',
+    path: '/api/titles/:titleId/new-season-tracking/stop',
+    changesListState: false,
+    why: 'turns the owner opt-in off; a preference flag only (#454, US-072)',
+  },
+  {
+    method: 'POST',
     path: '/api/batches',
     changesListState: false,
     why: 'opens a DRAFT batch; nothing is applied until close (US-005 AC-3)',
