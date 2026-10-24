@@ -564,7 +564,7 @@ test.describe('T-A11Y-001 — the 320 px floor', () => {
     await expectNoHorizontalOverflow(page);
 
     const items = menu.getByRole('menuitem');
-    // Five since US-074: Not interested, Fix match, Remove from library, Finished watching, Cancel.
+    // Five since US-074; #471 reorders them and the phone sheet ends with Close.
     await expect(items).toHaveCount(5);
     for (let i = 0; i < 5; i += 1) {
       await expectTapTarget(items.nth(i));

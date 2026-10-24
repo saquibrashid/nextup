@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 300 |
+| ✅ done | 301 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **303** |
+| **total** | **304** |
 
 ## Ready to start
 
@@ -341,3 +341,4 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-303` | The move and chip at 280 px in a real browser. Test id: `T-FTW-080`. | `T-FTW-080` |
 | `TASK-304` | Waiting card content pass (#467, `A68`, US-076 / REQ-142): title case, placeholder poster, one *as of* note, *Not interested* in a row menu, lighter status chips. No state, route or migration change. Test ids: `T-WCARD-001`..`T-WCARD-004`. | `T-WCARD-001`, `T-WCARD-002`, `T-WCARD-003`, `T-WCARD-004` |
 | `TASK-305` | Mobile Library and Waiting grid/list layouts (#470, `A68`, US-077 / REQ-143): two-column Library poster grid, equal-height Waiting grid, Library-height Waiting compact rows, at 280/390/1024 px. Test id: `T-MCARD-080`. | `T-MCARD-080` |
+| `TASK-306` | Lighter row action menu (#471, `A69`, US-078 / REQ-144): short labels, light popover, phone bottom sheet, one shared `RowMenu` for Library and Waiting. Presentation only. Test ids: `T-MENU-001`, `T-MENU-002`, `T-MENU-080`. | `T-MENU-001`, `T-MENU-002`, `T-MENU-080` |

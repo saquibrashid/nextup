@@ -159,6 +159,21 @@
 
 ---
 
+> ## ⚠ AMENDMENT — 2026-10-25 — `A69` (owner-requested, #471): a lighter row action menu
+>
+> **The owner observed** (#471) that the row menu is a stack of five heavy, bordered, bold buttons whose long labels wrap in the grid and which cover the card. **Decision:** one presentation-only redesign of the shared `RowMenu`.
+>
+> | Decision | What it changes | Kind |
+> |---|---|---|
+> | **1. Light popover (US-078 / REQ-144)** | Plain icon rows, regular weight, no per-item borders, hover/focus background, thin group dividers, a subdued danger tint, width fitted to content, no visible *Cancel* on desktop. | **Instruction** |
+> | **2. Short labels** | *Not interested*, *Fix match*, *Remove*, *Finished* are shown; the full wording (*Remove from library*, *Finished watching*) stays as the accessible name and tooltip. | **Instruction** |
+> | **3. Phone bottom sheet** | Large tap targets and a visible *Close* affordance. | **Instruction** |
+> | **4. Nothing else moves** | Items, order intent (destructive farthest from the thumb; *Fix match* moves below *Remove*), confirmations, undo, keyboard behaviour and action semantics are unchanged; no migration, route, dependency or process. | **Instruction** |
+>
+> **New in this document:** **US-078 / REQ-144** (Epic L). **Amended in place:** `specs/ui.md` §2.3, `specs/testing.md` US-078.
+
+---
+
 > ## ⚠ AMENDMENT — 2026-10-24 — `A65` (owner-reported, #463): the left navigation is grouped into sections
 
 > **The owner observed** (#463) that the sidebar was one undifferentiated stack of nine links: *Availability changes* wrapped to two lines, the signed-in address broke mid-word, About sat between working destinations, and nothing said what belonged together. **Decision:** the sidebar and the Menu drawer list the same nine destinations in labelled sections. This is presentation only — no route, URL, label or behaviour changes.
@@ -2558,6 +2573,28 @@ introduced.
 | AC-4 | Both pages at the same widths | They render | The page-level *as of* note is shown once. |
 
 **Out of scope:** Library list density changes; new routes; new filters.
+**Open questions:** none.
+
+#### US-078 — A lighter row action menu (`A69`)
+
+**REQ-144 (`must`, owner-requested #471, `A69`).** The row action menu, shared by the Library and Waiting cards, is a light popover: plain rows with a leading icon, regular-weight one-line labels (*Not interested*, *Fix match*, *Remove*, *Finished*), no per-item borders, a hover and focus background, thin dividers between groups and a subdued danger tint on *Not interested* and *Remove*. The full wording stays as each item's accessible name and tooltip. It has no visible *Cancel* on desktop (Escape or an outside press closes it); on a phone it is a bottom sheet with large tap targets and a visible *Close*. Its width fits its content (at least about 11 rem) and it stays inside the viewport. Presentation only: the items, their order intent, confirmations, undo and keyboard behaviour are unchanged.
+
+**As** the owner
+**I want** the row menu to be light and readable
+**So that** it does not cover the card or wrap its labels
+
+**Traces to:** REQ-144, REQ-142, REQ-143, REQ-140, REQ-071
+**Priority:** must
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | The row menu is open | It renders | Items show the short labels, each keeps its full accessible name, and the menu items are unchanged. |
+| AC-2 | The menu is open on a desktop | It renders | Items have no borders, there is no visible *Cancel*, and Escape closes it. |
+| AC-3 | The menu is open at 280, 390 and 1024 px | It renders | No label wraps, the menu stays inside the viewport, and on a phone it is a bottom sheet with a visible *Close*. |
+| AC-4 | A Library or Waiting menu action is chosen | It runs | Its confirmation, undo and action are unchanged. |
+
+**Out of scope:** new menu items, new icons, and Library or Waiting card changes.
 **Open questions:** none.
 
 ### 7.4 Closed enumeration of permitted mutations (REQ-041)
