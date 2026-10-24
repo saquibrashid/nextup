@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, type JSX } from 'react';
 
 import { MoreIcon, SuppressedIcon } from './icons';
+import { ROW_MENU_CANCEL_LABEL } from './RowMenu';
 import { Button } from './ui/Button';
 import { OFFLINE_DISABLED_REASON, WAITING_NOT_INTERESTED } from '../copy';
 
@@ -54,12 +55,18 @@ export function WaitingRowMenu({ name, offline, onSuppress }: WaitingRowMenuProp
         <MoreIcon />
       </Button>
       {open && (
-        <div className="waiting-row__menu-panel" role="menu" aria-label={`Actions for ${name}`}>
+        <div
+          className="row-menu waiting-row__menu-panel"
+          role="menu"
+          aria-label={`Actions for ${name}`}
+        >
           <Button
             variant="ghost"
             role="menuitem"
+            data-tone="danger"
             data-testid="waiting-not-interested"
             aria-label={`${WAITING_NOT_INTERESTED}: ${name}`}
+            title={WAITING_NOT_INTERESTED}
             disabled={offline}
             autoFocus
             onClick={() => {
@@ -68,9 +75,22 @@ export function WaitingRowMenu({ name, offline, onSuppress }: WaitingRowMenuProp
             }}
           >
             <SuppressedIcon />
-            {WAITING_NOT_INTERESTED}
+            <span className="row-menu__label">{WAITING_NOT_INTERESTED}</span>
           </Button>
           {offline && <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>}
+          {/* Shown only in the phone sheet (CSS); desktop closes on Escape or an outside press. */}
+          <Button
+            variant="ghost"
+            role="menuitem"
+            data-menu-close=""
+            aria-label={ROW_MENU_CANCEL_LABEL}
+            onClick={() => {
+              setOpen(false);
+              trigger.current?.focus();
+            }}
+          >
+            Close
+          </Button>
         </div>
       )}
     </span>

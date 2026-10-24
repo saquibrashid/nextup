@@ -233,7 +233,7 @@ describe('T-UX-030 the row menu reaches the suppress and fix-match dialogs', () 
     const user = userEvent.setup();
     const props = mount();
     await openMenu(user, 'Dune');
-    await user.click(await screen.findByRole('menuitem', { name: 'Cancel' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Close menu' }));
 
     await waitFor(() => {
       expect(screen.queryByRole('menu')).toBeNull();

@@ -91,6 +91,21 @@ Collected locations: `packages/domain/test/titleCategory.spec.ts`;
 | **`T-WCARD-003`** (`a`) | W | `TASK-304` | Same file: rows sharing a date show one note. |
 | **`T-WCARD-004`** (`a`–`b`) | W | `TASK-304` | Same file: the menu offers *Not interested*, calls the unchanged suppression, and Escape closes it. |
 
+### US-078 — A lighter row action menu (TASK-306, #471, `A69`)
+
+| AC | Level | Test IDs | Assertion |
+| --- | --- | --- | --- |
+| AC-1 | W | `T-MENU-001` | Short visible labels; full accessible names; unchanged item set and order. |
+| AC-2 | W/E | `T-MENU-002`, `T-MENU-080` (`a`) | No per-item border and no visible *Cancel* on desktop; Escape closes. |
+| AC-3 | E | `T-MENU-080` (`b`–`c`) | No wrapped label and inside the viewport at 280/390/1024 px; phone sheet with *Close*. |
+| AC-4 | W | `T-UX-030`, `T-VIEWED-062`, `T-WCARD-004` | Confirmations, undo and actions unchanged. |
+
+| ID | Level | Task | What it asserts |
+| --- | --- | --- | --- |
+| **`T-MENU-001`** (`a`–`b`) | W | `TASK-306` | `apps/web/test/rowMenuLight.spec.tsx`: short labels with full accessible names and tooltips; Library and Waiting share one stylesheet and the close control is a labelled button. |
+| **`T-MENU-002`** (`a`) | W | `TASK-306` | Same file: the stylesheet gives menu items no border, no bold weight, and hides the close control outside the phone layout. |
+| **`T-MENU-080`** (`a`–`c`) | E | `TASK-306` | `tests/e2e/rowMenu.spec.ts`: at 280, 390 and 1024 px no item label wraps (offenders named, 30% headroom), the menu stays in the viewport, desktop items have no border and no visible *Cancel*, the phone sheet shows *Close*. |
+
 ### US-077 — Mobile Library and Waiting grid and list layouts (TASK-305, #470, `A68`)
 
 | AC | Level | Test IDs | Assertion |

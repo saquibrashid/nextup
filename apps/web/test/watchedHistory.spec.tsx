@@ -440,10 +440,10 @@ describe('T-VIEWED-062 · the row menu', () => {
     const items = within(screen.getByTestId('row-menu-popup')).getAllByRole('menuitem');
     expect(items.map((item) => item.textContent)).toStrictEqual([
       'Not interested',
+      'Remove',
       'Fix match',
-      'Remove from library',
-      'Finished watching',
-      'Cancel',
+      'Finished',
+      'Close',
     ]);
 
     await userEvent.click(screen.getByTestId('row-menu-finished'));

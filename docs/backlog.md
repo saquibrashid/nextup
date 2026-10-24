@@ -762,6 +762,7 @@ finished, so the exception cannot outlive its reason.
 | `TASK-303` | `done` | The move and chip at 280 px in a real browser. Test id: `T-FTW-080`. |
 | `TASK-304` | `done` | Waiting card content pass (#467, `A68`, US-076 / REQ-142): title case, placeholder poster, one *as of* note, *Not interested* in a row menu, lighter status chips. No state, route or migration change. Test ids: `T-WCARD-001`..`T-WCARD-004`. |
 | `TASK-305` | `done` | Mobile Library and Waiting grid/list layouts (#470, `A68`, US-077 / REQ-143): two-column Library poster grid, equal-height Waiting grid, Library-height Waiting compact rows, at 280/390/1024 px. Test id: `T-MCARD-080`. |
+| `TASK-306` | `done` | Lighter row action menu (#471, `A69`, US-078 / REQ-144): short labels, light popover, phone bottom sheet, one shared `RowMenu` for Library and Waiting. Presentation only. Test ids: `T-MENU-001`, `T-MENU-002`, `T-MENU-080`. |
 <!-- STATUS-LEDGER:END -->
 ### Approved availability moves (#397/#410), 2026-09-29
 
@@ -823,6 +824,7 @@ TASK-265."~~
 | TASK-303 | The move and chip in a browser at 280 px (US-075 AC-4). | 1 agent-run + 5 owner-review-minutes | TASK-302 | `T-FTW-080` |
 | TASK-304 | Waiting card content pass: title case, placeholder poster, one *as of* note, row overflow menu, lighter status chips (US-076). | 1 agent-run + 15 owner-review-minutes | TASK-303 | `T-WCARD-001`; `T-WCARD-002`; `T-WCARD-003`; `T-WCARD-004` |
 | TASK-305 | Mobile Library and Waiting grid/list layouts at 280/390/1024 px (US-077). | 1 agent-run + 15 owner-review-minutes | TASK-304 | `T-MCARD-080` |
+| TASK-306 | Lighter row action menu: short labels, light popover, phone bottom sheet (US-078). | 1 agent-run + 15 owner-review-minutes | TASK-305 | `T-MENU-001`; `T-MENU-002`; `T-MENU-080` |
 | TASK-299 | Recently watched view, edit dialog and nav entry (US-074). | 1 agent-run + 10 owner-review-minutes | TASK-298 | `T-VIEWED-061`; `T-VIEWED-064` |
 | TASK-300 | Finished flow and history view in a browser at 280 px (US-074 AC-8). | 1 agent-run + 5 owner-review-minutes | TASK-299 | `T-VIEWED-080` |
 

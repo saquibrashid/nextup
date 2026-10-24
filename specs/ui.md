@@ -602,6 +602,21 @@ Rules, all of them load-bearing:
 
 ### 2.3 Row menu dialogs
 
+- **The row menu itself (#471, `A69`, US-078 / REQ-144, `T-MENU-*`)** is one light
+  popover shared by the Library (`RowMenu`) and Waiting (`WaitingRowMenu`) cards.
+  Rows are plain: a leading icon (reused from the closed register), regular-weight
+  one-line text, no per-item border, a hover and focus background, thin dividers
+  between groups and a subdued danger tint on *Not interested* and *Remove*. Visible
+  labels are short (*Not interested*, *Fix match*, *Remove*, *Finished*); the full
+  wording (*Remove from library*, *Finished watching*) is each item's accessible name
+  and tooltip. Groups by intent: dismiss (*Not interested*, *Remove*), fix
+  (*Fix match*), watching (*Finished*); the destructive group is farthest from the
+  thumb (so *Fix match* now sits below *Remove*; *Finished* stays last). There is no visible *Cancel* on desktop
+  (Escape or an outside press closes it). On a phone (`html[data-layout='phone']`) the
+  menu is a bottom sheet with at least 3 rem tap targets and a visible *Close*.
+  Width fits content (minimum 11 rem) and never exceeds the viewport.
+  Presentation only; confirmations, undo and keyboard behaviour are unchanged.
+
 - **Not interested** (`components/SuppressDialog.tsx`) — states plainly:
   *"'Dune' will be hidden from your list and won't come back on future
   uploads, even if it's still saved on your streaming services. You can undo this from

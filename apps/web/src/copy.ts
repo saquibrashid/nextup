@@ -144,6 +144,8 @@ export const REMOVED_BY_OWNER = 'Removed by you';
 
 /** §2.2 row menu — the third item. */
 export const ROW_MENU_REMOVE_LABEL = 'Remove from library';
+/** #471 — the one-line label shown in the row menu; the full wording above stays the accessible name. */
+export const ROW_MENU_REMOVE_SHORT_LABEL = 'Remove';
 
 /** #457 — shared lookup-result row copy. */
 export const TITLE_SEARCH_SELECT = 'Select';
@@ -2135,6 +2137,8 @@ export const WAITING_SUPPRESS_FAILED = "Couldn't do that. Nothing was changed.";
 /** US-074 (`A66`) — Finished watching, per-season tracking and Recently watched. */
 export const NAV_WATCHED_LABEL = 'Recently watched';
 export const ROW_MENU_FINISHED_LABEL = 'Finished watching';
+/** #471 — the one-line label shown in the row menu. */
+export const ROW_MENU_FINISHED_SHORT_LABEL = 'Finished';
 export const FINISHED_LOADING = 'Loading what you have watched…';
 export const FINISHED_LOAD_FAILED = "Couldn't load your watched history. Nothing was changed.";
 export const FINISHED_SAVE_FAILED = "Couldn't save that. Nothing was changed.";
