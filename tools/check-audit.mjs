@@ -70,6 +70,40 @@ export const EXCEPTIONS = [
       'request is rejected before a decompression stream is created. Remove this ' +
       'entry once body-parser >= 2.4.0 is installable (the gate fails when stale).',
   },
+  {
+    id: 'GHSA-xcx6-jx8p-x3h5',
+    package: '@azure/msal-node',
+    accepted: '2026-10-24',
+    reason:
+      'MSAL Node authorization code flow may disclose parameters to an ' +
+      'attacker-controlled endpoint (<= 7.0.2). Reached only as @azure/identity → ' +
+      '@azure/msal-node, used through DefaultAzureCredential for managed identity ' +
+      '(Blob, Azure OpenAI, Vision). The vulnerable surface is the interactive ' +
+      'authorization-code flow (acquireTokenByCode / auth-code URL), which nextup ' +
+      'never calls: there is no user sign-in in the application (Easy Auth does it ' +
+      'outside the process) and no redirect URI or authority is owner- or ' +
+      'attacker-supplied. A real fix needs msal-node 7.1.1, a MAJOR bump past ' +
+      '@azure/identity 4.13.3\u2019s declared ^6.0.0 range, forced through an ' +
+      'override that cannot be exercised against real Azure credentials in CI, so ' +
+      'it is deliberately not taken blind. Remove this entry once @azure/identity ' +
+      'depends on a patched msal-node (the gate fails when stale).',
+  },
+  {
+    id: 'GHSA-q7qp-rjg7-q26m',
+    package: 'multer',
+    accepted: '2026-10-24',
+    reason:
+      'Denial of service via a pending ASYNCHRONOUS fileFilter after request ' +
+      'teardown (multer 2.0.0 - 2.4.0). The only patched line is 3.0.0-alpha.2, a ' +
+      'pre-release major, which is not acceptable for the upload path. The ' +
+      'precondition does not exist here: the single multer instance in ' +
+      'apps/api/src/routes/batchImages.ts sets NO fileFilter at all (memory ' +
+      'storage plus size and file-count limits only), so there is no pending ' +
+      'filter to leak, and the route sits behind authentication for the single ' +
+      'allow-listed owner. Rule for the future: do not add an async fileFilter ' +
+      'while this entry exists. Remove this entry once a stable multer >= the ' +
+      'fixed release is installable (the gate fails when stale).',
+  },
 ];
 
 function runAudit() {
