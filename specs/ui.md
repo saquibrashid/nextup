@@ -1571,6 +1571,16 @@ carries the same action. Offline it is disabled with the standard reason.
   *Keep in Library* first and *Remove from Library* second. Nothing is
   automatic. After removing: a status line with *Undo* (back in the Library,
   record untouched). Focus moves to the new step's first control.
+- **Move to Waiting (#468, `A67`, `T-FTW-010`).** When the season list has a
+  dated unaired season, the ask step adds a third button *Move to Waiting to
+  stream (Season N, date)* with a one-line hint; it is hidden otherwise. Choosing
+  it sets the title aside, opens the season-and-date Waiting entry
+  (*Track new seasons*), and shows a status line with *Undo* (back in the
+  Library, Waiting entry ended). A failed move puts the title back and says so.
+  Buttons wrap; nothing overflows at 280 px (`T-FTW-080`).
+- **Waiting card chip (`T-FTW-011`).** A card with a season shows a bordered chip
+  *Season N upcoming · date* (*Season out* once it has aired) in the existing
+  outlook block; the chip wraps (`overflow-wrap: anywhere`).
 
 **`/watched` — Recently watched** (`pages/WatchedPage.tsx`, nav History group
 before *Removal history*). Newest first; each row has the poster, name (year),

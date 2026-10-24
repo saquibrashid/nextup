@@ -1961,8 +1961,11 @@ export const WAITING_ADD_TO_LIBRARY_FAILED =
 export const WAITING_MOVED_FROM_LIBRARY = 'Moved from your Library on';
 
 /** #454 — tracking a removed show for a new season. */
-export const SEASON_TAG_ANNOUNCED = 'New season';
 export const SEASON_TAG_OUT = 'Season out';
+/** #468 — the Waiting card's chip for a season that has not aired yet. */
+export function seasonUpcomingChip(season: number, date: string): string {
+  return `Season ${season} upcoming · ${date}`;
+}
 export function seasonPremieresText(season: number, date: string): string {
   return `Season ${season} premieres ${date}.`;
 }
@@ -2152,6 +2155,16 @@ export const FINISHED_ASK_REMOVE_HINT =
   'It stays in Recently watched, and you can return it to your Library any time.';
 export const FINISHED_REMOVE_ACTION = 'Remove from Library';
 export const FINISHED_KEEP_ACTION = 'Keep in Library';
+/** #468 — a third answer when every aired season is finished and another is announced. */
+export function finishedWaitingAction(season: number, date: string): string {
+  return `Move to Waiting to stream (Season ${season}, ${date})`;
+}
+export const FINISHED_WAITING_HINT =
+  'It leaves your Library and waits in Waiting to stream until that season is out. You can undo this.';
+export const FINISHED_MOVED_WAITING =
+  '“{name}” is in Waiting to stream for Season {n}, and out of your Library.';
+export const FINISHED_MOVE_WAITING_FAILED =
+  "Couldn't move it to Waiting to stream. It is still in your Library.";
 export const FINISHED_REMOVED = '“{name}” is out of your Library and stays in Recently watched.';
 export const FINISHED_RETURN_ACTION = 'Return to Library';
 export const FINISHED_RETURNED = '“{name}” is back in your Library.';

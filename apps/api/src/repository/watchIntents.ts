@@ -63,6 +63,14 @@ export async function listWaitingIntents(
     select: { title: { select: { workIdentity: true } } },
   });
   const hidden = new Set(inLibrary.map((listing) => listing.title.workIdentity));
+  if (hidden.size === 0) return intents;
+  // #468 (`A67`): a finished show the owner set aside is not in the Library
+  // view, so its waiting entry (a new season to wait for) must still show.
+  const setAside = await db(tx).watchPreference.findMany({
+    where: { ownerId, libraryHidden: true, workIdentity: { in: [...hidden] } },
+    select: { workIdentity: true },
+  });
+  for (const row of setAside) hidden.delete(row.workIdentity);
   return intents.filter((intent) => !hidden.has(intent.workIdentity));
 }
 

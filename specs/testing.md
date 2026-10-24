@@ -58,6 +58,23 @@ Collected locations: `packages/domain/test/titleCategory.spec.ts`;
 | **`T-VIEWED-064`** (`a`) | W | `TASK-299` | Same file: the `/watched` route and its nav label. |
 | **`T-VIEWED-080`** (`a`–`b`) | E | `TASK-300` | `tests/e2e/finishedWatching.spec.ts`: the flow and the history view at 280 px and 1024 px, no overflow, no axe violations. |
 
+### US-075 — Move a finished show to Waiting to stream (TASK-301, TASK-302, TASK-303, #468, `A67`)
+
+| AC | Level | Test IDs | Assertion |
+| --- | --- | --- | --- |
+| AC-1 | W | `T-FTW-010` | The option shows only with a dated unaired season after every aired season is finished. |
+| AC-2 | W/E | `T-FTW-010`, `T-FTW-080` | The move hides the title and opens the Waiting entry; a failure puts it back. |
+| AC-3 | U/I/W | `T-FTW-001`, `T-FTW-002`, `T-FTW-010` | Undo returns the title and ends the Waiting entry; the Waiting read shows a set-aside title's entry. |
+| AC-4 | W/E | `T-FTW-011`, `T-FTW-080` | The *Season N upcoming · date* chip, no overflow at 280 px. |
+
+| ID | Level | Task | What it asserts |
+| --- | --- | --- | --- |
+| **`T-FTW-001`** (`a`–`b`) | U | `TASK-301` | `apps/api/test/unit/routes/watched.spec.ts`: `library-hidden` with `hidden: false` ends the open Waiting intent; `hidden: true` does not touch it. |
+| **`T-FTW-002`** (`a`) | I | `TASK-301` | `apps/api/test/integration/waitingAvailability.spec.ts`: a set-aside work's waiting intent is listed. |
+| **`T-FTW-010`** (`a`–`d`) | W | `TASK-302` | `apps/web/test/watchedHistory.spec.tsx`: the third option's visibility, the move, a failed move, and undo. |
+| **`T-FTW-011`** (`a`) | W | `TASK-302` | `apps/web/test/newSeasons.spec.tsx`: the *Season N upcoming · date* chip. |
+| **`T-FTW-080`** (`a`–`b`) | E | `TASK-303` | `tests/e2e/finishedWatching.spec.ts`: the move and chip at 280 px, no overflow, no axe violations. |
+
 ### US-073 — Grouped left navigation (TASK-295, TASK-296, #463, `A65`)
 
 | AC | Level | Test IDs | Assertion |

@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 295 |
+| ✅ done | 298 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **298** |
+| **total** | **301** |
 
 ## Ready to start
 
@@ -336,3 +336,6 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-298` | Finished watching dialog and ask-before-remove (#325/#465, US-074): row-menu item, per-season form, details button. Test ids: `T-VIEWED-060`, `T-VIEWED-062`, `T-VIEWED-063`. | `T-VIEWED-060`, `T-VIEWED-062`, `T-VIEWED-063` |
 | `TASK-299` | Recently watched view, edit dialog and nav entry (US-074). Test ids: `T-VIEWED-061`, `T-VIEWED-064`. | `T-VIEWED-061`, `T-VIEWED-064` |
 | `TASK-300` | Finished flow and history view in a real browser at 280 px (US-074 AC-8). Test ids: `T-VIEWED-080`. | `T-VIEWED-080` |
+| `TASK-301` | Finished show to Waiting, backend (#468, `A67`, US-075 / REQ-141): `library-hidden` `false` ends the open Waiting intent; the Waiting read lists a set-aside work's intent. No new route, no migration. Test ids: `T-FTW-001`, `T-FTW-002`. | `T-FTW-001`, `T-FTW-002` |
+| `TASK-302` | Finished show to Waiting, web: the third *Move to Waiting to stream (Season N, date)* option with Undo, and the *Season N upcoming · date* chip. Test ids: `T-FTW-010`, `T-FTW-011`. | `T-FTW-010`, `T-FTW-011` |
+| `TASK-303` | The move and chip at 280 px in a real browser. Test id: `T-FTW-080`. | `T-FTW-080` |

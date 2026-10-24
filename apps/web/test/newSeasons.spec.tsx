@@ -87,7 +87,19 @@ describe('T-SEAS-060 · Waiting shows the new season', () => {
     expect(screen.getByTestId('waiting-season-text').textContent).toBe(
       'Season 3 premieres 1 Feb 2027.',
     );
-    expect(screen.getByText('New season')).toBeTruthy();
+    expect(screen.getByTestId('waiting-season-chip').textContent).toBe(
+      'Season 3 upcoming · 1 Feb 2027',
+    );
+  });
+
+  it('T-FTW-011a: a card created by Finished watching shows a visible Season N upcoming chip, not the out tag', () => {
+    render(
+      <WaitingPage items={[item({ season: { number: 3, airsOn: '2027-02-01', out: false } })]} />,
+    );
+    const chip = screen.getByTestId('waiting-season-chip');
+    expect(chip).toBeVisible();
+    expect(chip.textContent).toContain('Season 3 upcoming');
+    expect(screen.queryByText('Season out')).toBeNull();
   });
 
   it('T-SEAS-060b: a season that is out says so, and still waits for the owner', () => {

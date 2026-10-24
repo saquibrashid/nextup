@@ -548,6 +548,28 @@ describe('T-WAIT-008 · a work in the Library is not also waiting', () => {
   });
 });
 
+describe('T-FTW-002 · a set-aside work still waits (#468)', () => {
+  it('T-FTW-002a · an active listing hides the intent, unless the work is set aside from the Library', async () => {
+    const { titleId } = await makeWaitingIntent({ tmdbId: 438_631, name: 'Dune' });
+    await testPrisma().serviceListing.create({
+      data: {
+        listingId: 'listing-ftw-1',
+        ownerId,
+        titleId,
+        service: 'netflix',
+        state: 'active',
+        dateAdded: new Date(Date.UTC(2026, 0, 10)),
+      },
+    });
+    expect(await listWaitingIntents(ownerId as OwnerId)).toHaveLength(0);
+
+    await testPrisma().watchPreference.create({
+      data: { ownerId, workIdentity: 'tmdb:movie:438631', libraryHidden: true },
+    });
+    expect(await listWaitingIntents(ownerId as OwnerId)).toHaveLength(1);
+  });
+});
+
 describe('T-AVAIL-007 · US-042 AC-7 · a provider outage degrades, never blanks', () => {
   it('T-AVAIL-007a · last-known availability and its as-of date survive an unreachable TMDB', async () => {
     const checkedAt = daysAgo(90);

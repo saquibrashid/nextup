@@ -2751,6 +2751,11 @@ Body `{ hidden: boolean }`. `hidden: true` sets the title aside (requires an act
 visible listing, else `409 TITLE_NOT_ACTIVE`); `hidden: false` returns it. Flips
 `watch_preference.library_hidden` only: no listing, suppression or removal-log row is written.
 
+**#468 (`A67`, REQ-141).** `hidden: false` also ends (`satisfied`) the work's open Waiting intent, so a
+title returned by *Undo* after *Move to Waiting to stream* is never in the Library and Waiting at once.
+`GET /api/waiting` lists the intent of a work whose active listings are all set aside. The move itself
+is `hidden: true` followed by §6.57 (`new-season-tracking`); there is no new route.
+
 ---
 
 ## 7. Status-code policy

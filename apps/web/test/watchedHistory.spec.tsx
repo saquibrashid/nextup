@@ -331,6 +331,78 @@ describe('T-VIEWED-060 · the Finished watching dialog', () => {
   });
 });
 
+describe('T-FTW-010 · Move to Waiting to stream (#468)', () => {
+  const finishedShow = (over: Partial<WatchedState> = {}): WatchedState =>
+    showState({ allAiredFinished: true, ...over });
+
+  function mount(
+    state: WatchedState,
+    tracking: unknown = { status: 'waiting', season: { number: 3, airsOn: '2999-01-01' } },
+  ) {
+    const mocks = {
+      ...apiWith(state),
+      startNewSeasonTracking: vi.fn().mockResolvedValue(tracking),
+      stopNewSeasonTracking: vi.fn().mockResolvedValue({}),
+    };
+    return { mocks, ...mountDialog(mocks as unknown as Mocks) };
+  }
+
+  it('T-FTW-010a: the third option names the upcoming season and moves nothing until chosen', async () => {
+    const { mocks } = mount(finishedShow());
+    await userEvent.click(await screen.findByTestId('finished-mark-all'));
+    const move = await screen.findByTestId('finished-move-waiting');
+    expect(move).toHaveTextContent('Move to Waiting to stream (Season 3, 1 Jan 2999)');
+    expect(screen.getByTestId('finished-keep')).toBeVisible();
+    expect(screen.getByTestId('finished-remove')).toBeVisible();
+    expect(mocks.setLibraryHidden).not.toHaveBeenCalled();
+    expect(mocks.startNewSeasonTracking).not.toHaveBeenCalled();
+  });
+
+  it('T-FTW-010b: it is absent for a movie, with no dated unaired season, or while an aired season is unfinished', async () => {
+    const noDate = finishedShow().seasons.filter((season) => season.seasonNumber !== 3);
+    mount(finishedShow({ seasons: noDate }));
+    await userEvent.click(await screen.findByTestId('finished-mark-all'));
+    await screen.findByTestId('finished-ask');
+    expect(screen.queryByTestId('finished-move-waiting')).toBeNull();
+    cleanup();
+
+    mount(movieState());
+    await userEvent.click(await screen.findByTestId('finished-mark'));
+    await screen.findByTestId('finished-ask');
+    expect(screen.queryByTestId('finished-move-waiting')).toBeNull();
+  });
+
+  it('T-FTW-010c: choosing it sets the title aside, opens the Waiting entry, and Undo returns it', async () => {
+    const { mocks, onLibraryChange } = mount(finishedShow());
+    await userEvent.click(await screen.findByTestId('finished-mark-all'));
+    await userEvent.click(await screen.findByTestId('finished-move-waiting'));
+
+    expect(mocks.setLibraryHidden).toHaveBeenCalledWith('t1', true);
+    expect(mocks.startNewSeasonTracking).toHaveBeenCalledWith('t1');
+    expect(onLibraryChange).toHaveBeenLastCalledWith(true);
+    expect(await screen.findByTestId('finished-waiting')).toHaveTextContent(
+      'in Waiting to stream for Season 3',
+    );
+
+    await userEvent.click(screen.getByTestId('finished-waiting-undo'));
+    expect(mocks.setLibraryHidden).toHaveBeenLastCalledWith('t1', false);
+    expect(onLibraryChange).toHaveBeenLastCalledWith(false);
+    expect(await screen.findByTestId('finished-returned')).toBeVisible();
+  });
+
+  it('T-FTW-010d: when the Waiting entry cannot be made the title is put back and the owner is told', async () => {
+    const { mocks, onLibraryChange } = mount(finishedShow(), { status: 'tracking', season: null });
+    await userEvent.click(await screen.findByTestId('finished-mark-all'));
+    await userEvent.click(await screen.findByTestId('finished-move-waiting'));
+
+    expect(await screen.findByTestId('finished-error')).toHaveTextContent('still in your Library');
+    expect(mocks.setLibraryHidden).toHaveBeenLastCalledWith('t1', false);
+    expect(mocks.stopNewSeasonTracking).toHaveBeenCalledWith('t1');
+    expect(onLibraryChange).not.toHaveBeenCalled();
+    expect(screen.getByTestId('finished-ask')).toBeVisible();
+  });
+});
+
 const DUNE: TitleListItem = {
   titleId: 't1',
   workIdentity: 'tmdb:movie:438631',

@@ -23,6 +23,7 @@ const setLibraryHidden = vi.fn();
 const listHiddenIdentities = vi.fn();
 const latestTitlesByIdentity = vi.fn();
 const getSeasons = vi.fn();
+const satisfyWaitingIntents = vi.fn();
 
 vi.mock('../../../src/repository/ownerData.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../src/repository/ownerData.js')>();
@@ -30,6 +31,14 @@ vi.mock('../../../src/repository/ownerData.js', async (importOriginal) => {
     ...actual,
     findTitle: (...args: unknown[]) => findTitle(...args) as unknown,
     listListedWorkIdentities: (...args: unknown[]) => listListedWorkIdentities(...args) as unknown,
+  };
+});
+
+vi.mock('../../../src/repository/watchIntents.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/repository/watchIntents.js')>();
+  return {
+    ...actual,
+    satisfyWaitingIntents: (...args: unknown[]) => satisfyWaitingIntents(...args) as unknown,
   };
 });
 
@@ -131,6 +140,7 @@ beforeEach(async () => {
   listFinishedRecords.mockResolvedValue({ items: [RECORD], hasMore: false });
   isLibraryHidden.mockResolvedValue(false);
   setLibraryHidden.mockResolvedValue(undefined);
+  satisfyWaitingIntents.mockResolvedValue({ count: 0 });
   listHiddenIdentities.mockResolvedValue(new Set());
   latestTitlesByIdentity.mockResolvedValue(new Map());
   getSeasons.mockResolvedValue(SEASONS);
@@ -370,5 +380,27 @@ describe('T-VIEWED-043 · POST /api/titles/:titleId/library-hidden', () => {
     ).toBe(400);
     findTitle.mockResolvedValue(null);
     expect((await call('POST', '/api/titles/x/library-hidden', { hidden: true })).status).toBe(404);
+  });
+});
+
+describe('T-FTW-001 · returning a title ends its open Waiting entry (#468)', () => {
+  it('T-FTW-001a · hidden false satisfies the work’s waiting intent, after the flag is cleared', async () => {
+    const res = await call('POST', '/api/titles/t-movie/library-hidden', { hidden: false });
+    expect(res.status).toBe(200);
+    expect(satisfyWaitingIntents).toHaveBeenCalledWith(
+      expect.anything(),
+      ['tmdb:movie:603'],
+      expect.any(Date),
+    );
+    expect(setLibraryHidden.mock.invocationCallOrder[0]).toBeLessThan(
+      satisfyWaitingIntents.mock.invocationCallOrder[0] as number,
+    );
+  });
+
+  it('T-FTW-001b · hidden true, and a refused return, never touch the Waiting entry', async () => {
+    await call('POST', '/api/titles/t-movie/library-hidden', { hidden: true });
+    listListedWorkIdentities.mockResolvedValue(new Set());
+    await call('POST', '/api/titles/t-movie/library-hidden', { hidden: false });
+    expect(satisfyWaitingIntents).not.toHaveBeenCalled();
   });
 });

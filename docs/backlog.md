@@ -757,6 +757,9 @@ finished, so the exception cannot outlive its reason.
 | `TASK-298` | `done` | Finished watching dialog and ask-before-remove (#325/#465, US-074): row-menu item, per-season form, details button. Test ids: `T-VIEWED-060`, `T-VIEWED-062`, `T-VIEWED-063`. |
 | `TASK-299` | `done` | Recently watched view, edit dialog and nav entry (US-074). Test ids: `T-VIEWED-061`, `T-VIEWED-064`. |
 | `TASK-300` | `done` | Finished flow and history view in a real browser at 280 px (US-074 AC-8). Test ids: `T-VIEWED-080`. |
+| `TASK-301` | `done` | Finished show to Waiting, backend (#468, `A67`, US-075 / REQ-141): `library-hidden` `false` ends the open Waiting intent; the Waiting read lists a set-aside work's intent. No new route, no migration. Test ids: `T-FTW-001`, `T-FTW-002`. |
+| `TASK-302` | `done` | Finished show to Waiting, web: the third *Move to Waiting to stream (Season N, date)* option with Undo, and the *Season N upcoming · date* chip. Test ids: `T-FTW-010`, `T-FTW-011`. |
+| `TASK-303` | `done` | The move and chip at 280 px in a real browser. Test id: `T-FTW-080`. |
 <!-- STATUS-LEDGER:END -->
 
 ### Approved availability moves (#397/#410), 2026-09-29
@@ -814,6 +817,9 @@ TASK-265."~~
 | TASK-296 | The grouped sidebar and drawer in a real browser at 1280 px and 280 px. | 1 agent-run + 5 owner-review-minutes | TASK-295 | `T-NAVG-020`; `T-NAVG-021` |
 | TASK-297 | Watched history data model and API: `watch_record`, `library_hidden`, TMDB seasons, routes, fix-match carry, REQ-041 item 19 (US-074). | 2 agent-runs + 20 owner-review-minutes | TASK-296 | `T-VIEWED-001`; `T-VIEWED-002`; `T-VIEWED-020`; `T-VIEWED-040`; `T-VIEWED-041`; `T-VIEWED-042`; `T-VIEWED-043`; `T-VIEWED-070`; `T-VIEWED-090` |
 | TASK-298 | Finished watching dialog, row-menu item and ask-before-remove (US-074). | 1 agent-run + 15 owner-review-minutes | TASK-297 | `T-VIEWED-060`; `T-VIEWED-062`; `T-VIEWED-063` |
+| TASK-301 | Finished show to Waiting, backend: `library-hidden` `false` ends the open Waiting intent; Waiting lists a set-aside work's intent (US-075). | 1 agent-run + 10 owner-review-minutes | TASK-297, TASK-292 | `T-FTW-001`; `T-FTW-002` |
+| TASK-302 | Finished show to Waiting, web: the third option, Undo and the upcoming-season chip (US-075). | 1 agent-run + 15 owner-review-minutes | TASK-301, TASK-298 | `T-FTW-010`; `T-FTW-011` |
+| TASK-303 | The move and chip in a browser at 280 px (US-075 AC-4). | 1 agent-run + 5 owner-review-minutes | TASK-302 | `T-FTW-080` |
 | TASK-299 | Recently watched view, edit dialog and nav entry (US-074). | 1 agent-run + 10 owner-review-minutes | TASK-298 | `T-VIEWED-061`; `T-VIEWED-064` |
 | TASK-300 | Finished flow and history view in a browser at 280 px (US-074 AC-8). | 1 agent-run + 5 owner-review-minutes | TASK-299 | `T-VIEWED-080` |
 

@@ -26,6 +26,7 @@ import { TmdbClient, type ShowSeason } from '../clients/tmdbClient.js';
 import { AppError } from '../errors/AppError.js';
 import { requireOwnerId } from '../middleware/requestContext.js';
 import { findTitle, listListedWorkIdentities } from '../repository/ownerData.js';
+import { satisfyWaitingIntents } from '../repository/watchIntents.js';
 import {
   isLibraryHidden,
   latestTitlesByIdentity,
@@ -296,6 +297,9 @@ export function registerWatchedRoutes(
       );
     }
     await setLibraryHidden(ownerId, title.workIdentity, hidden);
+    // #468 (`A67`): returning a show also ends the Waiting entry that the
+    // finished-to-waiting move opened, so it is never in both places.
+    if (!hidden) await satisfyWaitingIntents(ownerId, [title.workIdentity], new Date());
     res.status(200).json({ titleId: title.id, workIdentity: title.workIdentity, hidden });
   });
 }

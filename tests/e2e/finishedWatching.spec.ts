@@ -46,7 +46,69 @@ const HISTORY_ROW = {
   leftLibrary: true,
 };
 
-async function mock(page: Page): Promise<string[]> {
+const SHOW_STATE = {
+  titleId: 'fin-one',
+  workIdentity: 'tmdb:tv:84773',
+  mediaType: 'tv',
+  inLibrary: true,
+  hidden: false,
+  perSeason: true,
+  seasonsUnavailable: false,
+  seasons: [
+    {
+      seasonNumber: 1,
+      airDate: '2022-09-01',
+      aired: true,
+      finished: true,
+      watchedOn: null,
+      rating: null,
+    },
+    {
+      seasonNumber: 2,
+      airDate: '2024-08-29',
+      aired: true,
+      finished: true,
+      watchedOn: null,
+      rating: null,
+    },
+    {
+      seasonNumber: 3,
+      airDate: '2999-02-01',
+      aired: false,
+      finished: false,
+      watchedOn: null,
+      rating: null,
+    },
+  ],
+  allAiredFinished: true,
+  whole: null,
+};
+
+const WAITING_SEASON = {
+  count: 1,
+  availabilityRefreshFailed: false,
+  newSeasonOffers: [],
+  items: [
+    {
+      intentId: 'wi_s',
+      titleId: 'fin-one',
+      workIdentity: 'tmdb:tv:84773',
+      name: 'The Lord of the Rings: The Rings of Power',
+      releaseYear: 2022,
+      posterPath: null,
+      discoveredAt: '2026-09-01',
+      discoverySource: 'search',
+      availableOn: [],
+      flaggedOn: [],
+      accessState: 'not-seen',
+      availabilityCheckedAt: '2026-09-20T00:00:00.000Z',
+      availabilityRegion: 'US',
+      season: { number: 3, airsOn: '2999-02-01', out: false },
+    },
+  ],
+};
+
+async function mock(page: Page, show = false): Promise<string[]> {
   const writes: string[] = [];
   await page.route('**/api/**', async (route) => {
     const request = route.request();
@@ -67,18 +129,33 @@ async function mock(page: Page): Promise<string[]> {
         json = { items: [MOVIE], nextCursor: null, limit: 50, runtimeUnknownHidden: 0 };
         break;
       case '/api/titles/fin-one/watched':
+        json = show
+          ? SHOW_STATE
+          : {
+              titleId: 'fin-one',
+              workIdentity: MOVIE.workIdentity,
+              mediaType: 'movie',
+              inLibrary: true,
+              hidden: false,
+              perSeason: false,
+              seasonsUnavailable: false,
+              seasons: [],
+              allAiredFinished: false,
+              whole: null,
+            };
+        break;
+      case '/api/titles/fin-one/library-hidden':
+        json = { titleId: 'fin-one', hidden: true };
+        break;
+      case '/api/titles/fin-one/new-season-tracking':
         json = {
           titleId: 'fin-one',
-          workIdentity: MOVIE.workIdentity,
-          mediaType: 'movie',
-          inLibrary: true,
-          hidden: false,
-          perSeason: false,
-          seasonsUnavailable: false,
-          seasons: [],
-          allAiredFinished: false,
-          whole: null,
+          status: 'waiting',
+          season: { number: 3, airsOn: '2999-02-01' },
         };
+        break;
+      case '/api/waiting':
+        json = WAITING_SEASON;
         break;
       case '/api/titles/fin-one/finished':
         json = {
@@ -168,6 +245,52 @@ for (const width of [280, 1024]) {
       await expect(page.getByText('A Remarkably Long Fixture Show Title')).toBeVisible();
       expect(await offenders(page, 'main, main *')).toEqual([]);
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    });
+  });
+}
+
+for (const width of [280, 390, 1024]) {
+  describe(`Move to Waiting to stream at ${width}px (#468)`, () => {
+    test('T-FTW-080a: finishing every aired season offers the move, which opens Waiting with the upcoming-season chip', async ({
+      page,
+    }) => {
+      const writes = await mock(page, true);
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto('/');
+      await page.getByTestId('row-menu').first().click();
+      await page.getByTestId('row-menu-finished').click();
+      await page.getByTestId('finished-season-3').waitFor();
+      // Both aired seasons are already finished, so the ask step opens after one more save.
+      await page.getByTestId('finished-season-1').check();
+      await page.getByTestId('finished-mark-selected').click();
+      const move = page.getByTestId('finished-move-waiting');
+      await expect(move).toContainText('Move to Waiting to stream (Season 3');
+      expect(await offenders(page, '[role="dialog"], [role="dialog"] *')).toEqual([]);
+      expect(
+        (await new AxeBuilder({ page }).include('[role="dialog"]').analyze()).violations,
+      ).toEqual([]);
+      expect(writes).toEqual(['POST /api/titles/fin-one/finished']);
+
+      await move.click();
+      await expect(page.getByTestId('finished-waiting')).toBeVisible();
+      expect(writes).toEqual([
+        'POST /api/titles/fin-one/finished',
+        'POST /api/titles/fin-one/library-hidden',
+        'POST /api/titles/fin-one/new-season-tracking',
+      ]);
+      expect(await offenders(page, '[role="dialog"], [role="dialog"] *')).toEqual([]);
+    });
+
+    test('T-FTW-080b: the Waiting card carries the Season N upcoming chip inside the viewport', async ({
+      page,
+    }) => {
+      await mock(page, true);
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto('/waiting');
+      await expect(page.getByTestId('waiting-season-chip')).toContainText(
+        'Season 3 upcoming · 1 Feb 2999',
+      );
+      expect(await offenders(page, 'main, main *')).toEqual([]);
     });
   });
 }
