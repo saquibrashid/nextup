@@ -77,10 +77,10 @@ import {
   SEASON_OFFER_ADD,
   SEASON_OFFER_FAILED,
   SEASON_OFFER_STOP,
-  SEASON_TAG_ANNOUNCED,
   SEASON_TAG_OUT,
   seasonOutText,
   seasonPremieresText,
+  seasonUpcomingChip,
 } from '../copy';
 import type { NewSeasonOffer, TmdbSearchResult, WaitingItem } from '../lib/apiClient';
 import { TMDB_IMAGE_BASE, TMDB_IMAGE_BASE_2X } from '../components/TitleRow';
@@ -513,10 +513,12 @@ export function WaitingOutlook({ item }: { readonly item: WaitingItem }): JSX.El
       {season !== null && (
         <div className={OUTLOOK_CLASS[seasonKind]} data-testid="waiting-season">
           <p className="waiting-row__outlook-head" aria-hidden="true">
-            <span className={TAG_CLASS[seasonKind]}>
-              {season.out ? SEASON_TAG_OUT : SEASON_TAG_ANNOUNCED}
+            <span className={TAG_CLASS[seasonKind]} data-testid="waiting-season-chip">
+              {season.out
+                ? SEASON_TAG_OUT
+                : seasonUpcomingChip(season.number, friendlyDate(season.airsOn))}
             </span>
-            <span className="waiting-row__when">{friendlyDate(season.airsOn)}</span>
+            {season.out && <span className="waiting-row__when">{friendlyDate(season.airsOn)}</span>}
           </p>
           <p className={FORECAST_CLASS[seasonKind]} data-testid="waiting-season-text">
             {season.out

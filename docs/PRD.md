@@ -130,6 +130,21 @@
 
 ---
 
+> ## ⚠ AMENDMENT — 2026-10-24 — `A67` (owner-requested, #468): finishing every aired season of a show with an announced season offers *Move to Waiting to stream*
+
+> **The owner observed** (#468) that after finishing seasons 1 and 2 of a show whose season 3 is announced, the *Also remove from your Library?* prompt offered only *Keep* / *Remove*, though the show belongs in *Waiting to stream* until the season is out. **Decision:** when every aired season is finished **and** TMDB lists a dated, unaired season, the ask step gains a third, owner-confirmed answer, *Move to Waiting to stream (Season N, date)*, and the Waiting card says why it is there with a *Season N upcoming · date* chip.
+>
+> | Decision | What it changes | Kind |
+> |---|---|---|
+> | **1. A third answer, never automatic** | The option appears only when the show's season list (the existing per-request TMDB read) has an unaired season with a date, and only after every aired season is finished; otherwise the prompt is unchanged. Closing the dialog or choosing *Keep* changes nothing. | **Instruction** |
+> | **2. Reuses the existing mechanisms, no new route** | The move is the confirmed set-aside (`POST /api/titles/:titleId/library-hidden`, REQ-041 item 19) followed by *Track new seasons* (`POST …/new-season-tracking`, `A64`), which opens the same season-and-date Waiting entry *Add to Waiting* makes. If the entry cannot be made the title is put back. No new mutating route, no migration, no scheduler, no fifth process. | **Instruction** |
+> | **3. Undoable, and never in both places** | *Undo* returns the title (`library-hidden` with `hidden: false`), which now also ends the open Waiting entry for that work in the same request, so a title is never in the Library view and Waiting at once. A set-aside title's Waiting entry is shown (the Waiting read no longer hides a work whose only active listings are set aside). | **Amendment** |
+> | **4. Say why it waits** | A Waiting card with a season shows a visible chip *Season N upcoming · date* (replacing the generic *New season* tag). | **Instruction** |
+>
+> **New in this document:** **US-075 / REQ-141** (Epic L), four acceptance criteria. **Amended in place:** `specs/api.md` §6.64, `specs/ui.md` §7e, `specs/testing.md` US-075.
+
+---
+
 > ## ⚠ AMENDMENT — 2026-10-24 — `A65` (owner-reported, #463): the left navigation is grouped into sections
 
 > **The owner observed** (#463) that the sidebar was one undifferentiated stack of nine links: *Availability changes* wrapped to two lines, the signed-in address broke mid-word, About sat between working destinations, and nothing said what belonged together. **Decision:** the sidebar and the Menu drawer list the same nine destinations in labelled sections. This is presentation only — no route, URL, label or behaviour changes.
@@ -2463,6 +2478,28 @@ introduced.
 | AC-8 | The owner uses Finished watching, the per-season list, the rating/date editor or Recently watched, at a 280 px viewport | Any step of the flow | Nothing overflows the viewport; every control has an accessible name; finishing a movie or a show's last aired season only ever *asks* whether to remove it from the Library (Keep is the first choice) and the removal is undoable; "Recently watched" sits in the History nav group without a wrapped label. |
 
 **Out of scope:** copy/share recommendation text; public profiles, links or multi-user; per-viewing history; progress chips on Library rows; automatic finishing; reminders to finish or to rate; reading Specials.
+**Open questions:** none.
+
+#### US-075 — Move a finished show to Waiting to stream when a season is upcoming (`A67`)
+
+**REQ-141 (`must`, owner-requested #468, `A67`).** When the owner has finished every aired season of a show and TMDB announces a dated, unaired season, the follow-up prompt offers *Move to Waiting to stream (Season N, date)* beside *Keep* and *Remove*. The move is owner-confirmed, undoable, reuses *Track new seasons* to open the Waiting entry, and the Waiting card shows a *Season N upcoming · date* chip. Nothing is moved automatically and no scheduler or fifth process is introduced.
+
+**As** the owner
+**I want** a finished show with a coming season to wait in Waiting to stream
+**So that** it leaves my Library without my losing track of the next season
+
+**Traces to:** REQ-141, REQ-140, REQ-138, REQ-041, REQ-028
+**Priority:** must
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | A show in the Library whose every aired season is now finished | The prompt appears | The third option is offered only if the season list has a dated unaired season, naming it; otherwise (none, undated, TMDB unavailable, a movie, a season still unfinished) the prompt is unchanged. |
+| AC-2 | The owner chooses it | The move runs | The title leaves the Library view and a Waiting entry with that season and date exists; if the entry cannot be made the title is returned and the owner is told; nothing moves without the choice. |
+| AC-3 | The owner chooses *Undo* | It runs | The title is back in the Library and its Waiting entry is ended, so it is never in both. |
+| AC-4 | A Waiting entry with a season | The card renders, at 280 px | A visible *Season N upcoming · date* chip is shown and nothing overflows. |
+
+**Out of scope:** the full Waiting card redesign (#467); automatic moves; seasons with no date.
 **Open questions:** none.
 
 ### 7.4 Closed enumeration of permitted mutations (REQ-041)

@@ -45,6 +45,8 @@ interface TitleDetailsPageProps {
     | 'markFinished'
     | 'unfinishWatched'
     | 'setLibraryHidden'
+    | 'startNewSeasonTracking'
+    | 'stopNewSeasonTracking'
   >;
   /**
    * US-063 — the confirmation of the last availability move. Held by the

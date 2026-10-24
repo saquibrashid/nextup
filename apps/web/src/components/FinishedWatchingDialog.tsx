@@ -24,6 +24,8 @@ import {
   FINISHED_MARK_ALL,
   FINISHED_MARK_MOVIE,
   FINISHED_MARK_SELECTED,
+  FINISHED_MOVED_WAITING,
+  FINISHED_MOVE_WAITING_FAILED,
   FINISHED_NOT_FINISHED,
   FINISHED_NOT_IN_LIBRARY,
   FINISHED_NO_SEASONS_AIRED,
@@ -35,7 +37,9 @@ import {
   FINISHED_SAVE_FAILED,
   FINISHED_SEASONS_UNAVAILABLE,
   FINISHED_UNFINISHED,
+  FINISHED_WAITING_HINT,
   OFFLINE_DISABLED_REASON,
+  finishedWaitingAction,
   REMOVE_TITLE_UNDO_LABEL,
   ROW_MENU_FINISHED_LABEL,
   WATCHED_SEASON_LABEL,
@@ -57,7 +61,12 @@ import { Input } from './ui/Input';
 
 export type FinishedApi = Pick<
   ApiClient,
-  'getWatched' | 'markFinished' | 'unfinishWatched' | 'setLibraryHidden'
+  | 'getWatched'
+  | 'markFinished'
+  | 'unfinishWatched'
+  | 'setLibraryHidden'
+  | 'startNewSeasonTracking'
+  | 'stopNewSeasonTracking'
 >;
 
 export interface FinishedWatchingDialogProps {
@@ -70,7 +79,7 @@ export interface FinishedWatchingDialogProps {
   readonly onLibraryChange?: (hidden: boolean) => void;
 }
 
-type Step = 'form' | 'ask' | 'removed' | 'returned';
+type Step = 'form' | 'ask' | 'removed' | 'waiting' | 'returned';
 
 const seasonName = (n: number): string => WATCHED_SEASON_LABEL.replace('{n}', String(n));
 
@@ -95,6 +104,7 @@ export function FinishedWatchingDialog({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<Step>('form');
+  const [waitingSeason, setWaitingSeason] = useState<number | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -204,6 +214,51 @@ export function FinishedWatchingDialog({
     );
   };
 
+  // #468 — the owner chose to wait for the announced season. The Waiting entry
+  // is the existing "Track new seasons" one; if it cannot be made, the title is
+  // put back so nothing is left half-moved.
+  const moveToWaiting = (): void => {
+    setBusy(true);
+    setError(null);
+    const rollback = async (): Promise<void> => {
+      try {
+        await api.stopNewSeasonTracking(titleId);
+      } catch {
+        // Tracking being left on is harmless: it only ever offers.
+      }
+      try {
+        await api.setLibraryHidden(titleId, false);
+      } catch {
+        // The title was never listed as removed; the next open reads it again.
+      }
+    };
+    api
+      .setLibraryHidden(titleId, true)
+      .then(async () => {
+        const result = await api.startNewSeasonTracking(titleId);
+        if (result.status === 'waiting' && result.season) {
+          setWaitingSeason(result.season.number);
+          setStep('waiting');
+          onLibraryChange?.(true);
+          return;
+        }
+        await rollback();
+        setError(FINISHED_MOVE_WAITING_FAILED);
+      })
+      .catch(async (caught: unknown) => {
+        await rollback();
+        if (caught instanceof ApiError && caught.code === 'TITLE_NOT_ACTIVE') {
+          setStep('form');
+          setMessage(FINISHED_NOT_IN_LIBRARY);
+          return;
+        }
+        setError(FINISHED_MOVE_WAITING_FAILED);
+      })
+      .finally(() => {
+        setBusy(false);
+      });
+  };
+
   // The step swap unmounts the button that had focus; move it to the step's
   // primary control rather than letting it fall to the page behind the dialog.
   useEffect(() => {
@@ -214,7 +269,13 @@ export function FinishedWatchingDialog({
   const airedSeasons = state?.seasons.filter((season) => season.aired) ?? [];
   const openSeasons = airedSeasons.filter((season) => !season.finished);
   const inputsDisabled = busy || offline;
-
+  // Only a dated season that has not aired, and only once every aired one is finished.
+  const upcoming =
+    state !== null && state.perSeason && !state.seasonsUnavailable && state.allAiredFinished
+      ? (state.seasons
+          .filter((season) => !season.aired && season.airDate !== null && season.seasonNumber > 0)
+          .sort((a, b) => a.seasonNumber - b.seasonNumber)[0] ?? null)
+      : null;
   const fields = (
     <>
       <WatchedDateField
@@ -273,7 +334,22 @@ export function FinishedWatchingDialog({
               >
                 {FINISHED_REMOVE_ACTION}
               </Button>
+              {upcoming !== null && (
+                <Button
+                  variant="secondary"
+                  data-testid="finished-move-waiting"
+                  disabled={inputsDisabled}
+                  onClick={moveToWaiting}
+                >
+                  {finishedWaitingAction(upcoming.seasonNumber, watchedDateText(upcoming.airDate))}
+                </Button>
+              )}
             </div>
+            {upcoming !== null && (
+              <p className="finished-dialog__hint" data-testid="finished-waiting-hint">
+                {FINISHED_WAITING_HINT}
+              </p>
+            )}
           </div>
         ) : step === 'removed' ? (
           <div data-testid="finished-removed">
@@ -281,6 +357,23 @@ export function FinishedWatchingDialog({
             <Button
               variant="secondary"
               data-testid="finished-undo"
+              data-dialog-initial-focus
+              disabled={inputsDisabled}
+              onClick={() => {
+                setAside(false);
+              }}
+            >
+              {REMOVE_TITLE_UNDO_LABEL}
+            </Button>
+          </div>
+        ) : step === 'waiting' ? (
+          <div data-testid="finished-waiting">
+            <p role="status">
+              {withName(FINISHED_MOVED_WAITING, name).replace('{n}', String(waitingSeason ?? ''))}
+            </p>
+            <Button
+              variant="secondary"
+              data-testid="finished-waiting-undo"
               data-dialog-initial-focus
               disabled={inputsDisabled}
               onClick={() => {
