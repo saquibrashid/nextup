@@ -10,7 +10,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -275,6 +275,7 @@ describe('T-WAIT-023 · #391 · Grid and Compact on Waiting to stream, as in the
       /not streaming on your services/i,
     );
     for (const row of [arrived!, rent!]) {
+      fireEvent.click(within(row).getByTestId('waiting-row-menu'));
       expect(within(row).getByTestId('waiting-not-interested')).toBeVisible();
     }
     // The detail goes to the details page.
@@ -313,7 +314,7 @@ describe('T-WAIT-023 · #391 · Grid and Compact on Waiting to stream, as in the
 
   it('T-WAIT-023d · the stylesheet lays Grid out as wrapping tiles, two across even on a phone', () => {
     expect(css).toMatch(
-      /\.waiting-list\[data-view='grid'\]\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(min\(100%,\s*8rem\),\s*1fr\)\)/,
+      /\.waiting-list\[data-view='grid'\]\s*\{[^}]*display:\s*grid;[^}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/,
     );
     // #414 — one column of shared (subgrid) rows replaced the poster/body/aside
     // areas; T-WGRID-001 owns the row-by-row assertions.

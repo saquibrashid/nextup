@@ -126,7 +126,7 @@ test.describe('T-WAIT-010 — the empty waiting view explains itself', () => {
 
     await expect(page.getByTestId('waiting-row')).toHaveCount(1);
     await expect(page.getByTestId('waiting-empty')).toHaveCount(0);
-    await expect(page.getByTestId('waiting-availability')).toContainText(
+    await expect(page.getByTestId('waiting-asof-note')).toContainText(
       'Not seen on your services as of 1 Feb 2026.',
     );
   });
@@ -221,9 +221,6 @@ test.describe('T-WAIT-018 — waiting to stream in a real browser (#378)', () =>
       '/upload?service=netflix',
     );
     await expect(page.getByTestId('waiting-rent-tag')).toHaveText('Rent or buy only');
-    await expect(page.getByTestId('waiting-other-services')).toContainText(
-      '(not one of your services)',
-    );
     await expect(page.getByTestId('waiting-search')).toBeVisible();
 
     const overflow = await page.evaluate(
@@ -397,19 +394,19 @@ async function checkRestyle(page: Page, width: number): Promise<void> {
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Waiting to stream');
   await expect(page.getByTestId('waiting-subtitle')).toBeVisible();
 
-  // Library poster sizes: 72 px on a phone, 96 px from 640 px.
+  // #470 — a compact poster: 56 px on a phone, 64 px from 640 px.
   const poster = await rows.first().locator('.waiting-row__poster').boundingBox();
-  expect(Math.round(poster?.width ?? 0)).toBe(width >= 640 ? 96 : 72);
+  expect(Math.round(poster?.width ?? 0)).toBe(width >= 640 ? 64 : 56);
 
   // The forecast headline is visible and carries its tag in words.
   const head = rows.nth(1).locator('.waiting-row__outlook-head');
   await expect(head).toBeVisible();
   await expect(head.locator('.waiting-row__tag')).toHaveText(/estimate/i);
 
-  // "Not interested" keeps the 44 px target but is no longer card-wide.
+  // The overflow menu keeps the 44 px target but is no longer card-wide.
   for (let index = 0; index < 3; index += 1) {
     const row = await rows.nth(index).boundingBox();
-    const button = await rows.nth(index).getByTestId('waiting-not-interested').boundingBox();
+    const button = await rows.nth(index).getByTestId('waiting-row-menu').boundingBox();
     expect(button?.height ?? 0).toBeGreaterThanOrEqual(44);
     expect(button?.width ?? 0).toBeLessThan((row?.width ?? 0) * 0.6);
   }
@@ -420,7 +417,7 @@ async function checkRestyle(page: Page, width: number): Promise<void> {
   const second = await rows.nth(1).boundingBox();
   expect(second?.y ?? 0).toBeGreaterThan((first?.y ?? 0) + (first?.height ?? 0) - 1);
   const body = await rows.nth(1).locator('.waiting-row__body').boundingBox();
-  const aside = await rows.nth(1).locator('.waiting-row__aside').boundingBox();
+  const aside = await rows.nth(1).locator('.waiting-row__status').boundingBox();
   if (width >= 1024) expect(aside?.x ?? 0).toBeGreaterThan((body?.x ?? 0) + (body?.width ?? 0) - 1);
   else expect(aside?.y ?? 0).toBeGreaterThan(body?.y ?? 0);
 
@@ -536,9 +533,9 @@ async function checkGrid(page: Page, width: number): Promise<void> {
   expect(second?.x ?? 0).toBeGreaterThan((first?.x ?? 0) + (first?.width ?? 0) - 1);
 
   // The answer and the 44 px Not interested survive the tile.
-  await expect(rows.nth(1).getByTestId('waiting-forecast')).toBeVisible();
+  await expect(rows.nth(1).locator('.waiting-row__outlook-head')).toBeVisible();
   for (let index = 0; index < 3; index += 1) {
-    const button = await rows.nth(index).getByTestId('waiting-not-interested').boundingBox();
+    const button = await rows.nth(index).getByTestId('waiting-row-menu').boundingBox();
     expect(button?.height ?? 0).toBeGreaterThanOrEqual(44);
   }
   await noOverflow(page);
@@ -629,13 +626,13 @@ async function checkAligned(page: Page, width: number): Promise<void> {
   // whether or not a card has the rent chip or a date block.
   allEqual(await heights('.waiting-row__poster'));
   allEqual(await tops("[data-grid-slot='title']"));
-  allEqual(await tops("[data-grid-slot='availability']"));
-  allEqual(await tops("[data-grid-slot='date']"));
+  allEqual(await tops("[data-grid-slot='status']"));
+  allEqual(await tops("[data-grid-slot='note']"));
   // Not interested sits on one baseline at the bottom of every card.
-  allEqual(await tops("[data-testid='waiting-not-interested']"));
+  allEqual(await tops("[data-testid='waiting-row-menu']"));
   for (const index of sameLine) {
     const card = await rows.nth(index).boundingBox();
-    const button = await rows.nth(index).getByTestId('waiting-not-interested').boundingBox();
+    const button = await rows.nth(index).getByTestId('waiting-row-menu').boundingBox();
     const cardBottom = (card?.y ?? 0) + (card?.height ?? 0);
     const buttonBottom = (button?.y ?? 0) + (button?.height ?? 0);
     expect(cardBottom - buttonBottom).toBeLessThanOrEqual(24);

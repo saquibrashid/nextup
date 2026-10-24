@@ -32,7 +32,12 @@ import {
   WAITING_SEARCH_FAILED,
   WAITING_SEARCH_SUPPRESSED,
 } from '../src/copy';
-import { WaitingPage, otherStreaming, rentOnlyStores } from '../src/pages/WaitingPage';
+import {
+  WaitingFacts,
+  WaitingPage,
+  otherStreaming,
+  rentOnlyStores,
+} from '../src/pages/WaitingPage';
 import { UploadPage } from '../src/pages/UploadPage';
 import { searchAddRefusal } from '../src/components/WaitingSearchAdd';
 
@@ -66,19 +71,23 @@ function item(over: Partial<WaitingItem> = {}): WaitingItem {
 describe('T-AVAIL-015 · #378 · each access state reads as what it is', () => {
   it('T-AVAIL-015a · rent-only names the storefronts, is marked as rental, and is never the flag', () => {
     const row = item({ accessState: 'rent-only', rentOn: ['Apple TV', 'Amazon Video'] });
-    render(<WaitingPage items={[row]} />);
-
-    // #382/#389 — storefronts are chips, the row carries a "Rent or buy only"
-    // pill, and the redundant "(rent/buy)" repeats neither.
-    const block = screen.getByTestId('waiting-rent-only');
+    const page = render(<WaitingPage items={[row]} />);
+    // #467 — the card carries the quiet pill and ONE note; the storefront chips and
+    // the sources are the details page's (WaitingFacts full).
     expect(screen.getByTestId('waiting-rent-tag').textContent).toBe(WAITING_RENT_ONLY_TAG);
+    expect(screen.queryByTestId('waiting-rent-only')).toBeNull();
+    expect(screen.getByTestId('waiting-row').textContent).not.toContain('(rent/buy)');
+    page.unmount();
+    render(<WaitingFacts item={row} full />);
+
+    // #382/#389 — storefronts are chips and the redundant "(rent/buy)" repeats neither.
+    const block = screen.getByTestId('waiting-rent-only');
     expect(
       within(block)
         .getAllByTestId('waiting-rent-store')
         .map((chip) => chip.textContent),
     ).toEqual(['Apple TV', 'Amazon Video']);
     expect(block).toBe(screen.getByRole('list', { name: WAITING_RENT_ONLY_LIST_LABEL }));
-    expect(screen.getByTestId('waiting-row').textContent).not.toContain('(rent/buy)');
     // ⚠ The other half is still said in words: not streaming on your services.
     const note = screen.getByTestId('waiting-rent-note').textContent ?? '';
     expect(note).toContain('Not streaming on your services yet');
@@ -109,7 +118,7 @@ describe('T-AVAIL-015 · #378 · each access state reads as what it is', () => {
       otherProvidersOn: ['Hulu'],
       accessState: 'streaming',
     });
-    render(<WaitingPage items={[row]} />);
+    render(<WaitingFacts item={row} full />);
 
     const other = screen.getByTestId('waiting-other-services');
     // #382 — a known service is its mark (the name kept accessibly), an
@@ -158,12 +167,10 @@ describe('T-AVAIL-015 · #378 · each access state reads as what it is', () => {
 
   it('T-AVAIL-015e · the source line says (rent/buy) for a storefront and names a search add', () => {
     render(
-      <WaitingPage
-        items={[
-          item({ intentId: 'wi-s', discoverySource: 'apple-tv-store' }),
-          item({ intentId: 'wi-q', discoverySource: 'search' }),
-        ]}
-      />,
+      <>
+        <WaitingFacts item={item({ intentId: 'wi-s', discoverySource: 'apple-tv-store' })} full />
+        <WaitingFacts item={item({ intentId: 'wi-q', discoverySource: 'search' })} full />
+      </>,
     );
     const lines = screen.getAllByTestId('waiting-discovery').map((el) => el.textContent);
     expect(lines).toContain('Seen on Apple TV (rent/buy) on 4 Jan 2026');

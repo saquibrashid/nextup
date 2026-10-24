@@ -1355,6 +1355,22 @@ and de-duplicated into Library-style cards at TASK-258 (#389); both are
 **presentation only** — what is added, removed or refreshed, the access-state
 and forecast logic, and the API are unchanged.
 
+- **#467/#470 (`A68`, US-076/US-077, `T-WCARD-*`, `T-MCARD-080`)** supersede the
+  card and layout details below where they differ. *Not interested* moves into a
+  per-row overflow menu (`WaitingRowMenu`, trigger `waiting-row-menu`, Escape or an
+  outside press closes it; suppression is the unchanged per-title call). Names go
+  through `displayTitle` (a multi-word ALL-CAPS name is title-cased; the stored name
+  is untouched). A title without artwork shows a poster-shaped placeholder with its
+  initial. *Rent or buy*, *Announced* and *Estimate* render as a light chip plus date
+  (the sentence is kept for assistive technology), the *Season N upcoming · date*
+  chip stays, and *Not seen on your services as of …* is one page-level note
+  (`waiting-asof-note`) when rows share a date; a row with another date shows its own.
+  **Phone layout:** Grid is two equal-height columns (subgrid slots poster, title,
+  meta, status, note, action) with no clipped or mid-word-wrapped text; Compact is a
+  row about a Library list row tall (small poster, title, year/type, one chip or
+  date, menu). The Library Grid is a two-column poster-first grid at every width, so
+  it no longer resembles its List; the List is unchanged. On a card narrower than
+  ~360 px the priority pill sits below the menu.
 - **One page heading**, *"Waiting to stream"*, in the Library heading type, with
   the helper as its subtitle (`WAITING_SUBTITLE`). The search box has no heading
   of its own; its landmark is named *"Add a title to wait for"* (~~*"Wait for a title"*~~).

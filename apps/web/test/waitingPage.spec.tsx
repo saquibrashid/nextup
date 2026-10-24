@@ -167,6 +167,7 @@ describe('T-WAIT-009 · US-043 AC-4 · "not interested" is the ordinary suppress
     const onSuppress = vi.fn().mockResolvedValue({ suppressionId: 's-1' });
     render(<WaitingPage items={[item({ titleId: 'title-dune' })]} onSuppress={onSuppress} />);
 
+    fireEvent.click(screen.getByTestId('waiting-row-menu'));
     fireEvent.click(screen.getByTestId('waiting-not-interested'));
 
     await waitFor(() => expect(onSuppress).toHaveBeenCalledWith('title-dune'));
@@ -176,6 +177,7 @@ describe('T-WAIT-009 · US-043 AC-4 · "not interested" is the ordinary suppress
     const onSuppress = vi.fn().mockResolvedValue({});
     render(<WaitingPage items={[item()]} onSuppress={onSuppress} />);
 
+    fireEvent.click(screen.getByTestId('waiting-row-menu'));
     fireEvent.click(screen.getByTestId('waiting-not-interested'));
 
     await waitFor(() => expect(screen.queryByTestId('waiting-row')).toBeNull());
@@ -186,6 +188,7 @@ describe('T-WAIT-009 · US-043 AC-4 · "not interested" is the ordinary suppress
     const onSuppress = vi.fn().mockRejectedValue(new Error('nope'));
     render(<WaitingPage items={[item()]} onSuppress={onSuppress} />);
 
+    fireEvent.click(screen.getByTestId('waiting-row-menu'));
     fireEvent.click(screen.getByTestId('waiting-not-interested'));
 
     await waitFor(() => expect(screen.getByTestId('waiting-suppress-error')).toBeTruthy());

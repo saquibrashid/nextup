@@ -99,7 +99,7 @@ describe('T-FORECAST-007 · when and where it is expected to stream', () => {
     );
     const line = screen.getByTestId('waiting-forecast');
     expect(line.textContent).toMatch(/^Estimate: likely on Peacock around /);
-    expect(line.className).toContain('waiting-row__forecast--estimate');
+    expect(line.closest('.waiting-row__outlook--estimate')).not.toBeNull();
     unmount();
 
     render(

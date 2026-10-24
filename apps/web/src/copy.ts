@@ -1908,6 +1908,8 @@ export const WAITING_EMPTY_ACTION = 'Import a storefront screenshot';
 export const WAITING_NOT_ON_YOUR_SERVICES = 'Not seen on your services as of';
 /** Never asked at all — there is not even an as-of date to show. */
 export const WAITING_NOT_CHECKED = 'Not checked yet.';
+/** #467 — a row's own short availability date, shown only when it differs from the page-level one. */
+export const WAITING_AS_OF = 'As of';
 
 /** US-042 AC-3 — the flag, with its invitation. Never an automatic add. */
 export const WAITING_NOW_ON_PREFIX = 'Now on';
