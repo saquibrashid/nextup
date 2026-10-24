@@ -2409,6 +2409,134 @@ button {
 }
 
 /*
+ * US-074 (`specs/ui.md` §7d) — Recently watched, the Finished watching dialog
+ * and the star control. ⚠ Nothing here has a fixed width: every row wraps, so
+ * 280px and the wider WebKit fonts keep their words in view.
+ */
+.watched-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.watched-row {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.watched-row--skeleton {
+  min-height: 4.5rem;
+  opacity: 0.55;
+}
+
+.watched-row__poster {
+  border-radius: var(--radius);
+  flex: 0 0 auto;
+  height: 4.5rem;
+  object-fit: cover;
+  width: 3rem;
+}
+
+.watched-row__poster--empty {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+
+.watched-row__body {
+  align-items: flex-start;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.watched-row__name {
+  font-weight: var(--weight-bold);
+}
+
+.watched-row__note {
+  color: var(--color-text-muted);
+}
+
+.finished-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.finished-dialog__name {
+  font-weight: var(--weight-bold);
+  margin: 0;
+}
+
+.finished-dialog__hint {
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.finished-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.finished-seasons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.finished-seasons__row {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.finished-seasons__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.finished-seasons__status {
+  color: var(--color-text-muted);
+}
+
+.star-rating {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.watched-date {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.watched-date__unknown {
+  align-items: center;
+  display: flex;
+  gap: var(--space-2);
+}
+
+/*
  * TASK-188/189 (`specs/ui.md` §7b), restyled at #382 in the Library's visual
  * language: one page heading with a subtitle, poster-forward cards on the
  * catalogue surface, the Library's meta line and service marks, and quiet

@@ -35,6 +35,7 @@ import { SuppressedRoute } from './containers/SuppressedRoute';
 import { UploadRoute } from './containers/UploadRoute';
 import { WaitingDetailsRoute } from './containers/WaitingDetailsRoute';
 import { WaitingRoute } from './containers/WaitingRoute';
+import { WatchedRoute } from './containers/WatchedRoute';
 
 export interface RouteDefinition {
   /** The `react-router` path pattern. `*` is the catch-all. */
@@ -96,6 +97,12 @@ export const ROUTES: readonly RouteDefinition[] = [
     Component: SuppressedRoute,
     examplePath: '/not-interested',
     navLabel: 'Not interested',
+  },
+  {
+    path: '/watched',
+    Component: WatchedRoute,
+    examplePath: '/watched',
+    navLabel: 'Recently watched',
   },
   {
     path: '/waiting',

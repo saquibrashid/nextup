@@ -26,7 +26,7 @@ function renderAt(path: string) {
 }
 
 describe('AppShell and routing', () => {
-  it('T-UI-023a · specs/ui.md §1 · the route table holds exactly the fourteen specified screens', () => {
+  it('T-UI-023a · specs/ui.md §1 · the route table holds exactly the fifteen specified screens', () => {
     // ⚠ The EXACT PATH LIST is the assertion; the length is a redundant
     // restatement of it kept only so a diff reads clearly. Epic M added
     // `/rating` (REQ-092) and Epic L added `/waiting` (US-043), which is why
@@ -40,6 +40,8 @@ describe('AppShell and routing', () => {
       '/batches/:batchId/review',
       '/removed',
       '/not-interested',
+      // US-074 (`A66`) — Recently watched, in the History group.
+      '/watched',
       '/waiting',
       '/waiting/:titleId',
       // US-064 (`A55`) — the availability review screen.
@@ -48,7 +50,7 @@ describe('AppShell and routing', () => {
       '/rating',
       '*',
     ]);
-    expect(ROUTES).toHaveLength(14);
+    expect(ROUTES).toHaveLength(15);
   });
 
   it('T-UI-023b · specs/ui.md §1 · every route renders its own screen inside the shell', () => {
@@ -97,7 +99,7 @@ describe('AppShell and routing', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Review');
   });
 
-  it('T-UI-023f · specs/ui.md §1 · the nav exposes the nine top-level destinations', () => {
+  it('T-UI-023f · specs/ui.md §1 · the nav exposes the ten top-level destinations', () => {
     renderAt('/');
 
     const nav = screen.getByRole('navigation', { name: 'Primary' });
@@ -115,6 +117,7 @@ describe('AppShell and routing', () => {
       'Availability changes',
       'Import',
       'Review',
+      'Recently watched',
       'Removal history',
       'Not interested',
       // Epic M (REQ-092). Reachable from the nav rather than only from a row.

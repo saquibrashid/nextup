@@ -50,6 +50,7 @@ import { registerSuppressionRoutes } from './suppressions.js';
 import { registerTitleRoutes } from './titles.js';
 import { registerTmdbRoutes } from './tmdb.js';
 import { registerWaitingRoutes } from './waiting.js';
+import { registerWatchedRoutes } from './watched.js';
 import { registerWatchPreferenceRoutes } from './watchPreferences.js';
 import { TmdbClient } from '../clients/tmdbClient.js';
 import { OmdbClient } from '../clients/omdbClient.js';
@@ -183,6 +184,10 @@ export function createApiRouter(): Router {
   // (US-072, PRD `A64`) — track a removed TV show for a new season. Owner
   // actions; they ask TMDB only when tapped.
   registerNewSeasonRoutes(apiRouter);
+  // (US-074, PRD `A66`) — Finished watching: the owner's viewing record and
+  // the confirmed "set it aside" that is NOT a removal. Asks TMDB for a
+  // show's season list only inside an owner request.
+  registerWatchedRoutes(apiRouter);
   // §6.40–§6.44 (US-063, PRD `A54`) — the owner's one-tap availability moves.
   // Registered after the waiting and listing routes whose rows they write;
   // none of them calls TMDB, so they need no client.
@@ -241,7 +246,9 @@ export function mountApi(app: Express, readPrincipal: PrincipalReader): void {
   // caller's body is never buffered or parsed, so an unauthenticated request
   // costs nothing beyond the 401. `express.json()` only claims
   // `application/json`, so the multipart image route (§6.12) is untouched.
-  app.use('/api', express.json({ limit: JSON_BODY_LIMIT }));
+  // `inflate: false` refuses any `Content-Encoding` body before a decompression
+  // stream exists (GHSA-27r3-jxmh-p828); the web client never compresses one.
+  app.use('/api', express.json({ limit: JSON_BODY_LIMIT, inflate: false }));
   app.use('/api', mapBodyParserError);
 
   app.use('/api', createApiRouter());

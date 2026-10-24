@@ -454,12 +454,23 @@ export async function findTitle(ownerId: OwnerId, id: string, tx?: Db) {
  * correct, and "yes" for nothing else, which is not how the combined list is
  * built. Reading the same table the list reads is the only way the two agree.
  */
-export async function listListedWorkIdentities(ownerId: OwnerId, tx?: Db): Promise<Set<string>> {
+export async function listListedWorkIdentities(
+  ownerId: OwnerId,
+  tx?: Db,
+  { visibleOnly = false }: { visibleOnly?: boolean } = {},
+): Promise<Set<string>> {
   const rows = await db(tx).serviceListing.findMany({
     where: { ownerId, state: 'active' },
     select: { title: { select: { workIdentity: true } } },
   });
-  return new Set(rows.map((row) => row.title.workIdentity));
+  const identities = new Set(rows.map((row) => row.title.workIdentity));
+  if (!visibleOnly || identities.size === 0) return identities;
+  const hidden = await db(tx).watchPreference.findMany({
+    where: { ownerId, libraryHidden: true },
+    select: { workIdentity: true },
+  });
+  for (const row of hidden) identities.delete(row.workIdentity);
+  return identities;
 }
 
 /**
@@ -738,6 +749,7 @@ function baseTitleListWhere(
     ${watching === undefined ? Prisma.empty : Prisma.sql`AND COALESCE(wp.watching, 0) = ${watching}`}
     ${priorities.length === 0 ? Prisma.empty : Prisma.sql`AND COALESCE(wp.priority, N'normal') IN (${Prisma.join(priorities)})`}
     ${statuses.length === 0 ? Prisma.empty : Prisma.sql`AND (CASE WHEN COALESCE(wp.watching, 0) = 1 THEN N'watching' ELSE COALESCE(wp.priority, N'normal') END) IN (${Prisma.join(statuses)})`}
+    AND COALESCE(wp.library_hidden, 0) = 0
     AND NOT EXISTS (
       SELECT 1 FROM suppression s
       WHERE s.owner_id = ${ownerId} AND s.work_identity = t.work_identity AND s.active = 1

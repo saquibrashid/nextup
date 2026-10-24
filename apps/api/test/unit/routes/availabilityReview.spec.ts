@@ -74,6 +74,11 @@ vi.mock('../../../src/repository/watchIntents.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../../../src/repository/watchRecords.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/repository/watchRecords.js')>();
+  return { ...actual, setLibraryHidden: vi.fn().mockResolvedValue(undefined) };
+});
+
 vi.mock('../../../src/repository/availabilityReview.js', () => ({
   listLibraryAvailability: fn(listLibraryAvailability),
 }));

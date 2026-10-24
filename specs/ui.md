@@ -1550,6 +1550,39 @@ layout is unchanged.
   `check-now-reason` says *"No TMDB match to check. Find a match first."*
   Offline: disabled with the standard offline reason.
 
+## 7e. Finished watching and Recently watched (US-074, #325, #465, PRD `A66`)
+
+**Entry points.** The row menu gains *Finished watching* (`row-menu-finished`)
+**after** *Remove from library*, so the order from the top is *Not interested*,
+*Fix match*, *Remove from library*, *Finished watching*, *Cancel*: the more
+destructive the item, the further from the thumb. The Library title details
+carries the same action. Offline it is disabled with the standard reason.
+
+**`components/FinishedWatchingDialog.tsx`** (`ui/Dialog`, `finished-dialog`).
+- Movie: *Date watched* (optional; *Date unknown*), *Your rating* (1–5 stars,
+  *Not rated*), *Mark as finished*.
+- Show: one checkbox row per **aired** season (Specials excluded; unaired
+  seasons are absent, so a later season is simply unwatched), each with its
+  own state, *Mark selected seasons finished* and *Mark all seasons finished*,
+  and *Not finished* per finished season (the date and rating are kept).
+  TMDB down: a status line and nothing is written.
+- **Ask step.** After finishing a movie, or when every aired season is
+  finished, the dialog *asks* *Also remove “name” from your Library?* with
+  *Keep in Library* first and *Remove from Library* second. Nothing is
+  automatic. After removing: a status line with *Undo* (back in the Library,
+  record untouched). Focus moves to the new step's first control.
+
+**`/watched` — Recently watched** (`pages/WatchedPage.tsx`, nav History group
+before *Removal history*). Newest first; each row has the poster, name (year),
+season, *Watched 20 Sep 2026* or *Date unknown*, *Your rating: ★ 4/5* beside the
+IMDb score, *Out of your Library* when applicable, and *Edit*
+(`WatchedEditDialog`: date, stars, *Save changes*, *Not finished*, *Return to
+Library*). Loading, failed and empty states; paged with the shared sentinel.
+Invariant 8a: facts only — no streaks, no nagging.
+
+**Layout.** Works at 280 px (`T-VIEWED-080`); labels have ≥ 30 % headroom and
+the sidebar keeps `white-space: nowrap` at 14rem (`T-NAVG-020`).
+
 ---
 ## 8. TMDB attribution (US-011, NFR-016) — compliance, and invisible when broken
 

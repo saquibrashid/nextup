@@ -47,6 +47,7 @@ const ALL_LABELS = [
   'Availability changes',
   'Import',
   'Review',
+  'Recently watched',
   'Removal history',
   'Not interested',
   'Rating lookup',
@@ -58,6 +59,7 @@ const ALL_HREFS = [
   '/availability',
   '/upload',
   '/batches',
+  '/watched',
   '/removed',
   '/not-interested',
   '/rating',
@@ -705,7 +707,7 @@ describe('T-NAVG · US-073 (A65) · the sidebar and the drawer group destination
   const SECTIONS = [
     ['Library', ['Library', 'Waiting to stream', 'Availability changes']],
     ['Capture', ['Import', 'Review']],
-    ['History', ['Removal history', 'Not interested']],
+    ['History', ['Recently watched', 'Removal history', 'Not interested']],
     ['Tools', ['Rating lookup']],
     ['Help', ['About']],
   ] as const;

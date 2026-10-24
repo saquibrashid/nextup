@@ -33,6 +33,7 @@ const ROUTES = [
   '/batches/01J0000000000000000000BTCH',
   '/batches/01J0000000000000000000BTCH/review',
   '/removed',
+  '/watched',
   '/not-interested',
   // Epic L (US-043). Listed here so the accessibility sweep covers the waiting
   // view; this list is a literal, so a new route is NOT picked up automatically
@@ -280,41 +281,62 @@ async function stubApi(page: Page): Promise<void> {
       ? ME
       : new URL(url).pathname === '/api/availability/review'
         ? AVAILABILITY_REVIEW
-        : url.includes('/titles') && !url.includes('/fix-match')
-          ? TITLES
-          : url.includes('/service-state')
-            ? SERVICE_STATE
-            : url.includes('/suppressions')
-              ? { items: [] }
-              : url.includes('/removed')
-                ? REMOVED
-                : url.includes('/images') && method === 'POST'
-                  ? {
-                      accepted: [{ imageId: 'img_1', fileName: 'screen.png' }],
-                      rejected: [],
-                      batchTotals: {
-                        imageCount: 1,
-                        uploadedByteSize: ONE_BY_ONE_PNG.length,
-                        storedByteSize: ONE_BY_ONE_PNG.length,
-                      },
-                    }
-                  : url.includes('/submit') && method === 'POST'
-                    ? {}
-                    : url.includes('/batches/01J0000000000000000000BTCH/review')
-                      ? REVIEW
-                      : url.includes('/batches/01J0000000000000000000BTCH')
-                        ? BATCH
-                        : url.endsWith('/api/batches') && method === 'GET'
-                          ? BATCHES
-                          : url.endsWith('/api/batches') && method === 'POST'
-                            ? {
-                                batchId: '01J0000000000000000000BTCH',
-                                service: 'netflix',
-                                mode: 'append-only',
-                                status: 'draft',
-                                createdAt: '2026-02-11T00:00:00.000Z',
-                              }
-                            : {};
+        : new URL(url).pathname === '/api/watched'
+          ? {
+              items: [
+                {
+                  workIdentity: 'tmdb:tv:1',
+                  seasonNumber: 2,
+                  finished: true,
+                  watchedOn: '2026-09-20',
+                  rating: 4,
+                  titleName: 'A Long Fixture Show Title',
+                  releaseYear: 2020,
+                  mediaType: 'tv',
+                  posterPath: null,
+                  titleId: null,
+                  imdbRatingTenths: 78,
+                  leftLibrary: true,
+                },
+              ],
+              nextCursor: null,
+              limit: 50,
+            }
+          : url.includes('/titles') && !url.includes('/fix-match')
+            ? TITLES
+            : url.includes('/service-state')
+              ? SERVICE_STATE
+              : url.includes('/suppressions')
+                ? { items: [] }
+                : url.includes('/removed')
+                  ? REMOVED
+                  : url.includes('/images') && method === 'POST'
+                    ? {
+                        accepted: [{ imageId: 'img_1', fileName: 'screen.png' }],
+                        rejected: [],
+                        batchTotals: {
+                          imageCount: 1,
+                          uploadedByteSize: ONE_BY_ONE_PNG.length,
+                          storedByteSize: ONE_BY_ONE_PNG.length,
+                        },
+                      }
+                    : url.includes('/submit') && method === 'POST'
+                      ? {}
+                      : url.includes('/batches/01J0000000000000000000BTCH/review')
+                        ? REVIEW
+                        : url.includes('/batches/01J0000000000000000000BTCH')
+                          ? BATCH
+                          : url.endsWith('/api/batches') && method === 'GET'
+                            ? BATCHES
+                            : url.endsWith('/api/batches') && method === 'POST'
+                              ? {
+                                  batchId: '01J0000000000000000000BTCH',
+                                  service: 'netflix',
+                                  mode: 'append-only',
+                                  status: 'draft',
+                                  createdAt: '2026-02-11T00:00:00.000Z',
+                                }
+                              : {};
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -542,9 +564,9 @@ test.describe('T-A11Y-001 — the 320 px floor', () => {
     await expectNoHorizontalOverflow(page);
 
     const items = menu.getByRole('menuitem');
-    // Four since US-048: Not interested, Fix match, Remove from library, Cancel.
-    await expect(items).toHaveCount(4);
-    for (let i = 0; i < 4; i += 1) {
+    // Five since US-074: Not interested, Fix match, Remove from library, Finished watching, Cancel.
+    await expect(items).toHaveCount(5);
+    for (let i = 0; i < 5; i += 1) {
       await expectTapTarget(items.nth(i));
     }
   });

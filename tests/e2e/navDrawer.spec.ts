@@ -20,6 +20,7 @@ const DESTINATIONS = [
   ['Availability changes', '/availability'],
   ['Import', '/upload'],
   ['Review', '/batches'],
+  ['Recently watched', '/watched'],
   ['Removal history', '/removed'],
   ['Not interested', '/not-interested'],
   ['Rating lookup', '/rating'],

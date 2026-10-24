@@ -27,6 +27,37 @@ Collected locations: `packages/domain/test/titleCategory.spec.ts`;
 `apps/web/test/titleDetails.spec.tsx`, `filterBar.spec.tsx`;
 `tests/e2e/titleDetails.spec.ts`.
 
+### US-074 — Finished watching, per-season tracking and Recently watched (TASK-297, #325, #465, `A66`)
+
+| AC | Level | Test IDs | Assertion |
+| --- | --- | --- | --- |
+| AC-1 | U/I | `T-VIEWED-001`, `T-VIEWED-040`, `T-VIEWED-042`, `T-VIEWED-090` | One whole-title record per movie; optional date and rating; edit updates the same record; unfinish keeps date and rating. |
+| AC-2 | U | `T-VIEWED-002`, `T-VIEWED-020`, `T-VIEWED-041` | Aired seasons only, Specials excluded, unaired refused, TMDB failure degrades and writes nothing. |
+| AC-3 | U/I | `T-VIEWED-043`, `T-VIEWED-090` | The set-aside route writes no listing, suppression or removal row and is reversible. |
+| AC-4 | U/I | `T-VIEWED-090` | Records survive re-capture and carry through fix-match without loss or duplication. |
+| AC-5 | U | `T-VIEWED-042` | History ordering, paging and fields. |
+| AC-6 | U | `T-VIEWED-001`, `T-VIEWED-040`, `T-VIEWED-041` | Invalid rating, date, season and unknown title are refused. |
+| AC-7 | S | `T-VIEWED-070` | Migration 0023 is additive and mirrored in the Prisma schema. |
+| AC-8 | W/E | `T-VIEWED-060`, `T-VIEWED-061`, `T-VIEWED-062`, `T-VIEWED-063`, `T-VIEWED-064`, `T-VIEWED-080` | The dialog, per-season list, ask-before-remove step, history view, edit dialog, row menu, details button and nav entry; 280 px, axe and no-overflow in a real browser. |
+
+| Id | Level | Owner | Claim |
+|---|---|---|---|
+| **`T-VIEWED-001`** (`a`–`e`) | U | `TASK-297` | `packages/domain/test/watched.spec.ts`: request and patch parsing. |
+| **`T-VIEWED-002`** (`a`–`b`) | U | `TASK-297` | Same file: season progress and "all aired finished". |
+| **`T-VIEWED-020`** (`a`–`b`) | U | `TASK-297` | `apps/api/test/unit/clients/tmdbClient.spec.ts`: `getSeasons`. |
+| **`T-VIEWED-040`** (`a`–`e`) | U | `TASK-297` | `apps/api/test/unit/routes/watched.spec.ts`: `GET /api/titles/:id/watched`. |
+| **`T-VIEWED-041`** (`a`–`e`) | U | `TASK-297` | Same file: `POST /api/titles/:id/finished`. |
+| **`T-VIEWED-042`** (`a`–`d`) | U | `TASK-297` | Same file: edit, unfinish and `GET /api/watched`. |
+| **`T-VIEWED-043`** (`a`–`d`) | U | `TASK-297` | Same file: `POST /api/titles/:id/library-hidden`. |
+| **`T-VIEWED-070`** (`a`–`c`) | S | `TASK-297` | `tests/infra/watchedHistoryMigration.spec.ts` on `0023_watched_history`. |
+| **`T-VIEWED-090`** (`a`–`e`) | I | `TASK-297` | `apps/api/test/integration/watchRecords.spec.ts`: the repository against SQL Server. |
+| **`T-VIEWED-060`** (`a`–`l`) | W | `TASK-298` | `apps/web/test/watchedHistory.spec.tsx`: the Finished watching dialog — movie and per-season forms, mark all, ask-before-remove, undo, unfinish, focus and failure states. |
+| **`T-VIEWED-061`** (`a`–`f`) | W | `TASK-299` | Same file: the Recently watched page, the edit dialog and `WatchedRoute`. |
+| **`T-VIEWED-062`** (`a`–`b`) | W | `TASK-298` | Same file: the row-menu item (ordering) and its ListPage wiring. |
+| **`T-VIEWED-063`** (`a`) | W | `TASK-298` | Same file: the details-page button. |
+| **`T-VIEWED-064`** (`a`) | W | `TASK-299` | Same file: the `/watched` route and its nav label. |
+| **`T-VIEWED-080`** (`a`–`b`) | E | `TASK-300` | `tests/e2e/finishedWatching.spec.ts`: the flow and the history view at 280 px and 1024 px, no overflow, no axe violations. |
+
 ### US-073 — Grouped left navigation (TASK-295, TASK-296, #463, `A65`)
 
 | AC | Level | Test IDs | Assertion |

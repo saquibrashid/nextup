@@ -49,7 +49,9 @@ export function registerNewSeasonRoutes(
         titleId,
       });
     }
-    if ((await listListedWorkIdentities(ownerId)).has(workIdentity)) {
+    if (
+      (await listListedWorkIdentities(ownerId, undefined, { visibleOnly: true })).has(workIdentity)
+    ) {
       throw new AppError(
         'TITLE_NOT_ACTIVE',
         409,

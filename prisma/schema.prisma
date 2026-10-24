@@ -253,8 +253,41 @@ model WatchPreference {
   seasonNumber    Int?      @map("season_number")
   seasonAirOn     DateTime? @map("season_air_on") @db.Date
 
+  /// #325/#465, migration 0023, PRD `A66`. The owner confirmed "finished, take
+  /// it off my Library". Hides the work from the combined list the way a
+  /// suppression does, but as its OWN relation: no listing is touched, so it is
+  /// not a removal, and nothing is marked "not interested". Reversible by one
+  /// deliberate tap.
+  libraryHidden Boolean @default(false, map: "df_watch_preference_library_hidden") @map("library_hidden")
+
   @@id([ownerId, workIdentity], map: "pk_watch_preference")
   @@map("watch_preference")
+}
+
+/// #325/#465, migration 0023, PRD `A66`. The owner's viewing record: one row
+/// per MOVIE (`seasonNumber` 0) or per show SEASON (1 and up; specials are
+/// never recorded). Keyed on canonical work identity, never on a row id, so a
+/// re-capture, a removal or a reappearance cannot reset it. Never deleted:
+/// "not finished" clears `finished` and keeps the date and rating. Not a
+/// `WatchIntent` (availability) and not a `Suppression` (rejection).
+/// The title fields are a display snapshot so history reads with no title row.
+model WatchRecord {
+  ownerId       String    @map("owner_id") @db.NVarChar(200)
+  workIdentity  String    @map("work_identity") @db.NVarChar(200)
+  seasonNumber  Int       @default(0, map: "df_watch_record_season") @map("season_number")
+  finished      Boolean   @default(true, map: "df_watch_record_finished")
+  watchedOn     DateTime? @map("watched_on") @db.Date
+  rating        Int?      @map("rating") @db.TinyInt
+  titleName     String?   @map("title_name") @db.NVarChar(500)
+  releaseYear   Int?      @map("release_year")
+  mediaType     String?   @map("media_type") @db.NVarChar(16)
+  posterPath    String?   @map("poster_path") @db.NVarChar(400)
+  createdAt     DateTime  @default(dbgenerated("SYSUTCDATETIME()"), map: "df_watch_record_created") @map("created_at") @db.DateTime2
+  updatedAt     DateTime  @default(dbgenerated("SYSUTCDATETIME()"), map: "df_watch_record_updated") @map("updated_at") @db.DateTime2
+
+  @@id([ownerId, workIdentity, seasonNumber], map: "pk_watch_record")
+  @@index([ownerId, finished, watchedOn(sort: Desc), updatedAt(sort: Desc)], map: "watch_record_recent")
+  @@map("watch_record")
 }
 
 /// *"The owner wants this work and it is not on a service they have."*

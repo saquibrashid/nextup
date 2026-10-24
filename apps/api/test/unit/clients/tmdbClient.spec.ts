@@ -772,3 +772,39 @@ describe('T-SEAS-020 · the next announced season of a TV show (#454, US-072)', 
     );
   });
 });
+
+describe('T-VIEWED-020 · a show season list for per-season tracking (#325, #465, US-074)', () => {
+  it('T-VIEWED-020a · numbered seasons ascend, specials and junk are dropped, undated stays null', async () => {
+    const client = new TmdbClient({
+      apiKey: 'fixture-key-not-a-real-secret',
+      fetch: (() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              seasons: [
+                { season_number: 2, air_date: '2024-05-01' },
+                { season_number: 0, air_date: '2020-01-01' },
+                'junk',
+                { season_number: 1, air_date: '2022-09-01T00:00:00Z' },
+                { season_number: 3 },
+                { season_number: 1.5, air_date: '2025-01-01' },
+              ],
+            }),
+            { status: 200, headers: { 'content-type': 'application/json' } },
+          ),
+        )) as typeof globalThis.fetch,
+      sleep: () => Promise.resolve(),
+    });
+    expect(await client.getSeasons(5)).toEqual([
+      { seasonNumber: 1, airDate: '2022-09-01' },
+      { seasonNumber: 2, airDate: '2024-05-01' },
+      { seasonNumber: 3, airDate: null },
+    ]);
+  });
+
+  it('T-VIEWED-020b · a body without a season list is an empty list', async () => {
+    const { readSeasons } = await import('../../../src/clients/tmdbClient.js');
+    expect(readSeasons('nope')).toEqual([]);
+    expect(readSeasons({})).toEqual([]);
+  });
+});

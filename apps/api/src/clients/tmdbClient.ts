@@ -446,6 +446,11 @@ export class TmdbClient {
     return readNextSeason(await this.#get<unknown>(`/tv/${tmdbId}`, {}), today);
   }
 
+  /** #325/#465 — a show's numbered seasons (never Specials), for per-season tracking. */
+  async getSeasons(tmdbId: number): Promise<ShowSeason[]> {
+    return readSeasons(await this.#get<unknown>(`/tv/${tmdbId}`, {}));
+  }
+
   async getPresentation(
     mediaType: MediaType,
     tmdbId: number,
@@ -700,6 +705,25 @@ export function readNextSeason(body: unknown, today: string): NextSeason | null 
   const next = body['next_episode_to_air'];
   if (best === null && isRecord(next)) consider(next['season_number'], next['air_date']);
   return best;
+}
+
+/** #325/#465 — one numbered season. `airDate` is `YYYY-MM-DD`, or `null` when undated. */
+export interface ShowSeason {
+  seasonNumber: number;
+  airDate: string | null;
+}
+
+/** Numbered seasons (1 and up) from a TV detail, ascending; specials are excluded. */
+export function readSeasons(body: unknown): ShowSeason[] {
+  if (!isRecord(body) || !Array.isArray(body['seasons'])) return [];
+  const seasons = new Map<number, ShowSeason>();
+  for (const season of body['seasons']) {
+    if (!isRecord(season)) continue;
+    const seasonNumber = season['season_number'];
+    if (!isPositiveInteger(seasonNumber)) continue;
+    seasons.set(seasonNumber, { seasonNumber, airDate: readDay(season['air_date']) });
+  }
+  return [...seasons.values()].sort((a, b) => a.seasonNumber - b.seasonNumber);
 }
 
 /** The metadata allow-list of US-007 AC-2/AC-6. Storage validation is TASK-061. */

@@ -117,8 +117,12 @@ export async function listTrackedSeasonWorks(
       select: { id: true, workIdentity: true, tmdbName: true, tmdbId: true },
     }),
   ]);
+  // A work the owner finished and hid is not in the Library, so it is offered.
+  const hidden = new Set(
+    prefs.filter((pref) => pref.libraryHidden).map((pref) => pref.workIdentity),
+  );
   const skip = new Set([
-    ...listed.map((row) => row.title.workIdentity),
+    ...listed.map((row) => row.title.workIdentity).filter((identity) => !hidden.has(identity)),
     ...waiting.map((row) => row.workIdentity),
   ]);
   const newest = new Map<string, (typeof titles)[number]>();

@@ -57,6 +57,7 @@ import {
   runInTransaction,
   updateTitle,
 } from '../repository/ownerData.js';
+import { carryWatchRecords } from '../repository/watchRecords.js';
 import { toDisplaySnapshot } from './suppressions.js';
 import { tmdbUnavailableAppError } from './tmdb.js';
 import { toIsoDate } from './titles.js';
@@ -346,6 +347,18 @@ export function registerFixMatchRoutes(router: Router, getClient: () => TmdbClie
 
       if (identityChanged) {
         await carryWatchPreference(ownerId, previousWorkIdentity, workIdentity, tx);
+        await carryWatchRecords(
+          ownerId,
+          previousWorkIdentity,
+          workIdentity,
+          {
+            titleName: detail.name,
+            releaseYear: detail.releaseYear,
+            mediaType: detail.mediaType,
+            posterPath: detail.posterPath,
+          },
+          tx,
+        );
       }
 
       if (carried !== null) {

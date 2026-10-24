@@ -375,6 +375,7 @@ export function ListRoute({ client = apiClient }: ListRouteProps = {}): JSX.Elem
       // `ListPage` renders the affordance only when both are present.
       onRemoveTitle={(titleId) => client.removeTitle(titleId)}
       onRestoreListing={(listingId) => client.restoreListing(listingId)}
+      onFinished={client}
       // US-047 — the standalone add, and the refetch that makes the new row
       // visible without a reload.
       onAddTitle={(body) => client.addTitle(body)}

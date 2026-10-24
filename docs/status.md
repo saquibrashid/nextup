@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 291 |
+| ✅ done | 295 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **294** |
+| **total** | **298** |
 
 ## Ready to start
 
@@ -332,3 +332,7 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-294` | The season panel and offers at 280 px in a real browser. Test id: `T-SEAS-080`. | `T-SEAS-080` |
 | `TASK-295` | Grouped left navigation (#463, `A65`, US-073 / REQ-139): the sidebar and Menu drawer list the nine destinations in labelled sections with About in a footer section; rows never wrap; the signed-in address truncates with a tooltip. Test ids: `T-NAVG-001`, `T-NAVG-002`, `T-NAVG-003`, `T-NAVG-004`. | `T-NAV-003`, `T-NAVG-001`, `T-NAVG-002`, `T-NAVG-003`, `T-NAVG-004`, `T-UX-132`, `T-UX-167` |
 | `TASK-296` | The grouped sidebar and drawer in a real browser at 1280 px and 280 px. Test ids: `T-NAVG-020`, `T-NAVG-021`. | `T-NAVG-020`, `T-NAVG-021` |
+| `TASK-297` | Watched history data model and API (#325/#465, `A66`, US-074 / REQ-140): `watch_record` per work identity and season, `watch_preference.library_hidden`, TMDB season list, the finished/edit/unfinish/history/library-hidden routes, fix-match carry, REQ-041 item 19. Test ids: `T-VIEWED-001`, `T-VIEWED-002`, `T-VIEWED-020`, `T-VIEWED-040`, `T-VIEWED-041`, `T-VIEWED-042`, `T-VIEWED-043`, `T-VIEWED-070`, `T-VIEWED-090`. | `T-VIEWED-001`, `T-VIEWED-002`, `T-VIEWED-020`, `T-VIEWED-040`, `T-VIEWED-041`, `T-VIEWED-042`, `T-VIEWED-043`, `T-VIEWED-070`, `T-VIEWED-090` |
+| `TASK-298` | Finished watching dialog and ask-before-remove (#325/#465, US-074): row-menu item, per-season form, details button. Test ids: `T-VIEWED-060`, `T-VIEWED-062`, `T-VIEWED-063`. | `T-VIEWED-060`, `T-VIEWED-062`, `T-VIEWED-063` |
+| `TASK-299` | Recently watched view, edit dialog and nav entry (US-074). Test ids: `T-VIEWED-061`, `T-VIEWED-064`. | `T-VIEWED-061`, `T-VIEWED-064` |
+| `TASK-300` | Finished flow and history view in a real browser at 280 px (US-074 AC-8). Test ids: `T-VIEWED-080`. | `T-VIEWED-080` |
