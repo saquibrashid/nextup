@@ -145,6 +145,20 @@
 
 ---
 
+> ## ⚠ AMENDMENT — 2026-10-25 — `A68` (owner-requested, #467 and #470): a calmer Waiting card and distinct mobile Grid and List layouts
+
+> **The owner observed** (#467) that Waiting cards repeat *Not seen on your services as of …*, shout ALL-CAPS titles, wrap *ANNOUNCED* mid-word, show blank posters and give *Not interested* the weight of a primary action; and (#470) that on a phone the Library Grid looked like its List and the Waiting Grid/Compact were uneven. **Decision:** one coherent, presentation-only redesign.
+>
+> | Decision | What it changes | Kind |
+> |---|---|---|
+> | **1. Content pass (US-076 / REQ-142)** | Title case, a placeholder poster, one page-level *as of* note, *Not interested* in a row overflow menu, lighter status chips. | **Instruction** |
+> | **2. Layout pass (US-077 / REQ-143)** | A two-column Library poster grid on a phone, equal-height two-column Waiting grid, Waiting compact rows about a Library list row tall. | **Instruction** |
+> | **3. Nothing else moves** | No list state, membership, ordering or badge change; the #468 season chip and REQ-039 freshness facts stay; no migration, route, dependency or process. | **Instruction** |
+>
+> **New in this document:** **US-076 / REQ-142** and **US-077 / REQ-143** (Epic L). **Amended in place:** `specs/ui.md` §7b, `specs/testing.md` US-076/US-077.
+
+---
+
 > ## ⚠ AMENDMENT — 2026-10-24 — `A65` (owner-reported, #463): the left navigation is grouped into sections
 
 > **The owner observed** (#463) that the sidebar was one undifferentiated stack of nine links: *Availability changes* wrapped to two lines, the signed-in address broke mid-word, About sat between working destinations, and nothing said what belonged together. **Decision:** the sidebar and the Menu drawer list the same nine destinations in labelled sections. This is presentation only — no route, URL, label or behaviour changes.
@@ -2499,7 +2513,51 @@ introduced.
 | AC-3 | The owner chooses *Undo* | It runs | The title is back in the Library and its Waiting entry is ended, so it is never in both. |
 | AC-4 | A Waiting entry with a season | The card renders, at 280 px | A visible *Season N upcoming · date* chip is shown and nothing overflows. |
 
-**Out of scope:** the full Waiting card redesign (#467); automatic moves; seasons with no date.
+**Out of scope:** the full Waiting card redesign (#467, now `A68` / US-076); automatic moves; seasons with no date.
+**Open questions:** none.
+
+#### US-076 — A calmer Waiting to stream card (`A68`)
+
+**REQ-142 (`must`, owner-requested #467, `A68`).** A Waiting card says what the owner needs once and in the owner's casing: the title is shown in sentence/title case (a multi-word ALL-CAPS name is not shouted), a title without artwork gets a poster-shaped placeholder carrying its initial, *Not interested* moves into a per-row overflow menu (suppression unchanged), the *Rent or buy*, *Announced* and *Estimate* statuses become a light chip plus date, the *Season N upcoming · date* chip and the per-service freshness facts stay, and *Not seen on your services as of …* is stated once for the page when every row shares the date. Display only: no list state, ordering, membership or badge changes.
+
+**As** the owner
+**I want** each Waiting card to be short, legible and not repeat itself
+**So that** I can scan what is waiting without reading the same sentence on every card
+
+**Traces to:** REQ-142, REQ-141, REQ-039, REQ-071, REQ-041
+**Priority:** must
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | A Waiting title whose name is multi-word ALL CAPS, or has no artwork | The card renders | The name is title-cased (initialisms and mixed case untouched) and a placeholder with the initial replaces the blank poster. |
+| AC-2 | Rows that share one availability-checked date | The page renders | *Not seen on your services as of …* appears once; a row with a different date shows its own. |
+| AC-3 | A Waiting row | The owner opens its overflow menu | *Not interested* is offered there (Escape closes it) and suppresses exactly as before. |
+| AC-4 | A row with a *Rent or buy*, *Announced* or *Estimate* status or a season | The card renders | The status is a light chip plus date and the *Season N upcoming · date* chip is kept. |
+
+**Out of scope:** changing what availability says, ordering, or the details page content.
+**Open questions:** none.
+
+#### US-077 — Mobile Library and Waiting grid and list layouts (`A68`)
+
+**REQ-143 (`must`, owner-requested #470, `A68`).** On a phone the Library *Grid* is a two-column poster-first grid that is visibly different from its *List* (which keeps its current density); the Waiting *Grid* is two equal-height columns with no clipped or mid-word-wrapped text; the Waiting *Compact* row is about as tall as a Library list row (small poster, title, year/type, one availability chip or date, overflow menu). Both keep their Grid/List or Grid/Compact toggle. Desktop layouts remain good at 1024 px and above. Presentation only.
+
+**As** the owner
+**I want** Grid and List (or Compact) to look different and fit a phone
+**So that** the choice of view means something on my phone
+
+**Traces to:** REQ-143, REQ-142, REQ-039
+**Priority:** must
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | The Library in Grid at 280, 390 and 1024 px | It renders | Posters sit in a true multi-column grid, unlike the List, with no overflow. |
+| AC-2 | The Waiting Grid at 280, 390 and 1024 px | It renders | Cards in a row are equal height and every label stays inside its card with no mid-word break. |
+| AC-3 | The Waiting Compact on a phone | It renders | A plain row is no taller than the shortest Library list row, and its overflow menu opens and closes. |
+| AC-4 | Both pages at the same widths | They render | The page-level *as of* note is shown once. |
+
+**Out of scope:** Library list density changes; new routes; new filters.
 **Open questions:** none.
 
 ### 7.4 Closed enumeration of permitted mutations (REQ-041)

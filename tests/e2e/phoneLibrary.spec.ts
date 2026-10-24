@@ -88,6 +88,8 @@ for (const width of [320, 390]) {
       await page.setViewportSize({ width, height: 844 });
       await stubApi(page);
       await page.goto('/');
+      // The phone grid is a poster grid (T-MCARD-080); the row layout is the list.
+      await page.getByRole('button', { name: 'Compact view', exact: true }).click();
       await expect(page.getByTestId('title-row-t1')).toBeVisible();
     });
 

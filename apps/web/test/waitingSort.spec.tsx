@@ -224,7 +224,7 @@ describe('T-WSORT-004 · #415 · the Library’s SortControl orders Waiting to s
   });
 });
 
-const SLOTS = ['poster', 'title', 'chip', 'meta', 'availability', 'moved', 'date', 'action'];
+const SLOTS = ['poster', 'title', 'meta', 'status', 'note', 'action'];
 
 function slotsOf(row: HTMLElement): string[] {
   return [...row.querySelectorAll<HTMLElement>('[data-grid-slot]')]
@@ -257,7 +257,7 @@ describe('T-WGRID-001 · #414 · every Grid card has the same rows, in the same 
     forecast: null,
   });
 
-  it('T-WGRID-001a · a full card and a bare card expose the same eight slots in DOM order, the action last', () => {
+  it('T-WGRID-001a · a full card and a bare card expose the same six slots in DOM order, the action last', () => {
     render(
       <MemoryRouter>
         <WaitingPage items={[full, bare]} view="grid" />
@@ -266,28 +266,24 @@ describe('T-WGRID-001 · #414 · every Grid card has the same rows, in the same 
     const [first, second] = screen.getAllByTestId('waiting-row');
     expect(slotsOf(first!)).toEqual(SLOTS);
     expect(slotsOf(second!)).toEqual(SLOTS);
-    expect(within(slot(second!, 'action')).getByTestId('waiting-not-interested')).toBeTruthy();
-    expect(within(slot(first!, 'action')).getByTestId('waiting-not-interested')).toBeTruthy();
+    expect(within(slot(second!, 'action')).getByTestId('waiting-row-menu')).toBeTruthy();
+    expect(within(slot(first!, 'action')).getByTestId('waiting-row-menu')).toBeTruthy();
   });
 
-  it('T-WGRID-001b · an absent chip, meta, moved note or date block leaves its slot reserved and empty', () => {
+  it('T-WGRID-001b · an absent meta line, status or note leaves its slot reserved and empty', () => {
     render(
       <MemoryRouter>
         <WaitingPage items={[full, bare]} view="grid" />
       </MemoryRouter>,
     );
     const [first, second] = screen.getAllByTestId('waiting-row');
-    expect(within(slot(first!, 'chip')).queryByText(/./)).not.toBeNull();
-    expect(slot(first!, 'date').textContent).not.toBe('');
-    expect(slot(first!, 'moved').textContent).not.toBe('');
-    for (const name of ['chip', 'meta', 'moved', 'date']) {
-      const empty = slot(second!, name);
-      expect(empty).toBeEmptyDOMElement();
-    }
-    // The reserved slots carry nothing for assistive technology.
-    for (const name of ['chip', 'meta', 'moved']) {
-      expect(slot(second!, name)).toHaveAttribute('aria-hidden', 'true');
-    }
+    expect(slot(first!, 'status').textContent).not.toBe('');
+    expect(slot(first!, 'note').textContent).not.toBe('');
+    expect(slot(first!, 'meta').textContent).not.toBe('');
+    expect(slot(second!, 'meta')).toBeEmptyDOMElement();
+    expect(slot(second!, 'status')).toBeEmptyDOMElement();
+    // The reserved meta slot carries nothing for assistive technology.
+    expect(slot(second!, 'meta')).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('T-WGRID-001c · Compact reserves nothing: no empty slots, and the same words as before', () => {
@@ -297,9 +293,10 @@ describe('T-WGRID-001 · #414 · every Grid card has the same rows, in the same 
       </MemoryRouter>,
     );
     const row = screen.getByTestId('waiting-row');
-    expect(row.querySelector('.waiting-row__slot-empty')).toBeNull();
+    // The empty slot is markup only; the stylesheet shows it in Grid alone.
     expect(row.querySelector('.waiting-row__slot')).toBeNull();
-    expect(within(row).getByTestId('waiting-not-interested')).toBeTruthy();
+    expect(css).toMatch(/\.waiting-row__slot-empty\s*\{[^}]*display:\s*none/);
+    expect(within(row).getByTestId('waiting-row-menu')).toBeTruthy();
   });
 
   it('T-WGRID-001d · the stylesheet puts each slot on a shared subgrid row and fixes the poster box', () => {
@@ -311,10 +308,9 @@ describe('T-WGRID-001 · #414 · every Grid card has the same rows, in the same 
     };
     const card = rule(".waiting-list[data-view='grid'] .waiting-row");
     expect(card).toMatch(/grid-template-rows:\s*subgrid/);
-    expect(card).toMatch(/grid-row:\s*span 8/);
-    expect(rule(".waiting-list[data-view='grid'] .waiting-row__poster")).toMatch(
-      /aspect-ratio:\s*2 \/ 3/,
-    );
+    expect(card).toMatch(/grid-row:\s*span 6/);
+    expect(rule('.waiting-row__poster')).toMatch(/aspect-ratio:\s*2 \/ 3/);
+    expect(rule(".waiting-list[data-view='grid'] .waiting-row__poster")).toMatch(/grid-row:\s*1;/);
     SLOTS.slice(1).forEach((name, index) => {
       expect(rule(`.waiting-list[data-view='grid'] [data-grid-slot='${name}']`)).toMatch(
         new RegExp(`grid-row:\\s*${index + 2};`),

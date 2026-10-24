@@ -222,12 +222,15 @@ describe('T-UX-111 · ui-refresh.md §4.1/§4.2 · at 1280 px the grid layout re
   });
 
   it('T-UX-111c: Cover browser retains full-width bounded portrait artwork', () => {
-    const block = mediaBlock('(min-width: 640px)');
     const gridSelector = "\\.title-list\\[data-view='grid'\\]";
-    expect(ruleBody(`${gridSelector} \\.title-row`, block)).toMatch(
+    // The poster-overlay card is the last grid rule: an earlier base rule is its overridden ancestor.
+    const overlay = BASE_CSS.slice(
+      BASE_CSS.lastIndexOf(`${gridSelector.replace(/\\/g, '')} .title-row {\n  --color`),
+    );
+    expect(ruleBody(`${gridSelector} \\.title-row`, overlay)).toMatch(
       /grid-template-columns:\s*minmax\(0,\s*1fr\)/,
     );
-    expect(ruleBody(`${gridSelector} \\.title-row__poster`, block)).toMatch(/width:\s*100%/);
+    expect(ruleBody(`${gridSelector} \\.title-row__poster`, overlay)).toMatch(/width:\s*100%/);
     expect(ruleBody(`${gridSelector} \\.title-row__poster`, BASE_CSS)).toMatch(/height:\s*auto/);
   });
 

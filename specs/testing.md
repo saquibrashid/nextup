@@ -75,6 +75,35 @@ Collected locations: `packages/domain/test/titleCategory.spec.ts`;
 | **`T-FTW-011`** (`a`) | W | `TASK-302` | `apps/web/test/newSeasons.spec.tsx`: the *Season N upcoming · date* chip. |
 | **`T-FTW-080`** (`a`–`b`) | E | `TASK-303` | `tests/e2e/finishedWatching.spec.ts`: the move and chip at 280 px, no overflow, no axe violations. |
 
+### US-076 — A calmer Waiting to stream card (TASK-304, #467, `A68`)
+
+| AC | Level | Test IDs | Assertion |
+| --- | --- | --- | --- |
+| AC-1 | U/W | `T-WCARD-001`, `T-WCARD-002` | Title case and the placeholder poster initial. |
+| AC-2 | W/E | `T-WCARD-003`, `T-MCARD-080` | The *as of* note once per page. |
+| AC-3 | W | `T-WCARD-004`, `T-WAIT-009` | *Not interested* in the row menu; suppression unchanged. |
+| AC-4 | W | `T-WAIT-022`, `T-FTW-011` | Light status chips; the season chip kept. |
+
+| ID | Level | Task | What it asserts |
+| --- | --- | --- | --- |
+| **`T-WCARD-001`** (`a`) | U | `TASK-304` | `apps/web/test/waitingCards.spec.tsx`: `displayTitle` title-cases multi-word ALL CAPS, keeps initialisms and mixed case. |
+| **`T-WCARD-002`** (`a`) | W | `TASK-304` | Same file: a poster-less title shows its initial. |
+| **`T-WCARD-003`** (`a`) | W | `TASK-304` | Same file: rows sharing a date show one note. |
+| **`T-WCARD-004`** (`a`–`b`) | W | `TASK-304` | Same file: the menu offers *Not interested*, calls the unchanged suppression, and Escape closes it. |
+
+### US-077 — Mobile Library and Waiting grid and list layouts (TASK-305, #470, `A68`)
+
+| AC | Level | Test IDs | Assertion |
+| --- | --- | --- | --- |
+| AC-1 | E | `T-MCARD-080` (`a`) | Library Grid is a poster grid unlike List at 280/390/1024 px. |
+| AC-2 | E | `T-MCARD-080` (`b`) | Waiting Grid cards are equal height; no spilled or mid-word-broken label (offenders named). |
+| AC-3 | E | `T-MCARD-080` (`c`) | Waiting Compact rows are no taller than the shortest Library row; the menu opens and Escape closes it. |
+| AC-4 | E | `T-MCARD-080` (`d`) | The *as of* note is shown once. |
+
+| ID | Level | Task | What it asserts |
+| --- | --- | --- | --- |
+| **`T-MCARD-080`** (`a`–`d`) | E | `TASK-305` | `tests/e2e/mobileCardLayouts.spec.ts`: the four assertions above at 280, 390 and 1024 px. |
+
 ### US-073 — Grouped left navigation (TASK-295, TASK-296, #463, `A65`)
 
 | AC | Level | Test IDs | Assertion |

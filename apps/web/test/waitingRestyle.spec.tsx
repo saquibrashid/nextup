@@ -123,6 +123,10 @@ describe('T-WAIT-020 · #382 · the waiting view in the Library look', () => {
 
   it('T-WAIT-020d · "Not interested" is a small ghost control naming the title', () => {
     render(<WaitingPage items={[item()]} />);
+    const trigger = screen.getByTestId('waiting-row-menu');
+    expect(trigger.getAttribute('aria-label')).toBe('Actions for Wicked: For Good');
+    expect(screen.queryByTestId('waiting-not-interested')).toBeNull();
+    fireEvent.click(trigger);
     const button = screen.getByTestId('waiting-not-interested');
     expect(button.className).toBe('btn btn--ghost tap-target');
     expect(button.getAttribute('aria-label')).toBe(`${WAITING_NOT_INTERESTED}: Wicked: For Good`);
@@ -146,9 +150,6 @@ describe('T-WAIT-020 · #382 · the waiting view in the Library look', () => {
     render(<WaitingPage items={[item()]} />);
     const row = screen.getByTestId('waiting-row');
     expect(row.textContent).not.toMatch(/\d{4}-\d{2}-\d{2}/);
-    expect(screen.getByTestId('waiting-discovery').textContent).toBe(
-      'Seen on Fandango at Home on 24 Sep 2026',
-    );
     expect(screen.getByTestId('waiting-rent-note').textContent).toContain('24 Sep 2026');
   });
 
@@ -164,11 +165,12 @@ describe('T-WAIT-020 · #382 · the waiting view in the Library look', () => {
     expect(row).toContain('box-shadow: var(--shadow-card)');
     const poster = rule('.waiting-row__poster');
     expect(poster).toContain('aspect-ratio: 2 / 3');
-    expect(poster).toContain('width: 4.5rem');
+    expect(poster).toContain('width: 100%');
+    expect(row).toContain('grid-template-columns: 3.5rem');
     const at640 = /@media \(min-width: 640px\) \{\s*\.waiting-row \{[\s\S]*?\n\}/.exec(css)?.[0];
-    expect(at640).toContain('width: 6rem');
+    expect(at640).toContain('grid-template-columns: 4rem');
     const at1024 = /@media \(min-width: 1024px\) \{\s*\.waiting-row \{([^}]*)\}/.exec(css)?.[1];
-    expect(at1024).toContain("grid-template-areas: 'poster body aside'");
+    expect(at1024).toContain("'poster body status footer'");
   });
 });
 
@@ -220,23 +222,20 @@ describe('T-WAIT-022 · #389 · each card says each thing once, in Library-style
         ]}
       />,
     );
-    const lines = screen.getAllByTestId('waiting-discovery').map((line) => line.textContent);
-    expect(lines).toEqual([
-      'Seen on Fandango at Home on 24 Sep 2026',
-      'Seen on Fandango at Home (rent/buy) on 24 Sep 2026',
-    ]);
+    // The discovery lines live on the details page now; a card carries one quiet note.
+    expect(screen.queryAllByTestId('waiting-discovery')).toHaveLength(0);
     expect(screen.getAllByTestId('waiting-rent-tag')).toHaveLength(1);
   });
 
-  it('T-WAIT-022d · one card per line, the panel beside the details from 1024 px', () => {
+  it('T-WAIT-022d · one card per line, status and note beside the details from 1024 px', () => {
     const rule = (selector: string): string => {
       const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       return new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`).exec(css)?.[1] ?? '';
     };
     expect(rule('.waiting-list')).toContain('flex-direction: column');
     expect(css).not.toMatch(/\.waiting-list \{[^}]*repeat\(2/);
-    expect(rule('.waiting-row')).toContain("'aside aside'");
-    expect(rule('.waiting-row__pill')).toContain('border-radius: 999px');
+    expect(rule('.waiting-row')).toContain("'poster body more'");
+    expect(rule('.waiting-row__pill')).toContain('border-radius: var(--radius)');
     expect(rule('.waiting-row__pill')).not.toContain('nowrap');
   });
 });

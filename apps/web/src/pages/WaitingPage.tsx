@@ -34,11 +34,12 @@ import { ServiceMark } from '../components/ServiceMark';
 import { WaitingSearchAdd } from '../components/WaitingSearchAdd';
 import { ListViewControl, type ListView } from '../components/ListViewControl';
 import { SortControl, WAITING_SORT } from '../components/SortControl';
-import { BookmarkIcon, InfoIcon, SuppressedIcon } from '../components/icons';
+import { BookmarkIcon, InfoIcon } from '../components/icons';
+import { WaitingRowMenu } from '../components/WaitingRowMenu';
+import { displayTitle } from '../lib/displayTitle';
 
 import {
   JUSTWATCH_ATTRIBUTION,
-  OFFLINE_DISABLED_REASON,
   RETRY_LABEL,
   WAITING_EMPTY_ACTION,
   WAITING_EMPTY_BODY,
@@ -54,7 +55,6 @@ import {
   WAITING_FORECAST_TAG_ESTIMATE,
   WAITING_LOADING,
   WAITING_NOT_CHECKED,
-  WAITING_NOT_INTERESTED,
   WAITING_NOT_ON_YOUR_SERVICES,
   WAITING_NOW_ON_INVITATION,
   WAITING_NOW_ON_PREFIX,
@@ -70,6 +70,7 @@ import {
   WAITING_SUPPRESS_FAILED,
   WATCHMODE_ATTRIBUTION_LINK,
   WAITING_ADD_TO_LIBRARY,
+  WAITING_AS_OF,
   WAITING_ADD_TO_LIBRARY_FAILED,
   WAITING_MOVED_FROM_LIBRARY,
   SEASON_OFFERS_BODY,
@@ -354,11 +355,24 @@ function mediaTypeText(workIdentity: string): string | null {
 const FORECAST_CLASS = {
   announced: 'waiting-row__forecast',
   estimate: 'waiting-row__forecast waiting-row__forecast--estimate',
+  card: 'sr-only',
+} as const;
+
+const ASOF_CLASS = {
+  own: 'waiting-row__asof',
+  shared: 'waiting-row__asof sr-only',
+} as const;
+
+const STREAMING_OUTLOOK_CLASS = {
+  page: 'waiting-row__outlook waiting-row__outlook--streaming',
+  card: 'waiting-row__outlook waiting-row__outlook--streaming waiting-row__outlook--card',
 } as const;
 
 const OUTLOOK_CLASS = {
   announced: 'waiting-row__outlook',
   estimate: 'waiting-row__outlook waiting-row__outlook--estimate',
+  'card-announced': 'waiting-row__outlook waiting-row__outlook--card',
+  'card-estimate': 'waiting-row__outlook waiting-row__outlook--estimate waiting-row__outlook--card',
 } as const;
 
 const TAG_CLASS = {
@@ -416,12 +430,41 @@ function ServiceBadges({
 export function WaitingFacts({
   item,
   full,
+  card,
 }: {
   readonly item: WaitingItem;
   readonly full: boolean;
-}): JSX.Element {
+  /**
+   * #467 — a card (Grid or Compact) carries one quiet availability line, not
+   * the storefronts, other services and discovery (those are on the details
+   * page). `shared` means the page already says "Not seen on your services as
+   * of …" once, so the row keeps the sentence for assistive technology only;
+   * `own` is a row whose date differs, and shows a short "As of …".
+   */
+  readonly card?: 'shared' | 'own';
+}): JSX.Element | null {
   const flagged = item.flaggedOn ?? [];
   const rentStores = rentOnlyStores(item);
+  if (card !== undefined) {
+    if (flagged.length > 0) return null;
+    const sentence =
+      rentStores !== null
+        ? `${WAITING_RENT_ONLY_SUFFIX} ${friendlyDate(item.availabilityCheckedAt ?? '')}.`
+        : availabilityLine(item);
+    const testId = rentStores !== null ? 'waiting-rent-note' : 'waiting-availability';
+    return (
+      <p className={ASOF_CLASS[card]} data-testid={testId}>
+        {card === 'own' && item.availabilityCheckedAt !== null ? (
+          <>
+            <span aria-hidden="true">{`${WAITING_AS_OF} ${friendlyDate(item.availabilityCheckedAt)}`}</span>
+            <span className="sr-only">{sentence}</span>
+          </>
+        ) : (
+          sentence
+        )}
+      </p>
+    );
+  }
   const others = otherStreaming(item);
   // #389 — the discovery line, without "(rent/buy)" when the row's own pill
   // already says rent or buy only. Any other row keeps it (T-AVAIL-015e).
@@ -498,7 +541,14 @@ export function WaitingFacts({
  * #389/#391 — the row's panel: the streaming invitation or the forecast.
  * Shared by the list, the grid and the details page.
  */
-export function WaitingOutlook({ item }: { readonly item: WaitingItem }): JSX.Element | null {
+export function WaitingOutlook({
+  item,
+  card = false,
+}: {
+  readonly item: WaitingItem;
+  /** #467 — the lighter card treatment: a chip and its date, no box. */
+  readonly card?: boolean;
+}): JSX.Element | null {
   const flagged = item.flaggedOn ?? [];
   const flaggedServices = flagged.flatMap((service) => {
     const known = knownService(service);
@@ -508,10 +558,19 @@ export function WaitingOutlook({ item }: { readonly item: WaitingItem }): JSX.El
   const seasonKind = 'announced';
   const forecast = flagged.length > 0 || season !== null ? null : forecastLine(item);
   const forecastKind = forecast?.estimate === true ? 'estimate' : 'announced';
+  const surface = card ? 'card' : 'page';
+  const seasonKey = card ? 'card-announced' : seasonKind;
+  const seasonSentence = card ? 'card' : seasonKind;
+  const forecastSentence = card ? 'card' : forecastKind;
+  const forecastKey = card
+    ? forecastKind === 'estimate'
+      ? 'card-estimate'
+      : 'card-announced'
+    : forecastKind;
   return (
     <>
       {season !== null && (
-        <div className={OUTLOOK_CLASS[seasonKind]} data-testid="waiting-season">
+        <div className={OUTLOOK_CLASS[seasonKey]} data-testid="waiting-season">
           <p className="waiting-row__outlook-head" aria-hidden="true">
             <span className={TAG_CLASS[seasonKind]} data-testid="waiting-season-chip">
               {season.out
@@ -520,7 +579,7 @@ export function WaitingOutlook({ item }: { readonly item: WaitingItem }): JSX.El
             </span>
             {season.out && <span className="waiting-row__when">{friendlyDate(season.airsOn)}</span>}
           </p>
-          <p className={FORECAST_CLASS[seasonKind]} data-testid="waiting-season-text">
+          <p className={FORECAST_CLASS[seasonSentence]} data-testid="waiting-season-text">
             {season.out
               ? seasonOutText(season.number)
               : seasonPremieresText(season.number, friendlyDate(season.airsOn))}
@@ -533,7 +592,7 @@ export function WaitingOutlook({ item }: { readonly item: WaitingItem }): JSX.El
         mark as the headline, and the sentence with its invitation. Only
         the mark is decorative; the words say the same.
       */
-        <div className="waiting-row__outlook waiting-row__outlook--streaming">
+        <div className={STREAMING_OUTLOOK_CLASS[surface]}>
           <span
             className="waiting-row__tag waiting-row__tag--streaming"
             data-testid="waiting-streaming-badge"
@@ -568,12 +627,12 @@ export function WaitingOutlook({ item }: { readonly item: WaitingItem }): JSX.El
           (#380), so an estimate never reads as an announcement. It names
           the service, so no mark repeats it.
         */
-          <div className={OUTLOOK_CLASS[forecastKind]}>
+          <div className={OUTLOOK_CLASS[forecastKey]}>
             <p className="waiting-row__outlook-head" aria-hidden="true">
               <span className={TAG_CLASS[forecastKind]}>{FORECAST_TAG[forecastKind]}</span>
               <span className="waiting-row__when">{forecastWhen(item.forecast)}</span>
             </p>
-            <p className={FORECAST_CLASS[forecastKind]} data-testid="waiting-forecast">
+            <p className={FORECAST_CLASS[forecastSentence]} data-testid="waiting-forecast">
               {forecast.text}
             </p>
           </div>
@@ -589,10 +648,10 @@ function WaitingRow({
   onPromote,
   onDone,
   offline,
-  view,
+  asOf,
 }: {
   item: WaitingItem;
-  view: ListView;
+  asOf: 'shared' | 'own';
   onSuppress: (titleId: string) => Promise<unknown>;
   onPromote: ((intentId: string, service: Service) => Promise<unknown>) | undefined;
   onDone: (intentId: string) => void;
@@ -608,7 +667,6 @@ function WaitingRow({
   const rentStores = rentOnlyStores(item);
   const rowKind = flagged.length > 0 ? 'streaming' : 'waiting';
   const mediaType = mediaTypeText(item.workIdentity);
-  const grid = view === 'grid';
 
   function addToLibrary(service: Service): void {
     if (onPromote === undefined) return;
@@ -643,7 +701,11 @@ function WaitingRow({
           className="waiting-row__poster waiting-row__poster--empty"
           data-testid="waiting-poster-placeholder"
           data-grid-slot="poster"
-        />
+          aria-hidden="true"
+        >
+          {/* #467 — a poster-shaped placeholder with the title's initial, never a blank box. */}
+          {Array.from(displayTitle(item.name).trim())[0]?.toUpperCase() ?? ''}
+        </div>
       )}
 
       <div className="waiting-row__body">
@@ -656,22 +718,11 @@ function WaitingRow({
                 to={`/waiting/${encodeURIComponent(item.titleId)}`}
                 data-testid="waiting-details-link"
               >
-                {item.name}
+                {displayTitle(item.name)}
               </Link>
             </h2>
             <EditionLabels labels={item.editionLabels} />
           </div>
-          {rentStores !== null ? (
-            <span
-              className="waiting-row__pill"
-              data-testid="waiting-rent-tag"
-              data-grid-slot="chip"
-            >
-              {WAITING_RENT_ONLY_TAG}
-            </span>
-          ) : (
-            grid && <EmptySlot slot="chip" />
-          )}
         </div>
 
         {/* Library's `title-row__facts`: the `·` separators are CSS-generated. */}
@@ -685,37 +736,30 @@ function WaitingRow({
             {mediaType !== null && <span data-testid="waiting-media-type">{mediaType}</span>}
           </p>
         ) : (
-          grid && <EmptySlot slot="meta" />
-        )}
-
-        {grid ? (
-          <div className="waiting-row__slot" data-grid-slot="availability">
-            <WaitingFacts item={item} full={false} />
-          </div>
-        ) : (
-          <WaitingFacts item={item} full />
-        )}
-        {item.movedFromLibraryAt != null ? (
-          <p
-            className="waiting-row__moved"
-            data-testid="waiting-moved-from-library"
-            data-grid-slot="moved"
-          >
-            {`${WAITING_MOVED_FROM_LIBRARY} ${friendlyDate(item.movedFromLibraryAt)}.`}
-          </p>
-        ) : (
-          grid && <EmptySlot slot="moved" />
+          <EmptySlot slot="meta" />
         )}
       </div>
 
       <div className="waiting-row__aside">
-        {grid ? (
-          <div className="waiting-row__slot" data-grid-slot="date">
-            <WaitingOutlook item={item} />
-          </div>
-        ) : (
-          <WaitingOutlook item={item} />
-        )}
+        {/* #467 — one status line: the chip and its date, rent or buy beside it, lighter. */}
+        <div className="waiting-row__status" data-grid-slot="status">
+          {rentStores !== null && (
+            <span className="waiting-row__pill" data-testid="waiting-rent-tag">
+              {WAITING_RENT_ONLY_TAG}
+            </span>
+          )}
+          <WaitingOutlook item={item} card />
+        </div>
+
+        {/* The availability fact is said once on the page; a row repeats it only if it differs. */}
+        <div className="waiting-row__note" data-grid-slot="note">
+          <WaitingFacts item={item} full={false} card={asOf} />
+          {item.movedFromLibraryAt != null && (
+            <p className="waiting-row__moved" data-testid="waiting-moved-from-library">
+              {`${WAITING_MOVED_FROM_LIBRARY} ${friendlyDate(item.movedFromLibraryAt)}.`}
+            </p>
+          )}
+        </div>
 
         {/* #414 — one box in Grid, so the action sits on the card's last row. */}
         <div className="waiting-row__footer" data-grid-slot="action">
@@ -735,39 +779,33 @@ function WaitingRow({
                     : WAITING_ADD_TO_LIBRARY}
                 </Button>
               ))}
-            {phase === 'idle' && (
-              <Button
-                variant="ghost"
-                data-testid="waiting-not-interested"
-                aria-label={`${WAITING_NOT_INTERESTED}: ${item.name}`}
-                disabled={offline}
-                onClick={suppress}
-              >
-                <SuppressedIcon />
-                {WAITING_NOT_INTERESTED}
-              </Button>
-            )}
-            {phase === 'submitting' && (
+          </div>
+          {phase === 'idle' && (
+            <span className="waiting-row__more">
+              <WaitingRowMenu name={item.name} offline={offline} onSuppress={suppress} />
+            </span>
+          )}
+          {phase === 'submitting' && (
+            <span className="waiting-row__more">
               <Button variant="ghost" data-testid="waiting-suppressing" disabled>
                 {'Working…'}
               </Button>
-            )}
-            {phase === 'error' && (
+            </span>
+          )}
+          {phase === 'error' && (
+            <span className="waiting-row__more">
               <Button variant="ghost" data-testid="waiting-not-interested" onClick={suppress}>
                 {RETRY_LABEL}
               </Button>
-            )}
-          </div>
-          {offline && phase === 'idle' && (
-            <span className="offline-reason">{OFFLINE_DISABLED_REASON}</span>
+            </span>
           )}
           {promote === 'error' && (
-            <p role="alert" data-testid="waiting-promote-error">
+            <p role="alert" className="waiting-row__feedback" data-testid="waiting-promote-error">
               {WAITING_ADD_TO_LIBRARY_FAILED}
             </p>
           )}
           {phase === 'error' && (
-            <p role="alert" data-testid="waiting-suppress-error">
+            <p role="alert" className="waiting-row__feedback" data-testid="waiting-suppress-error">
               {WAITING_SUPPRESS_FAILED}
             </p>
           )}
@@ -800,6 +838,16 @@ export function WaitingPage({
 
   // #415 — the server's order, untouched: no client-side sorting (US-065).
   const visible = items.filter((item) => !dismissed.has(item.intentId));
+  // #467 — "Not seen on your services as of …" is said once, when every
+  // checked, not-yet-streaming row shares the date; a row that differs says so itself.
+  const checkedDates = new Set(
+    visible.flatMap((item) =>
+      (item.flaggedOn ?? []).length === 0 && item.availabilityCheckedAt !== null
+        ? [item.availabilityCheckedAt.slice(0, 10)]
+        : [],
+    ),
+  );
+  const sharedAsOf = checkedDates.size === 1 ? ([...checkedDates][0] ?? null) : null;
   // The toolbar stays while a new order loads, so the control never vanishes.
   const toolbar = (
     <div className="waiting-toolbar">
@@ -873,12 +921,22 @@ export function WaitingPage({
       ) : (
         <>
           {toolbar}
+          {sharedAsOf !== null && (
+            <p className="waiting-asof" data-testid="waiting-asof-note">
+              {`${WAITING_NOT_ON_YOUR_SERVICES} ${friendlyDate(sharedAsOf)}.`}
+            </p>
+          )}
           <ul className="waiting-list" data-testid="waiting-list" data-view={view}>
             {visible.map((item) => (
               <WaitingRow
                 key={item.intentId}
                 item={item}
-                view={view}
+                asOf={
+                  item.availabilityCheckedAt !== null &&
+                  item.availabilityCheckedAt.slice(0, 10) === sharedAsOf
+                    ? 'shared'
+                    : 'own'
+                }
                 offline={offline}
                 onSuppress={onSuppress}
                 onPromote={onPromote}

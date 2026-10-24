@@ -13,10 +13,10 @@ unfinished. See `specs/testing.md` §9A (`T-STATUS-001`).
 |---|---|
 | ⬜ todo | 0 |
 | 🚧 doing | 0 |
-| ✅ done | 298 |
+| ✅ done | 300 |
 | 🙋 owner | 3 |
 | 💤 deferred | 0 |
-| **total** | **301** |
+| **total** | **303** |
 
 ## Ready to start
 
@@ -339,3 +339,5 @@ _Nothing is ready: every unfinished task is waiting on a dependency._
 | `TASK-301` | Finished show to Waiting, backend (#468, `A67`, US-075 / REQ-141): `library-hidden` `false` ends the open Waiting intent; the Waiting read lists a set-aside work's intent. No new route, no migration. Test ids: `T-FTW-001`, `T-FTW-002`. | `T-FTW-001`, `T-FTW-002` |
 | `TASK-302` | Finished show to Waiting, web: the third *Move to Waiting to stream (Season N, date)* option with Undo, and the *Season N upcoming · date* chip. Test ids: `T-FTW-010`, `T-FTW-011`. | `T-FTW-010`, `T-FTW-011` |
 | `TASK-303` | The move and chip at 280 px in a real browser. Test id: `T-FTW-080`. | `T-FTW-080` |
+| `TASK-304` | Waiting card content pass (#467, `A68`, US-076 / REQ-142): title case, placeholder poster, one *as of* note, *Not interested* in a row menu, lighter status chips. No state, route or migration change. Test ids: `T-WCARD-001`..`T-WCARD-004`. | `T-WCARD-001`, `T-WCARD-002`, `T-WCARD-003`, `T-WCARD-004` |
+| `TASK-305` | Mobile Library and Waiting grid/list layouts (#470, `A68`, US-077 / REQ-143): two-column Library poster grid, equal-height Waiting grid, Library-height Waiting compact rows, at 280/390/1024 px. Test id: `T-MCARD-080`. | `T-MCARD-080` |

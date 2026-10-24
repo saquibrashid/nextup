@@ -2609,35 +2609,45 @@ button {
   gap: var(--space-2);
 }
 
-/* #389 — one card per line, as on Library's list: the row is wide enough for its panel. */
+/*
+  #389/#467/#470 — Compact: a dense row like the Library's list. A small
+  poster, the title and its year · type, ONE status chip with its date, and the
+  overflow menu; a row that is now streaming adds its Add to Library button
+  underneath. The row is a grid whose areas the phone, the tablet and the
+  desktop re-place, so one DOM serves every width.
+*/
+.waiting-asof {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0 0 var(--space-3);
+}
+
 .waiting-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
   isolation: isolate;
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-/*
-  #389 — three zones: poster, details, and a panel (the forecast or the good
-  news) with "Not interested" under it. The panel sits under the details on a
-  phone and a tablet, and beside them from 1024 px.
-*/
 .waiting-row {
   background: var(--color-catalog-raised);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
+  column-gap: var(--space-3);
   display: grid;
-  gap: var(--space-3);
   grid-template-areas:
-    'poster body'
-    'aside aside';
-  grid-template-columns: 4.5rem minmax(0, 1fr);
+    'poster body more'
+    'poster status status'
+    'poster note note'
+    'poster act act';
+  grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+  grid-template-rows: auto;
   min-width: 0;
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   transition: border-color 140ms ease;
 }
 
@@ -2650,70 +2660,57 @@ button {
   opacity: 0.6;
 }
 
-/* REQ-111's uniform 2:3 box, at the Library's sizes. */
+/* REQ-111's uniform 2:3 box. The frame keeps a mostly-white poster visibly a poster. */
 .waiting-row__poster {
   aspect-ratio: 2 / 3;
+  background: var(--color-chip);
+  border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-poster);
   grid-area: poster;
-  height: 6.75rem;
+  height: auto;
   object-fit: cover;
-  width: 4.5rem;
+  width: 100%;
 }
 
+/* No artwork: the title's initial on the chip surface, so the card never has a blank box. */
 .waiting-row__poster--empty {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  align-items: center;
+  color: var(--color-text-muted);
+  display: flex;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  justify-content: center;
 }
 
 .waiting-row__body {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 0;
   grid-area: body;
-  min-width: 0; /* ⚠ Without this a long title forces horizontal scroll at 320 px. */
+  min-width: 0; /* ⚠ Without this a long title forces horizontal scroll at 280 px. */
 }
 
-/* The title on the left, the "Rent or buy only" pill on the right. */
 .waiting-row__heading {
-  align-items: flex-start;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-2);
-  justify-content: space-between;
   min-width: 0;
 }
 
 .waiting-row__title {
-  align-items: center;
-  display: flex;
-  flex: 1 1 12rem;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-2);
   min-width: 0;
-  overflow-wrap: anywhere;
 }
 
+/* Words stay whole; a word longer than its box is the only thing that breaks. */
 .waiting-row__name {
-  font-size: var(--text-lg);
+  display: -webkit-box;
+  font-size: var(--text-base);
   font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
   margin: 0;
-  overflow-wrap: anywhere;
-}
-
-/* ⚠ Tags and pills WRAP, never nowrap: at 280 px with Linux WebKit fonts a
-   nowrap "RENT OR BUY ONLY" pushed the page 12 px sideways (T-WAIT-018b). */
-.waiting-row__pill {
-  border: 1px solid var(--color-accent);
-  border-radius: 999px;
-  color: var(--color-accent);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-medium);
-  letter-spacing: 0.04em;
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  padding: 0 var(--space-2);
-  text-transform: uppercase;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 /* The Library's meta line: `2021 · Movie`, separators kept out of the accessible name. */
@@ -2772,7 +2769,7 @@ button {
   padding-inline-start: var(--space-2);
 }
 
-/* #389 — the availability and discovery facts, one icon line each. */
+/* #389 — the availability and discovery facts, one icon line each (details page). */
 .waiting-row__facts {
   color: var(--color-text-muted);
   display: flex;
@@ -2799,18 +2796,42 @@ button {
   width: 1rem;
 }
 
+/* The aside's boxes are placed by the row, so the aside itself is not a box. */
 .waiting-row__aside {
+  display: contents;
+}
+
+.waiting-row__status {
+  align-items: center;
   display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  grid-area: aside;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  grid-area: status;
+  margin-top: var(--space-1);
   min-width: 0;
 }
 
+.waiting-row__status:empty {
+  display: none;
+}
+
+.waiting-row__note {
+  grid-area: note;
+  min-width: 0;
+}
+
+.waiting-row__asof,
+.waiting-row__moved {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: var(--space-1) 0 0;
+  overflow-wrap: break-word;
+}
+
 /*
-  #380/#382/#389 — the panel: a tag, a headline, and the sentence. An
-  announced date is a fact; an estimate is a guess and says so in words
-  ("Estimate:"), with the dashed frame and italic only reinforcing that.
+  #380/#382/#389 — the details page's panel: a tag, a headline, and the
+  sentence. An announced date is a fact; an estimate is a guess and says so in
+  words ("Estimate:"), with the dashed frame and italic only reinforcing that.
 */
 .waiting-row__outlook {
   align-items: flex-start;
@@ -2839,17 +2860,15 @@ button {
   margin: 0;
 }
 
-/* A small tracked label: "Estimate", "Announced", "Now streaming". */
+/* A small label: "Estimate", "Announced", "Now streaming" — sentence case, never shouted. */
 .waiting-row__tag {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
-  letter-spacing: 0.04em;
   max-width: 100%;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   padding: 0 var(--space-2);
-  text-transform: uppercase;
 }
 
 /* An estimate's border is dashed: a second, non-colour cue that it is a guess. */
@@ -2857,9 +2876,15 @@ button {
   border-style: dashed;
 }
 
-.waiting-row__tag--announced,
-.waiting-row__tag--streaming {
+.waiting-row__tag--announced {
   border-color: var(--color-success);
+}
+
+/* The one good-news chip is filled, so Now streaming is the card's loudest status. */
+.waiting-row__tag--streaming {
+  background: var(--color-status-watching);
+  border-color: var(--color-status-watching-border);
+  color: var(--color-success);
 }
 
 .waiting-row__when {
@@ -2890,20 +2915,118 @@ button {
   font-weight: var(--weight-normal);
 }
 
-/* A small secondary control, never the largest thing on the card. */
+/*
+  #467 — the card's status: no box, a chip and its date on one line. The
+  sentence behind it is kept for assistive technology (`sr-only` in the
+  markup), so the fact is not said twice on screen.
+*/
+.waiting-row__outlook--card {
+  align-items: center;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+  padding: 0;
+}
+
+.waiting-row__outlook--card .waiting-row__outlook-head {
+  align-items: center;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.waiting-row__outlook--card .waiting-row__when {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.waiting-row__outlook--card .waiting-row__flag {
+  color: var(--color-text-muted);
+  flex-basis: 100%;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-normal);
+}
+
+/* "Rent or buy only": the same chip family, but quiet — a fact, not a state to act on. */
+.waiting-row__pill {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  max-width: 100%;
+  overflow-wrap: break-word;
+  padding: 0 var(--space-2);
+}
+
+/* The footer is no box in Compact below 1024 px: its parts take the row's areas. */
+.waiting-row__footer {
+  display: contents;
+}
+
 .waiting-row__actions {
-  align-self: flex-end;
-  margin-top: auto;
+  grid-area: act;
+  justify-self: start;
+  margin-top: var(--space-1);
   max-width: 100%;
   min-width: 0;
 }
 
+.waiting-row__actions:empty {
+  display: none;
+}
+
 .waiting-row__actions .btn {
-  color: var(--color-text-muted);
   font-size: var(--text-sm);
   max-width: 100%;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
   white-space: normal;
+}
+
+.waiting-row__more {
+  align-self: start;
+  grid-area: more;
+  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) 0 0;
+}
+
+.waiting-row__feedback {
+  font-size: var(--text-sm);
+  grid-column: 2 / -1;
+  margin: var(--space-1) 0 0;
+}
+
+.waiting-row__menu {
+  display: inline-flex;
+  position: relative;
+}
+
+.waiting-row__menu > .btn {
+  color: var(--color-text-muted);
+}
+
+.waiting-row__menu-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  inset-block-start: 100%;
+  inset-inline-end: 0;
+  max-width: calc(100vw - 2 * var(--space-4));
+  min-width: max-content;
+  padding: var(--space-1);
+  position: absolute;
+  z-index: 10;
+}
+
+.waiting-row__menu-panel .btn {
+  gap: var(--space-2);
+  justify-content: flex-start;
 }
 
 /*
@@ -2918,57 +3041,72 @@ button {
 
 @media (min-width: 640px) {
   .waiting-row {
-    gap: var(--space-3) var(--space-4);
-    grid-template-areas:
-      'poster body'
-      'poster aside';
-    grid-template-columns: 6rem minmax(0, 1fr);
-    padding: var(--space-4);
+    column-gap: var(--space-4);
+    grid-template-columns: 4rem minmax(0, 1fr) auto;
+    padding: var(--space-3) var(--space-4);
   }
 
-  .waiting-row__poster {
-    height: 9rem;
-    width: 6rem;
+  .waiting-row__more {
+    margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) 0 0;
   }
 }
 
+/* Wide: poster, details, the status and note, and the actions — one dense line. */
 @media (min-width: 1024px) {
   .waiting-row {
-    grid-template-areas: 'poster body aside';
-    grid-template-columns: 6rem minmax(0, 1fr) 16rem;
+    align-items: center;
+    grid-template-areas:
+      'poster body status footer'
+      'poster body note footer';
+    grid-template-columns: 4rem minmax(0, 1fr) minmax(10rem, 16rem) auto;
+  }
+
+  .waiting-row__footer {
+    align-items: center;
+    display: flex;
+    gap: var(--space-2);
+    grid-area: footer;
+    justify-self: end;
+  }
+
+  .waiting-row__actions,
+  .waiting-row__more {
+    grid-area: auto;
+    margin: 0;
+  }
+
+  .waiting-row__status {
+    margin-top: 0;
   }
 }
 
 /* #391 — the Library's Grid / Compact switch, at the list's top right. */
 .waiting-toolbar {
   display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
   justify-content: flex-end;
   margin-block-end: var(--space-3);
 }
 
 /*
-  #391 — Grid: poster-forward tiles, two across even at 320 px, each keeping
-  the answer (the panel and the availability line) and leaving storefronts,
-  other services and discovery to the details page. Compact is the list above.
+  #391/#470 — Grid: poster-first tiles, two equal columns on a phone. Each
+  card's rows are a SUBGRID of the list (#414), so poster, title, meta, status,
+  note and action sit on the same line in every card of a row, present or not.
+  An absent block leaves its row empty, so nothing below it moves and the
+  action ends every card on one line.
 */
 .waiting-list[data-view='grid'] {
   display: grid;
   gap: var(--space-3);
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 8rem), 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-/*
-  #414 — row-aligned tiles, the Library grid's treatment: each card's rows are
-  a SUBGRID of the list, so poster, title, rent chip, meta, availability,
-  moved note, date block and action sit on the same line in every card of a
-  row. An absent optional block leaves its row empty (an `EmptySlot`), so
-  nothing below it moves, and *Not interested* ends every card on one line.
-  Grid view only: Compact and the phone card list keep their own layout.
-*/
 .waiting-list[data-view='grid'] .waiting-row {
   align-content: start;
-  gap: 0;
-  grid-row: span 8;
+  align-items: stretch;
+  column-gap: 0;
+  grid-row: span 6;
   grid-template-areas: none;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: subgrid;
@@ -2984,12 +3122,12 @@ button {
 }
 
 .waiting-list[data-view='grid'] .waiting-row__body,
-.waiting-list[data-view='grid'] .waiting-row__heading,
-.waiting-list[data-view='grid'] .waiting-row__aside {
+.waiting-list[data-view='grid'] .waiting-row__heading {
   display: contents;
 }
 
 .waiting-list[data-view='grid'] [data-grid-slot] {
+  grid-area: auto;
   grid-column: 1;
   margin-top: var(--space-2);
   min-width: 0;
@@ -3002,72 +3140,71 @@ button {
 /* A fixed 2:3 box whatever the image's own shape. */
 .waiting-list[data-view='grid'] .waiting-row__poster {
   align-self: start;
-  aspect-ratio: 2 / 3;
   grid-row: 1;
-  height: auto;
   margin-top: 0;
-  object-fit: cover;
-  width: 100%;
 }
 
 .waiting-list[data-view='grid'] [data-grid-slot='title'] {
   grid-row: 2;
 }
 
-.waiting-list[data-view='grid'] [data-grid-slot='chip'] {
-  align-self: start;
+.waiting-list[data-view='grid'] [data-grid-slot='meta'] {
   grid-row: 3;
-  justify-self: start;
+  margin-top: var(--space-1);
 }
 
-.waiting-list[data-view='grid'] [data-grid-slot='meta'] {
+.waiting-list[data-view='grid'] [data-grid-slot='status'] {
   grid-row: 4;
 }
 
-.waiting-list[data-view='grid'] [data-grid-slot='availability'] {
+.waiting-list[data-view='grid'] [data-grid-slot='note'] {
   grid-row: 5;
+  margin-top: 0;
 }
 
-.waiting-list[data-view='grid'] [data-grid-slot='moved'] {
-  grid-row: 6;
-}
-
-.waiting-list[data-view='grid'] [data-grid-slot='date'] {
-  grid-row: 7;
-}
-
-/* The last row, its content pushed to the bottom: one line for the action. */
+/* The last row, its content pushed to the bottom: Add to Library and the menu. */
 .waiting-list[data-view='grid'] [data-grid-slot='action'] {
+  align-items: stretch;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  grid-row: 8;
+  gap: var(--space-1);
+  grid-row: 6;
   justify-content: flex-end;
 }
 
-/* Outside Grid the footer is no box at all, so Compact is unchanged. */
-.waiting-row__footer {
-  display: contents;
+.waiting-list[data-view='grid'] .waiting-row__actions,
+.waiting-list[data-view='grid'] .waiting-row__more {
+  grid-area: auto;
+  margin: 0;
 }
 
-.waiting-row__slot {
-  min-width: 0;
+.waiting-list[data-view='grid'] .waiting-row__more {
+  align-self: flex-end;
 }
 
-.waiting-row__slot-empty {
-  display: block;
+.waiting-list[data-view='grid'] .waiting-row__actions {
+  justify-self: stretch;
+}
+
+.waiting-list[data-view='grid'] .waiting-row__actions .btn {
+  width: 100%;
+}
+
+.waiting-list[data-view='grid'] .waiting-row__feedback {
+  flex-basis: 100%;
 }
 
 .waiting-list[data-view='grid'] .waiting-row__name {
-  font-size: var(--text-base);
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
 }
 
-.waiting-list[data-view='grid'] .waiting-row__outlook {
-  padding: var(--space-2);
+.waiting-row__slot-empty {
+  display: none;
 }
 
-.waiting-list[data-view='grid'] .waiting-row__when {
-  font-size: var(--text-lg);
+.waiting-list[data-view='grid'] .waiting-row__slot-empty {
+  display: block;
 }
 
 @media (min-width: 640px) {
@@ -5734,241 +5871,253 @@ button {
   .sort-control-group {
     justify-self: start;
   }
+}
 
-  .title-list[data-view='grid'] {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+/*
+  #470 — the poster grid at EVERY width: two columns from a phone up, the
+  artwork dominant and the text a caption over it. It used to start at 640 px
+  and the phone layout flattened it into a list, so Grid and List matched.
+*/
+.title-list[data-view='grid'] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 
-  .title-list[data-view='grid'] .title-row {
-    --color-text-muted: var(--color-artwork-text-muted);
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: subgrid;
-    grid-row: span 6;
-    width: 100%;
-    min-width: 0;
-    row-gap: 0;
-    padding: 0;
-    position: relative;
-    min-height: min-content;
-    background: var(--color-catalog);
-  }
+.title-list[data-view='grid'] .title-row {
+  --color-text-muted: var(--color-artwork-text-muted);
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: subgrid;
+  grid-row: span 6;
+  width: 100%;
+  min-width: 0;
+  row-gap: 0;
+  padding: 0;
+  position: relative;
+  min-height: min-content;
+  background: var(--color-catalog);
+}
 
-  .title-list[data-view='grid'] .title-row::before {
-    content: '';
-    grid-column: 1;
-    grid-row: 1;
-    aspect-ratio: 4 / 3;
-  }
+.title-list[data-view='grid'] .title-row::before {
+  content: '';
+  grid-column: 1;
+  grid-row: 1;
+  aspect-ratio: 4 / 3;
+}
 
-  .title-list[data-view='grid'] .title-row__poster {
-    grid-column: 1;
-    grid-row: 1 / -1;
-    width: 100%;
-    z-index: 0;
-    border-radius: var(--radius-card);
-  }
+.title-list[data-view='grid'] .title-row__poster {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  width: 100%;
+  z-index: 0;
+  border-radius: var(--radius-card);
+}
 
-  .title-list[data-view='grid'] .title-row__name {
-    font-size: var(--text-card-title);
-    font-weight: var(--weight-medium);
-    line-height: var(--leading-tight);
-  }
+.title-list[data-view='grid'] .title-row__name {
+  font-size: var(--text-card-title);
+  font-weight: var(--weight-medium);
+  line-height: var(--leading-tight);
+}
 
-  .title-list[data-view='grid'] .title-row__actions {
-    position: absolute;
-    grid-area: auto;
-    inset: var(--space-1) var(--space-2) auto auto;
-    margin: 0;
-    z-index: 4;
-  }
+.title-list[data-view='grid'] .title-row__actions {
+  position: absolute;
+  grid-area: auto;
+  inset: var(--space-1) var(--space-2) auto auto;
+  margin: 0;
+  z-index: 4;
+}
 
-  .title-list[data-view='grid'] .title-row__actions > .btn,
-  .title-list[data-view='grid'] .title-row__menu > .btn {
-    background: var(--color-artwork-control);
-  }
+.title-list[data-view='grid'] .title-row__actions > .btn,
+.title-list[data-view='grid'] .title-row__menu > .btn {
+  background: var(--color-artwork-control);
+}
 
-  .title-list[data-view='grid'] .title-row[data-match-state='unmatched'] .title-row__actions,
-  .title-list[data-view='grid'] .title-row[aria-busy='true'] .title-row__actions {
-    position: relative;
-    inset: auto;
-    grid-column: 1;
-    grid-row: 6;
-    margin-inline: var(--space-3);
-    margin-top: 0;
-    padding-bottom: var(--space-2);
-  }
+.title-list[data-view='grid'] .title-row[data-match-state='unmatched'] .title-row__actions,
+.title-list[data-view='grid'] .title-row[aria-busy='true'] .title-row__actions {
+  position: relative;
+  inset: auto;
+  grid-column: 1;
+  grid-row: 6;
+  margin-inline: var(--space-3);
+  margin-top: 0;
+  padding-bottom: var(--space-2);
+}
 
-  .title-list[data-view='grid'] .title-row__body {
-    grid-column: 1;
-    grid-row: 2 / span 4;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-rows: subgrid;
-    align-items: start;
-    gap: var(--space-2);
-    margin: 0;
-    padding: var(--space-6) var(--space-3) var(--space-2);
-    background: var(--gradient-artwork);
-    border-radius: 0 0 var(--radius-card) var(--radius-card);
-    z-index: 1;
-  }
+.title-list[data-view='grid'] .title-row__body {
+  grid-column: 1;
+  grid-row: 2 / span 4;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: subgrid;
+  align-items: start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-6) var(--space-3) var(--space-2);
+  background: var(--gradient-artwork);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+  z-index: 1;
+}
 
-  .title-list[data-view='grid'] .title-row__identity {
-    grid-column: 1 / -1;
-  }
+.title-list[data-view='grid'] .title-row__identity {
+  grid-column: 1 / -1;
+}
 
+.title-list[data-view='grid'] .title-row__watch {
+  grid-area: auto;
+  position: absolute;
+  top: calc(var(--tap-target-min) + var(--space-2));
+  left: var(--space-2);
+  max-width: calc(100% - var(--space-5));
+  border-radius: var(--radius);
+  background: none;
+  z-index: 3;
+}
+
+.title-list[data-view='grid'] .title-row__watch .btn {
+  width: auto;
+  min-width: var(--tap-target-min);
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.title-list[data-view='grid'] .title-row__priority {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-artwork-control-border);
+  border-radius: var(--radius);
+  background: var(--color-artwork-control);
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
+}
+
+.title-list[data-view='grid'] .title-row__watch .icon {
+  display: none;
+}
+
+/* A 280–359 px card cannot seat the pill beside the menu, so it sits below it. */
+@media (min-width: 22.5rem) {
   .title-list[data-view='grid'] .title-row__watch {
-    grid-area: auto;
-    position: absolute;
     top: var(--space-1);
-    left: var(--space-2);
-    max-width: calc(100% - var(--space-5));
-    border-radius: var(--radius);
-    background: none;
-    z-index: 3;
   }
+}
 
-  .title-list[data-view='grid'] .title-row__watch .btn {
-    width: auto;
-    min-width: var(--tap-target-min);
-    padding: 0;
-    border: 0;
-    background: none;
-    box-shadow: none;
-  }
+.title-list[data-view='grid'] .title-row__rating {
+  grid-column: 2;
+  grid-row: 3;
+  justify-self: end;
+  align-self: start;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  text-align: right;
+}
 
-  .title-list[data-view='grid'] .title-row__priority {
-    padding: var(--space-1) var(--space-2);
-    border: 1px solid var(--color-artwork-control-border);
-    border-radius: var(--radius);
-    background: var(--color-artwork-control);
-    font-size: var(--text-sm);
-    line-height: var(--leading-tight);
-  }
+.title-list[data-view='grid'] .title-row__identity {
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-template-rows: subgrid;
+  grid-row: 1 / span 3;
+  align-self: stretch;
+  grid-column: 1 / -1;
+}
 
-  .title-list[data-view='grid'] .title-row__watch .icon {
-    display: none;
-  }
+.title-list[data-view='grid'] .title-row__heading {
+  display: block;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  min-height: 0;
+  padding-inline-end: 0;
+  align-items: start;
+  align-self: stretch;
+}
 
-  .title-list[data-view='grid'] .title-row__rating {
-    grid-column: 2;
-    grid-row: 3;
-    justify-self: end;
-    align-self: start;
-    font-size: var(--text-sm);
-    white-space: nowrap;
-    text-align: right;
-  }
+.title-list[data-view='grid'] .title-row__status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: start;
+  min-width: 0;
+}
 
-  .title-list[data-view='grid'] .title-row__identity {
-    display: grid;
-    grid-template-columns: subgrid;
-    grid-template-rows: subgrid;
-    grid-row: 1 / span 3;
-    align-self: stretch;
-    grid-column: 1 / -1;
-  }
+.title-list[data-view='grid'] .title-row__meta {
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-template-rows: subgrid;
+  grid-column: 1 / -1;
+  grid-row: 2 / span 2;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
 
-  .title-list[data-view='grid'] .title-row__heading {
-    display: block;
-    grid-column: 1 / -1;
-    grid-row: 1;
-    min-height: 0;
-    padding-inline-end: 0;
-    align-items: start;
-    align-self: stretch;
-  }
+.title-list[data-view='grid'] .title-row__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  grid-column: 1 / -1;
+}
 
-  .title-list[data-view='grid'] .title-row__status {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-    align-items: start;
-    min-width: 0;
-  }
+.title-list[data-view='grid'] .title-row__facts > .title-row__runtime::before {
+  content: '·';
+}
 
-  .title-list[data-view='grid'] .title-row__meta {
-    align-self: stretch;
-    display: grid;
-    grid-template-columns: subgrid;
-    grid-template-rows: subgrid;
-    grid-column: 1 / -1;
-    grid-row: 2 / span 2;
-    gap: var(--space-2);
-    font-size: var(--text-sm);
-  }
+.title-list[data-view='grid'] .genre-chips {
+  grid-column: 1;
+  grid-row: 2;
+  flex-wrap: nowrap;
+  column-gap: calc(var(--space-1) / 2);
+}
 
-  .title-list[data-view='grid'] .title-row__facts {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-1);
-    grid-column: 1 / -1;
-  }
+.title-list[data-view='grid'] .genre-chips .chip {
+  padding: 0 var(--space-1);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  /* Never break inside a genre: truncate the word instead. */
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-  .title-list[data-view='grid'] .title-row__facts > .title-row__runtime::before {
-    content: '·';
-  }
+.title-list[data-view='grid'] .genre-chips .btn {
+  color: var(--color-secondary);
+}
 
-  .title-list[data-view='grid'] .genre-chips {
-    grid-column: 1;
-    grid-row: 2;
-    flex-wrap: nowrap;
-    column-gap: calc(var(--space-1) / 2);
-  }
+.title-list[data-view='grid'] .title-row__footer {
+  grid-column: 1 / -1;
+  grid-row: 4;
+  display: grid;
+  /* The marks take what the date leaves, so two sit side by side. */
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  align-self: stretch;
+  gap: var(--space-1) var(--space-2);
+  padding-top: var(--space-1);
+}
 
-  .title-list[data-view='grid'] .genre-chips .chip {
-    padding: 0 var(--space-1);
-    font-size: var(--text-sm);
-    line-height: var(--leading-normal);
-    /* Never break inside a genre: truncate the word instead. */
-    min-width: 0;
-    overflow: hidden;
-    overflow-wrap: normal;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+.title-list[data-view='grid'] .title-row__date {
+  grid-column: 2;
+  grid-row: 1;
+  text-align: right;
+  font-size: var(--text-sm);
+}
 
-  .title-list[data-view='grid'] .genre-chips .btn {
-    color: var(--color-secondary);
-  }
+.title-list[data-view='grid'] .title-row__badges {
+  grid-column: 1;
+  grid-row: 1;
+  max-width: 100%;
+  border: 0;
+  padding: 0;
+}
 
-  .title-list[data-view='grid'] .title-row__footer {
-    grid-column: 1 / -1;
-    grid-row: 4;
-    display: grid;
-    /* The marks take what the date leaves, so two sit side by side. */
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: end;
-    align-self: stretch;
-    gap: var(--space-1) var(--space-2);
-    padding-top: var(--space-1);
-  }
+/* The mark keeps breathing room inside its box, as in the owner's mockup. */
+.title-list[data-view='grid'] .title-row__badges .badge {
+  padding: var(--space-1) var(--space-2);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 
-  .title-list[data-view='grid'] .title-row__date {
-    grid-column: 2;
-    grid-row: 1;
-    text-align: right;
-    font-size: var(--text-sm);
-  }
-
-  .title-list[data-view='grid'] .title-row__badges {
-    grid-column: 1;
-    grid-row: 1;
-    max-width: 100%;
-    border: 0;
-    padding: 0;
-  }
-
-  /* The mark keeps breathing room inside its box, as in the owner's mockup. */
-  .title-list[data-view='grid'] .title-row__badges .badge {
-    padding: var(--space-1) var(--space-2);
-    max-width: 100%;
-    overflow-wrap: anywhere;
-  }
-
-  .title-list[data-view='grid'] .title-row__badges svg {
-    height: 1.25rem;
-    max-width: 100%;
-  }
+.title-list[data-view='grid'] .title-row__badges svg {
+  height: 1.25rem;
+  max-width: 100%;
 }
 
 @media (min-width: 1024px) {
@@ -6744,15 +6893,13 @@ html[data-layout='phone'] .service-filters > .btn:first-child[aria-pressed='true
 
 /* ------ the rows: poster, then title with its status pill, facts, rating. */
 
-html[data-layout='phone'] .title-list,
-html[data-layout='phone'] .title-list[data-view='grid'],
-html[data-layout='phone'] .title-list[data-view='compact'] {
+html[data-layout='phone'] .title-list:not([data-view='grid']) {
   display: flex;
   flex-direction: column;
   gap: 0;
 }
 
-html[data-layout='phone'] .title-list .title-row {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row {
   background: none;
   border: 0;
   border-radius: 0;
@@ -6768,7 +6915,7 @@ html[data-layout='phone'] .title-list[data-view='compact'] .title-row {
   grid-template-columns: 4.5rem minmax(0, 1fr);
 }
 
-html[data-layout='phone'] .title-list .title-row__poster {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__poster {
   aspect-ratio: 10 / 11;
   border-radius: var(--radius-poster);
   object-fit: cover;
@@ -6778,7 +6925,7 @@ html[data-layout='phone'] .title-list .title-row__poster {
   width: 100%;
 }
 
-html[data-layout='phone'] .title-list .title-row__body {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__body {
   align-content: start;
   display: grid;
   /* A tight column gap: the rating's and the pill's columns are shared, and
@@ -6803,11 +6950,11 @@ html[data-layout='phone'] .title-list[data-view='compact'] .title-row__body {
 
 /* The identity box dissolves so the title can sit beside the pill while the
    facts line runs the full width under both, as the mockup draws them. */
-html[data-layout='phone'] .title-list .title-row__identity {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__identity {
   display: contents;
 }
 
-html[data-layout='phone'] .title-list .title-row__heading {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__heading {
   align-self: start;
   grid-area: name;
   min-height: 0;
@@ -6816,18 +6963,21 @@ html[data-layout='phone'] .title-list .title-row__heading {
   padding-inline-end: 0;
 }
 
-html[data-layout='phone'] .title-list .title-row__facts > .title-row__runtime::before {
+html[data-layout='phone']
+  .title-list:not([data-view='grid'])
+  .title-row__facts
+  > .title-row__runtime::before {
   content: '·';
   margin-right: var(--space-2);
 }
 
-html[data-layout='phone'] .title-list .title-row__name {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__name {
   font-size: var(--text-card-title);
   font-weight: var(--weight-bold);
   line-height: var(--leading-tight);
 }
 
-html[data-layout='phone'] .title-list .title-row__meta {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__meta {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
   grid-area: meta;
@@ -6836,6 +6986,7 @@ html[data-layout='phone'] .title-list .title-row__meta {
 /* The genres give way to the mockup's facts line — unless a genre filter is
    on, when the genre that explains the match stays (§4.3, REQ-112). */
 html[data-layout='phone'] .title-list .genre-chips:not([data-filtered]) {
+  /* #470: the poster grid's caption drops genres too (details on tap). */
   display: none;
 }
 
@@ -6844,13 +6995,13 @@ html[data-layout='phone'] .title-list .genre-chips:not([data-filtered]) {
  * inner label is drawn as the mockup's small pill, so the tap area and the
  * picture are not the same box.
  */
-html[data-layout='phone'] .title-list .title-row__watch {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__watch {
   align-self: start;
   grid-area: watch;
   margin-block: calc(-1 * var(--space-2));
 }
 
-html[data-layout='phone'] .title-list .title-row__watch .btn {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__watch .btn {
   background: none;
   border: 0;
   justify-content: flex-end;
@@ -6858,11 +7009,11 @@ html[data-layout='phone'] .title-list .title-row__watch .btn {
   width: auto;
 }
 
-html[data-layout='phone'] .title-list .title-row__watch .btn .icon {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__watch .btn .icon {
   display: none;
 }
 
-html[data-layout='phone'] .title-list .title-row__priority {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__priority {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-poster);
   color: var(--color-text);
@@ -6897,7 +7048,7 @@ html[data-layout='phone']
 }
 
 /* Rating, a hairline, then the service marks — one line, as drawn. */
-html[data-layout='phone'] .title-list .title-row__rating {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__rating {
   align-items: center;
   align-self: center;
   display: inline-flex;
@@ -6907,13 +7058,13 @@ html[data-layout='phone'] .title-list .title-row__rating {
   grid-area: rating;
 }
 
-html[data-layout='phone'] .title-list .title-row__footer {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__footer {
   display: contents;
 }
 
 /* The mockup draws no date; the owner kept it (2026-09-25): the Added date
    is how an imported backlog stays honest, so it takes a small muted line. */
-html[data-layout='phone'] .title-list .title-row__date {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__date {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
   grid-area: date;
@@ -6925,14 +7076,14 @@ html[data-layout='phone'] .title-list .title-row__date {
    so the menu can never reach up into the marks, and stopping a full 44 px
    short of the edge (not 44 px less the overhang — the body's column is
    fractional, and a sub-pixel sliver is still an overlap, T-UX-155c). */
-html[data-layout='phone'] .title-list .title-row__date {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__date {
   align-items: center;
   display: flex;
   margin-inline-end: 2.75rem;
   min-block-size: 2.75rem;
 }
 
-html[data-layout='phone'] .title-list .title-row__badges {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__badges {
   align-self: center;
   border: 0;
   border-inline-start: 1px solid var(--color-border-soft);
@@ -6946,25 +7097,25 @@ html[data-layout='phone'] .title-list .title-row__badges {
 /* With no date (a work with no listings) the marks are the last line, so
    they stop short of the menu instead. */
 html[data-layout='phone']
-  .title-list
+  .title-list:not([data-view='grid'])
   .title-row__footer:not(:has(.title-row__date))
   .title-row__badges {
   margin-inline-end: 2.75rem;
 }
 
-html[data-layout='phone'] .title-list .title-row__badges .badge {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__badges .badge {
   background: var(--color-chip);
   border: 1px solid var(--color-border-soft);
   border-radius: var(--space-1);
   padding: 0 var(--space-1);
 }
 
-html[data-layout='phone'] .title-list .title-row__badges .brand-mark {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__badges .brand-mark {
   block-size: 1.25rem;
 }
 
 /* The row menu sits faint at the line's end, keeping its 44 px target. */
-html[data-layout='phone'] .title-list .title-row__actions {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__actions {
   bottom: var(--space-2);
   position: absolute;
   right: calc(-1 * var(--space-3));
@@ -6973,16 +7124,32 @@ html[data-layout='phone'] .title-list .title-row__actions {
 /* An unmatched row's "Find a match" is a worded button, far wider than the
    menu's 44 px, so it takes its own line under the facts instead of hanging
    over the date. */
-html[data-layout='phone'] .title-list .title-row__actions:not(:has(.title-row__menu)) {
+html[data-layout='phone']
+  .title-list:not([data-view='grid'])
+  .title-row__actions:not(:has(.title-row__menu)) {
   grid-column: 2;
   justify-self: start;
   position: static;
 }
 
-html[data-layout='phone'] .title-list .title-row__menu > .btn {
+html[data-layout='phone'] .title-list:not([data-view='grid']) .title-row__menu > .btn {
   background: none;
   border: 0;
   color: var(--color-text-muted);
+}
+
+/*
+  #470 — the phone poster grid is a caption over the artwork: title, year and
+  type, rating and the service marks. The added date and runtime are on the
+  details page, and two ~165 px (or ~125 px at 280) columns keep the rest.
+*/
+html[data-layout='phone'] .title-list[data-view='grid'] .title-row__date,
+html[data-layout='phone'] .title-list[data-view='grid'] .title-row__runtime {
+  display: none;
+}
+
+html[data-layout='phone'] .title-list[data-view='grid'] .title-row__name {
+  overflow-wrap: anywhere;
 }
 
 /* ------ the filters sheet: X · Filters · Reset, chip rows, Show N titles. */
