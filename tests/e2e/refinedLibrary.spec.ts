@@ -688,6 +688,7 @@ async function compactPreservesList(
   requests: URL[],
   testInfo: TestInfo,
   singleColumn = false,
+  shorter = true,
 ): Promise<void> {
   const list = page.getByTestId('title-list');
   const beforeHeight = (await bounds(list)).height;
@@ -723,16 +724,18 @@ async function compactPreservesList(
       beforeHeight,
     );
   }
-  expect(await list.innerText()).toBe(beforeText);
+  // The phone poster grid hides dates and runtimes that Compact shows again.
+  if (shorter) expect(await list.innerText()).toBe(beforeText);
   expect(await page.getByTestId('title-name').allTextContents()).toEqual(beforeNames);
   expect(await list.getByRole('button').allTextContents()).toEqual(beforeButtons);
   await expect(list.getByTestId('poster')).toHaveCount(TITLES.length);
   for (const [index, row] of (await list.locator('li.title-row').all()).entries()) {
     const beforeRowHeight = beforeRowHeights[index];
     if (beforeRowHeight === undefined) throw new Error('Compact introduced an unexpected row');
-    expect((await bounds(row)).height, `Compact row ${index} must be shorter`).toBeLessThan(
-      beforeRowHeight,
-    );
+    if (shorter)
+      expect((await bounds(row)).height, `Compact row ${index} must be shorter`).toBeLessThan(
+        beforeRowHeight,
+      );
     for (const id of ['title-meta', 'runtime', 'imdb-rating', 'date-added-label', 'badges']) {
       await expect(row.getByTestId(id)).toBeVisible();
     }
@@ -774,7 +777,8 @@ test('T-UX-141f: 320px Grid and Compact retain metadata, actions and query witho
 }, testInfo) => {
   const requests = await mountLibrary(page, { width: 320, url: '/?sort=name&dir=asc' });
   await noOverflow(page);
-  await compactPreservesList(page, requests, testInfo, true);
+  // The phone grid is a 2-column poster grid (T-MCARD-080), not a stacked list.
+  await compactPreservesList(page, requests, testInfo, false, false);
 });
 
 test('T-UX-142b: six sort buttons select complete server orders and reverse the current order', async ({
@@ -2027,14 +2031,17 @@ test('T-UX-155c: library frame, priority geometry and portrait artwork stay inte
         const poster = await bounds(row.locator('.title-row__poster'));
         expect(poster.width).toBeGreaterThanOrEqual(72);
         // TASK-255: the phone mockup crops artwork to a near-square 10:11.
-        expect(poster.height / poster.width).toBeCloseTo(width < 640 ? 1.1 : 1.5, 1);
+        expect(poster.height / poster.width).toBeCloseTo(
+          width < 640 && view === 'Compact' ? 1.1 : 1.5,
+          1,
+        );
         const box = await bounds(row);
         for (const part of [
           // The phone dissolves the identity box (`display: contents`).
           width < 640 ? '.title-row__heading' : '.title-row__identity',
           '.title-row__watch',
           '.title-row__badges',
-          '.title-row__date',
+          ...(width < 640 && view === 'Grid' ? [] : ['.title-row__date']),
         ]) {
           const child = await bounds(row.locator(part));
           expect(child.x, `${view} ${width}: ${part} start`).toBeGreaterThanOrEqual(box.x);

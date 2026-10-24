@@ -91,6 +91,19 @@ Collected locations: `packages/domain/test/titleCategory.spec.ts`;
 | **`T-WCARD-003`** (`a`) | W | `TASK-304` | Same file: rows sharing a date show one note. |
 | **`T-WCARD-004`** (`a`–`b`) | W | `TASK-304` | Same file: the menu offers *Not interested*, calls the unchanged suppression, and Escape closes it. |
 
+### US-077 — Mobile Library and Waiting grid and list layouts (TASK-305, #470, `A68`)
+
+| AC | Level | Test IDs | Assertion |
+| --- | --- | --- | --- |
+| AC-1 | E | `T-MCARD-080` (`a`) | Library Grid is a poster grid unlike List at 280/390/1024 px. |
+| AC-2 | E | `T-MCARD-080` (`b`) | Waiting Grid cards are equal height; no spilled or mid-word-broken label (offenders named). |
+| AC-3 | E | `T-MCARD-080` (`c`) | Waiting Compact rows are no taller than the shortest Library row; the menu opens and Escape closes it. |
+| AC-4 | E | `T-MCARD-080` (`d`) | The *as of* note is shown once. |
+
+| ID | Level | Task | What it asserts |
+| --- | --- | --- | --- |
+| **`T-MCARD-080`** (`a`–`d`) | E | `TASK-305` | `tests/e2e/mobileCardLayouts.spec.ts`: the four assertions above at 280, 390 and 1024 px. |
+
 ### US-073 — Grouped left navigation (TASK-295, TASK-296, #463, `A65`)
 
 | AC | Level | Test IDs | Assertion |

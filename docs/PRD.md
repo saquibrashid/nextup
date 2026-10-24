@@ -2538,6 +2538,28 @@ introduced.
 **Out of scope:** changing what availability says, ordering, or the details page content.
 **Open questions:** none.
 
+#### US-077 — Mobile Library and Waiting grid and list layouts (`A68`)
+
+**REQ-143 (`must`, owner-requested #470, `A68`).** On a phone the Library *Grid* is a two-column poster-first grid that is visibly different from its *List* (which keeps its current density); the Waiting *Grid* is two equal-height columns with no clipped or mid-word-wrapped text; the Waiting *Compact* row is about as tall as a Library list row (small poster, title, year/type, one availability chip or date, overflow menu). Both keep their Grid/List or Grid/Compact toggle. Desktop layouts remain good at 1024 px and above. Presentation only.
+
+**As** the owner
+**I want** Grid and List (or Compact) to look different and fit a phone
+**So that** the choice of view means something on my phone
+
+**Traces to:** REQ-143, REQ-142, REQ-039
+**Priority:** must
+**Epic:** L
+
+| # | Given | When | Then |
+|---|---|---|---|
+| AC-1 | The Library in Grid at 280, 390 and 1024 px | It renders | Posters sit in a true multi-column grid, unlike the List, with no overflow. |
+| AC-2 | The Waiting Grid at 280, 390 and 1024 px | It renders | Cards in a row are equal height and every label stays inside its card with no mid-word break. |
+| AC-3 | The Waiting Compact on a phone | It renders | A plain row is no taller than the shortest Library list row, and its overflow menu opens and closes. |
+| AC-4 | Both pages at the same widths | They render | The page-level *as of* note is shown once. |
+
+**Out of scope:** Library list density changes; new routes; new filters.
+**Open questions:** none.
+
 ### 7.4 Closed enumeration of permitted mutations (REQ-041)
 
 **Owner-initiated operations that may change user-visible list state — this list is closed:**

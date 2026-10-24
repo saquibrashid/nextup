@@ -778,7 +778,7 @@ describe('T-UX-168e · filter pills, panels, ticks, card marks and the sidebar s
       /display:\s*flex/,
     );
     expect(rule('.range-slider__tick')).toMatch(/--tick/);
-    const badge = rule("  .title-list[data-view='grid'] .title-row__badges .badge");
+    const badge = rule(".title-list[data-view='grid'] .title-row__badges .badge");
     expect(badge).toMatch(/padding:\s*var\(--space-1\) var\(--space-2\)/);
     const frame = cssWithoutComments.slice(
       cssWithoutComments.lastIndexOf('grid-template-columns: 14rem minmax(0, 1fr)'),
