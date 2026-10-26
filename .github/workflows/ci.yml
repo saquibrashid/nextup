@@ -414,7 +414,8 @@ jobs:
         timeout-minutes: 12
         run: |
           for attempt in 1 2; do
-            if timeout --kill-after=30s 5m npx playwright install --with-deps chromium webkit; then
+            # Root-owned apt children must be stopped too; keep the runner's browser cache.
+            if sudo env "PATH=$PATH" "HOME=$HOME" timeout --kill-after=30s 5m npx playwright install --with-deps chromium webkit; then
               exit 0
             fi
             echo "::warning::Playwright install attempt $attempt failed or timed out."
@@ -453,7 +454,8 @@ jobs:
         # missing browser. Keep this list identical to the e2e job's.
         run: |
           for attempt in 1 2; do
-            if timeout --kill-after=30s 5m npx playwright install --with-deps chromium webkit; then
+            # Root-owned apt children must be stopped too; keep the runner's browser cache.
+            if sudo env "PATH=$PATH" "HOME=$HOME" timeout --kill-after=30s 5m npx playwright install --with-deps chromium webkit; then
               exit 0
             fi
             echo "::warning::Playwright install attempt $attempt failed or timed out."

@@ -68,7 +68,7 @@ describe('T-CI-009 the deployment pipeline cannot skip its own gates', () => {
       expect(install).toMatch(/timeout-minutes: 12/);
       expect(install).toContain('for attempt in 1 2; do');
       expect(install).toContain(
-        'if timeout --kill-after=30s 5m npx playwright install --with-deps chromium webkit; then',
+        'if sudo env "PATH=$PATH" "HOME=$HOME" timeout --kill-after=30s 5m npx playwright install --with-deps chromium webkit; then',
       );
       expect(install).toMatch(/then\s+exit 0/);
       expect(install).toMatch(/done[\s\S]*exit 1/);
