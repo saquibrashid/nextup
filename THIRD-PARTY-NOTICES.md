@@ -208,6 +208,7 @@ so they do not relicense this work — but their notices must be retained.
 | `lodash.isplainobject` | 4.0.6 | MIT |
 | `lodash.isstring` | 4.0.1 | MIT |
 | `lodash.once` | 4.1.1 | MIT |
+| `magicast` | 0.5.5 | MIT |
 | `math-intrinsics` | 1.1.0 | MIT |
 | `media-typer` | 0.3.0 | MIT |
 | `media-typer` | 1.1.1 | MIT |
@@ -224,7 +225,7 @@ so they do not relicense this work — but their notices must be retained.
 | `mime-types` | 3.0.2 | MIT |
 | `ms` | 2.1.3 | MIT |
 | `mssql` | 11.0.1 | MIT |
-| `multer` | 2.4.0 | MIT |
+| `multer` | 2.5.0 | MIT |
 | `native-duplexpair` | 1.0.0 | MIT |
 | `negotiator` | 1.0.0 | MIT |
 | `node-fetch-native` | 1.6.7 | MIT |
