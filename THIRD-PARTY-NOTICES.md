@@ -118,7 +118,7 @@ so they do not relicense this work — but their notices must be retained.
 | `async-mutex` | 0.5.0 | MIT |
 | `base64-js` | 1.5.1 | MIT |
 | `bl` | 6.1.6 | MIT |
-| `body-parser` | 2.3.0 | MIT |
+| `body-parser` | 2.4.0 | MIT |
 | `buffer` | 6.0.3 | MIT |
 | `buffer-equal-constant-time` | 1.0.1 | BSD-3-Clause |
 | `bundle-name` | 4.1.0 | MIT |
@@ -247,7 +247,7 @@ so they do not relicense this work — but their notices must be retained.
 | `process` | 0.11.10 | MIT |
 | `proxy-addr` | 2.0.8 | MIT |
 | `pure-rand` | 6.1.0 | MIT |
-| `qs` | 6.16.0 | BSD-3-Clause |
+| `qs` | 6.16.1 | BSD-3-Clause |
 | `range-parser` | 1.3.0 | MIT |
 | `raw-body` | 3.0.2 | MIT |
 | `rc9` | 2.1.2 | MIT |
