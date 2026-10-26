@@ -94,15 +94,9 @@ const SKIP_DIRS = new Set([
 /**
  * Recursively collect files, skipping build output and vendored code.
  *
- * ⚠ **A PATH THAT VANISHES MID-WALK IS SKIPPED, NOT THROWN ON.** This checker
- * is the one walker that MUST see `tests/infra/supplyChain.spec.ts`'s scratch
- * directories — they are how that suite proves the gate catches a real
- * violation — so it cannot skip `.tmp-*` the way `tools/check-status.mjs` does.
- * It therefore has to tolerate the other half of the same race: Vitest runs
- * spec files in parallel, and a sibling's scratch directory can be removed
- * between this `readdir` and the recursive call into it. Left unhandled, that
- * surfaced as `T-SEC-009d` reporting a planted `mixpanel` devDependency as NOT
- * caught — a security gate reading green because the walk died early.
+ * A path can vanish between the parent listing and recursion when another
+ * process removes its scratch directory. Violation fixtures use an explicit,
+ * isolated root; production still scans the entire repository.
  */
 async function walk(dir, out = []) {
   let entries;
@@ -122,7 +116,7 @@ async function walk(dir, out = []) {
   return out;
 }
 
-const rel = (p) => path.relative(ROOT, p).split(path.sep).join('/');
+const rel = (p, root = ROOT) => path.relative(root, p).split(path.sep).join('/');
 
 /**
  * The two files that necessarily CONTAIN the forbidden strings: this checker
@@ -136,13 +130,13 @@ const rel = (p) => path.relative(ROOT, p).split(path.sep).join('/');
 const SELF_REFERENTIAL = new Set(['tools/check-deps.mjs', 'tests/infra/supplyChain.spec.ts']);
 
 /** @returns {string[]} findings */
-function checkPackageJson(file) {
+function checkPackageJson(file, root) {
   const findings = [];
   let pkg;
   try {
     pkg = JSON.parse(readFileSync(file, 'utf8'));
   } catch {
-    return [`${rel(file)}: is not valid JSON`];
+    return [`${rel(file, root)}: is not valid JSON`];
   }
 
   const fields = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
@@ -151,7 +145,7 @@ function checkPackageJson(file) {
     for (const name of Object.keys(pkg[field] ?? {})) {
       if (FORBIDDEN_PACKAGES.some((re) => re.test(name))) {
         findings.push(
-          `${rel(file)}: ${field} contains forbidden telemetry/analytics package "${name}" (NFR-005, T-SEC-009)`,
+          `${rel(file, root)}: ${field} contains forbidden telemetry/analytics package "${name}" (NFR-005, T-SEC-009)`,
         );
       }
     }
@@ -160,7 +154,7 @@ function checkPackageJson(file) {
 }
 
 /** @returns {string[]} findings */
-function checkHtml(file) {
+function checkHtml(file, root) {
   const findings = [];
   const html = readFileSync(file, 'utf8');
 
@@ -171,7 +165,7 @@ function checkHtml(file) {
     const src = m[1];
     if (/^(https?:)?\/\//i.test(src)) {
       findings.push(
-        `${rel(file)}: third-party script tag "${src}" (NFR-005, T-SEC-009). The SPA loads no remote scripts.`,
+        `${rel(file, root)}: third-party script tag "${src}" (NFR-005, T-SEC-009). The SPA loads no remote scripts.`,
       );
     }
   }
@@ -179,38 +173,38 @@ function checkHtml(file) {
 }
 
 /** @returns {string[]} findings */
-function checkSourceForHosts(file) {
+function checkSourceForHosts(file, root) {
   const findings = [];
   const text = readFileSync(file, 'utf8');
   for (const host of FORBIDDEN_HOSTS) {
     if (text.includes(host)) {
-      findings.push(`${rel(file)}: references analytics host "${host}" (NFR-005, T-SEC-009)`);
+      findings.push(`${rel(file, root)}: references analytics host "${host}" (NFR-005, T-SEC-009)`);
     }
   }
   return findings;
 }
 
-export async function checkDependencies() {
-  const files = await walk(ROOT);
+export async function checkDependencies(root = ROOT) {
+  const files = await walk(root);
   const findings = [];
 
   for (const file of files) {
     const base = path.basename(file);
     const ext = path.extname(file);
 
-    if (SELF_REFERENTIAL.has(rel(file))) continue;
+    if (SELF_REFERENTIAL.has(rel(file, root))) continue;
 
     if (base === 'package.json') {
-      findings.push(...checkPackageJson(file));
+      findings.push(...checkPackageJson(file, root));
       continue;
     }
     if (ext === '.html') {
-      findings.push(...checkHtml(file));
+      findings.push(...checkHtml(file, root));
       continue;
     }
 
     if (['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'].includes(ext)) {
-      findings.push(...checkSourceForHosts(file));
+      findings.push(...checkSourceForHosts(file, root));
     }
   }
 
@@ -397,9 +391,9 @@ export function checkImageCodecs(lockfilePath = path.join(ROOT, 'package-lock.js
  * anyone who can push to that repository, which makes it a supply-chain hole
  * in a workflow that holds `GITHUB_TOKEN`.
  */
-export async function checkActionPinning() {
+export async function checkActionPinning(root = ROOT) {
   const findings = [];
-  const workflowDir = path.join(ROOT, '.github', 'workflows');
+  const workflowDir = path.join(root, '.github', 'workflows');
 
   let entries;
   try {

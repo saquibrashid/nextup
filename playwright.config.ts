@@ -43,7 +43,8 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   forbidOnly: Boolean(process.env.CI),
   fullyParallel: true,
-  workers: process.env.CI ? 1 : undefined,
+  // Multiple browser processes per worker exhaust local CPU long before RAM.
+  workers: process.env.CI ? 1 : 4,
 
   reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : [['list']],
 

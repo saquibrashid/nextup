@@ -401,7 +401,8 @@ jobs:
   # ── 8 ─────────────────────────────────────────────────────────────────────
   test-e2e:
     name: '8 · test:e2e'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -410,7 +411,17 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium webkit
+        timeout-minutes: 12
+        run: |
+          for attempt in 1 2; do
+            # Root-owned apt children must be stopped too; keep the runner's browser cache.
+            if sudo env "PATH=$PATH" "HOME=$HOME" timeout --kill-after=30s 5m npx playwright install --with-deps chromium webkit; then
+              exit 0
+            fi
+            echo "::warning::Playwright install attempt $attempt failed or timed out."
+          done
+          echo "::error::Playwright browser installation failed twice."
+          exit 1
       - name: Build
         run: npm run build
       - name: E2E (Chromium + Mobile Safari)
@@ -425,7 +436,8 @@ jobs:
   # ── 9 ─────────────────────────────────────────────────────────────────────
   test-a11y:
     name: '9 · test:a11y'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -434,12 +446,22 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Install Playwright browsers
+        timeout-minutes: 12
         # ⚠ WEBKIT IS NOT OPTIONAL HERE. The a11y spec runs the same
         # `mobile-safari` project as the e2e job, and nextup is mobile-first
         # at a 320 px floor — installing Chromium alone fails the job on a
         # missing executable, which reads as a broken test rather than a
         # missing browser. Keep this list identical to the e2e job's.
-        run: npx playwright install --with-deps chromium webkit
+        run: |
+          for attempt in 1 2; do
+            # Root-owned apt children must be stopped too; keep the runner's browser cache.
+            if sudo env "PATH=$PATH" "HOME=$HOME" timeout --kill-after=30s 5m npx playwright install --with-deps chromium webkit; then
+              exit 0
+            fi
+            echo "::warning::Playwright install attempt $attempt failed or timed out."
+          done
+          echo "::error::Playwright browser installation failed twice."
+          exit 1
       - name: Build
         run: npm run build
       # axe on all nine routes; ZERO serious/critical (§8 job 9). The

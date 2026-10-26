@@ -27,12 +27,13 @@ export default defineConfig({
   fullyParallel: true,
   reporter: process.env.CI ? 'github' : 'list',
 
-  // A freshly started revision may still be cold. Generous per-request
-  // timeouts, but no retry loop that would mask a genuinely dead deployment.
+  // Readiness runs before this suite. Bound requests below the test timeout
+  // so a slow target reports its cause before fixture teardown disposes it.
   timeout: 60_000,
   expect: { timeout: 15_000 },
 
   use: {
+    actionTimeout: 30_000,
     ignoreHTTPSErrors: false,
     extraHTTPHeaders: { 'user-agent': 'nextup-smoke' },
   },
