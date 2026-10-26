@@ -54,23 +54,6 @@ export const EXCEPTIONS = [
       'from the installed 6.19.3 and must not be taken.',
   },
   {
-    id: 'GHSA-27r3-jxmh-p828',
-    package: 'body-parser',
-    accepted: '2026-10-23',
-    reason:
-      'Process crash when a request with a Content-Encoding (e.g. gzip) body carries ' +
-      'trailing bytes after one valid compressed frame. Fixed in body-parser 2.4.0, ' +
-      'which is not yet published to the registry we install from (2.3.0 is the ' +
-      'latest there), so the finding is unfixable today, not unfixed. It cannot ' +
-      'hurt this product: body parsing is mounted AFTER authentication, so an ' +
-      'anonymous caller is refused with a 401 before any body is read; only the ' +
-      'single allow-listed owner behind Easy Auth reaches it, and the owner has ' +
-      'no reason to send a compressed body. The advisory\u2019s own workaround is ' +
-      'applied as well: express.json is mounted with inflate: false, so an encoded ' +
-      'request is rejected before a decompression stream is created. Remove this ' +
-      'entry once body-parser >= 2.4.0 is installable (the gate fails when stale).',
-  },
-  {
     id: 'GHSA-xcx6-jx8p-x3h5',
     package: '@azure/msal-node',
     accepted: '2026-10-24',
@@ -87,22 +70,6 @@ export const EXCEPTIONS = [
       'override that cannot be exercised against real Azure credentials in CI, so ' +
       'it is deliberately not taken blind. Remove this entry once @azure/identity ' +
       'depends on a patched msal-node (the gate fails when stale).',
-  },
-  {
-    id: 'GHSA-q7qp-rjg7-q26m',
-    package: 'multer',
-    accepted: '2026-10-24',
-    reason:
-      'Denial of service via a pending ASYNCHRONOUS fileFilter after request ' +
-      'teardown (multer 2.0.0 - 2.4.0). The only patched line is 3.0.0-alpha.2, a ' +
-      'pre-release major, which is not acceptable for the upload path. The ' +
-      'precondition does not exist here: the single multer instance in ' +
-      'apps/api/src/routes/batchImages.ts sets NO fileFilter at all (memory ' +
-      'storage plus size and file-count limits only), so there is no pending ' +
-      'filter to leak, and the route sits behind authentication for the single ' +
-      'allow-listed owner. Rule for the future: do not add an async fileFilter ' +
-      'while this entry exists. Remove this entry once a stable multer >= the ' +
-      'fixed release is installable (the gate fails when stale).',
   },
 ];
 
