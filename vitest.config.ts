@@ -47,7 +47,7 @@ export default defineConfig({
   test: {
     // Combined local runs otherwise start a worker per logical CPU, starving
     // module transforms and subprocesses. Keep CI's runner-sized default.
-    maxWorkers: process.env.CI ? undefined : 4,
+    maxWorkers: process.env.CI ? undefined : 2,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
