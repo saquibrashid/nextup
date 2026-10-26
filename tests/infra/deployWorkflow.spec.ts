@@ -61,6 +61,7 @@ describe('T-CI-009 the deployment pipeline cannot skip its own gates', () => {
     for (const jobName of ['test-e2e', 'test-a11y']) {
       const job = ci.split(`  ${jobName}:\n`)[1]?.split(/\n {2}[\w-]+:\n/)[0];
       expect(job).toBeDefined();
+      expect(job).toContain('runs-on: ubuntu-24.04');
       expect(job).toMatch(/timeout-minutes: (45|25)/);
       const install = job
         ?.split('- name: Install Playwright browsers')[1]
