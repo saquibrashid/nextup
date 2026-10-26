@@ -1821,7 +1821,14 @@ for (const width of [640, 1024, 1440]) {
           const part = item.locator(selector);
           const box = await bounds(part);
           expect(box.y + box.height).toBeLessThanOrEqual(outer.y + outer.height);
-          expect(await part.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
+          const dimensions = await part.evaluate((el) => ({
+            scroll: el.scrollHeight,
+            client: el.clientHeight,
+          }));
+          expect(
+            dimensions.scroll,
+            `${selector}: ${JSON.stringify(dimensions)}`,
+          ).toBeLessThanOrEqual(dimensions.client + 1);
         }
       }
       await noOverflow(page);

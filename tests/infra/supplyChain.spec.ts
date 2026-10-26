@@ -12,45 +12,18 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { copyFileSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { checkActionPinning, checkDependencies } from '../../tools/check-deps.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SCRIPT = path.join(ROOT, 'tools', 'check-deps.mjs');
 
-/** Temp workspaces created inside the repo, so the checker actually walks them. */
 const created: string[] = [];
-
-/**
- * ⚠ SWEEP STALE SCRATCH DIRS BEFORE ANYTHING ELSE. `afterEach` below already
- * removes what this run creates, but it cannot run when a run is INTERRUPTED
- * (Ctrl-C, a killed watcher, a crashed worker). A `.tmp-vendor-*` left behind
- * then contains a `package.json` declaring `dd-trace` or `@sentry/node`, and
- * because `checkDependencies()` scans the repo root it finds them — so the
- * NEXT run fails `T-SEC-009a` ("the repository as committed is clean") and,
- * via the same stray directory, `T-SEC-001a` and `T-STATUS-001p`.
- *
- * That presents as an intermittent multi-test failure with no relation to the
- * change under test, and it is the whole of the long-standing infra "flake".
- * It is not flaky: it is deterministic given a leftover directory, and it
- * persists until someone deletes it by hand. Sweeping on entry makes an
- * interrupted run cost nothing.
- *
- * ⚠ The scratch dirs must live in the repo ROOT, not `os.tmpdir()`, because
- * the checker only scans the repo — moving them out would make every
- * violation test pass vacuously.
- */
-beforeAll(() => {
-  for (const entry of readdirSync(ROOT, { withFileTypes: true })) {
-    if (entry.isDirectory() && entry.name.startsWith('.tmp-')) {
-      rmSync(path.join(ROOT, entry.name), { recursive: true, force: true });
-    }
-  }
-});
 
 afterEach(() => {
   while (created.length > 0) {
@@ -60,7 +33,7 @@ afterEach(() => {
 });
 
 function scratchDir(prefix: string): string {
-  const dir = mkdtempSync(path.join(ROOT, `.tmp-${prefix}-`));
+  const dir = mkdtempSync(path.join(tmpdir(), `nextup-supply-${prefix}-`));
   created.push(dir);
   return dir;
 }
@@ -78,7 +51,7 @@ describe('T-SEC-009 · no telemetry, analytics or APM anywhere (NFR-005)', () =>
       JSON.stringify({ name: 'violation', dependencies: { 'posthog-js': '^1.0.0' } }),
     );
 
-    const findings = await checkDependencies();
+    const findings = await checkDependencies(dir);
     expect(findings.some((f) => f.includes('posthog-js'))).toBe(true);
   });
 
@@ -103,7 +76,7 @@ describe('T-SEC-009 · no telemetry, analytics or APM anywhere (NFR-005)', () =>
         JSON.stringify({ name: 'violation', dependencies: { [name]: version } }),
       );
 
-      const findings = await checkDependencies();
+      const findings = await checkDependencies(dir);
       expect(
         findings.some((f) => f.includes(name)),
         `${name} was not caught`,
@@ -112,13 +85,7 @@ describe('T-SEC-009 · no telemetry, analytics or APM anywhere (NFR-005)', () =>
       rmSync(dir, { recursive: true, force: true });
       created.pop();
     }
-    // ⚠ Explicit timeout, NOT a slow-test workaround. This test re-walks the
-    // ENTIRE repository once per vendor — eight full scans — so its cost grows
-    // with the repository and Vitest's 5 s default is a time bomb every lane
-    // walks into as it lands files. Do not "fix" it by dropping vendors from
-    // the list: each one is named in specs/security.md §8 and must be proven
-    // caught individually.
-  }, 60_000);
+  });
 
   it('T-SEC-009d · US-034 AC-6 · a devDependency is caught, not just a runtime one', async () => {
     const dir = scratchDir('devdep');
@@ -127,7 +94,7 @@ describe('T-SEC-009 · no telemetry, analytics or APM anywhere (NFR-005)', () =>
       JSON.stringify({ name: 'violation', devDependencies: { mixpanel: '^0.18.0' } }),
     );
 
-    const findings = await checkDependencies();
+    const findings = await checkDependencies(dir);
     expect(findings.some((f) => f.includes('mixpanel'))).toBe(true);
   });
 
@@ -138,7 +105,7 @@ describe('T-SEC-009 · no telemetry, analytics or APM anywhere (NFR-005)', () =>
       '<html><body><script src="https://cdn.example.com/a.js"></script></body></html>',
     );
 
-    const findings = await checkDependencies();
+    const findings = await checkDependencies(dir);
     expect(findings.some((f) => f.includes('third-party script tag'))).toBe(true);
   });
 
@@ -149,7 +116,7 @@ describe('T-SEC-009 · no telemetry, analytics or APM anywhere (NFR-005)', () =>
       '<html><body><script src="/assets/index.js"></script><script type="module" src="./src/main.tsx"></script></body></html>',
     );
 
-    const findings = await checkDependencies();
+    const findings = await checkDependencies(dir);
     expect(findings).toEqual([]);
   });
 
@@ -162,7 +129,7 @@ describe('T-SEC-009 · no telemetry, analytics or APM anywhere (NFR-005)', () =>
       "export const send = () => fetch('https://www.google-analytics.com/collect');",
     );
 
-    const findings = await checkDependencies();
+    const findings = await checkDependencies(dir);
     expect(findings.some((f) => f.includes('google-analytics.com'))).toBe(true);
   });
 
@@ -179,7 +146,7 @@ describe('T-SEC-009 · no telemetry, analytics or APM anywhere (NFR-005)', () =>
       ].join('\n'),
     );
 
-    const findings = await checkDependencies();
+    const findings = await checkDependencies(dir);
     expect(findings).toEqual([]);
   });
 
@@ -192,11 +159,32 @@ describe('T-SEC-009 · no telemetry, analytics or APM anywhere (NFR-005)', () =>
       JSON.stringify({ name: 'violation', dependencies: { 'posthog-js': '^1.0.0' } }),
     );
 
-    expect(() => execFileSync(process.execPath, [SCRIPT], { stdio: 'pipe' })).toThrow();
+    const tools = path.join(dir, 'tools');
+    mkdirSync(tools);
+    copyFileSync(SCRIPT, path.join(tools, 'check-deps.mjs'));
+    copyFileSync(path.join(ROOT, 'package-lock.json'), path.join(dir, 'package-lock.json'));
+    expect(() =>
+      execFileSync(process.execPath, [path.join(tools, 'check-deps.mjs')], { stdio: 'pipe' }),
+    ).toThrow(/posthog-js/);
   });
 
   it('T-SEC-009j · US-034 AC-6 · the script exits zero on the clean tree', () => {
     expect(() => execFileSync(process.execPath, [SCRIPT], { stdio: 'pipe' })).not.toThrow();
+  });
+
+  it('T-SEC-009l · parallel scans cannot see another scan’s violation fixture', async () => {
+    const clean = scratchDir('clean');
+    const violation = scratchDir('violation');
+    writeFileSync(
+      path.join(violation, 'package.json'),
+      JSON.stringify({ dependencies: { 'posthog-js': '^1.0.0' } }),
+    );
+    const [cleanFindings, violationFindings] = await Promise.all([
+      checkDependencies(clean),
+      checkDependencies(violation),
+    ]);
+    expect(cleanFindings).toEqual([]);
+    expect(violationFindings.some((finding) => finding.includes('posthog-js'))).toBe(true);
   });
 });
 
@@ -209,16 +197,13 @@ describe('T-CI-006 · every GitHub Action is pinned to a commit SHA', () => {
   });
 
   it('T-CI-006b · a tag-pinned action is caught', async () => {
-    const dir = path.join(ROOT, '.github', 'workflows');
+    const root = scratchDir('action');
+    const dir = path.join(root, '.github', 'workflows');
     const file = path.join(dir, 'zz-fixture-unpinned.yml');
     mkdirSync(dir, { recursive: true });
     writeFileSync(file, 'jobs:\n  x:\n    steps:\n      - uses: actions/checkout@v4\n');
 
-    try {
-      const findings = await checkActionPinning();
-      expect(findings.some((f) => f.includes('actions/checkout@v4'))).toBe(true);
-    } finally {
-      rmSync(file, { force: true });
-    }
+    const findings = await checkActionPinning(root);
+    expect(findings.some((f) => f.includes('actions/checkout@v4'))).toBe(true);
   });
 });

@@ -232,6 +232,12 @@ jobs:
           DATABASE_URL: sqlserver://${{ steps.deploy.outputs.sql }}:1433;database=${{ steps.deploy.outputs.db }};user=${{ secrets.SQL_ADMIN_LOGIN }};password=${{ secrets.SQL_ADMIN_PASSWORD }};encrypt=true;trustServerCertificate=false
         run: npx prisma migrate deploy --schema prisma/schema.prisma
 
+      - name: Wait for staging to respond
+        timeout-minutes: 3
+        env:
+          SMOKE_BASE_URL: https://${{ steps.deploy.outputs.fqdn }}
+        run: node tools/wait-for-smoke.mjs
+
       - name: Staging smoke suite (T-SMOKE-*)
         env:
           SMOKE_BASE_URL: https://${{ steps.deploy.outputs.fqdn }}
@@ -386,6 +392,12 @@ jobs:
           fi
           echo "revision=$NEW" >> "$GITHUB_OUTPUT"
           echo "fqdn=$FQDN" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for the new production revision to respond
+        timeout-minutes: 3
+        env:
+          SMOKE_BASE_URL: https://${{ steps.target.outputs.fqdn }}
+        run: node tools/wait-for-smoke.mjs
 
       - name: Production smoke suite (T-SMOKE-*)
         env:

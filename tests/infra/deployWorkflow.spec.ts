@@ -1,9 +1,12 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { waitForSmoke } from '../../tools/wait-for-smoke.mjs';
 
 const repoRoot = path.resolve(import.meta.dirname, '../..');
 const deploy = readFileSync(path.join(repoRoot, '.github/workflows/deploy.yml'), 'utf8');
+const ci = readFileSync(path.join(repoRoot, '.github/workflows/ci.yml'), 'utf8');
 
 // ⚠ THE PARAMETER FILES ARE PART OF THE PIPELINE'S CONTRACT, so they are read
 // here rather than only in the bicep specs. `deploy.yml` used to pass every
@@ -35,12 +38,104 @@ const deployCode = deploy
 // not that two of them are the wrong way round.
 
 describe('T-CI-009 the deployment pipeline cannot skip its own gates', () => {
+  it('T-CI-009s: both smoke targets respond before the assertions start', () => {
+    for (const [start, end, target] of [
+      ['  staging:', '  production:', 'deploy'],
+      ['  production:', undefined, 'target'],
+    ] as const) {
+      const job = deployCode.slice(
+        deployCode.indexOf(start),
+        end ? deployCode.indexOf(end) : undefined,
+      );
+      const readiness = job.indexOf('run: node tools/wait-for-smoke.mjs');
+      const smoke = job.indexOf('run: npm run test:smoke');
+      expect(readiness).toBeGreaterThan(-1);
+      expect(smoke).toBeGreaterThan(readiness);
+      expect(job.slice(0, readiness)).toContain(
+        `SMOKE_BASE_URL: https://\${{ steps.${target}.outputs.fqdn }}`,
+      );
+    }
+  });
+
+  it('T-CI-009t: both browser installers have two bounded attempts and a job deadline', () => {
+    for (const jobName of ['test-e2e', 'test-a11y']) {
+      const job = ci.split(`  ${jobName}:\n`)[1]?.split(/\n {2}[\w-]+:\n/)[0];
+      expect(job).toBeDefined();
+      expect(job).toMatch(/timeout-minutes: (45|25)/);
+      const install = job
+        ?.split('- name: Install Playwright browsers')[1]
+        ?.split('- name: Build')[0];
+      expect(install).toMatch(/timeout-minutes: 12/);
+      expect(install).toContain('for attempt in 1 2; do');
+      expect(install).toContain(
+        'if timeout --kill-after=30s 5m npx playwright install --with-deps chromium webkit; then',
+      );
+      expect(install).toMatch(/then\s+exit 0/);
+      expect(install).toMatch(/done[\s\S]*exit 1/);
+      expect(install).not.toMatch(/continue-on-error/);
+    }
+  });
+
   it('T-CI-009a: production is gated on BOTH the build and a real staging deploy', () => {
     // `needs: [build, staging]` is the entire staging-first guarantee. Dropping
     // `staging` from that list leaves a workflow that still looks staged — the
     // job is still there, still runs, still goes green — while production no
     // longer waits for it.
     expect(deploy).toMatch(/needs:\s*\[build,\s*staging\]/);
+  });
+
+  describe('T-CI-009 smoke readiness never substitutes for the authentication assertions', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      vi.restoreAllMocks();
+    });
+
+    it('T-CI-009u: waits through a connection failure and 503, then accepts a challenge', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const fetch = vi
+        .fn()
+        .mockRejectedValueOnce(new TypeError('connection refused'))
+        .mockResolvedValueOnce(new Response(null, { status: 503 }))
+        .mockResolvedValueOnce(new Response(null, { status: 401 }));
+      vi.stubGlobal('fetch', fetch);
+      await waitForSmoke('https://staging.example', { intervalMs: 1 });
+      expect(fetch).toHaveBeenCalledTimes(3);
+      expect(fetch).toHaveBeenLastCalledWith(
+        new URL('https://staging.example/'),
+        expect.objectContaining({ redirect: 'manual', signal: expect.any(AbortSignal) }),
+      );
+    });
+
+    it('T-CI-009v: an insecure 200 is left for the smoke suite to reject without a retry', async () => {
+      const fetch = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+      vi.stubGlobal('fetch', fetch);
+      await waitForSmoke('https://staging.example');
+      expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('T-CI-009w: persistent 503s fail the readiness deadline', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 503 })));
+      await expect(
+        waitForSmoke('https://staging.example', { timeoutMs: 30, intervalMs: 1 }),
+      ).rejects.toThrow(/did not become ready.*HTTP 503/);
+    });
+
+    it('T-CI-009x: a hung request is aborted within the overall readiness deadline', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(
+          (_url: URL, { signal }: RequestInit) =>
+            new Promise((_resolve, reject) => {
+              signal?.addEventListener('abort', () => reject(signal.reason), { once: true });
+            }),
+        ),
+      );
+      await expect(
+        waitForSmoke('https://staging.example', { timeoutMs: 30, intervalMs: 1 }),
+      ).rejects.toThrow(/did not become ready/);
+    });
   });
 
   it('T-CI-009b: neither `prisma migrate dev` nor `prisma db push` appears anywhere', () => {
