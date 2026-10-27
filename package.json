@@ -62,7 +62,7 @@
     "backfill:sort-name": "npm run build:scripts && node scripts/dist/backfill-sort-name.js"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.13.0",
+    "@axe-core/playwright": "^4.14.0",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.64.1",
     "@testing-library/jest-dom": "^7.0.1",
