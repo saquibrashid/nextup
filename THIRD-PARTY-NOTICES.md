@@ -47,7 +47,7 @@ so they do not relicense this work — but their notices must be retained.
 | `@azure/core-tracing` | 1.4.0 | MIT |
 | `@azure/core-util` | 1.14.0 | MIT |
 | `@azure/core-xml` | 1.6.0 | MIT |
-| `@azure/identity` | 4.13.3 | MIT |
+| `@azure/identity` | 4.14.0 | MIT |
 | `@azure/keyvault-common` | 2.1.0 | MIT |
 | `@azure/keyvault-keys` | 4.10.2 | MIT |
 | `@azure/logger` | 1.4.0 | MIT |
@@ -121,7 +121,7 @@ so they do not relicense this work — but their notices must be retained.
 | `body-parser` | 2.4.0 | MIT |
 | `buffer` | 6.0.3 | MIT |
 | `buffer-equal-constant-time` | 1.0.1 | BSD-3-Clause |
-| `bundle-name` | 4.1.0 | MIT |
+| `bundle-name` | 4.1.1 | MIT |
 | `busboy` | 1.6.0 | MIT |
 | `bytes` | 3.1.2 | MIT |
 | `c12` | 3.1.0 | MIT |
@@ -140,7 +140,7 @@ so they do not relicense this work — but their notices must be retained.
 | `cookie-signature` | 1.2.2 | MIT |
 | `debug` | 4.4.3 | MIT |
 | `deepmerge-ts` | 7.1.5 | BSD-3-Clause |
-| `default-browser` | 5.5.0 | MIT |
+| `default-browser` | 5.5.1 | MIT |
 | `default-browser-id` | 5.0.1 | MIT |
 | `define-lazy-prop` | 3.0.0 | MIT |
 | `defu` | 6.1.7 | MIT |
@@ -189,6 +189,7 @@ so they do not relicense this work — but their notices must be retained.
 | `inherits` | 2.0.4 | ISC |
 | `ipaddr.js` | 1.9.1 | MIT |
 | `is-docker` | 3.0.0 | MIT |
+| `is-in-ssh` | 1.0.0 | MIT |
 | `is-inside-container` | 1.0.0 | MIT |
 | `is-promise` | 4.0.0 | MIT |
 | `is-unsafe` | 2.0.0 | MIT |
@@ -234,7 +235,7 @@ so they do not relicense this work — but their notices must be retained.
 | `ohash` | 2.0.11 | MIT |
 | `on-finished` | 2.4.1 | MIT |
 | `once` | 1.4.0 | ISC |
-| `open` | 10.2.0 | MIT |
+| `open` | 11.0.4 | MIT |
 | `openai` | 7.32.0 | Apache-2.0 |
 | `parseurl` | 1.3.3 | MIT |
 | `path-expression-matcher` | 1.6.2 | MIT |
@@ -243,6 +244,7 @@ so they do not relicense this work — but their notices must be retained.
 | `perfect-debounce` | 1.0.0 | MIT |
 | `pkg-types` | 2.3.1 | MIT |
 | `pngjs` | 6.0.0 | MIT |
+| `powershell-utils` | 0.2.1 | MIT |
 | `prisma` | 6.19.3 | Apache-2.0 |
 | `process` | 0.11.10 | MIT |
 | `proxy-addr` | 2.0.8 | MIT |
@@ -293,6 +295,6 @@ so they do not relicense this work — but their notices must be retained.
 | `vary` | 1.1.2 | MIT |
 | `wrappy` | 1.0.2 | ISC |
 | `ws` | 8.21.2 | MIT |
-| `wsl-utils` | 0.1.0 | MIT |
+| `wsl-utils` | 1.0.1 | MIT |
 | `xml-naming` | 0.3.0 | MIT |
 | `zod` | 4.6.6 | MIT |
