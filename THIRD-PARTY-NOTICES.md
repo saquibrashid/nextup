@@ -253,8 +253,8 @@ so they do not relicense this work — but their notices must be retained.
 | `rc9` | 2.1.2 | MIT |
 | `react` | 19.3.0 | MIT |
 | `react-dom` | 19.3.0 | MIT |
-| `react-router` | 7.18.4 | MIT |
-| `react-router-dom` | 7.18.4 | MIT |
+| `react-router` | 7.18.5 | MIT |
+| `react-router-dom` | 7.18.5 | MIT |
 | `readable-stream` | 4.7.0 | MIT |
 | `readdirp` | 4.1.2 | MIT |
 | `rfdc` | 1.4.1 | MIT |
@@ -266,7 +266,7 @@ so they do not relicense this work — but their notices must be retained.
 | `semver` | 7.8.5 | ISC |
 | `send` | 1.2.1 | MIT |
 | `serve-static` | 2.2.1 | MIT |
-| `set-cookie-parser` | 2.7.2 | MIT |
+| `set-cookie-parser` | 2.7.3 | MIT |
 | `setprototypeof` | 1.2.0 | ISC |
 | `sharp` | 0.35.5 | Apache-2.0 |
 | `side-channel` | 1.1.1 | MIT |
