@@ -91,7 +91,7 @@ so they do not relicense this work — but their notices must be retained.
 | `@img/sharp-win32-x64` | 0.35.5 | Apache-2.0 AND LGPL-3.0-or-later |
 | `@js-joda/core` | 5.7.0 | BSD-3-Clause |
 | `@noble/hashes` | 2.4.0 | MIT |
-| `@nodable/entities` | 3.0.0 | MIT |
+| `@nodable/entities` | 3.1.0 | MIT |
 | `@prisma/adapter-mssql` | 6.19.3 | Apache-2.0 |
 | `@prisma/client` | 6.19.3 | Apache-2.0 |
 | `@prisma/config` | 6.19.3 | Apache-2.0 |
@@ -164,8 +164,8 @@ so they do not relicense this work — but their notices must be retained.
 | `express` | 5.3.0 | MIT |
 | `exsolve` | 1.1.1 | MIT |
 | `fast-check` | 3.23.2 | MIT |
-| `fast-xml-builder` | 1.3.0 | MIT |
-| `fast-xml-parser` | 5.10.1 | MIT |
+| `fast-xml-builder` | 1.3.1 | MIT |
+| `fast-xml-parser` | 5.12.0 | MIT |
 | `finalhandler` | 2.1.1 | MIT |
 | `flatbuffers` | 25.9.23 | Apache-2.0 |
 | `forwarded` | 0.2.0 | MIT |
@@ -191,7 +191,7 @@ so they do not relicense this work — but their notices must be retained.
 | `is-docker` | 3.0.0 | MIT |
 | `is-inside-container` | 1.0.0 | MIT |
 | `is-promise` | 4.0.0 | MIT |
-| `is-unsafe` | 2.0.0 | MIT |
+| `is-unsafe` | 2.0.3 | MIT |
 | `is-wsl` | 3.1.1 | MIT |
 | `jiti` | 2.7.0 | MIT |
 | `jpeg-js` | 0.4.4 | BSD-3-Clause |
@@ -278,7 +278,7 @@ so they do not relicense this work — but their notices must be retained.
 | `statuses` | 2.0.2 | MIT |
 | `streamsearch` | 1.1.0 | MIT |
 | `string_decoder` | 1.3.0 | MIT |
-| `strnum` | 2.4.1 | MIT |
+| `strnum` | 2.5.1 | MIT |
 | `tarn` | 3.1.2 | MIT |
 | `tedious` | 18.6.2 | MIT |
 | `tinyexec` | 1.3.1 | MIT |
